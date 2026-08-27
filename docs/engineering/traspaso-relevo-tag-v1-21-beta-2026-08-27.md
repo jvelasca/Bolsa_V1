@@ -58,4 +58,4 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · Confirm = firma · `PAPE
 
 ## 5. Next (post-auditoría)
 
-Elegir **un** epic: OpportunityScore · Stress correlación · V1.18 B-read/backfill · Lab backtest≠policy. No mezclar con thaw/AUTO sin palabra explícita. UX: no añadir puertas L1 ni barras en Trading.
+Elegir **un** epic. Candidato de producto (consenso previo): **Hoy Cobertura Estudio** — [`traspaso-relevo-hoy-cobertura-estudio-propuesta-2026-08-27.md`](./traspaso-relevo-hoy-cobertura-estudio-propuesta-2026-08-27.md). Alternativas: OpportunityScore · Stress correlación · V1.18 B-read/backfill · Lab backtest≠policy. No mezclar con thaw/AUTO sin palabra explícita. UX: no añadir puertas L1 ni barras en Trading.

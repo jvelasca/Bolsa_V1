@@ -14,12 +14,14 @@
 
 - Opportunity ranking, scan diario y funnel de Hoy usan lista API `estudio`.
 - Instrumentos fuera de Estudio pueden aparecer como **Descubierto**; nunca como BUY diario.
-- Tríada de producto: **Descubrir** (Mercado) → **Supervisar** (Estudio) → **Operar** (Hoy).
+- Use-case Daily Ops: `DAILY_OPS_UNIVERSE = Estudio`. `instrument_ids` / settings / env son **filtro** (`Estudio ∩ ids`); nunca amplían el universo (V1.22 H1).
+- Tríada de producto: **Descubrir** (Mercado) → **Supervisar** (Estudio) → **Operar**.
+- **Enmienda V1.22:** Operar **vive en Mercado** (cockpit del instrumento). **Hoy es el inbox** del mismo flujo (atención + KPI de cobertura), no un segundo terminal. Estudio no es puerta L1.
 
 ### 1.2 Una OPERACIÓN visual
 
 - Proyección `OperationalPlanView` (no entidad nueva) alimentada por TradePlan/study o PositionState.
-- Mismo bloque en Hoy, ficha Journal, drawer de oportunidad y ruta de posición.
+- Mismo bloque en Hoy, ficha Journal, drawer de oportunidad y ruta de posición. Destino de producto (diseño V1.22, no recableado aún): también Mercado · Operativa.
 - `TradePlan.entry` sigue siendo un precio único (no inventar rangos).
 
 ### 1.3 Stop vigente único
@@ -27,6 +29,7 @@
 - Autoridad post-fill: `PositionState.currentStop`.
 - Plan inicial / propuesta / pending limit = trazas, no rivales.
 - T1 idempotente vía `target1AchievedAt` (ExitPlan no re-emite `TARGET_1`).
+- **V1.22 H2:** la proyección distingue T1/T2 **tocado** (precio) de **gestionado** (`target1AchievedAt` / reduce). Tocar el nivel ≠ reducción ejecutada. T2 no inventa sello.
 - Stop solo avanza (`applyCurrentStop` / never-worsen) salvo override auditado.
 - Ejecución de reduce/salida = SEMI (Confirm). El motor propone; el humano firma.
 
@@ -58,6 +61,6 @@ Confirm = firma · `PAPER_D_EXECUTE` off · AUTO off · Ranking ≠ BUY · LLM n
 
 ## 3. Consecuencias
 
-- Tests: `DAILY-OPS-UNIVERSE-001/002`, OP-03…08.
-- Enmienda ADR-040 §2 / §7.
-- Docs: `CURRENT_SYSTEM.md`, `domain-language.md`, relevo V1.21.
+- Tests: `DAILY-OPS-UNIVERSE-001/002`, OP-03…08 · H1 intersección Estudio · H2 touched vs managed.
+- Enmienda ADR-040 §2 / §7 / **§8 (V1.22)**.
+- Docs: `CURRENT_SYSTEM.md`, `domain-language.md`, relevo V1.21, relevo [V1.22 freeze](../engineering/traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md).

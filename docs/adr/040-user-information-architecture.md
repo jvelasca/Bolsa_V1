@@ -46,13 +46,13 @@ Nombres internos **no** aparecen en la navegación diaria: Decision Spine, Decis
 
 ## 3. Contrato UX (DoD)
 
-| ID    | Pregunta del usuario                    | Respuesta de producto                             |
-| ----- | --------------------------------------- | ------------------------------------------------- |
-| UX-01 | ¿Qué tengo que hacer hoy?               | **Hoy**                                           |
-| UX-02 | ¿Qué acciones son mejores para comprar? | **Hoy → Oportunidades**                           |
-| UX-03 | ¿Quiero estudiar una acción?            | **Mercado** o **Asesor**                          |
-| UX-04 | ¿Quiero modificar una orden?            | **Cartera → Órdenes** (o contexto de oportunidad) |
-| UX-05 | ¿Algo ha fallado en la operativa?       | **Hoy → estado operativo → Detalles**             |
+| ID    | Pregunta del usuario                    | Respuesta de producto                                                                      |
+| ----- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| UX-01 | ¿Qué tengo que hacer hoy?               | **Hoy** (inbox: atención + KPI cobertura; no reanaliza el mercado)                         |
+| UX-02 | ¿Qué acciones son mejores para comprar? | **Hoy → Oportunidades** (ranking ≠ BUY; universo = Estudio)                                |
+| UX-03 | ¿Quiero estudiar / operar un valor?     | **Mercado** (contexto estable: lista → gráfico → plan → acción). Asesor explica el porqué. |
+| UX-04 | ¿Quiero modificar una orden?            | **Cartera → Órdenes** (o contexto de oportunidad)                                          |
+| UX-05 | ¿Algo ha fallado en la operativa?       | **Hoy → estado operativo → Detalles**                                                      |
 
 Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para responder, la IA UX no está cerrada.
 
@@ -85,3 +85,13 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 - ⚙ abre solo preferencias / configuración de plataforma.
 - Cuenta activa visible en el header como **contexto** (selector compacto), no como página de administración.
 - Ver [ADR-041](./041-operational-coherence.md).
+
+## 8. Enmienda V1.22 — Mercado opera; Hoy resume
+
+**Fecha:** 2026-08-27
+
+- Las cinco puertas L1 **siguen**; el **peso operacional no es igual**.
+- **Mercado** = workspace operativo (cockpit del instrumento seleccionado).
+- **Hoy** = command center del día: Actuar / Priorizar / Cobertura (KPI). No dump de membresía Estudio (~180).
+- **Asesor** explica; no es una Mesa. **Cartera** gestiona lo ya comprado. **Laboratorio** prueba estrategias.
+- Ver [ADR-041](./041-operational-coherence.md) §1.1 enmienda · [relevo V1.22](../engineering/traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md).

@@ -26,7 +26,9 @@ CI release tag: [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/330954
 
 **Deuda explícita a validar como aparcada (no implementar):** OpportunityScore · correlación/VaR · thaw · AUTO.
 
-**No pedir:** OpportunityScore, VaR, thaw, AUTO, nuevas puertas L1, barras en Trading, auto-exit, promocionar thin trail a autoridad.
+**Propuesta post-v1.21 (consenso, no código):** [`traspaso-relevo-hoy-cobertura-estudio-propuesta-2026-08-27.md`](./traspaso-relevo-hoy-cobertura-estudio-propuesta-2026-08-27.md) — Hoy Command Center + Cobertura Estudio; tríada Actuar / Priorizar / Supervisar cobertura.
+
+**No pedir:** OpportunityScore, VaR, thaw, AUTO, nuevas puertas L1, barras en Trading, auto-exit, promocionar thin trail a autoridad, listar 180 en Resumen/Journal.
 
 ---
 
