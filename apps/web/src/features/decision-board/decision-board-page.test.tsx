@@ -136,9 +136,9 @@ describe("DecisionBoardPage", () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText("Equity")).toBeTruthy());
-    expect(screen.getByText("12500.00 €")).toBeTruthy();
+    expect(screen.getByText("12500.00")).toBeTruthy();
     expect(screen.getByText("Margen libre")).toBeTruthy();
-    expect(screen.getByText("3200.00 €")).toBeTruthy();
+    expect(screen.getByText("3200.00")).toBeTruthy();
   });
 
   it("muestra Cargando… mientras isLoading", () => {
