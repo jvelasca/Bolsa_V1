@@ -36,7 +36,7 @@ describe("resolveF3PlanBaseline", () => {
         suggestedPrice: 101,
         lastClose: 99,
       }),
-    ).toEqual({ qty: 10, price: 101 });
+    ).toEqual({ qty: 10, price: 101, stop: 95 });
   });
 
   it("returns null qty without TRIGGERED quantity", () => {
@@ -44,12 +44,12 @@ describe("resolveF3PlanBaseline", () => {
       resolveF3PlanBaseline({
         tradePlan: triggeredPlan({ status: "WATCH", quantity: 10 }),
       }),
-    ).toEqual({ qty: null, price: 100 });
+    ).toEqual({ qty: null, price: 100, stop: 95 });
   });
 });
 
 describe("f3TicketInputsStale", () => {
-  const baseline = { qty: 10, price: 100 };
+  const baseline = { qty: 10, price: 100, stop: 95 };
 
   it("false when inputs match baseline", () => {
     expect(
@@ -76,6 +76,17 @@ describe("f3TicketInputsStale", () => {
       f3TicketInputsStale({
         quantity: "10",
         priceField: "110",
+        baseline,
+      }),
+    ).toBe(true);
+  });
+
+  it("true when stop differs", () => {
+    expect(
+      f3TicketInputsStale({
+        quantity: "10",
+        priceField: "100",
+        stopField: "90",
         baseline,
       }),
     ).toBe(true);

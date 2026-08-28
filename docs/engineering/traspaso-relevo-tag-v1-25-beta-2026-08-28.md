@@ -2,7 +2,7 @@
 
 > **Padre:** [`traspaso-relevo-v1-25-operational-safety-2026-08-28.md`](./traspaso-relevo-v1-25-operational-safety-2026-08-28.md) · [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
 > **Estado:** **PUBLICACIÓN** — tag `v1.25-beta` → tip `f8e53f57`. **Release tag CI:** pin URL tras Actions GREEN.
-> **Arranque chat nuevo:** este relevo + contrato V1.25 + freeze SEMI.
+> **Arranque chat nuevo:** este relevo + contrato V1.25 + freeze SEMI · auditor externo: [`arranque-auditor-v1-25-beta-2026-08-28.md`](./arranque-auditor-v1-25-beta-2026-08-28.md).
 
 ---
 
@@ -22,7 +22,8 @@
 | Previo    | `v1.24-beta` → `c75b26a6` (tip docs `0d19e3aa`)                                                                      |
 | Relevo    | [`traspaso-relevo-v1-25-operational-safety-2026-08-28.md`](./traspaso-relevo-v1-25-operational-safety-2026-08-28.md) |
 | Contrato  | [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md)                         |
-| Daily ops | `pnpm test:daily-ops:offline` _(ejecutar pre-push)_                                                                  |
+| Daily ops | `pnpm test:daily-ops:offline` PASS (6/6; spine 497 en fase 5)                                                        |
+| Auditor   | [`arranque-auditor-v1-25-beta-2026-08-28.md`](./arranque-auditor-v1-25-beta-2026-08-28.md)                           |
 | Spine     | subset daily-ops **497**                                                                                             |
 | ADR       | [ADR-040 §10](../adr/040-user-information-architecture.md) · Operative Flow                                          |
 
