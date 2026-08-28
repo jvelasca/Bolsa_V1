@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
+from bolsa_analytics.cognitive.exit_policy import ExitPolicy, suggestion_from_exit_policy
 from bolsa_analytics.cognitive.position_state import PositionState
 
 ExitReason = Literal[
@@ -61,10 +62,6 @@ def _finite_positive(value: object) -> float | None:
     if number != number or number <= 0:
         return None
     return number
-
-
-def _round4(value: float) -> float:
-    return round(value * 10000) / 10000
 
 
 def _now_iso(at: str | None = None) -> str:
@@ -158,8 +155,10 @@ def _collect_reasons(
             and _target_touched(position.direction, mark_price, position.target1)
         ):
             fired.add("TARGET_1")
-        if position.target2 is not None and _target_touched(
-            position.direction, mark_price, position.target2
+        if (
+            position.target2 is not None
+            and not position.target2_achieved_at
+            and _target_touched(position.direction, mark_price, position.target2)
         ):
             fired.add("TARGET_2")
         # H2: T2 no interpreta T1 a ciegas (no reduce mitad por atajo T1).
@@ -195,15 +194,12 @@ def _derive_suggestion(
     primary: ExitReason | None,
     remaining: float,
     trail_stop: float | None,
+    exit_policy: object | None = None,
 ) -> tuple[ExitSuggestedAction, float | None, float | None]:
     if status in ("DONE", "IDLE") or primary is None:
         return "hold", None, None
-    if primary == "TARGET_1":
-        return "reduce", _round4(remaining / 2), None
-    if primary == "TRAIL":
-        stop = _round4(trail_stop) if trail_stop is not None else None
-        return "protect", None, stop
-    return "full_exit", _round4(remaining), None
+    policy = exit_policy if isinstance(exit_policy, ExitPolicy) else None
+    return suggestion_from_exit_policy(primary, remaining, policy, trail_stop)
 
 
 def build_exit_plan_from_position(
@@ -219,6 +215,7 @@ def build_exit_plan_from_position(
     trail_stop: float | None = None,
     exit_plan_id: str | None = None,
     at: str | None = None,
+    exit_policy: ExitPolicy | None = None,
 ) -> ExitPlan | None:
     """Factory F3: PositionState + señales → ExitPlan. No muta PositionState."""
     if position is None:
@@ -242,7 +239,7 @@ def build_exit_plan_from_position(
     primary: ExitReason | None = reasons[0] if reasons else None
     status = _derive_status(position, primary, trail_s)
     action, qty, stop = _derive_suggestion(
-        status, primary, position.remaining_quantity, trail_s
+        status, primary, position.remaining_quantity, trail_s, exit_policy
     )
     stamp = _now_iso(at)
     epid = (

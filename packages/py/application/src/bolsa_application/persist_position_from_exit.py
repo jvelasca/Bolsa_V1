@@ -42,6 +42,8 @@ class PersistPositionFromExitInput:
     filled_at: str | None = None
     """V1.21 — si la salida es reduce por T1, marca idempotencia."""
     mark_target1_achieved: bool = False
+    """V1.27 — sello T2 gestionado."""
+    mark_target2_achieved: bool = False
 
 
 def last_exit_transaction_id(row: Any) -> str | None:
@@ -108,6 +110,7 @@ class PersistPositionFromExit:
             at=inp.filled_at,
             origin="reduce",
             mark_target1_achieved=inp.mark_target1_achieved,
+            mark_target2_achieved=inp.mark_target2_achieved,
         )
         if updated is None:
             return None

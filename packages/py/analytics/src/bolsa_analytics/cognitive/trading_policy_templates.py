@@ -14,6 +14,11 @@ from bolsa_analytics.cognitive.trading_policy import (
     TradingPolicy,
     UniverseConstraints,
 )
+from bolsa_analytics.cognitive.exit_policy import (
+    AGGRESSIVE_SWING_EXIT_POLICY,
+    CONSERVATIVE_EXIT_POLICY,
+    MODERATE_EXIT_POLICY,
+)
 
 _NOW = "2026-07-22T00:00:00.000Z"
 
@@ -83,6 +88,7 @@ CONSERVATIVE_POLICY = TradingPolicy(
         minimum_dsr=0.7,
         require_edge_report_for_auto_live=True,
     ),
+    exit_policy=CONSERVATIVE_EXIT_POLICY,
     updated_at=_NOW,
     created_at=_NOW,
 )
@@ -151,6 +157,7 @@ MODERATE_POLICY = TradingPolicy(
         minimum_dsr=0.55,
         require_edge_report_for_auto_live=True,
     ),
+    exit_policy=MODERATE_EXIT_POLICY,
     updated_at=_NOW,
     created_at=_NOW,
 )
@@ -218,6 +225,7 @@ AGGRESSIVE_SWING_POLICY = TradingPolicy(
         minimum_dsr=0.45,
         require_edge_report_for_auto_live=True,
     ),
+    exit_policy=AGGRESSIVE_SWING_EXIT_POLICY,
     updated_at=_NOW,
     created_at=_NOW,
 )

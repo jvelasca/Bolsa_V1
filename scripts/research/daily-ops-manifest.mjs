@@ -146,6 +146,9 @@ export const pyDecisionSpineTests = [
   'packages/py/application/tests/test_persist_position_from_protect.py',
   'packages/py/application/tests/test_semi_triggered_confirm_protect.py',
   'packages/py/application/tests/test_v126_semi_position_birth.py',
+  'packages/py/application/tests/test_v127_golden_path.py',
+  'packages/py/application/tests/test_v127_golden_path_fail.py',
+  'packages/py/application/tests/test_backtest_risk_policy_wiring.py',
   'packages/py/application/tests/test_reconcile_portfolio_integrity.py',
   'packages/py/application/tests/test_reconcile_live_ledger.py',
   'packages/py/application/tests/test_reconciliation_opening_gate.py',
@@ -179,6 +182,7 @@ export const pyDecisionSpineTests = [
   'packages/py/analytics/tests/test_exit_permission.py',
   'packages/py/analytics/tests/test_risk_signature.py',
   'packages/py/analytics/tests/test_operational_levels.py',
+  'packages/py/analytics/tests/test_position_decision.py',
 ];
 
 /** @type {string[]} Python — DÍA D + CORE-R evidence + daily ops report (H1 offline) */

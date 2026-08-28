@@ -3,7 +3,13 @@
 from dataclasses import dataclass
 from typing import Any
 
-from bolsa_analytics.backtest import BacktestBarInput, BacktestCostModel, run_backtest
+from bolsa_analytics.backtest import (
+    BacktestBarInput,
+    BacktestCostModel,
+    BacktestRiskPolicy,
+    run_backtest,
+)
+from bolsa_analytics.cognitive.trading_policy_templates import MODERATE_POLICY
 from bolsa_analytics.cost_model_v2 import cost_v2_from_fixed
 from bolsa_analytics.research import BarFingerprint, build_run_manifest, compute_data_version
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
@@ -23,6 +29,13 @@ from bolsa_domain.repositories.strategy_definition_repository import StrategyDef
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.ids import new_id
+
+
+def backtest_risk_policy_from_trading_policy(policy: Any | None = None) -> BacktestRiskPolicy:
+    """P1 Lab — misma maxRiskPerTradePct que el perfil (default Moderado)."""
+    src = policy if policy is not None else MODERATE_POLICY
+    pct = float(src.risk.max_risk_per_trade_pct)
+    return BacktestRiskPolicy(max_risk_per_trade_pct=pct, stop_loss_pct=5.0)
 
 
 class ListBacktestRuns:
@@ -202,6 +215,7 @@ class RunAndSaveBacktest:
             costs=costs,
             cost_v2=cost_v2 if cost_v2.enabled else None,
             strategy_definition=saved_strategy.definition if saved_strategy else None,
+            risk_policy=backtest_risk_policy_from_trading_policy(),
         )
 
         run_id = new_id()

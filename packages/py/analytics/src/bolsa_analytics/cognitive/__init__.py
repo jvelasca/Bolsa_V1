@@ -90,6 +90,20 @@ from bolsa_analytics.cognitive.exit_plan import (
     ExitPlan,
     build_exit_plan_from_position,
 )
+from bolsa_analytics.cognitive.exit_policy import (
+    AGGRESSIVE_SWING_EXIT_POLICY,
+    CONSERVATIVE_EXIT_POLICY,
+    MODERATE_EXIT_POLICY,
+    ExitPolicy,
+    resolve_exit_policy,
+    suggestion_from_exit_policy,
+)
+from bolsa_analytics.cognitive.position_decision import (
+    POSITION_DECISION_KEY,
+    PositionDecision,
+    build_position_decision,
+    map_recon_status_to_health,
+)
 from bolsa_analytics.cognitive.exit_radar import (
     EXIT_RADAR_KEY,
     build_exit_radar_dict,
@@ -321,6 +335,12 @@ __all__ = [
     "POSITION_REVISIONS_KEY",
     "ExitPlan",
     "EXIT_PLAN_KEY",
+    "ExitPolicy",
+    "CONSERVATIVE_EXIT_POLICY",
+    "MODERATE_EXIT_POLICY",
+    "AGGRESSIVE_SWING_EXIT_POLICY",
+    "PositionDecision",
+    "POSITION_DECISION_KEY",
     "ExecutionPlan",
     "EXECUTION_PLAN_KEY",
     "ExecutionRecord",
@@ -380,6 +400,10 @@ __all__ = [
     "apply_signed_levels_to_trade_plan",
     "validate_operational_levels",
     "build_exit_plan_from_position",
+    "resolve_exit_policy",
+    "suggestion_from_exit_policy",
+    "build_position_decision",
+    "map_recon_status_to_health",
     "build_execution_plan_from_exit_plan",
     "build_execution_record",
     "execution_outcome_copy",

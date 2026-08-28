@@ -144,6 +144,7 @@ class PositionState:
     created_at: str
     updated_at: str
     target1_achieved_at: str | None = None
+    target2_achieved_at: str | None = None
     revisions: tuple[PositionRevision, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
@@ -160,6 +161,7 @@ class PositionState:
             "target1": self.target1,
             "target2": self.target2,
             "target1AchievedAt": self.target1_achieved_at,
+            "target2AchievedAt": self.target2_achieved_at,
             "quantity": self.quantity,
             "remainingQuantity": self.remaining_quantity,
             "initialRisk": self.initial_risk,
@@ -251,6 +253,12 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
             raw.get("target1AchievedAt").strip()
             if isinstance(raw.get("target1AchievedAt"), str)
             and str(raw.get("target1AchievedAt")).strip()
+            else None
+        ),
+        target2_achieved_at=(
+            raw.get("target2AchievedAt").strip()
+            if isinstance(raw.get("target2AchievedAt"), str)
+            and str(raw.get("target2AchievedAt")).strip()
             else None
         ),
         revisions=revisions_from_raw(raw.get("revisions")),
@@ -421,11 +429,13 @@ def apply_position_reduce(
     origin: PositionRevisionOrigin = "reduce",
     reason: str | None = None,
     mark_target1_achieved: bool = False,
+    mark_target2_achieved: bool = False,
 ) -> PositionState | None:
     """F2.1 reduce → remaining / realized_r / PARTIAL|CLOSED.
 
     OI-5: append revisión si status cambia.
-    V1.21: ``mark_target1_achieved`` fija ``target1_achieved_at`` (idempotencia T1).
+    V1.21: ``mark_target1_achieved`` fija ``target1_achieved_at``.
+    V1.27: ``mark_target2_achieved`` fija ``target2_achieved_at``.
     """
     if position is None or position.status == "CLOSED":
         return None
@@ -455,6 +465,11 @@ def apply_position_reduce(
         if mark_target1_achieved
         else position.target1_achieved_at
     )
+    t2_at = (
+        position.target2_achieved_at or updated
+        if mark_target2_achieved
+        else position.target2_achieved_at
+    )
     if remaining <= 0:
         next_pos = replace(
             position,
@@ -463,6 +478,7 @@ def apply_position_reduce(
             status="CLOSED",
             exit_status="done",
             target1_achieved_at=t1_at,
+            target2_achieved_at=t2_at,
             updated_at=updated,
         )
         return _with_revision_if_changed(
@@ -478,6 +494,7 @@ def apply_position_reduce(
         remaining_quantity=remaining,
         realized_r=realized,
         target1_achieved_at=t1_at,
+        target2_achieved_at=t2_at,
         updated_at=updated,
     )
     next_pos = replace(mid, status=derive_position_status(mid))

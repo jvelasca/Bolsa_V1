@@ -39,12 +39,12 @@ PositionState + mark
 
 ## Tras POM (V1.28+ / Lab / Frentes A·B)
 
-| Tema                                          | Cuándo                                                    | Fuera                           |
-| --------------------------------------------- | --------------------------------------------------------- | ------------------------------- |
-| V1.28 cockpit + toasts DISPARADA/T1 (B-α, G2) | POM verde                                                 | Drag, nav L1 nueva              |
-| Lab `risk_policy` desde `backtests.py`        | P1 fechado: mismo epic POM o chat siguiente si no bloquea | All-in silencioso               |
-| Frente B drag B-γ                             | N4 + §8 ACUERDO + POM congelado                           | B-δ, trail autoridad, OCO       |
-| Frente A AUTO A-β                             | V1.33; EdgeReport exigido                                 | A-γ, thaw estricto, broker live |
+| Tema                                          | Cuándo                                | Fuera                           |
+| --------------------------------------------- | ------------------------------------- | ------------------------------- |
+| V1.28 cockpit + toasts DISPARADA/T1 (B-α, G2) | POM verde                             | Drag, nav L1 nueva              |
+| Lab `risk_policy` desde `backtests.py`        | **Hecho en V1.27** (default Moderado) | —                               |
+| Frente B drag B-γ                             | N4 + §8 ACUERDO + POM congelado       | B-δ, trail autoridad, OCO       |
+| Frente A AUTO A-β                             | V1.33; EdgeReport exigido             | A-γ, thaw estricto, broker live |
 
 ## Lean de acuerdo (owner)
 

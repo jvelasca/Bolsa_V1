@@ -2,32 +2,37 @@
  * Plantillas base ART-TRADING-POLICY (RFC-008 D1).
  */
 
-import type { TradingPolicyV1 } from './trading-policy.js';
+import type { TradingPolicyV1 } from "./trading-policy.js";
+import {
+  AGGRESSIVE_SWING_EXIT_POLICY,
+  CONSERVATIVE_EXIT_POLICY,
+  MODERATE_EXIT_POLICY,
+} from "./exit-policy.js";
 
-const now = '2026-07-22T00:00:00.000Z';
+const now = "2026-07-22T00:00:00.000Z";
 
 function baseMeta(
-  templateId: TradingPolicyV1['templateId'],
+  templateId: TradingPolicyV1["templateId"],
   name: string,
   description: string,
 ): Pick<
   TradingPolicyV1,
-  | 'artifactType'
-  | 'schemaVersion'
-  | 'policyId'
-  | 'version'
-  | 'templateId'
-  | 'name'
-  | 'description'
-  | 'updatedAt'
-  | 'createdAt'
-  | 'weightRuleSetId'
+  | "artifactType"
+  | "schemaVersion"
+  | "policyId"
+  | "version"
+  | "templateId"
+  | "name"
+  | "description"
+  | "updatedAt"
+  | "createdAt"
+  | "weightRuleSetId"
 > {
   return {
-    artifactType: 'ART-TRADING-POLICY',
-    schemaVersion: '1.0.0',
+    artifactType: "ART-TRADING-POLICY",
+    schemaVersion: "1.0.0",
     policyId: `POL-${templateId.toUpperCase()}-V1`,
-    version: '1.0.0',
+    version: "1.0.0",
     templateId,
     name,
     description,
@@ -39,19 +44,19 @@ function baseMeta(
 
 export const CONSERVATIVE_TRADING_POLICY: TradingPolicyV1 = {
   ...baseMeta(
-    'conservative',
-    'Conservador',
-    'Preservación de capital: large-cap líquidas, sin apalancamiento, blackouts estrictos.',
+    "conservative",
+    "Conservador",
+    "Preservación de capital: large-cap líquidas, sin apalancamiento, blackouts estrictos.",
   ),
   universe: {
-    allowedAssetClasses: ['equities'],
-    allowedUniverses: ['sp500', 'nasdaq100'],
+    allowedAssetClasses: ["equities"],
+    allowedUniverses: ["sp500", "nasdaq100"],
     minMarketCapUSD: 10_000_000_000,
     minAverageDailyVolumeUSD: 20_000_000,
     maxSpreadBps: 15,
     minAtrPct: 0.3,
     maxAtrPct: 4,
-    excludedSectors: ['biotech'],
+    excludedSectors: ["biotech"],
     excludedTickers: [],
     allowShorting: false,
     allowOtc: false,
@@ -80,20 +85,20 @@ export const CONSERVATIVE_TRADING_POLICY: TradingPolicyV1 = {
     blockFedFomc: true,
     blockEcb: true,
     blockHighImpactMacro: true,
-    blockedMacroEventTypes: ['CPI', 'PCE', 'NFP', 'PMI', 'FOMC', 'ECB'],
+    blockedMacroEventTypes: ["CPI", "PCE", "NFP", "PMI", "FOMC", "ECB"],
     blockMnaRumors: true,
     blockDividendsHours: 24,
     blockSplitsHours: 48,
-    allowedTradingHoursUTC: { start: '13:30', end: '20:00' },
+    allowedTradingHoursUTC: { start: "13:30", end: "20:00" },
   },
   horizon: {
-    primaryTimeframe: 'D1',
+    primaryTimeframe: "D1",
     minHoldingPeriodMinutes: 60 * 24,
     maxHoldingPeriodDays: 90,
   },
   execution: {
-    allowedOrderTypes: ['limit', 'stop', 'stop_limit'],
-    defaultOrderType: 'limit',
+    allowedOrderTypes: ["limit", "stop", "stop_limit"],
+    defaultOrderType: "limit",
   },
   evidence: {
     minimumRequiredCredibility: 80,
@@ -102,17 +107,18 @@ export const CONSERVATIVE_TRADING_POLICY: TradingPolicyV1 = {
     minimumDsr: 0.7,
     requireEdgeReportForAutoLive: true,
   },
+  exit: CONSERVATIVE_EXIT_POLICY,
 };
 
 export const MODERATE_TRADING_POLICY: TradingPolicyV1 = {
   ...baseMeta(
-    'moderate',
-    'Moderado',
-    'Equilibrio crecimiento/riesgo: mid+large cap, R:R 2:1, blackouts estándar.',
+    "moderate",
+    "Moderado",
+    "Equilibrio crecimiento/riesgo: mid+large cap, R:R 2:1, blackouts estándar.",
   ),
   universe: {
-    allowedAssetClasses: ['equities'],
-    allowedUniverses: ['sp500', 'nasdaq100', 'russell1000'],
+    allowedAssetClasses: ["equities"],
+    allowedUniverses: ["sp500", "nasdaq100", "russell1000"],
     minMarketCapUSD: 2_000_000_000,
     minAverageDailyVolumeUSD: 5_000_000,
     maxSpreadBps: 25,
@@ -147,19 +153,19 @@ export const MODERATE_TRADING_POLICY: TradingPolicyV1 = {
     blockFedFomc: true,
     blockEcb: true,
     blockHighImpactMacro: true,
-    blockedMacroEventTypes: ['CPI', 'NFP', 'FOMC'],
+    blockedMacroEventTypes: ["CPI", "NFP", "FOMC"],
     blockMnaRumors: true,
     blockDividendsHours: 12,
     blockSplitsHours: 24,
   },
   horizon: {
-    primaryTimeframe: 'D1',
+    primaryTimeframe: "D1",
     minHoldingPeriodMinutes: 60 * 4,
     maxHoldingPeriodDays: 45,
   },
   execution: {
-    allowedOrderTypes: ['market', 'limit', 'stop', 'stop_limit'],
-    defaultOrderType: 'limit',
+    allowedOrderTypes: ["market", "limit", "stop", "stop_limit"],
+    defaultOrderType: "limit",
   },
   evidence: {
     minimumRequiredCredibility: 70,
@@ -168,17 +174,18 @@ export const MODERATE_TRADING_POLICY: TradingPolicyV1 = {
     minimumDsr: 0.55,
     requireEdgeReportForAutoLive: true,
   },
+  exit: MODERATE_EXIT_POLICY,
 };
 
 export const AGGRESSIVE_SWING_TRADING_POLICY: TradingPolicyV1 = {
   ...baseMeta(
-    'aggressive_swing',
-    'Swing agresivo',
-    'Mayor riesgo por trade y universo más amplio; sigue exigiendo stop y Edge para auto-live.',
+    "aggressive_swing",
+    "Swing agresivo",
+    "Mayor riesgo por trade y universo más amplio; sigue exigiendo stop y Edge para auto-live.",
   ),
   universe: {
-    allowedAssetClasses: ['equities'],
-    allowedUniverses: ['nasdaq100', 'russell2000', 'sp500'],
+    allowedAssetClasses: ["equities"],
+    allowedUniverses: ["nasdaq100", "russell2000", "sp500"],
     minMarketCapUSD: 500_000_000,
     minAverageDailyVolumeUSD: 2_000_000,
     maxSpreadBps: 40,
@@ -213,18 +220,18 @@ export const AGGRESSIVE_SWING_TRADING_POLICY: TradingPolicyV1 = {
     blockFedFomc: true,
     blockEcb: false,
     blockHighImpactMacro: true,
-    blockedMacroEventTypes: ['CPI', 'FOMC', 'NFP'],
+    blockedMacroEventTypes: ["CPI", "FOMC", "NFP"],
     blockMnaRumors: false,
     blockSplitsHours: 12,
   },
   horizon: {
-    primaryTimeframe: 'H4',
+    primaryTimeframe: "H4",
     minHoldingPeriodMinutes: 60,
     maxHoldingPeriodDays: 21,
   },
   execution: {
-    allowedOrderTypes: ['market', 'limit', 'stop', 'stop_limit', 'vwap'],
-    defaultOrderType: 'market',
+    allowedOrderTypes: ["market", "limit", "stop", "stop_limit", "vwap"],
+    defaultOrderType: "market",
   },
   evidence: {
     minimumRequiredCredibility: 65,
@@ -233,10 +240,11 @@ export const AGGRESSIVE_SWING_TRADING_POLICY: TradingPolicyV1 = {
     minimumDsr: 0.45,
     requireEdgeReportForAutoLive: true,
   },
+  exit: AGGRESSIVE_SWING_EXIT_POLICY,
 };
 
 export const TRADING_POLICY_TEMPLATES: Record<
-  'conservative' | 'moderate' | 'aggressive_swing',
+  "conservative" | "moderate" | "aggressive_swing",
   TradingPolicyV1
 > = {
   conservative: CONSERVATIVE_TRADING_POLICY,
@@ -245,7 +253,7 @@ export const TRADING_POLICY_TEMPLATES: Record<
 };
 
 export function getTradingPolicyTemplate(
-  id: 'conservative' | 'moderate' | 'aggressive_swing',
+  id: "conservative" | "moderate" | "aggressive_swing",
 ): TradingPolicyV1 {
   return structuredClone(TRADING_POLICY_TEMPLATES[id]);
 }

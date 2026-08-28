@@ -11,12 +11,17 @@
 import { useState } from "react";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 import type { InstrumentDailyOpinionV1 } from "@bolsa/shared";
+import { mapReconStatusToHealth, RECON_HEALTH_COPY } from "@bolsa/shared";
 import {
   formatConfirmDrawerCtaLabel,
   openConfirmDrawer,
 } from "@/features/confirm/confirm-drawer";
 import { useTradingLayoutStore } from "@/stores/trading-layout-store";
 import { cn } from "@/lib/utils";
+import {
+  useOpsSelfEval,
+  portfolioReconStatusFromReport,
+} from "@/features/operational-console/use-ops-self-eval";
 import {
   MERCADO_COCKPIT_PHASE_LABEL,
   mercadoCockpitNoLevelsCopy,
@@ -79,6 +84,10 @@ export function OperativaCockpitCard({
   const { phase, plan, study, position } = context;
   const primaryLabel = mercadoCockpitPrimaryCta(phase);
   const noLevelsCopy = mercadoCockpitNoLevelsCopy(phase);
+  const opsEval = useOpsSelfEval(context.accountId);
+  const reconStatus = portfolioReconStatusFromReport(opsEval.data);
+  const reconHealth =
+    reconStatus == null ? null : mapReconStatusToHealth(reconStatus);
 
   if (!instrumentId) {
     return (
@@ -115,12 +124,30 @@ export function OperativaCockpitCard({
             {opinion?.asOfBarDate ? ` · as-of ${opinion.asOfBarDate}` : null}
           </p>
         </div>
-        <span
-          className="rounded border border-border/70 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-          data-testid="operativa-cockpit-phase"
-        >
-          {MERCADO_COCKPIT_PHASE_LABEL[phase]}
-        </span>
+        <div className="flex shrink-0 flex-wrap items-center gap-1">
+          {reconHealth ? (
+            <span
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide",
+                reconHealth === "CRITICAL"
+                  ? "border-rose-600/50 bg-rose-500/10"
+                  : reconHealth === "ATTENTION"
+                    ? "border-amber-600/45 bg-amber-500/10"
+                    : "border-emerald-600/40 bg-emerald-500/10",
+              )}
+              data-testid="operativa-cockpit-recon"
+              data-recon={reconHealth}
+            >
+              {RECON_HEALTH_COPY[reconHealth]}
+            </span>
+          ) : null}
+          <span
+            className="rounded border border-border/70 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            data-testid="operativa-cockpit-phase"
+          >
+            {MERCADO_COCKPIT_PHASE_LABEL[phase]}
+          </span>
+        </div>
       </div>
 
       {context.loading ? (

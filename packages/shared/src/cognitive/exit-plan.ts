@@ -5,6 +5,7 @@
  */
 
 import { createRandomId } from "../create-id.js";
+import { suggestionFromExitPolicy, type ExitPolicyV1 } from "./exit-policy.js";
 import type { PositionStateV1 } from "./position-state.js";
 import type { TradePlanDirectionV1 } from "./trade-plan.js";
 
@@ -50,6 +51,8 @@ export type ExitPlanSignalsV1 = {
   trailStop?: number | null;
   exitPlanId?: string | null;
   at?: string | null;
+  /** V1.27 — si ausente, T1 = mitad (legado F3). */
+  exitPolicy?: ExitPolicyV1 | null;
 };
 
 export const EXIT_PLAN_KEY = "exitPlan";
@@ -77,10 +80,6 @@ const HARD_TRIGGER: ReadonlySet<ExitReasonV1> = new Set([
 
 function finite(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n);
-}
-
-function round4(n: number): number {
-  return Math.round(n * 10000) / 10000;
 }
 
 function nowIso(at?: string | null): string {
@@ -137,6 +136,7 @@ function collectReasons(
     }
     if (
       finite(position.target2) &&
+      !position.target2AchievedAt &&
       targetTouched(position.direction, mark, position.target2)
     ) {
       fired.add("TARGET_2");
@@ -188,29 +188,12 @@ function deriveSuggestion(
   if (status === "DONE" || status === "IDLE" || !primary) {
     return { suggestedAction: "hold", suggestedQty: null, suggestedStop: null };
   }
-  if (primary === "TARGET_1") {
-    return {
-      suggestedAction: "reduce",
-      suggestedQty: round4(remaining / 2),
-      suggestedStop: null,
-    };
-  }
-  if (primary === "TRAIL") {
-    const stop =
-      finite(signals.trailStop) && signals.trailStop > 0
-        ? round4(signals.trailStop)
-        : null;
-    return {
-      suggestedAction: "protect",
-      suggestedQty: null,
-      suggestedStop: stop,
-    };
-  }
-  return {
-    suggestedAction: "full_exit",
-    suggestedQty: round4(remaining),
-    suggestedStop: null,
-  };
+  return suggestionFromExitPolicy(
+    primary,
+    remaining,
+    signals.exitPolicy,
+    signals.trailStop,
+  );
 }
 
 /**

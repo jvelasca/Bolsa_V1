@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from bolsa_analytics.cognitive.exit_policy import ExitPolicy
+
 AssetClass = Literal["equities", "fx", "crypto", "commodities", "rates", "options"]
 PolicyTemplateId = Literal["conservative", "moderate", "aggressive_swing", "custom"]
 PrimaryTimeframe = Literal["M5", "M15", "H1", "H4", "D1", "W1"]
@@ -105,6 +107,7 @@ class TradingPolicy:
     schema_version: str = "1.0.0"
     description: str | None = None
     weight_rule_set_id: str | None = None
+    exit_policy: ExitPolicy | None = None
 
     def to_dict(self) -> dict[str, Any]:
         u = self.universe
@@ -182,6 +185,7 @@ class TradingPolicy:
                 "requireEdgeReportForAutoLive": self.evidence.require_edge_report_for_auto_live,
             },
             "weightRuleSetId": self.weight_rule_set_id,
+            "exit": None if self.exit_policy is None else self.exit_policy.to_dict(),
             "updatedAt": self.updated_at,
             "createdAt": self.created_at,
         }

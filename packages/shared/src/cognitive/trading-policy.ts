@@ -3,30 +3,32 @@
  * Policy Gate es el único permiso de apertura automática.
  */
 
+import type { ExitPolicyV1 } from "./exit-policy.js";
+
 export type AssetClass =
-  | 'equities'
-  | 'fx'
-  | 'crypto'
-  | 'commodities'
-  | 'rates'
-  | 'options';
+  | "equities"
+  | "fx"
+  | "crypto"
+  | "commodities"
+  | "rates"
+  | "options";
 
 export type PolicyTemplateId =
-  | 'conservative'
-  | 'moderate'
-  | 'aggressive_swing'
-  | 'custom';
+  | "conservative"
+  | "moderate"
+  | "aggressive_swing"
+  | "custom";
 
-export type PrimaryTimeframe = 'M5' | 'M15' | 'H1' | 'H4' | 'D1' | 'W1';
+export type PrimaryTimeframe = "M5" | "M15" | "H1" | "H4" | "D1" | "W1";
 
 export type AllowedOrderType =
-  | 'market'
-  | 'limit'
-  | 'stop'
-  | 'stop_limit'
-  | 'twap'
-  | 'vwap'
-  | 'iceberg';
+  | "market"
+  | "limit"
+  | "stop"
+  | "stop_limit"
+  | "twap"
+  | "vwap"
+  | "iceberg";
 
 export interface UniverseConstraints {
   allowedAssetClasses: AssetClass[];
@@ -98,8 +100,8 @@ export interface EvidenceThresholds {
 }
 
 export interface TradingPolicyV1 {
-  artifactType: 'ART-TRADING-POLICY';
-  schemaVersion: '1.0.0';
+  artifactType: "ART-TRADING-POLICY";
+  schemaVersion: "1.0.0";
   policyId: string;
   version: string;
   templateId: PolicyTemplateId;
@@ -112,13 +114,15 @@ export interface TradingPolicyV1 {
   horizon: HorizonConstraints;
   execution: ExecutionConstraints;
   evidence: EvidenceThresholds;
+  /** V1.27 — gestión T1/T2; opcional en policies custom/legacy. */
+  exit?: ExitPolicyV1;
   /** refs a WeightRules versionadas (D6); vacío en D1 */
   weightRuleSetId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
 
-export type PolicyRuleStatus = 'PASSED' | 'FAILED' | 'SKIPPED';
+export type PolicyRuleStatus = "PASSED" | "FAILED" | "SKIPPED";
 
 export interface PolicyRuleResult {
   rule: string;

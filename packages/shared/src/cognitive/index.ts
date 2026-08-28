@@ -15,6 +15,8 @@ export * from "./position-revision.js";
 export * from "./operational-levels.js";
 export * from "./risk-signature.js";
 export * from "./exit-plan.js";
+export * from "./exit-policy.js";
+export * from "./position-decision.js";
 export * from "./execution-plan.js";
 export * from "./execution-record.js";
 export * from "./submit-intent.js";

@@ -75,6 +75,7 @@ class PositionSyncCoordinator:
                             exit_transaction_id=tx_id,
                             filled_at=str(filled_at) if filled_at else None,
                             mark_target1_achieved=rec.action == "reduce",
+                            mark_target2_achieved=rec.action == "exit_hint",
                         )
                     )
         except Exception as exc:  # noqa: BLE001
