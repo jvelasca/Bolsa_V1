@@ -3,6 +3,7 @@ import type { MesaCandidateRowV1 } from "./mesa-hoy-model.js";
 import {
   buildPortfolioScenario,
   PORTFOLIO_SCENARIO_GATES_NOT_EVALUATED_WARNING,
+  candidateSectorExposurePair,
 } from "./portfolio-scenario.js";
 
 function candidate(
@@ -232,5 +233,30 @@ describe("buildPortfolioScenario", () => {
       s.warnings.some((w) => w.includes("Datos sectoriales incompletos")),
     ).toBe(true);
     expect(s.current.sectorConcentration).not.toBeNull();
+  });
+});
+
+describe("candidateSectorExposurePair", () => {
+  it("compares the candidate sector on both sides, not independent tops", () => {
+    const pair = candidateSectorExposurePair(
+      { Technology: 20, Energy: 5 },
+      { Technology: 18, Energy: 12 },
+      "Energy",
+    );
+    expect(pair).toEqual({
+      sector: "Energy",
+      currentPct: 5,
+      afterPct: 12,
+    });
+  });
+
+  it("uses 0 when the candidate sector is absent on one side", () => {
+    const pair = candidateSectorExposurePair(
+      { Technology: 20 },
+      { Technology: 18, Energy: 12 },
+      "Energy",
+    );
+    expect(pair?.currentPct).toBe(0);
+    expect(pair?.afterPct).toBe(12);
   });
 });

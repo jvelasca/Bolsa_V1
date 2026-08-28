@@ -29,6 +29,7 @@ import {
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
   ESTUDIO_LIST_ID,
+  PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
 } from "@bolsa/shared";
 import {
   DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
@@ -390,7 +391,7 @@ export function MesaHoyPage() {
         portfolioRisk,
         sectorExposurePct,
         sectorByInstrumentId,
-        maxSectorExposurePct: 40,
+        maxSectorExposurePct: PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
       },
     });
   }, [

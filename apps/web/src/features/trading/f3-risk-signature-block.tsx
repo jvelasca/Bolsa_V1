@@ -132,6 +132,31 @@ export function F3RiskSignatureBlock({
             data-testid="f3-risk-override-reason"
           />
         </div>
+      ) : signature.blockReason === "stop_wrong_side" ? (
+        <p
+          className="text-[11px] text-rose-800 dark:text-rose-300"
+          data-testid="f3-risk-geometry-block"
+        >
+          Stop al lado incorrecto de la entrada. Corrige el stop; no se puede
+          firmar ni con override.
+        </p>
+      ) : signature.blockReason === "stop_invalid" ? (
+        <p
+          className="text-[11px] text-rose-800 dark:text-rose-300"
+          data-testid="f3-risk-geometry-block"
+        >
+          Stop inválido (cero, negativo o no numérico). No se sustituye por el
+          del plan — corrige el campo.
+        </p>
+      ) : signature.blockReason === "targets_invalid" ||
+        signature.blockReason === "risk_non_positive" ? (
+        <p
+          className="text-[11px] text-rose-800 dark:text-rose-300"
+          data-testid="f3-risk-geometry-block"
+        >
+          Niveles operativos inválidos (entrada / stop / T1 / T2). Corrige la
+          geometría; no se puede firmar.
+        </p>
       ) : (
         <p className="text-[10px] text-muted-foreground">
           El tamaño firma el riesgo del plan, no un % de caja.

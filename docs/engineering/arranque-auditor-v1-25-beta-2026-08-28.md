@@ -26,9 +26,11 @@ CI release tag: [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/331493
 4. ¿Stop editable invalida firma stale y recalcula R (`signedStop`)?
 5. ¿Assessments y trailing quedan bajo «Ajustes avanzados» (ticket slim intacto)?
 
-**Deuda explícita a validar como aparcada (no implementar):** V1.26 lifecycle · V1.27 Mercado operativo/drag · V1.28 UX 10/10 · Lab `risk_policy` · OpportunityScore · VaR/correlación · thaw · AUTO.
+**Deuda explícita a validar como aparcada (no implementar):** V1.26 lifecycle · V1.27 Mercado operativo/drag · V1.28 UX 10/10 · Lab `risk_policy` · OpportunityScore · VaR/correlación · thaw estricto.
 
-**No pedir:** nav L1 nueva · drag gráfico · móvil · AUTO/thaw · OpportunityScore · promover thin trail a autoridad · colapsar Hoy.
+**Ronda de diseño abierta (post-V1.26):** operativa AUTO + gráfico → [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) · arranque [`arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md`](./arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md).
+
+**No pedir:** nav L1 nueva · drag gráfico sin acuerdo estudio §8 · móvil · thaw estricto · OpportunityScore · promover thin trail a autoridad · colapsar Hoy.
 
 ---
 

@@ -8,7 +8,12 @@ import type {
   PortfolioPositionRiskInput,
   PortfolioRiskSnapshotV1,
 } from "@bolsa/shared";
-import { buildPortfolioScenario } from "@bolsa/shared";
+import {
+  buildPortfolioScenario,
+  candidateSectorExposurePair,
+  dominantSectorExposure,
+  PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
+} from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -45,17 +50,22 @@ export function MesaWhatIfPanel({
     cash,
     candidateSector,
     riskTolerance: null,
-    maxSectorExposurePct: 40,
+    maxSectorExposurePct: PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
     portfolioRiskLimitR: portfolioRisk?.portfolioRiskLimitR ?? null,
   });
 
   const limit = portfolioRisk?.portfolioRiskLimitR ?? scenario.riskLimitR;
-  const topSectorAfter = Object.entries(scenario.after.sectorExposurePct).sort(
-    (a, b) => b[1] - a[1],
-  )[0];
-  const topSectorCurrent = Object.entries(
+  const candidatePair = candidateSectorExposurePair(
     scenario.current.sectorExposurePct,
-  ).sort((a, b) => b[1] - a[1])[0];
+    scenario.after.sectorExposurePct,
+    candidateSector,
+  );
+  const dominantCurrent = dominantSectorExposure(
+    scenario.current.sectorExposurePct,
+  );
+  const showDominant =
+    dominantCurrent != null &&
+    (candidatePair == null || dominantCurrent.sector !== candidatePair.sector);
   const unknownPct =
     scenario.after.sectorExposurePct.Unknown ??
     scenario.current.sectorExposurePct.Unknown ??
@@ -149,13 +159,26 @@ export function MesaWhatIfPanel({
         </dd>
         <dt className="text-muted-foreground">Sector</dt>
         <dd className="text-right tabular-nums">
-          {topSectorCurrent
-            ? `${topSectorCurrent[0]} ${topSectorCurrent[1]}%`
+          {candidatePair
+            ? `${candidatePair.sector} ${candidatePair.currentPct}%`
             : "—"}
         </dd>
         <dd className="text-right tabular-nums">
-          {topSectorAfter ? `${topSectorAfter[0]} ${topSectorAfter[1]}%` : "—"}
+          {candidatePair
+            ? `${candidatePair.sector} ${candidatePair.afterPct}%`
+            : "—"}
         </dd>
+        {showDominant ? (
+          <>
+            <dt className="text-muted-foreground">
+              Sector dominante (cartera)
+            </dt>
+            <dd className="text-right tabular-nums">
+              {`${dominantCurrent.sector} ${dominantCurrent.pct}%`}
+            </dd>
+            <dd className="text-right tabular-nums text-muted-foreground">—</dd>
+          </>
+        ) : null}
         {unknownPct > 0 ? (
           <>
             <dt className="text-muted-foreground">Unknown</dt>

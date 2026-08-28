@@ -153,4 +153,61 @@ describe("evaluateRiskSignature", () => {
     expect(s.overrideRequired).toBe(true);
     expect(s.allowed).toBe(false);
   });
+
+  it("DENY stop_wrong_side for LONG even when abs distance matches plan", () => {
+    const s = evaluateRiskSignature({
+      tradePlan: triggeredPlan(),
+      signedQty: 10,
+      signedPrice: 100,
+      signedStop: 105,
+      requireTriggeredPlan: true,
+    });
+    expect(s.allowed).toBe(false);
+    expect(s.overrideRequired).toBe(false);
+    expect(s.blockReason).toBe("stop_wrong_side");
+    expect(s.signedLossAtStop).toBeNull();
+  });
+
+  it("override cannot unblock stop_wrong_side", () => {
+    const s = evaluateRiskSignature({
+      tradePlan: triggeredPlan(),
+      signedQty: 10,
+      signedPrice: 100,
+      signedStop: 105,
+      overrideReason: "acepto el stop invertido",
+      requireTriggeredPlan: true,
+    });
+    expect(s.allowed).toBe(false);
+    expect(s.blockReason).toBe("stop_wrong_side");
+  });
+
+  it("DENY stop_wrong_side for SHORT when stop is below entry", () => {
+    const s = evaluateRiskSignature({
+      tradePlan: triggeredPlan({
+        direction: "short",
+        structuralStop: 105,
+        target1: 90,
+        target2: 80,
+      }),
+      signedQty: 10,
+      signedPrice: 100,
+      signedStop: 95,
+      requireTriggeredPlan: true,
+    });
+    expect(s.allowed).toBe(false);
+    expect(s.blockReason).toBe("stop_wrong_side");
+  });
+
+  it("DENY stop_invalid when signedStop is 0 (no silent substitute)", () => {
+    const s = evaluateRiskSignature({
+      tradePlan: triggeredPlan(),
+      signedQty: 10,
+      signedPrice: 100,
+      signedStop: 0,
+      requireTriggeredPlan: true,
+    });
+    expect(s.allowed).toBe(false);
+    expect(s.blockReason).toBe("stop_invalid");
+    expect(s.stop).toBeNull();
+  });
 });

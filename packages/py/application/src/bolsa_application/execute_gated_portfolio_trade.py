@@ -114,6 +114,8 @@ class ExecuteGatedPortfolioTrade:
         )
         tx_id = open_transaction_id_from_trade(trade)
         filled_at = getattr(getattr(trade, "transaction", None), "executed_at", None)
+        # HUMAN_MANUAL: este HTTP no es Confirm SEMI. Sin TradePlan TRIGGERED
+        # el sync sintetiza snapshot ``manual-{tx}`` — no inventar un plan IA.
         await sync_position_after_ledger_fill(
             account_id=account_id or "",
             instrument_id=instrument_id,

@@ -94,3 +94,55 @@ def test_blocks_loss_above_risk_amount() -> None:
     assert s["excess"] == "loss_above_plan"
     assert s["allowed"] is False
     assert s["signedLossAtStop"] == 150.0
+
+
+def test_deny_stop_wrong_side_long() -> None:
+    s = evaluate_risk_signature(
+        _plan(),
+        signed_qty=10.0,
+        signed_price=100.0,
+        signed_stop=105.0,
+        require_triggered_plan=True,
+    )
+    assert s["allowed"] is False
+    assert s["overrideRequired"] is False
+    assert s["blockReason"] == "stop_wrong_side"
+    assert s["signedLossAtStop"] is None
+
+
+def test_override_cannot_unblock_stop_wrong_side() -> None:
+    s = evaluate_risk_signature(
+        _plan(),
+        signed_qty=10.0,
+        signed_price=100.0,
+        signed_stop=105.0,
+        override_reason="acepto el stop invertido",
+        require_triggered_plan=True,
+    )
+    assert s["allowed"] is False
+    assert s["blockReason"] == "stop_wrong_side"
+
+
+def test_deny_stop_wrong_side_short() -> None:
+    s = evaluate_risk_signature(
+        _plan(direction="short", structuralStop=105.0, target1=90.0, target2=80.0),
+        signed_qty=10.0,
+        signed_price=100.0,
+        signed_stop=95.0,
+        require_triggered_plan=True,
+    )
+    assert s["allowed"] is False
+    assert s["blockReason"] == "stop_wrong_side"
+
+
+def test_deny_stop_invalid_zero_no_silent_substitute() -> None:
+    s = evaluate_risk_signature(
+        _plan(),
+        signed_qty=10.0,
+        signed_price=100.0,
+        signed_stop=0.0,
+        require_triggered_plan=True,
+    )
+    assert s["allowed"] is False
+    assert s["blockReason"] == "stop_invalid"
+    assert s["stop"] is None

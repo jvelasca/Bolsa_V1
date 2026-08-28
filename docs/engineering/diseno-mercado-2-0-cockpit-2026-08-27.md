@@ -2,6 +2,7 @@
 
 > **AsOf:** 2026-08-27 · **Estado:** **SLICE 2 en código (V1.23)** — overlays del plan en gráfico · `InstrumentOperationalContext` · Listas Estudio-first · Operaciones filtradas · Pulso/Lab bajo «¿Por qué?».
 > **Padre:** [`traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md`](./traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md) · [ADR-040](../adr/040-user-information-architecture.md) §9 · [ADR-041](../adr/041-operational-coherence.md).
+> **Estudio pendiente (drag / AUTO UX):** [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) — niveles en gráfico **read-only** hasta acuerdo §8.
 > **Regla:** No nuevas puertas L1. Shell dock intacto; cambia el contenido contextual.
 
 ---
@@ -114,6 +115,7 @@ Resumen de órdenes/fills del valor (o de la cuenta si no hay valor). No duplica
 - Batch propose
 - Promover trail a `currentStop`
 - Grid 180 en Resumen/Journal
+- **Drag de niveles / edición gráfica** — ver [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) (ronda auditorías abierta)
 
 ## 7. Criterio de hecho (cuando se implemente)
 

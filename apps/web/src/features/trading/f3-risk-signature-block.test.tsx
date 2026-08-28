@@ -93,4 +93,29 @@ describe("F3RiskSignatureBlock", () => {
     expect(text).toMatch(/bloqueado/i);
     expect(text).toMatch(/TRIGGERED/i);
   });
+
+  it("shows geometry block without override when stop is on the wrong side", () => {
+    render(
+      <MemoryRouter>
+        <F3RiskSignatureBlock
+          signature={{
+            ...noPlan,
+            mode: "plan",
+            suggestedQty: 10,
+            maxQty: 10,
+            stop: 105,
+            allowed: false,
+            blockReason: "stop_wrong_side",
+          }}
+          currency="EUR"
+          overrideReason=""
+          onOverrideReasonChange={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("f3-risk-geometry-block").textContent).toMatch(
+      /lado incorrecto/i,
+    );
+    expect(screen.queryByTestId("f3-risk-override-reason")).toBeNull();
+  });
 });

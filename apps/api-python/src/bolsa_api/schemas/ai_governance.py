@@ -108,6 +108,7 @@ class ConfirmIntentRequest(BaseModel):
     execute: bool = False
     session_id: str | None = Field(default=None, alias="sessionId")
     risk_override_reason: str | None = Field(default=None, alias="riskOverrideReason")
+    signed_stop: float | None = Field(default=None, alias="signedStop")
 
 
 class BacktestCoachAnalyzeRequest(BaseModel):

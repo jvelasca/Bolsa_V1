@@ -1,5 +1,13 @@
 """RFC-008 Cognitive Decision Architecture — D1…D7."""
 
+from bolsa_domain.entities.market_event import (
+    EventBlackoutContext,
+    MarketEvent,
+    MarketEventCalendar,
+    build_market_event,
+    event_decay_weight,
+)
+
 from bolsa_analytics.cognitive.auto_live import AutoLiveCheck, check_auto_live
 from bolsa_analytics.cognitive.bracket_plan import (
     BRACKET_PLAN_KEY,
@@ -143,6 +151,7 @@ from bolsa_analytics.cognitive.operational_incident import (
     operational_incident_status_copy,
     resolve_incident,
 )
+from bolsa_analytics.cognitive.operational_levels import validate_operational_levels
 from bolsa_analytics.cognitive.order_intent import (
     OrderIntent,
     intent_from_recommendation,
@@ -205,7 +214,10 @@ from bolsa_analytics.cognitive.recommendation import (
     Recommendation,
     recommendation_from_decision_package,
 )
-from bolsa_analytics.cognitive.risk_signature import evaluate_risk_signature
+from bolsa_analytics.cognitive.risk_signature import (
+    apply_signed_levels_to_trade_plan,
+    evaluate_risk_signature,
+)
 from bolsa_analytics.cognitive.score_macro import ScoreMacroResult, score_macro_from_facts
 from bolsa_analytics.cognitive.stats_suite import (
     monte_carlo_permutation_p_value,
@@ -258,13 +270,6 @@ from bolsa_analytics.cognitive.weight_rules import (
     WeightRuleResult,
     resolve_weight_rules,
     weight_rules_for_horizon,
-)
-from bolsa_domain.entities.market_event import (
-    EventBlackoutContext,
-    MarketEvent,
-    MarketEventCalendar,
-    build_market_event,
-    event_decay_weight,
 )
 
 __all__ = [
@@ -372,6 +377,8 @@ __all__ = [
     "build_position_state_from_fill",
     "build_position_revision",
     "evaluate_risk_signature",
+    "apply_signed_levels_to_trade_plan",
+    "validate_operational_levels",
     "build_exit_plan_from_position",
     "build_execution_plan_from_exit_plan",
     "build_execution_record",

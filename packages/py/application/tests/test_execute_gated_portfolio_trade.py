@@ -163,6 +163,10 @@ async def test_gated_http_buy_persists_manual_position() -> None:
     )
     assert len(fill_store.inserts) == 1
     assert fill_store.inserts[0]["birth_override_reason"] == "human_manual"
+    snap = fill_store.inserts[0]["trade_plan_snapshot"]
+    assert snap["status"] == "HUMAN_MANUAL"
+    assert snap["origin"] == "HUMAN_MANUAL"
+    assert str(snap["decisionId"]).startswith("manual-")
 
 
 class _FakeOhlcv:

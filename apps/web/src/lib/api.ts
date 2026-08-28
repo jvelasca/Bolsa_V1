@@ -1464,6 +1464,7 @@ export const api = {
     execute?: boolean;
     sessionId?: string;
     riskOverrideReason?: string | null;
+    signedStop?: number | null;
   }) =>
     call<{
       data: {

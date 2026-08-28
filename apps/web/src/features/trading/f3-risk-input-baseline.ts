@@ -71,7 +71,10 @@ export function resolveF3SignedPrice(input: {
     : null;
 }
 
-/** Resuelve stop firmado (campo editable → baseline del plan). */
+/** Resuelve stop firmado (campo editable → baseline del plan).
+ * Campo vacío → baseline. Campo no vacío e inválido (≤0 / no finito) → 0
+ * para que la firma DENY `stop_invalid` en vez de sustituir en silencio.
+ */
 export function resolveF3SignedStop(input: {
   stopField: string;
   baselineStop: number | null;
@@ -79,7 +82,8 @@ export function resolveF3SignedStop(input: {
   const trimmed = input.stopField.trim();
   if (trimmed) {
     const parsed = Number(trimmed);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+    return parsed;
   }
   return input.baselineStop;
 }

@@ -31,6 +31,9 @@ from bolsa_analytics.cognitive.execution_record import build_execution_record
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.recommendation import Recommendation
+from bolsa_analytics.cognitive.risk_signature import apply_signed_levels_to_trade_plan
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.broker_adapter import IBrokerAdapter, resolve_broker_adapter
@@ -76,7 +79,6 @@ from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 # Compat: nombres privados históricos usados por tests internos / re-exports.
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
@@ -269,6 +271,7 @@ class ConfirmRecommendationIntent:
         execute: bool = False,
         session_id: str | None = None,
         risk_override_reason: str | None = None,
+        signed_stop: float | None = None,
     ) -> dict[str, Any]:
         raw = recommendation_raw
         rec = build_recommendation_from_raw(raw, account_id=account_id)
@@ -372,6 +375,7 @@ class ConfirmRecommendationIntent:
                 trade_plan_dict=trade_plan_dict,
                 session_payload=session_payload,
                 risk_override_reason=risk_override_reason,
+                signed_stop=signed_stop,
             )
 
         _attach_execution_record(result)
@@ -525,6 +529,7 @@ class ConfirmRecommendationIntent:
         trade_plan_dict: dict[str, Any] | None,
         session_payload: dict[str, Any] | None,
         risk_override_reason: str | None,
+        signed_stop: float | None = None,
     ) -> None:
         price = float(rec.suggested_price or 0)
 
@@ -620,12 +625,13 @@ class ConfirmRecommendationIntent:
             )
             return
 
-        # RiskGate — risk_signature
+        # RiskGate — risk_signature (qty/price/stop firmados)
         if is_opening_action(rec.action) and self._risk.reject_reason(
             trade_plan=trade_plan_dict if isinstance(trade_plan_dict, dict) else None,
             signed_qty=float(intent.quantity),
             signed_price=price,
             override_reason=risk_override_reason,
+            signed_stop=signed_stop,
         ) is not None:
             await self._reject_gate(
                 result=result,
@@ -685,6 +691,17 @@ class ConfirmRecommendationIntent:
             result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
             return
 
+        signed_plan = (
+            apply_signed_levels_to_trade_plan(
+                trade_plan_dict if isinstance(trade_plan_dict, dict) else None,
+                signed_qty=float(intent.quantity),
+                signed_price=price,
+                signed_stop=signed_stop,
+            )
+            if is_opening_action(rec.action)
+            else trade_plan_dict
+        )
+
         await self._run_submit_and_sync(
             result=result,
             rec=rec,
@@ -693,7 +710,7 @@ class ConfirmRecommendationIntent:
             session_id=session_id,
             contract_status=contract_status,
             price=price,
-            trade_plan_dict=trade_plan_dict,
+            trade_plan_dict=signed_plan if isinstance(signed_plan, dict) else trade_plan_dict,
             session_payload=session_payload,
         )
 

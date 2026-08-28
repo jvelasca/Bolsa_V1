@@ -28,19 +28,21 @@ Confirm = firma · `PAPER_D_EXECUTE` off · AUTO off · Ranking ≠ BUY · trail
 
 No mezclar sin palabra explícita:
 
-| Prioridad | Tema                                                                           |
-| --------- | ------------------------------------------------------------------------------ |
-| V1.26     | Position lifecycle (post-fill, T1 gestionado, ruta operativa)                  |
-| V1.27     | Mercado operativo (drag, órdenes en gráfico)                                   |
-| V1.28     | UX 10/10 (command palette, hotkeys, densidad)                                  |
-| Lab       | Backtest `risk_policy` nunca pasado desde `backtests.py`                       |
-| Producto  | Grid Cobertura 180 · batch propose · OpportunityScore · VaR/correlación · thaw |
+| Prioridad   | Tema                                                                                                                                                                                                                                                                        |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1.26       | **CÓDIGO** Position Lifecycle Integrity — geometría + signedStop round-trip + nacimiento SEMI. Relevo [`traspaso-relevo-v1-26-position-lifecycle-integrity-2026-08-28.md`](./traspaso-relevo-v1-26-position-lifecycle-integrity-2026-08-28.md)                              |
+| V1.26b      | Flujo operativo (toast DISPARADA/T1 · fase en Listas) — **sin drag**                                                                                                                                                                                                        |
+| **Estudio** | AUTO + gráfico — [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) · arranque auditor [`arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md`](./arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md) |
+| V1.27       | Mercado operativo (drag → Confirm, órdenes en gráfico) — **tras** acuerdo estudio §8                                                                                                                                                                                        |
+| V1.28       | UX 10/10 (command palette, hotkeys, densidad)                                                                                                                                                                                                                               |
+| Lab         | Backtest `risk_policy` nunca pasado desde `backtests.py`                                                                                                                                                                                                                    |
+| Producto    | Grid Cobertura 180 · batch propose · OpportunityScore · VaR/correlación · thaw                                                                                                                                                                                              |
 
 ## 3. Arranque mañana
 
 1. Leer este relevo + [`traspaso-relevo-tag-v1-25-beta-2026-08-28.md`](./traspaso-relevo-tag-v1-25-beta-2026-08-28.md) + marco [`analisis-vs-apps-top-operative-flow-2026-08-28.md`](./analisis-vs-apps-top-operative-flow-2026-08-28.md).
 2. Confirmar CI tag GREEN; si falta, pin URL en el tag relevo.
-3. Elegir **un** epic (recomendado: V1.26 position lifecycle **o** Lab backtest risk_policy — no ambos).
+3. Siguiente: tag `v1.26-beta` si CI GREEN, **o** flujo operativo (toast/fase) — no drag/AUTO. HTTP `trade_plan_snapshot=None` es HUMAN_MANUAL, no pérdida de plan SEMI.
 4. No reabrir sizing paralelo ni `% caja` como mandato en openings supervisados.
 
 ## 4. Verificación local (pre-tag)

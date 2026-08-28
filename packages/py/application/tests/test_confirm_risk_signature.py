@@ -112,3 +112,48 @@ async def test_authorize_only_skips_signature_gate() -> None:
     )
     assert result["trade"] is None
     assert fake.calls == []
+
+
+@pytest.mark.asyncio
+async def test_execute_stop_wrong_side_rejected_even_with_override() -> None:
+    fake = _FakeExecuteTrade()
+    uc = ConfirmRecommendationIntent(execute_trade=fake)
+    result = await uc.execute(
+        recommendation_raw=_raw(qty=10.0, plan=_triggered()),
+        account_id="acc-1",
+        execute=True,
+        signed_stop=110.0,
+        risk_override_reason="acepto el stop invertido",
+    )
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_signature"
+    assert fake.calls == []
+
+
+@pytest.mark.asyncio
+async def test_execute_signed_stop_tighter_fills() -> None:
+    fake = _FakeExecuteTrade()
+    uc = ConfirmRecommendationIntent(execute_trade=fake)
+    result = await uc.execute(
+        recommendation_raw=_raw(qty=10.0, plan=_triggered()),
+        account_id="acc-1",
+        execute=True,
+        signed_stop=97.0,
+    )
+    assert result["trade"]["status"] == "executed"
+    assert len(fake.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_execute_signed_stop_zero_rejected_no_substitute() -> None:
+    fake = _FakeExecuteTrade()
+    uc = ConfirmRecommendationIntent(execute_trade=fake)
+    result = await uc.execute(
+        recommendation_raw=_raw(qty=10.0, plan=_triggered()),
+        account_id="acc-1",
+        execute=True,
+        signed_stop=0.0,
+    )
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_signature"
+    assert fake.calls == []

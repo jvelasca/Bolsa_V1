@@ -1,12 +1,18 @@
 /**
  * V1.25 — what-if cartera en Confirm (misma fn que Mesa).
+ * V1.26 — fila Sector = exposición al sector del candidato (no tops independientes).
  */
 
 import type { PortfolioScenarioV1 } from "@bolsa/shared";
+import {
+  candidateSectorExposurePair,
+  dominantSectorExposure,
+} from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 
 type F3ConfirmWhatIfBlockProps = {
   scenario: PortfolioScenarioV1;
+  candidateSector?: string | null;
   className?: string;
 };
 
@@ -17,14 +23,20 @@ function cell(value: string | number | null | undefined, suffix = ""): string {
 
 export function F3ConfirmWhatIfBlock({
   scenario,
+  candidateSector = null,
   className,
 }: F3ConfirmWhatIfBlockProps) {
-  const topSectorAfter = Object.entries(scenario.after.sectorExposurePct).sort(
-    (a, b) => b[1] - a[1],
-  )[0];
-  const topSectorCurrent = Object.entries(
+  const candidatePair = candidateSectorExposurePair(
     scenario.current.sectorExposurePct,
-  ).sort((a, b) => b[1] - a[1])[0];
+    scenario.after.sectorExposurePct,
+    candidateSector,
+  );
+  const dominantCurrent = dominantSectorExposure(
+    scenario.current.sectorExposurePct,
+  );
+  const showDominant =
+    dominantCurrent != null &&
+    (candidatePair == null || dominantCurrent.sector !== candidatePair.sector);
 
   return (
     <div
@@ -63,14 +75,33 @@ export function F3ConfirmWhatIfBlock({
             : "—"}
         </dd>
         <dt className="text-muted-foreground">Sector</dt>
-        <dd className="text-right tabular-nums">
-          {topSectorCurrent
-            ? `${topSectorCurrent[0]} ${topSectorCurrent[1]}%`
+        <dd
+          className="text-right tabular-nums"
+          data-testid="f3-confirm-what-if-sector-current"
+        >
+          {candidatePair
+            ? `${candidatePair.sector} ${candidatePair.currentPct}%`
             : "—"}
         </dd>
-        <dd className="text-right tabular-nums">
-          {topSectorAfter ? `${topSectorAfter[0]} ${topSectorAfter[1]}%` : "—"}
+        <dd
+          className="text-right tabular-nums"
+          data-testid="f3-confirm-what-if-sector-after"
+        >
+          {candidatePair
+            ? `${candidatePair.sector} ${candidatePair.afterPct}%`
+            : "—"}
         </dd>
+        {showDominant ? (
+          <>
+            <dt className="text-muted-foreground">
+              Sector dominante (cartera)
+            </dt>
+            <dd className="text-right tabular-nums">
+              {`${dominantCurrent.sector} ${dominantCurrent.pct}%`}
+            </dd>
+            <dd className="text-right tabular-nums text-muted-foreground">—</dd>
+          </>
+        ) : null}
         <dt className="text-muted-foreground">Fit</dt>
         <dd className="text-right">{scenario.current.portfolioFit}</dd>
         <dd className="text-right">{scenario.after.portfolioFit}</dd>

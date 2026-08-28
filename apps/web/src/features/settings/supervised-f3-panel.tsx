@@ -29,6 +29,7 @@ import {
   executeCtaLabel,
   executionOutcomeCopy,
   paperOrderStatusCopy,
+  PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
   resolveSupervisedOpeningQuantity,
 } from "@bolsa/shared";
 import {
@@ -414,6 +415,7 @@ export function SupervisedF3Panel() {
         riskOverrideReason: riskOverrideReason.trim()
           ? riskOverrideReason.trim()
           : undefined,
+        signedStop: signedStop ?? undefined,
       });
     },
     onSuccess: (res) => {
@@ -750,7 +752,7 @@ export function SupervisedF3Panel() {
       candidateSector:
         instrumentsForSelect.find((i) => i.id === pending.instrumentId)
           ?.sector ?? null,
-      maxSectorExposurePct: 40,
+      maxSectorExposurePct: PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
       portfolioRiskLimitR: portfolioRisk.portfolioRiskLimitR,
     });
   }, [
@@ -1050,7 +1052,14 @@ export function SupervisedF3Panel() {
               inputsStale={ticketInputsStale}
             />
             {confirmScenario ? (
-              <F3ConfirmWhatIfBlock scenario={confirmScenario} />
+              <F3ConfirmWhatIfBlock
+                scenario={confirmScenario}
+                candidateSector={
+                  instrumentsForSelect.find(
+                    (i) => i.id === pending.instrumentId,
+                  )?.sector ?? null
+                }
+              />
             ) : null}
             <F3RiskSignatureBlock
               signature={riskSignature}

@@ -42,6 +42,43 @@ export type PortfolioScenarioV1 = {
 export const PORTFOLIO_SCENARIO_GATES_NOT_EVALUATED_WARNING =
   "No evalúa check_opening / DS-05 / Fit de firma — Confirm es la firma";
 
+/** Deuda P1: default 40 hasta EffectiveTradingPolicy (no en V1.26). */
+export const PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT = 40;
+
+export type SectorExposurePairV1 = {
+  sector: string;
+  currentPct: number;
+  afterPct: number;
+};
+
+export type DominantSectorV1 = {
+  sector: string;
+  pct: number;
+};
+
+/** Exposición al sector del candidato en ambos lados (no el máximo de cada mapa). */
+export function candidateSectorExposurePair(
+  current: Record<string, number>,
+  after: Record<string, number>,
+  candidateSector: string | null | undefined,
+): SectorExposurePairV1 | null {
+  const sector = candidateSector?.trim();
+  if (!sector) return null;
+  return {
+    sector,
+    currentPct: current[sector] ?? 0,
+    afterPct: after[sector] ?? 0,
+  };
+}
+
+export function dominantSectorExposure(
+  exposure: Record<string, number>,
+): DominantSectorV1 | null {
+  const top = Object.entries(exposure).sort((a, b) => b[1] - a[1])[0];
+  if (!top) return null;
+  return { sector: top[0], pct: top[1] };
+}
+
 export type BuildPortfolioScenarioInput = {
   candidate: MesaCandidateRowV1;
   positions: ReadonlyArray<
@@ -192,7 +229,8 @@ export function buildPortfolioScenario(
     warnings.push(`Riesgo agregado elevado (>${riskLimitR}R límite mandato)`);
   }
 
-  const maxSector = input.maxSectorExposurePct ?? 40;
+  const maxSector =
+    input.maxSectorExposurePct ?? PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT;
   for (const [sector, pct] of Object.entries(afterSectors)) {
     if (pct > maxSector) {
       warnings.push(`Concentración sector ${sector}: ${pct}%`);

@@ -4257,6 +4257,8 @@ export interface components {
             };
             /** Riskoverridereason */
             riskOverrideReason?: string | null;
+            /** Signedstop */
+            signedStop?: number | null;
             /** Sessionid */
             sessionId?: string | null;
         };

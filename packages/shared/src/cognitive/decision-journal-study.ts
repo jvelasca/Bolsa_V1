@@ -6,6 +6,7 @@
 
 import type { DecisionAction } from "./decision-package.js";
 import type { ExitReasonV1 } from "./exit-plan.js";
+import { validateOperationalLevels } from "./operational-levels.js";
 import type { PositionStatusV1 } from "./position-state.js";
 import type { DirectionalBias } from "./technical-assessment.js";
 import type {
@@ -243,12 +244,11 @@ export function journalStudyHasValidStop(
 ): boolean {
   if (!plan) return false;
   if ((plan.whyNot ?? []).includes("no_stop")) return false;
-  const entry = finiteNumber(plan.entry);
-  const stop = finiteNumber(plan.structuralStop);
-  if (entry == null || entry <= 0 || stop == null) return false;
-  if (plan.direction === "long") return stop < entry;
-  if (plan.direction === "short") return stop > entry;
-  return false;
+  return validateOperationalLevels({
+    direction: plan.direction,
+    entry: plan.entry,
+    stop: plan.structuralStop,
+  }).ok;
 }
 
 /**

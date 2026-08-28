@@ -6,11 +6,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
+from bolsa_analytics.cognitive.operational_levels import validate_operational_levels
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+
 from bolsa_application.decision_board import (
     extract_session_thesis_health,
     extract_session_trade_plan,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 NO_OPERATIONAL_PLAN_COPY = "No existe todavía un plan operativo."
 ARTIFACT_TYPE = "ART-DECISION-JOURNAL-STUDY"
@@ -81,16 +83,12 @@ def journal_study_has_valid_stop(plan: dict[str, Any] | None) -> bool:
     why = plan.get("whyNot") or plan.get("why_not") or []
     if isinstance(why, list) and "no_stop" in why:
         return False
-    entry = _finite(_camel(plan, "entry", "entry"))
-    stop = _finite(_camel(plan, "structuralStop", "structural_stop"))
-    direction = str(plan.get("direction") or "")
-    if entry is None or entry <= 0 or stop is None:
-        return False
-    if direction == "long":
-        return stop < entry
-    if direction == "short":
-        return stop > entry
-    return False
+    verdict = validate_operational_levels(
+        direction=plan.get("direction"),
+        entry=_finite(_camel(plan, "entry", "entry")),
+        stop=_finite(_camel(plan, "structuralStop", "structural_stop")),
+    )
+    return bool(verdict.get("ok") is True)
 
 
 def journal_study_geometry(plan: dict[str, Any] | None) -> dict[str, Any]:

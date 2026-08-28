@@ -3,6 +3,7 @@
 > **AsOf:** 2026-08-28 · **Estado:** **MARCO** — no es implementación de código.
 > **Padre:** [`traspaso-relevo-v1-24-honesty-2026-08-28.md`](./traspaso-relevo-v1-24-honesty-2026-08-28.md) · [ADR-040](../adr/040-user-information-architecture.md) · [diseño Mercado 2.0](./diseno-mercado-2-0-cockpit-2026-08-27.md) · [ADR-041](../adr/041-operational-coherence.md).
 > **Contrato Confirm V1.25:** [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md).
+> **Estudio diseño (auditorías, abierto):** [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) · arranque [`arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md`](./arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md).
 > **Tag vivo:** `v1.25-beta` → `d3c2fd6b`. **BETA / no producción.**
 
 ---
@@ -159,13 +160,13 @@ Command palette · hotkeys · layouts SIMPLE/TRADER/ANALISTA · flash tick · de
 
 ## 6. Roadmap (sin mezclar epics)
 
-| Epic      | Objetivo                            | Dentro                                                                                                         | Fuera                                              |
-| --------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| **V1.25** | Operational safety                  | Sizing único · €/%/R en Confirm · what-if en ticket · override · assessments colapsados · tests de contrato    | Nav · paneles · drag gráfico · móvil · AUTO · thaw |
-| **V1.26** | Position management                 | Snapshot decisión+plan al fill · stop revisiones · T1 tocado→fill→gestionado · ExitPermission único            | Rediseño Mercado · palette                         |
-| **V1.27** | Mercado más operativo (mismo shell) | Drag niveles → recálculo V1.25 · blotter instrumento · strip Hoy enlace · móvil mínimo Hoy · Web Notifications | Nuevas puertas L1                                  |
-| **V1.28** | UX 10/10                            | Palette · hotkeys · layouts · densidad · tema · KPI Protección                                                 | Motores nuevos                                     |
-| **V1.29** | Copiloto explicativo                | «¿Por qué?» como producto (tesis, mandato, umbral); nunca «Compra X»                                           | Autopiloto                                         |
+| Epic      | Objetivo                            | Dentro                                                                                                         | Fuera                                                                                                                                                 |
+| --------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **V1.25** | Operational safety                  | Sizing único · €/%/R en Confirm · what-if en ticket · override · assessments colapsados · tests de contrato    | Nav · paneles · drag gráfico · móvil · AUTO · thaw                                                                                                    |
+| **V1.26** | Position management                 | Snapshot decisión+plan al fill · stop revisiones · T1 tocado→fill→gestionado · ExitPermission único            | Rediseño Mercado · palette                                                                                                                            |
+| **V1.27** | Mercado más operativo (mismo shell) | Drag niveles → recálculo V1.25 · blotter instrumento · strip Hoy enlace · móvil mínimo Hoy · Web Notifications | Nuevas puertas L1 · **implementar solo tras** [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) §8 |
+| **V1.28** | UX 10/10                            | Palette · hotkeys · layouts · densidad · tema · KPI Protección                                                 | Motores nuevos                                                                                                                                        |
+| **V1.29** | Copiloto explicativo                | «¿Por qué?» como producto (tesis, mandato, umbral); nunca «Compra X»                                           | Autopiloto                                                                                                                                            |
 
 ---
 
@@ -176,6 +177,18 @@ Normativa completa del ticket (campos default vs avanzado, recálculo, what-if, 
 → [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md)
 
 Ese documento es el **input directo** del epic de sizing. No implementar en este marco.
+
+---
+
+## 9. Estudio abierto — AUTO + gráfico (auditorías)
+
+Antes de V1.27 (drag) y de ampliar AUTO en producto, el owner abrió una **ronda de diseño** para las auditorías externas:
+
+→ [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md)
+
+**Arranque (copiar en chat auditor):** [`arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md`](./arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md)
+
+**Regla:** sin filas rellenas en §8 del estudio → no PR de drag ni AUTO ampliado. V1.26b (toast/fase) puede avanzar en paralelo.
 
 ---
 
