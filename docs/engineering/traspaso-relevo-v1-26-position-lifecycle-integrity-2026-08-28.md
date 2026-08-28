@@ -39,22 +39,23 @@ PositionStatus durable sigue `OPEN \| PARTIAL \| PROTECTED \| CLOSED`. T1 tocado
 
 ## 3. Fuera de V1.26 (no mezclar)
 
-| Prioridad                              | Tema                                                                                                                                                                        |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ESTUDIO (auditorías)**               | Operativa AUTO + operativa gráfico — [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) · **sin código** hasta acuerdo §8 |
-| V1.26b / V1.27 UX operativa (sin drag) | Toast DISPARADA / T1 tocado · punto de fase en Listas · cockpit «¿qué hago?»                                                                                                |
-| P1                                     | `EffectiveTradingPolicy` (eliminar default sector 40 como mandato)                                                                                                          |
-| P1                                     | ExitPolicy por perfil                                                                                                                                                       |
-| V1.27                                  | Mercado operativo (drag → Confirm, órdenes en gráfico) — **tras** estudio acordado                                                                                          |
-| V1.28                                  | UX 10/10 (command palette, hotkeys, densidad)                                                                                                                               |
-| Lab                                    | Backtest `risk_policy`                                                                                                                                                      |
-| Producto                               | Grid Cobertura 180 · batch propose · OpportunityScore · VaR · thaw estricto · móvil                                                                                         |
+| Prioridad                | Tema                                                                                                                                                                            |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ESTUDIO (auditorías)** | Operativa AUTO + operativa gráfico — [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) §8 **Aplazado** · **sin drag / AUTO** |
+| **V1.27**                | Position Operating Model — [`roadmap-v127-path-to-10-2026-08-28.md`](./roadmap-v127-path-to-10-2026-08-28.md)                                                                   |
+| V1.28 / V1.26b UX        | Toast DISPARADA / T1 tocado · punto de fase en Listas · cockpit «¿qué hago?» — **tras** POM                                                                                     |
+| P1                       | `EffectiveTradingPolicy` (eliminar default sector 40 como mandato)                                                                                                              |
+| P1                       | ExitPolicy por perfil                                                                                                                                                           |
+| V1.27                    | Mercado operativo (drag → Confirm, órdenes en gráfico) — **tras** estudio acordado                                                                                              |
+| V1.28                    | UX 10/10 (command palette, hotkeys, densidad)                                                                                                                                   |
+| Lab                      | Backtest `risk_policy`                                                                                                                                                          |
+| Producto                 | Grid Cobertura 180 · batch propose · OpportunityScore · VaR · thaw estricto · móvil                                                                                             |
 
 ## 4. Arranque siguiente chat
 
 1. Leer este relevo + [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
 2. Verificar tests: `pnpm --filter @bolsa/shared test` · `pnpm test:decision-spine` (incluye `test_v126_semi_position_birth.py` + `test_operational_levels.py`).
-3. No saltar a drag / AUTO ampliado / Mercado 2.0 visual sin **acuerdo de diseño** ([`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) §8). Siguiente rebanada código: tag `v1.26-beta` si CI GREEN **o** V1.26b (toast + fase en listas).
+3. No saltar a drag / AUTO ampliado / Mercado 2.0 visual sin **acuerdo de diseño** ([`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) §8 **Aplazado**). Siguiente rebanada código: tag `v1.26-beta` si CI GREEN, luego **V1.27 Position Operating Model** ([roadmap](./roadmap-v127-path-to-10-2026-08-28.md)). V1.26b (toast + fase) = V1.28, no drag.
 4. Auditorías externas: usar [`arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md`](./arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md).
 5. No reabrir sizing paralelo ni tratar HTTP None como pérdida de TradePlan SEMI.
 

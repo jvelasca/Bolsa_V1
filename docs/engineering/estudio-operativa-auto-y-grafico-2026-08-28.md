@@ -226,11 +226,14 @@ La pregunta no es «¿añadimos drag?» a ciegas. Es **qué ediciones gráficas 
 | Epic       | Frente      | Entregables diseño                                         | Fuera                        |
 | ---------- | ----------- | ---------------------------------------------------------- | ---------------------------- |
 | **V1.26b** | B (parcial) | Toast DISPARADA/T1 · fase en Listas · copy Operativa       | Drag · AUTO ampliado         |
-| **V1.27**  | B           | Drag → Confirm (B-γ) · what-if vivo · strip Hoy enlace     | OCO · móvil Mercado completo |
-| **V1.28**  | UX          | Palette · hotkeys · densidad                               | Motores                      |
-| **V1.29+** | A           | AUTO paridad SEMI (si acordado) · telemetría thaw estricto | Broker live                  |
+| **V1.27**  | POM         | Position Operating Model (evento ≠ decisión · Golden Path) | Drag · AUTO ampliado         |
+| **V1.28**  | UX cockpit  | Daily cockpit en shell existente · toasts B-α (G2)         | Drag · nav L1                |
+| **V1.31+** | B           | Drag → Confirm (B-γ) **solo si §8 ACUERDO**                | OCO · móvil Mercado completo |
+| **V1.33**  | A           | AUTO paridad SEMI A-β (si acordado) · telemetría thaw      | Broker live · A-γ            |
 
-Secuencia **recomendada:** cerrar tag `v1.26-beta` → acuerdo este estudio → V1.26b → V1.27 gráfico.
+Secuencia **recomendada:** tag `v1.26-beta` → **V1.27 POM** → V1.28 cockpit/toasts → drag/AUTO solo tras §8 ACUERDO. El drag **no** es el V1.27 de producto (colisión de numeración con auditorías: su «V1.26 POM» = nuestro V1.27).
+
+Hoja de ruta: [`roadmap-v127-path-to-10-2026-08-28.md`](./roadmap-v127-path-to-10-2026-08-28.md).
 
 ---
 
@@ -288,15 +291,23 @@ R5 Implement   →  solo tras R4 + CI plan
 
 ---
 
-## 8. Registro de acuerdo (rellenar tras R2)
+## 8. Registro de acuerdo (R2 owner 2026-08-28)
 
-| Tema                | Opción acordada | Fecha | Disensos archivados | Siguiente doc |
-| ------------------- | --------------- | ----- | ------------------- | ------------- |
-| AUTO modalidad      | _pendiente_     | —     | —                   | —             |
-| AUTO sizing SoT     | _pendiente_     | —     | —                   | —             |
-| Gráfico interacción | _pendiente_     | —     | —                   | —             |
-| Gráfico → Confirm   | _pendiente_     | —     | —                   | —             |
-| V1.26b alcance      | _pendiente_     | —     | —                   | —             |
+Respuestas archivadas: [Deep](./respuesta-auditor-Deep-operativa-auto-grafico-2026-08-28.md) · [A0 producto](./respuesta-auditor-A0-position-operating-model-2026-08-28.md). **N4:** no ha respondido con plantilla §7.2 — se registra _pendiente_, no declina. **No** hay `diseno-operativa-auto-grafico-ACORDADO-*` (drag/AUTO no se implementan).
+
+| Tema                | Opción acordada                                                 | Fecha      | Disensos archivados                            | Siguiente doc                                                                      |
+| ------------------- | --------------------------------------------------------------- | ---------- | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| AUTO modalidad      | **Aplazado** (lean A-β; A-γ rechazada; cero código V1.27–V1.30) | 2026-08-28 | Deep: A-β+A-δ; A0: cerebro de posición primero | [`roadmap-v127-path-to-10-2026-08-28.md`](./roadmap-v127-path-to-10-2026-08-28.md) |
+| AUTO sizing SoT     | **Aplazado** (cuando se haga: TradePlan TRIGGERED)              | 2026-08-28 | —                                              | —                                                                                  |
+| Gráfico interacción | **Aplazado** (G0; B-α toasts ≠ drag)                            | 2026-08-28 | Deep: B-α ahora / B-γ destino; A0: POM primero | Esperar N4                                                                         |
+| Gráfico → Confirm   | **Aplazado** (B-γ destino; B-δ no)                              | 2026-08-28 | Geometría = `operational-levels.ts`            | —                                                                                  |
+| V1.26b alcance      | Toasts/fase **después** de V1.27 POM                            | 2026-08-28 | —                                              | V1.28                                                                              |
+
+### 8.1 Voto owner
+
+- **A-γ rechazada** sin waiver (dos fuentes de tamaño). Destino AUTO = **A-β** + EdgeReport exigido; **cero código AUTO** hasta V1.33.
+- **B-δ rechazada.** Chart permanece G0. B-α (G2 toasts) permitido como UX fina **tras** POM, no es el gráfico. B-γ solo con N4 + este §8 en ACUERDO + doc hijo.
+- Cruce A×B: gana integridad V1.26; el gráfico nunca autoriza; `signedStop` humano posterior gana sobre AUTO; toast T1 informativo (H2).
 
 ---
 
@@ -321,9 +332,9 @@ R5 Implement   →  solo tras R4 + CI plan
 
 ## 10. Criterio de hecho de **este** estudio
 
-1. Las tres auditorías han respondido con la plantilla §7.2 **o** el owner ha registrado explícitamente «auditoría X declina».
-2. §8 tiene filas rellenas con opciones elegidas o «aplazado» justificado.
-3. Existe (o está calendarizado) el doc **`diseno-operativa-auto-grafico-ACORDADO-*`** antes de cualquier PR de drag o AUTO ampliado.
+1. Las tres auditorías han respondido con la plantilla §7.2 **o** el owner ha registrado explícitamente «auditoría X declina». **Estado 2026-08-28:** Deep + A0 archivadas; **N4 pendiente** (no declina). §8 = Aplazado justificado.
+2. §8 tiene filas rellenas con opciones elegidas o «aplazado» justificado. **Hecho (Aplazado).**
+3. Existe (o está calendarizado) el doc **`diseno-operativa-auto-grafico-ACORDADO-*`** antes de cualquier PR de drag o AUTO ampliado. **Aún no** — correcto: no hay PR de drag/AUTO.
 4. Ningún participante propone reabrir sizing paralelo `% caja` en SEMI TRIGGERED sin waiver ADR.
 
 ---
