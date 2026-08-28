@@ -1,7 +1,7 @@
 # RELEVO — tag v1.25-beta → auditoría / mañana (2026-08-28)
 
 > **Padre:** [`traspaso-relevo-v1-25-operational-safety-2026-08-28.md`](./traspaso-relevo-v1-25-operational-safety-2026-08-28.md) · [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.25-beta` → tip `d3c2fd6b`. **Release tag CI:** pin URL tras Actions GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.25-beta` → tip `d3c2fd6b` (docs pin `4455cee1`). **Release tag CI:** [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33149344989).
 > **Arranque chat nuevo:** este relevo + contrato V1.25 + freeze SEMI · auditor externo: [`arranque-auditor-v1-25-beta-2026-08-28.md`](./arranque-auditor-v1-25-beta-2026-08-28.md).
 
 ---
@@ -26,6 +26,7 @@
 | Auditor   | [`arranque-auditor-v1-25-beta-2026-08-28.md`](./arranque-auditor-v1-25-beta-2026-08-28.md)                           |
 | Spine     | subset daily-ops **497**                                                                                             |
 | ADR       | [ADR-040 §10](../adr/040-user-information-architecture.md) · Operative Flow                                          |
+| CI tag    | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33149344989)                                               |
 
 ### Owner: publicar
 

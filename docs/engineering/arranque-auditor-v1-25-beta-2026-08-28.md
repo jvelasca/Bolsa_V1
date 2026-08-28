@@ -16,7 +16,7 @@ Lee en este orden:
 6. [`docs/adr/040-user-information-architecture.md`](../adr/040-user-information-architecture.md) §10 (Operative Flow)
 7. Pack histórico: [`docs/engineering/audit-pack-estado-global-2026-08-27-v121.md`](../engineering/audit-pack-estado-global-2026-08-27-v121.md)
 
-CI release tag: _(pin en tag relevo tras Actions GREEN)_.
+CI release tag: [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33149344989).
 
 **Preguntas de foco (V1.25 operational safety — no nuevos motores ni nav L1):**
 
