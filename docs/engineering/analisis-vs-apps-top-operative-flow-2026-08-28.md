@@ -3,7 +3,7 @@
 > **AsOf:** 2026-08-28 · **Estado:** **MARCO** — no es implementación de código.
 > **Padre:** [`traspaso-relevo-v1-24-honesty-2026-08-28.md`](./traspaso-relevo-v1-24-honesty-2026-08-28.md) · [ADR-040](../adr/040-user-information-architecture.md) · [diseño Mercado 2.0](./diseno-mercado-2-0-cockpit-2026-08-27.md) · [ADR-041](../adr/041-operational-coherence.md).
 > **Contrato Confirm V1.25:** [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md).
-> **Tag vivo:** `v1.24-beta` → `c75b26a6`. **BETA / no producción.**
+> **Tag vivo:** `v1.25-beta` → `f8e53f57`. **BETA / no producción.**
 
 ---
 
