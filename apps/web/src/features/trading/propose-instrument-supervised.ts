@@ -9,8 +9,8 @@ import {
   demoBookRequiresEstudioMembership,
   ESTUDIO_MEMBERSHIP_REQUIRED_MSG,
   loadDemoBookPrefs,
-  suggestQuantityFromCash,
 } from "@/features/trading/demo-book-prefs";
+import { finalizeSupervisedProposePayload } from "@/features/trading/supervised-opening-sizing";
 import type { SupervisedProposePayload } from "@/stores/supervised-f3-queue-store";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 
@@ -43,22 +43,14 @@ export async function proposeInstrumentSupervised(opts: {
   }
   const priceHint =
     opts.priceHint != null && opts.priceHint > 0 ? opts.priceHint : null;
-  let suggestedQuantity = 1;
-  if (priceHint != null && summary.cash > 0) {
-    const q = suggestQuantityFromCash({
-      cash: summary.cash,
-      price: priceHint,
-      sizePctOfCash: book.defaultSizePctOfCash,
-    });
-    if (q > 0) suggestedQuantity = q;
-  }
-
   const strategyRef = opts.strategyDefinitionId?.trim() || undefined;
+
   const res = await api.proposeRecommendation({
     instrumentId: opts.instrumentId,
     symbol: opts.symbol,
     accountId: opts.accountId,
-    suggestedQuantity,
+    suggestedQuantity: 1,
+    ...(priceHint != null ? { suggestedPrice: priceHint } : {}),
     includeFundamentals: true,
     includeMacro: true,
     includeEvidence: true,
@@ -66,28 +58,17 @@ export async function proposeInstrumentSupervised(opts: {
     ...(strategyRef ? { strategyOrSignalRef: strategyRef } : {}),
   });
 
-  let payload: SupervisedProposePayload = {
+  let payload: SupervisedProposePayload = finalizeSupervisedProposePayload({
     ...(res.data as SupervisedProposePayload),
     source: opts.source ?? "operativa",
     strategyOrSignalRef: strategyRef ?? null,
     strategyLabel: opts.strategyLabel ?? opts.symbol,
-  };
+  });
 
-  const close = payload.lastClose ?? payload.suggestedPrice ?? null;
-  if (
-    (priceHint == null || !(priceHint > 0)) &&
-    close != null &&
-    close > 0 &&
-    summary.cash > 0
-  ) {
-    const q = suggestQuantityFromCash({
-      cash: summary.cash,
-      price: close,
-      sizePctOfCash: book.defaultSizePctOfCash,
-    });
-    if (q > 0) {
-      payload = { ...payload, suggestedQuantity: q, suggestedPrice: close };
-    }
+  const close =
+    payload.lastClose ?? payload.suggestedPrice ?? priceHint ?? null;
+  if (close != null && payload.suggestedPrice == null) {
+    payload = { ...payload, suggestedPrice: close };
   }
   return payload;
 }

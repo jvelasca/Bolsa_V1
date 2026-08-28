@@ -30,19 +30,19 @@ Confirm = firma · `PAPER_D_EXECUTE` off · AUTO off · Ranking ≠ BUY · trail
 
 No mezclar mañana sin palabra explícita:
 
-| Prioridad        | Tema                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------ |
-| V1.25            | Risk-based sizing único · riesgo €+R en Confirm · what-if before/after en ticket · sector limits |
-| Lab              | Backtest `risk_policy` nunca pasado desde `backtests.py` (all-in)                                |
-| AUTO path        | `paper_auto` fill sin `sync_position_after_ledger_fill` (freeze OFF)                             |
-| Producto         | Grid Cobertura 180 · batch propose · promover trail · OpportunityScore · VaR/correlación · thaw  |
-| UX 10/10 (V1.28) | Command palette · hotkeys · layouts nombrados · flash tick · densidad · Cartera KPI Protección   |
+| Prioridad        | Tema                                                                                                                                                                                                                                                                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1.25            | Risk-based sizing único · riesgo €+R en Confirm · what-if before/after en ticket · sector limits · contrato [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md) · marco [`analisis-vs-apps-top-operative-flow-2026-08-28.md`](./analisis-vs-apps-top-operative-flow-2026-08-28.md) · ADR-040 §10 |
+| Lab              | Backtest `risk_policy` nunca pasado desde `backtests.py` (all-in)                                                                                                                                                                                                                                                                         |
+| AUTO path        | `paper_auto` fill sin `sync_position_after_ledger_fill` (freeze OFF)                                                                                                                                                                                                                                                                      |
+| Producto         | Grid Cobertura 180 · batch propose · promover trail · OpportunityScore · VaR/correlación · thaw                                                                                                                                                                                                                                           |
+| UX 10/10 (V1.28) | Command palette · hotkeys · layouts nombrados · flash tick · densidad · Cartera KPI Protección                                                                                                                                                                                                                                            |
 
 ## 3. Arranque mañana
 
-1. Leer este relevo + [`traspaso-relevo-tag-v1-24-beta-2026-08-28.md`](./traspaso-relevo-tag-v1-24-beta-2026-08-28.md).
+1. Leer este relevo + [`traspaso-relevo-tag-v1-24-beta-2026-08-28.md`](./traspaso-relevo-tag-v1-24-beta-2026-08-28.md) + marco Operative Flow [`analisis-vs-apps-top-operative-flow-2026-08-28.md`](./analisis-vs-apps-top-operative-flow-2026-08-28.md).
 2. Confirmar CI tag GREEN; si falta, pin URL en el tag relevo.
-3. Elegir **un** epic (recomendado: V1.25 operational safety **o** Lab backtest risk_policy — no ambos).
+3. Elegir **un** epic (recomendado: V1.25 operational safety según [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md) **o** Lab backtest risk_policy — no ambos).
 4. No reabrir vocabulario Preparada/Datos/Calidad sin test de contrato.
 
 ## 4. Verificación local (pre-tag)

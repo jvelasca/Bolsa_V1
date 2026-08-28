@@ -110,3 +110,39 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 - Honestidad Estudio: `estudioStatus` = `ok` | `empty` | `unavailable` (fallo ≠ 0 candidatos).
 - Sin motores nuevos · Ranking ≠ BUY · Confirm = firma · trail ≠ autoridad.
 - Ver [diseño Mercado 2.0](../engineering/diseno-mercado-2-0-cockpit-2026-08-27.md) · [relevo V1.23](../engineering/traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md).
+
+## 10. Enmienda V1.24+ — Operative Flow (filosofía, no pantalla)
+
+**Fecha:** 2026-08-28
+
+**Contexto:** Auditorías post-V1.24 contrastan Bolsa V1 con TradingView / IBKR / thinkorswim / eToro. Coinciden en el destino (mesa asistida por IA, no terminal genérico) y divergen en si «Hoy» debe dejar de ser puerta L1.
+
+**Decisión:**
+
+1. **Operative Flow** es la filosofía de interfaz sobre el cockpit ya existente — **no** una sexta puerta ni un panel nuevo:
+
+   ```
+   Calidad → Encaja → Preparada → Trigger → Riesgo → Confirm → Protegida → T1/T2 → Salir
+   ```
+
+   («No operar» es resultado de primera clase cuando Estudio está ok y no hay triggers válidos.)
+
+2. **Cinco puertas L1 intactas.** Rechazado colapsar Hoy dentro de Mercado como única app. Hoy sigue respondiendo UX-01 («¿qué debo hacer hoy?»). Un strip compacto «Hoy» _dentro_ de Mercado (enlace, sin borrar la puerta) queda **aparcado** a V1.27.
+
+3. **Shell Mercado congelado:** `LISTAS | GRÁFICO | OPERATIVA` ([diseño Mercado 2.0](../engineering/diseno-mercado-2-0-cockpit-2026-08-27.md)). El peso operacional sigue siendo Mercado opera / Hoy resume (§8). No nuevas barras ni paneles L1.
+
+4. **Dos capas de UI:** Nivel 1 humano (Vigilar / Preparar / Mantener / Proteger / Reducir / Salir / No operar); Nivel 2 profesional (TradePlan, R, ExitPermission, …) detrás de «Más información» / «¿Por qué?» / «Ajustes avanzados». Nunca exponer cinco objetos internos cuando hay una sola acción.
+
+5. **V1.25 = operational safety en Confirm**, no «UI 10/10»:
+   - Sizing único TradePlan → ticket
+   - Riesgo € / % / R visibles en default
+   - What-if Antes→Después en el ticket (`buildPortfolioScenario`)
+   - Override si se edita qty/entrada/stop
+   - Assessments colapsados
+   - Contrato normativo: [`contrato-confirm-v125-ticket-2026-08-28.md`](../engineering/contrato-confirm-v125-ticket-2026-08-28.md)
+
+6. **No adelantar** en V1.25: drag de niveles en gráfico, móvil nativo, Web Notifications, command palette / hotkeys / layouts, colapsar puertas, AUTO / thaw.
+
+7. **Eje de victoria vs apps TOP:** contexto (por qué + riesgo) · continuidad (tesis → posición → salida) · simplicidad de «qué hago ahora» — no copiar la superficie de TradingView ni la densidad de TWS.
+
+**Marco completo:** [`analisis-vs-apps-top-operative-flow-2026-08-28.md`](../engineering/analisis-vs-apps-top-operative-flow-2026-08-28.md).

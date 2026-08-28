@@ -54,7 +54,7 @@ describe("F3RiskSignatureBlock", () => {
     );
     const text = screen.getByTestId("f3-risk-signature").textContent ?? "";
     expect(text).toMatch(/Sin TradePlan TRIGGERED/i);
-    expect(text).toMatch(/% caja/i);
+    expect(text).toMatch(/manualmente/i);
   });
 
   it("asks for override reason when qty exceeds plan", () => {

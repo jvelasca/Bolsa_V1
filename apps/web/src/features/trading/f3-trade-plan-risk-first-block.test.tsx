@@ -44,14 +44,22 @@ describe("F3TradePlanRiskFirstBlock", () => {
     ).toMatch(/modificados/i);
   });
 
-  it("hides stale warning at baseline", () => {
+  it("shows loss at stop not cashImpact (T-SIZE-03)", () => {
     render(
       <F3TradePlanRiskFirstBlock
         ticket={ticket}
         stop={95}
+        signedLossAtStop={50}
+        riskPct={0.72}
+        signedR={1}
         inputsStale={false}
       />,
     );
-    expect(screen.queryByTestId("f3-trade-plan-inputs-stale")).toBeNull();
+    const lossRow = screen.getByTestId("f3-trade-plan-loss-at-stop");
+    expect(lossRow.textContent).toMatch(/50/);
+    expect(lossRow.textContent).not.toMatch(/1\.203/);
+    expect(screen.getByTestId("f3-trade-plan-risk-pct").textContent).toMatch(
+      /0\.72/,
+    );
   });
 });

@@ -11,6 +11,7 @@ const PRICE_EPS = 0.001;
 export type F3PlanBaselineV1 = {
   qty: number | null;
   price: number | null;
+  stop: number | null;
 };
 
 export function resolveF3PlanBaseline(input: {
@@ -35,12 +36,19 @@ export function resolveF3PlanBaseline(input: {
     input.lastClose ??
     null;
 
+  const stopCandidate =
+    typeof plan?.structuralStop === "number" &&
+    Number.isFinite(plan.structuralStop)
+      ? plan.structuralStop
+      : null;
+
   return {
     qty: planQty,
     price:
       typeof priceCandidate === "number" && Number.isFinite(priceCandidate)
         ? priceCandidate
         : null,
+    stop: stopCandidate,
   };
 }
 
@@ -63,15 +71,33 @@ export function resolveF3SignedPrice(input: {
     : null;
 }
 
-/** True cuando qty/precio editados difieren del baseline TRIGGERED. */
+/** Resuelve stop firmado (campo editable → baseline del plan). */
+export function resolveF3SignedStop(input: {
+  stopField: string;
+  baselineStop: number | null;
+}): number | null {
+  const trimmed = input.stopField.trim();
+  if (trimmed) {
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  return input.baselineStop;
+}
+
+/** True cuando qty/precio/stop editados difieren del baseline TRIGGERED. */
 export function f3TicketInputsStale(input: {
   quantity: string;
   priceField: string;
+  stopField?: string;
   baseline: F3PlanBaselineV1;
   suggestedPrice?: number | null;
   lastClose?: number | null;
 }): boolean {
-  if (input.baseline.qty == null && input.baseline.price == null) {
+  if (
+    input.baseline.qty == null &&
+    input.baseline.price == null &&
+    input.baseline.stop == null
+  ) {
     return false;
   }
 
@@ -94,6 +120,18 @@ export function f3TicketInputsStale(input: {
     input.baseline.price != null &&
     signedPrice != null &&
     Math.abs(signedPrice - input.baseline.price) > PRICE_EPS
+  ) {
+    return true;
+  }
+
+  const signedStop = resolveF3SignedStop({
+    stopField: input.stopField ?? "",
+    baselineStop: input.baseline.stop,
+  });
+  if (
+    input.baseline.stop != null &&
+    signedStop != null &&
+    Math.abs(signedStop - input.baseline.stop) > PRICE_EPS
   ) {
     return true;
   }

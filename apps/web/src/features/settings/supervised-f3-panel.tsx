@@ -22,10 +22,14 @@ import type {
 } from "@bolsa/shared";
 import {
   brokerAdapterVenueCopy,
+  buildConfirmPortfolioScenario,
+  buildPortfolioRiskSnapshot,
+  computeSignedPortfolioRiskPct,
   evaluateRiskSignature,
   executeCtaLabel,
   executionOutcomeCopy,
   paperOrderStatusCopy,
+  resolveSupervisedOpeningQuantity,
 } from "@bolsa/shared";
 import {
   Card,
@@ -51,7 +55,6 @@ import {
 import {
   demoBookAllowsExecute,
   loadDemoBookPrefs,
-  suggestQuantityFromCash,
   type DemoBookCountryPrefer,
 } from "@/features/trading/demo-book-prefs";
 import {
@@ -70,12 +73,14 @@ import {
 } from "@/features/trading/semi-hm-conflict";
 import { F3TicketPreviewBlock } from "@/features/trading/f3-ticket-preview-block";
 import { F3TradePlanRiskFirstBlock } from "@/features/trading/f3-trade-plan-risk-first-block";
+import { F3ConfirmWhatIfBlock } from "@/features/trading/f3-confirm-what-if-block";
 import { F3RiskSignatureBlock } from "@/features/trading/f3-risk-signature-block";
 import { F3ProtectStopBlock } from "@/features/trading/f3-protect-stop-block";
 import {
   f3TicketInputsStale,
   resolveF3PlanBaseline,
   resolveF3SignedPrice,
+  resolveF3SignedStop,
 } from "@/features/trading/f3-risk-input-baseline";
 import { resolveF3TicketPreview } from "@/features/trading/f3-ticket-preview";
 import { asOperativaProtectMeta } from "@/features/operations/propose-position-exit";
@@ -191,6 +196,8 @@ export function SupervisedF3Panel() {
   const [instrumentId, setInstrumentId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("");
+  const [stopField, setStopField] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [riskOverrideReason, setRiskOverrideReason] = useState("");
   const [includeFund, setIncludeFund] = useState(true);
   const [includeMacro, setIncludeMacro] = useState(true);
@@ -224,7 +231,15 @@ export function SupervisedF3Panel() {
     staleTime: 15_000,
   });
   const cash = summaryQuery.data?.data?.cash ?? 0;
+  const equity = summaryQuery.data?.data?.totalEquity ?? null;
   const summary = summaryQuery.data?.data;
+
+  const portfolioQuery = useQuery({
+    queryKey: ["portfolio-confirm-whatif", effectiveAccountId],
+    queryFn: () => api.getPortfolio(),
+    enabled: Boolean(effectiveAccountId && pending),
+    staleTime: 15_000,
+  });
 
   useEffect(() => {
     function refreshBookPrefs() {
@@ -243,7 +258,7 @@ export function SupervisedF3Panel() {
 
   useEffect(() => {
     setRiskOverrideReason("");
-  }, [activeId, quantity, price]);
+  }, [activeId, quantity, price, stopField]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -254,32 +269,25 @@ export function SupervisedF3Panel() {
       const px = item.payload.suggestedPrice ?? item.payload.lastClose ?? null;
       if (px != null) setPrice(String(px));
       const plan = item.payload.tradePlan;
-      const planQty =
-        plan?.status === "TRIGGERED" &&
-        typeof plan.quantity === "number" &&
-        Number.isFinite(plan.quantity) &&
-        plan.quantity > 0
-          ? plan.quantity
-          : null;
+      const planQty = resolveSupervisedOpeningQuantity({
+        tradePlan: plan,
+        serverSuggestedQuantity: item.payload.suggestedQuantity,
+      });
       if (planQty != null) {
         setQuantity(String(planQty));
+      } else if (item.payload.suggestedQuantity) {
+        setQuantity(String(item.payload.suggestedQuantity));
       } else {
-        const book = loadDemoBookPrefs();
-        if (px != null && cash > 0) {
-          const q = suggestQuantityFromCash({
-            cash,
-            price: Number(px),
-            sizePctOfCash: book.defaultSizePctOfCash,
-          });
-          if (q > 0) setQuantity(String(q));
-          else if (item.payload.suggestedQuantity)
-            setQuantity(String(item.payload.suggestedQuantity));
-        } else if (item.payload.suggestedQuantity) {
-          setQuantity(String(item.payload.suggestedQuantity));
-        }
+        setQuantity("1");
       }
+      const planStop =
+        typeof plan?.structuralStop === "number" &&
+        Number.isFinite(plan.structuralStop)
+          ? plan.structuralStop
+          : null;
+      setStopField(planStop != null ? String(planStop) : "");
     }
-  }, [activeId, queueItems, cash]);
+  }, [activeId, queueItems]);
 
   const selectedCount = useMemo(
     () => queueItems.filter((i) => selectedIds.has(i.id)).length,
@@ -605,6 +613,7 @@ export function SupervisedF3Panel() {
       f3TicketInputsStale({
         quantity,
         priceField: price,
+        stopField,
         baseline: planBaseline,
         suggestedPrice: pending?.suggestedPrice,
         lastClose: pending?.lastClose,
@@ -612,10 +621,20 @@ export function SupervisedF3Panel() {
     [
       quantity,
       price,
+      stopField,
       planBaseline,
       pending?.suggestedPrice,
       pending?.lastClose,
     ],
+  );
+
+  const signedStop = useMemo(
+    () =>
+      resolveF3SignedStop({
+        stopField,
+        baselineStop: planBaseline.stop,
+      }),
+    [stopField, planBaseline.stop],
   );
 
   const riskSignature = useMemo(() => {
@@ -630,6 +649,7 @@ export function SupervisedF3Panel() {
       tradePlan: pending?.tradePlan,
       signedQty: Number.isFinite(qty) ? qty : NaN,
       signedPrice: px ?? NaN,
+      signedStop,
       overrideReason: riskOverrideReason,
       requireTriggeredPlan:
         pending?.action === "recommend_long" ||
@@ -640,10 +660,111 @@ export function SupervisedF3Panel() {
     pending?.action,
     quantity,
     price,
+    signedStop,
     planBaseline.price,
     pending?.suggestedPrice,
     pending?.lastClose,
     riskOverrideReason,
+  ]);
+
+  const displayRiskPct = useMemo(
+    () =>
+      computeSignedPortfolioRiskPct({
+        signedLossAtStop: riskSignature.signedLossAtStop,
+        equity,
+        planRiskPct: pending?.tradePlan?.riskPct ?? null,
+      }),
+    [riskSignature.signedLossAtStop, equity, pending?.tradePlan?.riskPct],
+  );
+
+  const riskPerShare = useMemo(() => {
+    const px = resolveF3SignedPrice({
+      priceField: price,
+      baselinePrice: planBaseline.price,
+      suggestedPrice: pending?.suggestedPrice,
+      lastClose: pending?.lastClose,
+    });
+    if (px == null || signedStop == null) return null;
+    const dist = Math.abs(px - signedStop);
+    return dist > 0 ? dist : null;
+  }, [
+    price,
+    planBaseline.price,
+    pending?.suggestedPrice,
+    pending?.lastClose,
+    signedStop,
+  ]);
+
+  const portfolioRisk = useMemo(() => {
+    const positions = portfolioQuery.data?.data?.positions ?? [];
+    return buildPortfolioRiskSnapshot({
+      positions: positions.map((p) => ({
+        avgCost: p.avgCost,
+        quantity: p.quantity,
+        lastPrice: p.lastPrice,
+        marketValue: p.marketValue,
+        sector: p.sector ?? null,
+        operational: p.operational,
+      })),
+    });
+  }, [portfolioQuery.data]);
+
+  const confirmScenario = useMemo(() => {
+    if (!pending) return null;
+    const isOpening =
+      pending.action === "recommend_long" ||
+      pending.action === "recommend_short";
+    if (!isOpening) return null;
+    const qty = Number(quantity);
+    const px = resolveF3SignedPrice({
+      priceField: price,
+      baselinePrice: planBaseline.price,
+      suggestedPrice: pending.suggestedPrice,
+      lastClose: pending.lastClose,
+    });
+    if (!Number.isFinite(qty) || qty <= 0 || px == null || px <= 0) {
+      return null;
+    }
+    const symbol =
+      activeItem?.symbol ??
+      instrumentsForSelect.find((i) => i.id === pending.instrumentId)?.symbol ??
+      pending.instrumentId.slice(0, 6);
+    const positions = portfolioQuery.data?.data?.positions ?? [];
+    return buildConfirmPortfolioScenario({
+      symbol,
+      instrumentId: pending.instrumentId,
+      signedQty: qty,
+      signedPrice: px,
+      signedStop,
+      tradePlan: pending.tradePlan,
+      positions: positions.map((p) => ({
+        avgCost: p.avgCost,
+        quantity: p.quantity,
+        lastPrice: p.lastPrice,
+        marketValue: p.marketValue,
+        sector: p.sector ?? null,
+        operational: p.operational,
+      })),
+      equity: portfolioQuery.data?.data?.totalEquity ?? equity,
+      cash,
+      candidateSector:
+        instrumentsForSelect.find((i) => i.id === pending.instrumentId)
+          ?.sector ?? null,
+      maxSectorExposurePct: 40,
+      portfolioRiskLimitR: portfolioRisk.portfolioRiskLimitR,
+    });
+  }, [
+    pending,
+    quantity,
+    price,
+    signedStop,
+    planBaseline.price,
+    activeItem?.symbol,
+    instrumentsForSelect,
+    portfolioQuery.data,
+    equity,
+    cash,
+    portfolioRisk.portfolioRiskLimitR,
   ]);
 
   const executeBlockedByRisk =
@@ -862,64 +983,95 @@ export function SupervisedF3Panel() {
               placeholder="auto"
             />
           </label>
-          <div className="flex flex-col gap-1 pt-4 text-xs text-muted-foreground sm:col-span-3">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={includeFund}
-                onChange={(e) => setIncludeFund(e.target.checked)}
-              />
-              FundamentalAssessment (Yahoo cache)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={includeMacro}
-                onChange={(e) => setIncludeMacro(e.target.checked)}
-              />
-              MacroAssessment (Yahoo ^VIX / curva live)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={includeEvidence}
-                onChange={(e) => setIncludeEvidence(e.target.checked)}
-              />
-              EvidenceAssessment (último EdgeReport)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={includeNews}
-                onChange={(e) => setIncludeNews(e.target.checked)}
-              />
-              NewsAssessment (Yahoo news + calendario)
-            </label>
-          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">
+              Stop (técnico · editable)
+            </span>
+            <input
+              className="rounded-md border border-border bg-background px-2 py-1.5"
+              value={stopField}
+              onChange={(e) => setStopField(e.target.value)}
+              placeholder="plan"
+              data-testid="f3-stop-field"
+            />
+          </label>
+          {advancedOpen ? (
+            <div className="flex flex-col gap-1 pt-4 text-xs text-muted-foreground sm:col-span-3">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeFund}
+                  onChange={(e) => setIncludeFund(e.target.checked)}
+                />
+                FundamentalAssessment (Yahoo cache)
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeMacro}
+                  onChange={(e) => setIncludeMacro(e.target.checked)}
+                />
+                MacroAssessment (Yahoo ^VIX / curva live)
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeEvidence}
+                  onChange={(e) => setIncludeEvidence(e.target.checked)}
+                />
+                EvidenceAssessment (último EdgeReport)
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeNews}
+                  onChange={(e) => setIncludeNews(e.target.checked)}
+                />
+                NewsAssessment (Yahoo news + calendario)
+              </label>
+            </div>
+          ) : null}
         </div>
-        {ticketPreview ? (
+        {ticketPreview && pending ? (
           <>
             <F3TradePlanRiskFirstBlock
               ticket={ticketPreview}
               stop={
-                protectMeta?.suggestedStop ?? protectMeta?.currentStop ?? null
+                signedStop ??
+                protectMeta?.suggestedStop ??
+                protectMeta?.currentStop ??
+                null
               }
-              target1={null}
-              riskPct={null}
+              target1={pending.tradePlan?.target1 ?? null}
+              riskPct={displayRiskPct}
+              signedLossAtStop={riskSignature.signedLossAtStop}
+              signedR={riskSignature.signedR}
+              riskPerShare={riskPerShare}
               inputsStale={ticketInputsStale}
             />
-            <F3TicketPreviewBlock ticket={ticketPreview} />
+            {confirmScenario ? (
+              <F3ConfirmWhatIfBlock scenario={confirmScenario} />
+            ) : null}
+            <F3RiskSignatureBlock
+              signature={riskSignature}
+              currency={accountCurrency}
+              overrideReason={riskOverrideReason}
+              onOverrideReasonChange={setRiskOverrideReason}
+            />
           </>
         ) : null}
-        {pending ? (
-          <F3RiskSignatureBlock
-            signature={riskSignature}
-            currency={accountCurrency}
-            overrideReason={riskOverrideReason}
-            onOverrideReasonChange={setRiskOverrideReason}
-          />
+        <button
+          type="button"
+          className="text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+          onClick={() => setAdvancedOpen((v) => !v)}
+          data-testid="f3-advanced-toggle"
+        >
+          {advancedOpen ? "Ocultar ajustes avanzados" : "Ajustes avanzados"}
+        </button>
+        {advancedOpen && ticketPreview ? (
+          <F3TicketPreviewBlock ticket={ticketPreview} />
         ) : null}
-        {protectMeta ? (
+        {advancedOpen && protectMeta ? (
           <F3ProtectStopBlock
             meta={protectMeta}
             currency={accountCurrency}
@@ -985,64 +1137,68 @@ export function SupervisedF3Panel() {
           </button>
         </div>
 
-        {ta ? (
-          <AssessmentBlock
-            title="Technical Assessment"
-            bias={ta.bias}
-            score={ta.score}
-            confidence={ta.confidence}
-            coverage={ta.coverage}
-            facts={ta.narrativeFacts ?? ta.facts}
-            warnings={ta.warnings}
-            components={ta.components}
-          />
-        ) : null}
-        {fa ? (
-          <AssessmentBlock
-            title="Fundamental Assessment"
-            bias={fa.bias}
-            score={fa.score}
-            confidence={fa.confidence}
-            coverage={fa.coverage}
-            facts={fa.narrativeFacts ?? fa.facts}
-            warnings={fa.warnings}
-            components={fa.components}
-          />
-        ) : null}
-        {ma ? (
-          <AssessmentBlock
-            title="Macro Assessment"
-            bias={ma.bias}
-            score={ma.score}
-            confidence={ma.confidence}
-            coverage={ma.coverage}
-            facts={ma.narrativeFacts ?? ma.facts}
-            warnings={ma.warnings}
-            components={ma.components}
-            extra={`${ma.regime} / ${ma.tradability}`}
-          />
-        ) : null}
-        {ea ? (
-          <AssessmentBlock
-            title="Evidence Assessment"
-            score={ea.score}
-            confidence={ea.confidence}
-            facts={ea.narrativeFacts ?? ea.facts}
-            warnings={ea.warnings}
-            extra={`band=${ea.band} · cred=${ea.credibility}`}
-          />
-        ) : null}
-        {na && na.eventCount > 0 ? (
-          <AssessmentBlock
-            title="News Assessment"
-            bias={na.bias}
-            score={na.score}
-            confidence={na.confidence}
-            coverage={na.coverage}
-            facts={na.narrativeFacts ?? na.facts}
-            warnings={na.warnings}
-            extra={`${na.eventCount} evento(s) · sent ${na.sentiment.toFixed(2)}`}
-          />
+        {advancedOpen ? (
+          <div className="space-y-3" data-testid="f3-advanced-section">
+            {ta ? (
+              <AssessmentBlock
+                title="Technical Assessment"
+                bias={ta.bias}
+                score={ta.score}
+                confidence={ta.confidence}
+                coverage={ta.coverage}
+                facts={ta.narrativeFacts ?? ta.facts}
+                warnings={ta.warnings}
+                components={ta.components}
+              />
+            ) : null}
+            {fa ? (
+              <AssessmentBlock
+                title="Fundamental Assessment"
+                bias={fa.bias}
+                score={fa.score}
+                confidence={fa.confidence}
+                coverage={fa.coverage}
+                facts={fa.narrativeFacts ?? fa.facts}
+                warnings={fa.warnings}
+                components={fa.components}
+              />
+            ) : null}
+            {ma ? (
+              <AssessmentBlock
+                title="Macro Assessment"
+                bias={ma.bias}
+                score={ma.score}
+                confidence={ma.confidence}
+                coverage={ma.coverage}
+                facts={ma.narrativeFacts ?? ma.facts}
+                warnings={ma.warnings}
+                components={ma.components}
+                extra={`${ma.regime} / ${ma.tradability}`}
+              />
+            ) : null}
+            {ea ? (
+              <AssessmentBlock
+                title="Evidence Assessment"
+                score={ea.score}
+                confidence={ea.confidence}
+                facts={ea.narrativeFacts ?? ea.facts}
+                warnings={ea.warnings}
+                extra={`band=${ea.band} · cred=${ea.credibility}`}
+              />
+            ) : null}
+            {na && na.eventCount > 0 ? (
+              <AssessmentBlock
+                title="News Assessment"
+                bias={na.bias}
+                score={na.score}
+                confidence={na.confidence}
+                coverage={na.coverage}
+                facts={na.narrativeFacts ?? na.facts}
+                warnings={na.warnings}
+                extra={`${na.eventCount} evento(s) · sent ${na.sentiment.toFixed(2)}`}
+              />
+            ) : null}
+          </div>
         ) : null}
 
         {pending ? (

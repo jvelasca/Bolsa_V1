@@ -126,4 +126,31 @@ describe("evaluateRiskSignature", () => {
     expect(s.allowed).toBe(false);
     expect(s.signedLossAtStop).toBe(150);
   });
+
+  it("T-SIZE-05: signedStop recalculates loss and R", () => {
+    const baseline = evaluateRiskSignature({
+      tradePlan: triggeredPlan(),
+      signedQty: 10,
+      signedPrice: 100,
+    });
+    const tighter = evaluateRiskSignature({
+      tradePlan: triggeredPlan(),
+      signedQty: 10,
+      signedPrice: 100,
+      signedStop: 97,
+    });
+    expect(baseline.signedLossAtStop).toBe(50);
+    expect(tighter.signedLossAtStop).toBe(30);
+    expect(tighter.signedR).toBeLessThan(baseline.signedR!);
+  });
+
+  it("T-SIZE-04: qty above plan requires override", () => {
+    const s = evaluateRiskSignature({
+      tradePlan: triggeredPlan(),
+      signedQty: 20,
+      signedPrice: 100,
+    });
+    expect(s.overrideRequired).toBe(true);
+    expect(s.allowed).toBe(false);
+  });
 });

@@ -1,5 +1,5 @@
 /**
- * V1.17 — ticket Confirm con orden riesgo → entrada → objetivo.
+ * V1.25 — ticket Confirm default: riesgo al stop (no cashImpact como pérdida máx.).
  */
 
 import { type ReactNode } from "react";
@@ -12,7 +12,10 @@ type F3TradePlanRiskFirstBlockProps = {
   stop?: number | null;
   target1?: number | null;
   riskPct?: number | null;
-  /** Cantidad/precio editados vs plan TRIGGERED — firma recalculada. */
+  /** Pérdida al stop (qty × |entry − stop|) — no notional/cashImpact. */
+  signedLossAtStop?: number | null;
+  signedR?: number | null;
+  riskPerShare?: number | null;
   inputsStale?: boolean;
   className?: string;
 };
@@ -28,9 +31,17 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  testId,
+}: {
+  label: string;
+  value: string;
+  testId?: string;
+}) {
   return (
-    <div className="flex justify-between gap-2 text-xs">
+    <div className="flex justify-between gap-2 text-xs" data-testid={testId}>
       <span className="text-muted-foreground">{label}</span>
       <span className="tabular-nums font-medium">{value}</span>
     </div>
@@ -42,11 +53,19 @@ export function F3TradePlanRiskFirstBlock({
   stop,
   target1,
   riskPct,
+  signedLossAtStop,
+  signedR,
+  riskPerShare,
   inputsStale = false,
   className,
 }: F3TradePlanRiskFirstBlockProps) {
   const { currency } = ticket;
   const money = (n: number) => `${formatPrice(n)} ${currency}`;
+
+  const lossLabel =
+    signedLossAtStop != null && Number.isFinite(signedLossAtStop)
+      ? money(signedLossAtStop)
+      : "—";
 
   return (
     <div
@@ -57,31 +76,46 @@ export function F3TradePlanRiskFirstBlock({
       data-testid="f3-trade-plan-risk-first"
     >
       <p className="text-[11px] font-medium">
-        Trade plan · {ticket.sideLabel}
+        Ticket · {ticket.sideLabel}
         {ticket.actionLabel ? ` · ${ticket.actionLabel}` : ""}
       </p>
-
-      <Section title="Riesgo (primero)">
-        <Row label="Stop" value={stop != null ? formatPrice(stop) : "—"} />
-        <Row
-          label="Pérdida máx. (est.)"
-          value={money(Math.abs(ticket.cashImpact))}
-        />
-        {riskPct != null ? (
-          <Row label="% cartera" value={`${riskPct.toFixed(2)}%`} />
-        ) : null}
-      </Section>
 
       <Section title="Entrada">
         <Row
           label="Precio"
           value={`${ticket.quantity} × ${formatPrice(ticket.price)}`}
         />
-        <Row label="Notional" value={money(ticket.notional)} />
+        <Row label="Exposición" value={money(ticket.notional)} />
+      </Section>
+
+      <Section title="Riesgo (primero)">
+        <Row label="Stop" value={stop != null ? formatPrice(stop) : "—"} />
+        {riskPerShare != null ? (
+          <Row label="Riesgo / acción" value={formatPrice(riskPerShare)} />
+        ) : null}
+        <Row
+          label="Riesgo total (al stop)"
+          value={lossLabel}
+          testId="f3-trade-plan-loss-at-stop"
+        />
+        {riskPct != null ? (
+          <Row
+            label="Riesgo % cartera"
+            value={`${riskPct.toFixed(2)}%`}
+            testId="f3-trade-plan-risk-pct"
+          />
+        ) : null}
+        {signedR != null ? (
+          <Row
+            label="R firmado"
+            value={`${signedR} R`}
+            testId="f3-trade-plan-signed-r"
+          />
+        ) : null}
       </Section>
 
       <Section title="Objetivo">
-        <Row label="TP1" value={target1 != null ? formatPrice(target1) : "—"} />
+        <Row label="T1" value={target1 != null ? formatPrice(target1) : "—"} />
       </Section>
 
       {inputsStale ? (
@@ -89,13 +123,14 @@ export function F3TradePlanRiskFirstBlock({
           className="text-[11px] text-amber-800 dark:text-amber-300"
           data-testid="f3-trade-plan-inputs-stale"
         >
-          Cantidad o precio modificados respecto al plan — la firma de riesgo se
-          recalcula. Si superas el plan, escribe un motivo antes de ejecutar.
+          Cantidad, precio o stop modificados respecto al plan — la firma de
+          riesgo se recalcula. Si superas el plan, escribe un motivo antes de
+          ejecutar.
         </p>
       ) : null}
       <p className="text-[10px] text-muted-foreground border-t border-border/60 pt-2">
-        PLAN → PROPUESTA → EJECUTADO. Modificar cantidad invalida el riesgo
-        calculado — recalcular antes de firmar.
+        PLAN → PROPUESTA → FIRMA. El riesgo mostrado es pérdida al stop, no
+        débito de caja.
       </p>
     </div>
   );

@@ -51,6 +51,8 @@ export function evaluateRiskSignature(input: {
   tradePlan: TradePlanV1 | null | undefined;
   signedQty: number;
   signedPrice: number;
+  /** Stop firmado (editable en ticket). Default = plan.structuralStop. */
+  signedStop?: number | null;
   overrideReason?: string | null;
   requireTriggeredPlan?: boolean;
 }): RiskSignatureV1 {
@@ -88,7 +90,12 @@ export function evaluateRiskSignature(input: {
     };
   }
 
-  const stop = finite(plan.structuralStop) ? plan.structuralStop : null;
+  const stop =
+    finite(input.signedStop) && input.signedStop > 0
+      ? input.signedStop
+      : finite(plan.structuralStop)
+        ? plan.structuralStop
+        : null;
   const plannedRisk = finite(plan.riskAmount) ? plan.riskAmount : null;
   const initialRiskR = finite(plan.initialRiskR) ? plan.initialRiskR : null;
 

@@ -22,8 +22,8 @@ import {
   demoBookRequiresEstudioMembership,
   ESTUDIO_MEMBERSHIP_REQUIRED_MSG,
   loadDemoBookPrefs,
-  suggestQuantityFromCash,
 } from "@/features/trading/demo-book-prefs";
+import { finalizeSupervisedProposePayload } from "@/features/trading/supervised-opening-sizing";
 import type { SupervisedProposePayload } from "@/stores/supervised-f3-queue-store";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 
@@ -62,50 +62,29 @@ export async function proposeFinalistSupervised(opts: {
   }
   const priceHint =
     opts.priceHint != null && opts.priceHint > 0 ? opts.priceHint : null;
-  let suggestedQuantity = 1;
-  if (priceHint != null && summary.cash > 0) {
-    const q = suggestQuantityFromCash({
-      cash: summary.cash,
-      price: priceHint,
-      sizePctOfCash: book.defaultSizePctOfCash,
-    });
-    if (q > 0) suggestedQuantity = q;
-  }
 
   const res = await api.proposeRecommendation({
     instrumentId: opts.instrumentId,
     symbol: opts.symbol,
     accountId: opts.accountId,
-    suggestedQuantity,
+    suggestedQuantity: 1,
     includeFundamentals: true,
     includeMacro: true,
     includeEvidence: true,
     includeNews: true,
     strategyOrSignalRef: opts.strategyDefinitionId,
   });
-  const payload = {
+  const payload = finalizeSupervisedProposePayload({
     ...(res.data as SupervisedProposePayload),
     source: FINALIST_SUPERVISED_SOURCE,
     strategyOrSignalRef: opts.strategyDefinitionId,
     strategyLabel: opts.strategyLabel ?? opts.symbol,
-  } satisfies SupervisedProposePayload;
+  } satisfies SupervisedProposePayload);
 
-  // Si no había priceHint, recalcular qty con lastClose del propose.
-  const close = payload.lastClose ?? payload.suggestedPrice ?? null;
-  if (
-    (opts.priceHint == null || !(opts.priceHint > 0)) &&
-    close != null &&
-    close > 0 &&
-    summary.cash > 0
-  ) {
-    const q = suggestQuantityFromCash({
-      cash: summary.cash,
-      price: close,
-      sizePctOfCash: book.defaultSizePctOfCash,
-    });
-    if (q > 0) {
-      return { ...payload, suggestedQuantity: q, suggestedPrice: close };
-    }
+  const close =
+    payload.lastClose ?? payload.suggestedPrice ?? priceHint ?? null;
+  if (close != null && payload.suggestedPrice == null) {
+    return { ...payload, suggestedPrice: close };
   }
   return payload;
 }

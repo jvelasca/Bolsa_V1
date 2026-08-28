@@ -56,4 +56,4 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · Confirm = firma · `PAPE
 
 ## 5. Next
 
-Elegir **un** epic: V1.25 operational safety **o** Lab `risk_policy` wiring. No thaw/AUTO.
+Elegir **un** epic: V1.25 operational safety ([`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md) · marco [`analisis-vs-apps-top-operative-flow-2026-08-28.md`](./analisis-vs-apps-top-operative-flow-2026-08-28.md) · ADR-040 §10) **o** Lab `risk_policy` wiring. No thaw/AUTO.

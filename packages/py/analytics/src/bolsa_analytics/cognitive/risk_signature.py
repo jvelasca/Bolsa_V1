@@ -38,6 +38,7 @@ def evaluate_risk_signature(
     *,
     signed_qty: float,
     signed_price: float,
+    signed_stop: float | None = None,
     override_reason: str | None = None,
     require_triggered_plan: bool = False,
 ) -> dict[str, Any]:
@@ -70,7 +71,10 @@ def evaluate_risk_signature(
             "blockReason": "no_tradeplan" if require_triggered_plan else None,
         }
 
-    stop = _finite(plan.get("structuralStop") if plan else None)
+    plan_stop = _finite(plan.get("structuralStop") if plan else None)
+    stop = _finite(signed_stop) if signed_stop is not None else plan_stop
+    if stop is not None and stop <= 0:
+        stop = plan_stop
     planned_risk = _finite(plan.get("riskAmount") if plan else None)
     initial_risk_r = _finite(plan.get("initialRiskR") if plan else None)
 

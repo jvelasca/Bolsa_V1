@@ -42,6 +42,8 @@ export * from "./scan-freshness-chip.js";
 export * from "./operational-plan-view.js";
 export * from "./product-vocabulary.js";
 export * from "./portfolio-scenario.js";
+export * from "./confirm-opening-sizing.js";
+export * from "./confirm-portfolio-scenario.js";
 export * from "./unified-alerts.js";
 export * from "./mesa-next-action.js";
 export * from "./mesa-protection-state.js";
