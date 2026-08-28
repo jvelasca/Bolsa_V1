@@ -1,6 +1,6 @@
 # RELEVO — V1.25 Operational safety (2026-08-28)
 
-> **AsOf:** 2026-08-28 · **Estado:** **PUBLICACIÓN** — tag `v1.25-beta` → `b4e05eab`.
+> **AsOf:** 2026-08-28 · **Estado:** **PUBLICACIÓN** — tag `v1.25-beta` → `d3c2fd6b`.
 > **Padre:** [`traspaso-relevo-v1-24-honesty-2026-08-28.md`](./traspaso-relevo-v1-24-honesty-2026-08-28.md) · [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md) · [ADR-040 §10](../adr/040-user-information-architecture.md).
 > **Tag relevo:** [`traspaso-relevo-tag-v1-25-beta-2026-08-28.md`](./traspaso-relevo-tag-v1-25-beta-2026-08-28.md).
 

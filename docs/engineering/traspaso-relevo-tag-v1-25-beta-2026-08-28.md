@@ -1,7 +1,7 @@
 # RELEVO — tag v1.25-beta → auditoría / mañana (2026-08-28)
 
 > **Padre:** [`traspaso-relevo-v1-25-operational-safety-2026-08-28.md`](./traspaso-relevo-v1-25-operational-safety-2026-08-28.md) · [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.25-beta` → tip `b4e05eab`. **Release tag CI:** pin URL tras Actions GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.25-beta` → tip `d3c2fd6b`. **Release tag CI:** pin URL tras Actions GREEN.
 > **Arranque chat nuevo:** este relevo + contrato V1.25 + freeze SEMI · auditor externo: [`arranque-auditor-v1-25-beta-2026-08-28.md`](./arranque-auditor-v1-25-beta-2026-08-28.md).
 
 ---
@@ -18,7 +18,7 @@
 
 | Pieza     | Valor                                                                                                                |
 | --------- | -------------------------------------------------------------------------------------------------------------------- |
-| Tag       | `v1.25-beta` → `b4e05eab` (feat `f8e53f57` + test fix)                                                               |
+| Tag       | `v1.25-beta` → `d3c2fd6b` (feat `f8e53f57` + CI fixes)                                                               |
 | Previo    | `v1.24-beta` → `c75b26a6` (tip docs `0d19e3aa`)                                                                      |
 | Relevo    | [`traspaso-relevo-v1-25-operational-safety-2026-08-28.md`](./traspaso-relevo-v1-25-operational-safety-2026-08-28.md) |
 | Contrato  | [`contrato-confirm-v125-ticket-2026-08-28.md`](./contrato-confirm-v125-ticket-2026-08-28.md)                         |

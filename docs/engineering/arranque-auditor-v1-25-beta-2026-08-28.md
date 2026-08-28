@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 post-tag **`v1.25-beta` → `b4e05eab`**.
+Eres auditor externo de Bolsa V1 post-tag **`v1.25-beta` → `d3c2fd6b`**.
 
 Lee en este orden:
 
