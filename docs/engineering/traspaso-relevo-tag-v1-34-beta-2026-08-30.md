@@ -1,7 +1,7 @@
 # RELEVO — tag v1.34-beta (+ v1.27-beta) → auditoría / siguiente chat (2026-08-30)
 
 > **Padre:** [`traspaso-relevo-v1-34-frente-b-drag-b-gamma-2026-08-30.md`](./traspaso-relevo-v1-34-frente-b-drag-b-gamma-2026-08-30.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **PUBLICACIÓN** — tag `v1.34-beta` → tip; tag `v1.27-beta` → `3315b69a`.  
+> **Estado:** **HISTÓRICO** — tag `v1.34-beta` → `b5d6bc29` (producto B-γ). Release-tag CI **RED** (ruff). Tip certificado posterior: [`traspaso-relevo-tag-v1-34-1-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-34-1-beta-2026-08-31.md).  
 > **Deuda tag:** V1.28…V1.33.3 + V1.31.1 + V1.31.2 **absorbidos** en tip (sin SHA por epic).  
 > **Fuera:** B-δ · OCO · entry/T1/T2 drag · flip execute · thaw.
 
@@ -28,6 +28,7 @@
 | Spine      | `pnpm test:decision-spine` **540**                                                                                         |
 | Daily ops  | `pnpm test:daily-ops:offline` OK                                                                                           |
 | Web tsc    | `pnpm --filter @bolsa/web exec tsc --noEmit` OK                                                                            |
+| CI tag     | [RED](https://github.com/jvelasca/Bolsa_V1/actions/runs/33337991420) (ruff) → supersede `v1.34.1-beta`                     |
 
 ### Owner: publicar
 
@@ -35,6 +36,8 @@
 git push origin main
 git push origin v1.27-beta v1.34-beta
 ```
+
+**Hecho** (2026-08-30). Tip CI fix → tag `v1.34.1-beta`.
 
 ## 2. Freeze
 
