@@ -28,13 +28,11 @@ from bolsa_analytics.cognitive.decision_session import (
     build_auto_session,
 )
 from bolsa_analytics.cognitive.execution_record import build_execution_record
+from bolsa_analytics.cognitive.exit_risk_signature import evaluate_exit_risk_signature
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.recommendation import Recommendation
 from bolsa_analytics.cognitive.risk_signature import apply_signed_levels_to_trade_plan
-from bolsa_analytics.cognitive.exit_risk_signature import evaluate_exit_risk_signature
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
-
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.broker_adapter import IBrokerAdapter, resolve_broker_adapter
@@ -81,6 +79,7 @@ from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
 )
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 # Compat: nombres privados históricos usados por tests internos / re-exports.
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}

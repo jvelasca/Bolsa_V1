@@ -88,7 +88,7 @@ def select_estudio_opening_candidates(
         as_of_s = as_of.isoformat() if isinstance(as_of, date) else str(as_of or "")[:10]
         out.append(
             {
-                "instrumentId": str(getattr(row, "instrument_id")),
+                "instrumentId": str(row.instrument_id),
                 "stance": stance,
                 "dictamenStars": stars,
                 "autoSource": auto_source,

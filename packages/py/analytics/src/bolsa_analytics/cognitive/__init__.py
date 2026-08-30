@@ -1,13 +1,5 @@
 """RFC-008 Cognitive Decision Architecture — D1…D7."""
 
-from bolsa_domain.entities.market_event import (
-    EventBlackoutContext,
-    MarketEvent,
-    MarketEventCalendar,
-    build_market_event,
-    event_decay_weight,
-)
-
 from bolsa_analytics.cognitive.auto_live import AutoLiveCheck, check_auto_live
 from bolsa_analytics.cognitive.bracket_plan import (
     BRACKET_PLAN_KEY,
@@ -59,6 +51,11 @@ from bolsa_analytics.cognitive.edge_report import (
     build_edge_report,
     compute_credibility,
 )
+from bolsa_analytics.cognitive.effective_trading_policy import (
+    effective_max_sector_exposure_pct,
+    format_portfolio_fit_preview,
+    resolve_effective_trading_policy,
+)
 from bolsa_analytics.cognitive.effectiveness import (
     EffectivenessSummary,
     build_effectiveness_summary,
@@ -98,22 +95,12 @@ from bolsa_analytics.cognitive.exit_policy import (
     resolve_exit_policy,
     suggestion_from_exit_policy,
 )
-from bolsa_analytics.cognitive.effective_trading_policy import (
-    effective_max_sector_exposure_pct,
-    format_portfolio_fit_preview,
-    resolve_effective_trading_policy,
-)
-from bolsa_analytics.cognitive.position_decision import (
-    POSITION_DECISION_KEY,
-    PositionDecision,
-    build_position_decision,
-    map_recon_status_to_health,
-)
 from bolsa_analytics.cognitive.exit_radar import (
     EXIT_RADAR_KEY,
     build_exit_radar_dict,
     map_exit_radar,
 )
+from bolsa_analytics.cognitive.exit_risk_signature import evaluate_exit_risk_signature
 from bolsa_analytics.cognitive.expectancy import (
     EXPECTANCY_KEY,
     build_expectancy_dict,
@@ -209,6 +196,12 @@ from bolsa_analytics.cognitive.portfolio_reconciliation import (
     build_portfolio_reconciliation,
     reconciliation_status_copy,
 )
+from bolsa_analytics.cognitive.position_decision import (
+    POSITION_DECISION_KEY,
+    PositionDecision,
+    build_position_decision,
+    map_recon_status_to_health,
+)
 from bolsa_analytics.cognitive.position_revision import (
     POSITION_REVISIONS_KEY,
     PositionRevision,
@@ -237,14 +230,6 @@ from bolsa_analytics.cognitive.risk_signature import (
     apply_signed_levels_to_trade_plan,
     evaluate_risk_signature,
 )
-from bolsa_analytics.cognitive.exit_risk_signature import evaluate_exit_risk_signature
-from bolsa_analytics.cognitive.supervised_opening_sizing import (
-    AUTO_OPENING_SOURCES,
-    extract_hit_auto_source,
-    extract_hit_trade_plan,
-    is_allowed_auto_opening_source,
-    resolve_supervised_opening_quantity,
-)
 from bolsa_analytics.cognitive.score_macro import ScoreMacroResult, score_macro_from_facts
 from bolsa_analytics.cognitive.stats_suite import (
     monte_carlo_permutation_p_value,
@@ -261,6 +246,13 @@ from bolsa_analytics.cognitive.submit_intent import (
     send_attempted_durable,
 )
 from bolsa_analytics.cognitive.suggest_policy import suggest_policy_template_from_declared
+from bolsa_analytics.cognitive.supervised_opening_sizing import (
+    AUTO_OPENING_SOURCES,
+    extract_hit_auto_source,
+    extract_hit_trade_plan,
+    is_allowed_auto_opening_source,
+    resolve_supervised_opening_quantity,
+)
 from bolsa_analytics.cognitive.thesis_health import (
     THESIS_HEALTH_KEY,
     build_thesis_health_dict,
@@ -297,6 +289,13 @@ from bolsa_analytics.cognitive.weight_rules import (
     WeightRuleResult,
     resolve_weight_rules,
     weight_rules_for_horizon,
+)
+from bolsa_domain.entities.market_event import (
+    EventBlackoutContext,
+    MarketEvent,
+    MarketEventCalendar,
+    build_market_event,
+    event_decay_weight,
 )
 
 __all__ = [

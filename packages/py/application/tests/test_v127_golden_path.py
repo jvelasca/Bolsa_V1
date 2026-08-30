@@ -6,9 +6,9 @@ from typing import Any
 
 import pytest
 
+from bolsa_analytics.cognitive.portfolio_reconciliation import build_portfolio_reconciliation
 from bolsa_analytics.cognitive.position_decision import build_position_decision
 from bolsa_analytics.cognitive.position_state import position_state_from_dict
-from bolsa_analytics.cognitive.portfolio_reconciliation import build_portfolio_reconciliation
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_application.persist_position_from_exit import (
     PersistPositionFromExit,

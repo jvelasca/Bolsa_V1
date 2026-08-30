@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from bolsa_analytics.cognitive.exit_policy import (
+    AGGRESSIVE_SWING_EXIT_POLICY,
+    CONSERVATIVE_EXIT_POLICY,
+    MODERATE_EXIT_POLICY,
+)
 from bolsa_analytics.cognitive.trading_policy import (
     BlackoutConstraints,
     EvidenceThresholds,
@@ -13,11 +18,6 @@ from bolsa_analytics.cognitive.trading_policy import (
     RiskConstraints,
     TradingPolicy,
     UniverseConstraints,
-)
-from bolsa_analytics.cognitive.exit_policy import (
-    AGGRESSIVE_SWING_EXIT_POLICY,
-    CONSERVATIVE_EXIT_POLICY,
-    MODERATE_EXIT_POLICY,
 )
 
 _NOW = "2026-07-22T00:00:00.000Z"
