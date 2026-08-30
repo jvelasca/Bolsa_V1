@@ -1,8 +1,8 @@
 # RELEVO — V1.34 Frente B Drag B-γ (2026-08-30)
 
-> **AsOf:** 2026-08-31 · **Estado:** **PUBLICADO** — stop drag → Confirm; tip certificado `v1.34.1-beta` (CI GREEN); producto `v1.34-beta` → `b5d6bc29`.  
+> **AsOf:** 2026-08-31 · **Estado:** **PUBLICADO** — stop drag → Confirm; tip certificado `v1.34.1-beta` → `4b2e3751` (CI GREEN); producto `v1.34-beta` → `b5d6bc29`.  
 > **Padre:** [`diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md`](./diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md) · [`plan-v134-frente-b-drag-b-gamma-2026-08-30.md`](./plan-v134-frente-b-drag-b-gamma-2026-08-30.md).  
-> **Tags:** `v1.34.1-beta` (tip CI) · `v1.34-beta` → `b5d6bc29` · `v1.27-beta` → `3315b69a` · previo `v1.26-beta` → `96c0d5d7`. Handoff [`traspaso-relevo-tag-v1-34-1-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-34-1-beta-2026-08-31.md).
+> **Tags:** `v1.34.1-beta` → `4b2e3751` · `v1.34-beta` → `b5d6bc29` · `v1.27-beta` → `3315b69a` · previo `v1.26-beta` → `96c0d5d7`. Handoff [`traspaso-relevo-tag-v1-34-1-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-34-1-beta-2026-08-31.md).
 
 ---
 

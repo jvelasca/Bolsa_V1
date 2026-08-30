@@ -18,7 +18,7 @@
 
 | Pieza      | Valor                                                                                                                      |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Tag tip    | `v1.34.1-beta` → tip docs pin (este commit)                                                                                |
+| Tag tip    | `v1.34.1-beta` → `4b2e3751`                                                                                                |
 | Código CI  | `ed84a717` (ruff `afe56506` · mypy `3fb63871` · fixtures stale)                                                            |
 | Previo tip | `v1.34-beta` → `b5d6bc29` (CI tag RED)                                                                                     |
 | Tag POM    | `v1.27-beta` → `3315b69a`                                                                                                  |
