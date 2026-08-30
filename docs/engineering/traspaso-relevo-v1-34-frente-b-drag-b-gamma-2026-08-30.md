@@ -1,8 +1,8 @@
 # RELEVO — V1.34 Frente B Drag B-γ (2026-08-30)
 
-> **AsOf:** 2026-08-30 · **Estado:** **PUBLICADO** — stop drag → Confirm; tag tip `v1.34-beta` → `3340b0f3`.  
+> **AsOf:** 2026-08-30 · **Estado:** **PUBLICADO** — stop drag → Confirm; tag tip `v1.34-beta` → `b5d6bc29`.  
 > **Padre:** [`diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md`](./diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md) · [`plan-v134-frente-b-drag-b-gamma-2026-08-30.md`](./plan-v134-frente-b-drag-b-gamma-2026-08-30.md).  
-> **Tags:** `v1.34-beta` → `3340b0f3` · `v1.27-beta` → `3315b69a` · previo `v1.26-beta` → `96c0d5d7`. Handoff [`traspaso-relevo-tag-v1-34-beta-2026-08-30.md`](./traspaso-relevo-tag-v1-34-beta-2026-08-30.md).
+> **Tags:** `v1.34-beta` → `b5d6bc29` · `v1.27-beta` → `3315b69a` · previo `v1.26-beta` → `96c0d5d7`. Handoff [`traspaso-relevo-tag-v1-34-beta-2026-08-30.md`](./traspaso-relevo-tag-v1-34-beta-2026-08-30.md).
 
 ---
 
@@ -40,4 +40,4 @@ Confirm = firma · gráfico no autoriza · sin PositionRevision desde chart · A
 2. `pnpm exec vitest run src/features/charts/chart-stop-drag-policy.test.ts src/features/charts/chart-stop-drag-commit.test.ts` (cwd `apps/web`).
 3. Smoke: Mercado · valor preparada/posición con niveles → handle rojo → arrastrar stop válido → Confirm con stop prefilled; inválido no abre; disparada sin handle.
 4. No abrir B-δ / OCO / flip execute / thaw.
-5. Tags publicados: `v1.27-beta` → `3315b69a` · `v1.34-beta` → `3340b0f3` (absorbidos V1.28–V1.33.3).
+5. Tags publicados: `v1.27-beta` → `3315b69a` · `v1.34-beta` → `b5d6bc29` (absorbidos V1.28–V1.33.3).
