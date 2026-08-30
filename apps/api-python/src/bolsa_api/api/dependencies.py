@@ -1598,8 +1598,30 @@ def get_daily_opinion_service(session: AsyncSession) -> DailyOpinionService:
     )
 
 
+def get_propose_estudio_auto_use_case(session: AsyncSession) -> Any:
+    """V1.33+ — Estudio dictamen/alarma → hit AUTO (TradePlan TRIGGERED)."""
+    from bolsa_application.estudio_auto_hits import ProposeEstudioAutoOpenings
+
+    return ProposeEstudioAutoOpenings(
+        get_daily_opinion_service(session),
+        get_propose_recommendation_use_case(session),
+        instruments=get_instrument_repository(session),
+        router=get_execution_router_use_case(session),
+        policies=get_execution_policy_repository(session),
+    )
+
+
 def get_daily_opinion_telemetry_service(session: AsyncSession) -> DailyOpinionTelemetryService:
     return DailyOpinionTelemetryService(
         SqlAlchemyInstrumentDailyOpinionRepository(session),
         get_ohlcv_repository(session),
+    )
+
+
+def get_estudio_auto_telemetry_service(session: AsyncSession) -> Any:
+    """V1.33.2 — A6 embudo Estudio AUTO (sin propose)."""
+    from bolsa_application.estudio_auto_telemetry import EstudioAutoTelemetryService
+
+    return EstudioAutoTelemetryService(
+        SqlAlchemyInstrumentDailyOpinionRepository(session),
     )

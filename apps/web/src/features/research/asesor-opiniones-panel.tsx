@@ -126,6 +126,16 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
       }),
     staleTime: 60_000,
   });
+  const a6Query = useQuery({
+    queryKey: ["instrument-daily-opinions-auto-telemetry", studyIds],
+    queryFn: () =>
+      api.getEstudioAutoTelemetry({
+        lookbackDays: 120,
+        accountId: effectiveAccountId ?? undefined,
+        instrumentIds: studyIds.length > 0 ? studyIds : undefined,
+      }),
+    staleTime: 60_000,
+  });
   const byId = useMemo(
     () => opinionByInstrumentId(opinionsQuery.data),
     [opinionsQuery.data],
@@ -199,6 +209,28 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
             <p className="text-xs text-muted-foreground">
               Telemetría A0 no disponible.
             </p>
+          ) : null}
+          {a6Query.data?.data ? (
+            <div
+              className="rounded-md border border-border/80 bg-muted/15 px-3 py-2 text-xs"
+              data-testid="asesor-auto-telemetry"
+            >
+              <p className="font-medium text-foreground">
+                Telemetría A6 (Estudio AUTO)
+              </p>
+              <p className="mt-1 tabular-nums text-muted-foreground">
+                {a6Query.data.data.funnel.candidatesAlarma} alarma ·{" "}
+                {a6Query.data.data.funnel.candidatesDictamen} dictamen · ampliar
+                fuentes{" "}
+                {a6Query.data.data.gates.expandSourcesReady
+                  ? "listo"
+                  : "bloqueado"}
+              </p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                Solo Estudio. Radar/Hoy fuera. P1–P5 en Consola. Execute env{" "}
+                {a6Query.data.data.gates.paperDExecuteEnv ? "on" : "off"}.
+              </p>
+            </div>
           ) : null}
 
           <div

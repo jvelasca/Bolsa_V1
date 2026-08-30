@@ -22,6 +22,9 @@ export function NotificationsSettingsPanel() {
   const alarmaToastEnabled = useNotificationPrefsStore(
     (s) => s.alarmaToastEnabled,
   );
+  const operativaToastEnabled = useNotificationPrefsStore(
+    (s) => s.operativaToastEnabled,
+  );
   const alarmaEmailEnabled = useNotificationPrefsStore(
     (s) => s.alarmaEmailEnabled,
   );
@@ -37,6 +40,7 @@ export function NotificationsSettingsPanel() {
   const emailOk = isValidEmailLoose(alarmaEmail);
   const ready = notificationEmailReady({
     alarmaToastEnabled,
+    operativaToastEnabled,
     alarmaEmailEnabled,
     alarmaEmail,
     dailyDigestEnabled,
@@ -73,6 +77,26 @@ export function NotificationsSettingsPanel() {
               <p className="mt-1 text-xs text-muted-foreground">
                 Avisa cuando aparece una Alarma nueva en el Estudio (sin spamear
                 al abrir la app).
+              </p>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className={cn(checkboxClassName, "mt-0.5")}
+              checked={operativaToastEnabled}
+              onChange={(e) =>
+                setPrefs({ operativaToastEnabled: e.target.checked })
+              }
+            />
+            <span>
+              <span className="font-medium">
+                Toast operativo (Disparada / T1)
+              </span>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Avisa cuando un valor del Estudio pasa a Disparada o toca T1 sin
+                gestionar. T1 es informativo (tocado ≠ reducido).
               </p>
             </span>
           </label>

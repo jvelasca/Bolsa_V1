@@ -2,6 +2,9 @@ import { Bell, X } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { openHelpBacktesting } from "@/features/backtests/core-r-status";
+import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
+import { openInstrumentInTrading } from "@/features/trading/open-instrument-in-trading";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 import {
   useAlertsStore,
   type AlertToast,
@@ -40,6 +43,18 @@ function runToastAction(
   }
   if (action.type === "open_asesor_opiniones") {
     navigate("/research?tab=opiniones");
+    return;
+  }
+  if (action.type === "open_trading_instrument") {
+    openInstrumentInTrading(
+      navigate,
+      { openChartTab: useWorkspaceStore.getState().openChartTab },
+      { instrumentId: action.instrumentId, symbol: action.symbol },
+    );
+    return;
+  }
+  if (action.type === "open_confirm_drawer") {
+    openConfirmDrawer();
   }
 }
 
@@ -62,7 +77,11 @@ function AlertToastItem({
     action?.label ??
     (action?.type === "open_asesor_opiniones"
       ? "Ver Opiniones"
-      : "Abrir Monitor");
+      : action?.type === "open_trading_instrument"
+        ? "Ver en Mercado"
+        : action?.type === "open_confirm_drawer"
+          ? "Cola Confirm"
+          : "Abrir Monitor");
 
   return (
     <div

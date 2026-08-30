@@ -14,6 +14,7 @@ import type { ExitSuggestedActionV1, ProtectPlanV1 } from "@bolsa/shared";
 import {
   buildMesaActionQueue,
   buildMesaOperationalHeader,
+  aggregateMesaProtectionKpi,
   buildMesaProtectionState,
   buildMesaDecisionAlerts,
   buildMesaSessionState,
@@ -29,7 +30,6 @@ import {
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
   ESTUDIO_LIST_ID,
-  PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
 } from "@bolsa/shared";
 import {
   DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
@@ -39,12 +39,14 @@ import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { Button } from "@/components/ui/button";
 import { FeatureErrorBoundary } from "@/components/layout/feature-error-boundary";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { useEffectiveTradingPolicy } from "@/features/accounts/use-effective-trading-policy";
 import { MesaIncidentBanner } from "@/features/operations/mesa-incident-banner";
 import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
 } from "@/features/operational-console/use-ops-self-eval";
 import { MesaCoberturaKpi } from "@/features/mesa/mesa-cobertura-kpi";
+import { MesaProteccionKpi } from "@/features/mesa/mesa-proteccion-kpi";
 import { MesaInboxBlock } from "@/features/mesa/mesa-inbox-block";
 import { MesaHoyDetailsMenu } from "@/features/mesa/mesa-hoy-details-menu";
 import { MesaDatosChip } from "@/features/mesa/mesa-datos-chip";
@@ -95,6 +97,7 @@ function formatHoyDate(d = new Date()): string {
 export function MesaHoyPage() {
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId, account } = useActiveAccount();
+  const { maxSectorExposurePct } = useEffectiveTradingPolicy();
   const [searchParams] = useSearchParams();
   const view = parseHoyView(
     searchParams.get("view"),
@@ -306,8 +309,9 @@ export function MesaHoyPage() {
     [positions, sectorByInstrumentId, studiesMap],
   );
 
-  const protectionDiscrepancies = useMemo(() => {
-    const out: Array<{
+  const protectionByPosition = useMemo(() => {
+    const states: ReturnType<typeof buildMesaProtectionState>[] = [];
+    const discrepancies: Array<{
       symbol: string;
       reason: string;
       recommendedAction: string;
@@ -330,17 +334,24 @@ export function MesaHoyPage() {
         currentStop: position.operational?.currentStop ?? null,
         protectPlan,
       });
+      states.push(protection);
       if (protection.discrepancy) {
-        out.push({
+        discrepancies.push({
           symbol: position.symbol,
           reason: "Discrepancia de protección — stop no confirmado",
           recommendedAction: "REVISAR PROTECCIÓN",
         });
       }
     }
-    return out;
+    return {
+      states,
+      discrepancies,
+      kpi: aggregateMesaProtectionKpi(states),
+    };
   }, [positions, studiesMap, board]);
 
+  const protectionDiscrepancies = protectionByPosition.discrepancies;
+  const protectionKpi = protectionByPosition.kpi;
   const attentionItems = useMemo(() => {
     const queue = buildMesaActionQueue(board);
     return filterMesaAttentionItems(queue, 5, protectionDiscrepancies);
@@ -391,7 +402,7 @@ export function MesaHoyPage() {
         portfolioRisk,
         sectorExposurePct,
         sectorByInstrumentId,
-        maxSectorExposurePct: PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
+        maxSectorExposurePct,
       },
     });
   }, [
@@ -406,6 +417,7 @@ export function MesaHoyPage() {
     sectorExposurePct,
     sectorByInstrumentId,
     mesaLastBarDate,
+    maxSectorExposurePct,
   ]);
 
   const protectPlanByInstrument = useMemo(() => {
@@ -784,6 +796,7 @@ export function MesaHoyPage() {
                 }
                 estudioStatus={estudioStatus}
               />
+              <MesaProteccionKpi kpi={protectionKpi} />
               <div
                 className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"
                 data-testid="mesa-system-health-link"
@@ -817,7 +830,11 @@ export function MesaHoyPage() {
               studiesByInstrument={studiesMap}
               studiesByDecisionId={studiesByDecision}
             />
-            <MesaLibroPanel summary={portfolio} accountName={account?.name} />
+            <MesaLibroPanel
+              summary={portfolio}
+              accountName={account?.name}
+              protectionKpi={protectionKpi}
+            />
           </div>
         ) : null}
 
@@ -833,6 +850,7 @@ export function MesaHoyPage() {
               equity={portfolio?.totalEquity ?? null}
               cash={summaryQuery.data?.data?.cash ?? null}
               universeListId={universeListId}
+              maxSectorExposurePct={maxSectorExposurePct}
             />
           </div>
         ) : null}

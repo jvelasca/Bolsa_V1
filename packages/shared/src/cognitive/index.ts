@@ -3,6 +3,7 @@
 export * from "./investor-profile.js";
 export * from "./trading-policy.js";
 export * from "./trading-policy-templates.js";
+export * from "./effective-trading-policy.js";
 export * from "./suggest-policy-from-declared.js";
 export * from "./policy-gate.js";
 export * from "./evidence-engine.js";
@@ -14,6 +15,7 @@ export * from "./position-state.js";
 export * from "./position-revision.js";
 export * from "./operational-levels.js";
 export * from "./risk-signature.js";
+export * from "./exit-risk-signature.js";
 export * from "./exit-plan.js";
 export * from "./exit-policy.js";
 export * from "./position-decision.js";

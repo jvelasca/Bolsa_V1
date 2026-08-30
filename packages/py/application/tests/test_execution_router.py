@@ -176,3 +176,230 @@ def test_validate_execution_mode() -> None:
         assert "mode debe ser" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def _triggered_plan(*, quantity: float = 5.0, price: float = 10.0) -> dict[str, Any]:
+    stop = price * 0.95
+    return {
+        "decisionId": "dec-a-beta",
+        "instrumentId": "inst-1",
+        "direction": "long",
+        "status": "TRIGGERED",
+        "quantity": quantity,
+        "entry": price,
+        "structuralStop": stop,
+        "riskAmount": quantity * (price - stop),
+        "initialRiskR": 1,
+        "whyNot": [],
+        "executionAllowed": True,
+    }
+
+
+class _FakeAccount:
+    id = "acc-1"
+    type = "simulated"
+    initial_deposit = 10_000.0
+    active_profile_id = None
+
+
+class _FakeScope:
+    account = _FakeAccount()
+
+
+class _FakeAccountRepo:
+    async def resolve_scope(self, account_id: str, portfolio_id: str | None = None):
+        return _FakeScope()
+
+    async def get_settings_json(self, account_id: str) -> dict[str, Any]:
+        return {}
+
+    async def merge_settings_json(self, account_id: str, fragment: dict[str, Any]) -> None:
+        return None
+
+
+class _FakeSummary:
+    positions: list[Any] = []
+    total_equity = 10_000.0
+
+    async def execute(self, account_id: str | None = None, portfolio_id: str | None = None):
+        return self
+
+
+class _FakeTrade:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    async def execute(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        tx = type("Tx", (), {"id": "tx-a-beta"})()
+        return type("TradeResult", (), {"transaction": tx})()
+
+
+def _router_for_a_beta() -> ExecutionRouter:
+    return ExecutionRouter(
+        policy_repo=_FakePolicyRepo(_paper_auto_policy()),  # type: ignore[arg-type]
+        account_repo=_FakeAccountRepo(),  # type: ignore[arg-type]
+        strategy_repo=object(),  # type: ignore[arg-type]
+        backtest_repo=object(),  # type: ignore[arg-type]
+        execute_trade=_FakeTrade(),  # type: ignore[arg-type]
+        portfolio_summary=_FakeSummary(),  # type: ignore[arg-type]
+        profile_store=None,
+        enforce_cognitive_gate=False,
+    )
+
+
+def _entry_hit(
+    *,
+    auto_source: str | None = "estudio_dictamen",
+    trade_plan: dict[str, Any] | None = None,
+    price: float = 10.0,
+) -> dict[str, Any]:
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    signal = SignalEventV1(
+        id="sig-a-beta",
+        instrument_id="inst-1",
+        timestamp="2026-08-30T12:00:00Z",
+        kind="entry_long",
+        strategy_definition_id="st-1",
+        strategy_version=1,
+        bar_index=0,
+        price=price,
+    )
+    hit: dict[str, Any] = {
+        "instrumentId": "inst-1",
+        "symbol": "SAN",
+        "signal": {
+            "id": signal.id,
+            "instrumentId": signal.instrument_id,
+            "timestamp": signal.timestamp,
+            "kind": signal.kind,
+            "strategyDefinitionId": signal.strategy_definition_id,
+            "strategyVersion": signal.strategy_version,
+            "barIndex": signal.bar_index,
+            "price": signal.price,
+        },
+    }
+    if auto_source is not None:
+        hit["autoSource"] = auto_source
+    if trade_plan is not None:
+        hit["tradePlan"] = trade_plan
+    return hit
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_opening_uses_triggered_plan_quantity(monkeypatch) -> None:
+    """V1.33 A-β — qty = TradePlan TRIGGERED, no sizing_value/price."""
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    router = _router_for_a_beta()
+    trade = router._execute_trade
+    assert isinstance(trade, _FakeTrade)
+    signal = __import__(
+        "bolsa_analytics.signals.strategy", fromlist=["SignalEventV1"]
+    ).SignalEventV1(
+        id="sig-a-beta",
+        instrument_id="inst-1",
+        timestamp="2026-08-30T12:00:00Z",
+        kind="entry_long",
+        strategy_definition_id="st-1",
+        strategy_version=1,
+        bar_index=0,
+        price=10.0,
+    )
+    result = await router._execute_paper_trade(
+        _paper_auto_policy(),
+        signal,
+        hit=_entry_hit(trade_plan=_triggered_plan(quantity=7.0, price=10.0)),
+        sizing_value=1000.0,  # would yield qty=100 if libro sizing — must not win
+    )
+    assert result.status == "trade_executed", result.reason
+    assert len(trade.calls) == 1
+    assert trade.calls[0]["quantity"] == 7.0
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_opening_denied_without_triggered_plan(monkeypatch) -> None:
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    router = _router_for_a_beta()
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    signal = SignalEventV1(
+        id="sig-no-plan",
+        instrument_id="inst-1",
+        timestamp="2026-08-30T12:00:00Z",
+        kind="entry_long",
+        strategy_definition_id="st-1",
+        strategy_version=1,
+        bar_index=0,
+        price=10.0,
+    )
+    result = await router._execute_paper_trade(
+        _paper_auto_policy(),
+        signal,
+        hit=_entry_hit(trade_plan=None),
+        sizing_value=1000.0,
+    )
+    assert result.status == "skipped"
+    assert result.reason == "no_tradeplan"
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_non_estudio_source_skipped(monkeypatch) -> None:
+    """V1.33 A-δ — Paper D / radar no abren hasta ampliar fuente."""
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    router = _router_for_a_beta()
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    signal = SignalEventV1(
+        id="sig-paper-d",
+        instrument_id="inst-1",
+        timestamp="2026-08-30T12:00:00Z",
+        kind="entry_long",
+        strategy_definition_id="st-1",
+        strategy_version=1,
+        bar_index=0,
+        price=10.0,
+    )
+    result = await router._execute_paper_trade(
+        _paper_auto_policy(),
+        signal,
+        hit=_entry_hit(
+            auto_source="paper_d",
+            trade_plan=_triggered_plan(quantity=5.0),
+        ),
+        sizing_value=1000.0,
+    )
+    assert result.status == "skipped"
+    assert result.reason == "auto_source_not_estudio"
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_opening_risk_signature_qty_above_plan(monkeypatch) -> None:
+    """AUTO no tiene override humano → qty ≠ plan no aplica; plan qty is used.
+
+    Si el plan no es TRIGGERED, DENY no_tradeplan / risk_signature.
+    """
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    router = _router_for_a_beta()
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    signal = SignalEventV1(
+        id="sig-watch",
+        instrument_id="inst-1",
+        timestamp="2026-08-30T12:00:00Z",
+        kind="entry_long",
+        strategy_definition_id="st-1",
+        strategy_version=1,
+        bar_index=0,
+        price=10.0,
+    )
+    watch = _triggered_plan(quantity=5.0)
+    watch["status"] = "WATCH"
+    result = await router._execute_paper_trade(
+        _paper_auto_policy(),
+        signal,
+        hit=_entry_hit(trade_plan=watch),
+        sizing_value=1000.0,
+    )
+    assert result.status == "skipped"
+    assert result.reason == "no_tradeplan"

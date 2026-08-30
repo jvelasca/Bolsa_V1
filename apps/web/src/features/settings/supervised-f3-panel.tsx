@@ -26,10 +26,10 @@ import {
   buildPortfolioRiskSnapshot,
   computeSignedPortfolioRiskPct,
   evaluateRiskSignature,
+  evaluateExitRiskSignature,
   executeCtaLabel,
   executionOutcomeCopy,
   paperOrderStatusCopy,
-  PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
   resolveSupervisedOpeningQuantity,
 } from "@bolsa/shared";
 import {
@@ -43,6 +43,7 @@ import {
   useActiveAccount,
   useActiveAccountSettings,
 } from "@/features/accounts/use-active-account";
+import { useEffectiveTradingPolicy } from "@/features/accounts/use-effective-trading-policy";
 import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broker-venue";
 import { api } from "@/lib/api";
 import { formatNumber0 } from "@/lib/format";
@@ -77,6 +78,8 @@ import { F3TradePlanRiskFirstBlock } from "@/features/trading/f3-trade-plan-risk
 import { F3ConfirmWhatIfBlock } from "@/features/trading/f3-confirm-what-if-block";
 import { F3RiskSignatureBlock } from "@/features/trading/f3-risk-signature-block";
 import { F3ProtectStopBlock } from "@/features/trading/f3-protect-stop-block";
+import { F3ExitPlanBlock } from "@/features/trading/f3-exit-plan-block";
+import { F3ExitRiskSignatureBlock } from "@/features/trading/f3-exit-risk-signature-block";
 import {
   f3TicketInputsStale,
   resolveF3PlanBaseline,
@@ -84,7 +87,14 @@ import {
   resolveF3SignedStop,
 } from "@/features/trading/f3-risk-input-baseline";
 import { resolveF3TicketPreview } from "@/features/trading/f3-ticket-preview";
-import { asOperativaProtectMeta } from "@/features/operations/propose-position-exit";
+import {
+  asOperativaExitMeta,
+  asOperativaProtectMeta,
+} from "@/features/operations/propose-position-exit";
+import {
+  CHART_SIGNED_STOP_PREFILL_EVENT,
+  consumeChartSignedStopPrefill,
+} from "@/features/charts/chart-signed-stop-prefill";
 import { PAPER_PATH_SUPERVISED } from "@/features/settings/paper-paths-copy";
 
 type ProposePayload = SupervisedProposePayload;
@@ -194,6 +204,7 @@ function AssessmentBlock({
 export function SupervisedF3Panel() {
   const { account, effectiveAccountId } = useActiveAccount();
   const { settings, currency: accountCurrency } = useActiveAccountSettings();
+  const { maxSectorExposurePct } = useEffectiveTradingPolicy();
   const [instrumentId, setInstrumentId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("");
@@ -286,9 +297,40 @@ export function SupervisedF3Panel() {
         Number.isFinite(plan.structuralStop)
           ? plan.structuralStop
           : null;
-      setStopField(planStop != null ? String(planStop) : "");
+      const chartStop = consumeChartSignedStopPrefill(
+        item.payload.instrumentId,
+      );
+      const protectStop = asOperativaProtectMeta(item.payload)?.suggestedStop;
+      const stop =
+        chartStop ??
+        (typeof protectStop === "number" && Number.isFinite(protectStop)
+          ? protectStop
+          : null) ??
+        planStop;
+      setStopField(stop != null ? String(stop) : "");
     }
   }, [activeId, queueItems]);
+
+  useEffect(() => {
+    function onPrefill(event: Event) {
+      const detail = (event as CustomEvent).detail as {
+        instrumentId?: string;
+        signedStop?: number;
+      };
+      if (
+        !detail?.instrumentId ||
+        typeof detail.signedStop !== "number" ||
+        !Number.isFinite(detail.signedStop)
+      ) {
+        return;
+      }
+      if (instrumentId && detail.instrumentId !== instrumentId) return;
+      setStopField(String(detail.signedStop));
+    }
+    window.addEventListener(CHART_SIGNED_STOP_PREFILL_EVENT, onPrefill);
+    return () =>
+      window.removeEventListener(CHART_SIGNED_STOP_PREFILL_EVENT, onPrefill);
+  }, [instrumentId]);
 
   const selectedCount = useMemo(
     () => queueItems.filter((i) => selectedIds.has(i.id)).length,
@@ -752,7 +794,7 @@ export function SupervisedF3Panel() {
       candidateSector:
         instrumentsForSelect.find((i) => i.id === pending.instrumentId)
           ?.sector ?? null,
-      maxSectorExposurePct: PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
+      maxSectorExposurePct,
       portfolioRiskLimitR: portfolioRisk.portfolioRiskLimitR,
     });
   }, [
@@ -767,6 +809,7 @@ export function SupervisedF3Panel() {
     equity,
     cash,
     portfolioRisk.portfolioRiskLimitR,
+    maxSectorExposurePct,
   ]);
 
   const executeBlockedByRisk =
@@ -776,6 +819,21 @@ export function SupervisedF3Panel() {
     !riskSignature.allowed;
 
   const protectMeta = useMemo(() => asOperativaProtectMeta(pending), [pending]);
+  const exitMeta = useMemo(() => asOperativaExitMeta(pending), [pending]);
+
+  const exitRiskSignature = useMemo(() => {
+    const qty = Number(quantity);
+    return evaluateExitRiskSignature({
+      plannedQty: exitMeta?.plannedQty ?? null,
+      signedQty: Number.isFinite(qty) ? qty : NaN,
+      overrideReason: riskOverrideReason,
+    });
+  }, [exitMeta?.plannedQty, quantity, riskOverrideReason]);
+
+  const executeBlockedByExitRisk =
+    Boolean(exitMeta) &&
+    (pending?.action === "reduce" || pending?.action === "exit_hint") &&
+    !exitRiskSignature.allowed;
 
   const executeBlockedByProtect =
     Boolean(protectMeta) &&
@@ -1036,37 +1094,55 @@ export function SupervisedF3Panel() {
         </div>
         {ticketPreview && pending ? (
           <>
-            <F3TradePlanRiskFirstBlock
-              ticket={ticketPreview}
-              stop={
-                signedStop ??
-                protectMeta?.suggestedStop ??
-                protectMeta?.currentStop ??
-                null
-              }
-              target1={pending.tradePlan?.target1 ?? null}
-              riskPct={displayRiskPct}
-              signedLossAtStop={riskSignature.signedLossAtStop}
-              signedR={riskSignature.signedR}
-              riskPerShare={riskPerShare}
-              inputsStale={ticketInputsStale}
-            />
-            {confirmScenario ? (
-              <F3ConfirmWhatIfBlock
-                scenario={confirmScenario}
-                candidateSector={
-                  instrumentsForSelect.find(
-                    (i) => i.id === pending.instrumentId,
-                  )?.sector ?? null
-                }
-              />
-            ) : null}
-            <F3RiskSignatureBlock
-              signature={riskSignature}
-              currency={accountCurrency}
-              overrideReason={riskOverrideReason}
-              onOverrideReasonChange={setRiskOverrideReason}
-            />
+            {exitMeta ? (
+              <>
+                <F3ExitPlanBlock
+                  meta={exitMeta}
+                  signedQty={
+                    Number.isFinite(Number(quantity)) ? Number(quantity) : null
+                  }
+                />
+                <F3ExitRiskSignatureBlock
+                  signature={exitRiskSignature}
+                  overrideReason={riskOverrideReason}
+                  onOverrideReasonChange={setRiskOverrideReason}
+                />
+              </>
+            ) : (
+              <>
+                <F3TradePlanRiskFirstBlock
+                  ticket={ticketPreview}
+                  stop={
+                    signedStop ??
+                    protectMeta?.suggestedStop ??
+                    protectMeta?.currentStop ??
+                    null
+                  }
+                  target1={pending.tradePlan?.target1 ?? null}
+                  riskPct={displayRiskPct}
+                  signedLossAtStop={riskSignature.signedLossAtStop}
+                  signedR={riskSignature.signedR}
+                  riskPerShare={riskPerShare}
+                  inputsStale={ticketInputsStale}
+                />
+                {confirmScenario ? (
+                  <F3ConfirmWhatIfBlock
+                    scenario={confirmScenario}
+                    candidateSector={
+                      instrumentsForSelect.find(
+                        (i) => i.id === pending.instrumentId,
+                      )?.sector ?? null
+                    }
+                  />
+                ) : null}
+                <F3RiskSignatureBlock
+                  signature={riskSignature}
+                  currency={accountCurrency}
+                  overrideReason={riskOverrideReason}
+                  onOverrideReasonChange={setRiskOverrideReason}
+                />
+              </>
+            )}
           </>
         ) : null}
         <button
@@ -1125,18 +1201,21 @@ export function SupervisedF3Panel() {
               (!protectMeta && pending.action === "wait") ||
               !canExecute ||
               executeBlockedByRisk ||
+              executeBlockedByExitRisk ||
               executeBlockedByProtect
             }
             title={
               executeBlockedByProtect
                 ? "Stop empeora el actual: escribe un motivo de override"
-                : executeBlockedByRisk
-                  ? "Supera el plan: escribe un motivo de override"
-                  : protectMeta
-                    ? "Persistir stop operativo (≠ orden broker)"
-                    : canExecute
-                      ? executeCtaLabel(brokerVenue)
-                      : "Cambia a SEMI en Libro DEMO"
+                : executeBlockedByExitRisk
+                  ? "Qty de salida supera el plan: escribe un motivo de override"
+                  : executeBlockedByRisk
+                    ? "Supera el plan: escribe un motivo de override"
+                    : protectMeta
+                      ? "Persistir stop operativo (≠ orden broker)"
+                      : canExecute
+                        ? executeCtaLabel(brokerVenue)
+                        : "Cambia a SEMI en Libro DEMO"
             }
             onClick={() => confirm.mutate(true)}
           >

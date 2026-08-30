@@ -2,6 +2,7 @@
  * Portfolio Scenario — simulador read-only de cartera (V1.19).
  */
 
+import { effectiveMaxSectorExposurePct } from "./effective-trading-policy.js";
 import type { MesaCandidateRowV1 } from "./mesa-hoy-model.js";
 import {
   portfolioRiskLimitR,
@@ -42,8 +43,9 @@ export type PortfolioScenarioV1 = {
 export const PORTFOLIO_SCENARIO_GATES_NOT_EVALUATED_WARNING =
   "No evalúa check_opening / DS-05 / Fit de firma — Confirm es la firma";
 
-/** Deuda P1: default 40 hasta EffectiveTradingPolicy (no en V1.26). */
-export const PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT = 40;
+/** Fallback moderate (30) — preferir perfil activo vía EffectiveTradingPolicy (V1.30). */
+export const PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT =
+  effectiveMaxSectorExposurePct(null);
 
 export type SectorExposurePairV1 = {
   sector: string;
@@ -230,7 +232,7 @@ export function buildPortfolioScenario(
   }
 
   const maxSector =
-    input.maxSectorExposurePct ?? PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT;
+    input.maxSectorExposurePct ?? effectiveMaxSectorExposurePct(null);
   for (const [sector, pct] of Object.entries(afterSectors)) {
     if (pct > maxSector) {
       warnings.push(`Concentración sector ${sector}: ${pct}%`);

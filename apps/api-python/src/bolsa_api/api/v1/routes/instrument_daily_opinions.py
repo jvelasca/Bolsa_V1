@@ -12,8 +12,11 @@ from bolsa_api.api.dependencies import (
     get_daily_opinion_service,
     get_daily_opinion_telemetry_service,
     get_db_session,
+    get_estudio_auto_telemetry_service,
+    get_propose_estudio_auto_use_case,
 )
 from bolsa_api.schemas.instrument_daily_opinions import (
+    EstudioAutoProposeDto,
     EstudioEodDigestNotifyDto,
     EstudioEodOpinionBatchResponseDto,
     EstudioEodOpinionEmailNotifyDto,
@@ -141,6 +144,89 @@ async def get_opinion_telemetry(
     service = get_daily_opinion_telemetry_service(session)
     tel = await service.compute(lookback_days=lookback_days, instrument_ids=ids)
     return OpinionTelemetryResponseDto(data=OpinionTelemetryDto.model_validate(tel.to_dict()))
+
+
+@router.get("/instrument-daily-opinions/auto-telemetry")
+async def get_estudio_auto_telemetry(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    lookback_days: Annotated[int, Query(alias="lookbackDays", ge=7, le=366)] = 120,
+    account_id: Annotated[str, Query(alias="accountId", min_length=1, max_length=128)] = (
+        "default-account-seed"
+    ),
+    instrument_ids: Annotated[list[str] | None, Query(alias="instrumentIds")] = None,
+) -> dict[str, Any]:
+    """A6 — embudo Estudio AUTO (A-δ). measure ≠ Accept · ≠ flip execute · ≠ Radar/Hoy."""
+    ids = None
+    if instrument_ids:
+        ids = [i.strip() for i in instrument_ids if isinstance(i, str) and i.strip()]
+        if not ids:
+            ids = None
+
+    auto_lane: dict[str, Any] | None = None
+    try:
+        from bolsa_application.ops_self_eval import build_ops_self_eval_report
+        from bolsa_application.ops_self_eval_counts import load_semi_account_counts
+        from bolsa_application.paper_d_propose import paper_d_execute_allowed
+
+        tel = await get_daily_opinion_telemetry_service(session).compute(
+            lookback_days=lookback_days,
+            instrument_ids=ids,
+        )
+        counts = await load_semi_account_counts(session, account_id=account_id)
+        oe1 = build_ops_self_eval_report(
+            account_id=account_id,
+            lookback_days=lookback_days,
+            paper_d_execute_env=paper_d_execute_allowed(),
+            kill_switch_effective=False,
+            broker_venue="paper",
+            days_with_opinions=int(tel.days_with_opinions),
+            buy_precision_5d=tel.buy_precision_5d,
+            buy_recall_5d=tel.buy_recall_5d,
+            alarma_buy_count=int(tel.alarma_buy_count),
+            mature_buy_sample=int(tel.mature_buy_sample),
+            confirm_seed=int(counts["confirmSeed"]),
+            journal_seed=int(counts["journalSeed"]),
+            buys_seed=int(counts["buysSeed"]),
+            trade_like=int(counts["tradeLike"]),
+            cash_max_dd_frac=float(counts["cashMaxDdFrac"]),
+            portfolio_reconciliation_status="not_wired",
+        )
+        auto_lane = oe1["lanes"]["auto"]
+    except Exception:  # noqa: BLE001 — P1–P5 gap → UNAVAILABLE en A6
+        auto_lane = None
+
+    data = await get_estudio_auto_telemetry_service(session).compute(
+        lookback_days=lookback_days,
+        instrument_ids=ids,
+        auto_lane=auto_lane,
+    )
+    return {"data": data}
+
+
+@router.post("/instrument-daily-opinions/auto-propose")
+async def propose_estudio_auto_openings(
+    body: EstudioAutoProposeDto,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    """Estudio buy aviso|alarma → TradePlan TRIGGERED → hit AUTO (A-δ).
+
+    Dry-run por defecto. Execute: ``PAPER_D_EXECUTE=1`` + ``execute=true`` +
+    ``executionPolicyId`` (paper_auto). ≠ Paper D Composite · ≠ Radar · ≠ Hoy.
+    """
+    payload = {
+        "instrumentIds": body.instrument_ids,
+        "asOfBarDate": body.as_of_bar_date,
+        "accountId": body.account_id,
+        "forceRefresh": body.force_refresh,
+        "maxCandidates": body.max_candidates,
+        "execute": body.execute,
+        "executionPolicyId": body.execution_policy_id,
+    }
+    try:
+        result = await get_propose_estudio_auto_use_case(session).execute(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"data": result}
 
 
 @router.post(

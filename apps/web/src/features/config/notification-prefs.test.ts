@@ -14,6 +14,7 @@ describe("notification-prefs", () => {
   it("defaults toast on and email off", () => {
     const d = defaultNotificationPrefs();
     expect(d.alarmaToastEnabled).toBe(true);
+    expect(d.operativaToastEnabled).toBe(true);
     expect(d.alarmaEmailEnabled).toBe(false);
     expect(d.alarmaEmail).toBe("");
     expect(d.dailyDigestEnabled).toBe(false);
@@ -28,6 +29,7 @@ describe("notification-prefs", () => {
       dailyDigestPdfEnabled: true,
     });
     expect(n.alarmaToastEnabled).toBe(true);
+    expect(n.operativaToastEnabled).toBe(true);
     expect(n.alarmaEmailEnabled).toBe(true);
     expect(n.alarmaEmail).toBe("a@b.com");
     expect(n.dailyDigestEnabled).toBe(true);
@@ -40,6 +42,7 @@ describe("notification-prefs", () => {
     expect(
       notificationEmailReady({
         alarmaToastEnabled: true,
+        operativaToastEnabled: true,
         alarmaEmailEnabled: true,
         alarmaEmail: "a@b.com",
         dailyDigestEnabled: false,
@@ -49,6 +52,7 @@ describe("notification-prefs", () => {
     expect(
       notificationEmailReady({
         alarmaToastEnabled: true,
+        operativaToastEnabled: true,
         alarmaEmailEnabled: true,
         alarmaEmail: "bad",
         dailyDigestEnabled: false,

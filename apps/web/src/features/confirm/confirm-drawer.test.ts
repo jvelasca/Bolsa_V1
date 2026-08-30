@@ -53,4 +53,22 @@ describe("confirm-drawer helpers", () => {
       window.removeEventListener(BOLSA_CONFIRM_DRAWER_EVENT, onEv);
     }
   });
+
+  it("openConfirmDrawer can pass signedStop prefill (B-γ)", () => {
+    const seen: unknown[] = [];
+    const onEv = (e: Event) => {
+      seen.push((e as CustomEvent).detail);
+    };
+    window.addEventListener(BOLSA_CONFIRM_DRAWER_EVENT, onEv);
+    try {
+      openConfirmDrawer({ signedStop: 12.5, instrumentId: "inst-x" });
+      expect(seen[0]).toEqual({
+        open: true,
+        signedStop: 12.5,
+        instrumentId: "inst-x",
+      });
+    } finally {
+      window.removeEventListener(BOLSA_CONFIRM_DRAWER_EVENT, onEv);
+    }
+  });
 });

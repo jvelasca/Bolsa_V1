@@ -28,6 +28,9 @@ import {
   ListProcessTimestampCell,
 } from "@/features/trading/lists-tab/list-process-status-cell";
 import { ListNameProcessSubtitle } from "@/features/trading/lists-tab/list-name-process-subtitle";
+import { ListOperativaPhaseBadge } from "@/features/trading/lists-tab/list-operativa-phase-badge";
+import { priceFlashClassName } from "@/features/trading/lists-tab/price-flash";
+import { usePriceFlash } from "@/features/trading/lists-tab/use-price-flash";
 import {
   formatEstudioProcessTimestamp,
   resolveEstudioProcessStatus,
@@ -120,6 +123,9 @@ export function ListItemAccordion({
   const dayLow = dayBar?.low ?? null;
 
   const dayClose = dayBar?.close ?? lastClose;
+
+  const lastCloseFlash = usePriceFlash(lastClose);
+  const dayCloseFlash = usePriceFlash(expanded ? dayClose : null);
 
   return (
     <div
@@ -294,6 +300,7 @@ export function ListItemAccordion({
                   <span className="block truncate font-medium text-foreground">
                     {cell.text}
                   </span>
+                  <ListOperativaPhaseBadge instrumentId={item.id} />
                   {processSubtitle ? (
                     <ListNameProcessSubtitle instrumentId={item.id} />
                   ) : subtitle ? (
@@ -301,6 +308,26 @@ export function ListItemAccordion({
                       {subtitle}
                     </span>
                   ) : null}
+                </button>
+              );
+            }
+
+            if (column.id === "symbol") {
+              return (
+                <button
+                  key={column.id}
+                  type="button"
+                  className={cn(
+                    "min-w-0 overflow-hidden text-left text-[10px]",
+                    listColumnContentClass(column.id, "data"),
+                    cell.className,
+                    isListSource &&
+                      "font-semibold text-emerald-600 dark:text-emerald-400",
+                  )}
+                  onClick={onOpenChart}
+                >
+                  <span className="block truncate">{cell.text}</span>
+                  <ListOperativaPhaseBadge instrumentId={item.id} />
                 </button>
               );
             }
@@ -314,8 +341,10 @@ export function ListItemAccordion({
                   listColumnContentClass(column.id, "data"),
                   cell.className,
                   isListSource &&
-                    (column.id === "symbol" || column.id === "lastClose") &&
+                    column.id === "lastClose" &&
                     "font-semibold text-emerald-600 dark:text-emerald-400",
+                  column.id === "lastClose" &&
+                    priceFlashClassName(lastCloseFlash),
                 )}
                 onClick={onOpenChart}
               >
@@ -370,6 +399,7 @@ export function ListItemAccordion({
           changePct={changePct}
           isUp={isUp}
           spreadPct={live?.spreadPct ?? null}
+          closeFlash={dayCloseFlash}
           onOrder={() => openOrderDialog(item)}
         />
       )}
@@ -386,6 +416,7 @@ function ListItemExpandedDetail({
   changePct,
   isUp,
   spreadPct,
+  closeFlash,
   onOrder,
 }: {
   itemId: string;
@@ -396,6 +427,7 @@ function ListItemExpandedDetail({
   changePct: number | null;
   isUp: boolean | null;
   spreadPct: number | null;
+  closeFlash: ReturnType<typeof usePriceFlash>;
   onOrder: () => void;
 }) {
   const runningId = useEstudioProcessRunningStore((s) => s.instrumentId);
@@ -437,7 +469,12 @@ function ListItemExpandedDetail({
         </div>
         <div className="min-w-0">
           <div className="text-[9px] text-muted-foreground">Cierre</div>
-          <div className="truncate font-medium">
+          <div
+            className={cn(
+              "truncate font-medium",
+              priceFlashClassName(closeFlash),
+            )}
+          >
             {dayClose != null ? formatPrice(dayClose) : "—"}
           </div>
         </div>

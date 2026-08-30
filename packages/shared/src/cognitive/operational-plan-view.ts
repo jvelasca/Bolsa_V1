@@ -144,6 +144,9 @@ function projectTrailing(input: {
   structuralStop: number | null;
   peakMfeR: number | null;
   currentR: number | null;
+  /** V1.29 — stop vigente: el hint no empeora riesgo. */
+  currentStop?: number | null;
+  trailWidth?: "tight" | "medium" | "wide" | null;
 }): Pick<
   OperationalPlanViewV1,
   | "trailingActive"
@@ -158,6 +161,8 @@ function projectTrailing(input: {
     structuralStop: input.structuralStop,
     peakMfeR: input.peakMfeR,
     currentR: input.currentR,
+    currentStop: input.currentStop,
+    trailWidth: input.trailWidth,
   });
   if (trail.status !== "tip" && trail.status !== "ratchet") {
     return EMPTY_TRAIL;
@@ -312,6 +317,7 @@ export function buildOperationalPlanFromPosition(input: {
         structuralStop: stopInicial ?? stopVigente,
         peakMfeR,
         currentR: unrealizedR,
+        currentStop: stopVigente,
       });
 
   return {

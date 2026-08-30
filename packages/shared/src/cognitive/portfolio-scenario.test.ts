@@ -49,6 +49,7 @@ describe("buildPortfolioScenario", () => {
       equity: 100_000,
       cash: 60_000,
       riskTolerance: "moderate",
+      maxSectorExposurePct: 40,
     });
     expect(s.verdict).toBe("COMPATIBLE");
     expect(s.riskLimitR).toBe(5);
@@ -133,6 +134,28 @@ describe("buildPortfolioScenario", () => {
     expect(s.verdict).toBe("NO_RECOMENDADA");
   });
 
+  it("uses moderate sector default (30%) without explicit max", () => {
+    const s = buildPortfolioScenario({
+      candidate: candidate(),
+      candidateSector: "Technology",
+      positions: [
+        {
+          avgCost: 50,
+          quantity: 100,
+          marketValue: 28_000,
+          sector: "Technology",
+          operational: { currentStop: 48, direction: "long" },
+          study: { stop: 48, riskAmount: 500 },
+        },
+      ],
+      equity: 100_000,
+      cash: 60_000,
+      riskTolerance: "moderate",
+    });
+    expect(s.verdict).toBe("NO_RECOMENDADA");
+    expect(s.warnings.some((w) => w.includes("Concentración"))).toBe(true);
+  });
+
   it("uses TradePlan quantity for candidate R, not a 1R stub", () => {
     const s = buildPortfolioScenario({
       candidate: candidate({
@@ -162,6 +185,7 @@ describe("buildPortfolioScenario", () => {
       equity: 100_000,
       cash: 60_000,
       riskTolerance: "moderate",
+      maxSectorExposurePct: 40,
     });
     expect(s.after.openRiskR).toBe(1.5);
     expect(s.verdict).toBe("COMPATIBLE");

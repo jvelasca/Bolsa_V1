@@ -78,6 +78,7 @@ import {
   ListRecommendationScoresProvider,
   useListRecommendationScoresMap,
 } from "@/features/trading/lists-tab/list-recommendation-scores-context";
+import { ListOperativaPhaseProvider } from "@/features/trading/lists-tab/list-operativa-phase-context";
 import { sortInstrumentListWithRecommendation } from "@/lib/list-sort-with-recommendation";
 import { PendingOrderListItem } from "@/features/trading/lists-tab/pending-order-list-item";
 import { ListCarousel } from "@/features/trading/lists-tab/list-carousel";
@@ -973,82 +974,121 @@ export function ListValuesPanel() {
         <ListRecommendationScoresProvider
           instrumentIds={selectableItems.map((item) => item.id)}
         >
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {viewingEstudio && !isLoading && listInstruments.length > 0 ? (
-              <EstudioListSupervisionBanner progress={estudioProgress} />
-            ) : null}
-            <div
-              ref={listScrollRef}
-              className="scroll-area min-h-0 flex-1 overflow-auto"
-            >
-              {isLoading && (
-                <p className="p-2 text-xs text-muted-foreground">Cargando…</p>
-              )}
-              {isError && (
-                <p className="p-2 text-xs text-destructive">
-                  Error al cargar lista
-                </p>
-              )}
+          <ListOperativaPhaseProvider
+            instrumentIds={selectableItems.map((item) => item.id)}
+          >
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {viewingEstudio && !isLoading && listInstruments.length > 0 ? (
+                <EstudioListSupervisionBanner progress={estudioProgress} />
+              ) : null}
+              <div
+                ref={listScrollRef}
+                className="scroll-area min-h-0 flex-1 overflow-auto"
+              >
+                {isLoading && (
+                  <p className="p-2 text-xs text-muted-foreground">Cargando…</p>
+                )}
+                {isError && (
+                  <p className="p-2 text-xs text-destructive">
+                    Error al cargar lista
+                  </p>
+                )}
 
-              {activeVirtual !== VIRTUAL_LIST_PENDING_ORDERS &&
-                !isLoading &&
-                (portfolioListItems.length > 0 ||
-                  listInstruments.length > 0 ||
-                  visualizationListItems.length > 0) && (
-                  <ListColumnHeader
-                    selectAllChecked={
-                      selectionEnabled ? selectAllChecked : undefined
-                    }
-                    selectAllIndeterminate={
-                      selectionEnabled ? selectAllIndeterminate : undefined
-                    }
-                    onSelectAllToggle={
-                      selectionEnabled ? toggleSelectAll : undefined
-                    }
+                {activeVirtual !== VIRTUAL_LIST_PENDING_ORDERS &&
+                  !isLoading &&
+                  (portfolioListItems.length > 0 ||
+                    listInstruments.length > 0 ||
+                    visualizationListItems.length > 0) && (
+                    <ListColumnHeader
+                      selectAllChecked={
+                        selectionEnabled ? selectAllChecked : undefined
+                      }
+                      selectAllIndeterminate={
+                        selectionEnabled ? selectAllIndeterminate : undefined
+                      }
+                      onSelectAllToggle={
+                        selectionEnabled ? toggleSelectAll : undefined
+                      }
+                    />
+                  )}
+
+                {activeVirtual === VIRTUAL_LIST_PORTFOLIO &&
+                  !isLoading &&
+                  positions.length === 0 && (
+                    <p className="p-4 text-center text-xs text-muted-foreground">
+                      Sin posiciones en cartera — ejecuta una compra desde el
+                      diálogo de operación.
+                    </p>
+                  )}
+
+                {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS &&
+                  !isLoading &&
+                  pendingBuyOrders.length === 0 && (
+                    <p className="p-4 text-center text-xs text-muted-foreground">
+                      Sin compras pendientes — crea una orden limitada desde el
+                      diálogo de operación.
+                    </p>
+                  )}
+
+                {viewingVisualizados &&
+                  !isLoading &&
+                  visualizationListItems.length === 0 && (
+                    <p className="p-4 text-center text-xs text-muted-foreground">
+                      Aquí solo aparecen los valores con pestaña de gráfico
+                      abierta. Busca arriba o abre un valor; al cerrar la
+                      pestaña sale de Visualizados. Desde aquí puedes «Pasar a
+                      Estudio».
+                    </p>
+                  )}
+
+                {viewingEstudio &&
+                  !isLoading &&
+                  listInstruments.length === 0 && (
+                    <p className="p-4 text-center text-xs text-muted-foreground">
+                      Selecciona valores en Visualizados, IBEX u otra lista y
+                      pulsa «Pasar a Estudio». Aquí viven los valores
+                      supervisables. Activa Supervisión ON en el banner.
+                    </p>
+                  )}
+
+                {viewingVisualizados &&
+                  !isLoading &&
+                  visualizationListItems.length > 0 && (
+                    <SortedVisualizationList
+                      items={visualizationListItems}
+                      activeInstrumentId={activeInstrumentId}
+                      isListSource={isListSourceRow}
+                      onOpenChart={focusInstrument}
+                      selectedIds={selectedInstrumentIds}
+                      onToggleSelect={handleSelectClick}
+                    />
+                  )}
+
+                {activeVirtual === VIRTUAL_LIST_PORTFOLIO && (
+                  <PortfolioKeyboardList
+                    items={portfolioListItems}
+                    activeInstrumentId={activeInstrumentId}
+                    isListSource={isListSourceRow}
+                    onOpenChart={focusInstrument}
+                    positions={positions}
+                    allInstruments={allInstruments}
+                    selectedIds={selectedInstrumentIds}
+                    onToggleSelect={handleSelectClick}
                   />
                 )}
 
-              {activeVirtual === VIRTUAL_LIST_PORTFOLIO &&
-                !isLoading &&
-                positions.length === 0 && (
-                  <p className="p-4 text-center text-xs text-muted-foreground">
-                    Sin posiciones en cartera — ejecuta una compra desde el
-                    diálogo de operación.
-                  </p>
+                {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS && (
+                  <PendingOrdersKeyboardList
+                    orders={pendingBuyOrders}
+                    activeInstrumentId={activeInstrumentId}
+                    onOpenChart={focusInstrument}
+                  />
                 )}
 
-              {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS &&
-                !isLoading &&
-                pendingBuyOrders.length === 0 && (
-                  <p className="p-4 text-center text-xs text-muted-foreground">
-                    Sin compras pendientes — crea una orden limitada desde el
-                    diálogo de operación.
-                  </p>
-                )}
-
-              {viewingVisualizados &&
-                !isLoading &&
-                visualizationListItems.length === 0 && (
-                  <p className="p-4 text-center text-xs text-muted-foreground">
-                    Aquí solo aparecen los valores con pestaña de gráfico
-                    abierta. Busca arriba o abre un valor; al cerrar la pestaña
-                    sale de Visualizados. Desde aquí puedes «Pasar a Estudio».
-                  </p>
-                )}
-
-              {viewingEstudio && !isLoading && listInstruments.length === 0 && (
-                <p className="p-4 text-center text-xs text-muted-foreground">
-                  Selecciona valores en Visualizados, IBEX u otra lista y pulsa
-                  «Pasar a Estudio». Aquí viven los valores supervisables.
-                  Activa Supervisión ON en el banner.
-                </p>
-              )}
-
-              {viewingVisualizados &&
-                !isLoading &&
-                visualizationListItems.length > 0 && (
-                  <SortedVisualizationList
-                    items={visualizationListItems}
+                {!activeVirtual && (
+                  <SortedApiList
+                    items={listInstruments}
+                    processSubtitle={viewingEstudio}
                     activeInstrumentId={activeInstrumentId}
                     isListSource={isListSourceRow}
                     onOpenChart={focusInstrument}
@@ -1056,41 +1096,9 @@ export function ListValuesPanel() {
                     onToggleSelect={handleSelectClick}
                   />
                 )}
-
-              {activeVirtual === VIRTUAL_LIST_PORTFOLIO && (
-                <PortfolioKeyboardList
-                  items={portfolioListItems}
-                  activeInstrumentId={activeInstrumentId}
-                  isListSource={isListSourceRow}
-                  onOpenChart={focusInstrument}
-                  positions={positions}
-                  allInstruments={allInstruments}
-                  selectedIds={selectedInstrumentIds}
-                  onToggleSelect={handleSelectClick}
-                />
-              )}
-
-              {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS && (
-                <PendingOrdersKeyboardList
-                  orders={pendingBuyOrders}
-                  activeInstrumentId={activeInstrumentId}
-                  onOpenChart={focusInstrument}
-                />
-              )}
-
-              {!activeVirtual && (
-                <SortedApiList
-                  items={listInstruments}
-                  processSubtitle={viewingEstudio}
-                  activeInstrumentId={activeInstrumentId}
-                  isListSource={isListSourceRow}
-                  onOpenChart={focusInstrument}
-                  selectedIds={selectedInstrumentIds}
-                  onToggleSelect={handleSelectClick}
-                />
-              )}
+              </div>
             </div>
-          </div>
+          </ListOperativaPhaseProvider>
         </ListRecommendationScoresProvider>
       </ListColumnLayoutProvider>
 

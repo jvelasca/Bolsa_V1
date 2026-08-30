@@ -1,12 +1,12 @@
 # Estudio — Operativa AUTO y operativa sobre el gráfico
 
-> **AsOf:** 2026-08-28 · **Estado:** **ESTUDIO ABIERTO** — ronda de contraste entre auditorías; **no es implementación**.
+> **AsOf:** 2026-08-30 · **Estado:** **§8 ACUERDO B-γ** (gráfico) · AUTO A-β ya código V1.33+ · R5 = V1.34.
 > **Repo:** https://github.com/jvelasca/Bolsa_V1 · **Ruta:** `docs/engineering/estudio-operativa-auto-y-grafico-2026-08-28.md`
 > **Arranque auditor (copiar en chat):** [`arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md`](./arranque-auditor-estudio-operativa-auto-grafico-2026-08-28.md)
 > **Padre:** [`analisis-vs-apps-top-operative-flow-2026-08-28.md`](./analisis-vs-apps-top-operative-flow-2026-08-28.md) · [`diseno-mercado-2-0-cockpit-2026-08-27.md`](./diseno-mercado-2-0-cockpit-2026-08-27.md) · [`traspaso-relevo-v1-26-position-lifecycle-integrity-2026-08-28.md`](./traspaso-relevo-v1-26-position-lifecycle-integrity-2026-08-28.md) · [ADR-040 §10](../adr/040-user-information-architecture.md) · [ADR-023](../adr/023-camino-d-thaw.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
 > **Destinatarios:** auditorías externas (**A0** arquitectura/producto · **N4** invariantes/mecánica · **Deep** código/seguridad) + owner producto.
 > **Idioma de respuesta preferido:** español (o bilingüe con resumen ES).
-> **Regla:** hasta **acuerdo de diseño explícito** en §8, no abrir código de drag gráfico ni ampliar AUTO más allá del thaw BETA-D ya aceptado.
+> **Regla:** drag gráfico solo según [`diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md`](./diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md) (B-γ stop-only → Confirm). B-δ / OCO / flip execute siguen fuera.
 
 ---
 
@@ -120,15 +120,15 @@ La duda no es «¿AUTO es posible?» — BETA-D ya lo aceptó con condiciones. L
 
 ### 3.2 Preguntas de diseño (AUTO)
 
-| ID  | Pregunta                                                                                                      | Por qué importa                                    |
-| --- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| A1  | ¿AUTO abre solo desde **dictamen/alarma Estudio** o también desde Radar / scan / cola Hoy?                    | Dos ritmos (EOD vs on_bar) sin doble verdad        |
-| A2  | ¿AUTO usa **TradePlan TRIGGERED** como sizing SoT (paridad SEMI) o sizing **libro** (`defaultSizePctOfCash`)? | Contradicción P0 histórica                         |
-| A3  | ¿Qué ve el usuario cuando AUTO **DENY** por gate?                                                             | Honestidad vs ruido                                |
-| A4  | ¿Dónde vive el CTA «AUTO armado» vs «SEMI Confirm» en Operativa?                                              | Un solo CTA primario por fase                      |
-| A5  | ¿AUTO puede **proteger/reducir** posiciones existentes sin Confirm?                                           | ExitPermission asimétrico (H2) ya existe en código |
-| A6  | ¿Qué telemetría mínima exige ampliar AUTO antes de thaw estricto?                                             | P1–P5 siguen FAIL                                  |
-| A7  | ¿Copy de producto: «Autopilot» / «Automático» / «Libro AUTO»?                                                 | ADR-040: nunca «Compra X» desde IA                 |
+| ID  | Pregunta                                                                                                      | Por qué importa                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| A1  | ¿AUTO abre solo desde **dictamen/alarma Estudio** o también desde Radar / scan / cola Hoy?                    | Dos ritmos (EOD vs on_bar) sin doble verdad                                                                   |
+| A2  | ¿AUTO usa **TradePlan TRIGGERED** como sizing SoT (paridad SEMI) o sizing **libro** (`defaultSizePctOfCash`)? | Contradicción P0 histórica                                                                                    |
+| A3  | ¿Qué ve el usuario cuando AUTO **DENY** por gate?                                                             | Honestidad vs ruido                                                                                           |
+| A4  | ¿Dónde vive el CTA «AUTO armado» vs «SEMI Confirm» en Operativa?                                              | Un solo CTA primario por fase                                                                                 |
+| A5  | ¿AUTO puede **proteger/reducir** posiciones existentes sin Confirm?                                           | ExitPermission asimétrico (H2) ya existe en código                                                            |
+| A6  | ¿Qué telemetría mínima exige ampliar AUTO antes de thaw estricto?                                             | **V1.33.2 + V1.33.3:** `GET …/auto-telemetry` · `lastPropose` JSONL · P1–P5 FAIL → `expandSourcesReady=false` |
+| A7  | ¿Copy de producto: «Autopilot» / «Automático» / «Libro AUTO»?                                                 | ADR-040: nunca «Compra X» desde IA                                                                            |
 
 ### 3.3 Opciones AUTO (para votar)
 
@@ -291,22 +291,22 @@ R5 Implement   →  solo tras R4 + CI plan
 
 ---
 
-## 8. Registro de acuerdo (R2 owner 2026-08-28)
+## 8. Registro de acuerdo (R2 owner 2026-08-28 · enmienda 2026-08-30)
 
-Respuestas archivadas: [Deep](./respuesta-auditor-Deep-operativa-auto-grafico-2026-08-28.md) · [A0 producto](./respuesta-auditor-A0-position-operating-model-2026-08-28.md). **N4:** no ha respondido con plantilla §7.2 — se registra _pendiente_, no declina. **No** hay `diseno-operativa-auto-grafico-ACORDADO-*` (drag/AUTO no se implementan).
+Respuestas archivadas: [Deep](./respuesta-auditor-Deep-operativa-auto-grafico-2026-08-28.md) · [A0 producto](./respuesta-auditor-A0-position-operating-model-2026-08-28.md) · [N4](./respuesta-auditor-N4-operativa-auto-grafico-2026-08-30.md). Doc hijo: [`diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md`](./diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md). Plan código: [`plan-v134-frente-b-drag-b-gamma-2026-08-30.md`](./plan-v134-frente-b-drag-b-gamma-2026-08-30.md).
 
-| Tema                | Opción acordada                                                 | Fecha      | Disensos archivados                            | Siguiente doc                                                                      |
-| ------------------- | --------------------------------------------------------------- | ---------- | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
-| AUTO modalidad      | **Aplazado** (lean A-β; A-γ rechazada; cero código V1.27–V1.30) | 2026-08-28 | Deep: A-β+A-δ; A0: cerebro de posición primero | [`roadmap-v127-path-to-10-2026-08-28.md`](./roadmap-v127-path-to-10-2026-08-28.md) |
-| AUTO sizing SoT     | **Aplazado** (cuando se haga: TradePlan TRIGGERED)              | 2026-08-28 | —                                              | —                                                                                  |
-| Gráfico interacción | **Aplazado** (G0; B-α toasts ≠ drag)                            | 2026-08-28 | Deep: B-α ahora / B-γ destino; A0: POM primero | Esperar N4                                                                         |
-| Gráfico → Confirm   | **Aplazado** (B-γ destino; B-δ no)                              | 2026-08-28 | Geometría = `operational-levels.ts`            | —                                                                                  |
-| V1.26b alcance      | Toasts/fase **después** de V1.27 POM                            | 2026-08-28 | —                                              | V1.28                                                                              |
+| Tema                | Opción acordada                                             | Fecha      | Disensos archivados                           | Siguiente doc   |
+| ------------------- | ----------------------------------------------------------- | ---------- | --------------------------------------------- | --------------- |
+| AUTO modalidad      | **A-β CÓDIGO** (V1.33+; A-γ rechazada)                      | 2026-08-30 | Deep: A-β+A-δ; A0: POM primero                | Telemetría A6   |
+| AUTO sizing SoT     | **TradePlan TRIGGERED** (V1.33)                             | 2026-08-30 | —                                             | —               |
+| Gráfico interacción | **ACUERDO B-γ** (G3+G4; stop-only; B-α toasts ya en V1.28+) | 2026-08-30 | Deep pedía también entrada — owner: stop-only | Diseño ACORDADO |
+| Gráfico → Confirm   | **ACUERDO B-γ** (`signedStop`; B-δ no)                      | 2026-08-30 | Geometría = `operational-levels.ts`           | V1.34           |
+| V1.26b alcance      | Toasts/fase **hecho** vía V1.28+                            | 2026-08-30 | —                                             | —               |
 
 ### 8.1 Voto owner
 
-- **A-γ rechazada** sin waiver (dos fuentes de tamaño). Destino AUTO = **A-β** + EdgeReport exigido; **cero código AUTO** hasta V1.33.
-- **B-δ rechazada.** Chart permanece G0. B-α (G2 toasts) permitido como UX fina **tras** POM, no es el gráfico. B-γ solo con N4 + este §8 en ACUERDO + doc hijo.
+- **A-γ rechazada** sin waiver (dos fuentes de tamaño). Destino AUTO = **A-β** + EdgeReport (V1.33+).
+- **B-δ rechazada.** **B-γ ACUERDO 2026-08-30:** stop-only → Confirm; N4 archivada; doc hijo + plan V1.34. Chart deja de ser G0 **solo** en el slice acordado.
 - Cruce A×B: gana integridad V1.26; el gráfico nunca autoriza; `signedStop` humano posterior gana sobre AUTO; toast T1 informativo (H2).
 
 ---
@@ -332,9 +332,9 @@ Respuestas archivadas: [Deep](./respuesta-auditor-Deep-operativa-auto-grafico-20
 
 ## 10. Criterio de hecho de **este** estudio
 
-1. Las tres auditorías han respondido con la plantilla §7.2 **o** el owner ha registrado explícitamente «auditoría X declina». **Estado 2026-08-28:** Deep + A0 archivadas; **N4 pendiente** (no declina). §8 = Aplazado justificado.
-2. §8 tiene filas rellenas con opciones elegidas o «aplazado» justificado. **Hecho (Aplazado).**
-3. Existe (o está calendarizado) el doc **`diseno-operativa-auto-grafico-ACORDADO-*`** antes de cualquier PR de drag o AUTO ampliado. **Aún no** — correcto: no hay PR de drag/AUTO.
+1. Las tres auditorías han respondido con la plantilla §7.2 **o** el owner ha registrado explícitamente «auditoría X declina». **Estado 2026-08-30:** Deep + A0 + N4 archivadas.
+2. §8 tiene filas rellenas con opciones elegidas o «aplazado» justificado. **Hecho** (gráfico → **ACUERDO B-γ**; AUTO A-β ya código).
+3. Existe el doc **`diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md`**. R5 = **V1.34 CÓDIGO** (stop → Confirm).
 4. Ningún participante propone reabrir sizing paralelo `% caja` en SEMI TRIGGERED sin waiver ADR.
 
 ---

@@ -32,6 +32,7 @@ from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.recommendation import Recommendation
 from bolsa_analytics.cognitive.risk_signature import apply_signed_levels_to_trade_plan
+from bolsa_analytics.cognitive.exit_risk_signature import evaluate_exit_risk_signature
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 from bolsa_application.account_mandate_gate import AccountMandateLookup
@@ -52,6 +53,7 @@ from bolsa_application.confirm.exit_gate import ExitGateCoordinator
 from bolsa_application.confirm.identity import (
     IdentityCoordinator,
     build_recommendation_from_raw,
+    extract_operativa_exit_meta,
     extract_operativa_protect_meta,
     price_revalidation_reason,
     recommendation_is_expired,
@@ -101,6 +103,7 @@ __all__ = [
     "ConfirmRecommendationIntent",
     "PRICE_REVALIDATION_MAX_REL_DEVIATION",
     "extract_operativa_protect_meta",
+    "extract_operativa_exit_meta",
     "price_revalidation_reason",
     "recommendation_is_expired",
     "resolve_confirm_trade_plan",
@@ -376,6 +379,7 @@ class ConfirmRecommendationIntent:
                 session_payload=session_payload,
                 risk_override_reason=risk_override_reason,
                 signed_stop=signed_stop,
+                exit_meta=extract_operativa_exit_meta(raw),
             )
 
         _attach_execution_record(result)
@@ -530,6 +534,7 @@ class ConfirmRecommendationIntent:
         session_payload: dict[str, Any] | None,
         risk_override_reason: str | None,
         signed_stop: float | None = None,
+        exit_meta: dict[str, Any] | None = None,
     ) -> None:
         price = float(rec.suggested_price or 0)
 
@@ -645,6 +650,32 @@ class ConfirmRecommendationIntent:
                 reason="risk_signature",
             )
             return
+
+        # V1.32 — Exit risk signature (qty firmada vs plannedQty)
+        if is_closing_action(rec.action):
+            planned: float | None = None
+            if isinstance(exit_meta, dict):
+                raw_planned = exit_meta.get("plannedQty")
+                if isinstance(raw_planned, (int, float)):
+                    planned = float(raw_planned)
+            exit_sig = evaluate_exit_risk_signature(
+                planned_qty=planned,
+                signed_qty=float(intent.quantity),
+                override_reason=risk_override_reason,
+            )
+            if not exit_sig.get("allowed"):
+                await self._reject_gate(
+                    result=result,
+                    intent=intent,
+                    contract_status=contract_status,
+                    rec=rec,
+                    session_id=session_id,
+                    account_id=account_id,
+                    trade_plan_dict=trade_plan_dict,
+                    session_payload=session_payload,
+                    reason="exit_risk_signature",
+                )
+                return
 
         # ExitGate — exit_permission
         if is_closing_action(rec.action):

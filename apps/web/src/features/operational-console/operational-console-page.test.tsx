@@ -20,6 +20,7 @@ vi.mock("@/features/accounts/use-active-account", () => ({
 vi.mock("@/lib/api", () => ({
   api: {
     getOpsSelfEval: vi.fn(),
+    getEstudioAutoTelemetry: vi.fn(),
     getDecisionBoard: vi.fn(),
     getActiveOperationalIncidents: vi.fn(),
     resolveOperationalIncident: vi.fn(),
@@ -96,6 +97,44 @@ describe("OperationalConsolePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.getOpsSelfEval).mockResolvedValue(mockSelfEval as never);
+    vi.mocked(api.getEstudioAutoTelemetry).mockResolvedValue({
+      data: {
+        schemaVersion: "estudio_auto_telemetry_v0",
+        rule: "measure ≠ Accept",
+        asOf: "2026-08-30",
+        lookbackDays: 120,
+        funnel: {
+          opinionRows: 10,
+          daysWithOpinions: 28,
+          candidatesAlarma: 2,
+          candidatesDictamen: 3,
+          candidatesTotal: 5,
+          notCandidate: 5,
+          allowedSources: ["estudio_alarma", "estudio_dictamen"],
+          excludedSources: ["paper_d", "radar", "hoy"],
+        },
+        edgeReport: {
+          paperAutoRequiresEdgeReport: true,
+          parityWithSemi: true,
+          mark: "PASS",
+          note: "EdgeReport",
+        },
+        p1p5: {
+          mark: "FAIL",
+          strictAcceptReady: false,
+          source: "oe1_auto_lane",
+        },
+        lastPropose: null,
+        recentProposes: [],
+        gates: {
+          expandSourcesReady: false,
+          thawEstrictoReady: false,
+          paperDExecuteEnv: false,
+          blockers: ["p1_p5_not_green"],
+        },
+        caveats: [],
+      },
+    } as never);
     vi.mocked(api.getDecisionBoard).mockResolvedValue({
       data: {
         accountId: "acc-1",
@@ -128,6 +167,9 @@ describe("OperationalConsolePage", () => {
     expect(screen.getByTestId("ops-auto-lane").textContent).toMatch(/FAIL/);
     expect(screen.getByTestId("ops-recon-status").textContent).toMatch(
       /drift/i,
+    );
+    expect(screen.getByTestId("ops-a6-expand-gate").textContent).toMatch(
+      /bloqueado/i,
     );
   });
 

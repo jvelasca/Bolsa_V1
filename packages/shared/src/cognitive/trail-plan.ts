@@ -2,9 +2,13 @@
  * Trail Plan advisory thin (ADR-031 Ciclo 8.1).
  * Continuous ratchet from peak MFE; hint only.
  * Does not mutate structuralStop, call broker, or auto-exit.
- * At peakMfeR=1.5 → lockedR=0.5 (aligned with Exit Radar 5.2 tip).
+ * At peakMfeR=1.5 → lockedR=0.5 (aligned with Exit Radar 5.2 tip) with medium width.
+ * V1.29: trailWidth from ExitPolicy; clamp vs currentStop (trail no empeora riesgo).
  */
 
+import type { ExitTrailWidthV1 } from "./exit-policy.js";
+import { trailDistanceRFromWidth } from "./exit-policy.js";
+import { clampStopNotWorsen } from "./position-state.js";
 import type { TradePlanDirectionV1 } from "./trade-plan.js";
 
 export type TrailPlanStatusV1 = "none" | "tip" | "ratchet";
@@ -15,7 +19,8 @@ export type TrailPlanWhyV1 =
   | "aligned_exit_radar_tip"
   | "ratchet_lock"
   | "not_permission"
-  | "hint_only";
+  | "hint_only"
+  | "clamped_not_worsen";
 
 export type TrailPlanV1 = {
   status: TrailPlanStatusV1;
@@ -34,9 +39,13 @@ export type MapTrailPlanInput = {
   /** Peak favorable excursion in R (prefer mfeMae.mfeR). */
   peakMfeR?: number | null;
   currentR?: number | null;
+  /** V1.29 — ExitPolicy.trailWidth; default medium (= 1.0R). */
+  trailWidth?: ExitTrailWidthV1 | null;
+  /** V1.29 — stop vigente: el hint nunca empeora este nivel. */
+  currentStop?: number | null;
 };
 
-/** Cushion from peak MFE; at 1.5R peak → lock 0.5R (= Exit Radar tip). */
+/** Cushion from peak MFE (medium); at 1.5R peak → lock 0.5R (= Exit Radar tip). */
 export const TRAIL_DISTANCE_R = 1.0;
 const TIP_MIN_MFE_R = 1.5;
 const RATCHET_MIN_MFE_R = 2.0;
@@ -57,8 +66,9 @@ export function mapTrailPlan(input: MapTrailPlanInput): TrailPlanV1 {
   const entry = input.entry;
   const stop = input.structuralStop;
   const currentR = finite(input.currentR) ? input.currentR : null;
+  const trailDistanceR = trailDistanceRFromWidth(input.trailWidth);
   const base = {
-    trailDistanceR: TRAIL_DISTANCE_R,
+    trailDistanceR,
     currentR,
   } as const;
 
@@ -118,11 +128,23 @@ export function mapTrailPlan(input: MapTrailPlanInput): TrailPlanV1 {
     };
   }
 
-  const lockedR = round4(peakMfeR - TRAIL_DISTANCE_R);
+  const lockedR = round4(peakMfeR - trailDistanceR);
   const sign = direction === "long" ? 1 : -1;
-  const suggestedTrailStop = round4(entry + sign * lockedR * R);
-
+  let suggestedTrailStop = round4(entry + sign * lockedR * R);
   const why: TrailPlanWhyV1[] = ["not_permission", "hint_only"];
+
+  if (finite(input.currentStop) && input.currentStop > 0) {
+    const clamped = clampStopNotWorsen(
+      direction,
+      input.currentStop,
+      suggestedTrailStop,
+    );
+    if (Math.abs(clamped - suggestedTrailStop) > 1e-9) {
+      why.push("clamped_not_worsen");
+      suggestedTrailStop = clamped;
+    }
+  }
+
   let status: TrailPlanStatusV1;
   if (peakMfeR >= RATCHET_MIN_MFE_R) {
     status = "ratchet";

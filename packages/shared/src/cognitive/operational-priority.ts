@@ -3,6 +3,7 @@
  * La heurística legacy queda como projection fallback.
  */
 
+import { effectiveMaxSectorExposurePct } from "./effective-trading-policy.js";
 import type { MesaCandidateRowV1 } from "./mesa-hoy-model.js";
 import type { TradePlanStatusV1 } from "./trade-plan.js";
 import {
@@ -85,7 +86,7 @@ function scoreSuitability(
     }
   } else if (ctx.sectorExposurePct) {
     const current = ctx.sectorExposurePct[sector] ?? 0;
-    const max = ctx.maxSectorExposurePct ?? 40;
+    const max = ctx.maxSectorExposurePct ?? effectiveMaxSectorExposurePct(null);
     if (current >= max) {
       value -= 40;
       factors.push(`Sector ${sector} saturado (${current}%)`);

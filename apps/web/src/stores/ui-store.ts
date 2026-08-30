@@ -5,6 +5,20 @@ import { persist } from "zustand/middleware";
 import { groupForDrawTool } from "@/features/charts/chart-drawing-tools";
 import type { ChartInspectorNavigateRequest } from "@/features/charts/chart-inspector-nav";
 import { writeDrawToolSessionLocal } from "@/lib/draw-tool-session-storage";
+import {
+  applyUiDensityToDocument,
+  isUiDensity,
+  UI_DENSITY_DEFAULT,
+  type UiDensity,
+} from "@/features/command-palette/ui-density";
+import {
+  applyUiThemeToDocument,
+  isUiTheme,
+  UI_THEME_DEFAULT,
+  type UiTheme,
+} from "@/features/command-palette/ui-theme";
+
+export type { UiDensity, UiTheme };
 export type PlatformConfigTab =
   | "general"
   | "investor-profile"
@@ -17,6 +31,12 @@ export type PlatformConfigTab =
   | "other";
 
 interface UiState {
+  /** V1.31 — densidad de shell (persistida). */
+  uiDensity: UiDensity;
+  setUiDensity: (density: UiDensity) => void;
+  /** V1.31.1 — tema dark | light | system (persistido). */
+  uiTheme: UiTheme;
+  setUiTheme: (theme: UiTheme) => void;
   listHubOpen: boolean;
   workspacePickerOpen: boolean;
   listManagerOpen: boolean;
@@ -78,6 +98,16 @@ interface UiState {
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
+      uiDensity: UI_DENSITY_DEFAULT,
+      setUiDensity: (density) => {
+        applyUiDensityToDocument(density);
+        set({ uiDensity: density });
+      },
+      uiTheme: UI_THEME_DEFAULT,
+      setUiTheme: (theme) => {
+        applyUiThemeToDocument(theme);
+        set({ uiTheme: theme });
+      },
       chartGlobalBarSettingsOpen: false,
       chartDataBarSettingsOpen: false,
       listHubOpen: false,
@@ -192,7 +222,26 @@ export const useUiStore = create<UiState>()(
       partialize: (state) => ({
         chartDrawTool: state.chartDrawTool,
         lastDrawToolByGroup: state.lastDrawToolByGroup,
+        uiDensity: state.uiDensity,
+        uiTheme: state.uiTheme,
       }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<UiState> | undefined;
+        const density = isUiDensity(p?.uiDensity)
+          ? p.uiDensity
+          : current.uiDensity;
+        const theme = isUiTheme(p?.uiTheme) ? p.uiTheme : current.uiTheme;
+        return {
+          ...current,
+          ...p,
+          uiDensity: density,
+          uiTheme: theme,
+        };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state?.uiDensity) applyUiDensityToDocument(state.uiDensity);
+        if (state?.uiTheme) applyUiThemeToDocument(state.uiTheme);
+      },
     },
   ),
 );

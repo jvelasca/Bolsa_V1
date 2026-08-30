@@ -54,9 +54,42 @@ describe("buildPositionExitPayload", () => {
     expect(payload.suggestedQuantity).toBe(10);
     expect(payload.decisionId).toBe("dec-1");
     expect(payload.source).toBe("operativa");
+    expect(payload.decisionPackage).toMatchObject({
+      operativaIntent: "exit_hint",
+      exitSource: "manual",
+      plannedQty: 10,
+    });
   });
 
-  it("builds reduce with half quantity rounded up", () => {
+  it("V1.32 — event exitSource when ExitPlan TRIGGERED", () => {
+    const payload = buildPositionExitPayload({
+      position: position({
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          currentStop: 95,
+          target1: 110,
+          target2: 120,
+          tradePlanId: "dec-1",
+          exitPlan: {
+            status: "TRIGGERED",
+            suggestedAction: "reduce",
+            primaryReason: "TARGET_1",
+            suggestedQty: 3,
+          },
+        },
+      }),
+      accountId: "acc-1",
+      intent: "reduce",
+    });
+    expect(payload.decisionPackage).toMatchObject({
+      operativaIntent: "reduce",
+      exitSource: "event",
+      plannedQty: 3,
+    });
+  });
+
+  it("builds reduce with half quantity rounded up when no policy event", () => {
     const payload = buildPositionExitPayload({
       position: position({ quantity: 7 }),
       accountId: "acc-1",
@@ -64,6 +97,137 @@ describe("buildPositionExitPayload", () => {
     });
     expect(payload.action).toBe("reduce");
     expect(payload.suggestedQuantity).toBe(4);
+  });
+
+  it("V1.29 — reduce uses ExitPolicy suggestedQty from exitPlan", () => {
+    const payload = buildPositionExitPayload({
+      position: position({
+        quantity: 10,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          currentStop: 95,
+          target1: 110,
+          target2: 120,
+          tradePlanId: "dec-1",
+          exitPlan: {
+            status: "TRIGGERED",
+            suggestedAction: "reduce",
+            primaryReason: "TARGET_1",
+            suggestedQty: 3,
+            policyTemplateId: "moderate",
+          },
+        },
+      }),
+      accountId: "acc-1",
+      intent: "reduce",
+    });
+    expect(payload.suggestedQuantity).toBe(3);
+  });
+
+  it("V1.29 — reduce from TARGET_1 + conservative without suggestedQty", () => {
+    const payload = buildPositionExitPayload({
+      position: position({
+        quantity: 10,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          currentStop: 95,
+          target1: 110,
+          target2: 120,
+          tradePlanId: "dec-1",
+          exitPlan: {
+            status: "TRIGGERED",
+            suggestedAction: "reduce",
+            primaryReason: "TARGET_1",
+            policyTemplateId: "conservative",
+          },
+        },
+      }),
+      accountId: "acc-1",
+      intent: "reduce",
+    });
+    // conservative t1ReduceFraction 0.5 → 5
+    expect(payload.suggestedQuantity).toBe(5);
+  });
+
+  it("V1.29 — protect clamps trail that would worsen long stop", () => {
+    const payload = buildPositionExitPayload({
+      position: position({
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          currentStop: 100,
+          target1: 110,
+          target2: 120,
+          tradePlanId: "dec-1",
+          exitPlan: {
+            status: "ARMED",
+            suggestedAction: "protect",
+            primaryReason: "TRAIL",
+            suggestedStop: 95,
+          },
+        },
+      }),
+      accountId: "acc-1",
+      intent: "protect",
+    });
+    expect(payload.suggestedPrice).toBe(100);
+    expect(payload.decisionPackage).toMatchObject({
+      operativaIntent: "protect",
+      suggestedStop: 100,
+      stopOverrideRequired: false,
+    });
+  });
+
+  it("V1.29 — positionShowsProtectHint false when clamp equals current", () => {
+    expect(
+      positionShowsProtectHint(
+        position({
+          operational: {
+            status: "OPEN",
+            direction: "long",
+            currentStop: 100,
+            target1: 110,
+            target2: 120,
+            tradePlanId: "dec-1",
+            exitPlan: {
+              status: "ARMED",
+              suggestedAction: "protect",
+              primaryReason: "TRAIL",
+              suggestedStop: 95,
+            },
+          },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("V1.34 — suggestedStopOverride + allowPendingOverride encola stop del chart", () => {
+    const improve = buildPositionExitPayload({
+      position: position(),
+      accountId: "acc-1",
+      intent: "protect",
+      suggestedStopOverride: 96,
+      allowPendingOverride: true,
+    });
+    expect(improve.decisionPackage).toMatchObject({
+      operativaIntent: "protect",
+      suggestedStop: 96,
+      stopOverrideRequired: false,
+    });
+
+    const worsen = buildPositionExitPayload({
+      position: position(),
+      accountId: "acc-1",
+      intent: "protect",
+      suggestedStopOverride: 90,
+      allowPendingOverride: true,
+    });
+    expect(worsen.decisionPackage).toMatchObject({
+      suggestedStop: 90,
+      stopOverrideRequired: true,
+    });
   });
 
   it("rejects without operational plan", () => {
@@ -112,7 +276,8 @@ describe("buildPositionExitPayload", () => {
             exitPlan: {
               status: "ARMED",
               suggestedAction: "protect",
-              primaryReason: null,
+              primaryReason: "TRAIL",
+              suggestedStop: 100,
             },
           },
         }),

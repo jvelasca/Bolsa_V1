@@ -8,12 +8,16 @@
  */
 
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
+import { setChartSignedStopPrefill } from "@/features/charts/chart-signed-stop-prefill";
 
 /** Evento SPA: abrir/cerrar el drawer Confirmar. */
 export const BOLSA_CONFIRM_DRAWER_EVENT = "bolsa:confirm-drawer" as const;
 
 export type ConfirmDrawerDetail = {
   open: boolean;
+  /** V1.34 B-γ — prefill stop firmado desde drag del gráfico. */
+  signedStop?: number;
+  instrumentId?: string;
 };
 
 /** Label del CTA en Operativa (abre drawer, no navega). */
@@ -21,6 +25,11 @@ export const CONFIRM_DRAWER_CTA_LABEL = "Cola Confirm" as const;
 
 /** Link a la página completa desde el drawer. */
 export const CONFIRM_FULL_PAGE_LINK_LABEL = "Abrir página completa" as const;
+
+export type OpenConfirmDrawerOptions = {
+  signedStop?: number;
+  instrumentId?: string;
+};
 
 /**
  * True si el detalle del evento pide abrir el drawer.
@@ -49,12 +58,24 @@ export function isConfirmDrawerCloseDetail(
 }
 
 /** Dispara apertura del drawer (host en PlatformShell). */
-export function openConfirmDrawer(): void {
-  window.dispatchEvent(
-    new CustomEvent(BOLSA_CONFIRM_DRAWER_EVENT, {
-      detail: { open: true } satisfies ConfirmDrawerDetail,
-    }),
-  );
+export function openConfirmDrawer(opts?: OpenConfirmDrawerOptions): void {
+  if (
+    opts?.signedStop != null &&
+    Number.isFinite(opts.signedStop) &&
+    opts.signedStop > 0 &&
+    opts.instrumentId
+  ) {
+    setChartSignedStopPrefill({
+      instrumentId: opts.instrumentId,
+      signedStop: opts.signedStop,
+    });
+  }
+  const detail: ConfirmDrawerDetail = { open: true };
+  if (opts?.signedStop != null && Number.isFinite(opts.signedStop)) {
+    detail.signedStop = opts.signedStop;
+  }
+  if (opts?.instrumentId) detail.instrumentId = opts.instrumentId;
+  window.dispatchEvent(new CustomEvent(BOLSA_CONFIRM_DRAWER_EVENT, { detail }));
 }
 
 /** Cierra el drawer si está abierto. */

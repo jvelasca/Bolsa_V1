@@ -3,7 +3,7 @@
 > **AsOf:** 2026-08-28 · **Estado:** **IMPLEMENTADO** (V1.25 operational safety).
 > **Padre:** [`analisis-vs-apps-top-operative-flow-2026-08-28.md`](./analisis-vs-apps-top-operative-flow-2026-08-28.md) · [`traspaso-relevo-v1-24-honesty-2026-08-28.md`](./traspaso-relevo-v1-24-honesty-2026-08-28.md) · [ADR-040 §10](../adr/040-user-information-architecture.md).
 > **Superficie:** drawer Confirm + `/confirm` → `SupervisedF3Panel` (`apps/web/src/features/settings/supervised-f3-panel.tsx`).
-> **Freeze:** Confirm = firma · Ranking ≠ BUY · AUTO off · `PAPER_D_EXECUTE` off · sin nuevas puertas L1 · sin drag de gráfico · sin móvil.
+> **Freeze:** Confirm = firma · Ranking ≠ BUY · AUTO off · `PAPER_D_EXECUTE` off · sin nuevas puertas L1 · drag gráfico solo B-γ stop→Confirm (V1.34) · sin móvil.
 
 ---
 

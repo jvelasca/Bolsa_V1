@@ -84,7 +84,7 @@ export const MESA_TIPS: Record<MesaTipId, MesaTip> = {
   "operational-console": {
     id: "operational-console",
     title: "Consola operacional",
-    body: "Panel read-only de salud ops: OE-1 Autoeval, readiness OR-6, recon OI-6 y incidentes DEX-3. PASS ≠ permiso operar. No firma ni ejecuta — Confirm sigue siendo la única firma. Posiciones en Libro · Operaciones.",
+    body: "Panel read-only de salud ops: OE-1 Autoeval, A6 embudo Estudio AUTO, readiness OR-6, recon OI-6 y incidentes DEX-3. PASS ≠ permiso operar. A6 rojo ≠ thaw y no amplía Radar/Hoy. No firma ni ejecuta — Confirm sigue siendo la única firma. Posiciones en Libro · Operaciones.",
     linkTo: "/operational-console",
     linkLabel: "Abrir detalles operativos",
   },

@@ -9,6 +9,7 @@ from bolsa_api.api.dependencies import (
     get_account_repository,
     get_db_session,
     get_execute_gated_portfolio_trade_use_case,
+    get_investor_profile_repository,
     get_list_transactions_use_case,
     get_portfolio_summary_use_case,
     get_position_state_repository,
@@ -27,7 +28,10 @@ from bolsa_api.schemas.portfolio import (
     TradeResponseDto,
     TransactionsResponseDto,
 )
-from bolsa_application.execute_gated_portfolio_trade import OpeningVetoedError
+from bolsa_application.execute_gated_portfolio_trade import (
+    ExitVetoedError,
+    OpeningVetoedError,
+)
 
 router = APIRouter()
 
@@ -54,7 +58,15 @@ async def get_portfolio(
     records = await get_position_state_repository(session).list_open_for_account(
         scope.account.id
     )
-    attach_operational_positions(dto, records)
+    profile = await get_investor_profile_repository(session).get_for_account(
+        scope.account.id
+    )
+    template_id = (
+        profile.selected_policy_template_id
+        if profile is not None
+        else None
+    )
+    attach_operational_positions(dto, records, policy_template_id=template_id)
     return PortfolioSummaryResponseDto(data=dto)
 
 
@@ -108,6 +120,8 @@ async def execute_trade(
             idempotency_key=body.idempotency_key,
         )
     except OpeningVetoedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ExitVetoedError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

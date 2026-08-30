@@ -63,6 +63,25 @@ def resolve_exit_policy(template_id: str | None) -> ExitPolicy:
     return MODERATE_EXIT_POLICY
 
 
+TRAIL_DISTANCE_R_BY_WIDTH: dict[ExitTrailWidth, float] = {
+    "tight": 0.75,
+    "medium": 1.0,
+    "wide": 1.25,
+}
+
+
+def trail_distance_r_from_width(width: str | None) -> float:
+    if width in TRAIL_DISTANCE_R_BY_WIDTH:
+        return TRAIL_DISTANCE_R_BY_WIDTH[width]  # type: ignore[index]
+    return TRAIL_DISTANCE_R_BY_WIDTH["medium"]
+
+
+def format_exit_policy_preview(policy: ExitPolicy) -> str:
+    t1 = int(round(clamp_exit_fraction(policy.t1_reduce_fraction) * 100))
+    t2 = int(round(clamp_exit_fraction(policy.t2_reduce_fraction) * 100))
+    return f"Salida T1 {t1}% · T2 {t2}% · trail {policy.trail_width}"
+
+
 def suggestion_from_exit_policy(
     primary: str | None,
     remaining: float,

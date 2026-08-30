@@ -3,6 +3,8 @@ import {
   AGGRESSIVE_SWING_EXIT_POLICY,
   CONSERVATIVE_EXIT_POLICY,
   MODERATE_EXIT_POLICY,
+  formatExitPolicyActionHint,
+  formatExitPolicyPreview,
   suggestionFromExitPolicy,
 } from "./cognitive/exit-policy.js";
 import { buildPositionDecision } from "./cognitive/position-decision.js";
@@ -79,6 +81,23 @@ describe("ExitPolicy V1.27", () => {
     const s = suggestionFromExitPolicy("TARGET_2", 7, CONSERVATIVE_EXIT_POLICY);
     expect(s.suggestedAction).toBe("full_exit");
     expect(s.suggestedQty).toBe(7);
+  });
+
+  it("V1.29 formatExitPolicyPreview", () => {
+    expect(formatExitPolicyPreview(MODERATE_EXIT_POLICY)).toBe(
+      "Salida T1 30% · T2 30% · trail medium",
+    );
+  });
+
+  it("V1.29 formatExitPolicyActionHint reduce", () => {
+    expect(
+      formatExitPolicyActionHint({
+        suggestedAction: "reduce",
+        suggestedQty: 3,
+        primaryReason: "TARGET_1",
+        templateId: "moderate",
+      }),
+    ).toBe("T1 → reducir 3 u. (30%, moderado)");
   });
 });
 

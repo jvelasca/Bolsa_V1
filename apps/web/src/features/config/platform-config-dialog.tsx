@@ -17,6 +17,7 @@ import {
 import { SyncSettingsPanel } from "@/features/sync/sync-settings-panel";
 import { DatabaseConfigPanel } from "@/features/config/database-config-panel";
 import { NotificationsSettingsPanel } from "@/features/config/notifications-settings-panel";
+import { ShortcutsSettingsPanel } from "@/features/command-palette/shortcuts-settings-panel";
 import { useTradePreferencesStore } from "@/stores/trade-preferences-store";
 import { cn } from "@/lib/utils";
 import { useUiStore, type PlatformConfigTab } from "@/stores/ui-store";
@@ -31,6 +32,7 @@ const TABS: { id: PlatformConfigTab; label: string }[] = [
   { id: "commissions", label: "Comisiones y fiscal" },
   { id: "notifications", label: "Notificaciones" },
   { id: "confirmations", label: "Confirmaciones" },
+  { id: "shortcuts", label: "Atajos" },
   { id: "bd", label: "BD" },
   { id: "other", label: "Sync / proveedores" },
 ];
@@ -314,6 +316,8 @@ function ConfigTabPanel({ tab }: { tab: PlatformConfigTab }) {
       return <ConfirmationsTabPanel />;
     case "notifications":
       return <NotificationsSettingsPanel />;
+    case "shortcuts":
+      return <ShortcutsSettingsPanel />;
     case "bd":
       return <DatabaseConfigPanel />;
     case "other":
@@ -341,8 +345,7 @@ function ConfigTabPanel({ tab }: { tab: PlatformConfigTab }) {
         </div>
       );
     case "sounds":
-    case "shortcuts":
-      // Tabs reservados (aún sin UI); redirigidos vía safeTab en el diálogo
+      // Tab reservado (aún sin UI)
       return (
         <div className="space-y-4">
           <AccountSettingsCard />

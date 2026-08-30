@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { OpsSelfEvalReport } from "@/features/operational-console/use-ops-self-eval";
+import type { EstudioAutoTelemetry } from "@/features/operational-console/use-estudio-auto-telemetry";
 
 function markClasses(mark: string): string {
   if (mark === "PASS") {
@@ -286,6 +287,117 @@ export function OpsRuntimeSection({
           </Link>
           . Consola no duplica toggles peligrosos.
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function OpsEstudioAutoSection({
+  report,
+  isLoading,
+  isError,
+}: {
+  report: EstudioAutoTelemetry | undefined;
+  isLoading?: boolean;
+  isError?: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <Card data-testid="ops-estudio-auto-section">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
+            Telemetría A6 · Estudio AUTO
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Cargando embudo…</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  if (isError || !report) {
+    return (
+      <Card data-testid="ops-estudio-auto-section">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
+            Telemetría A6 · Estudio AUTO
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Sin embudo A6. Measure ≠ ampliar Radar/Hoy.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { funnel, gates, lastPropose, edgeReport, recentProposes } = report;
+  const skipped = Object.entries(lastPropose?.skippedByReason ?? {});
+  const recentCount = recentProposes?.length ?? 0;
+  const durabilityLabel =
+    lastPropose?.durability === "jsonl"
+      ? "persistido JSONL"
+      : lastPropose?.durability === "process_memory"
+        ? "memoria de proceso"
+        : (lastPropose?.durability ?? "");
+
+  return (
+    <Card data-testid="ops-estudio-auto-section">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">
+          Telemetría A6 · Estudio AUTO
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <p className="text-xs text-muted-foreground">{report.rule}</p>
+        <p
+          className={cn(
+            "inline-flex rounded-md border px-2 py-1 font-medium",
+            gates.expandSourcesReady
+              ? "border-emerald-500/40 text-emerald-800 dark:text-emerald-200"
+              : "border-rose-500/40 text-rose-800 dark:text-rose-200",
+          )}
+          data-testid="ops-a6-expand-gate"
+        >
+          Ampliar fuentes: {gates.expandSourcesReady ? "listo" : "bloqueado"}
+        </p>
+        <p className="text-xs tabular-nums text-muted-foreground">
+          Embudo {funnel.daysWithOpinions}d · {funnel.candidatesAlarma} alarma ·{" "}
+          {funnel.candidatesDictamen} dictamen · {funnel.notCandidate} fuera
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Fuentes permitidas: {funnel.allowedSources.join(" · ")}. Fuera:{" "}
+          {funnel.excludedSources.join(" · ")}.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          EdgeReport paridad SEMI: {edgeReport.mark}
+          {gates.paperDExecuteEnv ? " · execute env on" : " · execute env off"}
+        </p>
+        {gates.blockers.length > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Blockers: {gates.blockers.join(" · ")}
+          </p>
+        ) : null}
+        {lastPropose ? (
+          <p
+            className="text-xs tabular-nums text-muted-foreground"
+            data-testid="ops-a6-last-propose"
+          >
+            Último auto-propose: {lastPropose.executeStatus} ·{" "}
+            {lastPropose.hitCount} hit(s) / {lastPropose.candidateCount} cand.
+            {skipped.length > 0
+              ? ` · skip ${skipped.map(([k, n]) => `${k}×${n}`).join(", ")}`
+              : ""}
+            {" · "}
+            {durabilityLabel}
+            {recentCount > 1 ? ` · ${recentCount} en histórico` : ""}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Sin lastPropose — corre POST auto-propose dry-run en esta API.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

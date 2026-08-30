@@ -7315,10 +7315,18 @@ export interface components {
         OperationalExitPlanDto: {
             /** Primaryreason */
             primaryReason: string | null;
+            /** Policytemplateid */
+            policyTemplateId?: string | null;
             /** Status */
             status: string;
             /** Suggestedaction */
             suggestedAction: string;
+            /** Suggestedqty */
+            suggestedQty?: number | null;
+            /** Suggestedstop */
+            suggestedStop?: number | null;
+            /** Trailwidth */
+            trailWidth?: string | null;
         };
         /**
          * OperationalIncidentDto

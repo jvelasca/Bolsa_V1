@@ -697,6 +697,7 @@ const TRAIL_PLAN_WHYS = new Set<TrailPlanWhyV1>([
   "ratchet_lock",
   "not_permission",
   "hint_only",
+  "clamped_not_worsen",
 ]);
 
 function asTrailPlan(value: unknown): TrailPlanV1 | null {

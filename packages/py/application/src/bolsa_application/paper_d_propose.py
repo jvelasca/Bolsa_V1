@@ -88,6 +88,8 @@ def build_paper_d_hits(
                 "instrumentId": iid,
                 "symbol": cand.get("ticker") or iid,
                 "scanId": plan_id,
+                # V1.33 A-δ: Paper D ≠ Estudio; Router abrirá skip auto_source_not_estudio.
+                "autoSource": "paper_d",
                 "signal": {
                     "id": f"pd-{day}-{pol[:8]}-{iid[:8]}",
                     "instrumentId": iid,

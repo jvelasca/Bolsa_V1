@@ -1223,6 +1223,95 @@ export const api = {
       }),
     ),
 
+  /** A6 — embudo Estudio AUTO (read-only; ≠ flip execute · ≠ Radar/Hoy). */
+  getEstudioAutoTelemetry: async (opts?: {
+    lookbackDays?: number;
+    accountId?: string;
+    instrumentIds?: string[];
+  }) => {
+    const q = new URLSearchParams();
+    q.set("lookbackDays", String(opts?.lookbackDays ?? 120));
+    if (opts?.accountId) q.set("accountId", opts.accountId);
+    for (const id of opts?.instrumentIds ?? []) {
+      if (id.trim()) q.append("instrumentIds", id.trim());
+    }
+    const account = getActiveAccountId();
+    const headers: HeadersInit = {};
+    if (account) headers["X-Account-Id"] = account;
+    const res = await fetch(
+      `${API_URL}/api/instrument-daily-opinions/auto-telemetry?${q.toString()}`,
+      { headers, credentials: "include" },
+    );
+    if (!res.ok) {
+      let detail: unknown;
+      try {
+        detail = await res.json();
+      } catch {
+        detail = undefined;
+      }
+      throw new ApiError(
+        formatApiErrorDetail(detail) ?? res.statusText,
+        res.status,
+      );
+    }
+    return (await res.json()) as {
+      data: {
+        schemaVersion: string;
+        rule: string;
+        asOf: string;
+        lookbackDays: number;
+        funnel: {
+          opinionRows: number;
+          daysWithOpinions: number;
+          candidatesAlarma: number;
+          candidatesDictamen: number;
+          candidatesTotal: number;
+          notCandidate: number;
+          allowedSources: string[];
+          excludedSources: string[];
+        };
+        edgeReport: {
+          paperAutoRequiresEdgeReport: boolean;
+          parityWithSemi: boolean;
+          mark: string;
+          note: string;
+        };
+        p1p5: {
+          mark: string;
+          strictAcceptReady: boolean;
+          source: string;
+        };
+        lastPropose: {
+          generatedAt?: string | null;
+          planId?: string | null;
+          candidateCount: number;
+          hitCount: number;
+          executeStatus?: string | null;
+          skippedByReason: Record<string, number>;
+          hitsBySource: Record<string, number>;
+          durability: string;
+        } | null;
+        recentProposes: Array<{
+          generatedAt?: string | null;
+          planId?: string | null;
+          candidateCount: number;
+          hitCount: number;
+          executeStatus?: string | null;
+          skippedByReason: Record<string, number>;
+          hitsBySource: Record<string, number>;
+          durability: string;
+        }>;
+        gates: {
+          expandSourcesReady: boolean;
+          thawEstrictoReady: boolean;
+          paperDExecuteEnv: boolean;
+          blockers: string[];
+        };
+        caveats: string[];
+      };
+    };
+  },
+
   getAccountMandates: (accountId: string, instrumentId?: string) =>
     call<{ data: import("@bolsa/shared").MandateBundleDto }>(() =>
       client.GET("/api/accounts/{account_id}/mandates", {

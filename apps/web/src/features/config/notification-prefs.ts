@@ -11,6 +11,8 @@ export const NOTIFICATION_PREFS_KEY = "bolsa-notification-prefs-v1";
 export type NotificationPrefs = {
   /** Toast in-app al detectar Alarmas Estudio nuevas. */
   alarmaToastEnabled: boolean;
+  /** Toast in-app DISPARADA / T1 en universo Estudio (V1.28 G2). */
+  operativaToastEnabled: boolean;
   /** Intentar email tras eod-batch / cron (requiere SMTP servidor). */
   alarmaEmailEnabled: boolean;
   /** Destinatario (un solo operador hasta multiusuario). */
@@ -27,6 +29,7 @@ export type NotificationPrefs = {
 export function defaultNotificationPrefs(): NotificationPrefs {
   return {
     alarmaToastEnabled: true,
+    operativaToastEnabled: true,
     alarmaEmailEnabled: false,
     alarmaEmail: "",
     dailyDigestEnabled: false,
@@ -52,6 +55,10 @@ export function normalizeNotificationPrefs(raw: unknown): NotificationPrefs {
       typeof o.alarmaToastEnabled === "boolean"
         ? o.alarmaToastEnabled
         : d.alarmaToastEnabled,
+    operativaToastEnabled:
+      typeof o.operativaToastEnabled === "boolean"
+        ? o.operativaToastEnabled
+        : d.operativaToastEnabled,
     alarmaEmailEnabled:
       typeof o.alarmaEmailEnabled === "boolean"
         ? o.alarmaEmailEnabled

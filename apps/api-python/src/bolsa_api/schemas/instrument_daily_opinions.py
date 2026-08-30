@@ -172,6 +172,28 @@ class EstudioEodOpinionBatchResponseDto(BaseModel):
     )
 
 
+class EstudioAutoProposeDto(BaseModel):
+    """V1.33+ — Estudio buy aviso|alarma → hit AUTO (TradePlan TRIGGERED)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    instrument_ids: list[str] = Field(alias="instrumentIds", min_length=1, max_length=100)
+    as_of_bar_date: str | None = Field(default=None, alias="asOfBarDate")
+    account_id: str | None = Field(default=None, alias="accountId")
+    force_refresh: bool = Field(default=False, alias="forceRefresh")
+    max_candidates: int = Field(default=25, alias="maxCandidates", ge=1, le=100)
+    execute: bool = False
+    execution_policy_id: str | None = Field(default=None, alias="executionPolicyId")
+
+    @field_validator("instrument_ids")
+    @classmethod
+    def _non_empty_ids(cls, value: list[str]) -> list[str]:
+        cleaned = [i.strip() for i in value if isinstance(i, str) and i.strip()]
+        if not cleaned:
+            raise ValueError("instrumentIds must not be empty")
+        return cleaned
+
+
 class OpinionTelemetryDto(BaseModel):
     """A0 — acierto dictamen (proxy 5d)."""
 

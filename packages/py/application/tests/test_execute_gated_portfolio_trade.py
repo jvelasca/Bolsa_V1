@@ -112,6 +112,37 @@ async def test_gated_http_sell_skips_opening_gate() -> None:
     assert trade.calls[0]["trade_type"] == "sell"
 
 
+@pytest.mark.asyncio
+async def test_gated_http_sell_fenced_when_position_open() -> None:
+    from bolsa_application.execute_gated_portfolio_trade import ExitVetoedError
+
+    trade = _FakeExecuteTrade()
+    exit_store = _ExitStore(row={"id": "pos-1", "status": "OPEN"})
+
+    class _ExitUc:
+        def __init__(self):
+            self._store = exit_store
+
+        async def get_open(self, account_id: str, instrument_id: str):
+            return await exit_store.get_open_for_instrument(account_id, instrument_id)
+
+    uc = ExecuteGatedPortfolioTrade(
+        trade,  # type: ignore[arg-type]
+        portfolio_summary=_VetoSummary(),
+        position_from_exit=_ExitUc(),  # type: ignore[arg-type]
+    )
+    with pytest.raises(ExitVetoedError, match="position_exit_requires_confirm"):
+        await uc.execute(
+            instrument_id="inst-1",
+            trade_type="sell",
+            quantity=1.0,
+            price=10.0,
+            account_id="acc-1",
+            idempotency_key="k" * 16,
+        )
+    assert trade.calls == []
+
+
 class _FillStore:
     def __init__(self) -> None:
         self.inserts: list[dict] = []

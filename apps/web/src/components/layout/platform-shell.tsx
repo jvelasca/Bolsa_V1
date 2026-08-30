@@ -22,6 +22,7 @@ import { InstrumentSyncDialog } from "@/features/instruments/instrument-sync-dia
 import { PendingOrdersMonitor } from "@/features/trading/pending-orders-monitor";
 import { TrackerAlarmInboxPoller } from "@/features/trading/tracker-alarm-inbox-poller";
 import { EstudioOpinionAlarmPoller } from "@/features/research/estudio-opinion-alarm-poller";
+import { OperativaPhaseToastPoller } from "@/features/trading/operativa-phase-toast-poller";
 
 import { InstrumentInfoDialog } from "@/features/trading/instrument-info-dialog";
 import { OrderDialog } from "@/features/trading/order-dialog";
@@ -43,6 +44,7 @@ import { wireEstudioProcessRunningEvents } from "@/stores/estudio-process-runnin
 import { WorkspacePickerDialog } from "@/features/workspace/workspace-picker-dialog";
 
 import { PlatformConfigDialog } from "@/features/config/platform-config-dialog";
+import { CommandPaletteHost } from "@/features/command-palette/command-palette-host";
 import { CreateAccountWizardDialog } from "@/features/accounts/create-account-wizard-dialog";
 
 import { BacktestsPage } from "@/features/backtests/backtests-page";
@@ -131,10 +133,10 @@ export function PlatformShell() {
             ) : !onBacktests ? (
               <main
                 className={cn(
-                  "min-h-0 flex-1 p-3 md:p-4",
+                  "min-h-0 flex-1 p-[var(--density-pad)] md:p-[var(--density-pad-md)]",
                   fillHub
                     ? "flex flex-col overflow-hidden"
-                    : "overflow-auto md:p-6",
+                    : "overflow-auto md:p-[var(--density-pad-lg)]",
                 )}
               >
                 <Outlet />
@@ -145,7 +147,7 @@ export function PlatformShell() {
               <main
                 className={cn(
                   onBacktests
-                    ? "flex min-h-0 flex-1 flex-col overflow-hidden p-3 md:p-4"
+                    ? "flex min-h-0 flex-1 flex-col overflow-hidden p-[var(--density-pad)] md:p-[var(--density-pad-md)]"
                     : "pointer-events-none fixed left-0 top-0 h-px w-px overflow-hidden opacity-0",
                 )}
                 aria-hidden={!onBacktests}
@@ -172,6 +174,8 @@ export function PlatformShell() {
 
       <PlatformConfigDialog />
 
+      <CommandPaletteHost />
+
       <CreateAccountWizardDialog />
 
       <VisualizationLogDialog />
@@ -188,6 +192,7 @@ export function PlatformShell() {
       <DrawingAlertsMonitor />
       <TrackerAlarmInboxPoller />
       <EstudioOpinionAlarmPoller />
+      <OperativaPhaseToastPoller />
       <PendingOrdersMonitor />
 
       <AlertToasts />

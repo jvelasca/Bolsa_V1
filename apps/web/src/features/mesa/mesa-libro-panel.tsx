@@ -14,14 +14,17 @@ import {
 import { formatPrice } from "@/features/charts/chart-utils";
 import { OperationsPanel } from "@/features/trading/operations-panel";
 import { NoTradeSessionButton } from "@/features/operations/no-trade-session-button";
-import type { PortfolioSummaryDto } from "@bolsa/shared";
+import type { MesaProtectionKpiV1, PortfolioSummaryDto } from "@bolsa/shared";
+import { MesaProteccionKpi } from "@/features/mesa/mesa-proteccion-kpi";
 
 export function MesaLibroPanel({
   summary,
   accountName,
+  protectionKpi,
 }: {
   summary: PortfolioSummaryDto | null | undefined;
   accountName?: string | null;
+  protectionKpi?: MesaProtectionKpiV1 | null;
 }) {
   const positionsCount = summary?.positions.length ?? 0;
 
@@ -40,6 +43,9 @@ export function MesaLibroPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
+          {protectionKpi ? (
+            <MesaProteccionKpi kpi={protectionKpi} compact />
+          ) : null}
           <NoTradeSessionButton />
           <Link
             to="/history"

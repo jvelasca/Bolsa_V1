@@ -13,13 +13,17 @@ class PortfolioDto(BaseModel):
 
 
 class OperationalExitPlanDto(BaseModel):
-    """P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits)."""
+    """P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits). V1.29 + qty/stop/policy."""
 
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     status: str
     suggested_action: str = Field(alias="suggestedAction")
     primary_reason: str | None = Field(alias="primaryReason")
+    suggested_qty: float | None = Field(default=None, alias="suggestedQty")
+    suggested_stop: float | None = Field(default=None, alias="suggestedStop")
+    policy_template_id: str | None = Field(default=None, alias="policyTemplateId")
+    trail_width: str | None = Field(default=None, alias="trailWidth")
 
 
 class OperationalPositionDto(BaseModel):

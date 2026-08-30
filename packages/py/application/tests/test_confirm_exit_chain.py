@@ -261,6 +261,22 @@ def test_advisory_target1_reduce() -> None:
     assert adv is not None
     assert adv["primaryReason"] == "TARGET_1"
     assert adv["suggestedAction"] == "reduce"
+    # V1.29 default moderate → 30% of remaining
+    assert adv["suggestedQty"] == 3.0
+    assert adv["policyTemplateId"] == "moderate"
+    assert adv["trailWidth"] == "medium"
+
+
+def test_advisory_target1_conservative_policy() -> None:
+    row = _open_row()
+    adv = advisory_exit_plan(
+        row["position_state"], mark_price=105.0, template_id="conservative"
+    )
+    assert adv is not None
+    assert adv["suggestedAction"] == "reduce"
+    assert adv["suggestedQty"] == 5.0
+    assert adv["policyTemplateId"] == "conservative"
+    assert adv["trailWidth"] == "tight"
 
 
 def test_semi_manual_allows_full_exit() -> None:
@@ -269,3 +285,67 @@ def test_semi_manual_allows_full_exit() -> None:
     assert perm.allowed is True
     assert perm.action == "full_exit"
     assert perm.verdict == "ALLOW"
+
+
+@pytest.mark.asyncio
+async def test_exit_risk_signature_blocks_qty_over_plan() -> None:
+    """V1.32 — qty firmada > plannedQty sin override → exit_risk_signature."""
+    fake = _FakeExecuteTrade()
+    store = _FakeExitStore(_open_row())
+    uc = ConfirmRecommendationIntent(
+        cognitive_store=_FakeCognitiveStore(None),
+        execute_trade=fake,
+        position_from_exit=PersistPositionFromExit(store),
+    )
+    raw = {
+        **_closing_raw(qty=10.0, action="reduce"),
+        "decisionPackage": {
+            "operativaIntent": "reduce",
+            "exitSource": "event",
+            "plannedQty": 3.0,
+            "exitPlan": {
+                "status": "TRIGGERED",
+                "suggestedAction": "reduce",
+                "primaryReason": "TARGET_1",
+                "suggestedQty": 3.0,
+            },
+        },
+    }
+    result = await uc.execute(
+        recommendation_raw=raw,
+        account_id="acc-1",
+        execute=True,
+        session_id=None,
+    )
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "exit_risk_signature"
+    assert fake.calls == []
+
+
+@pytest.mark.asyncio
+async def test_exit_risk_signature_allows_with_override() -> None:
+    fake = _FakeExecuteTrade()
+    store = _FakeExitStore(_open_row())
+    uc = ConfirmRecommendationIntent(
+        cognitive_store=_FakeCognitiveStore(None),
+        execute_trade=fake,
+        position_from_exit=PersistPositionFromExit(store),
+    )
+    raw = {
+        **_closing_raw(qty=10.0, action="reduce"),
+        "decisionPackage": {
+            "operativaIntent": "reduce",
+            "exitSource": "manual",
+            "plannedQty": 3.0,
+            "exitPlan": None,
+        },
+    }
+    result = await uc.execute(
+        recommendation_raw=raw,
+        account_id="acc-1",
+        execute=True,
+        session_id=None,
+        risk_override_reason="tomar más beneficio",
+    )
+    assert result["trade"]["status"] == "executed"
+    assert fake.calls[0]["trade_type"] == "sell"

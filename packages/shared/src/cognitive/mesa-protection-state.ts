@@ -118,3 +118,32 @@ export function stopDistancePct(
   }
   return Math.round(((lastPrice - stop) / lastPrice) * 1000) / 10;
 }
+
+/** KPI cartera — posiciones con stop Confirmada / N abiertas. */
+export type MesaProtectionKpiV1 = {
+  protected: number;
+  open: number;
+  discrepancies: number;
+  /** protected/open · 0–100; null si open=0. */
+  pct: number | null;
+};
+
+export function aggregateMesaProtectionKpi(
+  states: ReadonlyArray<
+    Pick<MesaProtectionStateV1, "summaryLabel" | "discrepancy">
+  >,
+): MesaProtectionKpiV1 {
+  const open = states.length;
+  let protectedCount = 0;
+  let discrepancies = 0;
+  for (const s of states) {
+    if (s.summaryLabel === "Confirmada") protectedCount += 1;
+    if (s.discrepancy) discrepancies += 1;
+  }
+  return {
+    protected: protectedCount,
+    open,
+    discrepancies,
+    pct: open > 0 ? Math.round((protectedCount / open) * 100) : null,
+  };
+}

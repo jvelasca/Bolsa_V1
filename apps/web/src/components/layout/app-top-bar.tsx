@@ -34,11 +34,17 @@ import {
   PanelBottom,
   PanelRight,
   RotateCcw,
+  Search,
   Settings,
   SquareArrowOutUpRight,
   User,
 } from "lucide-react";
 import { AppHelpMenu } from "@/features/help/app-help-menu";
+import { requestOpenCommandPalette } from "@/features/command-palette/command-palette-host";
+import {
+  NAMED_LAYOUT_LABELS,
+  type NamedLayoutId,
+} from "@/features/command-palette/named-layout";
 import { UniverseChip } from "@/features/platform/universe-chip";
 import { AccountScopeSelector } from "@/features/accounts/account-scope-selector";
 import { cn } from "@/lib/utils";
@@ -384,7 +390,7 @@ export function AppTopBar() {
   ];
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border bg-card/90 px-2">
+    <header className="flex h-[var(--density-topbar-h,3rem)] shrink-0 items-center gap-1 border-b border-border bg-card/90 px-2 py-[var(--density-topbar-py)]">
       <div
         className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background/40 p-0.5"
         role="group"
@@ -566,6 +572,34 @@ export function AppTopBar() {
               <PanelRight className="h-4 w-4" />
             </button>
             <div className="mx-0.5 h-4 w-px bg-border/80" aria-hidden />
+            <label className="sr-only" htmlFor="named-layout-select">
+              Layout Mercado
+            </label>
+            <select
+              id="named-layout-select"
+              title="Layout nombrado (Simple / Trader / Analista)"
+              value={layout.namedLayoutId ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "simple" || v === "trader" || v === "analista") {
+                  layout.applyNamedLayout(v satisfies NamedLayoutId);
+                }
+              }}
+              className="max-w-[7.5rem] rounded border-0 bg-transparent px-1 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {layout.namedLayoutId == null ? (
+                <option value="" disabled>
+                  Custom
+                </option>
+              ) : null}
+              {(Object.keys(NAMED_LAYOUT_LABELS) as NamedLayoutId[]).map(
+                (id) => (
+                  <option key={id} value={id}>
+                    {NAMED_LAYOUT_LABELS[id]}
+                  </option>
+                ),
+              )}
+            </select>
             <button
               type="button"
               title="Restablecer paneles (watchlist / operaciones / operativa)"
@@ -590,6 +624,18 @@ export function AppTopBar() {
       )}
 
       <div className="ml-auto flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => requestOpenCommandPalette()}
+          title="Command palette (Ctrl/⌘ K)"
+          aria-label="Abrir command palette"
+          className="flex items-center gap-1 rounded-md px-1.5 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <Search className="h-4 w-4" />
+          <kbd className="hidden rounded border border-border px-1 py-0.5 text-[10px] text-muted-foreground sm:inline">
+            ⌘K
+          </kbd>
+        </button>
         <NavLink
           to="/alerts"
           className={({ isActive }) =>

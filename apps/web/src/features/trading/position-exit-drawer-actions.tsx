@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import type { PositionDto, ProtectPlanV1 } from "@bolsa/shared";
+import { formatExitPolicyActionHint } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
@@ -67,6 +68,13 @@ export function PositionExitDrawerActions({
     : "rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent";
 
   const showProtect = positionShowsProtectHint(position, protectPlan);
+  const exitPlan = position.operational?.exitPlan;
+  const policyHint = formatExitPolicyActionHint({
+    suggestedAction: exitPlan?.suggestedAction,
+    suggestedQty: exitPlan?.suggestedQty,
+    primaryReason: exitPlan?.primaryReason,
+    templateId: exitPlan?.policyTemplateId,
+  });
 
   return (
     <div className={cn("flex flex-col items-start gap-0.5", className)}>
@@ -109,6 +117,14 @@ export function PositionExitDrawerActions({
           Salir
         </button>
       </div>
+      {policyHint ? (
+        <span
+          className="max-w-[240px] text-[9px] text-muted-foreground"
+          data-testid={`position-exit-policy-hint-${position.symbol}`}
+        >
+          {policyHint}
+        </span>
+      ) : null}
       {error ? (
         <span className="max-w-[200px] text-[9px] text-destructive">
           {error}

@@ -10,6 +10,12 @@
 import type { TradingDockLayoutPrefs } from "@bolsa/shared";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  isNamedLayoutId,
+  namedLayoutDockSnapshot,
+  NAMED_LAYOUT_DEFAULT,
+  type NamedLayoutId,
+} from "@/features/command-palette/named-layout";
 
 const DEFAULT_LISTS_WIDTH_PCT = 26;
 const DEFAULT_OPERATIONS_HEIGHT_PCT = 22;
@@ -45,6 +51,8 @@ interface TradingLayoutState {
   operativaWidthPct: number;
   operativaSections: Record<OperativaSectionId, boolean>;
   operativaSectionHeights: Record<OperativaSectionId, number>;
+  /** V1.31.2 — último preset nombrado; null si el usuario tweakeó docks a mano. */
+  namedLayoutId: NamedLayoutId | null;
   toggleLists: () => void;
   ensureListsOpen: () => void;
   toggleCharts: () => void;
@@ -55,6 +63,7 @@ interface TradingLayoutState {
   maximizeOperations: () => void;
   restoreLayout: () => void;
   resetLayout: () => void;
+  applyNamedLayout: (id: NamedLayoutId) => void;
   setListsWidthPct: (pct: number) => void;
   setOperationsHeightPct: (pct: number) => void;
   setOperativaWidthPct: (pct: number) => void;
@@ -91,18 +100,20 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
       operativaWidthPct: DEFAULT_OPERATIVA_WIDTH_PCT,
       operativaSections: { ...DEFAULT_OPERATIVA_SECTIONS },
       operativaSectionHeights: { ...DEFAULT_OPERATIVA_SECTION_HEIGHTS },
+      namedLayoutId: NAMED_LAYOUT_DEFAULT,
 
       toggleLists: () => {
         const open = !get().listsOpen;
         set({
           listsOpen: open,
           listsMaximized: open ? get().listsMaximized : false,
+          namedLayoutId: null,
         });
       },
 
       ensureListsOpen: () => {
         if (!get().listsOpen) {
-          set({ listsOpen: true, listsMaximized: false });
+          set({ listsOpen: true, listsMaximized: false, namedLayoutId: null });
         }
       },
 
@@ -111,6 +122,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
         set({
           chartsOpen: open,
           chartsMaximized: open ? get().chartsMaximized : false,
+          namedLayoutId: null,
         });
       },
 
@@ -119,11 +131,12 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
         set({
           operationsOpen: open,
           operationsMaximized: open ? get().operationsMaximized : false,
+          namedLayoutId: null,
         });
       },
 
       toggleOperativa: () => {
-        set({ operativaOpen: !get().operativaOpen });
+        set({ operativaOpen: !get().operativaOpen, namedLayoutId: null });
       },
 
       maximizeLists: () => {
@@ -183,12 +196,12 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           operationsMaximized: false,
         }),
 
-      resetLayout: () =>
+      resetLayout: () => get().applyNamedLayout("trader"),
+
+      applyNamedLayout: (id) => {
+        const docks = namedLayoutDockSnapshot(id);
         set({
-          listsOpen: true,
-          chartsOpen: true,
-          operationsOpen: true,
-          operativaOpen: true,
+          ...docks,
           listsMaximized: false,
           chartsMaximized: false,
           operationsMaximized: false,
@@ -197,11 +210,14 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           operativaWidthPct: DEFAULT_OPERATIVA_WIDTH_PCT,
           operativaSections: { ...DEFAULT_OPERATIVA_SECTIONS },
           operativaSectionHeights: { ...DEFAULT_OPERATIVA_SECTION_HEIGHTS },
-        }),
+          namedLayoutId: id,
+        });
+      },
 
       setListsWidthPct: (pct) =>
         set({
           listsWidthPct: clamp(pct, MIN_LISTS_WIDTH_PCT, MAX_LISTS_WIDTH_PCT),
+          namedLayoutId: null,
         }),
 
       setOperationsHeightPct: (pct) =>
@@ -211,6 +227,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
             MIN_OPERATIONS_HEIGHT_PCT,
             MAX_OPERATIONS_HEIGHT_PCT,
           ),
+          namedLayoutId: null,
         }),
 
       setOperativaWidthPct: (pct) =>
@@ -220,6 +237,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
             MIN_OPERATIVA_WIDTH_PCT,
             MAX_OPERATIVA_WIDTH_PCT,
           ),
+          namedLayoutId: null,
         }),
 
       toggleOperativaSection: (id) => {
@@ -253,6 +271,12 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
       name: "bolsa-trading-layout-v1",
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<TradingLayoutState>;
+        const namedLayoutId =
+          p.namedLayoutId === null
+            ? null
+            : isNamedLayoutId(p.namedLayoutId)
+              ? p.namedLayoutId
+              : (current.namedLayoutId ?? NAMED_LAYOUT_DEFAULT);
         return {
           ...current,
           ...p,
@@ -270,6 +294,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
             ...DEFAULT_OPERATIVA_SECTION_HEIGHTS,
             ...(p.operativaSectionHeights ?? {}),
           },
+          namedLayoutId,
         };
       },
     },

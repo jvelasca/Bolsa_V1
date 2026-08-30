@@ -61,6 +61,13 @@ def _is_audited_override(override: object | None) -> bool:
 def _stop_worsens(
     direction: TradePlanDirection, current: float | None, nxt: float
 ) -> bool:
+    return does_stop_worsen(direction, current, nxt)
+
+
+def does_stop_worsen(
+    direction: str, current: float | None, nxt: float
+) -> bool:
+    """H2 — long: new stop lower than current; short: new stop higher."""
     if current is None or current <= 0:
         return False
     if direction == "long":
@@ -68,6 +75,17 @@ def _stop_worsens(
     if direction == "short":
         return nxt > current + 1e-9
     return False
+
+
+def clamp_stop_not_worsen(
+    direction: str, current: float | None, nxt: float
+) -> float:
+    """V1.29 — trail/protect advisory: nunca proponer un stop que empeore el vigente."""
+    if nxt != nxt or nxt <= 0:
+        return nxt
+    if does_stop_worsen(direction, current, nxt) and current is not None and current > 0:
+        return round(float(current) * 10000) / 10000
+    return round(float(nxt) * 10000) / 10000
 
 
 def _now_iso(at: str | None = None) -> str:

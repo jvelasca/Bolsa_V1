@@ -17,6 +17,11 @@ import { useTradingLayoutStore } from "@/stores/trading-layout-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { ChartNewChartTemplatePinButton } from "@/features/charts/chart-new-chart-template-pin-button";
+import type { UiTheme } from "@/features/command-palette/ui-theme";
+import {
+  NAMED_LAYOUT_LABELS,
+  type NamedLayoutId,
+} from "@/features/command-palette/named-layout";
 
 export function GeneralSettingsSection({
   compact = false,
@@ -27,6 +32,12 @@ export function GeneralSettingsSection({
   const setAutoSave = useWorkspaceStore((s) => s.setAutoSave);
   const setOpenOnStartup = useWorkspaceStore((s) => s.setOpenOnStartup);
   const openWorkspacePicker = useUiStore((s) => s.openWorkspacePicker);
+  const uiDensity = useUiStore((s) => s.uiDensity);
+  const setUiDensity = useUiStore((s) => s.setUiDensity);
+  const uiTheme = useUiStore((s) => s.uiTheme);
+  const setUiTheme = useUiStore((s) => s.setUiTheme);
+  const namedLayoutId = useTradingLayoutStore((s) => s.namedLayoutId);
+  const applyNamedLayout = useTradingLayoutStore((s) => s.applyNamedLayout);
   const resetLayout = useTradingLayoutStore((s) => s.resetLayout);
 
   const body = (
@@ -94,11 +105,57 @@ export function GeneralSettingsSection({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>
-            Tema oscuro activo. Tema claro y densidad de UI:{" "}
-            <span className="text-amber-500/90">pendiente</span> (fase
-            posterior).
-          </p>
+          <label className="flex flex-col gap-1.5 text-foreground">
+            <span className="font-medium">Tema</span>
+            <select
+              value={uiTheme}
+              onChange={(e) => setUiTheme(e.target.value as UiTheme)}
+              className="max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="dark">Oscuro</option>
+              <option value="light">Claro</option>
+              <option value="system">Sistema</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5 text-foreground">
+            <span className="font-medium">Densidad de UI</span>
+            <select
+              value={uiDensity}
+              onChange={(e) =>
+                setUiDensity(e.target.value as "comfortable" | "compact")
+              }
+              className="max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="comfortable">Comfortable</option>
+              <option value="compact">Compact</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5 text-foreground">
+            <span className="font-medium">Layout Mercado</span>
+            <select
+              value={namedLayoutId ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "simple" || v === "trader" || v === "analista") {
+                  applyNamedLayout(v satisfies NamedLayoutId);
+                }
+              }}
+              className="max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm"
+            >
+              {namedLayoutId == null ? (
+                <option value="" disabled>
+                  Personalizado
+                </option>
+              ) : null}
+              {(Object.keys(NAMED_LAYOUT_LABELS) as NamedLayoutId[]).map(
+                (id) => (
+                  <option key={id} value={id}>
+                    {NAMED_LAYOUT_LABELS[id]}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
           <p>
             El layout de paneles (watchlist / operaciones) y los anchos de
             columnas de Listas/Valores se guardan en este dispositivo:

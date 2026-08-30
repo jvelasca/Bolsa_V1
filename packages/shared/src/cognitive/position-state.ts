@@ -161,6 +161,26 @@ export function doesStopWorsen(
   return false;
 }
 
+/**
+ * V1.29 — trail/protect advisory: nunca proponer un stop que empeore el vigente.
+ * Si empeoraría, devuelve el stop actual (hold de riesgo).
+ */
+export function clampStopNotWorsen(
+  direction: TradePlanDirectionV1 | string,
+  current: number | null | undefined,
+  next: number,
+): number {
+  if (!finite(next) || next <= 0) return next;
+  if (
+    doesStopWorsen(direction, current, next) &&
+    finite(current) &&
+    current > 0
+  ) {
+    return round4(current);
+  }
+  return round4(next);
+}
+
 function stopWorsens(
   direction: TradePlanDirectionV1,
   current: number | null | undefined,

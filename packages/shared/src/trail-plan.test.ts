@@ -76,4 +76,30 @@ describe("mapTrailPlan (Ciclo 8.1)", () => {
     expect(out.lockedR).toBe(0.8);
     expect(out.suggestedTrailStop).toBe(108);
   });
+
+  it("V1.29 — tight trailWidth shortens distance", () => {
+    const out = mapTrailPlan({
+      direction: "long",
+      entry: 100,
+      structuralStop: 90,
+      peakMfeR: 2.0,
+      trailWidth: "tight",
+    });
+    expect(out.trailDistanceR).toBe(0.75);
+    expect(out.lockedR).toBe(1.25);
+    expect(out.suggestedTrailStop).toBe(112.5);
+  });
+
+  it("V1.29 — clamps trail that would worsen currentStop", () => {
+    const out = mapTrailPlan({
+      direction: "long",
+      entry: 100,
+      structuralStop: 90,
+      peakMfeR: 1.5,
+      currentStop: 108,
+    });
+    // raw tip would be 105; clamp keeps 108
+    expect(out.suggestedTrailStop).toBe(108);
+    expect(out.why).toContain("clamped_not_worsen");
+  });
 });

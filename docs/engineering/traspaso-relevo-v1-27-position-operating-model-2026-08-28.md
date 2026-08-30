@@ -29,14 +29,15 @@ Estudio AUTO+gráfico §8 **Aplazado** (N4 pendiente). **No** `diseno-operativa-
 
 ## 2. Next (un epic)
 
-| Epic      | Qué                                                              | Fuera                 |
-| --------- | ---------------------------------------------------------------- | --------------------- |
-| **V1.28** | Daily cockpit + toasts DISPARADA/T1 (B-α, G2) en shell existente | Drag · nav nueva      |
-| Frente B  | Drag B-γ                                                         | Hasta N4 + §8 ACUERDO |
-| Frente A  | AUTO A-β                                                         | V1.33; A-γ rechazada  |
+| Epic      | Qué                                                                                                                                                                     | Fuera                 |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **V1.28** | Daily cockpit + toasts DISPARADA/T1 (B-α, G2) — **CÓDIGO** → [`traspaso-relevo-v1-28-daily-cockpit-2026-08-28.md`](./traspaso-relevo-v1-28-daily-cockpit-2026-08-28.md) | Drag · nav nueva      |
+| **V1.29** | Exit and profit (UI ExitPolicy; trail no empeora riesgo)                                                                                                                | Drag · nav nueva      |
+| Frente B  | Drag B-γ                                                                                                                                                                | Hasta N4 + §8 ACUERDO |
+| Frente A  | AUTO A-β                                                                                                                                                                | V1.33; A-γ rechazada  |
 
 ## 3. Arranque siguiente chat
 
-1. Este relevo + [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) + roadmap path-to-10.
+1. Preferir relevo **V1.28** + [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) + roadmap path-to-10.
 2. `pnpm --filter @bolsa/shared test` (**430**) · `pnpm test:decision-spine` (**530**, incluye `test_v127_golden_path.py` + FAIL).
 3. No abrir drag / AUTO.

@@ -1,7 +1,8 @@
 """HTTP paper trade con permiso pre-fill (Ciclo I1) + sync PositionState (OI-1).
 
 ``buy`` re-ejecuta ``allow_opening_fill`` (mismo SoT que Confirm/Fill).
-``sell`` no abre cesta y no pasa el gate de apertura.
+``sell`` no abre cesta; V1.32 — si hay PositionState abierta, exige Confirm
+(ExitPermission) y no deja bypass HTTP.
 Tras fill: ``post_fill_position_sync`` alinea ledger y Position persistida.
 """
 
@@ -34,8 +35,12 @@ class OpeningVetoedError(Exception):
     """Apertura HTTP bloqueada por ``check_opening`` (fail-closed)."""
 
 
+class ExitVetoedError(Exception):
+    """V1.32 — venta HTTP bloqueada si hay PositionState (usar Confirm SEMI)."""
+
+
 class ExecuteGatedPortfolioTrade:
-    """Use-case del ``POST /portfolio/trade``: gate en buy, ledger en ambos."""
+    """Use-case del ``POST /portfolio/trade``: gate en buy, fence en sell+Position."""
 
     def __init__(
         self,
@@ -104,6 +109,13 @@ class ExecuteGatedPortfolioTrade:
             )
             if not allowed:
                 raise OpeningVetoedError("risk_veto")
+        elif side == "sell" and self._position_from_exit is not None:
+            # V1.32 — Position abierta ⇒ Confirm SEMI (ExitPermission), no HTTP.
+            row = await self._position_from_exit.get_open(
+                account_id or "", instrument_id
+            )
+            if row is not None:
+                raise ExitVetoedError("position_exit_requires_confirm")
         trade = await self._execute_trade.execute(
             instrument_id=instrument_id,
             trade_type=side,

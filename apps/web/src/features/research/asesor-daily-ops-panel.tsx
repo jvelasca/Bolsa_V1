@@ -146,6 +146,9 @@ export function AsesorDailyOpsPanel() {
   const alarmaToastEnabled = useNotificationPrefsStore(
     (s) => s.alarmaToastEnabled,
   );
+  const operativaToastEnabled = useNotificationPrefsStore(
+    (s) => s.operativaToastEnabled,
+  );
   const setPrefs = useNotificationPrefsStore((s) => s.setPrefs);
   const pushToast = useAlertsStore((s) => s.pushToast);
   const [sending, setSending] = useState(false);
@@ -153,6 +156,7 @@ export function AsesorDailyOpsPanel() {
 
   const emailReady = notificationEmailReady({
     alarmaToastEnabled,
+    operativaToastEnabled,
     alarmaEmailEnabled,
     alarmaEmail,
     dailyDigestEnabled: digestEnabled,

@@ -98,6 +98,11 @@ from bolsa_analytics.cognitive.exit_policy import (
     resolve_exit_policy,
     suggestion_from_exit_policy,
 )
+from bolsa_analytics.cognitive.effective_trading_policy import (
+    effective_max_sector_exposure_pct,
+    format_portfolio_fit_preview,
+    resolve_effective_trading_policy,
+)
 from bolsa_analytics.cognitive.position_decision import (
     POSITION_DECISION_KEY,
     PositionDecision,
@@ -231,6 +236,14 @@ from bolsa_analytics.cognitive.recommendation import (
 from bolsa_analytics.cognitive.risk_signature import (
     apply_signed_levels_to_trade_plan,
     evaluate_risk_signature,
+)
+from bolsa_analytics.cognitive.exit_risk_signature import evaluate_exit_risk_signature
+from bolsa_analytics.cognitive.supervised_opening_sizing import (
+    AUTO_OPENING_SOURCES,
+    extract_hit_auto_source,
+    extract_hit_trade_plan,
+    is_allowed_auto_opening_source,
+    resolve_supervised_opening_quantity,
 )
 from bolsa_analytics.cognitive.score_macro import ScoreMacroResult, score_macro_from_facts
 from bolsa_analytics.cognitive.stats_suite import (
@@ -397,10 +410,19 @@ __all__ = [
     "build_position_state_from_fill",
     "build_position_revision",
     "evaluate_risk_signature",
+    "evaluate_exit_risk_signature",
     "apply_signed_levels_to_trade_plan",
+    "resolve_supervised_opening_quantity",
+    "extract_hit_trade_plan",
+    "extract_hit_auto_source",
+    "is_allowed_auto_opening_source",
+    "AUTO_OPENING_SOURCES",
     "validate_operational_levels",
     "build_exit_plan_from_position",
     "resolve_exit_policy",
+    "resolve_effective_trading_policy",
+    "effective_max_sector_exposure_pct",
+    "format_portfolio_fit_preview",
     "suggestion_from_exit_policy",
     "build_position_decision",
     "map_recon_status_to_health",

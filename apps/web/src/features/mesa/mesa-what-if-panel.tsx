@@ -12,7 +12,7 @@ import {
   buildPortfolioScenario,
   candidateSectorExposurePair,
   dominantSectorExposure,
-  PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
+  effectiveMaxSectorExposurePct,
 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,8 @@ type MesaWhatIfPanelProps = {
   candidateSector?: string | null;
   equity: number | null;
   cash: number | null;
+  /** V1.30 — desde EffectiveTradingPolicy del perfil activo. */
+  maxSectorExposurePct?: number;
   className?: string;
 };
 
@@ -39,9 +41,12 @@ export function MesaWhatIfPanel({
   candidateSector = null,
   equity,
   cash,
+  maxSectorExposurePct,
   className,
 }: MesaWhatIfPanelProps) {
   const [open, setOpen] = useState(false);
+  const sectorLimit =
+    maxSectorExposurePct ?? effectiveMaxSectorExposurePct(null);
 
   const scenario = buildPortfolioScenario({
     candidate: row,
@@ -50,7 +55,7 @@ export function MesaWhatIfPanel({
     cash,
     candidateSector,
     riskTolerance: null,
-    maxSectorExposurePct: PORTFOLIO_SCENARIO_DEFAULT_MAX_SECTOR_PCT,
+    maxSectorExposurePct: sectorLimit,
     portfolioRiskLimitR: portfolioRisk?.portfolioRiskLimitR ?? null,
   });
 
@@ -215,6 +220,9 @@ export function MesaWhatIfPanel({
           : "—"}
       </p>
       <p className="text-muted-foreground">Límite mandato: {limit}R</p>
+      <p className="text-muted-foreground">
+        Límite sector (política): {sectorLimit}%
+      </p>
       {scenario.warnings.length > 0 ? (
         <ul className="mt-1 list-disc pl-4 text-amber-700 dark:text-amber-300">
           {scenario.warnings.map((w) => (

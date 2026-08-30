@@ -145,6 +145,7 @@ function OpportunityCard({
   equity,
   cash,
   sectorByInstrumentId,
+  maxSectorExposurePct,
   onOpenDrawer,
 }: {
   rankRow: OpportunityRankRowV1;
@@ -154,6 +155,7 @@ function OpportunityCard({
   equity: number | null;
   cash: number | null;
   sectorByInstrumentId?: Record<string, string | null | undefined>;
+  maxSectorExposurePct?: number;
   onOpenDrawer: (row: OpportunityRankRowV1) => void;
 }) {
   const row = rankRow.candidate;
@@ -285,6 +287,7 @@ function OpportunityCard({
           }
           equity={equity}
           cash={cash}
+          maxSectorExposurePct={maxSectorExposurePct}
         />
       </div>
     </div>
@@ -386,6 +389,7 @@ export function MesaCandidatesPanel({
   cash = null,
   sectorExposurePct: _sectorExposurePct,
   sectorByInstrumentId,
+  maxSectorExposurePct,
   universeListId = DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
 }: {
   ranking: OpportunityRankingV1 | null;
@@ -397,6 +401,8 @@ export function MesaCandidatesPanel({
   /** Reservado — suitability ya viene en ranking.operationalPriority. */
   sectorExposurePct?: Record<string, number>;
   sectorByInstrumentId?: Record<string, string | null | undefined>;
+  /** V1.30 — EffectiveTradingPolicy del perfil activo. */
+  maxSectorExposurePct?: number;
   universeListId?: string;
 }) {
   const [funnelOpen, setFunnelOpen] = useState(false);
@@ -550,6 +556,7 @@ export function MesaCandidatesPanel({
                       equity={equity}
                       cash={cash}
                       sectorByInstrumentId={sectorByInstrumentId}
+                      maxSectorExposurePct={maxSectorExposurePct}
                       onOpenDrawer={setDrawerRow}
                     />
                   ))}
@@ -607,6 +614,7 @@ export function MesaCandidatesPanel({
         equity={equity}
         cash={cash}
         sectorByInstrumentId={sectorByInstrumentId}
+        maxSectorExposurePct={maxSectorExposurePct}
       />
     </Card>
   );

@@ -7,9 +7,14 @@ DS-05: aperturas pasan ``signal.timestamp`` + ``require_fresh_data=True`` al
 mismo ``check_opening`` (VETO stale / missing).
 DS-03: aperturas pasan tenure abierto desde BD + ``require_account_mandate=True``
 (VETO sin mandato / mismatch estrategia AUTO).
+V1.33 A-β: aperturas ``paper_auto`` exigen TradePlan TRIGGERED + ``risk_signature``
+(paridad SEMI; solo salta Confirm). Sizing libro/% caja no es autoridad.
+V1.33 A-δ: aperturas solo ``autoSource`` Estudio (``estudio_dictamen`` |
+``estudio_alarma``). Exits/protect intactos (ExitPermission H2).
 
 @see docs/engineering/risk-engine-or-re-2026-08-04.md
 @see docs/engineering/camino-d-a2-a5-prep-2026-08-04.md
+@see docs/engineering/estudio-operativa-auto-y-grafico-2026-08-28.md
 """
 
 from __future__ import annotations
@@ -19,6 +24,13 @@ from typing import Any, Literal
 
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
+from bolsa_analytics.cognitive.risk_signature import evaluate_risk_signature
+from bolsa_analytics.cognitive.supervised_opening_sizing import (
+    extract_hit_auto_source,
+    extract_hit_trade_plan,
+    is_allowed_auto_opening_source,
+    resolve_supervised_opening_quantity,
+)
 from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
@@ -660,6 +672,7 @@ class ExecutionRouter:
         summary = await self._portfolio_summary.execute(account_id=policy.account_id)
 
         quantity: float
+        opening_trade_plan: dict[str, Any] | None = None
         if trade_type == "sell" and str(signal.kind) == "exit":
             position = next(
                 (item for item in summary.positions if item.instrument_id == signal.instrument_id),
@@ -674,7 +687,49 @@ class ExecutionRouter:
                 )
             quantity = float(position.quantity)
         else:
-            quantity = sizing_value / price
+            # V1.33 A-β / A-δ — apertura: Estudio + TradePlan TRIGGERED + risk_signature.
+            # No sizing libro (A-γ rechazada). ``sizing_value`` solo aplica a live_auto dry-run.
+            _ = sizing_value
+            auto_source = extract_hit_auto_source(hit if isinstance(hit, dict) else None)
+            if not is_allowed_auto_opening_source(auto_source):
+                return ExecutionActionResult(
+                    instrument_id=signal.instrument_id,
+                    signal_kind=str(signal.kind),
+                    status="skipped",
+                    reason="auto_source_not_estudio",
+                )
+            opening_trade_plan = extract_hit_trade_plan(
+                hit if isinstance(hit, dict) else None
+            )
+            plan_qty = resolve_supervised_opening_quantity(opening_trade_plan)
+            if plan_qty is None:
+                return ExecutionActionResult(
+                    instrument_id=signal.instrument_id,
+                    signal_kind=str(signal.kind),
+                    status="skipped",
+                    reason="no_tradeplan",
+                )
+            plan_stop = None
+            if isinstance(opening_trade_plan, dict):
+                raw_stop = opening_trade_plan.get("structuralStop")
+                if isinstance(raw_stop, (int, float)) and not isinstance(raw_stop, bool):
+                    plan_stop = float(raw_stop)
+            sig = evaluate_risk_signature(
+                opening_trade_plan,
+                signed_qty=plan_qty,
+                signed_price=price,
+                signed_stop=plan_stop,
+                override_reason=None,
+                require_triggered_plan=True,
+            )
+            if sig.get("allowed") is not True:
+                return ExecutionActionResult(
+                    instrument_id=signal.instrument_id,
+                    signal_kind=str(signal.kind),
+                    status="skipped",
+                    reason="risk_signature",
+                )
+            quantity = float(plan_qty)
             if quantity <= 0:
                 return ExecutionActionResult(
                     instrument_id=signal.instrument_id,

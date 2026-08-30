@@ -116,8 +116,12 @@ def to_portfolio_summary_dto(summary: PortfolioSummary) -> PortfolioSummaryDto:
 def attach_operational_positions(
     dto: PortfolioSummaryDto,
     records: list[Any],
+    *,
+    policy_template_id: str | None = None,
 ) -> PortfolioSummaryDto:
-    """P1 — adjunta snapshot de autoridad al holding, por instrumento."""
+    """P1 — adjunta snapshot de autoridad al holding, por instrumento.
+    V1.29 — ExitPolicy del perfil activo parametriza advisory ExitPlan.
+    """
     from bolsa_application.evaluate_exit_plan import advisory_exit_plan
     from bolsa_application.origin_decision_package import origin_thesis_from_position_state
 
@@ -132,7 +136,11 @@ def attach_operational_positions(
             continue
         state = getattr(rec, "position_state", None) or {}
         state_dict = state if isinstance(state, dict) else {}
-        adv = advisory_exit_plan(state_dict or None, mark_price=pos.last_price)
+        adv = advisory_exit_plan(
+            state_dict or None,
+            mark_price=pos.last_price,
+            template_id=policy_template_id,
+        )
         exit_plan = None
         if isinstance(adv, dict):
             exit_plan = OperationalExitPlanDto(
@@ -140,6 +148,14 @@ def attach_operational_positions(
                 suggested_action=str(adv.get("suggestedAction") or "hold"),
                 primary_reason=adv.get("primaryReason")
                 if isinstance(adv.get("primaryReason"), str)
+                else None,
+                suggested_qty=_finite_or_none(adv.get("suggestedQty")),
+                suggested_stop=_finite_or_none(adv.get("suggestedStop")),
+                policy_template_id=adv.get("policyTemplateId")
+                if isinstance(adv.get("policyTemplateId"), str)
+                else None,
+                trail_width=adv.get("trailWidth")
+                if isinstance(adv.get("trailWidth"), str)
                 else None,
             )
         pos.operational = OperationalPositionDto(

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { MesaIncidentBanner } from "@/features/operations/mesa-incident-banner";
 import {
+  OpsEstudioAutoSection,
   OpsReadinessSection,
   OpsReconSection,
   OpsRuntimeSection,
@@ -21,6 +22,7 @@ import {
   OpsIncidentsSection,
   OpsQuickLinksSection,
 } from "@/features/operational-console/ops-incidents-and-links";
+import { useEstudioAutoTelemetry } from "@/features/operational-console/use-estudio-auto-telemetry";
 import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
@@ -30,7 +32,9 @@ import { api } from "@/lib/api";
 export function OperationalConsolePage() {
   const { effectiveAccountId, account } = useActiveAccount();
   const selfEvalQuery = useOpsSelfEval(effectiveAccountId);
+  const a6Query = useEstudioAutoTelemetry(effectiveAccountId);
   const report = selfEvalQuery.data;
+  const a6 = a6Query.data?.data;
   const portfolioReconStatus = portfolioReconStatusFromReport(report);
 
   const boardQuery = useQuery({
@@ -65,7 +69,8 @@ export function OperationalConsolePage() {
             Consola operacional
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Salud ops read-only — OE-1, readiness, recon e incidentes
+            Salud ops read-only — OE-1, A6 Estudio AUTO, readiness, recon e
+            incidentes
             {account ? ` · ${account.name}` : ""}.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -118,6 +123,11 @@ export function OperationalConsolePage() {
         <OpsReadinessSection report={report} />
         <OpsRuntimeSection report={report} />
         <OpsSelfEvalSection report={report} />
+        <OpsEstudioAutoSection
+          report={a6}
+          isLoading={a6Query.isLoading}
+          isError={a6Query.isError}
+        />
         <OpsReconSection report={report} />
         {effectiveAccountId ? (
           <OpsIncidentsSection

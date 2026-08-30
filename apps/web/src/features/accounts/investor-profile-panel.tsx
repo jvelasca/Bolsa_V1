@@ -15,6 +15,8 @@ import type {
 } from "@bolsa/shared";
 import {
   POLICY_TEMPLATE_LABELS,
+  formatExitPolicyPreview,
+  formatPortfolioFitPreview,
   getTradingPolicyTemplate,
   observeInvestorProfile,
   suggestPolicyTemplateFromDeclared,
@@ -682,6 +684,20 @@ export function InvestorProfilePanel({
             Riesgo/trade {policyPreview.risk.maxRiskPerTradePct}% · R:R{" "}
             {policyPreview.risk.minRewardToRiskRatio} · max pos.{" "}
             {policyPreview.exposure.maxOpenPositions}
+          </p>
+          {policyPreview.exit ? (
+            <p
+              className="text-[10px] text-muted-foreground"
+              data-testid="investor-profile-exit-policy"
+            >
+              {formatExitPolicyPreview(policyPreview.exit)}
+            </p>
+          ) : null}
+          <p
+            className="text-[10px] text-muted-foreground"
+            data-testid="investor-profile-portfolio-fit"
+          >
+            {formatPortfolioFitPreview(policyPreview)}
           </p>
         </div>
 

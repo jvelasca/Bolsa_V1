@@ -5,20 +5,20 @@
 
 **Regla:** no añadir módulo/pantalla/botón si no mejora qué sabe el inversor, qué decide, qué riesgo tiene, qué firma, y cómo sabemos que se ejecutó.
 
-**Gráfico:** G0 read-only. Cero drag hasta §8 ACUERDO + N4 + doc `diseno-operativa-auto-grafico-ACORDADO-*`.
+**Gráfico:** §8 **ACUERDO B-γ** · código **V1.34** (stop-only → Confirm). B-δ / OCO / entry drag fuera.
 
 **Numeración:** V1.26 = lifecycle integrity (ya en código). El Position Operating Model de las auditorías es **V1.27**, no un segundo V1.26.
 
-| Tag            | Nombre                       | Criterio de salida                                               |
-| -------------- | ---------------------------- | ---------------------------------------------------------------- |
-| **v1.26-beta** | Position Lifecycle Integrity | Tag + CI GREEN                                                   |
-| **V1.27**      | Position Operating Model     | Evento ≠ decisión; Golden Path; atención recon                   |
-| **V1.28**      | Daily cockpit                | Qué hago en &lt;10 s **en el shell existente**; toasts B-α (G2)  |
-| **V1.29**      | Exit and profit              | UI de ExitPolicy; trail no empeora riesgo                        |
-| **V1.30**      | Portfolio intelligence       | `EffectiveTradingPolicy`; Encaja vs cartera                      |
-| **V1.31**      | UX 10/10                     | Palette/densidad; **drag B-γ solo si §8 ACUERDO**                |
-| **V1.32**      | SEMI paper maduro            | Entrada/salida simétricas supervisadas                           |
-| **V1.33**      | AUTO A-β + gobernanza        | Paridad SEMI + EdgeReport; `PAPER_D_EXECUTE` off hasta evidencia |
+| Tag            | Nombre                       | Criterio de salida                                                                                                                           |
+| -------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **v1.26-beta** | Position Lifecycle Integrity | Tag + CI GREEN                                                                                                                               |
+| **V1.27**      | Position Operating Model     | Evento ≠ decisión; Golden Path; atención recon — **CÓDIGO** (`3315b69a`; sin tag)                                                            |
+| **V1.28**      | Daily cockpit                | Qué hago en &lt;10 s **en el shell existente**; toasts B-α (G2) — **CÓDIGO** (sin tag)                                                       |
+| **V1.29**      | Exit and profit              | UI de ExitPolicy; trail no empeora riesgo — **CÓDIGO** (sin tag)                                                                             |
+| **V1.30**      | Portfolio intelligence       | `EffectiveTradingPolicy`; Encaja vs cartera — **CÓDIGO** (sin tag)                                                                           |
+| **V1.31**      | UX 10/10                     | Palette + densidad + tema (V1.31.1) + residual layouts/flash/KPI (V1.31.2); **CÓDIGO** (sin tag); drag B-γ solo si §8 ACUERDO                |
+| **V1.32**      | SEMI paper maduro            | Entrada/salida simétricas supervisadas — **CÓDIGO** (sin tag)                                                                                |
+| **V1.33**      | AUTO A-β + gobernanza        | Paridad SEMI + EdgeReport + A-δ Estudio + wire Estudio→hit (V1.33.1) + telemetría A6 (V1.33.2) — **CÓDIGO** (sin tag); `PAPER_D_EXECUTE` off |
 
 Una fase cierra con código + tests + contrato + Golden/Failure Path + doc.
 
@@ -39,12 +39,17 @@ PositionState + mark
 
 ## Tras POM (V1.28+ / Lab / Frentes A·B)
 
-| Tema                                          | Cuándo                                | Fuera                           |
-| --------------------------------------------- | ------------------------------------- | ------------------------------- |
-| V1.28 cockpit + toasts DISPARADA/T1 (B-α, G2) | POM verde                             | Drag, nav L1 nueva              |
-| Lab `risk_policy` desde `backtests.py`        | **Hecho en V1.27** (default Moderado) | —                               |
-| Frente B drag B-γ                             | N4 + §8 ACUERDO + POM congelado       | B-δ, trail autoridad, OCO       |
-| Frente A AUTO A-β                             | V1.33; EdgeReport exigido             | A-γ, thaw estricto, broker live |
+| Tema                                                                  | Cuándo                                                           | Fuera                              |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------- |
+| V1.28 cockpit + toasts DISPARADA/T1 (B-α, G2)                         | **Hecho** (relevo V1.28)                                         | Drag, nav L1 nueva                 |
+| V1.29 Exit and profit                                                 | **Hecho** (relevo V1.29)                                         | Drag, AUTO                         |
+| V1.30 Portfolio intelligence                                          | **Hecho** (relevo V1.30)                                         | Drag, AUTO                         |
+| V1.31 UX 10/10 (palette + densidad + tema V1.31.1 + residual V1.31.2) | **Hecho** (relevos V1.31 / V1.31.1 / V1.31.2)                    | Drag, AUTO                         |
+| V1.32 SEMI paper maduro                                               | **Hecho** (relevo V1.32)                                         | Drag, AUTO                         |
+| V1.33 AUTO A-β + gobernanza                                           | **Hecho** (relevo V1.33 + wire Estudio→hit V1.33.1 + A6 V1.33.2) | A-γ, thaw estricto                 |
+| Lab `risk_policy` desde `backtests.py`                                | **Hecho en V1.27** (default Moderado)                            | —                                  |
+| Frente B drag B-γ                                                     | **CÓDIGO V1.34** (sin tag)                                       | B-δ, trail autoridad, OCO, entrada |
+| Frente A AUTO A-β                                                     | V1.33; EdgeReport exigido                                        | A-γ, thaw estricto, broker live    |
 
 ## Lean de acuerdo (owner)
 

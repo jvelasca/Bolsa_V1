@@ -100,6 +100,41 @@ def _empty_summary() -> _FakePortfolioSummary:
     return _FakePortfolioSummary(positions=[], total_equity=200.0)
 
 
+def _a_beta_opening_hit(
+    *,
+    instrument_id: str = "inst-new",
+    sector: str = "tech",
+    quantity: float = 4.0,
+    price: float = 1.0,
+    stop: float = 0.95,
+    auto_source: str = "estudio_dictamen",
+    trade_plan: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """V1.33 — hit Estudio + TradePlan TRIGGERED (paridad SEMI)."""
+    plan = trade_plan
+    if plan is None:
+        risk = quantity * abs(price - stop)
+        plan = {
+            "decisionId": "dec-auto-test",
+            "instrumentId": instrument_id,
+            "direction": "long",
+            "status": "TRIGGERED",
+            "quantity": quantity,
+            "entry": price,
+            "structuralStop": stop,
+            "riskAmount": risk,
+            "initialRiskR": 1,
+            "whyNot": [],
+            "executionAllowed": True,
+        }
+    return {
+        "sector": sector,
+        "instrumentId": instrument_id,
+        "autoSource": auto_source,
+        "tradePlan": plan,
+    }
+
+
 def _paper_policy() -> ExecutionPolicyRecord:
     return ExecutionPolicyRecord(
         id="pol-ds08",
@@ -154,7 +189,7 @@ async def test_ds08_auto_risk_block_does_not_execute_trade() -> None:
     result = await _router(_sector_gap_summary(), fake_trade)._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(),
-        hit={"sector": "tech", "instrumentId": "inst-new"},
+        hit=_a_beta_opening_hit(),
         sizing_value=4.0,
     )
 
@@ -175,7 +210,7 @@ async def test_ds05_auto_stale_data_does_not_execute_trade() -> None:
     result = await _router(_empty_summary(), fake_trade)._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(timestamp=stale_ts),
-        hit={"sector": "tech", "instrumentId": "inst-new"},
+        hit=_a_beta_opening_hit(),
         sizing_value=4.0,
     )
 
@@ -229,7 +264,7 @@ async def test_ds03_auto_no_open_mandate_does_not_execute_trade() -> None:
     )._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(),
-        hit={"sector": "tech", "instrumentId": "inst-new"},
+        hit=_a_beta_opening_hit(),
         sizing_value=4.0,
     )
 
@@ -285,12 +320,13 @@ async def test_ds03_auto_open_mandate_matching_strategy_executes() -> None:
     result = await router._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(),
-        hit={"sector": "tech", "instrumentId": "inst-new"},
+        hit=_a_beta_opening_hit(),
         sizing_value=4.0,
     )
 
     assert result.status == "trade_executed"
     assert len(fake_trade.calls) == 1
+    assert fake_trade.calls[0]["quantity"] == 4.0
 
 
 @pytest.mark.asyncio
@@ -302,7 +338,7 @@ async def test_paper_auto_missing_edge_does_not_execute_trade() -> None:
     )._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(instrument_id="inst-no-edge", signal_id="sig-no-edge"),
-        hit={"sector": "tech", "instrumentId": "inst-no-edge"},
+        hit=_a_beta_opening_hit(instrument_id="inst-no-edge"),
         sizing_value=4.0,
     )
     assert result.status == "skipped"
@@ -344,7 +380,7 @@ async def test_paper_auto_luck_edge_does_not_execute_trade() -> None:
     result = await router._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(instrument_id="inst-luck", signal_id="sig-luck"),
-        hit={"sector": "tech", "instrumentId": "inst-luck"},
+        hit=_a_beta_opening_hit(instrument_id="inst-luck"),
         sizing_value=4.0,
     )
     assert result.status == "skipped"
@@ -377,7 +413,7 @@ async def test_paper_auto_sanity_lookup_failed_vetoes() -> None:
     result = await router._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(instrument_id="inst-status-boom", signal_id="sig-status-boom"),
-        hit={"sector": "tech", "instrumentId": "inst-status-boom"},
+        hit=_a_beta_opening_hit(instrument_id="inst-status-boom"),
         sizing_value=4.0,
     )
     assert result.status == "skipped"
@@ -414,7 +450,7 @@ async def test_paper_auto_sanity_split_vetoes() -> None:
     result = await router._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(instrument_id="inst-split", signal_id="sig-split"),
-        hit={"sector": "tech", "instrumentId": "inst-split"},
+        hit=_a_beta_opening_hit(instrument_id="inst-split"),
         sizing_value=4.0,
     )
     assert result.status == "skipped"
@@ -431,9 +467,10 @@ async def test_paper_auto_sanity_gap_only_allows() -> None:
     result = await router._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(instrument_id="inst-gap-ok", signal_id="sig-gap"),
-        hit={"sector": "tech", "instrumentId": "inst-gap-ok"},
+        hit=_a_beta_opening_hit(instrument_id="inst-gap-ok"),
         sizing_value=4.0,
     )
     assert result.status == "trade_executed", result.reason
     assert len(fake_trade.calls) == 1
+    assert fake_trade.calls[0]["quantity"] == 4.0
 

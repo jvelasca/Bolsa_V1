@@ -16,6 +16,16 @@ export type AlertToastAction =
   | {
       type: "open_asesor_opiniones";
       label?: string;
+    }
+  | {
+      type: "open_trading_instrument";
+      instrumentId: string;
+      symbol: string;
+      label?: string;
+    }
+  | {
+      type: "open_confirm_drawer";
+      label?: string;
     };
 
 interface AlertsState {

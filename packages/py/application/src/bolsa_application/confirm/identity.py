@@ -191,6 +191,19 @@ def extract_operativa_protect_meta(raw: dict[str, Any]) -> dict[str, Any] | None
     return pkg
 
 
+def extract_operativa_exit_meta(raw: dict[str, Any]) -> dict[str, Any] | None:
+    """V1.32 — meta reduce/exit_hint con plannedQty + ExitPlan snapshot."""
+    pkg = raw.get("decisionPackage")
+    if not isinstance(pkg, dict):
+        return None
+    if pkg.get("operativaIntent") not in {"reduce", "exit_hint"}:
+        return None
+    planned = pkg.get("plannedQty")
+    if not isinstance(planned, (int, float)) or float(planned) <= 0:
+        return None
+    return pkg
+
+
 def build_recommendation_from_raw(
     raw: dict[str, Any],
     *,

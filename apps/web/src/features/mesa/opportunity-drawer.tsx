@@ -44,6 +44,7 @@ type OpportunityDrawerProps = {
   cash: number | null;
   sectorByInstrumentId?: Record<string, string | null | undefined>;
   entriesBlocked?: boolean;
+  maxSectorExposurePct?: number;
 };
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -65,6 +66,7 @@ export function OpportunityDrawer({
   cash,
   sectorByInstrumentId,
   entriesBlocked = false,
+  maxSectorExposurePct,
 }: OpportunityDrawerProps) {
   const navigate = useNavigate();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
@@ -172,6 +174,7 @@ export function OpportunityDrawer({
           candidateSector={sector}
           equity={equity}
           cash={cash}
+          maxSectorExposurePct={maxSectorExposurePct}
         />
 
         <div className="flex flex-wrap gap-2 border-t border-border pt-3">

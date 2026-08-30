@@ -249,8 +249,13 @@ export interface OperationalExitPlanDto {
   status: string;
   suggestedAction: string;
   primaryReason: string | null;
-  /** P4.2 — advisory stop sugerido (protect); puede no venir del wire aún. */
+  /** V1.29 — qty según ExitPolicy (T1/T2); puede faltar en wire legado. */
+  suggestedQty?: number | null;
+  /** P4.2 / V1.29 — advisory stop sugerido (protect). */
   suggestedStop?: number | null;
+  /** V1.29 — plantilla que parametrizó la sugerencia. */
+  policyTemplateId?: string | null;
+  trailWidth?: string | null;
 }
 
 /** V1.18 L2a — tesis de nacimiento congelada al fill. */

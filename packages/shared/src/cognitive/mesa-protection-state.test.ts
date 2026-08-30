@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aggregateMesaProtectionKpi,
   buildMesaProtectionState,
   stopDistancePct,
 } from "./mesa-protection-state.js";
@@ -60,5 +61,33 @@ describe("stopDistancePct", () => {
 
   it("returns null without data", () => {
     expect(stopDistancePct(null, 95)).toBeNull();
+  });
+});
+
+describe("aggregateMesaProtectionKpi", () => {
+  it("counts Confirmada and discrepancies", () => {
+    const kpi = aggregateMesaProtectionKpi([
+      buildMesaProtectionState({ currentStop: 10 }),
+      buildMesaProtectionState({}),
+      buildMesaProtectionState({
+        protectPlan: { status: "protect_hint", suggestedProtectStop: 9 },
+        currentStop: null,
+      }),
+    ]);
+    expect(kpi).toEqual({
+      protected: 1,
+      open: 3,
+      discrepancies: 1,
+      pct: 33,
+    });
+  });
+
+  it("empty portfolio → zeros and null pct", () => {
+    expect(aggregateMesaProtectionKpi([])).toEqual({
+      protected: 0,
+      open: 0,
+      discrepancies: 0,
+      pct: null,
+    });
   });
 });

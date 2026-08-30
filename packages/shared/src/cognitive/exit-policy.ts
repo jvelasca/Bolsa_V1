@@ -47,6 +47,75 @@ export function resolveExitPolicy(
   return MODERATE_EXIT_POLICY;
 }
 
+/** V1.29 — distancia R del trail advisory por ancho de política. */
+export const TRAIL_DISTANCE_R_BY_WIDTH: Record<ExitTrailWidthV1, number> = {
+  tight: 0.75,
+  medium: 1.0,
+  wide: 1.25,
+};
+
+export function trailDistanceRFromWidth(
+  width: ExitTrailWidthV1 | null | undefined,
+): number {
+  if (width === "tight" || width === "wide" || width === "medium") {
+    return TRAIL_DISTANCE_R_BY_WIDTH[width];
+  }
+  return TRAIL_DISTANCE_R_BY_WIDTH.medium;
+}
+
+/** Preview Config / Operativa: fracciones + ancho (no es CTA). */
+export function formatExitPolicyPreview(policy: ExitPolicyV1): string {
+  const pct = (f: number) => `${Math.round(clampExitFraction(f) * 100)}%`;
+  return `Salida T1 ${pct(policy.t1ReduceFraction)} · T2 ${pct(policy.t2ReduceFraction)} · trail ${policy.trailWidth}`;
+}
+
+/**
+ * Hint corto bajo Mantener/Reducir cuando hay evento + política.
+ * V1.29 — superficie ExitPolicy en shell existente.
+ */
+export function formatExitPolicyActionHint(input: {
+  suggestedAction?: string | null;
+  suggestedQty?: number | null;
+  primaryReason?: string | null;
+  templateId?: string | null;
+}): string | null {
+  const action = input.suggestedAction;
+  if (!action || action === "hold") return null;
+  const policy = resolveExitPolicy(input.templateId);
+  const label =
+    input.templateId === "conservative"
+      ? "conservador"
+      : input.templateId === "aggressive_swing"
+        ? "agresivo"
+        : "moderado";
+  if (action === "protect") {
+    return `Trail → proteger (${label}, ${policy.trailWidth})`;
+  }
+  if (action === "full_exit") {
+    return `Salida completa según política (${label})`;
+  }
+  if (action === "reduce") {
+    const qty =
+      typeof input.suggestedQty === "number" &&
+      Number.isFinite(input.suggestedQty) &&
+      input.suggestedQty > 0
+        ? ` ${round4(input.suggestedQty)} u.`
+        : "";
+    const reason =
+      input.primaryReason === "TARGET_2"
+        ? "T2"
+        : input.primaryReason === "TARGET_1"
+          ? "T1"
+          : "evento";
+    const frac =
+      input.primaryReason === "TARGET_2"
+        ? policy.t2ReduceFraction
+        : policy.t1ReduceFraction;
+    return `${reason} → reducir${qty} (${Math.round(frac * 100)}%, ${label})`;
+  }
+  return null;
+}
+
 function finite(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n);
 }
