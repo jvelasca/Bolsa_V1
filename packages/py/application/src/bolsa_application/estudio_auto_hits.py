@@ -45,7 +45,17 @@ class _PolicyRepo(Protocol):
 
 
 class _OpinionQuery(Protocol):
-    async def query(self, **kwargs: Any) -> list[Any]: ...
+    """Compatible con ``DailyOpinionService.query`` (kwargs nombrados, no ``**kwargs``)."""
+
+    async def query(
+        self,
+        *,
+        instrument_ids: list[str],
+        as_of_bar_date: date | None = None,
+        account_id: str | None = None,
+        force_refresh: bool = False,
+        hints: Any = None,
+    ) -> list[Any]: ...
 
 
 class _InstrumentLookup(Protocol):
