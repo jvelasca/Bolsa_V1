@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from bolsa_analytics.signals.fundamental_gate import build_fundamental_gate
 from bolsa_analytics.signals.fundamental_screener import (
     FUNDAMENTAL_SCREENER_VERSION,
@@ -23,7 +25,9 @@ def _good_fund():
         "fcfYield": 0.04,
         "altmanZ": 3.0,
         "piotroski": 8,
-        "fetchedAt": "2026-07-29T12:00:00Z",
+        "fetchedAt": (datetime.now(UTC) - timedelta(days=1)).strftime(
+            "%Y-%m-%dT12:00:00Z"
+        ),
         "sourceVersion": "yahoo_quote_summary_v3",
     }
 

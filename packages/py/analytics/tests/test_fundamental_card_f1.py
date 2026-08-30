@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from bolsa_analytics.knowledge.fundamental_card import (
     FUND_CARD_SCHEMA_VERSION,
     build_fundamental_card,
@@ -30,7 +32,9 @@ def _full_raw(**overrides):
         "altmanZ": 3.5,
         "altmanMethod": "altman_z_classic_v1",
         "altmanEbitSource": "income_statement",
-        "fetchedAt": "2026-07-29T12:00:00Z",
+        "fetchedAt": (datetime.now(UTC) - timedelta(days=1)).strftime(
+            "%Y-%m-%dT12:00:00Z"
+        ),
         "sourceVersion": "yahoo_quote_summary_v3",
     }
     base.update(overrides)

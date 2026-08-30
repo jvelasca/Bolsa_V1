@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from bolsa_analytics.knowledge.composite_score import (
     COMPOSITE_SCORE_VERSION,
     build_composite_card,
@@ -27,7 +29,9 @@ def _fund(**overrides):
         "freeCashflow": 2e9,
         "fcfYield": 0.04,
         "altmanZ": 3.2,
-        "fetchedAt": "2026-07-29T12:00:00Z",
+        "fetchedAt": (datetime.now(UTC) - timedelta(days=1)).strftime(
+            "%Y-%m-%dT12:00:00Z"
+        ),
         "sourceVersion": "yahoo_quote_summary_v3",
     }
     base.update(overrides)
