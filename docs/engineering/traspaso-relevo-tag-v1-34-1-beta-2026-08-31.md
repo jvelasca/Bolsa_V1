@@ -28,15 +28,11 @@
 | Diseño     | [`diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md`](./diseno-operativa-auto-grafico-ACORDADO-2026-08-30.md)           |
 | Spine      | `pnpm test:decision-spine` **540**                                                                                         |
 | Python CI  | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33339216149)                                                     |
-| CI tag     | pendiente post-push                                                                                                        |
+| CI tag     | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33339412970)                                                     |
 
 ### Owner: publicar
 
-```bash
-git push origin main
-git push origin v1.26-beta v1.34.1-beta
-# Actions Release tag CI → GREEN → pin URL en este relevo + CURRENT_SYSTEM
-```
+**Hecho** (2026-08-31): `main` + tags tip; Release-tag CI tip GREEN pin arriba.
 
 ## 2. Freeze
 

@@ -16,7 +16,7 @@ Lee en este orden:
 6. Tag POM: [`docs/engineering/traspaso-relevo-v1-27-position-operating-model-2026-08-28.md`](./traspaso-relevo-v1-27-position-operating-model-2026-08-28.md)
 7. Pack histórico: [`docs/engineering/audit-pack-estado-global-2026-08-27-v121.md`](./audit-pack-estado-global-2026-08-27-v121.md)
 
-Python CI tip: [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33339216149). Release-tag CI: pin tras push.
+Python CI tip: [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33339216149). Release-tag CI: [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33339412970).
 
 **Preguntas de foco (V1.34 B-γ + integridad CI — no nuevos motores ni nav L1):**
 
