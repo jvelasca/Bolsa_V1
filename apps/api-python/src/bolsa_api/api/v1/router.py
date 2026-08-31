@@ -24,6 +24,7 @@ from bolsa_api.api.v1.routes import (
     market,
     market_indices,
     paper_d,
+    paper_desk,
     pending_orders,
     platform_events,
     portfolio,
@@ -77,6 +78,7 @@ api_v1_router.include_router(trackers.router, tags=["trackers"])
 api_v1_router.include_router(execution_policies.router, tags=["execution-policies"])
 api_v1_router.include_router(position_policies.router, tags=["position-policies"])
 api_v1_router.include_router(position_automation.router, tags=["position-automation"])
+api_v1_router.include_router(paper_desk.router, tags=["paper-desk"])
 api_v1_router.include_router(platform_events.router, tags=["platform-events"])
 api_v1_router.include_router(market.router, tags=["market"])
 api_v1_router.include_router(workspaces.router, tags=["workspaces"])

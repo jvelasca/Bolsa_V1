@@ -1513,6 +1513,40 @@ def get_execute_position_policy_auto_use_case(
     return uc, protect
 
 
+def get_paper_desk_cycle_use_case(
+    session: AsyncSession,
+    *,
+    execution_policy_id: str | None = None,
+    dry_run: bool = True,
+) -> Any:
+    """V1.46 — PaperDeskCycle (EntryTick stub + PositionTick / ExecutePositionPolicyAuto)."""
+    from bolsa_application.paper_desk_cycle import (
+        HonestStubPaperDeskEntry,
+        PaperDeskCycle,
+    )
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
+
+    repo = SqlAlchemyPositionStateRepository(session)
+
+    class _OpenAdapter:
+        async def list_open(self, account_id: str) -> list[Any]:
+            return list(await repo.list_open_for_account(account_id))
+
+    execute_auto = None
+    if not dry_run:
+        execute_auto, _protect = get_execute_position_policy_auto_use_case(
+            session, execution_policy_id=execution_policy_id
+        )
+
+    return PaperDeskCycle(
+        entry=HonestStubPaperDeskEntry(),
+        open_positions=_OpenAdapter(),
+        execute_auto=execute_auto,
+    )
+
+
 def get_draft_strategy_from_prompt_use_case() -> DraftStrategyFromPrompt:
     return DraftStrategyFromPrompt()
 

@@ -84,6 +84,8 @@ class DailyOpsReportBundle:
     notes: list[str] = field(default_factory=list)
     estudio_status: str = ESTUDIO_STATUS_OK
     estudio_count: int = 0
+    # V1.46 — opcional; ausente = informe clásico sin autoDesk.
+    auto_desk: dict[str, Any] | None = None
 
 
 class GetDailyOpsReport:
@@ -128,6 +130,7 @@ class GetDailyOpsReport:
         as_of: date | None = None,
         instrument_ids: list[str] | None = None,
         symbol_by_id: dict[str, str] | None = None,
+        auto_desk: dict[str, Any] | None = None,
     ) -> DailyOpsReportBundle:
         day = as_of or datetime.now(tz=UTC).date()
         as_of_s = day.isoformat()
@@ -236,4 +239,5 @@ class GetDailyOpsReport:
             notes=notes,
             estudio_status=estudio_status,
             estudio_count=len(estudio_ids),
+            auto_desk=auto_desk,
         )

@@ -5,6 +5,7 @@
  */
 
 import type { AccountSummaryDto, LedgerEntryDto } from "./accounts.js";
+import type { PaperDailyReportV1 } from "./cognitive/paper-daily-report.js";
 import type { InstrumentDailyOpinionV1 } from "./instrument-daily-opinion.js";
 import type { OpinionChannelLevel } from "./opinion-channel-map.js";
 
@@ -62,6 +63,11 @@ export type DailyOpsReportV1 = {
   estudioStatus: EstudioUniverseStatusV1;
   /** Tamaño de membresía Estudio (antes del filtro). */
   estudioCount: number;
+  /**
+   * V1.46 — proyección opcional del PaperDeskCycle (AUTO mesa).
+   * Ausente = informe diario clásico; no rompe consumidores.
+   */
+  autoDesk?: PaperDailyReportV1;
 };
 
 export type DailyOpsReportResponseV1 = {

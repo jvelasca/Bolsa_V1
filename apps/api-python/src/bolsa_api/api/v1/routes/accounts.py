@@ -379,6 +379,7 @@ async def get_daily_ops_report(
             "notes": bundle.notes,
             "estudioStatus": bundle.estudio_status,
             "estudioCount": bundle.estudio_count,
+            **({"autoDesk": bundle.auto_desk} if bundle.auto_desk else {}),
         }
     }
 
