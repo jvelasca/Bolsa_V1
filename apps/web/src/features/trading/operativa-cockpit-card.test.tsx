@@ -156,7 +156,7 @@ function renderCockpit(ui: ReactElement) {
   return render(ui);
 }
 
-describe("OperativaCockpitCard POSICIÓN V1.36", () => {
+describe("OperativaCockpitCard POSICIÓN V1.40", () => {
   beforeEach(() => {
     useInstrumentOperationalContext.mockReturnValue(posicionContext());
   });
@@ -191,13 +191,42 @@ describe("OperativaCockpitCard POSICIÓN V1.36", () => {
     expect(screen.queryByText(/Stop vigente/i)).toBeNull();
   });
 
-  it("shows Mantener badge and exit CTAs in posición", () => {
+  it("omits live price and open R from stacked plan (Summary owns estado)", () => {
     renderCockpit(
       <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
     );
-    expect(screen.getByText("Mantener")).toBeTruthy();
-    expect(screen.getByTestId("position-exit-reduce-AAPL")).toBeTruthy();
-    expect(screen.getByTestId("position-exit-full-AAPL")).toBeTruthy();
+    const planPanel = screen.getByTestId("operativa-cockpit-plan-AAPL");
+    expect(within(planPanel).queryByText("Actual")).toBeNull();
+    expect(within(planPanel).queryByText("R abierto")).toBeNull();
+    expect(screen.getByTestId("position-operating-pnl")).toBeTruthy();
+  });
+
+  it("shows exit route with Proteger and T1/T2 in posición", () => {
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    expect(screen.getByTestId("exit-route-AAPL")).toBeTruthy();
+    expect(screen.getByTestId("exit-route-AAPL-node-stop").textContent).toMatch(
+      /Proteger/,
+    );
+    expect(
+      screen.getByTestId("exit-route-AAPL-node-target1").textContent,
+    ).toMatch(/T1/);
+  });
+
+  it("shows single primary CTA Mantener in posición (no secondary exit buttons)", () => {
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    expect(screen.getByTestId("position-operating-action").textContent).toBe(
+      "Mantener",
+    );
+    expect(
+      screen.getByTestId("position-operating-summary").getAttribute("data-cta"),
+    ).toBe("maintain");
+    expect(screen.getAllByText("Mantener").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByTestId("position-exit-reduce-AAPL")).toBeNull();
+    expect(screen.queryByTestId("position-exit-full-AAPL")).toBeNull();
   });
 
   it("does not show operating summary in preparada phase", () => {
@@ -206,6 +235,17 @@ describe("OperativaCockpitCard POSICIÓN V1.36", () => {
         phase: "preparada",
         position: null,
         showsPlanLevels: true,
+        study: {
+          instrumentId: "inst-aapl",
+          symbol: "AAPL",
+          hasOperationalPlan: true,
+          tradePlanStatus: "ARMED",
+          studiedAt: "2026-08-31T09:00:00.000Z",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+        } as never,
       }),
     );
     renderCockpit(
@@ -215,5 +255,9 @@ describe("OperativaCockpitCard POSICIÓN V1.36", () => {
       screen.getByTestId("operativa-cockpit").getAttribute("data-phase"),
     ).toBe("preparada");
     expect(screen.queryByTestId("position-operating-summary")).toBeNull();
+    expect(screen.getByTestId("entry-operating-summary")).toBeTruthy();
+    expect(screen.getByTestId("entry-operating-action").textContent).toBe(
+      "Preparar operación",
+    );
   });
 });

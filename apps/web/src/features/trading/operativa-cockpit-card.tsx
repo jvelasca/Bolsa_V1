@@ -30,7 +30,10 @@ import {
 } from "@/features/trading/operativa-cockpit-phase";
 import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
 import { PositionOperatingSummary } from "@/features/trading/position-operating-summary";
+import { EntryOperatingSummary } from "@/features/trading/entry-operating-summary";
+import { ExitRouteView } from "@/features/trading/exit-route-view";
 import { useInstrumentOperationalContext } from "@/features/trading/use-instrument-operational-context";
+import { buildEntryOperatingTruth, buildOperationalTruth } from "@bolsa/shared";
 
 type OperativaCockpitCardProps = {
   instrumentId: string | null;
@@ -83,10 +86,31 @@ export function OperativaCockpitCard({
   const toggleOperations = useTradingLayoutStore((s) => s.toggleOperations);
 
   const { phase, plan, study, position } = context;
-  const primaryLabel = mercadoCockpitPrimaryCta(phase);
-  const noLevelsCopy = mercadoCockpitNoLevelsCopy(phase);
+  const entryTruth =
+    study && phase !== "posicion"
+      ? buildEntryOperatingTruth({
+          study,
+          hasOpenPosition: Boolean(position),
+          inConfirmQueue: context.inConfirmQueue,
+          orderPendingFill: context.orderPendingFill,
+        })
+      : null;
   const opsEval = useOpsSelfEval(context.accountId);
   const reconStatus = portfolioReconStatusFromReport(opsEval.data);
+  const positionTruth =
+    phase === "posicion" && position
+      ? buildOperationalTruth({
+          position,
+          study,
+          originStudy: context.originStudy,
+          portfolioReconStatus: reconStatus,
+        })
+      : null;
+  const primaryLabel =
+    positionTruth?.primaryCta.label ??
+    entryTruth?.primaryCta.label ??
+    mercadoCockpitPrimaryCta(phase);
+  const noLevelsCopy = mercadoCockpitNoLevelsCopy(phase);
   const reconHealth =
     reconStatus == null ? null : mapReconStatusToHealth(reconStatus);
 
@@ -156,9 +180,27 @@ export function OperativaCockpitCard({
       ) : phase === "posicion" && position ? (
         <>
           <PositionOperatingSummary
+            truth={positionTruth}
             position={position}
             portfolioReconStatus={reconStatus}
           />
+          {context.showsPlanLevels ? (
+            <OperationalPlanView
+              plan={plan}
+              omitLiveMetrics
+              testId={`operativa-cockpit-plan-${symbol}`}
+            />
+          ) : null}
+          <ExitRouteView
+            truth={positionTruth}
+            position={position}
+            study={study}
+            originStudy={context.originStudy}
+          />
+        </>
+      ) : entryTruth ? (
+        <>
+          <EntryOperatingSummary truth={entryTruth} />
           {context.showsPlanLevels ? (
             <OperationalPlanView
               plan={plan}
@@ -234,8 +276,8 @@ export function OperativaCockpitCard({
         {phase === "posicion" && position ? (
           <PositionExitDrawerActions
             position={position}
-            showMaintain
             portfolioReconStatus={reconStatus}
+            primaryOnly
           />
         ) : null}
 

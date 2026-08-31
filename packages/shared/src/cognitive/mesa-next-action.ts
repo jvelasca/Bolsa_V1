@@ -9,6 +9,10 @@ import type { ProtectPlanV1 } from "./protect-plan.js";
 import type { TradePlanStatusV1 } from "./trade-plan.js";
 import type { HoyActionKindV1 } from "./hoy-queue.js";
 import {
+  buildEntryOperatingTruth,
+  mesaNextActionFromEntryOperatingTruth,
+} from "./entry-operating-truth.js";
+import {
   buildDataFreshness,
   mesaDataFreshnessFromContract,
   type DataFreshnessV1,
@@ -338,10 +342,20 @@ export function buildMesaOperationalHeader(input: {
 export function mapCandidateNextAction(
   row: {
     status: TradePlanStatusV1;
-    study?: Pick<DecisionJournalStudyViewV1, "hasOperationalPlan"> | null;
+    study?: DecisionJournalStudyViewV1 | null;
+    gate?: string | null;
   },
   entriesBlocked: boolean,
 ): MesaNextActionV1 {
+  if (row.study) {
+    const truth = buildEntryOperatingTruth({
+      study: { ...row.study, tradePlanStatus: row.status },
+      entriesBlocked,
+      gateStatus: row.gate ?? null,
+    });
+    if (truth) return mesaNextActionFromEntryOperatingTruth(truth);
+  }
+
   return mapMesaNextAction({
     entriesBlocked,
     tradePlanStatus: row.status,

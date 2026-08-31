@@ -5,6 +5,8 @@ import {
   JOURNAL_STUDY_PERIOD_LABELS,
   JOURNAL_STUDY_STATUS_LABELS,
   buildOperationalPlanFromStudy,
+  buildOperationalTruth,
+  buildEntryOperatingTruth,
   journalStudyConsensusPercents,
   type DecisionJournalStudyViewV1,
   type JournalStudyOpinion,
@@ -18,6 +20,8 @@ import { openDecisionReplay } from "@/features/decision-journal/decision-journal
 import { formatPrice } from "@/features/charts/chart-utils";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 import { PositionOperatingSummary } from "@/features/trading/position-operating-summary";
+import { EntryOperatingSummary } from "@/features/trading/entry-operating-summary";
+import { ExitRouteView } from "@/features/trading/exit-route-view";
 import { cn } from "@/lib/utils";
 
 function opinionTone(opinion: string | null): string {
@@ -125,6 +129,17 @@ export function DecisionFichaPanel({
       ? study.indicators.confirmation.split(" + ").map((s) => s.trim())
       : []),
   ].filter(Boolean);
+  const positionTruth = position
+    ? buildOperationalTruth({
+        position,
+        study,
+        portfolioReconStatus,
+      })
+    : null;
+  const entryTruth =
+    !position && study.hasOperationalPlan
+      ? buildEntryOperatingTruth({ study })
+      : null;
 
   return (
     <aside
@@ -317,21 +332,43 @@ export function DecisionFichaPanel({
           </section>
         ) : null}
 
-        {position ? (
-          <PositionOperatingSummary
-            position={position}
-            portfolioReconStatus={portfolioReconStatus}
-          />
-        ) : null}
-
-        {study.hasOperationalPlan ? (
+        {positionTruth ? (
+          <>
+            <PositionOperatingSummary truth={positionTruth} />
+            {positionTruth.plan.hasPlan ? (
+              <OperationalPlanView
+                plan={positionTruth.plan}
+                omitLiveMetrics
+                testId={`operational-plan-ficha-${study.symbol ?? study.sessionId}`}
+              />
+            ) : null}
+            {position ? (
+              <ExitRouteView
+                truth={positionTruth}
+                position={position}
+                study={study}
+              />
+            ) : null}
+          </>
+        ) : entryTruth ? (
+          <>
+            <EntryOperatingSummary truth={entryTruth} />
+            {entryTruth.plan.hasPlan ? (
+              <OperationalPlanView
+                plan={entryTruth.plan}
+                testId={`operational-plan-ficha-${study.symbol ?? study.sessionId}`}
+              />
+            ) : null}
+          </>
+        ) : study.hasOperationalPlan ? (
           <OperationalPlanView
             plan={buildOperationalPlanFromStudy(study)}
             testId={`operational-plan-ficha-${study.symbol ?? study.sessionId}`}
           />
         ) : null}
 
-        {study.hasOperationalPlan && study.riskAmount != null ? (
+        {entryTruth?.sizing.riskAmount !=
+        null ? null : study.hasOperationalPlan && study.riskAmount != null ? (
           <p className="text-[11px] text-muted-foreground">
             Pérdida máxima estimada: {formatPrice(study.riskAmount)}
           </p>

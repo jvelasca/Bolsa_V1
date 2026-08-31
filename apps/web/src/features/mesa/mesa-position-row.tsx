@@ -13,7 +13,9 @@ import {
   JOURNAL_STUDY_OPINION_LABELS,
   buildInvestmentPositionAggregate,
   buildMesaProtectionState,
+  buildOperationalTruth,
   mapMesaStatusDimensions,
+  mesaNextActionFromOperationalTruth,
   stopDistancePct,
   type MesaNextActionKindV1,
 } from "@bolsa/shared";
@@ -51,22 +53,32 @@ export function MesaPositionNextActionButton({
   study,
   originStudy,
   compact = true,
+  portfolioReconStatus,
 }: {
   position: PositionDto;
   protectPlan?: ProtectPlanV1 | null;
   study?: DecisionJournalStudyViewV1 | null;
   originStudy?: DecisionJournalStudyViewV1 | null;
   compact?: boolean;
+  portfolioReconStatus?: string | null;
 }) {
   const { effectiveAccountId } = useActiveAccount();
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const [error, setError] = useState<string | null>(null);
-  const nextAction = buildInvestmentPositionAggregate({
+  const truth = buildOperationalTruth({
     position,
     study,
     originStudy,
-    protectPlan,
-  }).nextAction;
+    portfolioReconStatus,
+  });
+  const nextAction = truth
+    ? mesaNextActionFromOperationalTruth(truth)
+    : buildInvestmentPositionAggregate({
+        position,
+        study,
+        originStudy,
+        protectPlan,
+      }).nextAction;
 
   function enqueueExit(intent: "review" | "reduce" | "exit_hint" | "protect") {
     setError(null);
@@ -195,11 +207,13 @@ export function MesaPositionExitActions({
   protectPlan,
   compact = false,
   study,
+  portfolioReconStatus,
 }: {
   position: PositionDto;
   protectPlan?: ProtectPlanV1 | null;
   compact?: boolean;
   study?: DecisionJournalStudyViewV1 | null;
+  portfolioReconStatus?: string | null;
 }) {
   return (
     <MesaPositionNextActionButton
@@ -207,6 +221,7 @@ export function MesaPositionExitActions({
       protectPlan={protectPlan}
       study={study}
       compact={compact}
+      portfolioReconStatus={portfolioReconStatus}
     />
   );
 }
@@ -246,12 +261,20 @@ export function MesaPositionRow({
   const stopForDist = protection.executed.value ?? protection.proposal.value;
   const distPct = stopDistancePct(position.lastPrice, stopForDist);
 
-  const nextAction = buildInvestmentPositionAggregate({
+  const nextAction = buildOperationalTruth({
     position,
     study,
     originStudy,
-    protectPlan,
-  }).nextAction;
+    portfolioReconStatus,
+  });
+  const actionLabel = nextAction
+    ? nextAction.primaryCta.label
+    : buildInvestmentPositionAggregate({
+        position,
+        study,
+        originStudy,
+        protectPlan,
+      }).nextAction.label;
 
   return (
     <div
@@ -265,7 +288,7 @@ export function MesaPositionRow({
             className="text-[10px] text-muted-foreground"
             data-testid={`mesa-position-action-${position.symbol}`}
           >
-            Acción: {nextAction.label}
+            Acción: {actionLabel}
           </div>
           {study?.opinion ? (
             <div className="text-[10px] text-muted-foreground">
@@ -330,6 +353,7 @@ export function MesaPositionRow({
             protectPlan={protectPlan}
             study={study}
             originStudy={originStudy}
+            portfolioReconStatus={portfolioReconStatus}
           />
         </div>
       </div>

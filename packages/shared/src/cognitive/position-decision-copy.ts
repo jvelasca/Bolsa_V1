@@ -17,6 +17,11 @@ export type PositionExitCtaKindV1 =
   | "exit"
   | "review";
 
+export type PositionOperatingCtaV1 = {
+  kind: PositionExitCtaKindV1;
+  label: string;
+};
+
 /** CTA principal sugerida por PositionDecision (≠ permiso). */
 export function primaryPositionExitCta(
   decision: PositionDecisionV1,
@@ -44,6 +49,34 @@ export function isPrimaryPositionExitCta(
   kind: PositionExitCtaKindV1,
 ): boolean {
   return primaryPositionExitCta(decision) === kind;
+}
+
+export const POSITION_DECISION_ACTION_LABEL: Record<
+  PositionExitCtaKindV1,
+  string
+> = {
+  maintain: "Mantener",
+  protect: "Proteger",
+  reduce: "Reducir",
+  exit: "Salir",
+  review: "Revisar",
+};
+
+export function formatPositionDecisionActionLabel(
+  decision: PositionDecisionV1,
+): string {
+  return positionOperatingCtaFromDecision(decision).label;
+}
+
+/** CTA canónica de posición abierta — alineada a `decision.action` (V1.39). */
+export function positionOperatingCtaFromDecision(
+  decision: PositionDecisionV1,
+): PositionOperatingCtaV1 {
+  const kind = primaryPositionExitCta(decision);
+  return {
+    kind,
+    label: POSITION_DECISION_ACTION_LABEL[kind],
+  };
 }
 
 export const NEXT_EVENT_LABEL: Record<PositionNextEventV1, string> = {

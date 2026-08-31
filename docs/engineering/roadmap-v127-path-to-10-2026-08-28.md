@@ -50,7 +50,12 @@ PositionState + mark
 | Lab `risk_policy` desde `backtests.py`                                | **Hecho en V1.27** (default Moderado)                            | —                                  |
 | Frente B drag B-γ                                                     | **CÓDIGO V1.34** (tag v1.34.1-beta)                              | B-δ, trail autoridad, OCO, entrada |
 | **V1.35 Position Operating Hardening**                                | **CÓDIGO** (post-auditoría v1.34.1-beta)                         | UI Mercado 2.0, nav L1             |
-| **V1.36 Daily Operating UI**                                          | Next — Mercado cockpit visual definitivo                         | Backend operativo (congelado)      |
+| **V1.36 Daily Operating UI**                                          | **CÓDIGO** (cockpit POSICIÓN + copy humano)                      | Backend operativo (congelado)      |
+| **V1.37 Operational Truth**                                           | **CÓDIGO** — misma decisión en Mercado/Hoy/Journal/Operaciones   | Motor nuevo, backend               |
+| **V1.38 Entry Operating UX**                                          | **CÓDIGO** — PREPARADA→CONFIRMADA, no BUY                        | Drag, AUTO                         |
+| **V1.39 Position Operating UX**                                       | Next — una CTA primaria                                          | Drag, AUTO                         |
+| **V1.40 Exit Management UX**                                          | Ruta visual Stop/T1/T2                                           | OCO, trail autoridad               |
+| **V1.41 Daily Desk**                                                  | Hoy inbox (quitar paneles)                                       | Segundo Mercado                    |
 | Frente A AUTO A-β                                                     | V1.33; EdgeReport exigido                                        | A-γ, thaw estricto, broker live    |
 
 ## Lean de acuerdo (owner)

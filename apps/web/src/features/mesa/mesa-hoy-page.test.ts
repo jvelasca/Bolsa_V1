@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  buildDailyDeskInbox,
   buildMesaOperationalHeader,
   buildMesaProtectionState,
   buildMesaSessionState,
@@ -71,35 +72,55 @@ describe("mesa-hoy-page invariants", () => {
     expect(items[0]?.recommendedAction).toBe("REVISAR PROTECCIÓN");
   });
 
-  it("ARMED candidate has Ver tesis, not Confirm CTA", () => {
+  it("ARMED candidate → Preparar operación (no BUY)", () => {
     const next = mapCandidateNextAction(
       {
         symbol: "ARM1",
         status: "ARMED",
         statusLabel: "Preparado",
         gate: "PASS",
-        study: { hasOperationalPlan: true } as never,
+        study: {
+          hasOperationalPlan: true,
+          instrumentId: "inst-arm1",
+          symbol: "ARM1",
+          tradePlanStatus: "ARMED",
+          studiedAt: "2026-08-31T09:00:00.000Z",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+        } as never,
       },
       false,
     );
     expect(next.kind).toBe("view_thesis");
+    expect(next.label).toBe("Preparar operación");
     expect(next.label).not.toMatch(/comprar/i);
-    expect(next.kind).not.toBe("review_proposal");
   });
 
-  it("TRIGGERED candidate → Revisar propuesta", () => {
+  it("TRIGGERED candidate → Revisar y confirmar", () => {
     const next = mapCandidateNextAction(
       {
         symbol: "TRG1",
         status: "TRIGGERED",
         statusLabel: "Propuesto",
         gate: "PASS",
-        study: { hasOperationalPlan: true } as never,
+        study: {
+          hasOperationalPlan: true,
+          instrumentId: "inst-trg1",
+          symbol: "TRG1",
+          tradePlanStatus: "TRIGGERED",
+          studiedAt: "2026-08-31T09:00:00.000Z",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+        } as never,
       },
       false,
     );
     expect(next.kind).toBe("review_proposal");
-    expect(next.label).toBe("Revisar propuesta");
+    expect(next.label).toBe("Revisar y confirmar");
   });
 
   it("EXPIRED candidate is not operable", () => {
@@ -206,20 +227,40 @@ describe("mesa-hoy-page invariants", () => {
     ]);
     expect(items[0]?.id).toBe("discrepancy-NVDA");
   });
+
+  it("daily desk folds pending + position attention without BUY", () => {
+    const desk = buildDailyDeskInbox({
+      positions: [],
+      pendingConfirm: 1,
+      protectionDiscrepancies: [
+        {
+          symbol: "AAPL",
+          reason: "Discrepancia",
+          recommendedAction: "REVISAR PROTECCIÓN",
+        },
+      ],
+    });
+    expect(desk.count).toBe(2);
+    for (const item of desk.items) {
+      expect(item.ctaLabel.toUpperCase()).not.toContain("BUY");
+    }
+  });
 });
 
-describe("Hoy inbox chrome (V1.23 Fase 4)", () => {
+describe("Hoy Daily Desk chrome (V1.41)", () => {
   const src = readFileSync(resolve(__dirname, "mesa-hoy-page.tsx"), "utf8");
 
-  it("renders the four inbox blocks in order", () => {
-    const order = [
-      "Requiere acción",
-      "Oportunidades",
-      "Vigilar",
-      "Sin acción",
-    ].map((title) => src.indexOf(`title="${title}"`));
-    expect(order.every((i) => i >= 0)).toBe(true);
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  it("renders Daily Desk inbox instead of four panel blocks", () => {
+    expect(src).toMatch(/<DailyDeskInbox/);
+    expect(src).toMatch(/buildDailyDeskInbox/);
+    expect(src).not.toMatch(/title="Oportunidades"/);
+    expect(src).not.toMatch(/title="Vigilar"/);
+    expect(src).not.toMatch(/title="Sin acción"/);
+    expect(src).not.toMatch(/<MesaOpportunitiesTeaser/);
+    expect(src).not.toMatch(/<MesaWatchList/);
+    expect(src).not.toMatch(/<MesaCoberturaKpi/);
+    expect(src).not.toMatch(/<MesaProteccionKpi/);
+    expect(src).not.toMatch(/<MesaAttentionQueue/);
   });
 
   it("drops the L2 tab bar and the Confirmar tab from the chrome", () => {
@@ -237,17 +278,24 @@ describe("Hoy inbox chrome (V1.23 Fase 4)", () => {
     expect(src).toMatch(/view === HOY_VIEW\.posiciones/);
   });
 
-  it("signs from the drawer or /confirm, not from a Hoy tab", () => {
-    expect(src).toMatch(/openConfirmDrawer\(\)/);
-    expect(src).toMatch(/CONFIRM_PATH/);
+  it("open-position inbox uses OperationalTruth via Daily Desk", () => {
+    expect(src).toMatch(/buildDailyDeskInbox/);
+    expect(src).not.toMatch(/positionsNeedingAction/);
+    expect(src).not.toMatch(/mapMesaNextAction/);
   });
 
-  it("shows the Datos freshness chip and no session dump nor Spine on the inbox", () => {
+  it("shows Datos chip and no session dump nor Spine on the inbox", () => {
     expect(src).toMatch(/<MesaDatosChip/);
     expect(src).not.toMatch(/<MesaSessionStateCard/);
     expect(src).not.toMatch(/<MesaOperationalHeaderStrip/);
     const spineAt = src.indexOf("<DecisionSpineDetailPanel");
     const inboxAt = src.indexOf('data-testid="hoy-inbox"');
     expect(spineAt).toBeGreaterThan(inboxAt);
+  });
+
+  it("footer points to opportunities without embedding ranking panel", () => {
+    expect(src).toMatch(/daily-desk-footer/);
+    expect(src).toMatch(/daily-desk-link-oportunidades/);
+    expect(src).toMatch(/Hoy no es\s+Mercado/);
   });
 });

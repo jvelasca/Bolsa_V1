@@ -38,18 +38,14 @@ describe("parseHoyView", () => {
   });
 });
 
-describe("Hoy inbox chrome (V1.23 Fase 4)", () => {
-  it("lists the four inbox blocks in reading order", () => {
-    expect(HOY_INBOX_BLOCKS.map((b) => b.title)).toEqual([
-      "Requiere acción",
-      "Oportunidades",
-      "Vigilar",
-      "Sin acción",
-    ]);
+describe("Hoy Daily Desk chrome (V1.41)", () => {
+  it("lists a single attention inbox block", () => {
+    expect(HOY_INBOX_BLOCKS.map((b) => b.title)).toEqual(["Requiere atención"]);
   });
 
   it("moves detail views behind Ver detalles, keeping ?view= deep links", () => {
     const byId = new Map(HOY_DETAIL_ITEMS.map((i) => [i.id, i.href]));
+    expect(byId.get("oportunidades")).toBe("/mesa?view=oportunidades");
     expect(byId.get("decisiones")).toBe("/mesa?view=decisiones");
     expect(byId.get("journal")).toBe("/mesa?view=journal");
     expect(byId.get("posiciones")).toBe("/mesa?view=posiciones");

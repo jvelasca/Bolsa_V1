@@ -17,6 +17,10 @@ type OperationalPlanViewProps = {
   className?: string;
   /** test id suffix (symbol / session). */
   testId?: string;
+  /**
+   * V1.37 — cuando el Summary ya muestra P&L / precio, el Plan solo geometría.
+   */
+  omitLiveMetrics?: boolean;
 };
 
 function Row({
@@ -57,6 +61,7 @@ export function OperationalPlanView({
   plan,
   className,
   testId = "operational-plan",
+  omitLiveMetrics = false,
 }: OperationalPlanViewProps) {
   if (!plan.hasPlan) {
     return (
@@ -110,7 +115,7 @@ export function OperationalPlanView({
           label="Entrada"
           value={plan.entry != null ? formatPrice(plan.entry) : "—"}
         />
-        {plan.currentPrice != null ? (
+        {!omitLiveMetrics && plan.currentPrice != null ? (
           <Row label="Actual" value={formatPrice(plan.currentPrice)} />
         ) : null}
         <Row
@@ -137,7 +142,7 @@ export function OperationalPlanView({
         {plan.riskR != null ? (
           <Row label="Riesgo" value={`${plan.riskR.toFixed(2)}R`} />
         ) : null}
-        {plan.unrealizedR != null ? (
+        {!omitLiveMetrics && plan.unrealizedR != null ? (
           <Row
             label="R abierto"
             value={`${plan.unrealizedR >= 0 ? "+" : ""}${plan.unrealizedR.toFixed(2)}R`}

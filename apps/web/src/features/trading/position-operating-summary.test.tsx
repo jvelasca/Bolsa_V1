@@ -1,10 +1,11 @@
 /**
- * V1.36 — resumen operativo diario (frase + próximo evento + protección).
+ * V1.37 — resumen operativo diario (estado: acción, P&L, próximo evento, protección, asOf).
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { PositionDto } from "@bolsa/shared";
+import { buildOperationalTruth } from "@bolsa/shared";
 import { PositionOperatingSummary } from "@/features/trading/position-operating-summary";
 
 afterEach(() => cleanup());
@@ -37,7 +38,7 @@ function openPosition(overrides: Partial<PositionDto> = {}): PositionDto {
   };
 }
 
-describe("PositionOperatingSummary V1.36", () => {
+describe("PositionOperatingSummary V1.39", () => {
   it("renders phrase, next event and protection for open position", () => {
     render(
       <PositionOperatingSummary
@@ -46,6 +47,12 @@ describe("PositionOperatingSummary V1.36", () => {
       />,
     );
     expect(screen.getByTestId("position-operating-summary")).toBeTruthy();
+    expect(
+      screen.getByTestId("position-operating-summary").getAttribute("data-cta"),
+    ).toBe("maintain");
+    expect(screen.getByTestId("position-operating-action").textContent).toBe(
+      "Mantener",
+    );
     expect(screen.getByTestId("position-operating-phrase").textContent).toMatch(
       /Mantén/,
     );
@@ -55,6 +62,9 @@ describe("PositionOperatingSummary V1.36", () => {
     expect(
       screen.getByTestId("position-operating-protection").textContent,
     ).toMatch(/Stop operativo vigente/);
+    expect(screen.getByTestId("position-operating-pnl").textContent).toMatch(
+      /\+2\.0%/,
+    );
   });
 
   it("shows semantic disclaimer: stop operativo ≠ broker", () => {
@@ -75,7 +85,24 @@ describe("PositionOperatingSummary V1.36", () => {
     expect(screen.getByTestId("position-operating-phrase").textContent).toMatch(
       /discrepancia/i,
     );
-    expect(screen.getByText("Bloqueada")).toBeTruthy();
+    expect(screen.getByTestId("position-operating-recon").textContent).toBe(
+      "Operativa bloqueada",
+    );
+    expect(
+      screen.getByTestId("position-operating-recon-detail").textContent,
+    ).toMatch(/Reconciliación necesaria/i);
+  });
+
+  it("shows asOf from OperationalTruth", () => {
+    const truth = buildOperationalTruth({
+      position: openPosition(),
+      portfolioReconStatus: "ok",
+      asOf: "2026-08-31T08:15:00.000Z",
+    });
+    render(<PositionOperatingSummary truth={truth} />);
+    expect(screen.getByTestId("position-operating-asof").textContent).toMatch(
+      /2026-08-31 08:15 UTC/,
+    );
   });
 
   it("returns null without operational trade plan", () => {

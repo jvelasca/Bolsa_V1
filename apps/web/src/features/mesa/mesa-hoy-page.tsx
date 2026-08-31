@@ -1,32 +1,26 @@
 /**
- * Hoy — inbox diario (ADR-037 + ADR-040 · V1.23 Fase 4).
+ * Hoy — Daily Desk (ADR-037 + ADR-040 · V1.41).
  *
- * Cuatro bloques: Requiere acción · Oportunidades · Vigilar · Sin acción.
- * Las vistas de detalle salen del chrome (menú «Ver detalles»); los deep-links
- * `?view=` siguen vivos. La firma es el drawer de Confirmar / `/confirm`.
+ * Inbox único ordenado por attention. Sin paneles de ranking/KPI en el chrome
+ * (no segundo Mercado). Detalles detrás de «Ver detalles» / `?view=`.
+ * Confirm = firma (drawer / `/confirm`).
  */
 
 import { useMemo, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
-import type { ExitSuggestedActionV1, ProtectPlanV1 } from "@bolsa/shared";
+import type { ProtectPlanV1 } from "@bolsa/shared";
 import {
-  buildMesaActionQueue,
   buildMesaOperationalHeader,
   aggregateMesaProtectionKpi,
   buildMesaProtectionState,
-  buildMesaDecisionAlerts,
   buildMesaSessionState,
   buildOpportunityRanking,
   buildPortfolioRiskSnapshot,
-  buildUnifiedAlertInbox,
-  buildInvestmentPositionAggregate,
+  buildDailyDeskInbox,
   computeSectorExposurePct,
-  filterMesaAttentionItems,
-  mapMesaNextAction,
   mesaEntriesBlocked,
-  pickPositionStudies,
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
   ESTUDIO_LIST_ID,
@@ -45,46 +39,21 @@ import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
 } from "@/features/operational-console/use-ops-self-eval";
-import { MesaCoberturaKpi } from "@/features/mesa/mesa-cobertura-kpi";
-import { MesaProteccionKpi } from "@/features/mesa/mesa-proteccion-kpi";
-import { MesaInboxBlock } from "@/features/mesa/mesa-inbox-block";
 import { MesaHoyDetailsMenu } from "@/features/mesa/mesa-hoy-details-menu";
 import { MesaDatosChip } from "@/features/mesa/mesa-datos-chip";
-import { MesaOpportunitiesTeaser } from "@/features/mesa/mesa-opportunities-teaser";
-import { MesaWatchList } from "@/features/mesa/mesa-watch-list";
-import { MesaAttentionQueue } from "@/features/mesa/mesa-attention-queue";
+import { DailyDeskInbox } from "@/features/mesa/daily-desk-inbox";
 import { MesaPositionsSummary } from "@/features/mesa/mesa-positions-summary";
-import { MesaDecisionAlertsPanel } from "@/features/mesa/mesa-decision-alerts-panel";
 import { MesaLibroPanel } from "@/features/mesa/mesa-libro-panel";
 import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-panel";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 import { parseHoyView } from "@/features/mesa/mesa-hoy-view";
 import { HOY_VIEW, hoyViewHref } from "@/features/confirm/daily-nav";
-import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
-import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 
 const STUDIES_LIMIT = 200;
 const MESA_REFETCH_MS = 60_000;
-
-const EXIT_SUGGESTED_ACTIONS = new Set([
-  "hold",
-  "protect",
-  "reduce",
-  "full_exit",
-]);
-
-/** El wire trae `suggestedAction` como string; no se asume acción desconocida. */
-function parseExitSuggestedAction(
-  raw: string | null | undefined,
-): ExitSuggestedActionV1 | null {
-  if (raw && EXIT_SUGGESTED_ACTIONS.has(raw)) {
-    return raw as ExitSuggestedActionV1;
-  }
-  return null;
-}
 
 function formatHoyDate(d = new Date()): string {
   return d.toLocaleDateString(undefined, {
@@ -187,12 +156,6 @@ export function MesaHoyPage() {
     if (fromApi) return fromApi;
     return estudioMembers.map((m) => m.instrumentId);
   }, [estudioUniverseUnavailable, universeListQuery.data, estudioMembers]);
-
-  const estudioStatus = estudioUniverseUnavailable
-    ? ("unavailable" as const)
-    : estudioInstrumentIds.length === 0
-      ? ("empty" as const)
-      : ("ok" as const);
 
   const board = boardQuery.data?.data;
   const portfolio = portfolioQuery.data?.data;
@@ -352,10 +315,6 @@ export function MesaHoyPage() {
 
   const protectionDiscrepancies = protectionByPosition.discrepancies;
   const protectionKpi = protectionByPosition.kpi;
-  const attentionItems = useMemo(() => {
-    const queue = buildMesaActionQueue(board);
-    return filterMesaAttentionItems(queue, 5, protectionDiscrepancies);
-  }, [board, protectionDiscrepancies]);
 
   const latestCompletedScan = useMemo(() => {
     const jobs = scanJobsQuery.data?.data ?? [];
@@ -489,99 +448,28 @@ export function MesaHoyPage() {
     ],
   );
 
-  const decisionAlerts = useMemo(
-    () =>
-      buildMesaDecisionAlerts({
-        positions,
-        studies,
-        dataStale: operationalHeader.dataFreshness.state === "stale",
-        incidentCount: Math.max(0, incidentCount),
-        protectionDiscrepancies: protectionDiscrepancies.map((d) => ({
-          symbol: d.symbol,
-        })),
-      }),
-    [
-      positions,
-      studies,
-      operationalHeader.dataFreshness.state,
-      incidentCount,
-      protectionDiscrepancies,
-    ],
-  );
-
-  const positionAggregates = useMemo(
-    () =>
-      positions.map((position) => {
-        const { originStudy, evolutionStudy } = pickPositionStudies(
-          position,
-          studiesByDecision,
-          studiesMap,
-        );
-        const protectPlan = protectPlanByInstrument.get(position.instrumentId);
-        return buildInvestmentPositionAggregate({
-          position,
-          study: evolutionStudy,
-          originStudy,
-          protectPlan,
-        });
-      }),
-    [positions, studiesMap, studiesByDecision, protectPlanByInstrument],
-  );
-
-  const unifiedAlerts = useMemo(
-    () =>
-      buildUnifiedAlertInbox({
-        decisionAlerts,
-        positionAggregates,
-        portfolioRiskWarnings:
-          portfolioRisk.portfolioOpenRiskR != null &&
-          portfolioRisk.portfolioOpenRiskR > portfolioRisk.portfolioRiskLimitR
-            ? [
-                `Riesgo abierto ${portfolioRisk.portfolioOpenRiskR}R supera límite ${portfolioRisk.portfolioRiskLimitR}R`,
-              ]
-            : [],
-      }),
-    [decisionAlerts, positionAggregates, portfolioRisk],
-  );
-
   const pendingSignature = Math.max(
     board?.buckets?.pendingConfirm ?? 0,
     board?.semiF3Queue?.length ?? 0,
   );
 
-  /** Posiciones cuya siguiente acción es Proteger / Reducir / Salir. */
-  const positionsNeedingAction = useMemo(() => {
-    const discrepancySymbols = new Set(
-      protectionDiscrepancies.map((d) => d.symbol),
-    );
-    const out: Array<{ symbol: string; label: string }> = [];
-    for (const position of positions) {
-      const next = mapMesaNextAction({
-        hasOpenPosition: true,
-        protectPlan: protectPlanByInstrument.get(position.instrumentId) ?? null,
-        exitSuggestedAction: parseExitSuggestedAction(
-          position.operational?.exitPlan?.suggestedAction,
-        ),
-        protectionDiscrepancy: discrepancySymbols.has(position.symbol),
-      });
-      if (
-        next.kind === "protect" ||
-        next.kind === "reduce" ||
-        next.kind === "exit"
-      ) {
-        out.push({ symbol: position.symbol, label: next.label });
-      }
-    }
-    return out;
-  }, [positions, protectPlanByInstrument, protectionDiscrepancies]);
-
-  const watchRows = useMemo(
-    () => opportunityRanking.all.filter((row) => row.category === "WATCH"),
-    [opportunityRanking],
+  const dailyDesk = useMemo(
+    () =>
+      buildDailyDeskInbox({
+        positions,
+        board,
+        portfolioReconStatus,
+        pendingConfirm: pendingSignature,
+        protectionDiscrepancies,
+      }),
+    [
+      positions,
+      board,
+      portfolioReconStatus,
+      pendingSignature,
+      protectionDiscrepancies,
+    ],
   );
-
-  const requiereAccionCount =
-    attentionItems.length + pendingSignature + positionsNeedingAction.length;
 
   const isRefreshing =
     boardQuery.isFetching ||
@@ -688,133 +576,42 @@ export function MesaHoyPage() {
 
         {view === HOY_VIEW.resumen ? (
           <div className="space-y-6" data-testid="hoy-inbox">
-            <MesaInboxBlock
-              title="Requiere acción"
-              description="Atención, firmas pendientes y posiciones que piden Proteger / Reducir / Salir."
-              count={requiereAccionCount}
-              emptyLabel="Nada requiere tu acción"
-              testId="mesa-inbox-requiere-accion"
-            >
-              {pendingSignature > 0 ? (
-                <div
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
-                  data-testid="mesa-inbox-f3-pending"
-                >
-                  <p className="font-medium text-amber-950 dark:text-amber-100">
-                    {pendingSignature} pendiente
-                    {pendingSignature === 1 ? "" : "s"} de firma
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-primary hover:underline"
-                      onClick={() => openConfirmDrawer()}
-                    >
-                      Abrir Confirm
-                    </button>
-                    <Link
-                      to={CONFIRM_PATH}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Ir a /confirm
-                    </Link>
-                  </div>
-                </div>
-              ) : null}
-              <MesaAttentionQueue items={attentionItems} board={board} />
-              {positionsNeedingAction.length > 0 ? (
-                <ul
-                  className="space-y-1 rounded-md border border-border/60 px-3 py-2 text-xs"
-                  data-testid="mesa-inbox-positions-action"
-                >
-                  {positionsNeedingAction.map((row) => (
-                    <li key={row.symbol} className="flex justify-between gap-2">
-                      <span className="font-medium">{row.symbol}</span>
-                      <button
-                        type="button"
-                        className="text-primary hover:underline"
-                        onClick={() => openConfirmDrawer()}
-                      >
-                        {row.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <MesaDecisionAlertsPanel
-                alerts={decisionAlerts}
-                unifiedAlerts={unifiedAlerts}
-              />
-            </MesaInboxBlock>
+            <DailyDeskInbox inbox={dailyDesk} />
 
-            <MesaInboxBlock
-              title="Oportunidades"
-              description="Calidad del ranking — no es una orden. Confirm firma."
-              count={opportunityRanking.top.length}
-              emptyLabel="Sin oportunidades TOP"
-              testId="mesa-inbox-oportunidades"
+            <div
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/15 px-3 py-2 text-xs"
+              data-testid="daily-desk-footer"
             >
-              <MesaOpportunitiesTeaser
-                rows={opportunityRanking.top}
-                entriesBlocked={entriesBlocked}
-                operableCount={opportunityRanking.funnel.operableCount}
-                verTodasHref={hoyViewHref(HOY_VIEW.oportunidades)}
-              />
-            </MesaInboxBlock>
-
-            <MesaInboxBlock
-              title="Vigilar"
-              description="Interesantes todavía no preparadas — sin CTA de compra."
-              count={watchRows.length}
-              emptyLabel="Nada en vigilancia"
-              testId="mesa-inbox-vigilar"
-            >
-              <MesaWatchList rows={watchRows} />
-            </MesaInboxBlock>
-
-            <MesaInboxBlock
-              title="Sin acción"
-              description="Cobertura Estudio y frescura — información secundaria."
-              count={null}
-              testId="mesa-inbox-sin-accion"
-              headerRight={
-                <MesaDatosChip
-                  scanUpdatedAt={opportunityRanking.funnel.rankingAsOf}
-                />
-              }
-            >
-              <MesaCoberturaKpi
-                frescos={
-                  estudioStatus === "unavailable"
-                    ? 0
-                    : opportunityRanking.funnel.analyzedCount
-                }
-                universeCount={
-                  estudioStatus === "unavailable"
-                    ? 0
-                    : opportunityRanking.funnel.universeCount
-                }
-                estudioStatus={estudioStatus}
-              />
-              <MesaProteccionKpi kpi={protectionKpi} />
-              <div
-                className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"
-                data-testid="mesa-system-health-link"
-              >
-                <p className="font-medium">
-                  Estado operativo: {operationalHeader.operationalStatusLabel}
+              <div className="space-y-0.5">
+                <p className="font-medium text-foreground">
+                  Estado: {operationalHeader.operationalStatusLabel}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Salud del sistema, recon e incidentes — solo si hace falta.
+                <p className="text-muted-foreground">
+                  Oportunidades y cobertura viven en Ver detalles — Hoy no es
+                  Mercado.
                 </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  to={hoyViewHref(HOY_VIEW.oportunidades)}
+                  className="text-primary hover:underline"
+                  data-testid="daily-desk-link-oportunidades"
+                >
+                  Oportunidades
+                  {opportunityRanking.top.length > 0
+                    ? ` (${opportunityRanking.top.length})`
+                    : ""}{" "}
+                  →
+                </Link>
                 <Link
                   to={mesaOperationalConsoleHref()}
-                  className="mt-2 inline-block text-xs text-primary hover:underline"
+                  className="text-primary hover:underline"
+                  data-testid="daily-desk-link-consola"
                 >
-                  Detalles operativos →
+                  Consola →
                 </Link>
               </div>
-            </MesaInboxBlock>
+            </div>
           </div>
         ) : null}
 

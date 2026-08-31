@@ -1,8 +1,8 @@
 /**
  * Vistas de Hoy (`?view=`) + compat `?focus=` (ADR-040).
  *
- * V1.23 Fase 4 — Hoy es un inbox de cuatro bloques. Las vistas de detalle ya
- * no son pestañas de chrome: se abren desde «Ver detalles» o por deep-link.
+ * V1.41 — Daily Desk: inbox único por attention. Detalles detrás de
+ * «Ver detalles» o deep-link `?view=` (no segundo Mercado).
  */
 
 import {
@@ -31,12 +31,9 @@ export function parseHoyView(
   return HOY_VIEW.resumen;
 }
 
-/** Bloques del inbox (orden de lectura garantizado). */
+/** V1.41 — chrome de Hoy = un solo inbox por attention (sin paneles L2). */
 export const HOY_INBOX_BLOCKS = [
-  { id: "requiere-accion", title: "Requiere acción" },
-  { id: "oportunidades", title: "Oportunidades" },
-  { id: "vigilar", title: "Vigilar" },
-  { id: "sin-accion", title: "Sin acción" },
+  { id: "requiere-atencion", title: "Requiere atención" },
 ] as const;
 
 export type HoyInboxBlockId = (typeof HOY_INBOX_BLOCKS)[number]["id"];
@@ -48,6 +45,12 @@ export const HOY_DETAIL_ITEMS: ReadonlyArray<{
   href: string;
   hint: string;
 }> = [
+  {
+    id: "oportunidades",
+    label: "Oportunidades",
+    href: hoyViewHref(HOY_VIEW.oportunidades),
+    hint: "Ranking Estudio — no es una orden",
+  },
   {
     id: "decisiones",
     label: "Decisiones",

@@ -29,6 +29,8 @@ export function PositionExitDrawerActions({
   protectPlan,
   compact = false,
   showMaintain = false,
+  /** V1.39 — una sola CTA alineada a truth.action (cockpit, Hoy, Operaciones). */
+  primaryOnly = false,
   portfolioReconStatus,
   className,
 }: {
@@ -37,6 +39,7 @@ export function PositionExitDrawerActions({
   compact?: boolean;
   /** Cockpit en fase POSICIÓN muestra «Mantener» como estado, no como botón. */
   showMaintain?: boolean;
+  primaryOnly?: boolean;
   portfolioReconStatus?: string | null;
   className?: string;
 }) {
@@ -96,10 +99,21 @@ export function PositionExitDrawerActions({
   const showProtect =
     !reconBlocked &&
     (decision?.action === "PROTECT" ||
-      positionShowsProtectHint(position, protectPlan));
-  const showMaintainBadge = showMaintain || decision?.action === "HOLD";
+      (!primaryOnly && positionShowsProtectHint(position, protectPlan)));
+  const showMaintainBadge = primaryOnly
+    ? decision && isPrimaryPositionExitCta(decision, "maintain")
+    : showMaintain || decision?.action === "HOLD";
   const showReview = reconBlocked || decision?.action === "REVIEW";
-  const showReduceExit = !reconBlocked && !showReview;
+  const showReduceExit =
+    !reconBlocked && !showReview && !primaryOnly
+      ? true
+      : !reconBlocked &&
+        !showReview &&
+        primaryOnly &&
+        decision != null &&
+        (decision.action === "REDUCE" ||
+          decision.action === "TAKE_PROFIT" ||
+          decision.action === "EXIT");
 
   const exitPlan = position.operational?.exitPlan;
   const policyHint = formatExitPolicyActionHint({
@@ -151,24 +165,32 @@ export function PositionExitDrawerActions({
         ) : null}
         {showReduceExit ? (
           <>
-            <button
-              type="button"
-              className={cn(ctaClass("reduce"), "border-amber-500/40")}
-              onClick={() => enqueueExit("reduce")}
-              data-testid={`position-exit-reduce-${position.symbol}`}
-              title="Reducir → cola Confirm (firma SEMI)"
-            >
-              Reducir
-            </button>
-            <button
-              type="button"
-              className={cn(ctaClass("exit"), "border-rose-500/40")}
-              onClick={() => enqueueExit("exit_hint")}
-              data-testid={`position-exit-full-${position.symbol}`}
-              title="Salir → cola Confirm (firma SEMI)"
-            >
-              Salir
-            </button>
+            {(
+              primaryOnly ? isPrimaryPositionExitCta(decision!, "reduce") : true
+            ) ? (
+              <button
+                type="button"
+                className={cn(ctaClass("reduce"), "border-amber-500/40")}
+                onClick={() => enqueueExit("reduce")}
+                data-testid={`position-exit-reduce-${position.symbol}`}
+                title="Reducir → cola Confirm (firma SEMI)"
+              >
+                Reducir
+              </button>
+            ) : null}
+            {(
+              primaryOnly ? isPrimaryPositionExitCta(decision!, "exit") : true
+            ) ? (
+              <button
+                type="button"
+                className={cn(ctaClass("exit"), "border-rose-500/40")}
+                onClick={() => enqueueExit("exit_hint")}
+                data-testid={`position-exit-full-${position.symbol}`}
+                title="Salir → cola Confirm (firma SEMI)"
+              >
+                Salir
+              </button>
+            ) : null}
           </>
         ) : null}
       </div>

@@ -61,6 +61,7 @@ export function positionStateFromPositionDto(
 
 export type BuildPositionDecisionFromDtoInputV1 = {
   portfolioReconStatus?: string | null;
+  at?: string | null;
 };
 
 /** PositionDto wire → PositionDecisionV1 (cockpit / Hoy / Journal). */
@@ -80,5 +81,6 @@ export function buildPositionDecisionFromDto(
     },
     templateId,
     portfolioReconStatus: input.portfolioReconStatus ?? undefined,
+    at: input.at,
   });
 }

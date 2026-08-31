@@ -33,3 +33,7 @@ pnpm --filter @bolsa/web exec tsc --noEmit
 ```
 
 Backend operativo **congelado**. Solo UI + shared client-side projection.
+
+## 2. Next
+
+**V1.37 — Operational Truth:** [`traspaso-relevo-v1-37-operational-truth-2026-08-31.md`](./traspaso-relevo-v1-37-operational-truth-2026-08-31.md).

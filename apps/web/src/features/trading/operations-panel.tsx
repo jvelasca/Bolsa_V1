@@ -6,6 +6,7 @@ import type { ProtectPlanV1 } from "@bolsa/shared";
 import {
   buildInvestmentPositionAggregate,
   buildOperationalPlanFromPosition,
+  buildOperationalTruth,
   studiesByInstrumentMap,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
@@ -26,20 +27,6 @@ import {
 } from "@/features/operational-console/use-ops-self-eval";
 
 type OperationsTab = "open" | "pending";
-
-const EXIT_ACTION_LABEL: Record<string, string> = {
-  protect: "proteger",
-  reduce: "reducir",
-  full_exit: "salir",
-};
-
-function exitPlanLabel(
-  operational: { exitPlan?: { suggestedAction?: string | null } | null } | null,
-): string {
-  const action = operational?.exitPlan?.suggestedAction;
-  if (!action || action === "hold") return "—";
-  return EXIT_ACTION_LABEL[action] ?? action;
-}
 
 function formatR(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -245,6 +232,11 @@ export function OperationsPanel({
                   const operational = pos.operational ?? null;
                   const study = studiesMap.get(pos.instrumentId) ?? null;
                   const showRoute = mesaPositionShowsRoute(pos, study);
+                  const truth = buildOperationalTruth({
+                    position: pos,
+                    study,
+                    portfolioReconStatus,
+                  });
                   const aggregate = buildInvestmentPositionAggregate({
                     position: pos,
                     study,
@@ -253,6 +245,7 @@ export function OperationsPanel({
                     aggregate,
                     markPrice: pos.lastPrice ?? null,
                   });
+                  const actionLabel = truth?.primaryCta.label ?? "—";
 
                   return (
                     <Fragment key={pos.id}>
@@ -296,7 +289,7 @@ export function OperationsPanel({
                         </td>
 
                         <td className="px-2 py-1 text-right text-muted-foreground">
-                          {exitPlanLabel(operational)}
+                          {actionLabel}
                         </td>
 
                         <td
@@ -321,6 +314,7 @@ export function OperationsPanel({
                           <PositionExitDrawerActions
                             position={pos}
                             compact
+                            primaryOnly
                             protectPlan={protectPlanByInstrument.get(
                               pos.instrumentId,
                             )}

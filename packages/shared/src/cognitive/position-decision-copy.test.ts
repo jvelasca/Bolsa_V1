@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   formatNextEventLabel,
+  formatPositionDecisionActionLabel,
   formatPositionDecisionPhrase,
   formatProtectionLabel,
   isPrimaryPositionExitCta,
+  positionOperatingCtaFromDecision,
   primaryPositionExitCta,
 } from "./position-decision-copy.js";
 import { buildPositionDecision } from "./position-decision.js";
@@ -88,5 +90,41 @@ describe("position-decision-copy V1.36", () => {
       portfolioReconStatus: "drift",
     });
     expect(primaryPositionExitCta(drift!)).toBe("review");
+  });
+
+  it("positionOperatingCtaFromDecision mirrors primary exit CTA", () => {
+    const hold = buildPositionDecision({
+      position: openLong(),
+      signals: { markPrice: 102 },
+      templateId: "moderate",
+    });
+    expect(positionOperatingCtaFromDecision(hold!)).toEqual({
+      kind: "maintain",
+      label: "Mantener",
+    });
+    const drift = buildPositionDecision({
+      position: openLong(),
+      signals: { markPrice: 102 },
+      portfolioReconStatus: "drift",
+    });
+    expect(positionOperatingCtaFromDecision(drift!)).toEqual({
+      kind: "review",
+      label: "Revisar",
+    });
+  });
+
+  it("formats action labels for surface copy", () => {
+    const hold = buildPositionDecision({
+      position: openLong(),
+      signals: { markPrice: 102 },
+      templateId: "moderate",
+    });
+    expect(formatPositionDecisionActionLabel(hold!)).toBe("Mantener");
+    const drift = buildPositionDecision({
+      position: openLong(),
+      signals: { markPrice: 102 },
+      portfolioReconStatus: "drift",
+    });
+    expect(formatPositionDecisionActionLabel(drift!)).toBe("Revisar");
   });
 });

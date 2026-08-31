@@ -188,12 +188,12 @@ describe("mercadoCockpitShowsPlanLevels", () => {
 describe("mercadoCockpitPrimaryCta", () => {
   it("labels de producto V1.24", () => {
     expect(mercadoCockpitPrimaryCta("vigilar")).toBe("Ver análisis");
-    expect(mercadoCockpitPrimaryCta("preparada")).toBe("Revisar operación");
+    expect(mercadoCockpitPrimaryCta("preparada")).toBe("Preparar operación");
     expect(mercadoCockpitPrimaryCta("bloqueada")).toBe(
       "Ver motivo del bloqueo",
     );
     expect(mercadoCockpitPrimaryCta("caducada")).toBe("Ver análisis");
-    expect(mercadoCockpitPrimaryCta("disparada")).toBe("Confirmar");
+    expect(mercadoCockpitPrimaryCta("disparada")).toBe("Revisar y confirmar");
     expect(mercadoCockpitPrimaryCta("confirmada")).toBe("Ver operaciones");
     expect(mercadoCockpitPrimaryCta("posicion")).toBe("Mantener");
   });
