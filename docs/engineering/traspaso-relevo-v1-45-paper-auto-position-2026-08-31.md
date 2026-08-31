@@ -1,7 +1,7 @@
 # RELEVO — V1.45 PAPER AUTO position execute (2026-08-31)
 
 > **Padre:** [`spec-v145-paper-auto-position-2026-08-31.md`](./spec-v145-paper-auto-position-2026-08-31.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v145-paper-auto-position-2026-08-31.md`](./plan-v145-paper-auto-position-2026-08-31.md) · tip `v1.44-beta` → `db346a11`.  
-> **Estado:** **CERRADO (código)** — `ExecutePositionPolicyAuto` → JIT Permission → protect | Router reduce/exit → PositionRevision. `PAPER_D_EXECUTE` **default off**. **No** LIVE. **Tag tip:** [`v1.45-beta` → `6ca5ec12`](./traspaso-relevo-tag-v1-45-beta-2026-08-31.md) (CI pending; was `1627e9c9` mypy unblock).  
+> **Estado:** **CERRADO (código)** — `ExecutePositionPolicyAuto` → JIT Permission → protect | Router reduce/exit → PositionRevision. `PAPER_D_EXECUTE` **default off**. **No** LIVE. **Tag tip:** [`v1.45-beta` → `6ca5ec12`](./traspaso-relevo-tag-v1-45-beta-2026-08-31.md) · CI **GREEN**.  
 > **Arranque auditor:** [`arranque-auditor-v1-45-beta-2026-08-31.md`](./arranque-auditor-v1-45-beta-2026-08-31.md).
 
 ---
@@ -39,13 +39,11 @@ Confirm = firma · `PAPER_D_EXECUTE` off · sin Lab SoT · sin LIVE · sin OCO �
 
 ## 3. OUT
 
-- Tag `v1.45-beta` (owner + CI GREEN)
 - Browser E2E / Daily Journal UI
 - Retrofit Lab EvaluatePositionExits
-- `PAPER_D_EXECUTE` default on · thaw LIVE
+- `PAPER_D_EXECUTE` default on · thaw LIVE · OCO · auto-promote · package bump
 
 ## 4. Next
 
-1. Tag `v1.45-beta` cuando owner pida + relevo-tag.
-2. Auditar con arranque auditor.
-3. V1.46 Autonomous Paper Desk — solo tras tip certificado. NO LIVE.
+1. **V1.46** Autonomous Paper Desk — solo tras tip certificado (este tip). NO LIVE.
+2. Lab retrofit / OCO / thaw LIVE / browser E2E siguen parked.
