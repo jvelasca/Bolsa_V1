@@ -284,6 +284,12 @@ describe("Hoy Daily Desk chrome (V1.41)", () => {
     expect(src).not.toMatch(/mapMesaNextAction/);
   });
 
+  it("feeds entriesBlocked from shared hook and pending ids to Daily Desk", () => {
+    expect(src).toMatch(/useMesaEntriesBlocked/);
+    expect(src).toMatch(/pendingInstrumentIds/);
+    expect(src).toMatch(/usePendingOrders/);
+  });
+
   it("shows Datos chip and no session dump nor Spine on the inbox", () => {
     expect(src).toMatch(/<MesaDatosChip/);
     expect(src).not.toMatch(/<MesaSessionStateCard/);

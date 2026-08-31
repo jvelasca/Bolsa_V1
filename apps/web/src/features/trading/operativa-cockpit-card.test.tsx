@@ -4,6 +4,8 @@
 
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { ReactElement } from "react";
 import type { OperationalPlanViewV1, PositionDto } from "@bolsa/shared";
 import { OperativaCockpitCard } from "@/features/trading/operativa-cockpit-card";
@@ -19,6 +21,18 @@ vi.mock("@/features/trading/use-instrument-operational-context", () => ({
 vi.mock("@/features/operational-console/use-ops-self-eval", () => ({
   useOpsSelfEval: () => ({ data: undefined, isLoading: false }),
   portfolioReconStatusFromReport: () => "ok",
+}));
+
+const useMesaEntriesBlocked = vi.fn(() => ({
+  entriesBlocked: false,
+  killOn: false,
+  vetoed: 0,
+  incidentCount: 0,
+  incidentsFailed: false,
+}));
+
+vi.mock("@/features/mesa/use-mesa-entries-blocked", () => ({
+  useMesaEntriesBlocked: (...args: unknown[]) => useMesaEntriesBlocked(...args),
 }));
 
 vi.mock("@/features/accounts/use-active-account", () => ({
@@ -159,6 +173,13 @@ function renderCockpit(ui: ReactElement) {
 describe("OperativaCockpitCard POSICIÓN V1.40", () => {
   beforeEach(() => {
     useInstrumentOperationalContext.mockReturnValue(posicionContext());
+    useMesaEntriesBlocked.mockReturnValue({
+      entriesBlocked: false,
+      killOn: false,
+      vetoed: 0,
+      incidentCount: 0,
+      incidentsFailed: false,
+    });
   });
 
   it("shows phase Posición and operating summary", () => {
@@ -259,5 +280,55 @@ describe("OperativaCockpitCard POSICIÓN V1.40", () => {
     expect(screen.getByTestId("entry-operating-action").textContent).toBe(
       "Preparar operación",
     );
+  });
+
+  it("entriesBlocked → Entradas bloqueadas on preparada", () => {
+    useMesaEntriesBlocked.mockReturnValue({
+      entriesBlocked: true,
+      killOn: true,
+      vetoed: 0,
+      incidentCount: 0,
+      incidentsFailed: false,
+    });
+    useInstrumentOperationalContext.mockReturnValue(
+      posicionContext({
+        phase: "preparada",
+        position: null,
+        showsPlanLevels: true,
+        study: {
+          instrumentId: "inst-aapl",
+          symbol: "AAPL",
+          hasOperationalPlan: true,
+          tradePlanStatus: "ARMED",
+          studiedAt: "2026-08-31T09:00:00.000Z",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+        } as never,
+      }),
+    );
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    expect(screen.getByTestId("entry-operating-action").textContent).toBe(
+      "Entradas bloqueadas",
+    );
+    expect(screen.getByTestId("entry-operating-phrase").textContent).toMatch(
+      /bloqueadas/i,
+    );
+  });
+});
+
+describe("OperativaCockpitCard honesty wiring (V1.41.2)", () => {
+  it("passes entriesBlocked, gateStatus and orderPending into builders", () => {
+    const src = readFileSync(
+      resolve(__dirname, "operativa-cockpit-card.tsx"),
+      "utf8",
+    );
+    expect(src).toMatch(/useMesaEntriesBlocked/);
+    expect(src).toMatch(/entriesBlocked,/);
+    expect(src).toMatch(/gateStatus: opinion\?\.gateStatus/);
+    expect(src).toMatch(/orderPending: context\.orderPendingFill/);
   });
 });

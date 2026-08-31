@@ -59,8 +59,16 @@ function armedStudy(
   } as DecisionJournalStudyViewV1;
 }
 
-function fourSurfaces(study: DecisionJournalStudyViewV1) {
-  const input = { study, asOf: ASOF };
+function fourSurfaces(
+  study: DecisionJournalStudyViewV1,
+  extra: {
+    entriesBlocked?: boolean;
+    gateStatus?: string | null;
+    inConfirmQueue?: boolean;
+    orderPendingFill?: boolean;
+  } = {},
+) {
+  const input = { study, asOf: ASOF, ...extra };
   return {
     mercado: buildEntryOperatingTruth(input),
     hoy: buildEntryOperatingTruth(input),
@@ -151,6 +159,31 @@ describe("sameEntryOperatingTruthAcrossSurfaces V1.38", () => {
       true,
     );
     expect(candidate.label).toBe("Entradas bloqueadas");
+  });
+
+  it("entriesBlocked → misma CTA y frase en las cuatro superficies", () => {
+    const { mercado, hoy, journal, operaciones } = fourSurfaces(armedStudy(), {
+      entriesBlocked: true,
+    });
+    expect(mercado).not.toBeNull();
+    const snap = entryOperatingSurfaceSnapshot(mercado!);
+    expect(snap.ctaKind).toBe("none");
+    expect(snap.ctaLabel).toBe("Entradas bloqueadas");
+    expect(snap.phrase).toMatch(/bloqueadas/i);
+    expect(entryOperatingSurfaceSnapshot(hoy!)).toEqual(snap);
+    expect(entryOperatingSurfaceSnapshot(journal!)).toEqual(snap);
+    expect(entryOperatingSurfaceSnapshot(operaciones!)).toEqual(snap);
+  });
+
+  it("gateStatus VETO → misma frase de veto en las cuatro superficies", () => {
+    const { mercado, hoy, journal, operaciones } = fourSurfaces(armedStudy(), {
+      gateStatus: "VETO",
+    });
+    expect(mercado?.phrase).toMatch(/veto/i);
+    expect(hoy?.phrase).toBe(mercado?.phrase);
+    expect(journal?.phrase).toBe(mercado?.phrase);
+    expect(operaciones?.phrase).toBe(mercado?.phrase);
+    expect(mercado?.primaryCta.kind).not.toBe("none");
   });
 
   it("open position → null (OperationalTruth gobierna posición)", () => {

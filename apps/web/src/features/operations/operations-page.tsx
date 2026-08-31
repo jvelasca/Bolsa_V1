@@ -15,6 +15,7 @@ import { OperationsPanel } from "@/features/trading/operations-panel";
 import { MesaOperationalBar } from "@/features/operations/mesa-operational-bar";
 import { MesaEntryQueuePanel } from "@/features/operations/mesa-entry-queue-panel";
 import { NoTradeSessionButton } from "@/features/operations/no-trade-session-button";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 
@@ -27,24 +28,10 @@ export function OperationsPage() {
     queryFn: api.getPortfolio,
   });
 
-  const killQuery = useQuery({
-    queryKey: ["risk-kill-switch"],
-    queryFn: () => api.getRiskKillSwitch(),
-    staleTime: 15_000,
-  });
-
-  const boardQuery = useQuery({
-    queryKey: ["decision-board", accountScope],
-    queryFn: () => api.getDecisionBoard(accountScope!),
-    enabled: Boolean(accountScope),
-    staleTime: 15_000,
-  });
+  const { entriesBlocked } = useMesaEntriesBlocked();
 
   const summary = portfolioQuery.data?.data;
   const positionsCount = summary?.positions.length ?? 0;
-  const killOn = killQuery.data?.effective === true;
-  const vetoed = boardQuery.data?.data?.buckets?.vetoed ?? 0;
-  const entriesBlocked = killOn || vetoed > 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

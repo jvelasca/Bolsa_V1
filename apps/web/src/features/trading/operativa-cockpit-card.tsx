@@ -33,6 +33,7 @@ import { PositionOperatingSummary } from "@/features/trading/position-operating-
 import { EntryOperatingSummary } from "@/features/trading/entry-operating-summary";
 import { ExitRouteView } from "@/features/trading/exit-route-view";
 import { useInstrumentOperationalContext } from "@/features/trading/use-instrument-operational-context";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { buildEntryOperatingTruth, buildOperationalTruth } from "@bolsa/shared";
 
 type OperativaCockpitCardProps = {
@@ -82,6 +83,7 @@ export function OperativaCockpitCard({
 }: OperativaCockpitCardProps) {
   const [whyOpen, setWhyOpen] = useState(false);
   const context = useInstrumentOperationalContext(instrumentId);
+  const { entriesBlocked } = useMesaEntriesBlocked();
   const operationsOpen = useTradingLayoutStore((s) => s.operationsOpen);
   const toggleOperations = useTradingLayoutStore((s) => s.toggleOperations);
 
@@ -93,6 +95,8 @@ export function OperativaCockpitCard({
           hasOpenPosition: Boolean(position),
           inConfirmQueue: context.inConfirmQueue,
           orderPendingFill: context.orderPendingFill,
+          entriesBlocked,
+          gateStatus: opinion?.gateStatus ?? null,
         })
       : null;
   const opsEval = useOpsSelfEval(context.accountId);
@@ -104,6 +108,7 @@ export function OperativaCockpitCard({
           study,
           originStudy: context.originStudy,
           portfolioReconStatus: reconStatus,
+          orderPending: context.orderPendingFill,
         })
       : null;
   const primaryLabel =
@@ -237,7 +242,11 @@ export function OperativaCockpitCard({
         {(phase === "preparada" || phase === "disparada") && onPropose ? (
           <button
             type="button"
-            disabled={proposePending || !canPropose}
+            disabled={
+              proposePending ||
+              !canPropose ||
+              entryTruth?.primaryCta.kind === "none"
+            }
             className="rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1.5 text-left text-xs font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50"
             onClick={onPropose}
             data-testid="operativa-cockpit-cta-preparar"

@@ -232,10 +232,14 @@ export function OperationsPanel({
                   const operational = pos.operational ?? null;
                   const study = studiesMap.get(pos.instrumentId) ?? null;
                   const showRoute = mesaPositionShowsRoute(pos, study);
+                  const orderPending = pendingOrders.some(
+                    (order) => order.instrumentId === pos.instrumentId,
+                  );
                   const truth = buildOperationalTruth({
                     position: pos,
                     study,
                     portfolioReconStatus,
+                    orderPending,
                   });
                   const aggregate = buildInvestmentPositionAggregate({
                     position: pos,
@@ -330,6 +334,7 @@ export function OperationsPanel({
                               position={pos}
                               study={study}
                               portfolioReconStatus={portfolioReconStatus}
+                              orderPending={orderPending}
                             />
                           </td>
                         </tr>

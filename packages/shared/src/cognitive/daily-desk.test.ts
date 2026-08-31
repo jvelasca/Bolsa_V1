@@ -140,4 +140,15 @@ describe("dailyDesk V1.41", () => {
       expect(item.ctaLabel.toUpperCase()).not.toContain("COMPRAR");
     }
   });
+
+  it("orderPending on T1 still lists the position (hint is none internally)", () => {
+    const pos = aaplOpen({ lastPrice: 105 });
+    const inbox = buildDailyDeskInbox({
+      positions: [pos],
+      portfolioReconStatus: "ok",
+      pendingInstrumentIds: [pos.instrumentId],
+    });
+    expect(inbox.count).toBe(1);
+    expect(inbox.items[0]?.ctaLabel).toBe("Reducir");
+  });
 });

@@ -53,9 +53,11 @@ PositionState + mark
 | **V1.36 Daily Operating UI**                                          | **CÓDIGO** (cockpit POSICIÓN + copy humano)                      | Backend operativo (congelado)      |
 | **V1.37 Operational Truth**                                           | **CÓDIGO** — misma decisión en Mercado/Hoy/Journal/Operaciones   | Motor nuevo, backend               |
 | **V1.38 Entry Operating UX**                                          | **CÓDIGO** — PREPARADA→CONFIRMADA, no BUY                        | Drag, AUTO                         |
-| **V1.39 Position Operating UX**                                       | Next — una CTA primaria                                          | Drag, AUTO                         |
-| **V1.40 Exit Management UX**                                          | Ruta visual Stop/T1/T2                                           | OCO, trail autoridad               |
-| **V1.41 Daily Desk**                                                  | Hoy inbox (quitar paneles)                                       | Segundo Mercado                    |
+| **V1.39 Position Operating UX**                                       | **CÓDIGO** — una CTA primaria                                    | Drag, AUTO                         |
+| **V1.40 Exit Management UX**                                          | **CÓDIGO** — ruta visual Stop/T1/T2                              | OCO, trail autoridad               |
+| **V1.41 Daily Desk**                                                  | **CÓDIGO** — Hoy inbox (quitar paneles)                          | Segundo Mercado                    |
+| **V1.41.2 Operational Honesty**                                       | **CÓDIGO** — `entriesBlocked` + `orderPending` en 4 superficies  | ExecutionState, TradeStory         |
+| **V1.42 Operating Excellence**                                        | Parked — modelo/cockpit/TradeStory/DailyDesk 2.0                 | OpportunityScore, AUTO, drag       |
 | Frente A AUTO A-β                                                     | V1.33; EdgeReport exigido                                        | A-γ, thaw estricto, broker live    |
 
 ## Lean de acuerdo (owner)

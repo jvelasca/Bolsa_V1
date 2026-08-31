@@ -17,6 +17,7 @@ vi.mock("@/lib/api", () => ({
   api: {
     getAccounts: vi.fn(async () => ({ data: [] })),
     getAccountSettings: vi.fn(async () => ({ data: null })),
+    getPendingOrders: vi.fn(async () => ({ data: [] })),
   },
 }));
 

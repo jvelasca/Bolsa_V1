@@ -77,6 +77,8 @@ export type BuildDailyDeskInboxInputV1 = {
     recommendedAction: string;
   }>;
   attentionLimit?: number;
+  /** Instrumentos con orden en vuelo (mismo executionHint que Mercado). */
+  pendingInstrumentIds?: readonly string[];
 };
 
 export function buildDailyDeskInbox(
@@ -100,11 +102,13 @@ export function buildDailyDeskInbox(
   }
 
   const seenSymbols = new Set<string>();
+  const pendingIds = new Set(input.pendingInstrumentIds ?? []);
 
   for (const position of input.positions) {
     const truth = buildOperationalTruth({
       position,
       portfolioReconStatus: input.portfolioReconStatus,
+      orderPending: pendingIds.has(position.instrumentId),
     });
     if (!truth) continue;
     const needsAction = openPositionNeedsAction(truth.decision);

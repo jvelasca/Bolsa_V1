@@ -100,3 +100,12 @@ export function usePendingOrders() {
     removePendingOrder: deleteMutation.mutateAsync,
   };
 }
+
+/** Orden en vuelo para un instrumento (OperationalTruth.orderPending). */
+export function useInstrumentOrderPending(
+  instrumentId: string | null | undefined,
+): boolean {
+  const { pendingOrders } = usePendingOrders();
+  if (!instrumentId) return false;
+  return pendingOrders.some((order) => order.instrumentId === instrumentId);
+}

@@ -82,4 +82,14 @@ describe("EntryOperatingSummary V1.38", () => {
       /2026-08-31 09:00 UTC/,
     );
   });
+
+  it("entriesBlocked → Entradas bloqueadas", () => {
+    render(<EntryOperatingSummary study={triggeredStudy()} entriesBlocked />);
+    expect(screen.getByTestId("entry-operating-action").textContent).toBe(
+      "Entradas bloqueadas",
+    );
+    expect(screen.getByTestId("entry-operating-phrase").textContent).toMatch(
+      /bloqueadas/i,
+    );
+  });
 });

@@ -16,6 +16,7 @@ type PositionRoutePanelProps = {
   study?: DecisionJournalStudyViewV1 | null;
   originStudy?: DecisionJournalStudyViewV1 | null;
   portfolioReconStatus?: string | null;
+  orderPending?: boolean;
   className?: string;
 };
 
@@ -24,6 +25,7 @@ export function PositionRoutePanel({
   study,
   originStudy,
   portfolioReconStatus,
+  orderPending,
   className,
 }: PositionRoutePanelProps) {
   const truth = buildOperationalTruth({
@@ -31,6 +33,7 @@ export function PositionRoutePanel({
     study,
     originStudy,
     portfolioReconStatus,
+    orderPending,
   });
   const plan = truth?.plan;
 

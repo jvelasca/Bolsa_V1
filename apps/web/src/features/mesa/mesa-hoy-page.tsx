@@ -20,7 +20,6 @@ import {
   buildPortfolioRiskSnapshot,
   buildDailyDeskInbox,
   computeSectorExposurePct,
-  mesaEntriesBlocked,
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
   ESTUDIO_LIST_ID,
@@ -47,6 +46,8 @@ import { MesaLibroPanel } from "@/features/mesa/mesa-libro-panel";
 import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-panel";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 import { parseHoyView } from "@/features/mesa/mesa-hoy-view";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
+import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { HOY_VIEW, hoyViewHref } from "@/features/confirm/daily-nav";
 import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
 import { api } from "@/lib/api";
@@ -78,6 +79,8 @@ export function MesaHoyPage() {
   const portfolioReconStatus = portfolioReconStatusFromReport(
     selfEvalQuery.data,
   );
+  const { entriesBlocked } = useMesaEntriesBlocked();
+  const { pendingOrders } = usePendingOrders();
 
   const boardQuery = useQuery({
     queryKey: ["decision-board", accountScope],
@@ -183,17 +186,6 @@ export function MesaHoyPage() {
   const incidentCount = incidentsFailed
     ? -1
     : (incidentsQuery.data?.data?.incidents?.length ?? 0);
-  const incidents = incidentsFailed
-    ? []
-    : (incidentsQuery.data?.data?.incidents ?? []);
-
-  const entriesBlocked =
-    incidentsFailed ||
-    mesaEntriesBlocked({
-      killSwitchEffective: killOn,
-      incidents,
-      vetoed,
-    });
 
   const sessionState = useMemo(
     () =>
@@ -453,6 +445,11 @@ export function MesaHoyPage() {
     board?.semiF3Queue?.length ?? 0,
   );
 
+  const pendingInstrumentIds = useMemo(
+    () => pendingOrders.map((order) => order.instrumentId).filter(Boolean),
+    [pendingOrders],
+  );
+
   const dailyDesk = useMemo(
     () =>
       buildDailyDeskInbox({
@@ -461,6 +458,7 @@ export function MesaHoyPage() {
         portfolioReconStatus,
         pendingConfirm: pendingSignature,
         protectionDiscrepancies,
+        pendingInstrumentIds,
       }),
     [
       positions,
@@ -468,6 +466,7 @@ export function MesaHoyPage() {
       portfolioReconStatus,
       pendingSignature,
       protectionDiscrepancies,
+      pendingInstrumentIds,
     ],
   );
 

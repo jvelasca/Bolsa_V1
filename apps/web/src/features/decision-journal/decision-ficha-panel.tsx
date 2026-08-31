@@ -88,12 +88,18 @@ export function DecisionFichaPanel({
   study,
   position,
   portfolioReconStatus,
+  entriesBlocked,
+  gateStatus,
+  orderPending,
   onClose,
   onCollapse,
 }: {
   study: DecisionJournalStudyViewV1;
   position?: PositionDto | null;
   portfolioReconStatus?: string | null;
+  entriesBlocked?: boolean;
+  gateStatus?: string | null;
+  orderPending?: boolean;
   onClose: () => void;
   onCollapse: () => void;
 }) {
@@ -134,11 +140,17 @@ export function DecisionFichaPanel({
         position,
         study,
         portfolioReconStatus,
+        orderPending,
       })
     : null;
   const entryTruth =
     !position && study.hasOperationalPlan
-      ? buildEntryOperatingTruth({ study })
+      ? buildEntryOperatingTruth({
+          study,
+          entriesBlocked,
+          gateStatus,
+          orderPendingFill: orderPending,
+        })
       : null;
 
   return (

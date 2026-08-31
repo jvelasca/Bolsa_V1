@@ -29,6 +29,7 @@ import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { PositionRoutePanel } from "@/features/mesa/position-route-panel";
+import { useInstrumentOrderPending } from "@/features/trading/use-pending-orders";
 
 function formatR(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -65,11 +66,13 @@ export function MesaPositionNextActionButton({
   const { effectiveAccountId } = useActiveAccount();
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const [error, setError] = useState<string | null>(null);
+  const orderPending = useInstrumentOrderPending(position.instrumentId);
   const truth = buildOperationalTruth({
     position,
     study,
     originStudy,
     portfolioReconStatus,
+    orderPending,
   });
   const nextAction = truth
     ? mesaNextActionFromOperationalTruth(truth)
@@ -260,12 +263,14 @@ export function MesaPositionRow({
 
   const stopForDist = protection.executed.value ?? protection.proposal.value;
   const distPct = stopDistancePct(position.lastPrice, stopForDist);
+  const orderPending = useInstrumentOrderPending(position.instrumentId);
 
   const nextAction = buildOperationalTruth({
     position,
     study,
     originStudy,
     portfolioReconStatus,
+    orderPending,
   });
   const actionLabel = nextAction
     ? nextAction.primaryCta.label
@@ -364,6 +369,7 @@ export function MesaPositionRow({
             study={study}
             originStudy={originStudy}
             portfolioReconStatus={portfolioReconStatus}
+            orderPending={orderPending}
           />
         </div>
       ) : null}

@@ -44,11 +44,16 @@ function aaplOpen(overrides: Partial<PositionDto> = {}): PositionDto {
   };
 }
 
-function fourSurfaces(position: PositionDto, recon?: string | null) {
+function fourSurfaces(
+  position: PositionDto,
+  recon?: string | null,
+  extra: { orderPending?: boolean } = {},
+) {
   const input = {
     position,
     portfolioReconStatus: recon,
     asOf: ASOF,
+    ...extra,
   };
   const mercado = buildOperationalTruth(input);
   const hoy = buildOperationalTruth(input);
@@ -76,6 +81,7 @@ describe("sameOperationalTruthAcrossSurfaces V1.37", () => {
       stopOperativo: 95,
       target1: 105,
       target2: 110,
+      executionHint: "none",
     });
     expect(operationalTruthSurfaceSnapshot(hoy!)).toEqual(snap);
     expect(operationalTruthSurfaceSnapshot(journal!)).toEqual(snap);
@@ -103,6 +109,7 @@ describe("sameOperationalTruthAcrossSurfaces V1.37", () => {
     expect(snap.ctaLabel).toBe("Reducir");
     expect(snap.ctaKind).toBe("reduce");
     expect(snap.nextEvent).toBe("T1");
+    expect(snap.executionHint).toBe("recommended_not_executed");
     expect(operationalTruthSurfaceSnapshot(hoy!)).toEqual(snap);
     expect(operationalTruthSurfaceSnapshot(journal!)).toEqual(snap);
     expect(operationalTruthSurfaceSnapshot(operaciones!)).toEqual(snap);
@@ -124,6 +131,7 @@ describe("sameOperationalTruthAcrossSurfaces V1.37", () => {
       reconHealth: "CRITICAL",
       nextEvent: "RECONCILIATION",
       asOf: ASOF,
+      executionHint: "none",
     });
     expect(operationalTruthSurfaceSnapshot(hoy!)).toEqual(snap);
     expect(operationalTruthSurfaceSnapshot(journal!)).toEqual(snap);
@@ -163,5 +171,22 @@ describe("sameOperationalTruthAcrossSurfaces V1.37", () => {
     });
     expect(pending?.executionHint).toBe("none");
     expect(formatExecutionHintCopy(pending!)).toBeNull();
+  });
+
+  it("same orderPending → same executionHint on Mercado/Hoy/Journal/Operaciones", () => {
+    const pos = aaplOpen({ lastPrice: 105 });
+    const { mercado, hoy, journal, operaciones } = fourSurfaces(pos, "ok", {
+      orderPending: true,
+    });
+    expect(mercado?.executionHint).toBe("none");
+    expect(hoy?.executionHint).toBe(mercado?.executionHint);
+    expect(journal?.executionHint).toBe(mercado?.executionHint);
+    expect(operaciones?.executionHint).toBe(mercado?.executionHint);
+    expect(formatExecutionHintCopy(mercado!)).toBeNull();
+    const open = fourSurfaces(pos, "ok", { orderPending: false });
+    expect(open.mercado?.executionHint).toBe("recommended_not_executed");
+    expect(open.hoy?.executionHint).toBe(open.mercado?.executionHint);
+    expect(open.journal?.executionHint).toBe(open.mercado?.executionHint);
+    expect(open.operaciones?.executionHint).toBe(open.mercado?.executionHint);
   });
 });

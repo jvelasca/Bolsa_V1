@@ -19,6 +19,8 @@ import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
 } from "@/features/operational-console/use-ops-self-eval";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
+import { useInstrumentOrderPending } from "@/features/trading/use-pending-orders";
 import { JournalTimeline } from "@/features/decision-journal/journal-timeline";
 import {
   DEFAULT_JOURNAL_STUDY_FILTERS,
@@ -46,6 +48,7 @@ export function DecisionJournalPage() {
   const accountScope = useActiveAccountQueryKey();
   const opsEval = useOpsSelfEval(effectiveAccountId);
   const portfolioReconStatus = portfolioReconStatusFromReport(opsEval.data);
+  const { entriesBlocked } = useMesaEntriesBlocked();
   const [searchParams] = useSearchParams();
   const isWide = useMediaQuery("(min-width: 1024px)");
   const splitPrefs = useMemo(() => loadJournalStudiesSplitPrefs(), []);
@@ -73,6 +76,9 @@ export function DecisionJournalPage() {
   const [evolutionInstrumentId, setEvolutionInstrumentId] = useState<
     string | null
   >(null);
+  const selectedOrderPending = useInstrumentOrderPending(
+    selected?.instrumentId,
+  );
 
   useEffect(() => {
     persistJournalStudiesSplitPrefs({ listWidthPct, stackHeightPct });
@@ -319,6 +325,8 @@ export function DecisionJournalPage() {
                       study={selected}
                       position={selectedPosition}
                       portfolioReconStatus={portfolioReconStatus}
+                      entriesBlocked={entriesBlocked}
+                      orderPending={selectedOrderPending}
                       onClose={() => setSelected(null)}
                       onCollapse={() => setFichaCollapsed(true)}
                     />

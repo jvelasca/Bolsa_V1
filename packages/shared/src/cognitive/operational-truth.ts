@@ -94,6 +94,7 @@ export type OperationalTruthSurfaceSnapshotV1 = {
   stopOperativo: number | null;
   target1: number | null;
   target2: number | null;
+  executionHint: OperationalTruthExecutionHintV1;
 };
 
 const ACTIONABLE_CTA = new Set<PositionExitCtaKindV1>([
@@ -208,6 +209,7 @@ export function operationalTruthSurfaceSnapshot(
     stopOperativo: truth.levels.stopOperativo,
     target1: truth.levels.target1,
     target2: truth.levels.target2,
+    executionHint: truth.executionHint,
   };
 }
 
