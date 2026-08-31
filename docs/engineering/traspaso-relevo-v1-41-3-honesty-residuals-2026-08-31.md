@@ -39,8 +39,8 @@ Confirm = firma · Spine · `PAPER_D_EXECUTE` off · AUTO execute off · `protec
 
 ## 3. Next (hoja, no implementar aquí)
 
-| Tag   | Nombre               | Notas                                                                 |
-| ----- | -------------------- | --------------------------------------------------------------------- |
-| V1.42 | Operating Excellence | ExecutionState / TradeStory / DailyDesk 2.0 / Market Cockpit — parked |
+| Tag   | Nombre               | Notas                                                                                                                                                                           |
+| ----- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1.42 | Operating Excellence | Contrato [`spec-v142-operating-excellence-2026-08-31.md`](./spec-v142-operating-excellence-2026-08-31.md) · [ADR-042](../adr/042-operating-excellence.md) — spec; código parked |
 
 Fuera: P2 Lab · móvil · push · thaw estricto · OCO · segundo Mercado · OpportunityScore · `secondaryReasons[]` · confirms individualizados.

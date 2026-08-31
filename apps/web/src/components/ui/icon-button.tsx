@@ -1,15 +1,11 @@
-import { forwardRef } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface IconButtonProps {
+interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: LucideIcon;
   title: string;
-  onClick?: () => void;
   active?: boolean;
-  disabled?: boolean;
-  className?: string;
-  type?: "button" | "submit";
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -22,6 +18,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       disabled,
       className,
       type = "button",
+      ...rest
     },
     ref,
   ) {
@@ -39,8 +36,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
           active && "bg-accent text-primary",
           className,
         )}
+        {...rest}
       >
-        <Icon className="h-3.5 w-3.5" />
+        <Icon className="h-3.5 w-3.5" aria-hidden />
       </button>
     );
   },

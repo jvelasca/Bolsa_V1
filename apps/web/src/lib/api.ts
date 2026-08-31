@@ -1223,6 +1223,65 @@ export const api = {
       }),
     ),
 
+  /**
+   * V1.33+ Estudio AUTO propose. Dry-run por defecto (`execute: false`).
+   * Execute real exige `PAPER_D_EXECUTE=1` + policy paper_auto — no usar desde Consola.
+   */
+  proposeEstudioAuto: async (body: {
+    instrumentIds: string[];
+    accountId?: string | null;
+    asOfBarDate?: string | null;
+    forceRefresh?: boolean;
+    maxCandidates?: number;
+    execute?: boolean;
+    executionPolicyId?: string | null;
+  }) => {
+    const account = body.accountId ?? getActiveAccountId();
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (account) headers["X-Account-Id"] = account;
+    const res = await fetch(
+      `${API_URL}/api/instrument-daily-opinions/auto-propose`,
+      {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({
+          instrumentIds: body.instrumentIds,
+          accountId: account ?? null,
+          asOfBarDate: body.asOfBarDate ?? null,
+          forceRefresh: body.forceRefresh ?? false,
+          maxCandidates: body.maxCandidates ?? 25,
+          execute: body.execute ?? false,
+          executionPolicyId: body.executionPolicyId ?? null,
+        }),
+      },
+    );
+    if (!res.ok) {
+      let detail: unknown;
+      try {
+        detail = await res.json();
+      } catch {
+        detail = undefined;
+      }
+      throw new ApiError(
+        formatApiErrorDetail(detail) ?? res.statusText,
+        res.status,
+      );
+    }
+    return (await res.json()) as {
+      data: {
+        planId?: string;
+        generatedAt?: string;
+        candidateCount?: number;
+        hitCount?: number;
+        executeStatus?: string;
+        skippedByReason?: Record<string, number>;
+        hitsBySource?: Record<string, number>;
+        [key: string]: unknown;
+      };
+    };
+  },
+
   /** A6 — embudo Estudio AUTO (read-only; ≠ flip execute · ≠ Radar/Hoy). */
   getEstudioAutoTelemetry: async (opts?: {
     lookbackDays?: number;

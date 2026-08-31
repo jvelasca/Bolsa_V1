@@ -1,6 +1,7 @@
 # Diseño — Mercado 2.0 (cockpit)
 
-> **AsOf:** 2026-08-27 · **Estado:** **SLICE 2 en código (V1.23)** — overlays del plan en gráfico · `InstrumentOperationalContext` · Listas Estudio-first · Operaciones filtradas · Pulso/Lab bajo «¿Por qué?».
+> **AsOf:** 2026-08-31 · **Estado:** **SLICE 2 en código (V1.23)** — overlays del plan en gráfico · `InstrumentOperationalContext` · Listas Estudio-first · Operaciones filtradas · Pulso/Lab bajo «¿Por qué?».  
+> **Contrato V1.42 (sin código):** panel derecho = **DECISIÓN** — [ADR-042](../adr/042-operating-excellence.md) · [spec](./spec-v142-operating-excellence-2026-08-31.md) §B. El chrome actual puede seguir diciendo «Operativa» hasta F5.
 > **Padre:** [`traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md`](./traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md) · [ADR-040](../adr/040-user-information-architecture.md) §9 · [ADR-041](../adr/041-operational-coherence.md).
 > **Estudio pendiente (drag / AUTO UX):** [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) — niveles en gráfico **read-only** hasta acuerdo §8.
 > **Regla:** No nuevas puertas L1. Shell dock intacto; cambia el contenido contextual.
@@ -19,7 +20,7 @@ Layout **actual** de `/trading` se conserva (no más paneles):
 ┌─────────────────────────────────────────────────────────────┐
 │ NAV · cuenta · mercado · datos · ayuda · configuración      │
 ├──────────────┬──────────────────────────────┬───────────────┤
-│ LISTAS       │           GRÁFICO            │   OPERATIVA   │
+│ LISTAS       │           GRÁFICO            │   DECISIÓN    │
 │ ¿Qué miro?   │     ¿Qué está pasando?       │  ¿Qué hago?   │
 ├──────────────┴──────────────────────────────┴───────────────┤
 │                    OPERACIONES / RESUMEN                     │
@@ -46,9 +47,11 @@ Gráfico del instrumento. Niveles del plan cuando existan: entrada, stop vigente
 
 Fuente de niveles = `OperationalPlanView` (misma proyección que Hoy / Journal). No un segundo stop.
 
-## 3. Derecha — ¿Qué hago? (Operativa)
+## 3. Derecha — ¿Qué hago? (DECISIÓN)
 
-Sustituir Pulso/dictamen/Lab como idioma principal por **una tarjeta contextual** (`OperationalPlanView`) + bloque «¿Por qué?» colapsado.
+Nombre de producto **DECISIÓN** ([ADR-042](../adr/042-operating-excellence.md)): ¿cuál es la decisión operativa sobre este activo? No Operativa, ni Asesor, ni Trading. El código V1.23 puede seguir usando el identificador `Operativa` hasta F5.
+
+Sustituir Pulso/dictamen/Lab como idioma principal por **una tarjeta contextual** (`OperationalPlanView` / truths V1.37–V1.38) + bloque «¿Por qué?» colapsado. **Una CTA primaria.**
 
 No botón BUY gigante. Stance interno puede ser BUY; el lenguaje de producto es:
 
@@ -68,6 +71,8 @@ VIGILAR → PREPARADA → DISPARADA → PROPUESTA → CONFIRMADA → POSICIÓN
 | **POSICIÓN**   | Fill · PositionState OPEN/PARTIAL/PROTECTED  | Entrada · actual · P&L · R · stop vigente · T1/T2 (tocado vs gestionado) · trailing propuesta | Mantener            | Reducir / Salir       |
 
 Confirm **sigue siendo la firma**. Preparar / Revisar navegan o abren el drawer de Confirm; no ejecutan.
+
+**V1.42 (contrato):** una sola CTA primaria. En **POSICIÓN**, Reducir/Salir son secundarias **solo si** la primaria no es ya Reducir o Salir (spec §A.7–A.8: `full_exit` urgente → Salir). Copy de T1 = «Mantener», no `T1_REACHED`.
 
 Ranking ≠ BUY. Opportunity ≠ Permission.
 
@@ -119,7 +124,7 @@ Resumen de órdenes/fills del valor (o de la cuenta si no hay valor). No duplica
 
 ## 7. Criterio de hecho (cuando se implemente)
 
-1. Seleccionar NVIDIA en Estudio deja gráfico + Operativa + plan alineados sin cambiar de página.
+1. Seleccionar NVIDIA en Estudio deja gráfico + **DECISIÓN** + plan alineados sin cambiar de página.
 2. El mismo plan se ve igual (números) en Mercado, Hoy, Journal, posición.
 3. T1 tocado no se lee como «ya reducido».
 4. Confirm es el único camino a ejecutar.

@@ -1,12 +1,16 @@
 /**
  * Ayuda → Flujo y módulos.
- * Resumen para usuario básico; fuentes en help-registry (`workflow`).
+ * Resumen para usuario básico; bloque experto en Hoy; fuentes help-registry (`workflow`).
  * @see docs/engineering/research-lifecycle.md
  * @see docs/adr/019-dual-universes-lab-vs-trading.md
  */
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
+import {
+  OperatingDeskBasicBlocks,
+  OperatingDeskExpertDetails,
+} from "@/features/help/operating-desk-help-blocks";
 import { HELP_CONTENT_AS_OF } from "@/features/help/help-registry";
 
 function RouteLink({ to, children }: { to: string; children: ReactNode }) {
@@ -37,11 +41,17 @@ export function WorkflowModulesSection() {
     <div className="space-y-5 text-sm">
       <HoyEnLaMesaBlock />
 
+      <OperatingDeskBasicBlocks />
+
+      <OperatingDeskExpertDetails />
+
       <p className="text-muted-foreground">
         Bolsa V1 combina <strong className="text-foreground">investigar</strong>{" "}
         (simular estrategias en el pasado) con{" "}
         <strong className="text-foreground">operar en demo</strong> (cuenta
-        simulada con libro contable). Todo gira en torno a una{" "}
+        simulada con libro contable). Estás en{" "}
+        <strong className="text-foreground">fase de pruebas</strong>: todo gira
+        en torno a una{" "}
         <strong className="text-foreground">cuenta activa DEMO</strong> y a dos
         universos separados: el{" "}
         <strong className="text-foreground">Laboratorio</strong> y la{" "}
@@ -177,11 +187,15 @@ export function WorkflowModulesSection() {
               </li>
             </ul>
           </ModuleCard>
-          <ModuleCard title="Operativa diaria (Trading)">
+          <ModuleCard title="Operativa diaria (mesa)">
             <ul className="list-disc space-y-1 pl-4">
               <li>
-                <RouteLink to="/trading">Trading</RouteLink> — gráficos,
-                watchlist, panel Operativa (IO, mandato).
+                <RouteLink to="/mesa">Hoy</RouteLink> — inbox del día (Daily
+                Desk). Detalles / Journal / Libro detrás de «Ver detalles».
+              </li>
+              <li>
+                <RouteLink to="/trading">Mercado</RouteLink> — terminal:
+                watchlist, gráfico, operativa (frase + CTA), operaciones.
               </li>
               <li>
                 Ayuda → <strong className="text-foreground">Watchlist</strong> —
@@ -189,11 +203,11 @@ export function WorkflowModulesSection() {
               </li>
               <li>
                 <RouteLink to="/screeners">Señales</RouteLink> — rastreadores
-                híbridos; alarmas → inbox Radar.
+                híbridos; alarmas → inbox Radar → Confirm.
               </li>
               <li>
                 <RouteLink to="/confirm">Confirmar</RouteLink> — cola F3
-                supervisada (firma humana).
+                supervisada (única firma).
               </li>
               <li>
                 <strong className="text-foreground">Libro</strong> —{" "}
@@ -263,24 +277,22 @@ export function WorkflowModulesSection() {
           inferior de Trading → clic abre Cuentas · Operativa.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          <strong className="text-foreground">Decision Spine:</strong> tesis
-          (paquete) ≠ plan (TradePlan) ≠ permiso (Confirmar /{" "}
-          <code className="text-[10px]">check_opening</code>). Ranking no es
-          BUY. Hoy sin plan = WATCH.
+          <strong className="text-foreground">En la práctica:</strong> ranking /
+          dictamen / calidad no son compra. Sin plan vivo, Hoy no inventa BUY
+          (vigilar). Confirm es la firma. Detalle de capas en el bloque
+          «Información avanzada» de Hoy (arriba).
         </p>
       </section>
 
       <section>
         <h3 className="mb-2 font-semibold">Por detrás (solo referencia)</h3>
         <p className="text-muted-foreground">
-          La app es un monorepo: interfaz React, API Python (FastAPI) y
-          PostgreSQL como fuente de verdad. Los datos de mercado entran por
-          Yahoo; las estrategias y el ledger viven en base de datos. No hace
-          falta conocer esto para usar la mesa diaria.
+          Interfaz React, API Python y PostgreSQL. Datos de mercado vía Yahoo;
+          estrategias y ledger en BD. Para arquitectura y ADRs usa el índice de
+          docs del repo — aquí no se repiten.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Docs técnicos: <code>docs/ARCHITECTURE.md</code>,{" "}
-          <code>docs/README.md</code>. Sync Ayuda {HELP_CONTENT_AS_OF}.
+          Sync Ayuda {HELP_CONTENT_AS_OF}.
         </p>
       </section>
     </div>

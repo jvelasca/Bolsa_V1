@@ -1,8 +1,15 @@
 import { Link } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { Play } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { OpsSelfEvalReport } from "@/features/operational-console/use-ops-self-eval";
 import type { EstudioAutoTelemetry } from "@/features/operational-console/use-estudio-auto-telemetry";
+import { fetchEstudioInstrumentIds } from "@/features/trading/estudio-membership";
+import { api } from "@/lib/api";
+import { formatDateTimeCompact } from "@/lib/format";
 
 function markClasses(mark: string): string {
   if (mark === "PASS") {
@@ -294,13 +301,49 @@ export function OpsRuntimeSection({
 
 export function OpsEstudioAutoSection({
   report,
+  accountId,
   isLoading,
   isError,
+  onDryRunComplete,
 }: {
   report: EstudioAutoTelemetry | undefined;
+  accountId?: string | null;
   isLoading?: boolean;
   isError?: boolean;
+  onDryRunComplete?: () => void;
 }) {
+  const [dryRunMsg, setDryRunMsg] = useState<string | null>(null);
+
+  const dryRunMutation = useMutation({
+    mutationFn: async () => {
+      const ids = (await fetchEstudioInstrumentIds()).slice(0, 100);
+      if (ids.length === 0) {
+        throw new Error(
+          "Estudio vacío — añade instrumentos antes del dry-run AUTO.",
+        );
+      }
+      return api.proposeEstudioAuto({
+        instrumentIds: ids,
+        accountId: accountId ?? undefined,
+        execute: false,
+        maxCandidates: 25,
+      });
+    },
+    onSuccess: (res) => {
+      const d = res.data;
+      const hits = d.hitCount ?? 0;
+      const cands = d.candidateCount ?? 0;
+      const status = d.executeStatus ?? "dry_run";
+      setDryRunMsg(
+        `Dry-run OK · ${status} · ${hits} hit(s) / ${cands} cand. · no execute`,
+      );
+      onDryRunComplete?.();
+    },
+    onError: (err: Error) => {
+      setDryRunMsg(err.message || "Dry-run falló.");
+    },
+  });
+
   if (isLoading) {
     return (
       <Card data-testid="ops-estudio-auto-section">
@@ -323,10 +366,19 @@ export function OpsEstudioAutoSection({
             Telemetría A6 · Estudio AUTO
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             Sin embudo A6. Measure ≠ ampliar Radar/Hoy.
           </p>
+          <DryRunControls
+            disabled={!accountId || dryRunMutation.isPending}
+            pending={dryRunMutation.isPending}
+            message={dryRunMsg}
+            onRun={() => {
+              setDryRunMsg(null);
+              dryRunMutation.mutate();
+            }}
+          />
         </CardContent>
       </Card>
     );
@@ -334,7 +386,7 @@ export function OpsEstudioAutoSection({
 
   const { funnel, gates, lastPropose, edgeReport, recentProposes } = report;
   const skipped = Object.entries(lastPropose?.skippedByReason ?? {});
-  const recentCount = recentProposes?.length ?? 0;
+  const recent = recentProposes ?? [];
   const durabilityLabel =
     lastPropose?.durability === "jsonl"
       ? "persistido JSONL"
@@ -349,8 +401,13 @@ export function OpsEstudioAutoSection({
           Telemetría A6 · Estudio AUTO
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
+      <CardContent className="space-y-3 text-sm">
         <p className="text-xs text-muted-foreground">{report.rule}</p>
+        <p className="text-xs text-muted-foreground">
+          Dry-run ≠ execute. Arm «ACTIVAR AUTO» ≠{" "}
+          <code className="text-[0.7rem]">PAPER_D_EXECUTE</code> (off por
+          defecto).
+        </p>
         <p
           className={cn(
             "inline-flex rounded-md border px-2 py-1 font-medium",
@@ -400,14 +457,129 @@ export function OpsEstudioAutoSection({
               : ""}
             {" · "}
             {durabilityLabel}
-            {recentCount > 1 ? ` · ${recentCount} en histórico` : ""}
+            {recent.length > 1 ? ` · ${recent.length} en histórico` : ""}
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Sin lastPropose — corre POST auto-propose dry-run en esta API.
+            Sin lastPropose — usa el botón dry-run abajo.
           </p>
         )}
+
+        <DryRunControls
+          disabled={!accountId || dryRunMutation.isPending}
+          pending={dryRunMutation.isPending}
+          message={dryRunMsg}
+          onRun={() => {
+            setDryRunMsg(null);
+            dryRunMutation.mutate();
+          }}
+        />
+
+        <RecentProposesTable rows={recent} />
       </CardContent>
     </Card>
+  );
+}
+
+function DryRunControls({
+  disabled,
+  pending,
+  message,
+  onRun,
+}: {
+  disabled: boolean;
+  pending: boolean;
+  message: string | null;
+  onRun: () => void;
+}) {
+  return (
+    <div className="space-y-1.5" data-testid="ops-a6-dryrun-controls">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        onClick={onRun}
+        data-testid="ops-a6-dryrun-cta"
+      >
+        <Play className="h-3.5 w-3.5" />
+        {pending ? "Corriendo dry-run…" : "Correr auto-propose (dry-run)"}
+      </Button>
+      {message ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="ops-a6-dryrun-msg"
+        >
+          {message}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Solo mide candidatos/hits Estudio. No firma Confirm ni ejecuta paper.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function RecentProposesTable({
+  rows,
+}: {
+  rows: NonNullable<EstudioAutoTelemetry>["recentProposes"];
+}) {
+  if (!rows.length) {
+    return (
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid="ops-a6-recent-empty"
+      >
+        Histórico vacío — corre un dry-run para poblar JSONL.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto" data-testid="ops-a6-recent-table">
+      <table className="w-full min-w-[28rem] border-collapse text-left text-xs">
+        <thead>
+          <tr className="border-b border-border text-muted-foreground">
+            <th className="py-1 pr-2 font-medium">AsOf</th>
+            <th className="py-1 pr-2 font-medium">Status</th>
+            <th className="py-1 pr-2 font-medium tabular-nums">Hits</th>
+            <th className="py-1 pr-2 font-medium tabular-nums">Cand.</th>
+            <th className="py-1 font-medium">Skip</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, idx) => {
+            const skip = Object.entries(row.skippedByReason ?? {})
+              .map(([k, n]) => `${k}×${n}`)
+              .join(", ");
+            const key = `${row.planId ?? "p"}-${row.generatedAt ?? idx}`;
+            return (
+              <tr
+                key={key}
+                className="border-b border-border/60 tabular-nums"
+                data-testid="ops-a6-recent-row"
+              >
+                <td className="py-1 pr-2 whitespace-nowrap">
+                  {row.generatedAt
+                    ? formatDateTimeCompact(row.generatedAt)
+                    : "—"}
+                </td>
+                <td className="py-1 pr-2">{row.executeStatus ?? "—"}</td>
+                <td className="py-1 pr-2">{row.hitCount}</td>
+                <td className="py-1 pr-2">{row.candidateCount}</td>
+                <td
+                  className="py-1 max-w-[10rem] truncate"
+                  title={skip || undefined}
+                >
+                  {skip || "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

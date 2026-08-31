@@ -18,6 +18,10 @@ import { DataCaptureSection } from "@/features/settings/data-capture-section";
 import { WatchlistHelpSection } from "@/features/settings/watchlist-help-section";
 import { HelpSourcesFooter } from "@/features/help/help-sources-footer";
 import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
+import {
+  OperatingDeskBasicBlocks,
+  OperatingDeskExpertDetails,
+} from "@/features/help/operating-desk-help-blocks";
 import { WorkflowModulesSection } from "@/features/help/workflow-modules-section";
 import {
   HELP_CONTENT_AS_OF,
@@ -95,50 +99,22 @@ function GuideContent() {
     <div className="space-y-5 text-sm">
       <HoyEnLaMesaBlock />
 
+      <OperatingDeskBasicBlocks showNav />
+
+      <OperatingDeskExpertDetails />
+
       <p className="text-muted-foreground">
         Bolsa V1 es una plataforma personal de gestión bursátil con terminal de
         trading, cuentas simuladas, ledger contable y fiscal. Todo el patrimonio
         y las operaciones se gestionan por <strong>cuenta de inversión</strong>{" "}
-        (modelo estilo XTB). Para el recorrido completo (Laboratorio → Trading)
-        y el mapa de módulos, abre{" "}
+        (modelo estilo XTB). Estás en{" "}
+        <strong className="text-foreground">
+          fase de pruebas (BETA / demo)
+        </strong>
+        . Para el mapa Laboratorio → mesa y módulos, abre{" "}
         <strong className="text-foreground">Flujo y módulos</strong> en esta
         ventana.
       </p>
-
-      <section>
-        <h3 className="mb-2 font-semibold">Navegación principal</h3>
-        <ul className="space-y-2 text-muted-foreground">
-          <li>
-            <strong>← →</strong> — historial de navegación SPA.
-          </li>
-          <li>
-            <RouteLink to="/mesa">Hoy</RouteLink> — ¿Qué debo hacer hoy?
-            (resumen, posiciones, oportunidades, decisiones, confirmar,
-            journal).
-          </li>
-          <li>
-            <RouteLink to="/trading">Mercado</RouteLink> — Terminal (watchlist,
-            gráfico, operaciones, operativa). Menú: Señales, Instrumentos,
-            Alertas.
-          </li>
-          <li>
-            <strong className="text-foreground">Cartera</strong> — Posiciones,
-            órdenes, <RouteLink to="/history">Historial</RouteLink>, riesgo.
-          </li>
-          <li>
-            <RouteLink to="/research">Asesor</RouteLink> — Dictamen / diario /
-            ledger (explica, no firma).
-          </li>
-          <li>
-            <RouteLink to="/backtests">Laboratorio</RouteLink> — Simulaciones y
-            estudios.
-          </li>
-          <li>
-            🔔 Alertas · ? Ayuda · ⚙ Configuración (Cuentas, Overview, Fiscal,
-            Consola avanzada).
-          </li>
-        </ul>
-      </section>
 
       <section>
         <h3 className="mb-2 font-semibold">Más pantallas</h3>
@@ -156,6 +132,10 @@ function GuideContent() {
             <RouteLink to="/backtests">Laboratorio</RouteLink> — Simulaciones
             históricas (alias Backtesting). Guía en Ayuda →{" "}
             <strong className="text-foreground">Backtesting</strong>.
+          </li>
+          <li>
+            🔔 Alertas · ? Ayuda · ⚙ Configuración (Cuentas, Overview, Fiscal,
+            Consola avanzada).
           </li>
         </ul>
       </section>
@@ -213,7 +193,7 @@ function GuideContent() {
           </li>
           <li>
             <strong>Grupo tras separador</strong> — Flechas ← → (historial). En
-            Trading, además: watchlist, operaciones y restablecer paneles.
+            Mercado, además: watchlist, operaciones y restablecer paneles.
           </li>
           <li>
             <strong>Chip del espacio</strong> — Nombre (punto ámbar =
@@ -239,7 +219,7 @@ function GuideContent() {
         <h3 className="mb-2 font-semibold">Cuenta activa</h3>
         <p className="text-muted-foreground">
           El selector de cuenta está en la{" "}
-          <strong className="text-foreground">barra inferior</strong> (Trading /
+          <strong className="text-foreground">barra inferior</strong> (Mercado /
           Operaciones) y en Configuración. Define patrimonio, trades y fiscal.
           No está en la barra superior.
         </p>
@@ -328,11 +308,53 @@ function AccountsContent() {
         <h3 className="mb-2 font-semibold text-foreground">
           Movimientos de efectivo
         </h3>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            Pestaña <em>Movimientos</em>: botones{" "}
+            <strong className="text-foreground">Depósito</strong> y{" "}
+            <strong className="text-foreground">Retirada</strong> (mismo tamaño
+            que Confirmar) para capital externo simulado.
+          </li>
+          <li>
+            Cada fila del libro muestra{" "}
+            <strong className="text-foreground">fecha y hora</strong> (y saldo
+            posterior cuando aplica).
+          </li>
+          <li>
+            Iconos de exportar →{" "}
+            <strong className="text-foreground">CSV</strong> o{" "}
+            <strong className="text-foreground">JSON</strong> (hasta 500
+            movimientos).
+          </li>
+        </ul>
+      </section>
+      <section>
+        <h3 className="mb-2 font-semibold text-foreground">
+          Modo de operativa (Configuración)
+        </h3>
         <p>
-          En la pestaña <em>Movimientos</em> del detalle de cuenta: depósitos y
-          retiradas externas (simulan capital que entra o sale de la cuenta
-          demo).
+          En la pestaña <em>Configuración</em> de la cuenta activa:{" "}
+          <strong className="text-foreground">MANUAL</strong> (tú operas),{" "}
+          <strong className="text-foreground">SEMI</strong> (recomendado: la app
+          propone, firmas en Confirmar) y{" "}
+          <strong className="text-foreground">AUTO</strong> (BETA; armado +
+          execute opt-in). Aplica a toda la cuenta, no al panel de cada valor.
         </p>
+      </section>
+      <section>
+        <h3 className="mb-2 font-semibold text-foreground">
+          Barra lateral (administración)
+        </h3>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong className="text-foreground">Perfiles</strong> — abre el
+            catálogo de perfiles de inversor (Configuración).
+          </li>
+          <li>
+            <strong className="text-foreground">Estadísticas</strong> — acceso
+            preparado para la cartera en curso (próximamente).
+          </li>
+        </ul>
       </section>
       <section>
         <h3 className="mb-2 font-semibold text-foreground">
@@ -371,10 +393,15 @@ function AccountsContent() {
 function TradingContent() {
   return (
     <div className="space-y-4 text-sm text-muted-foreground">
+      <OperatingDeskBasicBlocks />
+      <OperatingDeskExpertDetails />
+
       <p>
-        El workspace de <RouteLink to="/trading">Trading</RouteLink> combina
+        El terminal <RouteLink to="/trading">Mercado</RouteLink> combina
         gráficos multi-timeframe, watchlist y operativa sobre la{" "}
-        <strong className="text-foreground">cuenta activa DEMO</strong>.
+        <strong className="text-foreground">cuenta activa DEMO</strong>. Hoy (
+        <RouteLink to="/mesa">/mesa</RouteLink>) es el inbox; Confirm es la
+        firma.
       </p>
       <section>
         <h3 className="mb-2 font-semibold text-foreground">Panel Operativa</h3>
@@ -501,24 +528,9 @@ function TradingContent() {
             suelto.
           </li>
         </ul>
-        <p className="mt-2">
-          Docs:{" "}
-          <code className="text-[0.85em]">
-            docs/adr/020-operating-mandate-tenure.md
-          </code>{" "}
-          ·{" "}
-          <code className="text-[0.85em]">
-            docs/adr/024-estudio-supervision-universe.md
-          </code>{" "}
-          ·{" "}
-          <code className="text-[0.85em]">
-            docs/engineering/trading-operativa-panel-2026-08-04.md
-          </code>{" "}
-          ·{" "}
-          <code className="text-[0.85em]">
-            docs/engineering/estudio-process-status-ui-2026-08-06.md
-          </code>
-          .
+        <p className="mt-2 text-xs">
+          Detalle de mandato y Estudio: pie de fuentes de esta sección (sin
+          repetir ADRs aquí).
         </p>
       </section>
       <section>
@@ -789,7 +801,8 @@ function AboutContent() {
       <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-muted-foreground">
         <p className="text-xs uppercase tracking-wide">Modo actual</p>
         <p className="mt-1">
-          Cuentas simuladas · Sin conexión a broker real · Datos Yahoo Finance
+          Fase de pruebas · tip v1.41.3-beta · Cuentas simuladas · Sin broker
+          live por defecto · Datos Yahoo Finance · AUTO execute off
         </p>
       </div>
       <div>

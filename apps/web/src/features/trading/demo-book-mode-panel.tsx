@@ -37,9 +37,16 @@ import {
 } from "@/features/trading/demo-book-prefs";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 
-const MODE_LABEL: Record<Exclude<DemoBookMode, "auto">, string> = {
-  manual: "Manual",
-  semi: "Semi",
+const MODE_LABEL: Record<DemoBookMode, string> = {
+  manual: "MANUAL",
+  semi: "SEMI",
+  auto: "AUTO",
+};
+
+const MODE_HINT: Record<DemoBookMode, string> = {
+  manual: "Tú operas desde el gráfico; sin cola de propuestas.",
+  semi: "La app propone; firmas en Confirmar (recomendado).",
+  auto: "BETA: armar con frase; execute solo con PAPER_D_EXECUTE.",
 };
 
 const GEO_LABEL: Record<DemoBookCountryPrefer, string> = {
@@ -125,72 +132,132 @@ export function DemoBookModePanel({ className, compact }: Props) {
 
   const killOn = Boolean(killQ.data?.effective);
 
+  const modeButtonClass = (active: boolean) =>
+    compact
+      ? cn(
+          "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
+          active
+            ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
+            : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+        )
+      : cn(
+          "flex min-w-[6.5rem] flex-1 flex-col items-stretch gap-0.5 rounded-md border px-3 py-2 text-left transition-colors",
+          active
+            ? "border-emerald-500 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200"
+            : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+        );
+
   return (
     <div
       className={cn(
-        "space-y-2 rounded-md border border-border/80 bg-muted/20 p-2 text-[11px]",
+        "space-y-2 rounded-md border border-border/80 bg-muted/20 p-2",
+        compact ? "text-[11px]" : "text-sm",
         className,
       )}
       data-testid="demo-book-mode-panel"
     >
-      <p className="font-medium text-foreground" title={accountTitle}>
-        <span className="line-clamp-2">{accountTitle}</span>
-        {!compact ? (
-          <span className="ml-1 font-normal text-muted-foreground">
-            · operativa
-          </span>
-        ) : null}
-      </p>
-      <div className="flex flex-wrap gap-1">
+      {!compact ? (
+        <div className="space-y-0.5">
+          <p className="text-sm font-semibold text-foreground">
+            Modo de operativa
+          </p>
+          <p className="text-xs text-muted-foreground">
+            En SEMI la app propone; tú firmas. Nunca se envían órdenes solas.
+          </p>
+        </div>
+      ) : (
+        <p className="font-medium text-foreground" title={accountTitle}>
+          <span className="line-clamp-2">{accountTitle}</span>
+        </p>
+      )}
+      {!compact ? (
+        <p className="text-xs text-muted-foreground" title={accountTitle}>
+          Cuenta: <span className="text-foreground">{accountTitle}</span>
+        </p>
+      ) : null}
+      <div
+        className={cn("flex flex-wrap", compact ? "gap-1" : "gap-2")}
+        role="group"
+        aria-label="Modo de operativa"
+      >
         {(["manual", "semi"] as const).map((mode) => {
           const active = prefs.mode === mode;
           return (
             <button
               key={mode}
               type="button"
-              title={
-                mode === "manual"
-                  ? "Solo avisos · sin Confirm automático"
-                  : "Propuestas → Confirm F3 → DEMO"
-              }
+              title={MODE_HINT[mode]}
               onClick={() => selectNonAuto(mode)}
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
-                active
-                  ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
-                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
-              )}
+              className={modeButtonClass(active)}
+              data-testid={`demo-book-mode-${mode}`}
+              aria-pressed={active}
             >
-              {MODE_LABEL[mode]}
+              <span
+                className={cn(
+                  "font-semibold tracking-wide",
+                  compact ? "text-[10px]" : "text-sm",
+                )}
+              >
+                {MODE_LABEL[mode]}
+              </span>
+              {!compact ? (
+                <span className="text-[11px] font-normal leading-snug text-muted-foreground">
+                  {MODE_HINT[mode]}
+                </span>
+              ) : null}
             </button>
           );
         })}
         {DEMO_BOOK_AUTO_UI_ENABLED ? (
           <button
             type="button"
-            title={DEMO_BOOK_AUTO_TOOLTIP}
+            title={MODE_HINT.auto}
             data-testid="demo-book-auto-pill"
             onClick={() => requestAutoMode()}
-            className={cn(
-              "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
-              prefs.mode === "auto"
-                ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
-            )}
+            className={modeButtonClass(prefs.mode === "auto")}
+            aria-pressed={prefs.mode === "auto"}
           >
-            Auto
+            <span
+              className={cn(
+                "font-semibold tracking-wide",
+                compact ? "text-[10px]" : "text-sm",
+              )}
+            >
+              {MODE_LABEL.auto}
+            </span>
+            {!compact ? (
+              <span className="text-[11px] font-normal leading-snug text-muted-foreground">
+                {MODE_HINT.auto}
+              </span>
+            ) : null}
           </button>
         ) : (
           <span
-            className="cursor-default rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground/70"
+            className={cn(
+              modeButtonClass(false),
+              "cursor-default border-dashed opacity-70",
+            )}
             data-testid="demo-book-auto-unavailable"
             title={DEMO_BOOK_AUTO_TOOLTIP}
           >
-            AUTO · {DEMO_BOOK_AUTO_UNAVAILABLE_LABEL}
+            <span className="font-semibold tracking-wide">
+              AUTO · {DEMO_BOOK_AUTO_UNAVAILABLE_LABEL}
+            </span>
           </span>
         )}
       </div>
 
+      {!compact && prefs.mode ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="demo-book-mode-active-hint"
+        >
+          Activo:{" "}
+          <strong className="text-foreground">{MODE_LABEL[prefs.mode]}</strong>
+          {" — "}
+          {MODE_HINT[prefs.mode]}
+        </p>
+      ) : null}
       {armOpen ? (
         <div
           className="space-y-1.5 rounded border border-amber-500/40 bg-amber-500/10 p-2"

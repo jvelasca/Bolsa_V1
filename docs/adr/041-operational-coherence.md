@@ -21,7 +21,7 @@
 ### 1.2 Una OPERACIÓN visual
 
 - Proyección `OperationalPlanView` (no entidad nueva) alimentada por TradePlan/study o PositionState.
-- Mismo bloque en Hoy, ficha Journal, drawer de oportunidad y ruta de posición. Destino de producto (diseño V1.22, no recableado aún): también Mercado · Operativa.
+- Mismo bloque en Hoy, ficha Journal, drawer de oportunidad y ruta de posición. Destino de producto: Mercado · panel **DECISIÓN** ([ADR-042](./042-operating-excellence.md); código V1.42 parked). El shell actual puede seguir etiquetando «Operativa» hasta F5.
 - `TradePlan.entry` sigue siendo un precio único (no inventar rangos).
 
 ### 1.3 Stop vigente único
@@ -51,6 +51,17 @@ Cuenta activa = contexto en header (selector compacto de demos diarias).
 - No borrar seed en migración; limpieza = cerrar + purge cerradas.
 - Acción segura «Cerrar extras de desarrollo»: simulated activas ≠ seed, `positionsCount === 0`; Paper sin bulk.
 
+### 1.6 Enmienda V1.42 — panel DECISIÓN (contrato; código parked)
+
+**Fecha:** 2026-08-31 · **Norma:** [ADR-042](./042-operating-excellence.md) · [spec V1.42](../engineering/spec-v142-operating-excellence-2026-08-31.md) §B.
+
+- El panel derecho de Mercado se llama **DECISIÓN**: ¿cuál es la decisión operativa sobre este activo?
+- No se llama Operativa, Asesor ni Trading. No absorbe Hoy, Journal ni Decision Spine.
+- Hoy permanece command center (cuatro cubos: requiere acción / oportunidades / vigilar / sin acción). Mercado permanece terminal.
+- Una CTA primaria por activo. `full_exit` urgente no queda oculta por discrepancia de protección.
+- Proyecciones de lectura `ExecutionState` / `PositionOperatingTruth` / `TradeStory`: no motores, no tablas. `OperationalTruth` se compone, no se sustituye.
+- Implementación = F5/F6 del spec §D. Este ADR no autoriza código en el slice de contrato.
+
 ---
 
 ## 2. Freeze (heredado)
@@ -64,3 +75,4 @@ Confirm = firma · `PAPER_D_EXECUTE` off · AUTO off · Ranking ≠ BUY · LLM n
 - Tests: `DAILY-OPS-UNIVERSE-001/002`, OP-03…08 · H1 intersección Estudio · H2 touched vs managed.
 - Enmienda ADR-040 §2 / §7 / **§8 (V1.22)**.
 - Docs: `CURRENT_SYSTEM.md`, `domain-language.md`, relevo V1.21, relevo [V1.22 freeze](../engineering/traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md).
+- Enmienda §1.6 (V1.42 contrato): panel **DECISIÓN** · [ADR-042](./042-operating-excellence.md).

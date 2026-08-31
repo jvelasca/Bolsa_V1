@@ -80,11 +80,27 @@ describe("DemoBookModePanel A3-wire", () => {
     fireEvent.click(screen.getByTestId("demo-book-auto-arm-confirm"));
     expect(loadDemoBookPrefs().mode).toBe("auto");
 
-    fireEvent.click(screen.getByRole("button", { name: "Semi" }));
+    fireEvent.click(screen.getByRole("button", { name: /SEMI/i }));
     expect(loadDemoBookPrefs().mode).toBe("semi");
 
     fireEvent.click(screen.getByTestId("demo-book-auto-pill"));
     expect(screen.getByTestId("demo-book-auto-arm-form")).toBeTruthy();
     expect(loadDemoBookPrefs().mode).toBe("semi");
+  });
+
+  it("shows MANUAL / SEMI / AUTO labels with mode hints", () => {
+    renderPanel();
+    expect(screen.getByTestId("demo-book-mode-manual").textContent).toMatch(
+      /MANUAL/,
+    );
+    expect(screen.getByTestId("demo-book-mode-semi").textContent).toMatch(
+      /SEMI/,
+    );
+    expect(screen.getByTestId("demo-book-auto-pill").textContent).toMatch(
+      /AUTO/,
+    );
+    expect(
+      screen.getByTestId("demo-book-mode-active-hint").textContent,
+    ).toMatch(/firmas en Confirmar/i);
   });
 });

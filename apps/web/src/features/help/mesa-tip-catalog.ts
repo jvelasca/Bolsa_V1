@@ -42,9 +42,9 @@ export const MESA_TIPS: Record<MesaTipId, MesaTip> = {
   "operativa-recomendacion": {
     id: "operativa-recomendacion",
     title: "Recomendación (Operativa)",
-    body: "Pulso IO/TA/FA, dictamen y TOP #1 del Lab para el valor activo. Úsalo para decidir si Proponer F3. No sustituye la firma humana en Confirmar.",
+    body: "Frase y CTA del valor activo (entrada o posición): misma lectura que en Hoy y Journal. IO/TA/FA y TOP #1 orientan; no sustituyen Confirm. Ranking ≠ compra. Si hay entradas bloqueadas o Gate en veto, no uses atajos de comprar.",
     linkTo: "/trading",
-    linkLabel: "Ir a Trading",
+    linkLabel: "Ir a Mercado",
   },
   "operativa-confirm-drawer": {
     id: "operativa-confirm-drawer",

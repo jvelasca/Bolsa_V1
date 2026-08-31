@@ -125,8 +125,12 @@ export function OperationalConsolePage() {
         <OpsSelfEvalSection report={report} />
         <OpsEstudioAutoSection
           report={a6}
+          accountId={effectiveAccountId}
           isLoading={a6Query.isLoading}
           isError={a6Query.isError}
+          onDryRunComplete={() => {
+            void a6Query.refetch();
+          }}
         />
         <OpsReconSection report={report} />
         {effectiveAccountId ? (

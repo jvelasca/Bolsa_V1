@@ -15,7 +15,7 @@ export const DEMO_BOOK_AUTO_UNAVAILABLE_LABEL = "No disponible";
 
 /** Tooltip de mesa — Libro AUTO condicionado. */
 export const DEMO_BOOK_AUTO_TOOLTIP =
-  "Libro AUTO (BETA-D): escribe «ACTIVAR AUTO» para armar; execute solo con PAPER_D_EXECUTE=1. Misma disciplina SEMI (TradePlan) sin Confirm.";
+  "Libro AUTO (BETA-D): escribe «ACTIVAR AUTO» para armar; execute solo con PAPER_D_EXECUTE=1. Dry-run A6 en Consola ops no ejecuta. Misma disciplina SEMI (TradePlan) sin Confirm.";
 
 /** Líneas de riesgo del panel. */
 export const DEMO_BOOK_AUTO_RISK_LINES = [

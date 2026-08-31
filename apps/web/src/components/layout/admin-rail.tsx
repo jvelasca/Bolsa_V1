@@ -1,21 +1,24 @@
 /**
  * AdminRail — barra administrativa icon-first (V1.21+).
  * Por defecto solo iconos (mínimo ancho); al hover se descolapsa el texto.
- * No es navegación diaria de producto. Overview / Cuentas / Fiscal / Consola.
+ * No es navegación diaria de producto. Overview / Cuentas / Perfiles /
+ * Estadísticas (preparado) / Fiscal / Consola.
  *
  * @see docs/adr/040-user-information-architecture.md (enmienda V1.21)
  * @see docs/adr/041-operational-coherence.md
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { NavLink } from "react-router-dom";
 import {
   BarChart3,
   Briefcase,
   LayoutDashboard,
+  PieChart,
   Pin,
   PinOff,
   Receipt,
+  UserCircle,
   Wrench,
 } from "lucide-react";
 import {
@@ -23,35 +26,69 @@ import {
   OPERATIONAL_CONSOLE_PATH,
 } from "@/features/confirm/daily-nav";
 import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
 
 const STORAGE_KEY = "bolsa-admin-rail-pinned";
 
-const ADMIN_ITEMS = [
+type AdminNavItem = {
+  kind: "nav";
+  id: string;
+  label: string;
+  href: string;
+  icon: ComponentType<{ className?: string }>;
+  hint: string;
+};
+
+type AdminActionItem = {
+  kind: "action";
+  id: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  hint: string;
+  /** Si true, solo preparado (próximamente). */
+  stub?: boolean;
+  onClick: () => void;
+};
+
+type AdminItem = AdminNavItem | AdminActionItem;
+
+const NAV_ITEMS: AdminNavItem[] = [
   {
+    kind: "nav",
+    id: "overview",
     label: "Overview",
     href: "/overview",
     icon: LayoutDashboard,
     hint: "Resumen de cuenta y atajos",
   },
   {
+    kind: "nav",
+    id: "accounts",
     label: "Cuentas",
     href: "/accounts",
     icon: Briefcase,
     hint: "Hub de cuentas e operativa",
   },
+];
+
+const TRAILING_NAV: AdminNavItem[] = [
   {
+    kind: "nav",
+    id: "fiscal",
     label: "Fiscal",
     href: "/fiscal",
     icon: Receipt,
     hint: "Plusvalías y ejercicio",
   },
   {
+    kind: "nav",
+    id: "operational-console",
     label: OPERATIONAL_CONSOLE_LABEL,
     href: OPERATIONAL_CONSOLE_PATH,
     icon: Wrench,
     hint: "Diagnóstico operativo",
   },
-] as const;
+];
 
 function loadPinned(): boolean {
   try {
@@ -61,10 +98,44 @@ function loadPinned(): boolean {
   }
 }
 
+const railButtonClass = (expanded: boolean, active?: boolean) =>
+  cn(
+    "flex w-full items-center gap-2 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground",
+    !expanded && "justify-center px-1.5",
+    active && "bg-accent text-primary",
+  );
+
 export function AdminRail() {
   const [pinned, setPinned] = useState(loadPinned);
   const [hovered, setHovered] = useState(false);
   const expanded = pinned || hovered;
+  const openPlatformConfig = useUiStore((s) => s.openPlatformConfig);
+
+  const actionItems: AdminActionItem[] = [
+    {
+      kind: "action",
+      id: "investor-profiles",
+      label: "Perfiles",
+      icon: UserCircle,
+      hint: "Catálogo de perfiles de inversor",
+      onClick: () => openPlatformConfig("investor-profile"),
+    },
+    {
+      kind: "action",
+      id: "portfolio-stats",
+      label: "Estadísticas",
+      icon: PieChart,
+      hint: "Estadísticas de la cartera en curso (próximamente)",
+      stub: true,
+      onClick: () => {
+        window.alert(
+          "Estadísticas de la cartera: próximamente. El acceso queda preparado en esta barra.",
+        );
+      },
+    },
+  ];
+
+  const items: AdminItem[] = [...NAV_ITEMS, ...actionItems, ...TRAILING_NAV];
 
   useEffect(() => {
     try {
@@ -122,24 +193,53 @@ export function AdminRail() {
         className="flex flex-1 flex-col gap-0.5 p-1.5"
         aria-label="Administración"
       >
-        {ADMIN_ITEMS.map((item) => (
-          <NavLink
-            key={item.href}
-            to={item.href}
-            title={item.hint}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground",
-                !expanded && "justify-center px-1.5",
-                isActive && "bg-accent text-primary",
-              )
-            }
-            data-testid={`admin-rail-${item.href.replace(/^\//, "")}`}
-          >
-            <item.icon className="h-4 w-4 shrink-0" />
-            {expanded ? <span className="truncate">{item.label}</span> : null}
-          </NavLink>
-        ))}
+        {items.map((item) => {
+          if (item.kind === "nav") {
+            return (
+              <NavLink
+                key={item.id}
+                to={item.href}
+                title={item.hint}
+                className={({ isActive }) =>
+                  railButtonClass(expanded, isActive)
+                }
+                data-testid={`admin-rail-${item.id}`}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                {expanded ? (
+                  <span className="truncate">{item.label}</span>
+                ) : null}
+              </NavLink>
+            );
+          }
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              title={item.hint}
+              onClick={item.onClick}
+              className={cn(
+                railButtonClass(expanded),
+                item.stub && "opacity-80",
+              )}
+              data-testid={`admin-rail-${item.id}`}
+              aria-disabled={item.stub ? true : undefined}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              {expanded ? (
+                <span className="truncate">
+                  {item.label}
+                  {item.stub ? (
+                    <span className="ml-1 text-[10px] text-muted-foreground">
+                      · pronto
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </nav>
 
       <button

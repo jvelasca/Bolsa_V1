@@ -54,6 +54,11 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
     label: "Guía de la aplicación",
     kind: "guide",
     sources: [
+      {
+        path: "apps/web/src/features/help/operating-desk-help.ts",
+        role: "tracker",
+        note: "Mesa diaria: resumen básico + experto (fase pruebas)",
+      },
       { path: "docs/HELP.md", role: "doc", note: "Mapa Ayuda ↔ trackers" },
       { path: "docs/ONBOARDING.md", role: "doc" },
       { path: "docs/UI_PLATFORM.md", role: "doc" },
@@ -64,6 +69,11 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
     label: "Flujo y módulos",
     kind: "guide",
     sources: [
+      {
+        path: "apps/web/src/features/help/operating-desk-help.ts",
+        role: "tracker",
+        note: "Hoy · Mercado · Confirm · honestidad operativa",
+      },
       {
         path: "docs/engineering/research-lifecycle.md",
         role: "doc",
@@ -117,6 +127,11 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
     label: "Trading y gráficos",
     kind: "guide",
     sources: [
+      {
+        path: "apps/web/src/features/help/operating-desk-help.ts",
+        role: "tracker",
+        note: "Resumen básico + experto (fase pruebas v1.41.3)",
+      },
       { path: "docs/CHART_DATA_BAR.md", role: "doc" },
       {
         path: "docs/engineering/research-radar-unification-2026-07-31.md",

@@ -21,11 +21,16 @@ vi.mock("@/lib/api", () => ({
   api: {
     getOpsSelfEval: vi.fn(),
     getEstudioAutoTelemetry: vi.fn(),
+    proposeEstudioAuto: vi.fn(),
     getDecisionBoard: vi.fn(),
     getActiveOperationalIncidents: vi.fn(),
     resolveOperationalIncident: vi.fn(),
     clearOperationalIncident: vi.fn(),
   },
+}));
+
+vi.mock("@/features/trading/estudio-membership", () => ({
+  fetchEstudioInstrumentIds: vi.fn(async () => ["inst-1", "inst-2"]),
 }));
 
 import { api } from "@/lib/api";
@@ -125,7 +130,18 @@ describe("OperationalConsolePage", () => {
           source: "oe1_auto_lane",
         },
         lastPropose: null,
-        recentProposes: [],
+        recentProposes: [
+          {
+            generatedAt: "2026-08-31T10:00:00Z",
+            planId: "edo_1",
+            candidateCount: 5,
+            hitCount: 1,
+            executeStatus: "dry_run",
+            skippedByReason: { no_tradeplan: 2 },
+            hitsBySource: { estudio_alarma: 1 },
+            durability: "jsonl",
+          },
+        ],
         gates: {
           expandSourcesReady: false,
           sourcesShouldContract: true,
@@ -134,6 +150,14 @@ describe("OperationalConsolePage", () => {
           blockers: ["p1_p5_not_green"],
         },
         caveats: [],
+      },
+    } as never);
+    vi.mocked(api.proposeEstudioAuto).mockResolvedValue({
+      data: {
+        planId: "edo_test",
+        executeStatus: "dry_run",
+        hitCount: 0,
+        candidateCount: 2,
       },
     } as never);
     vi.mocked(api.getDecisionBoard).mockResolvedValue({
@@ -218,5 +242,33 @@ describe("OperationalConsolePage", () => {
       ),
     );
     expect(screen.getByTestId("ops-link-board")).toBeTruthy();
+  });
+
+  it("muestra CTA dry-run y tabla recentProposes", async () => {
+    renderConsole();
+    expect(await screen.findByTestId("ops-a6-dryrun-cta")).toBeTruthy();
+    expect(screen.getByTestId("ops-a6-recent-table")).toBeTruthy();
+    expect(screen.getByTestId("ops-a6-recent-row").textContent).toMatch(
+      /dry_run/,
+    );
+  });
+
+  it("dry-run CTA llama proposeEstudioAuto con execute false", async () => {
+    renderConsole();
+    const cta = await screen.findByTestId("ops-a6-dryrun-cta");
+    fireEvent.click(cta);
+    await waitFor(() =>
+      expect(api.proposeEstudioAuto).toHaveBeenCalledWith(
+        expect.objectContaining({
+          execute: false,
+          instrumentIds: ["inst-1", "inst-2"],
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ops-a6-dryrun-msg").textContent).toMatch(
+        /Dry-run OK/,
+      ),
+    );
   });
 });

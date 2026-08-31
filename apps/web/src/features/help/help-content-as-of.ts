@@ -89,6 +89,15 @@
  * overlays + contexto operativo; Prioridad ≠ orden; Estudio empty≠unavailable.
  * **2026-08-28** — V1.24 Honestidad: fases BLOCKED≠Preparada; Calidad N/100;
  * Barrido≠Datos; Encaja≠Preparada; sameOperationalPlanAcrossSurfaces.
+ * **2026-08-31** — Fase de pruebas tip **v1.41.3-beta**: serie mesa Daily Operating
+ * → Operational Honesty (V1.36…V1.41.3). Hoy = Daily Desk (inbox por atención);
+ * Mercado cockpit con verdad de entrada/posición/salida; misma CTA/frase/hint
+ * en Hoy·Mercado·Journal·Operaciones; `entriesBlocked`/`gateStatus`/`orderPending`
+ * + residuales side-doors. Ayuda: resumen básico + bloque experto
+ * (`operating-desk-help.ts`) sin volcar docs/engineering.
+ * **2026-08-31b** — Cuentas: Depósito/Retirada simétricos · fecha/hora en
+ * movimientos · export CSV/JSON · Operativa MANUAL/SEMI/AUTO más visible ·
+ * AdminRail Perfiles + Estadísticas (stub).
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -118,6 +127,9 @@
  * - `docs/engineering/fundamental-intelligence-engine-2026-07-30.md`
  * - `docs/engineering/list-auto-ops-2026-07-29.md` § CORE-R
  *
+ * **2026-08-31e** — V1.33.4 Consola: dry-run Estudio AUTO + histórico A6;
+ * dry-run ≠ execute · arm ≠ PAPER_D_EXECUTE.
+ *
  * Verificar: `pnpm test:fa` · `pnpm test:operativa` · `pnpm test:coach`
  *
  * @see docs/adr/024-estudio-supervision-universe.md
@@ -129,4 +141,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-28" as const;
+export const HELP_CONTENT_AS_OF = "2026-08-31" as const;

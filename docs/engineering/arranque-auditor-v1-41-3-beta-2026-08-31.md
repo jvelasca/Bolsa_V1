@@ -26,7 +26,7 @@ Lee en este orden:
 6. ¿Freeze intacto: Confirm = firma · `PAPER_D_EXECUTE` off · AUTO execute off · `protect_hint` thin ≠ autoridad · sin drag entry/exit?
 7. ¿Release-tag CI del tip `v1.41.3-beta` GREEN y coherente con `CURRENT_SYSTEM`?
 
-**Deuda explícita aparcada (no implementar):** P2 Lab · móvil · push · thaw estricto · OCO · trail autoridad · segundo Mercado · entry/T1/T2 drag · OpportunityScore · `secondaryReasons[]` · confirms individualizados · V1.42 Operating Excellence.
+**Deuda explícita aparcada (no implementar):** P2 Lab · móvil · push · thaw estricto · OCO · trail autoridad · segundo Mercado · entry/T1/T2 drag · OpportunityScore · `secondaryReasons[]` · confirms individualizados · **código** V1.42 (el contrato está en [`spec-v142-operating-excellence-2026-08-31.md`](./spec-v142-operating-excellence-2026-08-31.md) · [ADR-042](../adr/042-operating-excellence.md)).
 
 **No pedir:** nav L1 nueva · thaw · promover thin trail · motores ExecutionState/TradeStory · simulaciones E2E de toda la APP (eso es post-auditoría, owner).
 

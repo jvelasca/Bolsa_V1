@@ -10,7 +10,12 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  FileJson,
+  FileSpreadsheet,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { createIdempotencyKey } from "@bolsa/shared";
@@ -24,15 +29,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { inputClassName } from "@/components/ui/dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import { AccountInvestorProfileSelect } from "@/features/accounts/account-investor-profile-select";
 import { AccountSettingsDialog } from "@/features/accounts/account-settings-dialog";
+import {
+  exportLedgerCsv,
+  exportLedgerJson,
+  fetchAllLedgerEntries,
+} from "@/features/accounts/ledger-export";
 import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
 import { PAPER_PATH_LAB } from "@/features/settings/paper-paths-copy";
 import { useActivateAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { DemoBookModePanel } from "@/features/trading/demo-book-mode-panel";
 import { api } from "@/lib/api";
-import { parseLocalizedNumber } from "@/lib/format";
+import { formatDateTimeCompact, parseLocalizedNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useActiveAccountStore } from "@/stores/active-account-store";
 
@@ -82,6 +93,7 @@ export function AccountDetailPanel({
   const [cashTab, setCashTab] = useState<"deposit" | "withdraw">("deposit");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exportingLedger, setExportingLedger] = useState(false);
   // F1 (R-10): key de idempotencia cacheada por operación de depósito/retirada en
   // curso. Se genera al disparar el movimiento y se reutiliza en retries del mismo
   // intento; se limpia al confirmar éxito o al cambiar de tipo de movimiento.
@@ -138,6 +150,39 @@ export function AccountDetailPanel({
   const summary = summaryQuery.data;
   const portfolio = portfolioQuery.data?.data;
   const ledger = ledgerQuery.data ?? [];
+
+  async function handleExportLedger(format: "csv" | "json") {
+    setExportingLedger(true);
+    setError(null);
+    try {
+      const { entries, truncated } = await fetchAllLedgerEntries(
+        async (limit, offset) =>
+          (await api.getAccountLedger(account.id, limit, offset)).data ?? [],
+      );
+      const label = account.name?.trim() || account.id;
+      if (format === "csv") exportLedgerCsv(entries, label);
+      else exportLedgerJson(entries, label);
+      if (!entries.length) {
+        setMessage(
+          `Sin movimientos que exportar (${format.toUpperCase()} vacío).`,
+        );
+      } else if (truncated) {
+        setMessage(
+          `Exportados ${entries.length} movimientos (${format.toUpperCase()}; tope de paginación — puede haber más en cuenta).`,
+        );
+      } else {
+        setMessage(
+          `Exportados ${entries.length} movimientos (${format.toUpperCase()}).`,
+        );
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo exportar el ledger.",
+      );
+    } finally {
+      setExportingLedger(false);
+    }
+  }
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -407,31 +452,37 @@ export function AccountDetailPanel({
                   <button
                     type="button"
                     onClick={() => setCashTab("deposit")}
+                    data-testid="account-cash-deposit"
                     className={cn(
-                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs",
-                      cashTab === "deposit" && "border-primary text-primary",
+                      "inline-flex h-9 min-w-[7.5rem] items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium",
+                      cashTab === "deposit"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
                     )}
                   >
-                    <ArrowDownToLine className="h-3 w-3" /> Depósito
+                    <ArrowDownToLine className="h-4 w-4" /> Depósito
                   </button>
                   <button
                     type="button"
                     onClick={() => setCashTab("withdraw")}
+                    data-testid="account-cash-withdraw"
                     className={cn(
-                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs",
-                      cashTab === "withdraw" && "border-primary text-primary",
+                      "inline-flex h-9 min-w-[7.5rem] items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium",
+                      cashTab === "withdraw"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
                     )}
                   >
-                    <ArrowUpFromLine className="h-3 w-3" /> Retirada
+                    <ArrowUpFromLine className="h-4 w-4" /> Retirada
                   </button>
                   <input
-                    className={cn(inputClassName, "w-28")}
+                    className={cn(inputClassName, "h-9 w-28")}
                     placeholder="Importe"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                   />
                   <input
-                    className={cn(inputClassName, "min-w-[140px] flex-1")}
+                    className={cn(inputClassName, "h-9 min-w-[140px] flex-1")}
                     placeholder="Nota"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
@@ -440,19 +491,38 @@ export function AccountDetailPanel({
                     type="button"
                     disabled={cashMutation.isPending}
                     onClick={() => void cashMutation.mutateAsync()}
-                    className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground"
+                    className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
                   >
                     Confirmar
                   </button>
                 </CardContent>
               </Card>
             )}
-            <p className="text-xs text-muted-foreground">
-              Los importes negativos (rojo) salen de tu efectivo; los positivos
-              (verde) lo aumentan. Las comisiones de cada operación aparecen
-              como líneas «Comisión y cargos» separadas de la compra o venta.
-            </p>
-            <ul className="space-y-2 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Los importes negativos (rojo) salen de tu efectivo; los
+                positivos (verde) lo aumentan. Cada fila muestra fecha y hora.
+              </p>
+              <div className="flex shrink-0 items-center gap-0.5">
+                <IconButton
+                  icon={FileSpreadsheet}
+                  title="Exportar movimientos a CSV"
+                  data-testid="ledger-export-csv"
+                  disabled={exportingLedger}
+                  onClick={() => void handleExportLedger("csv")}
+                  className="h-7 w-7"
+                />
+                <IconButton
+                  icon={FileJson}
+                  title="Exportar movimientos a JSON"
+                  data-testid="ledger-export-json"
+                  disabled={exportingLedger}
+                  onClick={() => void handleExportLedger("json")}
+                  className="h-7 w-7"
+                />
+              </div>
+            </div>
+            <ul className="space-y-2 text-sm" data-testid="account-ledger-list">
               {ledger.map((entry) => (
                 <LedgerMovementRow key={entry.id} entry={entry} />
               ))}
@@ -503,13 +573,14 @@ export function AccountDetailPanel({
                 focus === "operativa" && "ring-2 ring-primary/40",
               )}
             >
-              <p className="mb-1 text-sm font-medium text-foreground">
-                Operativa
+              <p className="mb-1 text-sm font-semibold text-foreground">
+                Modo de operativa
               </p>
               <p className="mb-2 text-xs text-muted-foreground">
-                Manual / SEMI / AUTO aplica a toda la cuenta (todos los
-                valores). Se configura aquí, no en el panel Operativa de cada
-                instrumento.
+                Define cómo trabaja esta cuenta demo (todos los valores).{" "}
+                <strong className="text-foreground">SEMI</strong> es el
+                recomendado en pruebas: la app propone; tú firmas en Confirmar.
+                No se configura en el panel Operativa de cada instrumento.
               </p>
               {isWorkingAccount && !isClosed ? (
                 <DemoBookModePanel />
@@ -517,7 +588,7 @@ export function AccountDetailPanel({
                 <p className="text-xs text-muted-foreground">
                   {isClosed
                     ? "Cuenta cerrada: no se puede cambiar la operativa."
-                    : "Activa esta cuenta («Usar ahora») para cambiar Manual / SEMI / AUTO."}
+                    : "Activa esta cuenta («Usar ahora») para cambiar MANUAL / SEMI / AUTO."}
                 </p>
               )}
             </div>
@@ -628,12 +699,26 @@ export function AccountDetailPanel({
   );
 }
 
-function LedgerMovementRow({ entry }: { entry: LedgerEntryDto }) {
+export function LedgerMovementRow({ entry }: { entry: LedgerEntryDto }) {
   const hint = ledgerEntryHint(entry);
   return (
-    <li className="flex items-start justify-between gap-3 border-b border-border/40 py-2">
+    <li
+      className="flex items-start justify-between gap-3 border-b border-border/40 py-2"
+      data-testid="ledger-movement-row"
+    >
       <div className="min-w-0">
         <p className="font-medium">{formatLedgerEntryLabel(entry)}</p>
+        <p
+          className="text-xs tabular-nums text-muted-foreground"
+          data-testid="ledger-movement-datetime"
+        >
+          {formatDateTimeCompact(entry.executedAt)}
+          {Number.isFinite(entry.balanceAfter) ? (
+            <span className="ml-2">
+              · saldo {formatPrice(entry.balanceAfter)}
+            </span>
+          ) : null}
+        </p>
         {entry.description && (
           <p className="text-xs text-muted-foreground">{entry.description}</p>
         )}

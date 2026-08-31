@@ -103,7 +103,7 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 - **Hoy = inbox de 4 niveles:** Requiere acción · Oportunidades · Vigilar · Sin acción. Sin pestañas L2 en el chrome.
 - **Confirmar** no es vista de Hoy: firma = drawer + `/confirm`.
 - Detalles (Decisiones / Journal / Libro / Consola) detrás de **«Ver detalles»**; deep-links `?view=` intactos.
-- **Mercado** = cockpit operativo completo: Listas (Estudio primero) | Gráfico (overlays del plan) | Operativa contextual | Operaciones filtradas al valor.
+- **Mercado** = cockpit operativo completo: Listas (Estudio primero) | Gráfico (overlays del plan) | **DECISIÓN** contextual ([ADR-042](./042-operating-excellence.md); chrome V1.23 puede decir «Operativa» hasta F5) | Operaciones filtradas al valor.
 - Panel derecho por fase (`InstrumentOperationalContext`): en estudio **no** se muestran Entrada/Stop/T1/T2.
 - Ranking visual: **Prioridad N/100** + **NO ES UNA ORDEN** (nunca BUY).
 - Asesor: Análisis / Tesis / Journal / Investigación — sin CTA operativo primario.
@@ -129,7 +129,7 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 
 2. **Cinco puertas L1 intactas.** Rechazado colapsar Hoy dentro de Mercado como única app. Hoy sigue respondiendo UX-01 («¿qué debo hacer hoy?»). Un strip compacto «Hoy» _dentro_ de Mercado (enlace, sin borrar la puerta) queda **aparcado** a V1.27.
 
-3. **Shell Mercado congelado:** `LISTAS | GRÁFICO | OPERATIVA` ([diseño Mercado 2.0](../engineering/diseno-mercado-2-0-cockpit-2026-08-27.md)). El peso operacional sigue siendo Mercado opera / Hoy resume (§8). No nuevas barras ni paneles L1.
+3. **Shell Mercado congelado:** `LISTAS | GRÁFICO | DECISIÓN` (etiqueta de producto; [ADR-042](./042-operating-excellence.md) · [diseño Mercado 2.0](../engineering/diseno-mercado-2-0-cockpit-2026-08-27.md)). Geometría intacta. El peso operacional sigue siendo Mercado opera / Hoy resume (§8). No nuevas barras ni paneles L1.
 
 4. **Dos capas de UI:** Nivel 1 humano (Vigilar / Preparar / Mantener / Proteger / Reducir / Salir / No operar); Nivel 2 profesional (TradePlan, R, ExitPermission, …) detrás de «Más información» / «¿Por qué?» / «Ajustes avanzados». Nunca exponer cinco objetos internos cuando hay una sola acción.
 
@@ -146,3 +146,11 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 7. **Eje de victoria vs apps TOP:** contexto (por qué + riesgo) · continuidad (tesis → posición → salida) · simplicidad de «qué hago ahora» — no copiar la superficie de TradingView ni la densidad de TWS.
 
 **Marco completo:** [`analisis-vs-apps-top-operative-flow-2026-08-28.md`](../engineering/analisis-vs-apps-top-operative-flow-2026-08-28.md).
+
+## 11. Enmienda V1.42 — contrato Operating Excellence (sin código)
+
+**Fecha:** 2026-08-31
+
+- Se acepta [ADR-042](./042-operating-excellence.md) y el [spec](../engineering/spec-v142-operating-excellence-2026-08-31.md).
+- Panel derecho de Mercado = **DECISIÓN**. Hoy = command center; Mercado = terminal. Sin nuevas puertas L1.
+- Implementación F1–F8 **parked**. Este ADR no autoriza ExecutionState ni pantallas en este slice.

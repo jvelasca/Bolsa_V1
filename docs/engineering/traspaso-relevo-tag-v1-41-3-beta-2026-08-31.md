@@ -1,9 +1,9 @@
 # RELEVO — tag v1.41.3-beta → auditoría externa (2026-08-31)
 
 > **Padre:** [`traspaso-relevo-v1-41-3-honesty-residuals-2026-08-31.md`](./traspaso-relevo-v1-41-3-honesty-residuals-2026-08-31.md) · [`traspaso-relevo-tag-v1-41-2-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-41-2-beta-2026-08-31.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** tip stampado — tip `v1.41.3-beta` → `a8101ab7` · Release-tag CI pendiente de push.  
+> **Estado:** **CERTIFICADO** — tip `v1.41.3-beta` → `a8101ab7` · Release-tag CI **GREEN**.  
 > **Arranque auditor:** [`arranque-auditor-v1-41-3-beta-2026-08-31.md`](./arranque-auditor-v1-41-3-beta-2026-08-31.md).  
-> **Fuera:** P2 Lab · móvil · push · thaw estricto · OCO · trail autoridad · segundo Mercado · drag entry/exit · OpportunityScore · V1.42.
+> **Fuera:** P2 Lab · móvil · push · thaw estricto · OCO · trail autoridad · segundo Mercado · drag entry/exit · OpportunityScore · código V1.42.
 
 ---
 
@@ -20,16 +20,28 @@ Residuales de honestidad operativa **post** tip `v1.41.2-beta` (**sin motores nu
 
 **Regla:** misma posición + mismo gate / misma cola Confirm / misma orden pendiente → misma CTA, frase y `executionHint`. Ranking ≠ BUY. Confirm = firma.
 
+**Capas de veto (conceptual, no cambio de código):** `entriesBlocked` = UX fail-closed / no generar propuestas desde superficies. `check_opening` = autoridad de apertura. `POST /ai/recommendations/propose` no recibe `entriesBlocked` y **no se toca**. Propose ≠ execute.
+
 Freeze: Confirm = firma · Spine · `PAPER_D_EXECUTE` off · AUTO execute off · `protect_hint` thin ≠ autoridad · sin drag entry/exit.
 
 ## 1. Release
 
-| Pieza         | Valor                                                     |
-| ------------- | --------------------------------------------------------- |
-| Tag tip       | `v1.41.3-beta` → `a8101ab7`                               |
-| Previo tip    | `v1.41.2-beta` → `ebb11e07` (CI GREEN)                    |
-| Producto base | `v1.41-beta` → `4247f0f0` (Daily Desk + stack proyección) |
-| CI tag        | pendiente tras `git push origin v1.41.3-beta`             |
+| Pieza         | Valor                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| Tag tip       | `v1.41.3-beta` → `a8101ab7`                                                                 |
+| Previo tip    | `v1.41.2-beta` → `ebb11e07` (CI GREEN)                                                      |
+| Producto base | `v1.41-beta` → `4247f0f0` (Daily Desk + stack proyección)                                   |
+| CI tag        | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33382034705) |
+
+Jobs del mismo push `v1.41.3-beta` (2026-08-31T10:21Z), todos **success**:
+
+| Workflow          | Run                                                                          |
+| ----------------- | ---------------------------------------------------------------------------- |
+| Release tag CI    | [33382034705](https://github.com/jvelasca/Bolsa_V1/actions/runs/33382034705) |
+| Python CI         | [33382034712](https://github.com/jvelasca/Bolsa_V1/actions/runs/33382034712) |
+| Fase 2 scientific | [33382034719](https://github.com/jvelasca/Bolsa_V1/actions/runs/33382034719) |
+| Optimize lab      | [33382034742](https://github.com/jvelasca/Bolsa_V1/actions/runs/33382034742) |
+| Frontend CI       | [33382034770](https://github.com/jvelasca/Bolsa_V1/actions/runs/33382034770) |
 
 ## 2. Pre-flight tip (local)
 
@@ -44,6 +56,8 @@ Resultado local (2026-08-31): shared build OK · 70 shared + 54 web tests OK · 
 
 ## 3. Auditoría externa
 
-Objetivo: validar residuals honesty **antes** de V1.42 / simulaciones E2E de toda la APP. No abrir thaw ni Lab P2.
+**Veredicto (2026-08-31, tip real `a8101ab7`):** PASS de honestidad operativa. Backend operativo intocado vs `v1.41.2-beta`. Side-doors propose/buy cerrados en superficies. VETO↔CTA alineados. `mapCandidateNextAction` / `EntryOperatingTruth` maduros.
 
-**CI tag:** pendiente de push del tip.
+**CI tag:** GREEN (tabla §1). No retag. No thaw. No Lab P2.
+
+**Next (spec, no código):** contrato V1.42 [`spec-v142-operating-excellence-2026-08-31.md`](./spec-v142-operating-excellence-2026-08-31.md) · [ADR-042](../adr/042-operating-excellence.md). Versionado [`versioning.md`](./versioning.md).
