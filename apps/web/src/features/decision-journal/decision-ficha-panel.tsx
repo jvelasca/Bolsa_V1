@@ -91,6 +91,7 @@ export function DecisionFichaPanel({
   entriesBlocked,
   gateStatus,
   orderPending,
+  inConfirmQueue,
   onClose,
   onCollapse,
 }: {
@@ -100,6 +101,7 @@ export function DecisionFichaPanel({
   entriesBlocked?: boolean;
   gateStatus?: string | null;
   orderPending?: boolean;
+  inConfirmQueue?: boolean;
   onClose: () => void;
   onCollapse: () => void;
 }) {
@@ -150,6 +152,7 @@ export function DecisionFichaPanel({
           entriesBlocked,
           gateStatus,
           orderPendingFill: orderPending,
+          inConfirmQueue,
         })
       : null;
 

@@ -1,6 +1,6 @@
 /**
  * Drawer de oportunidad — composición de datos ya presentes (ADR-040 E).
- * Ranking ≠ BUY. Continuidad: Ver en Mercado · Preparar orden.
+ * Ranking ≠ BUY. Continuidad: Ver en Mercado · CTA de EntryOperatingTruth.
  */
 
 import { useNavigate } from "react-router-dom";
@@ -11,17 +11,25 @@ import type {
   PortfolioRiskSnapshotV1,
 } from "@bolsa/shared";
 import {
+  ENTRIES_BLOCKED_CTA_LABEL,
   JOURNAL_STUDY_OPINION_LABELS,
   JOURNAL_STUDY_VIGENCIA_LABELS,
   NO_OPERATIONAL_PLAN_COPY,
   OPPORTUNITY_CATEGORY_LABEL,
+  buildEntryOperatingTruth,
   buildOperationalPlanFromStudy,
+  entryOperatingPrimaryLabel,
 } from "@bolsa/shared";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { MesaWhatIfPanel } from "@/features/mesa/mesa-what-if-panel";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 import { OpportunityScoreBars } from "@/features/mesa/opportunity-score-bars";
+import { EntryOperatingSummary } from "@/features/trading/entry-operating-summary";
+import {
+  opinionByInstrumentId,
+  useInstrumentDailyOpinions,
+} from "@/features/trading/use-instrument-daily-opinions";
 import {
   PRIORITY_NOT_AN_ORDER,
   formatPriorityScore,
@@ -44,6 +52,8 @@ type OpportunityDrawerProps = {
   cash: number | null;
   sectorByInstrumentId?: Record<string, string | null | undefined>;
   entriesBlocked?: boolean;
+  inConfirmQueue?: boolean;
+  orderPendingFill?: boolean;
   maxSectorExposurePct?: number;
 };
 
@@ -66,6 +76,8 @@ export function OpportunityDrawer({
   cash,
   sectorByInstrumentId,
   entriesBlocked = false,
+  inConfirmQueue = false,
+  orderPendingFill = false,
   maxSectorExposurePct,
 }: OpportunityDrawerProps) {
   const navigate = useNavigate();
@@ -75,9 +87,39 @@ export function OpportunityDrawer({
     (s) => s.focusInstrumentFromList,
   );
 
+  const selectedInstrumentId =
+    open && rankRow?.candidate.study?.hasOperationalPlan
+      ? (rankRow.candidate.instrumentId ?? null)
+      : null;
+  const opinionsQuery = useInstrumentDailyOpinions(
+    selectedInstrumentId ? [selectedInstrumentId] : [],
+    [],
+    { enabled: Boolean(selectedInstrumentId) },
+  );
+
   if (!rankRow) return null;
   const row: MesaCandidateRowV1 = rankRow.candidate;
   const study = row.study;
+  const dictamenGate = selectedInstrumentId
+    ? (opinionByInstrumentId(opinionsQuery.data).get(selectedInstrumentId)
+        ?.gateStatus ?? null)
+    : null;
+  const gateStatus = dictamenGate ?? row.gate ?? null;
+  const entryTruth = study
+    ? buildEntryOperatingTruth({
+        study,
+        entriesBlocked,
+        gateStatus,
+        inConfirmQueue,
+        orderPendingFill,
+      })
+    : null;
+  const entryBlocked = entriesBlocked || entryTruth?.primaryCta.kind === "none";
+  const prepareLabel =
+    entryTruth?.primaryCta.label ??
+    (entryBlocked
+      ? ENTRIES_BLOCKED_CTA_LABEL
+      : (entryOperatingPrimaryLabel("preparada") ?? "Preparar operación"));
   const opinion =
     study?.opinion != null ? JOURNAL_STUDY_OPINION_LABELS[study.opinion] : "—";
   const sector = row.instrumentId
@@ -96,6 +138,7 @@ export function OpportunityDrawer({
   }
 
   function handlePrepararOrden() {
+    if (entryBlocked) return;
     openConfirmDrawer();
     navigate(CONFIRM_PATH);
     onClose();
@@ -153,7 +196,8 @@ export function OpportunityDrawer({
             value={`${row.statusLabel} · Gate ${row.gate}`}
           />
           {study?.hasOperationalPlan ? (
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 space-y-2">
+              {entryTruth ? <EntryOperatingSummary truth={entryTruth} /> : null}
               <OperationalPlanView
                 plan={buildOperationalPlanFromStudy(study)}
                 testId={`operational-plan-drawer-${row.symbol}`}
@@ -191,10 +235,11 @@ export function OpportunityDrawer({
           <Button
             type="button"
             size="sm"
+            disabled={entryBlocked}
             onClick={handlePrepararOrden}
             data-testid="opportunity-drawer-prepare"
           >
-            Preparar orden
+            {prepareLabel}
           </Button>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             Cerrar

@@ -7,6 +7,7 @@ import {
   buildInvestmentPositionAggregate,
   buildOperationalPlanFromPosition,
   buildOperationalTruth,
+  formatExecutionHintCopy,
   studiesByInstrumentMap,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
@@ -250,6 +251,9 @@ export function OperationsPanel({
                     markPrice: pos.lastPrice ?? null,
                   });
                   const actionLabel = truth?.primaryCta.label ?? "—";
+                  const executionHintCopy = truth
+                    ? formatExecutionHintCopy(truth)
+                    : null;
 
                   return (
                     <Fragment key={pos.id}>
@@ -293,7 +297,15 @@ export function OperationsPanel({
                         </td>
 
                         <td className="px-2 py-1 text-right text-muted-foreground">
-                          {actionLabel}
+                          <div>{actionLabel}</div>
+                          {executionHintCopy ? (
+                            <div
+                              className="text-[10px] font-medium text-amber-800 dark:text-amber-200"
+                              data-testid={`ops-execution-hint-${pos.symbol}`}
+                            >
+                              {executionHintCopy}
+                            </div>
+                          ) : null}
                         </td>
 
                         <td

@@ -175,15 +175,19 @@ describe("sameEntryOperatingTruthAcrossSurfaces V1.38", () => {
     expect(entryOperatingSurfaceSnapshot(operaciones!)).toEqual(snap);
   });
 
-  it("gateStatus VETO → misma frase de veto en las cuatro superficies", () => {
+  it("gateStatus VETO → misma frase y CTA none en las cuatro superficies", () => {
     const { mercado, hoy, journal, operaciones } = fourSurfaces(armedStudy(), {
       gateStatus: "VETO",
     });
     expect(mercado?.phrase).toMatch(/veto/i);
+    expect(mercado?.primaryCta.kind).toBe("none");
+    expect(mercado?.primaryCta.label).toBe("Gate en veto");
     expect(hoy?.phrase).toBe(mercado?.phrase);
     expect(journal?.phrase).toBe(mercado?.phrase);
     expect(operaciones?.phrase).toBe(mercado?.phrase);
-    expect(mercado?.primaryCta.kind).not.toBe("none");
+    expect(hoy?.primaryCta).toEqual(mercado?.primaryCta);
+    expect(journal?.primaryCta).toEqual(mercado?.primaryCta);
+    expect(operaciones?.primaryCta).toEqual(mercado?.primaryCta);
   });
 
   it("open position → null (OperationalTruth gobierna posición)", () => {

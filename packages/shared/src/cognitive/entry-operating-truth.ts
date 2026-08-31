@@ -115,7 +115,10 @@ export function buildEntryOperatingTruth(
 
   const entriesBlocked = input.entriesBlocked === true;
   const gateStatus = input.gateStatus ?? null;
-  const primaryCta = entryOperatingCtaFromPhase(phase, { entriesBlocked });
+  const primaryCta = entryOperatingCtaFromPhase(phase, {
+    entriesBlocked,
+    gateStatus,
+  });
 
   const asOf =
     typeof input.asOf === "string" && input.asOf.trim()

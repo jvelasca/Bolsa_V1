@@ -31,6 +31,15 @@ export type EntryOperatingCtaV1 = {
   label: string;
 };
 
+/** CTA / copy canónico cuando kill+incidentes+vetoed (fail-closed). */
+export const ENTRIES_BLOCKED_CTA_LABEL = "Entradas bloqueadas";
+export const ENTRIES_BLOCKED_PROPOSE_MSG =
+  "Entradas bloqueadas por incidente o recon — no proponer hasta resolver.";
+
+/** CTA cuando gate diario VETO/DEFERRED — frase y botón alineados (no «Preparar…»). */
+export const GATE_VETO_CTA_LABEL = "Gate en veto";
+export const GATE_DEFERRED_CTA_LABEL = "Gate diferido";
+
 const ENTRY_PRIMARY_LABEL: Record<EntryOperatingPhaseV1, string> = {
   preparada: "Preparar operación",
   disparada: "Revisar y confirmar",
@@ -60,10 +69,17 @@ export function entryOperatingPrimaryLabel(
 
 export function entryOperatingCtaFromPhase(
   phase: EntryOperatingPhaseV1,
-  opts: { entriesBlocked?: boolean } = {},
+  opts: { entriesBlocked?: boolean; gateStatus?: string | null } = {},
 ): EntryOperatingCtaV1 {
   if (opts.entriesBlocked && phase !== "confirmada") {
-    return { kind: "none", label: "Entradas bloqueadas" };
+    return { kind: "none", label: ENTRIES_BLOCKED_CTA_LABEL };
+  }
+  const gate = opts.gateStatus?.toUpperCase();
+  if (gate === "VETO" && phase !== "confirmada") {
+    return { kind: "none", label: GATE_VETO_CTA_LABEL };
+  }
+  if (gate === "DEFERRED" && phase !== "confirmada") {
+    return { kind: "none", label: GATE_DEFERRED_CTA_LABEL };
   }
   return {
     kind: ENTRY_CTA_KIND[phase],
@@ -76,7 +92,7 @@ export function formatEntryOperatingPhrase(
   opts: { entriesBlocked?: boolean; gateStatus?: string | null } = {},
 ): string {
   if (opts.entriesBlocked && phase !== "confirmada") {
-    return "Entradas bloqueadas por incidente o recon — no proponer hasta resolver.";
+    return ENTRIES_BLOCKED_PROPOSE_MSG;
   }
   const gate = opts.gateStatus?.toUpperCase();
   if (gate === "VETO" || gate === "DEFERRED") {

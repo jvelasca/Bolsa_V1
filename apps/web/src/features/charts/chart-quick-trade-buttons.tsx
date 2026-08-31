@@ -3,6 +3,9 @@ import type {
   InstrumentWithMetaDto,
   OhlcvBarDto,
 } from "@bolsa/shared";
+import { ENTRIES_BLOCKED_PROPOSE_MSG } from "@bolsa/shared";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
+import { cn } from "@/lib/utils";
 
 function barChangePct(bar: OhlcvBarDto): number | null {
   if (!bar.open) return null;
@@ -40,6 +43,7 @@ export function ChartQuickTradeButtons({
   onBuy: () => void;
   onSell: () => void;
 }) {
+  const { entriesBlocked } = useMesaEntriesBlocked();
   return (
     <div className="flex shrink-0 items-center gap-1">
       <button
@@ -52,9 +56,12 @@ export function ChartQuickTradeButtons({
       </button>
       <button
         type="button"
-        title="Compra rápida"
+        title={entriesBlocked ? ENTRIES_BLOCKED_PROPOSE_MSG : "Compra rápida"}
+        disabled={entriesBlocked}
         onClick={onBuy}
-        className="rounded border border-emerald-500/50 bg-emerald-600/90 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-600"
+        className={cn(
+          "rounded border border-emerald-500/50 bg-emerald-600/90 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50",
+        )}
       >
         C
       </button>

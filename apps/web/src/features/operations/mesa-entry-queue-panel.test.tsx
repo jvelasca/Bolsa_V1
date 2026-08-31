@@ -74,13 +74,13 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
-function renderPanel() {
+function renderPanel(entriesBlocked = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MesaEntryQueuePanel />
+      <MesaEntryQueuePanel entriesBlocked={entriesBlocked} />
     </QueryClientProvider>,
   );
 }
@@ -114,5 +114,25 @@ describe("MesaEntryQueuePanel P4.2 filters", () => {
       expect(screen.queryByText("AAA")).toBeNull();
       expect(screen.getByText("BBB")).toBeTruthy();
     });
+  });
+
+  it("ARMED row shows Preparar operación (same CTA as Mercado/Hoy)", async () => {
+    renderPanel();
+    expect(
+      await screen.findByTestId("mesa-entry-action-AAA"),
+    ).toHaveTextContent("Preparar operación");
+    expect(screen.getByTestId("mesa-entry-action-AAA").textContent).not.toMatch(
+      /comprar/i,
+    );
+  });
+
+  it("entriesBlocked → Entradas bloqueadas on every row", async () => {
+    renderPanel(true);
+    expect(
+      await screen.findByTestId("mesa-entry-action-AAA"),
+    ).toHaveTextContent("Entradas bloqueadas");
+    expect(screen.getByTestId("mesa-entry-action-BBB")).toHaveTextContent(
+      "Entradas bloqueadas",
+    );
   });
 });

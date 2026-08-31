@@ -3,7 +3,7 @@
  * Ranking ≠ Action Queue ≠ BUY. Funnel honesto + TOP 5.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ESTUDIO_LIST_ID,
@@ -48,6 +48,8 @@ import {
   opportunityResultLabel,
   opportunityResultTone,
 } from "@/features/mesa/mesa-opportunity-language";
+import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 
 /** Universo diario de Opportunity Discovery = Estudio (ADR-024 / V1.21). */
 export const DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID = ESTUDIO_LIST_ID;
@@ -62,12 +64,30 @@ export function mesaScreenersUniverseHref(
 function CandidateNextAction({
   row,
   entriesBlocked,
+  inConfirmQueue,
+  orderPendingFill,
 }: {
   row: MesaCandidateRowV1;
   entriesBlocked: boolean;
+  inConfirmQueue: boolean;
+  orderPendingFill: boolean;
 }) {
-  const next = mapCandidateNextAction(row, entriesBlocked);
+  const next = mapCandidateNextAction(
+    { ...row, inConfirmQueue, orderPendingFill },
+    entriesBlocked,
+  );
   const label = `Acción: ${next.label}`;
+
+  if (next.kind === "none") {
+    return (
+      <span
+        className="rounded border border-rose-500/40 bg-rose-500/5 px-1.5 py-0.5 text-[11px] font-medium text-rose-700 dark:text-rose-300"
+        data-testid={`mesa-candidate-action-${row.symbol}`}
+      >
+        {label}
+      </span>
+    );
+  }
 
   if (next.kind === "review_proposal") {
     return (
@@ -108,7 +128,7 @@ function CandidateNextAction({
         className="rounded border border-primary/40 bg-primary/5 px-1.5 py-0.5 text-[11px] text-primary hover:underline"
         data-testid={`mesa-candidate-action-${row.symbol}`}
       >
-        Acción: Ver tesis
+        {label}
       </Link>
     );
   }
@@ -140,6 +160,8 @@ function categoryTone(category: OpportunityCategoryV1): string {
 function OpportunityCard({
   rankRow,
   entriesBlocked,
+  inConfirmQueue,
+  orderPendingFill,
   portfolioRisk,
   positions = [],
   equity,
@@ -150,6 +172,8 @@ function OpportunityCard({
 }: {
   rankRow: OpportunityRankRowV1;
   entriesBlocked: boolean;
+  inConfirmQueue: boolean;
+  orderPendingFill: boolean;
   portfolioRisk: PortfolioRiskSnapshotV1 | null;
   positions?: ReadonlyArray<PortfolioPositionRiskInput>;
   equity: number | null;
@@ -275,7 +299,12 @@ function OpportunityCard({
         >
           Ver oportunidad
         </Button>
-        <CandidateNextAction row={row} entriesBlocked={entriesBlocked} />
+        <CandidateNextAction
+          row={row}
+          entriesBlocked={entriesBlocked}
+          inConfirmQueue={inConfirmQueue}
+          orderPendingFill={orderPendingFill}
+        />
         <MesaWhatIfPanel
           row={row}
           portfolioRisk={portfolioRisk}
@@ -408,6 +437,17 @@ export function MesaCandidatesPanel({
   const [funnelOpen, setFunnelOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [drawerRow, setDrawerRow] = useState<OpportunityRankRowV1 | null>(null);
+  const queueItems = useSupervisedF3QueueStore((s) => s.items);
+  const { pendingOrders } = usePendingOrders();
+  const confirmInstrumentIds = useMemo(
+    () =>
+      new Set(queueItems.map((i) => i.payload.instrumentId).filter(Boolean)),
+    [queueItems],
+  );
+  const pendingFillIds = useMemo(
+    () => new Set(pendingOrders.map((o) => o.instrumentId).filter(Boolean)),
+    [pendingOrders],
+  );
 
   const funnel = ranking?.funnel;
   const top = ranking?.top ?? [];
@@ -551,6 +591,12 @@ export function MesaCandidatesPanel({
                       key={`${rankRow.symbol}-${rankRow.category}`}
                       rankRow={rankRow}
                       entriesBlocked={entriesBlocked}
+                      inConfirmQueue={confirmInstrumentIds.has(
+                        rankRow.candidate.instrumentId ?? "",
+                      )}
+                      orderPendingFill={pendingFillIds.has(
+                        rankRow.candidate.instrumentId ?? "",
+                      )}
                       portfolioRisk={portfolioRisk}
                       positions={positions}
                       equity={equity}
@@ -609,6 +655,12 @@ export function MesaCandidatesPanel({
         onClose={() => setDrawerRow(null)}
         rankRow={drawerRow}
         entriesBlocked={entriesBlocked}
+        inConfirmQueue={confirmInstrumentIds.has(
+          drawerRow?.candidate.instrumentId ?? "",
+        )}
+        orderPendingFill={pendingFillIds.has(
+          drawerRow?.candidate.instrumentId ?? "",
+        )}
         portfolioRisk={portfolioRisk}
         positions={positions}
         equity={equity}

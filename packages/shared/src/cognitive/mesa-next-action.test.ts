@@ -141,6 +141,72 @@ describe("mapCandidateNextAction", () => {
     );
     expect(next.kind).not.toBe("review_proposal");
   });
+
+  it("entriesBlocked → Entradas bloqueadas even without study", () => {
+    const next = mapCandidateNextAction(
+      {
+        symbol: "X",
+        status: "WATCH",
+        statusLabel: "Vigilar",
+        gate: "PASS",
+        study: null,
+      },
+      true,
+    );
+    expect(next.kind).toBe("none");
+    expect(next.label).toBe("Entradas bloqueadas");
+    expect(next.allowsEntry).toBe(false);
+  });
+
+  it("orderPendingFill with operable study → Ver operaciones", () => {
+    const next = mapCandidateNextAction(
+      {
+        symbol: "AAPL",
+        status: "TRIGGERED",
+        statusLabel: "Listo",
+        gate: "PASS",
+        orderPendingFill: true,
+        study: {
+          hasOperationalPlan: true,
+          instrumentId: "inst-aapl",
+          symbol: "AAPL",
+          tradePlanStatus: "TRIGGERED",
+          studiedAt: "2026-08-31T09:00:00.000Z",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+        } as never,
+      },
+      false,
+    );
+    expect(next.label).toBe("Ver operaciones");
+  });
+
+  it("inConfirmQueue with operable study → Revisar y confirmar", () => {
+    const next = mapCandidateNextAction(
+      {
+        symbol: "AAPL",
+        status: "TRIGGERED",
+        statusLabel: "Listo",
+        gate: "PASS",
+        inConfirmQueue: true,
+        study: {
+          hasOperationalPlan: true,
+          instrumentId: "inst-aapl",
+          symbol: "AAPL",
+          tradePlanStatus: "TRIGGERED",
+          studiedAt: "2026-08-31T09:00:00.000Z",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+        } as never,
+      },
+      false,
+    );
+    expect(next.label).toBe("Revisar y confirmar");
+  });
 });
 
 describe("buildMesaOperationalHeader", () => {

@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bell, RefreshCw, Settings2 } from "lucide-react";
-import { DEFAULT_CHART_CONFIG, createIdempotencyKey } from "@bolsa/shared";
+import {
+  DEFAULT_CHART_CONFIG,
+  createIdempotencyKey,
+  ENTRIES_BLOCKED_PROPOSE_MSG,
+} from "@bolsa/shared";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +25,7 @@ import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broke
 import { InstrumentStrategyTopPanel } from "@/features/backtests/instrument-strategy-top-panel";
 import { OhlcvChart } from "@/features/charts/ohlcv-chart";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { TradeConfirmPanel } from "@/features/trading/trade-confirm-panel";
 import { TradeFeeBreakdown } from "@/features/trading/trade-fee-breakdown";
 import { useTradeNotional } from "@/features/trading/use-trade-notional";
@@ -50,6 +55,7 @@ export function InstrumentDetailPage() {
   } = useActiveAccountSettings();
   const { effectiveAccountId } = useActiveAccount();
   const brokerVenue = useEffectiveBrokerVenue();
+  const { entriesBlocked } = useMesaEntriesBlocked();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
   const openChartInspector = useWorkspaceStore((s) => s.openChartInspector);
 
@@ -154,6 +160,10 @@ export function InstrumentDetailPage() {
 
   function requestTrade(side: "buy" | "sell") {
     setTradeError(null);
+    if (side === "buy" && entriesBlocked) {
+      setTradeError(ENTRIES_BLOCKED_PROPOSE_MSG);
+      return;
+    }
     const validationError = validateTrade();
     if (validationError) {
       setTradeError(validationError);
@@ -357,10 +367,13 @@ export function InstrumentDetailPage() {
             </label>
             <Button
               size="sm"
-              disabled={tradeMutation.isPending || !summary?.lastClose}
+              disabled={
+                tradeMutation.isPending || !summary?.lastClose || entriesBlocked
+              }
+              title={entriesBlocked ? ENTRIES_BLOCKED_PROPOSE_MSG : undefined}
               onClick={() => requestTrade("buy")}
             >
-              Comprar
+              {entriesBlocked ? "Entradas bloqueadas" : "Comprar"}
             </Button>
             <Button
               size="sm"
@@ -427,7 +440,14 @@ export function InstrumentDetailPage() {
             error={tradeError}
             isPending={tradeMutation.isPending}
             venue={brokerVenue}
-            onConfirm={() => tradeMutation.mutate(pendingSide)}
+            onConfirm={() => {
+              if (pendingSide === "buy" && entriesBlocked) {
+                setTradeError(ENTRIES_BLOCKED_PROPOSE_MSG);
+                setPendingSide(null);
+                return;
+              }
+              tradeMutation.mutate(pendingSide);
+            }}
             onCancel={() => setPendingSide(null)}
           />
         </Dialog>

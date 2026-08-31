@@ -94,4 +94,20 @@ describe("V1.24 — ranking language in the panel and drawer", () => {
     expect(src).toMatch(/<OpportunityScoreBars/);
     expect(src).not.toMatch(/Opportunity \$\{rankRow\.quality\}/);
   });
+
+  it("Hoy Oportunidades uses EntryOperatingTruth CTA (blocked ≠ Ver tesis / Preparar)", () => {
+    const panel = readSource("mesa-candidates-panel.tsx");
+    expect(panel).toMatch(/next\.kind === "none"/);
+    expect(panel).toMatch(/mapCandidateNextAction\(/);
+    expect(panel).toMatch(/inConfirmQueue/);
+    expect(panel).toMatch(/orderPendingFill/);
+    expect(panel).not.toMatch(/Acción: Ver tesis/);
+    const drawer = readSource("opportunity-drawer.tsx");
+    expect(drawer).toMatch(/buildEntryOperatingTruth/);
+    expect(drawer).toMatch(/useInstrumentDailyOpinions/);
+    expect(drawer).toMatch(/disabled=\{entryBlocked\}/);
+    expect(drawer).toMatch(/Preparar operación|entryOperatingPrimaryLabel/);
+    expect(drawer).not.toMatch(/Preparar orden/);
+    expect(drawer).toMatch(/<EntryOperatingSummary/);
+  });
 });

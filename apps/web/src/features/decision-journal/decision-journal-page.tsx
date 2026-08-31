@@ -21,6 +21,11 @@ import {
 } from "@/features/operational-console/use-ops-self-eval";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { useInstrumentOrderPending } from "@/features/trading/use-pending-orders";
+import {
+  opinionByInstrumentId,
+  useInstrumentDailyOpinions,
+} from "@/features/trading/use-instrument-daily-opinions";
+import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { JournalTimeline } from "@/features/decision-journal/journal-timeline";
 import {
   DEFAULT_JOURNAL_STUDY_FILTERS,
@@ -79,6 +84,12 @@ export function DecisionJournalPage() {
   const selectedOrderPending = useInstrumentOrderPending(
     selected?.instrumentId,
   );
+  const queueItems = useSupervisedF3QueueStore((s) => s.items);
+  const selectedInConfirmQueue = useMemo(() => {
+    const id = selected?.instrumentId;
+    if (!id) return false;
+    return queueItems.some((item) => item.payload.instrumentId === id);
+  }, [queueItems, selected?.instrumentId]);
 
   useEffect(() => {
     persistJournalStudiesSplitPrefs({ listWidthPct, stackHeightPct });
@@ -177,6 +188,23 @@ export function DecisionJournalPage() {
       ) ?? null
     );
   }, [portfolioQuery.data, selected]);
+
+  const selectedInstrumentId = selected?.instrumentId ?? null;
+  const opinionsQuery = useInstrumentDailyOpinions(
+    selectedInstrumentId ? [selectedInstrumentId] : [],
+    [],
+    {
+      enabled:
+        Boolean(selectedInstrumentId) &&
+        showFicha &&
+        !selectedPosition &&
+        selected?.hasOperationalPlan === true,
+    },
+  );
+  const selectedGateStatus = selectedInstrumentId
+    ? (opinionByInstrumentId(opinionsQuery.data).get(selectedInstrumentId)
+        ?.gateStatus ?? null)
+    : null;
 
   useEffect(() => {
     const instrumentParam = searchParams.get("instrument");
@@ -326,7 +354,9 @@ export function DecisionJournalPage() {
                       position={selectedPosition}
                       portfolioReconStatus={portfolioReconStatus}
                       entriesBlocked={entriesBlocked}
+                      gateStatus={selectedGateStatus}
                       orderPending={selectedOrderPending}
+                      inConfirmQueue={selectedInConfirmQueue}
                       onClose={() => setSelected(null)}
                       onCollapse={() => setFichaCollapsed(true)}
                     />

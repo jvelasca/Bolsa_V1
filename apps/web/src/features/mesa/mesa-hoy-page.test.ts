@@ -217,6 +217,32 @@ describe("mesa-hoy-page invariants", () => {
     }
   });
 
+  it("entriesBlocked → Entradas bloqueadas (not Ver tesis)", () => {
+    const next = mapCandidateNextAction(
+      {
+        symbol: "ARM1",
+        status: "ARMED",
+        statusLabel: "Preparado",
+        gate: "PASS",
+        study: {
+          hasOperationalPlan: true,
+          instrumentId: "inst-arm1",
+          symbol: "ARM1",
+          tradePlanStatus: "ARMED",
+          studiedAt: "2026-08-31T09:00:00.000Z",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+        } as never,
+      },
+      true,
+    );
+    expect(next.kind).toBe("none");
+    expect(next.label).toBe("Entradas bloqueadas");
+    expect(next.allowsEntry).toBe(false);
+  });
+
   it("attention extra items have a stable id per symbol", () => {
     const items = filterMesaAttentionItems([], 5, [
       {

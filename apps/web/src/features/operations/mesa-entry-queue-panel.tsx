@@ -6,16 +6,21 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   buildMesaEntryQueue,
+  enrichMesaCandidates,
   filterMesaEntryQueue,
   groupMesaEntryQueue,
+  mapCandidateNextAction,
   MESA_ENTRY_GROUP_ORDER,
   MESA_ENTRY_STATUS_LABEL,
+  type MesaCandidateRowV1,
   type MesaEntryGateFilter,
   type TradePlanStatusV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 
 const GATE_CLASS: Record<string, string> = {
   VETO: "text-rose-600 dark:text-rose-300",
@@ -41,6 +46,17 @@ export function MesaEntryQueuePanel({
   const [statusFilter, setStatusFilter] = useState<Set<TradePlanStatusV1>>(
     () => new Set(MESA_ENTRY_GROUP_ORDER),
   );
+  const queueItems = useSupervisedF3QueueStore((s) => s.items);
+  const { pendingOrders } = usePendingOrders();
+  const confirmInstrumentIds = useMemo(
+    () =>
+      new Set(queueItems.map((i) => i.payload.instrumentId).filter(Boolean)),
+    [queueItems],
+  );
+  const pendingFillIds = useMemo(
+    () => new Set(pendingOrders.map((o) => o.instrumentId).filter(Boolean)),
+    [pendingOrders],
+  );
 
   const boardQuery = useQuery({
     queryKey: ["decision-board", effectiveAccountId],
@@ -52,12 +68,19 @@ export function MesaEntryQueuePanel({
   const groups = useMemo(() => {
     const board = boardQuery.data?.data;
     if (!board) return [];
-    const rows = filterMesaEntryQueue(buildMesaEntryQueue(board), {
-      statuses: [...statusFilter],
-      gate: gateFilter,
-      symbolQuery,
-    });
-    return groupMesaEntryQueue(rows);
+    const rows = enrichMesaCandidates(
+      filterMesaEntryQueue(buildMesaEntryQueue(board), {
+        statuses: [...statusFilter],
+        gate: gateFilter,
+        symbolQuery,
+      }),
+      board,
+      new Map(),
+    );
+    return groupMesaEntryQueue(rows).map((group) => ({
+      ...group,
+      items: group.items as MesaCandidateRowV1[],
+    }));
   }, [boardQuery.data, statusFilter, gateFilter, symbolQuery]);
 
   function toggleStatus(status: TradePlanStatusV1) {
@@ -153,23 +176,48 @@ export function MesaEntryQueuePanel({
             </span>
           </div>
           <ul className="space-y-0.5">
-            {group.items.map((row) => (
-              <li
-                key={`${group.status}-${row.symbol}`}
-                className="flex items-center justify-between gap-2 rounded px-1 py-0.5 hover:bg-accent/30"
-              >
-                <span className="font-medium">{row.symbol}</span>
-                <span
-                  className={cn(
-                    "text-[10px] uppercase tracking-wide",
-                    GATE_CLASS[row.gate.toUpperCase()] ??
-                      "text-muted-foreground",
-                  )}
+            {group.items.map((row) => {
+              const next = mapCandidateNextAction(
+                {
+                  ...row,
+                  inConfirmQueue: confirmInstrumentIds.has(
+                    row.instrumentId ?? "",
+                  ),
+                  orderPendingFill: pendingFillIds.has(row.instrumentId ?? ""),
+                },
+                entriesBlocked,
+              );
+              return (
+                <li
+                  key={`${group.status}-${row.symbol}`}
+                  className="flex items-center justify-between gap-2 rounded px-1 py-0.5 hover:bg-accent/30"
                 >
-                  {row.gate}
-                </span>
-              </li>
-            ))}
+                  <span className="font-medium">{row.symbol}</span>
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "text-[10px]",
+                        next.kind === "none"
+                          ? "font-medium text-rose-700 dark:text-rose-300"
+                          : "text-muted-foreground",
+                      )}
+                      data-testid={`mesa-entry-action-${row.symbol}`}
+                    >
+                      {next.label}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[10px] uppercase tracking-wide",
+                        GATE_CLASS[row.gate.toUpperCase()] ??
+                          "text-muted-foreground",
+                      )}
+                    >
+                      {row.gate}
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}

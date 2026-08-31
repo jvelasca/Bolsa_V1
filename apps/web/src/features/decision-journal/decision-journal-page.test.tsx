@@ -37,7 +37,19 @@ vi.mock("@/lib/api", () => ({
     getDecisionStudyHistory: vi.fn(),
     getLists: vi.fn(),
     getOhlcv: vi.fn(),
+    getPortfolio: vi.fn(),
+    queryInstrumentDailyOpinions: vi.fn(),
   },
+}));
+
+vi.mock("@/features/mesa/use-mesa-entries-blocked", () => ({
+  useMesaEntriesBlocked: () => ({
+    entriesBlocked: false,
+    killOn: false,
+    vetoed: 0,
+    incidentCount: 0,
+    incidentsFailed: false,
+  }),
 }));
 
 vi.mock("@/features/accounts/use-active-account", () => ({
@@ -194,6 +206,12 @@ describe("DecisionJournalPage", () => {
     vi.mocked(api.getOhlcv).mockResolvedValue({
       data: [],
       meta: { timeframe: "1d", count: 0 },
+    } as never);
+    vi.mocked(api.getPortfolio).mockResolvedValue({
+      data: { positions: [] },
+    } as never);
+    vi.mocked(api.queryInstrumentDailyOpinions).mockResolvedValue({
+      data: [],
     } as never);
   });
 
@@ -389,6 +407,53 @@ describe("DecisionJournalPage", () => {
     );
     expect(screen.getByTestId("journal-meta").textContent).toMatch(
       /42 entradas/,
+    );
+  });
+
+  it("ficha con plan + gate VETO muestra frase y CTA none alineadas con Mercado", async () => {
+    vi.mocked(api.getDecisionStudies).mockResolvedValue({
+      data: {
+        accountId: "acc1",
+        studies: [
+          makeStudy({
+            hasOperationalPlan: true,
+            tradePlanStatus: "ARMED",
+            entry: 100,
+            stop: 94,
+            target1: 112,
+            target2: 124,
+            expectedRR: 2,
+            riskAmount: 250,
+            quantity: 10,
+            initialRiskR: 1,
+            positionValue: 1000,
+          }),
+        ],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      },
+    } as never);
+    vi.mocked(api.queryInstrumentDailyOpinions).mockResolvedValue({
+      data: [
+        {
+          instrumentId: "inst-1",
+          gateStatus: "VETO",
+          stance: "hold_watch",
+          dictamenStars: 2,
+        },
+      ],
+    } as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("study-row")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("study-row"));
+    await waitFor(() =>
+      expect(screen.getByTestId("entry-operating-phrase").textContent).toMatch(
+        /veto/i,
+      ),
+    );
+    expect(screen.getByTestId("entry-operating-action").textContent).toBe(
+      "Gate en veto",
     );
   });
 });

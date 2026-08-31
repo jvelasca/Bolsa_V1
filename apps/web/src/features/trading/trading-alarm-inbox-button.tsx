@@ -7,10 +7,11 @@ import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Bell, BrainCircuit, Loader2 } from "lucide-react";
-import { SIGNAL_KIND_LABELS } from "@bolsa/shared";
+import { SIGNAL_KIND_LABELS, ENTRIES_BLOCKED_PROPOSE_MSG } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -61,12 +62,14 @@ function AlarmRow({
   onAck,
   onPropose,
   proposePending,
+  entriesBlocked,
 }: {
   item: TrackerAlarmInboxItem;
   onOpen: () => void;
   onAck: () => void;
   onPropose: () => void;
   proposePending: boolean;
+  entriesBlocked: boolean;
 }) {
   const unread = !item.ackedAt;
   return (
@@ -100,8 +103,12 @@ function AlarmRow({
             size="sm"
             variant="outline"
             className="h-6 gap-0.5 px-1.5 text-[10px]"
-            disabled={proposePending}
-            title={PAPER_PATH_SUPERVISED.blurb}
+            disabled={proposePending || entriesBlocked}
+            title={
+              entriesBlocked
+                ? ENTRIES_BLOCKED_PROPOSE_MSG
+                : PAPER_PATH_SUPERVISED.blurb
+            }
             onClick={onPropose}
           >
             {proposePending ? (
@@ -109,7 +116,7 @@ function AlarmRow({
             ) : (
               <BrainCircuit className="h-3 w-3" aria-hidden />
             )}
-            F3
+            {entriesBlocked ? "Bloq." : "F3"}
           </Button>
           {unread ? (
             <Button
@@ -137,6 +144,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { effectiveAccountId } = useActiveAccount();
+  const { entriesBlocked } = useMesaEntriesBlocked();
   const items = useTrackerAlarmInboxStore((s) => s.items);
   const ack = useTrackerAlarmInboxStore((s) => s.ack);
   const ackAllForAccount = useTrackerAlarmInboxStore((s) => s.ackAllForAccount);
@@ -159,6 +167,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
   const proposeMutation = useMutation({
     mutationFn: async (item: TrackerAlarmInboxItem) => {
       if (!effectiveAccountId) throw new Error("Sin cuenta DEMO activa");
+      if (entriesBlocked) throw new Error(ENTRIES_BLOCKED_PROPOSE_MSG);
       const book = loadDemoBookPrefs();
       if (!demoBookAllowsEnqueueConfirm(book.mode)) {
         throw new Error(
@@ -352,6 +361,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
                     onAck={() => ack(item.id)}
                     onPropose={() => proposeMutation.mutate(item)}
                     proposePending={pendingId === item.id}
+                    entriesBlocked={entriesBlocked}
                   />
                 ))}
               </ul>

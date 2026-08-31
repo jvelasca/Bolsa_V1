@@ -3,6 +3,7 @@
  * Misma disciplina que Finalistas y Alarm inbox. No Camino D.
  */
 
+import { ENTRIES_BLOCKED_PROPOSE_MSG } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import {
   demoBookAllowsEnqueueConfirm,
@@ -23,7 +24,12 @@ export async function proposeInstrumentSupervised(opts: {
   strategyDefinitionId?: string | null;
   strategyLabel?: string | null;
   priceHint?: number | null;
+  /** Kill + incidentes + vetoed (fail-closed). */
+  entriesBlocked?: boolean;
 }): Promise<SupervisedProposePayload> {
+  if (opts.entriesBlocked) {
+    throw new Error(ENTRIES_BLOCKED_PROPOSE_MSG);
+  }
   const book = loadDemoBookPrefs();
   if (!demoBookAllowsEnqueueConfirm(book.mode)) {
     throw new Error(

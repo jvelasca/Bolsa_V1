@@ -37,6 +37,7 @@ import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { MesaTipButton } from "@/features/help/mesa-tip-button";
 import { proposeInstrumentSupervised } from "@/features/trading/propose-instrument-supervised";
 import { OperativaCockpitCard } from "@/features/trading/operativa-cockpit-card";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { TradingOperativaSection } from "@/features/trading/trading-operativa-section";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import {
@@ -74,6 +75,10 @@ import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { InstrumentDailyOpinionHintV1 } from "@bolsa/shared";
 import {
+  ENTRIES_BLOCKED_CTA_LABEL,
+  ENTRIES_BLOCKED_PROPOSE_MSG,
+} from "@bolsa/shared";
+import {
   getMandateStoreSnapshot,
   listOpenMandateTenures,
   subscribeMandateStore,
@@ -96,6 +101,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const timeframe = (active?.timeframe as string) || "1d";
   const { effectiveAccountId } = useActiveAccount();
   const accountScope = useActiveAccountQueryKey();
+  const { entriesBlocked } = useMesaEntriesBlocked();
   const bookPrefs = useDemoBookPrefs();
   const pushToast = useAlertsStore((s) => s.pushToast);
   const enqueueSupervised = useSupervisedF3QueueStore((s) => s.enqueue);
@@ -237,6 +243,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         source: "operativa",
         strategyDefinitionId: topSlot?.strategyDefinitionId ?? null,
         strategyLabel: topSlot?.label ?? symbol,
+        entriesBlocked,
       });
     },
     onSuccess: (payload) => {
@@ -335,6 +342,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
           canPropose={
             Boolean(effectiveAccountId) &&
             canEnqueueConfirm &&
+            !entriesBlocked &&
             !(requiresEstudio && !inEstudio)
           }
           proposePending={proposeMutation.isPending}
@@ -488,23 +496,28 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
               disabled={
                 proposeMutation.isPending ||
                 !effectiveAccountId ||
+                entriesBlocked ||
                 (requiresEstudio && !inEstudio) ||
                 !canEnqueueConfirm
               }
               title={
-                !canEnqueueConfirm
-                  ? "Cambia a SEMI en Configuración para Proponer F3"
-                  : requiresEstudio && !inEstudio
-                    ? "Añade el valor a Estudio primero"
-                    : "Atajo avanzado: Propose → cola Confirm (Camino C). El CTA del día está en la tarjeta del valor."
+                entriesBlocked
+                  ? ENTRIES_BLOCKED_PROPOSE_MSG
+                  : !canEnqueueConfirm
+                    ? "Cambia a SEMI en Configuración para Proponer F3"
+                    : requiresEstudio && !inEstudio
+                      ? "Añade el valor a Estudio primero"
+                      : "Atajo avanzado: Propose → cola Confirm (Camino C). El CTA del día está en la tarjeta del valor."
               }
               onClick={() => proposeMutation.mutate()}
             >
               {proposeMutation.isPending
                 ? "Proponiendo…"
-                : !canEnqueueConfirm
-                  ? "Proponer F3 (pasa a SEMI)"
-                  : "Proponer F3 → Confirm (avanzado)"}
+                : entriesBlocked
+                  ? ENTRIES_BLOCKED_CTA_LABEL
+                  : !canEnqueueConfirm
+                    ? "Proponer F3 (pasa a SEMI)"
+                    : "Proponer F3 → Confirm (avanzado)"}
             </button>
             <MesaTipButton tip="operativa-proponer" className="mt-0.5" />
           </div>

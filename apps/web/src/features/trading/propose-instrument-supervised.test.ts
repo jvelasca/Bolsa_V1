@@ -56,4 +56,24 @@ describe("proposeInstrumentSupervised", () => {
 
     expect(api.proposeRecommendation).not.toHaveBeenCalled();
   });
+
+  it("blocks when entriesBlocked before hitting API", async () => {
+    vi.mocked(loadDemoBookPrefs).mockReturnValue({
+      mode: "semi",
+      maxOpenPositions: 10,
+      defaultSizePctOfCash: 10,
+    } as ReturnType<typeof loadDemoBookPrefs>);
+
+    await expect(
+      proposeInstrumentSupervised({
+        instrumentId: "i1",
+        symbol: "SAN",
+        accountId: "acc1",
+        entriesBlocked: true,
+      }),
+    ).rejects.toThrow(/bloqueadas/i);
+
+    expect(api.getAccountSummary).not.toHaveBeenCalled();
+    expect(api.proposeRecommendation).not.toHaveBeenCalled();
+  });
 });

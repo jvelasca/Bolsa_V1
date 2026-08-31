@@ -344,6 +344,8 @@ export function mapCandidateNextAction(
     status: TradePlanStatusV1;
     study?: DecisionJournalStudyViewV1 | null;
     gate?: string | null;
+    inConfirmQueue?: boolean;
+    orderPendingFill?: boolean;
   },
   entriesBlocked: boolean,
 ): MesaNextActionV1 {
@@ -352,8 +354,18 @@ export function mapCandidateNextAction(
       study: { ...row.study, tradePlanStatus: row.status },
       entriesBlocked,
       gateStatus: row.gate ?? null,
+      inConfirmQueue: row.inConfirmQueue,
+      orderPendingFill: row.orderPendingFill,
     });
     if (truth) return mesaNextActionFromEntryOperatingTruth(truth);
+  }
+
+  if (entriesBlocked) {
+    return {
+      kind: "none",
+      label: "Entradas bloqueadas",
+      allowsEntry: false,
+    };
   }
 
   return mapMesaNextAction({

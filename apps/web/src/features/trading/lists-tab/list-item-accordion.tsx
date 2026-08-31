@@ -44,6 +44,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 
 import { useTradingUiStore } from "@/stores/trading-ui-store";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
+import { ENTRIES_BLOCKED_PROPOSE_MSG } from "@bolsa/shared";
 
 interface ListItemAccordionProps {
   item: InstrumentWithMetaDto;
@@ -93,6 +95,7 @@ export function ListItemAccordion({
   const openOrderDialog = useTradingUiStore((s) => s.openOrderDialog);
 
   const openInfoDialog = useTradingUiStore((s) => s.openInfoDialog);
+  const { entriesBlocked } = useMesaEntriesBlocked();
 
   const liveQuery = useExpandedInstrumentLiveQuote(item.id, expanded);
 
@@ -375,7 +378,8 @@ export function ListItemAccordion({
           />
           <IconButton
             icon={Plus}
-            title="Operar"
+            title={entriesBlocked ? ENTRIES_BLOCKED_PROPOSE_MSG : "Operar"}
+            disabled={entriesBlocked}
             onClick={() => openOrderDialog(item)}
           />
         </div>
@@ -400,6 +404,7 @@ export function ListItemAccordion({
           isUp={isUp}
           spreadPct={live?.spreadPct ?? null}
           closeFlash={dayCloseFlash}
+          entriesBlocked={entriesBlocked}
           onOrder={() => openOrderDialog(item)}
         />
       )}
@@ -417,6 +422,7 @@ function ListItemExpandedDetail({
   isUp,
   spreadPct,
   closeFlash,
+  entriesBlocked,
   onOrder,
 }: {
   itemId: string;
@@ -428,6 +434,7 @@ function ListItemExpandedDetail({
   isUp: boolean | null;
   spreadPct: number | null;
   closeFlash: ReturnType<typeof usePriceFlash>;
+  entriesBlocked: boolean;
   onOrder: () => void;
 }) {
   const runningId = useEstudioProcessRunningStore((s) => s.instrumentId);
@@ -554,7 +561,14 @@ function ListItemExpandedDetail({
       </div>
 
       <div className="flex justify-end gap-0.5">
-        <IconButton icon={Plus} title="Nueva operación" onClick={onOrder} />
+        <IconButton
+          icon={Plus}
+          title={
+            entriesBlocked ? ENTRIES_BLOCKED_PROPOSE_MSG : "Nueva operación"
+          }
+          disabled={entriesBlocked}
+          onClick={onOrder}
+        />
       </div>
     </div>
   );

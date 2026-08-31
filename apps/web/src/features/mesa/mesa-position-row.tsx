@@ -14,6 +14,7 @@ import {
   buildInvestmentPositionAggregate,
   buildMesaProtectionState,
   buildOperationalTruth,
+  formatExecutionHintCopy,
   mapMesaStatusDimensions,
   mesaNextActionFromOperationalTruth,
   stopDistancePct,
@@ -280,6 +281,9 @@ export function MesaPositionRow({
         originStudy,
         protectPlan,
       }).nextAction.label;
+  const executionHintCopy = nextAction
+    ? formatExecutionHintCopy(nextAction)
+    : null;
 
   return (
     <div
@@ -295,6 +299,14 @@ export function MesaPositionRow({
           >
             Acción: {actionLabel}
           </div>
+          {executionHintCopy ? (
+            <div
+              className="text-[10px] font-medium text-amber-800 dark:text-amber-200"
+              data-testid={`mesa-position-execution-${position.symbol}`}
+            >
+              {executionHintCopy}
+            </div>
+          ) : null}
           {study?.opinion ? (
             <div className="text-[10px] text-muted-foreground">
               {JOURNAL_STUDY_OPINION_LABELS[study.opinion]}

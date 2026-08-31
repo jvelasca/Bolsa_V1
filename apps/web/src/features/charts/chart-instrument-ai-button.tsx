@@ -11,10 +11,12 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { IconButton } from "@/components/ui/icon-button";
 import { AiInfoButton } from "@/features/ai/ai-info-button";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { proposeInstrumentSupervised } from "@/features/trading/propose-instrument-supervised";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { cn } from "@/lib/utils";
+import { ENTRIES_BLOCKED_PROPOSE_MSG } from "@bolsa/shared";
 
 export function ChartInstrumentAiButton({
   instrumentId,
@@ -26,6 +28,7 @@ export function ChartInstrumentAiButton({
   className?: string;
 }) {
   const { effectiveAccountId } = useActiveAccount();
+  const { entriesBlocked } = useMesaEntriesBlocked();
   const pushToast = useAlertsStore((s) => s.pushToast);
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
@@ -39,6 +42,7 @@ export function ChartInstrumentAiButton({
         symbol,
         accountId: effectiveAccountId,
         source: "chart",
+        entriesBlocked,
       });
     },
     onSuccess: (payload) => {
@@ -58,7 +62,7 @@ export function ChartInstrumentAiButton({
   });
 
   const pending = study.isPending;
-  const disabled = !instrumentId || pending;
+  const disabled = !instrumentId || pending || entriesBlocked;
 
   return (
     <div className={cn("inline-flex items-center gap-0.5", className)}>
@@ -68,9 +72,11 @@ export function ChartInstrumentAiButton({
         title={
           pending
             ? `Evaluando IA · ${symbol}…`
-            : !instrumentId
-              ? "Información IA del valor (carga el instrumento)"
-              : `Estudio IA · ${symbol} (propose → Supervisado F3)`
+            : entriesBlocked
+              ? ENTRIES_BLOCKED_PROPOSE_MSG
+              : !instrumentId
+                ? "Información IA del valor (carga el instrumento)"
+                : `Estudio IA · ${symbol} (propose → Supervisado F3)`
         }
         disabled={disabled}
         onClick={() => study.mutate()}

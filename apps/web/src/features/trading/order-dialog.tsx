@@ -17,6 +17,7 @@ import {
   useActiveAccountSettings,
 } from "@/features/accounts/use-active-account";
 import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broker-venue";
+import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { TradeConfirmPanel } from "@/features/trading/trade-confirm-panel";
 import { TradeFeeBreakdown } from "@/features/trading/trade-fee-breakdown";
 import { useTradeNotional } from "@/features/trading/use-trade-notional";
@@ -26,6 +27,10 @@ import { api } from "@/lib/api";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useTradePreferencesStore } from "@/stores/trade-preferences-store";
 import { useTradingUiStore } from "@/stores/trading-ui-store";
+import {
+  ENTRIES_BLOCKED_CTA_LABEL,
+  ENTRIES_BLOCKED_PROPOSE_MSG,
+} from "@bolsa/shared";
 
 type OrderMode = "market" | "stop_limit";
 type SizeMode = "volume" | "value";
@@ -47,6 +52,7 @@ export function OrderDialog() {
     accountName,
   } = useActiveAccountSettings();
   const { effectiveAccountId } = useActiveAccount();
+  const { entriesBlocked } = useMesaEntriesBlocked();
   const brokerVenue = useEffectiveBrokerVenue();
   const [mode, setMode] = useState<OrderMode>("market");
   const [sizeMode, setSizeMode] = useState<SizeMode>("volume");
@@ -172,6 +178,10 @@ export function OrderDialog() {
 
   function requestAction(side: "buy" | "sell") {
     setError(null);
+    if (side === "buy" && entriesBlocked) {
+      setError(ENTRIES_BLOCKED_PROPOSE_MSG);
+      return;
+    }
     const validationError = validateOrder();
     if (validationError) {
       setError(validationError);
@@ -195,6 +205,11 @@ export function OrderDialog() {
 
   function confirmPendingAction() {
     if (!pendingConfirm) return;
+    if (pendingConfirm.side === "buy" && entriesBlocked) {
+      setError(ENTRIES_BLOCKED_PROPOSE_MSG);
+      setPendingConfirm(null);
+      return;
+    }
     if (pendingConfirm.kind === "market") {
       executeMarket(pendingConfirm.side);
     } else {
@@ -403,12 +418,17 @@ export function OrderDialog() {
         </button>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || entriesBlocked}
+          title={entriesBlocked ? ENTRIES_BLOCKED_PROPOSE_MSG : undefined}
           className="rounded-lg bg-emerald-600/90 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
           onClick={() => requestAction("buy")}
         >
-          {mode === "market" ? "COMPRA" : "COMPRA A PRECIO"}{" "}
-          {lastPrice ? formatPrice(lastPrice) : ""}
+          {entriesBlocked
+            ? ENTRIES_BLOCKED_CTA_LABEL
+            : mode === "market"
+              ? "COMPRA"
+              : "COMPRA A PRECIO"}{" "}
+          {!entriesBlocked && lastPrice ? formatPrice(lastPrice) : ""}
         </button>
       </div>
     </Dialog>

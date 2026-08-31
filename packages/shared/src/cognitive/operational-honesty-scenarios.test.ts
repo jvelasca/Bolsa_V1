@@ -162,14 +162,15 @@ describe("operationalHonestyScenarios V1.41.2", () => {
     expect(entryOperatingSurfaceSnapshot(truth!).ctaKind).toBe("none");
   });
 
-  it("7 Gate VETO → frase de veto (CTA de fase intacta)", () => {
+  it("7 Gate VETO → frase de veto y CTA none (alineadas)", () => {
     const truth = buildEntryOperatingTruth({
       study: armedStudy(),
       gateStatus: "VETO",
       asOf: ASOF,
     });
     expect(truth?.phrase).toMatch(/veto/i);
-    expect(truth?.primaryCta.kind).toBe("prepare");
+    expect(truth?.primaryCta.kind).toBe("none");
+    expect(truth?.primaryCta.label).toBe("Gate en veto");
   });
 
   it("8 Posición OPEN HOLD limpia", () => {
