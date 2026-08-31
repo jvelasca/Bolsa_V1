@@ -29,6 +29,7 @@ const useMesaEntriesBlocked = vi.fn(() => ({
   vetoed: 0,
   incidentCount: 0,
   incidentsFailed: false,
+  paperDExecuteEnv: false,
 }));
 
 vi.mock("@/features/mesa/use-mesa-entries-blocked", () => ({
@@ -70,6 +71,14 @@ vi.mock("@/features/confirm/confirm-drawer", () => ({
 vi.mock("@/features/trading/demo-book-prefs", () => ({
   loadDemoBookPrefs: () => ({ mode: "semi" }),
   demoBookAllowsEnqueueConfirm: () => true,
+}));
+
+vi.mock("@/features/trading/use-demo-book-prefs", () => ({
+  useDemoBookPrefs: () => ({ mode: "semi" }),
+}));
+
+vi.mock("@/features/trading/demo-book-auto-arm", () => ({
+  loadAutoArm: () => ({ armed: false, armedAt: null, confirmPhrase: null }),
 }));
 
 afterEach(() => cleanup());
@@ -161,6 +170,7 @@ function posicionContext(
     inConfirmQueue: false,
     confirmQueueCount: 0,
     orderPendingFill: false,
+    submitIntent: null,
     loading: false,
     ...overrides,
   };
@@ -179,6 +189,7 @@ describe("OperativaCockpitCard POSICIÓN V1.40", () => {
       vetoed: 0,
       incidentCount: 0,
       incidentsFailed: false,
+      paperDExecuteEnv: false,
     });
   });
 
@@ -193,8 +204,11 @@ describe("OperativaCockpitCard POSICIÓN V1.40", () => {
     );
     expect(screen.getByTestId("position-operating-summary")).toBeTruthy();
     expect(screen.getByTestId("position-operating-phrase").textContent).toMatch(
-      /Mantén/,
+      /T1 alcanzado · Mantener/,
     );
+    expect(
+      screen.getByTestId("position-operating-phrase").textContent,
+    ).not.toMatch(/T1_REACHED/);
     expect(
       screen.getByTestId("position-operating-next-event").textContent,
     ).toBe("T1");
@@ -289,6 +303,7 @@ describe("OperativaCockpitCard POSICIÓN V1.40", () => {
       vetoed: 0,
       incidentCount: 0,
       incidentsFailed: false,
+      paperDExecuteEnv: false,
     });
     useInstrumentOperationalContext.mockReturnValue(
       posicionContext({
@@ -330,5 +345,63 @@ describe("OperativaCockpitCard honesty wiring (V1.41.2)", () => {
     expect(src).toMatch(/entriesBlocked,/);
     expect(src).toMatch(/gateStatus: opinion\?\.gateStatus/);
     expect(src).toMatch(/orderPending: context\.orderPendingFill/);
+  });
+
+  it("feeds orderPendingFill into summaries for ExecutionState (V1.42 F2)", () => {
+    const src = readFileSync(
+      resolve(__dirname, "operativa-cockpit-card.tsx"),
+      "utf8",
+    );
+    expect(src).toMatch(/orderPending=\{context\.orderPendingFill\}/);
+    expect(src).toMatch(/orderPendingFill=\{context\.orderPendingFill\}/);
+    expect(src).toMatch(/orderPending: context\.orderPendingFill/);
+  });
+
+  it("feeds submitIntent into summaries + UNKNOWN → Ver operaciones (V1.42 F2b)", () => {
+    const src = readFileSync(
+      resolve(__dirname, "operativa-cockpit-card.tsx"),
+      "utf8",
+    );
+    expect(src).toMatch(/submitIntent=\{context\.submitIntent\}/);
+    expect(src).toMatch(/buildExecutionState|buildPositionOperatingTruth/);
+    expect(src).toMatch(/unknownExecution/);
+    expect(src).toMatch(/Ver operaciones/);
+  });
+
+  it("uses PositionOperatingTruth on open-position path (V1.42 F3)", () => {
+    const src = readFileSync(
+      resolve(__dirname, "operativa-cockpit-card.tsx"),
+      "utf8",
+    );
+    expect(src).toMatch(/buildPositionOperatingTruth/);
+    expect(src).toMatch(/pot=\{positionPot\}/);
+  });
+
+  it("chrome DECISIÓN + CONTEXTO→ESTADO→ACCIÓN (V1.42 F5)", () => {
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    const cockpit = screen.getByTestId("operativa-cockpit");
+    expect(cockpit.getAttribute("aria-label")).toBe("DECISIÓN · AAPL");
+    expect(screen.getByTestId("decision-contexto")).toBeTruthy();
+    expect(screen.getByTestId("decision-estado")).toBeTruthy();
+    expect(screen.getByTestId("decision-accion")).toBeTruthy();
+    const src = readFileSync(
+      resolve(__dirname, "operativa-cockpit-card.tsx"),
+      "utf8",
+    );
+    expect(src).toMatch(/primaryCtaKind=\{potExitKind\}/);
+    expect(src).toMatch(/Confirm es la única firma/);
+    expect(src).toMatch(/Ranking ≠ BUY/);
+  });
+
+  it("single primary CTA: disparada + cola Confirm does not dual-propose (V1.42 F5)", () => {
+    const src = readFileSync(
+      resolve(__dirname, "operativa-cockpit-card.tsx"),
+      "utf8",
+    );
+    expect(src).toMatch(/inConfirmPath/);
+    expect(src).toMatch(/showPropose/);
+    expect(src).toMatch(/!inConfirmPath/);
   });
 });

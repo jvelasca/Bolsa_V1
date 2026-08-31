@@ -9,6 +9,7 @@ import {
   demoBookAllowsEnqueueConfirm,
   demoBookAllowsExecute,
   demoBookRequiresEstudioMembership,
+  demoBookRequiresHumanConfirm,
   loadDemoBookPrefs,
   normalizeDemoBookPrefs,
   patchDemoBookPrefs,
@@ -63,13 +64,16 @@ describe("demo-book-prefs", () => {
     expect(patchDemoBookPrefs({ mode: "auto" }).mode).toBe("semi");
   });
 
-  it("gates enqueue / execute by mode", () => {
+  it("gates enqueue / execute by mode (F8: AUTO omits Confirm)", () => {
     expect(demoBookAllowsEnqueueConfirm("manual")).toBe(false);
     expect(demoBookAllowsEnqueueConfirm("semi")).toBe(true);
-    expect(demoBookAllowsEnqueueConfirm("auto")).toBe(true);
+    expect(demoBookAllowsEnqueueConfirm("auto")).toBe(false);
     expect(demoBookAllowsExecute("manual")).toBe(false);
     expect(demoBookAllowsExecute("semi")).toBe(true);
     expect(demoBookAllowsExecute("auto")).toBe(false);
+    expect(demoBookRequiresHumanConfirm("manual")).toBe(false);
+    expect(demoBookRequiresHumanConfirm("semi")).toBe(true);
+    expect(demoBookRequiresHumanConfirm("auto")).toBe(false);
   });
 
   it("SEMI/AUTO require Estudio membership; MANUAL does not", () => {

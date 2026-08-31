@@ -86,7 +86,7 @@ export function supervisedQueueOriginLabel(
     case "alarm":
       return "Alarma Radar";
     case "operativa":
-      return "Operativa";
+      return "DECISIÓN";
     case "asesor":
       return "Asesor";
     default:

@@ -5,14 +5,18 @@ import {
   JOURNAL_STUDY_PERIOD_LABELS,
   JOURNAL_STUDY_STATUS_LABELS,
   buildOperationalPlanFromStudy,
-  buildOperationalTruth,
   buildEntryOperatingTruth,
+  buildExecutionState,
+  buildPositionOperatingTruth,
+  buildTradeStory,
   journalStudyConsensusPercents,
+  type DecisionJournalEntryV1,
   type DecisionJournalStudyViewV1,
   type JournalStudyOpinion,
   type JournalStudyPeriod,
   type JournalStudyUserStatus,
   type PositionDto,
+  type SubmitIntentListItemV1,
 } from "@bolsa/shared";
 import { IconButton } from "@/components/ui/icon-button";
 import { DecisionStudyChart } from "@/features/decision-journal/decision-study-chart";
@@ -84,6 +88,18 @@ function BiasDonut({
   );
 }
 
+function formatStoryAsOf(asOf: string): string {
+  const d = new Date(asOf);
+  if (Number.isNaN(d.getTime())) return asOf;
+  return d.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function DecisionFichaPanel({
   study,
   position,
@@ -91,7 +107,9 @@ export function DecisionFichaPanel({
   entriesBlocked,
   gateStatus,
   orderPending,
+  submitIntent,
   inConfirmQueue,
+  journalEntries,
   onClose,
   onCollapse,
 }: {
@@ -101,7 +119,10 @@ export function DecisionFichaPanel({
   entriesBlocked?: boolean;
   gateStatus?: string | null;
   orderPending?: boolean;
+  submitIntent?: SubmitIntentListItemV1 | null;
   inConfirmQueue?: boolean;
+  /** Spine journal rows for this instrument/decision — optional thin wire. */
+  journalEntries?: DecisionJournalEntryV1[] | null;
   onClose: () => void;
   onCollapse: () => void;
 }) {
@@ -137,14 +158,16 @@ export function DecisionFichaPanel({
       ? study.indicators.confirmation.split(" + ").map((s) => s.trim())
       : []),
   ].filter(Boolean);
-  const positionTruth = position
-    ? buildOperationalTruth({
+  const positionPot = position
+    ? buildPositionOperatingTruth({
         position,
         study,
         portfolioReconStatus,
         orderPending,
+        submitIntent,
       })
     : null;
+  const positionTruth = positionPot?.operational ?? null;
   const entryTruth =
     !position && study.hasOperationalPlan
       ? buildEntryOperatingTruth({
@@ -155,6 +178,26 @@ export function DecisionFichaPanel({
           inConfirmQueue,
         })
       : null;
+
+  // TradeStory thin wire: only facts with asOf. No invent from tradePlanStatus /
+  // orderPending boolean / thin OperationalPositionDto (revisions/T1 stamps missing).
+  const tradeStoryExecution =
+    orderPending || submitIntent
+      ? buildExecutionState({
+          instrumentId: study.instrumentId,
+          pendingOrder: orderPending,
+          submitIntent: submitIntent ?? null,
+          asOf: submitIntent?.sendAttemptedAt ?? null,
+        })
+      : null;
+  const tradeStory = buildTradeStory({
+    instrumentId: study.instrumentId,
+    decisionId: study.decisionId,
+    study,
+    journalEntries: journalEntries ?? null,
+    submitIntent: submitIntent ?? null,
+    executionState: tradeStoryExecution,
+  });
 
   return (
     <aside
@@ -347,10 +390,16 @@ export function DecisionFichaPanel({
           </section>
         ) : null}
 
-        {positionTruth ? (
+        {positionPot ? (
           <>
-            <PositionOperatingSummary truth={positionTruth} />
-            {positionTruth.plan.hasPlan ? (
+            <PositionOperatingSummary
+              pot={positionPot}
+              position={position ?? undefined}
+              orderPending={orderPending}
+              submitIntent={submitIntent}
+              portfolioReconStatus={portfolioReconStatus}
+            />
+            {positionTruth?.plan.hasPlan ? (
               <OperationalPlanView
                 plan={positionTruth.plan}
                 omitLiveMetrics
@@ -367,7 +416,11 @@ export function DecisionFichaPanel({
           </>
         ) : entryTruth ? (
           <>
-            <EntryOperatingSummary truth={entryTruth} />
+            <EntryOperatingSummary
+              truth={entryTruth}
+              orderPendingFill={orderPending}
+              submitIntent={submitIntent}
+            />
             {entryTruth.plan.hasPlan ? (
               <OperationalPlanView
                 plan={entryTruth.plan}
@@ -388,6 +441,38 @@ export function DecisionFichaPanel({
             Pérdida máxima estimada: {formatPrice(study.riskAmount)}
           </p>
         ) : null}
+
+        <section data-testid="ficha-trade-story">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Historia de la operación
+          </p>
+          {tradeStory.events.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Sin eventos con marca de tiempo. No se inventan fases desde el
+              estado actual (preparada/trigger/T1 sin stamp).
+            </p>
+          ) : (
+            <ol className="space-y-1.5 text-xs">
+              {tradeStory.events.map((ev) => (
+                <li
+                  key={ev.eventId}
+                  className="flex justify-between gap-2"
+                  data-testid={`trade-story-event-${ev.kind}`}
+                >
+                  <span className="font-medium text-foreground">
+                    {ev.label}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {formatStoryAsOf(ev.asOf)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Distinto del Historial técnico (audit spine). Trail hint ≠ aplicado.
+          </p>
+        </section>
 
         <details
           className="rounded-md border border-border/60 p-2"

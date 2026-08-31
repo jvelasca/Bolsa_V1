@@ -23,6 +23,7 @@ import {
   type PortfolioPositionRiskInput,
 } from "./portfolio-risk-metrics.js";
 import { buildMesaOperationalStatusDetail } from "./mesa-operational-health.js";
+import { buildPaperAutoPosture } from "./paper-auto-posture.js";
 
 export { sumPortfolioUnrealizedR };
 export type { DataFreshnessV1, PortfolioPositionRiskInput };
@@ -81,14 +82,8 @@ function blockedEntry(input: MapMesaNextActionInput): boolean {
 export function mapMesaNextAction(
   input: MapMesaNextActionInput,
 ): MesaNextActionV1 {
-  if (input.protectionDiscrepancy) {
-    return {
-      kind: "protect",
-      label: MESA_NEXT_ACTION_LABELS.protect,
-      allowsEntry: false,
-    };
-  }
-
+  // V1.42 §A.8 — full_exit / reduce win over protectionDiscrepancy.
+  // Discrepancy alone (no exit/reduce) still maps to protect.
   const exit = input.exitSuggestedAction;
   if (exit === "full_exit") {
     return {
@@ -104,6 +99,15 @@ export function mapMesaNextAction(
       allowsEntry: false,
     };
   }
+
+  if (input.protectionDiscrepancy) {
+    return {
+      kind: "protect",
+      label: MESA_NEXT_ACTION_LABELS.protect,
+      allowsEntry: false,
+    };
+  }
+
   if (exit === "protect" || input.protectPlan?.status === "protect_hint") {
     return {
       kind: "protect",
@@ -276,6 +280,10 @@ export function buildMesaOperationalHeader(input: {
   readinessState?: string | null;
   riskTolerance?: string | null;
   maxAcceptableLossPct?: number | null;
+  /** F8: cuenta operativa MANUAL/SEMI/AUTO (default SEMI). */
+  bookMode?: "manual" | "semi" | "auto" | null;
+  /** F8: armado local A3 (`ACTIVAR AUTO`). */
+  autoArmed?: boolean | null;
 }): MesaOperationalHeaderV1 {
   const equity = input.equity ?? null;
   const cash = input.cash ?? null;
@@ -316,6 +324,12 @@ export function buildMesaOperationalHeader(input: {
     maxAcceptableLossPct: input.maxAcceptableLossPct,
   });
 
+  const posture = buildPaperAutoPosture({
+    bookMode: input.bookMode,
+    autoArmed: input.autoArmed,
+    paperDExecuteEnv: input.paperDExecuteEnv,
+  });
+
   return {
     regimeHint: input.regimeHint ?? null,
     portfolioPnLR: riskSnapshot.portfolioPnLR,
@@ -331,8 +345,8 @@ export function buildMesaOperationalHeader(input: {
     operationalPrimaryReason: statusDetail.primaryReason,
     dataFreshness: mesaDataFreshnessFromContract(dataFreshnessContract),
     dataFreshnessContract,
-    modeLabel: "SEMI",
-    modeDetail: "IA propone · humano firma · AUTO off",
+    modeLabel: posture.modeLabel,
+    modeDetail: posture.modeDetail,
     brokerVenue: input.brokerVenue ?? null,
     paperDExecuteEnv: input.paperDExecuteEnv ?? false,
     readinessState: input.readinessState ?? null,

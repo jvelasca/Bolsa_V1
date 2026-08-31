@@ -113,4 +113,80 @@ describe("PositionOperatingSummary V1.39", () => {
     );
     expect(container.firstChild).toBeNull();
   });
+
+  it("orderPending → ExecutionState in_flight copy (V1.42 F2)", () => {
+    render(
+      <PositionOperatingSummary
+        position={openPosition()}
+        portfolioReconStatus="ok"
+        orderPending
+      />,
+    );
+    const root = screen.getByTestId("position-operating-summary");
+    expect(root.getAttribute("data-execution-lifecycle")).toBe("in_flight");
+    expect(root.getAttribute("data-execution-order")).toBe("pending");
+    expect(
+      screen.getByTestId("position-operating-execution").textContent,
+    ).toMatch(/en vuelo/i);
+  });
+
+  it("submitIntent venue_bound → UNKNOWN copy from list facts (V1.42 F2b)", () => {
+    render(
+      <PositionOperatingSummary
+        position={openPosition()}
+        portfolioReconStatus="ok"
+        submitIntent={{
+          decisionId: "DEC-1",
+          intentId: "INT-1",
+          orderId: "ORD-1",
+          accountId: "acc-1",
+          phase: "venue_bound",
+          venueOrderId: "v-1",
+          reason: "crash_after_venue_ack",
+          venue: "paper",
+          sendAttemptedAt: "2026-08-31T12:00:00.000Z",
+          instrumentId: "inst-aapl",
+        }}
+      />,
+    );
+    const root = screen.getByTestId("position-operating-summary");
+    expect(root.getAttribute("data-execution-lifecycle")).toBe("unknown");
+    expect(root.getAttribute("data-execution-order")).toBe("unknown");
+    expect(
+      screen.getByTestId("position-operating-execution").textContent,
+    ).toMatch(/desconocida|no duplicar/i);
+  });
+
+  it("full_exit + protectionDiscrepancy → Salir + secondary (V1.42 F3 §A.8)", () => {
+    render(
+      <PositionOperatingSummary
+        position={openPosition({
+          lastPrice: 94,
+          operational: {
+            status: "OPEN",
+            direction: "long",
+            tradePlanId: "tp-1",
+            plannedEntry: 100,
+            actualEntry: 100,
+            initialStop: 95,
+            currentStop: 95,
+            target1: 105,
+            target2: 110,
+            exitPlan: { suggestedAction: "full_exit" },
+          },
+        })}
+        portfolioReconStatus="ok"
+        protectionDiscrepancy
+      />,
+    );
+    const root = screen.getByTestId("position-operating-summary");
+    expect(root.getAttribute("data-cta")).toBe("exit");
+    expect(screen.getByTestId("position-operating-action").textContent).toBe(
+      "Salir",
+    );
+    expect(root.getAttribute("data-protection-discrepancy")).toBe("1");
+    expect(
+      screen.getByTestId("position-operating-secondary").textContent,
+    ).toMatch(/protección discrepante/i);
+  });
 });

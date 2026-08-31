@@ -28,12 +28,13 @@ function pxToPct(px: number, total: number) {
 }
 
 /**
- * Terminal Mercado / TRADING (ADR-019 + ADR-040):
+ * Terminal Mercado / TRADING (ADR-019 + ADR-040 + ADR-041 §1.6 / ADR-042):
  * columna izq. = Listas | Gráfico + Operaciones;
- * columna der. = Operativa a altura completa (hasta TradingStatusBar).
+ * columna der. = DECISIÓN a altura completa (hasta TradingStatusBar).
  * Sin HoyCommandStrip ni MesaOperationalBar — candidatos viven en Hoy.
  *
  * @see docs/adr/040-user-information-architecture.md
+ * @see docs/adr/042-operating-excellence.md
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 export function TradingLayout({ children }: { children: ReactNode }) {
@@ -251,7 +252,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
         {showOperativa ? (
           <>
             <PanelResizeHandle
-              label="Redimensionar panel operativa"
+              label="Redimensionar panel DECISIÓN"
               className="hidden md:flex"
               onDrag={adjustOperativa}
               onDragEnd={() =>
@@ -259,7 +260,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
               }
             />
             <DockZone
-              title="Operativa"
+              title="DECISIÓN"
               open
               maximized={false}
               onClose={layout.toggleOperativa}

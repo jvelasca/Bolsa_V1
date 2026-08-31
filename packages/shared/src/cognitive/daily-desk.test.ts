@@ -1,14 +1,19 @@
 /**
- * V1.41 — Daily Desk: misma attention → mismo inbox (contratos de builders).
+ * V1.42 F6 — Daily Desk four buckets (§B.7).
  */
 
 import { describe, expect, it } from "vitest";
-import type { PositionDto } from "../types.js";
+import type { DecisionJournalStudyViewV1 } from "./decision-journal-study.js";
 import {
   attentionRank,
+  bucketFromEntryTruth,
   buildDailyDeskInbox,
+  DAILY_DESK_BUCKET_LABEL,
+  DAILY_DESK_BUCKET_ORDER,
   dailyDeskSurfaceSnapshot,
 } from "./daily-desk.js";
+import { buildEntryOperatingTruth } from "./entry-operating-truth.js";
+import type { PositionDto } from "../types.js";
 
 function aaplOpen(overrides: Partial<PositionDto> = {}): PositionDto {
   return {
@@ -38,8 +43,66 @@ function aaplOpen(overrides: Partial<PositionDto> = {}): PositionDto {
   };
 }
 
-describe("dailyDesk V1.41", () => {
-  it("HOLD clean position → empty inbox (NORMAL)", () => {
+function armedStudy(
+  overrides: Partial<DecisionJournalStudyViewV1> = {},
+): DecisionJournalStudyViewV1 {
+  return {
+    artifactType: "decision_journal_study",
+    schemaVersion: 1,
+    sessionId: "s1",
+    decisionId: "d1",
+    instrumentId: "inst-msft",
+    symbol: "MSFT",
+    name: "Microsoft",
+    studiedAt: "2026-08-31T09:00:00.000Z",
+    ageMs: null,
+    period: null,
+    timeframe: null,
+    opinion: null,
+    status: "in_progress",
+    strength: null,
+    strengthBand: null,
+    vigencia: null,
+    entry: 100,
+    stop: 94,
+    target1: 112,
+    target2: 124,
+    expectedRR: 2,
+    riskAmount: 60,
+    quantity: 10,
+    initialRiskR: 1,
+    positionValue: 1000,
+    direction: "long",
+    hasOperationalPlan: true,
+    userThesis: null,
+    decisionSummary: null,
+    analysisNotes: [],
+    trends: [],
+    consensus: { bullish: 0, bearish: 0, neutral: 0, total: 0 },
+    indicators: { primary: null, confirmation: null },
+    invalidation: [],
+    nextReviewAt: null,
+    tradePlanStatus: "ARMED",
+    action: null,
+    ...overrides,
+  } as DecisionJournalStudyViewV1;
+}
+
+describe("dailyDesk V1.42 F6 four buckets", () => {
+  it("always exposes four chrome buckets in §B.7 order", () => {
+    const inbox = buildDailyDeskInbox({ positions: [], pendingConfirm: 0 });
+    expect(inbox.buckets.map((b) => b.id)).toEqual([
+      ...DAILY_DESK_BUCKET_ORDER,
+    ]);
+    expect(inbox.buckets.map((b) => b.label)).toEqual([
+      DAILY_DESK_BUCKET_LABEL.requiere_accion,
+      DAILY_DESK_BUCKET_LABEL.oportunidades,
+      DAILY_DESK_BUCKET_LABEL.vigilar,
+      DAILY_DESK_BUCKET_LABEL.sin_accion,
+    ]);
+  });
+
+  it("HOLD clean → empty items; ⚪ honest empty (not a fifth Mercado)", () => {
     const inbox = buildDailyDeskInbox({
       positions: [aaplOpen()],
       portfolioReconStatus: "ok",
@@ -47,21 +110,26 @@ describe("dailyDesk V1.41", () => {
     });
     expect(inbox.count).toBe(0);
     expect(inbox.emptyLabel).toMatch(/Nada requiere/i);
+    const sin = inbox.buckets.find((b) => b.id === "sin_accion");
+    expect(sin?.count).toBe(0);
+    expect(sin?.emptyLabel).toMatch(/Nada que hacer/i);
   });
 
-  it("pending confirm → URGENT item first", () => {
+  it("pending confirm → 🔴 REQUIERE ACCIÓN", () => {
     const inbox = buildDailyDeskInbox({
       positions: [aaplOpen()],
       pendingConfirm: 2,
       portfolioReconStatus: "ok",
     });
-    expect(inbox.count).toBe(1);
     expect(inbox.items[0]?.kind).toBe("pending_confirm");
-    expect(inbox.items[0]?.attention).toBe("URGENT");
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
     expect(inbox.items[0]?.ctaLabel).toBe("Revisar y confirmar");
+    expect(inbox.buckets.find((b) => b.id === "requiere_accion")?.count).toBe(
+      1,
+    );
   });
 
-  it("T1 reached → position item with Reducir CTA", () => {
+  it("full_exit / T1 reduce → 🔴 with same POT CTA family", () => {
     const pos = aaplOpen({
       lastPrice: 105,
       marketValue: 1050,
@@ -72,22 +140,23 @@ describe("dailyDesk V1.41", () => {
       portfolioReconStatus: "ok",
     });
     expect(inbox.count).toBe(1);
-    expect(inbox.items[0]?.kind).toBe("position");
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
     expect(inbox.items[0]?.ctaLabel).toBe("Reducir");
+    expect(inbox.items[0]?.phrase.length).toBeGreaterThan(0);
     expect(attentionRank(inbox.items[0]!.attention)).toBeGreaterThan(0);
   });
 
-  it("recon drift → BLOCKED attention ahead of HOLD noise", () => {
+  it("recon drift → 🔴 BLOCKED", () => {
     const inbox = buildDailyDeskInbox({
       positions: [aaplOpen()],
       portfolioReconStatus: "drift",
     });
-    expect(inbox.count).toBe(1);
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
     expect(inbox.items[0]?.attention).toBe("BLOCKED");
     expect(inbox.items[0]?.ctaLabel).toBe("Revisar");
   });
 
-  it("protection discrepancy appears as board_attention", () => {
+  it("protection discrepancy → 🔴 Proteger", () => {
     const inbox = buildDailyDeskInbox({
       positions: [],
       protectionDiscrepancies: [
@@ -98,13 +167,140 @@ describe("dailyDesk V1.41", () => {
         },
       ],
     });
-    expect(inbox.count).toBe(1);
-    expect(inbox.items[0]?.kind).toBe("board_attention");
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
     expect(inbox.items[0]?.ctaLabel).toBe("Proteger");
-    expect(inbox.items[0]?.attention).toBe("URGENT");
   });
 
-  it("surface snapshot is stable for same inputs", () => {
+  it("UNKNOWN instrument → 🔴 Ver operaciones (never reenviar)", () => {
+    const inbox = buildDailyDeskInbox({
+      positions: [aaplOpen()],
+      portfolioReconStatus: "ok",
+      unknownInstrumentIds: ["inst-aapl"],
+    });
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
+    expect(inbox.items[0]?.ctaLabel).toMatch(/operaciones/i);
+    expect(inbox.items[0]?.phrase).toMatch(/desconocida|no duplicar/i);
+  });
+
+  it("incident → 🔴", () => {
+    const inbox = buildDailyDeskInbox({
+      positions: [],
+      hasOpenIncident: true,
+    });
+    expect(inbox.items[0]?.kind).toBe("incident");
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
+  });
+
+  it("preparada EOT → 🟢 OPORTUNIDADES with human phase (not ARMED)", () => {
+    const study = armedStudy();
+    const eot = buildEntryOperatingTruth({ study, inEstudio: true });
+    expect(eot?.phase).toBe("preparada");
+    expect(bucketFromEntryTruth(eot!)).toBe("oportunidades");
+
+    const studies = new Map([[study.instrumentId, study]]);
+    const inbox = buildDailyDeskInbox({
+      positions: [],
+      studiesByInstrument: studies,
+      board: {
+        buckets: {
+          pendingConfirm: 0,
+          vetoed: 0,
+          deferred: 0,
+          autoWaiting: 0,
+        },
+        decisionSessions: [
+          {
+            sessionId: "s1",
+            kind: "propose",
+            status: "open",
+            instrumentId: study.instrumentId,
+            symbol: "MSFT",
+            createdAt: "2026-08-31T09:00:00Z",
+            gate: "PASS",
+            tradePlan: {
+              artifactType: "ART-TRADE-PLAN",
+              schemaVersion: "1.0.0",
+              decisionId: "d1",
+              instrumentId: study.instrumentId,
+              direction: "long",
+              status: "ARMED",
+              entryReady: true,
+              structuralStop: 94,
+              entry: 100,
+              target1: 112,
+              target2: 124,
+            },
+          },
+        ],
+        semiF3Queue: [],
+      } as never,
+    });
+    const opp = inbox.buckets.find((b) => b.id === "oportunidades");
+    expect(opp?.count).toBeGreaterThan(0);
+    const item = opp!.items[0]!;
+    expect(item.phaseLabel).toMatch(/Preparada/i);
+    expect(item.phaseLabel).not.toMatch(/ARMED|WATCH|TRIGGERED/);
+    expect(item.ctaLabel.toUpperCase()).not.toContain("BUY");
+    expect(item.phrase).toMatch(/Plan armado|Disparador/i);
+  });
+
+  it("WATCH without operable plan → 🟡 VIGILAR (not Ranking BUY)", () => {
+    const study = armedStudy({
+      instrumentId: "inst-enst",
+      symbol: "ENST1",
+      tradePlanStatus: "WATCH",
+      hasOperationalPlan: false,
+      entry: null,
+      stop: null,
+      target1: null,
+      target2: null,
+    });
+    const studies = new Map([[study.instrumentId, study]]);
+    const inbox = buildDailyDeskInbox({
+      positions: [],
+      studiesByInstrument: studies,
+      board: {
+        buckets: {
+          pendingConfirm: 0,
+          vetoed: 0,
+          deferred: 0,
+          autoWaiting: 0,
+        },
+        decisionSessions: [
+          {
+            sessionId: "sw",
+            kind: "propose",
+            status: "open",
+            instrumentId: study.instrumentId,
+            symbol: "ENST1",
+            createdAt: "2026-08-31T09:00:00Z",
+            gate: "PASS",
+            tradePlan: {
+              artifactType: "ART-TRADE-PLAN",
+              schemaVersion: "1.0.0",
+              decisionId: "dw",
+              instrumentId: study.instrumentId,
+              direction: "long",
+              status: "WATCH",
+              entryReady: false,
+              structuralStop: 9,
+              entry: 10,
+            },
+          },
+        ],
+        semiF3Queue: [],
+      } as never,
+    });
+    const vigilar = inbox.buckets.find((b) => b.id === "vigilar");
+    expect(vigilar?.count).toBeGreaterThan(0);
+    expect(vigilar!.items[0]!.phaseLabel).toMatch(/estudio/i);
+    for (const item of vigilar!.items) {
+      expect(item.phaseLabel ?? "").not.toMatch(/^(WATCH|ARMED|TRIGGERED)$/);
+      expect(item.ctaLabel.toUpperCase()).not.toContain("BUY");
+    }
+  });
+
+  it("surface snapshot includes buckets + phrases; no BUY", () => {
     const pos = aaplOpen({ lastPrice: 105 });
     const a = buildDailyDeskInbox({
       positions: [pos],
@@ -117,31 +313,15 @@ describe("dailyDesk V1.41", () => {
       portfolioReconStatus: "ok",
     });
     expect(dailyDeskSurfaceSnapshot(a)).toEqual(dailyDeskSurfaceSnapshot(b));
-    expect(dailyDeskSurfaceSnapshot(a).ctaLabels).toContain(
-      "Revisar y confirmar",
-    );
-    expect(dailyDeskSurfaceSnapshot(a).ctaLabels).toContain("Reducir");
-  });
-
-  it("never exposes BUY in CTA labels", () => {
-    const inbox = buildDailyDeskInbox({
-      positions: [aaplOpen({ lastPrice: 105 })],
-      pendingConfirm: 1,
-      protectionDiscrepancies: [
-        {
-          symbol: "X",
-          reason: "x",
-          recommendedAction: "REVISAR",
-        },
-      ],
-    });
-    for (const item of inbox.items) {
+    expect(dailyDeskSurfaceSnapshot(a).bucketIds).toContain("requiere_accion");
+    expect(dailyDeskSurfaceSnapshot(a).phrases.length).toBe(a.count);
+    for (const item of a.items) {
       expect(item.ctaLabel.toUpperCase()).not.toContain("BUY");
       expect(item.ctaLabel.toUpperCase()).not.toContain("COMPRAR");
     }
   });
 
-  it("orderPending on T1 still lists the position (hint is none internally)", () => {
+  it("orderPending on T1 → 🔴 Ver operaciones (same POT/ExecutionState as Mercado)", () => {
     const pos = aaplOpen({ lastPrice: 105 });
     const inbox = buildDailyDeskInbox({
       positions: [pos],
@@ -149,6 +329,7 @@ describe("dailyDesk V1.41", () => {
       pendingInstrumentIds: [pos.instrumentId],
     });
     expect(inbox.count).toBe(1);
-    expect(inbox.items[0]?.ctaLabel).toBe("Reducir");
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
+    expect(inbox.items[0]?.ctaLabel).toMatch(/operaciones/i);
   });
 });

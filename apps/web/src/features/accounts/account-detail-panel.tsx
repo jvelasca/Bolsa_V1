@@ -580,7 +580,7 @@ export function AccountDetailPanel({
                 Define cómo trabaja esta cuenta demo (todos los valores).{" "}
                 <strong className="text-foreground">SEMI</strong> es el
                 recomendado en pruebas: la app propone; tú firmas en Confirmar.
-                No se configura en el panel Operativa de cada instrumento.
+                No se configura en el panel DECISIÓN de cada instrumento.
               </p>
               {isWorkingAccount && !isClosed ? (
                 <DemoBookModePanel />

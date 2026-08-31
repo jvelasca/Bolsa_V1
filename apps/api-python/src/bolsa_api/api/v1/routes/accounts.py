@@ -27,6 +27,7 @@ from bolsa_api.api.dependencies import (
     get_live_recon_lookup,
     get_operational_incident_store,
     get_portfolio_recon_lookup,
+    get_submit_intent_store,
     get_record_session_verdict_use_case,
     get_set_default_account_use_case,
     get_tax_report_use_case,
@@ -68,6 +69,9 @@ from bolsa_api.schemas.accounts import (
     ResolveOperationalIncidentBodyDto,
     ReviewOperationalIncidentBodyDto,
     SendDailyOpsDigestDto,
+    SubmitIntentListItemDto,
+    SubmitIntentsListDto,
+    SubmitIntentsListResponseDto,
     SessionVerdictBodyDto,
     SessionVerdictResponseDto,
     TaxReportResponseDto,
@@ -536,6 +540,76 @@ async def list_active_operational_incidents(
             account_id=account_id,
             incidents=incidents,
             total=len(incidents),
+        )
+    )
+
+
+async def _instrument_ids_for_decisions(
+    session: AsyncSession,
+    decision_ids: list[str],
+) -> dict[str, str | None]:
+    """Soft-join fail-closed: decision_sessions.decision_id → instrument_id."""
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import DecisionSessionRow
+
+    keys = [d.strip() for d in decision_ids if (d or "").strip()]
+    if not keys:
+        return {}
+    stmt = select(DecisionSessionRow.decision_id, DecisionSessionRow.instrument_id).where(
+        DecisionSessionRow.decision_id.in_(keys)
+    )
+    rows = (await session.execute(stmt)).all()
+    out: dict[str, str | None] = {k: None for k in keys}
+    for decision_id, instrument_id in rows:
+        if not decision_id:
+            continue
+        iid = (instrument_id or "").strip() or None
+        # First non-empty wins; missing stays null (fail-closed).
+        if out.get(decision_id) is None and iid is not None:
+            out[decision_id] = iid
+    return out
+
+
+def _to_submit_intent_dto(
+    intent: object,
+    *,
+    instrument_id: str | None,
+) -> SubmitIntentListItemDto:
+    payload = dict(intent.to_dict())  # type: ignore[attr-defined]
+    payload["instrumentId"] = instrument_id
+    return SubmitIntentListItemDto.model_validate(payload)
+
+
+@router.get(
+    "/accounts/{account_id}/submit-intents",
+    response_model=SubmitIntentsListResponseDto,
+)
+async def list_in_flight_submit_intents(
+    account_id: Annotated[str, Depends(require_account_access)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> SubmitIntentsListResponseDto:
+    """F2b — submit intents in-flight (recorded/send_attempted/venue_bound). Solo lectura."""
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    store = get_submit_intent_store(session)
+    intents = await store.list_in_flight(account_id)
+    instrument_by_decision = await _instrument_ids_for_decisions(
+        session,
+        [intent.decision_id for intent in intents],
+    )
+    items = [
+        _to_submit_intent_dto(
+            intent,
+            instrument_id=instrument_by_decision.get(intent.decision_id),
+        )
+        for intent in intents
+    ]
+    return SubmitIntentsListResponseDto(
+        data=SubmitIntentsListDto(
+            account_id=account_id,
+            intents=items,
+            total=len(items),
         )
     )
 

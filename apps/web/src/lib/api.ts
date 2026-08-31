@@ -1689,6 +1689,20 @@ export const api = {
       }),
     ),
 
+  /** F2b — submit intents in-flight (recorded/send_attempted/venue_bound). Solo lectura. */
+  getSubmitIntents: (accountId: string) =>
+    call<{
+      data: {
+        accountId: string;
+        intents: import("@bolsa/shared").SubmitIntentListItemV1[];
+        total: number;
+      };
+    }>(() =>
+      client.GET("/api/accounts/{account_id}/submit-intents", {
+        params: { path: { account_id: accountId } },
+      }),
+    ),
+
   resolveOperationalIncident: (
     accountId: string,
     incidentId: string,

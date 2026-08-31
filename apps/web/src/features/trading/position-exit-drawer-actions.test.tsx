@@ -63,8 +63,8 @@ function position(
   };
 }
 
-describe("PositionExitDrawerActions V1.36", () => {
-  it("emphasizes Mantener on HOLD", () => {
+describe("PositionExitDrawerActions V1.36 / F7", () => {
+  it("emphasizes Mantener on HOLD and hides Reducir/Salir (primaryOnly default)", () => {
     render(
       <PositionExitDrawerActions
         position={position()}
@@ -73,6 +73,8 @@ describe("PositionExitDrawerActions V1.36", () => {
       />,
     );
     expect(screen.getByText("Mantener").className).toMatch(/ring-primary/);
+    expect(screen.queryByTestId("position-exit-reduce-TEST")).toBeNull();
+    expect(screen.queryByTestId("position-exit-full-TEST")).toBeNull();
   });
 
   it("shows Revisar and hides reduce/exit on recon drift", () => {
@@ -87,6 +89,41 @@ describe("PositionExitDrawerActions V1.36", () => {
     expect(screen.queryByTestId("position-exit-full-TEST")).toBeNull();
   });
 
+  it("shows only Reducir when primaryCtaKind=reduce", () => {
+    render(
+      <PositionExitDrawerActions
+        position={position(undefined, {
+          status: "TRIGGERED",
+          suggestedAction: "reduce",
+          suggestedQty: 5,
+          primaryReason: "TARGET_1",
+          policyTemplateId: "moderate",
+        })}
+        primaryCtaKind="reduce"
+        portfolioReconStatus="ok"
+      />,
+    );
+    expect(screen.getByTestId("position-exit-reduce-TEST")).toBeTruthy();
+    expect(screen.queryByTestId("position-exit-full-TEST")).toBeNull();
+  });
+
+  it("shows only Salir when primaryCtaKind=exit", () => {
+    render(
+      <PositionExitDrawerActions
+        position={position(undefined, {
+          status: "TRIGGERED",
+          suggestedAction: "full_exit",
+          primaryReason: "STRUCTURAL_STOP",
+          policyTemplateId: "moderate",
+        })}
+        primaryCtaKind="exit"
+        portfolioReconStatus="ok"
+      />,
+    );
+    expect(screen.getByTestId("position-exit-full-TEST")).toBeTruthy();
+    expect(screen.queryByTestId("position-exit-reduce-TEST")).toBeNull();
+  });
+
   it("shows Proteger when exit plan suggests protect", () => {
     render(
       <PositionExitDrawerActions
@@ -97,6 +134,7 @@ describe("PositionExitDrawerActions V1.36", () => {
           primaryReason: "TRAIL",
           policyTemplateId: "moderate",
         })}
+        primaryCtaKind="protect"
         portfolioReconStatus="ok"
       />,
     );

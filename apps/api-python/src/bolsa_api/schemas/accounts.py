@@ -593,3 +593,32 @@ class ReviewOperationalIncidentBodyDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     reviewed_by: str | None = Field(default=None, alias="reviewedBy")
+
+
+class SubmitIntentListItemDto(BaseModel):
+    """F2b — DurableSubmitIntent wire + soft-join instrumentId (fail-closed null)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    decision_id: str = Field(alias="decisionId")
+    intent_id: str = Field(alias="intentId")
+    order_id: str = Field(alias="orderId")
+    account_id: str = Field(alias="accountId")
+    phase: Literal["recorded", "send_attempted", "venue_bound", "filled"]
+    venue_order_id: str | None = Field(default=None, alias="venueOrderId")
+    reason: str | None = None
+    venue: str = "paper"
+    send_attempted_at: str | None = Field(default=None, alias="sendAttemptedAt")
+    instrument_id: str | None = Field(default=None, alias="instrumentId")
+
+
+class SubmitIntentsListDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    account_id: str = Field(alias="accountId")
+    intents: list[SubmitIntentListItemDto]
+    total: int
+
+
+class SubmitIntentsListResponseDto(BaseModel):
+    data: SubmitIntentsListDto

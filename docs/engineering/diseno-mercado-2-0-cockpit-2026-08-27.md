@@ -1,7 +1,7 @@
 # Diseño — Mercado 2.0 (cockpit)
 
-> **AsOf:** 2026-08-31 · **Estado:** **SLICE 2 en código (V1.23)** — overlays del plan en gráfico · `InstrumentOperationalContext` · Listas Estudio-first · Operaciones filtradas · Pulso/Lab bajo «¿Por qué?».  
-> **Contrato V1.42 (sin código):** panel derecho = **DECISIÓN** — [ADR-042](../adr/042-operating-excellence.md) · [spec](./spec-v142-operating-excellence-2026-08-31.md) §B. El chrome actual puede seguir diciendo «Operativa» hasta F5.
+> **AsOf:** 2026-08-31 · **Estado:** **SLICE 2 + V1.42 F5 CÓDIGO** — overlays del plan en gráfico · `InstrumentOperationalContext` · Listas Estudio-first · Operaciones filtradas · Pulso/Lab bajo «¿Por qué?».  
+> **Contrato V1.42:** panel derecho = **DECISIÓN** — [ADR-042](../adr/042-operating-excellence.md) · [spec](./spec-v142-operating-excellence-2026-08-31.md) §B · [relevo F5](./traspaso-relevo-v1-42-f5-mercado-decision-2026-08-31.md).
 > **Padre:** [`traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md`](./traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md) · [ADR-040](../adr/040-user-information-architecture.md) §9 · [ADR-041](../adr/041-operational-coherence.md).
 > **Estudio pendiente (drag / AUTO UX):** [`estudio-operativa-auto-y-grafico-2026-08-28.md`](./estudio-operativa-auto-y-grafico-2026-08-28.md) — niveles en gráfico **read-only** hasta acuerdo §8.
 > **Regla:** No nuevas puertas L1. Shell dock intacto; cambia el contenido contextual.
@@ -49,7 +49,7 @@ Fuente de niveles = `OperationalPlanView` (misma proyección que Hoy / Journal).
 
 ## 3. Derecha — ¿Qué hago? (DECISIÓN)
 
-Nombre de producto **DECISIÓN** ([ADR-042](../adr/042-operating-excellence.md)): ¿cuál es la decisión operativa sobre este activo? No Operativa, ni Asesor, ni Trading. El código V1.23 puede seguir usando el identificador `Operativa` hasta F5.
+Nombre de producto **DECISIÓN** ([ADR-042](../adr/042-operating-excellence.md)): ¿cuál es la decisión operativa sobre este activo? No Operativa, ni Asesor, ni Trading. **F5 CÓDIGO** — chrome DockZone/top-bar/HELP = DECISIÓN; ids de código `operativa*` se conservan.
 
 Sustituir Pulso/dictamen/Lab como idioma principal por **una tarjeta contextual** (`OperationalPlanView` / truths V1.37–V1.38) + bloque «¿Por qué?» colapsado. **Una CTA primaria.**
 

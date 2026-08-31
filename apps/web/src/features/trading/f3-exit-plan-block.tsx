@@ -1,8 +1,15 @@
 /**
  * V1.32 — ExitPlan + fuente evento|manual en el ticket Confirm (Nivel 1).
  * Simétrico a F3TradePlanRiskFirstBlock / firma de apertura.
+ * V1.42 F7 — copy humano (sin enums exit_hint / full_exit / TARGET_1).
  */
 
+import {
+  formatExitOperativaIntentLabel,
+  formatExitPlanStatusLabel,
+  formatExitReasonLabel,
+  formatExitSuggestedActionLabel,
+} from "@bolsa/shared";
 import { MesaTipButton } from "@/features/help/mesa-tip-button";
 import type { OperativaExitMetaV1 } from "@/features/operations/propose-position-exit";
 import { cn } from "@/lib/utils";
@@ -34,7 +41,7 @@ export function F3ExitPlanBlock({
     >
       <div className="flex flex-wrap items-center gap-1.5">
         <p className="text-[11px] font-medium text-foreground">
-          Plan de salida · ExitPlan
+          Plan de salida
         </p>
         <MesaTipButton tip="confirm-risk-signature" />
         <span
@@ -53,7 +60,7 @@ export function F3ExitPlanBlock({
         <div className="flex justify-between gap-2">
           <span className="text-muted-foreground">Intent</span>
           <span className="font-medium tabular-nums text-foreground">
-            {meta.operativaIntent}
+            {formatExitOperativaIntentLabel(meta.operativaIntent)}
           </span>
         </div>
         <div className="flex justify-between gap-2">
@@ -77,15 +84,21 @@ export function F3ExitPlanBlock({
           <>
             <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Estado</span>
-              <span className="tabular-nums">{plan.status}</span>
+              <span className="tabular-nums">
+                {formatExitPlanStatusLabel(plan.status)}
+              </span>
             </div>
             <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Acción</span>
-              <span className="tabular-nums">{plan.suggestedAction}</span>
+              <span className="tabular-nums">
+                {formatExitSuggestedActionLabel(plan.suggestedAction)}
+              </span>
             </div>
             <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Motivo</span>
-              <span className="tabular-nums">{plan.primaryReason ?? "—"}</span>
+              <span className="tabular-nums">
+                {formatExitReasonLabel(plan.primaryReason)}
+              </span>
             </div>
           </>
         ) : (
@@ -103,8 +116,8 @@ export function F3ExitPlanBlock({
       ) : null}
       {meta.exitSource === "manual" ? (
         <p className="text-[11px] text-muted-foreground">
-          Confirm = firma humana. ExitPermission en servidor usa{" "}
-          <span className="text-foreground">manual=True</span> (desriesgo SEMI).
+          Confirm = firma humana. ExitPermission en servidor usa desriesgo SEMI
+          (manual).
         </p>
       ) : null}
     </div>

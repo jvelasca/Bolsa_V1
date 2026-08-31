@@ -13,10 +13,10 @@ import {
   JOURNAL_STUDY_OPINION_LABELS,
   buildInvestmentPositionAggregate,
   buildMesaProtectionState,
-  buildOperationalTruth,
-  formatExecutionHintCopy,
+  buildPositionOperatingTruth,
+  formatPositionOperatingExecutionCopy,
   mapMesaStatusDimensions,
-  mesaNextActionFromOperationalTruth,
+  mesaNextActionFromPositionOperatingTruth,
   stopDistancePct,
   type MesaNextActionKindV1,
 } from "@bolsa/shared";
@@ -31,6 +31,10 @@ import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { PositionRoutePanel } from "@/features/mesa/position-route-panel";
 import { useInstrumentOrderPending } from "@/features/trading/use-pending-orders";
+import {
+  pickSubmitIntentForInstrument,
+  useInFlightSubmitIntents,
+} from "@/features/operations/use-in-flight-submit-intents";
 
 function formatR(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -68,15 +72,17 @@ export function MesaPositionNextActionButton({
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const [error, setError] = useState<string | null>(null);
   const orderPending = useInstrumentOrderPending(position.instrumentId);
-  const truth = buildOperationalTruth({
+  const pot = buildPositionOperatingTruth({
     position,
     study,
     originStudy,
     portfolioReconStatus,
     orderPending,
+    protectPlan,
   });
-  const nextAction = truth
-    ? mesaNextActionFromOperationalTruth(truth)
+  // Path B (aggregate) inherits §A.8 via mapMesaNextAction — no regress.
+  const nextAction = pot
+    ? mesaNextActionFromPositionOperatingTruth(pot)
     : buildInvestmentPositionAggregate({
         position,
         study,
@@ -265,25 +271,32 @@ export function MesaPositionRow({
   const stopForDist = protection.executed.value ?? protection.proposal.value;
   const distPct = stopDistancePct(position.lastPrice, stopForDist);
   const orderPending = useInstrumentOrderPending(position.instrumentId);
+  const { effectiveAccountId } = useActiveAccount();
+  const submitIntentsQuery = useInFlightSubmitIntents(effectiveAccountId);
+  const submitIntent = pickSubmitIntentForInstrument(
+    submitIntentsQuery.data?.data?.intents,
+    position.instrumentId,
+  );
 
-  const nextAction = buildOperationalTruth({
+  const pot = buildPositionOperatingTruth({
     position,
     study,
     originStudy,
     portfolioReconStatus,
     orderPending,
+    submitIntent,
+    protectPlan,
   });
-  const actionLabel = nextAction
-    ? nextAction.primaryCta.label
+  // Path B inherits §A.8 (full_exit/reduce before protectionDiscrepancy).
+  const actionLabel = pot
+    ? pot.primaryCta.label
     : buildInvestmentPositionAggregate({
         position,
         study,
         originStudy,
         protectPlan,
       }).nextAction.label;
-  const executionHintCopy = nextAction
-    ? formatExecutionHintCopy(nextAction)
-    : null;
+  const executionCopy = pot ? formatPositionOperatingExecutionCopy(pot) : null;
 
   return (
     <div
@@ -299,12 +312,12 @@ export function MesaPositionRow({
           >
             Acción: {actionLabel}
           </div>
-          {executionHintCopy ? (
+          {executionCopy ? (
             <div
               className="text-[10px] font-medium text-amber-800 dark:text-amber-200"
               data-testid={`mesa-position-execution-${position.symbol}`}
             >
-              {executionHintCopy}
+              {executionCopy}
             </div>
           ) : null}
           {study?.opinion ? (
@@ -382,6 +395,7 @@ export function MesaPositionRow({
             originStudy={originStudy}
             portfolioReconStatus={portfolioReconStatus}
             orderPending={orderPending}
+            submitIntent={submitIntent}
           />
         </div>
       ) : null}

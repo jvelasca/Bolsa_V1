@@ -1,7 +1,7 @@
 /**
  * V1.41.2 — matriz de honestidad operativa sobre proyecciones actuales.
- * No E2E browser. Escenarios sin modelo (fill parcial / REJECTED / mercado cerrado)
- * quedan parked como it.todo — no inventar ExecutionState.
+ * No E2E browser. V1.42 F2: fill parcial / REJECTED vía ExecutionState.
+ * Mercado cerrado / trailing autoridad siguen parked.
  */
 
 import { describe, expect, it } from "vitest";
@@ -13,10 +13,17 @@ import {
   entryOperatingSurfaceSnapshot,
 } from "./entry-operating-truth.js";
 import {
+  buildExecutionState,
+  formatExecutionStateCopy,
+  isOrderInFlight,
+} from "./execution-state.js";
+import {
   buildOperationalTruth,
   formatExecutionHintCopy,
   operationalTruthSurfaceSnapshot,
 } from "./operational-truth.js";
+import { buildPaperOrder, transitionPaperOrder } from "./paper-order.js";
+import { buildPositionOperatingTruth } from "./position-operating-truth.js";
 
 const ASOF = "2026-08-31T08:15:00.000Z";
 
@@ -323,8 +330,84 @@ describe("operationalHonestyScenarios V1.41.2", () => {
     for (const item of desk.items) noBuy(item.ctaLabel);
   });
 
+  it("19a Fill parcial → ExecutionState partial (V1.42 F2)", () => {
+    const paper = transitionPaperOrder(
+      transitionPaperOrder(
+        buildPaperOrder({
+          instrumentId: "inst-aapl",
+          side: "buy",
+          quantity: 10,
+          orderId: "ORD-partial",
+        }),
+        "SUBMITTED",
+      ),
+      "PARTIAL",
+      { filledQuantity: 4 },
+    );
+    const state = buildExecutionState({
+      instrumentId: "inst-aapl",
+      paperOrder: paper,
+      asOf: ASOF,
+    });
+    expect(state.lifecycle).toBe("in_flight");
+    expect(state.orderState).toBe("partial");
+    expect(state.fillState).toBe("partial");
+    expect(isOrderInFlight(state)).toBe(true);
+    expect(formatExecutionStateCopy(state)).toMatch(/parcial/i);
+    expect(state.nextAction?.allowsEntry).toBe(false);
+  });
+
+  it("19b REJECTED → ExecutionState failed (V1.42 F2)", () => {
+    const paper = transitionPaperOrder(
+      buildPaperOrder({
+        instrumentId: "inst-aapl",
+        side: "buy",
+        quantity: 10,
+        orderId: "ORD-rej",
+      }),
+      "REJECTED",
+    );
+    const state = buildExecutionState({
+      instrumentId: "inst-aapl",
+      paperOrder: paper,
+      asOf: ASOF,
+    });
+    expect(state.lifecycle).toBe("failed");
+    expect(state.orderState).toBe("rejected");
+    expect(isOrderInFlight(state)).toBe(false);
+    expect(formatExecutionStateCopy(state)).toMatch(/rechazada/i);
+  });
+
+  it("19d full_exit + protectionDiscrepancy → exit CTA (V1.42 F3 §A.8)", () => {
+    const pot = buildPositionOperatingTruth({
+      position: aaplOpen({
+        lastPrice: 94,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          tradePlanId: "tp-aapl",
+          plannedEntry: 100,
+          actualEntry: 100,
+          initialStop: 95,
+          currentStop: 95,
+          target1: 105,
+          target2: 110,
+          exitPlan: { suggestedAction: "full_exit" },
+        },
+      }),
+      protectionDiscrepancy: true,
+      asOf: ASOF,
+    });
+    expect(pot?.primaryCta.kind).toBe("exit");
+    expect(pot?.primaryCta.label).toBe("Salir");
+    expect(
+      pot?.secondaryConditions.some((c) => c.kind === "protection_discrepancy"),
+    ).toBe(true);
+    noBuy(pot?.primaryCta.label);
+  });
+
   it.todo(
-    "19 Mercado cerrado / fill parcial / REJECTED — no están en el modelo actual (parked ExecutionState)",
+    "19c Mercado cerrado — parked (no modelo de sesión en ExecutionState F2)",
   );
 
   it.todo(

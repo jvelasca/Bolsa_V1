@@ -146,7 +146,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "docs/adr/019-dual-universes-lab-vs-trading.md",
         role: "adr",
-        note: "LAB ≠ TRADING · panel Operativa",
+        note: "LAB ≠ TRADING · panel DECISIÓN",
       },
       {
         path: "docs/adr/020-operating-mandate-tenure.md",

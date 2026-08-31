@@ -19,6 +19,7 @@ import {
   type EntryOperatingPhaseV1,
 } from "./entry-operating-copy.js";
 import type { MesaNextActionV1 } from "./mesa-next-action.js";
+import type { PaperAutoPostureV1 } from "./paper-auto-posture.js";
 import {
   MERCADO_COCKPIT_PHASE_LABEL,
   resolveMercadoCockpitPhase,
@@ -62,6 +63,8 @@ export type BuildEntryOperatingTruthInputV1 = {
   entriesBlocked?: boolean;
   gateStatus?: string | null;
   asOf?: string | null;
+  /** F8 PAPER AUTO posture — omit Confirm CTA when autoActive. */
+  paperAuto?: PaperAutoPostureV1 | null;
 };
 
 export type EntryOperatingSurfaceSnapshotV1 = {
@@ -115,9 +118,11 @@ export function buildEntryOperatingTruth(
 
   const entriesBlocked = input.entriesBlocked === true;
   const gateStatus = input.gateStatus ?? null;
+  const paperAuto = input.paperAuto ?? null;
   const primaryCta = entryOperatingCtaFromPhase(phase, {
     entriesBlocked,
     gateStatus,
+    paperAuto,
   });
 
   const asOf =
@@ -132,7 +137,11 @@ export function buildEntryOperatingTruth(
     phaseLabel: MERCADO_COCKPIT_PHASE_LABEL[phase],
     plan,
     primaryCta,
-    phrase: formatEntryOperatingPhrase(phase, { entriesBlocked, gateStatus }),
+    phrase: formatEntryOperatingPhrase(phase, {
+      entriesBlocked,
+      gateStatus,
+      paperAuto,
+    }),
     triggerLabel: formatEntryTriggerLabel(phase),
     sizing: {
       riskAmount: study.riskAmount,

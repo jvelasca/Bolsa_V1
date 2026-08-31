@@ -3,6 +3,8 @@
  *
  * Encola el ticket y abre el drawer de Confirm (la firma sigue siendo Confirm).
  * No navega a Hoy: el contexto del valor se mantiene.
+ * V1.42 F5 — `primaryCtaKind` desde PositionOperatingTruth alinea CTA con Hoy/Journal.
+ * V1.42 F7 — `primaryOnly` default true: una CTA primaria; Reducir/Salir solo si son primary.
  *
  * @see docs/engineering/diseno-mercado-2-0-cockpit-2026-08-27.md §3.1
  */
@@ -13,6 +15,8 @@ import {
   buildPositionDecisionFromDto,
   formatExitPolicyActionHint,
   isPrimaryPositionExitCta,
+  primaryPositionExitCta,
+  type PositionExitCtaKindV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -29,8 +33,10 @@ export function PositionExitDrawerActions({
   protectPlan,
   compact = false,
   showMaintain = false,
-  /** V1.39 — una sola CTA alineada a truth.action (cockpit, Hoy, Operaciones). */
-  primaryOnly = false,
+  /** V1.42 F7 — una sola CTA alineada a truth.action (default true · SEMI). */
+  primaryOnly = true,
+  /** V1.42 F5 — preferir CTA de PositionOperatingTruth (§A.8) cuando existe. */
+  primaryCtaKind,
   portfolioReconStatus,
   className,
 }: {
@@ -40,6 +46,7 @@ export function PositionExitDrawerActions({
   /** Cockpit en fase POSICIÓN muestra «Mantener» como estado, no como botón. */
   showMaintain?: boolean;
   primaryOnly?: boolean;
+  primaryCtaKind?: PositionExitCtaKindV1 | null;
   portfolioReconStatus?: string | null;
   className?: string;
 }) {
@@ -52,6 +59,8 @@ export function PositionExitDrawerActions({
     portfolioReconStatus,
   });
   const reconBlocked = decision?.reconHealth === "CRITICAL";
+  const effectivePrimary: PositionExitCtaKindV1 | null =
+    primaryCtaKind ?? (decision ? primaryPositionExitCta(decision) : null);
 
   function enqueueExit(intent: PositionExitIntent) {
     setError(null);
@@ -85,35 +94,45 @@ export function PositionExitDrawerActions({
     ? "ring-1 ring-primary/45 bg-primary/10 font-semibold"
     : "ring-1 ring-primary/45 bg-primary/10 font-semibold";
 
-  function ctaClass(
-    kind: "maintain" | "protect" | "reduce" | "exit" | "review",
-  ) {
+  function isPrimaryKind(kind: PositionExitCtaKindV1) {
+    if (effectivePrimary) return effectivePrimary === kind;
+    if (!decision) return false;
+    return isPrimaryPositionExitCta(decision, kind);
+  }
+
+  function ctaClass(kind: PositionExitCtaKindV1) {
     const base = btnClass;
-    if (!decision) return base;
-    if (isPrimaryPositionExitCta(decision, kind)) {
+    if (isPrimaryKind(kind)) {
       return cn(base, primaryBtnClass);
     }
     return cn(base, "opacity-75");
   }
 
+  const hasProtectHint = positionShowsProtectHint(position, protectPlan);
+  // Primary protect, or secondary «Proteger» when Mantener + hint (trail/protect → Confirm).
   const showProtect =
     !reconBlocked &&
-    (decision?.action === "PROTECT" ||
-      (!primaryOnly && positionShowsProtectHint(position, protectPlan)));
+    (effectivePrimary === "protect" ||
+      decision?.action === "PROTECT" ||
+      hasProtectHint);
+  const showProtectAsPrimary =
+    effectivePrimary === "protect" || decision?.action === "PROTECT";
+  const showProtectSecondary =
+    primaryOnly &&
+    effectivePrimary === "maintain" &&
+    hasProtectHint &&
+    !showProtectAsPrimary;
   const showMaintainBadge = primaryOnly
-    ? decision && isPrimaryPositionExitCta(decision, "maintain")
+    ? effectivePrimary === "maintain"
     : showMaintain || decision?.action === "HOLD";
-  const showReview = reconBlocked || decision?.action === "REVIEW";
+  const showReview =
+    reconBlocked ||
+    effectivePrimary === "review" ||
+    decision?.action === "REVIEW";
   const showReduceExit =
-    !reconBlocked && !showReview && !primaryOnly
-      ? true
-      : !reconBlocked &&
-        !showReview &&
-        primaryOnly &&
-        decision != null &&
-        (decision.action === "REDUCE" ||
-          decision.action === "TAKE_PROFIT" ||
-          decision.action === "EXIT");
+    !reconBlocked &&
+    !showReview &&
+    (effectivePrimary === "reduce" || effectivePrimary === "exit");
 
   const exitPlan = position.operational?.exitPlan;
   const policyHint = formatExitPolicyActionHint({
@@ -130,9 +149,7 @@ export function PositionExitDrawerActions({
           <span
             className={cn(
               "rounded-md border border-border px-2 py-1 text-xs text-muted-foreground",
-              decision && isPrimaryPositionExitCta(decision, "maintain")
-                ? primaryBtnClass
-                : null,
+              effectivePrimary === "maintain" ? primaryBtnClass : null,
             )}
           >
             Mantener
@@ -149,25 +166,24 @@ export function PositionExitDrawerActions({
             Revisar
           </button>
         ) : null}
-        {showProtect ? (
+        {showProtect && (showProtectAsPrimary || showProtectSecondary) ? (
           <button
             type="button"
             className={cn(
-              ctaClass("protect"),
+              showProtectAsPrimary ? ctaClass("protect") : btnClass,
               "border-emerald-500/40 text-emerald-900 dark:text-emerald-100",
+              showProtectSecondary && "opacity-75",
             )}
             onClick={() => enqueueExit("protect")}
             data-testid={`position-exit-protect-${position.symbol}`}
-            title="Proteger → cola Confirm (firma SEMI)"
+            title="Proteger → cola Confirm (firma SEMI · hint ≠ stop)"
           >
             Proteger
           </button>
         ) : null}
         {showReduceExit ? (
           <>
-            {(
-              primaryOnly ? isPrimaryPositionExitCta(decision!, "reduce") : true
-            ) ? (
+            {effectivePrimary === "reduce" ? (
               <button
                 type="button"
                 className={cn(ctaClass("reduce"), "border-amber-500/40")}
@@ -178,9 +194,7 @@ export function PositionExitDrawerActions({
                 Reducir
               </button>
             ) : null}
-            {(
-              primaryOnly ? isPrimaryPositionExitCta(decision!, "exit") : true
-            ) ? (
+            {effectivePrimary === "exit" ? (
               <button
                 type="button"
                 className={cn(ctaClass("exit"), "border-rose-500/40")}

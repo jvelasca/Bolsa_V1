@@ -205,11 +205,11 @@ export function OperationalPlanView({
             </p>
           ) : (
             <p className="mt-1 text-[10px] font-medium text-amber-800 dark:text-amber-200">
-              ⚠ No aplicado
+              ⚠ No aplicado · requiere Confirm
             </p>
           )}
           <p className="mt-0.5 text-[10px] text-muted-foreground">
-            Propuesta thin · SEMI firma · no empeora el stop vigente
+            Hint · no aplicado · requiere Confirm · no empeora el stop vigente
           </p>
         </div>
       ) : null}

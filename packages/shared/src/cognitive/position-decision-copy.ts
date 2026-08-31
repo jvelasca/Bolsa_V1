@@ -123,12 +123,25 @@ function actionVerb(action: PositionDecisionActionV1): string {
   }
 }
 
-/** Frase operativa corta para cockpit Mercado (≠ permiso). */
+/** Frase operativa corta para cockpit Mercado (≠ permiso). Spec §B.5 — sin enums. */
 export function formatPositionDecisionPhrase(
   decision: PositionDecisionV1,
 ): string {
   if (decision.reconHealth === "CRITICAL") {
     return "No operes: discrepancia de cartera. Reconcilia antes de cualquier acción.";
+  }
+
+  // §B.5 — T1 alcanzado + HOLD → frase humana (nunca T1_REACHED).
+  if (decision.action === "HOLD" && decision.nextEvent === "T1") {
+    const bits = ["T1 alcanzado · Mantener."];
+    if (decision.protection === "ACTIVE") {
+      bits.push("Stop operativo registrado.");
+    }
+    return bits.join(" ");
+  }
+
+  if (decision.action === "HOLD" && decision.nextEvent === "T2") {
+    return "T2 pendiente · Mantener.";
   }
 
   const verb = actionVerb(decision.action);
@@ -141,13 +154,15 @@ export function formatPositionDecisionPhrase(
   }
 
   if (decision.nextEvent === "T1") {
-    parts.push("T1 aún no gestionado.");
+    parts.push("T1 alcanzado.");
   } else if (decision.nextEvent === "T2") {
     parts.push("T2 es el siguiente hito.");
   } else if (decision.nextEvent === "STOP") {
     parts.push("Stop estructural alcanzado o inminente.");
   } else if (decision.nextEvent === "THESIS_REVIEW") {
     parts.push("La tesis requiere revisión.");
+  } else if (decision.nextEvent === "TRAIL") {
+    parts.push("Trail sugerido · no aplicado · requiere Confirm.");
   } else if (decision.action === "HOLD" && decision.nextEvent === "NONE") {
     parts.push("Sin evento operativo pendiente.");
   }
@@ -161,4 +176,82 @@ export function formatPositionDecisionPhrase(
   }
 
   return parts.join(" ");
+}
+
+/** Labels humanos para ExitPlan en Confirm / shell (V1.42 F7 — sin enums). */
+export function formatExitOperativaIntentLabel(intent: string): string {
+  switch (intent) {
+    case "exit_hint":
+      return "Salir";
+    case "reduce":
+      return "Reducir";
+    case "protect":
+      return "Proteger";
+    case "review":
+      return "Revisar";
+    default:
+      return intent;
+  }
+}
+
+export function formatExitPlanStatusLabel(status: string): string {
+  switch (status) {
+    case "ARMED":
+      return "Armado";
+    case "TRIGGERED":
+      return "Disparado";
+    case "WATCH":
+      return "Vigilar";
+    case "NONE":
+      return "Sin plan";
+    case "EXPIRED":
+      return "Caducado";
+    case "CANCELLED":
+      return "Cancelado";
+    case "BLOCKED":
+      return "Bloqueado";
+    default:
+      return status;
+  }
+}
+
+export function formatExitSuggestedActionLabel(action: string): string {
+  switch (action) {
+    case "hold":
+      return "Mantener";
+    case "protect":
+      return "Proteger";
+    case "reduce":
+      return "Reducir";
+    case "full_exit":
+      return "Salir";
+    default:
+      return action;
+  }
+}
+
+export function formatExitReasonLabel(
+  reason: string | null | undefined,
+): string {
+  if (!reason) return "—";
+  switch (reason) {
+    case "TARGET_1":
+      return "T1";
+    case "TARGET_2":
+      return "T2";
+    case "STRUCTURAL_STOP":
+      return "Stop estructural";
+    case "TRAIL":
+      return "Trailing";
+    case "TIME_STOP":
+      return "Time stop";
+    case "THESIS_INVALIDATION":
+      return "Tesis invalidada";
+    case "PORTFOLIO_RISK":
+      return "Riesgo de cartera";
+    case "MANUAL":
+      return "Manual";
+    default:
+      return reason;
+  }
 }

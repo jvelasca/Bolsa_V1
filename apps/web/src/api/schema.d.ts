@@ -479,6 +479,26 @@ export interface paths {
         patch: operations["update_account_settings_api_accounts__account_id__settings_patch"];
         trace?: never;
     };
+    "/api/accounts/{account_id}/submit-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List In Flight Submit Intents
+         * @description F2b — submit intents in-flight (recorded/send_attempted/venue_bound). Solo lectura.
+         */
+        get: operations["list_in_flight_submit_intents_api_accounts__account_id__submit_intents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts/{account_id}/summary": {
         parameters: {
             query?: never;
@@ -1454,6 +1474,49 @@ export interface paths {
         put?: never;
         /** Draft Indicator From Prompt */
         post: operations["draft_indicator_from_prompt_api_indicators_draft_from_prompt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/instrument-daily-opinions/auto-propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Estudio Auto Openings
+         * @description Estudio buy aviso|alarma → TradePlan TRIGGERED → hit AUTO (A-δ).
+         *
+         *     Dry-run por defecto. Execute: ``PAPER_D_EXECUTE=1`` + ``execute=true`` +
+         *     ``executionPolicyId`` (paper_auto). ≠ Paper D Composite · ≠ Radar · ≠ Hoy.
+         */
+        post: operations["propose_estudio_auto_openings_api_instrument_daily_opinions_auto_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/instrument-daily-opinions/auto-telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Estudio Auto Telemetry
+         * @description A6 — embudo Estudio AUTO (A-δ). measure ≠ Accept · ≠ flip execute · ≠ Radar/Hoy.
+         */
+        get: operations["get_estudio_auto_telemetry_api_instrument_daily_opinions_auto_telemetry_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4257,10 +4320,10 @@ export interface components {
             };
             /** Riskoverridereason */
             riskOverrideReason?: string | null;
-            /** Signedstop */
-            signedStop?: number | null;
             /** Sessionid */
             sessionId?: string | null;
+            /** Signedstop */
+            signedStop?: number | null;
         };
         /** ConsolidationEligibilityResponseDto */
         ConsolidationEligibilityResponseDto: {
@@ -4891,6 +4954,8 @@ export interface components {
             decisionId?: string | null;
             /** Decisionsummary */
             decisionSummary?: string | null;
+            /** Direction */
+            direction?: string | null;
             /** Entry */
             entry?: number | null;
             /** Expectedrr */
@@ -4901,6 +4966,8 @@ export interface components {
             indicators?: {
                 [key: string]: unknown;
             };
+            /** Initialriskr */
+            initialRiskR?: number | null;
             /** Instrumentid */
             instrumentId: string;
             /** Invalidation */
@@ -4913,6 +4980,10 @@ export interface components {
             opinion?: string | null;
             /** Period */
             period?: string | null;
+            /** Positionvalue */
+            positionValue?: number | null;
+            /** Quantity */
+            quantity?: number | null;
             /** Riskamount */
             riskAmount?: number | null;
             /**
@@ -5281,6 +5352,35 @@ export interface components {
             data: {
                 [key: string]: number;
             };
+        };
+        /**
+         * EstudioAutoProposeDto
+         * @description V1.33+ — Estudio buy aviso|alarma → hit AUTO (TradePlan TRIGGERED).
+         */
+        EstudioAutoProposeDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Asofbardate */
+            asOfBarDate?: string | null;
+            /**
+             * Execute
+             * @default false
+             */
+            execute: boolean;
+            /** Executionpolicyid */
+            executionPolicyId?: string | null;
+            /**
+             * Forcerefresh
+             * @default false
+             */
+            forceRefresh: boolean;
+            /** Instrumentids */
+            instrumentIds: string[];
+            /**
+             * Maxcandidates
+             * @default 25
+             */
+            maxCandidates: number;
         };
         /**
          * EstudioEodDigestNotifyDto
@@ -7310,13 +7410,13 @@ export interface components {
         };
         /**
          * OperationalExitPlanDto
-         * @description P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits).
+         * @description P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits). V1.29 + qty/stop/policy.
          */
         OperationalExitPlanDto: {
-            /** Primaryreason */
-            primaryReason: string | null;
             /** Policytemplateid */
             policyTemplateId?: string | null;
+            /** Primaryreason */
+            primaryReason: string | null;
             /** Status */
             status: string;
             /** Suggestedaction */
@@ -7386,34 +7486,33 @@ export interface components {
          * @description P1 — snapshot de autoridad post-fill (no es el holding ledger).
          */
         OperationalPositionDto: {
+            /** Actualentry */
+            actualEntry?: number | null;
             /** Currentstop */
             currentStop: number | null;
             /** Direction */
             direction: string;
             exitPlan?: components["schemas"]["OperationalExitPlanDto"] | null;
+            /** Initialstop */
+            initialStop?: number | null;
+            /** Originthesis */
+            originThesis?: {
+                [key: string]: unknown;
+            } | null;
+            /** Plannedentry */
+            plannedEntry?: number | null;
             /** Status */
             status: string;
             /** Target1 */
             target1?: number | null;
+            /** Target1Achievedat */
+            target1AchievedAt?: string | null;
             /** Target2 */
             target2?: number | null;
             /** Tradeplanid */
             tradePlanId: string;
             /** Unrealizedr */
             unrealizedR?: number | null;
-            /** Plannedentry */
-            plannedEntry?: number | null;
-            /** Actualentry */
-            actualEntry?: number | null;
-            /** Initialstop */
-            initialStop?: number | null;
-            /**
-             * Originthesis
-             * @description V1.18 L2a — tesis de nacimiento congelada al fill.
-             */
-            originThesis?: {
-                [key: string]: unknown;
-            } | null;
         };
         /**
          * OpinionTelemetryDto
@@ -8677,6 +8776,51 @@ export interface components {
         StrategyDefinitionsListResponseDto: {
             /** Data */
             data: components["schemas"]["StrategyDefinitionSummaryDto"][];
+        };
+        /**
+         * SubmitIntentListItemDto
+         * @description F2b — DurableSubmitIntent wire + soft-join instrumentId (fail-closed null).
+         */
+        SubmitIntentListItemDto: {
+            /** Accountid */
+            accountId: string;
+            /** Decisionid */
+            decisionId: string;
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /** Intentid */
+            intentId: string;
+            /** Orderid */
+            orderId: string;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "recorded" | "send_attempted" | "venue_bound" | "filled";
+            /** Reason */
+            reason?: string | null;
+            /** Sendattemptedat */
+            sendAttemptedAt?: string | null;
+            /**
+             * Venue
+             * @default paper
+             */
+            venue: string;
+            /** Venueorderid */
+            venueOrderId?: string | null;
+        };
+        /** SubmitIntentsListDto */
+        SubmitIntentsListDto: {
+            /** Accountid */
+            accountId: string;
+            /** Intents */
+            intents: components["schemas"]["SubmitIntentListItemDto"][];
+            /** Total */
+            total: number;
+        };
+        /** SubmitIntentsListResponseDto */
+        SubmitIntentsListResponseDto: {
+            data: components["schemas"]["SubmitIntentsListDto"];
         };
         /** SubscribeMarketIndexRequestDto */
         SubscribeMarketIndexRequestDto: {
@@ -10497,6 +10641,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_in_flight_submit_intents_api_accounts__account_id__submit_intents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitIntentsListResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -12335,6 +12510,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DraftIndicatorFromPromptResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_estudio_auto_openings_api_instrument_daily_opinions_auto_propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstudioAutoProposeDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_estudio_auto_telemetry_api_instrument_daily_opinions_auto_telemetry_get: {
+        parameters: {
+            query?: {
+                lookbackDays?: number;
+                accountId?: string;
+                instrumentIds?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

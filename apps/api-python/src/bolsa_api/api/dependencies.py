@@ -557,6 +557,13 @@ def get_operational_incident_store(session: AsyncSession) -> Any:
     return PostgresOperationalIncidentStore(session)
 
 
+def get_submit_intent_store(session: AsyncSession) -> Any:
+    """F2b — store PG de DurableSubmitIntent (lectura list in-flight)."""
+    from bolsa_application.submit_intent_store import PostgresSubmitIntentStore
+
+    return PostgresSubmitIntentStore(session)
+
+
 def get_list_transactions_use_case(session: AsyncSession) -> ListTransactions:
     return ListTransactions(get_account_repository(session), get_portfolio_repository(session))
 

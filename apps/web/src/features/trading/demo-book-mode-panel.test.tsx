@@ -9,6 +9,7 @@ vi.mock("@/lib/api", () => ({
       env: false,
       runtimeMemory: false,
       redis: null,
+      paperDExecuteEnv: false,
     })),
     setRiskKillSwitch: vi.fn(),
   },
@@ -102,5 +103,17 @@ describe("DemoBookModePanel A3-wire", () => {
     expect(
       screen.getByTestId("demo-book-mode-active-hint").textContent,
     ).toMatch(/firmas en Confirmar/i);
+  });
+
+  it("F8: AUTO armed with PAPER_D_EXECUTE off shows ejecución off badge", async () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("demo-book-auto-pill"));
+    fireEvent.change(screen.getByTestId("demo-book-auto-arm-phrase"), {
+      target: { value: AUTO_ARM_CONFIRM_PHRASE },
+    });
+    fireEvent.click(screen.getByTestId("demo-book-auto-arm-confirm"));
+    expect(loadDemoBookPrefs().mode).toBe("auto");
+    const badge = await screen.findByTestId("demo-book-auto-armed-badge");
+    expect(badge.textContent).toMatch(/AUTO armado · ejecución off/);
   });
 });

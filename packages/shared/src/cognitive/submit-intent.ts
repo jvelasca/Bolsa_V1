@@ -30,6 +30,11 @@ export type DurableSubmitIntentV1 = {
   sendAttemptedAt: string | null;
 };
 
+/** F2b — list item: DurableSubmitIntent + soft-join instrument (null if missing). */
+export type SubmitIntentListItemV1 = DurableSubmitIntentV1 & {
+  instrumentId?: string | null;
+};
+
 export const SUBMIT_INTENT_KEY = "submitIntent";
 
 const SEND_PHASES: ReadonlySet<SubmitIntentPhaseV1> = new Set([

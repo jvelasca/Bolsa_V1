@@ -19,6 +19,8 @@ export type MesaEntriesBlockedStateV1 = {
   vetoed: number;
   incidentCount: number;
   incidentsFailed: boolean;
+  /** Eco server `PAPER_D_EXECUTE` (F8 · arm ≠ execute). */
+  paperDExecuteEnv: boolean;
 };
 
 export function useMesaEntriesBlocked(): MesaEntriesBlockedStateV1 {
@@ -49,6 +51,7 @@ export function useMesaEntriesBlocked(): MesaEntriesBlockedStateV1 {
   });
 
   const killOn = killQuery.data?.effective === true;
+  const paperDExecuteEnv = killQuery.data?.paperDExecuteEnv === true;
   const vetoed = boardQuery.data?.data?.buckets?.vetoed ?? 0;
   const incidentsFailed = incidentsQuery.isError;
   const incidents = incidentsFailed
@@ -72,5 +75,6 @@ export function useMesaEntriesBlocked(): MesaEntriesBlockedStateV1 {
     vetoed,
     incidentCount,
     incidentsFailed,
+    paperDExecuteEnv,
   };
 }

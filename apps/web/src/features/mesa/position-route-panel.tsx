@@ -4,7 +4,11 @@
  * V1.40 — ExitRouteView canónica (Entrada → Stop / T1 / T2).
  */
 
-import type { DecisionJournalStudyViewV1, PositionDto } from "@bolsa/shared";
+import type {
+  DecisionJournalStudyViewV1,
+  PositionDto,
+  SubmitIntentListItemV1,
+} from "@bolsa/shared";
 import { buildOperationalTruth } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
@@ -17,6 +21,7 @@ type PositionRoutePanelProps = {
   originStudy?: DecisionJournalStudyViewV1 | null;
   portfolioReconStatus?: string | null;
   orderPending?: boolean;
+  submitIntent?: SubmitIntentListItemV1 | null;
   className?: string;
 };
 
@@ -26,6 +31,7 @@ export function PositionRoutePanel({
   originStudy,
   portfolioReconStatus,
   orderPending,
+  submitIntent,
   className,
 }: PositionRoutePanelProps) {
   const truth = buildOperationalTruth({
@@ -46,6 +52,8 @@ export function PositionRoutePanel({
         truth={truth}
         position={position}
         portfolioReconStatus={portfolioReconStatus}
+        orderPending={orderPending}
+        submitIntent={submitIntent}
       />
       {plan?.hasPlan ? (
         <OperationalPlanView

@@ -1,8 +1,8 @@
 /**
  * Barra de estado Trading: cuenta Activa + operativa + métricas (izq.) · Colas/Alarmas (der.).
  *
- * Badge `OPERATIVA: Manual|Semi` = modo de la cuenta entera (no por valor).
- * AUTO de cuenta no está disponible en BETA (R-12 C3); no se presenta como modo armable.
+ * Badge `OPERATIVA: Manual|Semi|Auto` = modo de la cuenta entera (no por valor).
+ * AUTO (F8): armado local + PAPER_D_EXECUTE opt-in; arm ≠ execute; omite Confirm.
  * Clic en nombre o badge → `/accounts?selected=…&tab=config&focus=operativa`.
  *
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md §6
@@ -164,9 +164,11 @@ export function TradingStatusBar() {
                     "shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold tracking-wide hover:bg-accent",
                     bookPrefs.mode === "semi"
                       ? "border-sky-500/60 bg-sky-500/10 text-sky-800 dark:text-sky-200"
-                      : "border-border bg-muted/40 text-foreground",
+                      : bookPrefs.mode === "auto"
+                        ? "border-amber-500/60 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                        : "border-border bg-muted/40 text-foreground",
                   )}
-                  title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nAfecta a todos los valores. Clic → cambiar en Cuentas`}
+                  title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nSEMI = Confirm · AUTO = sin firma (arm ≠ execute / PAPER_D_EXECUTE)\nClic → cambiar en Cuentas`}
                   data-testid="status-bar-operativa-mode"
                 >
                   <span className="text-muted-foreground">OPERATIVA:</span>{" "}

@@ -3,6 +3,7 @@
  * Thaw BETA-D (ADR-023 Accepted 2026-08-25): UI seleccionable tras armado local.
  * Execute sigue detrás de `PAPER_D_EXECUTE=1` (opt-in; default off).
  * V1.33 A-β: paridad SEMI (TradePlan TRIGGERED + risk_signature); solo salta Confirm.
+ * V1.42 F8: productiza posture — arm ≠ execute; mismos objetos SEMI.
  *
  * No confundir con Lista AUTO del Laboratorio (`list-auto-activity-store`).
  */
@@ -15,15 +16,15 @@ export const DEMO_BOOK_AUTO_UNAVAILABLE_LABEL = "No disponible";
 
 /** Tooltip de mesa — Libro AUTO condicionado. */
 export const DEMO_BOOK_AUTO_TOOLTIP =
-  "Libro AUTO (BETA-D): escribe «ACTIVAR AUTO» para armar; execute solo con PAPER_D_EXECUTE=1. Dry-run A6 en Consola ops no ejecuta. Misma disciplina SEMI (TradePlan) sin Confirm.";
+  "Libro AUTO (F8): escribe «ACTIVAR AUTO» para armar; execute solo con PAPER_D_EXECUTE=1. Arm ≠ execute. Misma disciplina SEMI (TradePlan) sin Confirm. ≠ LIVE · ≠ thaw estricto.";
 
 /** Líneas de riesgo del panel. */
 export const DEMO_BOOK_AUTO_RISK_LINES = [
-  "Libro AUTO es thaw parcial (ADR-023 BETA-D): no broker live · no sizing libro paralelo.",
+  "Libro AUTO = mismos objetos que SEMI; omite firma humana (F8). No broker live · no sizing libro paralelo.",
   "Armado UI (frase ACTIVAR AUTO) obligatorio; execute solo con PAPER_D_EXECUTE=1 + Gate / kill switch.",
-  "Aperturas: TradePlan TRIGGERED + risk_signature (paridad SEMI). Sin claim de precisión Estudio (P3'/P4' diferidos).",
+  "Con PAPER_D_EXECUTE=0: «AUTO armado · ejecución off». Aperturas: TradePlan TRIGGERED + risk_signature.",
 ] as const;
 
 /** Pie del panel Config operativa. */
 export const DEMO_BOOK_AUTO_FOOTER =
-  "SEMI = Confirm humano. Libro AUTO = armar con «ACTIVAR AUTO» + PAPER_D_EXECUTE=1 (BETA-D; paridad TradePlan).";
+  "SEMI = Confirm humano. Libro AUTO = armar «ACTIVAR AUTO» · sin firma · PAPER_D_EXECUTE opt-in (default off).";

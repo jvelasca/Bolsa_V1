@@ -14,6 +14,7 @@ import type {
   DecisionJournalStudyViewV1,
   OperationalPlanViewV1,
   PositionDto,
+  SubmitIntentListItemV1,
 } from "@bolsa/shared";
 import {
   buildInvestmentPositionAggregate,
@@ -29,6 +30,10 @@ import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
+import {
+  pickSubmitIntentForInstrument,
+  useInFlightSubmitIntents,
+} from "@/features/operations/use-in-flight-submit-intents";
 import {
   mercadoCockpitShowsPlanLevels,
   resolveMercadoCockpitPhase,
@@ -53,6 +58,8 @@ export type InstrumentOperationalContextV1 = {
   confirmQueueCount: number;
   /** Firma hecha, fill pendiente (orden en vuelo). */
   orderPendingFill: boolean;
+  /** F2b — in-flight SubmitIntent for this instrument (list facts). */
+  submitIntent: SubmitIntentListItemV1 | null;
   loading: boolean;
 };
 
@@ -68,6 +75,7 @@ export function useInstrumentOperationalContext(
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
   const studyContains = useEstudioMembershipStore((s) => s.contains);
   const { pendingOrders } = usePendingOrders();
+  const submitIntentsQuery = useInFlightSubmitIntents(effectiveAccountId);
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
@@ -145,6 +153,15 @@ export function useInstrumentOperationalContext(
     return pendingOrders.some((order) => order.instrumentId === instrumentId);
   }, [instrumentId, pendingOrders]);
 
+  const submitIntent = useMemo(
+    () =>
+      pickSubmitIntentForInstrument(
+        submitIntentsQuery.data?.data?.intents,
+        instrumentId,
+      ),
+    [submitIntentsQuery.data, instrumentId],
+  );
+
   const inEstudio = instrumentId ? studyContains(instrumentId) : false;
 
   const phase = resolveMercadoCockpitPhase({
@@ -180,6 +197,7 @@ export function useInstrumentOperationalContext(
     inConfirmQueue,
     confirmQueueCount: queueItems.length,
     orderPendingFill,
+    submitIntent,
     loading: studiesQuery.isLoading || portfolioQuery.isLoading,
   };
 }

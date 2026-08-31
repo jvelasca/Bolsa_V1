@@ -1,7 +1,7 @@
 /**
  * Vistas de Hoy (`?view=`) + compat `?focus=` (ADR-040).
  *
- * V1.41 — Daily Desk: inbox único por attention. Detalles detrás de
+ * V1.42 F6 — chrome = cuatro cubos §B.7. Detalles detrás de
  * «Ver detalles» o deep-link `?view=` (no segundo Mercado).
  */
 
@@ -11,6 +11,11 @@ import {
   hoyViewHref,
   type HoyView,
 } from "@/features/confirm/daily-nav";
+import {
+  DAILY_DESK_BUCKET_LABEL,
+  DAILY_DESK_BUCKET_ORDER,
+  type DailyDeskBucketIdV1,
+} from "@bolsa/shared";
 
 const VALID: ReadonlySet<string> = new Set(Object.values(HOY_VIEW));
 
@@ -31,14 +36,18 @@ export function parseHoyView(
   return HOY_VIEW.resumen;
 }
 
-/** V1.41 — chrome de Hoy = un solo inbox por attention (sin paneles L2). */
-export const HOY_INBOX_BLOCKS = [
-  { id: "requiere-atencion", title: "Requiere atención" },
-] as const;
+/** V1.42 F6 — chrome de Hoy = cuatro cubos §B.7 (no quinto de cobertura). */
+export const HOY_INBOX_BLOCKS: ReadonlyArray<{
+  id: DailyDeskBucketIdV1;
+  title: string;
+}> = DAILY_DESK_BUCKET_ORDER.map((id) => ({
+  id,
+  title: DAILY_DESK_BUCKET_LABEL[id],
+}));
 
 export type HoyInboxBlockId = (typeof HOY_INBOX_BLOCKS)[number]["id"];
 
-/** Menú «Ver detalles» — no son puertas L1 ni pestañas. */
+/** Menú «Ver detalles» — no son puertas L1 ni pestañas ni quinto cubo. */
 export const HOY_DETAIL_ITEMS: ReadonlyArray<{
   id: string;
   label: string;
@@ -47,9 +56,9 @@ export const HOY_DETAIL_ITEMS: ReadonlyArray<{
 }> = [
   {
     id: "oportunidades",
-    label: "Oportunidades",
+    label: "Ranking Estudio",
     href: hoyViewHref(HOY_VIEW.oportunidades),
-    hint: "Ranking Estudio — no es una orden",
+    hint: "Ranking Estudio — no es una orden · Ranking ≠ BUY",
   },
   {
     id: "decisiones",

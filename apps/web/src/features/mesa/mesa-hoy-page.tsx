@@ -1,7 +1,8 @@
 /**
- * Hoy — Daily Desk (ADR-037 + ADR-040 · V1.41).
+ * Hoy — Daily Desk 2.0 (ADR-037 + ADR-040 · V1.42 F6).
  *
- * Inbox único ordenado por attention. Sin paneles de ranking/KPI en el chrome
+ * Cuatro cubos §B.7 (requiere acción / oportunidades / vigilar / sin acción).
+ * Misma CTA/frase que Mercado (POT/EOT). Sin ranking/KPI en el chrome
  * (no segundo Mercado). Detalles detrás de «Ver detalles» / `?view=`.
  * Confirm = firma (drawer / `/confirm`).
  */
@@ -47,6 +48,8 @@ import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 import { parseHoyView } from "@/features/mesa/mesa-hoy-view";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
+import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
+import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { HOY_VIEW, hoyViewHref } from "@/features/confirm/daily-nav";
 import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
@@ -67,6 +70,8 @@ function formatHoyDate(d = new Date()): string {
 export function MesaHoyPage() {
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId, account } = useActiveAccount();
+  const bookPrefs = useDemoBookPrefs();
+  const autoArmed = loadAutoArm().armed;
   const { maxSectorExposurePct } = useEffectiveTradingPolicy();
   const [searchParams] = useSearchParams();
   const view = parseHoyView(
@@ -416,6 +421,8 @@ export function MesaHoyPage() {
         brokerVenue: killQuery.data?.brokerVenue ?? null,
         paperDExecuteEnv: killQuery.data?.paperDExecuteEnv === true,
         readinessState: selfEvalQuery.data?.operationalReadiness?.state ?? null,
+        bookMode: bookPrefs.mode,
+        autoArmed,
       }),
     [
       sessionState.regimeHint,
@@ -437,6 +444,8 @@ export function MesaHoyPage() {
       selfEvalQuery.isError,
       killQuery.data,
       selfEvalQuery.data,
+      bookPrefs.mode,
+      autoArmed,
     ],
   );
 
@@ -450,6 +459,14 @@ export function MesaHoyPage() {
     [pendingOrders],
   );
 
+  const confirmQueueInstrumentIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const row of board?.semiF3Queue ?? []) {
+      if (row.instrumentId) ids.push(row.instrumentId);
+    }
+    return ids;
+  }, [board]);
+
   const dailyDesk = useMemo(
     () =>
       buildDailyDeskInbox({
@@ -459,6 +476,11 @@ export function MesaHoyPage() {
         pendingConfirm: pendingSignature,
         protectionDiscrepancies,
         pendingInstrumentIds,
+        studiesByInstrument: studiesMap,
+        confirmQueueInstrumentIds,
+        entriesBlocked,
+        hasOpenIncident: incidentCount > 0,
+        protectPlanByInstrument,
       }),
     [
       positions,
@@ -467,6 +489,11 @@ export function MesaHoyPage() {
       pendingSignature,
       protectionDiscrepancies,
       pendingInstrumentIds,
+      studiesMap,
+      confirmQueueInstrumentIds,
+      entriesBlocked,
+      incidentCount,
+      protectPlanByInstrument,
     ],
   );
 
@@ -575,7 +602,11 @@ export function MesaHoyPage() {
 
         {view === HOY_VIEW.resumen ? (
           <div className="space-y-6" data-testid="hoy-inbox">
-            <DailyDeskInbox inbox={dailyDesk} />
+            <DailyDeskInbox
+              inbox={dailyDesk}
+              positions={positions}
+              protectPlanByInstrument={protectPlanByInstrument}
+            />
 
             <div
               className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/15 px-3 py-2 text-xs"
@@ -586,8 +617,8 @@ export function MesaHoyPage() {
                   Estado: {operationalHeader.operationalStatusLabel}
                 </p>
                 <p className="text-muted-foreground">
-                  Oportunidades y cobertura viven en Ver detalles — Hoy no es
-                  Mercado.
+                  Ranking Estudio, Libro, Decisiones y Consola viven en Ver
+                  detalles — Hoy no es Mercado.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">

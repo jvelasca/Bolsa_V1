@@ -273,15 +273,14 @@ describe("mesa-hoy-page invariants", () => {
   });
 });
 
-describe("Hoy Daily Desk chrome (V1.41)", () => {
+describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
   const src = readFileSync(resolve(__dirname, "mesa-hoy-page.tsx"), "utf8");
 
-  it("renders Daily Desk inbox instead of four panel blocks", () => {
+  it("renders Daily Desk four-bucket inbox (not ranking panels)", () => {
     expect(src).toMatch(/<DailyDeskInbox/);
     expect(src).toMatch(/buildDailyDeskInbox/);
-    expect(src).not.toMatch(/title="Oportunidades"/);
-    expect(src).not.toMatch(/title="Vigilar"/);
-    expect(src).not.toMatch(/title="Sin acción"/);
+    expect(src).toMatch(/studiesByInstrument/);
+    expect(src).toMatch(/confirmQueueInstrumentIds/);
     expect(src).not.toMatch(/<MesaOpportunitiesTeaser/);
     expect(src).not.toMatch(/<MesaWatchList/);
     expect(src).not.toMatch(/<MesaCoberturaKpi/);
@@ -304,10 +303,10 @@ describe("Hoy Daily Desk chrome (V1.41)", () => {
     expect(src).toMatch(/view === HOY_VIEW\.posiciones/);
   });
 
-  it("open-position inbox uses OperationalTruth via Daily Desk", () => {
+  it("open-position inbox uses POT via Daily Desk (same facts as Mercado)", () => {
     expect(src).toMatch(/buildDailyDeskInbox/);
+    expect(src).toMatch(/protectPlanByInstrument/);
     expect(src).not.toMatch(/positionsNeedingAction/);
-    expect(src).not.toMatch(/mapMesaNextAction/);
   });
 
   it("feeds entriesBlocked from shared hook and pending ids to Daily Desk", () => {
@@ -325,7 +324,7 @@ describe("Hoy Daily Desk chrome (V1.41)", () => {
     expect(spineAt).toBeGreaterThan(inboxAt);
   });
 
-  it("footer points to opportunities without embedding ranking panel", () => {
+  it("footer points to ranking without embedding ranking panel", () => {
     expect(src).toMatch(/daily-desk-footer/);
     expect(src).toMatch(/daily-desk-link-oportunidades/);
     expect(src).toMatch(/Hoy no es\s+Mercado/);

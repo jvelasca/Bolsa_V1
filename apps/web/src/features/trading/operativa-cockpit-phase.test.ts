@@ -201,7 +201,10 @@ describe("mercadoCockpitPrimaryCta", () => {
 
 describe("mercadoCockpitNoLevelsCopy", () => {
   it("explica la ausencia de plan solo donde no hay niveles", () => {
-    expect(mercadoCockpitNoLevelsCopy("vigilar")).toMatch(/supervisión/i);
+    expect(mercadoCockpitNoLevelsCopy("vigilar")).toMatch(
+      /Esperando disparador/i,
+    );
+    expect(mercadoCockpitNoLevelsCopy("vigilar")).toMatch(/Ranking ≠ BUY/i);
     expect(mercadoCockpitNoLevelsCopy("descubierto")).toMatch(/Estudio/);
     expect(mercadoCockpitNoLevelsCopy("sin_contexto")).toMatch(/Selecciona/);
     expect(mercadoCockpitNoLevelsCopy("bloqueada")).toMatch(/bloqueado/i);
@@ -225,7 +228,7 @@ describe("resolveMercadoTrailingCopy", () => {
     ).toBe(false);
   });
 
-  it("sugerencia no recogida → Stop sugerido · No aplicado", () => {
+  it("sugerencia no recogida → Stop sugerido · No aplicado · requiere Confirm", () => {
     const copy = resolveMercadoTrailingCopy({ ...base, phase: "posicion" });
     expect(copy.show).toBe(true);
     expect(copy.stopVigenteLabel).toBe("Stop operativo");
@@ -233,7 +236,7 @@ describe("resolveMercadoTrailingCopy", () => {
     expect(copy.stopVigente).toBe(95);
     expect(copy.stopSugerido).toBe(101);
     expect(copy.applied).toBe(false);
-    expect(copy.statusLabel).toBe("No aplicado");
+    expect(copy.statusLabel).toBe("No aplicado · requiere Confirm");
   });
 
   it("stop vigente ya por encima de la sugerencia → aplicado, sin aviso", () => {
@@ -269,7 +272,7 @@ describe("resolveMercadoTrailingCopy", () => {
       direction: "short",
     });
     expect(copy.applied).toBe(false);
-    expect(copy.statusLabel).toBe("No aplicado");
+    expect(copy.statusLabel).toBe("No aplicado · requiere Confirm");
   });
 
   it("trail activo sin stop sugerido → Revisar", () => {

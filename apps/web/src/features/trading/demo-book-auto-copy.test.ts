@@ -17,6 +17,7 @@ describe("demo-book-auto-copy (ADR-023 BETA-D + V1.33 Libro AUTO)", () => {
     expect(DEMO_BOOK_AUTO_TOOLTIP).toMatch(/Libro AUTO/);
     expect(DEMO_BOOK_AUTO_TOOLTIP).toMatch(/PAPER_D_EXECUTE/);
     expect(DEMO_BOOK_AUTO_TOOLTIP).toMatch(/ACTIVAR AUTO/);
+    expect(DEMO_BOOK_AUTO_TOOLTIP).toMatch(/Arm ≠ execute|arm ≠ execute/i);
     expect(DEMO_BOOK_AUTO_FOOTER).toMatch(/Libro AUTO/);
     expect(DEMO_BOOK_AUTO_FOOTER).toMatch(/ACTIVAR AUTO/);
     expect(
@@ -24,7 +25,7 @@ describe("demo-book-auto-copy (ADR-023 BETA-D + V1.33 Libro AUTO)", () => {
     ).toBe(true);
     expect(
       DEMO_BOOK_AUTO_RISK_LINES.some((line) =>
-        /TradePlan TRIGGERED/.test(line),
+        /AUTO armado · ejecución off/.test(line),
       ),
     ).toBe(true);
   });

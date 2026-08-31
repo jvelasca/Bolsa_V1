@@ -6,10 +6,13 @@
 import type {
   DecisionJournalStudyViewV1,
   EntryOperatingTruthV1,
+  SubmitIntentListItemV1,
 } from "@bolsa/shared";
 import {
   buildEntryOperatingTruth,
+  buildExecutionState,
   formatEntryOperatingAsOf,
+  formatExecutionStateCopy,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
@@ -34,6 +37,7 @@ export function EntryOperatingSummary({
   study,
   inConfirmQueue,
   orderPendingFill,
+  submitIntent,
   entriesBlocked,
   gateStatus,
   className,
@@ -42,6 +46,7 @@ export function EntryOperatingSummary({
   study?: DecisionJournalStudyViewV1 | null;
   inConfirmQueue?: boolean;
   orderPendingFill?: boolean;
+  submitIntent?: SubmitIntentListItemV1 | null;
   entriesBlocked?: boolean;
   gateStatus?: string | null;
   className?: string;
@@ -61,6 +66,13 @@ export function EntryOperatingSummary({
 
   const { sizing, phaseLabel, primaryCta } = truth;
   const asOfLabel = formatEntryOperatingAsOf(truth.asOf);
+  const executionState = buildExecutionState({
+    instrumentId: truth.instrumentId,
+    asOf: truth.asOf,
+    pendingOrder: orderPendingFill ?? false,
+    submitIntent: submitIntent ?? null,
+  });
+  const executionCopy = formatExecutionStateCopy(executionState);
   const riskMoney = formatMoney(sizing.riskAmount);
   const riskR = formatR(sizing.riskR);
   const rr = formatRR(sizing.expectedRR);
@@ -79,6 +91,7 @@ export function EntryOperatingSummary({
       data-testid="entry-operating-summary"
       data-phase={truth.phase}
       data-cta={primaryCta.kind}
+      data-execution-lifecycle={executionState.lifecycle}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p
@@ -151,6 +164,14 @@ export function EntryOperatingSummary({
           </div>
         ) : null}
       </dl>
+      {executionCopy ? (
+        <p
+          className="text-[10px] font-medium text-amber-800 dark:text-amber-200"
+          data-testid="entry-operating-execution"
+        >
+          {executionCopy}
+        </p>
+      ) : null}
       <p className="text-[9px] text-muted-foreground">
         Ranking ≠ BUY. Confirm = firma.
       </p>

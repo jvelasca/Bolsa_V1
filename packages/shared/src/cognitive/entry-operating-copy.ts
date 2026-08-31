@@ -1,6 +1,7 @@
 /**
  * Entry Operating UX — copy y CTA canónicos (V1.38).
- * PREPARADA / DISPARADA / PROPUESTA / CONFIRMADA. Ranking ≠ BUY. Confirm = firma.
+ * PREPARADA / DISPARADA / PROPUESTA / CONFIRMADA. Ranking ≠ BUY.
+ * SEMI: Confirm = firma. PAPER AUTO (F8): mismos objetos; omite firma humana.
  *
  * @see docs/engineering/diseno-mercado-2-0-cockpit-2026-08-27.md §3.1
  */
@@ -10,6 +11,11 @@ import {
   type MesaNextActionKindV1,
   type MesaNextActionV1,
 } from "./mesa-next-action.js";
+import type { PaperAutoPostureV1 } from "./paper-auto-posture.js";
+import {
+  PAPER_AUTO_ARMED_EXEC_OFF,
+  PAPER_AUTO_ARMED_EXEC_ON,
+} from "./paper-auto-posture.js";
 
 export const ENTRY_OPERATING_PHASES = [
   "preparada",
@@ -69,7 +75,12 @@ export function entryOperatingPrimaryLabel(
 
 export function entryOperatingCtaFromPhase(
   phase: EntryOperatingPhaseV1,
-  opts: { entriesBlocked?: boolean; gateStatus?: string | null } = {},
+  opts: {
+    entriesBlocked?: boolean;
+    gateStatus?: string | null;
+    /** F8: when AUTO active, omit Confirm CTA on entry phases. */
+    paperAuto?: PaperAutoPostureV1 | null;
+  } = {},
 ): EntryOperatingCtaV1 {
   if (opts.entriesBlocked && phase !== "confirmada") {
     return { kind: "none", label: ENTRIES_BLOCKED_CTA_LABEL };
@@ -81,6 +92,19 @@ export function entryOperatingCtaFromPhase(
   if (gate === "DEFERRED" && phase !== "confirmada") {
     return { kind: "none", label: GATE_DEFERRED_CTA_LABEL };
   }
+  const auto = opts.paperAuto;
+  if (
+    auto?.autoActive === true &&
+    auto.requiresHumanConfirm === false &&
+    (phase === "disparada" || phase === "propuesta")
+  ) {
+    return {
+      kind: "none",
+      label: auto.executeEligible
+        ? PAPER_AUTO_ARMED_EXEC_ON
+        : PAPER_AUTO_ARMED_EXEC_OFF,
+    };
+  }
   return {
     kind: ENTRY_CTA_KIND[phase],
     label: ENTRY_PRIMARY_LABEL[phase],
@@ -89,7 +113,11 @@ export function entryOperatingCtaFromPhase(
 
 export function formatEntryOperatingPhrase(
   phase: EntryOperatingPhaseV1,
-  opts: { entriesBlocked?: boolean; gateStatus?: string | null } = {},
+  opts: {
+    entriesBlocked?: boolean;
+    gateStatus?: string | null;
+    paperAuto?: PaperAutoPostureV1 | null;
+  } = {},
 ): string {
   if (opts.entriesBlocked && phase !== "confirmada") {
     return ENTRIES_BLOCKED_PROPOSE_MSG;
@@ -97,6 +125,25 @@ export function formatEntryOperatingPhrase(
   const gate = opts.gateStatus?.toUpperCase();
   if (gate === "VETO" || gate === "DEFERRED") {
     return "Gate de riesgo o mandato en veto — el plan no autoriza entrada.";
+  }
+  const auto = opts.paperAuto;
+  if (auto?.autoActive === true && auto.requiresHumanConfirm === false) {
+    switch (phase) {
+      case "preparada":
+        return "Plan armado (AUTO). Disparador aún no cruzado — Ranking ≠ BUY · sin firma.";
+      case "disparada":
+        return auto.executeEligible
+          ? "Disparo OK · PAPER AUTO omite Confirm — misma disciplina Risk/Policy (paper)."
+          : "Disparo OK · AUTO armado · ejecución off (PAPER_D_EXECUTE) — arm ≠ execute.";
+      case "propuesta":
+        return auto.executeEligible
+          ? "PAPER AUTO: sin cola Confirm — IA → Risk → Policy → Execution."
+          : "AUTO armado · ejecución off — no hay firma SEMI ni fill hasta PAPER_D_EXECUTE=1.";
+      case "confirmada":
+        return "Fill / orden en vuelo — mira Operaciones (AUTO o SEMI previo).";
+      default:
+        return "Sin acción de entrada.";
+    }
   }
   switch (phase) {
     case "preparada":

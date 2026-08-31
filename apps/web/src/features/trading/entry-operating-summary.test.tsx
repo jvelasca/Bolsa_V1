@@ -92,4 +92,38 @@ describe("EntryOperatingSummary V1.38", () => {
       /bloqueadas/i,
     );
   });
+
+  it("orderPendingFill → ExecutionState in_flight copy (V1.42 F2)", () => {
+    render(<EntryOperatingSummary study={triggeredStudy()} orderPendingFill />);
+    const root = screen.getByTestId("entry-operating-summary");
+    expect(root.getAttribute("data-execution-lifecycle")).toBe("in_flight");
+    expect(screen.getByTestId("entry-operating-execution").textContent).toMatch(
+      /en vuelo/i,
+    );
+  });
+
+  it("submitIntent send_attempted → UNKNOWN copy without Confirm (V1.42 F2b)", () => {
+    render(
+      <EntryOperatingSummary
+        study={triggeredStudy()}
+        submitIntent={{
+          decisionId: "DEC-1",
+          intentId: "INT-1",
+          orderId: "ORD-1",
+          accountId: "acc-1",
+          phase: "send_attempted",
+          venueOrderId: null,
+          reason: "crash_before_venue_ack",
+          venue: "paper",
+          sendAttemptedAt: "2026-08-31T12:00:00.000Z",
+          instrumentId: "inst-nvda",
+        }}
+      />,
+    );
+    const root = screen.getByTestId("entry-operating-summary");
+    expect(root.getAttribute("data-execution-lifecycle")).toBe("unknown");
+    expect(screen.getByTestId("entry-operating-execution").textContent).toMatch(
+      /desconocida|no duplicar/i,
+    );
+  });
 });

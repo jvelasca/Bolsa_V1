@@ -9,7 +9,9 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from bolsa_analytics.cognitive.submit_intent import (
+    bind_venue_order,
     mark_send_attempted,
+    mark_submit_filled,
     record_submit_intent,
 )
 from bolsa_application.broker_adapter import XtbBrokerAdapter
@@ -40,6 +42,110 @@ async def test_inmemory_put_get_delete_roundtrip() -> None:
     assert got.send_attempted_at is not None
     await store.delete("DEC-STORE-1")
     assert await store.get("DEC-STORE-1") is None
+
+
+@pytest.mark.asyncio
+async def test_inmemory_list_in_flight_filters_account_and_phase() -> None:
+    """F2b — recorded/send_attempted/venue_bound; exclude filled; filter account."""
+    store = InMemorySubmitIntentStore()
+    await store.put(
+        record_submit_intent(
+            decision_id="DEC-REC",
+            intent_id="INT-REC",
+            order_id="ORD-REC",
+            account_id="acc-1",
+        )
+    )
+    await store.put(
+        mark_send_attempted(
+            record_submit_intent(
+                decision_id="DEC-SEND",
+                intent_id="INT-SEND",
+                order_id="ORD-SEND",
+                account_id="acc-1",
+            )
+        )
+    )
+    await store.put(
+        bind_venue_order(
+            mark_send_attempted(
+                record_submit_intent(
+                    decision_id="DEC-BOUND",
+                    intent_id="INT-BOUND",
+                    order_id="ORD-BOUND",
+                    account_id="acc-1",
+                )
+            ),
+            venue_order_id="v-1",
+        )
+    )
+    await store.put(
+        mark_submit_filled(
+            bind_venue_order(
+                mark_send_attempted(
+                    record_submit_intent(
+                        decision_id="DEC-FILL",
+                        intent_id="INT-FILL",
+                        order_id="ORD-FILL",
+                        account_id="acc-1",
+                    )
+                ),
+                venue_order_id="v-fill",
+            )
+        )
+    )
+    await store.put(
+        mark_send_attempted(
+            record_submit_intent(
+                decision_id="DEC-OTHER",
+                intent_id="INT-OTHER",
+                order_id="ORD-OTHER",
+                account_id="acc-2",
+            )
+        )
+    )
+
+    inflight = await store.list_in_flight("acc-1")
+    phases = {i.phase for i in inflight}
+    decision_ids = {i.decision_id for i in inflight}
+    assert phases == {"recorded", "send_attempted", "venue_bound"}
+    assert "DEC-FILL" not in decision_ids
+    assert "DEC-OTHER" not in decision_ids
+    assert len(inflight) == 3
+    assert await store.list_in_flight("") == []
+    assert await store.list_in_flight("acc-missing") == []
+
+
+@pytest.mark.asyncio
+async def test_postgres_list_in_flight_filters_phase_and_account() -> None:
+    """F2b contract without live DB: execute stub returns filtered rows."""
+    session = AsyncMock()
+    row_send = MagicMock()
+    row_send.decision_id = "DEC-SEND"
+    row_send.intent_id = "INT-SEND"
+    row_send.order_id = "ORD-SEND"
+    row_send.account_id = "acc-1"
+    row_send.venue = "paper"
+    row_send.phase = "send_attempted"
+    row_send.venue_order_id = None
+    row_send.reason = "crash_before_venue_ack"
+    row_send.send_attempted_at = None
+
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = [row_send]
+    session.execute = AsyncMock(return_value=result)
+
+    store = PostgresSubmitIntentStore(session)
+    got = await store.list_in_flight("acc-1")
+    assert len(got) == 1
+    assert got[0].decision_id == "DEC-SEND"
+    assert got[0].phase == "send_attempted"
+    session.execute.assert_awaited()
+
+    empty = await store.list_in_flight("  ")
+    assert empty == []
+    # empty account short-circuits before execute
+    assert session.execute.await_count == 1
 
 
 @pytest.mark.asyncio

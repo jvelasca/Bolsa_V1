@@ -74,7 +74,7 @@ export function WorkflowModulesSection() {
           </ModuleCard>
           <ModuleCard title="Trading (mesa diaria)">
             <p>
-              Donde <em>operas</em>: gráficos, lista Estudio, panel Operativa,
+              Donde <em>operas</em>: gráficos, lista Estudio, panel DECISIÓN,
               órdenes demo, mandato vigente y firma humana en Confirmar.
             </p>
             <p className="mt-2">
@@ -116,7 +116,7 @@ export function WorkflowModulesSection() {
           <li>
             <strong className="text-foreground">Adoptar estrategia</strong> — en
             Finalistas, Checklist / Adoptar enlaza la estrategia #1 con tu
-            cuenta demo (mandato operativo en Trading → Operativa → Info).
+            cuenta demo (mandato operativo en Trading → DECISIÓN → Info).
           </li>
           <li>
             <strong className="text-foreground">Supervisar</strong> — en

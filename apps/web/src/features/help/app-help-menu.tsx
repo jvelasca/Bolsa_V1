@@ -404,12 +404,16 @@ function TradingContent() {
         firma.
       </p>
       <section>
-        <h3 className="mb-2 font-semibold text-foreground">Panel Operativa</h3>
+        <h3 className="mb-2 font-semibold text-foreground">Panel DECISIÓN</h3>
         <p>
           Columna derecha a{" "}
           <strong className="text-foreground">altura completa</strong> (hasta la
           barra de estado). Operaciones queda a la izquierda, bajo watchlist y
-          gráfico. Tres secciones con scroll y altura ajustable:
+          gráfico. Estructura{" "}
+          <strong className="text-foreground">
+            CONTEXTO → ESTADO → ACCIÓN
+          </strong>{" "}
+          (una CTA primaria). Evidencia avanzada detrás de «¿Por qué?»:
         </p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>

@@ -19,6 +19,11 @@ from bolsa_analytics.cognitive.submit_intent import (
 from bolsa_infrastructure.database.models.tables import SubmitIntentRow
 from bolsa_infrastructure.ids import new_id
 
+# F2b — in-flight = no filled. Solo lectura Mercado/peers.
+_IN_FLIGHT_PHASES: frozenset[str] = frozenset(
+    {"recorded", "send_attempted", "venue_bound"}
+)
+
 
 class SubmitIntentStore(Protocol):
     """get/put/delete por decision_id. Durabilidad = implementación."""
@@ -28,6 +33,8 @@ class SubmitIntentStore(Protocol):
     async def put(self, intent: DurableSubmitIntent) -> None: ...
 
     async def delete(self, decision_id: str) -> None: ...
+
+    async def list_in_flight(self, account_id: str) -> list[DurableSubmitIntent]: ...
 
 
 class InMemorySubmitIntentStore:
@@ -53,6 +60,16 @@ class InMemorySubmitIntentStore:
         if not key:
             return
         self._by_decision.pop(key, None)
+
+    async def list_in_flight(self, account_id: str) -> list[DurableSubmitIntent]:
+        aid = (account_id or "").strip()
+        if not aid:
+            return []
+        return [
+            intent
+            for intent in self._by_decision.values()
+            if intent.account_id == aid and intent.phase in _IN_FLIGHT_PHASES
+        ]
 
 
 def _utcnow() -> datetime:
@@ -143,6 +160,18 @@ class PostgresSubmitIntentStore:
             return
         await self._session.delete(row)
         await self._session.commit()
+
+    async def list_in_flight(self, account_id: str) -> list[DurableSubmitIntent]:
+        aid = (account_id or "").strip()
+        if not aid:
+            return []
+        stmt = (
+            select(SubmitIntentRow)
+            .where(SubmitIntentRow.account_id == aid)
+            .where(SubmitIntentRow.phase.in_(tuple(_IN_FLIGHT_PHASES)))
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [_row_to_intent(row) for row in rows]
 
 
 _PROCESS_STORE = InMemorySubmitIntentStore()

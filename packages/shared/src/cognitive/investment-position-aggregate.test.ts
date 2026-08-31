@@ -240,4 +240,62 @@ describe("investment-position-aggregate", () => {
     expect(agg.thesisSnapshot?.entry).toBe(180);
     expect(agg.thesisSnapshot?.strength).toBe(7);
   });
+
+  it("§A.8 full_exit + protectionDiscrepancy → exit (inherits mapMesaNextAction)", () => {
+    const agg = buildInvestmentPositionAggregate({
+      position: {
+        symbol: "AAPL",
+        instrumentId: "i1",
+        quantity: 10,
+        avgCost: 100,
+        lastPrice: 94,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          tradePlanId: "D1",
+          currentStop: null,
+          exitPlan: { suggestedAction: "full_exit" },
+        },
+      },
+      protectPlan: {
+        status: "protect_hint",
+        target1: null,
+        suggestedProtectStop: 100,
+        rMultiple: 1,
+        why: ["mfe_ge_1r"],
+      },
+    });
+    expect(agg.currentState.protectionDiscrepancy).toBe(true);
+    expect(agg.currentState.exitSuggestedAction).toBe("full_exit");
+    expect(agg.nextAction.kind).toBe("exit");
+    expect(agg.nextAction.label).toBe("Salir");
+  });
+
+  it("§A.8 reduce + protectionDiscrepancy → reduce", () => {
+    const agg = buildInvestmentPositionAggregate({
+      position: {
+        symbol: "AAPL",
+        instrumentId: "i1",
+        quantity: 10,
+        avgCost: 100,
+        lastPrice: 110,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          tradePlanId: "D1",
+          currentStop: null,
+          exitPlan: { suggestedAction: "reduce" },
+        },
+      },
+      protectPlan: {
+        status: "protect_hint",
+        target1: null,
+        suggestedProtectStop: 100,
+        rMultiple: 1,
+        why: ["mfe_ge_1r"],
+      },
+    });
+    expect(agg.currentState.protectionDiscrepancy).toBe(true);
+    expect(agg.nextAction.kind).toBe("reduce");
+  });
 });

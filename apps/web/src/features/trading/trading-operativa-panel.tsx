@@ -1,11 +1,13 @@
 /**
- * Panel Operativa (Trading) — cockpit (plan + acción) + Recomendación / Info.
+ * Panel DECISIÓN (Mercado) — CONTEXTO → ESTADO → ACCIÓN + ¿Por qué? colapsado.
+ * Ids de código `operativa*` se conservan; chrome de producto = DECISIÓN (ADR-042).
  *
  * Manual/SEMI/AUTO = cuenta entera → barra de estado / Cuentas (no aquí).
  * Supervisión Lab lista Estudio = banner Estudio.
  *
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  * @see docs/engineering/diseno-mercado-2-0-cockpit-2026-08-27.md
+ * @see docs/adr/042-operating-excellence.md
  */
 
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -253,12 +255,12 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
       });
       setActiveSupervised(id);
       pushToast(
-        `Operativa · ${payload.symbol ?? symbol}: ${payload.action} → Confirm`,
+        `DECISIÓN · ${payload.symbol ?? symbol}: ${payload.action} → Confirm`,
       );
       openConfirmDrawer();
     },
     onError: (e: Error) => {
-      pushToast(`Operativa · ${symbol}: ${e.message}`);
+      pushToast(`DECISIÓN · ${symbol}: ${e.message}`);
     },
   });
 
@@ -326,7 +328,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         className,
       )}
       data-testid="trading-operativa-panel"
-      aria-label={`Operativa · ${symbol}`}
+      aria-label={`DECISIÓN · ${symbol}`}
     >
       <p className="shrink-0 px-0.5 text-[10px] font-medium text-muted-foreground">
         {symbol} · {timeframe}

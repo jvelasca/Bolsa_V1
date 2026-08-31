@@ -6,8 +6,8 @@ import type { ProtectPlanV1 } from "@bolsa/shared";
 import {
   buildInvestmentPositionAggregate,
   buildOperationalPlanFromPosition,
-  buildOperationalTruth,
-  formatExecutionHintCopy,
+  buildPositionOperatingTruth,
+  formatPositionOperatingExecutionCopy,
   studiesByInstrumentMap,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,10 @@ import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
 } from "@/features/operational-console/use-ops-self-eval";
+import {
+  pickSubmitIntentForInstrument,
+  useInFlightSubmitIntents,
+} from "@/features/operations/use-in-flight-submit-intents";
 
 type OperationsTab = "open" | "pending";
 
@@ -72,6 +76,7 @@ export function OperationsPanel({
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId } = useActiveAccount();
   const opsEval = useOpsSelfEval(effectiveAccountId);
+  const submitIntentsQuery = useInFlightSubmitIntents(effectiveAccountId);
   const portfolioReconStatus = portfolioReconStatusFromReport(opsEval.data);
 
   const portfolioQuery = useQuery({
@@ -236,11 +241,16 @@ export function OperationsPanel({
                   const orderPending = pendingOrders.some(
                     (order) => order.instrumentId === pos.instrumentId,
                   );
-                  const truth = buildOperationalTruth({
+                  const submitIntent = pickSubmitIntentForInstrument(
+                    submitIntentsQuery.data?.data?.intents,
+                    pos.instrumentId,
+                  );
+                  const pot = buildPositionOperatingTruth({
                     position: pos,
                     study,
                     portfolioReconStatus,
                     orderPending,
+                    submitIntent,
                   });
                   const aggregate = buildInvestmentPositionAggregate({
                     position: pos,
@@ -250,9 +260,9 @@ export function OperationsPanel({
                     aggregate,
                     markPrice: pos.lastPrice ?? null,
                   });
-                  const actionLabel = truth?.primaryCta.label ?? "—";
-                  const executionHintCopy = truth
-                    ? formatExecutionHintCopy(truth)
+                  const actionLabel = pot?.primaryCta.label ?? "—";
+                  const executionCopy = pot
+                    ? formatPositionOperatingExecutionCopy(pot)
                     : null;
 
                   return (
@@ -298,12 +308,12 @@ export function OperationsPanel({
 
                         <td className="px-2 py-1 text-right text-muted-foreground">
                           <div>{actionLabel}</div>
-                          {executionHintCopy ? (
+                          {executionCopy ? (
                             <div
                               className="text-[10px] font-medium text-amber-800 dark:text-amber-200"
                               data-testid={`ops-execution-hint-${pos.symbol}`}
                             >
-                              {executionHintCopy}
+                              {executionCopy}
                             </div>
                           ) : null}
                         </td>
@@ -347,6 +357,7 @@ export function OperationsPanel({
                               study={study}
                               portfolioReconStatus={portfolioReconStatus}
                               orderPending={orderPending}
+                              submitIntent={submitIntent}
                             />
                           </td>
                         </tr>

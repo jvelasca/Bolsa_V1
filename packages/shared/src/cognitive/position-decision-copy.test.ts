@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatExitOperativaIntentLabel,
+  formatExitPlanStatusLabel,
+  formatExitReasonLabel,
+  formatExitSuggestedActionLabel,
   formatNextEventLabel,
   formatPositionDecisionActionLabel,
   formatPositionDecisionPhrase,
@@ -61,9 +65,10 @@ describe("position-decision-copy V1.36", () => {
       portfolioReconStatus: "clean",
     });
     const phrase = formatPositionDecisionPhrase(d!);
-    expect(phrase).toMatch(/Mantén/);
+    expect(phrase).toMatch(/T1 alcanzado/);
+    expect(phrase).toMatch(/Mantener/);
+    expect(phrase).not.toMatch(/T1_REACHED/);
     expect(phrase).toMatch(/Stop operativo/);
-    expect(phrase).toMatch(/T1/);
   });
 
   it("human phrase for recon drift", () => {
@@ -126,5 +131,12 @@ describe("position-decision-copy V1.36", () => {
       portfolioReconStatus: "drift",
     });
     expect(formatPositionDecisionActionLabel(drift!)).toBe("Revisar");
+  });
+
+  it("F7 exit plan labels are human (no diagnostic enums)", () => {
+    expect(formatExitOperativaIntentLabel("exit_hint")).toBe("Salir");
+    expect(formatExitSuggestedActionLabel("full_exit")).toBe("Salir");
+    expect(formatExitPlanStatusLabel("TRIGGERED")).toBe("Disparado");
+    expect(formatExitReasonLabel("TARGET_1")).toBe("T1");
   });
 });

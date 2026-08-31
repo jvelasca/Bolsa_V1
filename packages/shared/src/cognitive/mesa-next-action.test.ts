@@ -285,6 +285,30 @@ describe("buildMesaOperationalHeader", () => {
     expect(h.portfolioOpenRiskR).not.toBeNull();
     expect(h.totalRiskR).toBe(h.portfolioPnLR);
   });
+
+  it("F8: default mode SEMI; AUTO armed + env off → posture honesty", () => {
+    const semi = buildMesaOperationalHeader({});
+    expect(semi.modeLabel).toBe("SEMI");
+    expect(semi.modeDetail).toMatch(/Humano confirma/);
+
+    const autoOff = buildMesaOperationalHeader({
+      bookMode: "auto",
+      autoArmed: true,
+      paperDExecuteEnv: false,
+    });
+    expect(autoOff.modeLabel).toBe("AUTO");
+    expect(autoOff.modeDetail).toMatch(/ejecución off|arm ≠ execute/i);
+    expect(autoOff.paperDExecuteEnv).toBe(false);
+
+    const autoOn = buildMesaOperationalHeader({
+      bookMode: "auto",
+      autoArmed: true,
+      paperDExecuteEnv: true,
+    });
+    expect(autoOn.modeLabel).toBe("AUTO");
+    expect(autoOn.modeDetail).not.toMatch(/Humano confirma/);
+    expect(autoOn.paperDExecuteEnv).toBe(true);
+  });
 });
 
 describe("deriveMesaDataFreshness", () => {
@@ -328,11 +352,52 @@ describe("deriveMesaOperationalStatus", () => {
 });
 
 describe("mapPositionNextAction", () => {
-  it("discrepancy → protect", () => {
+  it("discrepancy alone → protect", () => {
     const next = mapPositionNextAction({
       position: { operational: { exitPlan: { suggestedAction: "hold" } } },
       protectionDiscrepancy: true,
     });
     expect(next.kind).toBe("protect");
+  });
+});
+
+describe("mapMesaNextAction §A.8 EXIT vs protectionDiscrepancy", () => {
+  it("full_exit + discrepancy → exit (not protect)", () => {
+    const next = mapMesaNextAction({
+      hasOpenPosition: true,
+      exitSuggestedAction: "full_exit",
+      protectionDiscrepancy: true,
+    });
+    expect(next.kind).toBe("exit");
+    expect(next.label).toBe("Salir");
+    expect(next.allowsEntry).toBe(false);
+  });
+
+  it("reduce + discrepancy → reduce (not protect)", () => {
+    const next = mapMesaNextAction({
+      hasOpenPosition: true,
+      exitSuggestedAction: "reduce",
+      protectionDiscrepancy: true,
+    });
+    expect(next.kind).toBe("reduce");
+    expect(next.label).toBe("Reducir");
+  });
+
+  it("discrepancy alone → protect", () => {
+    const next = mapMesaNextAction({
+      hasOpenPosition: true,
+      exitSuggestedAction: "hold",
+      protectionDiscrepancy: true,
+    });
+    expect(next.kind).toBe("protect");
+  });
+
+  it("full_exit alone → exit", () => {
+    const next = mapMesaNextAction({
+      hasOpenPosition: true,
+      exitSuggestedAction: "full_exit",
+      protectionDiscrepancy: false,
+    });
+    expect(next.kind).toBe("exit");
   });
 });

@@ -92,7 +92,7 @@ export function closeConfirmDrawer(): void {
 }
 
 /**
- * Texto del botón Operativa con conteo opcional de cola.
+ * Texto del botón DECISIÓN / Confirm con conteo opcional de cola.
  */
 export function formatConfirmDrawerCtaLabel(queueCount: number): string {
   if (queueCount <= 0) return CONFIRM_DRAWER_CTA_LABEL;

@@ -22,6 +22,10 @@ import {
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { useInstrumentOrderPending } from "@/features/trading/use-pending-orders";
 import {
+  pickSubmitIntentForInstrument,
+  useInFlightSubmitIntents,
+} from "@/features/operations/use-in-flight-submit-intents";
+import {
   opinionByInstrumentId,
   useInstrumentDailyOpinions,
 } from "@/features/trading/use-instrument-daily-opinions";
@@ -82,6 +86,11 @@ export function DecisionJournalPage() {
     string | null
   >(null);
   const selectedOrderPending = useInstrumentOrderPending(
+    selected?.instrumentId,
+  );
+  const submitIntentsQuery = useInFlightSubmitIntents(effectiveAccountId);
+  const selectedSubmitIntent = pickSubmitIntentForInstrument(
+    submitIntentsQuery.data?.data?.intents,
     selected?.instrumentId,
   );
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
@@ -159,6 +168,30 @@ export function DecisionJournalPage() {
       }),
     refetchInterval: 60_000,
   });
+
+  /** Thin TradeStory wire — spine entries for selected thesis (not Historial técnico UI). */
+  const storyJournalQuery = useQuery({
+    queryKey: [
+      "decision-journal-story",
+      effectiveAccountId,
+      selected?.instrumentId,
+      selected?.decisionId,
+    ],
+    enabled: Boolean(effectiveAccountId) && Boolean(selected?.instrumentId),
+    queryFn: () =>
+      api.getDecisionJournal(effectiveAccountId!, {
+        instrumentId: selected!.instrumentId,
+        limit: 100,
+      }),
+    refetchInterval: 60_000,
+  });
+
+  const selectedJournalEntries = useMemo(() => {
+    const entries = storyJournalQuery.data?.data.entries ?? [];
+    const decisionId = selected?.decisionId;
+    if (!decisionId) return entries;
+    return entries.filter((e) => e.decisionId === decisionId);
+  }, [storyJournalQuery.data?.data.entries, selected?.decisionId]);
 
   const studies = useMemo(
     () => studiesQuery.data?.data.studies ?? [],
@@ -356,7 +389,9 @@ export function DecisionJournalPage() {
                       entriesBlocked={entriesBlocked}
                       gateStatus={selectedGateStatus}
                       orderPending={selectedOrderPending}
+                      submitIntent={selectedSubmitIntent}
                       inConfirmQueue={selectedInConfirmQueue}
+                      journalEntries={selectedJournalEntries}
                       onClose={() => setSelected(null)}
                       onCollapse={() => setFichaCollapsed(true)}
                     />

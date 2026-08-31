@@ -123,7 +123,7 @@ export function mercadoCockpitNoLevelsCopy(
 ): string | null {
   switch (phase) {
     case "vigilar":
-      return "En supervisión. Sin disparador de entrada todavía — Ranking ≠ BUY.";
+      return "Esperando disparador. En supervisión — Ranking ≠ BUY.";
     case "descubierto":
       return "Fuera de Estudio. Sin plan diario — añádelo a Estudio para supervisarlo.";
     case "sin_contexto":
@@ -137,8 +137,10 @@ export function mercadoCockpitNoLevelsCopy(
   }
 }
 
-/** Copy trailing: stop vigente (autoridad) vs stop sugerido · No aplicado / Revisar. */
-export type MercadoTrailingStatusLabel = "No aplicado" | "Revisar";
+/** Copy trailing: stop vigente (autoridad) vs stop sugerido · No aplicado · requiere Confirm. */
+export type MercadoTrailingStatusLabel =
+  | "No aplicado · requiere Confirm"
+  | "Revisar";
 
 export type MercadoTrailingCopyV1 = {
   show: boolean;
@@ -159,7 +161,8 @@ function finite(n: number | null | undefined): n is number {
 
 /**
  * El trail nunca se promueve a `currentStop`: si el stop vigente no lo recoge
- * es «No aplicado»; si el trail está activo sin precio resoluble, «Revisar».
+ * es «No aplicado · requiere Confirm»; si el trail está activo sin precio
+ * resoluble, «Revisar». Hint ≠ autoridad (GP-08 / §A.9).
  */
 export function resolveMercadoTrailingCopy(input: {
   phase: MercadoCockpitPhase;
@@ -198,6 +201,6 @@ export function resolveMercadoTrailingCopy(input: {
     show: true,
     stopSugerido: hint,
     applied,
-    statusLabel: applied ? null : "No aplicado",
+    statusLabel: applied ? null : "No aplicado · requiere Confirm",
   };
 }

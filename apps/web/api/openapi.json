@@ -2034,6 +2034,17 @@
               }
             ],
             "title": "Sessionid"
+          },
+          "signedStop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signedstop"
           }
         },
         "required": [
@@ -3785,6 +3796,17 @@
             ],
             "title": "Decisionsummary"
           },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
           "entry": {
             "anyOf": [
               {
@@ -3815,6 +3837,17 @@
             "additionalProperties": true,
             "title": "Indicators",
             "type": "object"
+          },
+          "initialRiskR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initialriskr"
           },
           "instrumentId": {
             "title": "Instrumentid",
@@ -3870,6 +3903,28 @@
               }
             ],
             "title": "Period"
+          },
+          "positionValue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positionvalue"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
           },
           "riskAmount": {
             "anyOf": [
@@ -4968,6 +5023,75 @@
           "data"
         ],
         "title": "EnqueueStaleResponseDto",
+        "type": "object"
+      },
+      "EstudioAutoProposeDto": {
+        "description": "V1.33+ — Estudio buy aviso|alarma → hit AUTO (TradePlan TRIGGERED).",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "asOfBarDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asofbardate"
+          },
+          "execute": {
+            "default": false,
+            "title": "Execute",
+            "type": "boolean"
+          },
+          "executionPolicyId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executionpolicyid"
+          },
+          "forceRefresh": {
+            "default": false,
+            "title": "Forcerefresh",
+            "type": "boolean"
+          },
+          "instrumentIds": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Instrumentids",
+            "type": "array"
+          },
+          "maxCandidates": {
+            "default": 25,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Maxcandidates",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instrumentIds"
+        ],
+        "title": "EstudioAutoProposeDto",
         "type": "object"
       },
       "EstudioEodDigestNotifyDto": {
@@ -11045,8 +11169,19 @@
         "type": "object"
       },
       "OperationalExitPlanDto": {
-        "description": "P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits).",
+        "description": "P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits). V1.29 + qty/stop/policy.",
         "properties": {
+          "policyTemplateId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policytemplateid"
+          },
           "primaryReason": {
             "anyOf": [
               {
@@ -11065,6 +11200,39 @@
           "suggestedAction": {
             "title": "Suggestedaction",
             "type": "string"
+          },
+          "suggestedQty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestedqty"
+          },
+          "suggestedStop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestedstop"
+          },
+          "trailWidth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trailwidth"
           }
         },
         "required": [
@@ -11307,7 +11475,6 @@
                 "type": "null"
               }
             ],
-            "description": "V1.18 L2a — tesis de nacimiento congelada al fill.",
             "title": "Originthesis"
           },
           "plannedEntry": {
@@ -11335,6 +11502,17 @@
               }
             ],
             "title": "Target1"
+          },
+          "target1AchievedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target1Achievedat"
           },
           "target2": {
             "anyOf": [
@@ -12473,6 +12651,17 @@
           "quantity": {
             "title": "Quantity",
             "type": "number"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
           },
           "symbol": {
             "title": "Symbol",
@@ -15221,6 +15410,133 @@
           "data"
         ],
         "title": "StrategyDefinitionsListResponseDto",
+        "type": "object"
+      },
+      "SubmitIntentListItemDto": {
+        "description": "F2b — DurableSubmitIntent wire + soft-join instrumentId (fail-closed null).",
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "decisionId": {
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "intentId": {
+            "title": "Intentid",
+            "type": "string"
+          },
+          "orderId": {
+            "title": "Orderid",
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "recorded",
+              "send_attempted",
+              "venue_bound",
+              "filled"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "sendAttemptedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sendattemptedat"
+          },
+          "venue": {
+            "default": "paper",
+            "title": "Venue",
+            "type": "string"
+          },
+          "venueOrderId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venueorderid"
+          }
+        },
+        "required": [
+          "decisionId",
+          "intentId",
+          "orderId",
+          "accountId",
+          "phase"
+        ],
+        "title": "SubmitIntentListItemDto",
+        "type": "object"
+      },
+      "SubmitIntentsListDto": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "intents": {
+            "items": {
+              "$ref": "#/components/schemas/SubmitIntentListItemDto"
+            },
+            "title": "Intents",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accountId",
+          "intents",
+          "total"
+        ],
+        "title": "SubmitIntentsListDto",
+        "type": "object"
+      },
+      "SubmitIntentsListResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SubmitIntentsListDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "SubmitIntentsListResponseDto",
         "type": "object"
       },
       "SubscribeMarketIndexRequestDto": {
@@ -19441,6 +19757,49 @@
         ]
       }
     },
+    "/api/accounts/{account_id}/submit-intents": {
+      "get": {
+        "description": "F2b — submit intents in-flight (recorded/send_attempted/venue_bound). Solo lectura.",
+        "operationId": "list_in_flight_submit_intents_api_accounts__account_id__submit_intents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitIntentsListResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List In Flight Submit Intents",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
     "/api/accounts/{account_id}/summary": {
       "get": {
         "operationId": "get_account_summary_api_accounts__account_id__summary_get",
@@ -21969,6 +22328,129 @@
         "summary": "Draft Indicator From Prompt",
         "tags": [
           "indicators"
+        ]
+      }
+    },
+    "/api/instrument-daily-opinions/auto-propose": {
+      "post": {
+        "description": "Estudio buy aviso|alarma → TradePlan TRIGGERED → hit AUTO (A-δ).\n\nDry-run por defecto. Execute: ``PAPER_D_EXECUTE=1`` + ``execute=true`` +\n``executionPolicyId`` (paper_auto). ≠ Paper D Composite · ≠ Radar · ≠ Hoy.",
+        "operationId": "propose_estudio_auto_openings_api_instrument_daily_opinions_auto_propose_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstudioAutoProposeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Propose Estudio Auto Openings Api Instrument Daily Opinions Auto Propose Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Estudio Auto Openings",
+        "tags": [
+          "instrument-daily-opinions"
+        ]
+      }
+    },
+    "/api/instrument-daily-opinions/auto-telemetry": {
+      "get": {
+        "description": "A6 — embudo Estudio AUTO (A-δ). measure ≠ Accept · ≠ flip execute · ≠ Radar/Hoy.",
+        "operationId": "get_estudio_auto_telemetry_api_instrument_daily_opinions_auto_telemetry_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lookbackDays",
+            "required": false,
+            "schema": {
+              "default": 120,
+              "maximum": 366,
+              "minimum": 7,
+              "title": "Lookbackdays",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": false,
+            "schema": {
+              "default": "default-account-seed",
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Accountid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrumentIds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrumentids"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Estudio Auto Telemetry Api Instrument Daily Opinions Auto Telemetry Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Estudio Auto Telemetry",
+        "tags": [
+          "instrument-daily-opinions"
         ]
       }
     },

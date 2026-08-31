@@ -1,11 +1,12 @@
 # Spec — V1.42 Operating Excellence (contrato)
 
-> **AsOf:** 2026-08-31 · **Estado:** **CONTRATO** — sin código de producto.  
+> **AsOf:** 2026-08-31 · **Estado:** **CONTRATO** — F2 + F2b + F3 + F4 TradeStory + F5 Mercado DECISIÓN + F6 Hoy cubos + F7 SEMI + F8 PAPER AUTO **CÓDIGO**.
+
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) · [ADR-032](../adr/032-operational-core-tradeplan-positionstate-execution.md) · [ADR-037](../adr/037-mesa-hoy-operational-ux.md) · [ADR-040](../adr/040-user-information-architecture.md) · [ADR-041](../adr/041-operational-coherence.md) · [ADR-042](../adr/042-operating-excellence.md).  
 > **Tip certificado:** `v1.41.3-beta` → `a8101ab7` [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33382034705).  
 > **Auditoría externa (2026-08-31):** PASS honesty; no más parches de UI; este documento es el salto estructural.
 
-Este fichero es **una** especificación. No hay hojas rivales de «Mercado 2.0 vs Hoy 2.0 vs ExecutionState». El ADR acepta el contrato; la implementación (F1–F8 §D) queda **aparcada** hasta que el owner lo dé por aceptado.
+Este fichero es **una** especificación. No hay hojas rivales de «Mercado 2.0 vs Hoy 2.0 vs ExecutionState». El ADR acepta el contrato; **F2–F8 están en código** (Operating Excellence serie completa; residuals parked).
 
 ```text
 DOMAIN (intocado)
@@ -207,7 +208,7 @@ watch                    → vigilar
 discrepancia             → secondaryCondition (salvo que no haya exit/reduce)
 ```
 
-El código actual (`protectionDiscrepancy` absoluto sobre `full_exit`) es **deuda de contrato**, no un parche a aplicar antes de F3.
+El código previo a F3 (`protectionDiscrepancy` absoluto sobre `full_exit`) era **deuda de contrato**; **F3 CÓDIGO** aplica §A.8.
 
 ### A.9 Trailing
 
@@ -456,31 +457,33 @@ submit → crash → UNKNOWN → reconcile → no duplicate order.
 
 ### C.11 Cobertura tests actuales vs gap
 
-| GP    | Dominio / spine      | Proyección shared        | UI Mercado/Hoy                      |
-| ----- | -------------------- | ------------------------ | ----------------------------------- |
-| 01    | Parcial V1.27        | Entry truth sí; Story no | Parcial                             |
-| 02    | Gate + FE V1.41.3    | Sí                       | Sí                                  |
-| 03–04 | PaperOrder / PARTIAL | Hint only                | Parcial                             |
-| 05–07 | V1.27 + ExitRoute    | Parcial; §A.8 no         | Parcial                             |
-| 08    | Hint only            | —                        | —                                   |
-| 09–10 | OR/DEX               | —                        | Banner incidente; no ExecutionState |
+| GP    | Dominio / spine      | Proyección shared                         | UI Mercado/Hoy                           |
+| ----- | -------------------- | ----------------------------------------- | ---------------------------------------- |
+| 01    | Parcial V1.27        | Entry truth sí; Story no                  | Parcial                                  |
+| 02    | Gate + FE V1.41.3    | Sí                                        | Sí                                       |
+| 03–04 | PaperOrder / PARTIAL | **ExecutionState F2 CÓDIGO**              | Thin wire (summary / Mesa / Operaciones) |
+| 05–07 | V1.27 + ExitRoute    | Parcial; §A.8 no (F3)                     | Parcial                                  |
+| 08    | Hint only            | trailingState eco F2; autoridad F3+       | —                                        |
+| 09    | OR/DEX               | reconciliationState eco; POT F3           | Banner incidente                         |
+| 10    | OR-2 / DEX           | **ExecutionState F2 CÓDIGO** (con hechos) | Copy UNKNOWN; F2b = list intents         |
 
 ---
 
-## D. Next — implementación aparcada (no este slice)
+## D. Next — implementación
 
-Orden exacto **después** de spec aceptada:
+Orden exacto:
 
-| Fase | Qué                                                                                 | No                                       |
-| ---- | ----------------------------------------------------------------------------------- | ---------------------------------------- |
-| F1   | Tests Golden Path (contrato §C) sobre proyecciones existentes + huecos documentados | UI nueva                                 |
-| F2   | `ExecutionState` proyección shared                                                  | Motor / tabla                            |
-| F3   | `PositionOperatingTruth` + prioridad §A.8                                           | Sustituir OperationalTruth               |
-| F4   | `TradeStory`                                                                        | Segundo Journal                          |
-| F5   | Mercado 2.0 panel **DECISIÓN** (este contrato §B)                                   | Nav L1 / segundo Mercado                 |
-| F6   | Hoy 2.0 cubos §B.7                                                                  | Dump diagnóstico                         |
-| F7   | SEMI completo (entrada/salida simétricas ya modeladas)                              | AUTO execute                             |
-| F8   | PAPER AUTO                                                                          | Thaw estricto · broker live como default |
+| Fase | Qué                                                                                 | Estado                                      |
+| ---- | ----------------------------------------------------------------------------------- | ------------------------------------------- |
+| F1   | Tests Golden Path (contrato §C) sobre proyecciones existentes + huecos documentados | Parcial (F2 cubre 03/04/10)                 |
+| F2   | `ExecutionState` proyección shared                                                  | **CÓDIGO** (2026-08-31)                     |
+| F2b  | List in-flight `submit_intents` (read-only)                                         | **CÓDIGO** (2026-08-31)                     |
+| F3   | `PositionOperatingTruth` + prioridad §A.8                                           | **CÓDIGO** (2026-08-31)                     |
+| F4   | `TradeStory`                                                                        | **CÓDIGO** (2026-08-31)                     |
+| F5   | Mercado 2.0 panel **DECISIÓN** (este contrato §B)                                   | **CÓDIGO** (2026-08-31)                     |
+| F6   | Hoy 2.0 cubos §B.7                                                                  | **CÓDIGO** (2026-08-31)                     |
+| F7   | SEMI completo (entrada/salida simétricas ya modeladas)                              | **CÓDIGO** (2026-08-31)                     |
+| F8   | PAPER AUTO                                                                          | **CÓDIGO** (2026-08-31) · sin thaw estricto |
 
 SEMI vs AUTO:
 

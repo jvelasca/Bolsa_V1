@@ -1,8 +1,8 @@
 # ADR-042: Operating Excellence — contrato de operativa (V1.42)
 
-**Estado:** Accepted — **contrato**; implementación F1–F8 **parked**  
+**Estado:** Accepted — **contrato**; **F2–F8 CÓDIGO** (2026-08-31; serie Operating Excellence completa)  
 **Fecha:** 2026-08-31  
-**Contexto:** Auditoría externa sobre tip `v1.41.3-beta` → `a8101ab7` (CI GREEN). Honesty operativa PASS. El backend no debe retocarse para parches de UI. El cuello de botella es un **contrato único** (Operating Model + Golden Paths + UI State Machine) antes de programar ExecutionState / Mercado 2.0 / Hoy 2.0.
+**Contexto:** Auditoría externa sobre tip `v1.41.3-beta` → `a8101ab7` (CI GREEN). Honesty operativa PASS. El backend no debe retocarse para parches de UI. El cuello de botella es un **contrato único** (Operating Model + Golden Paths + UI State Machine) antes de programar ExecutionState / Mercado 2.0 / Hoy 2.0. F2 implementa la proyección `ExecutionState` en `@bolsa/shared` sin motor ni tabla. F2b añade GET read-only de intents in-flight para UNKNOWN en Mercado sin Confirm. F5 renombra chrome a **DECISIÓN** y estructura CONTEXTO→ESTADO→ACCIÓN sin motores nuevos. F6 proyecta Hoy a cuatro cubos §B.7 sin DailyEngine. F7 cierra simetría SEMI entrada/salida (Confirm = firma; trail honesty; copy §B.5). F8 productiza PAPER AUTO (mismos objetos; omite Confirm; arm ≠ execute; `PAPER_D_EXECUTE` opt-in).
 
 **Depende de:** [ADR-031](./031-operational-model-tesis-plan-permiso.md) · [ADR-032](./032-operational-core-tradeplan-positionstate-execution.md) · [ADR-037](./037-mesa-hoy-operational-ux.md) · [ADR-040](./040-user-information-architecture.md) · [ADR-041](./041-operational-coherence.md) · spec [`spec-v142-operating-excellence-2026-08-31.md`](../engineering/spec-v142-operating-excellence-2026-08-31.md).
 
@@ -60,9 +60,8 @@ Cinco verdades distintas: product · git tag · package · schema · API. [`vers
 
 - Spec canónico: [`spec-v142-operating-excellence-2026-08-31.md`](../engineering/spec-v142-operating-excellence-2026-08-31.md).
 - Enmienda ADR-041 §1.6 · diseño Mercado 2.0 (etiqueta DECISIÓN).
-- Implementación **parked** spec §D: F1 tests GP → F2 ExecutionState → F3 PositionOperatingTruth → F4 TradeStory → F5 Mercado → F6 Hoy → F7 SEMI → F8 PAPER AUTO.
-- **No** relevo de implementación V1.42 en este slice.
-- Backend operativo intocado. Sin nav L1 nueva. Sin thaw. Sin Lab P2.
+- Implementación: **F2–F8 CÓDIGO** ([plan F8](../engineering/plan-v142-f8-paper-auto-2026-08-31.md) · [relevo F8](../engineering/traspaso-relevo-v1-42-f8-paper-auto-2026-08-31.md)); residuals parked (trail durable · thaw estricto · LIVE).
+- Backend money path / Confirm SEMI intocados en F8 (solo posture UI + gates existentes). Sin nav L1 nueva. Sin thaw. Sin Lab P2.
 
 ## 8. Fuera
 

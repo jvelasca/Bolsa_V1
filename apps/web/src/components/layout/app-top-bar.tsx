@@ -561,7 +561,7 @@ export function AppTopBar() {
             <button
               type="button"
               title={
-                layout.operativaOpen ? "Ocultar operativa" : "Mostrar operativa"
+                layout.operativaOpen ? "Ocultar DECISIÓN" : "Mostrar DECISIÓN"
               }
               onClick={layout.toggleOperativa}
               className={cn(

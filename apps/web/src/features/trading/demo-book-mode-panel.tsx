@@ -35,7 +35,9 @@ import {
   type DemoBookMode,
   type DemoBookPrefs,
 } from "@/features/trading/demo-book-prefs";
+import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
+import { PAPER_AUTO_ARMED_EXEC_OFF } from "@bolsa/shared";
 
 const MODE_LABEL: Record<DemoBookMode, string> = {
   manual: "MANUAL",
@@ -46,7 +48,7 @@ const MODE_LABEL: Record<DemoBookMode, string> = {
 const MODE_HINT: Record<DemoBookMode, string> = {
   manual: "Tú operas desde el gráfico; sin cola de propuestas.",
   semi: "La app propone; firmas en Confirmar (recomendado).",
-  auto: "BETA: armar con frase; execute solo con PAPER_D_EXECUTE.",
+  auto: "Sin Confirm · execute solo con PAPER_D_EXECUTE=1 (arm ≠ execute).",
 };
 
 const GEO_LABEL: Record<DemoBookCountryPrefer, string> = {
@@ -131,6 +133,12 @@ export function DemoBookModePanel({ className, compact }: Props) {
   }
 
   const killOn = Boolean(killQ.data?.effective);
+  const paperDExecuteEnv = killQ.data?.paperDExecuteEnv === true;
+  const autoPosture = resolvePaperAutoPosture({
+    bookMode: prefs.mode,
+    autoArmed: arm.armed,
+    paperDExecuteEnv,
+  });
 
   const modeButtonClass = (active: boolean) =>
     compact
@@ -266,7 +274,7 @@ export function DemoBookModePanel({ className, compact }: Props) {
           <p className="text-[10px] leading-snug text-foreground">
             Armar AUTO (doble confirmación). Escribe exactamente{" "}
             <span className="font-semibold">{AUTO_ARM_CONFIRM_PHRASE}</span>.
-            Execute sigue requiriendo <code>PAPER_D_EXECUTE=1</code>.
+            Arm ≠ execute — con env off verás «{PAPER_AUTO_ARMED_EXEC_OFF}».
           </p>
           <input
             type="text"
@@ -331,12 +339,13 @@ export function DemoBookModePanel({ className, compact }: Props) {
         >
           {killOn ? "Kill switch ON" : "Kill switch off"}
         </button>
-        {prefs.mode === "auto" && arm.armed ? (
+        {autoPosture.autoActive && autoPosture.statusBadge ? (
           <span
             className="text-[10px] text-muted-foreground"
             data-testid="demo-book-auto-armed-badge"
+            title={autoPosture.modeDetail}
           >
-            AUTO armado
+            {autoPosture.statusBadge}
           </span>
         ) : null}
       </div>

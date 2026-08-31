@@ -2,13 +2,15 @@
  * Preferencias del libro operativo de la cuenta activa DEMO — MANUAL / SEMI / AUTO.
  *
  * Slice 1 + A1 + A3-wire: localStorage. Canal SEMI = Camino C (F3 Confirm).
- * AUTO (BETA-D): UI on solo si `DEMO_BOOK_AUTO_UI_ENABLED` **y** armado local A3
+ * AUTO (BETA-D / V1.42 F8): UI on solo si `DEMO_BOOK_AUTO_UI_ENABLED` **y** armado local A3
  * (`loadAutoArm().armed`). Sin armado, `mode: auto` en storage se coacciona a SEMI.
  * Execute sigue detrás de `PAPER_D_EXECUTE` (server); arm ≠ execute.
+ * AUTO omite Confirm (mismos objetos SEMI); SEMI Confirm intacto.
  *
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
  * @see docs/engineering/plan-ciclo-a3-wire-auto-arm-ui-2026-08-25.md
  * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A3
+ * @see docs/engineering/plan-v142-f8-paper-auto-2026-08-31.md
  */
 
 import {
@@ -196,13 +198,21 @@ export function getDemoBookPrefsServerSnapshot(): DemoBookPrefs {
   return SERVER_SNAPSHOT;
 }
 
-/** SEMI permite encolar Confirm; MANUAL solo aviso; AUTO reserved (execute nunca hasta thaw). */
+/** SEMI permite encolar Confirm; MANUAL solo aviso; AUTO omite Confirm (F8). */
 export function demoBookAllowsEnqueueConfirm(mode: DemoBookMode): boolean {
-  return mode === "semi" || mode === "auto";
+  return mode === "semi";
 }
 
-/** Solo SEMI ejecuta Confirm hoy. AUTO → false aunque el modo exista en tipos. */
+/**
+ * SEMI ejecuta vía Confirm. AUTO no usa Confirm (paper_auto + PAPER_D_EXECUTE).
+ * MANUAL nunca.
+ */
 export function demoBookAllowsExecute(mode: DemoBookMode): boolean {
+  return mode === "semi";
+}
+
+/** SEMI exige firma humana; AUTO activo omite Confirm; MANUAL no encola. */
+export function demoBookRequiresHumanConfirm(mode: DemoBookMode): boolean {
   return mode === "semi";
 }
 

@@ -28,12 +28,12 @@ describe("SEMI DEMO operativa contract", () => {
     expect(d.countryPrefer).toBe("home_first");
   });
 
-  it("MANUAL blocks enqueue+execute; SEMI allows both; AUTO execute blocked", () => {
+  it("MANUAL blocks enqueue+execute; SEMI allows both; AUTO omits Confirm (F8)", () => {
     expect(demoBookAllowsEnqueueConfirm("manual")).toBe(false);
     expect(demoBookAllowsExecute("manual")).toBe(false);
     expect(demoBookAllowsEnqueueConfirm("semi")).toBe(true);
     expect(demoBookAllowsExecute("semi")).toBe(true);
-    expect(demoBookAllowsEnqueueConfirm("auto")).toBe(true);
+    expect(demoBookAllowsEnqueueConfirm("auto")).toBe(false);
     expect(demoBookAllowsExecute("auto")).toBe(false);
   });
 

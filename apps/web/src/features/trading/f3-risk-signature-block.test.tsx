@@ -53,8 +53,9 @@ describe("F3RiskSignatureBlock", () => {
       </MemoryRouter>,
     );
     const text = screen.getByTestId("f3-risk-signature").textContent ?? "";
-    expect(text).toMatch(/Sin TradePlan TRIGGERED/i);
+    expect(text).toMatch(/Sin plan disparado/i);
     expect(text).toMatch(/manualmente/i);
+    expect(text).not.toMatch(/TRIGGERED/);
   });
 
   it("asks for override reason when qty exceeds plan", () => {
@@ -74,7 +75,7 @@ describe("F3RiskSignatureBlock", () => {
     );
   });
 
-  it("shows no_tradeplan block copy when SEMI opening lacks TRIGGERED", () => {
+  it("shows no_tradeplan block copy when SEMI opening lacks disparado", () => {
     render(
       <MemoryRouter>
         <F3RiskSignatureBlock
@@ -91,7 +92,8 @@ describe("F3RiskSignatureBlock", () => {
     );
     const text = screen.getByTestId("f3-risk-signature").textContent ?? "";
     expect(text).toMatch(/bloqueado/i);
-    expect(text).toMatch(/TRIGGERED/i);
+    expect(text).toMatch(/plan disparado/i);
+    expect(text).not.toMatch(/TRIGGERED/);
   });
 
   it("shows geometry block without override when stop is on the wrong side", () => {

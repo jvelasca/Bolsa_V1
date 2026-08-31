@@ -66,12 +66,12 @@ export function F3RiskSignatureBlock({
         </div>
         <p className="text-[11px] text-muted-foreground">
           {signature.blockReason === "no_tradeplan"
-            ? "Sin TradePlan TRIGGERED no se puede firmar una apertura SEMI. Usa manual HTTP solo con override explícito de mesa, o espera plan Propuesto."
-            : "Sin TradePlan TRIGGERED: no hay stop/R/máx del plan. Indica cantidad manualmente; no se prellena sizing de mandato."}
+            ? "Sin plan disparado no se puede firmar una apertura SEMI. Usa manual HTTP solo con override explícito de mesa, o espera propuesta."
+            : "Sin plan disparado: no hay stop/R/máx del plan. Indica cantidad manualmente; no se prellena sizing de mandato."}
         </p>
         {signature.blockReason === "no_tradeplan" ? (
           <p className="text-[11px] text-amber-800 dark:text-amber-300">
-            Ejecutar apertura bloqueado hasta TRIGGERED.
+            Ejecutar apertura bloqueado hasta plan disparado.
           </p>
         ) : null}
       </div>
