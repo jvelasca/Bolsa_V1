@@ -1,8 +1,9 @@
 # RELEVO — V1.43 Trail hint → PositionRevision → currentStop (2026-08-31)
 
-> **Padre:** [`traspaso-relevo-tag-v1-42-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-42-beta-2026-08-31.md) · ADR-042 §4 · GP-08 · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
+> **Padre:** [`traspaso-relevo-v1-43-trail-revision-2026-08-31.md`](./traspaso-relevo-v1-43-trail-revision-2026-08-31.md) · ADR-042 §4 · GP-08 · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
 > **Estado:** **CERRADO** — SEMI: TRAIL/protect Confirm → `PersistPositionFromProtect` → `apply_position_current_stop(origin=trail)` → proyección `trailingApplied` / clear `trail_hint_not_applied`.  
-> **Tag:** [`traspaso-relevo-tag-v1-43-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-43-beta-2026-08-31.md) · arranque [`arranque-auditor-v1-43-beta-2026-08-31.md`](./arranque-auditor-v1-43-beta-2026-08-31.md).
+> **Tag:** [`traspaso-relevo-tag-v1-43-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-43-beta-2026-08-31.md) · arranque [`arranque-auditor-v1-43-beta-2026-08-31.md`](./arranque-auditor-v1-43-beta-2026-08-31.md).  
+> **Next:** V1.44 contrato [`traspaso-relevo-v1-44-position-automation-2026-08-31.md`](./traspaso-relevo-v1-44-position-automation-2026-08-31.md).
 
 ---
 

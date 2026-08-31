@@ -22,6 +22,9 @@ ExitPermissionReason = Literal[
     "paper_auto_env_blocked",
     "execution_blocked",
     "missing_exit_plan",
+    "data_stale",
+    "market_closed",
+    "portfolio_drift",
 ]
 ExitPermissionAction = Literal["full_exit", "reduce", "protect", "none"]
 
@@ -86,6 +89,41 @@ def _deny(
     )
 
 
+def _is_protective(exit_plan: ExitPlan, immediate_risk: bool) -> bool:
+    reason = exit_plan.primary_reason
+    if reason in ("STRUCTURAL_STOP", "THESIS_INVALIDATION", "PORTFOLIO_RISK"):
+        return True
+    return immediate_risk
+
+
+def _jit_deny_reason(
+    exit_plan: ExitPlan,
+    *,
+    auto_execute: bool,
+    data_stale: bool | None,
+    market_closed: bool | None,
+    portfolio_drift: bool | None,
+    immediate_risk: bool,
+    require_jit_context: bool,
+) -> ExitPermissionReason | None:
+    if not auto_execute:
+        return None
+    protective = _is_protective(exit_plan, immediate_risk)
+    if data_stale is True and not protective:
+        return "data_stale"
+    if require_jit_context and data_stale is None and not protective:
+        return "data_stale"
+    if market_closed is True and not protective:
+        return "market_closed"
+    if require_jit_context and market_closed is None and not protective:
+        return "market_closed"
+    if portfolio_drift is True and not protective:
+        return "portfolio_drift"
+    if require_jit_context and portfolio_drift is None and not protective:
+        return "portfolio_drift"
+    return None
+
+
 def check_exit_permission(
     exit_plan: ExitPlan | None,
     *,
@@ -96,6 +134,11 @@ def check_exit_permission(
     position_closed: bool = False,
     execution_plan: ExecutionPlan | None = None,
     at: str | None = None,
+    data_stale: bool | None = None,
+    market_closed: bool | None = None,
+    portfolio_drift: bool | None = None,
+    immediate_risk: bool = False,
+    require_jit_context: bool = False,
 ) -> ExitPermission:
     """Gate F5: ¿podemos salir / mutar stop ahora? No ejecuta."""
     if exit_plan is None:
@@ -123,6 +166,18 @@ def check_exit_permission(
 
     if auto_execute and not paper_d_execute:
         return _deny(["paper_auto_env_blocked"], exit_plan, at)
+
+    jit = _jit_deny_reason(
+        exit_plan,
+        auto_execute=auto_execute,
+        data_stale=data_stale,
+        market_closed=market_closed,
+        portfolio_drift=portfolio_drift,
+        immediate_risk=immediate_risk,
+        require_jit_context=require_jit_context,
+    )
+    if jit is not None:
+        return _deny([jit], exit_plan, at)
 
     if execution_plan is not None and execution_plan.status == "BLOCKED":
         return _deny(["execution_blocked"], exit_plan, at)

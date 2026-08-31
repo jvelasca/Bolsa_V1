@@ -7,6 +7,7 @@ import {
   buildPositionRevision,
   positionRevisionFromUnknown,
   revisionsFromUnknown,
+  revisionOriginFromExitReason,
   stopOrStatusChanged,
 } from "./cognitive/position-revision.js";
 import {
@@ -176,5 +177,12 @@ describe("OI-5 apply stop/reduce revisions", () => {
   it("mark does not append", () => {
     const marked = applyPositionMark(openLong(), 105, "t1");
     expect(marked?.revisions).toEqual([]);
+  });
+
+  it("V1.44 revisionOriginFromExitReason: only TRAIL → trail", () => {
+    expect(revisionOriginFromExitReason("TRAIL")).toBe("trail");
+    expect(revisionOriginFromExitReason("TARGET_1")).toBe("protect");
+    expect(revisionOriginFromExitReason("TRAILING")).toBe("protect");
+    expect(revisionOriginFromExitReason(null)).toBe("protect");
   });
 });

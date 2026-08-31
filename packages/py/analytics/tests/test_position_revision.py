@@ -4,6 +4,7 @@ from bolsa_analytics.cognitive.position_revision import (
     build_position_revision,
     position_revision_from_dict,
     revisions_from_raw,
+    revision_origin_from_exit_reason,
     stop_or_status_changed,
 )
 from bolsa_analytics.cognitive.position_state import (
@@ -186,3 +187,10 @@ def test_revisions_from_raw_skips_invalid() -> None:
     )
     assert ok is not None
     assert ok.revision_id == "REV-1"
+
+
+def test_revision_origin_from_exit_reason() -> None:
+    assert revision_origin_from_exit_reason("TRAIL") == "trail"
+    assert revision_origin_from_exit_reason("TARGET_1") == "protect"
+    assert revision_origin_from_exit_reason("TRAILING") == "protect"
+    assert revision_origin_from_exit_reason(None) == "protect"

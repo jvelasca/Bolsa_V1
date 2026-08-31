@@ -14,6 +14,7 @@ import {
   clampStopNotWorsen,
   doesStopWorsen,
   resolveExitPolicy,
+  revisionOriginFromExitReason,
   suggestionFromExitPolicy,
 } from "@bolsa/shared";
 import type { SupervisedProposePayload } from "@/stores/supervised-f3-queue-store";
@@ -291,8 +292,7 @@ export function buildPositionExitPayload(opts: {
       typeof operational.exitPlan?.primaryReason === "string"
         ? operational.exitPlan.primaryReason
         : null;
-    const revisionOrigin: "protect" | "trail" =
-      primaryReason === "TRAIL" ? "trail" : "protect";
+    const revisionOrigin = revisionOriginFromExitReason(primaryReason);
     const protectMeta: OperativaProtectMetaV1 = {
       operativaIntent: "protect",
       suggestedStop,

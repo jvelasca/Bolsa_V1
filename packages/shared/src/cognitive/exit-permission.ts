@@ -5,7 +5,7 @@
  */
 
 import type { ExecutionPlanV1 } from "./execution-plan.js";
-import type { ExitPlanV1, ExitSuggestedActionV1 } from "./exit-plan.js";
+import type { ExitPlanV1 } from "./exit-plan.js";
 
 export type ExitPermissionVerdictV1 = "ALLOW" | "DENY";
 
@@ -16,7 +16,10 @@ export type ExitPermissionReasonV1 =
   | "broker_not_allowed"
   | "paper_auto_env_blocked"
   | "execution_blocked"
-  | "missing_exit_plan";
+  | "missing_exit_plan"
+  | "data_stale"
+  | "market_closed"
+  | "portfolio_drift";
 
 export type ExitPermissionActionV1 =
   | "full_exit"
@@ -43,6 +46,19 @@ export type ExitPermissionSignalsV1 = {
   positionClosed?: boolean | null;
   executionPlan?: ExecutionPlanV1 | null;
   at?: string | null;
+  /** V1.44 JIT — lastPrice / bar older than policy limit. */
+  dataStale?: boolean | null;
+  /** V1.44 JIT — session not open. */
+  marketClosed?: boolean | null;
+  /** V1.44 JIT — OR-4 portfolio/broker ledger drift. */
+  portfolioDrift?: boolean | null;
+  /** Stop tocado u otro riesgo inmediato (bypassa stale/closed/drift). */
+  immediateRisk?: boolean | null;
+  /**
+   * AUTO: dato JIT ausente → DENY fail-closed (salvo protective).
+   * Omitido = gate off (compat tests legado).
+   */
+  requireJitContext?: boolean | null;
 };
 
 export const EXIT_PERMISSION_KEY = "exitPermission";
@@ -74,6 +90,51 @@ function resolveAction(exitPlan: ExitPlanV1 | null): ExitPermissionActionV1 {
 
 function isActionable(exitPlan: ExitPlanV1): boolean {
   return resolveAction(exitPlan) !== "none";
+}
+
+function isProtectiveExit(
+  exitPlan: ExitPlanV1,
+  immediateRisk?: boolean | null,
+): boolean {
+  const reason = exitPlan.primaryReason;
+  if (
+    reason === "STRUCTURAL_STOP" ||
+    reason === "THESIS_INVALIDATION" ||
+    reason === "PORTFOLIO_RISK"
+  ) {
+    return true;
+  }
+  return immediateRisk === true;
+}
+
+function absent(value: boolean | null | undefined): boolean {
+  return value == null;
+}
+
+/**
+ * V1.44 JIT — solo AUTO. Protective (stop/invalidation) bypassea stale/closed/drift.
+ * requireJitContext: ausente → DENY fail-closed salvo protective.
+ */
+function jitDenyReason(
+  exitPlan: ExitPlanV1,
+  sig: ExitPermissionSignalsV1,
+): ExitPermissionReasonV1 | null {
+  if (sig.autoExecute !== true) return null;
+  const protective = isProtectiveExit(exitPlan, sig.immediateRisk);
+  const require = sig.requireJitContext === true;
+
+  if (sig.dataStale === true && !protective) return "data_stale";
+  if (require && absent(sig.dataStale) && !protective) return "data_stale";
+
+  if (sig.marketClosed === true && !protective) return "market_closed";
+  if (require && absent(sig.marketClosed) && !protective)
+    return "market_closed";
+
+  if (sig.portfolioDrift === true && !protective) return "portfolio_drift";
+  if (require && absent(sig.portfolioDrift) && !protective)
+    return "portfolio_drift";
+
+  return null;
 }
 
 function deny(
@@ -133,6 +194,11 @@ export function checkExitPermission(
 
   if (sig.autoExecute === true && sig.paperDExecute !== true) {
     return deny(["paper_auto_env_blocked"], exitPlan, at);
+  }
+
+  const jit = jitDenyReason(exitPlan, sig);
+  if (jit) {
+    return deny([jit], exitPlan, at);
   }
 
   if (exec && exec.status === "BLOCKED") {

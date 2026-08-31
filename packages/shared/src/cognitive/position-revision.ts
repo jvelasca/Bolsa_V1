@@ -133,6 +133,16 @@ export function revisionsFromUnknown(raw: unknown): PositionRevisionV1[] {
   return out;
 }
 
+/**
+ * V1.44 — origin trail vs protect from canonical ExitReason, not UI strings.
+ * Only "TRAIL" maps to trail; everything else that enqueues protect is protect.
+ */
+export function revisionOriginFromExitReason(
+  reason: string | null | undefined,
+): Extract<PositionRevisionOriginV1, "protect" | "trail"> {
+  return reason === "TRAIL" ? "trail" : "protect";
+}
+
 /** True si hay cambio real de stop o status (tolerancia 1e-9). */
 export function stopOrStatusChanged(input: {
   previousStop: number | null | undefined;

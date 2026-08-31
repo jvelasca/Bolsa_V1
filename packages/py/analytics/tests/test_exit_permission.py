@@ -170,3 +170,49 @@ def test_kill_precedes_not_actionable() -> None:
     idle = build_exit_plan_from_position(_open_long())
     perm = check_exit_permission(idle, kill_switch=True)
     assert perm.reasons == ("kill_switch",)
+
+
+def test_jit_auto_stale_denies_t1_allows_stop() -> None:
+    t1 = build_exit_plan_from_position(_open_long(), mark_price=105.0)
+    stale = check_exit_permission(
+        t1, auto_execute=True, paper_d_execute=True, data_stale=True
+    )
+    assert stale.reasons == ("data_stale",)
+    stop = _exit_triggered()
+    protect = check_exit_permission(
+        stop, auto_execute=True, paper_d_execute=True, data_stale=True
+    )
+    assert protect.verdict == "ALLOW"
+
+
+def test_jit_auto_market_closed_and_require_context() -> None:
+    t1 = build_exit_plan_from_position(_open_long(), mark_price=105.0)
+    closed = check_exit_permission(
+        t1, auto_execute=True, paper_d_execute=True, market_closed=True
+    )
+    assert closed.reasons == ("market_closed",)
+    missing = check_exit_permission(
+        t1, auto_execute=True, paper_d_execute=True, require_jit_context=True
+    )
+    assert missing.reasons == ("data_stale",)
+
+
+def test_jit_auto_portfolio_drift_asymmetric() -> None:
+    t1 = build_exit_plan_from_position(_open_long(), mark_price=105.0)
+    drift = check_exit_permission(
+        t1, auto_execute=True, paper_d_execute=True, portfolio_drift=True
+    )
+    assert drift.reasons == ("portfolio_drift",)
+    stop = _exit_triggered()
+    allow = check_exit_permission(
+        stop, auto_execute=True, paper_d_execute=True, portfolio_drift=True
+    )
+    assert allow.verdict == "ALLOW"
+
+
+def test_jit_does_not_apply_to_semi() -> None:
+    t1 = build_exit_plan_from_position(_open_long(), mark_price=105.0)
+    perm = check_exit_permission(
+        t1, data_stale=True, market_closed=True, portfolio_drift=True
+    )
+    assert perm.verdict == "ALLOW"

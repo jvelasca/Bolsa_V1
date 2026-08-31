@@ -16,6 +16,7 @@ import {
   formatExitPolicyActionHint,
   isPrimaryPositionExitCta,
   primaryPositionExitCta,
+  revisionOriginFromExitReason,
   type PositionExitCtaKindV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
@@ -177,7 +178,7 @@ export function PositionExitDrawerActions({
             onClick={() => enqueueExit("protect")}
             data-testid={`position-exit-protect-${position.symbol}`}
             title={
-              exitPlan?.primaryReason === "TRAIL"
+              revisionOriginFromExitReason(exitPlan?.primaryReason) === "trail"
                 ? "Trail → Confirm (firma SEMI · hint ≠ currentStop hasta revision)"
                 : "Proteger → cola Confirm (firma SEMI · hint ≠ stop)"
             }

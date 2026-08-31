@@ -58,6 +58,8 @@ Resultado local (2026-08-31): shared build OK · 48 shared + 20 web · tsc OK ·
 
 **Veredicto (2026-08-31, tip `5dfac890`):** **PASS** — trail SEMI durable. Siete preguntas de foco OK.
 
+**Matiz de alcance (auditoría externa, ronda posterior):** PASS V1.43 = TRAIL SEMI + Operating Excellence F2–F8 **dentro del alcance documentado**. **No** significa «AUTO de gestión de posiciones certificado». LIVE **no**. `PAPER_D_EXECUTE` off. AUTO opt-in. Next = [V1.44 Position Automation Contract](./spec-v144-position-automation-2026-08-31.md) (policy + JIT + Golden Paths; sin execute). Lab P2 sigue parked.
+
 | #   | Foco                                                        | Resultado |
 | --- | ----------------------------------------------------------- | --------- |
 | 1   | Confirm TRAIL → `origin=trail` · `trail_confirm`            | PASS      |
@@ -83,10 +85,6 @@ HEAD post-tip `033fe6e6` = docs re-pin only (4 ficheros); **no** forma parte del
 - Tratar `protect_hint` thin como CTA authority sin Confirm (`mapMesaNextAction` → Proteger; enqueue no aplica stop)
 - Honesty #20 `19c` Mercado cerrado (`todo`)
 
-## 5. Next (elige una)
+## 5. Next
 
-1. **Docs-only close** — commit de este relevo + `CURRENT_SYSTEM` CI GREEN (sin código).
-2. **V1.42 tip relevo** — marcar CI GREEN de `v1.42-beta` (ya GREEN; relevo aún decía pending).
-3. **Operar SEMI** — sin slice nuevo; mesa paper con trail Confirm.
-4. **Slice pequeño honesty** — `protect_hint` thin ≠ CTA primary (alineación con freeze; sin auto-promote).
-5. **Parked grande** — solo con palabra explícita: thaw LIVE · OCO · broker trail · package bump estable.
+**V1.44 Position Automation Contract** — [spec](./spec-v144-position-automation-2026-08-31.md) · [ADR-043](../adr/043-position-automation.md) · [plan](./plan-v144-position-automation-foundation-2026-08-31.md). Sin AUTO execute de posiciones. Lab P2 / OCO / broker trail / thaw LIVE siguen parked.

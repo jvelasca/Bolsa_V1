@@ -186,4 +186,67 @@ describe("F5 checkExitPermission", () => {
     const perm = checkExitPermission(idle, { killSwitch: true });
     expect(perm.reasons).toEqual(["kill_switch"]);
   });
+
+  it("V1.44 JIT AUTO stale DENY T1; STOP protective ALLOW", () => {
+    const t1 = buildExitPlanFromPosition(openLong(), { markPrice: 105 });
+    const stale = checkExitPermission(t1, {
+      autoExecute: true,
+      paperDExecute: true,
+      dataStale: true,
+    });
+    expect(stale.reasons).toEqual(["data_stale"]);
+
+    const stop = exitTriggered();
+    const protect = checkExitPermission(stop, {
+      autoExecute: true,
+      paperDExecute: true,
+      dataStale: true,
+    });
+    expect(protect.verdict).toBe("ALLOW");
+  });
+
+  it("V1.44 JIT AUTO market_closed DENY T1; requireJitContext fail-closed", () => {
+    const t1 = buildExitPlanFromPosition(openLong(), { markPrice: 105 });
+    const closed = checkExitPermission(t1, {
+      autoExecute: true,
+      paperDExecute: true,
+      marketClosed: true,
+    });
+    expect(closed.reasons).toEqual(["market_closed"]);
+
+    const missing = checkExitPermission(t1, {
+      autoExecute: true,
+      paperDExecute: true,
+      requireJitContext: true,
+    });
+    expect(missing.reasons).toEqual(["data_stale"]);
+  });
+
+  it("V1.44 JIT AUTO portfolio_drift DENY reduce; ALLOW protective", () => {
+    const t1 = buildExitPlanFromPosition(openLong(), { markPrice: 105 });
+    const drift = checkExitPermission(t1, {
+      autoExecute: true,
+      paperDExecute: true,
+      portfolioDrift: true,
+    });
+    expect(drift.reasons).toEqual(["portfolio_drift"]);
+
+    const stop = exitTriggered();
+    const allow = checkExitPermission(stop, {
+      autoExecute: true,
+      paperDExecute: true,
+      portfolioDrift: true,
+    });
+    expect(allow.verdict).toBe("ALLOW");
+  });
+
+  it("V1.44 JIT does not apply to SEMI human", () => {
+    const t1 = buildExitPlanFromPosition(openLong(), { markPrice: 105 });
+    const perm = checkExitPermission(t1, {
+      dataStale: true,
+      marketClosed: true,
+      portfolioDrift: true,
+    });
+    expect(perm.verdict).toBe("ALLOW");
+  });
 });

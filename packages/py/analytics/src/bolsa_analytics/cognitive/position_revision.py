@@ -129,6 +129,13 @@ def revisions_from_raw(raw: object) -> tuple[PositionRevision, ...]:
     return tuple(out)
 
 
+def revision_origin_from_exit_reason(
+    reason: str | None,
+) -> Literal["protect", "trail"]:
+    """V1.44 — TRAIL → origin=trail; resto de protect enqueue → protect."""
+    return "trail" if reason == "TRAIL" else "protect"
+
+
 def stop_or_status_changed(
     *,
     previous_stop: float | None,
