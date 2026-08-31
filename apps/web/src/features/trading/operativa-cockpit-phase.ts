@@ -150,7 +150,7 @@ export type MercadoTrailingCopyV1 = {
   /** true = el stop vigente ya recoge la sugerencia: nada que firmar. */
   applied: boolean;
   label: "↗ Trailing sugerido";
-  stopVigenteLabel: "Stop vigente";
+  stopVigenteLabel: "Stop operativo";
   stopSugeridoLabel: "Stop sugerido";
   /** null cuando la sugerencia ya está recogida en el stop vigente. */
   statusLabel: MercadoTrailingStatusLabel | null;
@@ -179,7 +179,7 @@ export function resolveMercadoTrailingCopy(input: {
     stopSugerido: null,
     applied: false,
     label: "↗ Trailing sugerido" as const,
-    stopVigenteLabel: "Stop vigente" as const,
+    stopVigenteLabel: "Stop operativo" as const,
     stopSugeridoLabel: "Stop sugerido" as const,
     statusLabel: null as MercadoTrailingStatusLabel | null,
   };

@@ -10,12 +10,14 @@ import {
   type JournalStudyOpinion,
   type JournalStudyPeriod,
   type JournalStudyUserStatus,
+  type PositionDto,
 } from "@bolsa/shared";
 import { IconButton } from "@/components/ui/icon-button";
 import { DecisionStudyChart } from "@/features/decision-journal/decision-study-chart";
 import { openDecisionReplay } from "@/features/decision-journal/decision-journal-helpers";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
+import { PositionOperatingSummary } from "@/features/trading/position-operating-summary";
 import { cn } from "@/lib/utils";
 
 function opinionTone(opinion: string | null): string {
@@ -80,10 +82,14 @@ function BiasDonut({
 
 export function DecisionFichaPanel({
   study,
+  position,
+  portfolioReconStatus,
   onClose,
   onCollapse,
 }: {
   study: DecisionJournalStudyViewV1;
+  position?: PositionDto | null;
+  portfolioReconStatus?: string | null;
   onClose: () => void;
   onCollapse: () => void;
 }) {
@@ -309,6 +315,13 @@ export function DecisionFichaPanel({
             </p>
             <p className="text-xs">{study.nextReviewAt}</p>
           </section>
+        ) : null}
+
+        {position ? (
+          <PositionOperatingSummary
+            position={position}
+            portfolioReconStatus={portfolioReconStatus}
+          />
         ) : null}
 
         {study.hasOperationalPlan ? (

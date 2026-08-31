@@ -20,6 +20,8 @@ export * from "./exit-risk-signature.js";
 export * from "./exit-plan.js";
 export * from "./exit-policy.js";
 export * from "./position-decision.js";
+export * from "./position-decision-copy.js";
+export * from "./position-state-from-dto.js";
 export * from "./execution-plan.js";
 export * from "./execution-record.js";
 export * from "./submit-intent.js";

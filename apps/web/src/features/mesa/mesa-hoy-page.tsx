@@ -829,6 +829,7 @@ export function MesaHoyPage() {
               protectPlanByInstrument={protectPlanByInstrument}
               studiesByInstrument={studiesMap}
               studiesByDecisionId={studiesByDecision}
+              portfolioReconStatus={portfolioReconStatus}
             />
             <MesaLibroPanel
               summary={portfolio}

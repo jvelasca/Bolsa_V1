@@ -114,7 +114,7 @@ export function OperationalPlanView({
           <Row label="Actual" value={formatPrice(plan.currentPrice)} />
         ) : null}
         <Row
-          label="🛡 Stop vigente"
+          label="🛡 Stop operativo"
           value={plan.stopVigente != null ? formatPrice(plan.stopVigente) : "—"}
           hint={stopTrace}
           tone="stop"
@@ -155,7 +155,7 @@ export function OperationalPlanView({
           </p>
           <dl className="mt-1 space-y-0.5">
             <Row
-              label="Stop vigente"
+              label="Stop operativo"
               value={
                 plan.stopVigente != null ? formatPrice(plan.stopVigente) : "—"
               }

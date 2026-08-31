@@ -14,11 +14,13 @@ import {
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
+import { PositionOperatingSummary } from "@/features/trading/position-operating-summary";
 
 type PositionRoutePanelProps = {
   position: PositionDto;
   study?: DecisionJournalStudyViewV1 | null;
   originStudy?: DecisionJournalStudyViewV1 | null;
+  portfolioReconStatus?: string | null;
   className?: string;
 };
 
@@ -26,6 +28,7 @@ export function PositionRoutePanel({
   position,
   study,
   originStudy,
+  portfolioReconStatus,
   className,
 }: PositionRoutePanelProps) {
   const aggregate = buildInvestmentPositionAggregate({
@@ -44,6 +47,10 @@ export function PositionRoutePanel({
       className={cn("space-y-2", className)}
       data-testid={`position-route-${position.symbol}`}
     >
+      <PositionOperatingSummary
+        position={position}
+        portfolioReconStatus={portfolioReconStatus}
+      />
       <OperationalPlanView
         plan={plan}
         testId={`operational-plan-${position.symbol}`}

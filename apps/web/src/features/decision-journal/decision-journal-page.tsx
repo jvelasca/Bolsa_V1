@@ -7,13 +7,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
-import type { DecisionJournalStudyViewV1 } from "@bolsa/shared";
+import type { DecisionJournalStudyViewV1, PositionDto } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { useActiveAccountQueryKey } from "@/stores/active-account-store";
+import {
+  portfolioReconStatusFromReport,
+  useOpsSelfEval,
+} from "@/features/operational-console/use-ops-self-eval";
 import { JournalTimeline } from "@/features/decision-journal/journal-timeline";
 import {
   DEFAULT_JOURNAL_STUDY_FILTERS,
@@ -38,6 +43,9 @@ const STUDIES_PAGE_LIMIT = 200;
 
 export function DecisionJournalPage() {
   const { effectiveAccountId } = useActiveAccount();
+  const accountScope = useActiveAccountQueryKey();
+  const opsEval = useOpsSelfEval(effectiveAccountId);
+  const portfolioReconStatus = portfolioReconStatusFromReport(opsEval.data);
   const [searchParams] = useSearchParams();
   const isWide = useMediaQuery("(min-width: 1024px)");
   const splitPrefs = useMemo(() => loadJournalStudiesSplitPrefs(), []);
@@ -78,6 +86,13 @@ export function DecisionJournalPage() {
   const listsQuery = useQuery({
     queryKey: ["lists"],
     queryFn: () => api.getLists(),
+  });
+
+  const portfolioQuery = useQuery({
+    queryKey: ["portfolio", accountScope],
+    queryFn: api.getPortfolio,
+    enabled: Boolean(effectiveAccountId),
+    staleTime: 15_000,
   });
 
   const studiesQuery = useQuery({
@@ -144,6 +159,18 @@ export function DecisionJournalPage() {
   );
 
   const showFicha = Boolean(selected) && !fichaCollapsed;
+
+  const selectedPosition = useMemo((): PositionDto | null => {
+    if (!selected) return null;
+    const positions = portfolioQuery.data?.data.positions ?? [];
+    return (
+      positions.find(
+        (p) =>
+          p.instrumentId === selected.instrumentId &&
+          Math.abs(Number(p.quantity ?? 0)) > 0,
+      ) ?? null
+    );
+  }, [portfolioQuery.data, selected]);
 
   useEffect(() => {
     const instrumentParam = searchParams.get("instrument");
@@ -290,6 +317,8 @@ export function DecisionJournalPage() {
                   showFicha ? (
                     <DecisionFichaPanel
                       study={selected}
+                      position={selectedPosition}
+                      portfolioReconStatus={portfolioReconStatus}
                       onClose={() => setSelected(null)}
                       onCollapse={() => setFichaCollapsed(true)}
                     />

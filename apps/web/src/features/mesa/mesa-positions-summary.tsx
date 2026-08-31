@@ -24,11 +24,13 @@ export function MesaPositionsSummary({
   protectPlanByInstrument,
   studiesByInstrument,
   studiesByDecisionId,
+  portfolioReconStatus,
 }: {
   positions: PositionDto[];
   protectPlanByInstrument: Map<string, ProtectPlanV1>;
   studiesByInstrument: Map<string, DecisionJournalStudyViewV1>;
   studiesByDecisionId: Map<string, DecisionJournalStudyViewV1>;
+  portfolioReconStatus?: string | null;
 }) {
   return (
     <Card data-testid="mesa-positions-summary">
@@ -66,6 +68,7 @@ export function MesaPositionsSummary({
                 study={evolutionStudy}
                 originStudy={originStudy}
                 showRoute={mesaPositionShowsRoute(position, evolutionStudy)}
+                portfolioReconStatus={portfolioReconStatus}
               />
             );
           })

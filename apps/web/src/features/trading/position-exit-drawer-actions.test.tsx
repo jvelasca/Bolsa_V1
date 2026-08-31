@@ -1,0 +1,105 @@
+/**
+ * V1.36 — CTAs alineados con PositionDecision.action.
+ */
+
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { PositionDto } from "@bolsa/shared";
+import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
+
+vi.mock("@/features/accounts/use-active-account", () => ({
+  useActiveAccount: () => ({
+    effectiveAccountId: "acc-1",
+    account: { id: "acc-1" },
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/stores/supervised-f3-queue-store", () => ({
+  useSupervisedF3QueueStore: (
+    sel: (s: { enqueue: () => string; setActive: () => void }) => unknown,
+  ) => sel({ enqueue: vi.fn(() => "q1"), setActive: vi.fn() }),
+}));
+
+vi.mock("@/features/confirm/confirm-drawer", () => ({
+  openConfirmDrawer: vi.fn(),
+}));
+
+vi.mock("@/features/trading/demo-book-prefs", () => ({
+  loadDemoBookPrefs: () => ({ mode: "semi" }),
+  demoBookAllowsEnqueueConfirm: () => true,
+}));
+
+afterEach(() => cleanup());
+
+function position(
+  partial: Partial<PositionDto> = {},
+  exitPlan?: NonNullable<PositionDto["operational"]>["exitPlan"],
+): PositionDto {
+  return {
+    id: "p1",
+    instrumentId: "inst-1",
+    symbol: "TEST",
+    name: "Test",
+    quantity: 10,
+    avgCost: 100,
+    lastPrice: 102,
+    marketValue: 1020,
+    unrealizedPnl: 20,
+    unrealizedPnlPct: 2,
+    operational: {
+      status: "OPEN",
+      direction: "long",
+      tradePlanId: "tp-1",
+      plannedEntry: 100,
+      actualEntry: 100,
+      initialStop: 95,
+      currentStop: 95,
+      target1: 105,
+      target2: 110,
+      exitPlan,
+    },
+    ...partial,
+  };
+}
+
+describe("PositionExitDrawerActions V1.36", () => {
+  it("emphasizes Mantener on HOLD", () => {
+    render(
+      <PositionExitDrawerActions
+        position={position()}
+        showMaintain
+        portfolioReconStatus="ok"
+      />,
+    );
+    expect(screen.getByText("Mantener").className).toMatch(/ring-primary/);
+  });
+
+  it("shows Revisar and hides reduce/exit on recon drift", () => {
+    render(
+      <PositionExitDrawerActions
+        position={position()}
+        portfolioReconStatus="drift"
+      />,
+    );
+    expect(screen.getByTestId("position-exit-review-TEST")).toBeTruthy();
+    expect(screen.queryByTestId("position-exit-reduce-TEST")).toBeNull();
+    expect(screen.queryByTestId("position-exit-full-TEST")).toBeNull();
+  });
+
+  it("shows Proteger when exit plan suggests protect", () => {
+    render(
+      <PositionExitDrawerActions
+        position={position(undefined, {
+          status: "ARMED",
+          suggestedAction: "protect",
+          suggestedStop: 98,
+          primaryReason: "TRAIL",
+          policyTemplateId: "moderate",
+        })}
+        portfolioReconStatus="ok"
+      />,
+    );
+    expect(screen.getByTestId("position-exit-protect-TEST")).toBeTruthy();
+  });
+});

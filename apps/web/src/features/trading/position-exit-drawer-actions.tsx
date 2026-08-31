@@ -9,7 +9,11 @@
 
 import { useState } from "react";
 import type { PositionDto, ProtectPlanV1 } from "@bolsa/shared";
-import { formatExitPolicyActionHint } from "@bolsa/shared";
+import {
+  buildPositionDecisionFromDto,
+  formatExitPolicyActionHint,
+  isPrimaryPositionExitCta,
+} from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
@@ -25,6 +29,7 @@ export function PositionExitDrawerActions({
   protectPlan,
   compact = false,
   showMaintain = false,
+  portfolioReconStatus,
   className,
 }: {
   position: PositionDto;
@@ -32,12 +37,18 @@ export function PositionExitDrawerActions({
   compact?: boolean;
   /** Cockpit en fase POSICIÓN muestra «Mantener» como estado, no como botón. */
   showMaintain?: boolean;
+  portfolioReconStatus?: string | null;
   className?: string;
 }) {
   const { effectiveAccountId } = useActiveAccount();
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
   const [error, setError] = useState<string | null>(null);
+
+  const decision = buildPositionDecisionFromDto(position, {
+    portfolioReconStatus,
+  });
+  const reconBlocked = decision?.reconHealth === "CRITICAL";
 
   function enqueueExit(intent: PositionExitIntent) {
     setError(null);
@@ -67,7 +78,29 @@ export function PositionExitDrawerActions({
     ? "rounded border px-2 py-1 text-[10px] font-medium hover:bg-accent"
     : "rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent";
 
-  const showProtect = positionShowsProtectHint(position, protectPlan);
+  const primaryBtnClass = compact
+    ? "ring-1 ring-primary/45 bg-primary/10 font-semibold"
+    : "ring-1 ring-primary/45 bg-primary/10 font-semibold";
+
+  function ctaClass(
+    kind: "maintain" | "protect" | "reduce" | "exit" | "review",
+  ) {
+    const base = btnClass;
+    if (!decision) return base;
+    if (isPrimaryPositionExitCta(decision, kind)) {
+      return cn(base, primaryBtnClass);
+    }
+    return cn(base, "opacity-75");
+  }
+
+  const showProtect =
+    !reconBlocked &&
+    (decision?.action === "PROTECT" ||
+      positionShowsProtectHint(position, protectPlan));
+  const showMaintainBadge = showMaintain || decision?.action === "HOLD";
+  const showReview = reconBlocked || decision?.action === "REVIEW";
+  const showReduceExit = !reconBlocked && !showReview;
+
   const exitPlan = position.operational?.exitPlan;
   const policyHint = formatExitPolicyActionHint({
     suggestedAction: exitPlan?.suggestedAction,
@@ -79,16 +112,34 @@ export function PositionExitDrawerActions({
   return (
     <div className={cn("flex flex-col items-start gap-0.5", className)}>
       <div className="flex flex-wrap items-center gap-1">
-        {showMaintain ? (
-          <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+        {showMaintainBadge ? (
+          <span
+            className={cn(
+              "rounded-md border border-border px-2 py-1 text-xs text-muted-foreground",
+              decision && isPrimaryPositionExitCta(decision, "maintain")
+                ? primaryBtnClass
+                : null,
+            )}
+          >
             Mantener
           </span>
+        ) : null}
+        {showReview ? (
+          <button
+            type="button"
+            className={ctaClass("review")}
+            onClick={() => enqueueExit("review")}
+            data-testid={`position-exit-review-${position.symbol}`}
+            title="Revisar → cola Confirm (reconciliación / tesis)"
+          >
+            Revisar
+          </button>
         ) : null}
         {showProtect ? (
           <button
             type="button"
             className={cn(
-              btnClass,
+              ctaClass("protect"),
               "border-emerald-500/40 text-emerald-900 dark:text-emerald-100",
             )}
             onClick={() => enqueueExit("protect")}
@@ -98,24 +149,28 @@ export function PositionExitDrawerActions({
             Proteger
           </button>
         ) : null}
-        <button
-          type="button"
-          className={cn(btnClass, "border-amber-500/40")}
-          onClick={() => enqueueExit("reduce")}
-          data-testid={`position-exit-reduce-${position.symbol}`}
-          title="Reducir → cola Confirm (firma SEMI)"
-        >
-          Reducir
-        </button>
-        <button
-          type="button"
-          className={cn(btnClass, "border-rose-500/40")}
-          onClick={() => enqueueExit("exit_hint")}
-          data-testid={`position-exit-full-${position.symbol}`}
-          title="Salir → cola Confirm (firma SEMI)"
-        >
-          Salir
-        </button>
+        {showReduceExit ? (
+          <>
+            <button
+              type="button"
+              className={cn(ctaClass("reduce"), "border-amber-500/40")}
+              onClick={() => enqueueExit("reduce")}
+              data-testid={`position-exit-reduce-${position.symbol}`}
+              title="Reducir → cola Confirm (firma SEMI)"
+            >
+              Reducir
+            </button>
+            <button
+              type="button"
+              className={cn(ctaClass("exit"), "border-rose-500/40")}
+              onClick={() => enqueueExit("exit_hint")}
+              data-testid={`position-exit-full-${position.symbol}`}
+              title="Salir → cola Confirm (firma SEMI)"
+            >
+              Salir
+            </button>
+          </>
+        ) : null}
       </div>
       {policyHint ? (
         <span

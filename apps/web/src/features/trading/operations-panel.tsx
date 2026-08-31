@@ -20,6 +20,10 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { mesaPositionShowsRoute } from "@/features/mesa/mesa-position-row";
 import { PositionRoutePanel } from "@/features/mesa/position-route-panel";
 import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
+import {
+  portfolioReconStatusFromReport,
+  useOpsSelfEval,
+} from "@/features/operational-console/use-ops-self-eval";
 
 type OperationsTab = "open" | "pending";
 
@@ -79,6 +83,8 @@ export function OperationsPanel({
 
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId } = useActiveAccount();
+  const opsEval = useOpsSelfEval(effectiveAccountId);
+  const portfolioReconStatus = portfolioReconStatusFromReport(opsEval.data);
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
@@ -318,6 +324,7 @@ export function OperationsPanel({
                             protectPlan={protectPlanByInstrument.get(
                               pos.instrumentId,
                             )}
+                            portfolioReconStatus={portfolioReconStatus}
                             className="items-end"
                           />
                         </td>
@@ -325,7 +332,11 @@ export function OperationsPanel({
                       {showRoute ? (
                         <tr className="border-b border-border/50 bg-muted/10">
                           <td colSpan={9} className="px-2 py-2">
-                            <PositionRoutePanel position={pos} study={study} />
+                            <PositionRoutePanel
+                              position={pos}
+                              study={study}
+                              portfolioReconStatus={portfolioReconStatus}
+                            />
                           </td>
                         </tr>
                       ) : null}

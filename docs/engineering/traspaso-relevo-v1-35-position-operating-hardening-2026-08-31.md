@@ -1,7 +1,7 @@
 # RELEVO — V1.35 Position Operating Hardening (2026-08-31)
 
 > **Padre:** [`plan-v135-position-operating-hardening-2026-08-31.md`](./plan-v135-position-operating-hardening-2026-08-31.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CÓDIGO** — post-auditorías externas v1.34.1-beta; sin tag nuevo aún.  
+> **Estado:** **CERRADO** — tag local `v1.35-beta` → `ab07e1e4` (sin push).  
 > **Certified product tip:** `v1.34.1-beta` → `4b2e3751`.
 
 ---
@@ -40,4 +40,4 @@ Backend operativo **congelado** para V1.36 UI. Fuera: entry drag · OCO · nav L
 
 ## 3. Next
 
-**V1.36 — Daily Operating UI:** layout Mercado cockpit (próximo evento / protección / frase humana). Ver roadmap.
+**V1.36 — Daily Operating UI:** [`traspaso-relevo-v1-36-daily-operating-ui-2026-08-31.md`](./traspaso-relevo-v1-36-daily-operating-ui-2026-08-31.md) · slice 1 cockpit POSICIÓN en curso.

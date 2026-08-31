@@ -228,7 +228,7 @@ describe("resolveMercadoTrailingCopy", () => {
   it("sugerencia no recogida → Stop sugerido · No aplicado", () => {
     const copy = resolveMercadoTrailingCopy({ ...base, phase: "posicion" });
     expect(copy.show).toBe(true);
-    expect(copy.stopVigenteLabel).toBe("Stop vigente");
+    expect(copy.stopVigenteLabel).toBe("Stop operativo");
     expect(copy.stopSugeridoLabel).toBe("Stop sugerido");
     expect(copy.stopVigente).toBe(95);
     expect(copy.stopSugerido).toBe(101);

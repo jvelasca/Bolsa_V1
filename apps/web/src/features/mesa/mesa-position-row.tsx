@@ -217,12 +217,14 @@ export function MesaPositionRow({
   study,
   originStudy,
   showRoute = false,
+  portfolioReconStatus,
 }: {
   position: PositionDto;
   protectPlan?: ProtectPlanV1 | null;
   study?: DecisionJournalStudyViewV1 | null;
   originStudy?: DecisionJournalStudyViewV1 | null;
   showRoute?: boolean;
+  portfolioReconStatus?: string | null;
 }) {
   const operational = position.operational ?? null;
   const pnlUp = (position.unrealizedPnl ?? 0) >= 0;
@@ -337,6 +339,7 @@ export function MesaPositionRow({
             position={position}
             study={study}
             originStudy={originStudy}
+            portfolioReconStatus={portfolioReconStatus}
           />
         </div>
       ) : null}

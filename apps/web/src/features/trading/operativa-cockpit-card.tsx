@@ -29,6 +29,7 @@ import {
   type MercadoCockpitPhase,
 } from "@/features/trading/operativa-cockpit-phase";
 import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
+import { PositionOperatingSummary } from "@/features/trading/position-operating-summary";
 import { useInstrumentOperationalContext } from "@/features/trading/use-instrument-operational-context";
 
 type OperativaCockpitCardProps = {
@@ -152,6 +153,19 @@ export function OperativaCockpitCard({
 
       {context.loading ? (
         <p className="text-[11px] text-muted-foreground">Cargando plan…</p>
+      ) : phase === "posicion" && position ? (
+        <>
+          <PositionOperatingSummary
+            position={position}
+            portfolioReconStatus={reconStatus}
+          />
+          {context.showsPlanLevels ? (
+            <OperationalPlanView
+              plan={plan}
+              testId={`operativa-cockpit-plan-${symbol}`}
+            />
+          ) : null}
+        </>
       ) : context.showsPlanLevels ? (
         <OperationalPlanView
           plan={plan}
@@ -218,7 +232,11 @@ export function OperativaCockpitCard({
         ) : null}
 
         {phase === "posicion" && position ? (
-          <PositionExitDrawerActions position={position} showMaintain />
+          <PositionExitDrawerActions
+            position={position}
+            showMaintain
+            portfolioReconStatus={reconStatus}
+          />
         ) : null}
 
         {phase === "vigilar" ||
