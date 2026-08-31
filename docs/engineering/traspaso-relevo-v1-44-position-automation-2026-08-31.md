@@ -1,7 +1,7 @@
 # RELEVO — V1.44 Position Automation Contract (2026-08-31)
 
 > **Padre:** [`spec-v144-position-automation-2026-08-31.md`](./spec-v144-position-automation-2026-08-31.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v144-position-automation-foundation-2026-08-31.md`](./plan-v144-position-automation-foundation-2026-08-31.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CERRADO (código de contrato)** — `PositionEvent` → `decidePositionPolicy` → ExitPermission JIT + GP-AUTO-01 / casos malos. **No** AUTO execute de posiciones. **Tag tip:** [`v1.44-beta` → `57cf41a3`](./traspaso-relevo-tag-v1-44-beta-2026-08-31.md) (CI pending).  
+> **Estado:** **CERRADO (código de contrato)** — `PositionEvent` → `decidePositionPolicy` → ExitPermission JIT + GP-AUTO-01 / casos malos. **No** AUTO execute de posiciones. **Tag tip:** [`v1.44-beta` → `db346a11`](./traspaso-relevo-tag-v1-44-beta-2026-08-31.md) (CI pending; was `57cf41a3` ruff unblock).  
 > **Arranque auditor:** [`arranque-auditor-v1-44-beta-2026-08-31.md`](./arranque-auditor-v1-44-beta-2026-08-31.md).
 
 ---
