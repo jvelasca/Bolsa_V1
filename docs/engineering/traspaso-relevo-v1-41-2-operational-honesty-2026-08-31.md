@@ -2,7 +2,7 @@
 
 > **Padre:** [`traspaso-relevo-v1-41-daily-desk-2026-08-31.md`](./traspaso-relevo-v1-41-daily-desk-2026-08-31.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
 > **Estado:** **CERRADO** — `entriesBlocked`/`gateStatus` y `orderPending` alimentan las mismas proyecciones en Mercado / Hoy / Journal / Operaciones.
-> **Tag tip certificado:** sigue `v1.41.1-beta` → `9938ff30` (owner tagea aparte).
+> **Tag tip certificado:** `v1.41.2-beta` → `ebb11e07` · relevo tip [`traspaso-relevo-tag-v1-41-2-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-41-2-beta-2026-08-31.md).
 
 ---
 
