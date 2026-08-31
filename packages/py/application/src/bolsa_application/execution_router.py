@@ -721,18 +721,19 @@ class ExecutionRouter:
                 )
             open_qty = float(position.quantity)
             # V1.45 — qty explícita en hit (reduce); clamp ≤ open. Sin qty + exit = full.
-            quantity, qty_err = resolve_exit_sell_quantity(
+            resolved_qty, qty_err = resolve_exit_sell_quantity(
                 open_qty=open_qty,
                 signal_kind=sell_kind,
                 hit=hit if isinstance(hit, dict) else None,
             )
-            if quantity is None:
+            if resolved_qty is None:
                 return ExecutionActionResult(
                     instrument_id=signal.instrument_id,
                     signal_kind=sell_kind,
                     status="skipped",
                     reason=qty_err or "Cantidad de salida inválida",
                 )
+            quantity = resolved_qty
         else:
             # V1.33 A-β / A-δ — apertura: Estudio + TradePlan TRIGGERED + risk_signature.
             # No sizing libro (A-γ rechazada). ``sizing_value`` solo aplica a live_auto dry-run.

@@ -129,7 +129,7 @@ async def execute_position_policy_auto(
                 reason=decision.defer_reason,
                 decision=decision.to_dict(),
                 permission=None,
-                dryRun=True,
+                dry_run=True,
             )
         perm = auto_exit_permission(
             exit_plan,
@@ -145,7 +145,7 @@ async def execute_position_policy_auto(
             reason=None if perm.allowed else ",".join(perm.reasons),
             decision=decision.to_dict(),
             permission=perm.to_dict(),
-            dryRun=True,
+            dry_run=True,
         )
 
     if execution_policy_id is None or not str(execution_policy_id).strip():
@@ -171,5 +171,5 @@ async def execute_position_policy_auto(
         reason=result.reason,
         decision=result.decision.to_dict() if result.decision else None,
         permission=result.permission.to_dict() if result.permission else None,
-        dryRun=False,
+        dry_run=False,
     )
