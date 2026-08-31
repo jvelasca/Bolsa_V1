@@ -5,17 +5,17 @@
 
 Cinco números distintos. No son intercambiables. Una fila de docs no debe fingir que los cinco coinciden.
 
-| Verdad      | Qué es                                                                | Dónde vive                                | Valor vigente (AsOf)                           |
-| ----------- | --------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------- |
-| **Product** | Nombre de producto / slice de UX o dominio que lee el auditor         | AsOf de `CURRENT_SYSTEM.md`, relevos      | `V1.43-beta`                                   |
-| **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v1.43-beta` (sobre `v1.42-beta` → `5e3fb1a4`) |
-| **Package** | Semver npm del monorepo (workspaces `@bolsa/*` pueden seguir `0.1.0`) | raíz [`package.json`](../../package.json) | `1.35.0-beta` (congelado)                      |
-| **Schema**  | Migraciones de persistencia                                           | Alembic en `packages/py` / `bolsa_v1`     | revisión Alembic vigente                       |
-| **API**     | Contrato HTTP / OpenAPI si existe                                     | FastAPI · `apps/web/src/api/schema.d.ts`  | independiente del product                      |
+| Verdad      | Qué es                                                                | Dónde vive                                | Valor vigente (AsOf)      |
+| ----------- | --------------------------------------------------------------------- | ----------------------------------------- | ------------------------- |
+| **Product** | Nombre de producto / slice de UX o dominio que lee el auditor         | AsOf de `CURRENT_SYSTEM.md`, relevos      | `V1.43-beta`              |
+| **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v1.43-beta` → `5dfac890` |
+| **Package** | Semver npm del monorepo (workspaces `@bolsa/*` pueden seguir `0.1.0`) | raíz [`package.json`](../../package.json) | `1.35.0-beta` (congelado) |
+| **Schema**  | Migraciones de persistencia                                           | Alembic en `packages/py` / `bolsa_v1`     | revisión Alembic vigente  |
+| **API**     | Contrato HTTP / OpenAPI si existe                                     | FastAPI · `apps/web/src/api/schema.d.ts`  | independiente del product |
 
 ## Reglas
 
-1. **El tip certificado es el git tag**, no el `version` de npm. Un auditor cita `v1.43-beta` (`git rev-parse v1.43-beta`).
+1. **El tip certificado es el git tag**, no el `version` de npm. Un auditor cita `v1.43-beta` → `5dfac890`.
 2. **Package congelado a propósito** durante la serie UX V1.36–V1.43: no bumpir `package.json` en cada parche de proyección. El desfase `1.35.0-beta` vs producto `V1.43-beta` **no es un bug de runtime**.
 3. **Bump de package** solo al cerrar una **V1.42/V1.43 estable** (código + Golden Paths + tag), no al publicar este contrato.
 4. **Schema / API** cambian con migraciones o `contract:gen`, no con un relevo de UX. No sincronizarlos al product version por costumbre.

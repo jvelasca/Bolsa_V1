@@ -1,7 +1,7 @@
 # RELEVO — tag v1.43-beta → auditoría externa (2026-08-31)
 
 > **Padre:** [`traspaso-relevo-v1-43-trail-revision-2026-08-31.md`](./traspaso-relevo-v1-43-trail-revision-2026-08-31.md) · [`traspaso-relevo-tag-v1-42-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-42-beta-2026-08-31.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **TIP STAMPED** — `v1.43-beta` (SHA en §1 tras push) · Release-tag CI pending.  
+> **Estado:** **TIP STAMPED** — `v1.43-beta` → `5dfac890` · Release-tag CI pending after push.  
 > **Arranque auditor:** [`arranque-auditor-v1-43-beta-2026-08-31.md`](./arranque-auditor-v1-43-beta-2026-08-31.md).
 
 ---
@@ -26,7 +26,7 @@ Freeze: Confirm = firma · Spine · `PAPER_D_EXECUTE` off · AUTO opt-in · `pro
 
 | Pieza        | Valor                                                                                      |
 | ------------ | ------------------------------------------------------------------------------------------ |
-| Tag tip      | `v1.43-beta` → _(pin tras stamp; ver `git rev-parse v1.43-beta`)_                          |
+| Tag tip      | `v1.43-beta` → `5dfac890`                                                                  |
 | Código trail | `6136c27c` `feat(trail): SEMI Confirm trail → PositionRevision origin=trail → currentStop` |
 | Previo tip   | `v1.42-beta` → `5e3fb1a4`                                                                  |
 | CI tag       | Pending — workflow `release-tag-ci` tras push del tag                                      |

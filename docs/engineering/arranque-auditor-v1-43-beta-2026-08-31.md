@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 post-tag **`v1.43-beta`** (trail SEMI Confirm→`PositionRevision` `origin=trail`→`currentStop` sobre tip `v1.42-beta` → `5e3fb1a4`; resolve SHA con `git rev-parse --short=8 v1.43-beta`).
+Eres auditor externo de Bolsa V1 post-tag **`v1.43-beta` → `5dfac890`** (trail SEMI Confirm→`PositionRevision` `origin=trail`→`currentStop` sobre tip `v1.42-beta` → `5e3fb1a4`).
 
 Lee en este orden:
 
