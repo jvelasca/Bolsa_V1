@@ -1,6 +1,7 @@
 /**
  * AdminRail — barra administrativa icon-first (V1.21+).
  * Por defecto solo iconos (mínimo ancho); al hover se descolapsa el texto.
+ * Chincheta cicla: Auto (hover) → Fijo colapsado → Fijo expandido.
  * No es navegación diaria de producto. Overview / Cuentas / Perfiles /
  * Estadísticas (preparado) / Fiscal / Consola.
  *
@@ -28,7 +29,17 @@ import {
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
-const STORAGE_KEY = "bolsa-admin-rail-pinned";
+const STORAGE_KEY = "bolsa-admin-rail-mode";
+/** Legacy boolean pin (expanded-only). */
+const LEGACY_PIN_KEY = "bolsa-admin-rail-pinned";
+
+export type AdminRailMode = "auto" | "pinned-collapsed" | "pinned-expanded";
+
+const MODE_CYCLE: AdminRailMode[] = [
+  "auto",
+  "pinned-collapsed",
+  "pinned-expanded",
+];
 
 type AdminNavItem = {
   kind: "nav";
@@ -90,12 +101,28 @@ const TRAILING_NAV: AdminNavItem[] = [
   },
 ];
 
-function loadPinned(): boolean {
+export function loadAdminRailMode(): AdminRailMode {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (
+      raw === "auto" ||
+      raw === "pinned-collapsed" ||
+      raw === "pinned-expanded"
+    ) {
+      return raw;
+    }
+    // Migrate legacy pin: "1" = locked expanded, "0"/null = auto.
+    const legacy = localStorage.getItem(LEGACY_PIN_KEY);
+    if (legacy === "1") return "pinned-expanded";
+    return "auto";
   } catch {
-    return false;
+    return "auto";
   }
+}
+
+function nextMode(current: AdminRailMode): AdminRailMode {
+  const idx = MODE_CYCLE.indexOf(current);
+  return MODE_CYCLE[(idx + 1) % MODE_CYCLE.length]!;
 }
 
 const railButtonClass = (expanded: boolean, active?: boolean) =>
@@ -105,11 +132,43 @@ const railButtonClass = (expanded: boolean, active?: boolean) =>
     active && "bg-accent text-primary",
   );
 
+function modeChrome(mode: AdminRailMode): {
+  ariaLabel: string;
+  title: string;
+  label: string;
+  pinned: boolean;
+} {
+  switch (mode) {
+    case "pinned-collapsed":
+      return {
+        ariaLabel: "Anclado colapsado — clic para anclar expandido",
+        title: "Anclado: solo iconos (sin hover). Clic → expandido fijo",
+        label: "Iconos",
+        pinned: true,
+      };
+    case "pinned-expanded":
+      return {
+        ariaLabel: "Anclado expandido — clic para modo auto (hover)",
+        title: "Anclado: expandido. Clic → auto (hover)",
+        label: "Expandido",
+        pinned: true,
+      };
+    default:
+      return {
+        ariaLabel: "Modo auto (hover) — clic para anclar colapsado",
+        title: "Auto: se abre al pasar el ratón. Clic → fijar solo iconos",
+        label: "Auto",
+        pinned: false,
+      };
+  }
+}
+
 export function AdminRail() {
-  const [pinned, setPinned] = useState(loadPinned);
+  const [mode, setMode] = useState<AdminRailMode>(loadAdminRailMode);
   const [hovered, setHovered] = useState(false);
-  const expanded = pinned || hovered;
+  const expanded = mode === "pinned-expanded" || (mode === "auto" && hovered);
   const openPlatformConfig = useUiStore((s) => s.openPlatformConfig);
+  const chrome = modeChrome(mode);
 
   const actionItems: AdminActionItem[] = [
     {
@@ -139,11 +198,16 @@ export function AdminRail() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, pinned ? "1" : "0");
+      localStorage.setItem(STORAGE_KEY, mode);
+      // Keep legacy key in sync for older readers / diagnostics.
+      localStorage.setItem(
+        LEGACY_PIN_KEY,
+        mode === "pinned-expanded" ? "1" : "0",
+      );
     } catch {
       /* ignore */
     }
-  }, [pinned]);
+  }, [mode]);
 
   // Migrate legacy collapsed key once (default was collapsed=true → unpinned).
   useEffect(() => {
@@ -165,7 +229,8 @@ export function AdminRail() {
       aria-label="Administración"
       data-testid="admin-rail"
       data-collapsed={expanded ? "0" : "1"}
-      data-pinned={pinned ? "1" : "0"}
+      data-pinned={chrome.pinned ? "1" : "0"}
+      data-mode={mode}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocusCapture={() => setHovered(true)}
@@ -248,24 +313,21 @@ export function AdminRail() {
           "m-1.5 flex items-center justify-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-accent",
           expanded && "justify-start",
         )}
-        onClick={() => setPinned((v) => !v)}
-        aria-pressed={pinned}
-        aria-label={
-          pinned
-            ? "Desanclar administración (solo iconos)"
-            : "Anclar administración expandida"
-        }
-        title={pinned ? "Desanclar" : "Anclar expandido"}
+        onClick={() => setMode((m) => nextMode(m))}
+        aria-pressed={chrome.pinned}
+        aria-label={chrome.ariaLabel}
+        title={chrome.title}
         data-testid="admin-rail-toggle"
+        data-mode={mode}
       >
-        {pinned ? (
-          <PinOff className="h-3.5 w-3.5 shrink-0" />
-        ) : (
+        {mode === "auto" ? (
           <Pin className="h-3.5 w-3.5 shrink-0" />
+        ) : mode === "pinned-collapsed" ? (
+          <Pin className="h-3.5 w-3.5 shrink-0 fill-current" />
+        ) : (
+          <PinOff className="h-3.5 w-3.5 shrink-0" />
         )}
-        {expanded ? (
-          <span className="truncate">{pinned ? "Anclado" : "Anclar"}</span>
-        ) : null}
+        {expanded ? <span className="truncate">{chrome.label}</span> : null}
       </button>
     </aside>
   );
