@@ -43,9 +43,13 @@ import {
 import { useUiStore } from "@/stores/ui-store";
 import { useActiveChartTab, useWorkspaceStore } from "@/stores/workspace-store";
 import { useTradingUiStore } from "@/stores/trading-ui-store";
+import { clearChartSignedStopPrefill } from "@/features/charts/chart-signed-stop-prefill";
 
 export function ChartWorkspacePage() {
   const activeTab = useActiveChartTab();
+
+  useEffect(() => () => clearChartSignedStopPrefill(), []);
+
   const openInstrumentSyncDialog = useUiStore(
     (s) => s.openInstrumentSyncDialog,
   );

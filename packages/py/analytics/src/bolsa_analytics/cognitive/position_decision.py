@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from bolsa_analytics.cognitive.exit_plan import ExitPlan, build_exit_plan_from_position
+from bolsa_analytics.cognitive.exit_plan import ExitPlan, ExitPlanStatus, build_exit_plan_from_position
 from bolsa_analytics.cognitive.exit_policy import ExitPolicy, resolve_exit_policy
 from bolsa_analytics.cognitive.position_state import PositionState
 
@@ -17,10 +17,26 @@ PositionNextEvent = Literal[
     "NONE", "T1", "T2", "STOP", "TRAIL", "THESIS_REVIEW", "RECONCILIATION"
 ]
 PositionReconHealth = Literal["CLEAN", "ATTENTION", "CRITICAL"]
+PositionProtection = Literal["ACTIVE", "NONE"]
+PositionUrgency = Literal["LOW", "MEDIUM", "HIGH"]
 
 POSITION_DECISION_KEY = "positionDecision"
 
 _ATT_RANK = {"NORMAL": 0, "ATTENTION": 1, "URGENT": 2, "BLOCKED": 3}
+
+_STATUS_CONFIDENCE: dict[ExitPlanStatus, float] = {
+    "TRIGGERED": 0.9,
+    "ARMED": 0.75,
+    "HINT": 0.65,
+    "IDLE": 0.55,
+    "DONE": 0.5,
+}
+
+_RECON_CONFIDENCE: dict[PositionReconHealth, float] = {
+    "CLEAN": 1.0,
+    "ATTENTION": 0.85,
+    "CRITICAL": 0.5,
+}
 
 
 def map_recon_status_to_health(status: str | None) -> PositionReconHealth:
@@ -40,8 +56,22 @@ def recon_health_to_attention(health: PositionReconHealth) -> PositionAttention:
     return "NORMAL"
 
 
+def attention_to_urgency(attention: PositionAttention) -> PositionUrgency:
+    if attention in ("URGENT", "BLOCKED"):
+        return "HIGH"
+    if attention == "ATTENTION":
+        return "MEDIUM"
+    return "LOW"
+
+
 def _max_attention(a: PositionAttention, b: PositionAttention) -> PositionAttention:
     return a if _ATT_RANK[a] >= _ATT_RANK[b] else b
+
+
+def _protection_state(position: PositionState) -> PositionProtection:
+    if position.current_stop is not None:
+        return "ACTIVE"
+    return "NONE"
 
 
 def _next_event(position: PositionState, exit_plan: ExitPlan) -> PositionNextEvent:
@@ -60,9 +90,69 @@ def _next_event(position: PositionState, exit_plan: ExitPlan) -> PositionNextEve
         return "T1"
     if not position.target2_achieved_at and position.target2 is not None:
         return "T2"
-    if position.current_stop is not None:
-        return "STOP"
     return "NONE"
+
+
+def _mark_proximity_factor(
+    position: PositionState,
+    *,
+    mark_price: float | None,
+    next_event: PositionNextEvent,
+) -> float:
+    if mark_price is None or mark_price != mark_price:
+        return 0.85
+    target: float | None = None
+    if next_event == "T1" and position.target1 is not None:
+        target = position.target1
+    elif next_event == "T2" and position.target2 is not None:
+        target = position.target2
+    if target is None or target <= 0:
+        return 0.9
+    entry = position.actual_entry or position.planned_entry
+    if entry is None or entry <= 0:
+        return 0.9
+    span = abs(target - entry)
+    if span <= 1e-9:
+        return 0.9
+    progress = abs(mark_price - entry) / span
+    return min(1.0, max(0.75, 0.75 + progress * 0.25))
+
+
+def _evidence_strength(
+    exit_plan: ExitPlan,
+    recon_health: PositionReconHealth,
+    *,
+    mark_price: float | None,
+) -> float:
+    score = 0.2
+    if exit_plan.primary_reason:
+        score += 0.25
+    if mark_price is not None and mark_price == mark_price:
+        score += 0.2
+    if recon_health == "CLEAN":
+        score += 0.2
+    elif recon_health == "ATTENTION":
+        score += 0.1
+    if exit_plan.status in ("TRIGGERED", "ARMED"):
+        score += 0.15
+    return round(min(1.0, max(0.0, score)), 4)
+
+
+def _decision_confidence(
+    exit_plan: ExitPlan,
+    recon_health: PositionReconHealth,
+    position: PositionState,
+    *,
+    mark_price: float | None,
+    next_event: PositionNextEvent,
+) -> float:
+    base = _STATUS_CONFIDENCE.get(exit_plan.status, 0.55)
+    recon = _RECON_CONFIDENCE.get(recon_health, 0.85)
+    proximity = _mark_proximity_factor(
+        position, mark_price=mark_price, next_event=next_event
+    )
+    value = base * recon * proximity
+    return round(min(1.0, max(0.0, value)), 4)
 
 
 def _action_from_plan(
@@ -94,8 +184,11 @@ class PositionDecision:
     action: PositionDecisionAction
     reason: str
     confidence: float
+    urgency: PositionUrgency
+    evidence_strength: float
     attention: PositionAttention
     next_event: PositionNextEvent
+    protection: PositionProtection
     recon_health: PositionReconHealth
     suggested_qty: float | None
     suggested_stop: float | None
@@ -110,8 +203,11 @@ class PositionDecision:
             "action": self.action,
             "reason": self.reason,
             "confidence": self.confidence,
+            "urgency": self.urgency,
+            "evidenceStrength": self.evidence_strength,
             "attention": self.attention,
             "nextEvent": self.next_event,
+            "protection": self.protection,
             "reconHealth": self.recon_health,
             "suggestedQty": self.suggested_qty,
             "suggestedStop": self.suggested_stop,
@@ -160,6 +256,7 @@ def build_position_decision(
     attention = recon_health_to_attention(recon_health)
     action = _action_from_plan(exit_plan, recon_health, thesis_invalid)
     primary = exit_plan.primary_reason
+    protection = _protection_state(position)
 
     if primary == "STRUCTURAL_STOP":
         attention = _max_attention(attention, "URGENT")
@@ -178,7 +275,17 @@ def build_position_decision(
         reason = "hold"
         next_event = _next_event(position, exit_plan)
 
-    confidence = 1.0 if attention == "BLOCKED" else (0.7 if action == "HOLD" and attention == "NORMAL" else 0.85)
+    urgency = attention_to_urgency(attention)
+    evidence_strength = _evidence_strength(
+        exit_plan, recon_health, mark_price=mark_price
+    )
+    confidence = _decision_confidence(
+        exit_plan,
+        recon_health,
+        position,
+        mark_price=mark_price,
+        next_event=next_event,
+    )
     stamp = at or exit_plan.updated_at
 
     return PositionDecision(
@@ -187,8 +294,11 @@ def build_position_decision(
         action=action,
         reason=reason,
         confidence=confidence,
+        urgency=urgency,
+        evidence_strength=evidence_strength,
         attention=attention,
         next_event=next_event,
+        protection=protection,
         recon_health=recon_health,
         suggested_qty=exit_plan.suggested_qty,
         suggested_stop=exit_plan.suggested_stop,

@@ -4,6 +4,7 @@ export * from "./investor-profile.js";
 export * from "./trading-policy.js";
 export * from "./trading-policy-templates.js";
 export * from "./effective-trading-policy.js";
+export * from "./operating-policy.js";
 export * from "./suggest-policy-from-declared.js";
 export * from "./policy-gate.js";
 export * from "./evidence-engine.js";

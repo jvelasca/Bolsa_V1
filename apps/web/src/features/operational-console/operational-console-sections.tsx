@@ -362,6 +362,15 @@ export function OpsEstudioAutoSection({
         >
           Ampliar fuentes: {gates.expandSourcesReady ? "listo" : "bloqueado"}
         </p>
+        {gates.sourcesShouldContract ? (
+          <p
+            className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1.5 text-xs font-medium text-rose-800 dark:text-rose-200"
+            data-testid="ops-a6-contract-alert"
+          >
+            Veto A6: contraer fuentes AUTO — P1–P5 o EdgeReport ya no cumplen.
+            Revisión manual; el sistema no revierte fuentes solo.
+          </p>
+        ) : null}
         <p className="text-xs tabular-nums text-muted-foreground">
           Embudo {funnel.daysWithOpinions}d · {funnel.candidatesAlarma} alarma ·{" "}
           {funnel.candidatesDictamen} dictamen · {funnel.notCandidate} fuera

@@ -128,6 +128,7 @@ describe("OperationalConsolePage", () => {
         recentProposes: [],
         gates: {
           expandSourcesReady: false,
+          sourcesShouldContract: true,
           thawEstrictoReady: false,
           paperDExecuteEnv: false,
           blockers: ["p1_p5_not_green"],

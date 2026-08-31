@@ -297,10 +297,19 @@ export function SupervisedF3Panel() {
         Number.isFinite(plan.structuralStop)
           ? plan.structuralStop
           : null;
+      const operativa = asOperativaProtectMeta(item.payload);
       const chartStop = consumeChartSignedStopPrefill(
         item.payload.instrumentId,
+        {
+          tradePlanId: item.payload.decisionId ?? plan?.decisionId ?? null,
+          currentStop:
+            operativa?.currentStop ??
+            (typeof plan?.structuralStop === "number"
+              ? plan.structuralStop
+              : null),
+        },
       );
-      const protectStop = asOperativaProtectMeta(item.payload)?.suggestedStop;
+      const protectStop = operativa?.suggestedStop;
       const stop =
         chartStop ??
         (typeof protectStop === "number" && Number.isFinite(protectStop)

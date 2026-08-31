@@ -67,6 +67,8 @@ export function commitChartStopDrag(input: {
   setChartSignedStopPrefill({
     instrumentId: input.instrumentId,
     signedStop: input.ghostStop,
+    tradePlanId: input.position?.operational?.tradePlanId ?? undefined,
+    currentStop: input.position?.operational?.currentStop ?? undefined,
   });
 
   let enqueuedProtect = false;

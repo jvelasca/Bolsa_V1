@@ -1303,6 +1303,7 @@ export const api = {
         }>;
         gates: {
           expandSourcesReady: boolean;
+          sourcesShouldContract: boolean;
           thawEstrictoReady: boolean;
           paperDExecuteEnv: boolean;
           blockers: string[];

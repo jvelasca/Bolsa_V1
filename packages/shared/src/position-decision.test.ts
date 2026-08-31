@@ -113,6 +113,11 @@ describe("PositionDecision V1.27", () => {
     expect(d?.action).toBe("HOLD");
     expect(d?.attention).toBe("NORMAL");
     expect(d?.nextEvent).toBe("T1");
+    expect(d?.protection).toBe("ACTIVE");
+    expect(d?.urgency).toBe("LOW");
+    expect(d?.confidence).toBeGreaterThan(0);
+    expect(d?.confidence).toBeLessThanOrEqual(1);
+    expect(d?.evidenceStrength).toBeGreaterThan(0);
     expect(d?.reconHealth).toBe("CLEAN");
   });
 
@@ -162,6 +167,18 @@ describe("PositionDecision V1.27", () => {
     expect(d?.action).toBe("REVIEW");
     expect(d?.nextEvent).toBe("RECONCILIATION");
     expect(d?.reason).toBe("reconciliation:portfolio_drift");
+  });
+
+  it("stop vigente ≠ nextEvent STOP (protección separada)", () => {
+    const d = buildPositionDecision({
+      position: openLong(),
+      signals: { markPrice: 102 },
+      templateId: "moderate",
+      portfolioReconStatus: "clean",
+    });
+    expect(d?.protection).toBe("ACTIVE");
+    expect(d?.nextEvent).toBe("T1");
+    expect(d?.nextEvent).not.toBe("STOP");
   });
 
   it("structural stop → EXIT URGENT", () => {

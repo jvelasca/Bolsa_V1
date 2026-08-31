@@ -61,6 +61,10 @@ def test_decision_hold_next_t1() -> None:
     assert d.action == "HOLD"
     assert d.attention == "NORMAL"
     assert d.next_event == "T1"
+    assert d.protection == "ACTIVE"
+    assert d.urgency == "LOW"
+    assert 0 <= d.confidence <= 1
+    assert 0 <= d.evidence_strength <= 1
     assert d.recon_health == "CLEAN"
 
 

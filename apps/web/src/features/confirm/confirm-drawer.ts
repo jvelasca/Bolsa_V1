@@ -8,7 +8,10 @@
  */
 
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
-import { setChartSignedStopPrefill } from "@/features/charts/chart-signed-stop-prefill";
+import {
+  clearChartSignedStopPrefill,
+  setChartSignedStopPrefill,
+} from "@/features/charts/chart-signed-stop-prefill";
 
 /** Evento SPA: abrir/cerrar el drawer Confirmar. */
 export const BOLSA_CONFIRM_DRAWER_EVENT = "bolsa:confirm-drawer" as const;
@@ -80,6 +83,7 @@ export function openConfirmDrawer(opts?: OpenConfirmDrawerOptions): void {
 
 /** Cierra el drawer si está abierto. */
 export function closeConfirmDrawer(): void {
+  clearChartSignedStopPrefill();
   window.dispatchEvent(
     new CustomEvent(BOLSA_CONFIRM_DRAWER_EVENT, {
       detail: { open: false } satisfies ConfirmDrawerDetail,

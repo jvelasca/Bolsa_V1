@@ -226,6 +226,15 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                   ? "listo"
                   : "bloqueado"}
               </p>
+              {a6Query.data.data.gates.sourcesShouldContract ? (
+                <p
+                  className="mt-1 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] font-medium text-rose-800 dark:text-rose-200"
+                  data-testid="asesor-a6-contract-alert"
+                >
+                  Veto A6: contraer fuentes AUTO — telemetría degradada.
+                  Revisión manual.
+                </p>
+              ) : null}
               <p className="mt-0.5 text-[10px] text-muted-foreground">
                 Solo Estudio. Radar/Hoy fuera. P1–P5 en Consola. Execute env{" "}
                 {a6Query.data.data.gates.paperDExecuteEnv ? "on" : "off"}.

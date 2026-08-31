@@ -73,6 +73,7 @@ def test_gates_blocked_until_p1_p5_pass() -> None:
         paper_d_execute_env=False,
     )
     assert blocked["expandSourcesReady"] is False
+    assert blocked["sourcesShouldContract"] is True
     assert blocked["thawEstrictoReady"] is False
     assert blocked["paperDExecuteEnv"] is False
     assert "p1_p5_not_green" in blocked["blockers"]
@@ -86,6 +87,7 @@ def test_gates_expand_when_p1_p5_and_edge_parity() -> None:
         paper_d_execute_env=False,
     )
     assert ready["expandSourcesReady"] is True
+    assert ready["sourcesShouldContract"] is False
     assert ready["thawEstrictoReady"] is True
     assert ready["paperDExecuteEnv"] is False
     assert ready["blockers"] == []
@@ -99,7 +101,28 @@ def test_gates_edge_parity_blocks_expand_even_if_p1_p5_pass() -> None:
         paper_d_execute_env=False,
     )
     assert blocked["expandSourcesReady"] is False
+    assert blocked["sourcesShouldContract"] is True
     assert "edge_report_parity" in blocked["blockers"]
+
+
+def test_sources_should_contract_t0_pass_t1_fail() -> None:
+    t0 = derive_a6_gates(
+        auto_mark="PASS",
+        strict_accept_ready=True,
+        edge_report_parity=True,
+        paper_d_execute_env=False,
+    )
+    assert t0["expandSourcesReady"] is True
+    assert t0["sourcesShouldContract"] is False
+
+    t1 = derive_a6_gates(
+        auto_mark="FAIL",
+        strict_accept_ready=False,
+        edge_report_parity=True,
+        paper_d_execute_env=False,
+    )
+    assert t1["expandSourcesReady"] is False
+    assert t1["sourcesShouldContract"] is True
 
 
 def test_summarize_and_remember_last_propose(tmp_path: Path, monkeypatch) -> None:

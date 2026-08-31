@@ -215,8 +215,10 @@ def derive_a6_gates(
     if not edge_report_parity:
         blockers.append("edge_report_parity")
     expand = mark == "PASS" and bool(edge_report_parity)
+    contract = mark != "PASS" or not edge_report_parity
     return {
         "expandSourcesReady": expand,
+        "sourcesShouldContract": contract,
         "thawEstrictoReady": bool(strict_accept_ready),
         "paperDExecuteEnv": bool(paper_d_execute_env),
         "blockers": blockers,

@@ -48,7 +48,9 @@ PositionState + mark
 | V1.32 SEMI paper maduro                                               | **Hecho** (relevo V1.32)                                         | Drag, AUTO                         |
 | V1.33 AUTO A-β + gobernanza                                           | **Hecho** (relevo V1.33 + wire Estudio→hit V1.33.1 + A6 V1.33.2) | A-γ, thaw estricto                 |
 | Lab `risk_policy` desde `backtests.py`                                | **Hecho en V1.27** (default Moderado)                            | —                                  |
-| Frente B drag B-γ                                                     | **CÓDIGO V1.34** (sin tag)                                       | B-δ, trail autoridad, OCO, entrada |
+| Frente B drag B-γ                                                     | **CÓDIGO V1.34** (tag v1.34.1-beta)                              | B-δ, trail autoridad, OCO, entrada |
+| **V1.35 Position Operating Hardening**                                | **CÓDIGO** (post-auditoría v1.34.1-beta)                         | UI Mercado 2.0, nav L1             |
+| **V1.36 Daily Operating UI**                                          | Next — Mercado cockpit visual definitivo                         | Backend operativo (congelado)      |
 | Frente A AUTO A-β                                                     | V1.33; EdgeReport exigido                                        | A-γ, thaw estricto, broker live    |
 
 ## Lean de acuerdo (owner)

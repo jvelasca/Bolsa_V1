@@ -7,6 +7,7 @@
 import {
   buildExitPlanFromPosition,
   type ExitPlanSignalsV1,
+  type ExitPlanStatusV1,
   type ExitPlanV1,
 } from "./exit-plan.js";
 import { resolveExitPolicy, type ExitPolicyV1 } from "./exit-policy.js";
@@ -33,6 +34,10 @@ export type PositionNextEventV1 =
 
 export type PositionReconHealthV1 = "CLEAN" | "ATTENTION" | "CRITICAL";
 
+export type PositionProtectionV1 = "ACTIVE" | "NONE";
+
+export type PositionUrgencyV1 = "LOW" | "MEDIUM" | "HIGH";
+
 export const RECON_HEALTH_COPY: Record<PositionReconHealthV1, string> = {
   CLEAN: "Operativa normal",
   ATTENTION: "Operativa: atención",
@@ -45,14 +50,31 @@ export type PositionDecisionV1 = {
   action: PositionDecisionActionV1;
   reason: string;
   confidence: number;
+  urgency: PositionUrgencyV1;
+  evidenceStrength: number;
   attention: PositionAttentionV1;
   nextEvent: PositionNextEventV1;
+  protection: PositionProtectionV1;
   reconHealth: PositionReconHealthV1;
   suggestedQty: number | null;
   suggestedStop: number | null;
   primaryReason: string | null;
   marketAsOf: string | null;
   expiresAt: string | null;
+};
+
+const STATUS_CONFIDENCE: Record<ExitPlanStatusV1, number> = {
+  TRIGGERED: 0.9,
+  ARMED: 0.75,
+  HINT: 0.65,
+  IDLE: 0.55,
+  DONE: 0.5,
+};
+
+const RECON_CONFIDENCE: Record<PositionReconHealthV1, number> = {
+  CLEAN: 1,
+  ATTENTION: 0.85,
+  CRITICAL: 0.5,
 };
 
 export function mapReconStatusToHealth(
@@ -74,6 +96,14 @@ export function reconHealthToAttention(
   return "NORMAL";
 }
 
+export function attentionToUrgency(
+  attention: PositionAttentionV1,
+): PositionUrgencyV1 {
+  if (attention === "URGENT" || attention === "BLOCKED") return "HIGH";
+  if (attention === "ATTENTION") return "MEDIUM";
+  return "LOW";
+}
+
 function maxAttention(
   a: PositionAttentionV1,
   b: PositionAttentionV1,
@@ -85,6 +115,10 @@ function maxAttention(
     BLOCKED: 3,
   };
   return rank[a] >= rank[b] ? a : b;
+}
+
+function protectionState(position: PositionStateV1): PositionProtectionV1 {
+  return position.currentStop != null ? "ACTIVE" : "NONE";
 }
 
 function nextEventFromPosition(
@@ -99,8 +133,57 @@ function nextEventFromPosition(
   if (primary === "TRAIL") return "TRAIL";
   if (!position.target1AchievedAt && position.target1 != null) return "T1";
   if (!position.target2AchievedAt && position.target2 != null) return "T2";
-  if (position.currentStop != null) return "STOP";
   return "NONE";
+}
+
+function markProximityFactor(
+  position: PositionStateV1,
+  markPrice: number | null | undefined,
+  nextEvent: PositionNextEventV1,
+): number {
+  if (typeof markPrice !== "number" || !Number.isFinite(markPrice)) return 0.85;
+  let target: number | null = null;
+  if (nextEvent === "T1" && position.target1 != null) target = position.target1;
+  else if (nextEvent === "T2" && position.target2 != null) {
+    target = position.target2;
+  }
+  if (target == null || target <= 0) return 0.9;
+  const entry = position.actualEntry ?? position.plannedEntry;
+  if (entry == null || entry <= 0) return 0.9;
+  const span = Math.abs(target - entry);
+  if (span <= 1e-9) return 0.9;
+  const progress = Math.abs(markPrice - entry) / span;
+  return Math.min(1, Math.max(0.75, 0.75 + progress * 0.25));
+}
+
+function evidenceStrengthFromSignals(
+  exitPlan: ExitPlanV1,
+  reconHealth: PositionReconHealthV1,
+  markPrice: number | null | undefined,
+): number {
+  let score = 0.2;
+  if (exitPlan.primaryReason) score += 0.25;
+  if (typeof markPrice === "number" && Number.isFinite(markPrice)) score += 0.2;
+  if (reconHealth === "CLEAN") score += 0.2;
+  else if (reconHealth === "ATTENTION") score += 0.1;
+  if (exitPlan.status === "TRIGGERED" || exitPlan.status === "ARMED") {
+    score += 0.15;
+  }
+  return Math.round(Math.min(1, Math.max(0, score)) * 10000) / 10000;
+}
+
+function decisionConfidence(
+  exitPlan: ExitPlanV1,
+  reconHealth: PositionReconHealthV1,
+  position: PositionStateV1,
+  markPrice: number | null | undefined,
+  nextEvent: PositionNextEventV1,
+): number {
+  const base = STATUS_CONFIDENCE[exitPlan.status] ?? 0.55;
+  const recon = RECON_CONFIDENCE[reconHealth];
+  const proximity = markProximityFactor(position, markPrice, nextEvent);
+  const value = base * recon * proximity;
+  return Math.round(Math.min(1, Math.max(0, value)) * 10000) / 10000;
 }
 
 function actionFromPlan(
@@ -163,6 +246,7 @@ export function buildPositionDecision(
 
   const action = actionFromPlan(exitPlan, reconHealth, thesisInvalid);
   const primary = exitPlan.primaryReason;
+  const protection = protectionState(position);
 
   if (primary === "STRUCTURAL_STOP") {
     attention = maxAttention(attention, "URGENT");
@@ -182,12 +266,24 @@ export function buildPositionDecision(
   else if (primary) reason = primary.toLowerCase();
   else if (action === "HOLD") reason = "hold";
 
-  const confidence =
-    action === "HOLD" && attention === "NORMAL"
-      ? 0.7
-      : attention === "BLOCKED"
-        ? 1
-        : 0.85;
+  const nextEvent =
+    reconHealth === "CRITICAL"
+      ? "RECONCILIATION"
+      : nextEventFromPosition(position, exitPlan);
+  const markPrice = signals.markPrice;
+  const urgency = attentionToUrgency(attention);
+  const evidenceStrength = evidenceStrengthFromSignals(
+    exitPlan,
+    reconHealth,
+    markPrice,
+  );
+  const confidence = decisionConfidence(
+    exitPlan,
+    reconHealth,
+    position,
+    markPrice,
+    nextEvent,
+  );
 
   const stamp =
     typeof input.at === "string" && input.at.trim()
@@ -200,11 +296,11 @@ export function buildPositionDecision(
     action,
     reason,
     confidence,
+    urgency,
+    evidenceStrength,
     attention,
-    nextEvent:
-      reconHealth === "CRITICAL"
-        ? "RECONCILIATION"
-        : nextEventFromPosition(position, exitPlan),
+    nextEvent,
+    protection,
     reconHealth,
     suggestedQty: exitPlan.suggestedQty,
     suggestedStop: exitPlan.suggestedStop,

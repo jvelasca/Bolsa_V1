@@ -17,6 +17,7 @@ Responder A6 con un scorecard **read-only**: qué hay que ver en verde **antes**
 | D3  | `lastPropose` = snapshot in-process del POST auto-propose (se pierde al restart).      |
 | D4  | UI: Consola (card) + strip Asesor. Sin nav L1 nueva.                                   |
 | D5  | ≠ Alembic · ≠ Radar/Hoy AUTO · ≠ thaw · ≠ execute on.                                  |
+| D6  | `sourcesShouldContract` simétrico a expand (alert-only; reversión manual).             |
 
 ## Kernel
 
