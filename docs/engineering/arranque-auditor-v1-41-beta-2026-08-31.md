@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 post-tag **`v1.41-beta`** (serie V1.37→V1.41: Operational Truth → Daily Desk). Tip SHA: ver [`traspaso-relevo-tag-v1-41-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-41-beta-2026-08-31.md).
+Eres auditor externo de Bolsa V1 post-tag **`v1.41-beta` → `4247f0f0`** (serie V1.37→V1.41: Operational Truth → Daily Desk).
 
 Lee en este orden:
 
