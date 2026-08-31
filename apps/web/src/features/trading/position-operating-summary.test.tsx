@@ -54,7 +54,7 @@ describe("PositionOperatingSummary V1.39", () => {
       "Mantener",
     );
     expect(screen.getByTestId("position-operating-phrase").textContent).toMatch(
-      /Mantén/,
+      /T1 alcanzado · Mantener/,
     );
     expect(
       screen.getByTestId("position-operating-next-event").textContent,

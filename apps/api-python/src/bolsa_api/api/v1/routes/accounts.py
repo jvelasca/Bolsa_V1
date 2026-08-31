@@ -3,6 +3,11 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
+from bolsa_application.broker_venue_runtime import (
+    account_broker_venue_from_settings,
+    effective_broker_venue_async,
+    normalize_broker_venue,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,9 +32,9 @@ from bolsa_api.api.dependencies import (
     get_live_recon_lookup,
     get_operational_incident_store,
     get_portfolio_recon_lookup,
-    get_submit_intent_store,
     get_record_session_verdict_use_case,
     get_set_default_account_use_case,
+    get_submit_intent_store,
     get_tax_report_use_case,
     get_update_account_settings_use_case,
     get_update_account_use_case,
@@ -69,22 +74,17 @@ from bolsa_api.schemas.accounts import (
     ResolveOperationalIncidentBodyDto,
     ReviewOperationalIncidentBodyDto,
     SendDailyOpsDigestDto,
+    SessionVerdictBodyDto,
+    SessionVerdictResponseDto,
     SubmitIntentListItemDto,
     SubmitIntentsListDto,
     SubmitIntentsListResponseDto,
-    SessionVerdictBodyDto,
-    SessionVerdictResponseDto,
     TaxReportResponseDto,
     UpdateAccountSettingsDto,
     UpdateInvestmentAccountDto,
     WithdrawCashDto,
 )
 from bolsa_api.schemas.ai_governance import AiEffectivenessResponseDto
-from bolsa_application.broker_venue_runtime import (
-    account_broker_venue_from_settings,
-    effective_broker_venue_async,
-    normalize_broker_venue,
-)
 
 router = APIRouter()
 
@@ -549,9 +549,8 @@ async def _instrument_ids_for_decisions(
     decision_ids: list[str],
 ) -> dict[str, str | None]:
     """Soft-join fail-closed: decision_sessions.decision_id → instrument_id."""
-    from sqlalchemy import select
-
     from bolsa_infrastructure.database.models.tables import DecisionSessionRow
+    from sqlalchemy import select
 
     keys = [d.strip() for d in decision_ids if (d or "").strip()]
     if not keys:
