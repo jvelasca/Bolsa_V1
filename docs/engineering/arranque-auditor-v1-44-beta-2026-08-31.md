@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **V1.44 Position Automation Contract** (código de foundation sobre tip certificado **`v1.43-beta` → `5dfac890`**). Aún **no** hay tag `v1.44-beta` salvo que el owner lo haya creado; audita el HEAD de este slice, no una copia anterior.
+Eres auditor externo de Bolsa V1 **V1.44 Position Automation Contract** tip **`v1.44-beta` → `57cf41a3`** (foundation sobre tip certificado **`v1.43-beta` → `5dfac890`**). Audita ese tip (o el peeled del tag), no una copia anterior.
 
 Lee en este orden:
 
