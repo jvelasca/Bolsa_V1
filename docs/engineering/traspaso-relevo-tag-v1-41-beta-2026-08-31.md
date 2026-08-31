@@ -25,7 +25,7 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · AUTO execute off · Ranking 
 
 | Pieza    | Valor                                                                                                              |
 | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| Tag tip  | `v1.41-beta` → _(SHA tip en commit de pin)_                                                                        |
+| Tag tip  | `v1.41-beta` → `4247f0f0`                                                                                          |
 | Previo   | `v1.35-beta` → `ab07e1e4` · tip main previo `43b5aade` (V1.36)                                                     |
 | Relevo   | [`traspaso-relevo-v1-41-daily-desk-2026-08-31.md`](./traspaso-relevo-v1-41-daily-desk-2026-08-31.md)               |
 | Padre UX | [`traspaso-relevo-v1-37-operational-truth-2026-08-31.md`](./traspaso-relevo-v1-37-operational-truth-2026-08-31.md) |
