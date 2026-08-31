@@ -28,7 +28,7 @@ Sección opcional en DailyOpsReport: propuestas/ejecuciones entrada, mutaciones 
 ## 3. HTTP
 
 - `POST /api/paper-desk/cycle` — dryRun default true
-- `GET /api/paper-desk/daily-report` — cycle dry-run + report (salvo execute=true + env)
+- `GET /api/paper-desk/daily-report` — cycle dry-run + report (salvo execute=true + env). **Superseded V1.47:** GET ya no acepta `execute`; ver [`spec-v147-paper-desk-runtime-truth-2026-09-01.md`](./spec-v147-paper-desk-runtime-truth-2026-09-01.md).
 
 ## 4. OUT
 

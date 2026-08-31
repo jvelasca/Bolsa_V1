@@ -99,6 +99,7 @@ class _FakeSell:
         quantity: float,
         price: float,
         full_exit: bool,
+        **kwargs: Any,
     ) -> PaperPositionSellResult:
         self.calls.append(
             {
@@ -107,6 +108,7 @@ class _FakeSell:
                 "quantity": quantity,
                 "price": price,
                 "full_exit": full_exit,
+                "idempotency_key": kwargs.get("idempotency_key"),
             }
         )
         return PaperPositionSellResult(

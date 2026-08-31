@@ -1,4 +1,7 @@
-"""HTTP estrecho V1.45 — execute Position Policy AUTO (PAPER_D gate)."""
+"""HTTP estrecho V1.47 — execute Position Policy AUTO (PAPER_D gate).
+
+Mark / JIT se derivan de OperationalContext. El body no transporta hechos de mercado.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ from bolsa_analytics.cognitive.position_state import position_state_from_dict
 from bolsa_api.api.dependencies import (
     get_db_session,
     get_execute_position_policy_auto_use_case,
+    get_operational_context_builder,
 )
 from bolsa_application.execute_position_policy_auto import (
     ExecutePositionPolicyAuto,
@@ -26,15 +30,8 @@ router = APIRouter()
 
 
 class ExecutePositionPolicyAutoRequestDto(BaseModel):
-    mark_price: float = Field(alias="markPrice")
     template_id: str | None = Field(default="moderate", alias="templateId")
     dry_run: bool = Field(default=False, alias="dryRun")
-    data_stale: bool = Field(default=False, alias="dataStale")
-    market_closed: bool = Field(default=False, alias="marketClosed")
-    portfolio_drift: bool = Field(default=False, alias="portfolioDrift")
-    immediate_risk: bool = Field(default=False, alias="immediateRisk")
-    trail_hint: bool = Field(default=False, alias="trailHint")
-    trail_stop: float | None = Field(default=None, alias="trailStop")
 
     model_config = {"populate_by_name": True}
 
@@ -60,7 +57,7 @@ async def execute_position_policy_auto(
     instrument_id: str = Query(alias="instrumentId"),
     execution_policy_id: str | None = Query(default=None, alias="executionPolicyId"),
 ) -> ExecutePositionPolicyAutoResponseDto:
-    """V1.45 — Policy → JIT Permission → protect|reduce|exit. PAPER_D default off."""
+    """V1.47 — Policy → JIT Permission → protect|reduce|exit. Contexto servidor."""
     if not paper_d_execute_allowed() and not body.dry_run:
         raise HTTPException(
             status_code=403,
@@ -78,19 +75,34 @@ async def execute_position_policy_auto(
     if pos is None:
         raise HTTPException(status_code=404, detail="position_state_invalid")
 
+    builder = get_operational_context_builder(session)
+    ctx = await builder.build(account_id, [instrument_id])
+    mark = ctx.mark_price(instrument_id)
+    if mark is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "data_unavailable", "message": "NO MARKET DATA"},
+        )
+
+    snap = ctx.market_for(instrument_id)
+    data_stale = snap.is_stale() if snap is not None else True
+    market_closed = ctx.market_closed()
+    portfolio_drift = ctx.portfolio.drift
+    immediate_risk = ctx.stop_touched(instrument_id, pos)
+
     policy = resolve_operating_policy(body.template_id)
     exit_plan = build_exit_plan_from_position(
         pos,
-        mark_price=body.mark_price,
+        mark_price=float(mark),
         exit_policy=policy.exit,
-        trail_hint=body.trail_hint,
-        trail_stop=body.trail_stop,
+        trail_hint=ctx.trail_hint,
+        trail_stop=ctx.trail_stop,
     )
     if exit_plan is None:
         raise HTTPException(status_code=409, detail="no_exit_plan")
 
     session_flag: Literal["open", "closed"] = (
-        "closed" if body.market_closed else "open"
+        "closed" if market_closed else "open"
     )
     inp = ExecutePositionPolicyAutoInput(
         account_id=account_id,
@@ -98,18 +110,18 @@ async def execute_position_policy_auto(
         position=pos,
         exit_plan=exit_plan,
         operating_policy=policy,
-        mark_price=body.mark_price,
+        mark_price=float(mark),
         paper_d_execute=paper_d_execute_allowed(),
-        data_stale=body.data_stale,
-        market_closed=body.market_closed,
-        portfolio_drift=body.portfolio_drift,
-        immediate_risk=body.immediate_risk,
+        data_stale=data_stale,
+        market_closed=market_closed,
+        portfolio_drift=portfolio_drift,
+        immediate_risk=immediate_risk,
         session=session_flag,
-        stale=body.data_stale,
+        stale=data_stale,
+        stop_touched=immediate_risk,
     )
 
     if body.dry_run:
-        # Solo policy + permission; no mutar.
         from bolsa_analytics.cognitive.position_policy_decision import (
             decide_position_policy,
         )
@@ -120,8 +132,8 @@ async def execute_position_policy_auto(
             exit_plan,
             policy,
             session=session_flag,
-            stale=body.data_stale,
-            stop_touched=body.immediate_risk,
+            stale=data_stale,
+            stop_touched=immediate_risk,
         )
         if decision.verdict == "HOLD":
             return ExecutePositionPolicyAutoResponseDto(
@@ -134,10 +146,10 @@ async def execute_position_policy_auto(
         perm = auto_exit_permission(
             exit_plan,
             paper_d_execute=paper_d_execute_allowed(),
-            data_stale=body.data_stale,
-            market_closed=body.market_closed,
-            portfolio_drift=body.portfolio_drift,
-            immediate_risk=body.immediate_risk,
+            data_stale=data_stale,
+            market_closed=market_closed,
+            portfolio_drift=portfolio_drift,
+            immediate_risk=immediate_risk,
             position_closed=pos.status == "CLOSED",
         )
         return ExecutePositionPolicyAutoResponseDto(
@@ -149,14 +161,12 @@ async def execute_position_policy_auto(
         )
 
     if execution_policy_id is None or not str(execution_policy_id).strip():
-        # Protect/trail no necesitan Router; reduce/exit sí.
-        # Pre-check decision to avoid silent sell skip.
         from bolsa_analytics.cognitive.position_policy_decision import (
             decide_position_policy,
         )
 
         preview = decide_position_policy(
-            pos, exit_plan, policy, session=session_flag, stale=body.data_stale
+            pos, exit_plan, policy, session=session_flag, stale=data_stale
         )
         if preview.verdict in ("REDUCE", "EXIT"):
             raise HTTPException(

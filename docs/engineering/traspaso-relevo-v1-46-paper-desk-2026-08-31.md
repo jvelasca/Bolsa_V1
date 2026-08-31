@@ -45,5 +45,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 
 ## 4. Next
 
-1. Tag `v1.46-beta` tras auditoría PASS (tip git sigue `v1.45-beta` hasta entonces).
-2. Multi-día DeskRunner / semanas — solo tras foundation certificada.
+1. Tag `v1.46-beta` opcional como snapshot **foundation** (no «AUTO completo»). Tip git certificado sigue `v1.45-beta` hasta V1.47.
+2. **V1.47 Runtime Truth** — MarketSnapshot / OperationalContext · GET no muta · mark fail-closed · idempotencia · Golden Paths AUTO. **No** scheduler. EntryTick sigue stub ([spec](./spec-v147-paper-desk-runtime-truth-2026-09-01.md)).

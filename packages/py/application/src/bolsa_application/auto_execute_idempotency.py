@@ -19,6 +19,30 @@ def make_auto_execute_idempotency_key(
     return f"{instrument_id}|{as_of_s}|{policy_id}|{kind}"
 
 
+def make_position_event_idempotency_key(
+    *,
+    position_id: str,
+    event_type: str,
+    event_as_of: date | str,
+    action: str,
+    sequence: int = 1,
+) -> str:
+    """V1.47 — PositionEvent → executionIntentId / ExecuteTrade key.
+
+    ``positionId|eventType|asOf|sequence|action`` (reduce:T1 ≠ exit:STOP el mismo día).
+    """
+    as_of_s = (
+        event_as_of.isoformat()
+        if isinstance(event_as_of, date)
+        else as_of_from_iso(str(event_as_of) if event_as_of else None)
+    )
+    pos = (position_id or "").strip() or "pos"
+    ev = (event_type or "").strip() or "UNKNOWN"
+    act = (action or "").strip() or "exit"
+    seq = max(int(sequence), 1)
+    return f"{pos}|{ev}|{as_of_s}|{seq}|{act}"
+
+
 def as_of_from_iso(ts: str | None) -> str:
     """YYYY-MM-DD desde timestamp ISO; fallback hoy UTC."""
     from datetime import UTC, datetime

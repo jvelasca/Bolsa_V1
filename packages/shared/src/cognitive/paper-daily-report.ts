@@ -1,8 +1,10 @@
 /**
- * V1.46 — Paper Daily Report / autoDesk (proyección de PaperDeskCycle).
+ * V1.46/V1.47 — Paper Daily Report / autoDesk (proyección de PaperDeskCycle).
  *
- * @see docs/engineering/spec-v146-paper-desk-foundation-2026-08-31.md
+ * @see docs/engineering/spec-v147-paper-desk-runtime-truth-2026-09-01.md
  */
+
+import type { PaperDeskNextActionV1 } from "./operational-context.js";
 
 export const PAPER_DAILY_REPORT_SCHEMA = "paper_daily_report_v1" as const;
 
@@ -10,7 +12,8 @@ export type PaperDailyReportJitDenyCodeV1 =
   | "data_stale"
   | "market_closed"
   | "portfolio_drift"
-  | "paper_auto_env_blocked";
+  | "paper_auto_env_blocked"
+  | "data_unavailable";
 
 export type PaperDeskPositionRowV1 = {
   instrumentId: string;
@@ -18,6 +21,7 @@ export type PaperDeskPositionRowV1 = {
   reason?: string | null;
   decisionVerdict?: string | null;
   permissionReasons?: string[];
+  nextAction?: PaperDeskNextActionV1 | string | null;
 };
 
 export type PaperDailyReportV1 = {
@@ -67,6 +71,7 @@ const JIT_CODES: readonly PaperDailyReportJitDenyCodeV1[] = [
   "market_closed",
   "portfolio_drift",
   "paper_auto_env_blocked",
+  "data_unavailable",
 ] as const;
 
 export function buildPaperDailyReport(

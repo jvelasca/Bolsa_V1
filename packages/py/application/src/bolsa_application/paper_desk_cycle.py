@@ -1,12 +1,13 @@
-"""V1.46 — PaperDeskCycle: EntryTick + PositionTick (sesión PAPER).
+"""V1.46/V1.47 — PaperDeskCycle: EntryTick stub + PositionTick (sesión PAPER).
 
-Un ciclo por asOf. dry_run default true. Sin cron / multi-día.
+V1.47: OperationalContext es la fuente de mark/session/freshness/drift/riesgo.
+dry_run default true. Sin cron / multi-día. EntryTick = HonestStub.
 PAPER_D_EXECUTE default off; execute real solo si env + !dry_run.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
 from bolsa_analytics.cognitive.exit_plan import ExitPlan, build_exit_plan_from_position
@@ -23,8 +24,16 @@ from bolsa_application.execute_position_policy_auto import (
     ExecutePositionPolicyAutoInput,
     ExecutePositionPolicyAutoResult,
 )
+from bolsa_application.operational_context import (
+    OperationalContext,
+    OperationalContextBuilder,
+    PaperDeskNextAction,
+    PortfolioSnapshot,
+    resolve_paper_desk_next_action,
+)
 from bolsa_application.paper_d_propose import paper_d_execute_allowed
 from bolsa_application.persist_position_from_exit import row_position_state
+from bolsa_market.market_calendar import SessionState
 
 PaperDeskEntryStatus = Literal[
     "proposed",
@@ -74,6 +83,7 @@ class PaperDeskPositionTickRow:
     reason: str | None = None
     decision_verdict: str | None = None
     permission_reasons: tuple[str, ...] = ()
+    next_action: PaperDeskNextAction = "MANTENER"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -82,6 +92,7 @@ class PaperDeskPositionTickRow:
             "reason": self.reason,
             "decisionVerdict": self.decision_verdict,
             "permissionReasons": list(self.permission_reasons),
+            "nextAction": self.next_action,
         }
 
 
@@ -149,14 +160,7 @@ class PaperDeskCycleInput:
     dry_run: bool = True
     execution_policy_id: str | None = None
     template_id: str | None = "moderate"
-    mark_prices: dict[str, float] = field(default_factory=dict)
-    default_mark_price: float | None = None
-    data_stale: bool = False
-    market_closed: bool = False
-    portfolio_drift: bool = False
-    immediate_risk: bool = False
-    trail_hint: bool = False
-    trail_stop: float | None = None
+    context: OperationalContext | None = None
     # Si True y dry_run=False sin env → result blocked (HTTP 403 en capa ruta).
     require_env_for_execute: bool = True
 
@@ -220,9 +224,37 @@ def _position_from_row(row: Any) -> PositionState | None:
     return None
 
 
+def _row_with_next(
+    instrument_id: str,
+    status: PaperDeskPositionRowStatus,
+    *,
+    reason: str | None = None,
+    decision_verdict: str | None = None,
+    permission_reasons: tuple[str, ...] = (),
+    session: SessionState = "OPEN",
+) -> PaperDeskPositionTickRow:
+    next_action = resolve_paper_desk_next_action(
+        status=status,
+        decision_verdict=decision_verdict,
+        permission_reasons=permission_reasons,
+        reason=reason,
+        session=session,
+    )
+    return PaperDeskPositionTickRow(
+        instrument_id=instrument_id,
+        status=status,
+        reason=reason,
+        decision_verdict=decision_verdict,
+        permission_reasons=permission_reasons,
+        next_action=next_action,
+    )
+
+
 def _row_from_auto_result(
     instrument_id: str,
     result: ExecutePositionPolicyAutoResult,
+    *,
+    session: SessionState,
 ) -> PaperDeskPositionTickRow:
     verdict = result.decision.verdict if result.decision else None
     perm_reasons: tuple[str, ...] = ()
@@ -241,12 +273,13 @@ def _row_from_auto_result(
         status = result.status  # type: ignore[assignment]
     else:
         status = "error"
-    return PaperDeskPositionTickRow(
-        instrument_id=instrument_id,
-        status=status,
+    return _row_with_next(
+        instrument_id,
+        status,
         reason=result.reason,
         decision_verdict=verdict,
         permission_reasons=perm_reasons,
+        session=session,
     )
 
 
@@ -261,11 +294,14 @@ def _dry_run_position_row(
     market_closed: bool,
     portfolio_drift: bool,
     immediate_risk: bool,
-    session_flag: Literal["open", "closed"],
+    session: SessionState,
 ) -> PaperDeskPositionTickRow:
     from bolsa_analytics.cognitive.position_policy_decision import decide_position_policy
     from bolsa_application.evaluate_exit_plan import auto_exit_permission
 
+    session_flag: Literal["open", "closed"] = (
+        "closed" if (market_closed or session != "OPEN") else "open"
+    )
     decision = decide_position_policy(
         position,
         exit_plan,
@@ -275,11 +311,12 @@ def _dry_run_position_row(
         stop_touched=immediate_risk,
     )
     if decision.verdict == "HOLD":
-        return PaperDeskPositionTickRow(
-            instrument_id=instrument_id,
-            status="held",
+        return _row_with_next(
+            instrument_id,
+            "held",
             reason=decision.defer_reason,
             decision_verdict=decision.verdict,
+            session=session,
         )
     perm = auto_exit_permission(
         exit_plan,
@@ -291,14 +328,14 @@ def _dry_run_position_row(
         position_closed=position.status == "CLOSED",
     )
     if not perm.allowed:
-        return PaperDeskPositionTickRow(
-            instrument_id=instrument_id,
-            status="denied",
+        return _row_with_next(
+            instrument_id,
+            "denied",
             reason=",".join(perm.reasons) or "denied",
             decision_verdict=decision.verdict,
             permission_reasons=tuple(perm.reasons),
+            session=session,
         )
-    # dry_run: map verdict to intended mutation without persist
     mapped: PaperDeskPositionRowStatus
     if decision.verdict in ("PROTECT", "TRAIL"):
         mapped = "protected"
@@ -308,12 +345,13 @@ def _dry_run_position_row(
         mapped = "exited"
     else:
         mapped = "held"
-    return PaperDeskPositionTickRow(
-        instrument_id=instrument_id,
-        status=mapped,
+    return _row_with_next(
+        instrument_id,
+        mapped,
         reason="dry_run",
         decision_verdict=decision.verdict,
         permission_reasons=tuple(perm.reasons),
+        session=session,
     )
 
 
@@ -326,10 +364,12 @@ class PaperDeskCycle:
         entry: PaperDeskEntryPort,
         open_positions: PaperDeskOpenPositionsPort,
         execute_auto: ExecutePositionPolicyAuto | None = None,
+        context_builder: OperationalContextBuilder | None = None,
     ) -> None:
         self._entry = entry
         self._open = open_positions
         self._execute_auto = execute_auto
+        self._builder = context_builder
 
     async def execute(self, inp: PaperDeskCycleInput) -> PaperDeskCycleResult:
         account_id = (inp.account_id or "").strip()
@@ -362,21 +402,47 @@ class PaperDeskCycle:
                 block_reason="paper_auto_env_blocked",
             )
 
-        entry = await self._entry.run_entry_tick(
-            account_id=account_id,
-            as_of=inp.as_of,
-            dry_run=inp.dry_run,
-            paper_d_execute=env_ok,
-            execution_policy_id=inp.execution_policy_id,
-            template_id=inp.template_id,
-        )
+        open_rows = await self._open.list_open(account_id)
+        iids = [i for i in (_instrument_id_from_row(r) for r in open_rows) if i]
+        ctx = inp.context
+        if ctx is None and self._builder is not None:
+            ctx = await self._builder.build(account_id, iids, as_of=inp.as_of)
+        if ctx is None:
+            ctx = OperationalContext(
+                account_id=account_id,
+                as_of=inp.as_of,
+                session="OPEN",
+                portfolio=PortfolioSnapshot(account_id=account_id, drift=False),
+                markets={},
+            )
+            notes.append("operational_context_missing — fail-closed marks.")
+
+        if ctx.portfolio.drift:
+            notes.append("portfolio_drift")
+
+        if ctx.portfolio.drift and not inp.dry_run:
+            entry = PaperDeskEntryTickResult(
+                status="blocked",
+                reason="portfolio_drift",
+                notes=("EntryTick blocked: portfolio_drift (OR-4).",),
+            )
+        else:
+            entry = await self._entry.run_entry_tick(
+                account_id=account_id,
+                as_of=inp.as_of,
+                dry_run=inp.dry_run,
+                paper_d_execute=env_ok,
+                execution_policy_id=inp.execution_policy_id,
+                template_id=inp.template_id,
+            )
 
         policy = resolve_operating_policy(inp.template_id)
+        session = ctx.session
+        market_closed = ctx.market_closed()
         session_flag: Literal["open", "closed"] = (
-            "closed" if inp.market_closed else "open"
+            "closed" if market_closed else "open"
         )
         rows_out: list[PaperDeskPositionTickRow] = []
-        open_rows = await self._open.list_open(account_id)
 
         for row in open_rows:
             iid = _instrument_id_from_row(row)
@@ -385,43 +451,48 @@ class PaperDeskCycle:
             pos = _position_from_row(row)
             if pos is None:
                 rows_out.append(
-                    PaperDeskPositionTickRow(
-                        instrument_id=iid,
-                        status="error",
+                    _row_with_next(
+                        iid,
+                        "error",
                         reason="position_state_invalid",
+                        session=session,
                     )
                 )
                 continue
 
-            mark = inp.mark_prices.get(iid)
+            mark = ctx.mark_price(iid)
+            snap = ctx.market_for(iid)
             if mark is None:
-                mark = inp.default_mark_price
-            if mark is None and pos.actual_entry is not None:
-                mark = float(pos.actual_entry)
-            if mark is None or mark <= 0:
                 rows_out.append(
-                    PaperDeskPositionTickRow(
-                        instrument_id=iid,
-                        status="error",
-                        reason="missing_mark_price",
+                    _row_with_next(
+                        iid,
+                        "denied",
+                        reason="data_unavailable",
+                        permission_reasons=("data_unavailable",),
+                        session=session,
                     )
                 )
                 continue
+
+            data_stale = snap.is_stale() if snap is not None else True
+            immediate_risk = ctx.stop_touched(iid, pos)
+            portfolio_drift = ctx.portfolio.drift
 
             exit_plan = build_exit_plan_from_position(
                 pos,
                 mark_price=float(mark),
                 exit_policy=policy.exit,
-                trail_hint=inp.trail_hint,
-                trail_stop=inp.trail_stop,
+                trail_hint=ctx.trail_hint,
+                trail_stop=ctx.trail_stop,
             )
             if exit_plan is None:
                 rows_out.append(
-                    PaperDeskPositionTickRow(
-                        instrument_id=iid,
-                        status="no_plan",
+                    _row_with_next(
+                        iid,
+                        "no_plan",
                         reason="no_exit_plan",
                         decision_verdict="HOLD",
+                        session=session,
                     )
                 )
                 continue
@@ -433,12 +504,12 @@ class PaperDeskCycle:
                         pos,
                         exit_plan,
                         policy,
-                        paper_d_execute=env_ok if not inp.dry_run else env_ok,
-                        data_stale=inp.data_stale,
-                        market_closed=inp.market_closed,
-                        portfolio_drift=inp.portfolio_drift,
-                        immediate_risk=inp.immediate_risk,
-                        session_flag=session_flag,
+                        paper_d_execute=env_ok,
+                        data_stale=data_stale,
+                        market_closed=market_closed,
+                        portfolio_drift=portfolio_drift,
+                        immediate_risk=immediate_risk,
+                        session=session,
                     )
                 )
                 continue
@@ -452,16 +523,17 @@ class PaperDeskCycle:
                     operating_policy=policy,
                     mark_price=float(mark),
                     paper_d_execute=env_ok,
-                    data_stale=inp.data_stale,
-                    market_closed=inp.market_closed,
-                    portfolio_drift=inp.portfolio_drift,
-                    immediate_risk=inp.immediate_risk,
+                    data_stale=data_stale,
+                    market_closed=market_closed,
+                    portfolio_drift=portfolio_drift,
+                    immediate_risk=immediate_risk,
                     session=session_flag,
-                    stale=inp.data_stale,
+                    stale=data_stale,
+                    stop_touched=immediate_risk,
                     as_of=inp.as_of,
                 )
             )
-            rows_out.append(_row_from_auto_result(iid, result))
+            rows_out.append(_row_from_auto_result(iid, result, session=session))
 
         return PaperDeskCycleResult(
             account_id=account_id,

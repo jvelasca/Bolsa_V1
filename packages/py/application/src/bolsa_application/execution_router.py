@@ -792,7 +792,12 @@ class ExecutionRouter:
         # idempotencia se active siempre (incluso con gate desactivado). Se inicializa
         # aqui también `claimed` para que el release del except ValueError nunca encuentre
         # la variable sin definir cuando el gate está desactivado.
-        idem_key = make_auto_execute_idempotency_key(
+        explicit_key: str | None = None
+        if isinstance(hit, dict):
+            raw_key = hit.get("idempotencyKey") or hit.get("idempotency_key")
+            if isinstance(raw_key, str) and raw_key.strip():
+                explicit_key = raw_key.strip()
+        idem_key = explicit_key or make_auto_execute_idempotency_key(
             signal.instrument_id,
             as_of_from_iso(getattr(signal, "timestamp", None)),
             policy.id,

@@ -1462,6 +1462,19 @@ def get_evaluate_position_exits_use_case(session: AsyncSession) -> EvaluatePosit
     )
 
 
+def get_operational_context_builder(session: AsyncSession) -> Any:
+    """V1.47 — MarketSnapshot desde OHLCV + recon lookup."""
+    from bolsa_application.operational_context import (
+        OhlcvMarketDataPort,
+        OperationalContextBuilder,
+    )
+
+    return OperationalContextBuilder(
+        OhlcvMarketDataPort(get_ohlcv_repository(session)),
+        portfolio_recon=get_portfolio_recon_lookup(session),
+    )
+
+
 def get_execute_position_policy_auto_use_case(
     session: AsyncSession,
     *,
@@ -1519,7 +1532,7 @@ def get_paper_desk_cycle_use_case(
     execution_policy_id: str | None = None,
     dry_run: bool = True,
 ) -> Any:
-    """V1.46 — PaperDeskCycle (EntryTick stub + PositionTick / ExecutePositionPolicyAuto)."""
+    """V1.47 — PaperDeskCycle (EntryTick stub + PositionTick + OperationalContext)."""
     from bolsa_application.paper_desk_cycle import (
         HonestStubPaperDeskEntry,
         PaperDeskCycle,
@@ -1544,6 +1557,7 @@ def get_paper_desk_cycle_use_case(
         entry=HonestStubPaperDeskEntry(),
         open_positions=_OpenAdapter(),
         execute_auto=execute_auto,
+        context_builder=get_operational_context_builder(session),
     )
 
 

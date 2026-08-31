@@ -15,6 +15,7 @@ _JIT_DENY_CODES = frozenset(
         "market_closed",
         "portfolio_drift",
         "paper_auto_env_blocked",
+        "data_unavailable",
     }
 )
 

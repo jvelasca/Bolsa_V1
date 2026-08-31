@@ -1,9 +1,8 @@
-"""V1.45 — adapter PaperPositionSellPort vía ExecutionRouter (exit/reduce hits)."""
+"""V1.45/V1.47 — adapter PaperPositionSellPort vía ExecutionRouter (exit/reduce hits)."""
 
 from __future__ import annotations
 
 from typing import Any
-from uuid import uuid4
 
 from bolsa_application.execute_position_policy_auto import PaperPositionSellResult
 from bolsa_application.execution_router import ExecutionRouter
@@ -33,6 +32,10 @@ class RouterPaperPositionSell:
         quantity: float,
         price: float,
         full_exit: bool,
+        idempotency_key: str | None = None,
+        event_kind: str | None = None,
+        position_id: str | None = None,
+        as_of: str | None = None,
     ) -> PaperPositionSellResult:
         _ = account_id
         if not paper_d_execute_allowed():
@@ -40,31 +43,30 @@ class RouterPaperPositionSell:
                 status="blocked",
                 reason="paper_auto_env_blocked",
             )
-        kind = "exit" if full_exit else "reduce"
-        sig_id = f"pos-auto-{uuid4().hex[:12]}"
+        # SignalEventV1.kind no admite "reduce"; qty en hit impulsa parcial.
+        stable_id = (idempotency_key or "").strip() or (
+            f"pos-auto-{(position_id or instrument_id)}"
+        )
+        ts = (as_of or "").strip()
         hit: dict[str, Any] = {
             "instrumentId": instrument_id,
             "symbol": self._symbol or instrument_id,
-            "quantity": float(quantity) if not full_exit else None,
+            "idempotencyKey": stable_id,
+            "eventKind": event_kind,
             "signal": {
-                "id": sig_id,
+                "id": stable_id,
                 "instrumentId": instrument_id,
-                "timestamp": "",
-                "kind": kind if kind == "exit" else "exit",
-                # Always use exit kind for SignalEventV1 Literal; qty drives partial.
+                "timestamp": ts,
+                "kind": "exit",
                 "strategyDefinitionId": "position-policy-auto",
                 "strategyVersion": 1,
                 "barIndex": 0,
                 "price": float(price),
-                "quantity": float(quantity) if not full_exit else None,
             },
         }
         if not full_exit:
             hit["quantity"] = float(quantity)
             hit["signal"]["quantity"] = float(quantity)
-        else:
-            hit.pop("quantity", None)
-            hit["signal"].pop("quantity", None)
 
         try:
             batch = await self._router.execute(self._policy_id, [hit])

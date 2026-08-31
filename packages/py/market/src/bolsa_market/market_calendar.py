@@ -5,10 +5,14 @@ Fase P2: reglas por exchange/timezone. Sustituible por tabla MarketCalendar (ADR
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 POST_CLOSE_HOUR = 17
 POST_CLOSE_MINUTE = 35
+SESSION_OPEN_HOUR = 9
+
+SessionState = Literal["PRE", "OPEN", "BREAK", "CLOSED", "POST"]
 
 _EXCHANGE_TIMEZONES: dict[str, ZoneInfo] = {
     "BME": ZoneInfo("Europe/Madrid"),
@@ -66,3 +70,29 @@ def expected_last_daily_bar(
     if not post_close:
         return _previous_trading_day(session)
     return session
+
+
+def resolve_session_state(
+    *,
+    exchange: str,
+    country: str = "ES",
+    as_of: datetime | None = None,
+) -> SessionState:
+    """V1.47 — PRE / OPEN / POST / CLOSED. BREAK reservado (no implementado)."""
+    tz = resolve_exchange_timezone(exchange, country)
+    now = (as_of or datetime.now(tz)).astimezone(tz)
+    if now.weekday() >= 5:
+        return "CLOSED"
+    if now.hour < SESSION_OPEN_HOUR:
+        return "PRE"
+    post_close = (
+        now.hour > POST_CLOSE_HOUR
+        or (now.hour == POST_CLOSE_HOUR and now.minute >= POST_CLOSE_MINUTE)
+    )
+    if post_close:
+        return "POST"
+    return "OPEN"
+
+
+def session_is_open(state: SessionState) -> bool:
+    return state == "OPEN"

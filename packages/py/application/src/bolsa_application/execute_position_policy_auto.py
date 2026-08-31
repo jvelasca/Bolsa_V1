@@ -61,6 +61,10 @@ class PaperPositionSellPort(Protocol):
         quantity: float,
         price: float,
         full_exit: bool,
+        idempotency_key: str | None = None,
+        event_kind: str | None = None,
+        position_id: str | None = None,
+        as_of: str | None = None,
     ) -> PaperPositionSellResult: ...
 
 
@@ -254,12 +258,34 @@ class ExecutePositionPolicyAuto:
                 reason="invalid_mark_price",
             )
 
+        from bolsa_application.auto_execute_idempotency import (
+            make_position_event_idempotency_key,
+        )
+
+        event_kind = "UNKNOWN"
+        if decision.event is not None:
+            event_kind = str(decision.event.kind)
+        elif decision.reason_code:
+            event_kind = str(decision.reason_code)
+        action = "exit" if full_exit else "reduce"
+        pos_id = position.position_id if position is not None else inp.instrument_id
+        idem_key = make_position_event_idempotency_key(
+            position_id=pos_id,
+            event_type=event_kind,
+            event_as_of=inp.as_of or "",
+            action=action,
+        )
+
         sell = await self._sell.sell(
             account_id=inp.account_id,
             instrument_id=inp.instrument_id,
             quantity=float(qty),
             price=price,
             full_exit=full_exit,
+            idempotency_key=idem_key,
+            event_kind=event_kind,
+            position_id=pos_id,
+            as_of=inp.as_of,
         )
         if sell.status != "trade_executed":
             return ExecutePositionPolicyAutoResult(

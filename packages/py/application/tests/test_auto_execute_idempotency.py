@@ -7,6 +7,7 @@ import pytest
 from bolsa_application.auto_execute_idempotency import (
     as_of_from_iso,
     make_auto_execute_idempotency_key,
+    make_position_event_idempotency_key,
 )
 from bolsa_application.risk_runtime import (
     claim_auto_execute_idempotency,
@@ -26,6 +27,28 @@ def test_idempotency_key_stable() -> None:
 
 def test_as_of_from_iso() -> None:
     assert as_of_from_iso("2026-08-04T12:00:00Z") == "2026-08-04"
+
+
+def test_position_event_key_distinguishes_t1_and_stop() -> None:
+    t1 = make_position_event_idempotency_key(
+        position_id="pos-1",
+        event_type="T1",
+        event_as_of="2026-08-31T16:00:00Z",
+        action="reduce",
+    )
+    stop = make_position_event_idempotency_key(
+        position_id="pos-1",
+        event_type="STOP",
+        event_as_of="2026-08-31T16:00:00Z",
+        action="exit",
+    )
+    assert t1 != stop
+    assert t1 == make_position_event_idempotency_key(
+        position_id="pos-1",
+        event_type="T1",
+        event_as_of="2026-08-31",
+        action="reduce",
+    )
 
 
 @pytest.mark.asyncio

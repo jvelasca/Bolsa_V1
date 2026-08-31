@@ -25,7 +25,7 @@ describe("paper-daily-report", () => {
           status: "denied",
           permissionReasons: ["market_closed"],
         },
-        { instrumentId: "IBM", status: "protected" },
+        { instrumentId: "IBM", status: "protected", nextAction: "SUBIR_STOP" },
       ],
       notes: ["dryRun=true — no ledger mutate."],
     });
