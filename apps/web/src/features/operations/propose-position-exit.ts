@@ -30,6 +30,12 @@ export type OperativaProtectMetaV1 = {
   currentStop: number | null;
   direction: string;
   stopOverrideRequired: boolean;
+  /**
+   * V1.43 — trail Confirm → PositionRevision origin=trail.
+   * Default/omit = protect (T1 BE / protect_hint).
+   */
+  revisionOrigin?: "protect" | "trail";
+  primaryReason?: string | null;
 };
 
 /** V1.32 — snapshot ExitPlan + fuente evento|manual en enqueue reduce/exit. */
@@ -281,12 +287,20 @@ export function buildPositionExitPayload(opts: {
     }
 
     const now = new Date().toISOString();
+    const primaryReason =
+      typeof operational.exitPlan?.primaryReason === "string"
+        ? operational.exitPlan.primaryReason
+        : null;
+    const revisionOrigin: "protect" | "trail" =
+      primaryReason === "TRAIL" ? "trail" : "protect";
     const protectMeta: OperativaProtectMetaV1 = {
       operativaIntent: "protect",
       suggestedStop,
       currentStop: operational.currentStop ?? null,
       direction: operational.direction,
       stopOverrideRequired: overrideRequired,
+      revisionOrigin,
+      primaryReason,
     };
 
     return {
@@ -304,7 +318,11 @@ export function buildPositionExitPayload(opts: {
       status: "awaiting_human",
       createdAt: now,
       source: "operativa",
-      notes: ["Proteger (stop amend) desde Consola de Mesa (P4.2)"],
+      notes: [
+        revisionOrigin === "trail"
+          ? "Trail → Confirm (stop amend · revision origin=trail · P4.2)"
+          : "Proteger (stop amend) desde Consola de Mesa (P4.2)",
+      ],
       decisionPackage: protectMeta,
     };
   }

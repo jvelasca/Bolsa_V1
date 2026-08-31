@@ -244,20 +244,20 @@ async def test_journey_04_structural_stop_exit() -> None:
 
 @pytest.mark.asyncio
 async def test_journey_05_trail_protect_revision() -> None:
-    """J05 — trail/protect mejora stop → revision auditada."""
+    """J05 — trail Confirm → revision origin=trail → currentStop."""
     pos = _filled_position()
     updated = apply_position_current_stop(
         pos,
         98.0,
         at="2026-08-28T11:00:00Z",
-        origin="protect",
-        reason="trail ratchet",
+        origin="trail",
+        reason="trail_confirm",
     )
     assert updated is not None
     assert updated.current_stop == 98.0
     revisions = updated.revisions or []
     assert len(revisions) >= 1
-    assert revisions[-1].origin == "protect"
+    assert revisions[-1].origin == "trail"
 
     store = _Store()
     store.open_by_instrument[("acc-1", "inst-1")] = {
@@ -272,10 +272,14 @@ async def test_journey_05_trail_protect_revision() -> None:
             account_id="acc-1",
             instrument_id="inst-1",
             suggested_stop=98.0,
+            origin="trail",
         )
     )
     assert applied is not None
     assert applied["position_state"]["currentStop"] == 98.0
+    rev = applied["position_state"]["revisions"][-1]
+    assert rev["origin"] == "trail"
+    assert rev["reason"] == "trail_confirm"
 
 
 @pytest.mark.asyncio

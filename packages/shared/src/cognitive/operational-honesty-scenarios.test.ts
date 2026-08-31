@@ -1,7 +1,7 @@
 /**
  * V1.41.2 — matriz de honestidad operativa sobre proyecciones actuales.
  * No E2E browser. V1.42 F2: fill parcial / REJECTED vía ExecutionState.
- * Mercado cerrado / trailing autoridad siguen parked.
+ * Mercado cerrado sigue parked. V1.43: trailing SEMI Confirm→revision origin=trail.
  */
 
 import { describe, expect, it } from "vitest";
@@ -410,7 +410,72 @@ describe("operationalHonestyScenarios V1.41.2", () => {
     "19c Mercado cerrado — parked (no modelo de sesión en ExecutionState F2)",
   );
 
-  it.todo(
-    "20 Trailing como autoridad — parked (protect_hint thin ≠ autoridad)",
-  );
+  it("20 Trailing SEMI: hint ≠ autoridad; Confirm+revision → applied", () => {
+    const hintPos = aaplOpen({
+      lastPrice: 112.5,
+      marketValue: 1125,
+      unrealizedPnl: 125,
+      unrealizedPnlPct: 12.5,
+      operational: {
+        status: "OPEN",
+        direction: "long",
+        tradePlanId: "tp-aapl",
+        plannedEntry: 100,
+        actualEntry: 100,
+        initialStop: 95,
+        currentStop: 95,
+        target1: 130,
+        target2: 150,
+        unrealizedR: 2.5,
+        exitPlan: {
+          suggestedAction: "protect",
+          primaryReason: "TRAIL",
+          suggestedStop: 107.5,
+        },
+      },
+    });
+    const hintPot = buildPositionOperatingTruth({
+      position: hintPos,
+      asOf: ASOF,
+    });
+    expect(hintPot!.execution.trailingState).toBe("hint");
+    expect(hintPot!.operational.trailing.applied).toBe(false);
+    expect(
+      hintPot!.secondaryConditions.some(
+        (c) => c.kind === "trail_hint_not_applied",
+      ),
+    ).toBe(true);
+    // Hint alone never auto-promotes — secondary honesty, not applied authority.
+    expect(hintPot!.execution.trailingState).not.toBe("applied");
+
+    const afterConfirm = buildPositionOperatingTruth({
+      position: aaplOpen({
+        lastPrice: 112.5,
+        marketValue: 1125,
+        unrealizedPnl: 125,
+        unrealizedPnlPct: 12.5,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          tradePlanId: "tp-aapl",
+          plannedEntry: 100,
+          actualEntry: 100,
+          initialStop: 95,
+          currentStop: 107.5,
+          target1: 130,
+          target2: 150,
+          unrealizedR: 2.5,
+          exitPlan: { suggestedAction: "hold" },
+        },
+      }),
+      asOf: ASOF,
+    });
+    expect(afterConfirm!.operational.trailing.applied).toBe(true);
+    expect(afterConfirm!.execution.trailingState).toBe("applied");
+    expect(
+      afterConfirm!.secondaryConditions.some(
+        (c) => c.kind === "trail_hint_not_applied",
+      ),
+    ).toBe(false);
+  });
 });

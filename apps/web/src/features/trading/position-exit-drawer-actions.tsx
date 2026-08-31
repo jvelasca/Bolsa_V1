@@ -176,7 +176,11 @@ export function PositionExitDrawerActions({
             )}
             onClick={() => enqueueExit("protect")}
             data-testid={`position-exit-protect-${position.symbol}`}
-            title="Proteger → cola Confirm (firma SEMI · hint ≠ stop)"
+            title={
+              exitPlan?.primaryReason === "TRAIL"
+                ? "Trail → Confirm (firma SEMI · hint ≠ currentStop hasta revision)"
+                : "Proteger → cola Confirm (firma SEMI · hint ≠ stop)"
+            }
           >
             Proteger
           </button>

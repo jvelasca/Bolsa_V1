@@ -60,7 +60,7 @@ Cinco verdades distintas: product · git tag · package · schema · API. [`vers
 
 - Spec canónico: [`spec-v142-operating-excellence-2026-08-31.md`](../engineering/spec-v142-operating-excellence-2026-08-31.md).
 - Enmienda ADR-041 §1.6 · diseño Mercado 2.0 (etiqueta DECISIÓN).
-- Implementación: **F2–F8 CÓDIGO** ([plan F8](../engineering/plan-v142-f8-paper-auto-2026-08-31.md) · [relevo F8](../engineering/traspaso-relevo-v1-42-f8-paper-auto-2026-08-31.md)); residuals parked (trail durable · thaw estricto · LIVE).
+- Implementación: **F2–F8 CÓDIGO** ([plan F8](../engineering/plan-v142-f8-paper-auto-2026-08-31.md) · [relevo F8](../engineering/traspaso-relevo-v1-42-f8-paper-auto-2026-08-31.md)); residual trail durable **CERRADO** SEMI ([relevo V1.43](../engineering/traspaso-relevo-v1-43-trail-revision-2026-08-31.md)); parked: thaw estricto · LIVE · OCO · Lab P2.
 - Backend money path / Confirm SEMI intocados en F8 (solo posture UI + gates existentes). Sin nav L1 nueva. Sin thaw. Sin Lab P2.
 
 ## 8. Fuera

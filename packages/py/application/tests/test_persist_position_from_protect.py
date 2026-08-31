@@ -88,6 +88,26 @@ async def test_protect_improves_stop() -> None:
 
 
 @pytest.mark.asyncio
+async def test_trail_origin_improves_stop() -> None:
+    store = _ProtectStore(_open_row(current_stop=95.0))
+    uc = PersistPositionFromProtect(store)
+    row = await uc.persist(
+        PersistPositionFromProtectInput(
+            account_id="acc-1",
+            instrument_id="inst-1",
+            suggested_stop=98.0,
+            origin="trail",
+        )
+    )
+    assert row is not None
+    revisions = store.updates[0]["position_state"]["revisions"]
+    assert len(revisions) == 1
+    assert revisions[0]["origin"] == "trail"
+    assert revisions[0]["reason"] == "trail_confirm"
+    assert store.updates[0]["position_state"]["currentStop"] == 98.0
+
+
+@pytest.mark.asyncio
 async def test_protect_same_stop_no_revision() -> None:
     store = _ProtectStore(_open_row(current_stop=95.0))
     uc = PersistPositionFromProtect(store)

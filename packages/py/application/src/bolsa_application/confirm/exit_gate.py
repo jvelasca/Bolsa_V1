@@ -67,6 +67,8 @@ class ExitGateCoordinator:
         instrument_id: str,
         suggested_stop: float,
         override_reason: str | None,
+        origin: str = "protect",
+        reason: str | None = None,
     ) -> Any | None:
         assert self._position_from_protect is not None
         return await self._position_from_protect.persist(
@@ -75,6 +77,8 @@ class ExitGateCoordinator:
                 instrument_id=instrument_id,
                 suggested_stop=suggested_stop,
                 override_reason=override_reason,
+                origin=origin,
+                reason=reason,
             )
         )
 

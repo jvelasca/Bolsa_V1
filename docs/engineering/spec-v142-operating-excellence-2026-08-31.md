@@ -427,12 +427,12 @@ Simétrico a GP-06. T2 no inventa sello de gestionado (H2).
 
 T1 → trailing proposal → confirm → stop revision.
 
-|             |                                                       |
-| ----------- | ----------------------------------------------------- |
-| Autoridades | hint → Confirm → PositionRevision → `currentStop`     |
-| CTA         | Revisar (propuesta) luego Mantener                    |
-| Prohibido   | hint = stop operativo                                 |
-| Dominio hoy | Hint only (ciclo 8.1). Camino Confirm **no** producto |
+|             |                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Autoridades | hint → Confirm → PositionRevision → `currentStop`                                                                        |
+| CTA         | Revisar (propuesta) luego Mantener                                                                                       |
+| Prohibido   | hint = stop operativo                                                                                                    |
+| Dominio hoy | SEMI: hint → Confirm protect → `PositionRevision` `origin=trail` → `currentStop`. Hint ≠ auto-promote · sin broker trail |
 
 ### GP-09 Discrepancia
 
@@ -457,15 +457,15 @@ submit → crash → UNKNOWN → reconcile → no duplicate order.
 
 ### C.11 Cobertura tests actuales vs gap
 
-| GP    | Dominio / spine      | Proyección shared                         | UI Mercado/Hoy                           |
-| ----- | -------------------- | ----------------------------------------- | ---------------------------------------- |
-| 01    | Parcial V1.27        | Entry truth sí; Story no                  | Parcial                                  |
-| 02    | Gate + FE V1.41.3    | Sí                                        | Sí                                       |
-| 03–04 | PaperOrder / PARTIAL | **ExecutionState F2 CÓDIGO**              | Thin wire (summary / Mesa / Operaciones) |
-| 05–07 | V1.27 + ExitRoute    | Parcial; §A.8 no (F3)                     | Parcial                                  |
-| 08    | Hint only            | trailingState eco F2; autoridad F3+       | —                                        |
-| 09    | OR/DEX               | reconciliationState eco; POT F3           | Banner incidente                         |
-| 10    | OR-2 / DEX           | **ExecutionState F2 CÓDIGO** (con hechos) | Copy UNKNOWN; F2b = list intents         |
+| GP    | Dominio / spine                      | Proyección shared                         | UI Mercado/Hoy                           |
+| ----- | ------------------------------------ | ----------------------------------------- | ---------------------------------------- |
+| 01    | Parcial V1.27                        | Entry truth sí; Story no                  | Parcial                                  |
+| 02    | Gate + FE V1.41.3                    | Sí                                        | Sí                                       |
+| 03–04 | PaperOrder / PARTIAL                 | **ExecutionState F2 CÓDIGO**              | Thin wire (summary / Mesa / Operaciones) |
+| 05–07 | V1.27 + ExitRoute                    | Parcial; §A.8 no (F3)                     | Parcial                                  |
+| 08    | SEMI Confirm→revision `origin=trail` | trailingState hint→applied · honesty #20  | Proteger CTA · title trail               |
+| 09    | OR/DEX                               | reconciliationState eco; POT F3           | Banner incidente                         |
+| 10    | OR-2 / DEX                           | **ExecutionState F2 CÓDIGO** (con hechos) | Copy UNKNOWN; F2b = list intents         |
 
 ---
 

@@ -160,6 +160,37 @@ describe("PositionOperatingTruth Golden Paths V1.42 F3", () => {
     expect(pot!.primaryCta.kind).toBe("maintain");
   });
 
+  it("GP-08 Trailing: after Confirm stop matches hint → applied · no trail_hint_not_applied", () => {
+    // Same geometry as hint case; currentStop raised to trail hint (lockedR=1.5 → 107.5).
+    const pot = buildPositionOperatingTruth({
+      position: openPos({
+        lastPrice: 112.5,
+        marketValue: 900,
+        unrealizedPnl: 100,
+        unrealizedPnlPct: 12.5,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          tradePlanId: "tp-gp",
+          plannedEntry: 100,
+          actualEntry: 100,
+          initialStop: 95,
+          currentStop: 107.5,
+          target1: 130,
+          target2: 150,
+          unrealizedR: 2.5,
+          exitPlan: { suggestedAction: "hold" },
+        },
+      }),
+      asOf: ASOF,
+    });
+    expect(pot!.operational.trailing.applied).toBe(true);
+    expect(pot!.execution.trailingState).toBe("applied");
+    expect(
+      pot!.secondaryConditions.some((c) => c.kind === "trail_hint_not_applied"),
+    ).toBe(false);
+  });
+
   it("GP-09 Discrepancy: alone → protect; with full_exit → exit + secondary", () => {
     const alone = buildPositionOperatingTruth({
       position: openPos(),

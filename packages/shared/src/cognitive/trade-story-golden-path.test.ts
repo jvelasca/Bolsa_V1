@@ -175,7 +175,7 @@ describe("TradeStory Golden Paths V1.42 F4", () => {
     expect(kinds.indexOf("stop_updated")).toBeLessThan(kinds.indexOf("cierre"));
   });
 
-  it("GP-08 trailing hint ≠ trailing_applied; applied only via revision reason", () => {
+  it("GP-08 trailing hint ≠ trailing_applied; applied only via revision origin trail", () => {
     const hintOnly = buildTradeStory({
       instrumentId: INST,
       facts: [],
@@ -193,8 +193,8 @@ describe("TradeStory Golden Paths V1.42 F4", () => {
       at: "2026-09-12T11:00:00.000Z",
       previousStop: 100,
       nextStop: 105,
-      origin: "protect",
-      reason: "trailing_stop_confirm",
+      origin: "trail",
+      reason: "trail_confirm",
     });
     const applied = buildTradeStory({
       instrumentId: INST,
@@ -206,6 +206,24 @@ describe("TradeStory Golden Paths V1.42 F4", () => {
     expect(applied.events.some((e) => e.kind === "trailing_applied")).toBe(
       true,
     );
+
+    // Legacy: protect + reason containing trail still maps to trailing_applied.
+    const legacy = buildTradeStory({
+      instrumentId: INST,
+      positionState: basePosition({
+        currentStop: 105,
+        revisions: [
+          buildPositionRevision({
+            at: "2026-09-12T11:00:00.000Z",
+            previousStop: 100,
+            nextStop: 105,
+            origin: "protect",
+            reason: "trailing_stop_confirm",
+          }),
+        ],
+      }),
+    });
+    expect(legacy.events.some((e) => e.kind === "trailing_applied")).toBe(true);
   });
 
   it("GP-10 unknown_order → reconciled with same order identity", () => {

@@ -191,6 +191,17 @@ def extract_operativa_protect_meta(raw: dict[str, Any]) -> dict[str, Any] | None
     return pkg
 
 
+def resolve_protect_revision_origin(protect_meta: dict[str, Any]) -> str:
+    """V1.43 — trail Confirm → PositionRevision origin=trail; else protect."""
+    raw = protect_meta.get("revisionOrigin")
+    if isinstance(raw, str) and raw.strip().lower() == "trail":
+        return "trail"
+    primary = protect_meta.get("primaryReason")
+    if isinstance(primary, str) and primary.strip().upper() == "TRAIL":
+        return "trail"
+    return "protect"
+
+
 def extract_operativa_exit_meta(raw: dict[str, Any]) -> dict[str, Any] | None:
     """V1.32 — meta reduce/exit_hint con plannedQty + ExitPlan snapshot."""
     pkg = raw.get("decisionPackage")

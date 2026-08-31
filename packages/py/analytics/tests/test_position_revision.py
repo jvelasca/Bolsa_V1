@@ -101,6 +101,17 @@ def test_apply_stop_appends_revision() -> None:
     assert rev.at == "2026-08-26T01:00:00Z"
 
 
+def test_apply_stop_appends_trail_revision() -> None:
+    pos = _open_long()
+    nxt = apply_position_current_stop(
+        pos, 98.0, at="2026-08-26T01:00:00Z", origin="trail", reason="trail_confirm"
+    )
+    assert nxt is not None
+    assert len(nxt.revisions) == 1
+    assert nxt.revisions[0].origin == "trail"
+    assert nxt.revisions[0].reason == "trail_confirm"
+
+
 def test_same_stop_no_revision() -> None:
     pos = _open_long()
     nxt = apply_position_current_stop(pos, 95.0, at="2026-08-26T01:00:00Z")

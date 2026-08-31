@@ -177,6 +177,58 @@ describe("buildPositionExitPayload", () => {
       operativaIntent: "protect",
       suggestedStop: 100,
       stopOverrideRequired: false,
+      revisionOrigin: "trail",
+      primaryReason: "TRAIL",
+    });
+  });
+
+  it("V1.43 — TRAIL protect tags revisionOrigin=trail", () => {
+    const payload = buildPositionExitPayload({
+      position: position({
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          currentStop: 95,
+          target1: 110,
+          target2: 120,
+          tradePlanId: "dec-1",
+          exitPlan: {
+            status: "ARMED",
+            suggestedAction: "protect",
+            primaryReason: "TRAIL",
+            suggestedStop: 100,
+          },
+        },
+      }),
+      accountId: "acc-1",
+      intent: "protect",
+    });
+    expect(payload.decisionPackage).toMatchObject({
+      operativaIntent: "protect",
+      revisionOrigin: "trail",
+      primaryReason: "TRAIL",
+      suggestedStop: 100,
+    });
+    expect(payload.notes?.[0]).toMatch(/Trail → Confirm/i);
+  });
+
+  it("V1.43 — protect_hint path keeps revisionOrigin=protect", () => {
+    const payload = buildPositionExitPayload({
+      position: position(),
+      accountId: "acc-1",
+      intent: "protect",
+      protectPlan: {
+        status: "protect_hint",
+        target1: 110,
+        suggestedProtectStop: 100,
+        rMultiple: 1,
+        why: ["mfe_ge_1r"],
+      },
+    });
+    expect(payload.decisionPackage).toMatchObject({
+      operativaIntent: "protect",
+      revisionOrigin: "protect",
+      suggestedStop: 100,
     });
   });
 

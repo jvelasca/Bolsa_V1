@@ -57,6 +57,7 @@ from bolsa_application.confirm.identity import (
     recommendation_is_expired,
     required_fill_side,
     resolve_confirm_trade_plan,
+    resolve_protect_revision_origin,
 )
 from bolsa_application.confirm.opening_gate import OpeningGateCoordinator
 from bolsa_application.confirm.position_sync import PositionSyncCoordinator
@@ -472,6 +473,12 @@ class ConfirmRecommendationIntent:
             )
             return
 
+        revision_origin = resolve_protect_revision_origin(protect_meta)
+        revision_reason = (
+            "trail_confirm"
+            if revision_origin == "trail"
+            else None
+        )
         position_persist: dict[str, Any] = {"status": "applied"}
         try:
             applied_row = await self._exit.persist_protect(
@@ -479,6 +486,8 @@ class ConfirmRecommendationIntent:
                 instrument_id=str(rec.instrument_id or ""),
                 suggested_stop=suggested_stop,
                 override_reason=risk_override_reason,
+                origin=revision_origin,
+                reason=revision_reason,
             )
         except Exception as exc:  # noqa: BLE001
             position_persist = {"status": "error", "reason": str(exc)}
@@ -507,6 +516,7 @@ class ConfirmRecommendationIntent:
                     "suggestedStop": suggested_stop,
                     "currentStop": protect_meta.get("currentStop"),
                     "overrideReason": risk_override_reason,
+                    "revisionOrigin": revision_origin,
                 },
             ),
         )

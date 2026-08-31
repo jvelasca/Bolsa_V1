@@ -73,6 +73,19 @@ describe("OI-5 PositionRevision factory", () => {
     });
   });
 
+  it("accepts origin trail", () => {
+    const rev = buildPositionRevision({
+      revisionId: "REV-T",
+      at: "2026-08-31T12:00:00Z",
+      previousStop: 95,
+      nextStop: 98,
+      origin: "trail",
+      reason: "trail_confirm",
+    });
+    expect(rev.origin).toBe("trail");
+    expect(positionRevisionFromUnknown(rev)?.origin).toBe("trail");
+  });
+
   it("detects stop/status change", () => {
     expect(
       stopOrStatusChanged({
@@ -116,6 +129,21 @@ describe("OI-5 apply stop/reduce revisions", () => {
     expect(nxt?.revisions[0]?.origin).toBe("protect");
     expect(nxt?.revisions[0]?.previousStop).toBe(95);
     expect(nxt?.revisions[0]?.nextStop).toBe(98);
+  });
+
+  it("applyCurrentStop appends trail revision", () => {
+    const nxt = applyPositionCurrentStop(
+      openLong(),
+      98,
+      "2026-08-26T01:00:00Z",
+      null,
+      "trail",
+      "trail_confirm",
+    );
+    expect(nxt?.currentStop).toBe(98);
+    expect(nxt?.revisions).toHaveLength(1);
+    expect(nxt?.revisions[0]?.origin).toBe("trail");
+    expect(nxt?.revisions[0]?.reason).toBe("trail_confirm");
   });
 
   it("same stop does not append", () => {

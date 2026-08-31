@@ -14,6 +14,7 @@ export type PositionRevisionStatusV1 =
 
 export type PositionRevisionOriginV1 =
   | "protect"
+  | "trail"
   | "reduce"
   | "override"
   | "stop";
@@ -33,6 +34,7 @@ export const POSITION_REVISIONS_KEY = "revisions";
 
 const VALID_ORIGINS = new Set<PositionRevisionOriginV1>([
   "protect",
+  "trail",
   "reduce",
   "override",
   "stop",

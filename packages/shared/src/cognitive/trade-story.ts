@@ -446,9 +446,10 @@ function collectFromPositionState(
       (rev.previousStop != null || rev.nextStop != null);
     if (stopChanged) {
       const trailing =
-        rev.origin === "protect" &&
-        typeof rev.reason === "string" &&
-        /trail/i.test(rev.reason);
+        rev.origin === "trail" ||
+        (rev.origin === "protect" &&
+          typeof rev.reason === "string" &&
+          /trail/i.test(rev.reason));
       pushEvent(bag, {
         kind: trailing ? "trailing_applied" : "stop_updated",
         asOf: rev.at,

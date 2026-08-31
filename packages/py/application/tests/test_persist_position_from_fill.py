@@ -472,6 +472,36 @@ async def test_confirm_protect_applies_stop_without_trade() -> None:
     assert fake_trade.calls == []
     assert len(fake_protect.calls) == 1
     assert fake_protect.calls[0].suggested_stop == 98.0
+    assert fake_protect.calls[0].origin == "protect"
+
+
+@pytest.mark.asyncio
+async def test_confirm_trail_protect_uses_origin_trail() -> None:
+    fake_protect = _FakeProtect()
+    uc = ConfirmRecommendationIntent(position_from_protect=fake_protect)
+    result = await uc.execute(
+        recommendation_raw={
+            "decisionId": "dec-1",
+            "instrumentId": "inst-1",
+            "action": "wait",
+            "suggestedQuantity": 10.0,
+            "suggestedPrice": 98.0,
+            "decisionPackage": {
+                "operativaIntent": "protect",
+                "suggestedStop": 98.0,
+                "currentStop": 95.0,
+                "direction": "long",
+                "stopOverrideRequired": False,
+                "revisionOrigin": "trail",
+                "primaryReason": "TRAIL",
+            },
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+    assert result["trade"]["status"] == "protect_applied"
+    assert fake_protect.calls[0].origin == "trail"
+    assert fake_protect.calls[0].reason == "trail_confirm"
 
 
 class _FakeProtectNone(_FakeProtect):

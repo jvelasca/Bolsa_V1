@@ -41,12 +41,22 @@ class PersistPositionFromProtectInput:
     suggested_stop: float
     override_reason: str | None = None
     applied_at: str | None = None
+    # OI-5 / V1.43 — ``protect`` (default) o ``trail`` cuando Confirm firma un TRAIL.
+    origin: str = "protect"
+    reason: str | None = None
+
+
+def _resolve_protect_origin(raw: str | None) -> str:
+    oid = (raw or "").strip().lower()
+    if oid == "trail":
+        return "trail"
+    return "protect"
 
 
 class PersistPositionFromProtect:
     """Aplica ``apply_position_current_stop`` a la fila OPEN; idempotente por stop.
 
-    OI-5: origin=protect deja huella en ``revisions``.
+    OI-5: origin=protect|trail deja huella en ``revisions``.
     """
 
     def __init__(self, store: PositionStateProtectStore) -> None:
@@ -75,15 +85,21 @@ class PersistPositionFromProtect:
             return None
 
         pos = position_state_from_dict(blob)
-        reason = (inp.override_reason or "").strip()
-        override: dict[str, object] | None = {"reason": reason} if reason else None
+        override_reason = (inp.override_reason or "").strip()
+        override: dict[str, object] | None = (
+            {"reason": override_reason} if override_reason else None
+        )
+        origin = _resolve_protect_origin(inp.origin)
+        reason = (inp.reason or "").strip() or override_reason or (
+            "trail_confirm" if origin == "trail" else None
+        )
         updated = apply_position_current_stop(
             pos,
             float(inp.suggested_stop),
             at=inp.applied_at,
             override=override,
-            origin="protect",
-            reason=reason or None,
+            origin=origin,  # type: ignore[arg-type]
+            reason=reason,
         )
         if updated is None:
             return None

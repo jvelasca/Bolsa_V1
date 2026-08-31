@@ -10,11 +10,11 @@ from typing import Literal
 from uuid import uuid4
 
 PositionStatus = Literal["OPEN", "PARTIAL", "PROTECTED", "CLOSED"]
-PositionRevisionOrigin = Literal["protect", "reduce", "override", "stop"]
+PositionRevisionOrigin = Literal["protect", "trail", "reduce", "override", "stop"]
 
 POSITION_REVISIONS_KEY = "revisions"
 
-_VALID_ORIGINS = frozenset({"protect", "reduce", "override", "stop"})
+_VALID_ORIGINS = frozenset({"protect", "trail", "reduce", "override", "stop"})
 _VALID_STATUSES = frozenset({"OPEN", "PARTIAL", "PROTECTED", "CLOSED"})
 
 
