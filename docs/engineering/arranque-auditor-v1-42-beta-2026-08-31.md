@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 post-tag **`v1.42-beta` → `1bb00fd`** (Operating Excellence F2–F8 sobre tip `v1.41.3-beta` → `a8101ab7`).
+Eres auditor externo de Bolsa V1 post-tag **`v1.42-beta` → `5e95f611`** (Operating Excellence F2–F8 sobre tip `v1.41.3-beta` → `a8101ab7`; tip movido tras unblock CI ruff + frase Mantener).
 
 Lee en este orden:
 

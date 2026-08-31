@@ -1,7 +1,7 @@
 # RELEVO — tag v1.42-beta → auditoría externa (2026-08-31)
 
 > **Padre:** [`traspaso-relevo-v1-42-f8-paper-auto-2026-08-31.md`](./traspaso-relevo-v1-42-f8-paper-auto-2026-08-31.md) · [`traspaso-relevo-tag-v1-41-3-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-41-3-beta-2026-08-31.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **TIP STAMPED** — `v1.42-beta` → `1bb00fd` · Release-tag CI pendiente.  
+> **Estado:** **TIP STAMPED** — `v1.42-beta` → `5e95f611` · Release-tag CI pending after CI unblock.  
 > **Arranque auditor:** [`arranque-auditor-v1-42-beta-2026-08-31.md`](./arranque-auditor-v1-42-beta-2026-08-31.md).
 
 ---
@@ -27,11 +27,11 @@ Freeze: Confirm = firma · Spine · `PAPER_D_EXECUTE` off (default) · AUTO opt-
 
 ## 1. Release
 
-| Pieza      | Valor                                      |
-| ---------- | ------------------------------------------ |
-| Tag tip    | `v1.42-beta` → `1bb00fd`                   |
-| Previo tip | `v1.41.3-beta` → `a8101ab7` (CI GREEN)     |
-| CI tag     | Pendiente push — workflow `release-tag-ci` |
+| Pieza      | Valor                                                 |
+| ---------- | ----------------------------------------------------- |
+| Tag tip    | `v1.42-beta` → `5e95f611` (was `1bb00fd`; CI unblock) |
+| Previo tip | `v1.41.3-beta` → `a8101ab7` (CI GREEN)                |
+| CI tag     | Pending re-push — workflow `release-tag-ci`           |
 
 ## 2. Pre-flight tip (local)
 
