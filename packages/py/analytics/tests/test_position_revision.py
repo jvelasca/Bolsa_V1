@@ -3,8 +3,8 @@
 from bolsa_analytics.cognitive.position_revision import (
     build_position_revision,
     position_revision_from_dict,
-    revisions_from_raw,
     revision_origin_from_exit_reason,
+    revisions_from_raw,
     stop_or_status_changed,
 )
 from bolsa_analytics.cognitive.position_state import (
