@@ -165,6 +165,7 @@ async def test_entry_short_skipped_as_unsupported(monkeypatch) -> None:
 def test_signal_kind_to_trade_type() -> None:
     assert signal_kind_to_trade_type("entry_long") == "buy"
     assert signal_kind_to_trade_type("exit") == "sell"
+    assert signal_kind_to_trade_type("reduce") == "sell"
     assert signal_kind_to_trade_type("watch") is None
 
 

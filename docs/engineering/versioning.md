@@ -7,7 +7,7 @@ Cinco números distintos. No son intercambiables. Una fila de docs no debe fingi
 
 | Verdad      | Qué es                                                                | Dónde vive                                | Valor vigente (AsOf)      |
 | ----------- | --------------------------------------------------------------------- | ----------------------------------------- | ------------------------- |
-| **Product** | Nombre de producto / slice de UX o dominio que lee el auditor         | AsOf de `CURRENT_SYSTEM.md`, relevos      | `V1.44-beta`              |
+| **Product** | Nombre de producto / slice de UX o dominio que lee el auditor         | AsOf de `CURRENT_SYSTEM.md`, relevos      | `V1.45-beta`              |
 | **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v1.44-beta` → `db346a11` |
 | **Package** | Semver npm del monorepo (workspaces `@bolsa/*` pueden seguir `0.1.0`) | raíz [`package.json`](../../package.json) | `1.35.0-beta` (congelado) |
 | **Schema**  | Migraciones de persistencia                                           | Alembic en `packages/py` / `bolsa_v1`     | revisión Alembic vigente  |
@@ -16,8 +16,8 @@ Cinco números distintos. No son intercambiables. Una fila de docs no debe fingi
 ## Reglas
 
 1. **El tip certificado es el git tag**, no el `version` de npm. Un auditor cita `v1.44-beta` → `db346a11`.
-2. **Package congelado a propósito** durante la serie UX V1.36–V1.44: no bumpir `package.json` en cada parche de proyección. El desfase `1.35.0-beta` vs producto `V1.44-beta` **no es un bug de runtime**.
-3. **Bump de package** solo al cerrar una **versión estable** (código + Golden Paths + tag), no al publicar este contrato. V1.44 es contrato de Position Automation, no estable.
+2. **Package congelado a propósito** durante la serie UX V1.36–V1.45: no bumpir `package.json` en cada parche de proyección. El desfase `1.35.0-beta` vs producto `V1.45-beta` **no es un bug de runtime**.
+3. **Bump de package** solo al cerrar una **versión estable** (código + Golden Paths + tag), no al publicar este slice. V1.45 es PAPER AUTO position execute opt-in, no estable.
 4. **Schema / API** cambian con migraciones o `contract:gen`, no con un relevo de UX. No sincronizarlos al product version por costumbre.
 5. Apps y packages internos (`apps/web`, `packages/shared`, …) pueden permanecer en `0.1.0` mientras el monorepo raíz sea la verdad de package.
 

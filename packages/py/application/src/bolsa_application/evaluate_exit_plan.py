@@ -85,3 +85,32 @@ def semi_protect_permission(
         auto_execute=False,
         position_closed=pos.status == "CLOSED",
     )
+
+
+def auto_exit_permission(
+    exit_plan: Any,
+    *,
+    paper_d_execute: bool,
+    data_stale: bool | None = False,
+    market_closed: bool | None = False,
+    portfolio_drift: bool | None = False,
+    immediate_risk: bool = False,
+    require_jit_context: bool = True,
+    position_closed: bool = False,
+    kill_switch: bool = False,
+    at: str | None = None,
+) -> Any:
+    """V1.45 — permiso AUTO (JIT + PAPER_D). ≠ SEMI human."""
+    return check_exit_permission(
+        exit_plan,
+        kill_switch=kill_switch,
+        auto_execute=True,
+        paper_d_execute=paper_d_execute,
+        position_closed=position_closed,
+        data_stale=data_stale,
+        market_closed=market_closed,
+        portfolio_drift=portfolio_drift,
+        immediate_risk=immediate_risk,
+        require_jit_context=require_jit_context,
+        at=at,
+    )

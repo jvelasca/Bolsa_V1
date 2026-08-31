@@ -143,9 +143,42 @@ class ExecutionRouteResult:
 def signal_kind_to_trade_type(kind: str) -> Literal["buy", "sell"] | None:
     if kind == "entry_long":
         return "buy"
-    if kind in ("entry_short", "exit"):
+    # V1.45 — ``reduce`` = sell parcial (qty en hit); ``exit`` = cierre pleno o qty clamp.
+    if kind in ("entry_short", "exit", "reduce"):
         return "sell"
     return None
+
+
+def resolve_exit_sell_quantity(
+    *,
+    open_qty: float,
+    signal_kind: str,
+    hit: dict[str, Any] | None,
+) -> tuple[float | None, str | None]:
+    """V1.45 — qty de sell para exit/reduce. (qty, error_reason)."""
+    if open_qty <= 0:
+        return None, "Sin posición abierta para exit"
+    requested: float | None = None
+    if isinstance(hit, dict):
+        raw_qty = hit.get("quantity")
+        if isinstance(raw_qty, (int, float)) and not isinstance(raw_qty, bool):
+            requested = float(raw_qty)
+        elif isinstance(hit.get("signal"), dict):
+            sig_qty = hit["signal"].get("quantity")
+            if isinstance(sig_qty, (int, float)) and not isinstance(sig_qty, bool):
+                requested = float(sig_qty)
+    kind = str(signal_kind)
+    if kind == "reduce":
+        if requested is None or requested <= 0:
+            return None, "reduce_qty_required"
+        qty = min(requested, open_qty)
+    elif requested is not None and requested > 0:
+        qty = min(requested, open_qty)
+    else:
+        qty = open_qty
+    if qty <= 0:
+        return None, "Cantidad de salida inválida"
+    return qty, None
 
 
 def _unsupported_short_skip(instrument_id: str, kind: str) -> ExecutionActionResult | None:
@@ -673,7 +706,8 @@ class ExecutionRouter:
 
         quantity: float
         opening_trade_plan: dict[str, Any] | None = None
-        if trade_type == "sell" and str(signal.kind) == "exit":
+        sell_kind = str(signal.kind)
+        if trade_type == "sell" and sell_kind in ("exit", "reduce"):
             position = next(
                 (item for item in summary.positions if item.instrument_id == signal.instrument_id),
                 None,
@@ -681,11 +715,24 @@ class ExecutionRouter:
             if position is None or position.quantity <= 0:
                 return ExecutionActionResult(
                     instrument_id=signal.instrument_id,
-                    signal_kind=str(signal.kind),
+                    signal_kind=sell_kind,
                     status="skipped",
                     reason="Sin posición abierta para exit",
                 )
-            quantity = float(position.quantity)
+            open_qty = float(position.quantity)
+            # V1.45 — qty explícita en hit (reduce); clamp ≤ open. Sin qty + exit = full.
+            quantity, qty_err = resolve_exit_sell_quantity(
+                open_qty=open_qty,
+                signal_kind=sell_kind,
+                hit=hit if isinstance(hit, dict) else None,
+            )
+            if quantity is None:
+                return ExecutionActionResult(
+                    instrument_id=signal.instrument_id,
+                    signal_kind=sell_kind,
+                    status="skipped",
+                    reason=qty_err or "Cantidad de salida inválida",
+                )
         else:
             # V1.33 A-β / A-δ — apertura: Estudio + TradePlan TRIGGERED + risk_signature.
             # No sizing libro (A-γ rechazada). ``sizing_value`` solo aplica a live_auto dry-run.

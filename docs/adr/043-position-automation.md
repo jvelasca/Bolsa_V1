@@ -1,22 +1,22 @@
 # ADR-043: Position Automation — contrato de autorización de posición (V1.44)
 
-**Estado:** Accepted — **contrato**; foundation **CÓDIGO** (2026-08-31; tipos + JIT + Golden Paths). AUTO execute de posiciones **no**.  
+**Estado:** Accepted — **contrato V1.44** + **execute PAPER V1.45** (2026-08-31). LIVE **no**. `PAPER_D_EXECUTE` default **off**.  
 **Fecha:** 2026-08-31  
-**Contexto:** Auditorías externas post-`v1.43-beta` → `5dfac890`. TRAIL SEMI PASS. Operating Excellence F2–F8 PASS dentro de alcance. AUTO de gestión de posiciones **no certificado**. El siguiente salto no es UI ni inteligencia: es el contrato simétrico a Confirm para que una policy pueda autorizar mutaciones de posición _antes_ de cualquier AUTO.
+**Contexto:** Tip `v1.44-beta` → `db346a11` cerró Policy + JIT sin execute. V1.45 cablea orquestador Policy → Permission → protect persist | Router reduce/exit → PositionRevision en PAPER.
 
-**Depende de:** [ADR-031](./031-operational-model-tesis-plan-permiso.md) · [ADR-032](./032-operational-core-tradeplan-positionstate-execution.md) · [ADR-042](./042-operating-excellence.md) · spec [`spec-v144-position-automation-2026-08-31.md`](../engineering/spec-v144-position-automation-2026-08-31.md).
+**Depende de:** [ADR-031](./031-operational-model-tesis-plan-permiso.md) · [ADR-032](./032-operational-core-tradeplan-positionstate-execution.md) · [ADR-042](./042-operating-excellence.md) · spec [`spec-v144-position-automation-2026-08-31.md`](../engineering/spec-v144-position-automation-2026-08-31.md) · [`spec-v145-paper-auto-position-2026-08-31.md`](../engineering/spec-v145-paper-auto-position-2026-08-31.md).
 
 ---
 
 ## 1. Decisión
 
-Se acepta el spec V1.44 como **contrato de Position Automation**. Este ADR no cablea ExecutionRouter de posición ni enciende `PAPER_D_EXECUTE`.
+Se acepta el spec V1.44 como **contrato** y el spec V1.45 como **execute PAPER** (orquestador canónico; Lab `evaluate-exits` no es SoT). No se enciende `PAPER_D_EXECUTE` por defecto.
 
 ```text
 ExitPlan (evento)
   → PositionPolicyDecision (qué autoriza la policy *ahora*)
   → ExitPermission JIT (¿se puede hacer *ahora*?)
-  → [V1.45] Execution → Fill → PositionRevision
+  → Execution PAPER (protect persist | Router reduce/exit) → Fill → PositionRevision
 ```
 
 SEMI permanece: Proposal → Human Confirm → PositionRevision.
@@ -48,15 +48,15 @@ Contrato: `TARGET_2` reached no dispara reduce T1 + reduce T2. Ya implementado e
 
 ## 5. Versionado
 
-Cinco verdades: product · git tag · package · schema · API. [`versioning.md`](../engineering/versioning.md). Product `V1.44-beta`. Package `1.35.0-beta` congelado. Tip certificado `v1.44-beta` → `db346a11`.
+Cinco verdades: product · git tag · package · schema · API. [`versioning.md`](../engineering/versioning.md). Product `V1.45-beta`. Package `1.35.0-beta` congelado. Tip certificado sigue `v1.44-beta` → `db346a11` hasta tag `v1.45-beta`.
 
 ## 6. Consecuencias
 
-- Spec canónico: [`spec-v144-position-automation-2026-08-31.md`](../engineering/spec-v144-position-automation-2026-08-31.md).
-- Plan: [`plan-v144-position-automation-foundation-2026-08-31.md`](../engineering/plan-v144-position-automation-foundation-2026-08-31.md).
-- PASS V1.43 (TRAIL SEMI) **no** se reinterpreta como AUTO posición certificado.
-- V1.45 = PAPER AUTO position (execute). Lab P2 / OCO / LIVE / broker trail parked.
+- Spec contrato: [`spec-v144-position-automation-2026-08-31.md`](../engineering/spec-v144-position-automation-2026-08-31.md).
+- Spec execute: [`spec-v145-paper-auto-position-2026-08-31.md`](../engineering/spec-v145-paper-auto-position-2026-08-31.md).
+- Plan: [`plan-v145-paper-auto-position-2026-08-31.md`](../engineering/plan-v145-paper-auto-position-2026-08-31.md).
+- PASS V1.44 = contrato; PASS V1.45 = execute PAPER opt-in. **No** LIVE.
 
 ## 7. Fuera
 
-AUTO execute · auto-promote · Lab P2 · OCO · broker trailing · thaw LIVE · Alembic · bump package · nav L1 · seis estados visuales de Trail · GP-AUTO-01 E2E PAPER.
+auto-promote · Lab P2 · OCO · broker trailing · thaw LIVE · Alembic · bump package · nav L1 · `PAPER_D_EXECUTE` default on · browser E2E Daily Journal · retrofit Lab como SoT.

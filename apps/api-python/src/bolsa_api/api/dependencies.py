@@ -1462,6 +1462,57 @@ def get_evaluate_position_exits_use_case(session: AsyncSession) -> EvaluatePosit
     )
 
 
+def get_execute_position_policy_auto_use_case(
+    session: AsyncSession,
+    *,
+    execution_policy_id: str | None = None,
+) -> tuple[Any, Any]:
+    """V1.45 — UC + PersistPositionFromProtect (para lookup OPEN)."""
+    from bolsa_application.execute_position_policy_auto import (
+        ExecutePositionPolicyAuto,
+        PaperPositionSellResult,
+    )
+    from bolsa_application.persist_position_from_exit import (
+        PersistPositionFromExit,
+        PositionStateExitStore,
+    )
+    from bolsa_application.persist_position_from_protect import (
+        PersistPositionFromProtect,
+        PositionStateProtectStore,
+    )
+    from bolsa_application.router_paper_position_sell import RouterPaperPositionSell
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
+
+    repo = SqlAlchemyPositionStateRepository(session)
+    protect = PersistPositionFromProtect(cast(PositionStateProtectStore, repo))
+    exit_persist = PersistPositionFromExit(cast(PositionStateExitStore, repo))
+
+    class _BlockedSell:
+        async def sell(self, **kwargs: Any) -> PaperPositionSellResult:
+            _ = kwargs
+            return PaperPositionSellResult(
+                status="blocked",
+                reason="executionPolicyId_required",
+            )
+
+    if execution_policy_id and str(execution_policy_id).strip():
+        sell: Any = RouterPaperPositionSell(
+            get_execution_router_use_case(session),
+            execution_policy_id=str(execution_policy_id).strip(),
+        )
+    else:
+        sell = _BlockedSell()
+
+    uc = ExecutePositionPolicyAuto(
+        protect=protect,
+        exit_persist=exit_persist,
+        sell=sell,
+    )
+    return uc, protect
+
+
 def get_draft_strategy_from_prompt_use_case() -> DraftStrategyFromPrompt:
     return DraftStrategyFromPrompt()
 
