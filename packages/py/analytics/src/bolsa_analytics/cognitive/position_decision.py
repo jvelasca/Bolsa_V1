@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from bolsa_analytics.cognitive.exit_plan import ExitPlan, ExitPlanStatus, build_exit_plan_from_position
+from bolsa_analytics.cognitive.exit_plan import (
+    ExitPlan,
+    ExitPlanStatus,
+    build_exit_plan_from_position,
+)
 from bolsa_analytics.cognitive.exit_policy import ExitPolicy, resolve_exit_policy
 from bolsa_analytics.cognitive.position_state import PositionState
 
