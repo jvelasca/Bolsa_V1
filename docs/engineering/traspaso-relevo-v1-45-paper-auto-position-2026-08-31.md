@@ -1,7 +1,7 @@
 # RELEVO — V1.45 PAPER AUTO position execute (2026-08-31)
 
 > **Padre:** [`spec-v145-paper-auto-position-2026-08-31.md`](./spec-v145-paper-auto-position-2026-08-31.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v145-paper-auto-position-2026-08-31.md`](./plan-v145-paper-auto-position-2026-08-31.md) · tip `v1.44-beta` → `db346a11`.  
-> **Estado:** **CERRADO (código)** — `ExecutePositionPolicyAuto` → JIT Permission → protect | Router reduce/exit → PositionRevision. `PAPER_D_EXECUTE` **default off**. **No** LIVE. **No** tag todavía.  
+> **Estado:** **CERRADO (código)** — `ExecutePositionPolicyAuto` → JIT Permission → protect | Router reduce/exit → PositionRevision. `PAPER_D_EXECUTE` **default off**. **No** LIVE. **Tag tip:** [`v1.45-beta` → `1627e9c9`](./traspaso-relevo-tag-v1-45-beta-2026-08-31.md) (CI pending).  
 > **Arranque auditor:** [`arranque-auditor-v1-45-beta-2026-08-31.md`](./arranque-auditor-v1-45-beta-2026-08-31.md).
 
 ---
