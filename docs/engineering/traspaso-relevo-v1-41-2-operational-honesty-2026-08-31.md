@@ -36,8 +36,9 @@ Confirm = firma · Spine · `PAPER_D_EXECUTE` off · AUTO execute off · `protec
 
 ## 3. Next (hoja, no implementar aquí)
 
-| Tag   | Nombre               | Notas                                                                 |
-| ----- | -------------------- | --------------------------------------------------------------------- |
-| V1.42 | Operating Excellence | ExecutionState / TradeStory / DailyDesk 2.0 / Market Cockpit — parked |
+| Tag     | Nombre               | Notas                                                |
+| ------- | -------------------- | ---------------------------------------------------- |
+| V1.41.3 | Honesty Residuals    | Cerrado — tip `v1.41.3-beta` → `a8101ab7`            |
+| V1.42   | Operating Excellence | ExecutionState / TradeStory / DailyDesk 2.0 — parked |
 
 Fuera: P2 Lab · móvil · push · thaw estricto · OCO · segundo Mercado · OpportunityScore · `secondaryReasons[]` · confirms individualizados.

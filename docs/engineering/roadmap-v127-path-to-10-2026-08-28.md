@@ -57,6 +57,7 @@ PositionState + mark
 | **V1.40 Exit Management UX**                                          | **CÓDIGO** — ruta visual Stop/T1/T2                              | OCO, trail autoridad               |
 | **V1.41 Daily Desk**                                                  | **CÓDIGO** — Hoy inbox (quitar paneles)                          | Segundo Mercado                    |
 | **V1.41.2 Operational Honesty**                                       | **CERRADO** — tag `v1.41.2-beta` → `ebb11e07`                    | ExecutionState, TradeStory         |
+| **V1.41.3 Honesty Residuals**                                         | **CERRADO** — tag `v1.41.3-beta` → `a8101ab7`                    | ExecutionState, TradeStory         |
 | **V1.42 Operating Excellence**                                        | Parked — modelo/cockpit/TradeStory/DailyDesk 2.0                 | OpportunityScore, AUTO, drag       |
 | Frente A AUTO A-β                                                     | V1.33; EdgeReport exigido                                        | A-γ, thaw estricto, broker live    |
 
