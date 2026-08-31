@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 post-tag **`v1.41.1-beta`** (mismo producto que `v1.41-beta` → `4247f0f0`; tip CI GREEN tras Ruff I001).
+Eres auditor externo de Bolsa V1 post-tag **`v1.41.1-beta`** → `9938ff30` (mismo producto que `v1.41-beta` → `4247f0f0`; tip CI GREEN tras Ruff I001).
 
 Lee en este orden:
 

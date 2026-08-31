@@ -1,7 +1,7 @@
 # RELEVO — tag v1.41.1-beta → auditoría externa (2026-08-31)
 
 > **Padre:** [`traspaso-relevo-tag-v1-41-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-41-beta-2026-08-31.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **PUBLICACIÓN** — tip certificado `v1.41.1-beta` (mismo producto V1.37→V1.41 + CI tip GREEN).  
+> **Estado:** **CERRADO** — tip certificado `v1.41.1-beta` → `9938ff30` · Release-tag CI [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33370993883).  
 > **Arranque auditor:** [`arranque-auditor-v1-41-1-beta-2026-08-31.md`](./arranque-auditor-v1-41-1-beta-2026-08-31.md).  
 > **Fuera:** P2 Lab · móvil · push · thaw estricto · OCO · trail autoridad · segundo Mercado · drag entry/exit.
 
@@ -17,9 +17,10 @@
 
 | Pieza      | Valor                                                                                            |
 | ---------- | ------------------------------------------------------------------------------------------------ |
-| Tag tip    | `v1.41.1-beta` → _(SHA al publicar)_                                                             |
+| Tag tip    | `v1.41.1-beta` → `9938ff30`                                                                      |
 | Previo tip | `v1.41-beta` → `4247f0f0` (CI tag RED)                                                           |
 | Fix CI     | ruff I001 `packages/py/analytics/.../position_decision.py`                                       |
+| CI tag     | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33370993883)                           |
 | Relevo UX  | [`traspaso-relevo-tag-v1-41-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-41-beta-2026-08-31.md) |
 
 ## 2. Freeze
