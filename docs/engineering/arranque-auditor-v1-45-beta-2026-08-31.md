@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **V1.45 PAPER AUTO position execute** tip **`v1.45-beta` → `1627e9c9`** (sobre tip certificado **`v1.44-beta` → `db346a11`**). Audita ese tip (o el peeled del tag), no una copia anterior.
+Eres auditor externo de Bolsa V1 **V1.45 PAPER AUTO position execute** tip **`v1.45-beta` → `6ca5ec12`** (sobre tip certificado **`v1.44-beta` → `db346a11`**). Audita ese tip (o el peeled del tag), no una copia anterior.
 
 Lee en este orden:
 
