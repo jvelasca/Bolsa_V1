@@ -8,14 +8,14 @@ Cinco números distintos. No son intercambiables. Una fila de docs no debe fingi
 | Verdad      | Qué es                                                                | Dónde vive                                | Valor vigente (AsOf)      |
 | ----------- | --------------------------------------------------------------------- | ----------------------------------------- | ------------------------- |
 | **Product** | Nombre de producto / slice de UX o dominio que lee el auditor         | AsOf de `CURRENT_SYSTEM.md`, relevos      | `V1.47-beta`              |
-| **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v1.45-beta` → `6ca5ec12` |
+| **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v1.47-beta` → `77f96ead` |
 | **Package** | Semver npm del monorepo (workspaces `@bolsa/*` pueden seguir `0.1.0`) | raíz [`package.json`](../../package.json) | `1.35.0-beta` (congelado) |
 | **Schema**  | Migraciones de persistencia                                           | Alembic en `packages/py` / `bolsa_v1`     | revisión Alembic vigente  |
 | **API**     | Contrato HTTP / OpenAPI si existe                                     | FastAPI · `apps/web/src/api/schema.d.ts`  | independiente del product |
 
 ## Reglas
 
-1. **El tip certificado es el git tag**, no el `version` de npm. Un auditor cita `v1.45-beta` → `6ca5ec12`.
+1. **El tip certificado es el git tag**, no el `version` de npm. Un auditor cita `v1.47-beta` → `77f96ead`.
 2. **Package congelado a propósito** durante la serie UX V1.36–V1.47: no bumpir `package.json` en cada parche. El desfase `1.35.0-beta` vs producto `V1.47-beta` **no es un bug de runtime**.
 3. **Bump de package** solo al cerrar una **versión estable**. V1.46 es Paper Desk foundation (ciclo de sesión, Entry stub). V1.47 es Runtime Truth. Ninguno es estable.
 4. **Schema / API** cambian con migraciones o `contract:gen`, no con un relevo de UX. No sincronizarlos al product version por costumbre.

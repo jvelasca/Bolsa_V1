@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **V1.47 Paper Desk Runtime Truth** (product **`V1.47-beta`**). Tip git certificado previo **`v1.45-beta` → `6ca5ec12`**. V1.46 es foundation (EntryTick **stub** + Position AUTO), **no** AUTO completo. Audita Runtime Truth, no un runner multi-semana ni Entry AUTO real.
+Eres auditor externo de Bolsa V1 **V1.47 Paper Desk Runtime Truth** tip **`v1.47-beta` → `77f96ead`** (product **`V1.47-beta`**; previo certificado **`v1.45-beta` → `6ca5ec12`**). V1.46 es foundation (EntryTick **stub** + Position AUTO), **no** AUTO completo. Audita Runtime Truth, no un runner multi-semana ni Entry AUTO real.
 
 Lee en este orden:
 

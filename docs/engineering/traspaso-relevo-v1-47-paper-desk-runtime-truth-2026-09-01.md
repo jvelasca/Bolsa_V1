@@ -1,7 +1,7 @@
 # RELEVO — V1.47 Paper Desk Runtime Truth (2026-09-01)
 
-> **Padre:** [`spec-v147-paper-desk-runtime-truth-2026-09-01.md`](./spec-v147-paper-desk-runtime-truth-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v147-paper-desk-runtime-truth-2026-09-01.md`](./plan-v147-paper-desk-runtime-truth-2026-09-01.md) · tip certificado previo **`v1.45-beta` → `6ca5ec12`**. V1.46 foundation (Entry stub).  
-> **Estado:** **CÓDIGO** — `OperationalContext` / MarketSnapshot · GET no muta · mark fail-closed · idempotencia evento/intent · `nextAction` · GP AUTO-01..10. **No** LIVE. EntryTick **HonestStub**. Product **`V1.47-beta`**. Package `1.35.0-beta` congelado.  
+> **Padre:** [`spec-v147-paper-desk-runtime-truth-2026-09-01.md`](./spec-v147-paper-desk-runtime-truth-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v147-paper-desk-runtime-truth-2026-09-01.md`](./plan-v147-paper-desk-runtime-truth-2026-09-01.md) · tip previo **`v1.45-beta` → `6ca5ec12`**. V1.46 foundation (Entry stub).  
+> **Estado:** **TIP LOCAL** — tip **`v1.47-beta` → `77f96ead`** ([relevo tag](./traspaso-relevo-tag-v1-47-beta-2026-09-01.md)). `OperationalContext` / MarketSnapshot · GET no muta · mark fail-closed · idempotencia · `nextAction` · GP AUTO-01..10. **No** LIVE. EntryTick **HonestStub**. Product **`V1.47-beta`**. Package `1.35.0-beta` congelado.  
 > **Arranque auditor:** [`arranque-auditor-v1-47-beta-2026-09-01.md`](./arranque-auditor-v1-47-beta-2026-09-01.md).
 
 ---
@@ -50,5 +50,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 
 ## 4. Next
 
-1. Tag `v1.47-beta` tras auditoría PASS (tip git sigue `v1.45-beta` hasta entonces). Snapshot `v1.46-beta` opcional como foundation, no AUTO completo.
-2. **V1.48** EntryTick real — solo tras Runtime Truth certificado. **NO LIVE**.
+1. Push `v1.47-beta` → Release-tag CI · auditoría externa PASS.
+2. **V1.48** EntryTick real — solo tras tip certificado. **NO LIVE**.
