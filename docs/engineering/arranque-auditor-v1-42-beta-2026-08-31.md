@@ -25,7 +25,7 @@ Lee en este orden:
 7. ¿F8 PAPER AUTO: arm ≠ execute · `PAPER_D_EXECUTE` default off · sin thaw LIVE?
 8. ¿Release-tag CI del tip `v1.42-beta` GREEN?
 
-**Deuda aparcada:** trail durable · thaw LIVE · OCO · Lab P2 · OpportunityScore · package bump.
+**Deuda aparcada:** trail durable SEMI = **cerrado en `v1.43-beta`** · thaw LIVE · OCO · Lab P2 · OpportunityScore · package bump · auto-promote / broker trail.
 
 **No pedir:** nav L1 nueva · motores nuevos · simulaciones E2E completas de la APP.
 

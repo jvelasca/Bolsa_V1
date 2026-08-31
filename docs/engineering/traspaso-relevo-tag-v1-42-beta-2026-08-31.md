@@ -46,4 +46,4 @@ Resultado local (2026-08-31): shared build OK · 57 shared spot + tsc OK.
 
 ## 3. Residuals parked
 
-Trail hint → durable `PositionRevision` `origin=trail` → `currentStop` (**SEMI CERRADO** — [`traspaso-relevo-v1-43-trail-revision-2026-08-31.md`](./traspaso-relevo-v1-43-trail-revision-2026-08-31.md)). Siguen parked: thaw LIVE / Accept estricto · OCO · Lab P2 · OpportunityScore · segundo Mercado · broker trailing / auto-promote.
+Trail hint → durable `PositionRevision` `origin=trail` → `currentStop` (**SEMI CERRADO + tag `v1.43-beta`** — [`traspaso-relevo-tag-v1-43-beta-2026-08-31.md`](./traspaso-relevo-tag-v1-43-beta-2026-08-31.md)). Siguen parked: thaw LIVE / Accept estricto · OCO · Lab P2 · OpportunityScore · segundo Mercado · broker trailing / auto-promote.
