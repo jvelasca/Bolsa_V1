@@ -1,7 +1,7 @@
 # RELEVO — V1.58 Adversarial Execution (2026-09-01)
 
-> **Padre:** [`spec-v158-adversarial-execution-2026-09-01.md`](./spec-v158-adversarial-execution-2026-09-01.md) · [`plan-v158-adversarial-execution-2026-09-01.md`](./plan-v158-adversarial-execution-2026-09-01.md) · partida **`v1.56-beta` → `5c598a62`** (+ V1.57 working tree).  
-> **Estado:** **implementación CERRADA** — tag **pendiente** (no bump package · no LIVE).  
+> **Padre:** [`spec-v158-adversarial-execution-2026-09-01.md`](./spec-v158-adversarial-execution-2026-09-01.md) · [`plan-v158-adversarial-execution-2026-09-01.md`](./plan-v158-adversarial-execution-2026-09-01.md) · partida **`v1.57-beta` → `af9b7f84`**.  
+> **Estado:** **CERRADA** — tag **`v1.58-beta` → `4c42f1fc`** (no bump package · no LIVE).  
 > **Arranque auditor:** [`arranque-auditor-v1-58-adversarial-execution-2026-09-01.md`](./arranque-auditor-v1-58-adversarial-execution-2026-09-01.md).
 
 ---
@@ -33,6 +33,19 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-beta` · 
 
 ## 3. Next
 
-1. Commit + tag `v1.58-beta` cuando el owner lo pida (no en este slice).
-2. **V1.59** E2E FastAPI+DB · **V1.60** UX Mercado.
+1. **V1.59** E2E integrado FastAPI+DB — ver §4 (decisión de enfoque).
+2. **V1.60** UX Mercado.
 3. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura (LIVE gap).
+
+## 4. V1.59 — decisión de enfoque (pre-apertura)
+
+Roadmap: **E2E integrado FastAPI + PostgreSQL**, no solo smoke browser (V1.56 ya tiene GP-E2E-01..02 Journal/Consola con `E2E_RUN=1`).
+
+**Recomendación para spec V1.59:**
+
+| Enfoque                               | IN                                                                              | OUT                               |
+| ------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------- |
+| **A — pytest + TestClient + DB test** | GP-V159-\* contra API real con fixtures/seed PG; reproducible en CI sin browser | Playwright full stack obligatorio |
+| **B — Playwright full stack**         | UI + API + DB levantados (`:5173` + `:8000` + PG)                               | Sustituir Golden Session pytest   |
+
+**Priorizar A** para contratos API/DB (paper desk, posiciones, recon); **extender B** solo si hace falta smoke de rutas nuevas. Crear `spec-v159` + `plan-v159` antes de código.

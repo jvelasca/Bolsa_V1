@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-09-01** V1.58 Adversarial Execution **implementación CERRADA** (tag pendiente) · [spec-v158](./spec-v158-adversarial-execution-2026-09-01.md) · [relevo](./traspaso-relevo-v1-58-adversarial-execution-2026-09-01.md) · partida `v1.56-beta` → `5c598a62` · `v1.57-beta`
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-09-01** V1.58 Adversarial Execution **CERRADA** tag `v1.58-beta` · [spec-v158](./spec-v158-adversarial-execution-2026-09-01.md) · [relevo](./traspaso-relevo-v1-58-adversarial-execution-2026-09-01.md) · partida `v1.56-beta` → `5c598a62` · `v1.57-beta`
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
@@ -378,4 +378,4 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 33. **Cierre V1.55 → siguiente (2026-09-01):** [cierre-apertura](./traspaso-relevo-cierre-v155-apertura-siguiente-2026-09-01.md) · arco Paper Desk V1.48→V1.55 **cerrado** · fork §5. **V1.56** y **V1.57** tienen spec propia (ítems 34–35).
 34. **Hardening Residuals v1.56 (2026-09-01):** [spec-v156](./spec-v156-hardening-residuals-2026-09-01.md) · [plan](./plan-v156-hardening-residuals-2026-09-01.md) · [relevo tag](./traspaso-relevo-tag-v1-56-beta-2026-09-01.md) · **CERRADO**. Tag `v1.56-beta`. GP-SESSION-07e · GP-SESSION-10r · GP-E2E-01..02. **No** LIVE.
 35. **Operational Truth v1.57 (2026-09-01):** [spec-v157](./spec-v157-operational-truth-2026-09-01.md) · [plan](./plan-v157-operational-truth-2026-09-01.md) · [relevo](./traspaso-relevo-v1-57-operational-truth-2026-09-01.md) · [arranque auditor](./arranque-auditor-v1-57-operational-truth-2026-09-01.md) · **CERRADO** tag `v1.57-beta`. GP-V157-01..03 · INV-01..10. Partida `v1.56-beta` → `5c598a62`. **No** LIVE.
-36. **Adversarial Execution v1.58 (2026-09-01):** [spec-v158](./spec-v158-adversarial-execution-2026-09-01.md) · [plan](./plan-v158-adversarial-execution-2026-09-01.md) · [relevo](./traspaso-relevo-v1-58-adversarial-execution-2026-09-01.md) · [arranque auditor](./arranque-auditor-v1-58-adversarial-execution-2026-09-01.md) · **implementación CERRADA**, tag pendiente. GP-GOLDEN-DAY-ADV-01 · GP-V158-STOP-CLOSED · P0b network skip. **No** LIVE.
+36. **Adversarial Execution v1.58 (2026-09-01):** [spec-v158](./spec-v158-adversarial-execution-2026-09-01.md) · [plan](./plan-v158-adversarial-execution-2026-09-01.md) · [relevo](./traspaso-relevo-v1-58-adversarial-execution-2026-09-01.md) · [arranque auditor](./arranque-auditor-v1-58-adversarial-execution-2026-09-01.md) · **CERRADO** tag `v1.58-beta`. GP-GOLDEN-DAY-ADV-01 · GP-V158-STOP-CLOSED · P0b network skip. **No** LIVE.

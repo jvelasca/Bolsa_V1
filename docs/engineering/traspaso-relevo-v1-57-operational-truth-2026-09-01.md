@@ -1,7 +1,7 @@
 # RELEVO — V1.57 Operational Truth (2026-09-01)
 
 > **Padre:** [`spec-v157-operational-truth-2026-09-01.md`](./spec-v157-operational-truth-2026-09-01.md) · [`plan-v157-operational-truth-2026-09-01.md`](./plan-v157-operational-truth-2026-09-01.md) · tip certificado previo **`v1.56-beta` → `5c598a62`**.  
-> **Estado:** **implementación CERRADA** — tag **pendiente** (no bump package · no LIVE).  
+> **Estado:** **CERRADA** — tag **`v1.57-beta` → `af9b7f84`** (no bump package · no LIVE).  
 > **Arranque auditor:** [`arranque-auditor-v1-57-operational-truth-2026-09-01.md`](./arranque-auditor-v1-57-operational-truth-2026-09-01.md).
 
 ---
