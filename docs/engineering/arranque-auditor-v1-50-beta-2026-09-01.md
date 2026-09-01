@@ -6,7 +6,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 Eres auditor externo de Bolsa V1 **V1.50 Entry Decision Integrity** product **`V1.50-beta`** tip **`96623755`** (previo tip **`v1.49-beta` → `c8975c9d`**). V1.49 cableó EntryTick Estudio. V1.50 transporta la decisión completa (`CandidateSnapshot` + `decisionId` + `reasonCode` + `template_id` → policy) y cierra GP-DESK-04/05/06. **No** Fill→Position (V1.51). **No** LIVE. `PAPER_D_EXECUTE` default **off**.
 
-**Contexto CI (2026-09-01):** tag `v1.50-beta` → `96623755` · Release-tag CI **pendiente al push**. Pre-flight local verde (vitest 7 · pytest 83 desk-block · ruff · tsc).
+**Contexto CI (2026-09-01):** tag `v1.50-beta` → `96623755` · Release-tag CI **GREEN** ([run 33483870030](https://github.com/jvelasca/Bolsa_V1/actions/runs/33483870030)) · pre-flight local verde (vitest 7 · pytest 83 desk-block · ruff · tsc).
 
 **GitHub (auditor):**
 

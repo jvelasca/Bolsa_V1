@@ -52,7 +52,7 @@ Contrato: `TARGET_2` reached no dispara reduce T1 + reduce T2. Ya implementado e
 
 ## 5. Versionado
 
-Cinco verdades: product · git tag · package · schema · API. [`versioning.md`](../engineering/versioning.md). Product `V1.50-beta`. Package `1.35.0-beta` congelado. Tip `v1.50-beta` → `96623755` (CI pendiente; previo `v1.49-beta` → `c8975c9d`).
+Cinco verdades: product · git tag · package · schema · API. [`versioning.md`](../engineering/versioning.md). Product `V1.50-beta`. Package `1.35.0-beta` congelado. Tip certificado vigente `v1.50-beta` → `96623755` (V1.49 `c8975c9d`).
 
 ## 6. Consecuencias
 

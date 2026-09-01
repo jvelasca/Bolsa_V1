@@ -1,7 +1,7 @@
 # RELEVO — V1.50 Entry Decision Integrity (2026-09-01)
 
 > **Padre:** [`spec-v150-entry-decision-integrity-2026-09-01.md`](./spec-v150-entry-decision-integrity-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v150-entry-decision-integrity-2026-09-01.md`](./plan-v150-entry-decision-integrity-2026-09-01.md) · tip previo **`v1.49-beta` → `c8975c9d`**.  
-> **Estado:** **CÓDIGO** — tip **`v1.50-beta` → `96623755`** ([relevo tag](./traspaso-relevo-tag-v1-50-beta-2026-09-01.md)). Pre-flight local verde. Release-tag CI **pendiente push**. Product **`V1.50-beta`**. Package `1.35.0-beta` congelado. **No** LIVE.
+> **Estado:** **CI GREEN** — tip **`v1.50-beta` → `96623755`** ([relevo tag](./traspaso-relevo-tag-v1-50-beta-2026-09-01.md)). Pre-flight local + Release-tag CI **GREEN**. Product **`V1.50-beta`**. Package `1.35.0-beta` congelado. **No** LIVE.
 
 ---
 
@@ -41,5 +41,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 
 ## 4. Next
 
-1. Tag `v1.50-beta` + Release-tag CI cuando el owner lo pida. **NO LIVE**.
-2. **V1.51** Entry → Fill → Position.
+1. Auditoría externa PASS ([arranque](./arranque-auditor-v1-50-beta-2026-09-01.md)) → certificar tip `v1.50-beta`.
+2. **V1.51** Entry → Fill → Position — **NO LIVE**.
