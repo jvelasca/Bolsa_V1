@@ -11,7 +11,11 @@ import type {
   PositionDto,
   ProtectPlanV1,
 } from "@bolsa/shared";
-import { DAILY_DESK_BUCKET_LABEL } from "@bolsa/shared";
+import {
+  DAILY_DESK_BUCKET_LABEL,
+  PAPER_AUTO_ARMED_EXEC_OFF,
+  PAPER_AUTO_ARMED_EXEC_ON,
+} from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
@@ -20,7 +24,11 @@ import {
   buildPositionExitPayload,
   type PositionExitIntent,
 } from "@/features/operations/propose-position-exit";
-import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
+import {
+  mesaJournalTesisHref,
+  mesaOperationsHref,
+  mesaOperationalConsoleHref,
+} from "@/features/mesa/mesa-nav-links";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { Link } from "react-router-dom";
 
@@ -78,6 +86,18 @@ function ctaKindToExitIntent(
     default:
       return null;
   }
+}
+
+function isPaperAutoEntryLabel(label: string): boolean {
+  return (
+    label === PAPER_AUTO_ARMED_EXEC_OFF ||
+    label === PAPER_AUTO_ARMED_EXEC_ON ||
+    /AUTO armado/i.test(label)
+  );
+}
+
+function isOperacionesCtaLabel(label: string): boolean {
+  return /operaciones/i.test(label);
 }
 
 export function DailyDeskInbox({
@@ -247,6 +267,45 @@ function DailyDeskCta({
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
   const [error, setError] = useState<string | null>(null);
 
+  if (/comprar/i.test(item.ctaLabel)) {
+    return (
+      <span
+        className="rounded border border-border/60 px-2 py-1 text-[11px] text-muted-foreground"
+        data-testid={`daily-desk-cta-${item.symbol}`}
+      >
+        Ranking ≠ BUY
+      </span>
+    );
+  }
+
+  if (item.kind === "incident" && item.ctaKind === "review") {
+    return (
+      <Link
+        to={mesaOperationalConsoleHref()}
+        className="rounded border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
+        data-testid={`daily-desk-cta-${item.symbol}`}
+      >
+        {item.ctaLabel}
+      </Link>
+    );
+  }
+
+  if (
+    item.ctaKind === "review" &&
+    isOperacionesCtaLabel(item.ctaLabel) &&
+    item.kind !== "incident"
+  ) {
+    return (
+      <Link
+        to={mesaOperationsHref()}
+        className="rounded border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
+        data-testid={`daily-desk-cta-${item.symbol}`}
+      >
+        {item.ctaLabel}
+      </Link>
+    );
+  }
+
   if (item.kind === "pending_confirm") {
     return (
       <div className="flex flex-wrap gap-2">
@@ -341,9 +400,13 @@ function DailyDeskCta({
     (item.ctaKind === "view_thesis" || item.ctaKind === "watch") &&
     item.instrumentId
   ) {
+    const href =
+      item.kind === "entry" && isOperacionesCtaLabel(item.ctaLabel)
+        ? mesaOperationsHref()
+        : mesaJournalTesisHref(item.instrumentId, { ficha: true });
     return (
       <Link
-        to={mesaJournalTesisHref(item.instrumentId, { ficha: true })}
+        to={href}
         className="rounded border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
         data-testid={`daily-desk-cta-${item.symbol}`}
       >
@@ -353,6 +416,17 @@ function DailyDeskCta({
   }
 
   if (item.ctaKind === "maintain" || item.ctaKind === "none") {
+    if (item.kind === "entry" && isPaperAutoEntryLabel(item.ctaLabel)) {
+      return (
+        <span
+          className="rounded border border-sky-700/35 bg-sky-500/10 px-2 py-1 text-[11px] font-medium text-foreground"
+          data-testid={`daily-desk-cta-${item.symbol}`}
+          title="PAPER AUTO · Ranking ≠ BUY · arm ≠ execute"
+        >
+          {item.ctaLabel}
+        </span>
+      );
+    }
     return (
       <span
         className="rounded border border-border/60 px-2 py-1 text-[11px] text-muted-foreground"

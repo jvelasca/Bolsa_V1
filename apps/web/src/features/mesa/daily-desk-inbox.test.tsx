@@ -11,6 +11,8 @@ import {
   DAILY_DESK_BUCKET_EMPTY,
   DAILY_DESK_BUCKET_LABEL,
   DAILY_DESK_BUCKET_ORDER,
+  PAPER_AUTO_ARMED_EXEC_OFF,
+  POSITION_BIRTH_FAILED_PHRASE,
 } from "@bolsa/shared";
 import { DailyDeskInbox } from "@/features/mesa/daily-desk-inbox";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
@@ -237,5 +239,72 @@ describe("DailyDeskInbox V1.42 F6/F7", () => {
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect(setActive).toHaveBeenCalledWith("q1");
     expect(openConfirmDrawer).toHaveBeenCalledTimes(1);
+  });
+
+  it("V1.54: exception cubo rows link to operational console (Reconciliar)", () => {
+    const items = [
+      {
+        id: "exception-birth-aapl",
+        kind: "incident" as const,
+        bucket: "requiere_accion" as const,
+        symbol: "AAPL",
+        attention: "URGENT" as const,
+        phrase: POSITION_BIRTH_FAILED_PHRASE,
+        reason: "position_birth_failed",
+        ctaLabel: "Reconciliar",
+        ctaKind: "review" as const,
+        phaseLabel: null,
+        instrumentId: "inst-aapl",
+      },
+    ];
+    const buckets = emptyBuckets().map((b) => {
+      const bucketItems = items.filter((i) => i.bucket === b.id);
+      return { ...b, items: bucketItems, count: bucketItems.length };
+    });
+
+    render(
+      <MemoryRouter>
+        <DailyDeskInbox inbox={inbox({ count: 1, items, buckets })} />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByTestId("daily-desk-cta-AAPL");
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("/operational-console");
+    expect(link.textContent).toBe("Reconciliar");
+  });
+
+  it("V1.54: AUTO entry rows never show COMPRAR; paper auto is posture-only", () => {
+    const items = [
+      {
+        id: "auto-entry-msft",
+        kind: "entry" as const,
+        bucket: "oportunidades" as const,
+        symbol: "MSFT",
+        attention: "URGENT" as const,
+        phrase: "Disparo OK · AUTO armado · ejecución off",
+        reason: "#1 · moderate",
+        ctaLabel: PAPER_AUTO_ARMED_EXEC_OFF,
+        ctaKind: "none" as const,
+        phaseLabel: "Disparada",
+        instrumentId: "inst-msft",
+      },
+    ];
+    const buckets = emptyBuckets().map((b) => {
+      const bucketItems = items.filter((i) => i.bucket === b.id);
+      return { ...b, items: bucketItems, count: bucketItems.length };
+    });
+
+    render(
+      <MemoryRouter>
+        <DailyDeskInbox inbox={inbox({ count: 1, items, buckets })} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("daily-desk-cta-MSFT").textContent).toBe(
+      PAPER_AUTO_ARMED_EXEC_OFF,
+    );
+    expect(screen.queryByText(/comprar/i)).toBeNull();
+    expect(openConfirmDrawer).not.toHaveBeenCalled();
   });
 });

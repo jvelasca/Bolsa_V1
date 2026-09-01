@@ -271,7 +271,9 @@ function dailyDeskItemFromPot(
   };
 }
 
-function dailyDeskItemFromEot(truth: EntryOperatingTruthV1): DailyDeskItemV1 {
+export function dailyDeskItemFromEot(
+  truth: EntryOperatingTruthV1,
+): DailyDeskItemV1 {
   const bucket = bucketFromEntryTruth(truth);
   const ctaKind: DailyDeskItemV1["ctaKind"] =
     truth.primaryCta.kind === "prepare"
@@ -516,6 +518,21 @@ export function buildDailyDeskInbox(
     buckets,
     count: items.length,
     emptyLabel: "Nada requiere tu atención",
+  };
+}
+
+/** Reagrupa ítems ya construidos (merge autoDesk / excepciones). */
+export function finalizeDailyDeskInbox(
+  items: DailyDeskItemV1[],
+  emptyLabel = "Nada requiere tu atención",
+): DailyDeskInboxV1 {
+  sortDeskItems(items);
+  const buckets = groupBuckets(items);
+  return {
+    items,
+    buckets,
+    count: items.length,
+    emptyLabel,
   };
 }
 

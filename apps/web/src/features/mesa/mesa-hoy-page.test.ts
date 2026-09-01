@@ -278,7 +278,9 @@ describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
 
   it("renders Daily Desk four-bucket inbox (not ranking panels)", () => {
     expect(src).toMatch(/<DailyDeskInbox/);
-    expect(src).toMatch(/buildDailyDeskInbox/);
+    expect(src).toMatch(/build(Daily|Operating)DeskInbox/);
+    expect(src).toMatch(/buildOperatingDeskInbox|buildDailyDeskInbox/);
+    expect(src).toMatch(/autoDesk/);
     expect(src).toMatch(/studiesByInstrument/);
     expect(src).toMatch(/confirmQueueInstrumentIds/);
     expect(src).not.toMatch(/<MesaOpportunitiesTeaser/);
@@ -304,7 +306,7 @@ describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
   });
 
   it("open-position inbox uses POT via Daily Desk (same facts as Mercado)", () => {
-    expect(src).toMatch(/buildDailyDeskInbox/);
+    expect(src).toMatch(/build(Daily|Operating)DeskInbox/);
     expect(src).toMatch(/protectPlanByInstrument/);
     expect(src).not.toMatch(/positionsNeedingAction/);
   });

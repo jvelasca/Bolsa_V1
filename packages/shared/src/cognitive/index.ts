@@ -28,6 +28,7 @@ export * from "./operational-truth.js";
 export * from "./position-operating-truth.js";
 export * from "./exit-route-view.js";
 export * from "./daily-desk.js";
+export * from "./daily-desk-auto-projection.js";
 export * from "./paper-daily-report.js";
 export * from "./operational-context.js";
 export * from "./mercado-cockpit-phase.js";
