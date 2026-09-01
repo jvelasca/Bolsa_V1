@@ -86,6 +86,27 @@ class _Store:
         }
         return self.row
 
+    async def compare_and_swap_stop(
+        self,
+        *,
+        position_id: str,
+        expected_stop: float,
+        status: str,
+        position_state: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        blob = (self.row or {}).get("position_state") if self.row else None
+        current = None
+        if isinstance(blob, dict):
+            try:
+                current = float(blob.get("currentStop"))
+            except (TypeError, ValueError):
+                current = None
+        if current is None or abs(current - float(expected_stop)) > 1e-9:
+            return None
+        return await self.update_state(
+            position_id=position_id, status=status, position_state=position_state
+        )
+
 
 class _FakeSell:
     def __init__(self) -> None:

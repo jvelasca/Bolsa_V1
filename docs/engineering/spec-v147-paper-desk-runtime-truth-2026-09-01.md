@@ -45,4 +45,4 @@ Cada fila PositionTick proyecta: `MANTENER` · `SUBIR_STOP` · `REDUCIR` · `SAL
 
 ## 5. OUT
 
-EntryTick real · capability matrix · scheduler · UI Mercado · LIVE · OCO · flip env default · package bump.
+EntryTick real · capability matrix · scheduler · UI Mercado · LIVE · OCO · flip env default · package bump · Event Continuity (V1.48).

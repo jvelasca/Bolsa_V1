@@ -124,7 +124,11 @@ async def kill_switch_status() -> dict[str, Any]:
 
 
 async def claim_auto_execute_idempotency(key: str) -> bool:
-    """True si la clave es nueva (claim OK). False si ya existía (skip)."""
+    """Best-effort prefetch (memoria + Redis NX). **No** es autoridad AUTO.
+
+    V1.48: sells = UNIQUE transactions.idempotency_key (eventId);
+    TRAIL/PROTECT = CAS current_stop. Si Redis falla, este claim es fail-open.
+    """
     if key in _IDEMPOTENCY_MEMORY:
         return False
     client = await _redis_client()

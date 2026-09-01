@@ -12,7 +12,6 @@ from bolsa_analytics.cognitive.position_state import (
     build_position_state_from_fill,
     position_state_from_dict,
 )
-from bolsa_application.auto_execute_idempotency import make_position_event_idempotency_key
 from bolsa_application.execute_position_policy_auto import (
     ExecutePositionPolicyAuto,
     PaperPositionSellResult,
@@ -25,6 +24,7 @@ from bolsa_application.paper_desk_cycle import (
 )
 from bolsa_application.persist_position_from_exit import PersistPositionFromExit
 from bolsa_application.persist_position_from_protect import PersistPositionFromProtect
+from bolsa_application.position_event_log import claim_durable_event
 from bolsa_application.reconciliation_opening_gate import (
     reconciliation_opening_veto_reason,
 )
@@ -91,6 +91,27 @@ class _DeskStore:
         _ = position_id
         self.row = {**self.row, "status": status, "position_state": position_state}
         return self.row
+
+    async def compare_and_swap_stop(
+        self,
+        *,
+        position_id: str,
+        expected_stop: float,
+        status: str,
+        position_state: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        blob = self.row.get("position_state")
+        current = None
+        if isinstance(blob, dict):
+            try:
+                current = float(blob.get("currentStop"))
+            except (TypeError, ValueError):
+                current = None
+        if current is None or abs(current - float(expected_stop)) > 1e-9:
+            return None
+        return await self.update_state(
+            position_id=position_id, status=status, position_state=position_state
+        )
 
 
 class _IdempotentSell:
@@ -168,7 +189,8 @@ async def test_auto_01_t1_reduce_via_cycle(monkeypatch: pytest.MonkeyPatch) -> N
         )
     )
     assert result.positions[0].status == "reduced"
-    assert result.positions[0].next_action == "REDUCIR"
+    assert result.positions[0].next_action == "MONITOR"
+    assert result.positions[0].executed_action == "APPLIED"
     pos = position_state_from_dict(store.row["position_state"])
     assert pos is not None
     assert pos.remaining_quantity == pytest.approx(7.0)
@@ -191,7 +213,8 @@ async def test_auto_02_trail_protect_via_cycle(monkeypatch: pytest.MonkeyPatch) 
         )
     )
     assert result.positions[0].status == "protected"
-    assert result.positions[0].next_action == "SUBIR_STOP"
+    assert result.positions[0].next_action == "MONITOR"
+    assert result.positions[0].executed_action == "APPLIED"
     pos = position_state_from_dict(store.row["position_state"])
     assert pos is not None
     assert pos.current_stop == pytest.approx(102.0)
@@ -214,7 +237,7 @@ async def test_auto_03_stop_exit_via_cycle(monkeypatch: pytest.MonkeyPatch) -> N
         )
     )
     assert result.positions[0].status == "exited"
-    assert result.positions[0].next_action == "SALIR"
+    assert result.positions[0].next_action == "MONITOR"
     assert store.row["status"] == "CLOSED"
 
 
@@ -247,23 +270,27 @@ async def test_auto_04_same_event_twice_one_execution(
 async def test_auto_05_crash_replay_no_duplicate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Order accepted → restart → same idempotency key → no second fill."""
+    """Order accepted → restart → same eventId → no second fill."""
     monkeypatch.setenv("PAPER_D_EXECUTE", "1")
     store = _DeskStore(_open_row(qty=10.0))
     sell = _IdempotentSell()
-    key = make_position_event_idempotency_key(
+    blob = dict(store.row["position_state"])
+    next_blob, event, _created = claim_durable_event(
+        blob,
         position_id="pos-MSFT",
         event_type="T1",
-        event_as_of="2026-08-31T16:00:00Z",
         action="reduce",
+        as_of="2026-08-31T16:00:00Z",
+        quantity=3.0,
     )
+    store.row["position_state"] = next_blob
     accepted = await sell.sell(
         account_id="acc-1",
         instrument_id="MSFT",
         quantity=3.0,
         price=110.0,
         full_exit=False,
-        idempotency_key=key,
+        idempotency_key=event.event_id,
     )
     assert accepted.status == "trade_executed"
     assert sell.execute_count == 1

@@ -107,6 +107,7 @@ async def test_gp_desk_01_dry_run_no_mutate(monkeypatch: pytest.MonkeyPatch) -> 
         "REVISAR_DATOS_NO_FRESCOS",
         "ESPERAR_APERTURA",
         "SUBIR_STOP",
+        "MONITOR",
     }
     assert "dryRun=true" in " ".join(result.notes)
 

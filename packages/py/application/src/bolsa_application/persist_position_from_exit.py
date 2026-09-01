@@ -117,6 +117,9 @@ class PersistPositionFromExit:
         next_blob = dict(updated.to_dict())
         next_blob[LAST_EXIT_TRANSACTION_KEY] = tx_id
         next_blob = preserve_origin_decision_package(blob, next_blob)
+        from bolsa_application.position_event_log import preserve_position_events
+
+        next_blob = preserve_position_events(blob, next_blob)
         return await self._store.update_state(
             position_id=pid,
             status=updated.status,

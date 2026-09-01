@@ -27,9 +27,15 @@ from bolsa_application.execute_position_policy_auto import (
 from bolsa_application.operational_context import (
     OperationalContext,
     OperationalContextBuilder,
+    PaperDeskDecisionAction,
+    PaperDeskExecutedAction,
     PaperDeskNextAction,
     PortfolioSnapshot,
+    PositionOperatingState,
+    resolve_decision_action,
+    resolve_executed_action,
     resolve_paper_desk_next_action,
+    resolve_position_operating_state,
 )
 from bolsa_application.paper_d_propose import paper_d_execute_allowed
 from bolsa_application.persist_position_from_exit import row_position_state
@@ -84,6 +90,9 @@ class PaperDeskPositionTickRow:
     decision_verdict: str | None = None
     permission_reasons: tuple[str, ...] = ()
     next_action: PaperDeskNextAction = "MANTENER"
+    decision_action: PaperDeskDecisionAction = "UNKNOWN"
+    executed_action: PaperDeskExecutedAction = "NONE"
+    operating_state: PositionOperatingState | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -93,6 +102,9 @@ class PaperDeskPositionTickRow:
             "decisionVerdict": self.decision_verdict,
             "permissionReasons": list(self.permission_reasons),
             "nextAction": self.next_action,
+            "decisionAction": self.decision_action,
+            "executedAction": self.executed_action,
+            "operatingState": self.operating_state,
         }
 
 
@@ -232,14 +244,38 @@ def _row_with_next(
     decision_verdict: str | None = None,
     permission_reasons: tuple[str, ...] = (),
     session: SessionState = "OPEN",
+    position: PositionState | None = None,
+    recon_status: str = "clean",
+    has_unresolved_exit: bool = False,
 ) -> PaperDeskPositionTickRow:
+    executed = resolve_executed_action(status=status, reason=reason)
     next_action = resolve_paper_desk_next_action(
         status=status,
         decision_verdict=decision_verdict,
         permission_reasons=permission_reasons,
         reason=reason,
         session=session,
+        executed_action=executed,
     )
+    has_trail = False
+    has_protect = False
+    if position is not None:
+        for rev in position.revisions:
+            if rev.origin == "trail":
+                has_trail = True
+            if rev.origin == "protect":
+                has_protect = True
+    operating = None
+    if position is not None:
+        operating = resolve_position_operating_state(
+            position_status=position.status,
+            remaining_quantity=float(position.remaining_quantity),
+            quantity=float(position.quantity),
+            has_trail_revision=has_trail,
+            has_protect_revision=has_protect,
+            recon_status=recon_status,  # type: ignore[arg-type]
+            has_unresolved_exit=has_unresolved_exit,
+        )
     return PaperDeskPositionTickRow(
         instrument_id=instrument_id,
         status=status,
@@ -247,6 +283,9 @@ def _row_with_next(
         decision_verdict=decision_verdict,
         permission_reasons=permission_reasons,
         next_action=next_action,
+        decision_action=resolve_decision_action(decision_verdict),
+        executed_action=executed,
+        operating_state=operating,
     )
 
 
@@ -255,6 +294,9 @@ def _row_from_auto_result(
     result: ExecutePositionPolicyAutoResult,
     *,
     session: SessionState,
+    position: PositionState | None = None,
+    recon_status: str = "clean",
+    has_unresolved_exit: bool = False,
 ) -> PaperDeskPositionTickRow:
     verdict = result.decision.verdict if result.decision else None
     perm_reasons: tuple[str, ...] = ()
@@ -273,6 +315,13 @@ def _row_from_auto_result(
         status = result.status  # type: ignore[assignment]
     else:
         status = "error"
+    pos = position
+    if result.position_row is not None:
+        blob = row_position_state(result.position_row)
+        if isinstance(blob, dict):
+            hydrated = position_state_from_dict(blob)
+            if hydrated is not None:
+                pos = hydrated
     return _row_with_next(
         instrument_id,
         status,
@@ -280,6 +329,9 @@ def _row_from_auto_result(
         decision_verdict=verdict,
         permission_reasons=perm_reasons,
         session=session,
+        position=pos,
+        recon_status=recon_status,
+        has_unresolved_exit=has_unresolved_exit,
     )
 
 
@@ -417,14 +469,25 @@ class PaperDeskCycle:
             )
             notes.append("operational_context_missing — fail-closed marks.")
 
-        if ctx.portfolio.drift:
+        recon_status = getattr(ctx.portfolio, "recon_status", None) or (
+            "drift" if ctx.portfolio.drift else "clean"
+        )
+        if recon_status == "drift" or ctx.portfolio.drift:
             notes.append("portfolio_drift")
+        elif recon_status == "unavailable":
+            notes.append("recon_unavailable")
 
-        if ctx.portfolio.drift and not inp.dry_run:
+        entry_blocked = (not inp.dry_run) and (
+            ctx.portfolio.drift or recon_status in ("drift", "unavailable")
+        )
+        if entry_blocked:
+            block_reason = (
+                "recon_unavailable" if recon_status == "unavailable" else "portfolio_drift"
+            )
             entry = PaperDeskEntryTickResult(
                 status="blocked",
-                reason="portfolio_drift",
-                notes=("EntryTick blocked: portfolio_drift (OR-4).",),
+                reason=block_reason,
+                notes=(f"EntryTick blocked: {block_reason} (OR-4).",),
             )
         else:
             entry = await self._entry.run_entry_tick(
@@ -456,6 +519,7 @@ class PaperDeskCycle:
                         "error",
                         reason="position_state_invalid",
                         session=session,
+                        recon_status=recon_status,
                     )
                 )
                 continue
@@ -470,6 +534,8 @@ class PaperDeskCycle:
                         reason="data_unavailable",
                         permission_reasons=("data_unavailable",),
                         session=session,
+                        position=pos,
+                        recon_status=recon_status,
                     )
                 )
                 continue
@@ -493,6 +559,8 @@ class PaperDeskCycle:
                         reason="no_exit_plan",
                         decision_verdict="HOLD",
                         session=session,
+                        position=pos,
+                        recon_status=recon_status,
                     )
                 )
                 continue
@@ -531,9 +599,19 @@ class PaperDeskCycle:
                     stale=data_stale,
                     stop_touched=immediate_risk,
                     as_of=inp.as_of,
+                    existing_intent_keys=ctx.execution.existing_intent_keys,
                 )
             )
-            rows_out.append(_row_from_auto_result(iid, result, session=session))
+            rows_out.append(
+                _row_from_auto_result(
+                    iid,
+                    result,
+                    session=session,
+                    position=pos,
+                    recon_status=recon_status,
+                    has_unresolved_exit=bool(ctx.execution.unresolved_executions),
+                )
+            )
 
         return PaperDeskCycleResult(
             account_id=account_id,

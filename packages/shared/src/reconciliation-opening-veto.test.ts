@@ -10,10 +10,10 @@ describe("OR-4 reconciliationOpeningVetoReason", () => {
     expect(reconciliationOpeningVetoReason()).toBeNull();
   });
 
-  it("portfolio drift denies", () => {
+  it("portfolio unavailable denies", () => {
     expect(
-      reconciliationOpeningVetoReason({ portfolioReconStatus: "drift" }),
-    ).toBe("reconciliation:portfolio_drift");
+      reconciliationOpeningVetoReason({ portfolioReconStatus: "unavailable" }),
+    ).toBe("reconciliation:portfolio_unavailable");
   });
 
   it("live unavailable denies only on live venue", () => {

@@ -44,4 +44,4 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · EntryTick **HonestStub** · 
 
 ## 4. Next
 
-**V1.48** EntryTick real — solo tras tip `v1.47-beta` certificado (CI + auditoría). **NO LIVE**.
+**V1.48** Event Continuity — solo tras tip `v1.47-beta` certificado (CI + auditoría). EntryTick sigue stub. **NO LIVE**.

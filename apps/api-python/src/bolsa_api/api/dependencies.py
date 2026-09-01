@@ -1463,15 +1463,18 @@ def get_evaluate_position_exits_use_case(session: AsyncSession) -> EvaluatePosit
 
 
 def get_operational_context_builder(session: AsyncSession) -> Any:
-    """V1.47 — MarketSnapshot desde OHLCV + recon lookup."""
+    """V1.47/V1.48 — MarketSnapshot + recon + ExecutionSnapshot (submit_intents)."""
     from bolsa_application.operational_context import (
         OhlcvMarketDataPort,
         OperationalContextBuilder,
+        SubmitIntentExecutionTruth,
     )
+    from bolsa_application.submit_intent_store import PostgresSubmitIntentStore
 
     return OperationalContextBuilder(
         OhlcvMarketDataPort(get_ohlcv_repository(session)),
         portfolio_recon=get_portfolio_recon_lookup(session),
+        execution_truth=SubmitIntentExecutionTruth(PostgresSubmitIntentStore(session)),
     )
 
 

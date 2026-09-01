@@ -87,6 +87,7 @@ class ExecutePositionPolicyAutoInput:
     stale: bool | None = None
     stop_touched: bool | None = None
     as_of: str | None = None
+    existing_intent_keys: frozenset[str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +98,7 @@ class ExecutePositionPolicyAutoResult:
     reason: str | None = None
     position_row: Any | None = None
     sell: PaperPositionSellResult | None = None
+    event_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -258,10 +260,6 @@ class ExecutePositionPolicyAuto:
                 reason="invalid_mark_price",
             )
 
-        from bolsa_application.auto_execute_idempotency import (
-            make_position_event_idempotency_key,
-        )
-
         event_kind = "UNKNOWN"
         if decision.event is not None:
             event_kind = str(decision.event.kind)
@@ -269,12 +267,29 @@ class ExecutePositionPolicyAuto:
             event_kind = str(decision.reason_code)
         action = "exit" if full_exit else "reduce"
         pos_id = position.position_id if position is not None else inp.instrument_id
-        idem_key = make_position_event_idempotency_key(
-            position_id=pos_id,
+        claimed = await self._protect.claim_sell_event(
+            account_id=inp.account_id,
+            instrument_id=inp.instrument_id,
             event_type=event_kind,
-            event_as_of=inp.as_of or "",
             action=action,
+            as_of=inp.as_of,
+            quantity=float(qty),
         )
+        if claimed is None:
+            idem_key = pos_id
+            event_id = None
+        else:
+            idem_key = claimed.event_id
+            event_id = claimed.event_id
+        keys = inp.existing_intent_keys or frozenset()
+        if event_id and event_id in keys:
+            return ExecutePositionPolicyAutoResult(
+                status="sell_skipped",
+                decision=decision,
+                permission=permission,
+                reason="intent_unresolved",
+                event_id=event_id,
+            )
 
         sell = await self._sell.sell(
             account_id=inp.account_id,
@@ -294,6 +309,7 @@ class ExecutePositionPolicyAuto:
                 permission=permission,
                 reason=sell.reason or sell.status,
                 sell=sell,
+                event_id=event_id,
             )
 
         fill_qty = float(sell.fill_quantity or qty)
@@ -323,4 +339,5 @@ class ExecutePositionPolicyAuto:
             permission=permission,
             position_row=row,
             sell=sell,
+            event_id=event_id,
         )

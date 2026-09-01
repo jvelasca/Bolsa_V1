@@ -27,9 +27,11 @@ def make_position_event_idempotency_key(
     action: str,
     sequence: int = 1,
 ) -> str:
-    """V1.47 — PositionEvent → executionIntentId / ExecuteTrade key.
+    """Legacy day-composite key (tests / diagnóstico).
 
-    ``positionId|eventType|asOf|sequence|action`` (reduce:T1 ≠ exit:STOP el mismo día).
+    V1.48: el sell PAPER usa ``eventId`` persistido, no esta clave.
+    ``sequence`` default 1 es un landmine si se usara para TRAIL — no usarla
+    como autoridad de AUTO.
     """
     as_of_s = (
         event_as_of.isoformat()

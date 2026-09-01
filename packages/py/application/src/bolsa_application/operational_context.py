@@ -21,6 +21,7 @@ from bolsa_market.market_calendar import (
 MarketDataPermission = Literal["FRESH", "STALE", "MISSING", "INVALID"]
 PaperDeskNextAction = Literal[
     "MANTENER",
+    "MONITOR",
     "SUBIR_STOP",
     "REDUCIR",
     "SALIR",
@@ -28,6 +29,18 @@ PaperDeskNextAction = Literal[
     "REVISAR_DATOS_NO_FRESCOS",
     "BLOQUEADO",
 ]
+PaperDeskExecutedAction = Literal["NONE", "APPLIED", "DRY_RUN", "DENIED"]
+PaperDeskDecisionAction = Literal["HOLD", "PROTECT", "TRAIL", "REDUCE", "EXIT", "UNKNOWN"]
+PositionOperatingState = Literal[
+    "OPEN_UNPROTECTED",
+    "PROTECTED",
+    "TRAILING",
+    "PARTIALLY_REDUCED",
+    "EXIT_PENDING",
+    "CLOSED",
+    "RECONCILIATION_ERROR",
+]
+PortfolioReconStatus = Literal["clean", "drift", "unavailable"]
 
 
 def is_stop_touched(
@@ -109,11 +122,31 @@ class RiskSnapshot:
 class PortfolioSnapshot:
     account_id: str
     drift: bool
+    recon_status: PortfolioReconStatus = "clean"
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionIntentRef:
+    intent_id: str
+    decision_id: str
+    phase: str
+    event_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ExecutionSnapshot:
     existing_intent_keys: frozenset[str] = field(default_factory=frozenset)
+    pending_orders: tuple[str, ...] = ()
+    active_intents: tuple[ExecutionIntentRef, ...] = ()
+    recent_executions: tuple[str, ...] = ()
+    unresolved_executions: tuple[str, ...] = ()
+
+    def has_unresolved(self, event_id: str | None) -> bool:
+        if not event_id:
+            return False
+        if event_id in self.existing_intent_keys:
+            return True
+        return event_id in self.unresolved_executions
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +190,64 @@ class OperationalContext:
             instrument_id=instrument_id,
             stop_touched=self.stop_touched(instrument_id, position),
             mark_price=mark,
+        )
+
+
+class ExecutionTruthPort(Protocol):
+    async def snapshot(self, account_id: str) -> ExecutionSnapshot: ...
+
+
+class SubmitIntentExecutionTruth:
+    """V1.48 — ExecutionSnapshot desde submit_intents in-flight."""
+
+    def __init__(self, store: object) -> None:
+        self._store = store
+
+    async def snapshot(self, account_id: str) -> ExecutionSnapshot:
+        lister = getattr(self._store, "list_in_flight", None)
+        if lister is None:
+            return ExecutionSnapshot()
+        try:
+            rows = await lister(account_id)
+        except Exception:  # noqa: BLE001
+            return ExecutionSnapshot()
+        refs: list[ExecutionIntentRef] = []
+        keys: list[str] = []
+        unresolved: list[str] = []
+        for raw in rows or ():
+            intent_id = str(getattr(raw, "intent_id", None) or getattr(raw, "intentId", "") or "")
+            decision_id = str(
+                getattr(raw, "decision_id", None) or getattr(raw, "decisionId", "") or ""
+            )
+            phase = str(getattr(raw, "phase", "") or "")
+            event_id = None
+            if isinstance(raw, dict):
+                intent_id = str(raw.get("intentId") or raw.get("intent_id") or intent_id)
+                decision_id = str(raw.get("decisionId") or raw.get("decision_id") or decision_id)
+                phase = str(raw.get("phase") or phase)
+                event_id = raw.get("eventId") or raw.get("event_id")
+            if intent_id:
+                keys.append(intent_id)
+            if decision_id:
+                keys.append(decision_id)
+            if event_id:
+                event_s = str(event_id).strip()
+                keys.append(event_s)
+                unresolved.append(event_s)
+            refs.append(
+                ExecutionIntentRef(
+                    intent_id=intent_id,
+                    decision_id=decision_id,
+                    phase=phase,
+                    event_id=str(event_id).strip() if event_id else None,
+                )
+            )
+        pending = tuple(r.intent_id for r in refs if r.phase in ("recorded", "send_attempted"))
+        return ExecutionSnapshot(
+            existing_intent_keys=frozenset(k for k in keys if k),
+            pending_orders=pending,
+            active_intents=tuple(refs),
+            unresolved_executions=tuple(unresolved),
         )
 
 
@@ -259,12 +350,14 @@ class OperationalContextBuilder:
         exchange: str = "BME",
         country: str = "ES",
         now: datetime | None = None,
+        execution_truth: ExecutionTruthPort | None = None,
     ) -> None:
         self._market = market
         self._portfolio_recon = portfolio_recon
         self._exchange = exchange
         self._country = country
         self._now = now
+        self._execution_truth = execution_truth
 
     async def build(
         self,
@@ -278,16 +371,23 @@ class OperationalContextBuilder:
         session = resolve_session_state(
             exchange=self._exchange, country=self._country, as_of=self._now
         )
+        recon_status: PortfolioReconStatus = "clean"
         drift = False
         lookup = self._portfolio_recon
         if lookup is not None:
             getter = getattr(lookup, "portfolio_recon_status", None)
             if getter is not None:
                 try:
-                    status = await getter(account_id)
-                    drift = str(status) == "drift"
+                    status = str(await getter(account_id))
+                    if status == "drift":
+                        recon_status = "drift"
+                        drift = True
+                    elif status == "unavailable":
+                        recon_status = "unavailable"
+                    else:
+                        recon_status = "clean"
                 except Exception:  # noqa: BLE001
-                    drift = True
+                    recon_status = "unavailable"
 
         markets: dict[str, MarketSnapshot] = {}
         for iid in instrument_ids:
@@ -296,12 +396,22 @@ class OperationalContextBuilder:
                 continue
             markets[key] = await self._market.snapshot(key)
 
+        execution = ExecutionSnapshot()
+        if self._execution_truth is not None:
+            try:
+                execution = await self._execution_truth.snapshot(account_id)
+            except Exception:  # noqa: BLE001
+                execution = ExecutionSnapshot()
+
         return OperationalContext(
             account_id=account_id,
             as_of=as_of,
             session=session,
-            portfolio=PortfolioSnapshot(account_id=account_id, drift=drift),
+            portfolio=PortfolioSnapshot(
+                account_id=account_id, drift=drift, recon_status=recon_status
+            ),
             markets=markets,
+            execution=execution,
             trail_hint=trail_hint,
             trail_stop=trail_stop,
         )
@@ -315,9 +425,11 @@ def build_test_operational_context(
     permission: MarketDataPermission = "FRESH",
     session: SessionState = "OPEN",
     drift: bool = False,
+    recon_status: PortfolioReconStatus | None = None,
     trail_hint: bool = False,
     trail_stop: float | None = None,
     missing: tuple[str, ...] = (),
+    execution: ExecutionSnapshot | None = None,
 ) -> OperationalContext:
     """Solo tests — no es fuente de runtime HTTP."""
     markets: dict[str, MarketSnapshot] = {}
@@ -339,15 +451,46 @@ def build_test_operational_context(
             source="test",
             session=session,
         )
+    status: PortfolioReconStatus
+    if recon_status is not None:
+        status = recon_status
+    elif drift:
+        status = "drift"
+    else:
+        status = "clean"
     return OperationalContext(
         account_id=account_id,
         as_of=as_of,
         session=session,
-        portfolio=PortfolioSnapshot(account_id=account_id, drift=drift),
+        portfolio=PortfolioSnapshot(
+            account_id=account_id, drift=status == "drift", recon_status=status
+        ),
         markets=markets,
+        execution=execution or ExecutionSnapshot(),
         trail_hint=trail_hint,
         trail_stop=trail_stop,
     )
+
+
+def resolve_executed_action(
+    *,
+    status: str,
+    reason: str | None,
+) -> PaperDeskExecutedAction:
+    if reason == "dry_run":
+        return "DRY_RUN"
+    if status == "denied":
+        return "DENIED"
+    if status in ("protected", "reduced", "exited"):
+        return "APPLIED"
+    return "NONE"
+
+
+def resolve_decision_action(decision_verdict: str | None) -> PaperDeskDecisionAction:
+    raw = (decision_verdict or "").strip().upper()
+    if raw in ("HOLD", "PROTECT", "TRAIL", "REDUCE", "EXIT"):
+        return raw  # type: ignore[return-value]
+    return "UNKNOWN"
 
 
 def resolve_paper_desk_next_action(
@@ -357,8 +500,8 @@ def resolve_paper_desk_next_action(
     permission_reasons: tuple[str, ...] = (),
     reason: str | None = None,
     session: SessionState = "OPEN",
+    executed_action: PaperDeskExecutedAction | None = None,
 ) -> PaperDeskNextAction:
-    _ = decision_verdict
     reasons = set(permission_reasons)
     if (
         reason in ("data_unavailable", "missing_mark_price")
@@ -373,6 +516,9 @@ def resolve_paper_desk_next_action(
         not session_is_open(session) or reason == "queue_next_session"
     ):
         return "ESPERAR_APERTURA"
+    applied = executed_action or resolve_executed_action(status=status, reason=reason)
+    if applied == "APPLIED" and status in ("protected", "reduced", "exited"):
+        return "MONITOR"
     if status == "protected":
         return "SUBIR_STOP"
     if status == "reduced":
@@ -383,4 +529,33 @@ def resolve_paper_desk_next_action(
         return "MANTENER"
     if status in ("error", "no_plan", "skipped", "sell_skipped"):
         return "BLOQUEADO"
+    _ = decision_verdict
     return "MANTENER"
+
+
+def resolve_position_operating_state(
+    *,
+    position_status: str | None,
+    remaining_quantity: float | None,
+    quantity: float | None,
+    has_trail_revision: bool,
+    has_protect_revision: bool,
+    recon_status: PortfolioReconStatus = "clean",
+    has_unresolved_exit: bool = False,
+) -> PositionOperatingState:
+    if recon_status == "unavailable":
+        return "RECONCILIATION_ERROR"
+    if (position_status or "").upper() == "CLOSED":
+        return "CLOSED"
+    if has_unresolved_exit:
+        return "EXIT_PENDING"
+    qty = float(quantity or 0)
+    rem = float(remaining_quantity if remaining_quantity is not None else qty)
+    if qty > 0 and rem + 1e-9 < qty:
+        return "PARTIALLY_REDUCED"
+    if has_trail_revision:
+        return "TRAILING"
+    if has_protect_revision or (position_status or "").upper() == "PROTECTED":
+        return "PROTECTED"
+    return "OPEN_UNPROTECTED"
+

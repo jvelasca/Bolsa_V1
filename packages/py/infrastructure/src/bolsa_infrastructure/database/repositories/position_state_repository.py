@@ -190,3 +190,45 @@ class SqlAlchemyPositionStateRepository:
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return _to_record(row)
+
+    async def compare_and_swap_stop(
+        self,
+        *,
+        position_id: str,
+        expected_stop: float,
+        status: str,
+        position_state: dict[str, Any],
+    ) -> PositionStateRecord | None:
+        """V1.48 — UPDATE iff hot current_stop matches expected (row lock)."""
+        pid = position_id.strip() if position_id else ""
+        if not pid:
+            return None
+        stmt = (
+            select(PositionStateRow)
+            .where(PositionStateRow.id == pid)
+            .with_for_update()
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            return None
+        current = row.current_stop
+        if current is None:
+            current = _numeric_from_blob((row.position_state or {}).get("currentStop"))
+        try:
+            expected = Decimal(str(expected_stop))
+        except (InvalidOperation, ValueError):
+            return None
+        if current is None or abs(current - expected) > Decimal("0.000000001"):
+            return None
+        hot = hot_scalars_from_position_state(position_state)
+        row.status = status
+        row.position_state = position_state
+        row.direction = hot["direction"]
+        row.current_stop = hot["current_stop"]
+        row.remaining_quantity = hot["remaining_quantity"]
+        row.quantity = hot["quantity"]
+        row.initial_stop = hot["initial_stop"]
+        row.actual_entry = hot["actual_entry"]
+        row.updated_at = datetime.now(UTC)
+        await self._session.flush()
+        return _to_record(row)

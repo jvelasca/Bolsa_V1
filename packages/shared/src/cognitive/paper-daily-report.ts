@@ -22,6 +22,9 @@ export type PaperDeskPositionRowV1 = {
   decisionVerdict?: string | null;
   permissionReasons?: string[];
   nextAction?: PaperDeskNextActionV1 | string | null;
+  decisionAction?: string | null;
+  executedAction?: string | null;
+  operatingState?: string | null;
 };
 
 export type PaperDailyReportV1 = {

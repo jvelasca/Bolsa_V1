@@ -4,7 +4,7 @@
  * Nunca auto-heal.
  */
 
-export type PortfolioReconStatusV1 = "clean" | "drift";
+export type PortfolioReconStatusV1 = "clean" | "drift" | "unavailable";
 export type LiveReconStatusV1 = "clean" | "drift" | "unavailable";
 export type BrokerVenueV1 = "paper" | "live";
 
@@ -27,6 +27,9 @@ export function reconciliationOpeningVetoReason(
   }
   if (portfolio === "drift") {
     return "reconciliation:portfolio_drift";
+  }
+  if (portfolio === "unavailable") {
+    return "reconciliation:portfolio_unavailable";
   }
   const venue = String(input.brokerVenue ?? "paper")
     .trim()

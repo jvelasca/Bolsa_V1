@@ -57,6 +57,14 @@ def test_next_action_mapping() -> None:
     )
     assert (
         resolve_paper_desk_next_action(status="protected", decision_verdict="TRAIL")
+        == "MONITOR"
+    )
+    assert (
+        resolve_paper_desk_next_action(
+            status="protected",
+            decision_verdict="TRAIL",
+            reason="dry_run",
+        )
         == "SUBIR_STOP"
     )
     assert resolve_paper_desk_next_action(status="denied", decision_verdict="REDUCE") == "BLOQUEADO"
@@ -96,3 +104,25 @@ async def test_builder_derives_drift_and_snapshots() -> None:
     assert ctx.portfolio.drift is True
     assert ctx.mark_price("MSFT") == 110.0
     assert ctx.market_for("AAPL") is None
+
+
+@pytest.mark.asyncio
+async def test_builder_unavailable_is_not_drift() -> None:
+    class _Boom:
+        async def portfolio_recon_status(self, account_id: str) -> str:
+            _ = account_id
+            raise RuntimeError("down")
+
+    port = FakeMarketDataPort(
+        {
+            "MSFT": MarketSnapshot(
+                instrument_id="MSFT",
+                last_price=110.0,
+                permission="FRESH",
+                source="test",
+            )
+        }
+    )
+    ctx = await OperationalContextBuilder(port, _Boom()).build("acc-1", ["MSFT"])
+    assert ctx.portfolio.recon_status == "unavailable"
+    assert ctx.portfolio.drift is False

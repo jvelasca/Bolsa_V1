@@ -5,7 +5,10 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyMarketData,
+  resolveDecisionAction,
+  resolveExecutedAction,
   resolvePaperDeskNextAction,
+  resolvePositionOperatingState,
   sessionIsOpen,
 } from "./operational-context.js";
 
@@ -52,11 +55,25 @@ describe("operational-context", () => {
         session: "CLOSED",
       }),
     ).toBe("ESPERAR_APERTURA");
-    expect(resolvePaperDeskNextAction({ status: "protected" })).toBe(
-      "SUBIR_STOP",
-    );
+    expect(resolvePaperDeskNextAction({ status: "protected" })).toBe("MONITOR");
+    expect(
+      resolvePaperDeskNextAction({ status: "protected", reason: "dry_run" }),
+    ).toBe("SUBIR_STOP");
     expect(resolvePaperDeskNextAction({ status: "denied" })).toBe("BLOQUEADO");
     expect(sessionIsOpen("OPEN")).toBe(true);
     expect(sessionIsOpen("POST")).toBe(false);
+  });
+
+  it("splits decision / executed / nextAction", () => {
+    expect(
+      resolveExecutedAction({ status: "protected", reason: "dry_run" }),
+    ).toBe("DRY_RUN");
+    expect(resolveDecisionAction("TRAIL")).toBe("TRAIL");
+    expect(
+      resolvePositionOperatingState({
+        remainingQuantity: 7,
+        quantity: 10,
+      }),
+    ).toBe("PARTIALLY_REDUCED");
   });
 });

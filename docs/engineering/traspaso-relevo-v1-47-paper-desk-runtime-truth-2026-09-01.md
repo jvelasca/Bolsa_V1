@@ -51,4 +51,4 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 ## 4. Next
 
 1. Push `v1.47-beta` → Release-tag CI · auditoría externa PASS.
-2. **V1.48** EntryTick real — solo tras tip certificado. **NO LIVE**.
+2. **V1.48 Event Continuity** — PositionEvent durable, CAS TRAIL, ExecutionSnapshot, Golden Session. EntryTick **sigue stub** (Entry real = V1.49). **NO LIVE**.

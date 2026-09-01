@@ -18,6 +18,13 @@ def test_portfolio_drift_denies() -> None:
     )
 
 
+def test_portfolio_unavailable_denies() -> None:
+    assert (
+        reconciliation_opening_veto_reason(portfolio_recon_status="unavailable")
+        == "reconciliation:portfolio_unavailable"
+    )
+
+
 def test_portfolio_clean_allows() -> None:
     assert (
         reconciliation_opening_veto_reason(

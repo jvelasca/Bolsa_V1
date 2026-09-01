@@ -1,8 +1,10 @@
 /**
- * V1.47 — OperationalContext / MarketSnapshot contracts + nextAction.
+ * V1.47/V1.48 — OperationalContext / MarketSnapshot + nextAction semantics.
  *
- * @see docs/engineering/spec-v147-paper-desk-runtime-truth-2026-09-01.md
+ * @see docs/engineering/spec-v148-paper-desk-event-continuity-2026-09-01.md
  */
+
+import type { PortfolioReconStatusV1 } from "./reconciliation-opening-veto.js";
 
 export type MarketDataPermissionV1 = "FRESH" | "STALE" | "MISSING" | "INVALID";
 
@@ -10,12 +12,36 @@ export type SessionStateV1 = "PRE" | "OPEN" | "BREAK" | "CLOSED" | "POST";
 
 export type PaperDeskNextActionV1 =
   | "MANTENER"
+  | "MONITOR"
   | "SUBIR_STOP"
   | "REDUCIR"
   | "SALIR"
   | "ESPERAR_APERTURA"
   | "REVISAR_DATOS_NO_FRESCOS"
   | "BLOQUEADO";
+
+export type PaperDeskExecutedActionV1 =
+  | "NONE"
+  | "APPLIED"
+  | "DRY_RUN"
+  | "DENIED";
+
+export type PaperDeskDecisionActionV1 =
+  | "HOLD"
+  | "PROTECT"
+  | "TRAIL"
+  | "REDUCE"
+  | "EXIT"
+  | "UNKNOWN";
+
+export type PositionOperatingStateV1 =
+  | "OPEN_UNPROTECTED"
+  | "PROTECTED"
+  | "TRAILING"
+  | "PARTIALLY_REDUCED"
+  | "EXIT_PENDING"
+  | "CLOSED"
+  | "RECONCILIATION_ERROR";
 
 export type MarketSnapshotV1 = {
   instrumentId: string;
@@ -47,12 +73,45 @@ export function classifyMarketData(input: {
   return "FRESH";
 }
 
+export function resolveExecutedAction(input: {
+  status: string;
+  reason?: string | null;
+}): PaperDeskExecutedActionV1 {
+  if (input.reason === "dry_run") return "DRY_RUN";
+  if (input.status === "denied") return "DENIED";
+  if (
+    input.status === "protected" ||
+    input.status === "reduced" ||
+    input.status === "exited"
+  ) {
+    return "APPLIED";
+  }
+  return "NONE";
+}
+
+export function resolveDecisionAction(
+  verdict?: string | null,
+): PaperDeskDecisionActionV1 {
+  const raw = (verdict ?? "").trim().toUpperCase();
+  if (
+    raw === "HOLD" ||
+    raw === "PROTECT" ||
+    raw === "TRAIL" ||
+    raw === "REDUCE" ||
+    raw === "EXIT"
+  ) {
+    return raw;
+  }
+  return "UNKNOWN";
+}
+
 export function resolvePaperDeskNextAction(input: {
   status: string;
   decisionVerdict?: string | null;
   permissionReasons?: string[];
   reason?: string | null;
   session?: SessionStateV1;
+  executedAction?: PaperDeskExecutedActionV1 | null;
 }): PaperDeskNextActionV1 {
   const reasons = new Set(input.permissionReasons ?? []);
   const reason = input.reason ?? null;
@@ -73,6 +132,17 @@ export function resolvePaperDeskNextAction(input: {
   ) {
     return "ESPERAR_APERTURA";
   }
+  const executed =
+    input.executedAction ??
+    resolveExecutedAction({ status: input.status, reason });
+  if (
+    executed === "APPLIED" &&
+    (input.status === "protected" ||
+      input.status === "reduced" ||
+      input.status === "exited")
+  ) {
+    return "MONITOR";
+  }
   if (input.status === "protected") return "SUBIR_STOP";
   if (input.status === "reduced") return "REDUCIR";
   if (input.status === "exited") return "SALIR";
@@ -86,4 +156,29 @@ export function resolvePaperDeskNextAction(input: {
     return "BLOQUEADO";
   }
   return "MANTENER";
+}
+
+export function resolvePositionOperatingState(input: {
+  positionStatus?: string | null;
+  remainingQuantity?: number | null;
+  quantity?: number | null;
+  hasTrailRevision?: boolean;
+  hasProtectRevision?: boolean;
+  reconStatus?: PortfolioReconStatusV1;
+  hasUnresolvedExit?: boolean;
+}): PositionOperatingStateV1 {
+  if (input.reconStatus === "unavailable") return "RECONCILIATION_ERROR";
+  if ((input.positionStatus ?? "").toUpperCase() === "CLOSED") return "CLOSED";
+  if (input.hasUnresolvedExit) return "EXIT_PENDING";
+  const qty = input.quantity ?? 0;
+  const rem = input.remainingQuantity ?? qty;
+  if (qty > 0 && rem + 1e-9 < qty) return "PARTIALLY_REDUCED";
+  if (input.hasTrailRevision) return "TRAILING";
+  if (
+    input.hasProtectRevision ||
+    (input.positionStatus ?? "").toUpperCase() === "PROTECTED"
+  ) {
+    return "PROTECTED";
+  }
+  return "OPEN_UNPROTECTED";
 }

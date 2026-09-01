@@ -1,8 +1,8 @@
 # ADR-043: Position Automation — contrato de autorización de posición (V1.44)
 
-**Estado:** Accepted — **contrato V1.44** + **execute PAPER V1.45** + **Paper Desk cycle V1.46** + **Runtime Truth V1.47** (2026-09-01). LIVE **no**. `PAPER_D_EXECUTE` default **off**.  
+**Estado:** Accepted — **contrato V1.44** + **execute PAPER V1.45** + **Paper Desk cycle V1.46** + **Runtime Truth V1.47** + **Event Continuity V1.48** (2026-09-01). LIVE **no**. `PAPER_D_EXECUTE` default **off**.  
 **Fecha:** 2026-08-31  
-**Contexto:** Tip `v1.44-beta` → `db346a11` cerró Policy + JIT sin execute. V1.45 cablea orquestador Policy → Permission → protect persist | Router reduce/exit → PositionRevision en PAPER. V1.46 añade `PaperDeskCycle` (EntryTick **stub** + PositionTick) + `autoDesk` — foundation, **no** AUTO completo. V1.47 endurece Runtime Truth: `OperationalContext` / MarketSnapshot, GET no muta, mark fail-closed, idempotencia evento/intent.
+**Contexto:** Tip `v1.44-beta` → `db346a11` cerró Policy + JIT sin execute. V1.45 cablea orquestador Policy → Permission → protect persist | Router reduce/exit → PositionRevision en PAPER. V1.46 añade `PaperDeskCycle` (EntryTick **stub** + PositionTick) + `autoDesk` — foundation, **no** AUTO completo. V1.47 endurece Runtime Truth: `OperationalContext` / MarketSnapshot, GET no muta, mark fail-closed. V1.48 cierra identidad de evento durable (`events[]` / `eventId`), CAS TRAIL, ExecutionSnapshot y Golden Session PAPER. EntryTick sigue stub.
 
 **Depende de:** [ADR-031](./031-operational-model-tesis-plan-permiso.md) · [ADR-032](./032-operational-core-tradeplan-positionstate-execution.md) · [ADR-042](./042-operating-excellence.md) · spec [`spec-v144-position-automation-2026-08-31.md`](../engineering/spec-v144-position-automation-2026-08-31.md) · [`spec-v145-paper-auto-position-2026-08-31.md`](../engineering/spec-v145-paper-auto-position-2026-08-31.md).
 
@@ -48,15 +48,15 @@ Contrato: `TARGET_2` reached no dispara reduce T1 + reduce T2. Ya implementado e
 
 ## 5. Versionado
 
-Cinco verdades: product · git tag · package · schema · API. [`versioning.md`](../engineering/versioning.md). Product `V1.47-beta`. Package `1.35.0-beta` congelado. Tip `v1.47-beta` → `77f96ead` (previo certificado `v1.45-beta` → `6ca5ec12`).
+Cinco verdades: product · git tag · package · schema · API. [`versioning.md`](../engineering/versioning.md). Product `V1.48-beta`. Package `1.35.0-beta` congelado. Tip certificado vigente `v1.47-beta` → `77f96ead` (V1.48 tip pendiente).
 
 ## 6. Consecuencias
 
 - Spec contrato: [`spec-v144-position-automation-2026-08-31.md`](../engineering/spec-v144-position-automation-2026-08-31.md).
 - Spec execute: [`spec-v145-paper-auto-position-2026-08-31.md`](../engineering/spec-v145-paper-auto-position-2026-08-31.md).
-- Spec desk: [`spec-v146-paper-desk-foundation-2026-08-31.md`](../engineering/spec-v146-paper-desk-foundation-2026-08-31.md) · Runtime Truth [`spec-v147-paper-desk-runtime-truth-2026-09-01.md`](../engineering/spec-v147-paper-desk-runtime-truth-2026-09-01.md).
-- Plan: [`plan-v145-paper-auto-position-2026-08-31.md`](../engineering/plan-v145-paper-auto-position-2026-08-31.md) · [`plan-v146-paper-desk-foundation-2026-08-31.md`](../engineering/plan-v146-paper-desk-foundation-2026-08-31.md) · [`plan-v147-paper-desk-runtime-truth-2026-09-01.md`](../engineering/plan-v147-paper-desk-runtime-truth-2026-09-01.md).
-- PASS V1.44 = contrato; PASS V1.45 = execute PAPER opt-in; V1.46 = foundation (Entry stub); V1.47 = Runtime Truth. **No** LIVE · **no** DeskRunner multi-día · **no** AUTO completo (EntryTick stub).
+- Spec desk: [`spec-v146-paper-desk-foundation-2026-08-31.md`](../engineering/spec-v146-paper-desk-foundation-2026-08-31.md) · Runtime Truth [`spec-v147-paper-desk-runtime-truth-2026-09-01.md`](../engineering/spec-v147-paper-desk-runtime-truth-2026-09-01.md) · Event Continuity [`spec-v148-paper-desk-event-continuity-2026-09-01.md`](../engineering/spec-v148-paper-desk-event-continuity-2026-09-01.md).
+- Plan: [`plan-v145-paper-auto-position-2026-08-31.md`](../engineering/plan-v145-paper-auto-position-2026-08-31.md) · [`plan-v146-paper-desk-foundation-2026-08-31.md`](../engineering/plan-v146-paper-desk-foundation-2026-08-31.md) · [`plan-v147-paper-desk-runtime-truth-2026-09-01.md`](../engineering/plan-v147-paper-desk-runtime-truth-2026-09-01.md) · [`plan-v148-paper-desk-event-continuity-2026-09-01.md`](../engineering/plan-v148-paper-desk-event-continuity-2026-09-01.md).
+- PASS V1.44 = contrato; PASS V1.45 = execute PAPER opt-in; V1.46 = foundation (Entry stub); V1.47 = Runtime Truth; V1.48 = Event Continuity. **No** LIVE · **no** DeskRunner multi-día · **no** AUTO completo (EntryTick stub).
 
 ## 7. Fuera
 

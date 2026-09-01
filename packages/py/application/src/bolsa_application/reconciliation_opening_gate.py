@@ -18,7 +18,7 @@ from bolsa_application.reconcile_portfolio_integrity import (
     ReconcilePortfolioIntegrityInput,
 )
 
-PortfolioReconStatus = Literal["clean", "drift"]
+PortfolioReconStatus = Literal["clean", "drift", "unavailable"]
 LiveReconStatus = Literal["clean", "drift", "unavailable"]
 BrokerVenue = Literal["paper", "live"]
 
@@ -47,6 +47,8 @@ def reconciliation_opening_veto_reason(
 
     if portfolio_recon_status == "drift":
         return "reconciliation:portfolio_drift"
+    if portfolio_recon_status == "unavailable":
+        return "reconciliation:portfolio_unavailable"
 
     venue = (broker_venue or "paper").strip().lower()
     if venue == "live":
@@ -63,7 +65,7 @@ class PortfolioReconLookup(Protocol):
     """Puerto OR-4 — status OI-6 por cuenta."""
 
     async def portfolio_recon_status(self, account_id: str) -> PortfolioReconStatus:
-        """``clean`` | ``drift``. Lanza si infra falla."""
+        """``clean`` | ``drift`` | ``unavailable``. Lanza si infra falla."""
         ...
 
 
