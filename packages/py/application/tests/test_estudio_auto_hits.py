@@ -77,7 +77,31 @@ def test_build_hit_shape() -> None:
     assert hit["signal"]["kind"] == "entry_long"
     assert hit["signal"]["id"].startswith("edo-2026-08-30-")
     assert "paper_d" not in hit["autoSource"]
+    assert "templateId" not in hit
 
+
+def test_build_hit_includes_template_id() -> None:
+    plan = {
+        "status": "TRIGGERED",
+        "quantity": 7.0,
+        "entry": 10.0,
+        "structuralStop": 9.0,
+        "executionAllowed": True,
+    }
+    hit = build_estudio_auto_hit(
+        instrument_id="inst-abc",
+        symbol="SAN",
+        auto_source="estudio_dictamen",
+        trade_plan=plan,
+        price=10.0,
+        strategy_definition_id="st-1",
+        plan_id="edo_test",
+        as_of="2026-08-30",
+        policy_id="pol-12345678",
+        template_id="moderate",
+    )
+    assert hit["templateId"] == "moderate"
+    assert hit["autoSource"] == "estudio_dictamen"
 
 class _FakeOpinions:
     def __init__(self, rows: list) -> None:

@@ -1,7 +1,7 @@
 # RELEVO — tag v1.50-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-50-entry-decision-integrity-2026-09-01.md`](./traspaso-relevo-v1-50-entry-decision-integrity-2026-09-01.md) · [`traspaso-relevo-tag-v1-49-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-49-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.50-beta` → `96623755` · Release-tag CI **GREEN** · **pendiente auditoría externa**.  
+> **Estado:** **CI GREEN** — tip `v1.50-beta` → `96623755` · Release-tag CI **GREEN** · **auditoría externa PASS**. Next **V1.51**.  
 > **Arranque auditor:** [`arranque-auditor-v1-50-beta-2026-09-01.md`](./arranque-auditor-v1-50-beta-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · Fill→Position (V1.51) · scheduler · UI Mesa · OCO · package bump.
 
@@ -48,7 +48,9 @@ Jobs del push `v1.50-beta` (retag 2026-09-01T07:47Z), todos **success**:
 
 ## 2. Auditoría
 
-**Veredicto local (2026-09-01, tip `96623755`):** pre-flight verde (vitest 7 · pytest 83 · ruff · tsc) · Release-tag CI **GREEN**. **Pendiente auditoría externa** con [`arranque-auditor-v1-50-beta-2026-09-01.md`](./arranque-auditor-v1-50-beta-2026-09-01.md). **No** LIVE.
+**Veredicto local (2026-09-01, tip `96623755`):** pre-flight verde (vitest 7 · pytest 83 · ruff · tsc) · Release-tag CI **GREEN**. **No** LIVE.
+
+**Auditoría externa (2026-09-01):** **PASS**. CandidateSnapshot / reason codes / profile→policy / GP-DESK-04/05/06 aceptados. Tip `v1.50-beta` **certificado**. Arranque histórico: [`arranque-auditor-v1-50-beta-2026-09-01.md`](./arranque-auditor-v1-50-beta-2026-09-01.md).
 
 ## 3. Residuals parked
 
@@ -58,5 +60,5 @@ Jobs del push `v1.50-beta` (retag 2026-09-01T07:47Z), todos **success**:
 
 ## 4. Next
 
-1. Auditoría externa PASS → certificar tip `v1.50-beta`.
-2. **V1.51** Fill→Position — **NO LIVE**.
+1. **V1.51** Entry → Fill → Position — [`spec-v151-entry-fill-position-2026-09-01.md`](./spec-v151-entry-fill-position-2026-09-01.md). **NO LIVE**.
+2. V1.52 Golden Session · UI Mesa — después.

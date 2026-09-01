@@ -41,5 +41,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 
 ## 4. Next
 
-1. Auditoría externa PASS ([arranque](./arranque-auditor-v1-50-beta-2026-09-01.md)) → certificar tip `v1.50-beta`.
-2. **V1.51** Entry → Fill → Position — **NO LIVE**.
+1. Auditoría externa **PASS** — tip `v1.50-beta` certificado.
+2. **V1.51** Entry → Fill → Position — [`spec-v151-entry-fill-position-2026-09-01.md`](./spec-v151-entry-fill-position-2026-09-01.md). **NO LIVE**.

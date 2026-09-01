@@ -1362,8 +1362,16 @@ def get_investor_profile_repository(
 
 def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
+    from bolsa_application.persist_position_from_fill import (
+        PersistPositionFromFill,
+        PositionStateStore,
+    )
     from bolsa_application.shared_event_calendar import get_shared_market_event_calendar
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
 
+    position_store = SqlAlchemyPositionStateRepository(session)
     return ExecutionRouter(
         get_execution_policy_repository(session),
         get_account_repository(session),
@@ -1381,6 +1389,10 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
         incident_store=get_operational_incident_store(session),
         journal_writer=get_journal_writer(session),
         instrument_data_status=get_instrument_data_status_use_case(session),
+        position_from_fill=PersistPositionFromFill(
+            cast(PositionStateStore, position_store),
+            sessions=get_cognitive_repository(session),
+        ),
     )
 
 

@@ -404,3 +404,190 @@ async def test_paper_auto_opening_risk_signature_qty_above_plan(monkeypatch) -> 
     )
     assert result.status == "skipped"
     assert result.reason == "no_tradeplan"
+
+
+class _Desk07FillStore:
+    """OI-1 style store for GP-DESK-07 Position birth."""
+
+    def __init__(self) -> None:
+        self.inserts: list[dict[str, Any]] = []
+        self.by_tx: dict[str, dict[str, Any]] = {}
+        self.open_by_instrument: dict[tuple[str, str], dict[str, Any]] = {}
+
+    async def get_by_open_transaction_id(self, open_transaction_id: str) -> dict[str, Any] | None:
+        return self.by_tx.get(open_transaction_id)
+
+    async def get_open_for_instrument(
+        self, account_id: str, instrument_id: str
+    ) -> dict[str, Any] | None:
+        return self.open_by_instrument.get((account_id, instrument_id))
+
+    async def insert(self, **kwargs: Any) -> dict[str, Any]:
+        row = {"id": kwargs.get("position_id") or f"pos-{len(self.inserts)+1}", **kwargs}
+        self.inserts.append(row)
+        self.by_tx[str(kwargs["open_transaction_id"])] = row
+        self.open_by_instrument[(kwargs["account_id"], kwargs["instrument_id"])] = row
+        return row
+
+
+def _router_with_position_store(store: _Desk07FillStore) -> ExecutionRouter:
+    from bolsa_application.persist_position_from_fill import PersistPositionFromFill
+
+    return ExecutionRouter(
+        policy_repo=_FakePolicyRepo(_paper_auto_policy()),  # type: ignore[arg-type]
+        account_repo=_FakeAccountRepo(),  # type: ignore[arg-type]
+        strategy_repo=object(),  # type: ignore[arg-type]
+        backtest_repo=object(),  # type: ignore[arg-type]
+        execute_trade=_FakeTrade(),  # type: ignore[arg-type]
+        portfolio_summary=_FakeSummary(),  # type: ignore[arg-type]
+        profile_store=None,
+        enforce_cognitive_gate=False,
+        position_from_fill=PersistPositionFromFill(store),
+    )
+
+
+def _triggered_plan_full(*, quantity: float = 5.0, price: float = 10.0) -> dict[str, Any]:
+    stop = price * 0.95
+    t1 = price * 1.05
+    t2 = price * 1.10
+    return {
+        "decisionId": "dec-stale",
+        "instrumentId": "inst-1",
+        "direction": "long",
+        "status": "TRIGGERED",
+        "quantity": quantity,
+        "entry": price,
+        "structuralStop": stop,
+        "target1": t1,
+        "target2": t2,
+        "riskAmount": quantity * (price - stop),
+        "initialRiskR": 1,
+        "whyNot": [],
+        "executionAllowed": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_gp_desk_07_opening_fill_births_position(monkeypatch) -> None:
+    """GP-DESK-07 — trade_executed → Position con snapshot y trade_plan_id == signal.id."""
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    store = _Desk07FillStore()
+    router = _router_with_position_store(store)
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    signal = SignalEventV1(
+        id="sig-desk-07",
+        instrument_id="inst-1",
+        timestamp="2026-08-30T12:00:00Z",
+        kind="entry_long",
+        strategy_definition_id="st-1",
+        strategy_version=1,
+        bar_index=0,
+        price=10.0,
+    )
+    plan = _triggered_plan_full(quantity=7.0, price=10.0)
+    hit = _entry_hit(trade_plan=plan, auto_source="estudio_dictamen")
+    hit["templateId"] = "moderate"
+    hit["dictamenStars"] = 4
+    hit["signal"]["id"] = signal.id
+
+    result = await router._execute_paper_trade(
+        _paper_auto_policy(),
+        signal,
+        hit=hit,
+        sizing_value=1000.0,
+    )
+    assert result.status == "trade_executed", result.reason
+    assert result.reason is None
+    assert result.transaction_id == "tx-a-beta"
+    assert len(store.inserts) == 1
+    row = store.inserts[0]
+    assert row["trade_plan_id"] == "sig-desk-07"
+    snap = row["trade_plan_snapshot"]
+    assert snap["decisionId"] == "sig-desk-07"
+    assert snap["entry"] == 10.0
+    assert snap["structuralStop"] == 9.5
+    assert snap["target1"] == 10.5
+    assert snap["target2"] == 11.0
+    assert snap["riskAmount"] == pytest.approx(7.0 * 0.5)
+    assert snap["templateId"] == "moderate"
+    assert snap["autoSource"] == "estudio_dictamen"
+    assert snap["dictamenStars"] == 4
+    assert row["open_transaction_id"] == "tx-a-beta"
+
+
+@pytest.mark.asyncio
+async def test_gp_desk_07_idempotent_same_open_transaction(monkeypatch) -> None:
+    """Misma open_transaction_id no duplica Position."""
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    store = _Desk07FillStore()
+    router = _router_with_position_store(store)
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    signal = SignalEventV1(
+        id="sig-desk-07-idem",
+        instrument_id="inst-1",
+        timestamp="2026-08-30T12:00:00Z",
+        kind="entry_long",
+        strategy_definition_id="st-1",
+        strategy_version=1,
+        bar_index=0,
+        price=10.0,
+    )
+    hit = _entry_hit(trade_plan=_triggered_plan_full())
+    hit["signal"]["id"] = signal.id
+
+    first = await router._execute_paper_trade(
+        _paper_auto_policy(), signal, hit=hit, sizing_value=1000.0
+    )
+    second = await router._execute_paper_trade(
+        _paper_auto_policy(), signal, hit=hit, sizing_value=1000.0
+    )
+    assert first.status == "trade_executed"
+    assert second.status == "trade_executed"
+    assert len(store.inserts) == 1
+
+
+@pytest.mark.asyncio
+async def test_gp_desk_07_gate_deny_no_position(monkeypatch) -> None:
+    """Gate DENY / no_tradeplan → sin fill → sin Position (regresión GP-DESK-05)."""
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    store = _Desk07FillStore()
+    router = _router_with_position_store(store)
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    signal = SignalEventV1(
+        id="sig-desk-07-deny",
+        instrument_id="inst-1",
+        timestamp="2026-08-30T12:00:00Z",
+        kind="entry_long",
+        strategy_definition_id="st-1",
+        strategy_version=1,
+        bar_index=0,
+        price=10.0,
+    )
+    result = await router._execute_paper_trade(
+        _paper_auto_policy(),
+        signal,
+        hit=_entry_hit(trade_plan=None),
+        sizing_value=1000.0,
+    )
+    assert result.status == "skipped"
+    assert result.reason == "no_tradeplan"
+    assert store.inserts == []
+
+
+def test_enrich_opening_trade_plan_stamps_decision_id() -> None:
+    from bolsa_application.execution_router import enrich_opening_trade_plan_for_position
+
+    plan = {"decisionId": "old", "status": "TRIGGERED", "entry": 1.0}
+    out = enrich_opening_trade_plan_for_position(
+        plan,
+        signal_id="sig-new",
+        hit={"templateId": "conservative", "autoSource": "estudio_alarma", "rank": 2},
+    )
+    assert out["decisionId"] == "sig-new"
+    assert out["templateId"] == "conservative"
+    assert out["autoSource"] == "estudio_alarma"
+    assert out["rank"] == 2
+    assert plan["decisionId"] == "old"

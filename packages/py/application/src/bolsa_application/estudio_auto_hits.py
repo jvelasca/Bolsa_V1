@@ -129,6 +129,7 @@ def build_estudio_auto_hit(
     plan_id: str,
     as_of: str,
     policy_id: str | None = None,
+    template_id: str | None = None,
 ) -> dict[str, Any]:
     """Hit estilo scan para ``entry_long`` con autoSource Estudio + TradePlan."""
     ts = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -136,7 +137,7 @@ def build_estudio_auto_hit(
     pol = (policy_id or "estudio")[:8]
     iid_short = instrument_id[:8]
     strat = strategy_definition_id or "estudio_unbound"
-    return {
+    hit: dict[str, Any] = {
         "instrumentId": instrument_id,
         "symbol": symbol or instrument_id,
         "scanId": plan_id,
@@ -154,6 +155,10 @@ def build_estudio_auto_hit(
             "presetKey": "estudio_auto",
         },
     }
+    tid = (template_id or "").strip()
+    if tid:
+        hit["templateId"] = tid
+    return hit
 
 
 def as_of_from_day(ts: str) -> str:
@@ -354,6 +359,7 @@ class ProposeEstudioAutoOpenings:
                 plan_id=plan_id,
                 as_of=as_of,
                 policy_id=policy_id,
+                template_id=template_id,
             )
             hit["dictamenStars"] = cand.get("dictamenStars")
             hits.append(hit)
