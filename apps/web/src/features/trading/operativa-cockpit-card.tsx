@@ -33,13 +33,16 @@ import {
   portfolioReconStatusFromReport,
 } from "@/features/operational-console/use-ops-self-eval";
 import {
+  mercadoCockpitPosicionPhaseLabel,
   MERCADO_COCKPIT_PHASE_LABEL,
   mercadoCockpitNoLevelsCopy,
   mercadoCockpitPrimaryCta,
   type MercadoCockpitPhase,
 } from "@/features/trading/operativa-cockpit-phase";
 import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
+import { PositionOperationalStarCard } from "@/features/trading/position-operational-star-card";
 import { PositionOperatingSummary } from "@/features/trading/position-operating-summary";
+import { usePositionOperationalView } from "@/features/trading/use-position-operational-view";
 import { EntryOperatingSummary } from "@/features/trading/entry-operating-summary";
 import { ExitRouteView } from "@/features/trading/exit-route-view";
 import { useInstrumentOperationalContext } from "@/features/trading/use-instrument-operational-context";
@@ -129,6 +132,12 @@ export function OperativaCockpitCard({
   const toggleOperations = useTradingLayoutStore((s) => s.toggleOperations);
 
   const { phase, plan, study, position } = context;
+  const opsEval = useOpsSelfEval(context.accountId);
+  const reconStatus = portfolioReconStatusFromReport(opsEval.data);
+  const positionPov = usePositionOperationalView(
+    phase === "posicion" && position ? position : null,
+    reconStatus,
+  );
   const entryTruth =
     study && phase !== "posicion"
       ? buildEntryOperatingTruth({
@@ -141,8 +150,6 @@ export function OperativaCockpitCard({
           paperAuto,
         })
       : null;
-  const opsEval = useOpsSelfEval(context.accountId);
-  const reconStatus = portfolioReconStatusFromReport(opsEval.data);
   const positionPot =
     phase === "posicion" && position
       ? buildPositionOperatingTruth({
@@ -171,8 +178,18 @@ export function OperativaCockpitCard({
       entryTruth?.primaryCta.label ??
       mercadoCockpitPrimaryCta(phase));
   const noLevelsCopy = mercadoCockpitNoLevelsCopy(phase);
-  const reconHealth =
+  const reconHealthFromStatus =
     reconStatus == null ? null : mapReconStatusToHealth(reconStatus);
+  const reconHealth =
+    positionPov?.operatingState === "RECONCILIATION_DRIFT"
+      ? "CRITICAL"
+      : positionPov?.operatingState === "RECONCILIATION_ERROR"
+        ? "ATTENTION"
+        : reconHealthFromStatus;
+  const phaseLabel =
+    phase === "posicion"
+      ? mercadoCockpitPosicionPhaseLabel(positionPov?.operatingState)
+      : MERCADO_COCKPIT_PHASE_LABEL[phase];
 
   const potExitKind = asExitCtaKind(positionPot?.primaryCta.kind);
   const showOpsFromPot =
@@ -261,7 +278,7 @@ export function OperativaCockpitCard({
               className="rounded border border-border/70 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
               data-testid="operativa-cockpit-phase"
             >
-              {MERCADO_COCKPIT_PHASE_LABEL[phase]}
+              {phaseLabel}
             </span>
           </div>
         </div>
@@ -274,6 +291,10 @@ export function OperativaCockpitCard({
           <p className="text-[11px] text-muted-foreground">Cargando plan…</p>
         ) : phase === "posicion" && position ? (
           <>
+            <PositionOperationalStarCard
+              position={position}
+              portfolioReconStatus={reconStatus}
+            />
             <PositionOperatingSummary
               pot={positionPot}
               position={position}

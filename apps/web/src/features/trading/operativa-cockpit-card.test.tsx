@@ -2,7 +2,13 @@
  * V1.36 — cockpit Mercado fase POSICIÓN (integración UI).
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  within,
+  fireEvent,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -13,6 +19,8 @@ import type { InstrumentOperationalContextV1 } from "@/features/trading/use-inst
 
 const useInstrumentOperationalContext = vi.fn();
 
+const portfolioReconStatusFromReport = vi.fn(() => "ok");
+
 vi.mock("@/features/trading/use-instrument-operational-context", () => ({
   useInstrumentOperationalContext: (...args: unknown[]) =>
     useInstrumentOperationalContext(...args),
@@ -20,7 +28,8 @@ vi.mock("@/features/trading/use-instrument-operational-context", () => ({
 
 vi.mock("@/features/operational-console/use-ops-self-eval", () => ({
   useOpsSelfEval: () => ({ data: undefined, isLoading: false }),
-  portfolioReconStatusFromReport: () => "ok",
+  portfolioReconStatusFromReport: (...args: unknown[]) =>
+    portfolioReconStatusFromReport(...args),
 }));
 
 const useMesaEntriesBlocked = vi.fn(() => ({
@@ -117,7 +126,9 @@ function plan(
   };
 }
 
-function openPosition(): PositionDto {
+function openPosition(
+  operationalOverrides: Record<string, unknown> = {},
+): PositionDto {
   return {
     id: "p1",
     instrumentId: "inst-aapl",
@@ -140,6 +151,7 @@ function openPosition(): PositionDto {
       target1: 105,
       target2: 110,
       unrealizedR: 0.4,
+      ...operationalOverrides,
     },
   };
 }
@@ -182,6 +194,7 @@ function renderCockpit(ui: ReactElement) {
 
 describe("OperativaCockpitCard POSICIÓN V1.40", () => {
   beforeEach(() => {
+    portfolioReconStatusFromReport.mockReturnValue("ok");
     useInstrumentOperationalContext.mockReturnValue(posicionContext());
     useMesaEntriesBlocked.mockReturnValue({
       entriesBlocked: false,
@@ -332,6 +345,166 @@ describe("OperativaCockpitCard POSICIÓN V1.40", () => {
     expect(screen.getByTestId("entry-operating-phrase").textContent).toMatch(
       /bloqueadas/i,
     );
+  });
+});
+
+describe("OperativaCockpitCard POV star card V1.60", () => {
+  beforeEach(() => {
+    portfolioReconStatusFromReport.mockReturnValue("ok");
+    useInstrumentOperationalContext.mockReturnValue(posicionContext());
+    useMesaEntriesBlocked.mockReturnValue({
+      entriesBlocked: false,
+      killOn: false,
+      vetoed: 0,
+      incidentCount: 0,
+      incidentsFailed: false,
+      paperDExecuteEnv: false,
+    });
+  });
+
+  it("GP-V160-01/02: T2_READY vs T2_EXECUTED en operativa-cockpit-pov-state", () => {
+    useInstrumentOperationalContext.mockReturnValue(
+      posicionContext({
+        position: openPosition({
+          status: "PARTIAL",
+          remainingQuantity: 7,
+          target1Leg: {
+            status: "executed",
+            fillId: "tx-t1",
+            at: "2026-09-01T11:00:00.000Z",
+          },
+          target2Leg: {
+            status: "triggered",
+            at: "2026-09-01T13:00:00.000Z",
+          },
+        }),
+      }),
+    );
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    const povState = screen.getByTestId("operativa-cockpit-pov-state");
+    expect(povState.getAttribute("data-state")).toBe("T2_READY");
+    expect(povState.getAttribute("data-pov-state")).toBe("T2_READY");
+    expect(povState.textContent).toMatch(
+      /T2 disparado · pendiente de ejecutar/i,
+    );
+    expect(screen.getByTestId("operativa-cockpit-phase").textContent).toBe(
+      "Posición · T2 listo",
+    );
+
+    useInstrumentOperationalContext.mockReturnValue(
+      posicionContext({
+        position: openPosition({
+          status: "PARTIAL",
+          remainingQuantity: 3,
+          target1Leg: {
+            status: "executed",
+            fillId: "tx-t1",
+            at: "2026-09-01T11:00:00.000Z",
+          },
+          target2Leg: {
+            status: "executed",
+            fillId: "tx-t2",
+            at: "2026-09-01T14:00:00.000Z",
+          },
+        }),
+      }),
+    );
+    cleanup();
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    const executed = screen.getByTestId("operativa-cockpit-pov-state");
+    expect(executed.getAttribute("data-state")).toBe("T2_EXECUTED");
+    expect(executed.getAttribute("data-pov-state")).toBe("T2_EXECUTED");
+    expect(executed.textContent).toMatch(/T2 ejecutado/i);
+    expect(screen.getByTestId("operativa-cockpit-phase").textContent).toBe(
+      "Posición · T2 ejecutado",
+    );
+  });
+
+  it("GP-V160-02: RECONCILIATION_DRIFT copy + recon chip CRITICAL (≠ unavailable)", () => {
+    portfolioReconStatusFromReport.mockReturnValue("drift");
+    useInstrumentOperationalContext.mockReturnValue(
+      posicionContext({
+        position: openPosition({
+          status: "PROTECTED",
+          currentStop: 98,
+          revisions: [
+            {
+              revisionId: "r1",
+              at: "2026-09-01T10:00:00.000Z",
+              previousStop: 95,
+              nextStop: 98,
+              previousStatus: "OPEN",
+              nextStatus: "PROTECTED",
+              origin: "protect",
+              reason: "protect",
+            },
+          ],
+        }),
+      }),
+    );
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    const povState = screen.getByTestId("operativa-cockpit-pov-state");
+    expect(povState.getAttribute("data-state")).toBe("RECONCILIATION_DRIFT");
+    expect(povState.getAttribute("data-pov-state")).toBe(
+      "RECONCILIATION_DRIFT",
+    );
+    expect(povState.textContent).toMatch(/discrepancia de cartera/i);
+    expect(povState.textContent).not.toMatch(/RECONCILIATION_ERROR/);
+    const recon = screen.getByTestId("operativa-cockpit-recon");
+    expect(recon.getAttribute("data-recon")).toBe("CRITICAL");
+    expect(screen.getByTestId("operativa-cockpit-phase").textContent).toBe(
+      "Posición · Recon drift",
+    );
+  });
+
+  it("GP-V160-03/04: stop history colapsable con data-testid", () => {
+    useInstrumentOperationalContext.mockReturnValue(
+      posicionContext({
+        position: openPosition({
+          status: "PROTECTED",
+          currentStop: 102,
+          revisions: [
+            {
+              revisionId: "r1",
+              at: "2026-09-01T10:00:00.000Z",
+              previousStop: 95,
+              nextStop: 98,
+              previousStatus: "OPEN",
+              nextStatus: "PROTECTED",
+              origin: "protect",
+              reason: "protect",
+            },
+            {
+              revisionId: "r2",
+              at: "2026-09-01T12:00:00.000Z",
+              previousStop: 98,
+              nextStop: 102,
+              previousStatus: "PROTECTED",
+              nextStatus: "PROTECTED",
+              origin: "trail",
+              reason: "trail",
+            },
+          ],
+        }),
+      }),
+    );
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    expect(screen.queryByTestId("operativa-cockpit-stop-history")).toBeNull();
+    fireEvent.click(
+      screen.getByTestId("operativa-cockpit-stop-history-toggle"),
+    );
+    const history = screen.getByTestId("operativa-cockpit-stop-history");
+    expect(history.textContent).toMatch(/Protect/);
+    expect(history.textContent).toMatch(/Trail #1/);
+    expect(history.textContent).toMatch(/102\.00/);
   });
 });
 
