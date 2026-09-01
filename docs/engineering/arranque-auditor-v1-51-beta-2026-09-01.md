@@ -6,7 +6,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 Eres auditor externo de Bolsa V1 **V1.51 Entry → Paper Fill → Position** product **`V1.51-beta`** tip **`ab6a5bc6`** (previo certificado **`v1.50-beta` → `96623755`**, audit PASS). V1.50 cerró CandidateSnapshot / reason codes / GP-DESK-04/05/06. V1.51 nace **PositionState** tras fill PAPER de apertura AUTO reutilizando OI-1 `PersistPositionFromFill`, con `decisionId` = `signal.id` y `trade_plan_snapshot` enriquecido. **No** Golden Session birth+exit completo (V1.52). **No** UI Mesa. **No** LIVE. `PAPER_D_EXECUTE` default **off**.
 
-**Contexto CI:** tag `v1.51-beta` → `ab6a5bc6` · Release-tag CI — ver [`traspaso-relevo-tag-v1-51-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-51-beta-2026-09-01.md). Pre-flight local: vitest 7 · pytest desk-block (GP-DESK-07) · ruff · tsc · mypy router/hits.
+**Contexto CI (2026-09-01):** tag `v1.51-beta` → `ab6a5bc6` · Release-tag CI **GREEN** ([run 33492794600](https://github.com/jvelasca/Bolsa_V1/actions/runs/33492794600)) · pre-flight local verde.
 
 **GitHub (auditor):**
 

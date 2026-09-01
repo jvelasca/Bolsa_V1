@@ -1,7 +1,7 @@
-# RELEVO — tag v1.51-beta → CI (2026-09-01)
+# RELEVO — tag v1.51-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-51-entry-fill-position-2026-09-01.md`](./traspaso-relevo-v1-51-entry-fill-position-2026-09-01.md) · [`traspaso-relevo-tag-v1-50-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-50-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI PENDING** — tip `v1.51-beta` → `ab6a5bc6` · Release-tag CI en curso. Previo certificado **`v1.50-beta` → `96623755`** (audit PASS).  
+> **Estado:** **CI GREEN** — tip `v1.51-beta` → `ab6a5bc6` · Release-tag CI **GREEN** · **pendiente auditoría externa**. Previo certificado **`v1.50-beta` → `96623755`**.  
 > **Arranque auditor:** [`arranque-auditor-v1-51-beta-2026-09-01.md`](./arranque-auditor-v1-51-beta-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · Golden Session birth+exit (V1.52) · UI Mesa · scheduler · OCO · package bump.
 
@@ -25,16 +25,36 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · no UI Mesa · pac
 
 ## 1. Release
 
-| Pieza      | Valor                                             |
-| ---------- | ------------------------------------------------- |
-| Tag tip    | `v1.51-beta` → `ab6a5bc6`                         |
-| Previo tip | `v1.50-beta` → `96623755` (CI GREEN · audit PASS) |
-| CI tag     | **PENDING**                                       |
+| Pieza      | Valor                                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| Tag tip    | `v1.51-beta` → `ab6a5bc6`                                                                                        |
+| Código     | `ab6a5bc6` feat                                                                                                  |
+| Previo tip | `v1.50-beta` → `96623755` (CI GREEN · audit PASS)                                                                |
+| CI tag     | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33492794600) · `headSha=ab6a5bc6` |
 
-**GitHub:** [tag `v1.51-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.51-beta) · rama [`stage/v151-entry-fill-position-2026-09-01`](https://github.com/jvelasca/Bolsa_V1/tree/stage/v151-entry-fill-position-2026-09-01)
+**GitHub auditoría:** [tag `v1.51-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.51-beta) · [rama stage/v151](https://github.com/jvelasca/Bolsa_V1/tree/stage/v151-entry-fill-position-2026-09-01)
 
-## 2. Next
+Jobs del push `v1.51-beta` (2026-09-01T09:32Z), todos **success**:
 
-1. Push tag → Release-tag CI verde → stamp tip aquí + CURRENT_SYSTEM.
-2. Auditoría externa con arranque. **NO LIVE**.
-3. V1.52 Golden Session · UI Mesa — después.
+| Job            | Resultado |
+| -------------- | --------- |
+| python         | success   |
+| shared         | success   |
+| frontend       | success   |
+| decision-spine | success   |
+| security       | success   |
+| certify        | success   |
+
+## 2. Auditoría
+
+**Veredicto local (2026-09-01, tip `ab6a5bc6`):** pre-flight verde · Release-tag CI **GREEN**. **Pendiente auditoría externa** con [`arranque-auditor-v1-51-beta-2026-09-01.md`](./arranque-auditor-v1-51-beta-2026-09-01.md). **No** LIVE.
+
+## 3. Residuals parked
+
+- **V1.52** Golden Session completa · UI Mesa
+- Paper-D desk entry · scheduler · LIVE · package bump
+
+## 4. Next
+
+1. Auditoría externa PASS → certificar tip `v1.51-beta`.
+2. **V1.52** Golden Session · UI Mesa — **NO LIVE**.

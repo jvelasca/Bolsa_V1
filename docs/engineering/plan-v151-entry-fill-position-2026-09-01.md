@@ -2,7 +2,7 @@
 
 > **Padre:** [`spec-v151-entry-fill-position-2026-09-01.md`](./spec-v151-entry-fill-position-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md).  
 > **AsOf:** 2026-09-01.  
-> **Estado:** **CÓDIGO**.
+> **Estado:** **CI GREEN**.
 
 | ID  | Entrega                                                          | Estado |
 | --- | ---------------------------------------------------------------- | ------ |

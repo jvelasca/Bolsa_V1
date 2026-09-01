@@ -1,9 +1,9 @@
 # Spec — V1.51 Entry → Paper Fill → Position
 
-> **AsOf:** 2026-09-01 · **Estado:** **CÓDIGO**.  
+> **AsOf:** 2026-09-01 · **Estado:** **CI GREEN**.  
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-043](../adr/043-position-automation.md) · [`spec-v150-entry-decision-integrity-2026-09-01.md`](./spec-v150-entry-decision-integrity-2026-09-01.md).  
 > **Plan:** [`plan-v151-entry-fill-position-2026-09-01.md`](./plan-v151-entry-fill-position-2026-09-01.md).  
-> **Tip certificado previo:** `v1.50-beta` → `96623755` (Release-tag CI GREEN; auditoría externa PASS). **No** LIVE.
+> **Tip:** `v1.51-beta` → `ab6a5bc6` (Release-tag CI GREEN). Previo `v1.50-beta` → `96623755`. **No** LIVE.
 
 Cierra el nacimiento de **PositionState** tras un fill PAPER de apertura AUTO (Estudio). Reutiliza OI-1 `PersistPositionFromFill`. El `CandidateSnapshot` / TradePlan viaja en `trade_plan_snapshot` con `decisionId` = `signal.id`.
 

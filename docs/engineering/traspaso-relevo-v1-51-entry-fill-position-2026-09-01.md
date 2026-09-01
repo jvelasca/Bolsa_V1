@@ -1,7 +1,7 @@
 # RELEVO — V1.51 Entry → Paper Fill → Position (2026-09-01)
 
 > **Padre:** [`spec-v151-entry-fill-position-2026-09-01.md`](./spec-v151-entry-fill-position-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v151-entry-fill-position-2026-09-01.md`](./plan-v151-entry-fill-position-2026-09-01.md) · tip previo **`v1.50-beta` → `96623755`**.  
-> **Estado:** **CÓDIGO** — pre-flight verde. Product certificado vigente **`V1.50-beta`**. Package `1.35.0-beta` congelado. **No** LIVE.
+> **Estado:** **CI GREEN** — tip `v1.51-beta` → `ab6a5bc6`. Product certificado vigente **pendiente auditoría externa**. Package `1.35.0-beta` congelado. **No** LIVE.
 
 ---
 
@@ -32,5 +32,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · sin Alembic · sin UI Mes
 
 ## 3. Next
 
-1. Commit + push stage cuando el owner lo pida. **NO LIVE**.
-2. Tag `v1.51-beta` solo tras CI y cuando se pida.
+1. Auditoría externa PASS ([arranque](./arranque-auditor-v1-51-beta-2026-09-01.md)) → certificar tip `v1.51-beta`.
+2. **V1.52** Golden Session · UI Mesa — **NO LIVE**.
