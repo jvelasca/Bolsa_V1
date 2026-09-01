@@ -53,5 +53,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 
 ## 4. Next
 
-1. Tag `v1.48-beta` tras commit + auditoría.
+1. `git tag v1.48-beta` en `3d990aff` · push tag → Release-tag CI · auditoría externa PASS ([arranque](./arranque-auditor-v1-48-beta-2026-09-01.md)).
 2. **V1.49** EntryTick real — solo tras tip certificado. **NO LIVE**.
