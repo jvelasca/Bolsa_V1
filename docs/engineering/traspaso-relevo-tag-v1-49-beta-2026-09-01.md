@@ -1,7 +1,7 @@
 # RELEVO — tag v1.49-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-49-paper-desk-entry-auto-2026-09-01.md`](./traspaso-relevo-v1-49-paper-desk-entry-auto-2026-09-01.md) · [`traspaso-relevo-tag-v1-48-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-48-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.49-beta` → `c8975c9d` · Release-tag CI **GREEN** · **pendiente auditoría externa**.  
+> **Estado:** **CI GREEN** — tip `v1.49-beta` → `c8975c9d` · Release-tag CI **GREEN** · **auditoría externa recibida** ([respuesta](./respuesta-auditor-v149-entry-auto-2026-09-01.md)): PASS cableado Estudio; AUTO **no** cerrado. Next **V1.50**.  
 > **Arranque auditor:** [`arranque-auditor-v1-49-beta-2026-09-01.md`](./arranque-auditor-v1-49-beta-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · Paper-D desk entry · scheduler · UI Mercado · OCO · package bump.
 
@@ -47,15 +47,18 @@ Jobs del push `v1.49-beta` (2026-09-01T09:05Z), todos **success**:
 
 ## 2. Auditoría
 
-**Veredicto local (2026-09-01, tip `c8975c9d`):** pre-flight verde (vitest 7 · pytest 70 · ruff · tsc) · Release-tag CI **GREEN**. **Pendiente auditoría externa** con [`arranque-auditor-v1-49-beta-2026-09-01.md`](./arranque-auditor-v1-49-beta-2026-09-01.md). **No** LIVE.
+**Veredicto local (2026-09-01, tip `c8975c9d`):** pre-flight verde (vitest 7 · pytest 70 · ruff · tsc) · Release-tag CI **GREEN**. **No** LIVE.
+
+**Auditoría externa (2026-09-01):** recibida y contrastada con código. Global **9,2–9,3/10**. Arquitectura / empty≠unavailable / env block / policy obligatoria = **PASS**. GP-DESK-03 = **PASS de integración**, no de operativa completa. Entry AUTO **8,2**; Entry→Position **7,5**. Deuda P0 = CandidateSnapshot (el propose ya tiene `hits[]`; el adapter los tira) · `template_id` ignorado · reason codes · GP-DESK-04/05/06. Detalle: [`respuesta-auditor-v149-entry-auto-2026-09-01.md`](./respuesta-auditor-v149-entry-auto-2026-09-01.md). Tip `v1.49-beta` **certificado como cableado Estudio**, no como AUTO cerrado.
 
 ## 3. Residuals parked
 
+- **V1.50** Entry Decision Integrity (snapshot + profile + GPs 04–06)
+- **V1.51** Entry → Fill → Position · **V1.52** Golden Session completa · UI Mesa
 - Paper-D desk entry · scheduler · UI Mercado · MarketProfile
-- Golden Session entry birth + exit mismo ciclo
 - LIVE · `PAPER_D_EXECUTE` default on · package bump
 
 ## 4. Next
 
-1. Auditoría externa PASS → certificar tip `v1.49-beta`.
-2. **V1.50+** scheduler / UI Mercado — **NO LIVE**.
+1. **V1.50** Entry Decision Integrity — [`spec-v150-entry-decision-integrity-2026-09-01.md`](./spec-v150-entry-decision-integrity-2026-09-01.md). **NO LIVE**.
+2. V1.51 Fill→Position · V1.52 Golden Session · UI Mesa — después.

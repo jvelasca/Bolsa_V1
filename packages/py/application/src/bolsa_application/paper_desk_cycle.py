@@ -1,7 +1,8 @@
-"""V1.46–V1.49 — PaperDeskCycle: EntryTick + PositionTick (sesión PAPER).
+"""V1.46–V1.50 — PaperDeskCycle: EntryTick + PositionTick (sesión PAPER).
 
 V1.47: OperationalContext es la fuente de mark/session/freshness/drift/riesgo.
 V1.49: EntryTick = EstudioPaperDeskEntry (Estudio → TradePlan → Router).
+V1.50: EntryTick transporta CandidateSnapshot (decisionId, TradePlan, reasonCode).
 dry_run default true. PAPER_D_EXECUTE default off; execute real solo si env + !dry_run.
 """
 
@@ -48,6 +49,22 @@ PaperDeskEntryStatus = Literal[
     "blocked",
     "skipped",
     "dry_run",
+    "unavailable",
+]
+
+EntryReasonCode = Literal[
+    "ENTRY_NO_TRIGGER",
+    "ENTRY_INVALID_STOP",
+    "ENTRY_RISK_LIMIT",
+    "ENTRY_STALE_DATA",
+    "ENTRY_MANDATE_BLOCK",
+    "ENTRY_POLICY_MISSING",
+    "ENTRY_MARKET_CLOSED",
+    "ENTRY_DUPLICATE",
+    "ENTRY_ENV_BLOCKED",
+    "ENTRY_UNIVERSE_EMPTY",
+    "ENTRY_UNIVERSE_UNAVAILABLE",
+    "ENTRY_INFRA_UNAVAILABLE",
 ]
 
 PaperDeskPositionRowStatus = Literal[
@@ -64,13 +81,72 @@ PaperDeskPositionRowStatus = Literal[
 
 
 @dataclass(frozen=True, slots=True)
+class CandidateSnapshot:
+    """Decisión de entrada completa (transporte; persistir con Position = V1.51)."""
+
+    decision_id: str
+    instrument_id: str
+    rank: int
+    score: float
+    symbol: str | None = None
+    auto_source: str | None = None
+    template_id: str | None = None
+    analysis_as_of: str | None = None
+    market_as_of: str | None = None
+    execution_as_of: str | None = None
+    trade_plan: dict[str, Any] | None = None
+    entry: float | None = None
+    structural_stop: float | None = None
+    target1: float | None = None
+    target2: float | None = None
+    risk_amount: float | None = None
+    expected_rr: float | None = None
+    mandate: str = "not_evaluated"
+    freshness: str = "not_evaluated"
+    vetoes: tuple[str, ...] = ()
+    reason_code: EntryReasonCode | None = None
+    human_message: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "decisionId": self.decision_id,
+            "instrumentId": self.instrument_id,
+            "symbol": self.symbol,
+            "rank": self.rank,
+            "score": self.score,
+            "autoSource": self.auto_source,
+            "templateId": self.template_id,
+            "analysisAsOf": self.analysis_as_of,
+            "marketAsOf": self.market_as_of,
+            "executionAsOf": self.execution_as_of,
+            "tradePlan": self.trade_plan,
+            "entry": self.entry,
+            "structuralStop": self.structural_stop,
+            "target1": self.target1,
+            "target2": self.target2,
+            "riskAmount": self.risk_amount,
+            "expectedRr": self.expected_rr,
+            "mandate": self.mandate,
+            "freshness": self.freshness,
+            "vetoes": list(self.vetoes),
+            "reasonCode": self.reason_code,
+            "humanMessage": self.human_message,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class PaperDeskEntryTickResult:
     status: PaperDeskEntryStatus
     proposed_count: int = 0
     executed_count: int = 0
     skipped_count: int = 0
     reason: str | None = None
+    reason_code: EntryReasonCode | None = None
     notes: tuple[str, ...] = ()
+    candidates: tuple[CandidateSnapshot, ...] = ()
+    skipped: tuple[CandidateSnapshot, ...] = ()
+    template_id: str | None = None
+    operating_policy: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,7 +155,12 @@ class PaperDeskEntryTickResult:
             "executedCount": self.executed_count,
             "skippedCount": self.skipped_count,
             "reason": self.reason,
+            "reasonCode": self.reason_code,
             "notes": list(self.notes),
+            "candidates": [c.to_dict() for c in self.candidates],
+            "skipped": [s.to_dict() for s in self.skipped],
+            "templateId": self.template_id,
+            "operatingPolicy": self.operating_policy,
         }
 
 
@@ -196,6 +277,7 @@ class HonestStubPaperDeskEntry:
             return PaperDeskEntryTickResult(
                 status="blocked",
                 reason="paper_auto_env_blocked",
+                reason_code="ENTRY_ENV_BLOCKED",
                 notes=("EntryTick blocked: PAPER_D_EXECUTE off.",),
             )
         if dry_run:

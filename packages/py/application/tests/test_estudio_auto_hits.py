@@ -267,3 +267,21 @@ async def test_propose_execute_routes_estudio_hits(monkeypatch) -> None:
     assert policy_id == "pol-1"
     assert hits[0]["autoSource"] == "estudio_alarma"
     assert hits[0]["tradePlan"]["quantity"] == 9.0
+
+
+@pytest.mark.asyncio
+async def test_propose_passes_template_id_as_policy_version() -> None:
+    inner = _FakePropose({"inst-1": _triggered_result()})
+    uc = ProposeEstudioAutoOpenings(
+        _FakeOpinions([_opinion(stars=5)]),
+        inner,
+        instruments=_FakeInstruments(),
+    )
+    await uc.execute(
+        {
+            "instrumentIds": ["inst-1"],
+            "execute": False,
+            "templateId": "conservative",
+        }
+    )
+    assert inner.calls[0]["policy_version"] == "conservative"

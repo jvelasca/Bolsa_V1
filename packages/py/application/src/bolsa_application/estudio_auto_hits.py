@@ -242,6 +242,7 @@ class ProposeEstudioAutoOpenings:
         execute_env = paper_d_execute_allowed()
         policy_id = (payload.get("executionPolicyId") or "").strip() or None
         force_refresh = payload.get("forceRefresh") is True
+        template_id = (payload.get("templateId") or "").strip() or None
 
         rows = await self._opinions.query(
             instrument_ids=instrument_ids,
@@ -284,19 +285,24 @@ class ProposeEstudioAutoOpenings:
                         symbol = str(symbol)
 
             try:
-                propose_result = await self._propose.execute(
-                    instrument_id=iid,
-                    suggested_quantity=_PROPOSE_QTY_PLACEHOLDER,
-                    account_id=account_id,
-                    symbol=symbol,
-                    action_override="recommend_long",
-                )
+                propose_kwargs: dict[str, Any] = {
+                    "instrument_id": iid,
+                    "suggested_quantity": _PROPOSE_QTY_PLACEHOLDER,
+                    "account_id": account_id,
+                    "symbol": symbol,
+                    "action_override": "recommend_long",
+                }
+                if template_id:
+                    propose_kwargs["policy_version"] = template_id
+                propose_result = await self._propose.execute(**propose_kwargs)
             except Exception as exc:  # noqa: BLE001 — skip instrumento, no tumbar batch
                 skipped.append(
                     {
                         "instrumentId": iid,
                         "autoSource": cand["autoSource"],
                         "reason": f"propose_error:{exc}",
+                        "dictamenStars": cand.get("dictamenStars"),
+                        "asOfBarDate": cand.get("asOfBarDate"),
                     }
                 )
                 continue
@@ -304,12 +310,19 @@ class ProposeEstudioAutoOpenings:
             trade_plan = _extract_trade_plan(propose_result)
             status = trade_plan.get("status") if isinstance(trade_plan, dict) else None
             if not isinstance(trade_plan, dict) or status != "TRIGGERED":
+                why = (
+                    trade_plan.get("whyNot") if isinstance(trade_plan, dict) else None
+                )
                 skipped.append(
                     {
                         "instrumentId": iid,
                         "autoSource": cand["autoSource"],
                         "reason": "no_tradeplan",
                         "tradePlanStatus": status,
+                        "whyNot": why if isinstance(why, list) else [],
+                        "tradePlan": trade_plan if isinstance(trade_plan, dict) else None,
+                        "dictamenStars": cand.get("dictamenStars"),
+                        "asOfBarDate": cand.get("asOfBarDate"),
                     }
                 )
                 continue
@@ -324,24 +337,26 @@ class ProposeEstudioAutoOpenings:
                         "instrumentId": iid,
                         "autoSource": cand["autoSource"],
                         "reason": "sin_precio",
+                        "dictamenStars": cand.get("dictamenStars"),
+                        "asOfBarDate": cand.get("asOfBarDate"),
                     }
                 )
                 continue
 
             as_of = str(cand.get("asOfBarDate") or "")[:10]
-            hits.append(
-                build_estudio_auto_hit(
-                    instrument_id=iid,
-                    symbol=symbol,
-                    auto_source=str(cand["autoSource"]),
-                    trade_plan=trade_plan,
-                    price=float(price),
-                    strategy_definition_id=strategy_definition_id,
-                    plan_id=plan_id,
-                    as_of=as_of,
-                    policy_id=policy_id,
-                )
+            hit = build_estudio_auto_hit(
+                instrument_id=iid,
+                symbol=symbol,
+                auto_source=str(cand["autoSource"]),
+                trade_plan=trade_plan,
+                price=float(price),
+                strategy_definition_id=strategy_definition_id,
+                plan_id=plan_id,
+                as_of=as_of,
+                policy_id=policy_id,
             )
+            hit["dictamenStars"] = cand.get("dictamenStars")
+            hits.append(hit)
 
         execution: dict[str, Any] | None = None
         execute_status = "dry_run"

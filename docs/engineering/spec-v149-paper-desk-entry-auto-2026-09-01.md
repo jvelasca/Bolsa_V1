@@ -40,10 +40,10 @@ Confirm SEMI · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab ≠ S
 
 ## 3. Golden Paths
 
-| ID             | Comportamiento                                                                   |
-| -------------- | -------------------------------------------------------------------------------- |
-| GP-DESK-03     | dry_run → EntryTick propone hits Estudio (`proposed_count > 0`) sin mutar ledger |
-| GP-DESK-01..02 | Intactos (env block · stale derived)                                             |
+| ID             | Comportamiento                                                                                                                                                                               |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GP-DESK-03     | dry_run → EntryTick propone hits Estudio (`proposed_count > 0`) sin mutar ledger. Auditoría externa 2026-09-01: **PASS de cableado**, no de ranking/gate/size (eso es GP-DESK-04+ en V1.50). |
+| GP-DESK-01..02 | Intactos (env block · stale derived)                                                                                                                                                         |
 
 ## 4. Pre-flight
 

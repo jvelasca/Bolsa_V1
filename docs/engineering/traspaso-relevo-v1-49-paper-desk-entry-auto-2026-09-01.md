@@ -1,7 +1,7 @@
 # RELEVO — V1.49 Paper Desk Entry AUTO (2026-09-01)
 
 > **Padre:** [`spec-v149-paper-desk-entry-auto-2026-09-01.md`](./spec-v149-paper-desk-entry-auto-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v149-paper-desk-entry-auto-2026-09-01.md`](./plan-v149-paper-desk-entry-auto-2026-09-01.md) · tip previo **`v1.48-beta` → `d5852e8d`**.  
-> **Estado:** **CI GREEN** — tip **`v1.49-beta` → `c8975c9d`** ([relevo tag](./traspaso-relevo-tag-v1-49-beta-2026-09-01.md)). `EstudioPaperDeskEntry` cableado en `PaperDeskCycle` · Estudio list → rank → TradePlan → Router/`check_opening` · GP-DESK-03 · PositionTick/Event Continuity V1.48 intactos. **No** LIVE. Product **`V1.49-beta`**. Package `1.35.0-beta` congelado.
+> **Estado:** **CI GREEN** — tip **`v1.49-beta` → `c8975c9d`** ([relevo tag](./traspaso-relevo-tag-v1-49-beta-2026-09-01.md)). Auditoría externa **recibida** ([respuesta](./respuesta-auditor-v149-entry-auto-2026-09-01.md)): cableado PASS; AUTO no cerrado. Next **V1.50**. `EstudioPaperDeskEntry` · GP-DESK-03. **No** LIVE. Product **`V1.49-beta`**. Package `1.35.0-beta` congelado.
 
 ---
 
@@ -35,8 +35,9 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 - Paper-D desk entry · scheduler · UI Mercado · MarketProfile
 - Golden Session entry birth + exit mismo ciclo
 - LIVE · `PAPER_D_EXECUTE` default on · package bump
+- CandidateSnapshot / GP-DESK-04..06 (**V1.50**) · Fill→Position (**V1.51**)
 
 ## 4. Next
 
-1. Auditoría externa PASS ([arranque](./arranque-auditor-v1-49-beta-2026-09-01.md)) → certificar tip `v1.49-beta`.
-2. **V1.50+** scheduler / UI Mercado — **NO LIVE**.
+1. Auditoría externa **recibida** ([respuesta](./respuesta-auditor-v149-entry-auto-2026-09-01.md)): cableado PASS; AUTO no cerrado.
+2. **V1.50** Entry Decision Integrity — [`spec-v150-entry-decision-integrity-2026-09-01.md`](./spec-v150-entry-decision-integrity-2026-09-01.md). **NO LIVE**.
