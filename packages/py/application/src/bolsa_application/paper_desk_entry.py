@@ -20,6 +20,7 @@ from bolsa_application.daily_ops_report import (
 from bolsa_application.paper_desk_cycle import (
     CandidateSnapshot,
     EntryReasonCode,
+    PaperDeskEntryStatus,
     PaperDeskEntryTickResult,
 )
 
@@ -153,8 +154,10 @@ def _snapshot_from_hit(
     dry_run: bool,
     action: dict[str, Any] | None,
 ) -> CandidateSnapshot:
-    signal = hit.get("signal") if isinstance(hit.get("signal"), dict) else {}
-    plan = hit.get("tradePlan") if isinstance(hit.get("tradePlan"), dict) else None
+    raw_signal = hit.get("signal")
+    signal: dict[str, Any] = raw_signal if isinstance(raw_signal, dict) else {}
+    raw_plan = hit.get("tradePlan")
+    plan: dict[str, Any] | None = raw_plan if isinstance(raw_plan, dict) else None
     iid = str(hit.get("instrumentId") or signal.get("instrumentId") or "")
     decision_id = str(signal.get("id") or f"edo-{iid}")
     as_of = analysis_as_of or str(hit.get("asOfBarDate") or "")[:10] or None
@@ -310,38 +313,47 @@ def map_estudio_propose_to_entry_tick(
         for i, row in enumerate(skipped_rows)
     )
 
-    common = {
-        "proposed_count": hit_count,
-        "skipped_count": skipped_count,
-        "notes": notes,
-        "candidates": candidates,
-        "skipped": skipped,
-        "template_id": template_id,
-        "operating_policy": operating_policy,
-    }
-
     if execute_status == "blocked_env":
         return PaperDeskEntryTickResult(
             status="blocked",
+            proposed_count=hit_count,
+            skipped_count=skipped_count,
             reason="paper_auto_env_blocked",
             reason_code="ENTRY_ENV_BLOCKED",
-            **common,
+            notes=notes,
+            candidates=candidates,
+            skipped=skipped,
+            template_id=template_id,
+            operating_policy=operating_policy,
         )
 
     if dry_run or execute_status == "dry_run":
         return PaperDeskEntryTickResult(
             status="dry_run",
-            **common,
+            proposed_count=hit_count,
+            skipped_count=skipped_count,
+            notes=notes,
+            candidates=candidates,
+            skipped=skipped,
+            template_id=template_id,
+            operating_policy=operating_policy,
         )
 
     executed_count = _count_executed_actions(execution)
     gate_blocked = hit_count > 0 and executed_count == 0
+    status: PaperDeskEntryStatus = "blocked" if gate_blocked else "executed"
     return PaperDeskEntryTickResult(
-        status="blocked" if gate_blocked else "executed",
+        status=status,
+        proposed_count=hit_count,
         executed_count=executed_count,
+        skipped_count=skipped_count,
         reason="opening_gate_denied" if gate_blocked else None,
         reason_code="ENTRY_RISK_LIMIT" if gate_blocked else None,
-        **common,
+        notes=notes,
+        candidates=candidates,
+        skipped=skipped,
+        template_id=template_id,
+        operating_policy=operating_policy,
     )
 
 
