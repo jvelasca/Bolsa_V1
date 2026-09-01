@@ -1,7 +1,7 @@
 # RELEVO — V1.55 Operational Hardening (2026-09-01)
 
 > **Padre:** [`spec-v155-operational-hardening-2026-09-01.md`](./spec-v155-operational-hardening-2026-09-01.md) · tip certificado previo **`v1.54-beta` → `e057a8cc`**.  
-> **Estado:** **CÓDIGO** · Package `1.35.0-beta` congelado. **No** LIVE.
+> **Estado:** **TAG** `v1.55-beta` → `c797e234` · Release-tag CI **in_progress** ([run 33508058559](https://github.com/jvelasca/Bolsa_V1/actions/runs/33508058559)) · Package `1.35.0-beta` congelado. **No** LIVE.
 
 ---
 
@@ -28,5 +28,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-beta`.
 
 ## 3. Next
 
-1. Tip `v1.55-beta` · Release-tag CI.
-2. Auditoría adversarial (post-V1.55) · **NO LIVE**.
+1. Release-tag CI GREEN → certificar tip [`traspaso-relevo-tag-v1-55-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-55-beta-2026-09-01.md).
+2. **Auditoría adversarial post-V1.55** — [`arranque-auditor-v1-55-beta-2026-09-01.md`](./arranque-auditor-v1-55-beta-2026-09-01.md) · **NO LIVE**.
