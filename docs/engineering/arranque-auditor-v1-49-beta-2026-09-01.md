@@ -8,6 +8,12 @@ Eres auditor externo de Bolsa V1 **V1.49 Paper Desk Entry AUTO** product **`V1.4
 
 **Contexto CI (2026-09-01):** tag `v1.49-beta` pusheado → `c8975c9d` · Release-tag CI **GREEN** ([run 33480370327](https://github.com/jvelasca/Bolsa_V1/actions/runs/33480370327)) · pre-flight local verde (vitest 7 · pytest 70 · ruff · tsc).
 
+**GitHub (auditor):**
+
+- Código tip: [`v1.49-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.49-beta) → commit `c8975c9d`
+- Docs + arranque (HEAD): rama [`stage/v149-paper-desk-entry-auto-2026-09-01`](https://github.com/jvelasca/Bolsa_V1/tree/stage/v149-paper-desk-entry-auto-2026-09-01) · `main` sincronizado
+- Previo V1.48: [`v1.48-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.48-beta) → `d5852e8d`
+
 Lee en este orden:
 
 1. [`docs/CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md)

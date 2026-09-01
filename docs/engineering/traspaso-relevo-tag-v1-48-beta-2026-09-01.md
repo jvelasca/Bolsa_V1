@@ -55,4 +55,4 @@ Jobs del push `v1.48-beta` (retag 2026-09-01T06:50Z), todos **success**:
 ## 4. Next
 
 1. Auditoría externa PASS → certificar tip `v1.48-beta`.
-2. **V1.49** Entry AUTO — [`traspaso-relevo-v1-49-paper-desk-entry-auto-2026-09-01.md`](./traspaso-relevo-v1-49-paper-desk-entry-auto-2026-09-01.md) **CÓDIGO**. **NO LIVE**.
+2. **V1.49** Entry AUTO — [`traspaso-relevo-tag-v1-49-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-49-beta-2026-09-01.md) **CI GREEN** (`c8975c9d`). **NO LIVE**.

@@ -32,6 +32,8 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · Paper-D desk entr
 | Previo tip | `v1.48-beta` → `d5852e8d` (CI GREEN)                                                                             |
 | CI tag     | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33480370327) · `headSha=c8975c9d` |
 
+**GitHub auditoría:** [tag `v1.49-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.49-beta) · [rama stage/v149](https://github.com/jvelasca/Bolsa_V1/tree/stage/v149-paper-desk-entry-auto-2026-09-01) · [`main`](https://github.com/jvelasca/Bolsa_V1/tree/main)
+
 Jobs del push `v1.49-beta` (2026-09-01T09:05Z), todos **success**:
 
 | Job            | Resultado |
