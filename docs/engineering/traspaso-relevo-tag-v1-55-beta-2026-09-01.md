@@ -1,7 +1,7 @@
 # RELEVO — tag v1.55-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-55-operational-hardening-2026-09-01.md`](./traspaso-relevo-v1-55-operational-hardening-2026-09-01.md) · [`traspaso-relevo-tag-v1-54-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-54-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI failure (shared)** — run [33508291486](https://github.com/jvelasca/Bolsa_V1/actions/runs/33508291486) — tip `v1.55-beta` → `90999dad` — Ruff unblock OK; **pendiente auditoría externa adversarial**.
+> **Estado:** **CI GREEN** — tip `v1.55-beta` → `c23091d9` — Release-tag CI **GREEN** — **pendiente auditoría externa adversarial**.
 > **Arranque auditor:** [`arranque-auditor-v1-55-beta-2026-09-01.md`](./arranque-auditor-v1-55-beta-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · browser E2E · package bump.
 
@@ -28,24 +28,24 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-b
 
 | Pieza      | Valor                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| Tag tip    | `v1.55-beta` → `90999dad`                                                                                          |
+| Tag tip    | `v1.55-beta` → `c23091d9` (was `90999dad`; CI unblock shared honesty scenario 15)                                  |
 | Previo tip | `v1.54-beta` → `e057a8cc` (CI GREEN)                                                                               |
 | CI tag     | **failure** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33508291486) · `headSha=90999dad` |
 
-Jobs del push `v1.55-beta` (2026-09-01), snapshot parcial:
+Jobs del push `v1.55-beta` (retag 2026-09-01T12:38Z), todos **success**:
 
-| Job            | Resultado                                             |
-| -------------- | ----------------------------------------------------- |
-| python         | success (Ruff unblock: retag `90999dad`)              |
-| shared         | **failure** (`operational-honesty-scenarios` test 15) |
-| frontend       | success                                               |
-| decision-spine | success                                               |
-| security       | success                                               |
-| certify        | **failure** (aggregate)                               |
+| Job            | Resultado |
+| -------------- | --------- |
+| python         | success   |
+| shared         | success   |
+| frontend       | success   |
+| decision-spine | success   |
+| security       | success   |
+| certify        | success   |
 
 ## 2. Pre-flight
 
-Ver [`plan-v155-operational-hardening-2026-09-01.md`](./plan-v155-operational-hardening-2026-09-01.md). Local post close-out: pytest **25** · shared vitest **34** · web vitest **29** · ruff OK · tsc OK · Release-tag CI **in_progress** (run 33508291486).
+Ver [`plan-v155-operational-hardening-2026-09-01.md`](./plan-v155-operational-hardening-2026-09-01.md). Local post close-out: pytest **25** · shared vitest **34** · web vitest **29** · ruff OK · tsc OK · Release-tag CI **GREEN** (run [33508814540](https://github.com/jvelasca/Bolsa_V1/actions/runs/33508814540); `headSha=c23091d9`).
 
 ## 3. Next
 
