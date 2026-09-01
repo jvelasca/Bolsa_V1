@@ -1,7 +1,7 @@
 # RELEVO — tag v1.48-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-48-paper-desk-event-continuity-2026-09-01.md`](./traspaso-relevo-v1-48-paper-desk-event-continuity-2026-09-01.md) · [`traspaso-relevo-tag-v1-47-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-47-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **TIP LOCAL** — tip `v1.48-beta` → `3d990aff` · pendiente push + Release-tag CI · auditoría externa.  
+> **Estado:** **CI GREEN** — tip `v1.48-beta` → `d5852e8d` · Release-tag CI **GREEN** · **pendiente auditoría externa**.  
 > **Arranque auditor:** [`arranque-auditor-v1-48-beta-2026-09-01.md`](./arranque-auditor-v1-48-beta-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · EntryTick Estudio real (V1.49) · scheduler · UI Mercado · OCO · package bump.
 
@@ -24,16 +24,27 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · EntryTick **HonestStub** · 
 
 ## 1. Release
 
-| Pieza      | Valor                                                  |
-| ---------- | ------------------------------------------------------ |
-| Tag tip    | `v1.48-beta` → `3d990aff` (local, pendiente `git tag`) |
-| Código     | `3d990aff` close-out + `b1805c7d` Event Continuity     |
-| Previo tip | `v1.47-beta` → `77f96ead`                              |
-| CI tag     | pendiente push `v1.48-beta`                            |
+| Pieza      | Valor                                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| Tag tip    | `v1.48-beta` → `d5852e8d` (was `3d990aff`; CI unblock mypy)                                                      |
+| Código     | `b1805c7d` Event Continuity + `3d990aff` close-out + `d918de3e`/`d5852e8d` mypy                                  |
+| Previo tip | `v1.47-beta` → `77f96ead`                                                                                        |
+| CI tag     | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33479307015) · `headSha=d5852e8d` |
+
+Jobs del push `v1.48-beta` (retag 2026-09-01T06:50Z), todos **success**:
+
+| Job            | Resultado |
+| -------------- | --------- |
+| python         | success   |
+| shared         | success   |
+| frontend       | success   |
+| decision-spine | success   |
+| security       | success   |
+| certify        | success   |
 
 ## 2. Auditoría
 
-**Veredicto local (2026-09-01):** pre-flight verde (vitest 7 · pytest 62 · ruff · tsc). **Pendiente auditoría externa** con [`arranque-auditor-v1-48-beta-2026-09-01.md`](./arranque-auditor-v1-48-beta-2026-09-01.md). **No** LIVE. **No** AUTO completo (Entry stub).
+**Veredicto local (2026-09-01, tip `d5852e8d`):** pre-flight verde (vitest 7 · pytest 62 · ruff · tsc) · Release-tag CI **GREEN**. **Pendiente auditoría externa** con [`arranque-auditor-v1-48-beta-2026-09-01.md`](./arranque-auditor-v1-48-beta-2026-09-01.md). **No** LIVE. **No** AUTO completo (Entry stub).
 
 ## 3. Residuals parked
 
@@ -43,5 +54,5 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · EntryTick **HonestStub** · 
 
 ## 4. Next
 
-1. Push `v1.48-beta` → Release-tag CI · auditoría externa PASS.
+1. Auditoría externa PASS → certificar tip.
 2. **V1.49** EntryTick real — solo tras tip certificado. **NO LIVE**.

@@ -1,7 +1,7 @@
 # RELEVO — V1.48 Paper Desk Event Continuity (2026-09-01)
 
 > **Padre:** [`spec-v148-paper-desk-event-continuity-2026-09-01.md`](./spec-v148-paper-desk-event-continuity-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v148-paper-desk-event-continuity-2026-09-01.md`](./plan-v148-paper-desk-event-continuity-2026-09-01.md) · tip previo **`v1.47-beta` → `77f96ead`**.  
-> **Estado:** **CÓDIGO** — `PositionEvent` durable (JSONB `events[]`) · CAS protect/trail · sell `eventId` · `ExecutionSnapshot` · recon `unavailable` · `decisionAction`/`executedAction`/`nextAction` · `operatingState` · Golden Session + CAOS-01..10 · close-out: REDUCE/`claim` fail-closed · kill switch cableado · CAOS-07 propio. **No** LIVE. EntryTick **HonestStub**. Product **`V1.48-beta`**. Package `1.35.0-beta` congelado.  
+> **Estado:** **CI GREEN** — tip **`v1.48-beta` → `d5852e8d`** ([relevo tag](./traspaso-relevo-tag-v1-48-beta-2026-09-01.md)). `PositionEvent` durable (JSONB `events[]`) · CAS protect/trail · sell `eventId` · `ExecutionSnapshot` · recon `unavailable` · `decisionAction`/`executedAction`/`nextAction` · `operatingState` · Golden Session + CAOS-01..10 · close-out: REDUCE/`claim` fail-closed · kill switch cableado · CAOS-07 propio. **No** LIVE. EntryTick **HonestStub**. Product **`V1.48-beta`**. Package `1.35.0-beta` congelado.  
 > **Arranque auditor:** [`arranque-auditor-v1-48-beta-2026-09-01.md`](./arranque-auditor-v1-48-beta-2026-09-01.md).
 
 ---
@@ -53,5 +53,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 
 ## 4. Next
 
-1. `git tag v1.48-beta` en `3d990aff` · push tag → Release-tag CI · auditoría externa PASS ([arranque](./arranque-auditor-v1-48-beta-2026-09-01.md)).
+1. Auditoría externa PASS ([arranque](./arranque-auditor-v1-48-beta-2026-09-01.md)) → certificar tip `v1.48-beta` → `d5852e8d`.
 2. **V1.49** EntryTick real — solo tras tip certificado. **NO LIVE**.

@@ -4,7 +4,9 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **V1.48 Paper Desk Event Continuity** product **`V1.48-beta`** (previo tip **`v1.47-beta` → `77f96ead`**). V1.47 es Runtime Truth. V1.48 cierra identidad de eventos, ExecutionTruth y una Golden Session PAPER. **No** AUTO completo: EntryTick sigue **HonestStub**. Audita continuidad operativa, no Entry AUTO ni LIVE.
+Eres auditor externo de Bolsa V1 **V1.48 Paper Desk Event Continuity** product **`V1.48-beta`** tip **`d5852e8d`** (previo tip **`v1.47-beta` → `77f96ead`**). V1.47 es Runtime Truth. V1.48 cierra identidad de eventos, ExecutionTruth y una Golden Session PAPER. **No** AUTO completo: EntryTick sigue **HonestStub**. Audita continuidad operativa, no Entry AUTO ni LIVE.
+
+**Contexto CI (2026-09-01):** tag `v1.48-beta` pusheado → `d5852e8d` · Release-tag CI **GREEN** ([run 33479307015](https://github.com/jvelasca/Bolsa_V1/actions/runs/33479307015)) · pre-flight local verde (vitest 7 · pytest 62 · ruff · tsc).
 
 Lee en este orden:
 
