@@ -65,6 +65,10 @@ def test_from_fill_open_geometry() -> None:
     assert pos.trailing == {"status": "none"}
     assert pos.exit_status == "none"
     assert pos.revisions == ()
+    assert pos.target1_leg is not None
+    assert pos.target1_leg.status == "pending"
+    assert pos.target2_leg is not None
+    assert pos.target2_leg.status == "pending"
     d = pos.to_dict()
     assert d["revisions"] == []
     assert d["tradePlanId"] == "dec-1"
@@ -271,3 +275,51 @@ def test_from_dict_roundtrip_ignores_bookkeeping() -> None:
     assert restored.remaining_quantity == pos.remaining_quantity
     assert restored.status == "OPEN"
     assert position_state_from_dict({"direction": "long"}) is None
+
+
+def test_v152_target_leg_pending_at_birth_and_executed_on_t1_reduce() -> None:
+    from bolsa_analytics.cognitive.position_state import apply_target_leg
+
+    pos = _open_long()
+    assert pos.target1_leg is not None
+    assert pos.target1_leg.status == "pending"
+    trig = apply_target_leg(
+        pos, which="t1", status="triggered", at="2026-09-01T11:00:00Z", event_id="ev-t1"
+    )
+    assert trig.target1_leg is not None
+    assert trig.target1_leg.status == "triggered"
+    reduced = apply_position_reduce(
+        trig,
+        5.0,
+        exit_price=105.0,
+        at="2026-09-01T11:01:00Z",
+        mark_target1_achieved=True,
+        fill_id="tx-t1",
+        event_id="ev-t1",
+    )
+    assert reduced is not None
+    assert reduced.target1_leg is not None
+    assert reduced.target1_leg.status == "executed"
+    assert reduced.target1_leg.fill_id == "tx-t1"
+    assert reduced.target1_achieved_at is not None
+    # mark >= T1 without claim stays pending on a fresh position
+    assert _open_long().target1_leg.status == "pending"
+
+
+def test_v152_legacy_snapshot_hydrates_executed_from_achieved_at() -> None:
+    blob = dict(_open_long().to_dict())
+    blob.pop("target1Leg", None)
+    blob["target1AchievedAt"] = "2026-08-25T16:00:00Z"
+    restored = position_state_from_dict(blob)
+    assert restored is not None
+    assert restored.target1_leg is not None
+    assert restored.target1_leg.status == "executed"
+
+
+def test_v152_jit_deny_does_not_mark_failed_from_pending() -> None:
+    from bolsa_analytics.cognitive.position_state import apply_target_leg
+
+    pos = _open_long()
+    failed = apply_target_leg(pos, which="t1", status="failed", at="t")
+    assert failed.target1_leg is not None
+    assert failed.target1_leg.status == "pending"

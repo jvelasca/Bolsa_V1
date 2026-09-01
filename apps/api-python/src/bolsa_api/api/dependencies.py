@@ -1372,6 +1372,9 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
     )
 
     position_store = SqlAlchemyPositionStateRepository(session)
+    journal = get_journal_writer(session)
+    from bolsa_application.opening_fill_handle import JournalOpeningFillHandleStore
+
     return ExecutionRouter(
         get_execution_policy_repository(session),
         get_account_repository(session),
@@ -1387,12 +1390,13 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
         portfolio_recon=get_portfolio_recon_lookup(session),
         live_recon=get_live_recon_lookup(session),
         incident_store=get_operational_incident_store(session),
-        journal_writer=get_journal_writer(session),
+        journal_writer=journal,
         instrument_data_status=get_instrument_data_status_use_case(session),
         position_from_fill=PersistPositionFromFill(
             cast(PositionStateStore, position_store),
             sessions=get_cognitive_repository(session),
         ),
+        opening_fill_handles=JournalOpeningFillHandleStore(journal, journal),
     )
 
 
@@ -1567,6 +1571,24 @@ def get_paper_desk_cycle_use_case(
             session, execution_policy_id=execution_policy_id
         )
 
+    from bolsa_application.opening_fill_handle import (
+        JournalOpeningFillHandleStore,
+        RecoverOrphanOpeningFills,
+    )
+    from bolsa_application.persist_position_from_fill import (
+        PersistPositionFromFill,
+        PositionStateStore,
+    )
+
+    journal = get_journal_writer(session)
+    recover = RecoverOrphanOpeningFills(
+        handles=JournalOpeningFillHandleStore(journal, journal),
+        persist=PersistPositionFromFill(
+            cast(PositionStateStore, repo),
+            sessions=get_cognitive_repository(session),
+        ),
+    )
+
     return PaperDeskCycle(
         entry=EstudioPaperDeskEntry(
             propose=get_propose_estudio_auto_use_case(session),
@@ -1575,6 +1597,7 @@ def get_paper_desk_cycle_use_case(
         open_positions=_OpenAdapter(),
         execute_auto=execute_auto,
         context_builder=get_operational_context_builder(session),
+        recover_orphans=recover,
     )
 
 

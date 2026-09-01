@@ -55,6 +55,8 @@ def test_build_revision_fields() -> None:
         "nextStatus": "OPEN",
         "origin": "protect",
         "reason": None,
+        "decisionId": None,
+        "policyId": None,
     }
 
 
@@ -100,6 +102,7 @@ def test_apply_stop_appends_revision() -> None:
     assert rev.previous_status == "OPEN"
     assert rev.next_status == "OPEN"
     assert rev.at == "2026-08-26T01:00:00Z"
+    assert rev.decision_id == "dec-1"
 
 
 def test_apply_stop_appends_trail_revision() -> None:
@@ -187,6 +190,8 @@ def test_revisions_from_raw_skips_invalid() -> None:
     )
     assert ok is not None
     assert ok.revision_id == "REV-1"
+    assert ok.decision_id is None
+    assert ok.policy_id is None
 
 
 def test_revision_origin_from_exit_reason() -> None:

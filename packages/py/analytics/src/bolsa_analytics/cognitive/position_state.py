@@ -22,8 +22,123 @@ from bolsa_analytics.cognitive.position_revision import (
 PositionStatus = Literal["OPEN", "PARTIAL", "PROTECTED", "CLOSED"]
 PositionExitStatus = Literal["none", "hint", "armed", "done"]
 TradePlanDirection = Literal["long", "short", "none"]
+TargetLegStatus = Literal["pending", "triggered", "executed", "failed"]
 
 POSITION_STATE_KEY = "positionState"
+
+_VALID_TARGET_LEG = frozenset({"pending", "triggered", "executed", "failed"})
+
+
+@dataclass(frozen=True, slots=True)
+class TargetLeg:
+    """V1.52 — estado durable de T1/T2. mark >= T1 ≠ executed."""
+
+    status: TargetLegStatus
+    at: str | None = None
+    event_id: str | None = None
+    fill_id: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "status": self.status,
+            "at": self.at,
+            "eventId": self.event_id,
+            "fillId": self.fill_id,
+        }
+
+
+def _non_empty_str(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    trimmed = value.strip()
+    return trimmed or None
+
+
+def target_leg_from_unknown(
+    raw: object,
+    *,
+    price: float | None,
+    achieved_at: str | None,
+) -> TargetLeg | None:
+    if isinstance(raw, dict):
+        status = raw.get("status")
+        if isinstance(status, str) and status in _VALID_TARGET_LEG:
+            return TargetLeg(
+                status=status,  # type: ignore[arg-type]
+                at=_non_empty_str(raw.get("at")),
+                event_id=_non_empty_str(raw.get("eventId")),
+                fill_id=_non_empty_str(raw.get("fillId")),
+            )
+    achieved = _non_empty_str(achieved_at)
+    if achieved:
+        return TargetLeg(status="executed", at=achieved)
+    if price is not None:
+        return TargetLeg(status="pending")
+    return None
+
+
+def birth_target_leg(price: float | None) -> TargetLeg | None:
+    if price is None:
+        return None
+    return TargetLeg(status="pending")
+
+
+def _advance_target_leg(
+    current: TargetLeg | None,
+    next_status: TargetLegStatus,
+    *,
+    at: str,
+    event_id: str | None = None,
+    fill_id: str | None = None,
+) -> TargetLeg | None:
+    if current is None:
+        return None
+    if current.status == "executed":
+        return current
+    if next_status == "failed" and current.status == "pending":
+        return current
+    return TargetLeg(
+        status=next_status,
+        at=at,
+        event_id=_non_empty_str(event_id) or current.event_id,
+        fill_id=_non_empty_str(fill_id) or current.fill_id,
+    )
+
+
+def apply_target_leg(
+    position: PositionState,
+    *,
+    which: Literal["t1", "t2"],
+    status: TargetLegStatus,
+    at: str | None = None,
+    event_id: str | None = None,
+    fill_id: str | None = None,
+) -> PositionState:
+    """V1.52 — pending→triggered→executed|failed. executed es terminal."""
+    when = _now_iso(at)
+    if which == "t1":
+        return replace(
+            position,
+            target1_leg=_advance_target_leg(
+                position.target1_leg,
+                status,
+                at=when,
+                event_id=event_id,
+                fill_id=fill_id,
+            ),
+            updated_at=when,
+        )
+    return replace(
+        position,
+        target2_leg=_advance_target_leg(
+            position.target2_leg,
+            status,
+            at=when,
+            event_id=event_id,
+            fill_id=fill_id,
+        ),
+        updated_at=when,
+    )
 
 
 def _finite_positive(value: object) -> float | None:
@@ -163,6 +278,8 @@ class PositionState:
     updated_at: str
     target1_achieved_at: str | None = None
     target2_achieved_at: str | None = None
+    target1_leg: TargetLeg | None = None
+    target2_leg: TargetLeg | None = None
     revisions: tuple[PositionRevision, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
@@ -180,6 +297,8 @@ class PositionState:
             "target2": self.target2,
             "target1AchievedAt": self.target1_achieved_at,
             "target2AchievedAt": self.target2_achieved_at,
+            "target1Leg": self.target1_leg.to_dict() if self.target1_leg else None,
+            "target2Leg": self.target2_leg.to_dict() if self.target2_leg else None,
             "quantity": self.quantity,
             "remainingQuantity": self.remaining_quantity,
             "initialRisk": self.initial_risk,
@@ -243,6 +362,20 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
     stub_health = raw.get("thesisHealth")
     stub_protect = raw.get("protectionState")
     stub_trail = raw.get("trailing")
+    t1_at = (
+        raw.get("target1AchievedAt").strip()
+        if isinstance(raw.get("target1AchievedAt"), str)
+        and str(raw.get("target1AchievedAt")).strip()
+        else None
+    )
+    t2_at = (
+        raw.get("target2AchievedAt").strip()
+        if isinstance(raw.get("target2AchievedAt"), str)
+        and str(raw.get("target2AchievedAt")).strip()
+        else None
+    )
+    t1_price = _finite(raw.get("target1"))
+    t2_price = _finite(raw.get("target2"))
     return PositionState(
         position_id=position_id.strip(),
         trade_plan_id=trade_plan_id.strip(),
@@ -253,8 +386,8 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
         actual_entry=_finite(raw.get("actualEntry")),
         initial_stop=_finite(raw.get("initialStop")),
         current_stop=_finite(raw.get("currentStop")),
-        target1=_finite(raw.get("target1")),
-        target2=_finite(raw.get("target2")),
+        target1=t1_price,
+        target2=t2_price,
         quantity=_round4(qty),
         remaining_quantity=_round4(remaining),
         initial_risk=_finite(raw.get("initialRisk")),
@@ -267,17 +400,13 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
         exit_status=exit_status,  # type: ignore[arg-type]
         created_at=created.strip(),
         updated_at=updated.strip() if isinstance(updated, str) else created.strip(),
-        target1_achieved_at=(
-            raw.get("target1AchievedAt").strip()
-            if isinstance(raw.get("target1AchievedAt"), str)
-            and str(raw.get("target1AchievedAt")).strip()
-            else None
+        target1_achieved_at=t1_at,
+        target2_achieved_at=t2_at,
+        target1_leg=target_leg_from_unknown(
+            raw.get("target1Leg"), price=t1_price, achieved_at=t1_at
         ),
-        target2_achieved_at=(
-            raw.get("target2AchievedAt").strip()
-            if isinstance(raw.get("target2AchievedAt"), str)
-            and str(raw.get("target2AchievedAt")).strip()
-            else None
+        target2_leg=target_leg_from_unknown(
+            raw.get("target2Leg"), price=t2_price, achieved_at=t2_at
         ),
         revisions=revisions_from_raw(raw.get("revisions")),
     )
@@ -337,6 +466,8 @@ def build_position_state_from_fill(
     stub = {"status": "none"}
     qty_r = _round4(qty)
     pid = position_id.strip() if isinstance(position_id, str) and position_id.strip() else str(uuid4())
+    t1 = _finite(trade_plan.get("target1"))
+    t2 = _finite(trade_plan.get("target2"))
 
     return PositionState(
         position_id=pid,
@@ -348,8 +479,8 @@ def build_position_state_from_fill(
         actual_entry=actual_entry,
         initial_stop=initial_stop,
         current_stop=initial_stop,
-        target1=_finite(trade_plan.get("target1")),
-        target2=_finite(trade_plan.get("target2")),
+        target1=t1,
+        target2=t2,
         quantity=qty_r,
         remaining_quantity=qty_r,
         initial_risk=initial_risk,
@@ -362,6 +493,8 @@ def build_position_state_from_fill(
         exit_status="none",
         created_at=now,
         updated_at=now,
+        target1_leg=birth_target_leg(t1),
+        target2_leg=birth_target_leg(t2),
         revisions=(),
     )
 
@@ -373,6 +506,8 @@ def _with_revision_if_changed(
     origin: PositionRevisionOrigin,
     reason: str | None,
     at: str,
+    decision_id: str | None = None,
+    policy_id: str | None = None,
 ) -> PositionState:
     if not stop_or_status_changed(
         previous_stop=previous.current_stop,
@@ -389,6 +524,8 @@ def _with_revision_if_changed(
         next_status=next_pos.status,
         origin=origin,
         reason=reason,
+        decision_id=decision_id or previous.trade_plan_id,
+        policy_id=policy_id,
     )
     return replace(next_pos, revisions=previous.revisions + (rev,))
 
@@ -448,6 +585,10 @@ def apply_position_reduce(
     reason: str | None = None,
     mark_target1_achieved: bool = False,
     mark_target2_achieved: bool = False,
+    fill_id: str | None = None,
+    event_id: str | None = None,
+    decision_id: str | None = None,
+    policy_id: str | None = None,
 ) -> PositionState | None:
     """F2.1 reduce → remaining / realized_r / PARTIAL|CLOSED.
 
@@ -488,6 +629,28 @@ def apply_position_reduce(
         if mark_target2_achieved
         else position.target2_achieved_at
     )
+    t1_leg = (
+        _advance_target_leg(
+            position.target1_leg,
+            "executed",
+            at=updated,
+            event_id=event_id,
+            fill_id=fill_id,
+        )
+        if mark_target1_achieved
+        else position.target1_leg
+    )
+    t2_leg = (
+        _advance_target_leg(
+            position.target2_leg,
+            "executed",
+            at=updated,
+            event_id=event_id,
+            fill_id=fill_id,
+        )
+        if mark_target2_achieved
+        else position.target2_leg
+    )
     if remaining <= 0:
         next_pos = replace(
             position,
@@ -497,6 +660,8 @@ def apply_position_reduce(
             exit_status="done",
             target1_achieved_at=t1_at,
             target2_achieved_at=t2_at,
+            target1_leg=t1_leg,
+            target2_leg=t2_leg,
             updated_at=updated,
         )
         return _with_revision_if_changed(
@@ -505,6 +670,8 @@ def apply_position_reduce(
             origin=origin,
             reason=reason,
             at=updated,
+            decision_id=decision_id,
+            policy_id=policy_id,
         )
 
     mid = replace(
@@ -513,6 +680,8 @@ def apply_position_reduce(
         realized_r=realized,
         target1_achieved_at=t1_at,
         target2_achieved_at=t2_at,
+        target1_leg=t1_leg,
+        target2_leg=t2_leg,
         updated_at=updated,
     )
     next_pos = replace(mid, status=derive_position_status(mid))
@@ -522,6 +691,8 @@ def apply_position_reduce(
         origin=origin,
         reason=reason,
         at=updated,
+        decision_id=decision_id,
+        policy_id=policy_id,
     )
 
 
@@ -533,6 +704,8 @@ def apply_position_current_stop(
     override: dict[str, object] | None = None,
     origin: PositionRevisionOrigin | None = None,
     reason: str | None = None,
+    decision_id: str | None = None,
+    policy_id: str | None = None,
 ) -> PositionState | None:
     """F2.1 current_stop geométrico → posible PROTECTED (BE).
 
@@ -577,4 +750,6 @@ def apply_position_current_stop(
         origin=resolved_origin,
         reason=resolved_reason,
         at=updated,
+        decision_id=decision_id,
+        policy_id=policy_id,
     )

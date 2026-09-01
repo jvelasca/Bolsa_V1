@@ -5,8 +5,72 @@
  */
 
 import type { PaperDeskNextActionV1 } from "./operational-context.js";
+import type { TradePlanV1 } from "./trade-plan.js";
 
 export const PAPER_DAILY_REPORT_SCHEMA = "paper_daily_report_v1" as const;
+
+/** V1.50 — reason codes de EntryTick (mirror Python EntryReasonCode). */
+export type PaperDeskEntryReasonCodeV1 =
+  | "ENTRY_NO_TRIGGER"
+  | "ENTRY_INVALID_STOP"
+  | "ENTRY_RISK_LIMIT"
+  | "ENTRY_STALE_DATA"
+  | "ENTRY_MANDATE_BLOCK"
+  | "ENTRY_POLICY_MISSING"
+  | "ENTRY_MARKET_CLOSED"
+  | "ENTRY_DUPLICATE"
+  | "ENTRY_ENV_BLOCKED"
+  | "ENTRY_UNIVERSE_EMPTY"
+  | "ENTRY_UNIVERSE_UNAVAILABLE"
+  | "ENTRY_INFRA_UNAVAILABLE";
+
+/** V1.50 — CandidateSnapshot transport (mirror Python paper_desk_cycle). */
+export type PaperDeskCandidateSnapshotV1 = {
+  decisionId: string;
+  instrumentId: string;
+  rank: number;
+  score: number;
+  symbol?: string | null;
+  autoSource?: string | null;
+  templateId?: string | null;
+  analysisAsOf?: string | null;
+  marketAsOf?: string | null;
+  executionAsOf?: string | null;
+  tradePlan?: TradePlanV1 | null;
+  entry?: number | null;
+  structuralStop?: number | null;
+  target1?: number | null;
+  target2?: number | null;
+  riskAmount?: number | null;
+  expectedRr?: number | null;
+  mandate?: string;
+  freshness?: string;
+  vetoes?: string[];
+  reasonCode?: PaperDeskEntryReasonCodeV1 | null;
+  humanMessage?: string | null;
+};
+
+/** V1.54 — excepciones operativas para cubo 🔴 (sin auto-heal). */
+export type DailyDeskExceptionKindV1 =
+  | "position_birth_failed"
+  | "portfolio_recon_drift"
+  | "portfolio_recon_unavailable";
+
+export type DailyDeskExceptionFactV1 = {
+  kind: DailyDeskExceptionKindV1;
+  instrumentId?: string | null;
+  symbol?: string | null;
+  decisionId?: string | null;
+  message?: string | null;
+};
+
+export type PaperDailyReportEntryV1 = {
+  status: string;
+  proposed: number;
+  executed: number;
+  candidates?: PaperDeskCandidateSnapshotV1[];
+  skipped?: PaperDeskCandidateSnapshotV1[];
+};
 
 export type PaperDailyReportJitDenyCodeV1 =
   | "data_stale"
@@ -35,11 +99,9 @@ export type PaperDailyReportV1 = {
   paperDExecute: boolean;
   blocked?: boolean;
   blockReason?: string | null;
-  entry: {
-    status: string;
-    proposed: number;
-    executed: number;
-  };
+  entry: PaperDailyReportEntryV1;
+  /** V1.54 — hechos de excepción para proyección Desk (opcional). */
+  exceptionFacts?: DailyDeskExceptionFactV1[];
   positions: {
     held: number;
     denied: number;

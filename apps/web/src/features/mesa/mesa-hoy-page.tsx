@@ -20,6 +20,7 @@ import {
   buildOpportunityRanking,
   buildPortfolioRiskSnapshot,
   buildDailyDeskInbox,
+  buildOperatingDeskInbox,
   computeSectorExposurePct,
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
@@ -49,6 +50,7 @@ import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 import { parseHoyView } from "@/features/mesa/mesa-hoy-view";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
+import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { HOY_VIEW, hoyViewHref } from "@/features/confirm/daily-nav";
@@ -65,6 +67,13 @@ function formatHoyDate(d = new Date()): string {
     month: "short",
     year: "numeric",
   });
+}
+
+function todayIso(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function MesaHoyPage() {
@@ -164,6 +173,26 @@ export function MesaHoyPage() {
     if (fromApi) return fromApi;
     return estudioMembers.map((m) => m.instrumentId);
   }, [estudioUniverseUnavailable, universeListQuery.data, estudioMembers]);
+
+  const dailyOpsQuery = useQuery({
+    queryKey: [
+      "daily-ops-report",
+      effectiveAccountId,
+      "mesa-hoy",
+      estudioInstrumentIds.join(","),
+    ],
+    queryFn: () =>
+      api.getDailyOpsReport(effectiveAccountId!, {
+        asOf: todayIso(),
+        instrumentIds: estudioInstrumentIds.length
+          ? estudioInstrumentIds
+          : undefined,
+      }),
+    enabled: Boolean(effectiveAccountId),
+    staleTime: 60_000,
+    refetchInterval: MESA_REFETCH_MS,
+  });
+  const autoDesk = dailyOpsQuery.data?.data?.autoDesk ?? null;
 
   const board = boardQuery.data?.data;
   const portfolio = portfolioQuery.data?.data;
@@ -467,35 +496,54 @@ export function MesaHoyPage() {
     return ids;
   }, [board]);
 
-  const dailyDesk = useMemo(
+  const paperAutoPosture = useMemo(
     () =>
-      buildDailyDeskInbox({
-        positions,
-        board,
-        portfolioReconStatus,
-        pendingConfirm: pendingSignature,
-        protectionDiscrepancies,
-        pendingInstrumentIds,
-        studiesByInstrument: studiesMap,
-        confirmQueueInstrumentIds,
-        entriesBlocked,
-        hasOpenIncident: incidentCount > 0,
-        protectPlanByInstrument,
+      resolvePaperAutoPosture({
+        bookMode: bookPrefs.mode,
+        autoArmed,
+        paperDExecuteEnv: killQuery.data?.paperDExecuteEnv === true,
       }),
-    [
+    [bookPrefs.mode, autoArmed, killQuery.data?.paperDExecuteEnv],
+  );
+
+  const dailyDesk = useMemo(() => {
+    const baseInput = {
       positions,
       board,
       portfolioReconStatus,
-      pendingSignature,
+      pendingConfirm: pendingSignature,
       protectionDiscrepancies,
       pendingInstrumentIds,
-      studiesMap,
+      studiesByInstrument: studiesMap,
       confirmQueueInstrumentIds,
       entriesBlocked,
-      incidentCount,
+      hasOpenIncident: incidentCount > 0,
       protectPlanByInstrument,
-    ],
-  );
+    };
+    if (autoDesk) {
+      return buildOperatingDeskInbox({
+        ...baseInput,
+        autoDesk,
+        exceptionFacts: autoDesk.exceptionFacts ?? [],
+        paperAuto: paperAutoPosture,
+      });
+    }
+    return buildDailyDeskInbox(baseInput);
+  }, [
+    positions,
+    board,
+    portfolioReconStatus,
+    pendingSignature,
+    protectionDiscrepancies,
+    pendingInstrumentIds,
+    studiesMap,
+    confirmQueueInstrumentIds,
+    entriesBlocked,
+    incidentCount,
+    protectPlanByInstrument,
+    autoDesk,
+    paperAutoPosture,
+  ]);
 
   const isRefreshing =
     boardQuery.isFetching ||
@@ -511,6 +559,7 @@ export function MesaHoyPage() {
     void killQuery.refetch();
     void incidentsQuery.refetch();
     void selfEvalQuery.refetch();
+    void dailyOpsQuery.refetch();
   }
 
   return (

@@ -11,7 +11,10 @@ from bolsa_analytics.signals.strategy import SignalEventV1, _to_signal_event_v1
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.execution_router import ExecutionActionResult, ExecutionRouter
 from bolsa_application.get_ohlcv_bars import GetOhlcvBars
-from bolsa_application.paper_auto_http_gate import require_http_paper_auto_env
+from bolsa_application.paper_auto_http_gate import (
+    LabExitExecuteRetiredError,
+    require_http_paper_auto_env,
+)
 from bolsa_application.persist_position_from_exit import (
     PersistPositionFromExit,
     PersistPositionFromExitInput,
@@ -123,6 +126,9 @@ class EvaluatePositionExits:
         timeframe: str = "1d",
         bar_limit: int = 120,
     ) -> EvaluatePositionExitsResult:
+        if execute_trades:
+            # V1.52 — única autoridad AUTO SELL = PaperDesk / ExecutePositionPolicyAuto.
+            raise LabExitExecuteRetiredError()
         summary = await self._portfolio.execute(account_id=account_id)
         tf = TimeFrame.W1 if timeframe == "1wk" else TimeFrame.D1
 

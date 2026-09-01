@@ -30,6 +30,9 @@ class PaperDailyReportV1:
     entry_proposed: int = 0
     entry_executed: int = 0
     entry_status: str = "skipped"
+    entry_candidates: list[dict[str, Any]] = field(default_factory=list)
+    entry_skipped: list[dict[str, Any]] = field(default_factory=list)
+    exception_facts: list[dict[str, Any]] = field(default_factory=list)
     position_held: int = 0
     position_denied: int = 0
     position_protected: int = 0
@@ -42,7 +45,17 @@ class PaperDailyReportV1:
     block_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        entry: dict[str, Any] = {
+            "status": self.entry_status,
+            "proposed": self.entry_proposed,
+            "executed": self.entry_executed,
+        }
+        if self.entry_candidates:
+            entry["candidates"] = list(self.entry_candidates)
+        if self.entry_skipped:
+            entry["skipped"] = list(self.entry_skipped)
+
+        out: dict[str, Any] = {
             "schemaVersion": self.schema_version,
             "accountId": self.account_id,
             "asOf": self.as_of,
@@ -50,11 +63,7 @@ class PaperDailyReportV1:
             "paperDExecute": self.paper_d_execute,
             "blocked": self.blocked,
             "blockReason": self.block_reason,
-            "entry": {
-                "status": self.entry_status,
-                "proposed": self.entry_proposed,
-                "executed": self.entry_executed,
-            },
+            "entry": entry,
             "positions": {
                 "held": self.position_held,
                 "denied": self.position_denied,
@@ -66,6 +75,47 @@ class PaperDailyReportV1:
             "jitDenies": dict(self.jit_denies),
             "notes": list(self.notes),
         }
+        if self.exception_facts:
+            out["exceptionFacts"] = list(self.exception_facts)
+        return out
+
+
+def _collect_exception_facts(cycle: PaperDeskCycleResult) -> list[dict[str, Any]]:
+    """V1.54 — hechos operativos para proyección Desk (notes + entry)."""
+    facts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    all_notes = list(cycle.notes) + list(cycle.entry.notes)
+
+    def _add(kind: str, **fields: Any) -> None:
+        if kind in seen:
+            return
+        seen.add(kind)
+        fact: dict[str, Any] = {"kind": kind}
+        for key, value in fields.items():
+            if value is not None:
+                fact[key] = value
+        facts.append(fact)
+
+    birth_note = any("position_birth_failed" in n for n in all_notes)
+    birth_reason = cycle.entry.reason == "position_birth_failed"
+    if birth_note or birth_reason:
+        ctx: dict[str, Any] = {}
+        for cand in cycle.entry.candidates:
+            ctx = {
+                "instrumentId": cand.instrument_id,
+                "symbol": cand.symbol,
+                "decisionId": cand.decision_id,
+            }
+            break
+        _add("position_birth_failed", **ctx)
+
+    if any(n == "portfolio_drift" or "portfolio_drift" in n for n in all_notes):
+        _add("portfolio_recon_drift")
+
+    if any(n == "recon_unavailable" or "recon_unavailable" in n for n in all_notes):
+        _add("portfolio_recon_unavailable")
+
+    return facts
 
 
 def build_paper_daily_report(cycle: PaperDeskCycleResult) -> PaperDailyReportV1:
@@ -110,6 +160,9 @@ def build_paper_daily_report(cycle: PaperDeskCycleResult) -> PaperDailyReportV1:
         entry_proposed=cycle.entry.proposed_count,
         entry_executed=cycle.entry.executed_count,
         entry_status=cycle.entry.status,
+        entry_candidates=[c.to_dict() for c in cycle.entry.candidates],
+        entry_skipped=[s.to_dict() for s in cycle.entry.skipped],
+        exception_facts=_collect_exception_facts(cycle),
         position_held=held,
         position_denied=denied,
         position_protected=protected,

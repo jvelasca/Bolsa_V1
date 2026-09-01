@@ -44,6 +44,9 @@ class PersistPositionFromExitInput:
     mark_target1_achieved: bool = False
     """V1.27 — sello T2 gestionado."""
     mark_target2_achieved: bool = False
+    decision_id: str | None = None
+    policy_id: str | None = None
+    event_id: str | None = None
 
 
 def last_exit_transaction_id(row: Any) -> str | None:
@@ -111,6 +114,10 @@ class PersistPositionFromExit:
             origin="reduce",
             mark_target1_achieved=inp.mark_target1_achieved,
             mark_target2_achieved=inp.mark_target2_achieved,
+            fill_id=tx_id,
+            event_id=inp.event_id,
+            decision_id=inp.decision_id or (pos.trade_plan_id if pos else None),
+            policy_id=inp.policy_id,
         )
         if updated is None:
             return None

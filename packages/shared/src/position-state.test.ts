@@ -7,7 +7,9 @@ import {
   applyPositionCurrentStop,
   applyPositionMark,
   applyPositionReduce,
+  applyTargetLeg,
   buildPositionStateFromFill,
+  targetLegFromUnknown,
   type PositionStateV1,
 } from "./cognitive/position-state.js";
 import type { TradePlanV1 } from "./cognitive/trade-plan.js";
@@ -71,6 +73,8 @@ describe("F2 buildPositionStateFromFill", () => {
     expect(p.trailing).toEqual({ status: "none" });
     expect(p.exitStatus).toBe("none");
     expect(p.revisions).toEqual([]);
+    expect(p.target1Leg?.status).toBe("pending");
+    expect(p.target2Leg?.status).toBe("pending");
     expect(p.createdAt).toBe("2026-08-25T15:00:00Z");
   });
 
@@ -270,5 +274,39 @@ describe("H2 invariantes from_fill / stop", () => {
     const up2 = applyPositionCurrentStop(up1!, 100);
     expect(up2?.currentStop).toBe(100);
     expect(applyPositionCurrentStop(up2!, 98)).toBeNull();
+  });
+
+  it("V1.52 TargetLeg pending at birth; executed on T1 reduce", () => {
+    const open = openLong();
+    expect(open.target1Leg?.status).toBe("pending");
+    const trig = applyTargetLeg(
+      open,
+      "t1",
+      "triggered",
+      "2026-09-01T11:00:00Z",
+      "ev-t1",
+    );
+    expect(trig.target1Leg?.status).toBe("triggered");
+    const reduced = applyPositionReduce(
+      trig,
+      5,
+      105,
+      "2026-09-01T11:01:00Z",
+      "reduce",
+      null,
+      {
+        markTarget1Achieved: true,
+        fillId: "tx-t1",
+        eventId: "ev-t1",
+      },
+    );
+    expect(reduced?.target1Leg?.status).toBe("executed");
+    expect(reduced?.target1Leg?.fillId).toBe("tx-t1");
+    expect(reduced?.target1AchievedAt).toBe("2026-09-01T11:01:00Z");
+  });
+
+  it("V1.52 legacy snapshot hydrates executed from achievedAt", () => {
+    const leg = targetLegFromUnknown(undefined, 105, "2026-08-25T16:00:00Z");
+    expect(leg?.status).toBe("executed");
   });
 });

@@ -53,6 +53,8 @@ class PositionRevision:
     next_status: PositionStatus | None
     origin: PositionRevisionOrigin
     reason: str | None
+    decision_id: str | None = None
+    policy_id: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -64,6 +66,8 @@ class PositionRevision:
             "nextStatus": self.next_status,
             "origin": self.origin,
             "reason": self.reason,
+            "decisionId": self.decision_id,
+            "policyId": self.policy_id,
         }
 
 
@@ -77,6 +81,8 @@ def build_position_revision(
     origin: PositionRevisionOrigin = "stop",
     reason: str | None = None,
     revision_id: str | None = None,
+    decision_id: str | None = None,
+    policy_id: str | None = None,
 ) -> PositionRevision:
     """Factory pura. origin inválido → stop."""
     oid: PositionRevisionOrigin = origin if origin in _VALID_ORIGINS else "stop"
@@ -91,6 +97,8 @@ def build_position_revision(
         next_status=next_status,
         origin=oid,
         reason=_non_empty(reason),
+        decision_id=_non_empty(decision_id),
+        policy_id=_non_empty(policy_id),
     )
 
 
@@ -114,6 +122,8 @@ def position_revision_from_dict(raw: object) -> PositionRevision | None:
         next_status=_status(raw.get("nextStatus")),
         origin=origin_raw,  # type: ignore[arg-type]
         reason=_non_empty(raw.get("reason")),
+        decision_id=_non_empty(raw.get("decisionId")),
+        policy_id=_non_empty(raw.get("policyId")),
     )
 
 

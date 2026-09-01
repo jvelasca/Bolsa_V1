@@ -229,6 +229,8 @@ class ExecutePositionPolicyAuto:
                         else (decision.reason_code or "protect_auto")
                     ),
                     applied_at=inp.as_of,
+                    decision_id=position.trade_plan_id if position else None,
+                    policy_id=inp.operating_policy.template_id,
                 )
             )
             return ExecutePositionPolicyAutoResult(
@@ -312,6 +314,22 @@ class ExecutePositionPolicyAuto:
             as_of=inp.as_of,
         )
         if sell.status != "trade_executed":
+            fail_which = (
+                "t1"
+                if decision.reason_code == "TARGET_1"
+                else "t2"
+                if decision.reason_code == "TARGET_2"
+                else None
+            )
+            if fail_which is not None:
+                await self._protect.patch_target_leg(
+                    account_id=inp.account_id,
+                    instrument_id=inp.instrument_id,
+                    which=fail_which,
+                    status="failed",
+                    at=inp.as_of,
+                    event_id=event_id,
+                )
             return ExecutePositionPolicyAutoResult(
                 status="sell_skipped",
                 decision=decision,
@@ -336,8 +354,21 @@ class ExecutePositionPolicyAuto:
                 filled_at=inp.as_of,
                 mark_target1_achieved=mark_t1,
                 mark_target2_achieved=mark_t2,
+                decision_id=position.trade_plan_id if position else None,
+                policy_id=inp.operating_policy.template_id,
+                event_id=event_id,
             )
         )
+        if row is None and (mark_t1 or mark_t2):
+            await self._protect.patch_target_leg(
+                account_id=inp.account_id,
+                instrument_id=inp.instrument_id,
+                which="t1" if mark_t1 else "t2",
+                status="failed",
+                at=inp.as_of,
+                event_id=event_id,
+                fill_id=tx,
+            )
         return ExecutePositionPolicyAutoResult(
             status="exited" if full_exit or (row and getattr(row, "status", None) == "CLOSED")
             or (
