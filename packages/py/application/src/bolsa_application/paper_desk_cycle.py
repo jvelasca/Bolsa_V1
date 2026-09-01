@@ -1,8 +1,8 @@
-"""V1.46/V1.47 — PaperDeskCycle: EntryTick stub + PositionTick (sesión PAPER).
+"""V1.46–V1.49 — PaperDeskCycle: EntryTick + PositionTick (sesión PAPER).
 
 V1.47: OperationalContext es la fuente de mark/session/freshness/drift/riesgo.
-dry_run default true. Sin cron / multi-día. EntryTick = HonestStub.
-PAPER_D_EXECUTE default off; execute real solo si env + !dry_run.
+V1.49: EntryTick = EstudioPaperDeskEntry (Estudio → TradePlan → Router).
+dry_run default true. PAPER_D_EXECUTE default off; execute real solo si env + !dry_run.
 """
 
 from __future__ import annotations

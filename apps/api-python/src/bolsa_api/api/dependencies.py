@@ -1535,11 +1535,10 @@ def get_paper_desk_cycle_use_case(
     execution_policy_id: str | None = None,
     dry_run: bool = True,
 ) -> Any:
-    """V1.47 — PaperDeskCycle (EntryTick stub + PositionTick + OperationalContext)."""
-    from bolsa_application.paper_desk_cycle import (
-        HonestStubPaperDeskEntry,
-        PaperDeskCycle,
-    )
+    """V1.49 — PaperDeskCycle (EntryTick Estudio + PositionTick + OperationalContext)."""
+    from bolsa_application.lists import GetInstrumentList
+    from bolsa_application.paper_desk_cycle import PaperDeskCycle
+    from bolsa_application.paper_desk_entry import EstudioPaperDeskEntry
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
@@ -1557,7 +1556,10 @@ def get_paper_desk_cycle_use_case(
         )
 
     return PaperDeskCycle(
-        entry=HonestStubPaperDeskEntry(),
+        entry=EstudioPaperDeskEntry(
+            propose=get_propose_estudio_auto_use_case(session),
+            estudio_list=GetInstrumentList(get_list_repository(session)),
+        ),
         open_positions=_OpenAdapter(),
         execute_auto=execute_auto,
         context_builder=get_operational_context_builder(session),

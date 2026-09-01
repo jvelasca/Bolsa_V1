@@ -54,5 +54,5 @@ Jobs del push `v1.48-beta` (retag 2026-09-01T06:50Z), todos **success**:
 
 ## 4. Next
 
-1. Auditoría externa PASS → certificar tip.
-2. **V1.49** EntryTick real — solo tras tip certificado. **NO LIVE**.
+1. Auditoría externa PASS → certificar tip `v1.48-beta`.
+2. **V1.49** Entry AUTO — [`traspaso-relevo-v1-49-paper-desk-entry-auto-2026-09-01.md`](./traspaso-relevo-v1-49-paper-desk-entry-auto-2026-09-01.md) **CÓDIGO**. **NO LIVE**.
