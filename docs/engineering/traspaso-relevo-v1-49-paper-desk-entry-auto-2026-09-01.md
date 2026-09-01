@@ -1,7 +1,7 @@
 # RELEVO — V1.49 Paper Desk Entry AUTO (2026-09-01)
 
 > **Padre:** [`spec-v149-paper-desk-entry-auto-2026-09-01.md`](./spec-v149-paper-desk-entry-auto-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v149-paper-desk-entry-auto-2026-09-01.md`](./plan-v149-paper-desk-entry-auto-2026-09-01.md) · tip previo **`v1.48-beta` → `d5852e8d`**.  
-> **Estado:** **CÓDIGO** — `EstudioPaperDeskEntry` cableado en `PaperDeskCycle` · Estudio list → rank → TradePlan → Router/`check_opening` · GP-DESK-03 · PositionTick/Event Continuity V1.48 intactos. **No** LIVE. Product **`V1.49-beta`**. Package `1.35.0-beta` congelado.
+> **Estado:** **CI GREEN** — tip **`v1.49-beta` → `c8975c9d`** ([relevo tag](./traspaso-relevo-tag-v1-49-beta-2026-09-01.md)). `EstudioPaperDeskEntry` cableado en `PaperDeskCycle` · Estudio list → rank → TradePlan → Router/`check_opening` · GP-DESK-03 · PositionTick/Event Continuity V1.48 intactos. **No** LIVE. Product **`V1.49-beta`**. Package `1.35.0-beta` congelado.
 
 ---
 
@@ -38,5 +38,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab �
 
 ## 4. Next
 
-1. Pre-flight verde · tag `v1.49-beta` · Release-tag CI · auditoría externa.
-2. **V1.50+** scheduler / UI Mercado / capability matrix — **NO LIVE**.
+1. Auditoría externa PASS ([arranque](./arranque-auditor-v1-49-beta-2026-09-01.md)) → certificar tip `v1.49-beta`.
+2. **V1.50+** scheduler / UI Mercado — **NO LIVE**.

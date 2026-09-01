@@ -3,8 +3,8 @@
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
 > **AsOf:** 2026-08-28 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-032** Operational Core v1.9 **CERRADO (modelo)** · **ADR-033** Operational Authority v1.10 **CERRADA (H1→P4)** · **ADR-034** Operational Integrity **OI-1…PA-1 + OE-1 CERRADOS** · **ADR-035** Operational Reliability v1.12 **OR-1/3/4/5/6 CERRADOS · OR-2 cerrado vía DEX-1+DEX-2** · V1.13 Durable Execution **D0 + DEX-1…DEX-5 CERRADOS · pack v113 stampado** · **F1–F4** · **ExitPermission** · **INFRA CI-by-tag** · **ADR-023 Accepted BETA-D** · **A3-wire** `d704263` · **C1–C6** consolidación v1.8.1 **CERRADA**. Alembic `014` en `bolsa_v1`.
-> **AsOf:** 2026-09-01 · **Producto:** **V1.49** Paper Desk Entry AUTO **CÓDIGO** — [relevo](./engineering/traspaso-relevo-v1-49-paper-desk-entry-auto-2026-09-01.md) · [spec](./engineering/spec-v149-paper-desk-entry-auto-2026-09-01.md). **V1.48** tip **`v1.48-beta` → `d5852e8d`** (CI GREEN). **Tag tip:** pendiente `v1.49-beta`. **Package version:** `1.35.0-beta` (congelado). **BETA / no producción.**
-> **Auditoría:** V1.48 CI GREEN · auditoría externa V1.48 pendiente · EntryTick **Estudio** cableado (V1.49) · **no** LIVE.
+> **AsOf:** 2026-09-01 · **Producto:** **V1.49** Paper Desk Entry AUTO **CI GREEN** — [relevo](./engineering/traspaso-relevo-v1-49-paper-desk-entry-auto-2026-09-01.md) · [tag relevo](./engineering/traspaso-relevo-tag-v1-49-beta-2026-09-01.md) · [spec](./engineering/spec-v149-paper-desk-entry-auto-2026-09-01.md) · [arranque auditor](./engineering/arranque-auditor-v1-49-beta-2026-09-01.md). **V1.48** tip **`v1.48-beta` → `d5852e8d`**. **Tag tip:** **`v1.49-beta` → `c8975c9d`** (Release-tag CI GREEN). **Package version:** `1.35.0-beta` (congelado). **BETA / no producción.**
+> **Auditoría:** pre-flight verde (vitest 7 · pytest 70) · Release-tag CI GREEN · **pendiente auditoría externa V1.49** · EntryTick **Estudio** · **no** LIVE.
 
 ---
 
