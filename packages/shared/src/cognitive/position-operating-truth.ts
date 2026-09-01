@@ -38,6 +38,12 @@ import {
 import type { PositionAttentionV1 } from "./position-decision.js";
 import type { ProtectPlanV1 } from "./protect-plan.js";
 import type { DurableSubmitIntentV1 } from "./submit-intent.js";
+import {
+  buildPositionOperationalView,
+  type PositionOperationalViewV1,
+} from "./position-operational-view.js";
+import { positionStateFromPositionDto } from "./position-state-from-dto.js";
+import type { PaperDeskNextActionV1 } from "./operational-context.js";
 
 export type PositionSecondaryConditionKindV1 =
   | "protection_discrepancy"
@@ -68,6 +74,8 @@ export type PositionOperatingTruthV1 = {
   exitRoute: ExitRouteViewV1 | null;
   protectPlan: ProtectPlanV1 | null;
   protectionDiscrepancy: boolean;
+  /** V1.55 — canonical operational projection (backend-derived when available). */
+  operationalView: PositionOperationalViewV1 | null;
   primaryCta: MesaNextActionV1;
   phrase: string;
   secondaryConditions: PositionSecondaryConditionV1[];
@@ -287,6 +295,21 @@ export function buildPositionOperatingTruth(
           originStudy: input.originStudy,
         });
 
+  const stateFromDto = positionStateFromPositionDto(input.position);
+  const operationalView = stateFromDto
+    ? buildPositionOperationalView({
+        position: stateFromDto,
+        reconStatus:
+          input.portfolioReconStatus === "drift" ||
+          input.portfolioReconStatus === "unavailable"
+            ? input.portfolioReconStatus
+            : "clean",
+        deskStatus: mapOperatingStateToDeskStatusFromCta(primaryCta),
+        decisionVerdict: operational.decision.action,
+        templateId: null,
+      })
+    : null;
+
   return {
     instrumentId: operational.instrumentId,
     symbol: operational.symbol,
@@ -297,6 +320,7 @@ export function buildPositionOperatingTruth(
     exitRoute,
     protectPlan: input.protectPlan ?? null,
     protectionDiscrepancy,
+    operationalView,
     primaryCta,
     phrase: formatPositionDecisionPhrase(operational.decision),
     secondaryConditions,
@@ -323,6 +347,17 @@ export function positionOperatingTruthSurfaceSnapshot(
 export function mesaNextActionFromPositionOperatingTruth(
   truth: PositionOperatingTruthV1,
 ): MesaNextActionV1 {
+  if (truth.operationalView?.primaryAction) {
+    const mapped = truth.operationalView.primaryAction;
+    if (mapped === "MONITOR") {
+      return truth.primaryCta;
+    }
+    return {
+      kind: mapDeskActionToCtaKind(mapped),
+      label: MESA_NEXT_ACTION_LABELS[mapDeskActionToCtaKind(mapped)],
+      allowsEntry: false,
+    };
+  }
   return {
     kind: truth.primaryCta.kind,
     label: truth.primaryCta.label,
@@ -363,4 +398,41 @@ export function formatPositionOperatingExecutionCopy(
     formatExecutionStateCopy(truth.execution) ??
     formatExecutionHintCopy(truth.operational)
   );
+}
+
+function mapDeskActionToCtaKind(
+  action: PaperDeskNextActionV1,
+): MesaNextActionV1["kind"] {
+  switch (action) {
+    case "SUBIR_STOP":
+      return "protect";
+    case "REDUCIR":
+      return "reduce";
+    case "SALIR":
+      return "exit";
+    case "REVISAR_DATOS_NO_FRESCOS":
+    case "BLOQUEADO":
+      return "review";
+    case "ESPERAR_APERTURA":
+      return "watch";
+    case "MONITOR":
+    case "MANTENER":
+    default:
+      return "maintain";
+  }
+}
+
+function mapOperatingStateToDeskStatusFromCta(cta: MesaNextActionV1): string {
+  switch (cta.kind) {
+    case "protect":
+      return "protected";
+    case "reduce":
+      return "reduced";
+    case "exit":
+      return "exited";
+    case "review":
+      return "denied";
+    default:
+      return "held";
+  }
 }

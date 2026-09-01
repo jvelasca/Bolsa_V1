@@ -1,6 +1,6 @@
 /**
- * Operational Console — agregador read-only de salud operativa (OE-1, OR-6, recon, DEX-3).
- * Complementa P4 /operations (posiciones-first). No firma ni ejecuta.
+ * Operational Console — excepciones operativas (V1.55).
+ * Incidentes · recon · birth_failed · UNKNOWN. Diagnóstico técnico detrás de detalles.
  */
 
 import { useState } from "react";
@@ -69,12 +69,12 @@ export function OperationalConsolePage() {
             Consola operacional
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Salud ops read-only — OE-1, A6 Estudio AUTO, readiness, recon e
-            incidentes
+            Resolver excepciones — recon · incidentes · posición no nacida ·
+            órdenes UNKNOWN
             {account ? ` · ${account.name}` : ""}.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Posiciones y CTAs de desriesgo siguen en{" "}
+            Posiciones y CTAs de desriesgo en{" "}
             <Link
               to="/mesa?view=posiciones"
               className="text-primary hover:underline"
@@ -120,18 +120,6 @@ export function OperationalConsolePage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <OpsReadinessSection report={report} />
-        <OpsRuntimeSection report={report} />
-        <OpsSelfEvalSection report={report} />
-        <OpsEstudioAutoSection
-          report={a6}
-          accountId={effectiveAccountId}
-          isLoading={a6Query.isLoading}
-          isError={a6Query.isError}
-          onDryRunComplete={() => {
-            void a6Query.refetch();
-          }}
-        />
         <OpsReconSection report={report} />
         {effectiveAccountId ? (
           <OpsIncidentsSection
@@ -141,6 +129,26 @@ export function OperationalConsolePage() {
         ) : null}
         <OpsQuickLinksSection pendingConfirm={pendingConfirm} />
       </div>
+
+      <details className="rounded-lg border border-border/60 p-4">
+        <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+          Ver detalles técnicos (readiness · self-eval · Estudio AUTO)
+        </summary>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <OpsReadinessSection report={report} />
+          <OpsRuntimeSection report={report} />
+          <OpsSelfEvalSection report={report} />
+          <OpsEstudioAutoSection
+            report={a6}
+            accountId={effectiveAccountId}
+            isLoading={a6Query.isLoading}
+            isError={a6Query.isError}
+            onDryRunComplete={() => {
+              void a6Query.refetch();
+            }}
+          />
+        </div>
+      </details>
     </div>
   );
 }

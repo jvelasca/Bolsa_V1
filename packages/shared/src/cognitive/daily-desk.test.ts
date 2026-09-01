@@ -88,31 +88,31 @@ function armedStudy(
   } as DecisionJournalStudyViewV1;
 }
 
-describe("dailyDesk V1.42 F6 four buckets", () => {
-  it("always exposes four chrome buckets in §B.7 order", () => {
+describe("dailyDesk V1.55 five buckets", () => {
+  it("always exposes five chrome buckets in §B.7 order", () => {
     const inbox = buildDailyDeskInbox({ positions: [], pendingConfirm: 0 });
     expect(inbox.buckets.map((b) => b.id)).toEqual([
       ...DAILY_DESK_BUCKET_ORDER,
     ]);
     expect(inbox.buckets.map((b) => b.label)).toEqual([
       DAILY_DESK_BUCKET_LABEL.requiere_accion,
+      DAILY_DESK_BUCKET_LABEL.proteger,
+      DAILY_DESK_BUCKET_LABEL.posiciones,
       DAILY_DESK_BUCKET_LABEL.oportunidades,
-      DAILY_DESK_BUCKET_LABEL.vigilar,
-      DAILY_DESK_BUCKET_LABEL.sin_accion,
+      DAILY_DESK_BUCKET_LABEL.no_operar,
     ]);
   });
 
-  it("HOLD clean → empty items; ⚪ honest empty (not a fifth Mercado)", () => {
+  it("HOLD clean → posiciones bucket lists open book", () => {
     const inbox = buildDailyDeskInbox({
       positions: [aaplOpen()],
       portfolioReconStatus: "ok",
       pendingConfirm: 0,
     });
-    expect(inbox.count).toBe(0);
-    expect(inbox.emptyLabel).toMatch(/Nada requiere/i);
-    const sin = inbox.buckets.find((b) => b.id === "sin_accion");
-    expect(sin?.count).toBe(0);
-    expect(sin?.emptyLabel).toMatch(/Nada que hacer/i);
+    expect(inbox.count).toBeGreaterThan(0);
+    const posiciones = inbox.buckets.find((b) => b.id === "posiciones");
+    expect(posiciones?.count).toBeGreaterThan(0);
+    expect(posiciones?.items[0]?.ctaLabel).toMatch(/Mantener/i);
   });
 
   it("pending confirm → 🔴 REQUIERE ACCIÓN", () => {
@@ -156,7 +156,7 @@ describe("dailyDesk V1.42 F6 four buckets", () => {
     expect(inbox.items[0]?.ctaLabel).toBe("Revisar");
   });
 
-  it("protection discrepancy → 🔴 Proteger", () => {
+  it("protection discrepancy → 🟠 Proteger", () => {
     const inbox = buildDailyDeskInbox({
       positions: [],
       protectionDiscrepancies: [
@@ -167,7 +167,7 @@ describe("dailyDesk V1.42 F6 four buckets", () => {
         },
       ],
     });
-    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
+    expect(inbox.items[0]?.bucket).toBe("proteger");
     expect(inbox.items[0]?.ctaLabel).toBe("Proteger");
   });
 
@@ -291,10 +291,10 @@ describe("dailyDesk V1.42 F6 four buckets", () => {
         semiF3Queue: [],
       } as never,
     });
-    const vigilar = inbox.buckets.find((b) => b.id === "vigilar");
-    expect(vigilar?.count).toBeGreaterThan(0);
-    expect(vigilar!.items[0]!.phaseLabel).toMatch(/estudio/i);
-    for (const item of vigilar!.items) {
+    const noOperar = inbox.buckets.find((b) => b.id === "no_operar");
+    expect(noOperar?.count).toBeGreaterThan(0);
+    expect(noOperar!.items[0]!.phaseLabel).toMatch(/estudio/i);
+    for (const item of noOperar!.items) {
       expect(item.phaseLabel ?? "").not.toMatch(/^(WATCH|ARMED|TRIGGERED)$/);
       expect(item.ctaLabel.toUpperCase()).not.toContain("BUY");
     }

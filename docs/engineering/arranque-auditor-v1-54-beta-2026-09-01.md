@@ -8,13 +8,13 @@ Eres auditor externo de Bolsa V1 **stack V1.52 Position Lifecycle → V1.53 Gold
 
 **Alcance:** V1.52 TargetLeg + revisiones + Lab execute **DENY** + GP-EXIT/CRASH · V1.53 pytest **GP-SESSION-01..04** (Estudio 09:00 → birth → protect → T1 → TRAIL×2 → exit → `PaperDailyReport`) · V1.54 proyección **autoDesk → Daily Desk inbox** (`EntryOpportunity` thin, cubo ⚠ excepciones, **GP-DESK-UI-01..09**). **No** segundo motor de ranking · **no** CTA COMPRAR desde filas AUTO.
 
-**Contexto CI (2026-09-01):** tag `v1.54-beta` → `e057a8cc` → Release-tag CI **pending** (stamp/merge en curso; actualizar a **GREEN** cuando termine). Tips previos: `v1.52-beta` → `9725e9e7` (**GREEN**), `v1.53-beta` → `9725e9e7` (**GREEN**). Pre-flight local post close-out: shared + web vitest, pytest desk-block, ruff, tsc **OK**.
+**Contexto CI (2026-09-01):** tag `v1.54-beta` → `e057a8cc` · Release-tag CI **GREEN** ([run 33505011481](https://github.com/jvelasca/Bolsa_V1/actions/runs/33505011481)). Tips previos: `v1.52-beta` → `9725e9e7` (**GREEN**), `v1.53-beta` → `9725e9e7` (**GREEN**). Pre-flight local post close-out: shared + web vitest, pytest desk-block, ruff, tsc **OK**.
 
 **GitHub (auditor):**
 
 - Código tip: [`v1.54-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.54-beta) → commit `e057a8cc`
 - Rama integración: [`stage/v151-entry-fill-position-2026-09-01`](https://github.com/jvelasca/Bolsa_V1/tree/stage/v151-entry-fill-position-2026-09-01)
-- `main` debe contener el merge del stack + docs arranque (post-stamp)
+- `main` contiene el merge del stack + docs arranque ([PR #56](https://github.com/jvelasca/Bolsa_V1/pull/56) → `dbff6463`)
 - Partida certificada: [`v1.51-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.51-beta) → `5eb8e6de` (PASS 9,1)
 
 Lee en este orden:

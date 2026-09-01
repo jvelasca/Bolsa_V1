@@ -91,6 +91,29 @@ export type PaperDeskPositionRowV1 = {
   operatingState?: string | null;
 };
 
+export type PaperDailyReportSectionsV1 = {
+  decisiones: {
+    candidates: number;
+    proposed: number;
+    authorized: number;
+    executed: number;
+  };
+  operativa: {
+    entries: number;
+    t1: number;
+    trails: number;
+    exits: number;
+  };
+  resultado: {
+    realizedR: number | null;
+    dayPct: number | null;
+  };
+  noOperadas: {
+    skipped: number;
+    reasonCodes: Partial<Record<PaperDeskEntryReasonCodeV1, number>>;
+  };
+};
+
 export type PaperDailyReportV1 = {
   schemaVersion: typeof PAPER_DAILY_REPORT_SCHEMA;
   accountId: string;
@@ -100,6 +123,8 @@ export type PaperDailyReportV1 = {
   blocked?: boolean;
   blockReason?: string | null;
   entry: PaperDailyReportEntryV1;
+  /** V1.55 — DECISIONES / OPERATIVA / RESULTADO / NO OPERADAS */
+  sections?: PaperDailyReportSectionsV1;
   /** V1.54 — hechos de excepción para proyección Desk (opcional). */
   exceptionFacts?: DailyDeskExceptionFactV1[];
   positions: {
@@ -197,6 +222,11 @@ export function buildPaperDailyReport(
       proposed: cycle.entry.proposedCount ?? 0,
       executed: cycle.entry.executedCount ?? 0,
     },
+    sections: buildPaperDailyReportSections(cycle, {
+      protected: protectedCount,
+      reduced,
+      exited,
+    }),
     positions: {
       held,
       denied,
@@ -207,5 +237,43 @@ export function buildPaperDailyReport(
     },
     jitDenies,
     notes,
+  };
+}
+
+export function buildPaperDailyReportSections(
+  cycle: PaperDeskCycleLikeV1,
+  counts: { protected: number; reduced: number; exited: number },
+): PaperDailyReportSectionsV1 {
+  const proposed = cycle.entry.proposedCount ?? 0;
+  const executed = cycle.entry.executedCount ?? 0;
+  const skippedReasons: Partial<Record<PaperDeskEntryReasonCodeV1, number>> =
+    {};
+  let trails = 0;
+  for (const row of cycle.positions) {
+    if (row.decisionAction === "TRAIL" || row.decisionVerdict === "TRAIL") {
+      trails += 1;
+    }
+  }
+  return {
+    decisiones: {
+      candidates: proposed,
+      proposed,
+      authorized: executed > 0 ? 1 : 0,
+      executed,
+    },
+    operativa: {
+      entries: executed,
+      t1: counts.reduced,
+      trails,
+      exits: counts.exited,
+    },
+    resultado: {
+      realizedR: null,
+      dayPct: null,
+    },
+    noOperadas: {
+      skipped: Math.max(0, proposed - executed),
+      reasonCodes: skippedReasons,
+    },
   };
 }

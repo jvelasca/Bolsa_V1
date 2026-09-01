@@ -38,19 +38,21 @@ describe("parseHoyView", () => {
   });
 });
 
-describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
-  it("lists four §B.7 inbox cubes", () => {
+describe("Hoy Daily Desk chrome (V1.55)", () => {
+  it("lists five §B.7 inbox cubes", () => {
     expect(HOY_INBOX_BLOCKS.map((b) => b.id)).toEqual([
       "requiere_accion",
+      "proteger",
+      "posiciones",
       "oportunidades",
-      "vigilar",
-      "sin_accion",
+      "no_operar",
     ]);
     expect(HOY_INBOX_BLOCKS.map((b) => b.title)).toEqual([
       "Requiere acción",
+      "Proteger",
+      "Posiciones",
       "Oportunidades",
-      "Vigilar",
-      "Sin acción",
+      "No operar",
     ]);
   });
 
@@ -61,7 +63,7 @@ describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
     expect(byId.get("journal")).toBe("/mesa?view=journal");
     expect(byId.get("posiciones")).toBe("/mesa?view=posiciones");
     expect(byId.get("consola")).toBe("/operational-console");
-    expect(HOY_INBOX_BLOCKS).toHaveLength(4);
+    expect(HOY_INBOX_BLOCKS).toHaveLength(5);
   });
 
   it("does not offer Confirmar as a detail entry", () => {

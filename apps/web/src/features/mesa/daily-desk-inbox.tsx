@@ -36,10 +36,14 @@ function bucketTone(id: DailyDeskBucketV1["id"]): string {
   switch (id) {
     case "requiere_accion":
       return "border-rose-600/40";
+    case "proteger":
+      return "border-orange-500/40";
+    case "posiciones":
+      return "border-sky-600/35";
     case "oportunidades":
       return "border-emerald-600/35";
-    case "vigilar":
-      return "border-amber-500/35";
+    case "no_operar":
+      return "border-border/60";
     default:
       return "border-border/60";
   }
@@ -49,10 +53,14 @@ function bucketMarker(id: DailyDeskBucketV1["id"]): string {
   switch (id) {
     case "requiere_accion":
       return "🔴";
-    case "oportunidades":
+    case "proteger":
+      return "🟠";
+    case "posiciones":
       return "🟢";
-    case "vigilar":
-      return "🟡";
+    case "oportunidades":
+      return "🔵";
+    case "no_operar":
+      return "⚪";
     default:
       return "⚪";
   }

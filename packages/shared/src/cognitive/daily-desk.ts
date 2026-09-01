@@ -34,30 +34,34 @@ import type { ProtectPlanV1 } from "./protect-plan.js";
 
 export type DailyDeskBucketIdV1 =
   | "requiere_accion"
+  | "proteger"
+  | "posiciones"
   | "oportunidades"
-  | "vigilar"
-  | "sin_accion";
+  | "no_operar";
 
 export const DAILY_DESK_BUCKET_ORDER: readonly DailyDeskBucketIdV1[] = [
   "requiere_accion",
+  "proteger",
+  "posiciones",
   "oportunidades",
-  "vigilar",
-  "sin_accion",
+  "no_operar",
 ] as const;
 
 /** Chrome labels — human copy, never WATCH/ARMED/TRIGGERED enums. */
 export const DAILY_DESK_BUCKET_LABEL: Record<DailyDeskBucketIdV1, string> = {
   requiere_accion: "Requiere acción",
+  proteger: "Proteger",
+  posiciones: "Posiciones",
   oportunidades: "Oportunidades",
-  vigilar: "Vigilar",
-  sin_accion: "Sin acción",
+  no_operar: "No operar",
 };
 
 export const DAILY_DESK_BUCKET_EMPTY: Record<DailyDeskBucketIdV1, string> = {
   requiere_accion: "Nada requiere tu firma ni una salida ahora",
+  proteger: "Sin posiciones pendientes de protección",
+  posiciones: "Sin posiciones abiertas en seguimiento",
   oportunidades: "Sin preparadas, disparadas ni propuestas",
-  vigilar: "Nada en vigilancia",
-  sin_accion: "Nada que hacer",
+  no_operar: "Sin bloqueos ni vigilar hoy",
 };
 
 export type DailyDeskItemKindV1 =
@@ -186,7 +190,7 @@ function groupBuckets(items: DailyDeskItemV1[]): DailyDeskBucketV1[] {
   });
 }
 
-/** §B.7 — clasifica CTA/fase de posición → cubo. */
+/** §B.7 V1.55 — clasifica CTA/fase de posición → cubo. */
 export function bucketFromPositionTruth(
   truth: PositionOperatingTruthV1,
 ): DailyDeskBucketIdV1 {
@@ -196,19 +200,23 @@ export function bucketFromPositionTruth(
   ) {
     return "requiere_accion";
   }
+  if (truth.operationalView?.operatingState === "RECONCILIATION_ERROR") {
+    return "requiere_accion";
+  }
   switch (truth.primaryCta.kind) {
     case "exit":
     case "reduce":
-    case "protect":
     case "review":
     case "review_filter":
     case "review_proposal":
       return "requiere_accion";
-    case "watch":
-      return "vigilar";
+    case "protect":
+      return "proteger";
     case "maintain":
     case "none":
-      return "sin_accion";
+      return "posiciones";
+    case "watch":
+      return "no_operar";
     case "view_thesis":
       return "oportunidades";
     default:
@@ -228,7 +236,7 @@ export function bucketFromEntryTruth(
     case "confirmada":
       return "requiere_accion";
     default:
-      return "vigilar";
+      return "no_operar";
   }
 }
 
@@ -246,9 +254,8 @@ function phraseForPosition(truth: PositionOperatingTruthV1): string {
   return truth.phrase;
 }
 
-function shouldListPosition(bucket: DailyDeskBucketIdV1): boolean {
-  // HOLD limpio → no ensucia chrome; ⚪ queda vacío honesto.
-  return bucket !== "sin_accion";
+function shouldListPosition(_bucket: DailyDeskBucketIdV1): boolean {
+  return true;
 }
 
 function dailyDeskItemFromPot(
@@ -309,11 +316,13 @@ export function dailyDeskItemFromTruth(
 ): DailyDeskItemV1 {
   const kind = truth.primaryCta.kind as MesaNextActionKindV1;
   const bucket: DailyDeskBucketIdV1 =
-    kind === "maintain" || kind === "none"
-      ? "sin_accion"
-      : kind === "watch"
-        ? "vigilar"
-        : "requiere_accion";
+    kind === "protect"
+      ? "proteger"
+      : kind === "maintain" || kind === "none"
+        ? "posiciones"
+        : kind === "watch"
+          ? "no_operar"
+          : "requiere_accion";
   return {
     id: `position-${truth.positionId}`,
     kind: "position",
@@ -451,7 +460,7 @@ export function buildDailyDeskInbox(
           items.push({
             id: `watch-${row.instrumentId}`,
             kind: "entry",
-            bucket: "vigilar",
+            bucket: "no_operar",
             symbol: row.symbol,
             attention: "NORMAL",
             phrase: "En estudio — esperando disparador",
@@ -467,7 +476,7 @@ export function buildDailyDeskInbox(
       const item = dailyDeskItemFromEot(eot);
       // bloqueada/caducada con CTA none: no saturar 🟢; van a vigilar solo si hay atención.
       if (item.ctaKind === "none" && item.bucket === "oportunidades") {
-        item.bucket = "vigilar";
+        item.bucket = "no_operar";
       }
       seenSymbols.add(sym);
       seenInstrumentIds.add(row.instrumentId);
@@ -488,8 +497,11 @@ export function buildDailyDeskInbox(
     const isProtect = item.recommendedAction === "REVISAR PROTECCIÓN";
     const isExit = item.recommendedAction === "REVISAR SALIDA";
     const isBlocked = item.kind === "BLOCKED";
-    const bucket: DailyDeskBucketIdV1 =
-      isProtect || isExit || isBlocked ? "requiere_accion" : "vigilar";
+    const bucket: DailyDeskBucketIdV1 = isProtect
+      ? "proteger"
+      : isExit || isBlocked
+        ? "requiere_accion"
+        : "no_operar";
     items.push({
       id: item.id ?? `board-${item.symbol}-${item.kind}`,
       kind: "board_attention",

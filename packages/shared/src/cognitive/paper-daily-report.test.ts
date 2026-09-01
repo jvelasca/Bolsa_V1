@@ -38,6 +38,8 @@ describe("paper-daily-report", () => {
     expect(report.notes.some((n) => n.toLowerCase().includes("dryrun"))).toBe(
       true,
     );
+    expect(report.sections?.decisiones.proposed).toBe(2);
+    expect(report.sections?.operativa.entries).toBe(0);
   });
 
   it("GP-DESK-03 env blocked notes", () => {

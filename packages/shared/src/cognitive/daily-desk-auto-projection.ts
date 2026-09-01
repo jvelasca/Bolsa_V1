@@ -199,7 +199,7 @@ function deskItemFromDeniedCandidate(
   return {
     id: `auto-deny-${candidate.instrumentId}`,
     kind: "entry",
-    bucket: "vigilar",
+    bucket: "no_operar",
     symbol,
     attention: "BLOCKED",
     phrase: formatCandidateDenyPhrase(candidate),
@@ -249,7 +249,7 @@ export function dailyDeskItemFromCandidateSnapshot(
     item.bucket === "oportunidades" &&
     status !== "TRIGGERED"
   ) {
-    item.bucket = "vigilar";
+    item.bucket = "no_operar";
   }
   if (status === "TRIGGERED" && !isCandidateDenied(candidate)) {
     item.bucket = "oportunidades";

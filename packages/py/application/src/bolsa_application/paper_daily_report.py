@@ -77,7 +77,44 @@ class PaperDailyReportV1:
         }
         if self.exception_facts:
             out["exceptionFacts"] = list(self.exception_facts)
+        sections = _build_report_sections(self)
+        if sections:
+            out["sections"] = sections
         return out
+
+
+def _build_report_sections(report: PaperDailyReportV1) -> dict[str, Any]:
+    """V1.55 — DECISIONES / OPERATIVA / RESULTADO / NO OPERADAS."""
+    trails = sum(
+        1
+        for row in report.position_rows
+        if row.get("decisionAction") == "TRAIL"
+        or row.get("decisionVerdict") == "TRAIL"
+    )
+    proposed = report.entry_proposed
+    executed = report.entry_executed
+    return {
+        "decisiones": {
+            "candidates": proposed,
+            "proposed": proposed,
+            "authorized": 1 if executed > 0 else 0,
+            "executed": executed,
+        },
+        "operativa": {
+            "entries": executed,
+            "t1": report.position_reduced,
+            "trails": trails,
+            "exits": report.position_exited,
+        },
+        "resultado": {
+            "realizedR": None,
+            "dayPct": None,
+        },
+        "noOperadas": {
+            "skipped": max(0, proposed - executed),
+            "reasonCodes": {},
+        },
+    }
 
 
 def _collect_exception_facts(cycle: PaperDeskCycleResult) -> list[dict[str, Any]]:

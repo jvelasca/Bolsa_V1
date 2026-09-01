@@ -189,7 +189,7 @@ describe("DailyDeskInbox V1.42 F6/F7", () => {
         .getByTestId("daily-desk-bucket-oportunidades")
         .getAttribute("data-count"),
     ).toBe("1");
-    expect(screen.getByTestId("daily-desk-empty-sin_accion")).toBeTruthy();
+    expect(screen.getByTestId("daily-desk-empty-proteger")).toBeTruthy();
     expect(screen.getByTestId("daily-desk-cta-confirm").textContent).toBe(
       "Revisar y confirmar",
     );

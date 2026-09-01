@@ -31,6 +31,7 @@ export * from "./daily-desk.js";
 export * from "./daily-desk-auto-projection.js";
 export * from "./paper-daily-report.js";
 export * from "./operational-context.js";
+export * from "./position-operational-view.js";
 export * from "./mercado-cockpit-phase.js";
 export * from "./entry-operating-copy.js";
 export * from "./entry-operating-truth.js";

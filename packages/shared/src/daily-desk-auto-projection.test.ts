@@ -128,7 +128,7 @@ describe("GP-DESK-UI-01 TRIGGERED candidate → green row", () => {
 });
 
 describe("GP-DESK-UI-02 DENY candidate → no green / blocked copy", () => {
-  it("ENTRY_RISK_LIMIT → vigilar BLOCKED, not oportunidades", () => {
+  it("ENTRY_RISK_LIMIT → no_operar BLOCKED, not oportunidades", () => {
     const denied = triggeredCandidate({
       reasonCode: "ENTRY_RISK_LIMIT",
       vetoes: ["portfolio_risk_limit"],
@@ -140,7 +140,7 @@ describe("GP-DESK-UI-02 DENY candidate → no green / blocked copy", () => {
     const items = projectAutoDeskCandidates({ autoDesk });
     expect(items).toHaveLength(1);
     expect(items[0]?.bucket).not.toBe("oportunidades");
-    expect(items[0]?.bucket).toBe("vigilar");
+    expect(items[0]?.bucket).toBe("no_operar");
     expect(items[0]?.attention).toBe("BLOCKED");
     expect(items[0]?.phrase).toMatch(/DENY|ranking|book_max/i);
     expect(formatCandidateDenyPhrase(denied)).toMatch(/DENY|book_max/i);
@@ -154,7 +154,7 @@ describe("GP-DESK-UI-02 DENY candidate → no green / blocked copy", () => {
     });
     const autoDesk = autoDeskWithCandidates([], [skipped]);
     const items = projectAutoDeskCandidates({ autoDesk });
-    expect(items[0]?.bucket).toBe("vigilar");
+    expect(items[0]?.bucket).toBe("no_operar");
     expect(items[0]?.attention).toBe("BLOCKED");
   });
 });
@@ -221,7 +221,7 @@ describe("GP-DESK-UI-08 autoDesk absent → no crash", () => {
   it("buildOperatingDeskInbox without autoDesk equals base + exceptions only", () => {
     const inbox = buildOperatingDeskInbox({ positions: [] });
     expect(inbox.count).toBe(0);
-    expect(inbox.buckets).toHaveLength(4);
+    expect(inbox.buckets).toHaveLength(5);
   });
 
   it("legacy PaperDailyReport without candidates field is safe", () => {
