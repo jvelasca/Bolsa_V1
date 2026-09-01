@@ -4,13 +4,21 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+### V1.58 — Adversarial Execution (2026-09-01)
+
+- **GP-GOLDEN-DAY-ADV-01:** día PAPER encadenado (BUY → dup fill → T1 → crash replay → TRAIL → T2 network skip → retry → dup event → EXIT → recon clean) en `test_paper_desk_golden_day_adversarial.py`.
+- **AdversarialSell:** `fail_next(n)` → `skipped`/`network_failure` sin consumir fill id; retry ejecuta.
+- **P0b:** `execute_position_policy_auto` marca leg `failed` solo en `blocked`/`rejected`, no en transport skip.
+- **GP-V158-STOP-CLOSED:** STRUCTURAL_STOP + `session=CLOSED` vende; T1 + CLOSED → `queue_next_session`. Hallazgo 22 rondas cerrado como contrato PAPER (sin encolar stop a apertura).
+- Spec [`spec-v158-adversarial-execution-2026-09-01.md`](./docs/engineering/spec-v158-adversarial-execution-2026-09-01.md) · relevo [`traspaso-relevo-v1-58-adversarial-execution-2026-09-01.md`](./docs/engineering/traspaso-relevo-v1-58-adversarial-execution-2026-09-01.md) · arranque auditor [`arranque-auditor-v1-58-adversarial-execution-2026-09-01.md`](./docs/engineering/arranque-auditor-v1-58-adversarial-execution-2026-09-01.md). Freeze intacto: **no** LIVE · `PAPER_D_EXECUTE` OFF · package `1.35.0-beta`. Tag `v1.58-beta` pendiente.
+
 ### V1.57 — Operational Truth (2026-09-01)
 
 - **GP-V157-01:** `T2_EXECUTED` distinto de `T2_READY`; eventos T2 simétricos a T1; desk map `T2_*` → reduced.
 - **GP-V157-02:** `buildStopHistory` incluye `protect` / `trail` / `reduce` / `override` / `stop`.
 - **GP-V157-03:** `reconStatus === "drift"` → `RECONCILIATION_DRIFT` (TS + Python); cubo Mesa `requiere_accion`.
 - **INV-01..10:** batería `test_inv_operational_truth.py`. Exhaustividad `assertNever` en proyección cognitiva.
-- Spec [`spec-v157-operational-truth-2026-09-01.md`](./docs/engineering/spec-v157-operational-truth-2026-09-01.md) · relevo [`traspaso-relevo-v1-57-operational-truth-2026-09-01.md`](./docs/engineering/traspaso-relevo-v1-57-operational-truth-2026-09-01.md) · arranque auditor [`arranque-auditor-v1-57-operational-truth-2026-09-01.md`](./docs/engineering/arranque-auditor-v1-57-operational-truth-2026-09-01.md). Freeze intacto: **no** LIVE · `PAPER_D_EXECUTE` OFF · package `1.35.0-beta`. Tag `v1.57-beta` pendiente.
+- Spec [`spec-v157-operational-truth-2026-09-01.md`](./docs/engineering/spec-v157-operational-truth-2026-09-01.md) · relevo [`traspaso-relevo-v1-57-operational-truth-2026-09-01.md`](./docs/engineering/traspaso-relevo-v1-57-operational-truth-2026-09-01.md) · arranque auditor [`arranque-auditor-v1-57-operational-truth-2026-09-01.md`](./docs/engineering/arranque-auditor-v1-57-operational-truth-2026-09-01.md). Freeze intacto: **no** LIVE · `PAPER_D_EXECUTE` OFF · package `1.35.0-beta`. Tag **`v1.57-beta`**.
 
 ## [1.56-beta] — 2026-09-01
 

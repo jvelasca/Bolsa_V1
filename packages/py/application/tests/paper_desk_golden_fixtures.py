@@ -231,6 +231,31 @@ class Sell:
         return result
 
 
+class AdversarialSell(Sell):
+    """Sell stub with transient network skips — no fill id, retryable."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._fail_remaining = 0
+        self.network_skip_count = 0
+
+    def fail_next(self, n: int) -> None:
+        self._fail_remaining = max(0, int(n))
+
+    async def sell(self, **kwargs: Any) -> PaperPositionSellResult:
+        key = str(kwargs.get("idempotency_key") or "")
+        if key in self.by_key:
+            return self.by_key[key]
+        if self._fail_remaining > 0:
+            self._fail_remaining -= 1
+            self.network_skip_count += 1
+            return PaperPositionSellResult(
+                status="skipped",
+                reason="network_failure",
+            )
+        return await super().sell(**kwargs)
+
+
 class Policies:
     def __init__(self, policy: ExecutionPolicyRecord) -> None:
         self._policy = policy

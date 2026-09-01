@@ -321,7 +321,10 @@ class ExecutePositionPolicyAuto:
                 if decision.reason_code == "TARGET_2"
                 else None
             )
-            if fail_which is not None:
+            reason_raw = (sell.reason or "").lower()
+            status_raw = (sell.status or "").lower()
+            hard_reject = status_raw == "blocked" or "rejected" in reason_raw
+            if fail_which is not None and hard_reject:
                 await self._protect.patch_target_leg(
                     account_id=inp.account_id,
                     instrument_id=inp.instrument_id,

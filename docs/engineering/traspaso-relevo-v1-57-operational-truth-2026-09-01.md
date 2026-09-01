@@ -38,6 +38,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-beta` · 
 ## 3. Next
 
 1. Commit + tag `v1.57-beta` cuando el owner lo pida (no en este slice).
-2. **V1.58** GOLDEN-DAY-ADVERSARIAL (parked).
-3. **V1.59** E2E FastAPI+DB · **V1.60** UX Mercado.
-4. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura.
+2. **V1.59** E2E FastAPI+DB · **V1.60** UX Mercado.
+3. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura.
