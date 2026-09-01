@@ -1,6 +1,6 @@
 # Respuesta auditor — V1.55 Operational Hardening (2026-09-01)
 
-> **Padre:** [`traspaso-relevo-tag-v1-55-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-55-beta-2026-09-01.md) · [`spec-v155-operational-hardening-2026-09-01.md`](./spec-v155-operational-hardening-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
+> **Padre:** [`traspaso-relevo-tag-v1-55-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-55-beta-2026-09-01.md) · [`cierre-apertura`](./traspaso-relevo-cierre-v155-apertura-siguiente-2026-09-01.md) · [`spec-v155-operational-hardening-2026-09-01.md`](./spec-v155-operational-hardening-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
 > **Tip auditado:** `v1.55-beta` → `c23091d9` (Release-tag CI GREEN · [run 33508814540](https://github.com/jvelasca/Bolsa_V1/actions/runs/33508814540)).  
 > **Partida certificada:** `v1.54-beta` → `e057a8cc`.  
 > **Estado:** auditoría adversarial **PASS 9,3/10**. Operational Hardening **cerrado** sobre tip. **No** LIVE.

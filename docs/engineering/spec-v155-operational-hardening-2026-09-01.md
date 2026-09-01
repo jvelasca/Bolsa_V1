@@ -1,6 +1,6 @@
 # Spec — V1.55 Operational Hardening
 
-> **AsOf:** 2026-09-01 · **Estado:** **CÓDIGO**.  
+> **AsOf:** 2026-09-01 · **Estado:** **CERRADO** — tag `v1.55-beta` → `c23091d9` (CI GREEN · audit PASS 9,3).  
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-043](../adr/043-position-automation.md) · [`spec-v154-operating-desk-2026-09-01.md`](./spec-v154-operating-desk-2026-09-01.md) · tip certificado previo **`v1.54-beta` → `e057a8cc`**. **No** LIVE.
 
 Endurecimiento operativo: Golden Session con invariantes, `PositionOperationalView` como proyección canónica, Daily Report por secciones, Mesa cinco cubos, Consola solo excepciones. **No** motores nuevos · **no** LIVE.

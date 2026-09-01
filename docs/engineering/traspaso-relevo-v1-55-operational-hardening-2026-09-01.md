@@ -29,4 +29,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-beta`.
 ## 3. Next
 
 1. Tip `v1.55-beta` **certificado** ([relevo tag](./traspaso-relevo-tag-v1-55-beta-2026-09-01.md) · CI GREEN · audit **PASS 9,3**).
-2. **NO LIVE** · scheduler · package bump parked.
+2. **Cierre fase** — [cierre-apertura siguiente](./traspaso-relevo-cierre-v155-apertura-siguiente-2026-09-01.md).
+3. **NO LIVE** · scheduler · package bump · spec V1.56 parked.

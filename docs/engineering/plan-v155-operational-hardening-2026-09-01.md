@@ -2,7 +2,7 @@
 
 > **Padre:** [`spec-v155-operational-hardening-2026-09-01.md`](./spec-v155-operational-hardening-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md).  
 > **AsOf:** 2026-09-01.  
-> **Estado:** **CÓDIGO**.
+> **Estado:** **CERRADO** — tag `v1.55-beta` → `c23091d9` · [cierre-apertura](./traspaso-relevo-cierre-v155-apertura-siguiente-2026-09-01.md).
 
 | ID  | Entrega                                           | Estado |
 | --- | ------------------------------------------------- | ------ |

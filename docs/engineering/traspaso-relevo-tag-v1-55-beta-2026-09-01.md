@@ -1,7 +1,7 @@
 # RELEVO — tag v1.55-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-55-operational-hardening-2026-09-01.md`](./traspaso-relevo-v1-55-operational-hardening-2026-09-01.md) · [`traspaso-relevo-tag-v1-54-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-54-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.55-beta` → `c23091d9` · Release-tag CI **GREEN** · auditoría externa adversarial **PASS 9,3**.  
+> **Estado:** **CI GREEN** — tip `v1.55-beta` → `c23091d9` · Release-tag CI **GREEN** · auditoría externa adversarial **PASS 9,3** · fase **CERRADA** ([cierre-apertura](./traspaso-relevo-cierre-v155-apertura-siguiente-2026-09-01.md)).  
 > **Arranque auditor:** [`arranque-auditor-v1-55-beta-2026-09-01.md`](./arranque-auditor-v1-55-beta-2026-09-01.md) · [respuesta](./respuesta-auditor-v155-operational-hardening-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · browser E2E · package bump.
 
@@ -54,4 +54,5 @@ Ver [`plan-v155-operational-hardening-2026-09-01.md`](./plan-v155-operational-ha
 ## 4. Next
 
 1. **Operational Hardening cerrado** en tip certificado.
-2. **NO LIVE** · scheduler · package bump parked.
+2. **Cierre fase** — [cierre-apertura siguiente](./traspaso-relevo-cierre-v155-apertura-siguiente-2026-09-01.md).
+3. **NO LIVE** · scheduler · package bump · spec V1.56 parked.
