@@ -1,6 +1,6 @@
 # Spec — V1.59 E2E Integrated (FastAPI + PostgreSQL)
 
-> **AsOf:** 2026-09-02 · **Estado:** **implementación CERRADA** (tag pendiente).  
+> **AsOf:** 2026-09-02 · **Estado:** **implementación CERRADA** (tag **`v1.59-beta` → `b5c5c6ab`**).  
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-043](../adr/043-position-automation.md) · [`spec-v158-adversarial-execution-2026-09-01.md`](./spec-v158-adversarial-execution-2026-09-01.md) · tip certificado previo **`v1.58-beta` → `4c42f1fc`**. **No** LIVE.  
 > **Arranque auditor:** [`arranque-auditor-v1-59-e2e-integrated-2026-09-02.md`](./arranque-auditor-v1-59-e2e-integrated-2026-09-02.md).
 

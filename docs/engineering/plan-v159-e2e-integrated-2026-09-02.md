@@ -2,7 +2,7 @@
 
 > **Padre:** [`spec-v159-e2e-integrated-2026-09-02.md`](./spec-v159-e2e-integrated-2026-09-02.md) · [ADR-043](../adr/043-position-automation.md).  
 > **AsOf:** 2026-09-02.  
-> **Estado:** **implementación CERRADA** — partida **`v1.58-beta` → `4c42f1fc`**. Tag `v1.59-beta` pendiente.
+> **Estado:** **implementación CERRADA** — tag **`v1.59-beta` → `b5c5c6ab`**.
 
 | ID  | Entrega                                                                 | Estado |
 | --- | ----------------------------------------------------------------------- | ------ |

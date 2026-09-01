@@ -9,7 +9,7 @@ All notable releases of Bolsa V1.
 - **GP-V159-01..07:** suite integration pytest + `httpx.AsyncClient` + PG real (`@pytest.mark.integration`): trade/portfolio operational · paper-desk dry-run/gate · ops-self-eval recon · decision-journal · incident resolve/clear HTTP · execute-auto dry_run.
 - **Harness:** `v159_harness.py` + skip sin PostgreSQL; complementa Golden Session pytest (no sustituye).
 - **Fix colateral:** `opening_gate_seed` siembra serie plana 120d (elimina veto sanity split/dividendo en DS-05).
-- Spec [`spec-v159-e2e-integrated-2026-09-02.md`](./docs/engineering/spec-v159-e2e-integrated-2026-09-02.md) · relevo [`traspaso-relevo-v1-59-e2e-integrated-2026-09-02.md`](./docs/engineering/traspaso-relevo-v1-59-e2e-integrated-2026-09-02.md) · arranque auditor [`arranque-auditor-v1-59-e2e-integrated-2026-09-02.md`](./docs/engineering/arranque-auditor-v1-59-e2e-integrated-2026-09-02.md). Freeze intacto: **no** LIVE · `PAPER_D_EXECUTE` OFF · package `1.35.0-beta`. Tag **`v1.59-beta`** pendiente.
+- Spec [`spec-v159-e2e-integrated-2026-09-02.md`](./docs/engineering/spec-v159-e2e-integrated-2026-09-02.md) · relevo [`traspaso-relevo-v1-59-e2e-integrated-2026-09-02.md`](./docs/engineering/traspaso-relevo-v1-59-e2e-integrated-2026-09-02.md) · arranque auditor [`arranque-auditor-v1-59-e2e-integrated-2026-09-02.md`](./docs/engineering/arranque-auditor-v1-59-e2e-integrated-2026-09-02.md). Freeze intacto: **no** LIVE · `PAPER_D_EXECUTE` OFF · package `1.35.0-beta`. Tag **`v1.59-beta` → `b5c5c6ab`**.
 
 ### V1.58 — Adversarial Execution (2026-09-01)
 

@@ -1,7 +1,7 @@
 # RELEVO — V1.59 E2E Integrated (FastAPI + PostgreSQL) (2026-09-02)
 
 > **Padre:** [`spec-v159-e2e-integrated-2026-09-02.md`](./spec-v159-e2e-integrated-2026-09-02.md) · [`plan-v159-e2e-integrated-2026-09-02.md`](./plan-v159-e2e-integrated-2026-09-02.md) · partida **`v1.58-beta` → `4c42f1fc`**.  
-> **Estado:** **CERRADA** — tag **`v1.59-beta` pendiente** (no bump package · no LIVE).  
+> **Estado:** **CERRADA** — tag **`v1.59-beta` → `b5c5c6ab`** (no bump package · no LIVE).  
 > **Arranque auditor:** [`arranque-auditor-v1-59-e2e-integrated-2026-09-02.md`](./arranque-auditor-v1-59-e2e-integrated-2026-09-02.md).
 
 ---
@@ -42,6 +42,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-beta` · 
 
 ## 3. Next
 
-1. Commit + tag `v1.59-beta` cuando el owner lo pida (no en este slice).
-2. **V1.60** UX Mercado.
-3. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura (LIVE gap) · CI Release-tag job integration obligatorio (parked).
+1. **V1.60** UX Mercado — [spec V1.60](./spec-v160-ux-mercado-2026-09-02.md) · tarjeta estrella POV en DECISIÓN.
+2. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura (LIVE gap) · CI integration job en Release-tag (parked).
