@@ -39,6 +39,7 @@ from bolsa_application.operational_context import (
 )
 from bolsa_application.paper_d_propose import paper_d_execute_allowed
 from bolsa_application.persist_position_from_exit import row_position_state
+from bolsa_application.risk_runtime import effective_kill_switch
 from bolsa_market.market_calendar import SessionState
 
 PaperDeskEntryStatus = Literal[
@@ -347,6 +348,7 @@ def _dry_run_position_row(
     portfolio_drift: bool,
     immediate_risk: bool,
     session: SessionState,
+    kill_switch: bool = False,
 ) -> PaperDeskPositionTickRow:
     from bolsa_analytics.cognitive.position_policy_decision import decide_position_policy
     from bolsa_application.evaluate_exit_plan import auto_exit_permission
@@ -378,6 +380,7 @@ def _dry_run_position_row(
         portfolio_drift=portfolio_drift,
         immediate_risk=immediate_risk,
         position_closed=position.status == "CLOSED",
+        kill_switch=kill_switch,
     )
     if not perm.allowed:
         return _row_with_next(
@@ -505,6 +508,7 @@ class PaperDeskCycle:
         session_flag: Literal["open", "closed"] = (
             "closed" if market_closed else "open"
         )
+        kill_on = await effective_kill_switch()
         rows_out: list[PaperDeskPositionTickRow] = []
 
         for row in open_rows:
@@ -578,6 +582,7 @@ class PaperDeskCycle:
                         portfolio_drift=portfolio_drift,
                         immediate_risk=immediate_risk,
                         session=session,
+                        kill_switch=kill_on,
                     )
                 )
                 continue
@@ -600,6 +605,7 @@ class PaperDeskCycle:
                     stop_touched=immediate_risk,
                     as_of=inp.as_of,
                     existing_intent_keys=ctx.execution.existing_intent_keys,
+                    kill_switch=kill_on,
                 )
             )
             rows_out.append(

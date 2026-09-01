@@ -238,19 +238,25 @@ class ExecutePositionPolicyAuto:
                 position_row=row,
             )
 
-        # REDUCE | EXIT
+        # REDUCE | EXIT — solo EXIT puede asumir remaining; REDUCE sin qty = error.
         full_exit = decision.verdict == "EXIT"
         qty = decision.quantity
         if qty is None or qty <= 0:
-            if position is not None:
-                qty = float(position.remaining_quantity)
-            else:
+            if not full_exit:
+                return ExecutePositionPolicyAutoResult(
+                    status="error",
+                    decision=decision,
+                    permission=permission,
+                    reason="missing_reduce_quantity",
+                )
+            if position is None:
                 return ExecutePositionPolicyAutoResult(
                     status="error",
                     decision=decision,
                     permission=permission,
                     reason="missing_quantity",
                 )
+            qty = float(position.remaining_quantity)
         price = float(inp.mark_price)
         if price <= 0:
             return ExecutePositionPolicyAutoResult(
@@ -276,11 +282,14 @@ class ExecutePositionPolicyAuto:
             quantity=float(qty),
         )
         if claimed is None:
-            idem_key = pos_id
-            event_id = None
-        else:
-            idem_key = claimed.event_id
-            event_id = claimed.event_id
+            return ExecutePositionPolicyAutoResult(
+                status="error",
+                decision=decision,
+                permission=permission,
+                reason="event_claim_failed",
+            )
+        idem_key = claimed.event_id
+        event_id = claimed.event_id
         keys = inp.existing_intent_keys or frozenset()
         if event_id and event_id in keys:
             return ExecutePositionPolicyAutoResult(

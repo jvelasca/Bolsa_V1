@@ -326,6 +326,10 @@ async def test_caos_06_partial_fill(monkeypatch: pytest.MonkeyPatch) -> None:
     pos = position_state_from_dict(store.row["position_state"])
     assert pos is not None
     assert pos.remaining_quantity == pytest.approx(60.0)
+
+
+@pytest.mark.asyncio
+async def test_caos_07_stale(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PAPER_D_EXECUTE", "1")
     store = _CasStore(_open_row())
     sell = _IdempotentSell()
@@ -454,3 +458,89 @@ async def test_intent_unresolved_skips_second_sell(monkeypatch: pytest.MonkeyPat
     assert result.positions[0].status == "sell_skipped"
     assert result.positions[0].reason == "intent_unresolved"
     assert sell.execute_count == 0
+
+
+@pytest.mark.asyncio
+async def test_caos_crash_before_claim(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Crash tras decidir y antes de reclamar evento: el ciclo recupera una sola vez."""
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    store = _CasStore(_open_row())
+    sell = _IdempotentSell()
+    assert events_from_blob(store.row["position_state"]) == []
+    uc = _cycle(store, sell)
+    inp = PaperDeskCycleInput(
+        account_id="acc-1",
+        as_of="2026-09-01T16:00:00Z",
+        dry_run=False,
+        context=build_test_operational_context(marks={"MSFT": 110.0}),
+    )
+    await uc.execute(inp)
+    assert sell.execute_count == 1
+    events = events_from_blob(store.row["position_state"])
+    assert len(events) == 1
+    await uc.execute(inp)
+    assert sell.execute_count == 1
+    assert len(events_from_blob(store.row["position_state"])) == 1
+
+
+@pytest.mark.asyncio
+async def test_caos_missing_mark_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    store = _CasStore(_open_row())
+    sell = _IdempotentSell()
+    result = await _cycle(store, sell).execute(
+        PaperDeskCycleInput(
+            account_id="acc-1",
+            as_of="2026-09-01T16:00:00Z",
+            dry_run=False,
+            context=build_test_operational_context(missing=("MSFT",)),
+        )
+    )
+    assert result.positions[0].status == "denied"
+    assert result.positions[0].reason == "data_unavailable"
+    assert sell.execute_count == 0
+
+
+@pytest.mark.asyncio
+async def test_caos_kill_switch_denies_auto(monkeypatch: pytest.MonkeyPatch) -> None:
+    """H2: AUTO + kill switch DENY incluso protector; no sell ni trail."""
+    from bolsa_application.risk_runtime import set_runtime_kill_switch_memory
+
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    set_runtime_kill_switch_memory(True)
+    try:
+        store = _CasStore(_open_row())
+        sell = _IdempotentSell()
+        result = await _cycle(store, sell).execute(
+            PaperDeskCycleInput(
+                account_id="acc-1",
+                as_of="2026-09-01T16:20:00Z",
+                dry_run=False,
+                context=build_test_operational_context(marks={"MSFT": 94.0}),
+            )
+        )
+        assert result.positions[0].status == "denied"
+        assert "kill_switch" in (result.positions[0].reason or "")
+        assert sell.execute_count == 0
+
+        store_t = _CasStore(_open_row(stop=95.0))
+        sell_t = _IdempotentSell()
+        trail = await _cycle(store_t, sell_t).execute(
+            PaperDeskCycleInput(
+                account_id="acc-1",
+                as_of="2026-09-01T10:00:00Z",
+                dry_run=False,
+                context=build_test_operational_context(
+                    marks={"MSFT": 112.0},
+                    trail_hint=True,
+                    trail_stop=102.0,
+                ),
+            )
+        )
+        assert trail.positions[0].status == "denied"
+        assert "kill_switch" in (trail.positions[0].reason or "")
+        revs = revisions_from_raw(store_t.row["position_state"].get("revisions"))
+        assert not any(r.origin == "trail" for r in revs)
+        assert sell_t.execute_count == 0
+    finally:
+        set_runtime_kill_switch_memory(False)

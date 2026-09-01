@@ -40,7 +40,11 @@ Tesis ≠ plan ≠ permiso ≠ ejecución permanece. IA / algoritmo ≠ autorida
 
 Toda autorización AUTO futura re-evalúa el estado **actual** (portfolio, frescura, sesión, recon), no el snapshot del TradePlan. Fail-closed si el contexto JIT se exige y falta. Acción protectora (stop tocado / invalidation) tiene política distinta a T1/TRAIL en dato stale o mercado cerrado.
 
-OR-4 intacto: drift bloquea **entradas**; protective exit ALLOWED.
+**H2 kill switch (intencional):** SEMI humano en desriesgo (protect/reduce/full_exit) **ALLOW** con kill activo. AUTO (`auto_execute=true`) **DENY** `kill_switch` incluso si la acción es protectora. Motivo: el kill declara el sistema no fiable; no se confía en que AUTO calcule un stop o una salida. PaperDeskCycle y HTTP execute-auto inyectan `effective_kill_switch()`; no se deja el flag en `False` por omisión.
+
+OR-4 intacto: drift bloquea **entradas**; protective exit ALLOWED (salvo kill switch AUTO, arriba).
+
+Fill PAPER de un stop protector con mercado cerrado = último close (`last_close`), no precio de apertura. Contrato V1.44; sesgo vs LIVE aparcado a Lab P2.
 
 ## 4. T1+T2 mismo tick
 

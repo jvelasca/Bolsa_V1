@@ -402,3 +402,172 @@ async def test_gp_auto_01_e2e_paper_moderate() -> None:
     assert store.row is not None
     assert store.row["status"] == "CLOSED"
     assert len(sell.calls) >= 3
+
+
+@pytest.mark.asyncio
+async def test_reduce_without_qty_errors_not_full_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """REDUCE sin cantidad no vende remaining (no escala a EXIT)."""
+    from bolsa_analytics.cognitive.position_event import build_position_event
+    from bolsa_analytics.cognitive.position_policy_decision import PositionPolicyDecision
+
+    store = _Store(_open_row(qty=10.0))
+    pos = position_state_from_dict(store.row["position_state"])
+    assert pos is not None
+    policy = resolve_operating_policy("moderate")
+    exit_plan = build_exit_plan_from_position(
+        pos, mark_price=110.0, exit_policy=policy.exit
+    )
+    assert exit_plan is not None
+    fake = PositionPolicyDecision(
+        verdict="REDUCE",
+        reason_code="TARGET_1",
+        event=build_position_event("TARGET_1", "2026-08-31T16:00:00Z"),
+        quantity=None,
+        new_stop=None,
+        target=110.0,
+        risk_impact="reduce",
+        policy_id="moderate",
+        as_of="2026-08-31T16:00:00Z",
+        authorization="policy",
+        defer_reason=None,
+    )
+    monkeypatch.setattr(
+        "bolsa_application.execute_position_policy_auto.decide_position_policy",
+        lambda *_a, **_k: fake,
+    )
+    sell = _FakeSell()
+    result = await _uc(store, sell).execute(
+        ExecutePositionPolicyAutoInput(
+            account_id="acc-1",
+            instrument_id="MSFT",
+            position=pos,
+            exit_plan=exit_plan,
+            operating_policy=policy,
+            mark_price=110.0,
+            paper_d_execute=True,
+            data_stale=False,
+            market_closed=False,
+            portfolio_drift=False,
+            session="open",
+            as_of="2026-08-31T16:00:00Z",
+        )
+    )
+    assert result.status == "error"
+    assert result.reason == "missing_reduce_quantity"
+    assert sell.calls == []
+    after = position_state_from_dict(store.row["position_state"])
+    assert after is not None
+    assert after.remaining_quantity == pytest.approx(10.0)
+
+
+@pytest.mark.asyncio
+async def test_exit_without_qty_uses_remaining(monkeypatch: pytest.MonkeyPatch) -> None:
+    """EXIT sin qty explícita sí puede vender remaining."""
+    from bolsa_analytics.cognitive.position_event import build_position_event
+    from bolsa_analytics.cognitive.position_policy_decision import PositionPolicyDecision
+
+    store = _Store(_open_row(qty=10.0))
+    pos = position_state_from_dict(store.row["position_state"])
+    assert pos is not None
+    policy = resolve_operating_policy("moderate")
+    exit_plan = build_exit_plan_from_position(
+        pos, mark_price=94.0, exit_policy=policy.exit
+    )
+    assert exit_plan is not None
+    fake = PositionPolicyDecision(
+        verdict="EXIT",
+        reason_code="STRUCTURAL_STOP",
+        event=build_position_event("STRUCTURAL_STOP", "2026-08-31T16:20:00Z"),
+        quantity=None,
+        new_stop=None,
+        target=None,
+        risk_impact="exit",
+        policy_id="moderate",
+        as_of="2026-08-31T16:20:00Z",
+        authorization="policy",
+        defer_reason=None,
+    )
+    monkeypatch.setattr(
+        "bolsa_application.execute_position_policy_auto.decide_position_policy",
+        lambda *_a, **_k: fake,
+    )
+    sell = _FakeSell()
+    result = await _uc(store, sell).execute(
+        ExecutePositionPolicyAutoInput(
+            account_id="acc-1",
+            instrument_id="MSFT",
+            position=pos,
+            exit_plan=exit_plan,
+            operating_policy=policy,
+            mark_price=94.0,
+            paper_d_execute=True,
+            data_stale=False,
+            market_closed=False,
+            portfolio_drift=False,
+            immediate_risk=True,
+            stop_touched=True,
+            session="open",
+            as_of="2026-08-31T16:20:00Z",
+        )
+    )
+    assert result.status in ("exited", "reduced")
+    assert sell.calls[0]["quantity"] == pytest.approx(10.0)
+    assert sell.calls[0]["full_exit"] is True
+
+
+@pytest.mark.asyncio
+async def test_event_claim_failed_does_not_fallback_to_position_id() -> None:
+    """Claim None → error; nunca vender con idempotency_key = position_id."""
+
+    class _NoClaim(PersistPositionFromProtect):
+        async def claim_sell_event(
+            self,
+            *,
+            account_id: str,
+            instrument_id: str,
+            event_type: str,
+            action: str,
+            as_of: str | None,
+            quantity: float | None = None,
+        ) -> None:
+            _ = account_id, instrument_id, event_type, action, as_of, quantity
+            return None
+
+    store = _Store(_open_row(qty=10.0))
+    pos = position_state_from_dict(store.row["position_state"])
+    assert pos is not None
+    policy = resolve_operating_policy("moderate")
+    exit_plan = build_exit_plan_from_position(
+        pos, mark_price=110.0, exit_policy=policy.exit
+    )
+    assert exit_plan is not None
+    sell = _FakeSell()
+    uc = ExecutePositionPolicyAuto(
+        protect=_NoClaim(store),
+        exit_persist=PersistPositionFromExit(store),
+        sell=sell,
+    )
+    result = await uc.execute(
+        ExecutePositionPolicyAutoInput(
+            account_id="acc-1",
+            instrument_id="MSFT",
+            position=pos,
+            exit_plan=exit_plan,
+            operating_policy=policy,
+            mark_price=110.0,
+            paper_d_execute=True,
+            data_stale=False,
+            market_closed=False,
+            portfolio_drift=False,
+            session="open",
+            as_of="2026-08-31T16:00:00Z",
+        )
+    )
+    assert result.status == "error"
+    assert result.reason == "event_claim_failed"
+    assert sell.calls == []
+    after = position_state_from_dict(store.row["position_state"])
+    assert after is not None
+    assert after.remaining_quantity == pytest.approx(10.0)

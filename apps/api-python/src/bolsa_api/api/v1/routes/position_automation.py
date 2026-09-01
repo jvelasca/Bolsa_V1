@@ -25,6 +25,7 @@ from bolsa_application.execute_position_policy_auto import (
 )
 from bolsa_application.paper_d_propose import paper_d_execute_allowed
 from bolsa_application.persist_position_from_exit import row_position_state
+from bolsa_application.risk_runtime import effective_kill_switch
 
 router = APIRouter()
 
@@ -104,6 +105,7 @@ async def execute_position_policy_auto(
     session_flag: Literal["open", "closed"] = (
         "closed" if market_closed else "open"
     )
+    kill_on = await effective_kill_switch()
     inp = ExecutePositionPolicyAutoInput(
         account_id=account_id,
         instrument_id=instrument_id,
@@ -119,6 +121,8 @@ async def execute_position_policy_auto(
         session=session_flag,
         stale=data_stale,
         stop_touched=immediate_risk,
+        existing_intent_keys=ctx.execution.existing_intent_keys,
+        kill_switch=kill_on,
     )
 
     if body.dry_run:
@@ -151,6 +155,7 @@ async def execute_position_policy_auto(
             portfolio_drift=portfolio_drift,
             immediate_risk=immediate_risk,
             position_closed=pos.status == "CLOSED",
+            kill_switch=kill_on,
         )
         return ExecutePositionPolicyAutoResponseDto(
             status="allowed" if perm.allowed else "denied",

@@ -12,6 +12,7 @@
 | P1  | ExecutionSnapshot real; refuse unresolved; recon unavailable; 3 acciones | DONE   |
 | P2  | operatingState + Golden Session + CAOS-01/05/06/07/08/09                 | DONE   |
 | D1  | Relevo + arranque auditor + stamp product                                | DONE   |
+| P0h | Close-out: REDUCE/claim fail-closed · kill cableado · CAOS-07 propio     | DONE   |
 
 ## Freeze
 
