@@ -4,13 +4,13 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **V1.50 Entry Decision Integrity** product **`V1.50-beta`** tip **`9e511715`** (previo tip **`v1.49-beta` → `c8975c9d`**). V1.49 cableó EntryTick Estudio. V1.50 transporta la decisión completa (`CandidateSnapshot` + `decisionId` + `reasonCode` + `template_id` → policy) y cierra GP-DESK-04/05/06. **No** Fill→Position (V1.51). **No** LIVE. `PAPER_D_EXECUTE` default **off**.
+Eres auditor externo de Bolsa V1 **V1.50 Entry Decision Integrity** product **`V1.50-beta`** tip **`96623755`** (previo tip **`v1.49-beta` → `c8975c9d`**). V1.49 cableó EntryTick Estudio. V1.50 transporta la decisión completa (`CandidateSnapshot` + `decisionId` + `reasonCode` + `template_id` → policy) y cierra GP-DESK-04/05/06. **No** Fill→Position (V1.51). **No** LIVE. `PAPER_D_EXECUTE` default **off**.
 
-**Contexto CI (2026-09-01):** tag `v1.50-beta` → `9e511715` · Release-tag CI **pendiente al push**. Pre-flight local verde (vitest 7 · pytest 83 desk-block · ruff · tsc).
+**Contexto CI (2026-09-01):** tag `v1.50-beta` → `96623755` · Release-tag CI **pendiente al push**. Pre-flight local verde (vitest 7 · pytest 83 desk-block · ruff · tsc).
 
 **GitHub (auditor):**
 
-- Código tip: [`v1.50-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.50-beta) → commit `9e511715`
+- Código tip: [`v1.50-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.50-beta) → commit `96623755`
 - Docs + arranque (HEAD): rama [`stage/v150-entry-decision-integrity-2026-09-01`](https://github.com/jvelasca/Bolsa_V1/tree/stage/v150-entry-decision-integrity-2026-09-01)
 - Previo V1.49: [`v1.49-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.49-beta) → `c8975c9d`
 

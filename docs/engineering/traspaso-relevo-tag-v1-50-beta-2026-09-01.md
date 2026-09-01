@@ -1,7 +1,7 @@
 # RELEVO — tag v1.50-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-50-entry-decision-integrity-2026-09-01.md`](./traspaso-relevo-v1-50-entry-decision-integrity-2026-09-01.md) · [`traspaso-relevo-tag-v1-49-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-49-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** tip `v1.50-beta` → `9e511715` · Release-tag CI **pendiente push**.  
+> **Estado:** tip `v1.50-beta` → `96623755` · Release-tag CI **pendiente push**.  
 > **Arranque auditor:** [`arranque-auditor-v1-50-beta-2026-09-01.md`](./arranque-auditor-v1-50-beta-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · Fill→Position (V1.51) · scheduler · UI Mesa · OCO · package bump.
 
@@ -28,8 +28,8 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · no Fill→Positio
 
 | Pieza      | Valor                                           |
 | ---------- | ----------------------------------------------- |
-| Tag tip    | `v1.50-beta` → `9e511715`                       |
-| Código     | `9e511715` feat(v1.50) Entry Decision Integrity |
+| Tag tip    | `v1.50-beta` → `96623755`                       |
+| Código     | `9e511715` feat + `96623755` mypy (tip)         |
 | Previo tip | `v1.49-beta` → `c8975c9d` (CI GREEN)            |
 | CI tag     | **pendiente** tras `git push origin v1.50-beta` |
 
@@ -37,7 +37,7 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · no Fill→Positio
 
 ## 2. Auditoría
 
-**Veredicto local (2026-09-01, tip `9e511715`):** pre-flight verde (vitest 7 · pytest 83 · ruff · tsc). **No** LIVE. Pendiente Release-tag CI + auditoría externa ([arranque](./arranque-auditor-v1-50-beta-2026-09-01.md)).
+**Veredicto local (2026-09-01, tip `96623755`):** pre-flight verde (vitest 7 · pytest 83 · ruff · tsc). **No** LIVE. Pendiente Release-tag CI + auditoría externa ([arranque](./arranque-auditor-v1-50-beta-2026-09-01.md)).
 
 ## 3. Residuals parked
 
