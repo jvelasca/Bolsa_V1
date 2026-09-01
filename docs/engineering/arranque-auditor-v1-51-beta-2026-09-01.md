@@ -4,13 +4,13 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **V1.51 Entry → Paper Fill → Position** product **`V1.51-beta`**. Tip se fija en el tag `v1.51-beta` (previo certificado **`v1.50-beta` → `96623755`**, audit PASS). V1.50 cerró CandidateSnapshot / reason codes / GP-DESK-04/05/06. V1.51 nace **PositionState** tras fill PAPER de apertura AUTO reutilizando OI-1 `PersistPositionFromFill`, con `decisionId` = `signal.id` y `trade_plan_snapshot` enriquecido. **No** Golden Session birth+exit completo (V1.52). **No** UI Mesa. **No** LIVE. `PAPER_D_EXECUTE` default **off**.
+Eres auditor externo de Bolsa V1 **V1.51 Entry → Paper Fill → Position** product **`V1.51-beta`** tip **`ab6a5bc6`** (previo certificado **`v1.50-beta` → `96623755`**, audit PASS). V1.50 cerró CandidateSnapshot / reason codes / GP-DESK-04/05/06. V1.51 nace **PositionState** tras fill PAPER de apertura AUTO reutilizando OI-1 `PersistPositionFromFill`, con `decisionId` = `signal.id` y `trade_plan_snapshot` enriquecido. **No** Golden Session birth+exit completo (V1.52). **No** UI Mesa. **No** LIVE. `PAPER_D_EXECUTE` default **off**.
 
-**Contexto CI:** Release-tag CI del push `v1.51-beta` — ver [`traspaso-relevo-tag-v1-51-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-51-beta-2026-09-01.md). Pre-flight local: vitest 7 · pytest desk-block (GP-DESK-07) · ruff · tsc · mypy router/hits.
+**Contexto CI:** tag `v1.51-beta` → `ab6a5bc6` · Release-tag CI — ver [`traspaso-relevo-tag-v1-51-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-51-beta-2026-09-01.md). Pre-flight local: vitest 7 · pytest desk-block (GP-DESK-07) · ruff · tsc · mypy router/hits.
 
 **GitHub (auditor):**
 
-- Código tip: [`v1.51-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.51-beta)
+- Código tip: [`v1.51-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.51-beta) → commit `ab6a5bc6`
 - Rama: [`stage/v151-entry-fill-position-2026-09-01`](https://github.com/jvelasca/Bolsa_V1/tree/stage/v151-entry-fill-position-2026-09-01)
 - Previo: [`v1.50-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.50-beta) → `96623755`
 
