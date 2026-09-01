@@ -1,7 +1,7 @@
 # RELEVO — V1.50 Entry Decision Integrity (2026-09-01)
 
 > **Padre:** [`spec-v150-entry-decision-integrity-2026-09-01.md`](./spec-v150-entry-decision-integrity-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v150-entry-decision-integrity-2026-09-01.md`](./plan-v150-entry-decision-integrity-2026-09-01.md) · tip previo **`v1.49-beta` → `c8975c9d`**.  
-> **Estado:** **CÓDIGO** — pre-flight local verde (vitest 7 · pytest 83 · ruff · tsc). **Sin tag** / Release-tag CI pendiente. Product certificado vigente **`V1.49-beta`**. Package `1.35.0-beta` congelado. **No** LIVE.
+> **Estado:** **CÓDIGO** — tip **`v1.50-beta` → `9e511715`** ([relevo tag](./traspaso-relevo-tag-v1-50-beta-2026-09-01.md)). Pre-flight local verde. Release-tag CI **pendiente push**. Product **`V1.50-beta`**. Package `1.35.0-beta` congelado. **No** LIVE.
 
 ---
 
