@@ -24,6 +24,12 @@ from bolsa_application.opening_fill_handle import (
     RecoverOrphanOpeningFills,
 )
 from bolsa_application.operational_context import build_test_operational_context
+from bolsa_application.operational_incident_store import (
+    InMemoryOperationalIncidentStore,
+    clear_and_store,
+    resolve_and_store,
+    sync_opening_incidents,
+)
 from bolsa_application.paper_daily_report import build_paper_daily_report
 from bolsa_application.paper_desk_cycle import (
     HonestStubPaperDeskEntry,
@@ -166,6 +172,7 @@ async def test_gp_session_07_t2_closes_remainder(
             account_id="acc-demo",
             as_of="2026-09-01T11:00:00Z",
             dry_run=False,
+            template_id="moderate",
             context=build_test_operational_context(marks={"A": 110.0}),
         )
     )
@@ -179,19 +186,20 @@ async def test_gp_session_07_t2_closes_remainder(
             account_id="acc-demo",
             as_of="2026-09-01T14:00:00Z",
             dry_run=False,
+            template_id="conservative",
             context=build_test_operational_context(marks={"A": 120.0}),
         )
     )
-    assert t2.positions[0].status in {"reduced", "exited"}
+    assert t2.positions[0].status == "exited"
     pos = position_state_from_dict((store.row or {})["position_state"])
     assert pos is not None
     assert pos.target1_leg is not None
     assert pos.target1_leg.status == "executed"
     assert sell.execute_count > t1_sells
-    if pos.status == "CLOSED":
-        assert pos.remaining_quantity == 0
-        if pos.target2_leg is not None:
-            assert pos.target2_leg.status in {"executed", "triggered"}
+    assert pos.status == "CLOSED"
+    assert pos.remaining_quantity == 0
+    assert pos.target2_leg is not None
+    assert pos.target2_leg.status == "executed"
 
 
 @pytest.mark.asyncio
@@ -309,6 +317,91 @@ async def test_gp_session_10_reconciliation_exception_fact(
             "RECONCILIATION_ERROR",
             None,
         } or drift.blocked or "portfolio_drift" in drift.notes
+
+
+@pytest.mark.asyncio
+async def test_gp_session_10r_drift_human_resolve_clear_no_auto_heal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GP-SESSION-10r: drift → facts → INC → resolve → clear only if recon clean."""
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    monkeypatch.setenv("PAPER_D_ACCOUNT_ID", "acc-demo")
+    store = SessionStore()
+    sell = Sell()
+    birth_cycle, position_cycle = build_cycles(store, sell)
+
+    await birth_cycle.execute(
+        PaperDeskCycleInput(
+            account_id="acc-demo",
+            as_of="2026-09-01T09:00:00Z",
+            dry_run=False,
+            execution_policy_id="pol-1",
+            template_id="moderate",
+            context=build_test_operational_context(marks={"A": 100.0}),
+        )
+    )
+    position_state_before = dict((store.row or {})["position_state"])
+
+    drift = await position_cycle.execute(
+        PaperDeskCycleInput(
+            account_id="acc-demo",
+            as_of="2026-09-01T10:00:00Z",
+            dry_run=False,
+            context=build_test_operational_context(
+                marks={"A": 100.0},
+                recon_status="drift",
+            ),
+        )
+    )
+    report = build_paper_daily_report(drift)
+    kinds = [f["kind"] for f in report.to_dict().get("exceptionFacts", [])]
+    assert "portfolio_recon_drift" in kinds
+    assert "portfolio_drift" in drift.notes
+    assert dict((store.row or {})["position_state"]) == position_state_before
+
+    incident_store = InMemoryOperationalIncidentStore()
+    opening = await sync_opening_incidents(
+        incident_store,
+        account_id="acc-demo",
+        portfolio_recon_status="drift",
+        broker_venue="paper",
+    )
+    assert opening == "unresolved"
+    active = await incident_store.list_active("acc-demo")
+    assert len(active) == 1
+    assert active[0].kind == "portfolio_drift"
+    assert active[0].status == "open"
+
+    inc = active[0]
+    resolved = await resolve_and_store(
+        incident_store,
+        incident_id=inc.incident_id,
+        resolution_note="manual cash top-up verified",
+        resolved_by="operator",
+    )
+    assert resolved.status == "resolved"
+    assert resolved.resolution_note == "manual cash top-up verified"
+    assert dict((store.row or {})["position_state"]) == position_state_before
+
+    with pytest.raises(ValueError, match="recon_not_clean"):
+        await clear_and_store(
+            incident_store,
+            incident_id=inc.incident_id,
+            recon_status="drift",
+        )
+    still_resolved = await incident_store.get(inc.incident_id)
+    assert still_resolved is not None
+    assert still_resolved.status == "resolved"
+
+    cleared = await clear_and_store(
+        incident_store,
+        incident_id=inc.incident_id,
+        recon_status="clean",
+    )
+    assert cleared.status == "cleared"
+    assert await incident_store.list_active("acc-demo") == []
+    assert dict((store.row or {})["position_state"]) == position_state_before
+    assert sell.execute_count == 0
 
 
 @pytest.mark.asyncio

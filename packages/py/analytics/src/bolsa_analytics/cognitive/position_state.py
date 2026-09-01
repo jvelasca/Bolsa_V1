@@ -651,6 +651,21 @@ def apply_position_reduce(
         if mark_target2_achieved
         else position.target2_leg
     )
+    if (
+        remaining <= 0
+        and t2_leg is not None
+        and t2_leg.status == "triggered"
+        and fill_id
+    ):
+        t2_leg = _advance_target_leg(
+            t2_leg,
+            "executed",
+            at=updated,
+            event_id=event_id,
+            fill_id=fill_id,
+        )
+        if not t2_at:
+            t2_at = updated
     if remaining <= 0:
         next_pos = replace(
             position,
