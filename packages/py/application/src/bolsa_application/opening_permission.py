@@ -26,7 +26,9 @@ from bolsa_application.operational_incident_store import (
 )
 from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
+    LiveReconStatus,
     PortfolioReconLookup,
+    PortfolioReconStatus,
 )
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
@@ -177,8 +179,8 @@ async def allow_opening_fill(
             )
         except Exception:  # noqa: BLE001 — DS-03: indisponibilidad = veto
             return False
-    portfolio_recon_status: Literal["clean", "drift"] | None = None
-    live_recon_status: Literal["clean", "drift", "unavailable"] | None = None
+    portfolio_recon_status: PortfolioReconStatus | None = None
+    live_recon_status: LiveReconStatus | None = None
     require_recon_veto = False
     if portfolio_recon is not None:
         require_recon_veto = True

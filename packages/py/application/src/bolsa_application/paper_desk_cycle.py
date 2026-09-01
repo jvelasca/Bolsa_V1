@@ -313,7 +313,7 @@ def _row_from_auto_result(
         "sell_skipped",
         "error",
     ):
-        status = result.status  # type: ignore[assignment]
+        status = result.status
     else:
         status = "error"
     pos = position
