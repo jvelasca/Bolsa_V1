@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 import pytest
+from paper_desk_golden_fixtures import (
+    Sell,
+    SessionStore,
+    assert_birth_invariants,
+    assert_identities,
+    assert_journal_chain,
+    build_cycles,
+    golden_plan,
+)
 
-from bolsa_analytics.cognitive.position_revision import revisions_from_raw
 from bolsa_analytics.cognitive.position_state import (
     apply_position_current_stop,
     build_position_state_from_fill,
@@ -24,16 +32,6 @@ from bolsa_application.paper_desk_cycle import (
 )
 from bolsa_application.persist_position_from_fill import (
     PersistPositionFromFill,
-    PersistPositionFromFillInput,
-)
-from paper_desk_golden_fixtures import (
-    SessionStore,
-    Sell,
-    assert_birth_invariants,
-    assert_identities,
-    assert_journal_chain,
-    build_cycles,
-    golden_plan,
 )
 
 

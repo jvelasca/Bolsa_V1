@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
+from paper_desk_golden_fixtures import (
+    Sell,
+    SessionStore,
+    assert_birth_invariants,
+    assert_identities,
+    assert_journal_chain,
+    build_cycles,
+)
 
 from bolsa_analytics.cognitive.position_revision import revisions_from_raw
 from bolsa_analytics.cognitive.position_state import position_state_from_dict
@@ -12,14 +18,6 @@ from bolsa_application.operational_context import build_test_operational_context
 from bolsa_application.paper_daily_report import build_paper_daily_report
 from bolsa_application.paper_desk_cycle import PaperDeskCycleInput
 from bolsa_application.position_event_log import events_from_blob
-from paper_desk_golden_fixtures import (
-    SessionStore,
-    Sell,
-    assert_birth_invariants,
-    assert_identities,
-    assert_journal_chain,
-    build_cycles,
-)
 
 
 @pytest.mark.asyncio
