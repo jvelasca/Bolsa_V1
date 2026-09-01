@@ -16,6 +16,7 @@ import {
   type PositionOperatingStateV1,
 } from "./operational-context.js";
 import { revisionsFromUnknown } from "./position-revision.js";
+import type { PovReconStatusV1 } from "./reconciliation-opening-veto.js";
 
 /** Extended operating state for UI (projection only). */
 export type PositionOperationalStateV1 =
@@ -82,7 +83,7 @@ export type PositionOperationalViewV1 = {
 export type BuildPositionOperationalViewInputV1 = {
   position: PositionStateV1;
   mark?: number | null;
-  reconStatus?: "clean" | "drift" | "unavailable" | null;
+  reconStatus?: PovReconStatusV1;
   stopTouched?: boolean;
   exitPending?: boolean;
   templateId?: string | null;
@@ -92,9 +93,19 @@ export type BuildPositionOperationalViewInputV1 = {
   decisionVerdict?: string | null;
 };
 
+function coerceReconForOperatingState(
+  reconStatus: PovReconStatusV1 | undefined,
+): "clean" | "drift" | "unavailable" | undefined {
+  if (reconStatus == null) return undefined;
+  if (reconStatus === "drift" || reconStatus === "unavailable") {
+    return reconStatus;
+  }
+  return "clean";
+}
+
 function resolveExtendedOperatingState(input: {
   position: PositionStateV1;
-  reconStatus?: string | null;
+  reconStatus?: PovReconStatusV1;
   stopTouched?: boolean;
   exitPending?: boolean;
 }): PositionOperationalStateV1 {
@@ -108,10 +119,7 @@ function resolveExtendedOperatingState(input: {
     hasProtectRevision: input.position.revisions.some(
       (r) => r.origin === "protect",
     ),
-    reconStatus:
-      input.reconStatus === "drift" || input.reconStatus === "unavailable"
-        ? input.reconStatus
-        : "clean",
+    reconStatus: coerceReconForOperatingState(input.reconStatus),
     hasUnresolvedExit: input.exitPending ?? false,
   });
   if (base === "RECONCILIATION_ERROR" || base === "RECONCILIATION_DRIFT") {

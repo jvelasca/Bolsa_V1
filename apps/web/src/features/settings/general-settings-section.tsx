@@ -22,6 +22,8 @@ import {
   NAMED_LAYOUT_LABELS,
   type NamedLayoutId,
 } from "@/features/command-palette/named-layout";
+import { DecisionSurfacePlacementToggle } from "@/features/trading/decision-surface-placement-toggle";
+import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
 
 export function GeneralSettingsSection({
   compact = false,
@@ -39,6 +41,8 @@ export function GeneralSettingsSection({
   const namedLayoutId = useTradingLayoutStore((s) => s.namedLayoutId);
   const applyNamedLayout = useTradingLayoutStore((s) => s.applyNamedLayout);
   const resetLayout = useTradingLayoutStore((s) => s.resetLayout);
+  const { placement: decisionSurfacePlacement } =
+    useMercadoDecisionSurfacePrefs();
 
   const body = (
     <>
@@ -93,6 +97,27 @@ export function GeneralSettingsSection({
               para volver a los defaults del workspace.
             </p>
             <ChartNewChartTemplatePinButton />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Mercado</CardTitle>
+          <CardDescription>
+            Superficie de decisión (entrada / posición) en el panel DECISIÓN o
+            como HUD compacto en el gráfico activo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-2 text-foreground">
+            <span className="font-medium">Ubicación del estado operativo</span>
+            <DecisionSurfacePlacementToggle size="md" />
+            <p className="text-[11px] leading-relaxed">
+              {decisionSurfacePlacement === "panel"
+                ? "El estado completo se muestra en el panel DECISIÓN. El gráfico mantiene las líneas operativas."
+                : "El estado compacto flota en el gráfico. El panel DECISIÓN muestra un aviso y la ACCIÓN sigue ahí."}
+            </p>
           </div>
         </CardContent>
       </Card>

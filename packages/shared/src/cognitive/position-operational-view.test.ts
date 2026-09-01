@@ -12,6 +12,7 @@ import {
 } from "./position-revision.js";
 import {
   PORTFOLIO_RECON_STATUSES,
+  mapPortfolioReconToPovRecon,
   type PortfolioReconStatusV1,
 } from "./reconciliation-opening-veto.js";
 import type { PositionStateV1 } from "./position-state.js";
@@ -356,6 +357,14 @@ describe("V1.57 exhaustiveness", () => {
     for (const state of Object.keys(states) as PositionOperationalStateV1[]) {
       expect(typeof mapOperatingStateToDeskStatus(state)).toBe("string");
     }
+  });
+
+  it("GP-V161-01: unknown recon wire → unavailable not clean", () => {
+    expect(mapPortfolioReconToPovRecon("error")).toBe("unavailable");
+    expect(mapPortfolioReconToPovRecon("unknown")).toBe("unavailable");
+    expect(mapPortfolioReconToPovRecon("garbage")).toBe("unavailable");
+    expect(mapPortfolioReconToPovRecon(null)).toBeNull();
+    expect(mapPortfolioReconToPovRecon("ok")).toBe("clean");
   });
 
   it("every PortfolioReconStatusV1 is handled", () => {

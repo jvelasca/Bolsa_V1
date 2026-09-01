@@ -9,13 +9,13 @@
 
 **Todo elemento configurable de la UI** (layout, anchos, orden/visibilidad de columnas, paneles abiertos/colapsados, splits, favoritos de chrome, HUD, asistente, etc.) **se persiste en `localStorage` del navegador** del perfil en esa máquina.
 
-| Qué | Dónde |
-|-----|--------|
-| Chrome / preferencias de UI | `localStorage` (por dispositivo · por perfil de navegador) |
+| Qué                                                                                | Dónde                                                                                     |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Chrome / preferencias de UI                                                        | `localStorage` (por dispositivo · por perfil de navegador)                                |
 | Contenido de dominio del espacio (gráficos abiertos, listas, dibujos, plantillas…) | Servidor (`/api/workspaces`) — ver [WORKSPACE_PERSISTENCE.md](./WORKSPACE_PERSISTENCE.md) |
-| Auth / cuenta activa | También `localStorage` (sesión), no confundir con “chrome” |
+| Auth / cuenta activa                                                               | También `localStorage` (sesión), no confundir con “chrome”                                |
 
-**Consecuencia:** escritorio, portátil y móvil (o Chrome vs Edge) **no se pisan**. Cada entorno recuerda *su* layout. No es un bug: es el diseño.
+**Consecuencia:** escritorio, portátil y móvil (o Chrome vs Edge) **no se pisan**. Cada entorno recuerda _su_ layout. No es un bug: es el diseño.
 
 ---
 
@@ -31,27 +31,28 @@
 
 ## 3. Ejemplos actuales (no exhaustivo)
 
-| Ámbito | Clave / store |
-|--------|----------------|
-| Dock Trading | `bolsa-trading-layout-v1` (listas/ops/operativa open · anchos · alturas de sección Operativa) |
-| Libro operativo DEMO (MANUAL/SEMI) | `bolsa-demo-book-prefs-v1` |
-| Notificaciones Alarmas (toast/email) + digest diario + PDF | `bolsa-notification-prefs-v1` |
-| Anchos columnas listas | `bolsa-list-chrome-layout-v1` |
-| Screeners | `bolsa-screener-preferences` |
-| Backtesting splits / HUD / zona | `bolsa-backtest-layout-*`, `bolsa-backtest-hud-prefs-v1`, … |
-| Hub Instrumentos | `bolsa-instruments-hub-prefs-v2` (wide/stack + secciones) |
-| Backtesting DÍA D (fecha) | `bolsa-backtest-run-context-v1` → campo `diaD` |
-| Trading MODO DÍA D (sesión) | `bolsa-dia-d-trading-session-v1` — ahora **LAB Verificar** (`universe: lab`; mode, gateDecisions, autoRunId; `fullBleedMovie` no se persiste) |
-| Adopción TOP→TRADING | `bolsa-strategy-adoption-v1` (proyección del mandato vigente · ADR-020) |
-| Mandato operativo (tenures) | `bolsa-mandate-tenures-v1` (**cache**; SoT BD M1b) |
-| Mandato ↔ trades DEMO | `bolsa-mandate-trade-links-v1` (**cache**; SoT BD M1b) |
-| TOP experimento DÍA D (F-D) | `bolsa-dia-d-experiment-top-v1` ([ADR-021](./adr/021-dia-d-reconciliation.md)) |
-| Evidence DÍA D (archivo) | `bolsa-dia-d-evidence-archive-v1` (cap 30; opcional `researchEvidenceId`) |
-| CORE-R cola revisión | `bolsa-core-r-review-queue-v1` (cap 40; open/done) · **SoT BD** `GET\|PUT /api/accounts/{id}/core-r` (Q3.4) |
-| CORE-R scheduler | `bolsa-core-r-scheduler-v1` (`enabled`, `intervalMinutes`, `listId`, `scope`, `lastRemoteEnqueue*`) · sync BD · cron `CORE_R_CRON_ENABLED` · toast remoto `bolsa-core-r-last-seen-remote-enqueue` |
-| CORE-R informe Lista AUTO | `bolsa-core-r-report-v1` (juicio post-settle; fuente de Encolar) · sync BD |
-| Inbox alarmas Tracker | `bolsa-tracker-alarm-inbox-v1` |
-| Preferencias de trade / cuenta activa | `bolsa-trade-preferences`, `bolsa-active-account` |
+| Ámbito                                                     | Clave / store                                                                                                                                                                                     |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dock Trading                                               | `bolsa-trading-layout-v1` (listas/ops/operativa open · anchos · alturas de sección Operativa)                                                                                                     |
+| Libro operativo DEMO (MANUAL/SEMI)                         | `bolsa-demo-book-prefs-v1`                                                                                                                                                                        |
+| Mercado Decision Surface (panel vs gráfico)                | `bolsa-mercado-decision-surface-v1` (`placement`: `panel` \| `chart`, default `panel`)                                                                                                            |
+| Notificaciones Alarmas (toast/email) + digest diario + PDF | `bolsa-notification-prefs-v1`                                                                                                                                                                     |
+| Anchos columnas listas                                     | `bolsa-list-chrome-layout-v1`                                                                                                                                                                     |
+| Screeners                                                  | `bolsa-screener-preferences`                                                                                                                                                                      |
+| Backtesting splits / HUD / zona                            | `bolsa-backtest-layout-*`, `bolsa-backtest-hud-prefs-v1`, …                                                                                                                                       |
+| Hub Instrumentos                                           | `bolsa-instruments-hub-prefs-v2` (wide/stack + secciones)                                                                                                                                         |
+| Backtesting DÍA D (fecha)                                  | `bolsa-backtest-run-context-v1` → campo `diaD`                                                                                                                                                    |
+| Trading MODO DÍA D (sesión)                                | `bolsa-dia-d-trading-session-v1` — ahora **LAB Verificar** (`universe: lab`; mode, gateDecisions, autoRunId; `fullBleedMovie` no se persiste)                                                     |
+| Adopción TOP→TRADING                                       | `bolsa-strategy-adoption-v1` (proyección del mandato vigente · ADR-020)                                                                                                                           |
+| Mandato operativo (tenures)                                | `bolsa-mandate-tenures-v1` (**cache**; SoT BD M1b)                                                                                                                                                |
+| Mandato ↔ trades DEMO                                      | `bolsa-mandate-trade-links-v1` (**cache**; SoT BD M1b)                                                                                                                                            |
+| TOP experimento DÍA D (F-D)                                | `bolsa-dia-d-experiment-top-v1` ([ADR-021](./adr/021-dia-d-reconciliation.md))                                                                                                                    |
+| Evidence DÍA D (archivo)                                   | `bolsa-dia-d-evidence-archive-v1` (cap 30; opcional `researchEvidenceId`)                                                                                                                         |
+| CORE-R cola revisión                                       | `bolsa-core-r-review-queue-v1` (cap 40; open/done) · **SoT BD** `GET\|PUT /api/accounts/{id}/core-r` (Q3.4)                                                                                       |
+| CORE-R scheduler                                           | `bolsa-core-r-scheduler-v1` (`enabled`, `intervalMinutes`, `listId`, `scope`, `lastRemoteEnqueue*`) · sync BD · cron `CORE_R_CRON_ENABLED` · toast remoto `bolsa-core-r-last-seen-remote-enqueue` |
+| CORE-R informe Lista AUTO                                  | `bolsa-core-r-report-v1` (juicio post-settle; fuente de Encolar) · sync BD                                                                                                                        |
+| Inbox alarmas Tracker                                      | `bolsa-tracker-alarm-inbox-v1`                                                                                                                                                                    |
+| Preferencias de trade / cuenta activa                      | `bolsa-trade-preferences`, `bolsa-active-account`                                                                                                                                                 |
 
 ---
 

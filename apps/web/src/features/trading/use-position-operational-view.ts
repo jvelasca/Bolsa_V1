@@ -1,5 +1,6 @@
 /**
  * V1.60 — PositionOperationalView desde PositionDto wire (tarjeta estrella Mercado).
+ * V1.61 — source canonical/fallback · recon fail-closed.
  * Proyección cliente; autoridad en backend persistido.
  */
 
@@ -12,20 +13,17 @@ import type {
 import {
   MESA_NEXT_ACTION_LABELS,
   buildPositionOperationalView,
+  mapPortfolioReconToPovRecon,
   positionOperationalViewFromBlob,
   positionStateFromPositionDto,
 } from "@bolsa/shared";
 
-function mapPortfolioReconToPovRecon(
-  status: string | null | undefined,
-): "clean" | "drift" | "unavailable" | null {
-  const s = String(status ?? "")
-    .trim()
-    .toLowerCase();
-  if (s === "drift") return "drift";
-  if (s === "unavailable" || s === "not_wired") return "unavailable";
-  return "clean";
-}
+export type PositionOperationalViewSourceV1 = "canonical" | "fallback";
+
+export type PositionOperationalViewResultV1 = {
+  view: PositionOperationalViewV1;
+  source: PositionOperationalViewSourceV1;
+};
 
 /** Reconstruye blob PositionState mínimo desde PositionDto + campos extendidos opcionales. */
 export function operationalBlobFromPositionDto(
@@ -67,26 +65,29 @@ export function operationalBlobFromPositionDto(
 export function buildPositionOperationalViewFromDto(
   position: PositionDto,
   portfolioReconStatus?: string | null,
-): PositionOperationalViewV1 | null {
+): PositionOperationalViewResultV1 | null {
   const reconStatus = mapPortfolioReconToPovRecon(portfolioReconStatus);
 
   if (position.operational) {
     const blob = operationalBlobFromPositionDto(position);
     if (blob) {
       const fromBlob = positionOperationalViewFromBlob(blob, { reconStatus });
-      if (fromBlob) return fromBlob;
+      if (fromBlob) return { view: fromBlob, source: "canonical" };
     }
   }
 
   const state = positionStateFromPositionDto(position);
   if (!state) return null;
-  return buildPositionOperationalView({ position: state, reconStatus });
+  return {
+    view: buildPositionOperationalView({ position: state, reconStatus }),
+    source: "fallback",
+  };
 }
 
 export function usePositionOperationalView(
   position: PositionDto | null | undefined,
   portfolioReconStatus?: string | null,
-): PositionOperationalViewV1 | null {
+): PositionOperationalViewResultV1 | null {
   return useMemo(
     () =>
       position

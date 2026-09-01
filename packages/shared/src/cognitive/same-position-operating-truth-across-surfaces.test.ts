@@ -10,6 +10,10 @@ import {
   positionOperatingTruthSurfaceSnapshot,
   type BuildPositionOperatingTruthInputV1,
 } from "./position-operating-truth.js";
+import { buildPositionOperationalView } from "./position-operational-view.js";
+import { buildPositionDecisionFromDto } from "./position-state-from-dto.js";
+import { mapPortfolioReconToPovRecon } from "./reconciliation-opening-veto.js";
+import { positionStateFromPositionDto } from "./position-state-from-dto.js";
 
 const ASOF = "2026-08-31T15:00:00.000Z";
 
@@ -137,5 +141,86 @@ describe("samePositionOperatingTruthAcrossSurfaces V1.42 F3", () => {
       expect(t!.primaryCta.label).not.toMatch(/comprar/i);
       expect(t!.primaryCta.kind).not.toBe("watch");
     }
+  });
+});
+
+describe("GP-V161-06 cross-surface POV facts", () => {
+  function mercadoPovFacts(input: BuildPositionOperatingTruthInputV1) {
+    const state = positionStateFromPositionDto(input.position);
+    const recon = mapPortfolioReconToPovRecon(input.portfolioReconStatus);
+    return state
+      ? buildPositionOperationalView({ position: state, reconStatus: recon })
+      : null;
+  }
+
+  function potPovFacts(input: BuildPositionOperatingTruthInputV1) {
+    return buildPositionOperatingTruth(input)?.operationalView ?? null;
+  }
+
+  function decisionFacts(input: BuildPositionOperatingTruthInputV1) {
+    return buildPositionDecisionFromDto(input.position, {
+      portfolioReconStatus: input.portfolioReconStatus,
+    });
+  }
+
+  it("same fixture → same POV facts on Mercado/Hoy/Journal/Operaciones builders", () => {
+    const input: BuildPositionOperatingTruthInputV1 = {
+      position: aaplOpen({
+        operational: {
+          status: "PROTECTED",
+          direction: "long",
+          tradePlanId: "tp-aapl",
+          plannedEntry: 100,
+          actualEntry: 100,
+          initialStop: 95,
+          currentStop: 98,
+          target1: 105,
+          target2: 110,
+          unrealizedR: 0.4,
+          exitPlan: { suggestedAction: "hold" },
+        },
+      }),
+      portfolioReconStatus: "ok",
+      asOf: ASOF,
+    };
+    const mercadoPov = mercadoPovFacts(input);
+    const hoyPov = mercadoPovFacts(input);
+    const journalPov = mercadoPovFacts(input);
+    const operacionesPov = mercadoPovFacts(input);
+    expect(mercadoPov).toEqual(hoyPov);
+    expect(hoyPov).toEqual(journalPov);
+    expect(journalPov).toEqual(operacionesPov);
+
+    const mercadoPot = potPovFacts(input);
+    const hoyPot = potPovFacts(input);
+    expect(mercadoPot).toEqual(hoyPot);
+    expect(mercadoPot?.operatingState).toBe("PROTECTED");
+    expect(mercadoPov?.operatingState).toBe("PROTECTED");
+
+    const decision = decisionFacts(input);
+    expect(decision?.nextEvent).toBe("T1");
+    expect(decisionFacts(input)?.nextEvent).toBe(decision?.nextEvent);
+  });
+
+  it("drift recon → RECONCILIATION_DRIFT consistently", () => {
+    const input: BuildPositionOperatingTruthInputV1 = {
+      position: aaplOpen(),
+      portfolioReconStatus: "drift",
+      asOf: ASOF,
+    };
+    expect(mercadoPovFacts(input)?.operatingState).toBe("RECONCILIATION_DRIFT");
+    expect(potPovFacts(input)?.operatingState).toBe("RECONCILIATION_DRIFT");
+    expect(mapPortfolioReconToPovRecon("drift")).toBe("drift");
+  });
+
+  it("unknown recon → unavailable, never clean operating overlay", () => {
+    const input: BuildPositionOperatingTruthInputV1 = {
+      position: aaplOpen(),
+      portfolioReconStatus: "unknown",
+      asOf: ASOF,
+    };
+    expect(mapPortfolioReconToPovRecon("unknown")).toBe("unavailable");
+    expect(mercadoPovFacts(input)?.operatingState).toBe("RECONCILIATION_ERROR");
+    expect(potPovFacts(input)?.operatingState).toBe("RECONCILIATION_ERROR");
   });
 });

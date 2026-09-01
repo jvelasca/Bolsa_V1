@@ -6,6 +6,27 @@
 
 export type PortfolioReconStatusV1 = "clean" | "drift" | "unavailable";
 
+/** V1.61 — wire/ops report → POV recon overlay. null = informe no cargado (≠ CLEAN). */
+export type PovReconStatusV1 = PortfolioReconStatusV1 | null;
+
+/**
+ * Fail-closed mapper: unknown wire values never become CLEAN.
+ * @see docs/engineering/spec-v161-market-decision-surface-2026-09-02.md GP-V161-01
+ */
+export function mapPortfolioReconToPovRecon(
+  status: string | null | undefined,
+): PovReconStatusV1 {
+  if (status == null) return null;
+  const s = String(status).trim().toLowerCase();
+  if (s === "") return null;
+  if (s === "clean" || s === "ok") return "clean";
+  if (s === "drift") return "drift";
+  if (s === "unavailable" || s === "not_wired" || s === "error") {
+    return "unavailable";
+  }
+  return "unavailable";
+}
+
 export const PORTFOLIO_RECON_STATUSES = [
   "clean",
   "drift",

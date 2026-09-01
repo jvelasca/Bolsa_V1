@@ -34,5 +34,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-beta` · 
 
 ## 3. Next
 
-1. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura (LIVE gap) · CI integration job en Release-tag (parked).
-2. Thaw Accept (0/5 PASS) · TRUSTED_PROXIES IPs de producción (`BLOCKED_ON_OWNER`).
+1. **V1.62** EntryOperationalView + Mercado unificado (parked).
+2. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura (LIVE gap).

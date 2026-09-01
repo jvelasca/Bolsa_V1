@@ -27,6 +27,7 @@ import { ChartToolbarGlobalBar } from "@/features/charts/chart-toolbar-global-ba
 import { ChartToolbarChartBar } from "@/features/charts/chart-toolbar-chart-bar";
 import { ChartFinalistTop1EmptyBanner } from "@/features/charts/chart-finalist-top1-switch";
 import { OhlcvChart } from "@/features/charts/ohlcv-chart";
+import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
 import { ChartIndicatorStack } from "@/features/charts/chart-indicator-stack";
 import {
   subPanelInstancesAll,
@@ -47,6 +48,8 @@ import { clearChartSignedStopPrefill } from "@/features/charts/chart-signed-stop
 
 export function ChartWorkspacePage() {
   const activeTab = useActiveChartTab();
+  const { placement: decisionSurfacePlacement } =
+    useMercadoDecisionSurfacePrefs();
 
   useEffect(() => () => clearChartSignedStopPrefill(), []);
 
@@ -649,6 +652,7 @@ export function ChartWorkspacePage() {
                     instrumentId={instrumentId}
                     symbol={activeTab.label}
                     showOperationalPlanLevels
+                    decisionSurfacePlacement={decisionSurfacePlacement}
                     onOpenSyncDialog={() =>
                       openInstrumentSyncDialog(instrumentId!, activeTab.label)
                     }

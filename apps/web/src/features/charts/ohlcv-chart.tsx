@@ -49,6 +49,8 @@ import { ChartCrosshairMeasure } from "@/features/charts/chart-crosshair-measure
 import { ChartCursorStyleOverlay } from "@/features/charts/chart-cursor-style-overlay";
 import { ChartF3OrderProjectionLayer } from "@/features/charts/chart-f3-order-projection-layer";
 import { ChartOperationalPlanLevelsLayer } from "@/features/charts/chart-operational-plan-levels-layer";
+import { ChartDecisionSurfaceHud } from "@/features/charts/chart-decision-surface-hud";
+import type { DecisionSurfacePlacementV1 } from "@/features/trading/mercado-decision-surface-prefs";
 import { ChartTimeAxisLabel } from "@/features/charts/chart-time-axis-label";
 import {
   blocksChartPan,
@@ -141,6 +143,8 @@ interface OhlcvChartProps {
   drawingsLayerLocked?: boolean;
   /** Mercado: pinta los niveles de `OperationalPlanView` del valor activo. */
   showOperationalPlanLevels?: boolean;
+  /** V1.63 — ubicación de la Decision Surface (`panel` | `chart`). */
+  decisionSurfacePlacement?: DecisionSurfacePlacementV1;
 }
 
 function scheduleReflow(callback: () => void) {
@@ -189,6 +193,7 @@ export function OhlcvChart({
   drawingsLayerHidden = false,
   drawingsLayerLocked = false,
   showOperationalPlanLevels = false,
+  decisionSurfacePlacement = "panel",
 }: OhlcvChartProps) {
   const { colors, display, grid, cursor } = config;
   const configuredHeight = display.height;
@@ -1105,6 +1110,14 @@ export function OhlcvChart({
           instrumentId={instrumentId}
           chartReady={chartReady}
         />
+      ) : null}
+      {showOperationalPlanLevels &&
+      decisionSurfacePlacement === "chart" &&
+      chartReady &&
+      hasChartData(bars) &&
+      instrumentId &&
+      symbol ? (
+        <ChartDecisionSurfaceHud instrumentId={instrumentId} symbol={symbol} />
       ) : null}
     </div>
   );

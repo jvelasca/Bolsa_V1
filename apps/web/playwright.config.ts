@@ -1,5 +1,5 @@
 /**
- * Playwright — GP-E2E-01/02 smoke (spec-v156).
+ * Playwright — GP-E2E-01/02/03 smoke + GP-V164-UI integrado (spec-v156 / v164).
  *
  * Skip-by-default: set `E2E_RUN=1` to auto-start Vite (`pnpm dev`) with API mocks
  * in the specs, or `PLAYWRIGHT_BASE_URL` to hit an existing server.

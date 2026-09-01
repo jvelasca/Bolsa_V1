@@ -38,6 +38,9 @@ export type EntryOperatingSizingV1 = {
   quantity: number | null;
 };
 
+/** V1.62 — proyección canónica de entrada (alias simétrico a PositionOperationalView). */
+export type EntryOperationalViewV1 = EntryOperatingTruthV1;
+
 export type EntryOperatingTruthV1 = {
   instrumentId: string;
   symbol: string;

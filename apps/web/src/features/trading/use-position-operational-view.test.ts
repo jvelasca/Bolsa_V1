@@ -1,6 +1,66 @@
 import { describe, expect, it } from "vitest";
 import type { PositionDto } from "@bolsa/shared";
+import { mapPortfolioReconToPovRecon } from "@bolsa/shared";
 import { buildPositionOperationalViewFromDto } from "@/features/trading/use-position-operational-view";
+
+describe("mapPortfolioReconToPovRecon GP-V161-01", () => {
+  it("known clean values → clean", () => {
+    expect(mapPortfolioReconToPovRecon("clean")).toBe("clean");
+    expect(mapPortfolioReconToPovRecon("ok")).toBe("clean");
+    expect(mapPortfolioReconToPovRecon("OK")).toBe("clean");
+  });
+
+  it("drift → drift", () => {
+    expect(mapPortfolioReconToPovRecon("drift")).toBe("drift");
+  });
+
+  it("unavailable family → unavailable", () => {
+    expect(mapPortfolioReconToPovRecon("unavailable")).toBe("unavailable");
+    expect(mapPortfolioReconToPovRecon("not_wired")).toBe("unavailable");
+    expect(mapPortfolioReconToPovRecon("error")).toBe("unavailable");
+  });
+
+  it("empty/null → null (not clean)", () => {
+    expect(mapPortfolioReconToPovRecon(null)).toBeNull();
+    expect(mapPortfolioReconToPovRecon(undefined)).toBeNull();
+    expect(mapPortfolioReconToPovRecon("")).toBeNull();
+  });
+
+  it("unknown wire values → unavailable, never clean", () => {
+    for (const bad of ["unknown", "degraded", "garbage", "pending"]) {
+      expect(mapPortfolioReconToPovRecon(bad)).toBe("unavailable");
+      expect(mapPortfolioReconToPovRecon(bad)).not.toBe("clean");
+    }
+  });
+
+  it("error/unknown → RECONCILIATION_ERROR operatingState", () => {
+    const position: PositionDto = {
+      id: "p1",
+      instrumentId: "inst-aapl",
+      symbol: "AAPL",
+      name: "Apple",
+      quantity: 10,
+      avgCost: 100,
+      lastPrice: 102,
+      marketValue: 1020,
+      unrealizedPnl: 0,
+      unrealizedPnlPct: 0,
+      operational: {
+        status: "PROTECTED",
+        direction: "long",
+        tradePlanId: "tp-1",
+        currentStop: 98,
+        target1: 110,
+        target2: 120,
+        initialStop: 95,
+      },
+    };
+    for (const bad of ["error", "unknown", "degraded"]) {
+      const result = buildPositionOperationalViewFromDto(position, bad);
+      expect(result?.view.operatingState).toBe("RECONCILIATION_ERROR");
+    }
+  });
+});
 
 describe("buildPositionOperationalViewFromDto", () => {
   it("T2_READY from operational blob legs", () => {
@@ -37,8 +97,9 @@ describe("buildPositionOperationalViewFromDto", () => {
         },
       } as PositionDto["operational"],
     };
-    const view = buildPositionOperationalViewFromDto(position, "ok");
-    expect(view?.operatingState).toBe("T2_READY");
+    const result = buildPositionOperationalViewFromDto(position, "ok");
+    expect(result?.view.operatingState).toBe("T2_READY");
+    expect(result?.source).toBe("canonical");
   });
 
   it("RECONCILIATION_DRIFT when portfolio recon drift", () => {
@@ -63,7 +124,7 @@ describe("buildPositionOperationalViewFromDto", () => {
         initialStop: 95,
       },
     };
-    const view = buildPositionOperationalViewFromDto(position, "drift");
-    expect(view?.operatingState).toBe("RECONCILIATION_DRIFT");
+    const result = buildPositionOperationalViewFromDto(position, "drift");
+    expect(result?.view.operatingState).toBe("RECONCILIATION_DRIFT");
   });
 });

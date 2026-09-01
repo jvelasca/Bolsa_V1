@@ -41,15 +41,28 @@ import {
 } from "@/features/trading/operativa-cockpit-phase";
 import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
 import { PositionOperationalStarCard } from "@/features/trading/position-operational-star-card";
-import { PositionOperatingSummary } from "@/features/trading/position-operating-summary";
-import { usePositionOperationalView } from "@/features/trading/use-position-operational-view";
-import { EntryOperatingSummary } from "@/features/trading/entry-operating-summary";
+import {
+  mapPovPrimaryActionToExitCtaKind,
+  povOperatingStateTone,
+  povOperatingStateToneClasses,
+} from "@/features/trading/position-decision-surface";
+import {
+  usePositionOperationalView,
+  formatPovPrimaryActionLabel,
+} from "@/features/trading/use-position-operational-view";
+import { EntryDecisionSurfaceCard } from "@/features/trading/entry-decision-surface-card";
+import {
+  entryPhaseTone,
+  entryPhaseToneClasses,
+} from "@/features/trading/entry-decision-surface";
 import { ExitRouteView } from "@/features/trading/exit-route-view";
 import { useInstrumentOperationalContext } from "@/features/trading/use-instrument-operational-context";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
+import { DecisionSurfacePlacementToggle } from "@/features/trading/decision-surface-placement-toggle";
+import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
 
 type OperativaCockpitCardProps = {
   instrumentId: string | null;
@@ -78,7 +91,19 @@ function asExitCtaKind(
   return kind as PositionExitCtaKindV1;
 }
 
-function phaseTone(phase: MercadoCockpitPhase): string {
+function phaseTone(
+  phase: MercadoCockpitPhase,
+  opts?: {
+    povTone?: ReturnType<typeof povOperatingStateTone>;
+    entryTone?: ReturnType<typeof entryPhaseTone>;
+  },
+): string {
+  if (phase === "posicion" && opts?.povTone) {
+    return povOperatingStateToneClasses(opts.povTone);
+  }
+  if (opts?.entryTone && phase !== "posicion") {
+    return entryPhaseToneClasses(opts.entryTone);
+  }
   switch (phase) {
     case "posicion":
       return "border-emerald-600/40 bg-emerald-500/5";
@@ -130,14 +155,17 @@ export function OperativaCockpitCard({
   });
   const operationsOpen = useTradingLayoutStore((s) => s.operationsOpen);
   const toggleOperations = useTradingLayoutStore((s) => s.toggleOperations);
+  const { placement: decisionSurfacePlacement } =
+    useMercadoDecisionSurfacePrefs();
 
   const { phase, plan, study, position } = context;
   const opsEval = useOpsSelfEval(context.accountId);
   const reconStatus = portfolioReconStatusFromReport(opsEval.data);
-  const positionPov = usePositionOperationalView(
+  const positionPovResult = usePositionOperationalView(
     phase === "posicion" && position ? position : null,
     reconStatus,
   );
+  const positionPov = positionPovResult?.view ?? null;
   const entryTruth =
     study && phase !== "posicion"
       ? buildEntryOperatingTruth({
@@ -174,7 +202,10 @@ export function OperativaCockpitCard({
   const unknownExecution = executionState?.lifecycle === "unknown";
   const primaryLabel = unknownExecution
     ? (executionState?.nextAction?.label ?? "Ver operaciones")
-    : (positionPot?.primaryCta.label ??
+    : ((positionPov
+        ? formatPovPrimaryActionLabel(positionPov.primaryAction)
+        : null) ??
+      positionPot?.primaryCta.label ??
       entryTruth?.primaryCta.label ??
       mercadoCockpitPrimaryCta(phase));
   const noLevelsCopy = mercadoCockpitNoLevelsCopy(phase);
@@ -191,7 +222,12 @@ export function OperativaCockpitCard({
       ? mercadoCockpitPosicionPhaseLabel(positionPov?.operatingState)
       : MERCADO_COCKPIT_PHASE_LABEL[phase];
 
-  const potExitKind = asExitCtaKind(positionPot?.primaryCta.kind);
+  const potExitKind =
+    positionPov != null
+      ? asExitCtaKind(
+          mapPovPrimaryActionToExitCtaKind(positionPov.primaryAction),
+        )
+      : asExitCtaKind(positionPot?.primaryCta.kind);
   const showOpsFromPot =
     Boolean(positionPot) &&
     potExitKind === "review" &&
@@ -218,6 +254,18 @@ export function OperativaCockpitCard({
     showOpsFromPot ||
     (!unknownExecution && phase === "confirmada");
 
+  const povTone =
+    phase === "posicion" && positionPov
+      ? povOperatingStateTone(positionPov.operatingState)
+      : undefined;
+  const entryTone =
+    entryTruth != null
+      ? entryPhaseTone(entryTruth.phase, {
+          entriesBlocked: entryTruth.entriesBlocked,
+          gateStatus: entryTruth.gateStatus,
+        })
+      : undefined;
+
   if (!instrumentId) {
     return (
       <div
@@ -237,7 +285,7 @@ export function OperativaCockpitCard({
     <section
       className={cn(
         "space-y-2 rounded-md border px-3 py-2",
-        phaseTone(phase),
+        phaseTone(phase, { povTone, entryTone }),
         className,
       )}
       data-testid="operativa-cockpit"
@@ -286,29 +334,28 @@ export function OperativaCockpitCard({
 
       {/* ESTADO */}
       <div className="space-y-1.5" data-testid="decision-estado">
-        <SectionLabel>Estado</SectionLabel>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <SectionLabel>Estado</SectionLabel>
+          <DecisionSurfacePlacementToggle />
+        </div>
         {context.loading ? (
           <p className="text-[11px] text-muted-foreground">Cargando plan…</p>
+        ) : decisionSurfacePlacement === "chart" &&
+          (phase === "posicion" && position ? true : Boolean(entryTruth)) ? (
+          <p
+            className="text-[11px] leading-snug text-muted-foreground"
+            data-testid="decision-surface-on-chart-hint"
+          >
+            Estado operativo en el gráfico · ACCIÓN sigue aquí
+          </p>
         ) : phase === "posicion" && position ? (
           <>
             <PositionOperationalStarCard
               position={position}
+              symbol={symbol}
               portfolioReconStatus={reconStatus}
+              onOpenWhy={() => setWhyOpen(true)}
             />
-            <PositionOperatingSummary
-              pot={positionPot}
-              position={position}
-              portfolioReconStatus={reconStatus}
-              orderPending={context.orderPendingFill}
-              submitIntent={context.submitIntent}
-            />
-            {context.showsPlanLevels ? (
-              <OperationalPlanView
-                plan={plan}
-                omitLiveMetrics
-                testId={`operativa-cockpit-plan-${symbol}`}
-              />
-            ) : null}
             <ExitRouteView
               truth={positionPot?.operational ?? null}
               position={position}
@@ -317,19 +364,13 @@ export function OperativaCockpitCard({
             />
           </>
         ) : entryTruth ? (
-          <>
-            <EntryOperatingSummary
-              truth={entryTruth}
-              orderPendingFill={context.orderPendingFill}
-              submitIntent={context.submitIntent}
-            />
-            {context.showsPlanLevels ? (
-              <OperationalPlanView
-                plan={plan}
-                testId={`operativa-cockpit-plan-${symbol}`}
-              />
-            ) : null}
-          </>
+          <EntryDecisionSurfaceCard
+            truth={entryTruth}
+            symbol={symbol}
+            orderPendingFill={context.orderPendingFill}
+            submitIntent={context.submitIntent}
+            onOpenWhy={() => setWhyOpen(true)}
+          />
         ) : context.showsPlanLevels ? (
           <OperationalPlanView
             plan={plan}

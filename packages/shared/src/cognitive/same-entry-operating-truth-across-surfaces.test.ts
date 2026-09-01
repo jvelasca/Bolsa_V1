@@ -208,3 +208,19 @@ describe("sameEntryOperatingTruthAcrossSurfaces V1.38", () => {
     }
   });
 });
+
+describe("GP-V162-06 cross-surface EntryOperationalView facts", () => {
+  it("armed study → identical snapshot on Mercado/Hoy/Journal/Operaciones", () => {
+    const input = { study: armedStudy() };
+    const mercado = buildEntryOperatingTruth(input);
+    const hoy = buildEntryOperatingTruth(input);
+    const journal = buildEntryOperatingTruth(input);
+    const operaciones = buildEntryOperatingTruth(input);
+    const snap = entryOperatingSurfaceSnapshot(mercado!);
+    expect(entryOperatingSurfaceSnapshot(hoy!)).toEqual(snap);
+    expect(entryOperatingSurfaceSnapshot(journal!)).toEqual(snap);
+    expect(entryOperatingSurfaceSnapshot(operaciones!)).toEqual(snap);
+    expect(snap.phase).toBe("preparada");
+    expect(snap.ctaLabel).toBe("Preparar operación");
+  });
+});

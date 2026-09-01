@@ -44,6 +44,7 @@ import {
 } from "./position-operational-view.js";
 import { positionStateFromPositionDto } from "./position-state-from-dto.js";
 import type { PaperDeskNextActionV1 } from "./operational-context.js";
+import { mapPortfolioReconToPovRecon } from "./reconciliation-opening-veto.js";
 
 export type PositionSecondaryConditionKindV1 =
   | "protection_discrepancy"
@@ -299,11 +300,7 @@ export function buildPositionOperatingTruth(
   const operationalView = stateFromDto
     ? buildPositionOperationalView({
         position: stateFromDto,
-        reconStatus:
-          input.portfolioReconStatus === "drift" ||
-          input.portfolioReconStatus === "unavailable"
-            ? input.portfolioReconStatus
-            : "clean",
+        reconStatus: mapPortfolioReconToPovRecon(input.portfolioReconStatus),
         deskStatus: mapOperatingStateToDeskStatusFromCta(primaryCta),
         decisionVerdict: operational.decision.action,
         templateId: null,
