@@ -1,7 +1,7 @@
 # RELEVO — tag v1.54-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-54-operating-desk-2026-09-01.md`](./traspaso-relevo-v1-54-operating-desk-2026-09-01.md) → [`traspaso-relevo-tag-v1-53-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-53-beta-2026-09-01.md) → [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI pending** — tip `v1.54-beta` → `e057a8cc` (pendiente push) · previo certificado **`v1.53-beta` → `9725e9e7`** (CI GREEN).  
+> **Estado:** **CI GREEN** — tip `v1.54-beta` → `e057a8cc` → Release-tag CI **GREEN** · previo certificado **`v1.53-beta` → `9725e9e7`** (CI GREEN).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · OCO · package bump · browser E2E.
 
 ---
@@ -23,16 +23,27 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-b
 
 ## 1. Release
 
-| Pieza      | Valor                                              |
-| ---------- | -------------------------------------------------- |
-| Tag tip    | `v1.54-beta` → `e057a8cc` (pendiente push)         |
-| Código     | `bf115767` UI + `e057a8cc` autoDesk/exceptionFacts |
-| Previo tip | `v1.53-beta` → `9725e9e7` (CI GREEN)               |
-| CI tag     | **pending**                                        |
+| Pieza      | Valor                                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| Tag tip    | `v1.54-beta` → `e057a8cc`                                                                                        |
+| Código     | `bf115767` UI + `e057a8cc` autoDesk/exceptionFacts wire (tip en código V1.54, no docs-only `60f337bb`)           |
+| Previo tip | `v1.53-beta` → `9725e9e7` (CI GREEN)                                                                             |
+| CI tag     | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33505011481) · `headSha=e057a8cc` |
+
+Jobs del push `v1.54-beta` (2026-09-01), todos **success**:
+
+| Job            | Resultado |
+| -------------- | --------- |
+| python         | success   |
+| shared         | success   |
+| frontend       | success   |
+| decision-spine | success   |
+| security       | success   |
+| certify        | success   |
 
 ## 2. Pre-flight
 
-Bloque V1.53 + regresión V1.48/V1.52 · shared **27** · web **28** · pytest **17** · ruff OK · tsc OK.
+Bloque V1.53 + regresión V1.48/V1.52 · shared **27** · web **28** · pytest **17** · ruff OK · tsc OK · Release-tag CI **GREEN**.
 
 ## 3. Residuals parked
 
@@ -40,5 +51,5 @@ Bloque V1.53 + regresión V1.48/V1.52 · shared **27** · web **28** · pytest *
 
 ## 4. Next
 
-1. Push tip `v1.54-beta` → `e057a8cc` · Release-tag CI.
+1. Tip `v1.54-beta` **certificado** (CI GREEN).
 2. Auditoría externa (si aplica) · **NO LIVE**.
