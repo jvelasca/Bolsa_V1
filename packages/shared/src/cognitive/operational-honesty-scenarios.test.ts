@@ -274,13 +274,15 @@ describe("operationalHonestyScenarios V1.41.2", () => {
     expect(truth?.primaryCta.label).toBe("Mantener");
   });
 
-  it("15 Daily Desk: HOLD clean → vacío", () => {
+  it("15 Daily Desk: HOLD clean → 🟢 POSICIONES (V1.55 remap)", () => {
     const inbox = buildDailyDeskInbox({
       positions: [aaplOpen()],
       portfolioReconStatus: "ok",
       pendingConfirm: 0,
     });
-    expect(inbox.count).toBe(0);
+    expect(inbox.count).toBe(1);
+    expect(inbox.items[0]?.bucket).toBe("posiciones");
+    expect(inbox.items[0]?.ctaLabel).toMatch(/Mantener/i);
   });
 
   it("16 Daily Desk: pending confirm agregado (sin individualizar)", () => {
