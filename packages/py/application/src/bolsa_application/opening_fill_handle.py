@@ -57,11 +57,19 @@ def opening_fill_handle_from_payload(raw: object) -> OpeningFillHandle | None:
         return None
     if not isinstance(plan, dict):
         return None
+    price_raw = raw.get("fillPrice")
+    if price_raw is None:
+        price_raw = raw.get("fill_price")
+    qty_raw = raw.get("fillQuantity")
+    if qty_raw is None:
+        qty_raw = raw.get("fill_quantity")
+    if not isinstance(price_raw, (int, float)) or isinstance(price_raw, bool):
+        return None
+    if not isinstance(qty_raw, (int, float)) or isinstance(qty_raw, bool):
+        return None
     try:
-        price = float(raw.get("fillPrice") if raw.get("fillPrice") is not None else raw.get("fill_price"))
-        qty = float(
-            raw.get("fillQuantity") if raw.get("fillQuantity") is not None else raw.get("fill_quantity")
-        )
+        price = float(price_raw)
+        qty = float(qty_raw)
     except (TypeError, ValueError):
         return None
     if price != price or qty != qty or price <= 0 or qty <= 0:

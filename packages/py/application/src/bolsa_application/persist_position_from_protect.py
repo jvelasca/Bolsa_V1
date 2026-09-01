@@ -8,7 +8,7 @@ V1.48: CAS por current_stop + PositionEvent durable (eventId = identidad).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from bolsa_analytics.cognitive.position_revision import revisions_from_raw
 from bolsa_analytics.cognitive.position_state import (
@@ -263,7 +263,7 @@ class PersistPositionFromProtect:
         )
         next_blob = preserve_origin_decision_package(blob, next_blob)
         kind = (event_type or "").upper()
-        which = (
+        which: Literal["t1", "t2"] | None = (
             "t1"
             if kind in ("T1", "TARGET_1")
             else "t2"
