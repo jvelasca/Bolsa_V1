@@ -51,6 +51,9 @@ def test_select_candidates_prefers_alarma_and_caps() -> None:
     assert [c["instrumentId"] for c in selected] == ["b", "a"]
     assert selected[0]["autoSource"] == "estudio_alarma"
     assert selected[1]["autoSource"] == "estudio_dictamen"
+    assert [c["rank"] for c in selected] == [1, 2]
+    assert selected[0]["score"] == 5.0
+    assert selected[1]["score"] == 3.0
 
 
 def test_build_hit_shape() -> None:
@@ -76,6 +79,9 @@ def test_build_hit_shape() -> None:
     assert hit["tradePlan"]["quantity"] == 7.0
     assert hit["signal"]["kind"] == "entry_long"
     assert hit["signal"]["id"].startswith("edo-2026-08-30-")
+    assert hit["tradePlan"]["instrumentId"] == "inst-abc"
+    assert hit["tradePlan"]["direction"] == "long"
+    assert hit["tradePlan"]["decisionId"] == "tp-2026-08-30-inst-abc"
     assert "paper_d" not in hit["autoSource"]
     assert "templateId" not in hit
 

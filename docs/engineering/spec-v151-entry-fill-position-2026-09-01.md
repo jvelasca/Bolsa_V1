@@ -21,8 +21,8 @@ Confirm SEMI · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab ≠ S
 ## 1. IN
 
 - Tras `trade_executed` de **apertura** `paper_auto` + TradePlan TRIGGERED: llamar `sync_position_after_ledger_fill` / `PersistPositionFromFill`.
-- Stamp `tradePlan.decisionId = signal.id` (alineado a `CandidateSnapshot.decision_id`).
-- Enriquecer snapshot JSON (sin Alembic): `templateId`, `autoSource` (y rank/score si vienen en el hit).
+- Stamp `tradePlan.decisionId` **conservado** (no pisar con `signal.id`); `candidateDecisionId` = `signal.id`; `fillId` = ledger tx.
+- Enriquecer snapshot JSON (sin Alembic): `templateId`, `autoSource`, `rank`/`score`, `candidateSnapshot`.
 - DI: `get_execution_router_use_case` inyecta el mismo store Confirm.
 - Fallo de persist: **no** revierte el fill; `trade_executed` + `reason=position_birth_failed` (honesty OI-1).
 
@@ -34,12 +34,14 @@ Confirm SEMI · `PAPER_D_EXECUTE` off · arm ≠ execute · no LIVE · Lab ≠ S
 
 ## 3. Golden Paths
 
-| ID             | Comportamiento                                                                                                      |
-| -------------- | ------------------------------------------------------------------------------------------------------------------- |
-| GP-DESK-07     | hit TRIGGERED + execute → Position con `trade_plan_snapshot` (entry/stop/T1/T2/risk) y `trade_plan_id == signal.id` |
-| Idempotencia   | misma `open_transaction_id` no duplica Position                                                                     |
-| Gate DENY      | sin fill → sin Position (GP-DESK-05 intacto)                                                                        |
-| GP-DESK-03..06 | Intactos                                                                                                            |
+| ID             | Comportamiento                                                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| GP-DESK-07     | hit TRIGGERED + execute → Position; `trade_plan_id` = plan `decisionId`; `candidateDecisionId` = `signal.id`; `fillId` = ledger tx |
+| GP-DESK-08     | Estudio A,B,C,D `maxCandidates=2` → A,B → fill → Position con las tres identidades                                                 |
+| GP-DESK-05b    | `check_opening` real DENY → 0 Positions                                                                                            |
+| Idempotencia   | misma `open_transaction_id` no duplica Position                                                                                    |
+| Gate DENY      | sin fill → sin Position (GP-DESK-05 intacto)                                                                                       |
+| GP-DESK-03..06 | Intactos                                                                                                                           |
 
 ## 4. Pre-flight
 

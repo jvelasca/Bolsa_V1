@@ -12,7 +12,8 @@ V1.33 A-β: aperturas ``paper_auto`` exigen TradePlan TRIGGERED + ``risk_signatu
 V1.33 A-δ: aperturas solo ``autoSource`` Estudio (``estudio_dictamen`` |
 ``estudio_alarma``). Exits/protect intactos (ExitPermission H2).
 V1.51: tras fill PAPER de apertura AUTO nace PositionState vía
-``PersistPositionFromFill`` (``decisionId`` = ``signal.id``).
+``PersistPositionFromFill``. Identidades: ``decisionId`` (TradePlan),
+``candidateDecisionId`` (``signal.id``), ``fillId`` (ledger tx).
 
 @see docs/engineering/risk-engine-or-re-2026-08-04.md
 @see docs/engineering/camino-d-a2-a5-prep-2026-08-04.md
@@ -91,12 +92,23 @@ def enrich_opening_trade_plan_for_position(
     *,
     signal_id: str,
     hit: dict[str, Any] | None,
+    fill_id: str | None = None,
 ) -> dict[str, Any]:
-    """V1.51 — decisionId = signal.id; templateId/autoSource desde el hit."""
+    """V1.51 — conserva TradePlan.decisionId; estampa candidateDecisionId + fillId.
+
+    No pisa la identidad del plan con signal.id (auditoría 2).
+    """
     enriched = dict(plan)
     sid = (signal_id or "").strip()
-    if sid:
+    existing = enriched.get("decisionId") or enriched.get("decision_id")
+    has_plan_id = isinstance(existing, str) and bool(existing.strip())
+    if not has_plan_id and sid:
         enriched["decisionId"] = sid
+    if sid:
+        enriched["candidateDecisionId"] = sid
+    fid = (fill_id or "").strip()
+    if fid:
+        enriched["fillId"] = fid
     if not isinstance(hit, dict):
         return enriched
     tid = hit.get("templateId") or hit.get("template_id")
@@ -108,6 +120,19 @@ def enrich_opening_trade_plan_for_position(
     for key in ("rank", "score", "dictamenStars"):
         if key in hit and hit[key] is not None:
             enriched[key] = hit[key]
+    candidate: dict[str, Any] = {"decisionId": sid} if sid else {}
+    iid = hit.get("instrumentId") or enriched.get("instrumentId")
+    if isinstance(iid, str) and iid.strip():
+        candidate["instrumentId"] = iid.strip()
+    for key in ("rank", "score", "dictamenStars", "symbol"):
+        if key in hit and hit[key] is not None:
+            candidate[key] = hit[key]
+    if isinstance(tid, str) and tid.strip():
+        candidate["templateId"] = tid.strip()
+    if isinstance(src, str) and src.strip():
+        candidate["autoSource"] = src.strip()
+    if candidate:
+        enriched["candidateSnapshot"] = candidate
     return enriched
 
 
@@ -1095,6 +1120,7 @@ class ExecutionRouter:
                 opening_trade_plan,
                 signal_id=str(signal.id),
                 hit=hit if isinstance(hit, dict) else None,
+                fill_id=str(result.transaction.id),
             )
             try:
                 row = await sync_position_after_ledger_fill(

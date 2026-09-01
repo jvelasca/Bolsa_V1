@@ -518,3 +518,251 @@ async def test_entry_template_changes_operating_policy() -> None:
     )
     assert propose.payloads[0]["templateId"] == "conservative"
     assert propose.payloads[1]["templateId"] == "aggressive_swing"
+
+
+class _FillStore:
+    def __init__(self) -> None:
+        self.inserts: list[dict[str, Any]] = []
+        self.by_tx: dict[str, dict[str, Any]] = {}
+        self.open_by_instrument: dict[tuple[str, str], dict[str, Any]] = {}
+
+    async def get_by_open_transaction_id(self, open_transaction_id: str) -> dict[str, Any] | None:
+        return self.by_tx.get(open_transaction_id)
+
+    async def get_open_for_instrument(
+        self, account_id: str, instrument_id: str
+    ) -> dict[str, Any] | None:
+        return self.open_by_instrument.get((account_id, instrument_id))
+
+    async def insert(self, **kwargs: Any) -> dict[str, Any]:
+        row = {"id": kwargs.get("position_id") or f"pos-{len(self.inserts)+1}", **kwargs}
+        self.inserts.append(row)
+        self.by_tx[str(kwargs["open_transaction_id"])] = row
+        self.open_by_instrument[(kwargs["account_id"], kwargs["instrument_id"])] = row
+        return row
+
+
+class _SeqTrade:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.n = 0
+
+    async def execute(self, **kwargs: Any) -> Any:
+        self.n += 1
+        self.calls.append(kwargs)
+        tx = type("Tx", (), {"id": f"tx-fill-{self.n}"})()
+        return type("TradeResult", (), {"transaction": tx})()
+
+
+class _PaperAccount:
+    id = "acc-demo"
+    type = "simulated"
+    initial_deposit = 10_000.0
+    active_profile_id = None
+
+
+class _PaperScope:
+    account = _PaperAccount()
+
+
+class _PaperAccounts:
+    async def resolve_scope(self, account_id: str, portfolio_id: str | None = None):
+        _ = account_id, portfolio_id
+        return _PaperScope()
+
+    async def get_settings_json(self, account_id: str) -> dict[str, Any]:
+        _ = account_id
+        return {}
+
+    async def merge_settings_json(self, account_id: str, fragment: dict[str, Any]) -> None:
+        _ = account_id, fragment
+
+
+class _EmptyBook:
+    positions: list[Any] = []
+    total_equity = 10_000.0
+
+    async def execute(self, account_id: str | None = None, portfolio_id: str | None = None):
+        _ = account_id, portfolio_id
+        return self
+
+
+def _birth_plan(*, instrument_id: str, decision_id: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        trade_plan={
+            "decisionId": decision_id,
+            "instrumentId": instrument_id,
+            "direction": "long",
+            "status": "TRIGGERED",
+            "quantity": 10.0,
+            "entry": 47.8,
+            "structuralStop": 45.2,
+            "target1": 52.5,
+            "target2": 58.0,
+            "riskAmount": 75.0,
+            "expectedRR": 1.81,
+            "executionAllowed": True,
+            "whyNot": [],
+        },
+        last_close=47.8,
+    )
+
+
+def _estudio_router(store: _FillStore, *, book_max: int | None = None, summary: Any = None):
+    from bolsa_application.execution_router import ExecutionRouter
+    from bolsa_application.persist_position_from_fill import PersistPositionFromFill
+    from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
+
+    definition: dict[str, Any] = {"signalKinds": ["entry_long"]}
+    if book_max is not None:
+        definition["bookMaxOpenPositions"] = book_max
+    policy = ExecutionPolicyRecord(
+        id="pol-1",
+        name="paper",
+        definition=definition,
+        mode="paper_auto",
+        account_id="acc-demo",
+        strategy_definition_id=None,
+        origin="test",
+        enabled=True,
+        user_id=None,
+        created_at="2026-09-01T00:00:00Z",
+        updated_at="2026-09-01T00:00:00Z",
+    )
+
+    class _Repo:
+        async def get_policy(self, policy_id: str) -> Any:
+            return policy if policy_id == policy.id else None
+
+    return ExecutionRouter(
+        policy_repo=_Repo(),  # type: ignore[arg-type]
+        account_repo=_PaperAccounts(),  # type: ignore[arg-type]
+        strategy_repo=object(),  # type: ignore[arg-type]
+        backtest_repo=object(),  # type: ignore[arg-type]
+        execute_trade=_SeqTrade(),  # type: ignore[arg-type]
+        portfolio_summary=summary or _EmptyBook(),  # type: ignore[arg-type]
+        profile_store=None,
+        enforce_cognitive_gate=book_max is not None,
+        position_from_fill=PersistPositionFromFill(store),
+    ), policy
+
+
+@pytest.mark.asyncio
+async def test_gp_desk_08_estudio_fill_preserves_identities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GP-DESK-08: max=2 → A,B; fill A; candidate / plan / fill ids distintas."""
+    from bolsa_application.estudio_auto_hits import ProposeEstudioAutoOpenings
+
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    monkeypatch.setenv("PAPER_D_ACCOUNT_ID", "acc-demo")
+    store = _FillStore()
+    router, policy = _estudio_router(store)
+    propose = ProposeEstudioAutoOpenings(
+        _Opinions(
+            [
+                _opinion(instrument_id="A", stars=5),
+                _opinion(instrument_id="B", stars=4),
+                _opinion(instrument_id="C", stars=3),
+                _opinion(instrument_id="D", stars=2),
+            ]
+        ),
+        _InnerPropose(
+            {
+                "A": _birth_plan(instrument_id="A", decision_id="tp-A"),
+                "B": _birth_plan(instrument_id="B", decision_id="tp-B"),
+                "C": _birth_plan(instrument_id="C", decision_id="tp-C"),
+                "D": _birth_plan(instrument_id="D", decision_id="tp-D"),
+            }
+        ),
+        instruments=_Instruments(),
+        router=router,
+        policies=_Policies(policy),
+    )
+    entry = EstudioPaperDeskEntry(
+        propose=propose,
+        estudio_list=_FakeEstudioList(ids=["A", "B", "C", "D"]),
+        max_candidates=2,
+    )
+    result = await entry.run_entry_tick(
+        account_id="acc-demo",
+        as_of="2026-09-01",
+        dry_run=False,
+        paper_d_execute=True,
+        execution_policy_id="pol-1",
+        template_id="moderate",
+    )
+    ids = [c.instrument_id for c in result.candidates]
+    assert ids == ["A", "B"]
+    assert "C" not in ids and "D" not in ids
+    assert result.executed_count == 2
+    assert result.status == "executed"
+    assert len(store.inserts) == 2
+    cand_a = result.candidates[0]
+    row_a = next(r for r in store.inserts if r["instrument_id"] == "A")
+    snap = row_a["trade_plan_snapshot"]
+    assert cand_a.decision_id == snap["candidateDecisionId"]
+    assert row_a["trade_plan_id"] == "tp-A"
+    assert snap["decisionId"] == "tp-A"
+    assert snap["decisionId"] != snap["candidateDecisionId"]
+    assert row_a["open_transaction_id"] == snap["fillId"]
+    assert snap["fillId"].startswith("tx-fill-")
+    assert snap["templateId"] == "moderate"
+    assert snap["candidateSnapshot"]["decisionId"] == cand_a.decision_id
+    assert snap["rank"] == 1
+
+
+@pytest.mark.asyncio
+async def test_gp_desk_05b_estudio_gate_deny_no_position(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GP-DESK-05b Estudio: rank #1 + book max → BLOCKED · 0 Positions."""
+    from bolsa_application.estudio_auto_hits import ProposeEstudioAutoOpenings
+
+    monkeypatch.setenv("PAPER_D_EXECUTE", "1")
+    monkeypatch.setenv("PAPER_D_ACCOUNT_ID", "acc-demo")
+
+    async def _kill_off() -> bool:
+        return False
+
+    monkeypatch.setattr(
+        "bolsa_application.execution_router.effective_kill_switch",
+        _kill_off,
+    )
+    store = _FillStore()
+    held = SimpleNamespace(
+        positions=[SimpleNamespace(instrument_id="held", quantity=1.0)],
+        total_equity=10_000.0,
+    )
+
+    class _HeldBook:
+        async def execute(self, account_id: str | None = None, portfolio_id: str | None = None):
+            _ = account_id, portfolio_id
+            return held
+
+    router, policy = _estudio_router(store, book_max=1, summary=_HeldBook())
+    propose = ProposeEstudioAutoOpenings(
+        _Opinions([_opinion(instrument_id="A", stars=5)]),
+        _InnerPropose({"A": _birth_plan(instrument_id="A", decision_id="tp-A")}),
+        instruments=_Instruments(),
+        router=router,
+        policies=_Policies(policy),
+    )
+    entry = EstudioPaperDeskEntry(
+        propose=propose,
+        estudio_list=_FakeEstudioList(ids=["A"]),
+    )
+    result = await entry.run_entry_tick(
+        account_id="acc-demo",
+        as_of="2026-09-01",
+        dry_run=False,
+        paper_d_execute=True,
+        execution_policy_id="pol-1",
+        template_id="moderate",
+    )
+    assert result.executed_count == 0
+    assert result.proposed_count == 1
+    assert result.status == "blocked"
+    assert result.reason_code == "ENTRY_RISK_LIMIT"
+    assert store.inserts == []
+    assert "book_max_open_positions" in (result.candidates[0].human_message or "")

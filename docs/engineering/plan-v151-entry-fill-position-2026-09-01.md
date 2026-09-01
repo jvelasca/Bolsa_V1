@@ -11,7 +11,7 @@
 | P0  | DI `get_execution_router_use_case`                               | DONE   |
 | P0  | `decisionId` = `signal.id` + templateId/autoSource en snapshot   | DONE   |
 | P0  | Hit `templateId` desde propose payload                           | DONE   |
-| P0t | GP-DESK-07 + idempotencia + Gate DENY sin Position               | DONE   |
+| P0t | GP-DESK-07 + GP-DESK-08 + GP-DESK-05b                            | DONE   |
 
 ## Freeze
 

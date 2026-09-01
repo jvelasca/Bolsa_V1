@@ -115,7 +115,11 @@ def select_estudio_opening_candidates(
         )
     )
     cap = max(1, min(int(max_candidates), 100))
-    return out[:cap]
+    selected = out[:cap]
+    for index, row in enumerate(selected, start=1):
+        row["rank"] = index
+        row["score"] = float(row["dictamenStars"])
+    return selected
 
 
 def build_estudio_auto_hit(
@@ -137,12 +141,20 @@ def build_estudio_auto_hit(
     pol = (policy_id or "estudio")[:8]
     iid_short = instrument_id[:8]
     strat = strategy_definition_id or "estudio_unbound"
+    plan = dict(trade_plan)
+    if not isinstance(plan.get("instrumentId"), str) or not str(plan.get("instrumentId") or "").strip():
+        plan["instrumentId"] = instrument_id
+    if plan.get("direction") not in ("long", "short"):
+        plan["direction"] = "long"
+    raw_plan_id = plan.get("decisionId") or plan.get("decision_id")
+    if not isinstance(raw_plan_id, str) or not raw_plan_id.strip():
+        plan["decisionId"] = f"tp-{day}-{iid_short}"
     hit: dict[str, Any] = {
         "instrumentId": instrument_id,
         "symbol": symbol or instrument_id,
         "scanId": plan_id,
         "autoSource": auto_source,
-        "tradePlan": trade_plan,
+        "tradePlan": plan,
         "signal": {
             "id": f"edo-{day}-{pol}-{iid_short}",
             "instrumentId": instrument_id,
@@ -362,6 +374,8 @@ class ProposeEstudioAutoOpenings:
                 template_id=template_id,
             )
             hit["dictamenStars"] = cand.get("dictamenStars")
+            hit["rank"] = cand.get("rank")
+            hit["score"] = cand.get("score")
             hits.append(hit)
 
         execution: dict[str, Any] | None = None
