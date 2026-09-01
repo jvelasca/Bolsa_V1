@@ -33,7 +33,7 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-beta` · 
 
 ## 3. Next
 
-1. **V1.59** E2E integrado FastAPI+DB — ver §4 (decisión de enfoque).
+1. **V1.59** E2E integrado FastAPI+DB — **CERRADA** ([relevo V1.59](./traspaso-relevo-v1-59-e2e-integrated-2026-09-02.md)).
 2. **V1.60** UX Mercado.
 3. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura (LIVE gap).
 
