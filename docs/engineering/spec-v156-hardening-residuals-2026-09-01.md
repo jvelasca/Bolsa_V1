@@ -1,6 +1,6 @@
 # Spec — V1.56 Hardening Residuals
 
-> **AsOf:** 2026-09-01 · **Estado:** **CERRADO** (post-V1.55 · sin tag).  
+> **AsOf:** 2026-09-01 · **Estado:** **CERRADO** (tag **`v1.56-beta`** · [relevo](./traspaso-relevo-tag-v1-56-beta-2026-09-01.md)).  
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-043](../adr/043-position-automation.md) · [`spec-v155-operational-hardening-2026-09-01.md`](./spec-v155-operational-hardening-2026-09-01.md) · tip certificado previo **`v1.55-beta` → `c23091d9`**. **No** LIVE.
 
 Cierra observaciones menores de auditoría V1.55 y deuda aparcada §4: endurecer GP-SESSION-07, pytest RESOLVED en GP-SESSION-10, smoke browser Journal/Consola. **No** motores nuevos · **no** LIVE · **no** reabrir stack V1.55 salvo los slices abajo.

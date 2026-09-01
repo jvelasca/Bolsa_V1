@@ -4,6 +4,18 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+## [1.56-beta] — 2026-09-01
+
+Hardening Residuals post-V1.55. Producto **BETA / no producción**. Tag **`v1.56-beta`**. Partida **`v1.55-beta` → `c23091d9`**. Package congelado **`1.35.0-beta`**. Confirm/DEX/SubmitIntent **intactos**. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE.
+
+### V1.56 — Hardening Residuals (2026-09-01)
+
+- **GP-SESSION-07e:** assert estricto `target2Leg.status == executed`; fix `apply_position_reduce` promueve T2 `triggered`→`executed` en cierre.
+- **GP-SESSION-10r:** pytest drift → human `resolve` → `clear` solo recon clean; sin auto-heal.
+- **GP-E2E-01..02:** Playwright smoke Journal (`/decision-journal`) + Consola (`/operational-console`); script `pnpm --filter @bolsa/web e2e`; skip default · `E2E_RUN=1` → 2/2.
+- Relevo [`traspaso-relevo-tag-v1-56-beta-2026-09-01.md`](./docs/engineering/traspaso-relevo-tag-v1-56-beta-2026-09-01.md) · arranque auditor [`arranque-auditor-v1-56-beta-2026-09-01.md`](./docs/engineering/arranque-auditor-v1-56-beta-2026-09-01.md).
+- Pre-flight: pytest GP **26** · shared **34** · web **29** · ruff OK · tsc OK.
+
 ## [1.16-beta] — 2026-08-26
 
 Mesa desk V1.16–V1.19 (ADR-037 extensiones) + backend paralelo auditoría V1.15. Producto sigue **BETA / no producción**. Tag **`v1.16-beta` → `f16119b`**. Partida: **`v1.15-beta` → `fc2ed753`**. Spine **`pnpm test:decision-spine` = 485**. Pack: [`audit-pack-estado-global-2026-08-26-v116.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v116.md). Confirm/DEX/SubmitIntent **intactos**. Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. AUTO **off**.
