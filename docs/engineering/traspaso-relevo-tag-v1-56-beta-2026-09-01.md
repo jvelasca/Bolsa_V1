@@ -1,7 +1,7 @@
 # RELEVO — tag v1.56-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`spec-v156-hardening-residuals-2026-09-01.md`](./spec-v156-hardening-residuals-2026-09-01.md) · [`traspaso-relevo-tag-v1-55-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-55-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **tag emitido** — tip `v1.56-beta` → ver §1 tras commit de cierre.  
+> **Estado:** **tag emitido** — tip `v1.56-beta` → `5c598a62`.  
 > **Arranque auditor:** [`arranque-auditor-v1-56-beta-2026-09-01.md`](./arranque-auditor-v1-56-beta-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · package bump · CI Playwright obligatorio.
 
@@ -25,7 +25,7 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-b
 
 | Pieza      | Valor                                                            |
 | ---------- | ---------------------------------------------------------------- |
-| Tag tip    | `v1.56-beta` → commit de cierre (feat `79afe7e6` + docs tag)     |
+| Tag tip    | `v1.56-beta` → `5c598a62` (`feat` `79afe7e6` + docs cierre)      |
 | Previo tip | `v1.55-beta` → `c23091d9` (CI GREEN · auditoría PASS 9,3)        |
 | CI tag     | **pendiente** — Release-tag CI tras `git push origin v1.56-beta` |
 

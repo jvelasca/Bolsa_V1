@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **stack V1.55 Operational Hardening → V1.56 Hardening Residuals**. Producto bajo revisión **`V1.56-beta`** tip funcional **`79afe7e6`** (+ docs tag). Partida certificada **`v1.55-beta` → `c23091d9`** (Release-tag CI GREEN · auditoría PASS 9,3). El stack **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **stack V1.55 Operational Hardening → V1.56 Hardening Residuals**. Producto bajo revisión **`V1.56-beta`** tip funcional **`5c598a62`**. Partida certificada **`v1.55-beta` → `c23091d9`** (Release-tag CI GREEN · auditoría PASS 9,3). El stack **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
 
 **Alcance:** V1.55 stack **intacto** · V1.56 residuals: GP-SESSION-07e (T2 `executed` estricto) · GP-SESSION-10r (drift human resolve/clear) · Playwright GP-E2E-01..02 (Journal + Consola, opt-in `E2E_RUN=1`). **No** motores nuevos · **no** segundo ranking · **no** CTA BUY desde filas AUTO.
 
