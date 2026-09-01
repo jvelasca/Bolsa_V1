@@ -1,7 +1,7 @@
 # RELEVO — V1.52 Position Lifecycle (2026-09-01)
 
 > **Padre:** [`spec-v152-position-lifecycle-2026-09-01.md`](./spec-v152-position-lifecycle-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · tip certificado **`v1.51-beta` → `5eb8e6de`** (auditoría PASS 9,1).  
-> **Estado:** **CÓDIGO** — sin tag. Package `1.35.0-beta` congelado. **No** LIVE.
+> **Estado:** **TAG** — tip **`v1.52-beta` → `1da5eb3f`** ([relevo tag](./traspaso-relevo-tag-v1-52-beta-2026-09-01.md)). Package `1.35.0-beta` congelado. **No** LIVE.
 
 ---
 
@@ -38,5 +38,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · sin Alembic tabla nueva �
 
 ## 3. Next
 
-1. Pre-flight + Release-tag CI si se taggea.
-2. **V1.53** Golden Session — **NO LIVE** · **no** UI Mesa.
+1. Push `v1.52-beta` → Release-tag CI GREEN.
+2. **V1.53** Golden Session — [`traspaso-relevo-v1-53-golden-session-2026-09-01.md`](./traspaso-relevo-v1-53-golden-session-2026-09-01.md). **NO LIVE** · **no** UI Mesa.
