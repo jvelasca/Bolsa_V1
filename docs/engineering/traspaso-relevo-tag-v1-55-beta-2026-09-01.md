@@ -1,7 +1,7 @@
 # RELEVO — tag v1.55-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-55-operational-hardening-2026-09-01.md`](./traspaso-relevo-v1-55-operational-hardening-2026-09-01.md) · [`traspaso-relevo-tag-v1-54-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-54-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.55-beta` → `c23091d9` — Release-tag CI **GREEN** — **pendiente auditoría externa adversarial**.
+> **Estado:** **CI GREEN** — tip `v1.55-beta` → `c23091d9` · Release-tag CI **GREEN** · **pendiente auditoría externa adversarial**.
 > **Arranque auditor:** [`arranque-auditor-v1-55-beta-2026-09-01.md`](./arranque-auditor-v1-55-beta-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · browser E2E · package bump.
 
@@ -26,11 +26,11 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-b
 
 ## 1. Release
 
-| Pieza      | Valor                                                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| Tag tip    | `v1.55-beta` → `c23091d9` (was `90999dad`; CI unblock shared honesty scenario 15)                                  |
-| Previo tip | `v1.54-beta` → `e057a8cc` (CI GREEN)                                                                               |
-| CI tag     | **failure** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33508291486) · `headSha=90999dad` |
+| Pieza      | Valor                                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| Tag tip    | `v1.55-beta` → `c23091d9` (was `90999dad`; CI unblock shared honesty scenario 15)                                |
+| Previo tip | `v1.54-beta` → `e057a8cc` (CI GREEN)                                                                             |
+| CI tag     | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33508814540) · `headSha=c23091d9` |
 
 Jobs del push `v1.55-beta` (retag 2026-09-01T12:38Z), todos **success**:
 
