@@ -1,24 +1,24 @@
 # RELEVO — V1.51 Entry → Paper Fill → Position (2026-09-01)
 
-> **Padre:** [`spec-v151-entry-fill-position-2026-09-01.md`](./spec-v151-entry-fill-position-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · [`plan-v151-entry-fill-position-2026-09-01.md`](./plan-v151-entry-fill-position-2026-09-01.md) · tip previo **`v1.50-beta` → `96623755`**.  
-> **Estado:** **CI GREEN** — tip `v1.51-beta` → `ab6a5bc6`. Product certificado vigente **pendiente auditoría externa**. Package `1.35.0-beta` congelado. **No** LIVE.
+> **Padre:** [`spec-v151-entry-fill-position-2026-09-01.md`](./spec-v151-entry-fill-position-2026-09-01.md) · [`spec-v151-operativo-auditable-2026-09-01.md`](./spec-v151-operativo-auditable-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · tip previo **`v1.50-beta` → `96623755`**.  
+> **Estado:** **CI GREEN** — tip `v1.51-beta` → `5eb8e6de` (close-out identidades). Product **pendiente auditoría externa**. Package `1.35.0-beta` congelado. **No** LIVE.
 
 ---
 
 ## 0. Qué cierra
 
-| Pieza                                                | Estado  |
-| ---------------------------------------------------- | ------- |
-| Router PAPER opening → `PersistPositionFromFill`     | DONE    |
-| `decisionId` = `signal.id` en snapshot               | DONE    |
-| `templateId` / `autoSource` en `trade_plan_snapshot` | DONE    |
-| GP-DESK-07 + idempotencia + Gate DENY                | DONE    |
-| EntryTick CandidateSnapshot V1.50                    | intacto |
-| PositionTick Event Continuity V1.48                  | intacto |
+| Pieza                                                         | Estado  |
+| ------------------------------------------------------------- | ------- |
+| Router PAPER opening → `PersistPositionFromFill`              | DONE    |
+| Tres identidades (plan / candidate / fill)                    | DONE    |
+| `templateId` / `autoSource` / `candidateSnapshot` en snapshot | DONE    |
+| GP-DESK-07 + GP-DESK-08 + GP-DESK-05b                         | DONE    |
+| EntryTick CandidateSnapshot V1.50                             | intacto |
+| PositionTick Event Continuity V1.48                           | intacto |
 
 ```text
 Estudio → TradePlan TRIGGERED → Gate → ledger fill
-  → PositionState OPEN (trade_plan_snapshot)
+  → PositionState OPEN (decisionId ≠ candidateDecisionId ≠ fillId)
 ```
 
 ## 1. Freeze
