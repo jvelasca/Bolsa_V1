@@ -47,11 +47,15 @@ from bolsa_application.events.payloads import signal_event_payload
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.journal_writer import append_journal_event
+from bolsa_application.opening_fill_handle import OpeningFillHandle
 from bolsa_application.operational_incident_store import (
     OperationalIncidentStore,
     sync_opening_incidents,
 )
-from bolsa_application.persist_position_from_fill import PersistPositionFromFill
+from bolsa_application.persist_position_from_fill import (
+    PersistPositionFromFill,
+    ledger_position_id_from_trade,
+)
 from bolsa_application.post_fill_position_sync import sync_position_after_ledger_fill
 from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
@@ -316,6 +320,7 @@ class ExecutionRouter:
         journal_writer: Any | None = None,
         instrument_data_status: Any | None = None,
         position_from_fill: PersistPositionFromFill | None = None,
+        opening_fill_handles: Any | None = None,
     ) -> None:
         self._policies = policy_repo
         self._accounts = account_repo
@@ -336,6 +341,7 @@ class ExecutionRouter:
         self._journal_writer = journal_writer
         self._instrument_data_status = instrument_data_status
         self._position_from_fill = position_from_fill
+        self._opening_fill_handles = opening_fill_handles
 
     async def _resolve_sanity_warnings(
         self, instrument_id: str
@@ -1110,10 +1116,10 @@ class ExecutionRouter:
 
         # V1.51 — birth PositionState after opening PAPER fill (OI-1 PersistPositionFromFill).
         # Fill already committed: persist failure must not reverse the ledger.
+        # V1.52 — stamp opening_fill_handle BEFORE persist so crash/restart can recover.
         birth_reason: str | None = None
         if (
-            self._position_from_fill is not None
-            and trade_type == "buy"
+            trade_type == "buy"
             and isinstance(opening_trade_plan, dict)
         ):
             snap = enrich_opening_trade_plan_for_position(
@@ -1122,23 +1128,51 @@ class ExecutionRouter:
                 hit=hit if isinstance(hit, dict) else None,
                 fill_id=str(result.transaction.id),
             )
-            try:
-                row = await sync_position_after_ledger_fill(
-                    account_id=policy.account_id,
-                    instrument_id=signal.instrument_id,
-                    side="buy",
-                    fill_price=price,
-                    fill_quantity=quantity,
-                    trade=result,
-                    open_transaction_id=str(result.transaction.id),
-                    filled_at=str(signal.timestamp) if signal.timestamp else None,
-                    position_from_fill=self._position_from_fill,
-                    trade_plan_snapshot=snap,
-                )
-                if row is None:
+            handle = OpeningFillHandle(
+                account_id=policy.account_id,
+                open_transaction_id=str(result.transaction.id),
+                instrument_id=signal.instrument_id,
+                fill_price=price,
+                fill_quantity=quantity,
+                trade_plan=snap,
+                filled_at=str(signal.timestamp) if signal.timestamp else None,
+                ledger_position_id=ledger_position_id_from_trade(
+                    result, signal.instrument_id
+                ),
+            )
+            if self._opening_fill_handles is not None:
+                try:
+                    await self._opening_fill_handles.record(handle)
+                except Exception:  # noqa: BLE001 — fill OK; recovery optional
+                    pass
+            await append_journal_event(
+                self._journal_writer,
+                event_type="opening_fill_handle",
+                decision_id=str(
+                    snap.get("decisionId") or snap.get("decision_id") or result.transaction.id
+                ),
+                account_id=policy.account_id,
+                instrument_id=signal.instrument_id,
+                payload=handle.to_dict(),
+            )
+            if self._position_from_fill is not None:
+                try:
+                    row = await sync_position_after_ledger_fill(
+                        account_id=policy.account_id,
+                        instrument_id=signal.instrument_id,
+                        side="buy",
+                        fill_price=price,
+                        fill_quantity=quantity,
+                        trade=result,
+                        open_transaction_id=str(result.transaction.id),
+                        filled_at=str(signal.timestamp) if signal.timestamp else None,
+                        position_from_fill=self._position_from_fill,
+                        trade_plan_snapshot=snap,
+                    )
+                    if row is None:
+                        birth_reason = "position_birth_failed"
+                except Exception:  # noqa: BLE001 — honesty: ledger OK, Position optional
                     birth_reason = "position_birth_failed"
-            except Exception:  # noqa: BLE001 — honesty: ledger OK, Position optional
-                birth_reason = "position_birth_failed"
 
         return ExecutionActionResult(
             instrument_id=signal.instrument_id,

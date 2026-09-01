@@ -13,6 +13,7 @@ from __future__ import annotations
 from bolsa_application.paper_d_propose import paper_d_execute_allowed
 
 PAPER_AUTO_ENV_BLOCKED = "paper_auto_env_blocked"
+LAB_EXIT_EXECUTE_RETIRED = "lab_exit_execute_retired"
 
 
 class PaperAutoEnvBlockedError(Exception):
@@ -20,6 +21,13 @@ class PaperAutoEnvBlockedError(Exception):
 
     def __init__(self) -> None:
         super().__init__(PAPER_AUTO_ENV_BLOCKED)
+
+
+class LabExitExecuteRetiredError(Exception):
+    """V1.52 — Lab evaluate-exits no puede SELL. Autoridad AUTO = PaperDesk."""
+
+    def __init__(self) -> None:
+        super().__init__(LAB_EXIT_EXECUTE_RETIRED)
 
 
 def require_http_paper_auto_env(policy_mode: str | None) -> None:

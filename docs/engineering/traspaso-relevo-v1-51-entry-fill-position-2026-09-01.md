@@ -1,7 +1,7 @@
 # RELEVO — V1.51 Entry → Paper Fill → Position (2026-09-01)
 
 > **Padre:** [`spec-v151-entry-fill-position-2026-09-01.md`](./spec-v151-entry-fill-position-2026-09-01.md) · [`spec-v151-operativo-auditable-2026-09-01.md`](./spec-v151-operativo-auditable-2026-09-01.md) · [ADR-043](../adr/043-position-automation.md) · tip previo **`v1.50-beta` → `96623755`**.  
-> **Estado:** **CI GREEN** — tip `v1.51-beta` → `5eb8e6de` (close-out identidades). Product **pendiente auditoría externa**. Package `1.35.0-beta` congelado. **No** LIVE.
+> **Estado:** **CI GREEN** — tip `v1.51-beta` → `5eb8e6de` (close-out identidades). Auditoría externa **PASS 9,1**. Package `1.35.0-beta` congelado. **No** LIVE.
 
 ---
 
@@ -27,10 +27,10 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · sin Alembic · sin UI Mes
 
 ## 2. OUT / parked
 
-- V1.52 Golden Session completa
-- UI Mesa · scheduler · LIVE · package bump
+- Golden Session 09:00 (**V1.53**) · UI Mesa (**V1.54**)
+- scheduler · LIVE · package bump
 
 ## 3. Next
 
-1. Auditoría externa PASS ([arranque](./arranque-auditor-v1-51-beta-2026-09-01.md)) → certificar tip `v1.51-beta`.
-2. **V1.52** Golden Session · UI Mesa — **NO LIVE**.
+1. Tip `v1.51-beta` **certificado** (auditoría PASS 9,1).
+2. **V1.52** Position Lifecycle — **NO LIVE** · **no** UI Mesa.

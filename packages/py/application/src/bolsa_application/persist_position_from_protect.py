@@ -13,6 +13,7 @@ from typing import Any, Protocol
 from bolsa_analytics.cognitive.position_revision import revisions_from_raw
 from bolsa_analytics.cognitive.position_state import (
     apply_position_current_stop,
+    apply_target_leg,
     position_state_from_dict,
 )
 from bolsa_application.origin_decision_package import preserve_origin_decision_package
@@ -61,6 +62,8 @@ class PersistPositionFromProtectInput:
     # OI-5 / V1.43 — ``protect`` (default) o ``trail`` cuando Confirm firma un TRAIL.
     origin: str = "protect"
     reason: str | None = None
+    decision_id: str | None = None
+    policy_id: str | None = None
 
 
 def _resolve_protect_origin(raw: str | None) -> str:
@@ -191,6 +194,8 @@ class PersistPositionFromProtect:
             override=override,
             origin=origin,  # type: ignore[arg-type]
             reason=reason,
+            decision_id=inp.decision_id or (pos.trade_plan_id if pos else None),
+            policy_id=inp.policy_id,
         )
         if updated is None:
             return None
@@ -257,6 +262,28 @@ class PersistPositionFromProtect:
             detected_at=as_of,
         )
         next_blob = preserve_origin_decision_package(blob, next_blob)
+        kind = (event_type or "").upper()
+        which = (
+            "t1"
+            if kind in ("T1", "TARGET_1")
+            else "t2"
+            if kind in ("T2", "TARGET_2")
+            else None
+        )
+        if which is not None:
+            pos = position_state_from_dict(next_blob)
+            if pos is not None:
+                advanced = apply_target_leg(
+                    pos,
+                    which=which,
+                    status="triggered",
+                    at=as_of,
+                    event_id=getattr(event, "event_id", None),
+                )
+                if which == "t1" and advanced.target1_leg is not None:
+                    next_blob["target1Leg"] = advanced.target1_leg.to_dict()
+                if which == "t2" and advanced.target2_leg is not None:
+                    next_blob["target2Leg"] = advanced.target2_leg.to_dict()
         expected_stop = _blob_current_stop(blob)
         status = str(blob.get("status") or "OPEN")
         row = await _cas_or_update(
@@ -283,3 +310,58 @@ class PersistPositionFromProtect:
             next_stop=None,
         )
         return found
+
+    async def patch_target_leg(
+        self,
+        *,
+        account_id: str,
+        instrument_id: str,
+        which: str,
+        status: str,
+        at: str | None,
+        event_id: str | None = None,
+        fill_id: str | None = None,
+    ) -> Any | None:
+        """V1.52 — persiste triggered/failed sin mutar stop."""
+        acc = account_id.strip() if account_id else ""
+        inst = instrument_id.strip() if instrument_id else ""
+        if not acc or not inst or which not in ("t1", "t2"):
+            return None
+        if status not in ("pending", "triggered", "executed", "failed"):
+            return None
+        existing = await self._store.get_open_for_instrument(acc, inst)
+        if existing is None:
+            return None
+        pid = row_position_id(existing)
+        blob = row_position_state(existing)
+        if pid is None or blob is None:
+            return None
+        pos = position_state_from_dict(blob)
+        if pos is None:
+            return None
+        advanced = apply_target_leg(
+            pos,
+            which=which,  # type: ignore[arg-type]
+            status=status,  # type: ignore[arg-type]
+            at=at,
+            event_id=event_id,
+            fill_id=fill_id,
+        )
+        next_blob = dict(blob)
+        next_blob = preserve_origin_decision_package(blob, next_blob)
+        from bolsa_application.position_event_log import preserve_position_events
+
+        next_blob = preserve_position_events(blob, next_blob)
+        if which == "t1" and advanced.target1_leg is not None:
+            next_blob["target1Leg"] = advanced.target1_leg.to_dict()
+        if which == "t2" and advanced.target2_leg is not None:
+            next_blob["target2Leg"] = advanced.target2_leg.to_dict()
+        expected_stop = _blob_current_stop(blob)
+        row_status = str(blob.get("status") or pos.status)
+        return await _cas_or_update(
+            self._store,
+            position_id=pid,
+            expected_stop=expected_stop,
+            status=row_status,
+            position_state=next_blob,
+        )

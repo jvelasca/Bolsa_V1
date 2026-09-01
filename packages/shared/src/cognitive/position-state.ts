@@ -17,6 +17,23 @@ export type PositionStatusV1 = "OPEN" | "PARTIAL" | "PROTECTED" | "CLOSED";
 
 export type PositionExitStatusV1 = "none" | "hint" | "armed" | "done";
 
+/** V1.52 — T1/T2 durable. mark >= T1 ≠ executed. */
+export type TargetLegStatusV1 = "pending" | "triggered" | "executed" | "failed";
+
+export type TargetLegV1 = {
+  status: TargetLegStatusV1;
+  at?: string | null;
+  eventId?: string | null;
+  fillId?: string | null;
+};
+
+const VALID_TARGET_LEG: ReadonlySet<TargetLegStatusV1> = new Set([
+  "pending",
+  "triggered",
+  "executed",
+  "failed",
+]);
+
 /** Slot MFE/MAE en posición; C5 honesty — al nacer siempre source none. */
 export type PositionMfeMaeSlotV1 = {
   mfeR: number | null;
@@ -49,6 +66,10 @@ export type PositionStateV1 = {
    * V1.27 — T2 ya consumido (idempotencia). Ausente en snapshots legacy = no alcanzado.
    */
   target2AchievedAt?: string | null;
+  /** V1.52 — estado durable T1. Legacy se hidrata desde precio / achievedAt. */
+  target1Leg?: TargetLegV1 | null;
+  /** V1.52 — estado durable T2. */
+  target2Leg?: TargetLegV1 | null;
   quantity: number;
   remainingQuantity: number;
   initialRisk: number | null;
@@ -98,6 +119,103 @@ function round4(n: number): number {
 function nowIso(at?: string | null): string {
   if (typeof at === "string" && at.trim()) return at;
   return new Date().toISOString();
+}
+
+function nonEmptyStr(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function targetLegFromUnknown(
+  raw: unknown,
+  price: number | null | undefined,
+  achievedAt: string | null | undefined,
+): TargetLegV1 | null {
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const status = typeof o.status === "string" ? o.status : null;
+    if (status && VALID_TARGET_LEG.has(status as TargetLegStatusV1)) {
+      return {
+        status: status as TargetLegStatusV1,
+        at: nonEmptyStr(o.at),
+        eventId: nonEmptyStr(o.eventId),
+        fillId: nonEmptyStr(o.fillId),
+      };
+    }
+  }
+  const achieved = nonEmptyStr(achievedAt);
+  if (achieved) {
+    return { status: "executed", at: achieved, eventId: null, fillId: null };
+  }
+  if (finite(price) && price > 0) {
+    return { status: "pending", at: null, eventId: null, fillId: null };
+  }
+  return null;
+}
+
+export function birthTargetLeg(
+  price: number | null | undefined,
+): TargetLegV1 | null {
+  if (!finite(price) || price <= 0) return null;
+  return { status: "pending", at: null, eventId: null, fillId: null };
+}
+
+function advanceTargetLeg(
+  current: TargetLegV1 | null | undefined,
+  nextStatus: TargetLegStatusV1,
+  at: string,
+  eventId?: string | null,
+  fillId?: string | null,
+): TargetLegV1 | null {
+  if (!current) return current ?? null;
+  if (current.status === "executed") {
+    return current;
+  }
+  if (nextStatus === "failed" && current.status === "pending") {
+    return current;
+  }
+  return {
+    status: nextStatus,
+    at,
+    eventId: nonEmptyStr(eventId) ?? current.eventId ?? null,
+    fillId: nonEmptyStr(fillId) ?? current.fillId ?? null,
+  };
+}
+
+export function applyTargetLeg(
+  position: PositionStateV1,
+  which: "t1" | "t2",
+  status: TargetLegStatusV1,
+  at?: string | null,
+  eventId?: string | null,
+  fillId?: string | null,
+): PositionStateV1 {
+  const when = nowIso(at);
+  if (which === "t1") {
+    return {
+      ...position,
+      target1Leg: advanceTargetLeg(
+        position.target1Leg,
+        status,
+        when,
+        eventId,
+        fillId,
+      ),
+      updatedAt: when,
+    };
+  }
+  return {
+    ...position,
+    target2Leg: advanceTargetLeg(
+      position.target2Leg,
+      status,
+      when,
+      eventId,
+      fillId,
+    ),
+    updatedAt: when,
+  };
 }
 
 /** R firmado vs entry/risk. Sin inputs válidos → null. */
@@ -239,6 +357,12 @@ export function buildPositionStateFromFill(
     target2: finite(tradePlan.target2) ? tradePlan.target2 : null,
     target1AchievedAt: null,
     target2AchievedAt: null,
+    target1Leg: birthTargetLeg(
+      finite(tradePlan.target1) ? tradePlan.target1 : null,
+    ),
+    target2Leg: birthTargetLeg(
+      finite(tradePlan.target2) ? tradePlan.target2 : null,
+    ),
     quantity: qty,
     remainingQuantity: qty,
     initialRisk: initialRisk != null && initialRisk > 0 ? initialRisk : null,
@@ -261,6 +385,7 @@ function withRevisionIfChanged(
   origin: PositionRevisionOriginV1,
   reason: string | null | undefined,
   at: string,
+  lineage?: { decisionId?: string | null; policyId?: string | null } | null,
 ): PositionStateV1 {
   if (
     !stopOrStatusChanged({
@@ -280,6 +405,8 @@ function withRevisionIfChanged(
     nextStatus: next.status,
     origin,
     reason: reason ?? null,
+    decisionId: lineage?.decisionId ?? previous.tradePlanId,
+    policyId: lineage?.policyId ?? null,
   });
   return {
     ...next,
@@ -343,6 +470,10 @@ export function applyPositionReduce(
   options?: {
     markTarget1Achieved?: boolean;
     markTarget2Achieved?: boolean;
+    fillId?: string | null;
+    eventId?: string | null;
+    decisionId?: string | null;
+    policyId?: string | null;
   } | null,
 ): PositionStateV1 | null {
   if (!position || position.status === "CLOSED") return null;
@@ -373,6 +504,30 @@ export function applyPositionReduce(
     options?.markTarget2Achieved === true
       ? (position.target2AchievedAt ?? updatedAt)
       : (position.target2AchievedAt ?? null);
+  const target1Leg =
+    options?.markTarget1Achieved === true
+      ? advanceTargetLeg(
+          position.target1Leg,
+          "executed",
+          updatedAt,
+          options.eventId,
+          options.fillId,
+        )
+      : (position.target1Leg ?? null);
+  const target2Leg =
+    options?.markTarget2Achieved === true
+      ? advanceTargetLeg(
+          position.target2Leg,
+          "executed",
+          updatedAt,
+          options.eventId,
+          options.fillId,
+        )
+      : (position.target2Leg ?? null);
+  const lineage = {
+    decisionId: options?.decisionId ?? position.tradePlanId,
+    policyId: options?.policyId ?? null,
+  };
 
   if (remaining <= 0) {
     const next: PositionStateV1 = {
@@ -383,9 +538,18 @@ export function applyPositionReduce(
       exitStatus: "done",
       target1AchievedAt,
       target2AchievedAt,
+      target1Leg,
+      target2Leg,
       updatedAt,
     };
-    return withRevisionIfChanged(position, next, origin, reason, updatedAt);
+    return withRevisionIfChanged(
+      position,
+      next,
+      origin,
+      reason,
+      updatedAt,
+      lineage,
+    );
   }
 
   const mid: PositionStateV1 = {
@@ -394,13 +558,22 @@ export function applyPositionReduce(
     realizedR,
     target1AchievedAt,
     target2AchievedAt,
+    target1Leg,
+    target2Leg,
     updatedAt,
   };
   const next: PositionStateV1 = {
     ...mid,
     status: derivePositionStatus(mid),
   };
-  return withRevisionIfChanged(position, next, origin, reason, updatedAt);
+  return withRevisionIfChanged(
+    position,
+    next,
+    origin,
+    reason,
+    updatedAt,
+    lineage,
+  );
 }
 
 /**
@@ -416,6 +589,7 @@ export function applyPositionCurrentStop(
   override?: FactoryOverrideV1 | null,
   origin?: PositionRevisionOriginV1 | null,
   reason?: string | null,
+  lineage?: { decisionId?: string | null; policyId?: string | null } | null,
 ): PositionStateV1 | null {
   if (!position || position.status === "CLOSED") return null;
   if (!finite(stop) || stop <= 0) return null;
@@ -449,6 +623,10 @@ export function applyPositionCurrentStop(
     resolvedOrigin,
     resolvedReason,
     updatedAt,
+    {
+      decisionId: lineage?.decisionId ?? position.tradePlanId,
+      policyId: lineage?.policyId ?? null,
+    },
   );
 }
 

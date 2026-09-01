@@ -28,6 +28,10 @@ export type PositionRevisionV1 = {
   nextStatus: PositionRevisionStatusV1 | null;
   origin: PositionRevisionOriginV1;
   reason: string | null;
+  /** V1.52 — TradePlan / position.tradePlanId. Ausente en revisiones legacy. */
+  decisionId?: string | null;
+  /** V1.52 — OperatingPolicy.templateId. Ausente en revisiones legacy. */
+  policyId?: string | null;
 };
 
 export const POSITION_REVISIONS_KEY = "revisions";
@@ -56,6 +60,8 @@ export type BuildPositionRevisionInputV1 = {
   origin?: PositionRevisionOriginV1;
   reason?: string | null;
   revisionId?: string | null;
+  decisionId?: string | null;
+  policyId?: string | null;
 };
 
 function nonEmpty(value: string | null | undefined): string | null {
@@ -92,6 +98,8 @@ export function buildPositionRevision(
     nextStatus: input.nextStatus ?? null,
     origin,
     reason: nonEmpty(input.reason ?? null),
+    decisionId: nonEmpty(input.decisionId ?? null),
+    policyId: nonEmpty(input.policyId ?? null),
   };
 }
 
@@ -119,6 +127,10 @@ export function positionRevisionFromUnknown(
     nextStatus: asStatus(o.nextStatus),
     origin: originRaw as PositionRevisionOriginV1,
     reason: nonEmpty(typeof o.reason === "string" ? o.reason : null),
+    decisionId: nonEmpty(
+      typeof o.decisionId === "string" ? o.decisionId : null,
+    ),
+    policyId: nonEmpty(typeof o.policyId === "string" ? o.policyId : null),
   };
 }
 

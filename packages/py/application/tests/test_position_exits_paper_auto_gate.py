@@ -9,8 +9,8 @@ import pytest
 
 from bolsa_analytics.signals.evaluate import SignalEvent
 from bolsa_application.paper_auto_http_gate import (
-    PAPER_AUTO_ENV_BLOCKED,
-    PaperAutoEnvBlockedError,
+    LAB_EXIT_EXECUTE_RETIRED,
+    LabExitExecuteRetiredError,
 )
 from bolsa_application.position_exit_evaluator import EvaluatePositionExits
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
@@ -167,47 +167,35 @@ async def test_execute_full_auto_paper_auto_blocked_without_env(
     monkeypatch.delenv("PAPER_D_EXECUTE", raising=False)
     router = AsyncMock()
     use_case = _build_use_case(router=router)
-    with pytest.raises(PaperAutoEnvBlockedError) as exc:
+    with pytest.raises(LabExitExecuteRetiredError) as exc:
         await use_case.execute("acc1", execute_trades=True)
-    assert str(exc.value) == PAPER_AUTO_ENV_BLOCKED
+    assert str(exc.value) == LAB_EXIT_EXECUTE_RETIRED
     router.execute.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_execute_full_auto_paper_auto_allowed_with_env(
+async def test_execute_full_auto_retired_even_with_env(
     monkeypatch: pytest.MonkeyPatch,
     _force_exit_signal: None,
 ) -> None:
+    """V1.52 GP Lab: executeTrades=true DENY aunque PAPER_D_EXECUTE on."""
     monkeypatch.setenv("PAPER_D_EXECUTE", "1")
     router = AsyncMock()
-    router.execute = AsyncMock(
-        return_value=SimpleNamespace(
-            actions=[
-                SimpleNamespace(
-                    instrument_id="inst1",
-                    signal_kind="exit",
-                    status="trade_executed",
-                    reason=None,
-                    transaction_id="tx1",
-                )
-            ]
-        )
-    )
     use_case = _build_use_case(router=router)
-    result = await use_case.execute("acc1", execute_trades=True)
-    assert result.results[0].status == "executed"
-    router.execute.assert_awaited_once()
+    with pytest.raises(LabExitExecuteRetiredError) as exc:
+        await use_case.execute("acc1", execute_trades=True)
+    assert str(exc.value) == LAB_EXIT_EXECUTE_RETIRED
+    router.execute.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_execute_full_auto_inform_only_skips_env_gate(
+async def test_execute_full_auto_inform_only_also_retired(
     monkeypatch: pytest.MonkeyPatch,
     _force_exit_signal: None,
 ) -> None:
     monkeypatch.delenv("PAPER_D_EXECUTE", raising=False)
     router = AsyncMock()
-    router.execute = AsyncMock(return_value=SimpleNamespace(actions=[]))
     use_case = _build_use_case(exec_mode="inform_only", router=router)
-    result = await use_case.execute("acc1", execute_trades=True)
-    assert result.results[0].status == "skipped"
-    router.execute.assert_awaited_once()
+    with pytest.raises(LabExitExecuteRetiredError):
+        await use_case.execute("acc1", execute_trades=True)
+    router.execute.assert_not_called()

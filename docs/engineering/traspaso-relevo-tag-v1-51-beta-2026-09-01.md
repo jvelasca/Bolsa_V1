@@ -1,9 +1,9 @@
 # RELEVO — tag v1.51-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-51-entry-fill-position-2026-09-01.md`](./traspaso-relevo-v1-51-entry-fill-position-2026-09-01.md) · [`traspaso-relevo-tag-v1-50-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-50-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.51-beta` → `5eb8e6de` · Release-tag CI **GREEN** · **pendiente auditoría externa**. Previo certificado **`v1.50-beta` → `96623755`**.  
-> **Arranque auditor:** [`arranque-auditor-v1-51-beta-2026-09-01.md`](./arranque-auditor-v1-51-beta-2026-09-01.md).  
-> **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · Golden Session birth+exit (V1.52) · UI Mesa · scheduler · OCO · package bump.
+> **Estado:** **CI GREEN** — tip `v1.51-beta` → `5eb8e6de` · Release-tag CI **GREEN** · auditoría externa **PASS 9,1**. Previo certificado **`v1.50-beta` → `96623755`**.  
+> **Arranque auditor:** [`arranque-auditor-v1-51-beta-2026-09-01.md`](./arranque-auditor-v1-51-beta-2026-09-01.md) · [respuesta](./respuesta-auditor-v151-entry-fill-position-2026-09-01.md).  
+> **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · Golden Session 09:00 (V1.53) · UI Mesa (V1.54) · scheduler · OCO · package bump.
 
 ---
 
@@ -47,14 +47,15 @@ Jobs del push `v1.51-beta` (retag close-out 2026-09-01T10:12Z), todos **success*
 
 ## 2. Auditoría
 
-**Veredicto local (2026-09-01, tip `5eb8e6de`):** pre-flight desk-block 66 · ruff OK · Release-tag CI **GREEN**. **Pendiente auditoría externa** con [`arranque-auditor-v1-51-beta-2026-09-01.md`](./arranque-auditor-v1-51-beta-2026-09-01.md). **No** LIVE.
+**Veredicto (2026-09-01, tip `5eb8e6de`):** pre-flight desk-block 66 · ruff OK · Release-tag CI **GREEN**. Auditoría externa **PASS 9,1** — [`respuesta-auditor-v151-entry-fill-position-2026-09-01.md`](./respuesta-auditor-v151-entry-fill-position-2026-09-01.md). **No** LIVE.
 
 ## 3. Residuals parked
 
-- **V1.52** Golden Session completa · UI Mesa
-- T1/T2 estados · Paper-D desk entry · scheduler · LIVE · package bump
+- **V1.52** Position Lifecycle (autoridad SELL · T1/T2 legs · crash recovery)
+- **V1.53** Golden Session 09:00 · **V1.54** UI Mesa
+- Paper-D desk entry · scheduler · LIVE · package bump
 
 ## 4. Next
 
-1. Auditoría externa PASS → certificar tip `v1.51-beta`.
-2. **V1.52** Golden Session · UI Mesa — **NO LIVE**.
+1. Tip `v1.51-beta` **certificado**.
+2. **V1.52** Position Lifecycle — **NO LIVE** · **no** UI Mesa.

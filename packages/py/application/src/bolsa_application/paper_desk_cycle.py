@@ -502,11 +502,13 @@ class PaperDeskCycle:
         open_positions: PaperDeskOpenPositionsPort,
         execute_auto: ExecutePositionPolicyAuto | None = None,
         context_builder: OperationalContextBuilder | None = None,
+        recover_orphans: Any | None = None,
     ) -> None:
         self._entry = entry
         self._open = open_positions
         self._execute_auto = execute_auto
         self._builder = context_builder
+        self._recover_orphans = recover_orphans
 
     async def execute(self, inp: PaperDeskCycleInput) -> PaperDeskCycleResult:
         account_id = (inp.account_id or "").strip()
@@ -538,6 +540,15 @@ class PaperDeskCycle:
                 blocked=True,
                 block_reason="paper_auto_env_blocked",
             )
+
+        recovered = 0
+        if self._recover_orphans is not None:
+            try:
+                recovered = int(await self._recover_orphans.recover(account_id) or 0)
+            except Exception:  # noqa: BLE001 — fail-closed: no inventar Position
+                recovered = 0
+            if recovered:
+                notes.append(f"orphan_opening_recovered={recovered}")
 
         open_rows = await self._open.list_open(account_id)
         iids = [i for i in (_instrument_id_from_row(r) for r in open_rows) if i]

@@ -71,6 +71,8 @@ describe("OI-5 PositionRevision factory", () => {
       nextStatus: "OPEN",
       origin: "protect",
       reason: null,
+      decisionId: null,
+      policyId: null,
     });
   });
 
@@ -128,6 +130,7 @@ describe("OI-5 apply stop/reduce revisions", () => {
     expect(nxt?.currentStop).toBe(98);
     expect(nxt?.revisions).toHaveLength(1);
     expect(nxt?.revisions[0]?.origin).toBe("protect");
+    expect(nxt?.revisions[0]?.decisionId).toBe("dec-1");
     expect(nxt?.revisions[0]?.previousStop).toBe(95);
     expect(nxt?.revisions[0]?.nextStop).toBe(98);
   });
