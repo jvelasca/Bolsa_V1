@@ -1,5 +1,6 @@
 /** RFC-008 Cognitive Decision Architecture — shared contracts (D1 + D3 skeleton). */
 
+export * from "./never.js";
 export * from "./investor-profile.js";
 export * from "./trading-policy.js";
 export * from "./trading-policy-templates.js";

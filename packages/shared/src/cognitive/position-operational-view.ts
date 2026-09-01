@@ -1,12 +1,14 @@
 /**
  * V1.55 — PositionOperationalView: canonical projection for "what to do now".
+ * V1.57 — T2_EXECUTED · stopHistory 5 orígenes · RECONCILIATION_DRIFT.
  * Does not replace PositionState; derived from durable state + ExitPlan + recon.
  *
- * @see docs/engineering/spec-v155-operational-hardening-2026-09-01.md
+ * @see docs/engineering/spec-v157-operational-truth-2026-09-01.md
  */
 
-import type { PositionRevisionV1 } from "./position-revision.js";
+import type { PositionRevisionOriginV1 } from "./position-revision.js";
 import type { PositionStateV1, TargetLegV1 } from "./position-state.js";
+import { assertNever } from "./never.js";
 import {
   resolvePaperDeskNextAction,
   resolvePositionOperatingState,
@@ -22,6 +24,7 @@ export type PositionOperationalStateV1 =
   | "T1_READY"
   | "T1_EXECUTED"
   | "T2_READY"
+  | "T2_EXECUTED"
   | "EXIT_REQUIRED";
 
 export type PositionOperationalEventKindV1 =
@@ -111,17 +114,19 @@ function resolveExtendedOperatingState(input: {
         : "clean",
     hasUnresolvedExit: input.exitPending ?? false,
   });
-  if (base === "RECONCILIATION_ERROR") return base;
+  if (base === "RECONCILIATION_ERROR" || base === "RECONCILIATION_DRIFT") {
+    return base;
+  }
   if (base === "CLOSED") return "CLOSED";
   if (input.stopTouched && input.position.status !== "CLOSED") {
     return "EXIT_REQUIRED";
   }
+  const t2 = input.position.target2Leg;
+  if (t2?.status === "executed") return "T2_EXECUTED";
+  if (t2?.status === "triggered") return "T2_READY";
   const t1 = input.position.target1Leg;
   if (t1?.status === "executed") return "T1_EXECUTED";
   if (t1?.status === "triggered") return "T1_READY";
-  const t2 = input.position.target2Leg;
-  if (t2?.status === "executed") return "T2_READY";
-  if (t2?.status === "triggered") return "T2_READY";
   if (
     base === "OPEN_UNPROTECTED" &&
     input.position.currentStop != null &&
@@ -132,6 +137,26 @@ function resolveExtendedOperatingState(input: {
   return base;
 }
 
+function stopHistoryLabel(
+  origin: PositionRevisionOriginV1,
+  trailIdx: { n: number },
+): string {
+  switch (origin) {
+    case "protect":
+      return "Protect";
+    case "trail":
+      return `Trail #${++trailIdx.n}`;
+    case "reduce":
+      return "Reduce";
+    case "override":
+      return "Ajuste manual";
+    case "stop":
+      return "Stop";
+    default:
+      return assertNever(origin);
+  }
+}
+
 export function buildStopHistory(
   position: PositionStateV1,
 ): StopHistoryEntryV1[] {
@@ -140,13 +165,12 @@ export function buildStopHistory(
   if (initial != null) {
     entries.push({ label: "Initial", stop: initial, origin: "birth" });
   }
-  let trailIdx = 0;
+  const trailIdx = { n: 0 };
   let prev = initial;
   for (const rev of position.revisions) {
-    if (rev.origin !== "trail" && rev.origin !== "protect") continue;
     const stop = rev.nextStop;
     if (stop == null) continue;
-    const label = rev.origin === "protect" ? "Protect" : `Trail #${++trailIdx}`;
+    const label = stopHistoryLabel(rev.origin, trailIdx);
     const delta = prev != null ? stop - prev : null;
     entries.push({
       label,
@@ -204,8 +228,18 @@ export function buildPositionOperationalEvents(input: {
     }
   }
   const t2 = position.target2Leg;
-  if (t2?.status === "executed" && t2.fillId) {
-    events.push({ kind: "T2_EXECUTED", fillId: t2.fillId });
+  if (t2?.status === "triggered") {
+    events.push({ kind: "T2_TRIGGERED", at: t2.at ?? null });
+  }
+  if (t2?.status === "executed") {
+    events.push({
+      kind: "T2_EXECUTED",
+      at: t2.at ?? null,
+      fillId: t2.fillId ?? null,
+    });
+    if (t2.fillId) {
+      events.push({ kind: "T2_FILL", fillId: t2.fillId });
+    }
   }
   return events;
 }
@@ -252,29 +286,31 @@ export function buildPositionOperationalView(
   };
 }
 
-function mapOperatingStateToDeskStatus(
+export function mapOperatingStateToDeskStatus(
   state: PositionOperationalStateV1,
 ): string {
   switch (state) {
     case "PROTECT_REQUIRED":
+    case "OPEN_UNPROTECTED":
       return "held";
     case "T1_READY":
     case "T1_EXECUTED":
+    case "T2_READY":
+    case "T2_EXECUTED":
+    case "PARTIALLY_REDUCED":
       return "reduced";
     case "EXIT_REQUIRED":
     case "EXIT_PENDING":
-      return "exited";
     case "CLOSED":
       return "exited";
     case "TRAILING":
     case "PROTECTED":
       return "protected";
-    case "PARTIALLY_REDUCED":
-      return "reduced";
     case "RECONCILIATION_ERROR":
+    case "RECONCILIATION_DRIFT":
       return "denied";
     default:
-      return "held";
+      return assertNever(state);
   }
 }
 

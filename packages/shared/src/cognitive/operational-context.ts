@@ -4,6 +4,7 @@
  * @see docs/engineering/spec-v148-paper-desk-event-continuity-2026-09-01.md
  */
 
+import { assertNever } from "./never.js";
 import type { PortfolioReconStatusV1 } from "./reconciliation-opening-veto.js";
 
 export type MarketDataPermissionV1 = "FRESH" | "STALE" | "MISSING" | "INVALID";
@@ -41,7 +42,25 @@ export type PositionOperatingStateV1 =
   | "PARTIALLY_REDUCED"
   | "EXIT_PENDING"
   | "CLOSED"
-  | "RECONCILIATION_ERROR";
+  | "RECONCILIATION_ERROR"
+  | "RECONCILIATION_DRIFT";
+
+/** V1.57 — drift ≠ unavailable. null = no override (clean / ausente). */
+export function resolveReconOperatingState(
+  recon: PortfolioReconStatusV1 | null | undefined,
+): "RECONCILIATION_ERROR" | "RECONCILIATION_DRIFT" | null {
+  if (recon == null) return null;
+  switch (recon) {
+    case "unavailable":
+      return "RECONCILIATION_ERROR";
+    case "drift":
+      return "RECONCILIATION_DRIFT";
+    case "clean":
+      return null;
+    default:
+      return assertNever(recon);
+  }
+}
 
 export type MarketSnapshotV1 = {
   instrumentId: string;
@@ -167,7 +186,8 @@ export function resolvePositionOperatingState(input: {
   reconStatus?: PortfolioReconStatusV1;
   hasUnresolvedExit?: boolean;
 }): PositionOperatingStateV1 {
-  if (input.reconStatus === "unavailable") return "RECONCILIATION_ERROR";
+  const reconOverride = resolveReconOperatingState(input.reconStatus);
+  if (reconOverride) return reconOverride;
   if ((input.positionStatus ?? "").toUpperCase() === "CLOSED") return "CLOSED";
   if (input.hasUnresolvedExit) return "EXIT_PENDING";
   const qty = input.quantity ?? 0;

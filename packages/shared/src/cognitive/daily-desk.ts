@@ -200,7 +200,10 @@ export function bucketFromPositionTruth(
   ) {
     return "requiere_accion";
   }
-  if (truth.operationalView?.operatingState === "RECONCILIATION_ERROR") {
+  if (
+    truth.operationalView?.operatingState === "RECONCILIATION_ERROR" ||
+    truth.operationalView?.operatingState === "RECONCILIATION_DRIFT"
+  ) {
     return "requiere_accion";
   }
   switch (truth.primaryCta.kind) {

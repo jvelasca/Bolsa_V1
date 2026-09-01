@@ -5,6 +5,12 @@
  */
 
 export type PortfolioReconStatusV1 = "clean" | "drift" | "unavailable";
+
+export const PORTFOLIO_RECON_STATUSES = [
+  "clean",
+  "drift",
+  "unavailable",
+] as const satisfies readonly PortfolioReconStatusV1[];
 export type LiveReconStatusV1 = "clean" | "drift" | "unavailable";
 export type BrokerVenueV1 = "paper" | "live";
 

@@ -85,3 +85,22 @@ def adverse_exposure(
     if direction == "long":
         return max(0.0, float(entry) - float(stop))
     return max(0.0, float(stop) - float(entry))
+
+
+def closed_remaining_zero(*, status: str, remaining: float) -> bool:
+    """INV-02: CLOSED ⇒ remaining_quantity == 0 (qty de nacimiento se conserva)."""
+    if (status or "").upper() != "CLOSED":
+        return True
+    return abs(float(remaining)) < 1e-12
+
+
+def executed_leg_has_fill(status: str | None, fill_id: str | None) -> bool:
+    """INV-03/04: executed ⇒ fill id presente."""
+    if status != "executed":
+        return True
+    return isinstance(fill_id, str) and bool(fill_id.strip())
+
+
+def mapping_unchanged(before: object, after: object) -> bool:
+    """INV-08/09/10: snapshot de identidad no muta."""
+    return before == after

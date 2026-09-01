@@ -39,6 +39,7 @@ PositionOperatingState = Literal[
     "EXIT_PENDING",
     "CLOSED",
     "RECONCILIATION_ERROR",
+    "RECONCILIATION_DRIFT",
 ]
 PortfolioReconStatus = Literal["clean", "drift", "unavailable"]
 
@@ -545,6 +546,8 @@ def resolve_position_operating_state(
 ) -> PositionOperatingState:
     if recon_status == "unavailable":
         return "RECONCILIATION_ERROR"
+    if recon_status == "drift":
+        return "RECONCILIATION_DRIFT"
     if (position_status or "").upper() == "CLOSED":
         return "CLOSED"
     if has_unresolved_exit:

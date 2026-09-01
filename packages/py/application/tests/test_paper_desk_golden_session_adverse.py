@@ -311,12 +311,9 @@ async def test_gp_session_10_reconciliation_exception_fact(
     d = report.to_dict()
     kinds = [f["kind"] for f in d.get("exceptionFacts", [])]
     assert "portfolio_recon_drift" in kinds
-    if drift.positions:
-        row = drift.positions[0].to_dict()
-        assert row.get("operating_state") in {
-            "RECONCILIATION_ERROR",
-            None,
-        } or drift.blocked or "portfolio_drift" in drift.notes
+    assert drift.positions
+    assert drift.positions[0].operating_state == "RECONCILIATION_DRIFT"
+    assert drift.positions[0].to_dict().get("operatingState") == "RECONCILIATION_DRIFT"
 
 
 @pytest.mark.asyncio

@@ -76,4 +76,28 @@ describe("operational-context", () => {
       }),
     ).toBe("PARTIALLY_REDUCED");
   });
+
+  it("V1.57: drift → RECONCILIATION_DRIFT; unavailable → RECONCILIATION_ERROR", () => {
+    expect(
+      resolvePositionOperatingState({
+        positionStatus: "PROTECTED",
+        hasProtectRevision: true,
+        reconStatus: "drift",
+      }),
+    ).toBe("RECONCILIATION_DRIFT");
+    expect(
+      resolvePositionOperatingState({
+        positionStatus: "PROTECTED",
+        hasProtectRevision: true,
+        reconStatus: "unavailable",
+      }),
+    ).toBe("RECONCILIATION_ERROR");
+    expect(
+      resolvePositionOperatingState({
+        positionStatus: "PROTECTED",
+        hasProtectRevision: true,
+        reconStatus: "clean",
+      }),
+    ).toBe("PROTECTED");
+  });
 });

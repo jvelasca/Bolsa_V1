@@ -19,6 +19,14 @@ export type PositionRevisionOriginV1 =
   | "override"
   | "stop";
 
+export const POSITION_REVISION_ORIGINS = [
+  "protect",
+  "trail",
+  "reduce",
+  "override",
+  "stop",
+] as const satisfies readonly PositionRevisionOriginV1[];
+
 export type PositionRevisionV1 = {
   revisionId: string;
   at: string;
@@ -36,13 +44,9 @@ export type PositionRevisionV1 = {
 
 export const POSITION_REVISIONS_KEY = "revisions";
 
-const VALID_ORIGINS = new Set<PositionRevisionOriginV1>([
-  "protect",
-  "trail",
-  "reduce",
-  "override",
-  "stop",
-]);
+const VALID_ORIGINS = new Set<PositionRevisionOriginV1>(
+  POSITION_REVISION_ORIGINS,
+);
 
 const VALID_STATUSES = new Set<PositionRevisionStatusV1>([
   "OPEN",
