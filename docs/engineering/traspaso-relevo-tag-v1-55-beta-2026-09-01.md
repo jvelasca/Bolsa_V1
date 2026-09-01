@@ -1,8 +1,8 @@
 # RELEVO — tag v1.55-beta → auditoría / CI (2026-09-01)
 
 > **Padre:** [`traspaso-relevo-v1-55-operational-hardening-2026-09-01.md`](./traspaso-relevo-v1-55-operational-hardening-2026-09-01.md) · [`traspaso-relevo-tag-v1-54-beta-2026-09-01.md`](./traspaso-relevo-tag-v1-54-beta-2026-09-01.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.55-beta` → `c23091d9` · Release-tag CI **GREEN** · **pendiente auditoría externa adversarial**.
-> **Arranque auditor:** [`arranque-auditor-v1-55-beta-2026-09-01.md`](./arranque-auditor-v1-55-beta-2026-09-01.md).  
+> **Estado:** **CI GREEN** — tip `v1.55-beta` → `c23091d9` · Release-tag CI **GREEN** · auditoría externa adversarial **PASS 9,3**.  
+> **Arranque auditor:** [`arranque-auditor-v1-55-beta-2026-09-01.md`](./arranque-auditor-v1-55-beta-2026-09-01.md) · [respuesta](./respuesta-auditor-v155-operational-hardening-2026-09-01.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · browser E2E · package bump.
 
 ---
@@ -47,7 +47,11 @@ Jobs del push `v1.55-beta` (retag 2026-09-01T12:38Z), todos **success**:
 
 Ver [`plan-v155-operational-hardening-2026-09-01.md`](./plan-v155-operational-hardening-2026-09-01.md). Local post close-out: pytest **25** · shared vitest **34** · web vitest **29** · ruff OK · tsc OK · Release-tag CI **GREEN** (run [33508814540](https://github.com/jvelasca/Bolsa_V1/actions/runs/33508814540); `headSha=c23091d9`).
 
-## 3. Next
+## 3. Auditoría
 
-1. **Auditoría adversarial post-V1.55** — [`arranque-auditor-v1-55-beta-2026-09-01.md`](./arranque-auditor-v1-55-beta-2026-09-01.md).
+**Veredicto (2026-09-01, tip `c23091d9`):** GP-SESSION pytest **9/9 PASS** · shared **646** · web **1133** · Release-tag CI **GREEN**. Auditoría adversarial **PASS 9,3** — [`respuesta-auditor-v155-operational-hardening-2026-09-01.md`](./respuesta-auditor-v155-operational-hardening-2026-09-01.md). **No** LIVE.
+
+## 4. Next
+
+1. **Operational Hardening cerrado** en tip certificado.
 2. **NO LIVE** · scheduler · package bump parked.
