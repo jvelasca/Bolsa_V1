@@ -28,6 +28,8 @@ from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_application.account_mandate_gate import account_mandate_veto_reason
 from bolsa_application.reconciliation_opening_gate import (
+    LiveReconStatus,
+    PortfolioReconStatus,
     reconciliation_opening_veto_reason,
 )
 from bolsa_application.trading_policy_guard import (
@@ -137,8 +139,8 @@ def check_opening(
     mandate_strategy_id: str | None = None,
     require_account_mandate: bool = False,
     proposal_strategy_id: str | None = None,
-    portfolio_recon_status: Literal["clean", "drift"] | None = None,
-    live_recon_status: Literal["clean", "drift", "unavailable"] | None = None,
+    portfolio_recon_status: PortfolioReconStatus | None = None,
+    live_recon_status: LiveReconStatus | None = None,
     broker_venue: Literal["paper", "live"] | str | None = None,
     require_recon_veto: bool = False,
     incident_status: IncidentOpeningStatus | None = None,
