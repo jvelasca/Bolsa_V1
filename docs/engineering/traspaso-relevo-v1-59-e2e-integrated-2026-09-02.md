@@ -42,5 +42,5 @@ Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-beta` · 
 
 ## 3. Next
 
-1. **V1.60** UX Mercado — [spec V1.60](./spec-v160-ux-mercado-2026-09-02.md) · tarjeta estrella POV en DECISIÓN.
+1. **V1.60** UX Mercado — **CERRADA** ([relevo V1.60](./traspaso-relevo-v1-60-ux-mercado-2026-09-02.md) · tag `v1.60-beta` → `7ac8ad9b`).
 2. **NO LIVE** · scheduler · package bump · encolar STRUCTURAL_STOP a apertura (LIVE gap) · CI integration job en Release-tag (parked).

@@ -4,6 +4,12 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+### V1.60 — UX Mercado (tarjeta estrella DECISIÓN) (2026-09-02)
+
+- **GP-V160-01..04:** tarjeta estrella `PositionOperationalStarCard` + `usePositionOperationalView` — POV canónico en panel DECISIÓN; T2_READY/T2_EXECUTED · RECONCILIATION_DRIFT · stopHistory colapsable · vitest + testids.
+- Wire: `operativa-cockpit-card` · `mercadoCockpitPosicionPhaseLabel` · recon chip POV-aware.
+- Spec [`spec-v160-ux-mercado-2026-09-02.md`](./docs/engineering/spec-v160-ux-mercado-2026-09-02.md) · relevo [`traspaso-relevo-v1-60-ux-mercado-2026-09-02.md`](./docs/engineering/traspaso-relevo-v1-60-ux-mercado-2026-09-02.md) · arranque auditor [`arranque-auditor-v1-60-ux-mercado-2026-09-02.md`](./docs/engineering/arranque-auditor-v1-60-ux-mercado-2026-09-02.md). Freeze intacto: **no** LIVE · `PAPER_D_EXECUTE` OFF · package `1.35.0-beta`. Tag **`v1.60-beta` → `7ac8ad9b`**.
+
 ### V1.59 — E2E Integrated (FastAPI + PostgreSQL) (2026-09-02)
 
 - **GP-V159-01..07:** suite integration pytest + `httpx.AsyncClient` + PG real (`@pytest.mark.integration`): trade/portfolio operational · paper-desk dry-run/gate · ops-self-eval recon · decision-journal · incident resolve/clear HTTP · execute-auto dry_run.

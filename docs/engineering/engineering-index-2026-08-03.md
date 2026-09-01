@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-09-02** V1.59 E2E **CERRADA** tag `v1.59-beta` · V1.60 UX Mercado spec · [spec-v159](./spec-v159-e2e-integrated-2026-09-02.md) · [spec-v160](./spec-v160-ux-mercado-2026-09-02.md) · partida `v1.58-beta` → `4c42f1fc`
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-09-02** V1.60 UX Mercado **CERRADA** tag `v1.60-beta` · [spec-v160](./spec-v160-ux-mercado-2026-09-02.md) · partida `v1.59-beta` → `b5c5c6ab`
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
@@ -380,4 +380,4 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 35. **Operational Truth v1.57 (2026-09-01):** [spec-v157](./spec-v157-operational-truth-2026-09-01.md) · [plan](./plan-v157-operational-truth-2026-09-01.md) · [relevo](./traspaso-relevo-v1-57-operational-truth-2026-09-01.md) · [arranque auditor](./arranque-auditor-v1-57-operational-truth-2026-09-01.md) · **CERRADO** tag `v1.57-beta`. GP-V157-01..03 · INV-01..10. Partida `v1.56-beta` → `5c598a62`. **No** LIVE.
 36. **Adversarial Execution v1.58 (2026-09-01):** [spec-v158](./spec-v158-adversarial-execution-2026-09-01.md) · [plan](./plan-v158-adversarial-execution-2026-09-01.md) · [relevo](./traspaso-relevo-v1-58-adversarial-execution-2026-09-01.md) · [arranque auditor](./arranque-auditor-v1-58-adversarial-execution-2026-09-01.md) · **CERRADO** tag `v1.58-beta`. GP-GOLDEN-DAY-ADV-01 · GP-V158-STOP-CLOSED · P0b network skip. **No** LIVE.
 37. **E2E Integrated v1.59 (2026-09-02):** [spec-v159](./spec-v159-e2e-integrated-2026-09-02.md) · [plan](./plan-v159-e2e-integrated-2026-09-02.md) · [relevo](./traspaso-relevo-v1-59-e2e-integrated-2026-09-02.md) · [relevo tag](./traspaso-relevo-tag-v1-59-beta-2026-09-02.md) · [arranque auditor](./arranque-auditor-v1-59-e2e-integrated-2026-09-02.md) · **CERRADO** tag `v1.59-beta` → `b5c5c6ab`. GP-V159-01..07 · pytest+ASGI+PG · fix `opening_gate_seed`. Partida `v1.58-beta` → `4c42f1fc`. **No** LIVE.
-38. **UX Mercado v1.60 (2026-09-02):** [spec-v160](./spec-v160-ux-mercado-2026-09-02.md) · [plan](./plan-v160-ux-mercado-2026-09-02.md) · **SPEC**. GP-V160-01..04 tarjeta estrella POV en DECISIÓN. Partida `v1.59-beta` → `b5c5c6ab`. **No** LIVE.
+38. **UX Mercado v1.60 (2026-09-02):** [spec-v160](./spec-v160-ux-mercado-2026-09-02.md) · [plan](./plan-v160-ux-mercado-2026-09-02.md) · [relevo](./traspaso-relevo-v1-60-ux-mercado-2026-09-02.md) · [relevo tag](./traspaso-relevo-tag-v1-60-beta-2026-09-02.md) · [arranque auditor](./arranque-auditor-v1-60-ux-mercado-2026-09-02.md) · **CERRADO** tag `v1.60-beta` → `7ac8ad9b`. GP-V160-01..04 tarjeta estrella POV en DECISIÓN. Partida `v1.59-beta` → `b5c5c6ab`. **No** LIVE.

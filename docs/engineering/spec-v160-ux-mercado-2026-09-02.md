@@ -1,6 +1,6 @@
 # Spec — V1.60 UX Mercado (tarjeta estrella DECISIÓN)
 
-> **AsOf:** 2026-09-02 · **Estado:** **SPEC** (sin código).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** — tag **`v1.60-beta` → `7ac8ad9b`**.  
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-042](../adr/042-operating-excellence.md) · [`spec-v157-operational-truth-2026-09-01.md`](./spec-v157-operational-truth-2026-09-01.md) · [`spec-v159-e2e-integrated-2026-09-02.md`](./spec-v159-e2e-integrated-2026-09-02.md) · tip certificado previo **`v1.59-beta` → `b5c5c6ab`**. **No** LIVE.
 
 Cierra la brecha UI post-V1.57: el panel **DECISIÓN** (`operativa-cockpit-card`) consume **`PositionOperationalView`** (proyección canónica V1.55/V1.57) en lugar de depender solo de `PositionOperatingTruth` / copy legacy. **Tarjeta estrella** = una sola tarjeta contextual con estado operativo, stop history y recon honestos. **No** motores nuevos · **no** segundo Mercado.
