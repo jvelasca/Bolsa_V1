@@ -1,8 +1,8 @@
 # Spec — V1.83 Lifecycle Snapshot Truth (mock E2E)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA (código + E2E mock locales)** · **stamp CI GREEN remoto PENDIENTE** tag `v1.83-beta`.  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.83-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.83-beta) → [`dc596ee5`](https://github.com/jvelasca/Bolsa_V1/commit/dc596ee5) · [run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026) **success** (security · shared · spine · frontend · python · playwright-mock · certify; playwright-integrated skipped opt-in).  
 > **Padre:** [`spec-v182-fixtures-split-2026-09-02.md`](./spec-v182-fixtures-split-2026-09-02.md) · respuesta auditor [`respuesta-auditor-v182-operational-financial-truth-2026-09-02.md`](./respuesta-auditor-v182-operational-financial-truth-2026-09-02.md).  
-> **Partida tip:** **V1.82** CERRADA — [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) → [`d0ccf235`](https://github.com/jvelasca/Bolsa_V1/commit/d0ccf235) · CI GREEN [run 33651647262](https://github.com/jvelasca/Bolsa_V1/actions/runs/33651647262). **No** LIVE.
+> **Partida tip:** **V1.82** CERRADA — [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) → [`d0ccf235`](https://github.com/jvelasca/Bolsa_V1/commit/d0ccf235) · CI GREEN [run 33651647262](https://github.com/jvelasca/Bolsa_V1/actions/runs/33651647262). **Tip stamp:** `v1.83-beta` → `dc596ee5`. **No** LIVE.
 
 Certificación **mock E2E** de verdad operativa y financiera: un `LifecycleSnapshot` es la fuente de verdad de portfolio / summary / paper-desk / journal / POV. `EXIT_REQUIRED` y `CLOSED` **conservan lineage**. Sigue siendo **Stateful Projection** (stage → DTO), no motor de eventos.
 
@@ -91,4 +91,4 @@ pnpm --filter @bolsa/web exec tsc --noEmit
 # → EXIT 0
 ```
 
-Stamp remoto: tag `v1.83-beta` tras GREEN (mismo ritual V1.80–V1.82).
+Stamp remoto: **DONE** — tag `v1.83-beta` → `dc596ee5` · [run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026).
