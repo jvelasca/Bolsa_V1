@@ -1,8 +1,8 @@
 # Spec — V1.80 CI GREEN Tip Honesty (mock certification gate)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local; **sin stamp CI GREEN remoto** until Actions — tag `v*` / `workflow_dispatch`).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local · commit `aafdb5b9`; **sin stamp CI GREEN remoto** until Actions — tag `v*` / `workflow_dispatch`).  
 > **Padre:** [`spec-v179-stateful-position-lifecycle-2026-09-02.md`](./spec-v179-stateful-position-lifecycle-2026-09-02.md) · relevo [`traspaso-relevo-v1-79-stateful-position-lifecycle-2026-09-02.md`](./traspaso-relevo-v1-79-stateful-position-lifecycle-2026-09-02.md).  
-> **Partida tip:** **V1.79** Stateful Position Lifecycle [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3). **Commit:** TBD (parent). **No** LIVE.
+> **Partida tip:** **V1.79** Stateful Position Lifecycle [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3). **Commit:** [`aafdb5b9`](https://github.com/jvelasca/Bolsa_V1/commit/aafdb5b9). **No** LIVE.
 
 Honestidad del tip **CI GREEN** en el gate de certificación por tag: el job `playwright-mock` de `release-tag-ci.yml` deja de certificar solo `gp-e2e` y pasa a exigir el **curado mock** V1.73–V1.79 (+ `gp-e2e`). Expanding the mock gate ≠ having a remote GREEN check yet: gate ready; remote stamp needs tag `v*` or `workflow_dispatch` after push. No es LIVE, no es Playwright en cada PR, no es E2E integrado con PostgreSQL obligatorio.
 
@@ -73,7 +73,7 @@ expandir gate ≠ stamp CI GREEN remoto (pendiente Actions)
 
 1. Diff mínimo en `.github/workflows/release-tag-ci.yml` job `playwright-mock` (comando/curado) — **DONE**
 2. Docs: spec · plan · arranque auditor · relevo · CURRENT_SYSTEM · engineering-index — **DONE** (este cierre)
-3. Pre-flight local con el **mismo filtro** que CI — esperado EXIT 0 (puede aún estar corriendo en máquina local)
+3. Pre-flight local con el **mismo filtro** que CI — **32 passed** (3 integrated skipped)
 
 ## 4. OUT
 
@@ -90,9 +90,10 @@ Mismo curado que CI (`playwright-mock`):
 
 ```bash
 E2E_RUN=1 pnpm --filter @bolsa/web e2e -- "gp-e2e|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179"
+# → 32 passed (3 integrated skipped)
 
 pnpm --filter @bolsa/web exec tsc --noEmit
-# → EXIT 0 (esperado; pre-flight local puede aún estar en curso)
+# → EXIT 0
 ```
 
-**Honestidad:** gate listo en YAML + evidencia local esperada. **Sin stamp CI GREEN remoto** hasta que `release-tag-ci` (tag `v*` o `workflow_dispatch`) complete en verde en Actions.
+**Honestidad:** gate listo en YAML + evidencia local (32 passed). **Sin stamp CI GREEN remoto** hasta que `release-tag-ci` (tag `v*` o `workflow_dispatch`) complete en verde en Actions.

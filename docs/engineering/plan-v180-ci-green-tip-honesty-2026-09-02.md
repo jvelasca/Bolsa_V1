@@ -4,15 +4,15 @@
 > **Estado:** **CERRADA** (código + docs + pre-flight local esperado; **remote GREEN pendiente Actions** — tag `v*` / `workflow_dispatch`).  
 > **Partida tip:** V1.79 [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3).
 
-| ID  | Entrega                                                                                 | Estado                                                |
-| --- | --------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| D0  | spec GO + plan + arranque auditor                                                       | **DONE**                                              |
-| P0  | Expandir `release-tag-ci.yml` job `playwright-mock`: `gp-e2e` + `gp-v173\|…\|gp-v179`   | **DONE**                                              |
-| P0  | Verificar `certify` sigue needing `playwright-mock` (sin ampliar required a integrated) | **DONE**                                              |
-| P0  | Pre-flight local: un filtro `gp-e2e\|gp-v173\|…\|gp-v179` (mismo que CI)                | **DONE** (esperado EXIT 0; puede aún correr en local) |
-| P1  | Confirmar `frontend-ci.yml` sin Playwright (by design; sin diff salvo docs)             | **DONE**                                              |
-| P1  | Cierre: relevo · CURRENT_SYSTEM · engineering-index                                     | **DONE**                                              |
-| —   | _(opcional)_ Stamp CI GREEN remoto vía tag `v*` / `workflow_dispatch` en Actions        | **PENDING**                                           |
+| ID  | Entrega                                                                                 | Estado                           |
+| --- | --------------------------------------------------------------------------------------- | -------------------------------- |
+| D0  | spec GO + plan + arranque auditor                                                       | **DONE**                         |
+| P0  | Expandir `release-tag-ci.yml` job `playwright-mock`: `gp-e2e` + `gp-v173\|…\|gp-v179`   | **DONE**                         |
+| P0  | Verificar `certify` sigue needing `playwright-mock` (sin ampliar required a integrated) | **DONE**                         |
+| P0  | Pre-flight local: un filtro `gp-e2e\|gp-v173\|…\|gp-v179` (mismo que CI)                | **DONE** (32 passed · 3 skipped) |
+| P1  | Confirmar `frontend-ci.yml` sin Playwright (by design; sin diff salvo docs)             | **DONE**                         |
+| P1  | Cierre: relevo · CURRENT_SYSTEM · engineering-index                                     | **DONE**                         |
+| —   | _(opcional)_ Stamp CI GREEN remoto vía tag `v*` / `workflow_dispatch` en Actions        | **PENDING**                      |
 
 ## Secuencia (ejecutada)
 

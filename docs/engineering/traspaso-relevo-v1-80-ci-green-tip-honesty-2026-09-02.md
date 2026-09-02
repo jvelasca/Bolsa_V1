@@ -1,6 +1,6 @@
 # Relevo — V1.80 CI GREEN Tip Honesty (mock certification gate)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local; **sin stamp CI GREEN remoto** until Actions — tag `v*` / `workflow_dispatch`) · **Auditor:** [`arranque-auditor-v1-80-ci-green-tip-honesty-2026-09-02.md`](./arranque-auditor-v1-80-ci-green-tip-honesty-2026-09-02.md) · **Partida:** V1.79 [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3) · **Commit:** TBD (parent)
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local · commit [`aafdb5b9`](https://github.com/jvelasca/Bolsa_V1/commit/aafdb5b9); **sin stamp CI GREEN remoto** until Actions — tag `v*` / `workflow_dispatch`) · **Auditor:** [`arranque-auditor-v1-80-ci-green-tip-honesty-2026-09-02.md`](./arranque-auditor-v1-80-ci-green-tip-honesty-2026-09-02.md) · **Partida:** V1.79 [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3) · **Commit:** [`aafdb5b9`](https://github.com/jvelasca/Bolsa_V1/commit/aafdb5b9)
 
 ## Hecho
 
@@ -9,13 +9,13 @@
   (antes solo `gp-e2e`)
 - `certify` sigue `needs: … playwright-mock` · `playwright-integrated` sigue opt-in
 - `frontend-ci.yml` **sin** Playwright (by design · sin diff)
-- Pre-flight local: **mismo filtro único** que CI (gp-e2e + gp-v173..179) · esperado EXIT 0
+- Pre-flight local: **mismo filtro único** que CI → **32 passed** (3 integrated skipped)
 - Spec/plan/auditor · CURRENT_SYSTEM · engineering-index
 
 ## Reservas (honestidad)
 
 - **Gate expandido ≠ stamp CI GREEN remoto.** El tip honesty del mock gate está listo en YAML; el stamp remoto GREEN es follow-up cuando Actions corra (tag `v*` o `workflow_dispatch`) con éxito.
-- Pre-flight local puede aún estar en curso al cerrar docs; expectativa = mismo curado que CI.
+- Pre-flight local del curado CI: **32 passed** (3 integrated skipped).
 - Certificación = **mock E2E** en release-tag · **no** LIVE · **no** Playwright en cada PR · **no** integrated/PG obligatorio
 
 ## OUT (intactos)
