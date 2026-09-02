@@ -18,10 +18,10 @@ import type {
   PositionExitCtaKindV1,
 } from "@bolsa/shared";
 import {
+  buildDecisionExplainView,
   buildEntryOperatingTruth,
   buildExecutionState,
   buildPositionOperatingTruth,
-  mapMesaStatusDimensions,
   mapReconStatusToHealth,
   RECON_HEALTH_COPY,
 } from "@bolsa/shared";
@@ -62,6 +62,7 @@ import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-p
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
 import { DecisionSurfacePlacementToggle } from "@/features/trading/decision-surface-placement-toggle";
+import { DecisionExplainPanel } from "@/features/trading/decision-explain-panel";
 import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
 
 type OperativaCockpitCardProps = {
@@ -265,6 +266,24 @@ export function OperativaCockpitCard({
           gateStatus: entryTruth.gateStatus,
         })
       : undefined;
+
+  const explainView =
+    study != null
+      ? buildDecisionExplainView({
+          study,
+          entriesBlocked: entryTruth?.entriesBlocked ?? entriesBlocked,
+          gateStatus: entryTruth?.gateStatus ?? opinion?.gateStatus ?? null,
+          phase:
+            entryTruth?.phase ?? (phase === "posicion" ? "posicion" : phase),
+          secondaryConditions: positionPot?.secondaryConditions ?? [],
+          asOf:
+            entryTruth?.asOf ??
+            positionPot?.asOf ??
+            opinion?.asOfBarDate ??
+            null,
+          source: opinion?.source ?? null,
+        })
+      : null;
 
   if (!instrumentId) {
     return (
@@ -518,55 +537,7 @@ export function OperativaCockpitCard({
           {whyOpen ? "Ocultar ¿Por qué?" : "¿Por qué?"}
         </button>
         {whyOpen ? (
-          <dl
-            className="mt-1.5 space-y-1 text-[10px] text-muted-foreground"
-            data-testid="operativa-cockpit-why-body"
-          >
-            <div className="flex justify-between gap-2">
-              <dt>Dictamen</dt>
-              <dd className="font-medium text-foreground">
-                {opinionLoading
-                  ? "…"
-                  : (opinion?.stance ?? study?.opinion ?? "—")}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>Gate</dt>
-              <dd className="font-medium text-foreground">
-                {opinion?.gateStatus ?? "—"}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>Plan</dt>
-              <dd className="font-medium text-foreground">
-                {plan.phaseLabel ||
-                  (study?.tradePlanStatus
-                    ? mapMesaStatusDimensions({
-                        tradePlanStatus: study.tradePlanStatus,
-                      }).operational
-                    : "—")}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>Fuente opinión</dt>
-              <dd className="font-medium text-foreground">
-                {opinion?.source ?? "—"}
-              </dd>
-            </div>
-            {executionState?.lifecycle === "unknown" ? (
-              <div className="flex justify-between gap-2">
-                <dt>Orden</dt>
-                <dd className="font-medium text-amber-800 dark:text-amber-200">
-                  UNKNOWN — no reenviar · reconciliar
-                </dd>
-              </div>
-            ) : null}
-            <p className="pt-0.5 leading-snug">
-              {paperAuto.autoActive
-                ? `PAPER AUTO · ${paperAuto.statusBadge ?? "armado"} · Ranking ≠ BUY · trail ≠ currentStop.`
-                : "La IA no firma. Confirm es la única firma · Ranking ≠ BUY · trail = propuesta."}
-            </p>
-          </dl>
+          <DecisionExplainPanel view={explainView} loading={opinionLoading} />
         ) : null}
       </div>
     </section>

@@ -17,7 +17,11 @@ import type {
   ThesisHealthV1,
   TrailPlanV1,
 } from "@bolsa/shared";
-import { mapDecisionBoardToHoyQueue } from "@bolsa/shared";
+import {
+  formatTradePlanWhyNot,
+  mapDecisionBoardToHoyQueue,
+} from "@bolsa/shared";
+import type { TradePlanWhyNotV1 } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -32,33 +36,6 @@ const KIND_CLASS: Record<HoyQueueItemV1["kind"], string> = {
   REVIEW: "bg-orange-500/15 text-orange-900 dark:text-orange-200",
   BLOCKED: "bg-rose-500/15 text-rose-800 dark:text-rose-200",
 };
-
-function whyLabel(code: string): string {
-  switch (code) {
-    case "fit":
-      return "No encaja en la cartera";
-    case "entry":
-      return "Entrada aún no lista";
-    case "freshness":
-      return "Datos no frescos";
-    case "mandate":
-      return "Sin mandato abierto";
-    case "expired":
-      return "La decisión caducó";
-    case "no_stop":
-      return "Falta stop estructural";
-    case "regime":
-      return "Régimen no admite longs";
-    case "orphan":
-      return "Sin paquete de decisión";
-    case "rr":
-      return "Riesgo/beneficio insuficiente";
-    case "legacy_projection":
-      return "Sin plan vivo (proyección; motivo desconocido)";
-    default:
-      return code;
-  }
-}
 
 function setupLine(setup: HoySetupEvidenceV1): string {
   const parts: string[] = [];
@@ -329,7 +306,9 @@ export function HoyCommandStrip() {
               ) : (
                 <ul className="mt-1 list-disc pl-4 text-sm">
                   {selected.whyNot.map((code) => (
-                    <li key={code}>{whyLabel(code)}</li>
+                    <li key={code}>
+                      {formatTradePlanWhyNot(code as TradePlanWhyNotV1)}
+                    </li>
                   ))}
                 </ul>
               )}
