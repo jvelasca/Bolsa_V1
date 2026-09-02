@@ -23,7 +23,12 @@ from bolsa_application.operational_incident_store import (
 )
 from bolsa_infrastructure.auth.passwords import hash_password
 from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import InvestmentAccountRow, UserRow
+from bolsa_infrastructure.database.models import (
+    InvestmentAccountRow,
+    InvestmentPortfolioRow,
+    PortfolioRow,
+    UserRow,
+)
 
 
 def _now() -> datetime:
@@ -63,7 +68,11 @@ async def _insert_account(
     user_id: str,
     name: str,
 ) -> str:
+    """Account + legacy portfolio link (needed for HTTP recon clear / OI-6)."""
     account_id = f"lc-g-{uuid4().hex[:14]}"
+    legacy_id = f"pf-g-{uuid4().hex[:14]}"
+    inv_pf_id = f"ip-g-{uuid4().hex[:14]}"
+    now = _now()
     async with factory() as session:
         session.add(
             InvestmentAccountRow(
@@ -77,8 +86,32 @@ async def _insert_account(
                 initial_deposit=Decimal("1000"),
                 leverage=Decimal("1"),
                 is_default=False,
-                created_at=_now(),
-                updated_at=_now(),
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.add(
+            PortfolioRow(
+                id=legacy_id,
+                name=f"{name} — cartera",
+                currency="USD",
+                cash=Decimal("1000"),
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.add(
+            InvestmentPortfolioRow(
+                id=inv_pf_id,
+                account_id=account_id,
+                legacy_portfolio_id=legacy_id,
+                name="Cartera principal",
+                description=None,
+                strategy_tag="core",
+                sort_order=0,
+                is_default=True,
+                created_at=now,
+                updated_at=now,
             )
         )
         await session.commit()
