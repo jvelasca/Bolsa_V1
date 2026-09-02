@@ -7,10 +7,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleEventKind
-
 from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 from bolsa_application.persist_position_from_fill import ledger_position_id_from_trade
+from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleEventKind
 
 logger = logging.getLogger(__name__)
 

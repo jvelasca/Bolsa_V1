@@ -114,6 +114,8 @@ async def _post_event(
 
 @pytest.fixture
 def auth_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    # APP_PASSWORD ON so AuthMiddleware attaches JWT principal (accounts HTTP).
+    monkeypatch.setenv("APP_PASSWORD", "lifecycle-golden-test-password")
     monkeypatch.setenv("APP_AUTH_SECRET", "lifecycle-golden-test-secret-key-32b")
     monkeypatch.setenv("JWT_SIGNING_KEY", "lifecycle-golden-test-secret-key-32b")
     get_settings.cache_clear()

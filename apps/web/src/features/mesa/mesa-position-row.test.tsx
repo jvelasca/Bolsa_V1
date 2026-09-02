@@ -18,6 +18,15 @@ vi.mock("@/lib/api", () => ({
     getAccounts: vi.fn(async () => ({ data: [] })),
     getAccountSettings: vi.fn(async () => ({ data: null })),
     getPendingOrders: vi.fn(async () => ({ data: [] })),
+    getLifecycleSnapshot: vi.fn(async () => ({
+      data: {
+        positionId: "p1",
+        stage: "candidate",
+        lineagePath: "trail",
+        events: [],
+        accounting: null,
+      },
+    })),
   },
 }));
 
