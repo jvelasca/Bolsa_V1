@@ -151,11 +151,14 @@ async def _bump_portfolio_cash(
         SqlAlchemyPortfolioRepository,
     )
 
+    amount = float(delta)
     async with factory() as session:
         scope = await SqlAlchemyAccountRepository(session).resolve_scope(account_id)
-        await SqlAlchemyPortfolioRepository(session).add_cash(
-            scope.legacy_portfolio_id, float(delta)
-        )
+        repo = SqlAlchemyPortfolioRepository(session)
+        if amount > 0:
+            await repo.add_cash(scope.legacy_portfolio_id, amount)
+        elif amount < 0:
+            await repo.deduct_cash(scope.legacy_portfolio_id, abs(amount))
         await session.commit()
 
 
