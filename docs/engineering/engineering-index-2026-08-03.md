@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-09-02** V1.74 Paper Autonomous Day **CERRADA** (local; no CI GREEN) · V1.73 Multi-instrument · [spec-v174](./spec-v174-paper-autonomous-day-2026-09-02.md) · partida V1.73
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-09-02** V1.75 Chaos & stale → no-execute **CERRADA** (local; no CI GREEN) · V1.74 Paper Day · [spec-v175](./spec-v175-chaos-stale-no-execute-2026-09-02.md) · partida V1.74
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
@@ -386,3 +386,4 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 41. **Decision Explainability TOP v1.72 (2026-09-02):** [spec-v172](./spec-v172-decision-explainability-top-2026-09-02.md) · [plan](./plan-v172-decision-explainability-top-2026-09-02.md) · [relevo](./traspaso-relevo-v1-72-decision-explainability-top-2026-09-02.md) · [arranque auditor](./arranque-auditor-v1-72-decision-explainability-top-2026-09-02.md) · **CERRADO** (código + tests locales). GP-V172-01..05. Partida V1.71 `b70849bd`. **No** LIVE · **no** stamp CI GREEN.
 42. **Multi-instrument integrity v1.73 (2026-09-02):** [spec-v173](./spec-v173-multi-instrument-integrity-2026-09-02.md) · [plan](./plan-v173-multi-instrument-integrity-2026-09-02.md) · [relevo](./traspaso-relevo-v1-73-multi-instrument-integrity-2026-09-02.md) · [arranque auditor](./arranque-auditor-v1-73-multi-instrument-integrity-2026-09-02.md) · **CERRADO** (E2E mock locales). GP-V173-01..04. Partida V1.72. **No** LIVE · **no** stamp CI GREEN.
 43. **Paper Autonomous Day v1.74 (2026-09-02):** [spec-v174](./spec-v174-paper-autonomous-day-2026-09-02.md) · [plan](./plan-v174-paper-autonomous-day-2026-09-02.md) · [relevo](./traspaso-relevo-v1-74-paper-autonomous-day-2026-09-02.md) · [arranque auditor](./arranque-auditor-v1-74-paper-autonomous-day-2026-09-02.md) · **CERRADO** (E2E mock locales). GP-V174-01..08. Partida V1.73. **No** LIVE · **no** dryRun=false browser · **no** stamp CI GREEN.
+44. **Chaos & stale → no-execute v1.75 (2026-09-02):** [spec-v175](./spec-v175-chaos-stale-no-execute-2026-09-02.md) · [plan](./plan-v175-chaos-stale-no-execute-2026-09-02.md) · [relevo](./traspaso-relevo-v1-75-chaos-stale-no-execute-2026-09-02.md) · [arranque auditor](./arranque-auditor-v1-75-chaos-stale-no-execute-2026-09-02.md) · **CERRADO** (E2E mock + pytest locales). GP-V175-01..07. Partida V1.74 `67f922bf`. **No** LIVE · **no** dryRun=false browser · **no** stamp CI GREEN.

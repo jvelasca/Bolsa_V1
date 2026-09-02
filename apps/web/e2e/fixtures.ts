@@ -12,6 +12,9 @@ import {
   mercadoWorkspaceDocument,
   paperAutonomousDayDailyOpsEnvelope,
   paperAutonomousDayT1Position,
+  staleNoExecuteDailyOpsEnvelope,
+  staleNoExecuteOpenIncident,
+  staleNoExecuteUnknownSubmitIntent,
 } from "./integration";
 
 /** True when E2E should run (auto webServer or explicit base URL). */
@@ -131,12 +134,21 @@ function mercadoInstrumentCatalog(multi: boolean) {
 
 function routeBody(
   route: Route,
-  opts?: { mercado?: boolean; multi?: boolean; hoyDay?: boolean },
+  opts?: {
+    mercado?: boolean;
+    multi?: boolean;
+    hoyDay?: boolean;
+    /** V1.75 — separado de hoyDay; no contaminar Paper Day feliz. */
+    hoyStale?: boolean;
+  },
 ): Record<string, unknown> {
   const path = apiPath(route.request().url());
-  const mercado = opts?.mercado === true || opts?.hoyDay === true;
-  const multi = opts?.multi === true;
+  const hoyStale = opts?.hoyStale === true;
   const hoyDay = opts?.hoyDay === true;
+  const mercado =
+    opts?.mercado === true || hoyDay === true || hoyStale === true;
+  const multi = opts?.multi === true;
+  const deskDay = hoyDay || hoyStale;
 
   if (path === "/api/auth/status") {
     return { data: { authEnabled: false, authenticated: false } };
@@ -151,14 +163,14 @@ function routeBody(
     return { data: [demoAccount] };
   }
   if (path === "/api/portfolio") {
-    const positions = hoyDay
+    const positions = deskDay
       ? [paperAutonomousDayT1Position()]
       : multi
         ? mercadoMultiOpenPositions()
         : mercado
           ? [mercadoOpenPosition()]
           : [];
-    const equity = hoyDay
+    const equity = deskDay
       ? 101_060
       : multi
         ? 103_500
@@ -177,7 +189,7 @@ function routeBody(
     };
   }
   if (path === "/api/lists") {
-    if (hoyDay) {
+    if (deskDay) {
       return {
         data: [
           {
@@ -199,7 +211,7 @@ function routeBody(
   if (path === "/api/lists/memberships") {
     return { data: {} };
   }
-  if (hoyDay && path === "/api/lists/estudio") {
+  if (deskDay && path === "/api/lists/estudio") {
     return {
       data: {
         id: "estudio",
@@ -312,11 +324,23 @@ function routeBody(
     };
   }
   if (path.endsWith("/operational-incidents/active")) {
+    if (hoyStale) {
+      return {
+        data: {
+          accountId: E2E_ACCOUNT_ID,
+          incidents: [staleNoExecuteOpenIncident()],
+          total: 1,
+        },
+      };
+    }
     return {
       data: { accountId: E2E_ACCOUNT_ID, incidents: [], total: 0 },
     };
   }
   if (path === "/api/paper-desk/daily-report") {
+    if (hoyStale) {
+      return { data: staleNoExecuteDailyOpsEnvelope(E2E_ACCOUNT_ID) };
+    }
     if (hoyDay) {
       return { data: paperAutonomousDayDailyOpsEnvelope(E2E_ACCOUNT_ID) };
     }
@@ -327,14 +351,50 @@ function routeBody(
       data: {
         accountId: E2E_ACCOUNT_ID,
         cash: 100_000,
-        totalEquity: hoyDay ? 101_060 : 100_000,
-        openPositions: hoyDay ? 1 : 0,
-        dayPnl: hoyDay ? 60 : 0,
-        dayPnlPct: hoyDay ? 0.06 : 0,
+        totalEquity: deskDay ? 101_060 : 100_000,
+        openPositions: deskDay ? 1 : 0,
+        dayPnl: deskDay ? 60 : 0,
+        dayPnlPct: deskDay ? 0.06 : 0,
       },
     };
   }
   if (path.endsWith("/decision-studies")) {
+    if (hoyStale) {
+      return {
+        data: {
+          accountId: E2E_ACCOUNT_ID,
+          studies: [
+            {
+              decisionId: "dec-e2e-msft-stale",
+              instrumentId: "inst-msft",
+              symbol: "MSFT",
+              hasOperationalPlan: true,
+              tradePlanStatus: "ARMED",
+              studiedAt: "2026-09-02T09:00:00.000Z",
+              entry: 420,
+              stop: 400,
+              target1: 440,
+              target2: 460,
+            },
+            {
+              decisionId: "dec-e2e-nvda-stale",
+              instrumentId: E2E_ENTRY_ONLY_INSTRUMENT.id,
+              symbol: E2E_ENTRY_ONLY_INSTRUMENT.symbol,
+              hasOperationalPlan: true,
+              tradePlanStatus: "ARMED",
+              studiedAt: "2026-09-02T09:00:00.000Z",
+              entry: 118,
+              stop: 110,
+              target1: 130,
+              target2: 140,
+            },
+          ],
+          total: 2,
+          limit: 200,
+          offset: 0,
+        },
+      };
+    }
     if (hoyDay) {
       return {
         data: {
@@ -394,18 +454,20 @@ function routeBody(
     };
   }
   if (path.endsWith("/decision-journal")) {
-    if (hoyDay) {
+    if (deskDay) {
       return {
         data: {
           accountId: E2E_ACCOUNT_ID,
           entries: [
             {
-              id: "journal-e2e-day-1",
-              decisionId: "dec-e2e-msft-day",
+              id: "journal-e2e-stale-1",
+              decisionId: hoyStale ? "dec-e2e-msft-stale" : "dec-e2e-msft-day",
               instrumentId: "inst-msft",
               symbol: "MSFT",
               studiedAt: "2026-09-02T09:00:00.000Z",
-              headline: "Plan armado — dryRun",
+              headline: hoyStale
+                ? "ENTRY_STALE_DATA — no execute"
+                : "Plan armado — dryRun",
               status: "studied",
             },
           ],
@@ -426,6 +488,15 @@ function routeBody(
     };
   }
   if (path.endsWith("/submit-intents")) {
+    if (hoyStale) {
+      return {
+        data: {
+          accountId: E2E_ACCOUNT_ID,
+          intents: [staleNoExecuteUnknownSubmitIntent()],
+          total: 1,
+        },
+      };
+    }
     return {
       data: { accountId: E2E_ACCOUNT_ID, intents: [], total: 0 },
     };
@@ -462,7 +533,7 @@ function routeBody(
     return { data: [] };
   }
   if (path === "/api/instruments") {
-    if (multi || hoyDay) {
+    if (multi || deskDay) {
       return { data: mercadoInstrumentCatalog(true) };
     }
     if (mercado) {
@@ -470,10 +541,10 @@ function routeBody(
     }
     return { data: [] };
   }
-  if ((mercado || multi || hoyDay) && path === "/api/instruments/quotes") {
-    return { data: mercadoInstrumentCatalog(multi || hoyDay) };
+  if ((mercado || multi || deskDay) && path === "/api/instruments/quotes") {
+    return { data: mercadoInstrumentCatalog(multi || deskDay) };
   }
-  if ((mercado || multi) && path.endsWith("/ohlcv")) {
+  if ((mercado || multi || hoyStale) && path.endsWith("/ohlcv")) {
     const bars = mercadoOhlcvBars();
     return {
       data: bars,
@@ -481,7 +552,7 @@ function routeBody(
     };
   }
   if (
-    (mercado || multi) &&
+    (mercado || multi || hoyStale) &&
     path.match(/\/api\/instruments\/[^/]+$/) &&
     path !== "/api/instruments/quotes"
   ) {
@@ -490,6 +561,7 @@ function routeBody(
       ...E2E_MULTI_POSITION_INSTRUMENTS,
       E2E_ENTRY_ONLY_INSTRUMENT,
       { id: E2E_INSTRUMENT_ID, symbol: E2E_SYMBOL, name: "Apple E2E" },
+      { id: "inst-msft", symbol: "MSFT", name: "Microsoft E2E" },
     ].find((row) => row.id === id);
     return {
       data: {
@@ -501,24 +573,27 @@ function routeBody(
       },
     };
   }
-  if ((mercado || multi) && path.endsWith("/strategy-top")) {
+  if ((mercado || multi || hoyStale) && path.endsWith("/strategy-top")) {
     return { data: null };
   }
-  if ((mercado || multi) && path.endsWith("/indicators")) {
+  if ((mercado || multi || hoyStale) && path.endsWith("/indicators")) {
     return {
       data: [],
       meta: { timeframe: "1d", count: 0, indicators: [] },
     };
   }
-  if ((mercado || multi) && path.includes("/instrument-daily-opinions")) {
+  if (
+    (mercado || multi || hoyStale) &&
+    path.includes("/instrument-daily-opinions")
+  ) {
     return { data: [] };
   }
-  if ((mercado || multi) && path.endsWith("/data-status")) {
+  if ((mercado || multi || hoyStale) && path.endsWith("/data-status")) {
     return {
       data: {
         instrumentId: E2E_INSTRUMENT_ID,
         timeframe: "1d",
-        freshnessStatus: "current",
+        freshnessStatus: hoyStale ? "stale" : "current",
         barCount: 30,
         lastBarDate: "2026-08-30",
       },
@@ -534,7 +609,12 @@ function routeBody(
 /** Intercept /api/* so smoke tests run without the Python stack. */
 export async function installApiMocks(
   page: Page,
-  opts?: { mercado?: boolean; multi?: boolean; hoyDay?: boolean },
+  opts?: {
+    mercado?: boolean;
+    multi?: boolean;
+    hoyDay?: boolean;
+    hoyStale?: boolean;
+  },
 ): Promise<void> {
   await page.route(/\/api\//, async (route) => {
     await route.fulfill(jsonResponse(routeBody(route, opts)));
@@ -556,4 +636,13 @@ export async function installMercadoMultiApiMocks(page: Page): Promise<void> {
 export async function installHoyPaperDayApiMocks(page: Page): Promise<void> {
   setMercadoMockWorkspaceDocument(null);
   await installApiMocks(page, { hoyDay: true });
+}
+
+/**
+ * V1.75 — Chaos & stale → no-execute (helper separado; no usa hoyDay).
+ * ENTRY_STALE_DATA · UNKNOWN submitIntent · incidente abierto · data-status stale.
+ */
+export async function installHoyStaleNoExecuteMocks(page: Page): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  await installApiMocks(page, { hoyStale: true });
 }
