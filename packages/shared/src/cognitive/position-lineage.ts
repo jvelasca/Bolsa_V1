@@ -17,8 +17,10 @@ export type PositionLineageRefV1 = {
 };
 
 export type ResolvePositionOriginLineageInput = {
-  /** Explicit override; otherwise tradePlanId. */
+  /** Explicit override; otherwise positionDecisionId, then tradePlanId. */
   originDecisionId?: string | null;
+  /** V1.65 — persisted position.decisionId (≠ tradePlanId when both set). */
+  positionDecisionId?: string | null;
   tradePlanId?: string | null;
   /** Optional thesis id from TradePlan snapshot (defaults to originDecisionId). */
   thesisId?: string | null;
@@ -46,8 +48,9 @@ function trimId(value: unknown): string | null {
 export function resolvePositionOriginLineage(
   input: ResolvePositionOriginLineageInput,
 ): PositionLineageRefV1 {
-  const originDecisionId =
-    trimId(input.originDecisionId) ?? trimId(input.tradePlanId);
+  const explicitDecisionId =
+    trimId(input.originDecisionId) ?? trimId(input.positionDecisionId);
+  const originDecisionId = explicitDecisionId ?? trimId(input.tradePlanId);
   const thesisId = trimId(input.thesisId) ?? originDecisionId;
 
   if (!originDecisionId) {

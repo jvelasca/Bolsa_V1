@@ -229,7 +229,9 @@ class ExecutePositionPolicyAuto:
                         else (decision.reason_code or "protect_auto")
                     ),
                     applied_at=inp.as_of,
-                    decision_id=position.trade_plan_id if position else None,
+                    decision_id=(position.decision_id or position.trade_plan_id)
+                    if position
+                    else None,
                     policy_id=inp.operating_policy.template_id,
                 )
             )
@@ -357,7 +359,9 @@ class ExecutePositionPolicyAuto:
                 filled_at=inp.as_of,
                 mark_target1_achieved=mark_t1,
                 mark_target2_achieved=mark_t2,
-                decision_id=position.trade_plan_id if position else None,
+                decision_id=(position.decision_id or position.trade_plan_id)
+                if position
+                else None,
                 policy_id=inp.operating_policy.template_id,
                 event_id=event_id,
             )

@@ -54,4 +54,16 @@ describe("resolvePositionOriginLineage", () => {
     expect(ref.packageAvailable).toBe(false);
     expect(ref.orphanReason).toBe("instrument_mismatch");
   });
+
+  it("GP-V165-03: positionDecisionId wins over tradePlanId", () => {
+    const ref = resolvePositionOriginLineage({
+      positionDecisionId: "DEC-1",
+      tradePlanId: "TP-1",
+      originStudy: { decisionId: "DEC-1", instrumentId: "i1" },
+      positionInstrumentId: "i1",
+    });
+    expect(ref.originDecisionId).toBe("DEC-1");
+    expect(ref.originDecisionId).not.toBe("TP-1");
+    expect(ref.packageAvailable).toBe(true);
+  });
 });

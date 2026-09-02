@@ -120,6 +120,27 @@ describe("F2 buildPositionStateFromFill", () => {
     expect(pos?.initialRisk).toBe(6);
     expect(pos?.direction).toBe("short");
   });
+
+  it("GP-V165-03: preserves decisionId and tradePlanId from TradePlan", () => {
+    const pos = buildPositionStateFromFill(
+      triggeredPlan({
+        decisionId: "DEC-1",
+        tradePlanId: "TP-1",
+        direction: "long",
+        status: "TRIGGERED",
+      }),
+      {
+        price: 100,
+        quantity: 10,
+        filledAt: "2026-08-25T15:00:00Z",
+        positionId: "pos-dec-tp",
+      },
+    );
+    expect(pos).not.toBeNull();
+    expect(pos!.decisionId).toBe("DEC-1");
+    expect(pos!.tradePlanId).toBe("TP-1");
+    expect(pos!.decisionId).not.toBe("TP-1");
+  });
 });
 
 describe("F2.1 applyPositionMark", () => {

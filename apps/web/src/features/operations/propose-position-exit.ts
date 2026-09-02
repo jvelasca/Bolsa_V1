@@ -307,7 +307,7 @@ export function buildPositionExitPayload(opts: {
       artifactType: "ART-RECOMMENDATION",
       schemaVersion: "1.0.0",
       recommendationId: `REC-PROTECT-${position.instrumentId}-${Date.now()}`,
-      decisionId: operational.tradePlanId,
+      decisionId: operational.decisionId ?? operational.tradePlanId,
       instrumentId: position.instrumentId,
       symbol: position.symbol,
       accountId,
@@ -338,7 +338,7 @@ export function buildPositionExitPayload(opts: {
   }
 
   const now = new Date().toISOString();
-  const decisionId = operational.tradePlanId;
+  const decisionId = operational.decisionId ?? operational.tradePlanId;
   const exitPlanDto = operational.exitPlan ?? null;
   const exitMeta: OperativaExitMetaV1 | null =
     intent === "reduce" || intent === "exit_hint"

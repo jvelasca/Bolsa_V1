@@ -247,6 +247,32 @@ describe("buildPositionOperatingTruth", () => {
     ).toBeNull();
   });
 
+  it("GP-V165-03: operationalView keeps decisionId separate from tradePlanId", () => {
+    const pot = buildPositionOperatingTruth({
+      position: aaplOpen({
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          decisionId: "DEC-1",
+          tradePlanId: "TP-1",
+          plannedEntry: 100,
+          actualEntry: 100,
+          initialStop: 95,
+          currentStop: 95,
+          target1: 105,
+          target2: 110,
+          unrealizedR: 0.4,
+          exitPlan: { suggestedAction: "hold" },
+        },
+      }),
+      asOf: ASOF,
+    });
+    expect(pot).not.toBeNull();
+    expect(pot!.operationalView?.decisionId).toBe("DEC-1");
+    expect(pot!.operationalView?.tradePlanId).toBe("TP-1");
+    expect(pot!.operationalView?.decisionId).not.toBe("TP-1");
+  });
+
   it("includeExitRoute false skips route", () => {
     const pot = buildPositionOperatingTruth({
       position: aaplOpen(),

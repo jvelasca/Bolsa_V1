@@ -202,6 +202,9 @@ from bolsa_analytics.cognitive.position_decision import (
     build_position_decision,
     map_recon_status_to_health,
 )
+from bolsa_analytics.cognitive.position_operational_view import (
+    build_position_operational_view,
+)
 from bolsa_analytics.cognitive.position_revision import (
     POSITION_REVISIONS_KEY,
     PositionRevision,
@@ -424,6 +427,7 @@ __all__ = [
     "format_portfolio_fit_preview",
     "suggestion_from_exit_policy",
     "build_position_decision",
+    "build_position_operational_view",
     "map_recon_status_to_health",
     "build_execution_plan_from_exit_plan",
     "build_execution_record",

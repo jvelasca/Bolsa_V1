@@ -188,4 +188,26 @@ describe("OI-5 apply stop/reduce revisions", () => {
     expect(revisionOriginFromExitReason("TRAILING")).toBe("protect");
     expect(revisionOriginFromExitReason(null)).toBe("protect");
   });
+
+  it("GP-V165-03: revision decisionId stays DEC-1 not tradePlanId TP-1", () => {
+    const pos = buildPositionStateFromFill(
+      triggeredPlan({ decisionId: "DEC-1", tradePlanId: "TP-1" }),
+      {
+        price: 100,
+        quantity: 10,
+        filledAt: "2026-08-26T00:00:00Z",
+        positionId: "pos-dec-tp",
+      },
+    );
+    expect(pos?.decisionId).toBe("DEC-1");
+    expect(pos?.tradePlanId).toBe("TP-1");
+
+    const stopRev = applyPositionCurrentStop(pos!, 98, "2026-08-26T01:00:00Z");
+    expect(stopRev?.revisions[0]?.decisionId).toBe("DEC-1");
+    expect(stopRev?.revisions[0]?.decisionId).not.toBe("TP-1");
+
+    const reduceRev = applyPositionReduce(pos!, 5, 105, "2026-08-26T02:00:00Z");
+    expect(reduceRev?.revisions[0]?.decisionId).toBe("DEC-1");
+    expect(reduceRev?.revisions[0]?.decisionId).not.toBe("TP-1");
+  });
 });

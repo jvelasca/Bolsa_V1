@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { EntryOperatingPhaseV1 } from "@bolsa/shared";
+import { entryOperatingCtaFromPhase } from "@bolsa/shared";
 import {
+  entryDecisionLabel,
   entryExecutionStateLabel,
   entryPhaseHeadline,
   entryPhaseTone,
@@ -15,16 +17,19 @@ describe("entry-decision-surface GP-V162-02/04/05", () => {
   });
 
   it("GP-V162-04: primary action honesty labels", () => {
-    const cases: Array<{
-      phase: EntryOperatingPhaseV1;
-      label: string;
-    }> = [
-      { phase: "preparada", label: "Preparar operación" },
-      { phase: "disparada", label: "Revisar y confirmar" },
-      { phase: "confirmada", label: "Ver operaciones" },
+    const phases: EntryOperatingPhaseV1[] = [
+      "preparada",
+      "disparada",
+      "propuesta",
+      "confirmada",
     ];
-    for (const { label } of cases) {
+    for (const phase of phases) {
+      const cta = entryOperatingCtaFromPhase(phase);
+      const label = entryDecisionLabel(cta);
       expect(label).not.toMatch(/comprar/i);
+      expect(["prepare", "review_confirm", "view_operations"]).toContain(
+        cta.kind,
+      );
     }
   });
 

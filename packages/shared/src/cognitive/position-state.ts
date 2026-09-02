@@ -47,6 +47,8 @@ export type PositionStubStatusV1 = {
 
 export type PositionStateV1 = {
   positionId: string;
+  /** V1.65 — origen DecisionPackage (≠ tradePlanId cuando ambos existen). */
+  decisionId?: string | null;
   tradePlanId: string;
   instrumentId: string;
   direction: TradePlanDirectionV1;
@@ -343,9 +345,12 @@ export function buildPositionStateFromFill(
         : null;
 
   const qty = round4(fill.quantity);
+  const planDecisionId = tradePlan.decisionId;
+  const planTradePlanId = tradePlan.tradePlanId?.trim() || planDecisionId;
   return {
     positionId: fill.positionId?.trim() || createRandomId(),
-    tradePlanId: tradePlan.decisionId,
+    decisionId: planDecisionId,
+    tradePlanId: planTradePlanId,
     instrumentId: tradePlan.instrumentId,
     direction: tradePlan.direction,
     status: "OPEN",
@@ -379,6 +384,15 @@ export function buildPositionStateFromFill(
   };
 }
 
+function resolveRevisionDecisionId(
+  position: PositionStateV1,
+  lineage?: { decisionId?: string | null; policyId?: string | null } | null,
+): string | null {
+  return (
+    nonEmptyStr(lineage?.decisionId) ?? nonEmptyStr(position.decisionId) ?? null
+  );
+}
+
 function withRevisionIfChanged(
   previous: PositionStateV1,
   next: PositionStateV1,
@@ -405,7 +419,7 @@ function withRevisionIfChanged(
     nextStatus: next.status,
     origin,
     reason: reason ?? null,
-    decisionId: lineage?.decisionId ?? previous.tradePlanId,
+    decisionId: resolveRevisionDecisionId(previous, lineage),
     policyId: lineage?.policyId ?? null,
   });
   return {
@@ -525,7 +539,7 @@ export function applyPositionReduce(
         )
       : (position.target2Leg ?? null);
   const lineage = {
-    decisionId: options?.decisionId ?? position.tradePlanId,
+    decisionId: options?.decisionId ?? position.decisionId ?? null,
     policyId: options?.policyId ?? null,
   };
 
@@ -624,7 +638,7 @@ export function applyPositionCurrentStop(
     resolvedReason,
     updatedAt,
     {
-      decisionId: lineage?.decisionId ?? position.tradePlanId,
+      decisionId: lineage?.decisionId ?? position.decisionId ?? null,
       policyId: lineage?.policyId ?? null,
     },
   );

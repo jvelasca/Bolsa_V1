@@ -29,8 +29,16 @@ export function positionStateFromPositionDto(
     ? (op.status as PositionStatusV1)
     : "OPEN";
   const now = new Date().toISOString();
+  const decisionId =
+    typeof op.decisionId === "string" && op.decisionId.trim()
+      ? op.decisionId.trim()
+      : typeof op.originThesis?.decisionId === "string" &&
+          op.originThesis.decisionId.trim()
+        ? op.originThesis.decisionId.trim()
+        : null;
   return {
     positionId: position.id,
+    decisionId,
     tradePlanId: op.tradePlanId,
     instrumentId: position.instrumentId,
     direction,

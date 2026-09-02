@@ -288,4 +288,29 @@ describe("mesa-hoy-model", () => {
     expect(pair.originStudy?.decisionId).toBe("D1");
     expect(pair.evolutionStudy?.decisionId).toBe("D-LATER");
   });
+
+  it("pickPositionStudies prefers operational.decisionId over tradePlanId when they differ", () => {
+    const decStudy = {
+      decisionId: "DEC-1",
+      instrumentId: "i1",
+      symbol: "AAPL",
+    } as DecisionJournalStudyViewV1;
+    const tpStudy = {
+      decisionId: "TP-1",
+      instrumentId: "i1",
+      symbol: "AAPL",
+    } as DecisionJournalStudyViewV1;
+    const byDecision = studiesByDecisionIdMap([decStudy, tpStudy]);
+    const byInstrument = studiesByInstrumentMap([tpStudy]);
+    const pair = pickPositionStudies(
+      {
+        instrumentId: "i1",
+        operational: { decisionId: "DEC-1", tradePlanId: "TP-1" },
+      },
+      byDecision,
+      byInstrument,
+    );
+    expect(pair.originStudy?.decisionId).toBe("DEC-1");
+    expect(pair.evolutionStudy?.decisionId).toBe("TP-1");
+  });
 });

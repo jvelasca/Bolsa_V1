@@ -44,6 +44,7 @@ export function operationalBlobFromPositionDto(
     ...ext,
     positionId: position.id,
     instrumentId: position.instrumentId,
+    decisionId: op.decisionId ?? op.originThesis?.decisionId ?? null,
     tradePlanId: op.tradePlanId,
     direction: op.direction === "short" ? "short" : "long",
     status: op.status ?? "OPEN",
@@ -62,11 +63,27 @@ export function operationalBlobFromPositionDto(
   };
 }
 
+function isWireOperationalView(
+  value: unknown,
+): value is PositionOperationalViewV1 {
+  if (!value || typeof value !== "object") return false;
+  const o = value as Record<string, unknown>;
+  return (
+    typeof o.positionId === "string" &&
+    typeof o.tradePlanId === "string" &&
+    "operatingState" in o
+  );
+}
+
 export function buildPositionOperationalViewFromDto(
   position: PositionDto,
   portfolioReconStatus?: string | null,
 ): PositionOperationalViewResultV1 | null {
   const reconStatus = mapPortfolioReconToPovRecon(portfolioReconStatus);
+  const wireView = position.operational?.operationalView;
+  if (isWireOperationalView(wireView)) {
+    return { view: wireView, source: "canonical" };
+  }
 
   if (position.operational) {
     const blob = operationalBlobFromPositionDto(position);

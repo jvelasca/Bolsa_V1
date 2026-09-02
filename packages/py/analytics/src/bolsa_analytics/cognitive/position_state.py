@@ -281,9 +281,11 @@ class PositionState:
     target1_leg: TargetLeg | None = None
     target2_leg: TargetLeg | None = None
     revisions: tuple[PositionRevision, ...] = ()
+    # V1.65 — origen DecisionPackage (≠ trade_plan_id cuando ambos existen).
+    decision_id: str | None = None
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        out: dict[str, object] = {
             "positionId": self.position_id,
             "tradePlanId": self.trade_plan_id,
             "instrumentId": self.instrument_id,
@@ -313,6 +315,23 @@ class PositionState:
             "updatedAt": self.updated_at,
             "revisions": [r.to_dict() for r in self.revisions],
         }
+        if self.decision_id:
+            out["decisionId"] = self.decision_id
+        return out
+
+
+def _trim_id(value: object | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    t = value.strip()
+    return t if t else None
+
+
+def _resolve_revision_decision_id(
+    position: PositionState,
+    decision_id: str | None = None,
+) -> str | None:
+    return _trim_id(decision_id) or _trim_id(position.decision_id)
 
 
 def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | None:
@@ -376,6 +395,7 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
     )
     t1_price = _finite(raw.get("target1"))
     t2_price = _finite(raw.get("target2"))
+    decision_id = _trim_id(raw.get("decisionId"))
     return PositionState(
         position_id=position_id.strip(),
         trade_plan_id=trade_plan_id.strip(),
@@ -409,6 +429,7 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
             raw.get("target2Leg"), price=t2_price, achieved_at=t2_at
         ),
         revisions=revisions_from_raw(raw.get("revisions")),
+        decision_id=decision_id,
     )
 
 
@@ -442,6 +463,13 @@ def build_position_state_from_fill(
     decision_id = trade_plan.get("decisionId")
     if not isinstance(decision_id, str) or not decision_id.strip():
         return None
+    decision_id = decision_id.strip()
+    trade_plan_id_raw = trade_plan.get("tradePlanId")
+    trade_plan_id = (
+        trade_plan_id_raw.strip()
+        if isinstance(trade_plan_id_raw, str) and trade_plan_id_raw.strip()
+        else decision_id
+    )
     instrument_id = trade_plan.get("instrumentId")
     if not isinstance(instrument_id, str) or not instrument_id.strip():
         return None
@@ -471,7 +499,8 @@ def build_position_state_from_fill(
 
     return PositionState(
         position_id=pid,
-        trade_plan_id=decision_id,
+        decision_id=decision_id,
+        trade_plan_id=trade_plan_id,
         instrument_id=instrument_id,
         direction=direction,  # type: ignore[arg-type]
         status="OPEN",
@@ -524,7 +553,7 @@ def _with_revision_if_changed(
         next_status=next_pos.status,
         origin=origin,
         reason=reason,
-        decision_id=decision_id or previous.trade_plan_id,
+        decision_id=_resolve_revision_decision_id(previous, decision_id),
         policy_id=policy_id,
     )
     return replace(next_pos, revisions=previous.revisions + (rev,))

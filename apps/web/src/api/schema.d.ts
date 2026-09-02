@@ -7490,6 +7490,8 @@ export interface components {
             actualEntry?: number | null;
             /** Currentstop */
             currentStop: number | null;
+            /** Decisionid */
+            decisionId?: string | null;
             /** Direction */
             direction: string;
             exitPlan?: components["schemas"]["OperationalExitPlanDto"] | null;
@@ -7509,6 +7511,10 @@ export interface components {
             target1AchievedAt?: string | null;
             /** Target2 */
             target2?: number | null;
+            /** Operationalview */
+            operationalView?: {
+                [key: string]: unknown;
+            } | null;
             /** Tradeplanid */
             tradePlanId: string;
             /** Unrealizedr */

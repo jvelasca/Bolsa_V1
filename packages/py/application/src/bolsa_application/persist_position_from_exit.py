@@ -116,7 +116,9 @@ class PersistPositionFromExit:
             mark_target2_achieved=inp.mark_target2_achieved,
             fill_id=tx_id,
             event_id=inp.event_id,
-            decision_id=inp.decision_id or (pos.trade_plan_id if pos else None),
+            decision_id=inp.decision_id
+            or (pos.decision_id if pos else None)
+            or (pos.trade_plan_id if pos else None),
             policy_id=inp.policy_id,
         )
         if updated is None:

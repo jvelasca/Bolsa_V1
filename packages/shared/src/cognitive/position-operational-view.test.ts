@@ -383,3 +383,25 @@ describe("V1.57 exhaustiveness", () => {
     );
   });
 });
+
+describe("V1.65 GP-V165 identity", () => {
+  it("GP-V165-03: decisionId and tradePlanId diverge in POV", () => {
+    const view = buildPositionOperationalView({
+      position: basePosition({
+        decisionId: "DEC-1",
+        tradePlanId: "TP-1",
+      }),
+    });
+    expect(view.decisionId).toBe("DEC-1");
+    expect(view.tradePlanId).toBe("TP-1");
+    expect(view.lineageCollapsed).toBe(false);
+  });
+
+  it("GP-V165-02: legacy without decisionId → null + lineageCollapsed", () => {
+    const view = buildPositionOperationalView({
+      position: basePosition({ tradePlanId: "TP-1" }),
+    });
+    expect(view.decisionId).toBeNull();
+    expect(view.lineageCollapsed).toBe(true);
+  });
+});

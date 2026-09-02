@@ -429,19 +429,25 @@ export type PositionStudyPairV1 = {
 
 /**
  * Soft-join por instrumento solo para evolución.
- * Origen exige match por decisionId (= operational.tradePlanId).
+ * Origen exige match por decisionId (= operational.decisionId ?? tradePlanId).
  */
 export function pickPositionStudies(
   position: {
     instrumentId: string;
-    operational?: { tradePlanId?: string | null } | null;
+    operational?: {
+      decisionId?: string | null;
+      tradePlanId?: string | null;
+    } | null;
   },
   studiesByDecisionId: Map<string, DecisionJournalStudyViewV1>,
   studiesByInstrument: Map<string, DecisionJournalStudyViewV1>,
 ): PositionStudyPairV1 {
-  const tradePlanId = position.operational?.tradePlanId?.trim() || null;
-  const originStudy = tradePlanId
-    ? (studiesByDecisionId.get(tradePlanId) ?? null)
+  const originKey =
+    position.operational?.decisionId?.trim() ||
+    position.operational?.tradePlanId?.trim() ||
+    null;
+  const originStudy = originKey
+    ? (studiesByDecisionId.get(originKey) ?? null)
     : null;
   const evolutionStudy = studiesByInstrument.get(position.instrumentId) ?? null;
   return { originStudy, evolutionStudy };

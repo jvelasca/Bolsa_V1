@@ -46,6 +46,8 @@ export type ExecutionConstraintsV1 = {
 
 export type TradePlanV1 = {
   decisionId: string;
+  /** V1.65 — PK del plan cuando difiere de decisionId (default = decisionId). */
+  tradePlanId?: string | null;
   instrumentId: string;
   direction: TradePlanDirectionV1;
   status: TradePlanStatusV1;

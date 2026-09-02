@@ -194,7 +194,9 @@ class PersistPositionFromProtect:
             override=override,
             origin=origin,  # type: ignore[arg-type]
             reason=reason,
-            decision_id=inp.decision_id or (pos.trade_plan_id if pos else None),
+            decision_id=inp.decision_id
+            or (pos.decision_id if pos else None)
+            or (pos.trade_plan_id if pos else None),
             policy_id=inp.policy_id,
         )
         if updated is None:

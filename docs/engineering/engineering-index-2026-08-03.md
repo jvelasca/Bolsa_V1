@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-09-02** V1.60 UX Mercado **CERRADA** tag `v1.60-beta` · [spec-v160](./spec-v160-ux-mercado-2026-09-02.md) · partida `v1.59-beta` → `b5c5c6ab`
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-09-02** V1.65 Identity+DTO **CERRADA** · V1.64 `cbe89c8` · [spec-v165](./spec-v165-operational-identity-dto-2026-09-02.md) · partida V1.64
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md

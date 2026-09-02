@@ -103,6 +103,8 @@ export type BuildInvestmentPositionAggregateInput = {
       target2?: number | null;
       /** ISO — sello H2: T1 gestionado (reduce firmado). */
       target1AchievedAt?: string | null;
+      /** V1.65 — origen Decision (≠ tradePlanId). */
+      decisionId?: string | null;
       tradePlanId?: string | null;
       unrealizedR?: number | null;
       plannedEntry?: number | null;
@@ -191,6 +193,7 @@ export function buildInvestmentPositionAggregate(
 
   const lineage = resolvePositionOriginLineage({
     originDecisionId: input.originDecisionId,
+    positionDecisionId: op?.decisionId ?? snapshotThesis?.decisionId ?? null,
     tradePlanId: op?.tradePlanId,
     positionInstrumentId: position.instrumentId,
     originStudy: originStudyCandidate,

@@ -282,7 +282,11 @@ export interface OperationalPositionDto {
   currentStop: number | null;
   target1: number | null;
   target2: number | null;
+  /** V1.65 — origen Decision (≠ tradePlanId cuando ambos existen). */
+  decisionId?: string | null;
   tradePlanId: string;
+  /** V1.65 — POV canónico del servidor (PositionOperationalView). */
+  operationalView?: Record<string, unknown> | null;
   unrealizedR?: number | null;
   plannedEntry?: number | null;
   actualEntry?: number | null;

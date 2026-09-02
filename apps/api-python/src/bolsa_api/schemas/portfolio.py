@@ -38,7 +38,11 @@ class OperationalPositionDto(BaseModel):
     target2: float | None = None
     # H2 — sello de gestión T1 (≠ precio alcanzó el nivel).
     target1_achieved_at: str | None = Field(default=None, alias="target1AchievedAt")
+    # V1.65 — origen Decision (≠ tradePlanId cuando ambos existen).
+    decision_id: str | None = Field(default=None, alias="decisionId")
     trade_plan_id: str = Field(alias="tradePlanId")
+    # V1.65 — POV canónico del servidor.
+    operational_view: dict[str, Any] | None = Field(default=None, alias="operationalView")
     unrealized_r: float | None = Field(default=None, alias="unrealizedR")
     planned_entry: float | None = Field(default=None, alias="plannedEntry")
     actual_entry: float | None = Field(default=None, alias="actualEntry")

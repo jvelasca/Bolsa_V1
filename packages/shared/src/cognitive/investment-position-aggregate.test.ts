@@ -298,4 +298,35 @@ describe("investment-position-aggregate", () => {
     expect(agg.currentState.protectionDiscrepancy).toBe(true);
     expect(agg.nextAction.kind).toBe("reduce");
   });
+
+  it("GP-V165-03: originDecisionId uses decisionId not tradePlanId", () => {
+    const origin = study({ decisionId: "DEC-1" });
+    const agg = buildInvestmentPositionAggregate({
+      position: {
+        symbol: "AAPL",
+        instrumentId: "i1",
+        quantity: 10,
+        avgCost: 182,
+        lastPrice: 194,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          decisionId: "DEC-1",
+          tradePlanId: "TP-1",
+          currentStop: 178,
+          target1: 198,
+          target2: 210,
+          unrealizedR: 1.2,
+          exitPlan: { suggestedAction: "hold" },
+        },
+      },
+      study: origin,
+      originStudy: origin,
+    });
+    expect(agg.originDecisionId).toBe("DEC-1");
+    expect(agg.originDecisionId).not.toBe("TP-1");
+    expect(agg.lineage.originDecisionId).toBe("DEC-1");
+    expect(agg.lineage.thesisId).toBe("DEC-1");
+    expect(agg.lineage.packageAvailable).toBe(true);
+  });
 });

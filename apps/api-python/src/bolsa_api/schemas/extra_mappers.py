@@ -124,6 +124,10 @@ def attach_operational_positions(
     """
     from bolsa_application.evaluate_exit_plan import advisory_exit_plan
     from bolsa_application.origin_decision_package import origin_thesis_from_position_state
+    from bolsa_analytics.cognitive.position_operational_view import (
+        build_position_operational_view,
+    )
+    from bolsa_analytics.cognitive.position_state import position_state_from_dict
 
     by_instrument: dict[str, Any] = {}
     for rec in records:
@@ -158,6 +162,19 @@ def attach_operational_positions(
                 if isinstance(adv.get("trailWidth"), str)
                 else None,
             )
+        origin_thesis = origin_thesis_from_position_state(state_dict)
+        position_state = position_state_from_dict(state_dict)
+        decision_id: str | None = None
+        operational_view: dict[str, object] | None = None
+        if position_state is not None:
+            decision_id = position_state.decision_id
+            operational_view = build_position_operational_view(position_state)
+        elif isinstance(state_dict.get("decisionId"), str) and state_dict.get("decisionId"):
+            decision_id = str(state_dict["decisionId"]).strip() or None
+        if decision_id is None and isinstance(origin_thesis, dict):
+            raw_dec = origin_thesis.get("decisionId")
+            if isinstance(raw_dec, str) and raw_dec.strip():
+                decision_id = raw_dec.strip()
         pos.operational = OperationalPositionDto(
             status=str(state_dict.get("status") or getattr(rec, "status", "") or ""),
             direction=str(state_dict.get("direction") or ""),
@@ -170,15 +187,17 @@ def attach_operational_positions(
                 and state_dict.get("target1AchievedAt")
                 else None
             ),
+            decision_id=decision_id,
             trade_plan_id=str(
                 state_dict.get("tradePlanId") or getattr(rec, "trade_plan_id", "") or ""
             ),
+            operational_view=operational_view,
             unrealized_r=_finite_or_none(state_dict.get("unrealizedR")),
             planned_entry=_finite_or_none(state_dict.get("plannedEntry")),
             actual_entry=_finite_or_none(state_dict.get("actualEntry")),
             initial_stop=_finite_or_none(state_dict.get("initialStop")),
             exit_plan=exit_plan,
-            origin_thesis=origin_thesis_from_position_state(state_dict),
+            origin_thesis=origin_thesis,
         )
     return dto
 

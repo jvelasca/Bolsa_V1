@@ -66,7 +66,10 @@ export type PositionOperationalViewV1 = {
   positionId: string;
   instrumentId: string;
   tradePlanId: string;
-  decisionId: string;
+  /** V1.65 — origen Decision; null si legacy sin campo persistido. */
+  decisionId: string | null;
+  /** V1.65 — true cuando decisionId ausente en snapshot (no inferir desde tradePlanId). */
+  lineageCollapsed: boolean;
   operatingState: PositionOperationalStateV1;
   primaryAction: PaperDeskNextActionV1;
   levels: PositionOperationalLevelsV1;
@@ -252,6 +255,16 @@ export function buildPositionOperationalEvents(input: {
   return events;
 }
 
+function resolvePovDecisionId(position: PositionStateV1): string | null {
+  return nonEmptyStr(position.decisionId);
+}
+
+function nonEmptyStr(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const t = value.trim();
+  return t.length > 0 ? t : null;
+}
+
 export function buildPositionOperationalView(
   input: BuildPositionOperationalViewInputV1,
 ): PositionOperationalViewV1 {
@@ -266,11 +279,13 @@ export function buildPositionOperationalView(
     status: input.deskStatus ?? mapOperatingStateToDeskStatus(operatingState),
     decisionVerdict: input.decisionVerdict ?? null,
   });
+  const decisionId = resolvePovDecisionId(position);
   return {
     positionId: position.positionId,
     instrumentId: position.instrumentId,
     tradePlanId: position.tradePlanId,
-    decisionId: position.tradePlanId,
+    decisionId,
+    lineageCollapsed: decisionId == null,
     operatingState,
     primaryAction,
     levels: {
