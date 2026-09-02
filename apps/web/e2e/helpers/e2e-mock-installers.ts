@@ -11,6 +11,7 @@ import {
 import {
   jsonResponse,
   routeBody,
+  statusForRouteBody,
   type E2eMockRouteOpts,
 } from "./e2e-mock-routes";
 
@@ -20,7 +21,17 @@ export async function installApiMocks(
   opts?: E2eMockRouteOpts,
 ): Promise<void> {
   await page.route(/\/api\//, async (route) => {
-    await route.fulfill(jsonResponse(routeBody(route, opts)));
+    const path = (() => {
+      try {
+        return new URL(route.request().url()).pathname;
+      } catch {
+        return route.request().url();
+      }
+    })();
+    const method = route.request().method().toUpperCase();
+    const body = routeBody(route, opts);
+    const status = statusForRouteBody(path, method, body);
+    await route.fulfill(jsonResponse(body, status));
   });
 }
 

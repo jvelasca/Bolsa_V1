@@ -103,6 +103,8 @@ export type LifecycleFinancialPosition = {
   operational?: {
     remainingQuantity?: number;
     unrealizedR?: number;
+    realizedPnl?: number;
+    totalPnl?: number;
     operationalView?: {
       quantity?: number;
       remainingQuantity?: number;

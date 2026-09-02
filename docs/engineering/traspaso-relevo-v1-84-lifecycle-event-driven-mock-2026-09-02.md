@@ -30,7 +30,7 @@
 
 ## Next candidato
 
-Golden journey integrado FastAPI+PG (opt-in) **o** higiene mock residual — **sin** abrir LIVE. Decidir tras auditoría.
+**V1.85 — Lifecycle Integrity & Financial Event Model** (FSM · time · identity · realized PnL) — **sin** abrir LIVE.
 
 ## Texto exacto — arranque chat nuevo (dev)
 

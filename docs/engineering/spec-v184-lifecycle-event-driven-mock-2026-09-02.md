@@ -83,3 +83,5 @@ pnpm --filter @bolsa/web exec tsc --noEmit
 ```
 
 Stamp remoto: **DONE** — tag `v1.84-beta` → `504aa19d` · [run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690).
+
+**Compat V1.85:** journeys GP-V184-01/02 intactos; equity CLOSED deja de ser cash-only cuando el path event-driven aplica accounting de fills (realized PnL en cash).

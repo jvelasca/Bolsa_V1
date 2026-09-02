@@ -59,6 +59,24 @@ export function jsonResponse(body: unknown, status = 200) {
   };
 }
 
+/**
+ * V1.85 — map lifecycle POST error codes to HTTP status (fail-closed).
+ * Other routes keep default 200 with `{ error }` body for compatibility.
+ */
+export function statusForRouteBody(
+  path: string,
+  method: string,
+  body: Record<string, unknown>,
+): number {
+  if (path === "/api/e2e/lifecycle/events" && method === "POST") {
+    const err = body.error as { code?: string } | undefined;
+    if (!err?.code) return 200;
+    if (err.code === "invalid_json" || err.code === "invalid_kind") return 400;
+    return 409;
+  }
+  return 200;
+}
+
 function apiPath(url: string): string {
   try {
     return new URL(url).pathname;
@@ -172,7 +190,7 @@ export function routeBody(
     });
   };
 
-  // V1.84 — test-only mock: POST append-only lifecycle events.
+  // V1.84/V1.85 — test-only mock: POST validate → append lifecycle events.
   if (path === "/api/e2e/lifecycle/events" && method === "POST") {
     if (!lifecycleDesk) {
       return {
@@ -182,14 +200,10 @@ export function routeBody(
         },
       };
     }
-    let body: {
-      kind?: string;
-      at?: string;
-      fillId?: string;
-    } = {};
+    let body: Record<string, unknown> = {};
     try {
       const raw = route.request().postData();
-      body = raw ? (JSON.parse(raw) as typeof body) : {};
+      body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     } catch {
       return {
         error: { code: "invalid_json", message: "Expected JSON body" },
@@ -214,19 +228,38 @@ export function routeBody(
         },
       };
     }
-    const event = emitE2eMockLifecycleEvent({
+    const result = emitE2eMockLifecycleEvent({
       kind,
-      at: body.at,
-      fillId: body.fillId,
+      at: typeof body.at === "string" ? body.at : undefined,
+      eventId: typeof body.eventId === "string" ? body.eventId : undefined,
+      positionId:
+        typeof body.positionId === "string" ? body.positionId : undefined,
+      fillId: typeof body.fillId === "string" ? body.fillId : undefined,
+      quantity: typeof body.quantity === "number" ? body.quantity : undefined,
+      price: typeof body.price === "number" ? body.price : undefined,
+      fees: typeof body.fees === "number" ? body.fees : undefined,
+      venue: typeof body.venue === "string" ? body.venue : undefined,
+      venueOrderId:
+        typeof body.venueOrderId === "string" ? body.venueOrderId : undefined,
+      currency: typeof body.currency === "string" ? body.currency : undefined,
+      previousStop:
+        typeof body.previousStop === "number" ? body.previousStop : undefined,
+      newStop: typeof body.newStop === "number" ? body.newStop : undefined,
+      reason: typeof body.reason === "string" ? body.reason : undefined,
+      revisionId:
+        typeof body.revisionId === "string" ? body.revisionId : undefined,
     });
-    const runtime = getE2eMockRuntime();
+    if (!result.ok) {
+      return { error: result.error };
+    }
     return {
       data: {
         ok: true,
-        event,
-        stage: runtime.positionStage,
-        lineagePath: runtime.lineagePath,
-        count: runtime.lifecycleEvents.length,
+        event: result.event,
+        idempotent: result.idempotent,
+        stage: result.stage,
+        lineagePath: result.lineagePath,
+        count: result.count,
       },
     };
   }

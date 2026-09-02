@@ -1,23 +1,23 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import path from 'node:path';
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import path from "node:path";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@fixtures': path.resolve(__dirname, '../../tests/fixtures'),
+      "@": path.resolve(__dirname, "./src"),
+      "@fixtures": path.resolve(__dirname, "../../tests/fixtures"),
     },
   },
   test: {
-    environment: 'jsdom',
-    setupFiles: ['./vitest.setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    environment: "jsdom",
+    setupFiles: ["./vitest.setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}", "e2e/helpers/lifecycle-*.test.ts"],
     coverage: {
-      reporter: ['text', 'json'],
-      include: ['src/features/charts/**', 'src/lib/**'],
+      reporter: ["text", "json"],
+      include: ["src/features/charts/**", "src/lib/**"],
     },
   },
 });

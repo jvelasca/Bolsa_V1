@@ -1,14 +1,15 @@
 /**
  * V1.82 — E2E mock runtime flags (mutable mid-test).
  * V1.84 — append-only lifecycle event log (event-driven mock path).
+ * V1.85 — validate FSM + identity before append (fail-closed).
  * Public setters re-exported from `e2e/fixtures.ts`.
  */
 import { mercadoWorkspaceDocument } from "./mercado";
 import {
-  normalizeLifecycleStoreEvent,
-  reduceLifecycleEvents,
+  appendValidatedLifecycleEvent,
+  type LifecycleAppendError,
+  type LifecycleEventInput,
   type LifecycleStoreEvent,
-  type LifecycleStoreEventKind,
 } from "./lifecycle-events";
 import {
   resolveLineagePathForStage,
@@ -108,25 +109,44 @@ export function setE2eMockPositionStage(stage: E2eGoldenPositionStage): void {
   };
 }
 
+export type EmitLifecycleResult =
+  | {
+      ok: true;
+      event: LifecycleStoreEvent;
+      idempotent: boolean;
+      stage: E2eGoldenPositionStage;
+      lineagePath: LifecycleLineagePath;
+      count: number;
+    }
+  | { ok: false; error: LifecycleAppendError };
+
 /**
- * V1.84 — append a lifecycle event; derive stage/lineagePath from the full log.
- * Prefer POST `/api/e2e/lifecycle/events` from the browser for wire honesty.
+ * V1.85 — validate + append (or idempotent no-op). Does not mutate on reject.
  */
-export function emitE2eMockLifecycleEvent(input: {
-  kind: LifecycleStoreEventKind;
-  at?: string;
-  fillId?: string;
-}): LifecycleStoreEvent {
-  const event = normalizeLifecycleStoreEvent(input);
-  const lifecycleEvents = [...e2eMockRuntime.lifecycleEvents, event];
-  const reduced = reduceLifecycleEvents(lifecycleEvents);
+export function emitE2eMockLifecycleEvent(
+  input: LifecycleEventInput,
+): EmitLifecycleResult {
+  const result = appendValidatedLifecycleEvent(
+    e2eMockRuntime.lifecycleEvents,
+    input,
+  );
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
   e2eMockRuntime = {
     ...e2eMockRuntime,
-    lifecycleEvents,
-    positionStage: reduced.stage,
-    lineagePath: reduced.lineagePath,
+    lifecycleEvents: result.log,
+    positionStage: result.stage,
+    lineagePath: result.lineagePath,
   };
-  return event;
+  return {
+    ok: true,
+    event: result.event,
+    idempotent: result.idempotent,
+    stage: result.stage,
+    lineagePath: result.lineagePath,
+    count: result.log.length,
+  };
 }
 
 export function getE2eMockLifecycleEvents(): LifecycleStoreEvent[] {

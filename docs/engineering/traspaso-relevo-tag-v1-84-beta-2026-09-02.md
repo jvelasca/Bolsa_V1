@@ -1,8 +1,9 @@
 # RELEVO — tag v1.84-beta → auditoría externa (2026-09-02)
 
 > **Padre:** [`traspaso-relevo-v1-84-lifecycle-event-driven-mock-2026-09-02.md`](./traspaso-relevo-v1-84-lifecycle-event-driven-mock-2026-09-02.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.84-beta` → `504aa19d` · Release-tag CI **GREEN** ([run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690)) · docs stamp `d47168b7` · **listo para auditoría externa**.  
+> **Estado:** **CI GREEN + PASS auditor 9,5/10** — tip `v1.84-beta` → `504aa19d` · Release-tag CI **GREEN** ([run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690)) · docs stamp `d47168b7` · [`respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md`](./respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md).  
 > **Arranque auditor externo:** [`arranque-auditor-v1-84-beta-2026-09-02.md`](./arranque-auditor-v1-84-beta-2026-09-02.md).  
+> **Next:** [`spec-v185-lifecycle-integrity-financial-event-model-2026-09-02.md`](./spec-v185-lifecycle-integrity-financial-event-model-2026-09-02.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · bump package · Playwright en `frontend-ci` · integrated E2E obligatorio · event store FastAPI/PG.
 
 ---
@@ -59,8 +60,7 @@ pnpm --filter @bolsa/web exec tsc --noEmit
 
 ## 3. Auditoría
 
-Abrir chat nuevo con el bloque de [`arranque-auditor-v1-84-beta-2026-09-02.md`](./arranque-auditor-v1-84-beta-2026-09-02.md).  
-**No** declarar PASS hasta respuesta del auditor. Guardar respuesta como `respuesta-auditor-v184-…` cuando exista.
+**DONE** — [`respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md`](./respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md) · **PASS 9,5/10** · P1=3 → V1.85.
 
 ## 4. Cadena tips CI GREEN recientes
 
