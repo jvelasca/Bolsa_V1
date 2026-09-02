@@ -1,6 +1,6 @@
 # Spec — V1.86 Lifecycle Event Store (FastAPI + PostgreSQL)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA (código)** · pendiente tag CI remoto.  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tip [`v1.86-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.86-beta) → [`baaa7034`](https://github.com/jvelasca/Bolsa_V1/commit/baaa7034) · [run 33686297402](https://github.com/jvelasca/Bolsa_V1/actions/runs/33686297402) **success**.  
 > **Padre:** [`respuesta-auditor-v185-lifecycle-integrity-2026-09-02.md`](./respuesta-auditor-v185-lifecycle-integrity-2026-09-02.md) · [`spec-v185-lifecycle-integrity-financial-event-model-2026-09-02.md`](./spec-v185-lifecycle-integrity-financial-event-model-2026-09-02.md).  
 > **Partida tip:** `v1.85-beta` → [`665242a3`](https://github.com/jvelasca/Bolsa_V1/commit/665242a3). **No** LIVE · **no** V1.87 integrated obligatorio.
 

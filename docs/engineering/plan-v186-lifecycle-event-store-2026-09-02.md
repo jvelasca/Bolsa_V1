@@ -1,7 +1,7 @@
 # Plan — V1.86 Lifecycle Event Store
 
 > **Padre:** [`spec-v186-lifecycle-event-store-2026-09-02.md`](./spec-v186-lifecycle-event-store-2026-09-02.md).  
-> **Estado:** **CERRADA (código)** · pendiente tag CI remoto. Partida V1.85 PASS modelo mock · tip [`665242a3`](https://github.com/jvelasca/Bolsa_V1/commit/665242a3).
+> **Estado:** **CERRADA** · **stamp CI GREEN remoto DONE** — [`v1.86-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.86-beta) → [`baaa7034`](https://github.com/jvelasca/Bolsa_V1/commit/baaa7034) · [run 33686297402](https://github.com/jvelasca/Bolsa_V1/actions/runs/33686297402) **success**. Partida V1.85 PASS modelo mock · tip [`665242a3`](https://github.com/jvelasca/Bolsa_V1/commit/665242a3).
 
 | ID  | Entrega                                                          | Estado   |
 | --- | ---------------------------------------------------------------- | -------- |
