@@ -1,6 +1,6 @@
 # Relevo — V1.71 Identity & Certification
 
-> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + tests locales) · **Auditor:** [`arranque-auditor-v1-71-identity-certification-2026-09-02.md`](./arranque-auditor-v1-71-identity-certification-2026-09-02.md) · **Partida:** V1.70 `960383d2` · **Commit:** pendiente (no stamp CI GREEN)
+> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + tests locales) · **Auditor:** [`arranque-auditor-v1-71-identity-certification-2026-09-02.md`](./arranque-auditor-v1-71-identity-certification-2026-09-02.md) · **Partida:** V1.70 `960383d2` · **Commit:** `b70849bd` (no stamp CI GREEN)
 
 ## Hecho
 

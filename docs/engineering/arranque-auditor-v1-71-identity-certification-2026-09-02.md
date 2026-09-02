@@ -1,6 +1,6 @@
 # Arranque auditor — V1.71 Identity & Certification (2026-09-02)
 
-> **Padre:** [`spec-v171-identity-certification-2026-09-02.md`](./spec-v171-identity-certification-2026-09-02.md) · partida **V1.70** (`960383d2`)
+> **Padre:** [`spec-v171-identity-certification-2026-09-02.md`](./spec-v171-identity-certification-2026-09-02.md) · partida **V1.70** (`960383d2`) · **Commit:** `b70849bd`
 
 ## Punta de partida
 

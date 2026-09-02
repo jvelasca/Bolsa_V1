@@ -1,6 +1,6 @@
 # Spec — V1.71 Identity & Certification
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + tests locales; **sin stamp CI GREEN**).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + tests locales · commit `b70849bd`; **sin stamp CI GREEN**).  
 > **Padre:** [`spec-v170-lista-grafico-accion-2026-09-02.md`](./spec-v170-lista-grafico-accion-2026-09-02.md) · partida **V1.70** (`960383d2`). **No** LIVE.
 
 Cierra las reservas de certificación de V1.70: identidad DOM lista↔gráfico↔cockpit, POV con recon OI-6 en el wire, copy Decision Surface sin colapsar severidad, E2E SKIP solo de entorno, y paridad golden POV TS/Python.
