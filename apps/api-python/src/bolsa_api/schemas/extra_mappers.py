@@ -123,13 +123,13 @@ def attach_operational_positions(
     """P1 — adjunta snapshot de autoridad al holding, por instrumento.
     V1.29 — ExitPolicy del perfil activo parametriza advisory ExitPlan.
     """
-    from bolsa_application.evaluate_exit_plan import advisory_exit_plan
-    from bolsa_application.origin_decision_package import origin_thesis_from_position_state
     from bolsa_analytics.cognitive.position_operational_view import (
         build_position_operational_view,
         map_portfolio_recon_to_pov_recon,
     )
     from bolsa_analytics.cognitive.position_state import position_state_from_dict
+    from bolsa_application.evaluate_exit_plan import advisory_exit_plan
+    from bolsa_application.origin_decision_package import origin_thesis_from_position_state
 
     pov_recon = map_portfolio_recon_to_pov_recon(recon_status)
     by_instrument: dict[str, Any] = {}

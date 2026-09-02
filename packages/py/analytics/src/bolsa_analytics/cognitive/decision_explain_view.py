@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any, Literal, Mapping
+from collections.abc import Mapping
+from typing import Any, Literal
 
 DECISION_EXPLAIN_VIEW_ARTIFACT = "ART-DECISION-EXPLAIN-VIEW"
 DECISION_EXPLAIN_VIEW_SCHEMA = "1.1.0"
