@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **tip `v1.83-beta`**. Producto bajo revisión **`V1.83-beta`** tip funcional **`dc596ee5`**. Partida certificada previa **`v1.82-beta` → `d0ccf235`** (Release-tag CI GREEN). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **tip `v1.83-beta`**. Producto bajo revisión **`V1.83-beta`** tip funcional **`dc596ee5`**. Docs stamp en `main`: **`67ab2e75`**. Partida certificada previa **`v1.82-beta` → `d0ccf235`** (Release-tag CI GREEN). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
 
 **Alcance del stack a auditar (V1.73→V1.83, mock E2E + operational/financial truth):**
 
@@ -27,6 +27,7 @@ Eres auditor externo de Bolsa V1 **tip `v1.83-beta`**. Producto bajo revisión *
 **GitHub (auditor):**
 
 - Código tip: [`v1.83-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.83-beta) → commit `dc596ee5`
+- Docs stamp: [`67ab2e75`](https://github.com/jvelasca/Bolsa_V1/commit/67ab2e75) en `main`
 - Previo certificado: [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) → `d0ccf235`
 - Auditoría V1.82 (input de esta slice): [`respuesta-auditor-v182-operational-financial-truth-2026-09-02.md`](./respuesta-auditor-v182-operational-financial-truth-2026-09-02.md)
 

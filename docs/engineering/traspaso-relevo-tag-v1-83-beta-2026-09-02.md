@@ -1,7 +1,7 @@
 # RELEVO — tag v1.83-beta → auditoría externa (2026-09-02)
 
 > **Padre:** [`traspaso-relevo-v1-83-lifecycle-snapshot-truth-2026-09-02.md`](./traspaso-relevo-v1-83-lifecycle-snapshot-truth-2026-09-02.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.83-beta` → `dc596ee5` · Release-tag CI **GREEN** ([run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026)) · **listo para auditoría externa**.  
+> **Estado:** **CI GREEN** — tip `v1.83-beta` → `dc596ee5` · Release-tag CI **GREEN** ([run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026)) · docs stamp `67ab2e75` · **listo para auditoría externa**.  
 > **Arranque auditor externo:** [`arranque-auditor-v1-83-beta-2026-09-02.md`](./arranque-auditor-v1-83-beta-2026-09-02.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · bump package · Playwright en `frontend-ci` · integrated E2E obligatorio · event-driven engine.
 
@@ -27,6 +27,7 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-b
 | Pieza       | Valor                                                                                                            |
 | ----------- | ---------------------------------------------------------------------------------------------------------------- |
 | Tag tip     | `v1.83-beta` → `dc596ee5`                                                                                        |
+| Docs stamp  | `67ab2e75` (post-GREEN en `main`; no exige retag)                                                                |
 | Previo tip  | `v1.82-beta` → `d0ccf235` (CI GREEN · run 33651647262)                                                           |
 | CI tag      | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026) · `headSha=dc596ee5` |
 | Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.83-beta                                                     |
