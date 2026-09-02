@@ -1273,6 +1273,70 @@ class OperationalIncidentRow(Base):
     )
 
 
+class LifecycleEventRow(Base):
+    """V1.86 — append-only lifecycle event store (domain FSM + accounting)."""
+
+    __tablename__ = "lifecycle_events"
+    __table_args__ = (
+        UniqueConstraint("event_id", name="lifecycle_events_event_id_key"),
+        Index(
+            "lifecycle_events_fill_id_uidx",
+            "fill_id",
+            unique=True,
+            postgresql_where=text("fill_id IS NOT NULL"),
+        ),
+        Index(
+            "lifecycle_events_position_at_idx",
+            "position_id",
+            "at",
+        ),
+        Index("lifecycle_events_account_id_idx", "account_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    event_id: Mapped[str] = mapped_column("event_id", String, nullable=False)
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    position_id: Mapped[str] = mapped_column("position_id", String, nullable=False)
+    instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    decision_id: Mapped[str] = mapped_column("decision_id", String, nullable=False)
+    trade_plan_id: Mapped[str] = mapped_column("trade_plan_id", String, nullable=False)
+    symbol: Mapped[str] = mapped_column(String, nullable=False)
+    side: Mapped[str] = mapped_column(String, nullable=False, default="LONG")
+    currency: Mapped[str] = mapped_column(String, nullable=False, default="USD")
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    at: Mapped[datetime] = mapped_column("at", DateTime(timezone=True), nullable=False)
+    fill_id: Mapped[str | None] = mapped_column("fill_id", String, nullable=True)
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    fees: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    venue: Mapped[str | None] = mapped_column(String, nullable=True)
+    venue_order_id: Mapped[str | None] = mapped_column(
+        "venue_order_id", String, nullable=True
+    )
+    previous_stop: Mapped[Decimal | None] = mapped_column(
+        "previous_stop", Numeric(18, 6), nullable=True
+    )
+    new_stop: Mapped[Decimal | None] = mapped_column(
+        "new_stop", Numeric(18, 6), nullable=True
+    )
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    revision_id: Mapped[str | None] = mapped_column("revision_id", String, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    payload_hash: Mapped[str] = mapped_column("payload_hash", String, nullable=False)
+    schema_version: Mapped[int] = mapped_column(
+        "schema_version", Integer, nullable=False, default=1
+    )
+    causation_id: Mapped[str | None] = mapped_column(
+        "causation_id", String, nullable=True
+    )
+    correlation_id: Mapped[str | None] = mapped_column(
+        "correlation_id", String, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", DateTime(timezone=True), nullable=False
+    )
+
+
 class InvestorProfileRow(Base):
     """ART-PROFILE — catálogo (RFC-008)."""
 

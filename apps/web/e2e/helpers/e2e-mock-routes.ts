@@ -71,7 +71,13 @@ export function statusForRouteBody(
   if (path === "/api/e2e/lifecycle/events" && method === "POST") {
     const err = body.error as { code?: string } | undefined;
     if (!err?.code) return 200;
-    if (err.code === "invalid_json" || err.code === "invalid_kind") return 400;
+    if (
+      err.code === "invalid_json" ||
+      err.code === "invalid_kind" ||
+      err.code === "invalid_timestamp"
+    ) {
+      return 400;
+    }
     return 409;
   }
   return 200;

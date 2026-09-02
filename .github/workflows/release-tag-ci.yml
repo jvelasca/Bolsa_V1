@@ -149,12 +149,12 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @bolsa/web exec playwright install --with-deps chromium
 
-      # V1.84 tip honesty: gp-e2e + certification mocks V1.73–V1.85 (no PG · no LIVE)
-      - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v185)
+      # V1.86 tip honesty: gp-e2e + certification mocks V1.73–V1.86 (no PG · no LIVE)
+      - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v186)
         working-directory: apps/web
         env:
           E2E_RUN: '1'
-        run: pnpm e2e -- "gp-e2e|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183|gp-v184|gp-v185"
+        run: pnpm e2e -- "gp-e2e|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183|gp-v184|gp-v185|gp-v186"
 
   playwright-integrated:
     name: playwright (integrated E2E, opt-in)
@@ -288,8 +288,10 @@ jobs:
       - name: Pytest offline
         run: >
           uv run pytest
+          packages/py/domain/tests
           packages/py/market/tests
           packages/py/analytics/tests
+          packages/py/application/tests/test_lifecycle_event_store.py
           packages/py/infrastructure/tests/test_verify_financial_invariants.py
           apps/api-python/tests
           --ignore=apps/api-python/tests/integration
@@ -305,10 +307,52 @@ jobs:
           --ignore=apps/api-python/tests/test_workspaces_isolation.py
           -q
 
+  lifecycle-pg:
+    name: lifecycle-pg (event store POST→GET)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bolsa
+          POSTGRES_PASSWORD: bolsa_dev
+          POSTGRES_DB: bolsa_v1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolsa -d bolsa_v1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: bolsa
+      DB_PASSWORD: bolsa_dev
+      DB_NAME: bolsa_v1
+      LIFECYCLE_PG_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Pytest lifecycle PG (fail if skipped)
+        run: >
+          uv run pytest
+          packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
+          -q
+          --tb=short
+
   certify:
     name: certify (aggregate + artifact)
     runs-on: ubuntu-latest
-    needs: [security, shared, spine, frontend, python, playwright-mock]
+    needs: [security, shared, spine, frontend, python, playwright-mock, lifecycle-pg]
     if: always()
     steps:
       - name: Fail if any required job failed
@@ -318,7 +362,8 @@ jobs:
           needs.spine.result != 'success' ||
           needs.frontend.result != 'success' ||
           needs.python.result != 'success' ||
-          needs.playwright-mock.result != 'success'
+          needs.playwright-mock.result != 'success' ||
+          needs.lifecycle-pg.result != 'success'
         run: |
           echo "Release tag CI not GREEN"
           echo "security=${{ needs.security.result }}"
@@ -327,6 +372,7 @@ jobs:
           echo "frontend=${{ needs.frontend.result }}"
           echo "python=${{ needs.python.result }}"
           echo "playwright-mock=${{ needs.playwright-mock.result }}"
+          echo "lifecycle-pg=${{ needs.lifecycle-pg.result }}"
           exit 1
 
       - name: Write summary artifact
@@ -338,6 +384,7 @@ jobs:
           JOB_FRONTEND: ${{ needs.frontend.result }}
           JOB_PYTHON: ${{ needs.python.result }}
           JOB_PLAYWRIGHT_MOCK: ${{ needs.playwright-mock.result }}
+          JOB_LIFECYCLE_PG: ${{ needs.lifecycle-pg.result }}
         run: |
           mkdir -p artifacts
           python3 - <<'PY'
@@ -357,6 +404,7 @@ jobs:
                   "frontend": os.environ["JOB_FRONTEND"],
                   "python": os.environ["JOB_PYTHON"],
                   "playwright-mock": os.environ["JOB_PLAYWRIGHT_MOCK"],
+                  "lifecycle-pg": os.environ["JOB_LIFECYCLE_PG"],
               },
           }
           path = "artifacts/release-tag-ci-summary.json"

@@ -1,5 +1,5 @@
 /**
- * V1.85 — unit table: FSM reject · time · identity · idempotency · accounting.
+ * V1.85/V1.86 — unit table: FSM · time · identity · idempotency · ENTRY accounting.
  * Runs in frontend-ci via vitest (no Playwright browser).
  */
 import { describe, expect, it } from "vitest";
@@ -94,6 +94,7 @@ describe("V1.85 lifecycle FSM", () => {
         kind: "POSITION_OPENED" as const,
         eventId: "evt-reopen-illegal",
         at: "2026-09-02T16:00:00.000Z",
+        fillId: "fill-reopen-illegal",
       },
       code: "illegal_transition" as const,
     },
@@ -215,7 +216,18 @@ describe("V1.85 lifecycle time + identity", () => {
   });
 });
 
-describe("V1.85 lifecycle accounting", () => {
+describe("V1.86 lifecycle accounting + guards", () => {
+  it("OPEN debits cash; equity = initial + pnl", () => {
+    const log = appendAll(["POSITION_OPENED"]);
+    const acct = accountLifecycleFills(log);
+    expect(acct.cash).toBe(100_000 - 10 * 100);
+    expect(acct.remaining).toBe(10);
+    expect(acct.totalEquity).toBe(acct.cash + acct.marketValue);
+    expect(acct.totalEquity).toBe(
+      acct.initialEquity + acct.realizedPnl + acct.unrealizedPnl,
+    );
+  });
+
   it("trail CLOSED realized PnL lives in cash equity", () => {
     const log = appendAll([
       "POSITION_OPENED",
@@ -226,12 +238,12 @@ describe("V1.85 lifecycle accounting", () => {
       "POSITION_CLOSED",
     ]);
     const acct = accountLifecycleFills(log);
-    // T1 5@105 → +25; EXIT 5@106 → +30 ⇒ realized 55
+    // ENTRY -1000; T1 +525; EXIT +530 ⇒ cash 100055; realized 55
     expect(acct.remaining).toBe(0);
     expect(acct.realizedPnl).toBe(55);
     expect(acct.unrealizedPnl).toBe(0);
     expect(acct.totalPnl).toBe(55);
-    expect(acct.cash).toBe(100_000 + 5 * 105 + 5 * 106);
+    expect(acct.cash).toBe(100_055);
     expect(acct.totalEquity).toBe(acct.cash);
 
     const snap = buildLifecycleSnapshotFromEvents(log);
@@ -250,8 +262,73 @@ describe("V1.85 lifecycle accounting", () => {
       "POSITION_CLOSED",
     ]);
     const acct = accountLifecycleFills(log);
-    // T1 5@105=+25; T2 3@110=+30; EXIT 2@110=+20 ⇒ 75
+    // ENTRY -1000; T1 +525; T2 +330; EXIT +220 ⇒ cash 100075; realized 75
     expect(acct.realizedPnl).toBe(75);
-    expect(acct.totalEquity).toBe(100_000 + 5 * 105 + 3 * 110 + 2 * 110);
+    expect(acct.cash).toBe(100_075);
+    expect(acct.totalEquity).toBe(100_075);
+  });
+
+  it("same eventId different payload → event_id_conflict", () => {
+    let log = appendAll(["POSITION_OPENED"]);
+    const first = appendValidatedLifecycleEvent(log, {
+      kind: "T1_EXECUTED",
+      eventId: "evt-123",
+      quantity: 5,
+      price: 105,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    log = first.log;
+    const conflict = appendValidatedLifecycleEvent(log, {
+      kind: "T1_EXECUTED",
+      eventId: "evt-123",
+      quantity: 8,
+      price: 130,
+    });
+    expect(conflict.ok).toBe(false);
+    if (!conflict.ok) expect(conflict.error.code).toBe("event_id_conflict");
+    expect(log).toHaveLength(2);
+  });
+
+  it("rejects identity mismatch instrumentId", () => {
+    const log = appendAll(["POSITION_OPENED"]);
+    const result = appendValidatedLifecycleEvent(log, {
+      kind: "T1_EXECUTED",
+      instrumentId: "inst-nvda",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("identity_mismatch");
+  });
+
+  it("rejects trail relaxation LONG", () => {
+    const log = appendAll(["POSITION_OPENED", "T1_EXECUTED"]);
+    const result = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      previousStop: 98,
+      newStop: 92,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("trail_relaxation");
+  });
+
+  it("rejects invalid quantity", () => {
+    const log = appendAll(["POSITION_OPENED"]);
+    const result = appendValidatedLifecycleEvent(log, {
+      kind: "T1_EXECUTED",
+      quantity: -5,
+      eventId: "evt-neg-qty",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("invalid_payload");
+  });
+
+  it("rejects malformed timestamp", () => {
+    const result = appendValidatedLifecycleEvent([], {
+      kind: "POSITION_OPENED",
+      at: "not-a-date",
+      eventId: "evt-bad-ts",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("invalid_timestamp");
   });
 });

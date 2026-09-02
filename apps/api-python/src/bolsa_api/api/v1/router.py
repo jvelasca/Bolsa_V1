@@ -19,6 +19,7 @@ from bolsa_api.api.v1.routes import (
     instrument_strategy_tops,
     instruments,
     investor_profiles,
+    lifecycle,
     lists,
     mandates,
     market,
@@ -71,6 +72,7 @@ api_v1_router.include_router(core_r.router, tags=["core-r"])
 api_v1_router.include_router(supervised_f3.router, tags=["supervised-f3"])
 api_v1_router.include_router(investor_profiles.router, tags=["investor-profiles"])
 api_v1_router.include_router(portfolio.router, tags=["portfolio"])
+api_v1_router.include_router(lifecycle.router)
 api_v1_router.include_router(backtests.router, tags=["backtests"])
 api_v1_router.include_router(research.router, tags=["research"])
 api_v1_router.include_router(strategies.router, tags=["strategies"])

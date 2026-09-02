@@ -1,12 +1,15 @@
 /**
- * V1.84/V1.85 — Lifecycle event log: validate → append → reduce → snapshot + accounting.
- * Wire `events` come from the persisted log, not a regenerated stage template.
+ * V1.84–V1.86 — Lifecycle event log: validate → append → reduce → snapshot + accounting.
+ * V1.86: ENTRY fill on POSITION_OPENED · strict eventId idempotency · identity envelope ·
+ * payload/trail guards. Wire `events` come from the persisted log.
  */
 import {
+  E2E_ACCOUNT_ID,
   E2E_INSTRUMENT_ID,
   E2E_LIFECYCLE_DECISION_ID,
   E2E_LIFECYCLE_POSITION_ID,
   E2E_LIFECYCLE_TRADE_PLAN_ID,
+  E2E_SYMBOL,
 } from "./ids";
 import {
   buildLifecycleSnapshot,
@@ -41,7 +44,12 @@ export type LifecycleAppendErrorCode =
   | "time_regression"
   | "duplicate_fill_id"
   | "position_mismatch"
-  | "invalid_kind";
+  | "identity_mismatch"
+  | "invalid_kind"
+  | "invalid_payload"
+  | "event_id_conflict"
+  | "trail_relaxation"
+  | "invalid_timestamp";
 
 export type LifecycleAppendError = {
   code: LifecycleAppendErrorCode;
@@ -53,6 +61,7 @@ export type LifecycleStoreEvent = {
   positionId: string;
   kind: LifecycleStoreEventKind;
   at: string;
+  accountId?: string;
   fillId?: string;
   quantity?: number;
   price?: number;
@@ -63,10 +72,13 @@ export type LifecycleStoreEvent = {
   instrumentId?: string;
   decisionId?: string;
   tradePlanId?: string;
+  symbol?: string;
+  side?: string;
   previousStop?: number;
   newStop?: number;
   reason?: string;
   revisionId?: string;
+  payloadHash?: string;
 };
 
 export type LifecycleEventInput = {
@@ -74,6 +86,7 @@ export type LifecycleEventInput = {
   at?: string;
   eventId?: string;
   positionId?: string;
+  accountId?: string;
   fillId?: string;
   quantity?: number;
   price?: number;
@@ -84,6 +97,8 @@ export type LifecycleEventInput = {
   instrumentId?: string;
   decisionId?: string;
   tradePlanId?: string;
+  symbol?: string;
+  side?: string;
   previousStop?: number;
   newStop?: number;
   reason?: string;
@@ -99,6 +114,8 @@ export type LifecycleAccounting = {
   lastPrice: number;
   marketValue: number;
   totalEquity: number;
+  avgCost: number;
+  initialEquity: number;
 };
 
 /** Kinds that appear on operationalView.events (V1.83/V1.84 wire contract). */
@@ -109,7 +126,15 @@ const WIRE_EVENT_KINDS = new Set<LifecycleStoreEventKind>([
   "POSITION_CLOSED",
 ]);
 
+/** All cash-moving fills including ENTRY (POSITION_OPENED). */
 const FILL_KINDS = new Set<LifecycleStoreEventKind>([
+  "POSITION_OPENED",
+  "T1_EXECUTED",
+  "T2_EXECUTED",
+  "POSITION_CLOSED",
+]);
+
+const EXIT_FILL_KINDS = new Set<LifecycleStoreEventKind>([
   "T1_EXECUTED",
   "T2_EXECUTED",
   "POSITION_CLOSED",
@@ -126,7 +151,31 @@ const DEFAULT_AT: Record<LifecycleStoreEventKind, string> = {
   POSITION_CLOSED: "2026-09-02T15:00:00.000Z",
 };
 
+const MOCK_OPEN_FILL_ID = "fill-mock-entry";
 const MOCK_CLOSE_FILL_ID = "fill-mock-exit";
+
+const HASH_KEYS = [
+  "kind",
+  "at",
+  "positionId",
+  "accountId",
+  "instrumentId",
+  "decisionId",
+  "tradePlanId",
+  "symbol",
+  "side",
+  "currency",
+  "fillId",
+  "quantity",
+  "price",
+  "fees",
+  "venue",
+  "venueOrderId",
+  "previousStop",
+  "newStop",
+  "reason",
+  "revisionId",
+] as const;
 
 /** Legal FSM edges (preserve GP-V184 goldens: optional T1_TRIGGERED; T2 closes without EXIT). */
 const TRANSITIONS: Record<
@@ -145,12 +194,42 @@ const TRANSITIONS: Record<
   closed: {},
 };
 
-function ms(iso: string): number {
+function ms(iso: string): number | LifecycleAppendError {
   const value = Date.parse(iso);
   if (Number.isNaN(value)) {
-    throw new Error(`invalid ISO timestamp: ${iso}`);
+    return {
+      code: "invalid_timestamp",
+      message: `invalid ISO timestamp: ${iso}`,
+    };
   }
   return value;
+}
+
+function newEventId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `evt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** Stable FNV-1a 32-bit hex (deterministic across Node/browser for tests). */
+function hashCanonical(payload: Record<string, unknown>): string {
+  const encoded = JSON.stringify(payload, Object.keys(payload).sort());
+  let h = 0x811c9dc5;
+  for (let i = 0; i < encoded.length; i += 1) {
+    h ^= encoded.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+export function computePayloadHash(event: LifecycleStoreEvent): string {
+  const payload: Record<string, unknown> = {};
+  for (const key of HASH_KEYS) {
+    const value = event[key as keyof LifecycleStoreEvent];
+    if (value !== undefined) payload[key] = value;
+  }
+  return hashCanonical(payload);
 }
 
 export function validateTransition(
@@ -177,6 +256,13 @@ function defaultFillPayload(
   remainingBefore: number,
   lineagePath: LifecycleLineagePath,
 ): { quantity: number; price: number; fillId: string } | null {
+  if (kind === "POSITION_OPENED") {
+    return {
+      quantity: LIFECYCLE_BIRTH_QTY,
+      price: LIFECYCLE_AVG_COST,
+      fillId: MOCK_OPEN_FILL_ID,
+    };
+  }
   if (kind === "T1_EXECUTED") {
     return {
       quantity: LIFECYCLE_BIRTH_QTY - LIFECYCLE_REMAINING_AFTER_T1,
@@ -205,11 +291,15 @@ function defaultFillPayload(
 export function normalizeLifecycleStoreEvent(
   input: LifecycleEventInput,
   opts?: { remainingBefore?: number; lineagePath?: LifecycleLineagePath },
-): LifecycleStoreEvent {
+): LifecycleStoreEvent | { error: LifecycleAppendError } {
   const at = input.at ?? DEFAULT_AT[input.kind];
+  const atMs = ms(at);
+  if (typeof atMs !== "number") {
+    return { error: atMs };
+  }
   const positionId = input.positionId ?? E2E_LIFECYCLE_POSITION_ID;
-  const eventId = input.eventId ?? `evt-${input.kind}-${at}`;
-  const remainingBefore = opts?.remainingBefore ?? LIFECYCLE_BIRTH_QTY;
+  const eventId = input.eventId ?? newEventId();
+  const remainingBefore = opts?.remainingBefore ?? 0;
   const lineagePath = opts?.lineagePath ?? "trail";
 
   const base: LifecycleStoreEvent = {
@@ -217,15 +307,20 @@ export function normalizeLifecycleStoreEvent(
     positionId,
     kind: input.kind,
     at,
+    accountId: input.accountId ?? E2E_ACCOUNT_ID,
     instrumentId: input.instrumentId ?? E2E_INSTRUMENT_ID,
     decisionId: input.decisionId ?? E2E_LIFECYCLE_DECISION_ID,
     tradePlanId: input.tradePlanId ?? E2E_LIFECYCLE_TRADE_PLAN_ID,
+    symbol: input.symbol ?? E2E_SYMBOL,
+    side: input.side ?? "LONG",
+    currency: input.currency ?? "USD",
   };
 
+  let event: LifecycleStoreEvent;
   if (input.kind === "TRAIL_APPLIED") {
     const previousStop = input.previousStop ?? LIFECYCLE_INITIAL_STOP;
     const newStop = input.newStop ?? previousStop + 3;
-    return {
+    event = {
       ...base,
       previousStop,
       newStop,
@@ -233,34 +328,38 @@ export function normalizeLifecycleStoreEvent(
       revisionId: input.revisionId ?? `rev-trail-${positionId}`,
       fillId: input.fillId,
     };
-  }
-
-  if (FILL_KINDS.has(input.kind)) {
+  } else if (FILL_KINDS.has(input.kind)) {
     const defaults = defaultFillPayload(
       input.kind,
       remainingBefore,
       lineagePath,
     );
-    return {
+    event = {
       ...base,
       fillId: input.fillId ?? defaults?.fillId,
       quantity: input.quantity ?? defaults?.quantity,
       price: input.price ?? defaults?.price,
       fees: input.fees ?? 0,
       venue: input.venue ?? "MOCK",
-      venueOrderId: input.venueOrderId ?? `ord-${input.kind.toLowerCase()}`,
+      // V1.86: never invent venueOrderId
+      venueOrderId: input.venueOrderId,
       currency: input.currency ?? "USD",
     };
+  } else {
+    event = { ...base, fillId: input.fillId };
   }
 
-  return { ...base, fillId: input.fillId };
+  return { ...event, payloadHash: computePayloadHash(event) };
 }
 
 function remainingAfterLog(events: LifecycleStoreEvent[]): number {
-  let remaining = LIFECYCLE_BIRTH_QTY;
+  let remaining = 0;
   for (const ev of events) {
-    if (!FILL_KINDS.has(ev.kind)) continue;
-    remaining -= ev.quantity ?? 0;
+    if (ev.kind === "POSITION_OPENED") {
+      remaining += ev.quantity ?? 0;
+    } else if (EXIT_FILL_KINDS.has(ev.kind)) {
+      remaining -= ev.quantity ?? 0;
+    }
   }
   return remaining;
 }
@@ -270,9 +369,12 @@ function validateTimeConstraints(
   event: LifecycleStoreEvent,
 ): LifecycleAppendError | null {
   const previous = log[log.length - 1];
+  const nextMs = ms(event.at);
+  if (typeof nextMs !== "number") return nextMs;
+
   if (previous) {
     const prevMs = ms(previous.at);
-    const nextMs = ms(event.at);
+    if (typeof prevMs !== "number") return prevMs;
     if (event.kind === "POSITION_CLOSED") {
       if (nextMs <= prevMs) {
         return {
@@ -289,36 +391,152 @@ function validateTimeConstraints(
   }
 
   const t1Trig = log.find((e) => e.kind === "T1_TRIGGERED");
-  if (event.kind === "T1_EXECUTED" && t1Trig && ms(event.at) <= ms(t1Trig.at)) {
-    return {
-      code: "time_regression",
-      message: "T1_EXECUTED must be after T1_TRIGGERED",
-    };
+  if (event.kind === "T1_EXECUTED" && t1Trig) {
+    const t1Ms = ms(t1Trig.at);
+    if (typeof t1Ms !== "number") return t1Ms;
+    if (nextMs <= t1Ms) {
+      return {
+        code: "time_regression",
+        message: "T1_EXECUTED must be after T1_TRIGGERED",
+      };
+    }
   }
   const t1Exec = [...log, event].find((e) => e.kind === "T1_EXECUTED");
-  if (
-    event.kind === "TRAIL_APPLIED" &&
-    t1Exec &&
-    ms(event.at) < ms(t1Exec.at)
-  ) {
-    return {
-      code: "time_regression",
-      message: "TRAIL_APPLIED must be >= T1_EXECUTED",
-    };
+  if (event.kind === "TRAIL_APPLIED" && t1Exec) {
+    const t1e = ms(t1Exec.at);
+    if (typeof t1e !== "number") return t1e;
+    if (nextMs < t1e) {
+      return {
+        code: "time_regression",
+        message: "TRAIL_APPLIED must be >= T1_EXECUTED",
+      };
+    }
   }
   const t2Trig = log.find((e) => e.kind === "T2_TRIGGERED");
-  if (event.kind === "T2_EXECUTED" && t2Trig && ms(event.at) <= ms(t2Trig.at)) {
+  if (event.kind === "T2_EXECUTED" && t2Trig) {
+    const t2Ms = ms(t2Trig.at);
+    if (typeof t2Ms !== "number") return t2Ms;
+    if (nextMs <= t2Ms) {
+      return {
+        code: "time_regression",
+        message: "T2_EXECUTED must be after T2_TRIGGERED",
+      };
+    }
+  }
+  return null;
+}
+
+function validateIdentity(
+  log: LifecycleStoreEvent[],
+  event: LifecycleStoreEvent,
+): LifecycleAppendError | null {
+  if (log.length === 0) return null;
+  const anchor = log[0]!;
+  if (event.positionId !== anchor.positionId) {
     return {
-      code: "time_regression",
-      message: "T2_EXECUTED must be after T2_TRIGGERED",
+      code: "position_mismatch",
+      message: `positionId ${event.positionId} ≠ log ${anchor.positionId}`,
     };
+  }
+  const checks: Array<[string, string | undefined, string | undefined]> = [
+    ["instrumentId", event.instrumentId, anchor.instrumentId],
+    ["decisionId", event.decisionId, anchor.decisionId],
+    ["tradePlanId", event.tradePlanId, anchor.tradePlanId],
+    ["accountId", event.accountId, anchor.accountId],
+    ["symbol", event.symbol, anchor.symbol],
+    ["side", event.side, anchor.side],
+    ["currency", event.currency, anchor.currency],
+  ];
+  for (const [label, got, expected] of checks) {
+    if (got !== undefined && expected !== undefined && got !== expected) {
+      return {
+        code: "identity_mismatch",
+        message: `${label} ${got} ≠ envelope ${expected}`,
+      };
+    }
+  }
+  return null;
+}
+
+function validatePayload(
+  event: LifecycleStoreEvent,
+  remainingBefore: number,
+  stage: E2eGoldenPositionStage,
+  lineagePath: LifecycleLineagePath,
+): LifecycleAppendError | null {
+  if (FILL_KINDS.has(event.kind)) {
+    const qty = event.quantity;
+    const price = event.price;
+    const fees = event.fees ?? 0;
+    if (qty === undefined || !Number.isFinite(qty) || qty <= 0) {
+      return {
+        code: "invalid_payload",
+        message: `quantity must be > 0, got ${qty}`,
+      };
+    }
+    if (price === undefined || !Number.isFinite(price) || price <= 0) {
+      return {
+        code: "invalid_payload",
+        message: `price must be > 0, got ${price}`,
+      };
+    }
+    if (!Number.isFinite(fees) || fees < 0) {
+      return {
+        code: "invalid_payload",
+        message: `fees must be >= 0 finite, got ${fees}`,
+      };
+    }
+    if (event.kind === "POSITION_CLOSED") {
+      if (Math.abs(qty - remainingBefore) > 1e-9) {
+        return {
+          code: "invalid_payload",
+          message: `POSITION_CLOSED.quantity ${qty} != remaining ${remainingBefore}`,
+        };
+      }
+    } else if (
+      event.kind !== "POSITION_OPENED" &&
+      qty > remainingBefore + 1e-9
+    ) {
+      return {
+        code: "invalid_payload",
+        message: `quantity ${qty} > remaining ${remainingBefore}`,
+      };
+    }
+  }
+
+  if (event.kind === "TRAIL_APPLIED") {
+    const prev = event.previousStop;
+    const next = event.newStop;
+    if (prev === undefined || next === undefined) {
+      return {
+        code: "invalid_payload",
+        message: "TRAIL_APPLIED requires previousStop and newStop",
+      };
+    }
+    if (!Number.isFinite(prev) || !Number.isFinite(next)) {
+      return { code: "invalid_payload", message: "trail stops must be finite" };
+    }
+    const side = (event.side ?? "LONG").toUpperCase();
+    if (side === "LONG" && next < prev) {
+      return {
+        code: "trail_relaxation",
+        message: `LONG trail newStop ${next} < previousStop ${prev}`,
+      };
+    }
+    const lastPrice = lifecycleLastPriceForStage(stage, lineagePath);
+    if (side === "LONG" && next >= lastPrice) {
+      return {
+        code: "invalid_payload",
+        message: `LONG trail newStop ${next} must be < lastPrice ${lastPrice}`,
+      };
+    }
   }
   return null;
 }
 
 /**
- * Pure append with FSM + time + identity validation.
- * Same eventId → idempotent ok (no second append).
+ * Pure append with FSM + time + identity + payload validation.
+ * Same eventId + same payloadHash → idempotent; different payload → event_id_conflict.
  */
 export function appendValidatedLifecycleEvent(
   log: LifecycleStoreEvent[],
@@ -335,33 +553,40 @@ export function appendValidatedLifecycleEvent(
   | { ok: false; error: LifecycleAppendError } {
   const reduced = reduceLifecycleEvents(log);
   const remainingBefore = remainingAfterLog(log);
-  const event = normalizeLifecycleStoreEvent(input, {
+  const normalized = normalizeLifecycleStoreEvent(input, {
     remainingBefore,
     lineagePath: reduced.lineagePath,
   });
+  if ("error" in normalized) {
+    return { ok: false, error: normalized.error };
+  }
+  const event = normalized;
 
   const existing = log.find((row) => row.eventId === event.eventId);
   if (existing) {
-    return {
-      ok: true,
-      log,
-      event: existing,
-      idempotent: true,
-      stage: reduced.stage,
-      lineagePath: reduced.lineagePath,
-    };
-  }
-
-  const anchorPositionId = log[0]?.positionId ?? E2E_LIFECYCLE_POSITION_ID;
-  if (event.positionId !== anchorPositionId) {
+    const existingHash = existing.payloadHash ?? computePayloadHash(existing);
+    const newHash = event.payloadHash ?? computePayloadHash(event);
+    if (existingHash === newHash) {
+      return {
+        ok: true,
+        log,
+        event: existing,
+        idempotent: true,
+        stage: reduced.stage,
+        lineagePath: reduced.lineagePath,
+      };
+    }
     return {
       ok: false,
       error: {
-        code: "position_mismatch",
-        message: `positionId ${event.positionId} ≠ log ${anchorPositionId}`,
+        code: "event_id_conflict",
+        message: `eventId ${event.eventId} already exists with different payload`,
       },
     };
   }
+
+  const identityError = validateIdentity(log, event);
+  if (identityError) return { ok: false, error: identityError };
 
   if (event.fillId) {
     const dup = log.find(
@@ -383,6 +608,14 @@ export function appendValidatedLifecycleEvent(
 
   const transition = validateTransition(reduced.stage, event.kind);
   if (!transition.ok) return { ok: false, error: transition.error };
+
+  const payloadError = validatePayload(
+    event,
+    remainingBefore,
+    reduced.stage,
+    reduced.lineagePath,
+  );
+  if (payloadError) return { ok: false, error: payloadError };
 
   const nextLog = [...log, event];
   const nextReduced = reduceLifecycleEvents(nextLog);
@@ -427,17 +660,24 @@ export function accountLifecycleFills(
 ): LifecycleAccounting {
   const { stage, lineagePath } = reduceLifecycleEvents(events);
   let cash = LIFECYCLE_CASH;
-  let remaining = LIFECYCLE_BIRTH_QTY;
+  let remaining = 0;
   let realizedPnl = 0;
+  let avgCost = LIFECYCLE_AVG_COST;
 
   for (const ev of events) {
     if (!FILL_KINDS.has(ev.kind)) continue;
     const qty = ev.quantity ?? 0;
     const price = ev.price ?? 0;
     const fees = ev.fees ?? 0;
-    cash += qty * price - fees;
-    remaining -= qty;
-    realizedPnl += (price - LIFECYCLE_AVG_COST) * qty - fees;
+    if (ev.kind === "POSITION_OPENED") {
+      cash -= qty * price + fees;
+      remaining += qty;
+      avgCost = price;
+    } else {
+      cash += qty * price - fees;
+      remaining -= qty;
+      realizedPnl += (price - avgCost) * qty - fees;
+    }
   }
 
   if (remaining < 0) {
@@ -446,7 +686,7 @@ export function accountLifecycleFills(
 
   const lastPrice = lifecycleLastPriceForStage(stage, lineagePath);
   const fin = derivePositionFinancials({
-    avgCost: LIFECYCLE_AVG_COST,
+    avgCost,
     lastPrice,
     remaining,
     initialRisk: LIFECYCLE_INITIAL_RISK,
@@ -462,6 +702,8 @@ export function accountLifecycleFills(
     lastPrice,
     marketValue: fin.marketValue,
     totalEquity: cash + fin.marketValue,
+    avgCost,
+    initialEquity: LIFECYCLE_CASH,
   };
 }
 
@@ -479,7 +721,7 @@ export function wireEventsFromLog(
 
 /**
  * Snapshot whose operationalView.events are the persisted log (filtered to wire kinds).
- * V1.85 — financial overlay from fill accounting (cash / realized / unrealized).
+ * V1.86 — ENTRY accounting (cash debit on OPEN) + realized/unrealized overlay.
  */
 export function buildLifecycleSnapshotFromEvents(
   events: LifecycleStoreEvent[],
@@ -498,7 +740,7 @@ export function buildLifecycleSnapshotFromEvents(
   }
 
   const wireEvents = wireEventsFromLog(events);
-  const cost = LIFECYCLE_AVG_COST * acct.remaining;
+  const cost = acct.avgCost * acct.remaining;
   const unrealizedPnlPct = cost === 0 ? 0 : (acct.unrealizedPnl / cost) * 100;
   const unrealizedR =
     acct.remaining === 0 || LIFECYCLE_INITIAL_RISK === 0

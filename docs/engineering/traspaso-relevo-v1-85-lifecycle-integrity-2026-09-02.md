@@ -28,7 +28,7 @@
 
 ## Next candidato
 
-**V1.86 — FastAPI + PostgreSQL Lifecycle Event Store** (POST→PG→restart→GET) **o** auditoría externa tip V1.85 — **sin** abrir LIVE.
+**V1.86 — FastAPI + PostgreSQL Lifecycle Event Store** — **CERRADA (código)**; ver [`traspaso-relevo-v1-86-lifecycle-event-store-2026-09-02.md`](./traspaso-relevo-v1-86-lifecycle-event-store-2026-09-02.md). Auditoría tip V1.86 / V1.87 integrated — **sin** abrir LIVE.
 
 ## Texto exacto — arranque chat nuevo (dev)
 
