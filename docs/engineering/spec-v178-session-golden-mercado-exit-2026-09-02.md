@@ -1,8 +1,8 @@
 # Spec — V1.78 Session Golden MERCADO→EXIT (mock)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock locales; **sin stamp CI GREEN**; commit pendiente).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock locales · commit `e1dcfba8`; **sin stamp CI GREEN**).  
 > **Padre:** [`spec-v177-session-reliability-2026-09-02.md`](./spec-v177-session-reliability-2026-09-02.md) · relevo [`traspaso-relevo-v1-77-session-reliability-2026-09-02.md`](./traspaso-relevo-v1-77-session-reliability-2026-09-02.md).  
-> **Partida tip:** **V1.77** Session Reliability [`1f25d351`](https://github.com/jvelasca/Bolsa_V1/commit/1f25d351) (docs stamp `c9301851`). **No** LIVE.
+> **Partida tip:** **V1.77** Session Reliability [`1f25d351`](https://github.com/jvelasca/Bolsa_V1/commit/1f25d351) (docs stamp `c9301851`). **Commit:** [`e1dcfba8`](https://github.com/jvelasca/Bolsa_V1/commit/e1dcfba8). **No** LIVE.
 
 Certificación **journey-style mock E2E** del arco operativo aspiracional MERCADO→EXIT en superficies Hoy + Mercado. No es el golden pytest Paper Desk (V1.53/V1.55) ni un reloj de sesión de producción. Une candidatura de entrada, deny stale, posición, T1, trail, recon y salida — siempre con **verdad operativa** y **0 COMPRAR ambiguo**.
 

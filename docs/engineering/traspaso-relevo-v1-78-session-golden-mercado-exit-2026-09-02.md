@@ -1,6 +1,6 @@
 # Relevo — V1.78 Session Golden MERCADO→EXIT
 
-> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + E2E mock locales) · **Auditor:** [`arranque-auditor-v1-78-session-golden-mercado-exit-2026-09-02.md`](./arranque-auditor-v1-78-session-golden-mercado-exit-2026-09-02.md) · **Partida:** V1.77 `1f25d351` · **Commit:** _pendiente stamp_ (no stamp CI GREEN)
+> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + E2E mock locales) · **Auditor:** [`arranque-auditor-v1-78-session-golden-mercado-exit-2026-09-02.md`](./arranque-auditor-v1-78-session-golden-mercado-exit-2026-09-02.md) · **Partida:** V1.77 `1f25d351` · **Commit:** [`e1dcfba8`](https://github.com/jvelasca/Bolsa_V1/commit/e1dcfba8) (no stamp CI GREEN)
 
 ## Hecho
 
