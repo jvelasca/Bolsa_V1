@@ -1,7 +1,7 @@
 # Spec — V1.76 Certification Hardening
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock locales · **sin stamp CI GREEN**).  
-> **Padre:** [`spec-v175-chaos-stale-no-execute-2026-09-02.md`](./spec-v175-chaos-stale-no-execute-2026-09-02.md) · partida **V1.75** (`b5b114ff`). **No** LIVE.
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock locales · commit `bf6ba462`; **sin stamp CI GREEN**).  
+> **Padre:** [`spec-v175-chaos-stale-no-execute-2026-09-02.md`](./spec-v175-chaos-stale-no-execute-2026-09-02.md) · partida **V1.75** (`b5b114ff`). **Commit:** [`bf6ba462`](https://github.com/jvelasca/Bolsa_V1/commit/bf6ba462). **No** LIVE.
 
 Cierra las reservas de calidad de prueba de V1.75. El motor no se rediseña: se certifica **causa**, no una apariencia compatible.
 

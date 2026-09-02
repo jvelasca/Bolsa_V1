@@ -39,6 +39,41 @@ export function setMercadoMockWorkspaceDocument(
   mercadoMockWorkspaceDocument = document;
 }
 
+/** V1.77 — mutable mid-test flags (read on each fulfill). */
+type E2eMockRuntimeFlags = {
+  dataFreshness: "current" | "stale";
+  reconStatus: "ok" | "drift";
+  unknownOrder: boolean;
+};
+
+const e2eMockRuntimeDefaults: E2eMockRuntimeFlags = {
+  dataFreshness: "current",
+  reconStatus: "ok",
+  unknownOrder: false,
+};
+
+let e2eMockRuntime: E2eMockRuntimeFlags = { ...e2eMockRuntimeDefaults };
+
+export function resetE2eMockRuntimeFlags(): void {
+  e2eMockRuntime = { ...e2eMockRuntimeDefaults };
+}
+
+export function setE2eMockDataFreshness(
+  freshness: E2eMockRuntimeFlags["dataFreshness"],
+): void {
+  e2eMockRuntime = { ...e2eMockRuntime, dataFreshness: freshness };
+}
+
+export function setE2eMockReconStatus(
+  status: E2eMockRuntimeFlags["reconStatus"],
+): void {
+  e2eMockRuntime = { ...e2eMockRuntime, reconStatus: status };
+}
+
+export function setE2eMockUnknownOrder(enabled: boolean): void {
+  e2eMockRuntime = { ...e2eMockRuntime, unknownOrder: enabled };
+}
+
 const demoAccount = {
   id: E2E_ACCOUNT_ID,
   userId: "e2e-user",
@@ -303,7 +338,7 @@ function routeBody(
         paperDExecuteEnv: false,
         confirmPathHonesty: "e2e-mock",
       },
-      portfolioReconciliation: { status: "ok" },
+      portfolioReconciliation: { status: e2eMockRuntime.reconStatus },
       operationalReadiness: {
         state: "PAPER_READY",
         venue: "paper",
@@ -495,7 +530,7 @@ function routeBody(
     };
   }
   if (path.endsWith("/submit-intents")) {
-    if (hoyUnknown) {
+    if (hoyUnknown || e2eMockRuntime.unknownOrder) {
       return {
         data: {
           accountId: E2E_ACCOUNT_ID,
@@ -558,6 +593,15 @@ function routeBody(
       meta: { timeframe: "1d", count: bars.length },
     };
   }
+  if ((mercado || multi || hoyStale) && path.endsWith("/sync")) {
+    return {
+      data: {
+        synced: true,
+        barCount: 30,
+        lastBarDate: "2026-08-30",
+      },
+    };
+  }
   if (
     (mercado || multi || hoyStale) &&
     path.match(/\/api\/instruments\/[^/]+$/) &&
@@ -601,11 +645,12 @@ function routeBody(
       segments.length >= 2
         ? (segments[segments.length - 2] ?? E2E_INSTRUMENT_ID)
         : E2E_INSTRUMENT_ID;
+    const stale = hoyStale || e2eMockRuntime.dataFreshness === "stale";
     return {
       data: {
         instrumentId: requestedId,
         timeframe: "1d",
-        freshnessStatus: hoyStale ? "stale" : "current",
+        freshnessStatus: stale ? "stale" : "current",
         barCount: 30,
         lastBarDate: "2026-08-30",
       },
@@ -642,6 +687,16 @@ export async function installMercadoApiMocks(page: Page): Promise<void> {
 /** Mercado multi-instrumento (≥3 posiciones + Entry-only NVDA). */
 export async function installMercadoMultiApiMocks(page: Page): Promise<void> {
   setMercadoMockWorkspaceDocument(null);
+  resetE2eMockRuntimeFlags();
+  await installApiMocks(page, { mercado: true, multi: true });
+}
+
+/** V1.77 — Session reliability journey (multi + mutable stale/UNKNOWN/recon). */
+export async function installSessionReliabilityMocks(
+  page: Page,
+): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  resetE2eMockRuntimeFlags();
   await installApiMocks(page, { mercado: true, multi: true });
 }
 

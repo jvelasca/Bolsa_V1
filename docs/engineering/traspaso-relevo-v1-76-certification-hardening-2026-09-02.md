@@ -1,6 +1,6 @@
 # Relevo — V1.76 Certification Hardening
 
-> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + E2E mock locales) · **Auditor:** [`arranque-auditor-v1-76-certification-hardening-2026-09-02.md`](./arranque-auditor-v1-76-certification-hardening-2026-09-02.md) · **Partida:** V1.75 `b5b114ff` · **sin stamp CI GREEN**
+> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + E2E mock locales) · **Auditor:** [`arranque-auditor-v1-76-certification-hardening-2026-09-02.md`](./arranque-auditor-v1-76-certification-hardening-2026-09-02.md) · **Partida:** V1.75 `b5b114ff` · **Commit:** [`bf6ba462`](https://github.com/jvelasca/Bolsa_V1/commit/bf6ba462) (no stamp CI GREEN)
 
 ## Hecho
 

@@ -3,7 +3,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { APIRequestContext, Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { buildPaperDailyReport, DEFAULT_CHART_CONFIG } from "@bolsa/shared";
 
 export const E2E_ACCOUNT_ID = "default-account-seed";
@@ -329,6 +329,109 @@ export function mercadoMultiInstrumentSlicesFromMock(): MercadoInstrumentSlice[]
     decisionId: pos.operational.operationalView.decisionId,
     levels: pos.operational.operationalView.levels,
   }));
+}
+
+function formatLevelAssert(value: number | null | undefined): string | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  return value.toFixed(2);
+}
+
+/**
+ * V1.77 — identidad + verdad operativa (Mercado posición).
+ * Extiende el patrón assertPositionIdentity de GP-V173.
+ */
+export async function assertOperationalTruth(
+  page: Page,
+  slice: MercadoInstrumentSlice,
+  opts?: {
+    expectRecon?: "CLEAN" | "CRITICAL" | "ATTENTION" | null;
+    expectFreshness?: "current" | "stale" | null;
+    /** Default false — WHY needs study wire; opt-in per GP. */
+    openWhy?: boolean;
+  },
+): Promise<void> {
+  const chartZone = page.getByTestId("chart-indicators-zone");
+  await expect(chartZone).toBeVisible({ timeout: 20_000 });
+  await expect(chartZone).toHaveAttribute(
+    "data-instrument-id",
+    slice.instrumentId,
+  );
+
+  const cockpit = page.getByTestId("operativa-cockpit");
+  await expect(cockpit).toBeVisible({ timeout: 20_000 });
+  await expect(cockpit).toHaveAttribute(
+    "data-instrument-id",
+    slice.instrumentId,
+  );
+  await expect(cockpit).toHaveAttribute("data-symbol", slice.symbol);
+  await expect(cockpit).toHaveAttribute("data-position-id", slice.positionId);
+  await expect(cockpit).toHaveAttribute("data-phase", "posicion");
+  if (slice.tradePlanId) {
+    await expect(cockpit).toHaveAttribute(
+      "data-trade-plan-id",
+      slice.tradePlanId,
+    );
+  }
+  if (slice.decisionId) {
+    await expect(cockpit).toHaveAttribute("data-decision-id", slice.decisionId);
+  }
+
+  await expect(
+    page.getByTestId("position-operational-star-card"),
+  ).toBeVisible();
+  await expect(page.getByTestId("entry-decision-surface")).toHaveCount(0);
+
+  const stop = formatLevelAssert(slice.levels?.currentStop);
+  const t1 = formatLevelAssert(slice.levels?.target1);
+  const t2 = formatLevelAssert(slice.levels?.target2);
+  if (stop) {
+    await expect(page.getByTestId("position-decision-stop")).toContainText(
+      stop,
+    );
+  }
+  if (t1) {
+    await expect(page.getByTestId("position-decision-t1")).toContainText(t1);
+  }
+  if (t2) {
+    await expect(page.getByTestId("position-decision-t2")).toContainText(t2);
+  }
+
+  const povAction = page.getByTestId("operativa-cockpit-pov-action");
+  await expect(povAction).toBeVisible();
+  await expect(povAction).not.toContainText(/comprar/i);
+
+  if (opts?.expectRecon) {
+    await expect(page.getByTestId("operativa-cockpit-recon")).toHaveAttribute(
+      "data-recon",
+      opts.expectRecon,
+    );
+  }
+
+  if (opts?.expectFreshness) {
+    const badge = page.getByTestId("chart-data-status");
+    await expect(badge).toHaveAttribute(
+      "data-instrument-id",
+      slice.instrumentId,
+    );
+    await expect(badge).toHaveAttribute(
+      "data-freshness-status",
+      opts.expectFreshness,
+    );
+  }
+
+  await expect(page.getByRole("button", { name: /^COMPRAR$/i })).toHaveCount(0);
+
+  if (opts?.openWhy === true) {
+    const whyToggle = page
+      .getByTestId("position-decision-why-toggle")
+      .or(page.getByTestId("operativa-cockpit-why"));
+    if ((await whyToggle.count()) > 0) {
+      await whyToggle.first().click();
+      await expect(page.getByTestId("decision-explain-panel")).toBeVisible({
+        timeout: 10_000,
+      });
+    }
+  }
 }
 
 export function mercadoOhlcvBars() {
