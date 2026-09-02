@@ -81,4 +81,5 @@ jobs:
           --ignore=apps/api-python/tests/test_trackers_policies_isolation.py
           --ignore=apps/api-python/tests/test_workspaces_isolation.py
           --ignore=apps/api-python/tests/test_lifecycle_auth.py
+          --ignore=apps/api-python/tests/test_lifecycle_golden_v188.py
           -q

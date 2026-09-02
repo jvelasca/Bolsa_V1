@@ -29,7 +29,7 @@
 
 ## Next
 
-**Auditoría externa tip V1.87** — **sin** abrir LIVE · **sin** V1.88 aún.
+**V1.88 ABIERTA** — golden integrado · restart · recon. Auditoría V1.87 = [`respuesta-auditor-v187-lifecycle-operational-2026-09-02.md`](./respuesta-auditor-v187-lifecycle-operational-2026-09-02.md) **PASS 9,2/10**.
 
 ## Texto exacto — arranque chat nuevo (dev)
 
