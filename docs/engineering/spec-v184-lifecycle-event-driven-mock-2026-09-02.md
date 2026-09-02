@@ -1,8 +1,8 @@
 # Spec — V1.84 Lifecycle Event-Driven Mock (E2E)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local) · tip stamp remoto pendiente.  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → [`504aa19d`](https://github.com/jvelasca/Bolsa_V1/commit/504aa19d) · [run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690) **success** (security · shared · spine · frontend · python · playwright-mock · certify; playwright-integrated skipped opt-in).  
 > **Padre:** [`spec-v183-lifecycle-snapshot-truth-2026-09-02.md`](./spec-v183-lifecycle-snapshot-truth-2026-09-02.md) · respuesta auditor [`respuesta-auditor-v183-lifecycle-snapshot-truth-2026-09-02.md`](./respuesta-auditor-v183-lifecycle-snapshot-truth-2026-09-02.md).  
-> **Partida tip:** **V1.83** CERRADA · PASS auditor 9,85/10 · [`v1.83-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.83-beta) → [`dc596ee5`](https://github.com/jvelasca/Bolsa_V1/commit/dc596ee5) · CI GREEN [run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026). **No** LIVE.
+> **Partida tip:** **V1.83** CERRADA · PASS auditor 9,85/10 · [`v1.83-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.83-beta) → [`dc596ee5`](https://github.com/jvelasca/Bolsa_V1/commit/dc596ee5) · CI GREEN [run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026). **Tip stamp:** `v1.84-beta` → `504aa19d`. **No** LIVE.
 
 Certificación mock: el lifecycle ya no vive solo como `setStage → DTO`. Un **log append-only** es la fuente de verdad; `POST` (mock) persiste; `GET` portfolio/summary/desk **reduce** el log. Los `events` del DTO = prefijo del log (no regenerados desde un stage vacío).
 
@@ -82,4 +82,4 @@ pnpm --filter @bolsa/web exec tsc --noEmit
 # → EXIT 0
 ```
 
-Stamp remoto: pendiente (`v1.84-beta`).
+Stamp remoto: **DONE** — tag `v1.84-beta` → `504aa19d` · [run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690).

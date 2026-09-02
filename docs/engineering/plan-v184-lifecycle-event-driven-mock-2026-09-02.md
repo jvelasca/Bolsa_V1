@@ -1,7 +1,7 @@
 # Plan — V1.84 Lifecycle Event-Driven Mock (E2E)
 
 > **Padre:** [`spec-v184-lifecycle-event-driven-mock-2026-09-02.md`](./spec-v184-lifecycle-event-driven-mock-2026-09-02.md).  
-> **Estado:** **CERRADA** (código + pre-flight local) · stamp CI GREEN remoto pendiente.  
+> **Estado:** **CERRADA** · **stamp CI GREEN remoto DONE** — [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → [`504aa19d`](https://github.com/jvelasca/Bolsa_V1/commit/504aa19d) · [run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690) **success**.  
 > **Partida tip:** V1.83 [`dc596ee5`](https://github.com/jvelasca/Bolsa_V1/commit/dc596ee5) (tag `v1.83-beta`) · PASS auditor · CI GREEN [run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026).
 
 | ID  | Entrega                                                       | Estado                           |
@@ -12,7 +12,7 @@
 | P0  | GET lifecycle desde log cuando `events.length > 0`            | **DONE**                         |
 | P0  | GP-V184-01/02 + filtro CI `+gp-v184`                          | **DONE**                         |
 | P1  | Pre-flight filtro CI · `tsc --noEmit` · docs cierre           | **DONE** (37 passed · 3 skipped) |
-| —   | Stamp CI GREEN remoto vía tag `v1.84-beta`                    | pendiente                        |
+| —   | Stamp CI GREEN remoto vía tag `v1.84-beta` / Actions          | **DONE** (run 33659480690)       |
 
 ## Secuencia (ejecutada)
 
@@ -21,7 +21,7 @@
 3. Snapshot-from-events: finanzas V1.83 · wire `events` = log filtrado.
 4. POST `/api/e2e/lifecycle/events` · GET usa log.
 5. GP-V184 trail + T2 · filtro CI · pre-flight **37 passed**.
-6. Tag remoto = paso posterior.
+6. Tag remoto `v1.84-beta` → CI GREEN · pack auditoría externa.
 
 ## OUT (plan)
 

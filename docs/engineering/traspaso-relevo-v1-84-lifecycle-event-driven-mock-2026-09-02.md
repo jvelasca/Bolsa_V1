@@ -1,6 +1,7 @@
 # Relevo — V1.84 Lifecycle Event-Driven Mock (E2E)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local) · stamp CI GREEN remoto **pendiente**.  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → [`504aa19d`](https://github.com/jvelasca/Bolsa_V1/commit/504aa19d) · [run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690) **success**.  
+> **Auditor externo:** [`arranque-auditor-v1-84-beta-2026-09-02.md`](./arranque-auditor-v1-84-beta-2026-09-02.md) · **Relevo tag:** [`traspaso-relevo-tag-v1-84-beta-2026-09-02.md`](./traspaso-relevo-tag-v1-84-beta-2026-09-02.md).  
 > **Partida:** V1.83 [`dc596ee5`](https://github.com/jvelasca/Bolsa_V1/commit/dc596ee5) · tag [`v1.83-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.83-beta) · PASS auditor 9,85/10 · CI GREEN [run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026).
 
 ## Hecho
@@ -10,13 +11,15 @@
 - POST mock `/api/e2e/lifecycle/events` · GET portfolio/summary/desk desde log si no vacío
 - GP-V184-01 trail · GP-V184-02 T2 · filtro CI `+gp-v184`
 - Pre-flight = **37 passed** (3 integrated skipped) · `tsc --noEmit` EXIT 0
-- Spec/plan · CURRENT_SYSTEM · engineering-index §53 · stamp PASS V1.83
+- Spec/plan/auditor · CURRENT_SYSTEM · engineering-index §53 · stamp PASS V1.83
+- **Stamp CI GREEN remoto:** jobs GREEN security · shared · spine · frontend · python · playwright-mock · certify; playwright-integrated skipped (opt-in)
 
 ## Reservas (honestidad)
 
 - Mock event store (Node runtime + Playwright route) · **no** FastAPI/PG
 - Finanzas/POV siguen proyección V1.83 tras reduce; honestidad = wire `events` = log
 - GP-V178..V183 intactos vía `setStage` (limpia log)
+- Tag certifica tip código `504aa19d`; docs stamp post-GREEN en `main` (no exige retag)
 - **No** LIVE · **no** fills · **no** bump `1.35.0-beta`
 
 ## OUT (intactos)
@@ -25,18 +28,19 @@
 - Playwright en `frontend-ci` · E2E integrado obligatorio
 - Event store de producción
 
-## Next
+## Next candidato
 
-1. Commit + tag `v1.84-beta` → Release-tag CI GREEN
-2. Auditoría externa (arranque tras GREEN)
-3. Candidato posterior: golden journey integrado FastAPI+PG (opt-in) — **sin** LIVE
+Golden journey integrado FastAPI+PG (opt-in) **o** higiene mock residual — **sin** abrir LIVE. Decidir tras auditoría.
 
-## Texto exacto — arranque chat nuevo (dev / stamp)
+## Texto exacto — arranque chat nuevo (dev)
 
 ```text
-Partida: V1.84 CERRADA local · tip código pendiente de commit/tag · pre-flight 37 passed · partida V1.83 dc596ee5 PASS.
-Leer: docs/CURRENT_SYSTEM.md · docs/engineering/spec-v184-lifecycle-event-driven-mock-2026-09-02.md · plan-v184.
+Partida: V1.84 CERRADA · tip código 504aa19d (tag v1.84-beta) · CI GREEN run 33659480690 · pre-release v1.84-beta.
+Leer: docs/CURRENT_SYSTEM.md · docs/engineering/traspaso-relevo-tag-v1-84-beta-2026-09-02.md · arranque-auditor-v1-84-beta (externo).
 Freeze: NO LIVE · no fills · no dryRun=false browser · no bump 1.35.0-beta · no Playwright en frontend-ci · no integrated obligatorio.
-Siguiente: commit + tag v1.84-beta → CI GREEN · luego auditoría.
 No commitear **/logs/.
 ```
+
+## Texto exacto — auditoría externa
+
+Usar el bloque completo en [`arranque-auditor-v1-84-beta-2026-09-02.md`](./arranque-auditor-v1-84-beta-2026-09-02.md).
