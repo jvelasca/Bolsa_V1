@@ -28,7 +28,7 @@ Eres auditor externo de Bolsa V1 **tip `v1.84-beta`**. Producto bajo revisión *
 **GitHub (auditor):**
 
 - Código tip: [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → commit `504aa19d`
-- Docs stamp: _(commit de este pack en `main`; no exige retag)_
+- Docs stamp: [`d47168b7`](https://github.com/jvelasca/Bolsa_V1/commit/d47168b7) en `main`
 - Previo certificado: [`v1.83-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.83-beta) → `dc596ee5`
 - Auditoría V1.83 (input de esta slice): [`respuesta-auditor-v183-lifecycle-snapshot-truth-2026-09-02.md`](./respuesta-auditor-v183-lifecycle-snapshot-truth-2026-09-02.md)
 

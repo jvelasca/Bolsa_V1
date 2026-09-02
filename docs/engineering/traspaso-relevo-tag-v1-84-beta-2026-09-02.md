@@ -1,7 +1,7 @@
 # RELEVO — tag v1.84-beta → auditoría externa (2026-09-02)
 
 > **Padre:** [`traspaso-relevo-v1-84-lifecycle-event-driven-mock-2026-09-02.md`](./traspaso-relevo-v1-84-lifecycle-event-driven-mock-2026-09-02.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.84-beta` → `504aa19d` · Release-tag CI **GREEN** ([run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690)) · docs stamp _(post-GREEN)_ · **listo para auditoría externa**.  
+> **Estado:** **CI GREEN** — tip `v1.84-beta` → `504aa19d` · Release-tag CI **GREEN** ([run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690)) · docs stamp `d47168b7` · **listo para auditoría externa**.  
 > **Arranque auditor externo:** [`arranque-auditor-v1-84-beta-2026-09-02.md`](./arranque-auditor-v1-84-beta-2026-09-02.md).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · bump package · Playwright en `frontend-ci` · integrated E2E obligatorio · event store FastAPI/PG.
 
@@ -29,7 +29,7 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-b
 | Pieza       | Valor                                                                                                            |
 | ----------- | ---------------------------------------------------------------------------------------------------------------- |
 | Tag tip     | `v1.84-beta` → `504aa19d`                                                                                        |
-| Docs stamp  | _(post-GREEN en `main`; no exige retag)_                                                                         |
+| Docs stamp  | `d47168b7` (post-GREEN en `main`; no exige retag)                                                                |
 | Previo tip  | `v1.83-beta` → `dc596ee5` (CI GREEN · run 33657045026 · PASS 9,85/10)                                            |
 | CI tag      | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690) · `headSha=504aa19d` |
 | Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta                                                     |
