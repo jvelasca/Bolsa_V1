@@ -1,8 +1,8 @@
 # Spec — V1.88 Lifecycle Integrated Golden + Restart + Recon
 
-> **AsOf:** 2026-09-02 · **Estado:** **ABIERTA**  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA (CI GREEN)** · tip [`v1.88-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.88-beta) → [`33685242`](https://github.com/jvelasca/Bolsa_V1/commit/33685242) · [run 33691233738](https://github.com/jvelasca/Bolsa_V1/actions/runs/33691233738).  
 > **Padre:** [`respuesta-auditor-v187-lifecycle-operational-2026-09-02.md`](./respuesta-auditor-v187-lifecycle-operational-2026-09-02.md).  
-> **Partida tip:** `v1.87-beta` → [`646b97ac`](https://github.com/jvelasca/Bolsa_V1/commit/646b97ac). **No** LIVE · **no** bump.
+> **Partida tip:** `v1.87-beta` → [`646b97ac`](https://github.com/jvelasca/Bolsa_V1/commit/646b97ac). **No** LIVE · **no** bump. Pendiente auditoría externa.
 
 ```text
 USER A (JWT)

@@ -1,8 +1,9 @@
 # Relevo — V1.88 Lifecycle Integrated Golden + Restart + Recon
 
-> **AsOf:** 2026-09-02 · **Estado:** **CÓDIGO LISTO** · pendiente stamp CI GREEN / tag.  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA (CI GREEN)** · tip [`v1.88-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.88-beta) → [`33685242`](https://github.com/jvelasca/Bolsa_V1/commit/33685242) · [run 33691233738](https://github.com/jvelasca/Bolsa_V1/actions/runs/33691233738).  
 > **Partida:** V1.87 PASS operacional · tip [`646b97ac`](https://github.com/jvelasca/Bolsa_V1/commit/646b97ac) · [`respuesta-auditor-v187-lifecycle-operational-2026-09-02.md`](./respuesta-auditor-v187-lifecycle-operational-2026-09-02.md).  
-> **Spec/plan:** [`spec-v188-lifecycle-integrated-golden-2026-09-02.md`](./spec-v188-lifecycle-integrated-golden-2026-09-02.md) · [`plan-v188-lifecycle-integrated-golden-2026-09-02.md`](./plan-v188-lifecycle-integrated-golden-2026-09-02.md).
+> **Spec/plan:** [`spec-v188-lifecycle-integrated-golden-2026-09-02.md`](./spec-v188-lifecycle-integrated-golden-2026-09-02.md) · [`plan-v188-lifecycle-integrated-golden-2026-09-02.md`](./plan-v188-lifecycle-integrated-golden-2026-09-02.md).  
+> **Cierre tag:** [`traspaso-relevo-tag-v1-88-beta-2026-09-02.md`](./traspaso-relevo-tag-v1-88-beta-2026-09-02.md) · [`arranque-auditor-v1-88-beta-2026-09-02.md`](./arranque-auditor-v1-88-beta-2026-09-02.md).
 
 ## Hecho
 
@@ -24,4 +25,4 @@
 
 ## Next
 
-Stamp CI GREEN + tag `v1.88-beta`. **No** LIVE.
+Auditoría externa tip V1.88 / gate **beta estable PAPER**. **No** LIVE · **no** retag por docs.
