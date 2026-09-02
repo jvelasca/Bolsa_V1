@@ -1,7 +1,8 @@
 /**
- * V1.64 — helpers Playwright: mock vs integración FastAPI+PostgreSQL.
+ * V1.64 / V1.67 — helpers Playwright: mock vs integración FastAPI+PostgreSQL.
  */
 
+import { randomUUID } from "node:crypto";
 import type { APIRequestContext, Page } from "@playwright/test";
 import { DEFAULT_CHART_CONFIG } from "@bolsa/shared";
 
@@ -9,6 +10,16 @@ export const E2E_ACCOUNT_ID = "default-account-seed";
 export const E2E_INSTRUMENT_ID = "inst-aapl";
 export const E2E_SYMBOL = "AAPL";
 export const E2E_WORKSPACE_ID = "ws-e2e-mercado";
+export const E2E_MERCADO_ACCOUNT_PREFIX = "e2e-v167";
+
+export type MercadoIntegrationFixture = {
+  accountId: string;
+  instrumentId: string;
+  symbol: string;
+  workspaceId: string;
+  hasOpenPosition: boolean;
+  workspaceDocument: ReturnType<typeof mercadoWorkspaceDocument>;
+};
 
 export function e2eIntegrationMode(): boolean {
   return process.env.E2E_INTEGRATION === "1";
@@ -20,6 +31,18 @@ export function e2eMockMode(): boolean {
 
 export const E2E_SKIP_INTEGRATION_REASON =
   "Set E2E_INTEGRATION=1 and ensure FastAPI (:8000) + PostgreSQL are running. See spec-v164.";
+
+export const E2E_SKIP_DB_ISOLATION_REASON =
+  "Set E2E_ALLOW_DEV_DB=1 to run integrated Mercado E2E against local PostgreSQL (creates ephemeral e2e-v167-* accounts). See spec-v167.";
+
+/**
+ * Fail-closed unless explicitly opted in. Integrated Mercado E2E mutates PG
+ * (ephemeral accounts). Prefer `E2E_DATABASE_URL` pointing to a dedicated test DB.
+ */
+export function assertE2eDatabaseIsolation(): void {
+  if (process.env.E2E_ALLOW_DEV_DB === "1") return;
+  throw new Error(E2E_SKIP_DB_ISOLATION_REASON);
+}
 
 export async function assertApiHealthy(
   request: APIRequestContext,
@@ -34,12 +57,20 @@ export async function assertApiHealthy(
   }
 }
 
-export function mercadoWorkspaceDocument() {
+export function mercadoWorkspaceDocument(opts?: {
+  instrumentId?: string;
+  symbol?: string;
+  workspaceId?: string;
+  name?: string;
+}) {
   const tabId = "e2e-tab-mercado";
+  const instrumentId = opts?.instrumentId ?? E2E_INSTRUMENT_ID;
+  const symbol = opts?.symbol ?? E2E_SYMBOL;
+  const workspaceId = opts?.workspaceId ?? E2E_WORKSPACE_ID;
   return {
     version: 1,
-    id: E2E_WORKSPACE_ID,
-    name: "E2E Mercado",
+    id: workspaceId,
+    name: opts?.name ?? "E2E Mercado",
     updatedAt: "2026-09-02T12:00:00.000Z",
     layout: {
       listPanelOpen: true,
@@ -56,8 +87,8 @@ export function mercadoWorkspaceDocument() {
     charts: [
       {
         id: tabId,
-        instrumentId: E2E_INSTRUMENT_ID,
-        label: E2E_SYMBOL,
+        instrumentId,
+        label: symbol,
         timeframe: "1d",
         seriesType: "candles",
         chart: DEFAULT_CHART_CONFIG,
@@ -140,10 +171,165 @@ export function mercadoOhlcvBars() {
   return bars;
 }
 
-/** Seed cuenta activa + layout DECISIÓN abierto antes de navegar a /trading. */
-export async function seedMercadoBrowserState(page: Page): Promise<void> {
+function chartPersistBackupFromWorkspace(
+  workspace: ReturnType<typeof mercadoWorkspaceDocument>,
+) {
+  return {
+    charts: workspace.charts,
+    activeChartId: workspace.activeChartId,
+    chartStateByListInstrument: workspace.chartStateByListInstrument,
+    chartListContext: workspace.chartListContext,
+    chartToolbarGlobal: workspace.chartToolbarGlobal,
+    indicatorTemplates: workspace.indicatorTemplates,
+    indicatorPresets: workspace.indicatorPresets,
+    indicatorFavoritesByListId: workspace.indicatorFavoritesByListId,
+    defaultIndicatorTemplateId: workspace.defaultIndicatorTemplateId,
+    preferences: workspace.preferences,
+    chartInspectorOpen: workspace.layout.chartInspectorOpen,
+    list: workspace.list,
+    updatedAt: workspace.updatedAt,
+  };
+}
+
+/** Crea cuenta aislada, workspace con gráfico AAPL y buy opcional vía HTTP real. */
+export async function ensureMercadoIntegrationFixture(
+  request: APIRequestContext,
+  baseURL: string,
+): Promise<MercadoIntegrationFixture> {
+  assertE2eDatabaseIsolation();
+
+  const instrumentsRes = await request.get(
+    new URL("/api/instruments", baseURL).toString(),
+  );
+  if (!instrumentsRes.ok()) {
+    throw new Error(
+      `GET /api/instruments failed (${instrumentsRes.status()}).`,
+    );
+  }
+  const instruments = (await instrumentsRes.json()).data as Array<{
+    id: string;
+    symbol: string;
+  }>;
+  const instrument =
+    instruments.find((row) => row.id === E2E_INSTRUMENT_ID) ?? instruments[0];
+  if (!instrument) {
+    throw new Error("No instruments available for Mercado E2E seed.");
+  }
+
+  const suffix = randomUUID().slice(0, 8);
+  const accountRes = await request.post(
+    new URL("/api/accounts", baseURL).toString(),
+    {
+      data: {
+        name: `${E2E_MERCADO_ACCOUNT_PREFIX}-${suffix}`,
+        currency: "EUR",
+        initialDeposit: 100_000,
+      },
+    },
+  );
+  if (!accountRes.ok()) {
+    throw new Error(
+      `POST /api/accounts failed (${accountRes.status()}): ${await accountRes.text()}`,
+    );
+  }
+  const accountId = (await accountRes.json()).data.id as string;
+
+  const now = new Date().toISOString();
+  const mandateRes = await request.put(
+    new URL(`/api/accounts/${accountId}/mandates`, baseURL).toString(),
+    {
+      data: {
+        tenures: [
+          {
+            id: `mt-e2e-${suffix}`,
+            accountId,
+            instrumentId: instrument.id,
+            effectiveFrom: now,
+            actor: "user",
+            reason: "adopt",
+          },
+        ],
+        links: [],
+      },
+    },
+  );
+  if (!mandateRes.ok()) {
+    throw new Error(
+      `PUT mandates failed (${mandateRes.status()}): ${await mandateRes.text()}`,
+    );
+  }
+
+  let hasOpenPosition = false;
+  const tradeRes = await request.post(
+    new URL("/api/portfolio/trade", baseURL).toString(),
+    {
+      headers: { "X-Account-Id": accountId },
+      data: {
+        instrumentId: instrument.id,
+        type: "buy",
+        quantity: 5,
+        price: 50,
+        idempotencyKey: `e2e-v167-${suffix}`,
+      },
+    },
+  );
+  if (tradeRes.ok()) {
+    hasOpenPosition = true;
+  }
+
+  const workspaceDocument = mercadoWorkspaceDocument({
+    instrumentId: instrument.id,
+    symbol: instrument.symbol,
+    name: `E2E Mercado ${suffix}`,
+  });
+  const workspaceRes = await request.post(
+    new URL("/api/workspaces", baseURL).toString(),
+    {
+      data: {
+        name: workspaceDocument.name,
+        document: workspaceDocument,
+        isDefault: false,
+      },
+    },
+  );
+  if (!workspaceRes.ok()) {
+    throw new Error(
+      `POST /api/workspaces failed (${workspaceRes.status()}): ${await workspaceRes.text()}`,
+    );
+  }
+  const workspaceId = (await workspaceRes.json()).data.id as string;
+  const workspaceDocumentWithId = {
+    ...workspaceDocument,
+    id: workspaceId,
+  };
+
+  return {
+    accountId,
+    instrumentId: instrument.id,
+    symbol: instrument.symbol,
+    workspaceId,
+    hasOpenPosition,
+    workspaceDocument: workspaceDocumentWithId,
+  };
+}
+
+/** Seed cuenta activa + workspace + layout DECISIÓN antes de navegar a /trading. */
+export async function seedMercadoBrowserState(
+  page: Page,
+  opts?: {
+    accountId?: string;
+    workspaceId?: string;
+    workspaceDocument?: ReturnType<typeof mercadoWorkspaceDocument>;
+  },
+): Promise<void> {
+  const accountId = opts?.accountId ?? E2E_ACCOUNT_ID;
+  const workspaceDocument =
+    opts?.workspaceDocument ?? mercadoWorkspaceDocument();
+  const workspaceId = opts?.workspaceId ?? workspaceDocument.id;
+  const chartPersistBackup = chartPersistBackupFromWorkspace(workspaceDocument);
+
   await page.addInitScript(
-    ({ accountId }) => {
+    ({ accountId, workspaceId, chartPersistBackup }) => {
       const zustand = (key: string, partial: Record<string, unknown>) => {
         localStorage.setItem(
           key,
@@ -178,7 +364,18 @@ export async function seedMercadoBrowserState(page: Page): Promise<void> {
         "bolsa-mercado-decision-surface-v1",
         JSON.stringify({ placement: "panel" }),
       );
+      localStorage.setItem(
+        "bolsa-workspace-meta",
+        JSON.stringify({
+          state: {
+            activeWorkspaceId: workspaceId,
+            recents: [workspaceId],
+            chartPersistBackup,
+          },
+          version: 0,
+        }),
+      );
     },
-    { accountId: E2E_ACCOUNT_ID },
+    { accountId, workspaceId, chartPersistBackup },
   );
 }
