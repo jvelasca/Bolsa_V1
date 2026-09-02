@@ -11,6 +11,36 @@ export const E2E_INSTRUMENT_ID = "inst-aapl";
 export const E2E_SYMBOL = "AAPL";
 export const E2E_WORKSPACE_ID = "ws-e2e-mercado";
 export const E2E_MERCADO_ACCOUNT_PREFIX = "e2e-v167";
+export const E2E_MERCADO_MULTI_ACCOUNT_PREFIX = "e2e-v173";
+
+/** Mock / preferred symbols for multi-instrument integrity (V1.73). */
+export const E2E_MULTI_POSITION_INSTRUMENTS = [
+  { id: "inst-aapl", symbol: "AAPL", name: "Apple E2E" },
+  { id: "inst-msft", symbol: "MSFT", name: "Microsoft E2E" },
+  { id: "inst-googl", symbol: "GOOGL", name: "Alphabet E2E" },
+] as const;
+
+export const E2E_ENTRY_ONLY_INSTRUMENT = {
+  id: "inst-nvda",
+  symbol: "NVDA",
+  name: "NVIDIA E2E",
+} as const;
+
+export type MercadoLevels = {
+  entry: number | null;
+  currentStop: number | null;
+  target1: number | null;
+  target2: number | null;
+};
+
+export type MercadoInstrumentSlice = {
+  instrumentId: string;
+  symbol: string;
+  positionId: string;
+  tradePlanId: string | null;
+  decisionId: string | null;
+  levels: MercadoLevels | null;
+};
 
 export type MercadoIntegrationFixture = {
   accountId: string;
@@ -21,12 +51,16 @@ export type MercadoIntegrationFixture = {
   positionId: string | null;
   tradePlanId: string | null;
   decisionId: string | null;
-  levels: {
-    entry: number | null;
-    currentStop: number | null;
-    target1: number | null;
-    target2: number | null;
-  } | null;
+  levels: MercadoLevels | null;
+  workspaceDocument: ReturnType<typeof mercadoWorkspaceDocument>;
+};
+
+/** ≥3 posiciones PAPER + instrumento Entry-only (sin qty) cuando el catálogo lo permite. */
+export type MultiInstrumentMercadoFixture = {
+  accountId: string;
+  workspaceId: string;
+  instruments: MercadoInstrumentSlice[];
+  entryOnly: { instrumentId: string; symbol: string } | null;
   workspaceDocument: ReturnType<typeof mercadoWorkspaceDocument>;
 };
 
@@ -170,31 +204,131 @@ export function mercadoListFocusWorkspaceDocument(opts?: {
   };
 }
 
-export function mercadoOpenPosition() {
+/** Workspace con gráfico de posición + Entry-only (dos pestañas). */
+export function mercadoEntryPositionWorkspaceDocument(opts?: {
+  positionInstrumentId?: string;
+  positionSymbol?: string;
+  entryInstrumentId?: string;
+  entrySymbol?: string;
+  workspaceId?: string;
+  name?: string;
+}) {
+  const positionInstrumentId =
+    opts?.positionInstrumentId ?? E2E_MULTI_POSITION_INSTRUMENTS[0].id;
+  const positionSymbol =
+    opts?.positionSymbol ?? E2E_MULTI_POSITION_INSTRUMENTS[0].symbol;
+  const entryInstrumentId =
+    opts?.entryInstrumentId ?? E2E_ENTRY_ONLY_INSTRUMENT.id;
+  const entrySymbol = opts?.entrySymbol ?? E2E_ENTRY_ONLY_INSTRUMENT.symbol;
+  const workspaceId = opts?.workspaceId ?? E2E_WORKSPACE_ID;
+  const positionTabId = "e2e-tab-position";
+  const entryTabId = "e2e-tab-entry";
+  const base = mercadoWorkspaceDocument({
+    instrumentId: positionInstrumentId,
+    symbol: positionSymbol,
+    workspaceId,
+    name: opts?.name,
+  });
   return {
-    id: "pos-e2e-1",
-    instrumentId: E2E_INSTRUMENT_ID,
-    symbol: E2E_SYMBOL,
-    name: "Apple E2E",
-    quantity: 10,
-    avgCost: 100,
-    lastPrice: 102,
-    marketValue: 1020,
-    unrealizedPnl: 20,
-    unrealizedPnlPct: 2,
+    ...base,
+    charts: [
+      {
+        ...base.charts[0]!,
+        id: positionTabId,
+        instrumentId: positionInstrumentId,
+        label: positionSymbol,
+      },
+      {
+        ...base.charts[0]!,
+        id: entryTabId,
+        instrumentId: entryInstrumentId,
+        label: entrySymbol,
+      },
+    ],
+    activeChartId: positionTabId,
+  };
+}
+
+export function mercadoOpenPosition(opts?: {
+  id?: string;
+  instrumentId?: string;
+  symbol?: string;
+  name?: string;
+  tradePlanId?: string;
+  currentStop?: number;
+  target1?: number;
+  target2?: number;
+  avgCost?: number;
+  lastPrice?: number;
+}) {
+  const instrumentId = opts?.instrumentId ?? E2E_INSTRUMENT_ID;
+  const symbol = opts?.symbol ?? E2E_SYMBOL;
+  const avgCost = opts?.avgCost ?? 100;
+  const lastPrice = opts?.lastPrice ?? avgCost + 2;
+  const qty = 10;
+  return {
+    id: opts?.id ?? "pos-e2e-1",
+    instrumentId,
+    symbol,
+    name: opts?.name ?? "Apple E2E",
+    quantity: qty,
+    avgCost,
+    lastPrice,
+    marketValue: lastPrice * qty,
+    unrealizedPnl: (lastPrice - avgCost) * qty,
+    unrealizedPnlPct: ((lastPrice - avgCost) / avgCost) * 100,
     operational: {
       status: "PROTECTED",
       direction: "long",
-      tradePlanId: "tp-e2e",
-      plannedEntry: 100,
-      actualEntry: 100,
-      initialStop: 95,
-      currentStop: 95,
-      target1: 105,
-      target2: 110,
+      tradePlanId: opts?.tradePlanId ?? "tp-e2e",
+      plannedEntry: avgCost,
+      actualEntry: avgCost,
+      initialStop: opts?.currentStop ?? avgCost - 5,
+      currentStop: opts?.currentStop ?? avgCost - 5,
+      target1: opts?.target1 ?? avgCost + 5,
+      target2: opts?.target2 ?? avgCost + 10,
       unrealizedR: 0.4,
+      operationalView: {
+        positionId: opts?.id ?? "pos-e2e-1",
+        tradePlanId: opts?.tradePlanId ?? "tp-e2e",
+        decisionId: null,
+        levels: {
+          entry: avgCost,
+          currentStop: opts?.currentStop ?? avgCost - 5,
+          target1: opts?.target1 ?? avgCost + 5,
+          target2: opts?.target2 ?? avgCost + 10,
+        },
+      },
     },
   };
+}
+
+/** Tres posiciones mock + instrumento Entry-only (NVDA). */
+export function mercadoMultiOpenPositions() {
+  return E2E_MULTI_POSITION_INSTRUMENTS.map((row, index) =>
+    mercadoOpenPosition({
+      id: `pos-e2e-${index + 1}`,
+      instrumentId: row.id,
+      symbol: row.symbol,
+      name: row.name,
+      tradePlanId: `tp-e2e-${index + 1}`,
+      avgCost: 100 + index * 10,
+      currentStop: 95 + index * 10,
+      target1: 105 + index * 10,
+      target2: 110 + index * 10,
+    }),
+  );
+}
+
+export function mercadoMultiInstrumentSlicesFromMock(): MercadoInstrumentSlice[] {
+  return mercadoMultiOpenPositions().map((pos) => ({
+    instrumentId: pos.instrumentId,
+    symbol: pos.symbol,
+    positionId: pos.operational.operationalView.positionId,
+    tradePlanId: pos.operational.tradePlanId,
+    decisionId: pos.operational.operationalView.decisionId,
+    levels: pos.operational.operationalView.levels,
+  }));
 }
 
 export function mercadoOhlcvBars() {
@@ -423,6 +557,218 @@ export async function ensureMercadoIntegrationFixture(
     decisionId,
     levels,
     workspaceDocument: workspaceDocumentWithId,
+  };
+}
+
+type PortfolioPositionRow = {
+  id: string;
+  instrumentId: string;
+  operational?: {
+    tradePlanId?: string;
+    decisionId?: string;
+    operationalView?: {
+      positionId?: string;
+      tradePlanId?: string;
+      decisionId?: string | null;
+      levels?: {
+        entry?: number | null;
+        currentStop?: number | null;
+        target1?: number | null;
+        target2?: number | null;
+      };
+    };
+  };
+};
+
+function sliceFromPortfolioPosition(
+  seeded: PortfolioPositionRow,
+  symbol: string,
+): MercadoInstrumentSlice {
+  const viewLevels = seeded.operational?.operationalView?.levels;
+  return {
+    instrumentId: seeded.instrumentId,
+    symbol,
+    positionId: seeded.operational?.operationalView?.positionId ?? seeded.id,
+    tradePlanId:
+      seeded.operational?.operationalView?.tradePlanId ??
+      seeded.operational?.tradePlanId ??
+      null,
+    decisionId:
+      seeded.operational?.operationalView?.decisionId ??
+      seeded.operational?.decisionId ??
+      null,
+    levels: viewLevels
+      ? {
+          entry: viewLevels.entry ?? null,
+          currentStop: viewLevels.currentStop ?? null,
+          target1: viewLevels.target1 ?? null,
+          target2: viewLevels.target2 ?? null,
+        }
+      : null,
+  };
+}
+
+/**
+ * Cuenta aislada con ≥3 buys PAPER + mandato Entry-only (4º instrumento) si el catálogo lo permite.
+ * FAIL-closed si hay menos de 3 instrumentos disponibles.
+ */
+export async function ensureMultiInstrumentMercadoFixture(
+  request: APIRequestContext,
+  baseURL: string,
+): Promise<MultiInstrumentMercadoFixture> {
+  assertE2eDatabaseIsolation();
+
+  const instrumentsRes = await request.get(
+    new URL("/api/instruments", baseURL).toString(),
+  );
+  if (!instrumentsRes.ok()) {
+    throw new Error(
+      `GET /api/instruments failed (${instrumentsRes.status()}).`,
+    );
+  }
+  const catalog = (await instrumentsRes.json()).data as Array<{
+    id: string;
+    symbol: string;
+  }>;
+  if (catalog.length < 3) {
+    throw new Error(
+      `Multi-instrument Mercado E2E requires ≥3 instruments in catalog (got ${catalog.length}).`,
+    );
+  }
+
+  const preferredIds = new Set(
+    E2E_MULTI_POSITION_INSTRUMENTS.map((row) => row.id),
+  );
+  const preferred = catalog.filter((row) => preferredIds.has(row.id));
+  const rest = catalog.filter((row) => !preferredIds.has(row.id));
+  const ordered = [...preferred, ...rest];
+  const buyTargets = ordered.slice(0, 3);
+  const entryTarget = ordered.length >= 4 ? ordered[3]! : null;
+
+  const suffix = randomUUID().slice(0, 8);
+  const accountRes = await request.post(
+    new URL("/api/accounts", baseURL).toString(),
+    {
+      data: {
+        name: `${E2E_MERCADO_MULTI_ACCOUNT_PREFIX}-${suffix}`,
+        currency: "EUR",
+        initialDeposit: 250_000,
+      },
+    },
+  );
+  if (!accountRes.ok()) {
+    throw new Error(
+      `POST /api/accounts failed (${accountRes.status()}): ${await accountRes.text()}`,
+    );
+  }
+  const accountId = (await accountRes.json()).data.id as string;
+
+  const now = new Date().toISOString();
+  const mandateInstruments = entryTarget
+    ? [...buyTargets, entryTarget]
+    : buyTargets;
+  const mandateRes = await request.put(
+    new URL(`/api/accounts/${accountId}/mandates`, baseURL).toString(),
+    {
+      data: {
+        tenures: mandateInstruments.map((instrument, index) => ({
+          id: `mt-e2e-v173-${suffix}-${index}`,
+          accountId,
+          instrumentId: instrument.id,
+          effectiveFrom: now,
+          actor: "user",
+          reason: "adopt",
+        })),
+        links: [],
+      },
+    },
+  );
+  if (!mandateRes.ok()) {
+    throw new Error(
+      `PUT mandates failed (${mandateRes.status()}): ${await mandateRes.text()}`,
+    );
+  }
+
+  for (let i = 0; i < buyTargets.length; i++) {
+    const instrument = buyTargets[i]!;
+    const tradeRes = await request.post(
+      new URL("/api/portfolio/trade", baseURL).toString(),
+      {
+        headers: { "X-Account-Id": accountId },
+        data: {
+          instrumentId: instrument.id,
+          type: "buy",
+          quantity: 5,
+          price: 50 + i * 5,
+          idempotencyKey: `e2e-v173-${suffix}-${i}`,
+        },
+      },
+    );
+    if (!tradeRes.ok()) {
+      throw new Error(
+        `POST /api/portfolio/trade failed for ${instrument.symbol} (${tradeRes.status()}): ${await tradeRes.text()}.`,
+      );
+    }
+  }
+
+  const portfolioRes = await request.get(
+    new URL("/api/portfolio", baseURL).toString(),
+    { headers: { "X-Account-Id": accountId } },
+  );
+  if (!portfolioRes.ok()) {
+    throw new Error(
+      `GET /api/portfolio after buys failed (${portfolioRes.status()}): ${await portfolioRes.text()}`,
+    );
+  }
+  const portfolioJson = (await portfolioRes.json()) as {
+    data?: { positions?: PortfolioPositionRow[] };
+  };
+  const positions = portfolioJson.data?.positions ?? [];
+  const instruments: MercadoInstrumentSlice[] = buyTargets.map((target) => {
+    const seeded = positions.find((row) => row.instrumentId === target.id);
+    if (!seeded) {
+      throw new Error(
+        `Portfolio buy seed missing open position for ${target.symbol}.`,
+      );
+    }
+    return sliceFromPortfolioPosition(seeded, target.symbol);
+  });
+  if (instruments.length < 3) {
+    throw new Error(
+      `Multi-instrument fixture expected ≥3 open positions (got ${instruments.length}).`,
+    );
+  }
+
+  const workspaceDocument = mercadoListFocusWorkspaceDocument({
+    instrumentId: instruments[0]!.instrumentId,
+    symbol: instruments[0]!.symbol,
+    name: `E2E Mercado Multi ${suffix}`,
+  });
+  const workspaceRes = await request.post(
+    new URL("/api/workspaces", baseURL).toString(),
+    {
+      data: {
+        name: workspaceDocument.name,
+        document: workspaceDocument,
+        isDefault: false,
+      },
+    },
+  );
+  if (!workspaceRes.ok()) {
+    throw new Error(
+      `POST /api/workspaces failed (${workspaceRes.status()}): ${await workspaceRes.text()}`,
+    );
+  }
+  const workspaceId = (await workspaceRes.json()).data.id as string;
+
+  return {
+    accountId,
+    workspaceId,
+    instruments,
+    entryOnly: entryTarget
+      ? { instrumentId: entryTarget.id, symbol: entryTarget.symbol }
+      : null,
+    workspaceDocument: { ...workspaceDocument, id: workspaceId },
   };
 }
 

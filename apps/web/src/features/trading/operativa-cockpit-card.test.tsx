@@ -412,6 +412,58 @@ describe("OperativaCockpitCard V1.62 Entry Decision Surface", () => {
       screen.getByTestId("operativa-cockpit-entry-action").textContent,
     ).toMatch(/Decisión/i);
   });
+
+  it("GP-V172: why panel shows score + LONG and no COMPRAR", () => {
+    useInstrumentOperationalContext.mockReturnValue(
+      posicionContext({
+        phase: "preparada",
+        position: null,
+        showsPlanLevels: true,
+        study: {
+          instrumentId: "inst-aapl",
+          symbol: "AAPL",
+          hasOperationalPlan: true,
+          tradePlanStatus: "ARMED",
+          studiedAt: "2026-08-31T09:00:00.000Z",
+          opinion: "bullish",
+          strength: 8.7,
+          action: "recommend_long",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+          expectedRR: 2,
+          riskAmount: 250,
+          invalidation: ["Cierre < 94"],
+          trends: [
+            { key: "short_term", display: "Tendencia alcista", value: "up" },
+          ],
+        } as never,
+      }),
+    );
+    renderCockpit(
+      <OperativaCockpitCard
+        instrumentId="inst-aapl"
+        symbol="AAPL"
+        markPrice={101.5}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("operativa-cockpit-why"));
+    expect(screen.getByTestId("decision-explain-score").textContent).toMatch(
+      /AAPL · 8,7\/10/,
+    );
+    expect(screen.getByTestId("decision-explain-direction").textContent).toBe(
+      "LONG",
+    );
+    expect(
+      screen.getByTestId("decision-explain-direction").textContent,
+    ).not.toMatch(/COMPRAR|BUY/i);
+    expect(screen.getByTestId("decision-explain-entry-distance")).toBeTruthy();
+    expect(screen.getByTestId("entry-decision-mark")).toBeTruthy();
+    expect(screen.getByTestId("entry-decision-distance")).toBeTruthy();
+    expect(screen.queryByText(/Ideal/i)).toBeNull();
+    expect(screen.queryByText(/Máxima/i)).toBeNull();
+  });
 });
 
 describe("OperativaCockpitCard V1.61 Decision Surface", () => {
@@ -499,8 +551,9 @@ describe("OperativaCockpitCard POV star card V1.60", () => {
     const povState = screen.getByTestId("operativa-cockpit-pov-state");
     expect(povState.getAttribute("data-state")).toBe("T2_READY");
     expect(povState.getAttribute("data-pov-state")).toBe("T2_READY");
-    expect(povState.textContent).toMatch(
-      /T2 disparado · pendiente de ejecutar/i,
+    expect(povState.textContent).toMatch(/mesa MONITOR/i);
+    expect(screen.getByTestId("position-decision-headline").textContent).toBe(
+      "T2 alcanzado",
     );
     expect(screen.getByTestId("operativa-cockpit-phase").textContent).toBe(
       "Posición · T2 listo",

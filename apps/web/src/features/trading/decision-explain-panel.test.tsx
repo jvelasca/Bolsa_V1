@@ -1,5 +1,5 @@
 /**
- * V1.66 — DecisionExplainPanel render básico.
+ * V1.72 — DecisionExplainPanel layout TOP (score · LONG · factors).
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -18,10 +18,12 @@ function triggeredStudy(): DecisionJournalStudyViewV1 {
     tradePlanStatus: "TRIGGERED",
     studiedAt: "2026-08-31T09:00:00.000Z",
     opinion: "bullish",
+    strength: 8.7,
     strengthBand: "strong",
     decisionSummary: "Ruptura con volumen sobre resistencia.",
     direction: "long",
     status: "target_active",
+    action: "recommend_long",
     entry: 421.5,
     stop: 408,
     target1: 448,
@@ -45,32 +47,53 @@ function triggeredStudy(): DecisionJournalStudyViewV1 {
   } as DecisionJournalStudyViewV1;
 }
 
-describe("DecisionExplainPanel V1.66", () => {
-  it("renders canonical sections from explain view", () => {
+describe("DecisionExplainPanel V1.72", () => {
+  it("renders TOP layout: score, LONG, factors, no COMPRAR", () => {
     const view = buildDecisionExplainView({
       study: triggeredStudy(),
       gateStatus: "open",
       source: "daily_scan",
+      markPrice: 425,
     });
 
     render(<DecisionExplainPanel view={view} />);
 
     expect(screen.getByTestId("decision-explain-panel")).toBeTruthy();
+    expect(screen.getByTestId("decision-explain-score").textContent).toMatch(
+      /NVDA · 8,7\/10/,
+    );
+    expect(screen.getByTestId("decision-explain-direction").textContent).toBe(
+      "LONG",
+    );
+    expect(
+      screen.getByTestId("decision-explain-direction").textContent,
+    ).not.toMatch(/COMPRAR|BUY/i);
+    expect(
+      screen.getByTestId("decision-explain-factor-tendencia"),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("decision-explain-factor-momentum")
+        .getAttribute("data-state"),
+    ).toBe("unknown");
+    expect(screen.getByTestId("decision-explain-entry-distance")).toBeTruthy();
+    expect(
+      screen.getByTestId("decision-explain-section-authorization"),
+    ).toBeTruthy();
+    expect(screen.getByText(/no es autorización/i)).toBeTruthy();
+    expect(screen.queryByText(/Ideal/i)).toBeNull();
+    expect(screen.queryByText(/Máxima/i)).toBeNull();
     expect(screen.getByTestId("decision-explain-section-thesis")).toBeTruthy();
-    expect(screen.getByTestId("decision-explain-section-signals")).toBeTruthy();
-    expect(
-      screen.getByTestId("decision-explain-section-conditions"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("decision-explain-section-invalidators"),
-    ).toBeTruthy();
-    expect(screen.getByTestId("decision-explain-section-policy")).toBeTruthy();
-    expect(
-      screen.getByTestId("decision-explain-section-traceability"),
-    ).toBeTruthy();
-    expect(screen.getByText("Alcista")).toBeTruthy();
+    expect(screen.getAllByText("Alcista").length).toBeGreaterThan(0);
     expect(screen.getByText("Cierre bajo 408")).toBeTruthy();
-    expect(screen.getByText("open")).toBeTruthy();
+  });
+
+  it("omits distance when mark is missing", () => {
+    const view = buildDecisionExplainView({
+      study: triggeredStudy(),
+    });
+    render(<DecisionExplainPanel view={view} />);
+    expect(screen.queryByTestId("decision-explain-entry-distance")).toBeNull();
   });
 
   it("shows fallback copy when view is empty", () => {

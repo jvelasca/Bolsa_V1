@@ -1,9 +1,12 @@
 import type { Page, Route } from "@playwright/test";
 import {
   E2E_ACCOUNT_ID,
+  E2E_ENTRY_ONLY_INSTRUMENT,
   E2E_INSTRUMENT_ID,
+  E2E_MULTI_POSITION_INSTRUMENTS,
   E2E_SYMBOL,
   E2E_WORKSPACE_ID,
+  mercadoMultiOpenPositions,
   mercadoOhlcvBars,
   mercadoOpenPosition,
   mercadoWorkspaceDocument,
@@ -19,6 +22,17 @@ export function e2eEnabled(): boolean {
 
 export const E2E_SKIP_REASON =
   "Set E2E_RUN=1 (starts Vite + API mocks) or PLAYWRIGHT_BASE_URL (existing server). See e2e/*.spec.ts headers.";
+
+/** Optional workspace document override for multi-instrument mock routes. */
+let mercadoMockWorkspaceDocument: ReturnType<
+  typeof mercadoWorkspaceDocument
+> | null = null;
+
+export function setMercadoMockWorkspaceDocument(
+  document: ReturnType<typeof mercadoWorkspaceDocument> | null,
+): void {
+  mercadoMockWorkspaceDocument = document;
+}
 
 const demoAccount = {
   id: E2E_ACCOUNT_ID,
@@ -59,12 +73,67 @@ function gateMark(mark = "UNAVAILABLE") {
   return { mark, need: 0 };
 }
 
+function mercadoInstrumentCatalog(multi: boolean) {
+  if (multi) {
+    return [
+      ...E2E_MULTI_POSITION_INSTRUMENTS.map((row) => ({
+        id: row.id,
+        symbol: row.symbol,
+        yahooSymbol: row.symbol,
+        name: row.name,
+        exchange: "NASDAQ",
+        currency: "USD",
+        isActive: true,
+        meta: {
+          barCount: 30,
+          lastSync: "2026-08-30T00:00:00.000Z",
+          lastClose: 102,
+          changePct: 2,
+        },
+      })),
+      {
+        id: E2E_ENTRY_ONLY_INSTRUMENT.id,
+        symbol: E2E_ENTRY_ONLY_INSTRUMENT.symbol,
+        yahooSymbol: E2E_ENTRY_ONLY_INSTRUMENT.symbol,
+        name: E2E_ENTRY_ONLY_INSTRUMENT.name,
+        exchange: "NASDAQ",
+        currency: "USD",
+        isActive: true,
+        meta: {
+          barCount: 30,
+          lastSync: "2026-08-30T00:00:00.000Z",
+          lastClose: 120,
+          changePct: 1,
+        },
+      },
+    ];
+  }
+  return [
+    {
+      id: E2E_INSTRUMENT_ID,
+      symbol: E2E_SYMBOL,
+      yahooSymbol: E2E_SYMBOL,
+      name: "Apple E2E",
+      exchange: "NASDAQ",
+      currency: "USD",
+      isActive: true,
+      meta: {
+        barCount: 30,
+        lastSync: "2026-08-30T00:00:00.000Z",
+        lastClose: 102,
+        changePct: 2,
+      },
+    },
+  ];
+}
+
 function routeBody(
   route: Route,
-  opts?: { mercado?: boolean },
+  opts?: { mercado?: boolean; multi?: boolean },
 ): Record<string, unknown> {
   const path = apiPath(route.request().url());
   const mercado = opts?.mercado === true;
+  const multi = opts?.multi === true;
 
   if (path === "/api/auth/status") {
     return { data: { authEnabled: false, authenticated: false } };
@@ -79,14 +148,20 @@ function routeBody(
     return { data: [demoAccount] };
   }
   if (path === "/api/portfolio") {
+    const positions = multi
+      ? mercadoMultiOpenPositions()
+      : mercado
+        ? [mercadoOpenPosition()]
+        : [];
+    const equity = multi ? 103_500 : mercado ? 101_020 : 100_000;
     return {
       data: {
         accountId: E2E_ACCOUNT_ID,
         portfolio: {
           cash: 100_000,
-          totalEquity: mercado ? 101_020 : 100_000,
+          totalEquity: equity,
         },
-        positions: mercado ? [mercadoOpenPosition()] : [],
+        positions,
       },
     };
   }
@@ -112,14 +187,14 @@ function routeBody(
     return { data: [] };
   }
   if (mercado && path.startsWith("/api/workspaces/")) {
-    const doc = mercadoWorkspaceDocument();
+    const doc = mercadoMockWorkspaceDocument ?? mercadoWorkspaceDocument();
     return {
       data: {
-        id: E2E_WORKSPACE_ID,
-        name: "E2E Mercado",
+        id: doc.id || E2E_WORKSPACE_ID,
+        name: doc.name ?? "E2E Mercado",
         isDefault: true,
         updatedAt: doc.updatedAt,
-        document: doc,
+        document: { ...doc, id: doc.id || E2E_WORKSPACE_ID },
         dockLayout: null,
       },
     };
@@ -201,6 +276,30 @@ function routeBody(
     };
   }
   if (path.endsWith("/decision-studies")) {
+    if (multi) {
+      return {
+        data: {
+          accountId: E2E_ACCOUNT_ID,
+          studies: [
+            {
+              decisionId: "dec-e2e-nvda",
+              instrumentId: E2E_ENTRY_ONLY_INSTRUMENT.id,
+              symbol: E2E_ENTRY_ONLY_INSTRUMENT.symbol,
+              hasOperationalPlan: true,
+              tradePlanStatus: "ARMED",
+              studiedAt: "2026-09-02T09:00:00.000Z",
+              entry: 118,
+              stop: 110,
+              target1: 130,
+              target2: 140,
+            },
+          ],
+          total: 1,
+          limit: 200,
+          offset: 0,
+        },
+      };
+    }
     return {
       data: {
         accountId: E2E_ACCOUNT_ID,
@@ -259,60 +358,55 @@ function routeBody(
     return { data: [] };
   }
   if (path === "/api/instruments") {
-    if (mercado) {
-      return {
-        data: [
-          {
-            id: E2E_INSTRUMENT_ID,
-            symbol: E2E_SYMBOL,
-            yahooSymbol: E2E_SYMBOL,
-            name: "Apple E2E",
-            exchange: "NASDAQ",
-            currency: "USD",
-            isActive: true,
-            meta: {
-              barCount: 30,
-              lastSync: "2026-08-30T00:00:00.000Z",
-              lastClose: 102,
-              changePct: 2,
-            },
-          },
-        ],
-      };
+    if (multi || mercado) {
+      return { data: mercadoInstrumentCatalog(multi) };
     }
     return { data: [] };
   }
-  if (mercado && path.endsWith("/ohlcv")) {
+  if ((mercado || multi) && path === "/api/instruments/quotes") {
+    return { data: mercadoInstrumentCatalog(multi) };
+  }
+  if ((mercado || multi) && path.endsWith("/ohlcv")) {
     const bars = mercadoOhlcvBars();
     return {
       data: bars,
       meta: { timeframe: "1d", count: bars.length },
     };
   }
-  if (mercado && path.match(/\/api\/instruments\/[^/]+$/)) {
+  if (
+    (mercado || multi) &&
+    path.match(/\/api\/instruments\/[^/]+$/) &&
+    path !== "/api/instruments/quotes"
+  ) {
+    const id = path.split("/").pop() ?? E2E_INSTRUMENT_ID;
+    const known = [
+      ...E2E_MULTI_POSITION_INSTRUMENTS,
+      E2E_ENTRY_ONLY_INSTRUMENT,
+      { id: E2E_INSTRUMENT_ID, symbol: E2E_SYMBOL, name: "Apple E2E" },
+    ].find((row) => row.id === id);
     return {
       data: {
-        id: E2E_INSTRUMENT_ID,
-        symbol: E2E_SYMBOL,
-        name: "Apple E2E",
+        id: known?.id ?? id,
+        symbol: known?.symbol ?? E2E_SYMBOL,
+        name: known?.name ?? "Apple E2E",
         exchange: "NASDAQ",
         currency: "USD",
       },
     };
   }
-  if (mercado && path.endsWith("/strategy-top")) {
+  if ((mercado || multi) && path.endsWith("/strategy-top")) {
     return { data: null };
   }
-  if (mercado && path.endsWith("/indicators")) {
+  if ((mercado || multi) && path.endsWith("/indicators")) {
     return {
       data: [],
       meta: { timeframe: "1d", count: 0, indicators: [] },
     };
   }
-  if (mercado && path.includes("/instrument-daily-opinions")) {
+  if ((mercado || multi) && path.includes("/instrument-daily-opinions")) {
     return { data: [] };
   }
-  if (mercado && path.endsWith("/data-status")) {
+  if ((mercado || multi) && path.endsWith("/data-status")) {
     return {
       data: {
         instrumentId: E2E_INSTRUMENT_ID,
@@ -333,7 +427,7 @@ function routeBody(
 /** Intercept /api/* so smoke tests run without the Python stack. */
 export async function installApiMocks(
   page: Page,
-  opts?: { mercado?: boolean },
+  opts?: { mercado?: boolean; multi?: boolean },
 ): Promise<void> {
   await page.route(/\/api\//, async (route) => {
     await route.fulfill(jsonResponse(routeBody(route, opts)));
@@ -343,4 +437,10 @@ export async function installApiMocks(
 /** Mercado DECISIÓN + gráfico con posición protegida (GP-E2E-03 / GP-V164-UI-03 mock). */
 export async function installMercadoApiMocks(page: Page): Promise<void> {
   await installApiMocks(page, { mercado: true });
+}
+
+/** Mercado multi-instrumento (≥3 posiciones + Entry-only NVDA). */
+export async function installMercadoMultiApiMocks(page: Page): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  await installApiMocks(page, { mercado: true, multi: true });
 }

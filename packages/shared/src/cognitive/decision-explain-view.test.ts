@@ -127,6 +127,73 @@ describe("buildDecisionExplainView GP-V166-01", () => {
     });
   });
 
+  it("GP-V172-01: score X/10, LONG ≠ COMPRAR, unknown ≠ pass, distancia null sin mark", () => {
+    const view = buildDecisionExplainView({
+      study: armedStudy({ action: "recommend_long", strength: 8.7 }),
+    });
+    expect(view.schemaVersion).toBe("1.1.0");
+    expect(view.score).toEqual({ value: 8.7, label: "8,7/10" });
+    expect(view.thesisDirection).toEqual({
+      action: "recommend_long",
+      label: "LONG",
+    });
+    expect(view.thesisDirection.label).not.toMatch(/COMPRAR|BUY/i);
+    expect(view.authorization.copy).toMatch(/no es autorización/i);
+
+    const byId = Object.fromEntries(view.factors.map((f) => [f.id, f]));
+    expect(byId.tendencia.state).toBe("pass");
+    expect(byId.momentum.state).toBe("unknown");
+    expect(byId.volumen.state).toBe("unknown");
+    expect(byId.regimen.state).toBe("unknown");
+    expect(byId.perfil.state).toBe("unknown");
+    expect(view.factors.filter((f) => f.state === "unknown")).not.toHaveLength(
+      0,
+    );
+    expect(
+      view.factors
+        .filter((f) => f.state === "unknown")
+        .every((f) => f.detail === "sin dato" || f.detail === "neutro"),
+    ).toBe(true);
+
+    expect(view.entryGeometry.currentPrice).toBeNull();
+    expect(view.entryGeometry.distanceAbs).toBeNull();
+    expect(view.entryGeometry.distancePct).toBeNull();
+    expect(view.levels.stop).toBe(408);
+    expect(view.levels.target1).toBe(448);
+    expect(view.levels.target2).toBe(470);
+  });
+
+  it("GP-V172-01: mark produces entryGeometry distance; TA components can pass", () => {
+    const view = buildDecisionExplainView({
+      study: armedStudy({ action: "recommend_long" }),
+      markPrice: 425,
+      taComponents: { momentum: 0.4, volume: 0.2 },
+      regimeHint: "Régimen alcista",
+    });
+    expect(view.entryGeometry.currentPrice).toBe(425);
+    expect(view.entryGeometry.distanceAbs).toBeCloseTo(3.5);
+    const byId = Object.fromEntries(view.factors.map((f) => [f.id, f]));
+    expect(byId.momentum.state).toBe("pass");
+    expect(byId.volumen.state).toBe("pass");
+    expect(byId.regimen.state).toBe("pass");
+    expect(byId.rr.state).toBe("pass");
+    expect(byId.riesgo.state).toBe("pass");
+  });
+
+  it("GP-V172-01: whyNot rr/fit fail closed; blocked risk fails", () => {
+    const view = buildDecisionExplainView({
+      study: armedStudy({ action: "wait" }),
+      whyNot: ["rr", "fit"],
+      entriesBlocked: true,
+    });
+    expect(view.thesisDirection.label).toBe("ESPERAR");
+    expect(view.thesisDirection.label).not.toMatch(/COMPRAR|BUY/i);
+    const byId = Object.fromEntries(view.factors.map((f) => [f.id, f]));
+    expect(byId.rr.state).toBe("fail");
+    expect(byId.perfil.state).toBe("fail");
+    expect(byId.riesgo.state).toBe("fail");
+  });
+
   it("includes fit/mandate policy labels when whyNot codes present", () => {
     const view = buildDecisionExplainView({
       study: armedStudy({ tradePlanStatus: "BLOCKED" }),

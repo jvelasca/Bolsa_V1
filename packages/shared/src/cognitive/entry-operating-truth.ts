@@ -68,6 +68,8 @@ export type BuildEntryOperatingTruthInputV1 = {
   asOf?: string | null;
   /** F8 PAPER AUTO posture — omit Confirm CTA when autoActive. */
   paperAuto?: PaperAutoPostureV1 | null;
+  /** Last close / mark. Omit → plan.currentPrice null. */
+  markPrice?: number | null;
 };
 
 export type EntryOperatingSurfaceSnapshotV1 = {
@@ -105,7 +107,9 @@ export function buildEntryOperatingTruth(
   const { study } = input;
   if (input.hasOpenPosition) return null;
 
-  const plan = buildOperationalPlanFromStudy(study);
+  const plan = buildOperationalPlanFromStudy(study, null, {
+    markPrice: input.markPrice,
+  });
   const phase = resolveMercadoCockpitPhase({
     instrumentId: study.instrumentId,
     inEstudio: input.inEstudio ?? true,

@@ -75,6 +75,8 @@ type OperativaCockpitCardProps = {
   proposePending?: boolean;
   canPropose?: boolean;
   className?: string;
+  /** Last close / mark already in context. Omit → distances hidden. */
+  markPrice?: number | null;
 };
 
 const EXIT_CTA_KINDS = new Set<MesaNextActionKindV1>([
@@ -144,6 +146,7 @@ export function OperativaCockpitCard({
   proposePending,
   canPropose = true,
   className,
+  markPrice,
 }: OperativaCockpitCardProps) {
   const [whyOpen, setWhyOpen] = useState(false);
   const context = useInstrumentOperationalContext(instrumentId);
@@ -167,6 +170,14 @@ export function OperativaCockpitCard({
     reconStatus,
   );
   const positionPov = positionPovResult?.view ?? null;
+  const resolvedMark =
+    (typeof markPrice === "number" && Number.isFinite(markPrice)
+      ? markPrice
+      : null) ??
+    (typeof position?.lastPrice === "number" &&
+    Number.isFinite(position.lastPrice)
+      ? position.lastPrice
+      : null);
   const entryTruth =
     study && phase !== "posicion"
       ? buildEntryOperatingTruth({
@@ -177,6 +188,7 @@ export function OperativaCockpitCard({
           entriesBlocked,
           gateStatus: opinion?.gateStatus ?? null,
           paperAuto,
+          markPrice: resolvedMark,
         })
       : null;
   const positionPot =
@@ -282,6 +294,7 @@ export function OperativaCockpitCard({
             opinion?.asOfBarDate ??
             null,
           source: opinion?.source ?? null,
+          markPrice: resolvedMark,
         })
       : null;
 

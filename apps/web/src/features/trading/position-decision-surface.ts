@@ -75,10 +75,11 @@ export function povOperatingStateHeadline(
     case "RECONCILIATION_ERROR":
       return "Recon no disponible";
     case "T1_READY":
-    case "T2_READY":
     case "PROTECT_REQUIRED":
     case "OPEN_UNPROTECTED":
       return "Requiere atención";
+    case "T2_READY":
+      return "T2 alcanzado";
     case "CLOSED":
       return "Cerrada";
     default:

@@ -77,6 +77,29 @@ function finite(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n);
 }
 
+export type BuildOperationalPlanFromStudyOptsV1 = {
+  /** Mark / last close. Omit → currentPrice null (fail-closed). */
+  markPrice?: number | null;
+};
+
+export type EntryMarkDistanceV1 = {
+  distanceAbs: number | null;
+  distancePct: number | null;
+};
+
+/** Distancia signed mark−entry. Nulls if either missing or entry=0 for pct. */
+export function entryMarkDistance(
+  entry: number | null | undefined,
+  markPrice: number | null | undefined,
+): EntryMarkDistanceV1 {
+  if (!finite(entry) || !finite(markPrice)) {
+    return { distanceAbs: null, distancePct: null };
+  }
+  const distanceAbs = markPrice - entry;
+  const distancePct = entry === 0 ? null : (distanceAbs / entry) * 100;
+  return { distanceAbs, distancePct };
+}
+
 function targetTouchedByPrice(
   isShort: boolean,
   price: number | null,
@@ -194,6 +217,7 @@ function projectTrailing(input: {
 export function buildOperationalPlanFromStudy(
   study: DecisionJournalStudyViewV1 | null | undefined,
   tradePlan?: TradePlanV1 | null,
+  opts?: BuildOperationalPlanFromStudyOptsV1,
 ): OperationalPlanViewV1 {
   const hasPlan =
     study?.hasOperationalPlan === true ||
@@ -242,7 +266,7 @@ export function buildOperationalPlanFromStudy(
     riskR:
       (finite(tradePlan?.initialRiskR) ? tradePlan!.initialRiskR! : null) ??
       (finite(study?.initialRiskR) ? study!.initialRiskR! : null),
-    currentPrice: null,
+    currentPrice: finite(opts?.markPrice) ? opts!.markPrice! : null,
     unrealizedR: null,
     ...EMPTY_TRAIL,
     exitAuthorityHint: hasPlan

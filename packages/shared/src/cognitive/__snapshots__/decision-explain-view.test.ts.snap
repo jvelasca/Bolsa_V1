@@ -2,6 +2,12 @@
 
 exports[`sameDecisionExplainAcrossSurfaces GP-V166-04 > same fixture → same explain view on mercado/hoy/journal/operaciones 1`] = `
 {
+  "authorization": {
+    "copy": "La tesis no es autorización ni orden. Ranking ≠ BUY.",
+    "entriesBlocked": true,
+    "executionAllowed": null,
+    "gateStatus": "VETO",
+  },
   "conditions": {
     "entryCondition": "Esperar confirmación",
     "phase": "Bloqueada",
@@ -16,14 +22,74 @@ exports[`sameDecisionExplainAcrossSurfaces GP-V166-04 > same fixture → same ex
       },
     ],
   },
+  "entryGeometry": {
+    "currentPrice": null,
+    "distanceAbs": null,
+    "distancePct": null,
+    "entry": 421.5,
+  },
+  "factors": [
+    {
+      "detail": "Alcista",
+      "id": "tendencia",
+      "label": "Tendencia",
+      "state": "pass",
+    },
+    {
+      "detail": "sin dato",
+      "id": "momentum",
+      "label": "Momentum",
+      "state": "unknown",
+    },
+    {
+      "detail": "sin dato",
+      "id": "volumen",
+      "label": "Volumen",
+      "state": "unknown",
+    },
+    {
+      "detail": "sin dato",
+      "id": "regimen",
+      "label": "Régimen",
+      "state": "unknown",
+    },
+    {
+      "detail": "2.0:1",
+      "id": "rr",
+      "label": "R/R",
+      "state": "pass",
+    },
+    {
+      "detail": "Entradas bloqueadas",
+      "id": "riesgo",
+      "label": "Riesgo",
+      "state": "fail",
+    },
+    {
+      "detail": "sin dato",
+      "id": "perfil",
+      "label": "Perfil",
+      "state": "unknown",
+    },
+  ],
   "invalidators": [
     "Cierre < 408.00",
   ],
+  "levels": {
+    "entry": 421.5,
+    "stop": 408,
+    "target1": 448,
+    "target2": 470,
+  },
   "policy": {
     "entriesBlocked": true,
     "fitLabel": null,
     "gateStatus": "VETO",
     "mandateLabel": null,
+  },
+  "score": {
+    "label": "7,5/10",
+    "value": 7.5,
   },
   "signals": {
     "consensus": [
@@ -39,10 +105,15 @@ exports[`sameDecisionExplainAcrossSurfaces GP-V166-04 > same fixture → same ex
       "Tendencia alcista CP",
     ],
   },
+  "symbol": "NVDA",
   "thesis": {
     "opinion": "Alcista",
     "strength": "Fuerte",
     "summary": "Breakout con volumen en resistencia",
+  },
+  "thesisDirection": {
+    "action": null,
+    "label": null,
   },
   "traceability": {
     "asOf": "2026-09-02T08:00:00.000Z",

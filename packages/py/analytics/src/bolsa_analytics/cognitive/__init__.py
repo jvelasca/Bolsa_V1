@@ -22,6 +22,9 @@ from bolsa_analytics.cognitive.confidence_lifecycle import (
     apply_time_decay,
     open_confidence_state,
 )
+from bolsa_analytics.cognitive.decision_explain_view import (
+    build_decision_explain_view,
+)
 from bolsa_analytics.cognitive.decision_memory import DecisionMemoryEntry, build_memory_entry
 from bolsa_analytics.cognitive.decision_outcome import (
     OUTCOME_CRITERIA_VERSION,
@@ -397,6 +400,7 @@ __all__ = [
     "attach_execution_to_payload",
     "attach_outcome_to_payload",
     "build_auto_session",
+    "build_decision_explain_view",
     "build_decision_replay",
     "build_edge_report",
     "build_effectiveness_summary",

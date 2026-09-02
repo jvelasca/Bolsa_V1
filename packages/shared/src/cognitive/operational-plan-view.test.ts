@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOperationalPlanFromPosition,
   buildOperationalPlanFromStudy,
+  entryMarkDistance,
   isTrailingStopApplied,
   targetProgressHint,
 } from "./operational-plan-view.js";
@@ -39,6 +40,28 @@ describe("operational-plan-view", () => {
     expect(plan.stopInicial).toBe(94);
     expect(plan.target1).toBe(112);
     expect(plan.target2).toBe(124);
+    expect(plan.currentPrice).toBeNull();
+  });
+
+  it("GP-V172-03: markPrice threads into study plan currentPrice", () => {
+    const plan = buildOperationalPlanFromStudy(
+      {
+        hasOperationalPlan: true,
+        tradePlanStatus: "ARMED",
+        entry: 100,
+        stop: 94,
+        target1: 112,
+        target2: 124,
+        symbol: "NVDA",
+      } as DecisionJournalStudyViewV1,
+      null,
+      { markPrice: 101.5 },
+    );
+    expect(plan.currentPrice).toBe(101.5);
+    expect(entryMarkDistance(plan.entry, plan.currentPrice)).toEqual({
+      distanceAbs: 1.5,
+      distancePct: 1.5,
+    });
   });
 
   it("position uses currentStop as stop vigente", () => {

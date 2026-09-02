@@ -133,6 +133,27 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     queryFn: api.getPortfolio,
     staleTime: 15_000,
   });
+  const instrumentsCatalogQuery = useQuery({
+    queryKey: ["instruments"],
+    queryFn: api.getInstruments,
+    enabled: false,
+    staleTime: 60_000,
+  });
+  const markPrice = useMemo(() => {
+    if (!instrumentId) return null;
+    const fromCatalog = instrumentsCatalogQuery.data?.data.find(
+      (item) => item.id === instrumentId,
+    )?.meta.lastClose;
+    if (typeof fromCatalog === "number" && Number.isFinite(fromCatalog)) {
+      return fromCatalog;
+    }
+    const fromPosition = (portfolioQuery.data?.data.positions ?? []).find(
+      (row) => row.instrumentId === instrumentId,
+    )?.lastPrice;
+    return typeof fromPosition === "number" && Number.isFinite(fromPosition)
+      ? fromPosition
+      : null;
+  }, [instrumentId, instrumentsCatalogQuery.data, portfolioQuery.data]);
   const positionOpen = useMemo(() => {
     if (!instrumentId) return false;
     const positions = portfolioQuery.data?.data.positions ?? [];
@@ -339,6 +360,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         <OperativaCockpitCard
           instrumentId={instrumentId}
           symbol={symbol}
+          markPrice={markPrice}
           opinion={activeOpinion ?? null}
           opinionLoading={opinionsQuery.isLoading || scoresLoading}
           canPropose={

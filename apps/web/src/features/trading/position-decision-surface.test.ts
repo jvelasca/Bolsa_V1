@@ -60,6 +60,7 @@ describe("position-decision-surface GP-V161-02/04/05", () => {
   it("headlines are human-readable and do not collapse T2/DRIFT", () => {
     expect(povOperatingStateHeadline("PROTECTED")).toBe("Protegida");
     expect(povOperatingStateHeadline("T2_EXECUTED")).toBe("T2 ejecutado");
+    expect(povOperatingStateHeadline("T2_READY")).toBe("T2 alcanzado");
     expect(povOperatingStateHeadline("T1_READY")).toBe("Requiere atención");
     expect(povOperatingStateHeadline("EXIT_REQUIRED")).toBe("Salida necesaria");
     expect(povOperatingStateHeadline("RECONCILIATION_DRIFT")).toBe(

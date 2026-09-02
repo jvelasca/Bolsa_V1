@@ -92,6 +92,26 @@ function formatRR(value: number | null | undefined): string {
   return `${value.toFixed(1)}:1`;
 }
 
+function formatDistance(
+  entry: number | null | undefined,
+  mark: number | null | undefined,
+): string | null {
+  if (
+    entry == null ||
+    mark == null ||
+    !Number.isFinite(entry) ||
+    !Number.isFinite(mark)
+  ) {
+    return null;
+  }
+  const delta = mark - entry;
+  const sign = delta > 0 ? "+" : "";
+  const pct = entry === 0 ? null : (delta / entry) * 100;
+  const pctPart =
+    pct != null && Number.isFinite(pct) ? ` (${sign}${pct.toFixed(2)}%)` : "";
+  return `${sign}${delta.toFixed(2)}${pctPart}`;
+}
+
 function formatOperatingStatePhrase(
   state: PositionOperationalStateV1,
   portfolioReconStatus?: string | null,
@@ -103,7 +123,7 @@ function formatOperatingStatePhrase(
       : null;
   if (decision) {
     if (state === "T2_READY" && decision.nextEvent === "T2") {
-      return formatPositionDecisionPhrase(decision);
+      return `${formatPositionDecisionPhrase(decision)} · mesa MONITOR.`;
     }
     if (state === "T2_EXECUTED") {
       return "T2 ejecutado · posición parcial.";
@@ -118,7 +138,7 @@ function formatOperatingStatePhrase(
 
   switch (state) {
     case "T2_READY":
-      return "T2 disparado · pendiente de ejecutar.";
+      return "T2 alcanzado · mesa MONITOR.";
     case "T2_EXECUTED":
       return "T2 ejecutado · posición parcial.";
     case "T1_READY":
@@ -257,6 +277,28 @@ function EntryCompactBody({
                 {formatEntryLevel(plan.entry)}
               </dd>
             </div>
+            {plan.currentPrice != null && Number.isFinite(plan.currentPrice) ? (
+              <div className="flex justify-between gap-2">
+                <dt>Precio actual</dt>
+                <dd
+                  className="font-medium tabular-nums text-foreground"
+                  data-testid="entry-decision-mark"
+                >
+                  {formatEntryLevel(plan.currentPrice)}
+                </dd>
+              </div>
+            ) : null}
+            {formatDistance(plan.entry, plan.currentPrice) ? (
+              <div className="flex justify-between gap-2">
+                <dt>Distancia</dt>
+                <dd
+                  className="font-medium tabular-nums text-foreground"
+                  data-testid="entry-decision-distance"
+                >
+                  {formatDistance(plan.entry, plan.currentPrice)}
+                </dd>
+              </div>
+            ) : null}
             <div className="flex justify-between gap-2">
               <dt>Stop</dt>
               <dd

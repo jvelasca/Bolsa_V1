@@ -223,4 +223,12 @@ describe("GP-V162-06 cross-surface EntryOperationalView facts", () => {
     expect(snap.phase).toBe("preparada");
     expect(snap.ctaLabel).toBe("Preparar operación");
   });
+
+  it("GP-V172-03: markPrice is identical across surfaces", () => {
+    const input = { study: armedStudy(), markPrice: 425 };
+    const mercado = buildEntryOperatingTruth(input);
+    const hoy = buildEntryOperatingTruth(input);
+    expect(mercado?.plan.currentPrice).toBe(425);
+    expect(hoy?.plan.currentPrice).toBe(425);
+  });
 });
