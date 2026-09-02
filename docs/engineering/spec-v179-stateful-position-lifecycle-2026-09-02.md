@@ -1,8 +1,8 @@
 # Spec — V1.79 Stateful Position Lifecycle Certification (mock)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock locales; **sin stamp CI GREEN**).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock locales · commit `8228d1c3`; **sin stamp CI GREEN**).  
 > **Padre:** [`spec-v178-session-golden-mercado-exit-2026-09-02.md`](./spec-v178-session-golden-mercado-exit-2026-09-02.md) · relevo [`traspaso-relevo-v1-78-session-golden-mercado-exit-2026-09-02.md`](./traspaso-relevo-v1-78-session-golden-mercado-exit-2026-09-02.md).  
-> **Partida tip:** **V1.78** Session Golden MERCADO→EXIT [`e1dcfba8`](https://github.com/jvelasca/Bolsa_V1/commit/e1dcfba8) (docs stamp `22871141`). **No** LIVE.
+> **Partida tip:** **V1.78** Session Golden MERCADO→EXIT [`e1dcfba8`](https://github.com/jvelasca/Bolsa_V1/commit/e1dcfba8) (docs stamp `22871141`). **Commit:** [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3). **No** LIVE.
 
 Certificación **stateful mock E2E**: un único test muta el mock en caliente sobre **la misma identidad AAPL**. No es el golden pytest Paper Desk (V1.53/V1.55) ni un reloj de sesión de producción. Cierra la brecha de V1.78: fixtures independientes ≠ lifecycle.
 

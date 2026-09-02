@@ -1,6 +1,6 @@
 # Relevo — V1.79 Stateful Position Lifecycle Certification
 
-> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + E2E mock locales) · **Auditor:** [`arranque-auditor-v1-79-stateful-position-lifecycle-2026-09-02.md`](./arranque-auditor-v1-79-stateful-position-lifecycle-2026-09-02.md) · **Partida:** V1.78 `e1dcfba8` · **sin stamp CI GREEN**
+> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + E2E mock locales) · **Auditor:** [`arranque-auditor-v1-79-stateful-position-lifecycle-2026-09-02.md`](./arranque-auditor-v1-79-stateful-position-lifecycle-2026-09-02.md) · **Partida:** V1.78 `e1dcfba8` · **Commit:** [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3) (no stamp CI GREEN)
 
 ## Hecho
 
@@ -18,4 +18,4 @@
 
 ## Next candidato
 
-**V1.80** — a decidir (CI GREEN del tip · T2 POV · o split `fixtures.ts`). **NO LIVE**.
+**V1.80** CI GREEN Tip Honesty — **CERRADA** ([relevo V1.80](./traspaso-relevo-v1-80-ci-green-tip-honesty-2026-09-02.md)) (código + pre-flight local; **sin stamp CI GREEN remoto** until Actions). **NO LIVE**.
