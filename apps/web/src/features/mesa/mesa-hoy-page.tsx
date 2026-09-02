@@ -175,18 +175,10 @@ export function MesaHoyPage() {
   }, [estudioUniverseUnavailable, universeListQuery.data, estudioMembers]);
 
   const dailyOpsQuery = useQuery({
-    queryKey: [
-      "daily-ops-report",
-      effectiveAccountId,
-      "mesa-hoy",
-      estudioInstrumentIds.join(","),
-    ],
+    queryKey: ["paper-desk-daily-report", effectiveAccountId, "mesa-hoy"],
     queryFn: () =>
-      api.getDailyOpsReport(effectiveAccountId!, {
+      api.getPaperDeskDailyReport(effectiveAccountId!, {
         asOf: todayIso(),
-        instrumentIds: estudioInstrumentIds.length
-          ? estudioInstrumentIds
-          : undefined,
       }),
     enabled: Boolean(effectiveAccountId),
     staleTime: 60_000,

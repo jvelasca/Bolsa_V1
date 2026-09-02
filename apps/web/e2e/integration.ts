@@ -379,3 +379,76 @@ export async function seedMercadoBrowserState(
     { accountId, workspaceId, chartPersistBackup },
   );
 }
+
+export const E2E_HOY_ACCOUNT_PREFIX = "e2e-v168";
+
+export type HoyIntegrationFixture = {
+  accountId: string;
+  hasAutoDesk: boolean;
+  entryProposed: number;
+};
+
+/** Cuenta aislada para Hoy / Paper Autonomous Desk E2E. */
+export async function ensureHoyIntegrationFixture(
+  request: APIRequestContext,
+  baseURL: string,
+): Promise<HoyIntegrationFixture> {
+  assertE2eDatabaseIsolation();
+
+  const suffix = randomUUID().slice(0, 8);
+  const accountRes = await request.post(
+    new URL("/api/accounts", baseURL).toString(),
+    {
+      data: {
+        name: `${E2E_HOY_ACCOUNT_PREFIX}-${suffix}`,
+        currency: "EUR",
+        initialDeposit: 100_000,
+      },
+    },
+  );
+  if (!accountRes.ok()) {
+    throw new Error(
+      `POST /api/accounts failed (${accountRes.status()}): ${await accountRes.text()}`,
+    );
+  }
+  const accountId = (await accountRes.json()).data.id as string;
+
+  const reportRes = await request.get(
+    new URL(
+      `/api/paper-desk/daily-report?accountId=${encodeURIComponent(accountId)}`,
+      baseURL,
+    ).toString(),
+    { headers: { "X-Account-Id": accountId } },
+  );
+  if (!reportRes.ok()) {
+    throw new Error(
+      `GET /paper-desk/daily-report failed (${reportRes.status()}): ${await reportRes.text()}`,
+    );
+  }
+  const autoDesk = (await reportRes.json()).data?.autoDesk as
+    | { entry?: { proposed?: number } }
+    | undefined;
+
+  return {
+    accountId,
+    hasAutoDesk: Boolean(autoDesk),
+    entryProposed: autoDesk?.entry?.proposed ?? 0,
+  };
+}
+
+/** Seed cuenta activa antes de navegar a /mesa. */
+export async function seedHoyBrowserState(
+  page: Page,
+  opts?: { accountId?: string },
+): Promise<void> {
+  const accountId = opts?.accountId ?? E2E_ACCOUNT_ID;
+  await page.addInitScript(
+    ({ accountId }) => {
+      localStorage.setItem(
+        "bolsa-active-account",
+        JSON.stringify({ state: { activeAccountId: accountId }, version: 0 }),
+      );
+    },
+    { accountId },
+  );
+}

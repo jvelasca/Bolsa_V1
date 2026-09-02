@@ -1660,6 +1660,35 @@ export const api = {
       }),
     ),
 
+  /**
+   * V1.47 / V1.68 — DailyOpsReport + autoDesk (PaperDeskCycle dry-run evaluate).
+   * Hoy usa este path para Operating Desk; no muta ledger.
+   */
+  getPaperDeskDailyReport: (
+    accountId: string,
+    opts?: { asOf?: string; templateId?: string },
+  ) =>
+    call<import("@bolsa/shared").DailyOpsReportResponseV1>(async () => {
+      const params = new URLSearchParams({ accountId });
+      if (opts?.asOf) params.set("asOf", opts.asOf);
+      if (opts?.templateId) params.set("templateId", opts.templateId);
+      const response = await fetch(
+        `${API_URL}/api/paper-desk/daily-report?${params.toString()}`,
+        {
+          credentials: "include",
+          headers: {
+            "X-Account-Id": accountId,
+            Accept: "application/json",
+          },
+        },
+      );
+      const body = (await response.json().catch(() => null)) as unknown;
+      if (!response.ok) {
+        return { data: undefined, error: body, response };
+      }
+      return { data: body, error: undefined, response };
+    }),
+
   getAccountSummaries: (type?: string) =>
     call<{ data: import("@bolsa/shared").AccountSummaryDto[] }>(() =>
       client.GET("/api/accounts/summaries", {

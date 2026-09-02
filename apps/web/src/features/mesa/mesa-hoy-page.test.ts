@@ -280,6 +280,7 @@ describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
     expect(src).toMatch(/<DailyDeskInbox/);
     expect(src).toMatch(/build(Daily|Operating)DeskInbox/);
     expect(src).toMatch(/buildOperatingDeskInbox|buildDailyDeskInbox/);
+    expect(src).toMatch(/getPaperDeskDailyReport/);
     expect(src).toMatch(/autoDesk/);
     expect(src).toMatch(/studiesByInstrument/);
     expect(src).toMatch(/confirmQueueInstrumentIds/);
