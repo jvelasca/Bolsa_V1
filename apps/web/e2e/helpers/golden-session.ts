@@ -1,5 +1,5 @@
 /**
- * V1.78 golden stages + V1.79 stateful lifecycle (same identity AAPL).
+ * V1.78 golden stages + V1.79 stateful lifecycle + V1.81 T2 POV (same identity AAPL).
  */
 import { buildPaperDailyReport } from "@bolsa/shared";
 import {
@@ -13,13 +13,15 @@ import {
 } from "./ids";
 import { mercadoOpenPosition, type MercadoOpenPosition } from "./mercado";
 
-/** V1.78 stages + V1.79 lifecycle. `clean` unchanged for GP-V178. */
+/** V1.78–V1.79 + V1.81 T2. `clean` unchanged for GP-V178. */
 export type E2eGoldenPositionStage =
   | "clean"
   | "candidate"
   | "open"
   | "t1_ready"
   | "t1_executed"
+  | "t2_ready"
+  | "t2_executed"
   | "trailing"
   | "exit_required"
   | "closed";
@@ -27,8 +29,11 @@ export type E2eGoldenPositionStage =
 const T1_AT = "2026-09-02T11:00:00.000Z";
 const TRAIL_AT = "2026-09-02T12:00:00.000Z";
 const T1_EXEC_AT = "2026-09-02T11:30:00.000Z";
+const T2_AT = "2026-09-02T12:15:00.000Z";
+const T2_EXEC_AT = "2026-09-02T12:45:00.000Z";
 const CLOSED_AT = "2026-09-02T15:00:00.000Z";
 const MOCK_T1_FILL_ID = "fill-mock-t1";
+const MOCK_T2_FILL_ID = "fill-mock-t2";
 
 export function lifecycleOpenPosition(): MercadoOpenPosition {
   const pos = mercadoOpenPosition({
@@ -210,6 +215,129 @@ export function applyGoldenPositionStage(
               kind: "T1_EXECUTED",
               at: T1_EXEC_AT,
               fillId: MOCK_T1_FILL_ID,
+            },
+          ],
+          quantity: birthQty,
+          remainingQuantity: remaining,
+        },
+      },
+    };
+  }
+
+  // V1.81 — T2 after T1; primaryAction MONITOR (UI Mantener) intentional.
+  if (stage === "t2_ready") {
+    const remaining = remainingAfterT1;
+    const lastPrice = position.lastPrice;
+    return {
+      ...position,
+      quantity: remaining,
+      marketValue: lastPrice * remaining,
+      unrealizedPnl: (lastPrice - position.avgCost) * remaining,
+      unrealizedPnlPct:
+        ((lastPrice - position.avgCost) / position.avgCost) * 100,
+      operational: {
+        ...position.operational,
+        status: "PARTIAL",
+        remainingQuantity: remaining,
+        target1Leg: {
+          status: "executed",
+          at: T1_EXEC_AT,
+          fillId: MOCK_T1_FILL_ID,
+        },
+        target2Leg: { status: "triggered", at: T2_AT },
+        revisions: [],
+        operationalView: {
+          positionId: position.operational.operationalView.positionId,
+          instrumentId: position.instrumentId,
+          tradePlanId: position.operational.tradePlanId,
+          decisionId,
+          lineageCollapsed: false,
+          operatingState: "T2_READY",
+          primaryAction: "MONITOR",
+          levels: {
+            ...levels,
+            unrealizedR: 1.0,
+          },
+          t1: {
+            status: "executed",
+            at: T1_EXEC_AT,
+            fillId: MOCK_T1_FILL_ID,
+          },
+          t2: { status: "triggered", at: T2_AT },
+          stopHistory: [],
+          events: [
+            {
+              kind: "T1_EXECUTED",
+              at: T1_EXEC_AT,
+              fillId: MOCK_T1_FILL_ID,
+            },
+            { kind: "T2_TRIGGERED", at: T2_AT },
+          ],
+          quantity: birthQty,
+          remainingQuantity: remaining,
+        },
+      },
+    };
+  }
+
+  if (stage === "t2_executed") {
+    const remaining = 2;
+    const lastPrice = position.lastPrice;
+    return {
+      ...position,
+      quantity: remaining,
+      marketValue: lastPrice * remaining,
+      unrealizedPnl: (lastPrice - position.avgCost) * remaining,
+      unrealizedPnlPct:
+        ((lastPrice - position.avgCost) / position.avgCost) * 100,
+      operational: {
+        ...position.operational,
+        status: "PARTIAL",
+        remainingQuantity: remaining,
+        target1Leg: {
+          status: "executed",
+          at: T1_EXEC_AT,
+          fillId: MOCK_T1_FILL_ID,
+        },
+        target2Leg: {
+          status: "executed",
+          at: T2_EXEC_AT,
+          fillId: MOCK_T2_FILL_ID,
+        },
+        revisions: [],
+        operationalView: {
+          positionId: position.operational.operationalView.positionId,
+          instrumentId: position.instrumentId,
+          tradePlanId: position.operational.tradePlanId,
+          decisionId,
+          lineageCollapsed: false,
+          operatingState: "T2_EXECUTED",
+          primaryAction: "MONITOR",
+          levels: {
+            ...levels,
+            unrealizedR: 1.2,
+          },
+          t1: {
+            status: "executed",
+            at: T1_EXEC_AT,
+            fillId: MOCK_T1_FILL_ID,
+          },
+          t2: {
+            status: "executed",
+            at: T2_EXEC_AT,
+            fillId: MOCK_T2_FILL_ID,
+          },
+          stopHistory: [],
+          events: [
+            {
+              kind: "T1_EXECUTED",
+              at: T1_EXEC_AT,
+              fillId: MOCK_T1_FILL_ID,
+            },
+            {
+              kind: "T2_EXECUTED",
+              at: T2_EXEC_AT,
+              fillId: MOCK_T2_FILL_ID,
             },
           ],
           quantity: birthQty,

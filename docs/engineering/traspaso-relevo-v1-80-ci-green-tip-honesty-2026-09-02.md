@@ -27,4 +27,4 @@
 
 ## Next candidato
 
-Siguiente producto a decidir (T2 POV · fixtures split · etc.). **NO LIVE**.
+**V1.81** T2 POV Stages — **ABIERTA** ([relevo V1.81](./traspaso-relevo-v1-81-t2-pov-stages-2026-09-02.md) · [spec](./spec-v181-t2-pov-stages-2026-09-02.md)). Mock E2E `t2_ready`/`t2_executed` · GP-V181-01 · filtro `+gp-v181`. **NO LIVE**.
