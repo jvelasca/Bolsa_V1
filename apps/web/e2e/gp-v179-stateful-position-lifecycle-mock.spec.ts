@@ -24,9 +24,12 @@ import {
   E2E_LIFECYCLE_DECISION_ID,
   E2E_LIFECYCLE_POSITION_ID,
   E2E_SYMBOL,
+  assertClosedLineage,
   assertClosedPositionTruth,
   assertEntryCandidateTruth,
+  assertLifecycleFinancialInvariants,
   assertPositionCertification,
+  buildLifecycleSnapshot,
   lifecycleInstrumentSlice,
   mercadoWorkspaceDocument,
   seedMercadoBrowserState,
@@ -237,13 +240,25 @@ test.describe("GP-V179 — Stateful position lifecycle mock", () => {
         positions?: Array<{
           id: string;
           quantity: number;
+          avgCost?: number;
+          lastPrice?: number;
+          marketValue?: number;
+          unrealizedPnl?: number;
+          unrealizedPnlPct?: number;
           operational?: {
             remainingQuantity?: number;
+            unrealizedR?: number;
             operationalView?: {
               positionId?: string;
               decisionId?: string | null;
               remainingQuantity?: number;
               operatingState?: string;
+              quantity?: number;
+              t1?: { status?: string } | null;
+              t2?: { status?: string } | null;
+              stopHistory?: unknown[];
+              events?: Array<{ kind?: string }>;
+              levels?: { unrealizedR?: number };
             };
           };
         }>;
@@ -265,7 +280,20 @@ test.describe("GP-V179 — Stateful position lifecycle mock", () => {
     expect(closed!.operational?.operationalView?.decisionId).toBe(
       E2E_LIFECYCLE_DECISION_ID,
     );
-    expect(portfolioJson.data?.portfolio?.totalEquity).toBe(101_500);
+    assertClosedLineage(closed!.operational?.operationalView ?? {}, "trail");
+    assertLifecycleFinancialInvariants({
+      quantity: closed!.quantity,
+      avgCost: closed!.avgCost ?? 100,
+      lastPrice: closed!.lastPrice ?? 0,
+      marketValue: closed!.marketValue ?? 0,
+      unrealizedPnl: closed!.unrealizedPnl ?? 0,
+      unrealizedPnlPct: closed!.unrealizedPnlPct ?? 0,
+      operational: closed!.operational,
+    });
+    expect(portfolioJson.data?.portfolio?.totalEquity).toBe(
+      buildLifecycleSnapshot({ stage: "closed", lineagePath: "trail" })
+        .totalEquity,
+    );
 
     await focusAapl(page);
     await assertClosedPositionTruth(page, {

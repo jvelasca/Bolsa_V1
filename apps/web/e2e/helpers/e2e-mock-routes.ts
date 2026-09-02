@@ -14,10 +14,10 @@ import {
   mercadoOpenPosition,
   mercadoWorkspaceDocument,
   applyGoldenPositionStage,
+  buildLifecycleSnapshot,
   lifecycleDailyOpsEnvelope,
   lifecycleDecisionStudy,
   lifecycleJournalEntry,
-  lifecycleOpenPosition,
   paperAutonomousDayDailyOpsEnvelope,
   paperAutonomousDayT1Position,
   staleNoExecuteDailyOpsEnvelope,
@@ -170,15 +170,14 @@ export function routeBody(
   }
   if (path === "/api/portfolio") {
     const stage = e2eMockRuntime.positionStage;
+    const lifecycleSnap = lifecycleDesk
+      ? buildLifecycleSnapshot({
+          stage,
+          lineagePath: e2eMockRuntime.lineagePath,
+        })
+      : null;
     const lifecyclePositions =
-      stage === "candidate"
-        ? []
-        : [
-            applyGoldenPositionStage(
-              lifecycleOpenPosition(),
-              stage === "clean" ? "open" : stage,
-            ),
-          ];
+      lifecycleSnap?.position != null ? [lifecycleSnap.position] : [];
     const positions = lifecycleDesk
       ? lifecyclePositions
       : deskDay
@@ -186,7 +185,11 @@ export function routeBody(
         : multi
           ? mercadoMultiOpenPositions().map((pos, index) =>
               index === 0
-                ? applyGoldenPositionStage(pos, e2eMockRuntime.positionStage)
+                ? applyGoldenPositionStage(
+                    pos,
+                    e2eMockRuntime.positionStage,
+                    e2eMockRuntime.lineagePath,
+                  )
                 : pos,
             )
           : mercado
@@ -194,13 +197,12 @@ export function routeBody(
                 applyGoldenPositionStage(
                   mercadoOpenPosition(),
                   e2eMockRuntime.positionStage,
+                  e2eMockRuntime.lineagePath,
                 ),
               ]
             : [];
-    const equity = lifecycleDesk
-      ? stage === "closed"
-        ? 101_500
-        : 100_000
+    const equity = lifecycleSnap
+      ? lifecycleSnap.totalEquity
       : deskDay
         ? 101_060
         : multi
@@ -212,7 +214,7 @@ export function routeBody(
       data: {
         accountId: E2E_ACCOUNT_ID,
         portfolio: {
-          cash: 100_000,
+          cash: lifecycleSnap?.cash ?? 100_000,
           totalEquity: equity,
         },
         positions,
@@ -370,8 +372,12 @@ export function routeBody(
   }
   if (path === "/api/paper-desk/daily-report") {
     if (lifecycleDesk) {
+      const snap = buildLifecycleSnapshot({
+        stage: e2eMockRuntime.positionStage,
+        lineagePath: e2eMockRuntime.lineagePath,
+      });
       return {
-        data: lifecycleDailyOpsEnvelope(E2E_ACCOUNT_ID, lifecycleStale),
+        data: lifecycleDailyOpsEnvelope(E2E_ACCOUNT_ID, lifecycleStale, snap),
       };
     }
     if (hoyStale) {
@@ -383,21 +389,28 @@ export function routeBody(
     return { data: { autoDesk: null } };
   }
   if (path.endsWith("/summary")) {
+    const lifecycleSnap = lifecycleDesk
+      ? buildLifecycleSnapshot({
+          stage: e2eMockRuntime.positionStage,
+          lineagePath: e2eMockRuntime.lineagePath,
+        })
+      : null;
     return {
       data: {
         accountId: E2E_ACCOUNT_ID,
-        cash: 100_000,
-        totalEquity: deskDay || lifecycleDesk ? 101_060 : 100_000,
-        openPositions: deskDay
-          ? 1
-          : lifecycleDesk
-            ? e2eMockRuntime.positionStage === "candidate" ||
-              e2eMockRuntime.positionStage === "closed"
-              ? 0
-              : 1
+        cash: lifecycleSnap?.cash ?? 100_000,
+        totalEquity: lifecycleSnap
+          ? lifecycleSnap.totalEquity
+          : deskDay
+            ? 101_060
+            : 100_000,
+        openPositions: lifecycleSnap
+          ? lifecycleSnap.openPositions
+          : deskDay
+            ? 1
             : 0,
-        dayPnl: deskDay ? 60 : 0,
-        dayPnlPct: deskDay ? 0.06 : 0,
+        dayPnl: lifecycleSnap ? lifecycleSnap.dayPnl : deskDay ? 60 : 0,
+        dayPnlPct: lifecycleSnap ? lifecycleSnap.dayPnlPct : deskDay ? 0.06 : 0,
       },
     };
   }

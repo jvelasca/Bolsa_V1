@@ -149,12 +149,12 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @bolsa/web exec playwright install --with-deps chromium
 
-      # V1.81 — tip honesty: gp-e2e + certification mocks V1.73–V1.81 (no PG · no LIVE)
-      - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v181)
+      # V1.83 — tip honesty: gp-e2e + certification mocks V1.73–V1.83 (no PG · no LIVE)
+      - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v183)
         working-directory: apps/web
         env:
           E2E_RUN: '1'
-        run: pnpm e2e -- "gp-e2e|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181"
+        run: pnpm e2e -- "gp-e2e|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183"
 
   playwright-integrated:
     name: playwright (integrated E2E, opt-in)

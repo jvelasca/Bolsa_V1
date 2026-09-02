@@ -8,4 +8,5 @@ export * from "./helpers/database";
 export * from "./helpers/paper-day";
 export * from "./helpers/stale-unknown";
 export * from "./helpers/golden-session";
+export * from "./helpers/lifecycle-snapshot";
 export * from "./helpers/assertions";

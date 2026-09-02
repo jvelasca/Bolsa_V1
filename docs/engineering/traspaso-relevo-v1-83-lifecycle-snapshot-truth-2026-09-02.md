@@ -1,0 +1,43 @@
+# Relevo — V1.83 Lifecycle Snapshot Truth (mock E2E)
+
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA (código + E2E mock locales)** · stamp CI GREEN remoto **PENDIENTE** tag `v1.83-beta`.  
+> **Auditor:** [`arranque-auditor-v1-83-lifecycle-snapshot-truth-2026-09-02.md`](./arranque-auditor-v1-83-lifecycle-snapshot-truth-2026-09-02.md).  
+> **Partida:** V1.82 [`d0ccf235`](https://github.com/jvelasca/Bolsa_V1/commit/d0ccf235) · tag [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) · CI GREEN [run 33651647262](https://github.com/jvelasca/Bolsa_V1/actions/runs/33651647262).
+
+## Hecho
+
+- Respuesta auditor V1.82 (9,75/10 · P1 lineage / invariantes / snapshot)
+- `helpers/lifecycle-snapshot.ts`: SoT · `lineagePath` trail vs T2 · invariantes qty/PnL/R
+- `EXIT_REQUIRED` / `CLOSED` heredan prefijo (T1 + trail o T2); CLOSED añade `POSITION_CLOSED`
+- Rutas lifecycle: portfolio / summary / paper-desk desde el mismo snapshot (`totalEquity` único)
+- GP-V183-01 trail · GP-V183-02 T2 CLOSED
+- GP-V179/V181 CLOSED lineage; T2_EXECUTED HUD R = fórmula (0.4)
+- Filtro `playwright-mock` `+gp-v183`
+- Pre-flight local = **35 passed** (3 integrated skipped) · `tsc --noEmit` EXIT 0
+- `/portfolio.positions` **incluye** CLOSED qty 0 (documentado; open-only = P2)
+
+## Reservas (honestidad)
+
+- Stateful **Projection** E2E (setStage → DTO), no POST/engine
+- Integrated E2E sigue opt-in / skipped en certify
+- Stamp remoto `v1.83-beta` **no** hecho en esta rebanada local
+- **No** LIVE · **no** fills · **no** bump `1.35.0-beta`
+
+## OUT (intactos)
+
+- LIVE · scheduler · bump package · `dryRun=false` browser · fills ledger
+- Playwright en `frontend-ci` · E2E integrado obligatorio
+- Event-driven lifecycle · `/portfolio` open-only · CTA «GESTIONAR T2»
+
+## Next candidato
+
+Event-driven mock (emit → persist → GET) **o** un único Golden Journey integrado FastAPI+PG — **sin** abrir LIVE. Decidir en chat nuevo.
+
+## Texto exacto — arranque chat nuevo (dev)
+
+```text
+Partida: V1.83 CERRADA (código + E2E mock locales) · stamp remoto PENDIENTE v1.83-beta.
+Leer: docs/CURRENT_SYSTEM.md · docs/engineering/spec-v183-lifecycle-snapshot-truth-2026-09-02.md · arranque-auditor-v1-83.
+Freeze: NO LIVE · no fills · no dryRun=false browser · no bump 1.35.0-beta · no Playwright en frontend-ci · no integrated obligatorio.
+No commitear **/logs/.
+```

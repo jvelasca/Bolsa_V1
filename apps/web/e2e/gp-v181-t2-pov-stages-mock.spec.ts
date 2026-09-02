@@ -21,7 +21,9 @@ import {
   E2E_LIFECYCLE_DECISION_ID,
   E2E_LIFECYCLE_POSITION_ID,
   E2E_SYMBOL,
+  assertClosedLineage,
   assertClosedPositionTruth,
+  assertLifecycleFinancialInvariants,
   assertPositionCertification,
   lifecycleInstrumentSlice,
   mercadoWorkspaceDocument,
@@ -125,7 +127,7 @@ test.describe("GP-V181 — T2 POV stages mock", () => {
       operatingState: "T2_EXECUTED",
       actionText: /Mantener/i,
       remainingQuantity: 2,
-      unrealizedR: 1.2,
+      unrealizedR: 0.4,
     });
     await assertNoComprar(page);
 
@@ -140,12 +142,25 @@ test.describe("GP-V181 — T2 POV stages mock", () => {
         positions?: Array<{
           id: string;
           quantity: number;
+          avgCost?: number;
+          lastPrice?: number;
+          marketValue?: number;
+          unrealizedPnl?: number;
+          unrealizedPnlPct?: number;
           operational?: {
+            remainingQuantity?: number;
+            unrealizedR?: number;
             operationalView?: {
               positionId?: string;
               decisionId?: string | null;
               remainingQuantity?: number;
               operatingState?: string;
+              quantity?: number;
+              t1?: { status?: string } | null;
+              t2?: { status?: string } | null;
+              stopHistory?: unknown[];
+              events?: Array<{ kind?: string }>;
+              levels?: { unrealizedR?: number };
             };
           };
         }>;
@@ -164,6 +179,16 @@ test.describe("GP-V181 — T2 POV stages mock", () => {
     expect(closed!.operational?.operationalView?.decisionId).toBe(
       E2E_LIFECYCLE_DECISION_ID,
     );
+    assertClosedLineage(closed!.operational?.operationalView ?? {}, "t2");
+    assertLifecycleFinancialInvariants({
+      quantity: closed!.quantity,
+      avgCost: closed!.avgCost ?? 100,
+      lastPrice: closed!.lastPrice ?? 0,
+      marketValue: closed!.marketValue ?? 0,
+      unrealizedPnl: closed!.unrealizedPnl ?? 0,
+      unrealizedPnlPct: closed!.unrealizedPnlPct ?? 0,
+      operational: closed!.operational,
+    });
 
     await focusAapl(page);
     await assertClosedPositionTruth(page, {

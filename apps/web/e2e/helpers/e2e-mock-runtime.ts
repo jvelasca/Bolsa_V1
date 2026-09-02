@@ -2,10 +2,12 @@
  * V1.82 — E2E mock runtime flags (mutable mid-test).
  * Public setters re-exported from `e2e/fixtures.ts`.
  */
+import { mercadoWorkspaceDocument } from "./mercado";
 import {
-  mercadoWorkspaceDocument,
+  resolveLineagePathForStage,
   type E2eGoldenPositionStage,
-} from "../integration";
+  type LifecycleLineagePath,
+} from "./lifecycle-snapshot";
 
 /** True when E2E should run (auto webServer or explicit base URL). */
 export function e2eEnabled(): boolean {
@@ -45,6 +47,8 @@ export type E2eMockRuntimeFlags = {
   deskMode: "off" | "day" | "stale" | "lifecycle" | "lifecycle_stale";
   /** V1.78 — POV stage on first multi position (AAPL). V1.79 lifecycle stages. */
   positionStage: E2eGoldenPositionStage;
+  /** V1.83 — CLOSED/EXIT inherit trail vs T2 prefix. */
+  lineagePath: LifecycleLineagePath;
 };
 
 const e2eMockRuntimeDefaults: E2eMockRuntimeFlags = {
@@ -53,6 +57,7 @@ const e2eMockRuntimeDefaults: E2eMockRuntimeFlags = {
   unknownOrder: false,
   deskMode: "off",
   positionStage: "clean",
+  lineagePath: "trail",
 };
 
 let e2eMockRuntime: E2eMockRuntimeFlags = { ...e2eMockRuntimeDefaults };
@@ -84,7 +89,11 @@ export function setE2eMockDeskMode(
 }
 
 export function setE2eMockPositionStage(stage: E2eGoldenPositionStage): void {
-  e2eMockRuntime = { ...e2eMockRuntime, positionStage: stage };
+  e2eMockRuntime = {
+    ...e2eMockRuntime,
+    positionStage: stage,
+    lineagePath: resolveLineagePathForStage(stage, e2eMockRuntime.lineagePath),
+  };
 }
 
 /** Internal snapshot for routeBody. */
