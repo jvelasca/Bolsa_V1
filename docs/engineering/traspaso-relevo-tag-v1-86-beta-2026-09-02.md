@@ -28,7 +28,7 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-b
 | Pieza       | Valor                                                                                                            |
 | ----------- | ---------------------------------------------------------------------------------------------------------------- |
 | Tag tip     | `v1.86-beta` → `baaa7034`                                                                                        |
-| Docs stamp  | (post-GREEN en `main`; no exige retag)                                                                           |
+| Docs stamp  | `a8867559` (post-GREEN en `main`; no exige retag)                                                                |
 | Previo tip  | `v1.85-beta` → `665242a3` (CI GREEN · run 33663836923)                                                           |
 | CI tag      | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33686297402) · `headSha=baaa7034` |
 | Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.86-beta                                                     |

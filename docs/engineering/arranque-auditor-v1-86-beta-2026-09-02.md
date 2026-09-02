@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor) **tras** Release-tag CI GREEN:
 
 ---
 
-Eres auditor externo de Bolsa V1 **tip `v1.86-beta`**. Producto bajo revisión **`V1.86-beta`** tip funcional **`baaa7034`**. Docs stamp en `main`: **(rellenar tras stamp)**. Partida certificada previa **`v1.85-beta` → `665242a3`** (Release-tag CI GREEN · PASS modelo mock **9,25/10** · **NO** beta estable · P1=5). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **tip `v1.86-beta`**. Producto bajo revisión **`V1.86-beta`** tip funcional **`baaa7034`**. Docs stamp en `main`: **`a8867559`**. Partida certificada previa **`v1.85-beta` → `665242a3`** (Release-tag CI GREEN · PASS modelo mock **9,25/10** · **NO** beta estable · P1=5). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
 
 **Alcance del stack a auditar (V1.86 = Event Store real + P1-01…05):**
 
