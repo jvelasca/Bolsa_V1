@@ -1,6 +1,6 @@
 # Arranque auditor — V1.70 LISTA→GRÁFICO→ACCIÓN (2026-09-02)
 
-> **Padre:** [`spec-v170-lista-grafico-accion-2026-09-02.md`](./spec-v170-lista-grafico-accion-2026-09-02.md) · partida **V1.69** (`e3e1ca40`).
+> **Padre:** [`spec-v170-lista-grafico-accion-2026-09-02.md`](./spec-v170-lista-grafico-accion-2026-09-02.md) · partida **V1.69** (`e3e1ca40`) · **Commit:** `960383d2`
 
 ## Punta de partida
 

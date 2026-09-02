@@ -5,7 +5,7 @@
 > **AsOf:** 2026-08-28 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-032** Operational Core v1.9 **CERRADO (modelo)** · **ADR-033** Operational Authority v1.10 **CERRADA (H1→P4)** · **ADR-034** Operational Integrity **OI-1…PA-1 + OE-1 CERRADOS** · **ADR-035** Operational Reliability v1.12 **OR-1/3/4/5/6 CERRADOS · OR-2 cerrado vía DEX-1+DEX-2** · V1.13 Durable Execution **D0 + DEX-1…DEX-5 CERRADOS · pack v113 stampado** · **F1–F4** · **ExitPermission** · **INFRA CI-by-tag** · **ADR-023 Accepted BETA-D** · **A3-wire** `d704263` · **C1–C6** consolidación v1.8.1 **CERRADA**. Alembic `014` en `bolsa_v1`.
 > **AsOf:** 2026-09-02 · **Producto:** **V1.70** LISTA→GRÁFICO→ACCIÓN **CERRADA** — ([spec V1.70](./engineering/spec-v170-lista-grafico-accion-2026-09-02.md)): GP-V170-01..05 · journey lista→gráfico→DECISIÓN · POV fail-closed. **V1.69** CI Playwright Release-tag · **Package version:** `1.35.0-beta` (congelado). **BETA / no producción.**
 > **Stack:** V1.70 Lista→Gráfico→Acción · V1.69 Release-tag Playwright · V1.68 Paper Desk→Hoy · V1.67 Mercado E2E · E2E opt-in integrado. **No** LIVE · **no** scheduler · **no** bump package.  
-> **GitHub:** [`main`](https://github.com/jvelasca/Bolsa_V1/tree/main) → `cbe89c8` (V1.61–V1.64) · [`v1.60-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.60-beta) → `7ac8ad9b` · [`v1.59-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.59-beta) → `b5c5c6ab`
+> **GitHub:** [`main`](https://github.com/jvelasca/Bolsa_V1/tree/main) → `960383d2` (V1.70) · `e3e1ca40` (V1.69) · [`v1.60-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.60-beta) → `7ac8ad9b` · [`v1.59-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.59-beta) → `b5c5c6ab`
 
 ---
 

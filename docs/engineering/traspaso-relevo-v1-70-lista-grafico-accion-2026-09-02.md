@@ -1,6 +1,6 @@
 # Relevo — V1.70 LISTA→GRÁFICO→ACCIÓN
 
-> **AsOf:** 2026-09-02 · **Estado:** CERRADA · **Auditor:** [`arranque-auditor-v1-70-lista-grafico-accion-2026-09-02.md`](./arranque-auditor-v1-70-lista-grafico-accion-2026-09-02.md)
+> **AsOf:** 2026-09-02 · **Estado:** CERRADA · **Auditor:** [`arranque-auditor-v1-70-lista-grafico-accion-2026-09-02.md`](./arranque-auditor-v1-70-lista-grafico-accion-2026-09-02.md) · **Commit:** `960383d2`
 
 ## Hecho
 

@@ -1,6 +1,6 @@
 # Spec — V1.70 LISTA→GRÁFICO→ACCIÓN
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (pre-flight local 2026-09-02).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (pre-flight local 2026-09-02 · commit `960383d2`).  
 > **Padre:** [`spec-v169-ci-playwright-release-tag-2026-09-02.md`](./spec-v169-ci-playwright-release-tag-2026-09-02.md) · partida **V1.69** (`e3e1ca40`). **No** LIVE.
 
 Unifica el journey **lista → gráfico → panel DECISIÓN** en Mercado: click en fila abre pestaña, fuerza paneles visibles y alinea fase lista/cockpit con un resolver compartido.
