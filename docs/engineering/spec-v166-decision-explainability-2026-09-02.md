@@ -1,6 +1,6 @@
 # Spec — V1.66 Decision Explainability (Why)
 
-> **AsOf:** 2026-09-02 · **Estado:** **EN CURSO**.  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (pre-flight local 2026-09-02).  
 > **Padre:** [`spec-v165-operational-identity-dto-2026-09-02.md`](./spec-v165-operational-identity-dto-2026-09-02.md) · partida **V1.65** (`60148885`). **No** LIVE.
 
 Capa determinista **Estado → Acción → Por qué** sobre Decision Surface. El motor decide; la UI explica. **Sin** LLM en hot path.
