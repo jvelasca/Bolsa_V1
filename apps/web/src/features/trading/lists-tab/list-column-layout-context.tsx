@@ -248,3 +248,8 @@ export function useListColumnLayoutContext() {
   }
   return context;
 }
+
+/** Fail-open para providers anidados durante hidratación workspace/E2E. */
+export function useOptionalListColumnLayoutContext() {
+  return useContext(ListColumnLayoutContext);
+}

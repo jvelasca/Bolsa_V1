@@ -17,14 +17,15 @@ import type {
   SubmitIntentListItemV1,
 } from "@bolsa/shared";
 import {
-  buildInvestmentPositionAggregate,
-  buildOperationalPlanFromPosition,
-  buildOperationalPlanFromStudy,
   pickPositionStudies,
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import {
+  resolveInstrumentOperationalFacts,
+  hasOpenPositionQuantity,
+} from "@/features/trading/instrument-operational-facts";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
@@ -36,7 +37,6 @@ import {
 } from "@/features/operations/use-in-flight-submit-intents";
 import {
   mercadoCockpitShowsPlanLevels,
-  resolveMercadoCockpitPhase,
   resolveMercadoTrailingCopy,
   type MercadoCockpitPhase,
   type MercadoTrailingCopyV1,
@@ -64,7 +64,7 @@ export type InstrumentOperationalContextV1 = {
 };
 
 function hasQuantity(position: PositionDto | null): boolean {
-  return Boolean(position && Math.abs(Number(position.quantity ?? 0)) > 0);
+  return hasOpenPositionQuantity(position);
 }
 
 export function useInstrumentOperationalContext(
@@ -83,7 +83,6 @@ export function useInstrumentOperationalContext(
     staleTime: 15_000,
   });
 
-  // Misma fuente que Mesa Hoy / Libro — proyección; sin endpoint de histórico.
   const studiesQuery = useQuery({
     queryKey: ["decision-studies", effectiveAccountId, "mesa"],
     queryFn: () => api.getDecisionStudies(effectiveAccountId!, { limit: 200 }),
@@ -128,21 +127,6 @@ export function useInstrumentOperationalContext(
     return { study: soft, originStudy: soft };
   }, [instrumentId, position, byInstrument, byDecision]);
 
-  const plan = useMemo(() => {
-    if (hasQuantity(position)) {
-      const aggregate = buildInvestmentPositionAggregate({
-        position: position!,
-        study,
-        originStudy: originStudy ?? study,
-      });
-      return buildOperationalPlanFromPosition({
-        aggregate,
-        markPrice: position!.lastPrice ?? null,
-      });
-    }
-    return buildOperationalPlanFromStudy(study);
-  }, [position, study, originStudy]);
-
   const inConfirmQueue = useMemo(() => {
     if (!instrumentId) return false;
     return queueItems.some((i) => i.payload.instrumentId === instrumentId);
@@ -164,15 +148,39 @@ export function useInstrumentOperationalContext(
 
   const inEstudio = instrumentId ? studyContains(instrumentId) : false;
 
-  const phase = resolveMercadoCockpitPhase({
+  const operationalFacts = useMemo(() => {
+    if (!instrumentId) {
+      return resolveInstrumentOperationalFacts({
+        instrumentId: "",
+        inEstudio: false,
+        position: null,
+        study: null,
+        originStudy: null,
+        inConfirmQueue: false,
+        orderPendingFill: false,
+      });
+    }
+    return resolveInstrumentOperationalFacts({
+      instrumentId,
+      inEstudio,
+      position,
+      study,
+      originStudy,
+      inConfirmQueue,
+      orderPendingFill,
+    });
+  }, [
     instrumentId,
     inEstudio,
-    hasOpenPosition: hasQuantity(position),
+    position,
+    study,
+    originStudy,
     inConfirmQueue,
     orderPendingFill,
-    tradePlanStatus: study?.tradePlanStatus ?? null,
-    hasOperationalPlan: study?.hasOperationalPlan === true || plan.hasPlan,
-  });
+  ]);
+
+  const phase = operationalFacts.phase;
+  const plan = operationalFacts.plan;
 
   const trailing = resolveMercadoTrailingCopy({
     phase,

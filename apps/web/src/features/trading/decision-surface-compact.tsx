@@ -369,14 +369,13 @@ function PositionCompactBody({
   symbol,
   portfolioReconStatus,
   view,
-  viewSource,
+  viewSource: _viewSource,
   onOpenWhy,
   density,
 }: Omit<PositionCompactProps, "variant" | "className" | "testId"> & {
   view: PositionOperationalViewV1;
 }) {
   const [historyOpen, setHistoryOpen] = useState(false);
-  const source = viewSource;
   const headline = povOperatingStateHeadline(view.operatingState);
   const statePhrase = formatOperatingStatePhrase(
     view.operatingState,
@@ -550,15 +549,6 @@ function PositionCompactBody({
             >
               Ver por qué
             </button>
-          ) : null}
-          {import.meta.env.DEV && source === "fallback" ? (
-            <span
-              className="rounded border border-amber-600/40 bg-amber-500/10 px-1 py-0.5 text-[9px] font-medium text-amber-900 dark:text-amber-100"
-              data-testid="position-decision-fallback-dev"
-              title="Operational data fallback — blob incompleto"
-            >
-              Operational data fallback
-            </span>
           ) : null}
           {view.stopHistory.length > 0 ? (
             <button

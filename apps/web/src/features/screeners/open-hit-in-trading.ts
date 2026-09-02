@@ -3,6 +3,7 @@ import type { ChartTimeframe } from "@bolsa/shared";
 import { isKernelTimeframe } from "@bolsa/shared";
 import { ensureChartRoute } from "@/components/layout/chart-tab-bar";
 import { requestChartReflow } from "@/features/charts/chart-utils";
+import { ensureMercadoActionPanelsOpen } from "@/features/trading/focus-instrument-in-mercado";
 
 interface OpenHitInTradingDeps {
   openChartTab: (instrumentId: string, label: string) => string;
@@ -32,6 +33,7 @@ export function openHitInTrading(
   options?: OpenHitInTradingOptions,
 ) {
   const listId = options?.listId?.trim();
+  ensureMercadoActionPanelsOpen();
   const tabId =
     listId && deps.focusInstrumentFromList
       ? deps.focusInstrumentFromList(listId, hit.instrumentId, hit.symbol)

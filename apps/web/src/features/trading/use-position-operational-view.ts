@@ -1,6 +1,7 @@
 /**
  * V1.60 — PositionOperationalView desde PositionDto wire (tarjeta estrella Mercado).
- * V1.61 — source canonical/fallback · recon fail-closed.
+ * V1.61 — source canonical · recon fail-closed.
+ * V1.70 — sin fallback cliente: fail-closed si falta wire/blob.
  * Proyección cliente; autoridad en backend persistido.
  */
 
@@ -12,13 +13,11 @@ import type {
 } from "@bolsa/shared";
 import {
   MESA_NEXT_ACTION_LABELS,
-  buildPositionOperationalView,
   mapPortfolioReconToPovRecon,
   positionOperationalViewFromBlob,
-  positionStateFromPositionDto,
 } from "@bolsa/shared";
 
-export type PositionOperationalViewSourceV1 = "canonical" | "fallback";
+export type PositionOperationalViewSourceV1 = "canonical";
 
 export type PositionOperationalViewResultV1 = {
   view: PositionOperationalViewV1;
@@ -93,12 +92,7 @@ export function buildPositionOperationalViewFromDto(
     }
   }
 
-  const state = positionStateFromPositionDto(position);
-  if (!state) return null;
-  return {
-    view: buildPositionOperationalView({ position: state, reconStatus }),
-    source: "fallback",
-  };
+  return null;
 }
 
 export function usePositionOperationalView(

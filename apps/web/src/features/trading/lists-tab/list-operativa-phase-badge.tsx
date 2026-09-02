@@ -23,23 +23,34 @@ export function ListOperativaPhaseBadge({
   instrumentId: string;
 }) {
   const row = useListOperativaRow(instrumentId);
-  if (!row?.badge) return null;
+  if (!row) return null;
 
   return (
-    <span
-      className={cn(
-        "inline-flex max-w-full truncate rounded border px-1 py-px text-[9px] font-semibold tracking-wide",
-        badgeTone(row.badge.kind),
-      )}
-      data-testid="list-operativa-phase-badge"
-      data-badge={row.badge.kind}
-      title={
-        row.badge.kind === "t1"
-          ? "T1 alcanzado · pendiente de gestión (tocado ≠ reducido)"
-          : row.badge.label
-      }
-    >
-      {row.badge.label}
-    </span>
+    <>
+      {row.badge ? (
+        <span
+          className={cn(
+            "inline-flex max-w-full truncate rounded border px-1 py-px text-[9px] font-semibold tracking-wide",
+            badgeTone(row.badge.kind),
+          )}
+          data-testid="list-operativa-phase-badge"
+          data-phase={row.phase}
+          data-badge={row.badge.kind}
+          title={
+            row.badge.kind === "t1"
+              ? "T1 alcanzado · pendiente de gestión (tocado ≠ reducido)"
+              : row.badge.label
+          }
+        >
+          {row.badge.label}
+        </span>
+      ) : null}
+      <span
+        data-testid="list-operativa-phase"
+        data-phase={row.phase}
+        className="sr-only"
+        aria-hidden
+      />
+    </>
   );
 }

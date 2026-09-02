@@ -179,4 +179,20 @@ describe("buildPositionOperationalViewFromDto", () => {
     expect(result?.view.decisionId).toBe("DEC-1");
     expect(result?.view.tradePlanId).toBe("TP-1");
   });
+
+  it("GP-V170-05: fail-closed without wire or operational blob", () => {
+    const position: PositionDto = {
+      id: "p-fallback",
+      instrumentId: "inst-x",
+      symbol: "X",
+      name: "No wire",
+      quantity: 10,
+      avgCost: 100,
+      lastPrice: 102,
+      marketValue: 1020,
+      unrealizedPnl: 0,
+      unrealizedPnlPct: 0,
+    };
+    expect(buildPositionOperationalViewFromDto(position, "ok")).toBeNull();
+  });
 });

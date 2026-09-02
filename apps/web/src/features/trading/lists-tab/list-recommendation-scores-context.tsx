@@ -17,7 +17,7 @@ import {
   useInstrumentDailyOpinions,
 } from "@/features/trading/use-instrument-daily-opinions";
 import { resolveIndiceOperativo } from "@/features/trading/operativa-index";
-import { useListColumnLayoutContext } from "@/features/trading/lists-tab/list-column-layout-context";
+import { useOptionalListColumnLayoutContext } from "@/features/trading/lists-tab/list-column-layout-context";
 
 export type ListRecommendationRow = {
   io: number | null;
@@ -63,7 +63,8 @@ export function ListRecommendationScoresProvider({
   instrumentIds: ReadonlyArray<string>;
   children: ReactNode;
 }) {
-  const { visibleColumns } = useListColumnLayoutContext();
+  const layoutContext = useOptionalListColumnLayoutContext();
+  const visibleColumns = layoutContext?.visibleColumns ?? [];
   const visibleIds = useMemo(
     () => new Set(visibleColumns.map((c) => c.id)),
     [visibleColumns],

@@ -36,6 +36,10 @@ import { api, ApiError } from "@/lib/api";
 import { ensureChartRoute } from "@/components/layout/chart-tab-bar";
 import { requestChartReflow } from "@/features/charts/chart-utils";
 import {
+  ensureMercadoActionPanelsOpen,
+  focusInstrumentInMercado,
+} from "@/features/trading/focus-instrument-in-mercado";
+import {
   buildVirtualListSummaries,
   pendingOrderToListItem,
   positionToListItem,
@@ -585,9 +589,15 @@ export function ListValuesPanel() {
   const focusInstrument = useCallback(
     (instrumentId: string, symbol: string) => {
       const listId = selectedListId ?? listConfig.apiListId ?? listConfig.id;
-      focusInstrumentFromList(listId, instrumentId, symbol);
-      ensureChartRoute(navigate);
-      requestChartReflow();
+      focusInstrumentInMercado(
+        navigate,
+        {
+          openChartTab: useWorkspaceStore.getState().openChartTab,
+          focusInstrumentFromList,
+        },
+        { instrumentId, symbol },
+        { listId },
+      );
     },
     [
       selectedListId,
@@ -599,6 +609,7 @@ export function ListValuesPanel() {
   );
 
   function openSelectedCharts() {
+    ensureMercadoActionPanelsOpen();
     const listId = selectedListId ?? listConfig.apiListId ?? listConfig.id;
     const byId = new Map(selectableItems.map((item) => [item.id, item]));
     const items = [...selectedInstrumentIds]

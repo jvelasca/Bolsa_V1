@@ -58,6 +58,8 @@ interface TradingLayoutState {
   toggleCharts: () => void;
   toggleOperations: () => void;
   toggleOperativa: () => void;
+  ensureOperativaOpen: () => void;
+  ensureChartsOpen: () => void;
   maximizeLists: () => void;
   maximizeCharts: () => void;
   maximizeOperations: () => void;
@@ -137,6 +139,23 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
 
       toggleOperativa: () => {
         set({ operativaOpen: !get().operativaOpen, namedLayoutId: null });
+      },
+
+      ensureOperativaOpen: () => {
+        if (!get().operativaOpen) {
+          set({ operativaOpen: true, namedLayoutId: null });
+        }
+      },
+
+      ensureChartsOpen: () => {
+        const s = get();
+        if (!s.chartsOpen || s.chartsMaximized) {
+          set({
+            chartsOpen: true,
+            chartsMaximized: false,
+            namedLayoutId: null,
+          });
+        }
       },
 
       maximizeLists: () => {

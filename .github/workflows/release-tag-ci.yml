@@ -253,7 +253,7 @@ jobs:
           E2E_RUN: '1'
           E2E_INTEGRATION: '1'
           E2E_ALLOW_DEV_DB: '1'
-        run: pnpm e2e -- gp-v164-ui gp-v167 gp-v168
+        run: pnpm e2e -- gp-v164-ui gp-v167 gp-v168 gp-v170-list
 
   python:
     name: python (ruff/imports/mypy/pytest offline)

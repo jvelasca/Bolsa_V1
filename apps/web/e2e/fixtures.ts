@@ -265,9 +265,17 @@ function routeBody(
           {
             id: E2E_INSTRUMENT_ID,
             symbol: E2E_SYMBOL,
+            yahooSymbol: E2E_SYMBOL,
             name: "Apple E2E",
             exchange: "NASDAQ",
             currency: "USD",
+            isActive: true,
+            meta: {
+              barCount: 30,
+              lastSync: "2026-08-30T00:00:00.000Z",
+              lastClose: 102,
+              changePct: 2,
+            },
           },
         ],
       };

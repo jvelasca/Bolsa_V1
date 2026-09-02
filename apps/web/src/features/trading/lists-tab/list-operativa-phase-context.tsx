@@ -6,9 +6,6 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { DecisionJournalStudyViewV1, PositionDto } from "@bolsa/shared";
 import {
-  buildInvestmentPositionAggregate,
-  buildOperationalPlanFromPosition,
-  buildOperationalPlanFromStudy,
   pickPositionStudies,
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
@@ -20,13 +17,11 @@ import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import {
-  resolveMercadoCockpitPhase,
-  type MercadoCockpitPhase,
-} from "@/features/trading/operativa-cockpit-phase";
-import {
-  resolveListOperativaBadge,
-  type ListOperativaBadge,
-} from "@/features/trading/operativa-phase-toast";
+  resolveInstrumentOperationalFacts,
+  hasOpenPositionQuantity,
+} from "@/features/trading/instrument-operational-facts";
+import type { MercadoCockpitPhase } from "@/features/trading/operativa-cockpit-phase";
+import type { ListOperativaBadge } from "@/features/trading/operativa-phase-toast";
 
 export type ListOperativaRow = {
   phase: MercadoCockpitPhase;
@@ -48,7 +43,7 @@ const ListOperativaPhaseContext = createContext<Ctx>({
 });
 
 function hasQuantity(position: PositionDto | null): boolean {
-  return Boolean(position && Math.abs(Number(position.quantity ?? 0)) > 0);
+  return hasOpenPositionQuantity(position);
 }
 
 export function resolveListOperativaRow(input: {
@@ -60,39 +55,14 @@ export function resolveListOperativaRow(input: {
   inConfirmQueue: boolean;
   orderPendingFill: boolean;
 }): ListOperativaRow {
-  const plan = hasQuantity(input.position)
-    ? buildOperationalPlanFromPosition({
-        aggregate: buildInvestmentPositionAggregate({
-          position: input.position!,
-          study: input.study,
-          originStudy: input.originStudy ?? input.study,
-        }),
-        markPrice: input.position!.lastPrice ?? null,
-      })
-    : buildOperationalPlanFromStudy(input.study);
-
-  const phase = resolveMercadoCockpitPhase({
-    instrumentId: input.instrumentId,
-    inEstudio: input.inEstudio,
-    hasOpenPosition: hasQuantity(input.position),
-    inConfirmQueue: input.inConfirmQueue,
-    orderPendingFill: input.orderPendingFill,
-    tradePlanStatus: input.study?.tradePlanStatus ?? null,
-    hasOperationalPlan:
-      input.study?.hasOperationalPlan === true || plan.hasPlan,
-  });
-
+  const facts = resolveInstrumentOperationalFacts(input);
   return {
-    phase,
-    badge: resolveListOperativaBadge({
-      phase,
-      target1Touched: plan.target1Touched,
-      target1Managed: plan.target1Managed,
-    }),
-    target1Touched: plan.target1Touched,
-    target1Managed: plan.target1Managed,
-    decisionId: input.study?.decisionId ?? null,
-    positionId: input.position?.id ?? null,
+    phase: facts.phase,
+    badge: facts.badge,
+    target1Touched: facts.target1Touched,
+    target1Managed: facts.target1Managed,
+    decisionId: facts.decisionId,
+    positionId: facts.positionId,
   };
 }
 

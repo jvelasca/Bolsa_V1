@@ -9,6 +9,7 @@ import {
   Star,
 } from "lucide-react";
 import {
+  ESTUDIO_LIST_ID,
   JOURNAL_STUDY_OPINION_LABELS,
   JOURNAL_STUDY_PERIOD_LABELS,
   JOURNAL_STUDY_STATUS_LABELS,
@@ -51,6 +52,7 @@ import {
   type JournalStudySortState,
 } from "@/lib/journal-study-column-layout";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { focusInstrumentInMercado } from "@/features/trading/focus-instrument-in-mercado";
 
 function statusClass(status: string): string {
   switch (status as JournalStudyUserStatus) {
@@ -146,6 +148,9 @@ export function JournalStudiesTable({
 }) {
   const navigate = useNavigate();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
+  const focusInstrumentFromList = useWorkspaceStore(
+    (s) => s.focusInstrumentFromList,
+  );
   const stored = useMemo(() => loadJournalStudyLayout(), []);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [layout, setLayout] = useState<JournalStudyColumnLayoutItem[]>(
@@ -221,8 +226,15 @@ export function JournalStudiesTable({
   }
 
   function handleOpenChart(study: DecisionJournalStudyViewV1) {
-    openChartTab(study.instrumentId, study.symbol ?? study.instrumentId);
-    void navigate("/trading");
+    focusInstrumentInMercado(
+      navigate,
+      { openChartTab, focusInstrumentFromList },
+      {
+        instrumentId: study.instrumentId,
+        symbol: study.symbol ?? study.instrumentId,
+      },
+      { listId: ESTUDIO_LIST_ID },
+    );
   }
 
   return (

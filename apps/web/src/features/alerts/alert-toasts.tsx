@@ -48,7 +48,11 @@ function runToastAction(
   if (action.type === "open_trading_instrument") {
     openInstrumentInTrading(
       navigate,
-      { openChartTab: useWorkspaceStore.getState().openChartTab },
+      {
+        openChartTab: useWorkspaceStore.getState().openChartTab,
+        focusInstrumentFromList:
+          useWorkspaceStore.getState().focusInstrumentFromList,
+      },
       { instrumentId: action.instrumentId, symbol: action.symbol },
     );
     return;

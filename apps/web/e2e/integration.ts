@@ -126,6 +126,23 @@ export function mercadoWorkspaceDocument(opts?: {
   };
 }
 
+/** Workspace sin pestaña gráfica — journey LISTA→GRÁFICO (GP-V170). */
+export function mercadoListFocusWorkspaceDocument(opts?: {
+  instrumentId?: string;
+  symbol?: string;
+  workspaceId?: string;
+  name?: string;
+}) {
+  const base = mercadoWorkspaceDocument(opts);
+  return {
+    ...base,
+    charts: [],
+    activeChartId: null,
+    chartListContext: null,
+    chartStateByListInstrument: {},
+  };
+}
+
 export function mercadoOpenPosition() {
   return {
     id: "pos-e2e-1",
@@ -320,6 +337,8 @@ export async function seedMercadoBrowserState(
     accountId?: string;
     workspaceId?: string;
     workspaceDocument?: ReturnType<typeof mercadoWorkspaceDocument>;
+    operativaOpen?: boolean;
+    chartsOpen?: boolean;
   },
 ): Promise<void> {
   const accountId = opts?.accountId ?? E2E_ACCOUNT_ID;
@@ -327,9 +346,17 @@ export async function seedMercadoBrowserState(
     opts?.workspaceDocument ?? mercadoWorkspaceDocument();
   const workspaceId = opts?.workspaceId ?? workspaceDocument.id;
   const chartPersistBackup = chartPersistBackupFromWorkspace(workspaceDocument);
+  const operativaOpen = opts?.operativaOpen ?? true;
+  const chartsOpen = opts?.chartsOpen ?? true;
 
   await page.addInitScript(
-    ({ accountId, workspaceId, chartPersistBackup }) => {
+    ({
+      accountId,
+      workspaceId,
+      chartPersistBackup,
+      operativaOpen,
+      chartsOpen,
+    }) => {
       const zustand = (key: string, partial: Record<string, unknown>) => {
         localStorage.setItem(
           key,
@@ -339,9 +366,9 @@ export async function seedMercadoBrowserState(
       zustand("bolsa-active-account", { activeAccountId: accountId });
       zustand("bolsa-trading-layout-v1", {
         listsOpen: true,
-        chartsOpen: true,
+        chartsOpen,
         operationsOpen: false,
-        operativaOpen: true,
+        operativaOpen,
         listsMaximized: false,
         chartsMaximized: false,
         operationsMaximized: false,
@@ -376,7 +403,7 @@ export async function seedMercadoBrowserState(
         }),
       );
     },
-    { accountId, workspaceId, chartPersistBackup },
+    { accountId, workspaceId, chartPersistBackup, operativaOpen, chartsOpen },
   );
 }
 
