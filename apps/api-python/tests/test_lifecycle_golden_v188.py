@@ -26,6 +26,7 @@ from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.models import (
     InvestmentAccountRow,
     InvestmentPortfolioRow,
+    LedgerEntryRow,
     PortfolioRow,
     UserRow,
 )
@@ -68,11 +69,13 @@ async def _insert_account(
     user_id: str,
     name: str,
 ) -> str:
-    """Account + legacy portfolio link (needed for HTTP recon clear / OI-6)."""
+    """Account + legacy portfolio + initial ledger deposit (OI-6 clean baseline)."""
     account_id = f"lc-g-{uuid4().hex[:14]}"
     legacy_id = f"pf-g-{uuid4().hex[:14]}"
     inv_pf_id = f"ip-g-{uuid4().hex[:14]}"
+    ledger_id = f"le-g-{uuid4().hex[:14]}"
     now = _now()
+    deposit = Decimal("1000")
     async with factory() as session:
         session.add(
             InvestmentAccountRow(
@@ -83,7 +86,7 @@ async def _insert_account(
                 status="active",
                 currency="USD",
                 base_currency="USD",
-                initial_deposit=Decimal("1000"),
+                initial_deposit=deposit,
                 leverage=Decimal("1"),
                 is_default=False,
                 created_at=now,
@@ -95,7 +98,7 @@ async def _insert_account(
                 id=legacy_id,
                 name=f"{name} — cartera",
                 currency="USD",
-                cash=Decimal("1000"),
+                cash=deposit,
                 created_at=now,
                 updated_at=now,
             )
@@ -114,8 +117,46 @@ async def _insert_account(
                 updated_at=now,
             )
         )
+        session.add(
+            LedgerEntryRow(
+                id=ledger_id,
+                account_id=account_id,
+                portfolio_id=inv_pf_id,
+                type="deposit",
+                amount=deposit,
+                currency="USD",
+                balance_after=deposit,
+                reference_type="manual",
+                reference_id=account_id,
+                description="Depósito inicial golden",
+                executed_at=now,
+                created_at=now,
+            )
+        )
         await session.commit()
     return account_id
+
+
+async def _bump_portfolio_cash(
+    factory: async_sessionmaker[AsyncSession],
+    account_id: str,
+    *,
+    delta: Decimal,
+) -> None:
+    """M-2 hatch: cash ≠ Σ ledger → OI-6 drift (no auto-heal)."""
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    async with factory() as session:
+        scope = await SqlAlchemyAccountRepository(session).resolve_scope(account_id)
+        await SqlAlchemyPortfolioRepository(session).add_cash(
+            scope.legacy_portfolio_id, float(delta)
+        )
+        await session.commit()
 
 
 async def _jwt(factory: async_sessionmaker[AsyncSession], user_id: str) -> str:
@@ -195,7 +236,8 @@ async def test_v188_golden_trail_recon_restart_isolation(
                 client, account_id=acc_a, position_id=pos, kind="T1_EXECUTED"
             )
 
-            # RECON DRIFT mid-journey (DEX-3): open portfolio_drift incident
+            # RECON DRIFT mid-journey (DEX-3): real cash≠ledger + open incident
+            await _bump_portfolio_cash(factory, acc_a, delta=Decimal("500"))
             async with factory() as session:
                 store = PostgresOperationalIncidentStore(session)
                 status = await sync_opening_incidents(
@@ -213,8 +255,7 @@ async def test_v188_golden_trail_recon_restart_isolation(
             assert mid.status_code == 200
             assert mid.json()["data"]["stage"] == "t1_executed"
 
-            # RECOVERY via HTTP (V1.89): resolve + clear uses recon_status_for_incident_clear
-            # Books are clean → clear succeeds through server lookup (no store bypass).
+            # RECOVERY via HTTP (V1.89): resolve + clear fail-closed until OI-6 clean
             resolved = await client.post(
                 f"/api/accounts/{acc_a}/operational-incidents/{incident_id}/resolve",
                 json={
@@ -225,6 +266,14 @@ async def test_v188_golden_trail_recon_restart_isolation(
             assert resolved.status_code == 200, resolved.text
             assert resolved.json()["data"]["status"] == "resolved"
 
+            clear_blocked = await client.post(
+                f"/api/accounts/{acc_a}/operational-incidents/{incident_id}/clear",
+            )
+            assert clear_blocked.status_code == 409, clear_blocked.text
+            assert clear_blocked.json()["detail"] == "incident:recon_not_clean"
+
+            # Heal books (no auto-heal on clear) then clear succeeds via server lookup
+            await _bump_portfolio_cash(factory, acc_a, delta=Decimal("-500"))
             cleared = await client.post(
                 f"/api/accounts/{acc_a}/operational-incidents/{incident_id}/clear",
             )
