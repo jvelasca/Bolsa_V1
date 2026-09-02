@@ -10,11 +10,13 @@ import {
   mercadoOhlcvBars,
   mercadoOpenPosition,
   mercadoWorkspaceDocument,
+  applyGoldenPositionStage,
   paperAutonomousDayDailyOpsEnvelope,
   paperAutonomousDayT1Position,
   staleNoExecuteDailyOpsEnvelope,
   staleNoExecuteOpenIncident,
   unknownOrderSubmitIntent,
+  type E2eGoldenPositionStage,
 } from "./integration";
 
 /** True when E2E should run (auto webServer or explicit base URL). */
@@ -39,17 +41,23 @@ export function setMercadoMockWorkspaceDocument(
   mercadoMockWorkspaceDocument = document;
 }
 
-/** V1.77 — mutable mid-test flags (read on each fulfill). */
+/** V1.77 / V1.78 — mutable mid-test flags (read on each fulfill). */
 type E2eMockRuntimeFlags = {
   dataFreshness: "current" | "stale";
   reconStatus: "ok" | "drift";
   unknownOrder: boolean;
+  /** V1.78 — Hoy desk overlay over multi Mercado installer. */
+  deskMode: "off" | "day" | "stale";
+  /** V1.78 — POV stage on first multi position (AAPL). */
+  positionStage: E2eGoldenPositionStage;
 };
 
 const e2eMockRuntimeDefaults: E2eMockRuntimeFlags = {
   dataFreshness: "current",
   reconStatus: "ok",
   unknownOrder: false,
+  deskMode: "off",
+  positionStage: "clean",
 };
 
 let e2eMockRuntime: E2eMockRuntimeFlags = { ...e2eMockRuntimeDefaults };
@@ -72,6 +80,16 @@ export function setE2eMockReconStatus(
 
 export function setE2eMockUnknownOrder(enabled: boolean): void {
   e2eMockRuntime = { ...e2eMockRuntime, unknownOrder: enabled };
+}
+
+export function setE2eMockDeskMode(
+  mode: E2eMockRuntimeFlags["deskMode"],
+): void {
+  e2eMockRuntime = { ...e2eMockRuntime, deskMode: mode };
+}
+
+export function setE2eMockPositionStage(stage: E2eGoldenPositionStage): void {
+  e2eMockRuntime = { ...e2eMockRuntime, positionStage: stage };
 }
 
 const demoAccount = {
@@ -180,9 +198,10 @@ function routeBody(
   },
 ): Record<string, unknown> {
   const path = apiPath(route.request().url());
-  const hoyStale = opts?.hoyStale === true;
+  const hoyStale =
+    opts?.hoyStale === true || e2eMockRuntime.deskMode === "stale";
   const hoyUnknown = opts?.hoyUnknown === true;
-  const hoyDay = opts?.hoyDay === true;
+  const hoyDay = opts?.hoyDay === true || e2eMockRuntime.deskMode === "day";
   const mercado =
     opts?.mercado === true ||
     hoyDay === true ||
@@ -208,9 +227,18 @@ function routeBody(
     const positions = deskDay
       ? [paperAutonomousDayT1Position()]
       : multi
-        ? mercadoMultiOpenPositions()
+        ? mercadoMultiOpenPositions().map((pos, index) =>
+            index === 0
+              ? applyGoldenPositionStage(pos, e2eMockRuntime.positionStage)
+              : pos,
+          )
         : mercado
-          ? [mercadoOpenPosition()]
+          ? [
+              applyGoldenPositionStage(
+                mercadoOpenPosition(),
+                e2eMockRuntime.positionStage,
+              ),
+            ]
           : [];
     const equity = deskDay
       ? 101_060
@@ -695,6 +723,13 @@ export async function installMercadoMultiApiMocks(page: Page): Promise<void> {
 export async function installSessionReliabilityMocks(
   page: Page,
 ): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  resetE2eMockRuntimeFlags();
+  await installApiMocks(page, { mercado: true, multi: true });
+}
+
+/** V1.78 — Golden MERCADO→EXIT (multi + deskMode/positionStage mutables). */
+export async function installGoldenSessionMocks(page: Page): Promise<void> {
   setMercadoMockWorkspaceDocument(null);
   resetE2eMockRuntimeFlags();
   await installApiMocks(page, { mercado: true, multi: true });

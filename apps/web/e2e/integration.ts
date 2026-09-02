@@ -434,6 +434,145 @@ export async function assertOperationalTruth(
   }
 }
 
+/** V1.78 — POV stages on first multi position (wire operationalView). */
+export type E2eGoldenPositionStage =
+  | "clean"
+  | "t1_ready"
+  | "trailing"
+  | "exit_required";
+
+type MercadoOpenPosition = ReturnType<typeof mercadoOpenPosition>;
+
+export function applyGoldenPositionStage(
+  position: MercadoOpenPosition,
+  stage: E2eGoldenPositionStage,
+): MercadoOpenPosition {
+  if (stage === "clean") return position;
+
+  const levels = position.operational.operationalView.levels;
+  const decisionId =
+    position.operational.operationalView.decisionId ?? `dec-${position.id}`;
+  const operatingState =
+    stage === "t1_ready"
+      ? "T1_READY"
+      : stage === "trailing"
+        ? "TRAILING"
+        : "EXIT_REQUIRED";
+  const primaryAction =
+    stage === "t1_ready"
+      ? "REDUCIR"
+      : stage === "trailing"
+        ? "SUBIR_STOP"
+        : "SALIR";
+
+  return {
+    ...position,
+    operational: {
+      ...position.operational,
+      status: stage === "trailing" ? "TRAILING" : position.operational.status,
+      target1Leg:
+        stage === "t1_ready"
+          ? { status: "triggered", at: "2026-09-02T11:00:00.000Z" }
+          : { status: "pending" },
+      revisions:
+        stage === "trailing"
+          ? [
+              {
+                revisionId: `rev-trail-${position.id}`,
+                at: "2026-09-02T12:00:00.000Z",
+                previousStop: levels.currentStop,
+                nextStop: (levels.currentStop ?? 95) + 3,
+                previousStatus: "PROTECTED",
+                nextStatus: "PROTECTED",
+                origin: "trail",
+                reason: "trail",
+              },
+            ]
+          : [],
+      operationalView: {
+        positionId: position.operational.operationalView.positionId,
+        instrumentId: position.instrumentId,
+        tradePlanId: position.operational.tradePlanId,
+        decisionId,
+        lineageCollapsed: false,
+        operatingState,
+        primaryAction,
+        levels: {
+          ...levels,
+          unrealizedR: 0.6,
+        },
+        t1:
+          stage === "t1_ready"
+            ? { status: "triggered", at: "2026-09-02T11:00:00.000Z" }
+            : null,
+        t2: null,
+        stopHistory:
+          stage === "trailing"
+            ? [
+                {
+                  label: "Initial",
+                  stop: levels.currentStop,
+                  origin: "birth",
+                },
+                {
+                  label: "Trail #1",
+                  stop: (levels.currentStop ?? 95) + 3,
+                  delta: 3,
+                  at: "2026-09-02T12:00:00.000Z",
+                  origin: "trail",
+                },
+              ]
+            : [],
+        events: [],
+        quantity: position.quantity,
+        remainingQuantity: position.quantity,
+      },
+    },
+  };
+}
+
+/** V1.78 — entry-only candidato (sin posición). */
+export async function assertEntryCandidateTruth(
+  page: Page,
+  opts: { instrumentId: string; symbol: string },
+): Promise<void> {
+  const cockpit = page.getByTestId("operativa-cockpit");
+  await expect(cockpit).toBeVisible({ timeout: 20_000 });
+  await expect(cockpit).toHaveAttribute(
+    "data-instrument-id",
+    opts.instrumentId,
+  );
+  await expect(cockpit).toHaveAttribute("data-symbol", opts.symbol);
+  await expect(cockpit).not.toHaveAttribute("data-position-id");
+  await expect(page.getByTestId("entry-decision-surface")).toBeVisible();
+  await expect(page.getByTestId("position-operational-star-card")).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole("button", { name: /^COMPRAR$/i })).toHaveCount(0);
+}
+
+/** V1.78 — POV stage + identidad posición + 0 COMPRAR. */
+export async function assertPovOperatingStage(
+  page: Page,
+  slice: MercadoInstrumentSlice,
+  opts: {
+    operatingState: string;
+    actionText: RegExp;
+    expectRecon?: "CLEAN" | "CRITICAL" | "ATTENTION" | null;
+  },
+): Promise<void> {
+  await assertOperationalTruth(page, slice, {
+    expectRecon: opts.expectRecon ?? "CLEAN",
+    expectFreshness: "current",
+  });
+  const povState = page.getByTestId("operativa-cockpit-pov-state");
+  await expect(povState).toHaveAttribute("data-pov-state", opts.operatingState);
+  await expect(page.getByTestId("operativa-cockpit-pov-action")).toContainText(
+    opts.actionText,
+  );
+  await expect(page.getByRole("button", { name: /^COMPRAR$/i })).toHaveCount(0);
+}
+
 export function mercadoOhlcvBars() {
   const bars = [];
   for (let i = 0; i < 30; i++) {
