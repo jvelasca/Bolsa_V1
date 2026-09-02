@@ -1,8 +1,8 @@
 # Spec — V1.75 Chaos & stale → no-execute E2E
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (GO + implementación).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock + pytest locales · commit `b5b114ff`; **sin stamp CI GREEN**).  
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · relevo V1.74 · [`spec-v174` §2 OUT](./spec-v174-paper-autonomous-day-2026-09-02.md) · adversarial [`spec-v158`](./spec-v158-adversarial-execution-2026-09-01.md).  
-> **Partida tip:** `67f922bf` (feat v1.74 Paper Autonomous Day). **No** LIVE.
+> **Partida tip:** `67f922bf` (feat v1.74 Paper Autonomous Day) · **Commit:** [`b5b114ff`](https://github.com/jvelasca/Bolsa_V1/commit/b5b114ff). **No** LIVE.
 
 Certifica **fail-closed** ante datos stale / recovery ligera / no-execute, visible en mesa (E2E mock) y anclado en spine (pytest dryRun):
 

@@ -1,11 +1,12 @@
 # Arranque auditor — V1.75 Chaos & stale → no-execute (2026-09-02)
 
-> **Padre:** [`spec-v175-chaos-stale-no-execute-2026-09-02.md`](./spec-v175-chaos-stale-no-execute-2026-09-02.md) · partida **V1.74** (`67f922bf`)
+> **Padre:** [`spec-v175-chaos-stale-no-execute-2026-09-02.md`](./spec-v175-chaos-stale-no-execute-2026-09-02.md) · partida **V1.74** (`67f922bf`) · tip certificado **[`b5b114ff`](https://github.com/jvelasca/Bolsa_V1/commit/b5b114ff)**
 
 ## Punta de partida
 
 - Producto: **V1.74** Paper Autonomous Day · V1.73 Multi-instrument · V1.72 WHY rico
 - Brecha: fail-closed stale/UNKNOWN/recovery sin E2E mock + pytest ancla
+- **GitHub `main`:** [`b5b114ff`](https://github.com/jvelasca/Bolsa_V1/commit/b5b114ff) · árbol: https://github.com/jvelasca/Bolsa_V1/tree/main
 
 ## Qué auditar
 
@@ -26,7 +27,7 @@ E2E_RUN=1 pnpm --filter @bolsa/web e2e -- gp-v175
 # → 4 passed
 
 E2E_RUN=1 pnpm --filter @bolsa/web e2e -- gp-v174
-# → regresión V1.74
+# → 5 passed (regresión)
 
 python -m pytest packages/py/application/tests/test_v175_chaos_stale_no_execute.py -q
 # → 3 passed
