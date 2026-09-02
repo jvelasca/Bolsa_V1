@@ -1,13 +1,18 @@
-"""V1.86 — Lifecycle event store (append-only) + append/get snapshot use-case."""
+"""V1.87 — Lifecycle event store (append-only) + aggregate lock + sequence_no."""
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from uuid import uuid4
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +29,12 @@ from bolsa_domain.lifecycle import (
     compute_payload_hash,
     reduce_lifecycle_events,
 )
-from bolsa_infrastructure.database.models.tables import LifecycleEventRow
+from bolsa_infrastructure.database.models.tables import (
+    LifecycleAggregateRow,
+    LifecycleEventRow,
+)
+
+IntegrityKind = Literal["event_id_conflict", "duplicate_fill_id", "sequence_conflict"]
 
 
 def _parse_at(iso: str) -> datetime:
@@ -37,6 +47,51 @@ def _parse_at(iso: str) -> datetime:
 
 def _iso_at(dt: datetime) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _money(value: Decimal | None) -> Decimal | None:
+    if value is None:
+        return None
+    return Decimal(value)
+
+
+def _json_num(value: Decimal) -> int | float:
+    integral = value.to_integral_value()
+    if value == integral:
+        return int(integral)
+    return float(value)
+
+
+def accounting_to_dict(acct: LifecycleAccounting) -> dict[str, int | float]:
+    return {
+        "cash": _json_num(acct.cash),
+        "remaining": _json_num(acct.remaining),
+        "realizedPnl": _json_num(acct.realized_pnl),
+        "unrealizedPnl": _json_num(acct.unrealized_pnl),
+        "totalPnl": _json_num(acct.total_pnl),
+        "lastPrice": _json_num(acct.last_price),
+        "marketValue": _json_num(acct.market_value),
+        "totalEquity": _json_num(acct.total_equity),
+        "avgCost": _json_num(acct.avg_cost),
+        "initialEquity": _json_num(acct.initial_equity),
+    }
+
+
+def classify_lifecycle_integrity_error(exc: IntegrityError) -> IntegrityKind:
+    orig = exc.orig
+    constraint = ""
+    if orig is not None:
+        diag = getattr(orig, "diag", None)
+        if diag is not None:
+            constraint = str(getattr(diag, "constraint_name", None) or "")
+        if not constraint:
+            constraint = str(orig)
+    blob = f"{constraint} {exc}".lower()
+    if "fill_id" in blob:
+        return "duplicate_fill_id"
+    if "sequence" in blob or "position_seq" in blob:
+        return "sequence_conflict"
+    return "event_id_conflict"
 
 
 def row_to_event(row: LifecycleEventRow) -> LifecycleStoreEvent:
@@ -53,19 +108,20 @@ def row_to_event(row: LifecycleEventRow) -> LifecycleStoreEvent:
         side=row.side,
         currency=row.currency,
         fill_id=row.fill_id,
-        quantity=float(row.quantity) if row.quantity is not None else None,
-        price=float(row.price) if row.price is not None else None,
-        fees=float(row.fees) if row.fees is not None else None,
+        quantity=_money(row.quantity),
+        price=_money(row.price),
+        fees=_money(row.fees),
         venue=row.venue,
         venue_order_id=row.venue_order_id,
-        previous_stop=float(row.previous_stop) if row.previous_stop is not None else None,
-        new_stop=float(row.new_stop) if row.new_stop is not None else None,
+        previous_stop=_money(row.previous_stop),
+        new_stop=_money(row.new_stop),
         reason=row.reason,
         revision_id=row.revision_id,
         payload_hash=row.payload_hash,
         schema_version=row.schema_version,
         causation_id=row.causation_id,
         correlation_id=row.correlation_id,
+        sequence_no=row.sequence_no,
     )
 
 
@@ -84,20 +140,15 @@ def event_to_row(event: LifecycleStoreEvent) -> LifecycleEventRow:
         currency=event.currency or "USD",
         kind=event.kind,
         at=_parse_at(event.at),
+        sequence_no=event.sequence_no if event.sequence_no is not None else 0,
         fill_id=event.fill_id,
-        quantity=Decimal(str(event.quantity)) if event.quantity is not None else None,
-        price=Decimal(str(event.price)) if event.price is not None else None,
-        fees=Decimal(str(event.fees)) if event.fees is not None else None,
+        quantity=event.quantity,
+        price=event.price,
+        fees=event.fees,
         venue=event.venue,
         venue_order_id=event.venue_order_id,
-        previous_stop=(
-            Decimal(str(event.previous_stop))
-            if event.previous_stop is not None
-            else None
-        ),
-        new_stop=(
-            Decimal(str(event.new_stop)) if event.new_stop is not None else None
-        ),
+        previous_stop=event.previous_stop,
+        new_stop=event.new_stop,
         reason=event.reason,
         revision_id=event.revision_id,
         payload=payload,
@@ -110,24 +161,52 @@ def event_to_row(event: LifecycleStoreEvent) -> LifecycleEventRow:
 
 
 class LifecycleEventStore(Protocol):
+    def locked(
+        self, position_id: str, account_id: str
+    ) -> AbstractAsyncContextManager[None]: ...
+
     async def list_by_position(self, position_id: str) -> list[LifecycleStoreEvent]: ...
 
-    async def append(self, event: LifecycleStoreEvent) -> None: ...
+    async def append(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent: ...
 
     async def get_by_event_id(self, event_id: str) -> LifecycleStoreEvent | None: ...
 
+    async def get_account_id(self, position_id: str) -> str | None: ...
+
 
 class PostgresLifecycleEventStore:
-    """Append-only PostgreSQL store. No UPDATE/DELETE API."""
+    """Append-only PostgreSQL store. No UPDATE/DELETE API. Serializes per position."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    @asynccontextmanager
+    async def locked(self, position_id: str, account_id: str) -> AsyncIterator[None]:
+        stmt = (
+            pg_insert(LifecycleAggregateRow)
+            .values(
+                position_id=position_id,
+                account_id=account_id or "",
+                last_sequence_no=0,
+                created_at=datetime.now(UTC),
+            )
+            .on_conflict_do_nothing(index_elements=["position_id"])
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
+        lock_stmt = (
+            select(LifecycleAggregateRow)
+            .where(LifecycleAggregateRow.position_id == position_id)
+            .with_for_update()
+        )
+        await self._session.execute(lock_stmt)
+        yield
 
     async def list_by_position(self, position_id: str) -> list[LifecycleStoreEvent]:
         stmt = (
             select(LifecycleEventRow)
             .where(LifecycleEventRow.position_id == position_id)
-            .order_by(LifecycleEventRow.at.asc(), LifecycleEventRow.created_at.asc())
+            .order_by(LifecycleEventRow.sequence_no.asc())
         )
         rows = (await self._session.execute(stmt)).scalars().all()
         return [row_to_event(row) for row in rows]
@@ -137,10 +216,36 @@ class PostgresLifecycleEventStore:
         row = (await self._session.execute(stmt)).scalar_one_or_none()
         return row_to_event(row) if row else None
 
-    async def append(self, event: LifecycleStoreEvent) -> None:
+    async def get_account_id(self, position_id: str) -> str | None:
+        agg = await self._session.get(LifecycleAggregateRow, position_id)
+        if agg is not None and agg.account_id:
+            return agg.account_id
+        events = await self.list_by_position(position_id)
+        if events and events[0].account_id:
+            return events[0].account_id
+        return None
+
+    async def append(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent:
+        agg = await self._session.get(LifecycleAggregateRow, event.position_id)
+        last = agg.last_sequence_no if agg is not None else 0
+        stored = replace(event, sequence_no=last + 1)
         async with self._session.begin_nested():
-            self._session.add(event_to_row(event))
+            self._session.add(event_to_row(stored))
+            if agg is not None:
+                agg.last_sequence_no = stored.sequence_no or last + 1
+                if stored.account_id and not agg.account_id:
+                    agg.account_id = stored.account_id
+            else:
+                self._session.add(
+                    LifecycleAggregateRow(
+                        position_id=stored.position_id,
+                        account_id=stored.account_id or "",
+                        last_sequence_no=stored.sequence_no or 1,
+                        created_at=datetime.now(UTC),
+                    )
+                )
             await self._session.flush()
+        return stored
 
 
 class InMemoryLifecycleEventStore:
@@ -149,22 +254,54 @@ class InMemoryLifecycleEventStore:
     def __init__(self) -> None:
         self._by_position: dict[str, list[LifecycleStoreEvent]] = {}
         self._by_event_id: dict[str, LifecycleStoreEvent] = {}
+        self._account: dict[str, str] = {}
+        self._seq: dict[str, int] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
+
+    @asynccontextmanager
+    async def locked(self, position_id: str, account_id: str) -> AsyncIterator[None]:
+        lock = self._locks.setdefault(position_id, asyncio.Lock())
+        async with lock:
+            if account_id and position_id not in self._account:
+                self._account[position_id] = account_id
+            yield
 
     async def list_by_position(self, position_id: str) -> list[LifecycleStoreEvent]:
-        return list(self._by_position.get(position_id, []))
+        rows = list(self._by_position.get(position_id, []))
+        return sorted(rows, key=lambda e: e.sequence_no or 0)
 
     async def get_by_event_id(self, event_id: str) -> LifecycleStoreEvent | None:
         return self._by_event_id.get(event_id)
 
-    async def append(self, event: LifecycleStoreEvent) -> None:
+    async def get_account_id(self, position_id: str) -> str | None:
+        if position_id in self._account:
+            return self._account[position_id]
+        events = await self.list_by_position(position_id)
+        return events[0].account_id if events else None
+
+    async def append(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent:
         if event.event_id in self._by_event_id:
             raise IntegrityError(
                 "INSERT",
                 {"event_id": event.event_id},
-                Exception("duplicate event_id"),
+                Exception("duplicate event_id lifecycle_events_event_id_key"),
             )
-        self._by_event_id[event.event_id] = event
-        self._by_position.setdefault(event.position_id, []).append(event)
+        if event.fill_id:
+            for existing in self._by_event_id.values():
+                if existing.fill_id == event.fill_id:
+                    raise IntegrityError(
+                        "INSERT",
+                        {"fill_id": event.fill_id},
+                        Exception("duplicate fill_id lifecycle_events_fill_id_uidx"),
+                    )
+        next_seq = self._seq.get(event.position_id, 0) + 1
+        stored = replace(event, sequence_no=next_seq)
+        self._seq[event.position_id] = next_seq
+        self._by_event_id[stored.event_id] = stored
+        self._by_position.setdefault(event.position_id, []).append(stored)
+        if stored.account_id:
+            self._account.setdefault(event.position_id, stored.account_id)
+        return stored
 
 
 class AppendLifecycleResult:
@@ -195,7 +332,6 @@ class AppendLifecycleResult:
                 "ok": False,
                 "error": {"code": self.error.code, "message": self.error.message},
             }
-        acct = self.accounting
         return {
             "ok": True,
             "idempotent": self.idempotent,
@@ -204,26 +340,13 @@ class AppendLifecycleResult:
             "lineagePath": self.lineage_path,
             "event": self.event.to_canonical_dict() if self.event else None,
             "accounting": (
-                {
-                    "cash": acct.cash,
-                    "remaining": acct.remaining,
-                    "realizedPnl": acct.realized_pnl,
-                    "unrealizedPnl": acct.unrealized_pnl,
-                    "totalPnl": acct.total_pnl,
-                    "lastPrice": acct.last_price,
-                    "marketValue": acct.market_value,
-                    "totalEquity": acct.total_equity,
-                    "avgCost": acct.avg_cost,
-                    "initialEquity": acct.initial_equity,
-                }
-                if acct
-                else None
+                accounting_to_dict(self.accounting) if self.accounting else None
             ),
         }
 
 
 class AppendLifecycleEvent:
-    """POST path: load log → validate → insert → commit semantics via session."""
+    """POST path: lock aggregate → load log → validate → insert → sequence."""
 
     def __init__(self, store: LifecycleEventStore) -> None:
         self._store = store
@@ -236,10 +359,17 @@ class AppendLifecycleEvent:
     ) -> AppendLifecycleResult:
         pos = position_id or input_event.position_id or "pos-e2e-lifecycle-1"
         if input_event.position_id is None:
-            from dataclasses import replace
-
             input_event = replace(input_event, position_id=pos)
+        account_id = input_event.account_id or ""
 
+        async with self._store.locked(pos, account_id):
+            return await self._execute_locked(input_event, pos)
+
+    async def _execute_locked(
+        self,
+        input_event: LifecycleEventInput,
+        pos: str,
+    ) -> AppendLifecycleResult:
         log = await self._store.list_by_position(pos)
         result = append_validated_lifecycle_event(log, input_event)
         if isinstance(result, AppendFail):
@@ -261,9 +391,29 @@ class AppendLifecycleEvent:
             )
 
         try:
-            await self._store.append(result.event)
-        except IntegrityError:
-            # Race: another writer won UNIQUE(event_id)
+            stored = await self._store.append(result.event)
+        except IntegrityError as exc:
+            kind = classify_lifecycle_integrity_error(exc)
+            if kind == "duplicate_fill_id":
+                return AppendLifecycleResult(
+                    ok=False,
+                    error=LifecycleAppendError(
+                        code="duplicate_fill_id",
+                        message=(
+                            f"fillId {result.event.fill_id} already persisted"
+                        ),
+                    ),
+                    log=log,
+                )
+            if kind == "sequence_conflict":
+                return AppendLifecycleResult(
+                    ok=False,
+                    error=LifecycleAppendError(
+                        code="illegal_transition",
+                        message="concurrent sequence conflict on position",
+                    ),
+                    log=log,
+                )
             existing = await self._store.get_by_event_id(result.event.event_id)
             if existing is None:
                 return AppendLifecycleResult(
@@ -307,7 +457,7 @@ class AppendLifecycleEvent:
         return AppendLifecycleResult(
             ok=True,
             idempotent=False,
-            event=result.event,
+            event=stored,
             log=fresh,
             stage=result.stage,
             lineage_path=result.lineage_path,
@@ -337,18 +487,7 @@ class GetLifecycleSnapshot:
             "stage": stage,
             "lineagePath": lineage_path,
             "events": [e.to_canonical_dict() for e in log],
-            "accounting": {
-                "cash": acct.cash,
-                "remaining": acct.remaining,
-                "realizedPnl": acct.realized_pnl,
-                "unrealizedPnl": acct.unrealized_pnl,
-                "totalPnl": acct.total_pnl,
-                "lastPrice": acct.last_price,
-                "marketValue": acct.market_value,
-                "totalEquity": acct.total_equity,
-                "avgCost": acct.avg_cost,
-                "initialEquity": acct.initial_equity,
-            },
+            "accounting": accounting_to_dict(acct),
         }
 
 
@@ -369,13 +508,13 @@ def input_from_body(body: dict[str, Any]) -> LifecycleEventInput:
         side=body.get("side"),
         currency=body.get("currency"),
         fill_id=body.get("fillId") or body.get("fill_id"),
-        quantity=_opt_float(body.get("quantity")),
-        price=_opt_float(body.get("price")),
-        fees=_opt_float(body.get("fees")),
+        quantity=_opt_decimal(body.get("quantity")),
+        price=_opt_decimal(body.get("price")),
+        fees=_opt_decimal(body.get("fees")),
         venue=body.get("venue"),
         venue_order_id=body.get("venueOrderId") or body.get("venue_order_id"),
-        previous_stop=_opt_float(body.get("previousStop") or body.get("previous_stop")),
-        new_stop=_opt_float(body.get("newStop") or body.get("new_stop")),
+        previous_stop=_opt_decimal(body.get("previousStop") or body.get("previous_stop")),
+        new_stop=_opt_decimal(body.get("newStop") or body.get("new_stop")),
         reason=body.get("reason"),
         revision_id=body.get("revisionId") or body.get("revision_id"),
         causation_id=body.get("causationId") or body.get("causation_id"),
@@ -383,10 +522,12 @@ def input_from_body(body: dict[str, Any]) -> LifecycleEventInput:
     )
 
 
-def _opt_float(value: Any) -> float | None:
+def _opt_decimal(value: Any) -> Decimal | None:
     if value is None:
         return None
-    return float(value)
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
 
 
 __all__ = [
@@ -396,5 +537,7 @@ __all__ = [
     "InMemoryLifecycleEventStore",
     "LifecycleEventStore",
     "PostgresLifecycleEventStore",
+    "accounting_to_dict",
+    "classify_lifecycle_integrity_error",
     "input_from_body",
 ]

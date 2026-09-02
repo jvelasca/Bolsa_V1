@@ -1,19 +1,22 @@
-"""V1.86 — Lifecycle event store HTTP (append-only PG / domain validate).
+"""V1.87 — Lifecycle event store HTTP (JWT + ownership + append-only PG).
 
 POST /lifecycle/events — append validated event
 GET  /lifecycle/positions/{position_id}/snapshot — reduce log → snapshot
 Does NOT replace /portfolio or mock Playwright routes.
+accountId in the body is a claim to verify, never authority.
 """
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_api.api.dependencies import get_db_session
+from bolsa_api.api.dependencies import get_account_repository, get_db_session
+from bolsa_api.auth.request_principal import require_jwt_principal
 from bolsa_application.lifecycle_event_store import (
     AppendLifecycleEvent,
     GetLifecycleSnapshot,
@@ -27,7 +30,7 @@ _HTTP_400 = frozenset({"invalid_timestamp", "invalid_kind", "invalid_json"})
 
 
 class LifecycleEventRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     kind: str
     at: str | None = None
@@ -41,25 +44,60 @@ class LifecycleEventRequestDto(BaseModel):
     side: str | None = None
     currency: str | None = None
     fill_id: str | None = Field(default=None, alias="fillId")
-    quantity: float | None = None
-    price: float | None = None
-    fees: float | None = None
+    quantity: Decimal | None = None
+    price: Decimal | None = None
+    fees: Decimal | None = None
     venue: str | None = None
     venue_order_id: str | None = Field(default=None, alias="venueOrderId")
-    previous_stop: float | None = Field(default=None, alias="previousStop")
-    new_stop: float | None = Field(default=None, alias="newStop")
+    previous_stop: Decimal | None = Field(default=None, alias="previousStop")
+    new_stop: Decimal | None = Field(default=None, alias="newStop")
     reason: str | None = None
     revision_id: str | None = Field(default=None, alias="revisionId")
     causation_id: str | None = Field(default=None, alias="causationId")
     correlation_id: str | None = Field(default=None, alias="correlationId")
 
 
+async def _assert_account_owned(
+    session: AsyncSession, principal: str, account_id: str
+) -> None:
+    try:
+        await get_account_repository(session).get_account(
+            account_id, owner_user_id=principal
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "forbidden", "message": "account not owned by principal"},
+        ) from exc
+
+
 @router.post("/events")
 async def post_lifecycle_event(
     body: LifecycleEventRequestDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    principal: Annotated[str, Depends(require_jwt_principal)],
 ) -> dict[str, Any]:
     store = PostgresLifecycleEventStore(session)
+    pos = body.position_id or "pos-e2e-lifecycle-1"
+    persisted_account = await store.get_account_id(pos)
+    if persisted_account:
+        await _assert_account_owned(session, principal, persisted_account)
+        if body.account_id and body.account_id != persisted_account:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "forbidden",
+                    "message": "accountId does not match persisted position",
+                },
+            )
+    else:
+        if not body.account_id:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_kind", "message": "accountId required"},
+            )
+        await _assert_account_owned(session, principal, body.account_id)
+
     uc = AppendLifecycleEvent(store)
     raw = body.model_dump(by_alias=True, exclude_none=False)
     try:
@@ -86,8 +124,21 @@ async def post_lifecycle_event(
 async def get_lifecycle_snapshot(
     position_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    principal: Annotated[str, Depends(require_jwt_principal)],
 ) -> dict[str, Any]:
     store = PostgresLifecycleEventStore(session)
     uc = GetLifecycleSnapshot(store)
     snap = await uc.execute(position_id)
+    if not snap["events"]:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "position not found"},
+        )
+    account_id = await store.get_account_id(position_id)
+    if not account_id:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "position not found"},
+        )
+    await _assert_account_owned(session, principal, account_id)
     return {"data": snap}

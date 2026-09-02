@@ -17,6 +17,7 @@ esa conexión en lugar de crear engine propio.
 
 from __future__ import annotations
 
+import os
 import re
 from logging.config import fileConfig
 
@@ -35,7 +36,7 @@ target_metadata = Base.metadata
 
 def _resolved_url() -> str:
     default = config.get_main_option("sqlalchemy.url")
-    url = default or ""
+    url = os.environ.get("DATABASE_URL") or default or ""
     if "DATABASE_URL" in config.attributes:
         url = config.attributes["DATABASE_URL"]
     url = re.sub(r"^\s*postgresql(\+psycopg)?://", "postgresql+psycopg://", url)

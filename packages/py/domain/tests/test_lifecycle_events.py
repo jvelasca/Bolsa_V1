@@ -257,11 +257,13 @@ def test_invalid_timestamp() -> None:
 
 def test_duplicate_fill_id() -> None:
     log = _append_all(["POSITION_OPENED", "T1_EXECUTED", "T2_TRIGGERED"])
+    t1_fill = next(e.fill_id for e in log if e.kind == "T1_EXECUTED")
+    assert t1_fill
     result = append_validated_lifecycle_event(
         log,
         LifecycleEventInput(
             kind="T2_EXECUTED",
-            fill_id="fill-mock-t1",
+            fill_id=t1_fill,
             event_id="evt-other-t2",
         ),
     )

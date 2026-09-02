@@ -1279,6 +1279,11 @@ class LifecycleEventRow(Base):
     __tablename__ = "lifecycle_events"
     __table_args__ = (
         UniqueConstraint("event_id", name="lifecycle_events_event_id_key"),
+        UniqueConstraint(
+            "position_id",
+            "sequence_no",
+            name="lifecycle_events_position_seq_uidx",
+        ),
         Index(
             "lifecycle_events_fill_id_uidx",
             "fill_id",
@@ -1305,6 +1310,7 @@ class LifecycleEventRow(Base):
     currency: Mapped[str] = mapped_column(String, nullable=False, default="USD")
     kind: Mapped[str] = mapped_column(String, nullable=False)
     at: Mapped[datetime] = mapped_column("at", DateTime(timezone=True), nullable=False)
+    sequence_no: Mapped[int] = mapped_column("sequence_no", Integer, nullable=False)
     fill_id: Mapped[str | None] = mapped_column("fill_id", String, nullable=True)
     quantity: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
@@ -1331,6 +1337,21 @@ class LifecycleEventRow(Base):
     )
     correlation_id: Mapped[str | None] = mapped_column(
         "correlation_id", String, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", DateTime(timezone=True), nullable=False
+    )
+
+
+class LifecycleAggregateRow(Base):
+    """V1.87 — per-position lock target + last sequence_no."""
+
+    __tablename__ = "lifecycle_aggregates"
+
+    position_id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    last_sequence_no: Mapped[int] = mapped_column(
+        "last_sequence_no", Integer, nullable=False, default=0
     )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", DateTime(timezone=True), nullable=False

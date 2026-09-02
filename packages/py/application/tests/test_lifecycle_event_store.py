@@ -40,8 +40,11 @@ async def test_append_open_t1_close_and_fresh_store_snapshot() -> None:
     store_b = InMemoryLifecycleEventStore()
     store_b._by_position = dict(store_a._by_position)
     store_b._by_event_id = dict(store_a._by_event_id)
+    store_b._seq = dict(store_a._seq)
+    store_b._account = dict(store_a._account)
     snap2 = await GetLifecycleSnapshot(store_b).execute(pos)
     assert snap2 == snap1
+    assert [e["sequenceNo"] for e in snap1["events"]] == [1, 2, 3, 4, 5]
 
 
 @pytest.mark.asyncio
@@ -96,3 +99,69 @@ async def test_idempotent_replay() -> None:
     assert len(second.log) == 2
     if second.accounting:
         assert_equity_invariant(second.accounting)
+
+
+@pytest.mark.asyncio
+async def test_inmemory_concurrent_t1_one_wins() -> None:
+    import asyncio
+
+    store = InMemoryLifecycleEventStore()
+    uc = AppendLifecycleEvent(store)
+    pos = "pos-race-mem"
+    opened = await uc.execute(
+        LifecycleEventInput(kind="POSITION_OPENED", position_id=pos)  # type: ignore[arg-type]
+    )
+    assert opened.ok
+
+    async def _worker(fill_id: str, event_id: str):
+        return await uc.execute(
+            LifecycleEventInput(
+                kind="T1_EXECUTED",
+                position_id=pos,
+                fill_id=fill_id,
+                event_id=event_id,
+                quantity=5,
+                price=105,
+            )
+        )
+
+    r1, r2 = await asyncio.gather(
+        _worker("fill-race-a", "evt-race-a"),
+        _worker("fill-race-b", "evt-race-b"),
+    )
+    oks = [r1.ok, r2.ok]
+    assert oks.count(True) == 1
+    assert oks.count(False) == 1
+    loser = r1 if not r1.ok else r2
+    assert loser.error is not None
+    assert loser.error.code == "illegal_transition"
+    snap = await GetLifecycleSnapshot(store).execute(pos)
+    assert [e["sequenceNo"] for e in snap["events"]] == [1, 2]
+    assert snap["events"][1]["kind"] == "T1_EXECUTED"
+
+
+def test_classify_fill_id_not_event_id_conflict() -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    from bolsa_application.lifecycle_event_store import (
+        classify_lifecycle_integrity_error,
+    )
+
+    fill_exc = IntegrityError(
+        "INSERT",
+        {},
+        Exception("duplicate key lifecycle_events_fill_id_uidx"),
+    )
+    assert classify_lifecycle_integrity_error(fill_exc) == "duplicate_fill_id"
+    event_exc = IntegrityError(
+        "INSERT",
+        {},
+        Exception("duplicate key lifecycle_events_event_id_key"),
+    )
+    assert classify_lifecycle_integrity_error(event_exc) == "event_id_conflict"
+    seq_exc = IntegrityError(
+        "INSERT",
+        {},
+        Exception("duplicate key lifecycle_events_position_seq_uidx"),
+    )
+    assert classify_lifecycle_integrity_error(seq_exc) == "sequence_conflict"

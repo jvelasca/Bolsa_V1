@@ -1,16 +1,17 @@
-"""V1.86 — Lifecycle event domain kernel (pure: no infra / FastAPI).
+"""V1.87 — Lifecycle event domain kernel (pure: no infra / FastAPI).
 
-FSM + identity envelope + strict idempotency + ENTRY accounting + payload/trail guards.
+FSM + identity envelope + strict idempotency + ENTRY accounting + Decimal money.
+Sequence numbers are assigned by the store under an aggregate lock, not here.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import math
 import uuid
 from dataclasses import dataclass, replace
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Literal
 
 LifecycleEventKind = Literal[
@@ -62,13 +63,14 @@ WIRE_EVENT_KINDS: frozenset[str] = frozenset(
     {"T1_EXECUTED", "T2_TRIGGERED", "T2_EXECUTED", "POSITION_CLOSED"}
 )
 
-LIFECYCLE_BIRTH_QTY = 10.0
-LIFECYCLE_AVG_COST = 100.0
-LIFECYCLE_CASH = 100_000.0
-LIFECYCLE_INITIAL_STOP = 95.0
+LIFECYCLE_BIRTH_QTY = Decimal("10")
+LIFECYCLE_AVG_COST = Decimal("100")
+LIFECYCLE_CASH = Decimal("100000")
+LIFECYCLE_INITIAL_STOP = Decimal("95")
 LIFECYCLE_INITIAL_RISK = (LIFECYCLE_AVG_COST - LIFECYCLE_INITIAL_STOP) * LIFECYCLE_BIRTH_QTY
-LIFECYCLE_REMAINING_AFTER_T1 = 5.0
-LIFECYCLE_REMAINING_AFTER_T2 = 2.0
+LIFECYCLE_REMAINING_AFTER_T1 = Decimal("5")
+LIFECYCLE_REMAINING_AFTER_T2 = Decimal("2")
+_MONEY_EPS = Decimal("0.000000001")
 
 DEFAULT_AT: dict[str, str] = {
     "POSITION_OPENED": "2026-09-02T10:00:00.000Z",
@@ -155,19 +157,20 @@ class LifecycleStoreEvent:
     side: str | None = None
     currency: str | None = None
     fill_id: str | None = None
-    quantity: float | None = None
-    price: float | None = None
-    fees: float | None = None
+    quantity: Decimal | None = None
+    price: Decimal | None = None
+    fees: Decimal | None = None
     venue: str | None = None
     venue_order_id: str | None = None
-    previous_stop: float | None = None
-    new_stop: float | None = None
+    previous_stop: Decimal | None = None
+    new_stop: Decimal | None = None
     reason: str | None = None
     revision_id: str | None = None
     payload_hash: str | None = None
     schema_version: int = 1
     causation_id: str | None = None
     correlation_id: str | None = None
+    sequence_no: int | None = None
 
     def to_canonical_dict(self) -> dict[str, Any]:
         return {
@@ -183,19 +186,20 @@ class LifecycleStoreEvent:
             "side": self.side,
             "currency": self.currency,
             "fillId": self.fill_id,
-            "quantity": self.quantity,
-            "price": self.price,
-            "fees": self.fees,
+            "quantity": _json_money(self.quantity),
+            "price": _json_money(self.price),
+            "fees": _json_money(self.fees),
             "venue": self.venue,
             "venueOrderId": self.venue_order_id,
-            "previousStop": self.previous_stop,
-            "newStop": self.new_stop,
+            "previousStop": _json_money(self.previous_stop),
+            "newStop": _json_money(self.new_stop),
             "reason": self.reason,
             "revisionId": self.revision_id,
             "payloadHash": self.payload_hash,
             "schemaVersion": self.schema_version,
             "causationId": self.causation_id,
             "correlationId": self.correlation_id,
+            "sequenceNo": self.sequence_no,
         }
 
 
@@ -213,13 +217,13 @@ class LifecycleEventInput:
     side: str | None = None
     currency: str | None = None
     fill_id: str | None = None
-    quantity: float | None = None
-    price: float | None = None
-    fees: float | None = None
+    quantity: Decimal | float | int | str | None = None
+    price: Decimal | float | int | str | None = None
+    fees: Decimal | float | int | str | None = None
     venue: str | None = None
     venue_order_id: str | None = None
-    previous_stop: float | None = None
-    new_stop: float | None = None
+    previous_stop: Decimal | float | int | str | None = None
+    new_stop: Decimal | float | int | str | None = None
     reason: str | None = None
     revision_id: str | None = None
     causation_id: str | None = None
@@ -228,16 +232,16 @@ class LifecycleEventInput:
 
 @dataclass(frozen=True, slots=True)
 class LifecycleAccounting:
-    cash: float
-    remaining: float
-    realized_pnl: float
-    unrealized_pnl: float
-    total_pnl: float
-    last_price: float
-    market_value: float
-    total_equity: float
-    avg_cost: float
-    initial_equity: float = LIFECYCLE_CASH
+    cash: Decimal
+    remaining: Decimal
+    realized_pnl: Decimal
+    unrealized_pnl: Decimal
+    total_pnl: Decimal
+    last_price: Decimal
+    market_value: Decimal
+    total_equity: Decimal
+    avg_cost: Decimal
+    initial_equity: Decimal = LIFECYCLE_CASH
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,10 +258,32 @@ class AppendFail:
     error: LifecycleAppendError
 
 
-def _finite_positive(value: float | None, *, allow_zero: bool = False) -> bool:
+def _as_money(value: object) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, bool):
+        return Decimal(str(int(value)))
+    if isinstance(value, (int, float, str)):
+        return Decimal(str(value))
+    raise TypeError(f"unsupported money type {type(value)!r}")
+
+
+def _json_money(value: Decimal | None) -> int | float | None:
+    """JSON-stable number: ints stay ints so hashes do not depend on Decimal."""
+    if value is None:
+        return None
+    integral = value.to_integral_value()
+    if value == integral:
+        return int(integral)
+    return float(value)
+
+
+def _finite_positive(value: Decimal | None, *, allow_zero: bool = False) -> bool:
     if value is None:
         return False
-    if not math.isfinite(value):
+    if not value.is_finite():
         return False
     if allow_zero:
         return value >= 0
@@ -277,12 +303,12 @@ def _ms(iso: str) -> float | LifecycleAppendError:
     return dt.timestamp() * 1000.0
 
 
-def last_price_for_stage(stage: LifecycleStage, lineage_path: LineagePath) -> float:
+def last_price_for_stage(stage: LifecycleStage, lineage_path: LineagePath) -> Decimal:
     if stage in ("t2_ready", "t2_executed"):
-        return 110.0
+        return Decimal("110")
     if stage == "closed":
-        return 110.0 if lineage_path == "t2" else 106.0
-    return 106.0
+        return Decimal("110") if lineage_path == "t2" else Decimal("106")
+    return Decimal("106")
 
 
 def validate_transition_result(
@@ -342,34 +368,41 @@ def compute_payload_hash(event: LifecycleStoreEvent) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _scoped_mock_fill_id(base: str, position_id: str) -> str:
+    """Namespace mock fill IDs by position so global UNIQUE(fill_id) stays safe."""
+    return f"{base}:{position_id}"
+
+
 def _default_fill(
     kind: LifecycleEventKind,
-    remaining_before: float,
+    remaining_before: Decimal,
     lineage_path: LineagePath,
+    *,
+    position_id: str,
 ) -> dict[str, Any] | None:
     if kind == "POSITION_OPENED":
         return {
             "quantity": LIFECYCLE_BIRTH_QTY,
             "price": LIFECYCLE_AVG_COST,
-            "fill_id": MOCK_OPEN_FILL_ID,
+            "fill_id": _scoped_mock_fill_id(MOCK_OPEN_FILL_ID, position_id),
         }
     if kind == "T1_EXECUTED":
         return {
             "quantity": LIFECYCLE_BIRTH_QTY - LIFECYCLE_REMAINING_AFTER_T1,
-            "price": 105.0,
-            "fill_id": MOCK_T1_FILL_ID,
+            "price": Decimal("105"),
+            "fill_id": _scoped_mock_fill_id(MOCK_T1_FILL_ID, position_id),
         }
     if kind == "T2_EXECUTED":
         return {
             "quantity": LIFECYCLE_REMAINING_AFTER_T1 - LIFECYCLE_REMAINING_AFTER_T2,
-            "price": 110.0,
-            "fill_id": MOCK_T2_FILL_ID,
+            "price": Decimal("110"),
+            "fill_id": _scoped_mock_fill_id(MOCK_T2_FILL_ID, position_id),
         }
     if kind == "POSITION_CLOSED":
         return {
             "quantity": remaining_before,
             "price": last_price_for_stage("closed", lineage_path),
-            "fill_id": MOCK_CLOSE_FILL_ID,
+            "fill_id": _scoped_mock_fill_id(MOCK_CLOSE_FILL_ID, position_id),
         }
     return None
 
@@ -377,7 +410,7 @@ def _default_fill(
 def normalize_lifecycle_event(
     input_event: LifecycleEventInput,
     *,
-    remaining_before: float = 0.0,
+    remaining_before: Decimal = Decimal("0"),
     lineage_path: LineagePath = "trail",
     defaults: LifecycleIdentity | None = None,
 ) -> LifecycleStoreEvent | LifecycleAppendError:
@@ -426,14 +459,15 @@ def normalize_lifecycle_event(
 
     if kind == "TRAIL_APPLIED":
         previous_stop = (
-            input_event.previous_stop
+            _as_money(input_event.previous_stop)
             if input_event.previous_stop is not None
             else LIFECYCLE_INITIAL_STOP
         )
+        assert previous_stop is not None
         new_stop = (
-            input_event.new_stop
+            _as_money(input_event.new_stop)
             if input_event.new_stop is not None
-            else previous_stop + 3.0
+            else previous_stop + Decimal("3")
         )
         event = replace(
             base,
@@ -446,7 +480,9 @@ def normalize_lifecycle_event(
         return replace(event, payload_hash=compute_payload_hash(event))
 
     if kind in FILL_KINDS:
-        defaults_fill = _default_fill(kind, remaining_before, lineage_path)
+        defaults_fill = _default_fill(
+            kind, remaining_before, lineage_path, position_id=position_id
+        )
         qty = (
             input_event.quantity
             if input_event.quantity is not None
@@ -458,13 +494,13 @@ def normalize_lifecycle_event(
             else (defaults_fill or {}).get("price")
         )
         fill_id = input_event.fill_id or (defaults_fill or {}).get("fill_id")
-        fees = 0.0 if input_event.fees is None else input_event.fees
+        fees = Decimal("0") if input_event.fees is None else input_event.fees
         event = replace(
             base,
             fill_id=str(fill_id) if fill_id is not None else None,
-            quantity=float(qty) if qty is not None else None,
-            price=float(price) if price is not None else None,
-            fees=float(fees),
+            quantity=_as_money(qty),
+            price=_as_money(price),
+            fees=_as_money(fees),
             venue=input_event.venue or "MOCK",
             venue_order_id=input_event.venue_order_id,  # never invent
             currency=input_event.currency or identity.currency,
@@ -475,13 +511,16 @@ def normalize_lifecycle_event(
     return replace(event, payload_hash=compute_payload_hash(event))
 
 
-def remaining_after_log(events: list[LifecycleStoreEvent] | tuple[LifecycleStoreEvent, ...]) -> float:
-    remaining = 0.0
+def remaining_after_log(
+    events: list[LifecycleStoreEvent] | tuple[LifecycleStoreEvent, ...],
+) -> Decimal:
+    remaining = Decimal("0")
     for ev in events:
+        qty = ev.quantity or Decimal("0")
         if ev.kind == "POSITION_OPENED":
-            remaining += float(ev.quantity or 0.0)
+            remaining += qty
         elif ev.kind in EXIT_FILL_KINDS:
-            remaining -= float(ev.quantity or 0.0)
+            remaining -= qty
     return remaining
 
 
@@ -612,14 +651,14 @@ def _validate_time(
 def _validate_payload(
     event: LifecycleStoreEvent,
     *,
-    remaining_before: float,
+    remaining_before: Decimal,
     stage: LifecycleStage,
     lineage_path: LineagePath,
 ) -> LifecycleAppendError | None:
     if event.kind in FILL_KINDS:
         qty = event.quantity
         price = event.price
-        fees = event.fees if event.fees is not None else 0.0
+        fees = event.fees if event.fees is not None else Decimal("0")
         if not _finite_positive(qty):
             return LifecycleAppendError(
                 code="invalid_payload",
@@ -630,7 +669,7 @@ def _validate_payload(
                 code="invalid_payload",
                 message=f"price must be > 0, got {price}",
             )
-        if fees is None or not math.isfinite(fees) or fees < 0:
+        if fees is None or not fees.is_finite() or fees < 0:
             return LifecycleAppendError(
                 code="invalid_payload",
                 message=f"fees must be >= 0 finite, got {fees}",
@@ -639,14 +678,14 @@ def _validate_payload(
         if event.kind == "POSITION_OPENED":
             pass
         elif event.kind == "POSITION_CLOSED":
-            if abs(qty - remaining_before) > 1e-9:
+            if abs(qty - remaining_before) > _MONEY_EPS:
                 return LifecycleAppendError(
                     code="invalid_payload",
                     message=(
                         f"POSITION_CLOSED.quantity {qty} != remaining {remaining_before}"
                     ),
                 )
-        elif qty > remaining_before + 1e-9:
+        elif qty > remaining_before + _MONEY_EPS:
             return LifecycleAppendError(
                 code="invalid_payload",
                 message=f"quantity {qty} > remaining {remaining_before}",
@@ -660,7 +699,7 @@ def _validate_payload(
                 code="invalid_payload",
                 message="TRAIL_APPLIED requires previousStop and newStop",
             )
-        if not math.isfinite(prev) or not math.isfinite(new):
+        if not prev.is_finite() or not new.is_finite():
             return LifecycleAppendError(
                 code="invalid_payload",
                 message="trail stops must be finite",
@@ -817,16 +856,16 @@ def account_lifecycle_fills(
 ) -> LifecycleAccounting:
     stage, lineage_path = reduce_lifecycle_events(events)
     cash = LIFECYCLE_CASH
-    remaining = 0.0
-    realized_pnl = 0.0
+    remaining = Decimal("0")
+    realized_pnl = Decimal("0")
     avg_cost = LIFECYCLE_AVG_COST
 
     for ev in events:
         if ev.kind not in FILL_KINDS:
             continue
-        qty = float(ev.quantity or 0.0)
-        price = float(ev.price or 0.0)
-        fees = float(ev.fees or 0.0)
+        qty = ev.quantity or Decimal("0")
+        price = ev.price or Decimal("0")
+        fees = ev.fees or Decimal("0")
         if ev.kind == "POSITION_OPENED":
             cash -= qty * price + fees
             remaining += qty
@@ -836,7 +875,7 @@ def account_lifecycle_fills(
             remaining -= qty
             realized_pnl += (price - avg_cost) * qty - fees
 
-    if remaining < -1e-9:
+    if remaining < -_MONEY_EPS:
         raise ValueError(f"account_lifecycle_fills: remaining {remaining} < 0")
 
     last_price = last_price_for_stage(stage, lineage_path)
@@ -858,7 +897,9 @@ def account_lifecycle_fills(
     )
 
 
-def assert_equity_invariant(acct: LifecycleAccounting, *, tol: float = 1e-6) -> None:
+def assert_equity_invariant(
+    acct: LifecycleAccounting, *, tol: Decimal = Decimal("0.000001")
+) -> None:
     expected = acct.initial_equity + acct.realized_pnl + acct.unrealized_pnl
     if abs(acct.total_equity - expected) > tol:
         raise AssertionError(
