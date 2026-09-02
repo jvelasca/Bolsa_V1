@@ -1,8 +1,8 @@
 # Spec — V1.82 Fixtures Split (higiene E2E mock)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local) · **stamp CI GREEN remoto** pendiente tras tag `v1.82-beta`.  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) → [`d0ccf235`](https://github.com/jvelasca/Bolsa_V1/commit/d0ccf235) · [run 33651647262](https://github.com/jvelasca/Bolsa_V1/actions/runs/33651647262) **success** (security · shared · spine · frontend · python · playwright-mock · certify; playwright-integrated skipped opt-in).  
 > **Padre:** [`spec-v181-t2-pov-stages-2026-09-02.md`](./spec-v181-t2-pov-stages-2026-09-02.md) · relevo [`traspaso-relevo-v1-81-t2-pov-stages-2026-09-02.md`](./traspaso-relevo-v1-81-t2-pov-stages-2026-09-02.md).  
-> **Partida tip:** **V1.81** CERRADA — tip código [`4fcfc9bb`](https://github.com/jvelasca/Bolsa_V1/commit/4fcfc9bb) (tag [`v1.81-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.81-beta)) · docs stamp [`4d7120cf`](https://github.com/jvelasca/Bolsa_V1/commit/4d7120cf) (+ handoff [`3fcc8ade`](https://github.com/jvelasca/Bolsa_V1/commit/3fcc8ade)) · CI GREEN [run 33648642728](https://github.com/jvelasca/Bolsa_V1/actions/runs/33648642728). **No** LIVE.
+> **Partida tip:** **V1.81** CERRADA — tip código [`4fcfc9bb`](https://github.com/jvelasca/Bolsa_V1/commit/4fcfc9bb) (tag [`v1.81-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.81-beta)) · docs stamp [`4d7120cf`](https://github.com/jvelasca/Bolsa_V1/commit/4d7120cf) (+ handoff [`3fcc8ade`](https://github.com/jvelasca/Bolsa_V1/commit/3fcc8ade)) · CI GREEN [run 33648642728](https://github.com/jvelasca/Bolsa_V1/actions/runs/33648642728). **Tip stamp:** `v1.82-beta` → `d0ccf235`. **No** LIVE.
 
 Higiene: modularizar [`apps/web/e2e/fixtures.ts`](../../apps/web/e2e/fixtures.ts) (~800 LOC) al estilo V1.79 (`integration.ts` → `e2e/helpers/*` + barrel). **Misma semántica mock** · **sin** cambiar asserts · **sin** nuevos stages/productos. Gate filtro CI **intacto** (sin `gp-v182`).
 
@@ -32,9 +32,9 @@ V1.72–V1.81 intactos. **No** Playwright en `frontend-ci`. **No** integrated E2
 
 ## 2. IN
 
-| ID         | Pri | Comportamiento                                                     |
-| ---------- | --- | ------------------------------------------------------------------ | ------------------- |
-| GP-V182-00 | P0  | Split módulos + barrel · **0** cambio de asserts · filtro CI sin ` | gp-v182`. **DONE**. |
+| ID         | Pri | Comportamiento                                                                        |
+| ---------- | --- | ------------------------------------------------------------------------------------- |
+| GP-V182-00 | P0  | Split módulos + barrel · **0** cambio de asserts · filtro CI sin `gp-v182`. **DONE**. |
 
 ### Entregables técnicos
 
@@ -42,7 +42,7 @@ V1.72–V1.81 intactos. **No** Playwright en `frontend-ci`. **No** integrated E2
 2. `fixtures.ts` → barrel — **DONE**
 3. Docs: spec · plan · arranque · relevo · CURRENT_SYSTEM · engineering-index §51 — **DONE**
 4. Pre-flight filtro V1.81 — **DONE** (33 passed · 3 skipped · tsc EXIT 0)
-5. Stamp remoto vía tag `v1.82-beta` — **PENDING**
+5. Stamp remoto vía tag `v1.82-beta` — **DONE** (run 33651647262)
 
 ### Invariantes
 
