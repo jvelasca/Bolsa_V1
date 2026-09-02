@@ -10,6 +10,8 @@ import {
   mercadoOhlcvBars,
   mercadoOpenPosition,
   mercadoWorkspaceDocument,
+  paperAutonomousDayDailyOpsEnvelope,
+  paperAutonomousDayT1Position,
 } from "./integration";
 
 /** True when E2E should run (auto webServer or explicit base URL). */
@@ -129,11 +131,12 @@ function mercadoInstrumentCatalog(multi: boolean) {
 
 function routeBody(
   route: Route,
-  opts?: { mercado?: boolean; multi?: boolean },
+  opts?: { mercado?: boolean; multi?: boolean; hoyDay?: boolean },
 ): Record<string, unknown> {
   const path = apiPath(route.request().url());
-  const mercado = opts?.mercado === true;
+  const mercado = opts?.mercado === true || opts?.hoyDay === true;
   const multi = opts?.multi === true;
+  const hoyDay = opts?.hoyDay === true;
 
   if (path === "/api/auth/status") {
     return { data: { authEnabled: false, authenticated: false } };
@@ -148,12 +151,20 @@ function routeBody(
     return { data: [demoAccount] };
   }
   if (path === "/api/portfolio") {
-    const positions = multi
-      ? mercadoMultiOpenPositions()
-      : mercado
-        ? [mercadoOpenPosition()]
-        : [];
-    const equity = multi ? 103_500 : mercado ? 101_020 : 100_000;
+    const positions = hoyDay
+      ? [paperAutonomousDayT1Position()]
+      : multi
+        ? mercadoMultiOpenPositions()
+        : mercado
+          ? [mercadoOpenPosition()]
+          : [];
+    const equity = hoyDay
+      ? 101_060
+      : multi
+        ? 103_500
+        : mercado
+          ? 101_020
+          : 100_000;
     return {
       data: {
         accountId: E2E_ACCOUNT_ID,
@@ -166,10 +177,40 @@ function routeBody(
     };
   }
   if (path === "/api/lists") {
+    if (hoyDay) {
+      return {
+        data: [
+          {
+            id: "estudio",
+            name: "Estudio",
+            description: "E2E estudio universe",
+            kind: "estudio",
+            instrumentIds: [
+              E2E_INSTRUMENT_ID,
+              "inst-msft",
+              E2E_ENTRY_ONLY_INSTRUMENT.id,
+            ],
+          },
+        ],
+      };
+    }
     return { data: [] };
   }
   if (path === "/api/lists/memberships") {
     return { data: {} };
+  }
+  if (hoyDay && path === "/api/lists/estudio") {
+    return {
+      data: {
+        id: "estudio",
+        name: "Estudio",
+        instrumentIds: [
+          E2E_INSTRUMENT_ID,
+          "inst-msft",
+          E2E_ENTRY_ONLY_INSTRUMENT.id,
+        ],
+      },
+    };
   }
   if (path === "/api/workspaces") {
     if (mercado) {
@@ -275,7 +316,49 @@ function routeBody(
       data: { accountId: E2E_ACCOUNT_ID, incidents: [], total: 0 },
     };
   }
+  if (path === "/api/paper-desk/daily-report") {
+    if (hoyDay) {
+      return { data: paperAutonomousDayDailyOpsEnvelope(E2E_ACCOUNT_ID) };
+    }
+    return { data: { autoDesk: null } };
+  }
+  if (path.endsWith("/summary")) {
+    return {
+      data: {
+        accountId: E2E_ACCOUNT_ID,
+        cash: 100_000,
+        totalEquity: hoyDay ? 101_060 : 100_000,
+        openPositions: hoyDay ? 1 : 0,
+        dayPnl: hoyDay ? 60 : 0,
+        dayPnlPct: hoyDay ? 0.06 : 0,
+      },
+    };
+  }
   if (path.endsWith("/decision-studies")) {
+    if (hoyDay) {
+      return {
+        data: {
+          accountId: E2E_ACCOUNT_ID,
+          studies: [
+            {
+              decisionId: "dec-e2e-msft-day",
+              instrumentId: "inst-msft",
+              symbol: "MSFT",
+              hasOperationalPlan: true,
+              tradePlanStatus: "ARMED",
+              studiedAt: "2026-09-02T09:00:00.000Z",
+              entry: 420,
+              stop: 400,
+              target1: 440,
+              target2: 460,
+            },
+          ],
+          total: 1,
+          limit: 200,
+          offset: 0,
+        },
+      };
+    }
     if (multi) {
       return {
         data: {
@@ -311,6 +394,27 @@ function routeBody(
     };
   }
   if (path.endsWith("/decision-journal")) {
+    if (hoyDay) {
+      return {
+        data: {
+          accountId: E2E_ACCOUNT_ID,
+          entries: [
+            {
+              id: "journal-e2e-day-1",
+              decisionId: "dec-e2e-msft-day",
+              instrumentId: "inst-msft",
+              symbol: "MSFT",
+              studiedAt: "2026-09-02T09:00:00.000Z",
+              headline: "Plan armado — dryRun",
+              status: "studied",
+            },
+          ],
+          limit: 50,
+          offset: 0,
+          total: 1,
+        },
+      };
+    }
     return {
       data: {
         accountId: E2E_ACCOUNT_ID,
@@ -358,13 +462,16 @@ function routeBody(
     return { data: [] };
   }
   if (path === "/api/instruments") {
-    if (multi || mercado) {
-      return { data: mercadoInstrumentCatalog(multi) };
+    if (multi || hoyDay) {
+      return { data: mercadoInstrumentCatalog(true) };
+    }
+    if (mercado) {
+      return { data: mercadoInstrumentCatalog(false) };
     }
     return { data: [] };
   }
-  if ((mercado || multi) && path === "/api/instruments/quotes") {
-    return { data: mercadoInstrumentCatalog(multi) };
+  if ((mercado || multi || hoyDay) && path === "/api/instruments/quotes") {
+    return { data: mercadoInstrumentCatalog(multi || hoyDay) };
   }
   if ((mercado || multi) && path.endsWith("/ohlcv")) {
     const bars = mercadoOhlcvBars();
@@ -427,7 +534,7 @@ function routeBody(
 /** Intercept /api/* so smoke tests run without the Python stack. */
 export async function installApiMocks(
   page: Page,
-  opts?: { mercado?: boolean; multi?: boolean },
+  opts?: { mercado?: boolean; multi?: boolean; hoyDay?: boolean },
 ): Promise<void> {
   await page.route(/\/api\//, async (route) => {
     await route.fulfill(jsonResponse(routeBody(route, opts)));
@@ -443,4 +550,10 @@ export async function installMercadoApiMocks(page: Page): Promise<void> {
 export async function installMercadoMultiApiMocks(page: Page): Promise<void> {
   setMercadoMockWorkspaceDocument(null);
   await installApiMocks(page, { mercado: true, multi: true });
+}
+
+/** Hoy Paper Autonomous Day — autoDesk + T1 AAPL + entry MSFT + Mercado wire. */
+export async function installHoyPaperDayApiMocks(page: Page): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  await installApiMocks(page, { hoyDay: true });
 }
