@@ -442,6 +442,8 @@ function PositionCompactBody({
           data-state={view.operatingState}
           data-pov-state={view.operatingState}
           data-pov-source={viewSource ?? "canonical"}
+          data-remaining-quantity={String(view.remainingQuantity)}
+          data-birth-quantity={String(view.quantity)}
         >
           <p
             className={cn(

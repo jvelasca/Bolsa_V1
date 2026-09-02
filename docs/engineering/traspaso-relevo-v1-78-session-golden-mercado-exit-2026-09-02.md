@@ -17,4 +17,4 @@
 
 ## Next candidato
 
-**V1.79** — a decidir (nits V1.76 GP-V177-08 · T2 POV · o madurez CI). **NO LIVE**.
+**V1.79** Stateful Position Lifecycle — **CERRADA** ([relevo V1.79](./traspaso-relevo-v1-79-stateful-position-lifecycle-2026-09-02.md)). **NO LIVE**.

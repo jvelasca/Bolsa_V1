@@ -11,6 +11,10 @@ import {
   mercadoOpenPosition,
   mercadoWorkspaceDocument,
   applyGoldenPositionStage,
+  lifecycleDailyOpsEnvelope,
+  lifecycleDecisionStudy,
+  lifecycleJournalEntry,
+  lifecycleOpenPosition,
   paperAutonomousDayDailyOpsEnvelope,
   paperAutonomousDayT1Position,
   staleNoExecuteDailyOpsEnvelope,
@@ -47,8 +51,8 @@ type E2eMockRuntimeFlags = {
   reconStatus: "ok" | "drift";
   unknownOrder: boolean;
   /** V1.78 — Hoy desk overlay over multi Mercado installer. */
-  deskMode: "off" | "day" | "stale";
-  /** V1.78 — POV stage on first multi position (AAPL). */
+  deskMode: "off" | "day" | "stale" | "lifecycle" | "lifecycle_stale";
+  /** V1.78 — POV stage on first multi position (AAPL). V1.79 lifecycle stages. */
   positionStage: E2eGoldenPositionStage;
 };
 
@@ -198,6 +202,10 @@ function routeBody(
   },
 ): Record<string, unknown> {
   const path = apiPath(route.request().url());
+  const lifecycleDesk =
+    e2eMockRuntime.deskMode === "lifecycle" ||
+    e2eMockRuntime.deskMode === "lifecycle_stale";
+  const lifecycleStale = e2eMockRuntime.deskMode === "lifecycle_stale";
   const hoyStale =
     opts?.hoyStale === true || e2eMockRuntime.deskMode === "stale";
   const hoyUnknown = opts?.hoyUnknown === true;
@@ -206,8 +214,9 @@ function routeBody(
     opts?.mercado === true ||
     hoyDay === true ||
     hoyStale === true ||
-    hoyUnknown === true;
-  const multi = opts?.multi === true;
+    hoyUnknown === true ||
+    lifecycleDesk;
+  const multi = opts?.multi === true && !lifecycleDesk;
   const deskDay = hoyDay || hoyStale || hoyUnknown;
   const deskHappy = hoyDay || hoyUnknown;
 
@@ -224,29 +233,45 @@ function routeBody(
     return { data: [demoAccount] };
   }
   if (path === "/api/portfolio") {
-    const positions = deskDay
-      ? [paperAutonomousDayT1Position()]
-      : multi
-        ? mercadoMultiOpenPositions().map((pos, index) =>
-            index === 0
-              ? applyGoldenPositionStage(pos, e2eMockRuntime.positionStage)
-              : pos,
-          )
-        : mercado
-          ? [
-              applyGoldenPositionStage(
-                mercadoOpenPosition(),
-                e2eMockRuntime.positionStage,
-              ),
-            ]
-          : [];
-    const equity = deskDay
-      ? 101_060
-      : multi
-        ? 103_500
-        : mercado
-          ? 101_020
-          : 100_000;
+    const stage = e2eMockRuntime.positionStage;
+    const lifecyclePositions =
+      stage === "candidate"
+        ? []
+        : [
+            applyGoldenPositionStage(
+              lifecycleOpenPosition(),
+              stage === "clean" ? "open" : stage,
+            ),
+          ];
+    const positions = lifecycleDesk
+      ? lifecyclePositions
+      : deskDay
+        ? [paperAutonomousDayT1Position()]
+        : multi
+          ? mercadoMultiOpenPositions().map((pos, index) =>
+              index === 0
+                ? applyGoldenPositionStage(pos, e2eMockRuntime.positionStage)
+                : pos,
+            )
+          : mercado
+            ? [
+                applyGoldenPositionStage(
+                  mercadoOpenPosition(),
+                  e2eMockRuntime.positionStage,
+                ),
+              ]
+            : [];
+    const equity = lifecycleDesk
+      ? stage === "closed"
+        ? 101_500
+        : 100_000
+      : deskDay
+        ? 101_060
+        : multi
+          ? 103_500
+          : mercado
+            ? 101_020
+            : 100_000;
     return {
       data: {
         accountId: E2E_ACCOUNT_ID,
@@ -259,7 +284,7 @@ function routeBody(
     };
   }
   if (path === "/api/lists") {
-    if (deskDay) {
+    if (deskDay || lifecycleDesk) {
       return {
         data: [
           {
@@ -281,7 +306,7 @@ function routeBody(
   if (path === "/api/lists/memberships") {
     return { data: {} };
   }
-  if (deskDay && path === "/api/lists/estudio") {
+  if ((deskDay || lifecycleDesk) && path === "/api/lists/estudio") {
     return {
       data: {
         id: "estudio",
@@ -408,6 +433,11 @@ function routeBody(
     };
   }
   if (path === "/api/paper-desk/daily-report") {
+    if (lifecycleDesk) {
+      return {
+        data: lifecycleDailyOpsEnvelope(E2E_ACCOUNT_ID, lifecycleStale),
+      };
+    }
     if (hoyStale) {
       return { data: staleNoExecuteDailyOpsEnvelope(E2E_ACCOUNT_ID) };
     }
@@ -421,14 +451,32 @@ function routeBody(
       data: {
         accountId: E2E_ACCOUNT_ID,
         cash: 100_000,
-        totalEquity: deskDay ? 101_060 : 100_000,
-        openPositions: deskDay ? 1 : 0,
+        totalEquity: deskDay || lifecycleDesk ? 101_060 : 100_000,
+        openPositions: deskDay
+          ? 1
+          : lifecycleDesk
+            ? e2eMockRuntime.positionStage === "candidate" ||
+              e2eMockRuntime.positionStage === "closed"
+              ? 0
+              : 1
+            : 0,
         dayPnl: deskDay ? 60 : 0,
         dayPnlPct: deskDay ? 0.06 : 0,
       },
     };
   }
   if (path.endsWith("/decision-studies")) {
+    if (lifecycleDesk) {
+      return {
+        data: {
+          accountId: E2E_ACCOUNT_ID,
+          studies: [lifecycleDecisionStudy()],
+          total: 1,
+          limit: 200,
+          offset: 0,
+        },
+      };
+    }
     if (hoyStale) {
       return {
         data: {
@@ -524,6 +572,19 @@ function routeBody(
     };
   }
   if (path.endsWith("/decision-journal")) {
+    if (lifecycleDesk) {
+      return {
+        data: {
+          accountId: E2E_ACCOUNT_ID,
+          entries: [
+            lifecycleJournalEntry(e2eMockRuntime.positionStage === "closed"),
+          ],
+          limit: 50,
+          offset: 0,
+          total: 1,
+        },
+      };
+    }
     if (deskDay) {
       return {
         data: {
@@ -603,7 +664,7 @@ function routeBody(
     return { data: [] };
   }
   if (path === "/api/instruments") {
-    if (multi || deskDay) {
+    if (multi || deskDay || lifecycleDesk) {
       return { data: mercadoInstrumentCatalog(true) };
     }
     if (mercado) {
@@ -611,10 +672,18 @@ function routeBody(
     }
     return { data: [] };
   }
-  if ((mercado || multi || deskDay) && path === "/api/instruments/quotes") {
-    return { data: mercadoInstrumentCatalog(multi || deskDay) };
+  if (
+    (mercado || multi || deskDay || lifecycleDesk) &&
+    path === "/api/instruments/quotes"
+  ) {
+    return {
+      data: mercadoInstrumentCatalog(multi || deskDay || lifecycleDesk),
+    };
   }
-  if ((mercado || multi || hoyStale) && path.endsWith("/ohlcv")) {
+  if (
+    (mercado || multi || hoyStale || lifecycleDesk) &&
+    path.endsWith("/ohlcv")
+  ) {
     const bars = mercadoOhlcvBars();
     return {
       data: bars,
@@ -673,7 +742,8 @@ function routeBody(
       segments.length >= 2
         ? (segments[segments.length - 2] ?? E2E_INSTRUMENT_ID)
         : E2E_INSTRUMENT_ID;
-    const stale = hoyStale || e2eMockRuntime.dataFreshness === "stale";
+    const stale =
+      hoyStale || lifecycleStale || e2eMockRuntime.dataFreshness === "stale";
     return {
       data: {
         instrumentId: requestedId,
@@ -733,6 +803,15 @@ export async function installGoldenSessionMocks(page: Page): Promise<void> {
   setMercadoMockWorkspaceDocument(null);
   resetE2eMockRuntimeFlags();
   await installApiMocks(page, { mercado: true, multi: true });
+}
+
+/** V1.79 — Stateful AAPL lifecycle (Hoy + Mercado, no multi). */
+export async function installStatefulLifecycleMocks(page: Page): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  resetE2eMockRuntimeFlags();
+  setE2eMockDeskMode("lifecycle");
+  setE2eMockPositionStage("candidate");
+  await installApiMocks(page, { mercado: true });
 }
 
 /** Hoy Paper Autonomous Day — autoDesk + T1 AAPL + entry MSFT + Mercado wire. */

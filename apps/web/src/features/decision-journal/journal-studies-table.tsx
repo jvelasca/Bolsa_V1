@@ -457,6 +457,8 @@ export function JournalStudiesTable({
                 key={study.sessionId}
                 data-testid="study-row"
                 data-session-id={study.sessionId}
+                data-decision-id={study.decisionId ?? undefined}
+                data-instrument-id={study.instrumentId}
                 role="button"
                 tabIndex={0}
                 className={cn(
