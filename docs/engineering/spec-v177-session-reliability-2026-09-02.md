@@ -1,8 +1,8 @@
 # Spec — V1.77 Session Reliability / Operational Truth Certification
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock locales · **sin stamp CI GREEN**).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + E2E mock locales · commit `1f25d351`; **sin stamp CI GREEN**).  
 > **Padre:** [`spec-v176-certification-hardening-2026-09-02.md`](./spec-v176-certification-hardening-2026-09-02.md) · relevo [`traspaso-relevo-v1-76-certification-hardening-2026-09-02.md`](./traspaso-relevo-v1-76-certification-hardening-2026-09-02.md).  
-> **Partida tip:** **V1.76** Certification Hardening [`bf6ba462`](https://github.com/jvelasca/Bolsa_V1/commit/bf6ba462) (post V1.75 `b5b114ff`). **No** LIVE.
+> **Partida tip:** **V1.76** Certification Hardening [`bf6ba462`](https://github.com/jvelasca/Bolsa_V1/commit/bf6ba462) (post V1.75 `b5b114ff`). **Commit:** [`1f25d351`](https://github.com/jvelasca/Bolsa_V1/commit/1f25d351). **No** LIVE.
 
 Una certificación **journey-style** (mock E2E) que une identidad multi-instrumento (V1.73) con fail-closed stale / UNKNOWN (V1.75–V1.76) y añade **verdad operativa** en cada transición. No es un reloj de sesión de producción ni el golden MERCADO→EXIT completo.
 

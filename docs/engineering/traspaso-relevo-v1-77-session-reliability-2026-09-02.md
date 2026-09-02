@@ -1,6 +1,6 @@
 # Relevo — V1.77 Session Reliability / Operational Truth
 
-> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + E2E mock locales) · **Auditor:** [`arranque-auditor-v1-77-session-reliability-2026-09-02.md`](./arranque-auditor-v1-77-session-reliability-2026-09-02.md) · **Partida:** V1.76 `bf6ba462` · **sin stamp CI GREEN**
+> **AsOf:** 2026-09-02 · **Estado:** CERRADA (código + E2E mock locales) · **Auditor:** [`arranque-auditor-v1-77-session-reliability-2026-09-02.md`](./arranque-auditor-v1-77-session-reliability-2026-09-02.md) · **Partida:** V1.76 `bf6ba462` · **Commit:** [`1f25d351`](https://github.com/jvelasca/Bolsa_V1/commit/1f25d351) (no stamp CI GREEN)
 
 ## Hecho
 
