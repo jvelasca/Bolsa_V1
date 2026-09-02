@@ -1,7 +1,8 @@
 # Plan — V1.85 Lifecycle Integrity & Financial Event Model
 
 > **Padre:** [`spec-v185-lifecycle-integrity-financial-event-model-2026-09-02.md`](./spec-v185-lifecycle-integrity-financial-event-model-2026-09-02.md).  
-> **Estado:** **CERRADA** (pre-flight local) · Partida V1.84 [`504aa19d`](https://github.com/jvelasca/Bolsa_V1/commit/504aa19d) PASS 9,5/10.
+> **Estado:** **CERRADA** · **stamp CI GREEN remoto DONE** — [`v1.85-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.85-beta) → [`665242a3`](https://github.com/jvelasca/Bolsa_V1/commit/665242a3) · [run 33663836923](https://github.com/jvelasca/Bolsa_V1/actions/runs/33663836923) **success**.  
+> **Partida:** V1.84 [`504aa19d`](https://github.com/jvelasca/Bolsa_V1/commit/504aa19d) PASS 9,5/10.
 
 | ID  | Entrega                                                                  | Estado    |
 | --- | ------------------------------------------------------------------------ | --------- |

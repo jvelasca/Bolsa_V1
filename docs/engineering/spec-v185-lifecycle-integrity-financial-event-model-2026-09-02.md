@@ -1,6 +1,6 @@
 # Spec — V1.85 Lifecycle Integrity & Financial Event Model (E2E mock)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (pre-flight local) · Partida V1.84 PASS 9,5/10 · tip [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → [`504aa19d`](https://github.com/jvelasca/Bolsa_V1/commit/504aa19d) · CI GREEN [run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.85-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.85-beta) → [`665242a3`](https://github.com/jvelasca/Bolsa_V1/commit/665242a3) · [run 33663836923](https://github.com/jvelasca/Bolsa_V1/actions/runs/33663836923) **success**. Partida V1.84 PASS 9,5/10 · tip [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → [`504aa19d`](https://github.com/jvelasca/Bolsa_V1/commit/504aa19d).  
 > **Padre:** [`spec-v184-lifecycle-event-driven-mock-2026-09-02.md`](./spec-v184-lifecycle-event-driven-mock-2026-09-02.md) · [`respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md`](./respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md).  
 > **No** LIVE · **no** FastAPI/PG event store (V1.86).
 

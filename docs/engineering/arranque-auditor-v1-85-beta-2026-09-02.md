@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor) **tras** Release-tag CI GREEN:
 
 ---
 
-Eres auditor externo de Bolsa V1 **tip `v1.85-beta`**. Producto bajo revisión **`V1.85-beta`** tip funcional **`996c2f7d`**. Partida certificada previa **`v1.84-beta` → `504aa19d`** (Release-tag CI GREEN · PASS auditor **9,5/10**). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **tip `v1.85-beta`**. Producto bajo revisión **`V1.85-beta`** tip funcional **`665242a3`**. Partida certificada previa **`v1.84-beta` → `504aa19d`** (Release-tag CI GREEN · PASS auditor **9,5/10**). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
 
 **Alcance del stack a auditar (V1.73→V1.85, mock E2E + log de dominio validado):**
 
@@ -16,11 +16,11 @@ Eres auditor externo de Bolsa V1 **tip `v1.85-beta`**. Producto bajo revisión *
 
 **Regla absoluta en todo el arco:** **NINGÚN estado ambiguo → COMPRAR**. DryRun honesto (`dryRun=true` · `paperDExecute=false`). **No** fills ledger · **no** `dryRun=false` browser · **no** FastAPI/PG event store (V1.86).
 
-**Contexto CI (2026-09-02):** tag `v1.85-beta` → `996c2f7d` · Release-tag CI ([run 33663534894](https://github.com/jvelasca/Bolsa_V1/actions/runs/33663534894)). Previo: `v1.84-beta` → `504aa19d` ([run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690)). Pre-flight local = mismo filtro CI → **40 passed** (3 integrated skipped) · Vitest FSM **16 passed**.
+**Contexto CI (2026-09-02):** tag `v1.85-beta` → `665242a3` · Release-tag CI **GREEN** ([run 33663836923](https://github.com/jvelasca/Bolsa_V1/actions/runs/33663836923)). Previo: `v1.84-beta` → `504aa19d` ([run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690)). Pre-flight local = mismo filtro CI → **40 passed** (3 integrated skipped) · Vitest FSM **16 passed**.
 
 **GitHub (auditor):**
 
-- Código tip: [`v1.85-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.85-beta) → commit `996c2f7d`
+- Código tip: [`v1.85-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.85-beta) → commit `665242a3`
 - Previo certificado: [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → `504aa19d`
 - Auditoría V1.84 (input): [`respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md`](./respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md)
 

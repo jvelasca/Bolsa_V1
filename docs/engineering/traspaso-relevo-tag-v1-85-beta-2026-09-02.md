@@ -1,7 +1,7 @@
 # RELEVO — tag v1.85-beta → auditoría externa (2026-09-02)
 
 > **Padre:** [`traspaso-relevo-v1-85-lifecycle-integrity-2026-09-02.md`](./traspaso-relevo-v1-85-lifecycle-integrity-2026-09-02.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **tag tip publicado** — tip `v1.85-beta` → `996c2f7d` · Release-tag CI en curso ([run 33663534894](https://github.com/jvelasca/Bolsa_V1/actions/runs/33663534894)) · **no declarar PASS** hasta GREEN + respuesta auditor.  
+> **Estado:** **CI GREEN** — tip `v1.85-beta` → `665242a3` · Release-tag CI **GREEN** ([run 33663836923](https://github.com/jvelasca/Bolsa_V1/actions/runs/33663836923)) · **listo para auditoría externa**.  
 > **Arranque auditor externo:** [`arranque-auditor-v1-85-beta-2026-09-02.md`](./arranque-auditor-v1-85-beta-2026-09-02.md).  
 > **Partida:** V1.84 PASS 9,5/10 · [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → [`504aa19d`](https://github.com/jvelasca/Bolsa_V1/commit/504aa19d) · [run 33659480690](https://github.com/jvelasca/Bolsa_V1/actions/runs/33659480690).  
 > **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · bump package · Playwright en `frontend-ci` · integrated E2E obligatorio · event store FastAPI/PG.
@@ -10,7 +10,7 @@
 
 ## 0. Confirmación
 
-Sobre tip `v1.85-beta` → `996c2f7d` (partida `v1.84-beta` → `504aa19d` PASS):
+Sobre tip `v1.85-beta` → `665242a3` (partida `v1.84-beta` → `504aa19d` PASS):
 
 | Pieza                     | Entrega                                                                  |
 | ------------------------- | ------------------------------------------------------------------------ |
@@ -19,6 +19,7 @@ Sobre tip `v1.85-beta` → `996c2f7d` (partida `v1.84-beta` → `504aa19d` PASS)
 | Accounting                | realized/unrealized/totalPnl · cash equity (path event-driven)           |
 | HTTP mock                 | POST 409 reject / 400 invalid · log intacto                              |
 | Vitest                    | `lifecycle-fsm.test.ts` (16) en frontend-ci                              |
+| Playwright discovery      | `testIgnore: helpers/**/*.test.ts` (fix tip)                             |
 | GP-V185                   | reject · idempotency · trail PnL equity única                            |
 | Filtro CI playwright-mock | `gp-e2e\|gp-v173\|…\|gp-v184\|gp-v185`                                   |
 | Pre-flight local          | 40 passed (3 integrated skipped) · tsc EXIT 0                            |
@@ -27,13 +28,26 @@ Freeze: Confirm = firma · `PAPER_D_EXECUTE` off · no LIVE · package `1.35.0-b
 
 ## 1. Release
 
-| Pieza       | Valor                                                                                                               |
-| ----------- | ------------------------------------------------------------------------------------------------------------------- |
-| Tag tip     | `v1.85-beta` → `996c2f7d`                                                                                           |
-| Docs stamp  | (post-GREEN en `main`; no exige retag)                                                                              |
-| Previo tip  | `v1.84-beta` → `504aa19d` (CI GREEN · run 33659480690 · PASS 9,5/10)                                                |
-| CI tag      | **en curso** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33663534894) · `headSha=996c2f7d` |
-| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.85-beta                                                        |
+| Pieza       | Valor                                                                                                            |
+| ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| Tag tip     | `v1.85-beta` → `665242a3`                                                                                        |
+| Docs stamp  | (este commit en `main`; no exige retag)                                                                          |
+| Previo tip  | `v1.84-beta` → `504aa19d` (CI GREEN · run 33659480690 · PASS 9,5/10)                                             |
+| CI tag      | **GREEN** — [Release tag CI](https://github.com/jvelasca/Bolsa_V1/actions/runs/33663836923) · `headSha=665242a3` |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.85-beta                                                     |
+
+Jobs del push `v1.85-beta` (2026-09-02), todos **success** salvo integrated **skipped**:
+
+| Job                   | Resultado |
+| --------------------- | --------- |
+| security (gitleaks)   | success   |
+| shared                | success   |
+| decision-spine        | success   |
+| frontend              | success   |
+| python                | success   |
+| playwright-mock       | success   |
+| playwright-integrated | skipped   |
+| certify               | success   |
 
 ## 2. Pre-flight
 
@@ -50,7 +64,7 @@ pnpm --filter @bolsa/web exec tsc --noEmit
 
 ## 3. Auditoría
 
-Abrir chat nuevo con el bloque de [`arranque-auditor-v1-85-beta-2026-09-02.md`](./arranque-auditor-v1-85-beta-2026-09-02.md) **después** de CI GREEN.  
+Abrir chat nuevo con el bloque de [`arranque-auditor-v1-85-beta-2026-09-02.md`](./arranque-auditor-v1-85-beta-2026-09-02.md).  
 **No** declarar PASS hasta respuesta del auditor. Guardar respuesta como `respuesta-auditor-v185-…` cuando exista.
 
 ## 4. Cadena tips CI GREEN recientes
@@ -61,5 +75,5 @@ v1.81-beta → 4fcfc9bb · run 33648642728
 v1.82-beta → d0ccf235 · run 33651647262
 v1.83-beta → dc596ee5 · run 33657045026
 v1.84-beta → 504aa19d · run 33659480690
-v1.85-beta → 996c2f7d · run 33663534894 (en curso)
+v1.85-beta → 665242a3 · run 33663836923
 ```
