@@ -726,7 +726,7 @@ def append_validated_lifecycle_event(
             candidate = normalize_lifecycle_event(
                 input_event,
                 remaining_before=remaining_at,
-                lineage_path=prefix_path,  # type: ignore[arg-type]
+                lineage_path=prefix_path,
                 defaults=defaults,
             )
             if isinstance(candidate, LifecycleAppendError):
@@ -738,8 +738,8 @@ def append_validated_lifecycle_event(
                     log=tuple(log_list),
                     event=existing,
                     idempotent=True,
-                    stage=stage,  # type: ignore[arg-type]
-                    lineage_path=lineage_path,  # type: ignore[arg-type]
+                    stage=stage,
+                    lineage_path=lineage_path,
                 )
             return AppendFail(
                 error=LifecycleAppendError(
@@ -755,7 +755,7 @@ def append_validated_lifecycle_event(
     normalized = normalize_lifecycle_event(
         input_event,
         remaining_before=remaining_before,
-        lineage_path=lineage_path,  # type: ignore[arg-type]
+        lineage_path=lineage_path,
         defaults=defaults,
     )
     if isinstance(normalized, LifecycleAppendError):
