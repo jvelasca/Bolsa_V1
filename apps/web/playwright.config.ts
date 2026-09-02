@@ -18,6 +18,8 @@ const e2eRun = process.env.E2E_RUN === "1";
 
 export default defineConfig({
   testDir: "./e2e",
+  /** Vitest unit tables live under e2e/helpers/*.test.ts — never load them in Playwright. */
+  testIgnore: ["**/helpers/**/*.test.ts"],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
