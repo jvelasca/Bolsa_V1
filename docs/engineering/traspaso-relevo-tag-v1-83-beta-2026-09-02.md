@@ -1,9 +1,9 @@
 # RELEVO — tag v1.83-beta → auditoría externa (2026-09-02)
 
 > **Padre:** [`traspaso-relevo-v1-83-lifecycle-snapshot-truth-2026-09-02.md`](./traspaso-relevo-v1-83-lifecycle-snapshot-truth-2026-09-02.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **CI GREEN** — tip `v1.83-beta` → `dc596ee5` · Release-tag CI **GREEN** ([run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026)) · docs stamp `67ab2e75` · **listo para auditoría externa**.  
-> **Arranque auditor externo:** [`arranque-auditor-v1-83-beta-2026-09-02.md`](./arranque-auditor-v1-83-beta-2026-09-02.md).  
-> **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · bump package · Playwright en `frontend-ci` · integrated E2E obligatorio · event-driven engine.
+> **Estado:** **CI GREEN + PASS auditor** — tip `v1.83-beta` → `dc596ee5` · Release-tag CI **GREEN** ([run 33657045026](https://github.com/jvelasca/Bolsa_V1/actions/runs/33657045026)) · docs stamp `67ab2e75` · auditoría [`respuesta-auditor-v183-lifecycle-snapshot-truth-2026-09-02.md`](./respuesta-auditor-v183-lifecycle-snapshot-truth-2026-09-02.md) (**9,85/10** · P0=0 · P1=0).  
+> **Next:** [`spec-v184-lifecycle-event-driven-mock-2026-09-02.md`](./spec-v184-lifecycle-event-driven-mock-2026-09-02.md).  
+> **Fuera:** LIVE · `PAPER_D_EXECUTE` default on · scheduler · bump package · Playwright en `frontend-ci` · integrated E2E obligatorio.
 
 ---
 
@@ -57,8 +57,7 @@ pnpm --filter @bolsa/web exec tsc --noEmit
 
 ## 3. Auditoría
 
-Abrir chat nuevo con el bloque de [`arranque-auditor-v1-83-beta-2026-09-02.md`](./arranque-auditor-v1-83-beta-2026-09-02.md).  
-**No** declarar PASS hasta respuesta del auditor. Guardar respuesta como `respuesta-auditor-v183-…` cuando exista.
+**DONE** — [`respuesta-auditor-v183-lifecycle-snapshot-truth-2026-09-02.md`](./respuesta-auditor-v183-lifecycle-snapshot-truth-2026-09-02.md) · **PASS 9,85/10**. Next = V1.84 event-driven mock.
 
 ## 4. Cadena tips CI GREEN recientes
 

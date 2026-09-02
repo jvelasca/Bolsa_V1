@@ -1,8 +1,15 @@
 /**
  * V1.82 — E2E mock runtime flags (mutable mid-test).
+ * V1.84 — append-only lifecycle event log (event-driven mock path).
  * Public setters re-exported from `e2e/fixtures.ts`.
  */
 import { mercadoWorkspaceDocument } from "./mercado";
+import {
+  normalizeLifecycleStoreEvent,
+  reduceLifecycleEvents,
+  type LifecycleStoreEvent,
+  type LifecycleStoreEventKind,
+} from "./lifecycle-events";
 import {
   resolveLineagePathForStage,
   type E2eGoldenPositionStage,
@@ -49,6 +56,8 @@ export type E2eMockRuntimeFlags = {
   positionStage: E2eGoldenPositionStage;
   /** V1.83 — CLOSED/EXIT inherit trail vs T2 prefix. */
   lineagePath: LifecycleLineagePath;
+  /** V1.84 — append-only SoT when length > 0 (event-driven path). */
+  lifecycleEvents: LifecycleStoreEvent[];
 };
 
 const e2eMockRuntimeDefaults: E2eMockRuntimeFlags = {
@@ -58,6 +67,7 @@ const e2eMockRuntimeDefaults: E2eMockRuntimeFlags = {
   deskMode: "off",
   positionStage: "clean",
   lineagePath: "trail",
+  lifecycleEvents: [],
 };
 
 let e2eMockRuntime: E2eMockRuntimeFlags = { ...e2eMockRuntimeDefaults };
@@ -93,7 +103,34 @@ export function setE2eMockPositionStage(stage: E2eGoldenPositionStage): void {
     ...e2eMockRuntime,
     positionStage: stage,
     lineagePath: resolveLineagePathForStage(stage, e2eMockRuntime.lineagePath),
+    // V1.84 — stage projection mode clears the event log (compat V1.83).
+    lifecycleEvents: [],
   };
+}
+
+/**
+ * V1.84 — append a lifecycle event; derive stage/lineagePath from the full log.
+ * Prefer POST `/api/e2e/lifecycle/events` from the browser for wire honesty.
+ */
+export function emitE2eMockLifecycleEvent(input: {
+  kind: LifecycleStoreEventKind;
+  at?: string;
+  fillId?: string;
+}): LifecycleStoreEvent {
+  const event = normalizeLifecycleStoreEvent(input);
+  const lifecycleEvents = [...e2eMockRuntime.lifecycleEvents, event];
+  const reduced = reduceLifecycleEvents(lifecycleEvents);
+  e2eMockRuntime = {
+    ...e2eMockRuntime,
+    lifecycleEvents,
+    positionStage: reduced.stage,
+    lineagePath: reduced.lineagePath,
+  };
+  return event;
+}
+
+export function getE2eMockLifecycleEvents(): LifecycleStoreEvent[] {
+  return e2eMockRuntime.lifecycleEvents;
 }
 
 /** Internal snapshot for routeBody. */

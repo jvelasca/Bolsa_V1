@@ -15,6 +15,7 @@ import {
   mercadoWorkspaceDocument,
   applyGoldenPositionStage,
   buildLifecycleSnapshot,
+  buildLifecycleSnapshotFromEvents,
   lifecycleDailyOpsEnvelope,
   lifecycleDecisionStudy,
   lifecycleJournalEntry,
@@ -25,9 +26,11 @@ import {
   unknownOrderSubmitIntent,
 } from "../integration";
 import {
+  emitE2eMockLifecycleEvent,
   getE2eMockRuntime,
   getMercadoMockWorkspaceDocument,
 } from "./e2e-mock-runtime";
+import type { LifecycleStoreEventKind } from "./lifecycle-events";
 
 const demoAccount = {
   id: E2E_ACCOUNT_ID,
@@ -138,6 +141,7 @@ export function routeBody(
 ): Record<string, unknown> {
   const e2eMockRuntime = getE2eMockRuntime();
   const path = apiPath(route.request().url());
+  const method = route.request().method().toUpperCase();
   const lifecycleDesk =
     e2eMockRuntime.deskMode === "lifecycle" ||
     e2eMockRuntime.deskMode === "lifecycle_stale";
@@ -156,6 +160,77 @@ export function routeBody(
   const deskDay = hoyDay || hoyStale || hoyUnknown;
   const deskHappy = hoyDay || hoyUnknown;
 
+  /** V1.84 — event log SoT when non-empty; else V1.83 stage projection. */
+  const resolveLifecycleSnap = () => {
+    if (!lifecycleDesk) return null;
+    if (e2eMockRuntime.lifecycleEvents.length > 0) {
+      return buildLifecycleSnapshotFromEvents(e2eMockRuntime.lifecycleEvents);
+    }
+    return buildLifecycleSnapshot({
+      stage: e2eMockRuntime.positionStage,
+      lineagePath: e2eMockRuntime.lineagePath,
+    });
+  };
+
+  // V1.84 — test-only mock: POST append-only lifecycle events.
+  if (path === "/api/e2e/lifecycle/events" && method === "POST") {
+    if (!lifecycleDesk) {
+      return {
+        error: {
+          code: "lifecycle_desk_required",
+          message: "Emit requires deskMode lifecycle",
+        },
+      };
+    }
+    let body: {
+      kind?: string;
+      at?: string;
+      fillId?: string;
+    } = {};
+    try {
+      const raw = route.request().postData();
+      body = raw ? (JSON.parse(raw) as typeof body) : {};
+    } catch {
+      return {
+        error: { code: "invalid_json", message: "Expected JSON body" },
+      };
+    }
+    const kind = body.kind as LifecycleStoreEventKind | undefined;
+    const allowed: LifecycleStoreEventKind[] = [
+      "POSITION_OPENED",
+      "T1_TRIGGERED",
+      "T1_EXECUTED",
+      "T2_TRIGGERED",
+      "T2_EXECUTED",
+      "TRAIL_APPLIED",
+      "EXIT_REQUIRED",
+      "POSITION_CLOSED",
+    ];
+    if (!kind || !allowed.includes(kind)) {
+      return {
+        error: {
+          code: "invalid_kind",
+          message: `kind must be one of ${allowed.join("|")}`,
+        },
+      };
+    }
+    const event = emitE2eMockLifecycleEvent({
+      kind,
+      at: body.at,
+      fillId: body.fillId,
+    });
+    const runtime = getE2eMockRuntime();
+    return {
+      data: {
+        ok: true,
+        event,
+        stage: runtime.positionStage,
+        lineagePath: runtime.lineagePath,
+        count: runtime.lifecycleEvents.length,
+      },
+    };
+  }
+
   if (path === "/api/auth/status") {
     return { data: { authEnabled: false, authenticated: false } };
   }
@@ -169,13 +244,7 @@ export function routeBody(
     return { data: [demoAccount] };
   }
   if (path === "/api/portfolio") {
-    const stage = e2eMockRuntime.positionStage;
-    const lifecycleSnap = lifecycleDesk
-      ? buildLifecycleSnapshot({
-          stage,
-          lineagePath: e2eMockRuntime.lineagePath,
-        })
-      : null;
+    const lifecycleSnap = resolveLifecycleSnap();
     const lifecyclePositions =
       lifecycleSnap?.position != null ? [lifecycleSnap.position] : [];
     const positions = lifecycleDesk
@@ -372,10 +441,7 @@ export function routeBody(
   }
   if (path === "/api/paper-desk/daily-report") {
     if (lifecycleDesk) {
-      const snap = buildLifecycleSnapshot({
-        stage: e2eMockRuntime.positionStage,
-        lineagePath: e2eMockRuntime.lineagePath,
-      });
+      const snap = resolveLifecycleSnap()!;
       return {
         data: lifecycleDailyOpsEnvelope(E2E_ACCOUNT_ID, lifecycleStale, snap),
       };
@@ -389,12 +455,7 @@ export function routeBody(
     return { data: { autoDesk: null } };
   }
   if (path.endsWith("/summary")) {
-    const lifecycleSnap = lifecycleDesk
-      ? buildLifecycleSnapshot({
-          stage: e2eMockRuntime.positionStage,
-          lineagePath: e2eMockRuntime.lineagePath,
-        })
-      : null;
+    const lifecycleSnap = resolveLifecycleSnap();
     return {
       data: {
         accountId: E2E_ACCOUNT_ID,

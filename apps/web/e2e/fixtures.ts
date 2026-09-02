@@ -12,6 +12,8 @@ export {
   setE2eMockUnknownOrder,
   setE2eMockDeskMode,
   setE2eMockPositionStage,
+  emitE2eMockLifecycleEvent,
+  getE2eMockLifecycleEvents,
 } from "./helpers/e2e-mock-runtime";
 
 export {
