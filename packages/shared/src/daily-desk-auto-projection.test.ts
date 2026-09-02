@@ -142,8 +142,23 @@ describe("GP-DESK-UI-02 DENY candidate → no green / blocked copy", () => {
     expect(items[0]?.bucket).not.toBe("oportunidades");
     expect(items[0]?.bucket).toBe("no_operar");
     expect(items[0]?.attention).toBe("BLOCKED");
-    expect(items[0]?.phrase).toMatch(/DENY|ranking|book_max/i);
+    expect(items[0]?.reasonCode).toBe("ENTRY_RISK_LIMIT");
     expect(formatCandidateDenyPhrase(denied)).toMatch(/DENY|book_max/i);
+  });
+
+  it("ENTRY_STALE_DATA → reasonCode on desk item", () => {
+    const denied = triggeredCandidate({
+      reasonCode: "ENTRY_STALE_DATA",
+      freshness: "stale",
+      humanMessage: "Datos obsoletos — no proponer.",
+    });
+    const items = projectAutoDeskCandidates({
+      autoDesk: autoDeskWithCandidates([denied]),
+    });
+    expect(items[0]?.attention).toBe("BLOCKED");
+    expect(items[0]?.reasonCode).toBe("ENTRY_STALE_DATA");
+    expect(items[0]?.phrase).toMatch(/Datos obsoletos/i);
+    expect(items[0]?.ctaLabel.toUpperCase()).not.toContain("COMPRAR");
   });
 
   it("skipped[] candidates also projected as blocked", () => {

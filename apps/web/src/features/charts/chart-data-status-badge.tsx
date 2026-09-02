@@ -58,6 +58,11 @@ export function ChartDataStatusBadge({
     : (status?.freshnessStatus ?? "empty");
   const healthy = isBdHealthy(key) && (status?.barCount ?? 0) > 0;
   const lastBar = status?.lastBarDate ?? null;
+  const statusIdentity = {
+    "data-testid": "chart-data-status" as const,
+    "data-instrument-id": instrumentId ?? "",
+    "data-freshness-status": key,
+  };
 
   useEffect(() => {
     if (barsLoaded == null || barsLoaded === 0) return;
@@ -80,6 +85,7 @@ export function ChartDataStatusBadge({
           className,
         )}
         title="Actualizando y guardando en BD"
+        {...statusIdentity}
       >
         <span className="hidden sm:inline">
           Actualizando y guardando en BD…
@@ -97,6 +103,7 @@ export function ChartDataStatusBadge({
           className,
         )}
         title="Actualizados y guardados en BD"
+        {...statusIdentity}
       >
         <span className="hidden font-medium sm:inline">
           Actualizados y guardados en BD
@@ -112,7 +119,7 @@ export function ChartDataStatusBadge({
   }
 
   return (
-    <>
+    <span className="inline-flex items-center" {...statusIdentity}>
       <button
         type="button"
         title="Estado de datos en PostgreSQL — clic para ver detalle"
@@ -141,6 +148,6 @@ export function ChartDataStatusBadge({
           onSync={onSync}
         />
       )}
-    </>
+    </span>
   );
 }

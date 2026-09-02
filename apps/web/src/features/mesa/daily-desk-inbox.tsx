@@ -230,6 +230,7 @@ function DailyDeskBucket({
               data-kind={item.kind}
               data-bucket={item.bucket}
               data-attention={item.attention}
+              data-reason-code={item.reasonCode ?? undefined}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

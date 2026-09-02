@@ -307,4 +307,40 @@ describe("DailyDeskInbox V1.42 F6/F7", () => {
     expect(screen.queryByText(/comprar/i)).toBeNull();
     expect(openConfirmDrawer).not.toHaveBeenCalled();
   });
+
+  it("V1.76: denied stale item exposes data-reason-code and BLOCKED", () => {
+    const items = [
+      {
+        id: "auto-deny-inst-msft",
+        kind: "entry" as const,
+        bucket: "no_operar" as const,
+        symbol: "MSFT",
+        attention: "BLOCKED" as const,
+        phrase: "Datos obsoletos — no proponer.",
+        reason: "#1 · moderate · ENTRY_STALE_DATA",
+        ctaLabel: "Entradas bloqueadas",
+        ctaKind: "none" as const,
+        phaseLabel: null,
+        instrumentId: "inst-msft",
+        reasonCode: "ENTRY_STALE_DATA",
+      },
+    ];
+    const buckets = emptyBuckets().map((b) => {
+      const bucketItems = items.filter((i) => i.bucket === b.id);
+      return { ...b, items: bucketItems, count: bucketItems.length };
+    });
+
+    render(
+      <MemoryRouter>
+        <DailyDeskInbox inbox={inbox({ count: 1, items, buckets })} />
+      </MemoryRouter>,
+    );
+
+    const row = screen.getByTestId("daily-desk-item-auto-deny-inst-msft");
+    expect(row.getAttribute("data-attention")).toBe("BLOCKED");
+    expect(row.getAttribute("data-reason-code")).toBe("ENTRY_STALE_DATA");
+    expect(screen.getByTestId("daily-desk-cta-MSFT").textContent).not.toMatch(
+      /AUTO armado|COMPRAR/i,
+    );
+  });
 });

@@ -87,6 +87,8 @@ export type DailyDeskItemV1 = {
   phaseLabel: string | null;
   positionId?: string;
   instrumentId?: string;
+  /** V1.76 — código de deny (ENTRY_STALE_DATA, …) para certificación DOM. */
+  reasonCode?: string | null;
 };
 
 export type DailyDeskBucketV1 = {

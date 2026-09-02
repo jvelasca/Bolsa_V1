@@ -324,6 +324,7 @@ export function OperativaCockpitCard({
       data-phase={phase}
       data-instrument-id={instrumentId}
       data-symbol={symbol}
+      data-execution-lifecycle={executionState?.lifecycle ?? undefined}
       data-position-id={positionPov?.positionId ?? position?.id ?? undefined}
       data-trade-plan-id={positionPov?.tradePlanId ?? undefined}
       data-decision-id={positionPov?.decisionId ?? undefined}

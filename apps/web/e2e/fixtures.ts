@@ -14,7 +14,7 @@ import {
   paperAutonomousDayT1Position,
   staleNoExecuteDailyOpsEnvelope,
   staleNoExecuteOpenIncident,
-  staleNoExecuteUnknownSubmitIntent,
+  unknownOrderSubmitIntent,
 } from "./integration";
 
 /** True when E2E should run (auto webServer or explicit base URL). */
@@ -140,15 +140,22 @@ function routeBody(
     hoyDay?: boolean;
     /** V1.75 — separado de hoyDay; no contaminar Paper Day feliz. */
     hoyStale?: boolean;
+    /** V1.76 — UNKNOWN order aislado (sin stale, sin incidente). */
+    hoyUnknown?: boolean;
   },
 ): Record<string, unknown> {
   const path = apiPath(route.request().url());
   const hoyStale = opts?.hoyStale === true;
+  const hoyUnknown = opts?.hoyUnknown === true;
   const hoyDay = opts?.hoyDay === true;
   const mercado =
-    opts?.mercado === true || hoyDay === true || hoyStale === true;
+    opts?.mercado === true ||
+    hoyDay === true ||
+    hoyStale === true ||
+    hoyUnknown === true;
   const multi = opts?.multi === true;
-  const deskDay = hoyDay || hoyStale;
+  const deskDay = hoyDay || hoyStale || hoyUnknown;
+  const deskHappy = hoyDay || hoyUnknown;
 
   if (path === "/api/auth/status") {
     return { data: { authEnabled: false, authenticated: false } };
@@ -341,7 +348,7 @@ function routeBody(
     if (hoyStale) {
       return { data: staleNoExecuteDailyOpsEnvelope(E2E_ACCOUNT_ID) };
     }
-    if (hoyDay) {
+    if (deskHappy) {
       return { data: paperAutonomousDayDailyOpsEnvelope(E2E_ACCOUNT_ID) };
     }
     return { data: { autoDesk: null } };
@@ -395,7 +402,7 @@ function routeBody(
         },
       };
     }
-    if (hoyDay) {
+    if (deskHappy) {
       return {
         data: {
           accountId: E2E_ACCOUNT_ID,
@@ -488,11 +495,11 @@ function routeBody(
     };
   }
   if (path.endsWith("/submit-intents")) {
-    if (hoyStale) {
+    if (hoyUnknown) {
       return {
         data: {
           accountId: E2E_ACCOUNT_ID,
-          intents: [staleNoExecuteUnknownSubmitIntent()],
+          intents: [unknownOrderSubmitIntent()],
           total: 1,
         },
       };
@@ -588,10 +595,15 @@ function routeBody(
   ) {
     return { data: [] };
   }
-  if ((mercado || multi || hoyStale) && path.endsWith("/data-status")) {
+  if ((mercado || multi) && path.endsWith("/data-status")) {
+    const segments = path.split("/").filter(Boolean);
+    const requestedId =
+      segments.length >= 2
+        ? (segments[segments.length - 2] ?? E2E_INSTRUMENT_ID)
+        : E2E_INSTRUMENT_ID;
     return {
       data: {
-        instrumentId: E2E_INSTRUMENT_ID,
+        instrumentId: requestedId,
         timeframe: "1d",
         freshnessStatus: hoyStale ? "stale" : "current",
         barCount: 30,
@@ -614,6 +626,7 @@ export async function installApiMocks(
     multi?: boolean;
     hoyDay?: boolean;
     hoyStale?: boolean;
+    hoyUnknown?: boolean;
   },
 ): Promise<void> {
   await page.route(/\/api\//, async (route) => {
@@ -640,9 +653,16 @@ export async function installHoyPaperDayApiMocks(page: Page): Promise<void> {
 
 /**
  * V1.75 — Chaos & stale → no-execute (helper separado; no usa hoyDay).
- * ENTRY_STALE_DATA · UNKNOWN submitIntent · incidente abierto · data-status stale.
+ * ENTRY_STALE_DATA · incidente abierto · data-status stale.
+ * UNKNOWN order vive en installUnknownOrderMocks (V1.76).
  */
 export async function installHoyStaleNoExecuteMocks(page: Page): Promise<void> {
   setMercadoMockWorkspaceDocument(null);
   await installApiMocks(page, { hoyStale: true });
+}
+
+/** V1.76 — UNKNOWN order aislado (sin stale, sin incidente). */
+export async function installUnknownOrderMocks(page: Page): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  await installApiMocks(page, { hoyUnknown: true });
 }

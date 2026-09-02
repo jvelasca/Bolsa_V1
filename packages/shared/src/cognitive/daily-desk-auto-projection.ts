@@ -208,6 +208,7 @@ function deskItemFromDeniedCandidate(
     ctaKind: "none",
     phaseLabel: null,
     instrumentId: candidate.instrumentId,
+    reasonCode: candidate.reasonCode ?? null,
   };
 }
 
