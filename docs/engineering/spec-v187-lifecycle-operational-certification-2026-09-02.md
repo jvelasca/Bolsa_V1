@@ -1,6 +1,6 @@
 # Spec — V1.87 Lifecycle Operational Integration & Concurrency Certification
 
-> **AsOf:** 2026-09-02 · **Estado:** **ABIERTA**  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tip [`v1.87-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.87-beta) → [`646b97ac`](https://github.com/jvelasca/Bolsa_V1/commit/646b97ac) · [run 33689747400](https://github.com/jvelasca/Bolsa_V1/actions/runs/33689747400) **success**.  
 > **Padre:** [`respuesta-auditor-v186-lifecycle-event-store-2026-09-02.md`](./respuesta-auditor-v186-lifecycle-event-store-2026-09-02.md) · [`spec-v186-lifecycle-event-store-2026-09-02.md`](./spec-v186-lifecycle-event-store-2026-09-02.md).  
 > **Partida tip:** `v1.86-beta` → [`baaa7034`](https://github.com/jvelasca/Bolsa_V1/commit/baaa7034). **No** LIVE · **no** V1.88 golden integrado obligatorio.
 
