@@ -1,6 +1,6 @@
 # Relevo — V1.82 Fixtures Split (higiene E2E mock)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) → [`d0ccf235`](https://github.com/jvelasca/Bolsa_V1/commit/d0ccf235) · [run 33651647262](https://github.com/jvelasca/Bolsa_V1/actions/runs/33651647262) **success** · **Auditor:** [`arranque-auditor-v1-82-fixtures-split-2026-09-02.md`](./arranque-auditor-v1-82-fixtures-split-2026-09-02.md) · **Partida:** V1.81 [`4fcfc9bb`](https://github.com/jvelasca/Bolsa_V1/commit/4fcfc9bb) · **Tip código:** `d0ccf235` · Pre-releases: [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) · [`v1.81-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.81-beta)
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) → [`d0ccf235`](https://github.com/jvelasca/Bolsa_V1/commit/d0ccf235) · [run 33651647262](https://github.com/jvelasca/Bolsa_V1/actions/runs/33651647262) **success** · **Auditor externo:** [`arranque-auditor-v1-82-beta-2026-09-02.md`](./arranque-auditor-v1-82-beta-2026-09-02.md) · **Relevo tag:** [`traspaso-relevo-tag-v1-82-beta-2026-09-02.md`](./traspaso-relevo-tag-v1-82-beta-2026-09-02.md) · **Partida:** V1.81 [`4fcfc9bb`](https://github.com/jvelasca/Bolsa_V1/commit/4fcfc9bb) · **Tip código:** `d0ccf235` · **Tip docs stamp:** [`f543fab5`](https://github.com/jvelasca/Bolsa_V1/commit/f543fab5) · Pre-releases: [`v1.82-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.82-beta) · [`v1.81-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.81-beta)
 
 ## Hecho
 
@@ -31,11 +31,15 @@
 
 Deuda / higiene posterior o siguiente certificación mock — **sin** abrir LIVE. Decidir en chat nuevo.
 
-## Texto exacto — arranque chat nuevo
+## Texto exacto — arranque chat nuevo (dev)
 
 ```text
-Partida: V1.82 CERRADA · tip código d0ccf235 (tag v1.82-beta) · CI GREEN run 33651647262 · pre-release v1.82-beta.
-Leer: docs/CURRENT_SYSTEM.md · docs/engineering/traspaso-relevo-v1-82-fixtures-split-2026-09-02.md · arranque-auditor V1.82.
+Partida: V1.82 CERRADA · tip código d0ccf235 (tag v1.82-beta) · docs f543fab5 · CI GREEN run 33651647262 · pre-release v1.82-beta.
+Leer: docs/CURRENT_SYSTEM.md · docs/engineering/traspaso-relevo-tag-v1-82-beta-2026-09-02.md · arranque-auditor-v1-82-beta (externo).
 Freeze: NO LIVE · no fills · no dryRun=false browser · no bump 1.35.0-beta · no Playwright en frontend-ci · no integrated obligatorio.
 No commitear **/logs/.
 ```
+
+## Texto exacto — auditoría externa
+
+Usar el bloque completo en [`arranque-auditor-v1-82-beta-2026-09-02.md`](./arranque-auditor-v1-82-beta-2026-09-02.md).
