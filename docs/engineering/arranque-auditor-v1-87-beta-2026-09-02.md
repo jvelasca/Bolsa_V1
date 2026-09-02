@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor) **tras** Release-tag CI GREEN:
 
 ---
 
-Eres auditor externo de Bolsa V1 **tip `v1.87-beta`**. Producto bajo revisión **`V1.87-beta`** tip funcional **`646b97ac`**. Partida certificada previa **`v1.86-beta` → `baaa7034`** (Release-tag CI GREEN · arquitectura **9,0/10** · explotable **7,5/10** · **NO** beta estable · P0 auth HTTP · P1 sequence/Alembic/DTO). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **tip `v1.87-beta`**. Producto bajo revisión **`V1.87-beta`** tip funcional **`646b97ac`**. Docs stamp en `main`: **`3cfc9739`**. Partida certificada previa **`v1.86-beta` → `baaa7034`** (Release-tag CI GREEN · arquitectura **9,0/10** · explotable **7,5/10** · **NO** beta estable · P0 auth HTTP · P1 sequence/Alembic/DTO). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
 
 **Alcance del stack a auditar (V1.87 = Auth + Concurrency + Alembic real):**
 
