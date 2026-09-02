@@ -1,6 +1,6 @@
 # Relevo — V1.80 CI GREEN Tip Honesty (mock certification gate)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local · commit [`aafdb5b9`](https://github.com/jvelasca/Bolsa_V1/commit/aafdb5b9); **sin stamp CI GREEN remoto** until Actions — tag `v*` / `workflow_dispatch`) · **Auditor:** [`arranque-auditor-v1-80-ci-green-tip-honesty-2026-09-02.md`](./arranque-auditor-v1-80-ci-green-tip-honesty-2026-09-02.md) · **Partida:** V1.79 [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3) · **Commit:** [`aafdb5b9`](https://github.com/jvelasca/Bolsa_V1/commit/aafdb5b9)
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.80-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.80-beta) → [`7bd6ed81`](https://github.com/jvelasca/Bolsa_V1/commit/7bd6ed81) · [run 33644966298](https://github.com/jvelasca/Bolsa_V1/actions/runs/33644966298) **success** · **Auditor:** [`arranque-auditor-v1-80-ci-green-tip-honesty-2026-09-02.md`](./arranque-auditor-v1-80-ci-green-tip-honesty-2026-09-02.md) · **Partida:** V1.79 [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3) · **Tip:** `7bd6ed81` (ruff fix post-`aafdb5b9`)
 
 ## Hecho
 
@@ -11,12 +11,12 @@
 - `frontend-ci.yml` **sin** Playwright (by design · sin diff)
 - Pre-flight local: **mismo filtro único** que CI → **32 passed** (3 integrated skipped)
 - Spec/plan/auditor · CURRENT_SYSTEM · engineering-index
+- **Stamp CI GREEN remoto:** jobs GREEN security · shared · spine · frontend · python · playwright-mock (gp-e2e+gp-v173…179) · certify; playwright-integrated skipped (opt-in). Nota: 1ª push tag falló ruff; fix `7bd6ed81` + retag; playwright-mock ya GREEN.
 
 ## Reservas (honestidad)
 
-- **Gate expandido ≠ stamp CI GREEN remoto.** El tip honesty del mock gate está listo en YAML; el stamp remoto GREEN es follow-up cuando Actions corra (tag `v*` o `workflow_dispatch`) con éxito.
-- Pre-flight local del curado CI: **32 passed** (3 integrated skipped).
 - Certificación = **mock E2E** en release-tag · **no** LIVE · **no** Playwright en cada PR · **no** integrated/PG obligatorio
+- Pre-flight local del curado CI: **32 passed** (3 integrated skipped)
 
 ## OUT (intactos)
 
@@ -27,4 +27,4 @@
 
 ## Next candidato
 
-Stamp remoto GREEN (opcional follow-up) vía tag/`workflow_dispatch` **o** siguiente producto a decidir (T2 POV · fixtures split · etc.). **NO LIVE**.
+Siguiente producto a decidir (T2 POV · fixtures split · etc.). **NO LIVE**.

@@ -1,10 +1,10 @@
 # Spec — V1.80 CI GREEN Tip Honesty (mock certification gate)
 
-> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** (código + pre-flight local · commit `aafdb5b9`; **sin stamp CI GREEN remoto** until Actions — tag `v*` / `workflow_dispatch`).  
+> **AsOf:** 2026-09-02 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.80-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.80-beta) → [`7bd6ed81`](https://github.com/jvelasca/Bolsa_V1/commit/7bd6ed81) · [run 33644966298](https://github.com/jvelasca/Bolsa_V1/actions/runs/33644966298) **success** (security · shared · spine · frontend · python · playwright-mock gp-e2e+gp-v173…179 · certify; playwright-integrated skipped opt-in).  
 > **Padre:** [`spec-v179-stateful-position-lifecycle-2026-09-02.md`](./spec-v179-stateful-position-lifecycle-2026-09-02.md) · relevo [`traspaso-relevo-v1-79-stateful-position-lifecycle-2026-09-02.md`](./traspaso-relevo-v1-79-stateful-position-lifecycle-2026-09-02.md).  
-> **Partida tip:** **V1.79** Stateful Position Lifecycle [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3). **Commit:** [`aafdb5b9`](https://github.com/jvelasca/Bolsa_V1/commit/aafdb5b9). **No** LIVE.
+> **Partida tip:** **V1.79** Stateful Position Lifecycle [`8228d1c3`](https://github.com/jvelasca/Bolsa_V1/commit/8228d1c3). **Tip stamp:** `v1.80-beta` → `7bd6ed81` (ruff fix post-`aafdb5b9`; 1ª push tag falló ruff; playwright-mock ya GREEN). **No** LIVE.
 
-Honestidad del tip **CI GREEN** en el gate de certificación por tag: el job `playwright-mock` de `release-tag-ci.yml` deja de certificar solo `gp-e2e` y pasa a exigir el **curado mock** V1.73–V1.79 (+ `gp-e2e`). Expanding the mock gate ≠ having a remote GREEN check yet: gate ready; remote stamp needs tag `v*` or `workflow_dispatch` after push. No es LIVE, no es Playwright en cada PR, no es E2E integrado con PostgreSQL obligatorio.
+Honestidad del tip **CI GREEN** en el gate de certificación por tag: el job `playwright-mock` de `release-tag-ci.yml` deja de certificar solo `gp-e2e` y pasa a exigir el **curado mock** V1.73–V1.79 (+ `gp-e2e`). Stamp remoto GREEN en `v1.80-beta` / `7bd6ed81`. No es LIVE, no es Playwright en cada PR, no es E2E integrado con PostgreSQL obligatorio.
 
 ```text
 frontend-ci (PR diario)
@@ -48,7 +48,7 @@ V1.72–V1.79 intactos (WHY · multi-instrument · Paper Day · stale/UNKNOWN ·
 pnpm e2e -- "gp-e2e|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179"
 ```
 
-(antes solo `pnpm e2e -- gp-e2e`). Gate expandido; **sin stamp CI GREEN remoto** hasta que Actions corra con éxito.
+(antes solo `pnpm e2e -- gp-e2e`). Gate expandido; stamp CI GREEN remoto en `v1.80-beta` → `7bd6ed81` ([run](https://github.com/jvelasca/Bolsa_V1/actions/runs/33644966298)).
 
 ## 2. IN
 
@@ -66,7 +66,7 @@ playwright-mock corre gp-e2e ∧ curado V1.73–V1.79 (un filtro)
 playwright-integrated sigue opt-in (no required en certify)
 NO LIVE · dryRun honesto en mocks · sin fills ledger
 V1.73–V1.79 mock siguen verdes en local pre-flight
-expandir gate ≠ stamp CI GREEN remoto (pendiente Actions)
+stamp CI GREEN remoto: v1.80-beta → 7bd6ed81 (run 33644966298)
 ```
 
 ## 3. Entregables
@@ -82,9 +82,9 @@ expandir gate ≠ stamp CI GREEN remoto (pendiente Actions)
 - Playwright en **cada** PR vía `frontend-ci.yml`
 - E2E integrado / PostgreSQL **obligatorio** en cada run de tag
 - Cambiar semántica de productos V1.72–V1.79
-- Declarar **stamp CI GREEN remoto** sin run exitoso de tag/`workflow_dispatch`
+- Declarar **stamp CI GREEN remoto** sin run exitoso de tag/`workflow_dispatch` (cumplido: run 33644966298)
 
-## 5. Pre-flight (local 2026-09-02)
+## 5. Pre-flight + stamp remoto (2026-09-02)
 
 Mismo curado que CI (`playwright-mock`):
 
@@ -96,4 +96,4 @@ pnpm --filter @bolsa/web exec tsc --noEmit
 # → EXIT 0
 ```
 
-**Honestidad:** gate listo en YAML + evidencia local (32 passed). **Sin stamp CI GREEN remoto** hasta que `release-tag-ci` (tag `v*` o `workflow_dispatch`) complete en verde en Actions.
+**Honestidad:** gate YAML + local (32 passed) + **stamp CI GREEN remoto** [`v1.80-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.80-beta) → [`7bd6ed81`](https://github.com/jvelasca/Bolsa_V1/commit/7bd6ed81) · [Actions run 33644966298](https://github.com/jvelasca/Bolsa_V1/actions/runs/33644966298) **success**. Nota: 1ª push tag falló ruff; fix en `7bd6ed81` + retag; playwright-mock ya GREEN en el primer intento.
