@@ -4,7 +4,7 @@ Copia este bloque en un **chat nuevo** (auditor) **tras** Release-tag CI GREEN:
 
 ---
 
-Eres auditor externo de Bolsa V1 **tip `v1.85-beta`**. Producto bajo revisión **`V1.85-beta`** tip funcional **`665242a3`**. Partida certificada previa **`v1.84-beta` → `504aa19d`** (Release-tag CI GREEN · PASS auditor **9,5/10**). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **tip `v1.85-beta`**. Producto bajo revisión **`V1.85-beta`** tip funcional **`665242a3`**. Docs stamp en `main`: **`0ed3c59c`**. Partida certificada previa **`v1.84-beta` → `504aa19d`** (Release-tag CI GREEN · PASS auditor **9,5/10**). El tip **no** abre LIVE ni cambia Confirm SEMI. `PAPER_D_EXECUTE` default **off**. Package congelado **`1.35.0-beta`**.
 
 **Alcance del stack a auditar (V1.73→V1.85, mock E2E + log de dominio validado):**
 
@@ -21,6 +21,7 @@ Eres auditor externo de Bolsa V1 **tip `v1.85-beta`**. Producto bajo revisión *
 **GitHub (auditor):**
 
 - Código tip: [`v1.85-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.85-beta) → commit `665242a3`
+- Docs stamp: [`0ed3c59c`](https://github.com/jvelasca/Bolsa_V1/commit/0ed3c59c) en `main`
 - Previo certificado: [`v1.84-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.84-beta) → `504aa19d`
 - Auditoría V1.84 (input): [`respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md`](./respuesta-auditor-v184-lifecycle-event-driven-mock-2026-09-02.md)
 
