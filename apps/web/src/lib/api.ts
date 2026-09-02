@@ -910,6 +910,35 @@ export const api = {
       client.GET("/api/portfolio"),
     ),
 
+  /** V1.89 — lifecycle sidecar snapshot (stage FSM). No cash ledger. */
+  getLifecycleSnapshot: (positionId: string) =>
+    call<{
+      data: {
+        positionId: string;
+        stage: string;
+        lineagePath: string;
+        events: Array<Record<string, unknown>>;
+        accounting: Record<string, unknown> | null;
+      };
+    }>(async () => {
+      const accountId = getActiveAccountId();
+      const response = await fetch(
+        `${API_URL}/api/lifecycle/positions/${encodeURIComponent(positionId)}/snapshot`,
+        {
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            ...(accountId ? { "X-Account-Id": accountId } : {}),
+          },
+        },
+      );
+      const body = (await response.json().catch(() => null)) as unknown;
+      if (!response.ok) {
+        return { data: undefined, error: body, response };
+      }
+      return { data: body, error: undefined, response };
+    }),
+
   updateAccount: (
     accountId: string,
     body: import("@bolsa/shared").UpdateInvestmentAccountRequestDto,

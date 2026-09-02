@@ -1302,6 +1302,10 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
     """
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
     from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+    from bolsa_application.lifecycle_event_store import (
+        AppendLifecycleEvent,
+        PostgresLifecycleEventStore,
+    )
     from bolsa_application.persist_position_from_exit import (
         PersistPositionFromExit,
         PositionStateExitStore,
@@ -1340,6 +1344,7 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         ),
         position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
         position_from_protect=PersistPositionFromProtect(cast(PositionStateProtectStore, repo)),
+        lifecycle_append=AppendLifecycleEvent(PostgresLifecycleEventStore(session)),
         submit_intent_store=PostgresSubmitIntentStore(session),
         incident_store=get_operational_incident_store(session),
         instrument_data_status=get_instrument_data_status_use_case(session),

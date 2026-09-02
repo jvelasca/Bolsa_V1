@@ -19,8 +19,6 @@ from bolsa_api.auth.session import SESSION_COOKIE_NAME
 from bolsa_api.main import create_app, lifespan
 from bolsa_application.operational_incident_store import (
     PostgresOperationalIncidentStore,
-    clear_and_store,
-    resolve_and_store,
     sync_opening_incidents,
 )
 from bolsa_infrastructure.auth.passwords import hash_password
@@ -180,19 +178,29 @@ async def test_v188_golden_trail_recon_restart_isolation(
             assert mid.status_code == 200
             assert mid.json()["data"]["stage"] == "t1_executed"
 
-            # RECOVERY: resolve + clear (recon clean) — no auto-heal of books
-            async with factory() as session:
-                store = PostgresOperationalIncidentStore(session)
-                await resolve_and_store(
-                    store,
-                    incident_id=incident_id,
-                    resolution_note="v188-golden-manual-recon-clean",
-                    resolved_by=user_a,
-                )
-                await clear_and_store(
-                    store, incident_id=incident_id, recon_status="clean"
-                )
-                assert await store.list_active(acc_a) == []
+            # RECOVERY via HTTP (V1.89): resolve + clear uses recon_status_for_incident_clear
+            # Books are clean → clear succeeds through server lookup (no store bypass).
+            resolved = await client.post(
+                f"/api/accounts/{acc_a}/operational-incidents/{incident_id}/resolve",
+                json={
+                    "resolutionNote": "v188-golden-manual-recon-clean",
+                    "resolvedBy": user_a,
+                },
+            )
+            assert resolved.status_code == 200, resolved.text
+            assert resolved.json()["data"]["status"] == "resolved"
+
+            cleared = await client.post(
+                f"/api/accounts/{acc_a}/operational-incidents/{incident_id}/clear",
+            )
+            assert cleared.status_code == 200, cleared.text
+            assert cleared.json()["data"]["status"] == "cleared"
+
+            active_after = await client.get(
+                f"/api/accounts/{acc_a}/operational-incidents/active",
+            )
+            assert active_after.status_code == 200
+            assert active_after.json()["data"]["total"] == 0
 
             for kind in ("TRAIL_APPLIED", "EXIT_REQUIRED", "POSITION_CLOSED"):
                 await _post_event(

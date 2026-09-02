@@ -91,10 +91,19 @@ MOCK_CLOSE_FILL_ID = "fill-mock-exit"
 TRANSITIONS: dict[str, dict[str, str]] = {
     "clean": {},
     "candidate": {"POSITION_OPENED": "open"},
-    "open": {"T1_TRIGGERED": "t1_ready", "T1_EXECUTED": "t1_executed"},
-    "t1_ready": {"T1_EXECUTED": "t1_executed"},
-    "t1_executed": {"TRAIL_APPLIED": "trailing", "T2_TRIGGERED": "t2_ready"},
-    "trailing": {"EXIT_REQUIRED": "exit_required"},
+    # V1.89: SEMI full exit may close from open/t1 without trail theater.
+    "open": {
+        "T1_TRIGGERED": "t1_ready",
+        "T1_EXECUTED": "t1_executed",
+        "POSITION_CLOSED": "closed",
+    },
+    "t1_ready": {"T1_EXECUTED": "t1_executed", "POSITION_CLOSED": "closed"},
+    "t1_executed": {
+        "TRAIL_APPLIED": "trailing",
+        "T2_TRIGGERED": "t2_ready",
+        "POSITION_CLOSED": "closed",
+    },
+    "trailing": {"EXIT_REQUIRED": "exit_required", "POSITION_CLOSED": "closed"},
     "exit_required": {"POSITION_CLOSED": "closed"},
     "t2_ready": {"T2_EXECUTED": "t2_executed"},
     "t2_executed": {"POSITION_CLOSED": "closed"},

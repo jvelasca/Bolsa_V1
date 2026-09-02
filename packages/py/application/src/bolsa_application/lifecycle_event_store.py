@@ -351,6 +351,10 @@ class AppendLifecycleEvent:
     def __init__(self, store: LifecycleEventStore) -> None:
         self._store = store
 
+    @property
+    def store(self) -> LifecycleEventStore:
+        return self._store
+
     async def execute(
         self,
         input_event: LifecycleEventInput,

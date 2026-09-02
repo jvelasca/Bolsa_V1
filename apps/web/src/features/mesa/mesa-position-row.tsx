@@ -2,7 +2,7 @@
  * Fila comprimida de posición para Mesa · Hoy (P2 + V1.16).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   DecisionJournalStudyViewV1,
@@ -35,6 +35,7 @@ import {
   pickSubmitIntentForInstrument,
   useInFlightSubmitIntents,
 } from "@/features/operations/use-in-flight-submit-intents";
+import { api } from "@/lib/api";
 
 function formatR(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -253,6 +254,21 @@ export function MesaPositionRow({
 }) {
   const operational = position.operational ?? null;
   const pnlUp = (position.unrealizedPnl ?? 0) >= 0;
+  const [lifecycleStage, setLifecycleStage] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getLifecycleSnapshot(position.id)
+      .then((res) => {
+        if (!cancelled) setLifecycleStage(res.data.stage);
+      })
+      .catch(() => {
+        if (!cancelled) setLifecycleStage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [position.id]);
   const dims = mapMesaStatusDimensions({
     study,
     positionStatus:
@@ -312,6 +328,14 @@ export function MesaPositionRow({
           >
             Acción: {actionLabel}
           </div>
+          {lifecycleStage && lifecycleStage !== "candidate" ? (
+            <div
+              className="text-[10px] text-muted-foreground"
+              data-testid={`mesa-position-lifecycle-stage-${position.symbol}`}
+            >
+              Ciclo: {lifecycleStage}
+            </div>
+          ) : null}
           {executionCopy ? (
             <div
               className="text-[10px] font-medium text-amber-800 dark:text-amber-200"
