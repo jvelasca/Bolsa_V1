@@ -537,6 +537,9 @@ function validatePayload(
 /**
  * Pure append with FSM + time + identity + payload validation.
  * Same eventId + same payloadHash → idempotent; different payload → event_id_conflict.
+ *
+ * Idempotent replay normalizes against the log *prefix before* the existing event so
+ * remaining-dependent defaults (e.g. CLOSE qty) stay stable after append.
  */
 export function appendValidatedLifecycleEvent(
   log: LifecycleStoreEvent[],
@@ -552,6 +555,43 @@ export function appendValidatedLifecycleEvent(
     }
   | { ok: false; error: LifecycleAppendError } {
   const reduced = reduceLifecycleEvents(log);
+
+  if (input.eventId) {
+    const existingIdx = log.findIndex((row) => row.eventId === input.eventId);
+    if (existingIdx >= 0) {
+      const existing = log[existingIdx]!;
+      const prefix = log.slice(0, existingIdx);
+      const prefixReduced = reduceLifecycleEvents(prefix);
+      const remainingAtEvent = remainingAfterLog(prefix);
+      const candidate = normalizeLifecycleStoreEvent(input, {
+        remainingBefore: remainingAtEvent,
+        lineagePath: prefixReduced.lineagePath,
+      });
+      if ("error" in candidate) {
+        return { ok: false, error: candidate.error };
+      }
+      const existingHash = existing.payloadHash ?? computePayloadHash(existing);
+      const newHash = candidate.payloadHash ?? computePayloadHash(candidate);
+      if (existingHash === newHash) {
+        return {
+          ok: true,
+          log,
+          event: existing,
+          idempotent: true,
+          stage: reduced.stage,
+          lineagePath: reduced.lineagePath,
+        };
+      }
+      return {
+        ok: false,
+        error: {
+          code: "event_id_conflict",
+          message: `eventId ${input.eventId} already exists with different payload`,
+        },
+      };
+    }
+  }
+
   const remainingBefore = remainingAfterLog(log);
   const normalized = normalizeLifecycleStoreEvent(input, {
     remainingBefore,
@@ -561,29 +601,6 @@ export function appendValidatedLifecycleEvent(
     return { ok: false, error: normalized.error };
   }
   const event = normalized;
-
-  const existing = log.find((row) => row.eventId === event.eventId);
-  if (existing) {
-    const existingHash = existing.payloadHash ?? computePayloadHash(existing);
-    const newHash = event.payloadHash ?? computePayloadHash(event);
-    if (existingHash === newHash) {
-      return {
-        ok: true,
-        log,
-        event: existing,
-        idempotent: true,
-        stage: reduced.stage,
-        lineagePath: reduced.lineagePath,
-      };
-    }
-    return {
-      ok: false,
-      error: {
-        code: "event_id_conflict",
-        message: `eventId ${event.eventId} already exists with different payload`,
-      },
-    };
-  }
 
   const identityError = validateIdentity(log, event);
   if (identityError) return { ok: false, error: identityError };

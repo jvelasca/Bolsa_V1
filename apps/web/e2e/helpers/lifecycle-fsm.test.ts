@@ -203,6 +203,29 @@ describe("V1.85 lifecycle time + identity", () => {
     expect(second.log[0]?.positionId).toBe(E2E_LIFECYCLE_POSITION_ID);
   });
 
+  it("idempotent CLOSE replay after remaining=0 still matches", () => {
+    let log = appendAll([
+      "POSITION_OPENED",
+      "T1_EXECUTED",
+      "TRAIL_APPLIED",
+      "EXIT_REQUIRED",
+    ]);
+    const closeBody: LifecycleEventInput = {
+      kind: "POSITION_CLOSED",
+      eventId: "evt-close-once",
+    };
+    const first = appendValidatedLifecycleEvent(log, closeBody);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    log = first.log;
+    expect(accountLifecycleFills(log).remaining).toBe(0);
+    const second = appendValidatedLifecycleEvent(log, closeBody);
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.idempotent).toBe(true);
+    expect(second.log).toHaveLength(5);
+  });
+
   it("reduce throws on illegal log (fail-closed)", () => {
     const forged: LifecycleStoreEvent[] = [
       {

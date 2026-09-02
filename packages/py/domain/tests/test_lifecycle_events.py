@@ -115,6 +115,25 @@ def test_accounting_t2_closed() -> None:
     assert_equity_invariant(acct)
 
 
+def test_idempotent_close_replay_after_remaining_zero() -> None:
+    log = _append_all(
+        [
+            "POSITION_OPENED",
+            "T1_EXECUTED",
+            "TRAIL_APPLIED",
+            "EXIT_REQUIRED",
+        ]
+    )
+    body = LifecycleEventInput(kind="POSITION_CLOSED", event_id="evt-close-once")
+    first = append_validated_lifecycle_event(log, body)
+    assert isinstance(first, AppendOk)
+    assert account_lifecycle_fills(first.log).remaining == 0
+    second = append_validated_lifecycle_event(first.log, body)
+    assert isinstance(second, AppendOk)
+    assert second.idempotent is True
+    assert len(second.log) == 5
+
+
 def test_idempotent_same_payload() -> None:
     log = _append_all(["POSITION_OPENED"])
     first = append_validated_lifecycle_event(

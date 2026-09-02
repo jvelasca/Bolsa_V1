@@ -696,37 +696,71 @@ def append_validated_lifecycle_event(
             error=LifecycleAppendError(code="illegal_transition", message=str(exc))
         )
 
+    # Idempotent replay: normalize against prefix before existing event so
+    # remaining-dependent defaults (CLOSE qty) stay stable after append.
+    if input_event.event_id:
+        existing_idx = next(
+            (
+                i
+                for i, row in enumerate(log_list)
+                if row.event_id == input_event.event_id
+            ),
+            None,
+        )
+        if existing_idx is not None:
+            existing = log_list[existing_idx]
+            prefix = log_list[:existing_idx]
+            try:
+                prefix_stage, prefix_path = (
+                    reduce_lifecycle_events(prefix)
+                    if prefix
+                    else ("candidate", "trail")
+                )
+            except ValueError as exc:
+                return AppendFail(
+                    error=LifecycleAppendError(
+                        code="illegal_transition", message=str(exc)
+                    )
+                )
+            remaining_at = remaining_after_log(prefix)
+            candidate = normalize_lifecycle_event(
+                input_event,
+                remaining_before=remaining_at,
+                lineage_path=prefix_path,  # type: ignore[arg-type]
+                defaults=defaults,
+            )
+            if isinstance(candidate, LifecycleAppendError):
+                return AppendFail(error=candidate)
+            existing_hash = existing.payload_hash or compute_payload_hash(existing)
+            new_hash = candidate.payload_hash or compute_payload_hash(candidate)
+            if existing_hash == new_hash:
+                return AppendOk(
+                    log=tuple(log_list),
+                    event=existing,
+                    idempotent=True,
+                    stage=stage,  # type: ignore[arg-type]
+                    lineage_path=lineage_path,  # type: ignore[arg-type]
+                )
+            return AppendFail(
+                error=LifecycleAppendError(
+                    code="event_id_conflict",
+                    message=(
+                        f"eventId {input_event.event_id} already exists "
+                        "with different payload"
+                    ),
+                )
+            )
+
     remaining_before = remaining_after_log(log_list)
     normalized = normalize_lifecycle_event(
         input_event,
         remaining_before=remaining_before,
-        lineage_path=lineage_path,
+        lineage_path=lineage_path,  # type: ignore[arg-type]
         defaults=defaults,
     )
     if isinstance(normalized, LifecycleAppendError):
         return AppendFail(error=normalized)
     event = normalized
-
-    existing = next((row for row in log_list if row.event_id == event.event_id), None)
-    if existing is not None:
-        existing_hash = existing.payload_hash or compute_payload_hash(existing)
-        new_hash = event.payload_hash or compute_payload_hash(event)
-        if existing_hash == new_hash:
-            return AppendOk(
-                log=tuple(log_list),
-                event=existing,
-                idempotent=True,
-                stage=stage,
-                lineage_path=lineage_path,
-            )
-        return AppendFail(
-            error=LifecycleAppendError(
-                code="event_id_conflict",
-                message=(
-                    f"eventId {event.event_id} already exists with different payload"
-                ),
-            )
-        )
 
     identity_err = _validate_identity(log_list, event)
     if identity_err:
