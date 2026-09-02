@@ -8,6 +8,7 @@ import {
 import { resolveReconOperatingState } from "./operational-context.js";
 import {
   POSITION_REVISION_ORIGINS,
+  revisionsFromUnknown,
   type PositionRevisionOriginV1,
 } from "./position-revision.js";
 import {
@@ -403,5 +404,93 @@ describe("V1.65 GP-V165 identity", () => {
     });
     expect(view.decisionId).toBeNull();
     expect(view.lineageCollapsed).toBe(true);
+  });
+});
+
+describe("V1.71 GP-V171 TS/Python POV golden", () => {
+  it("T2_EXECUTED + primaryAction MONITOR", () => {
+    const view = buildPositionOperationalView({
+      position: basePosition({
+        status: "PARTIAL",
+        remainingQuantity: 3,
+        target1Leg: {
+          status: "executed",
+          fillId: "tx-t1",
+          at: "2026-09-01T11:00:00Z",
+        },
+        target2Leg: {
+          status: "executed",
+          fillId: "tx-t2",
+          at: "2026-09-01T14:00:00Z",
+        },
+      }),
+    });
+    expect(view.operatingState).toBe("T2_EXECUTED");
+    expect(view.primaryAction).toBe("MONITOR");
+    expect(view.levels.currentStop).toBe(98);
+    expect(view.levels.target2).toBe(120);
+  });
+
+  it("recon drift → RECONCILIATION_DRIFT + BLOQUEADO", () => {
+    const view = buildPositionOperationalView({
+      position: basePosition(),
+      reconStatus: "drift",
+    });
+    expect(view.operatingState).toBe("RECONCILIATION_DRIFT");
+    expect(view.primaryAction).toBe("BLOQUEADO");
+  });
+
+  it("invalid revision origin is dropped (not coerced to stop)", () => {
+    const kept = revisionsFromUnknown([
+      {
+        revisionId: "r-bad",
+        at: "2026-09-01T10:00:00Z",
+        origin: "not-a-real-origin",
+        nextStop: 96,
+      },
+      {
+        revisionId: "r-ok",
+        at: "2026-09-01T10:00:00Z",
+        origin: "protect",
+        nextStop: 98,
+      },
+    ]);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.origin).toBe("protect");
+  });
+
+  it("stopHistory labels for all five revision origins", () => {
+    const origins: PositionRevisionOriginV1[] = [
+      "protect",
+      "trail",
+      "reduce",
+      "override",
+      "stop",
+    ];
+    const history = buildStopHistory(
+      basePosition({
+        revisions: origins.map((origin, i) => ({
+          revisionId: `r-${origin}`,
+          at: `2026-09-01T10:0${i}:00Z`,
+          previousStop: 95 + i,
+          nextStop: 96 + i,
+          previousStatus: "OPEN",
+          nextStatus: "OPEN",
+          origin,
+          reason: origin,
+        })),
+      }),
+    );
+    const revEntries = history.filter(
+      (h) => h.origin !== "birth" && h.origin !== "current",
+    );
+    expect(revEntries.map((h) => h.origin)).toEqual(origins);
+    expect(revEntries.map((h) => h.label)).toEqual([
+      "Protect",
+      "Trail #1",
+      "Reduce",
+      "Ajuste manual",
+      "Stop",
+    ]);
   });
 });

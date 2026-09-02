@@ -53,6 +53,39 @@ describe("entry-decision-surface GP-V162-02/04/05", () => {
         { lifecycle: "filled", orderState: "filled", source: "none" } as never,
       ),
     ).toBe("EJECUTADA");
+    expect(
+      entryExecutionStateLabel(
+        "confirmada",
+        { kind: "view_operations", label: "Ver operaciones" },
+        {
+          lifecycle: "unknown",
+          orderState: "unknown",
+          source: "none",
+        } as never,
+      ),
+    ).toBe("REVISAR");
+    expect(
+      entryExecutionStateLabel(
+        "confirmada",
+        { kind: "view_operations", label: "Ver operaciones" },
+        {
+          lifecycle: "failed",
+          orderState: "rejected",
+          source: "none",
+        } as never,
+      ),
+    ).toBe("REVISAR");
+    expect(
+      entryExecutionStateLabel(
+        "confirmada",
+        { kind: "view_operations", label: "Ver operaciones" },
+        {
+          lifecycle: "in_flight",
+          orderState: "accepted",
+          source: "none",
+        } as never,
+      ),
+    ).toBe("PENDIENTE");
   });
 
   it("headlines are human-readable", () => {

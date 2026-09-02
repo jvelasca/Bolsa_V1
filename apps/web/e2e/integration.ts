@@ -18,6 +18,15 @@ export type MercadoIntegrationFixture = {
   symbol: string;
   workspaceId: string;
   hasOpenPosition: boolean;
+  positionId: string | null;
+  tradePlanId: string | null;
+  decisionId: string | null;
+  levels: {
+    entry: number | null;
+    currentStop: number | null;
+    target1: number | null;
+    target2: number | null;
+  } | null;
   workspaceDocument: ReturnType<typeof mercadoWorkspaceDocument>;
 };
 
@@ -34,6 +43,24 @@ export const E2E_SKIP_INTEGRATION_REASON =
 
 export const E2E_SKIP_DB_ISOLATION_REASON =
   "Set E2E_ALLOW_DEV_DB=1 to run integrated Mercado E2E against local PostgreSQL (creates ephemeral e2e-v167-* accounts). See spec-v167.";
+
+/** Environment unavailable → SKIP. Fixture/product errors must FAIL. */
+export async function gateIntegratedE2eEnvironment(
+  request: APIRequestContext,
+  baseURL: string | undefined,
+  opts: { e2eEnabled: boolean; e2eSkipReason: string },
+): Promise<string | null> {
+  if (!opts.e2eEnabled) return opts.e2eSkipReason;
+  if (!e2eIntegrationMode()) return E2E_SKIP_INTEGRATION_REASON;
+  if (!baseURL) return "baseURL required";
+  if (process.env.E2E_ALLOW_DEV_DB !== "1") return E2E_SKIP_DB_ISOLATION_REASON;
+  try {
+    await assertApiHealthy(request, baseURL);
+  } catch (err) {
+    return String(err);
+  }
+  return null;
+}
 
 /**
  * Fail-closed unless explicitly opted in. Integrated Mercado E2E mutates PG
@@ -277,6 +304,10 @@ export async function ensureMercadoIntegrationFixture(
   }
 
   let hasOpenPosition = false;
+  let positionId: string | null = null;
+  let tradePlanId: string | null = null;
+  let decisionId: string | null = null;
+  let levels: MercadoIntegrationFixture["levels"] = null;
   const tradeRes = await request.post(
     new URL("/api/portfolio/trade", baseURL).toString(),
     {
@@ -290,9 +321,70 @@ export async function ensureMercadoIntegrationFixture(
       },
     },
   );
-  if (tradeRes.ok()) {
-    hasOpenPosition = true;
+  if (!tradeRes.ok()) {
+    throw new Error(
+      `POST /api/portfolio/trade failed (${tradeRes.status()}): ${await tradeRes.text()}. Open position seed is required.`,
+    );
   }
+  hasOpenPosition = true;
+  const portfolioRes = await request.get(
+    new URL("/api/portfolio", baseURL).toString(),
+    { headers: { "X-Account-Id": accountId } },
+  );
+  if (!portfolioRes.ok()) {
+    throw new Error(
+      `GET /api/portfolio after buy failed (${portfolioRes.status()}): ${await portfolioRes.text()}`,
+    );
+  }
+  const portfolioJson = (await portfolioRes.json()) as {
+    data?: {
+      positions?: Array<{
+        id: string;
+        instrumentId: string;
+        operational?: {
+          tradePlanId?: string;
+          decisionId?: string;
+          operationalView?: {
+            positionId?: string;
+            tradePlanId?: string;
+            decisionId?: string | null;
+            levels?: {
+              entry?: number | null;
+              currentStop?: number | null;
+              target1?: number | null;
+              target2?: number | null;
+            };
+          };
+        };
+      }>;
+    };
+  };
+  const seeded = portfolioJson.data?.positions?.find(
+    (row) => row.instrumentId === instrument.id,
+  );
+  if (!seeded) {
+    throw new Error(
+      `Portfolio buy seed did not persist an open position for ${instrument.symbol}.`,
+    );
+  }
+  positionId = seeded.operational?.operationalView?.positionId ?? seeded.id;
+  tradePlanId =
+    seeded.operational?.operationalView?.tradePlanId ??
+    seeded.operational?.tradePlanId ??
+    null;
+  decisionId =
+    seeded.operational?.operationalView?.decisionId ??
+    seeded.operational?.decisionId ??
+    null;
+  const viewLevels = seeded.operational?.operationalView?.levels;
+  levels = viewLevels
+    ? {
+        entry: viewLevels.entry ?? null,
+        currentStop: viewLevels.currentStop ?? null,
+        target1: viewLevels.target1 ?? null,
+        target2: viewLevels.target2 ?? null,
+      }
+    : null;
 
   const workspaceDocument = mercadoWorkspaceDocument({
     instrumentId: instrument.id,
@@ -326,6 +418,10 @@ export async function ensureMercadoIntegrationFixture(
     symbol: instrument.symbol,
     workspaceId,
     hasOpenPosition,
+    positionId,
+    tradePlanId,
+    decisionId,
+    levels,
     workspaceDocument: workspaceDocumentWithId,
   };
 }

@@ -84,3 +84,99 @@ def test_pov_legacy_without_decision_id_is_lineage_collapsed() -> None:
     assert view["decisionId"] is None
     assert view["tradePlanId"] == "TP-LEG"
     assert view["lineageCollapsed"] is True
+
+
+def test_gp_v171_parity_t2_executed() -> None:
+    from bolsa_analytics.cognitive.position_state import apply_target_leg
+
+    pos = build_position_state_from_fill(
+        _plan(),
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="pos-1",
+    )
+    assert pos is not None
+    pos = apply_target_leg(pos, which="t1", status="executed", fill_id="tx-t1")
+    pos = apply_target_leg(pos, which="t2", status="executed", fill_id="tx-t2")
+    view = build_position_operational_view(pos)
+    assert view["operatingState"] == "T2_EXECUTED"
+    assert view["primaryAction"] == "MONITOR"
+    assert view["levels"]["target2"] == 110.0
+
+
+def test_gp_v171_parity_recon_drift() -> None:
+    pos = build_position_state_from_fill(
+        _plan(),
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="pos-1",
+    )
+    assert pos is not None
+    view = build_position_operational_view(pos, recon_status="drift")
+    assert view["operatingState"] == "RECONCILIATION_DRIFT"
+    assert view["primaryAction"] == "BLOQUEADO"
+
+
+def test_gp_v171_parity_stop_history_five_origins() -> None:
+    from dataclasses import replace
+
+    from bolsa_analytics.cognitive.position_revision import PositionRevision
+
+    pos = build_position_state_from_fill(
+        _plan(),
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="pos-1",
+    )
+    assert pos is not None
+    origins = ("protect", "trail", "reduce", "override", "stop")
+    revs = tuple(
+        PositionRevision(
+            revision_id=f"r-{origin}",
+            at=f"2026-09-01T10:0{i}:00Z",
+            previous_stop=95.0 + i,
+            next_stop=96.0 + i,
+            previous_status="OPEN",
+            next_status="OPEN",
+            origin=origin,
+            reason=origin,
+        )
+        for i, origin in enumerate(origins)
+    )
+    view = build_position_operational_view(replace(pos, revisions=revs))
+    hist = [
+        h
+        for h in view["stopHistory"]
+        if h["origin"] not in ("birth", "current")
+    ]
+    assert [h["origin"] for h in hist] == list(origins)
+    assert [h["label"] for h in hist] == [
+        "Protect",
+        "Trail #1",
+        "Reduce",
+        "Ajuste manual",
+        "Stop",
+    ]
+
+
+def test_gp_v171_invalid_revision_origin_dropped() -> None:
+    from bolsa_analytics.cognitive.position_revision import revisions_from_raw
+
+    kept = revisions_from_raw(
+        [
+            {
+                "revisionId": "r-bad",
+                "at": "2026-09-01T10:00:00Z",
+                "origin": "not-a-real-origin",
+                "nextStop": 96,
+            },
+            {
+                "revisionId": "r-ok",
+                "at": "2026-09-01T10:00:00Z",
+                "origin": "protect",
+                "nextStop": 98,
+            },
+        ]
+    )
+    assert len(kept) == 1
+    assert kept[0].origin == "protect"

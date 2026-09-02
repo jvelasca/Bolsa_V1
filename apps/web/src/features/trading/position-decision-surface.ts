@@ -1,5 +1,6 @@
 /**
  * V1.61 — Position Decision Surface helpers (tono, headline, ejecución, CTA).
+ * V1.71 — REVISAR en recon/BLOQUEADO · headlines sin colapsar T2/DRIFT · assertNever.
  * Display-only — no firma · no BUY.
  */
 
@@ -9,6 +10,7 @@ import type {
   PositionExitCtaKindV1,
   PositionOperationalStateV1,
 } from "@bolsa/shared";
+import { assertNever } from "@bolsa/shared";
 
 export type PovVisualToneV1 = "emerald" | "amber" | "rose" | "muted";
 
@@ -35,7 +37,7 @@ export function povOperatingStateTone(
     case "CLOSED":
       return "muted";
     default:
-      return "muted";
+      return assertNever(state);
   }
 }
 
@@ -58,15 +60,20 @@ export function povOperatingStateHeadline(
   switch (state) {
     case "PROTECTED":
     case "TRAILING":
-    case "T1_EXECUTED":
-    case "T2_EXECUTED":
-    case "PARTIALLY_REDUCED":
       return "Protegida";
+    case "T1_EXECUTED":
+      return "T1 ejecutado";
+    case "T2_EXECUTED":
+      return "T2 ejecutado";
+    case "PARTIALLY_REDUCED":
+      return "Parcial";
     case "EXIT_REQUIRED":
     case "EXIT_PENDING":
       return "Salida necesaria";
     case "RECONCILIATION_DRIFT":
+      return "Recon drift";
     case "RECONCILIATION_ERROR":
+      return "Recon no disponible";
     case "T1_READY":
     case "T2_READY":
     case "PROTECT_REQUIRED":
@@ -75,16 +82,29 @@ export function povOperatingStateHeadline(
     case "CLOSED":
       return "Cerrada";
     default:
-      return "Requiere atención";
+      return assertNever(state);
   }
 }
 
-export type PovExecutionCopyV1 = "NO REQUERIDA" | "PENDIENTE" | "EJECUTADA";
+export type PovExecutionCopyV1 =
+  | "NO REQUERIDA"
+  | "PENDIENTE"
+  | "EJECUTADA"
+  | "REVISAR";
 
 export function povExecutionStateLabel(
   state: PositionOperationalStateV1,
   primaryAction: PaperDeskNextActionV1,
 ): PovExecutionCopyV1 {
+  if (state === "RECONCILIATION_DRIFT" || state === "RECONCILIATION_ERROR") {
+    return "REVISAR";
+  }
+  if (
+    primaryAction === "BLOQUEADO" ||
+    primaryAction === "REVISAR_DATOS_NO_FRESCOS"
+  ) {
+    return "REVISAR";
+  }
   if (
     state === "T1_EXECUTED" ||
     state === "T2_EXECUTED" ||
@@ -124,8 +144,9 @@ export function mapPovPrimaryActionToCtaKind(
       return "watch";
     case "MONITOR":
     case "MANTENER":
-    default:
       return "maintain";
+    default:
+      return assertNever(action);
   }
 }
 

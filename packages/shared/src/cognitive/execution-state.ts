@@ -9,6 +9,7 @@
 
 import type { ExecutionRecordV1 } from "./execution-record.js";
 import type { MesaNextActionV1 } from "./mesa-next-action.js";
+import { assertNever } from "./never.js";
 import type { PaperOrderV1 } from "./paper-order.js";
 import type { DurableSubmitIntentV1 } from "./submit-intent.js";
 
@@ -478,7 +479,8 @@ export function formatExecutionStateCopy(
     case "reconciled":
       return "Orden conciliada.";
     case "none":
-    default:
       return null;
+    default:
+      return assertNever(state.lifecycle);
   }
 }

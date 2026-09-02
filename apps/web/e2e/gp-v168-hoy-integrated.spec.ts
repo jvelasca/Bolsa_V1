@@ -11,50 +11,38 @@
 import { test, expect } from "@playwright/test";
 import { e2eEnabled, E2E_SKIP_REASON } from "./fixtures";
 import {
-  assertApiHealthy,
-  assertE2eDatabaseIsolation,
-  e2eIntegrationMode,
   ensureHoyIntegrationFixture,
-  E2E_SKIP_DB_ISOLATION_REASON,
-  E2E_SKIP_INTEGRATION_REASON,
+  gateIntegratedE2eEnvironment,
   seedHoyBrowserState,
   type HoyIntegrationFixture,
 } from "./integration";
 
 test.describe("GP-V168 — Hoy Paper Autonomous Desk integrated", () => {
+  let environmentSkip: string | null = null;
   let fixture: HoyIntegrationFixture | null = null;
 
   test.beforeAll(async ({ request, baseURL }) => {
-    if (!e2eEnabled() || !e2eIntegrationMode() || !baseURL) return;
-    try {
-      assertE2eDatabaseIsolation();
-      await assertApiHealthy(request, baseURL);
-      fixture = await ensureHoyIntegrationFixture(request, baseURL);
-    } catch {
-      fixture = null;
-    }
+    environmentSkip = await gateIntegratedE2eEnvironment(request, baseURL, {
+      e2eEnabled: e2eEnabled(),
+      e2eSkipReason: E2E_SKIP_REASON,
+    });
+    if (environmentSkip || !baseURL) return;
+    fixture = await ensureHoyIntegrationFixture(request, baseURL);
   });
 
-  test.beforeEach(async ({ request, baseURL }) => {
-    test.skip(!e2eEnabled(), E2E_SKIP_REASON);
-    test.skip(!e2eIntegrationMode(), E2E_SKIP_INTEGRATION_REASON);
-    if (!baseURL) {
-      test.skip(true, "baseURL required");
-      return;
-    }
-    try {
-      assertE2eDatabaseIsolation();
-      await assertApiHealthy(request, baseURL);
-    } catch (err) {
-      test.skip(true, String(err));
+  test.beforeEach(() => {
+    if (environmentSkip) {
+      test.skip(true, environmentSkip);
     }
     if (!fixture) {
-      test.skip(true, E2E_SKIP_DB_ISOLATION_REASON);
+      throw new Error(
+        "Hoy E2E fixture missing after environment gates (fixture/product failure).",
+      );
     }
   });
 
   test("GP-V168-01: Hoy inbox loads with autoDesk wire", async ({ page }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedHoyBrowserState(page, { accountId: fixture.accountId });
     await page.goto("/mesa");
     await expect(page.getByTestId("mesa-hoy-page")).toBeVisible({
@@ -66,7 +54,7 @@ test.describe("GP-V168 — Hoy Paper Autonomous Desk integrated", () => {
   });
 
   test("GP-V168-02: Hoy has no primary COMPRAR CTA", async ({ page }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedHoyBrowserState(page, { accountId: fixture.accountId });
     await page.goto("/mesa");
     await expect(page.getByTestId("daily-desk-inbox")).toBeVisible({
@@ -78,7 +66,7 @@ test.describe("GP-V168 — Hoy Paper Autonomous Desk integrated", () => {
   });
 
   test("GP-V168-03: four Daily Desk buckets visible", async ({ page }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedHoyBrowserState(page, { accountId: fixture.accountId });
     await page.goto("/mesa");
     await expect(page.getByTestId("daily-desk-buckets")).toBeVisible({
@@ -100,7 +88,7 @@ test.describe("GP-V168 — Hoy Paper Autonomous Desk integrated", () => {
   test("GP-V168-04: autoDesk projects honest AUTO posture (no execute CTA)", async ({
     page,
   }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedHoyBrowserState(page, { accountId: fixture.accountId });
     await page.goto("/mesa");
     await expect(page.getByTestId("daily-desk-inbox")).toBeVisible({

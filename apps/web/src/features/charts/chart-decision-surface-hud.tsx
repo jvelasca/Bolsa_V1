@@ -74,6 +74,8 @@ export function ChartDecisionSurfaceHud({
         className,
       )}
       data-testid="chart-decision-surface-hud"
+      data-instrument-id={instrumentId}
+      data-symbol={symbol}
     >
       <div className="overflow-hidden rounded-md border border-border/70 bg-background/90 shadow-md backdrop-blur-sm">
         <button

@@ -7,8 +7,9 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
+  ESTUDIO_LIST_ID,
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   OPINION_CHANNEL_LEVEL_LABELS,
   OPINION_CHANNEL_MAP_LEGEND,
@@ -17,6 +18,8 @@ import {
   type InstrumentDailyOpinionHintV1,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { focusInstrumentInMercado } from "@/features/trading/focus-instrument-in-mercado";
 import {
   opinionByInstrumentId,
   useInstrumentDailyOpinions,
@@ -50,6 +53,11 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const [filter, setFilter] = useState<ChannelFilter>("todas");
   const [showMap, setShowMap] = useState(false);
   const [showEodOps, setShowEodOps] = useState(false);
+  const navigate = useNavigate();
+  const openChartTab = useWorkspaceStore((s) => s.openChartTab);
+  const focusInstrumentFromList = useWorkspaceStore(
+    (s) => s.focusInstrumentFromList,
+  );
   const { effectiveAccountId } = useActiveAccount();
   const pushToast = useAlertsStore((s) => s.pushToast);
   const notifyEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
@@ -365,13 +373,24 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        to={MERCADO_PATH}
+                      <button
+                        type="button"
                         className="font-medium text-foreground hover:underline"
                         title="Ver en Mercado"
+                        onClick={() =>
+                          focusInstrumentInMercado(
+                            navigate,
+                            { openChartTab, focusInstrumentFromList },
+                            {
+                              instrumentId: item.instrumentId,
+                              symbol: item.symbol,
+                            },
+                            { listId: ESTUDIO_LIST_ID },
+                          )
+                        }
                       >
                         {item.symbol}
-                      </Link>
+                      </button>
                       <span
                         className={cn(
                           "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",

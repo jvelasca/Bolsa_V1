@@ -49,11 +49,24 @@ describe("position-decision-surface GP-V161-02/04/05", () => {
     );
     expect(povExecutionStateLabel("T2_READY", "REDUCIR")).toBe("PENDIENTE");
     expect(povExecutionStateLabel("T2_EXECUTED", "MONITOR")).toBe("EJECUTADA");
+    expect(povExecutionStateLabel("RECONCILIATION_DRIFT", "BLOQUEADO")).toBe(
+      "REVISAR",
+    );
+    expect(povExecutionStateLabel("RECONCILIATION_ERROR", "BLOQUEADO")).toBe(
+      "REVISAR",
+    );
   });
 
-  it("headlines are human-readable", () => {
+  it("headlines are human-readable and do not collapse T2/DRIFT", () => {
     expect(povOperatingStateHeadline("PROTECTED")).toBe("Protegida");
+    expect(povOperatingStateHeadline("T2_EXECUTED")).toBe("T2 ejecutado");
     expect(povOperatingStateHeadline("T1_READY")).toBe("Requiere atención");
     expect(povOperatingStateHeadline("EXIT_REQUIRED")).toBe("Salida necesaria");
+    expect(povOperatingStateHeadline("RECONCILIATION_DRIFT")).toBe(
+      "Recon drift",
+    );
+    expect(povOperatingStateHeadline("RECONCILIATION_ERROR")).toBe(
+      "Recon no disponible",
+    );
   });
 });

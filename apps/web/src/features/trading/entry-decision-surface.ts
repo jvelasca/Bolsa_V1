@@ -1,5 +1,6 @@
 /**
  * V1.62 — Entry Decision Surface helpers (tono, headline, ejecución).
+ * V1.71 — unknown/failed → REVISAR · assertNever.
  * Display-only — no firma · no BUY.
  */
 
@@ -8,6 +9,7 @@ import type {
   EntryOperatingPhaseV1,
   ExecutionStateV1,
 } from "@bolsa/shared";
+import { assertNever } from "@bolsa/shared";
 
 export type EntryVisualToneV1 = "sky" | "amber" | "teal" | "rose" | "muted";
 
@@ -30,7 +32,7 @@ export function entryPhaseTone(
     case "confirmada":
       return "teal";
     default:
-      return "muted";
+      return assertNever(phase);
   }
 }
 
@@ -60,21 +62,27 @@ export function entryPhaseHeadline(phase: EntryOperatingPhaseV1): string {
     case "confirmada":
       return "En ejecución";
     default:
-      return "Entrada";
+      return assertNever(phase);
   }
 }
 
-export type EntryExecutionCopyV1 = "NO REQUERIDA" | "PENDIENTE" | "EJECUTADA";
+export type EntryExecutionCopyV1 =
+  | "NO REQUERIDA"
+  | "PENDIENTE"
+  | "EJECUTADA"
+  | "REVISAR";
 
 export function entryExecutionStateLabel(
   phase: EntryOperatingPhaseV1,
   primaryCta: EntryOperatingCtaV1,
   execution?: ExecutionStateV1 | null,
 ): EntryExecutionCopyV1 {
-  if (execution?.lifecycle === "filled") return "EJECUTADA";
+  const lifecycle = execution?.lifecycle;
+  if (lifecycle === "filled" || lifecycle === "reconciled") return "EJECUTADA";
+  if (lifecycle === "unknown" || lifecycle === "failed") return "REVISAR";
   if (
-    execution?.lifecycle === "in_flight" ||
-    execution?.lifecycle === "unknown" ||
+    lifecycle === "in_flight" ||
+    lifecycle === "submit" ||
     execution?.orderState === "pending"
   ) {
     return "PENDIENTE";
@@ -83,7 +91,6 @@ export function entryExecutionStateLabel(
   if (phase === "disparada" || phase === "propuesta") {
     if (primaryCta.kind === "review_confirm") return "PENDIENTE";
   }
-  if (primaryCta.kind === "none") return "NO REQUERIDA";
   return "NO REQUERIDA";
 }
 

@@ -22,6 +22,12 @@ export function ChartsZone({ children }: { children: ReactNode }) {
               key={tab.id}
               role="button"
               tabIndex={0}
+              data-testid={
+                tab.id === activeChartId ? "chart-active-tab" : undefined
+              }
+              data-instrument-id={tab.instrumentId}
+              data-symbol={tab.label}
+              data-active={tab.id === activeChartId ? "true" : undefined}
               onClick={() => {
                 selectChartTab(tab.id);
                 requestChartReflow();

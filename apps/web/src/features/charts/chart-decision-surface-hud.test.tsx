@@ -113,7 +113,10 @@ describe("ChartDecisionSurfaceHud (V1.63)", () => {
 
   it("GP-V163-04: renders HUD with entry fixture preparada", () => {
     render(<ChartDecisionSurfaceHud instrumentId="inst-aapl" symbol="AAPL" />);
-    expect(screen.getByTestId("chart-decision-surface-hud")).toBeTruthy();
+    const hud = screen.getByTestId("chart-decision-surface-hud");
+    expect(hud).toBeTruthy();
+    expect(hud.getAttribute("data-instrument-id")).toBe("inst-aapl");
+    expect(hud.getAttribute("data-symbol")).toBe("AAPL");
     expect(screen.getByTestId("entry-decision-headline").textContent).toBe(
       "Entrada preparada",
     );

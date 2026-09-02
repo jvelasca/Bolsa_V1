@@ -101,14 +101,14 @@ def resolve_paper_desk_next_action(
     status: str,
     decision_verdict: str | None = None,
 ) -> PaperDeskNextAction:
+    """Espejo TS ``resolvePaperDeskNextAction`` en el subconjunto que usa POV.
+
+    protected/reduced/exited sin dry_run → APPLIED → MONITOR (no SUBIR_STOP/REDUCIR).
+    """
     if status == "denied":
         return "BLOQUEADO"
-    if status == "protected":
-        return "SUBIR_STOP"
-    if status == "reduced":
-        return "REDUCIR"
-    if status == "exited":
-        return "SALIR"
+    if status in ("protected", "reduced", "exited"):
+        return "MONITOR"
     if status == "held":
         return "MANTENER"
     if status in ("error", "no_plan", "skipped", "sell_skipped"):
@@ -128,7 +128,7 @@ def map_operating_state_to_desk_status(state: PositionOperationalState) -> str:
         return "protected"
     if state in ("RECONCILIATION_ERROR", "RECONCILIATION_DRIFT"):
         return "denied"
-    return "held"
+    raise ValueError(f"unexpected operating state: {state!r}")
 
 
 def _stop_history_label(origin: PositionRevisionOrigin, trail_idx: list[int]) -> str:
@@ -141,7 +141,9 @@ def _stop_history_label(origin: PositionRevisionOrigin, trail_idx: list[int]) ->
         return "Reduce"
     if origin == "override":
         return "Ajuste manual"
-    return "Stop"
+    if origin == "stop":
+        return "Stop"
+    raise ValueError(f"unexpected revision origin: {origin!r}")
 
 
 def build_stop_history(position: PositionState) -> list[dict[str, object]]:

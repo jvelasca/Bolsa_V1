@@ -12,6 +12,7 @@ import type {
   SubmitIntentListItemV1,
 } from "@bolsa/shared";
 import {
+  assertNever,
   buildExecutionState,
   buildPositionDecisionFromDto,
   formatPositionDecisionPhrase,
@@ -63,7 +64,7 @@ type PositionCompactProps = {
   portfolioReconStatus?: string | null;
   /** Evita doble hook cuando el padre ya resolvió la vista. */
   view?: PositionOperationalViewV1;
-  viewSource?: "canonical" | "fallback";
+  viewSource?: "canonical" | "blob";
   onOpenWhy?: () => void;
   className?: string;
   testId?: string;
@@ -96,19 +97,6 @@ function formatOperatingStatePhrase(
   portfolioReconStatus?: string | null,
   position?: PositionDto,
 ): string {
-  if (state === "RECONCILIATION_DRIFT") {
-    return (
-      reconPhraseFromPortfolioStatus(portfolioReconStatus ?? "drift") ??
-      "Discrepancia de cartera · requiere acción."
-    );
-  }
-  if (state === "RECONCILIATION_ERROR") {
-    return (
-      reconPhraseFromPortfolioStatus("unavailable") ??
-      "Reconciliación no disponible."
-    );
-  }
-
   const decision =
     position != null
       ? buildPositionDecisionFromDto(position, { portfolioReconStatus })
@@ -153,8 +141,18 @@ function formatOperatingStatePhrase(
       return "Posición reducida parcialmente.";
     case "CLOSED":
       return "Posición cerrada.";
+    case "RECONCILIATION_DRIFT":
+      return (
+        reconPhraseFromPortfolioStatus(portfolioReconStatus ?? "drift") ??
+        "Discrepancia de cartera · requiere acción."
+      );
+    case "RECONCILIATION_ERROR":
+      return (
+        reconPhraseFromPortfolioStatus("unavailable") ??
+        "Reconciliación no disponible."
+      );
     default:
-      return String(state).replace(/_/g, " ");
+      return assertNever(state);
   }
 }
 
@@ -369,7 +367,7 @@ function PositionCompactBody({
   symbol,
   portfolioReconStatus,
   view,
-  viewSource: _viewSource,
+  viewSource,
   onOpenWhy,
   density,
 }: Omit<PositionCompactProps, "variant" | "className" | "testId"> & {
@@ -401,6 +399,7 @@ function PositionCompactBody({
           data-testid="operativa-cockpit-pov-state"
           data-state={view.operatingState}
           data-pov-state={view.operatingState}
+          data-pov-source={viewSource ?? "canonical"}
         >
           <p
             className={cn(

@@ -214,6 +214,10 @@ describe("OperativaCockpitCard POSICIÓN V1.40", () => {
     );
     const cockpit = screen.getByTestId("operativa-cockpit");
     expect(cockpit.getAttribute("data-phase")).toBe("posicion");
+    expect(cockpit.getAttribute("data-instrument-id")).toBe("inst-aapl");
+    expect(cockpit.getAttribute("data-symbol")).toBe("AAPL");
+    expect(cockpit.getAttribute("data-position-id")).toBe("p1");
+    expect(cockpit.getAttribute("data-trade-plan-id")).toBe("tp-1");
     expect(screen.getByTestId("operativa-cockpit-phase").textContent).toBe(
       "Posición",
     );
@@ -440,7 +444,7 @@ describe("OperativaCockpitCard V1.61 Decision Surface", () => {
     const card = screen.getByTestId("position-operational-star-card");
     expect(card.getAttribute("data-tone")).toBe("rose");
     expect(screen.getByTestId("position-decision-headline").textContent).toBe(
-      "Requiere atención",
+      "Recon drift",
     );
   });
 

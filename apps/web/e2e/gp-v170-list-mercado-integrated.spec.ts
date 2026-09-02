@@ -1,7 +1,7 @@
 /**
  * GP-V170 — LISTA→GRÁFICO→ACCIÓN integrado (API real).
  *
- * Journey: click fila Cartera → pestaña gráfico → cockpit DECISIÓN mismo símbolo/fase.
+ * Journey: click fila Cartera → pestaña gráfico → cockpit DECISIÓN mismo instrumento.
  * Workspace sin gráfico pre-seedeado. Panel DECISIÓN cerrado al inicio.
  *
  * Run:
@@ -10,54 +10,44 @@
 import { test, expect } from "@playwright/test";
 import { e2eEnabled, E2E_SKIP_REASON } from "./fixtures";
 import {
-  assertApiHealthy,
-  assertE2eDatabaseIsolation,
-  e2eIntegrationMode,
   ensureMercadoIntegrationFixture,
-  E2E_SKIP_DB_ISOLATION_REASON,
-  E2E_SKIP_INTEGRATION_REASON,
+  gateIntegratedE2eEnvironment,
   mercadoListFocusWorkspaceDocument,
   seedMercadoBrowserState,
   type MercadoIntegrationFixture,
 } from "./integration";
 
 test.describe("GP-V170 — Lista→Gráfico→Acción integrated", () => {
+  let environmentSkip: string | null = null;
   let fixture: MercadoIntegrationFixture | null = null;
 
   test.beforeAll(async ({ request, baseURL }) => {
-    if (!e2eEnabled() || !e2eIntegrationMode() || !baseURL) return;
-    try {
-      assertE2eDatabaseIsolation();
-      await assertApiHealthy(request, baseURL);
-      fixture = await ensureMercadoIntegrationFixture(request, baseURL);
-    } catch {
-      fixture = null;
-    }
+    environmentSkip = await gateIntegratedE2eEnvironment(request, baseURL, {
+      e2eEnabled: e2eEnabled(),
+      e2eSkipReason: E2E_SKIP_REASON,
+    });
+    if (environmentSkip || !baseURL) return;
+    fixture = await ensureMercadoIntegrationFixture(request, baseURL);
   });
 
-  test.beforeEach(async ({ request, baseURL }) => {
-    test.skip(!e2eEnabled(), E2E_SKIP_REASON);
-    test.skip(!e2eIntegrationMode(), E2E_SKIP_INTEGRATION_REASON);
-    if (!baseURL) {
-      test.skip(true, "baseURL required");
-      return;
-    }
-    try {
-      assertE2eDatabaseIsolation();
-      await assertApiHealthy(request, baseURL);
-    } catch (err) {
-      test.skip(true, String(err));
+  test.beforeEach(() => {
+    if (environmentSkip) {
+      test.skip(true, environmentSkip);
     }
     if (!fixture) {
-      test.skip(true, E2E_SKIP_DB_ISOLATION_REASON);
+      throw new Error(
+        "Mercado E2E fixture missing after environment gates (fixture/product failure).",
+      );
     }
   });
 
-  test("GP-V170-01: list row opens chart + cockpit with matching phase", async ({
+  test("GP-V170-01: list row opens chart + cockpit with matching identity", async ({
     page,
   }) => {
-    if (!fixture) return;
-    test.skip(!fixture.hasOpenPosition, "Requires portfolio buy seed");
+    if (!fixture) throw new Error("fixture required");
+    if (!fixture.hasOpenPosition || !fixture.positionId) {
+      throw new Error("Requires portfolio buy seed");
+    }
 
     const workspaceDocument = mercadoListFocusWorkspaceDocument({
       instrumentId: fixture.instrumentId,
@@ -75,6 +65,10 @@ test.describe("GP-V170 — Lista→Gráfico→Acción integrated", () => {
     await page.goto("/trading");
     const listRow = page.getByTestId(`list-instrument-open-${fixture.symbol}`);
     await expect(listRow).toBeVisible({ timeout: 20_000 });
+    await expect(listRow).toHaveAttribute(
+      "data-instrument-id",
+      fixture.instrumentId,
+    );
 
     const listPhase = await listRow
       .locator('[data-testid="list-operativa-phase"]')
@@ -84,20 +78,55 @@ test.describe("GP-V170 — Lista→Gráfico→Acción integrated", () => {
 
     await listRow.click();
 
-    await expect(page.getByTestId("chart-indicators-zone")).toBeVisible({
-      timeout: 20_000,
-    });
+    const chartZone = page.getByTestId("chart-indicators-zone");
+    await expect(chartZone).toBeVisible({ timeout: 20_000 });
+    await expect(chartZone).toHaveAttribute(
+      "data-instrument-id",
+      fixture.instrumentId,
+    );
+
     const cockpit = page.getByTestId("operativa-cockpit");
     await expect(cockpit).toBeVisible({ timeout: 20_000 });
     await expect(cockpit).toHaveAttribute("data-phase", listPhase!);
-    await expect(page.getByText(fixture.symbol).first()).toBeVisible();
+    await expect(cockpit).toHaveAttribute(
+      "data-instrument-id",
+      fixture.instrumentId,
+    );
+    await expect(cockpit).toHaveAttribute("data-symbol", fixture.symbol);
+    await expect(cockpit).toHaveAttribute(
+      "data-position-id",
+      fixture.positionId,
+    );
+    if (fixture.tradePlanId) {
+      await expect(cockpit).toHaveAttribute(
+        "data-trade-plan-id",
+        fixture.tradePlanId,
+      );
+    }
+    if (fixture.decisionId) {
+      await expect(cockpit).toHaveAttribute(
+        "data-decision-id",
+        fixture.decisionId,
+      );
+    }
+
+    await expect(page.getByTestId("position-decision-stop")).toBeVisible();
+    await expect(page.getByTestId("position-decision-t1")).toBeVisible();
+    await expect(page.getByTestId("position-decision-t2")).toBeVisible();
+    if (fixture.levels?.currentStop != null) {
+      await expect(page.getByTestId("position-decision-stop")).toContainText(
+        fixture.levels.currentStop.toFixed(2),
+      );
+    }
   });
 
-  test("GP-V170-03: list click opens DECISIÓN panel when collapsed", async ({
+  test("GP-V170-03: list click opens DECISIÓN panel and chart when collapsed", async ({
     page,
   }) => {
-    if (!fixture) return;
-    test.skip(!fixture.hasOpenPosition, "Requires portfolio buy seed");
+    if (!fixture) throw new Error("fixture required");
+    if (!fixture.hasOpenPosition) {
+      throw new Error("Requires portfolio buy seed");
+    }
 
     const workspaceDocument = mercadoListFocusWorkspaceDocument({
       instrumentId: fixture.instrumentId,
@@ -118,5 +147,10 @@ test.describe("GP-V170 — Lista→Gráfico→Acción integrated", () => {
       timeout: 20_000,
     });
     await expect(page.getByTestId("operativa-cockpit")).toBeVisible();
+    await expect(page.getByTestId("chart-indicators-zone")).toBeVisible();
+    await expect(page.getByTestId("operativa-cockpit")).toHaveAttribute(
+      "data-instrument-id",
+      fixture.instrumentId,
+    );
   });
 });

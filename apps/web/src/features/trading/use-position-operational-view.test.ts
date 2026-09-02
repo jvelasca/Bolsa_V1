@@ -99,7 +99,7 @@ describe("buildPositionOperationalViewFromDto", () => {
     };
     const result = buildPositionOperationalViewFromDto(position, "ok");
     expect(result?.view.operatingState).toBe("T2_READY");
-    expect(result?.source).toBe("canonical");
+    expect(result?.source).toBe("blob");
   });
 
   it("RECONCILIATION_DRIFT when portfolio recon drift", () => {
@@ -175,9 +175,60 @@ describe("buildPositionOperationalViewFromDto", () => {
     };
     const result = buildPositionOperationalViewFromDto(position, "ok");
     expect(result?.source).toBe("canonical");
-    expect(result?.view).toBe(wireView);
+    expect(result?.view).toEqual({ ...wireView });
     expect(result?.view.decisionId).toBe("DEC-1");
     expect(result?.view.tradePlanId).toBe("TP-1");
+  });
+
+  it("GP-V171: wire PROTECTED + live drift → RECONCILIATION_DRIFT", () => {
+    const wireView = {
+      positionId: "p1",
+      instrumentId: "inst-aapl",
+      tradePlanId: "TP-1",
+      decisionId: "DEC-1",
+      lineageCollapsed: false,
+      operatingState: "PROTECTED",
+      primaryAction: "SUBIR_STOP",
+      levels: {
+        entry: 100,
+        currentStop: 98,
+        target1: 110,
+        target2: 120,
+        unrealizedR: 0.5,
+      },
+      t1: null,
+      t2: null,
+      stopHistory: [],
+      events: [],
+      quantity: 10,
+      remainingQuantity: 10,
+    };
+    const position: PositionDto = {
+      id: "p1",
+      instrumentId: "inst-aapl",
+      symbol: "AAPL",
+      name: "Apple",
+      quantity: 10,
+      avgCost: 100,
+      lastPrice: 102,
+      marketValue: 1020,
+      unrealizedPnl: 0,
+      unrealizedPnlPct: 0,
+      operational: {
+        status: "OPEN",
+        direction: "long",
+        tradePlanId: "TP-1",
+        decisionId: "DEC-1",
+        currentStop: 98,
+        target1: 110,
+        target2: 120,
+        operationalView: wireView,
+      },
+    };
+    const result = buildPositionOperationalViewFromDto(position, "drift");
+    expect(result?.source).toBe("canonical");
+    expect(result?.view.operatingState).toBe("RECONCILIATION_DRIFT");
+    expect(result?.view.primaryAction).toBe("BLOQUEADO");
   });
 
   it("GP-V170-05: fail-closed without wire or operational blob", () => {

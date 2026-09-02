@@ -321,6 +321,7 @@ export function ListItemAccordion({
                   key={column.id}
                   type="button"
                   data-testid={`list-instrument-open-${item.symbol}`}
+                  data-instrument-id={item.id}
                   className={cn(
                     "min-w-0 overflow-hidden text-left text-[10px]",
                     listColumnContentClass(column.id, "data"),

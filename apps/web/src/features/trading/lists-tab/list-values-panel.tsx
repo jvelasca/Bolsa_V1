@@ -33,11 +33,10 @@ import {
 
 import { api, ApiError } from "@/lib/api";
 
-import { ensureChartRoute } from "@/components/layout/chart-tab-bar";
 import { requestChartReflow } from "@/features/charts/chart-utils";
 import {
-  ensureMercadoActionPanelsOpen,
   focusInstrumentInMercado,
+  focusInstrumentsInMercado,
 } from "@/features/trading/focus-instrument-in-mercado";
 import {
   buildVirtualListSummaries,
@@ -609,7 +608,6 @@ export function ListValuesPanel() {
   );
 
   function openSelectedCharts() {
-    ensureMercadoActionPanelsOpen();
     const listId = selectedListId ?? listConfig.apiListId ?? listConfig.id;
     const byId = new Map(selectableItems.map((item) => [item.id, item]));
     const items = [...selectedInstrumentIds]
@@ -617,11 +615,14 @@ export function ListValuesPanel() {
       .filter((item): item is (typeof selectableItems)[number] => Boolean(item))
       .map((item) => ({ instrumentId: item.id, label: item.symbol }));
     if (items.length === 0) return;
-    focusInstrumentsFromList(listId, items);
+    focusInstrumentsInMercado(
+      navigate,
+      { focusInstrumentsFromList },
+      listId,
+      items,
+    );
     const nextActiveId = useWorkspaceStore.getState().workspace.activeChartId;
     if (listId) setManualListSelection(listId, nextActiveId);
-    ensureChartRoute(navigate);
-    requestChartReflow();
   }
 
   async function reorderSelectedChartsByIo() {
@@ -699,9 +700,15 @@ export function ListValuesPanel() {
           )
         : null) ?? VIRTUAL_LIST_VISUALIZATION;
     updateListConfig(listConfigForSelection(preferredListId, apiLists));
-    focusInstrumentFromList(preferredListId, instrument.id, instrument.symbol);
-    ensureChartRoute(navigate);
-    requestChartReflow();
+    focusInstrumentInMercado(
+      navigate,
+      {
+        openChartTab: useWorkspaceStore.getState().openChartTab,
+        focusInstrumentFromList,
+      },
+      { instrumentId: instrument.id, symbol: instrument.symbol },
+      { listId: preferredListId },
+    );
     const { reconcileVisualizadosToOpenCharts } =
       await import("@/features/trading/lists-tab/use-chart-visualization-sync");
     reconcileVisualizadosToOpenCharts();

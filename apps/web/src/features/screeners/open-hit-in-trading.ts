@@ -1,9 +1,8 @@
 import type { NavigateFunction } from "react-router-dom";
 import type { ChartTimeframe } from "@bolsa/shared";
 import { isKernelTimeframe } from "@bolsa/shared";
-import { ensureChartRoute } from "@/components/layout/chart-tab-bar";
 import { requestChartReflow } from "@/features/charts/chart-utils";
-import { ensureMercadoActionPanelsOpen } from "@/features/trading/focus-instrument-in-mercado";
+import { focusInstrumentInMercado } from "@/features/trading/focus-instrument-in-mercado";
 
 interface OpenHitInTradingDeps {
   openChartTab: (instrumentId: string, label: string) => string;
@@ -32,18 +31,12 @@ export function openHitInTrading(
   hit: ScanHitLike,
   options?: OpenHitInTradingOptions,
 ) {
-  const listId = options?.listId?.trim();
-  ensureMercadoActionPanelsOpen();
-  const tabId =
-    listId && deps.focusInstrumentFromList
-      ? deps.focusInstrumentFromList(listId, hit.instrumentId, hit.symbol)
-      : deps.openChartTab(hit.instrumentId, hit.symbol);
-
-  ensureChartRoute(navigate);
+  const tabId = focusInstrumentInMercado(navigate, deps, hit, {
+    listId: options?.listId,
+  });
 
   if (options?.timeframe && isKernelTimeframe(options.timeframe)) {
     deps.updateChartTimeframe(options.timeframe, tabId);
+    requestChartReflow();
   }
-
-  requestChartReflow();
 }

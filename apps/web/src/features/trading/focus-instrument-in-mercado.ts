@@ -39,3 +39,21 @@ export function focusInstrumentInMercado(
   requestChartReflow();
   return tabId;
 }
+
+export function focusInstrumentsInMercado(
+  navigate: NavigateFunction,
+  deps: {
+    focusInstrumentsFromList: (
+      listId: string,
+      items: Array<{ instrumentId: string; label: string }>,
+    ) => void;
+  },
+  listId: string,
+  items: Array<{ instrumentId: string; label: string }>,
+): void {
+  if (items.length === 0) return;
+  ensureMercadoActionPanelsOpen();
+  deps.focusInstrumentsFromList(listId, items);
+  ensureChartRoute(navigate);
+  requestChartReflow();
+}

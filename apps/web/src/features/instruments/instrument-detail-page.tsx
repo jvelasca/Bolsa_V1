@@ -26,6 +26,7 @@ import { InstrumentStrategyTopPanel } from "@/features/backtests/instrument-stra
 import { OhlcvChart } from "@/features/charts/ohlcv-chart";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
+import { focusInstrumentInMercado } from "@/features/trading/focus-instrument-in-mercado";
 import { TradeConfirmPanel } from "@/features/trading/trade-confirm-panel";
 import { TradeFeeBreakdown } from "@/features/trading/trade-fee-breakdown";
 import { useTradeNotional } from "@/features/trading/use-trade-notional";
@@ -57,6 +58,9 @@ export function InstrumentDetailPage() {
   const brokerVenue = useEffectiveBrokerVenue();
   const { entriesBlocked } = useMesaEntriesBlocked();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
+  const focusInstrumentFromList = useWorkspaceStore(
+    (s) => s.focusInstrumentFromList,
+  );
   const openChartInspector = useWorkspaceStore((s) => s.openChartInspector);
 
   const instrumentQuery = useQuery({
@@ -229,8 +233,11 @@ export function InstrumentDetailPage() {
             variant="outline"
             size="sm"
             onClick={() => {
-              openChartTab(id!, instrument.symbol);
-              navigate("/trading");
+              focusInstrumentInMercado(
+                navigate,
+                { openChartTab, focusInstrumentFromList },
+                { instrumentId: id!, symbol: instrument.symbol },
+              );
               openChartInspector({ mode: "config", configSection: "styles" });
             }}
             title="Estilos del gráfico en el workspace"

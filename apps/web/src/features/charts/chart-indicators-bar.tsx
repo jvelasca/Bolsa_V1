@@ -23,12 +23,16 @@ export function ChartIndicatorsBar({
   onOpenCatalog,
   chartIndicatorCount = 0,
   finalistTop1,
+  instrumentId,
+  symbol,
   className,
 }: {
   onOpenCatalog: () => void;
   chartIndicatorCount?: number;
   /** Switch overlay Finalista TOP #1 (política «todos» o por gráfico). */
   finalistTop1?: ChartFinalistTop1Control;
+  instrumentId?: string;
+  symbol?: string;
   className?: string;
 }) {
   return (
@@ -36,6 +40,8 @@ export function ChartIndicatorsBar({
       className={cn(CHART_BAR_ZONE_ROW_CLASS, "shrink-0", className)}
       title="Catálogo de indicadores y overlay del Finalista TOP #1"
       data-testid="chart-indicators-zone"
+      data-instrument-id={instrumentId}
+      data-symbol={symbol}
     >
       <button
         type="button"

@@ -11,6 +11,7 @@ import {
   installMercadoApiMocks,
 } from "./fixtures";
 import {
+  E2E_INSTRUMENT_ID,
   E2E_SYMBOL,
   mercadoListFocusWorkspaceDocument,
   seedMercadoBrowserState,
@@ -43,9 +44,21 @@ test.describe("GP-V170 — Lista→Gráfico→Acción mock", () => {
     await expect(page.getByTestId("chart-indicators-zone")).toBeVisible({
       timeout: 20_000,
     });
+    await expect(page.getByTestId("chart-indicators-zone")).toHaveAttribute(
+      "data-instrument-id",
+      E2E_INSTRUMENT_ID,
+    );
     await expect(page.getByTestId("operativa-cockpit")).toHaveAttribute(
       "data-phase",
       listPhase!,
+    );
+    await expect(page.getByTestId("operativa-cockpit")).toHaveAttribute(
+      "data-instrument-id",
+      E2E_INSTRUMENT_ID,
+    );
+    await expect(page.getByTestId("operativa-cockpit")).toHaveAttribute(
+      "data-symbol",
+      E2E_SYMBOL,
     );
   });
 });

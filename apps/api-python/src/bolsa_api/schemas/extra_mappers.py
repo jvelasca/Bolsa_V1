@@ -118,6 +118,7 @@ def attach_operational_positions(
     records: list[Any],
     *,
     policy_template_id: str | None = None,
+    recon_status: str | None = None,
 ) -> PortfolioSummaryDto:
     """P1 — adjunta snapshot de autoridad al holding, por instrumento.
     V1.29 — ExitPolicy del perfil activo parametriza advisory ExitPlan.
@@ -126,9 +127,11 @@ def attach_operational_positions(
     from bolsa_application.origin_decision_package import origin_thesis_from_position_state
     from bolsa_analytics.cognitive.position_operational_view import (
         build_position_operational_view,
+        map_portfolio_recon_to_pov_recon,
     )
     from bolsa_analytics.cognitive.position_state import position_state_from_dict
 
+    pov_recon = map_portfolio_recon_to_pov_recon(recon_status)
     by_instrument: dict[str, Any] = {}
     for rec in records:
         iid = getattr(rec, "instrument_id", None)
@@ -168,7 +171,10 @@ def attach_operational_positions(
         operational_view: dict[str, object] | None = None
         if position_state is not None:
             decision_id = position_state.decision_id
-            operational_view = build_position_operational_view(position_state)
+            operational_view = build_position_operational_view(
+                position_state,
+                recon_status=pov_recon,
+            )
         elif isinstance(state_dict.get("decisionId"), str) and state_dict.get("decisionId"):
             decision_id = str(state_dict["decisionId"]).strip() or None
         if decision_id is None and isinstance(origin_thesis, dict):

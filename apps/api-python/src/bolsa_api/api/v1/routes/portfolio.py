@@ -11,6 +11,7 @@ from bolsa_api.api.dependencies import (
     get_execute_gated_portfolio_trade_use_case,
     get_investor_profile_repository,
     get_list_transactions_use_case,
+    get_portfolio_recon_lookup,
     get_portfolio_summary_use_case,
     get_position_state_repository,
     require_account_header_access,
@@ -66,8 +67,23 @@ async def get_portfolio(
         if profile is not None
         else None
     )
-    attach_operational_positions(dto, records, policy_template_id=template_id)
+    attach_operational_positions(
+        dto,
+        records,
+        policy_template_id=template_id,
+        recon_status=await _portfolio_recon_status(session, scope.account.id),
+    )
     return PortfolioSummaryResponseDto(data=dto)
+
+
+async def _portfolio_recon_status(session: AsyncSession, account_id: str) -> str:
+    try:
+        status = await get_portfolio_recon_lookup(session).portfolio_recon_status(
+            account_id
+        )
+        return str(status)
+    except Exception:
+        return "unavailable"
 
 
 

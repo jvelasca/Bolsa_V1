@@ -309,6 +309,11 @@ export function OperativaCockpitCard({
       )}
       data-testid="operativa-cockpit"
       data-phase={phase}
+      data-instrument-id={instrumentId}
+      data-symbol={symbol}
+      data-position-id={positionPov?.positionId ?? position?.id ?? undefined}
+      data-trade-plan-id={positionPov?.tradePlanId ?? undefined}
+      data-decision-id={positionPov?.decisionId ?? undefined}
       aria-label={`DECISIÓN · ${symbol}`}
     >
       {/* CONTEXTO */}

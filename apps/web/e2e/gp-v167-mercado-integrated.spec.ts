@@ -12,52 +12,40 @@
 import { test, expect } from "@playwright/test";
 import { e2eEnabled, E2E_SKIP_REASON } from "./fixtures";
 import {
-  assertApiHealthy,
-  assertE2eDatabaseIsolation,
-  e2eIntegrationMode,
   ensureMercadoIntegrationFixture,
-  E2E_SKIP_DB_ISOLATION_REASON,
-  E2E_SKIP_INTEGRATION_REASON,
+  gateIntegratedE2eEnvironment,
   seedMercadoBrowserState,
   type MercadoIntegrationFixture,
 } from "./integration";
 
 test.describe("GP-V167 — Mercado integrated browser journey", () => {
+  let environmentSkip: string | null = null;
   let fixture: MercadoIntegrationFixture | null = null;
 
   test.beforeAll(async ({ request, baseURL }) => {
-    if (!e2eEnabled() || !e2eIntegrationMode() || !baseURL) return;
-    try {
-      assertE2eDatabaseIsolation();
-      await assertApiHealthy(request, baseURL);
-      fixture = await ensureMercadoIntegrationFixture(request, baseURL);
-    } catch {
-      fixture = null;
-    }
+    environmentSkip = await gateIntegratedE2eEnvironment(request, baseURL, {
+      e2eEnabled: e2eEnabled(),
+      e2eSkipReason: E2E_SKIP_REASON,
+    });
+    if (environmentSkip || !baseURL) return;
+    fixture = await ensureMercadoIntegrationFixture(request, baseURL);
   });
 
-  test.beforeEach(async ({ request, baseURL }) => {
-    test.skip(!e2eEnabled(), E2E_SKIP_REASON);
-    test.skip(!e2eIntegrationMode(), E2E_SKIP_INTEGRATION_REASON);
-    if (!baseURL) {
-      test.skip(true, "baseURL required");
-      return;
-    }
-    try {
-      assertE2eDatabaseIsolation();
-      await assertApiHealthy(request, baseURL);
-    } catch (err) {
-      test.skip(true, String(err));
+  test.beforeEach(() => {
+    if (environmentSkip) {
+      test.skip(true, environmentSkip);
     }
     if (!fixture) {
-      test.skip(true, E2E_SKIP_DB_ISOLATION_REASON);
+      throw new Error(
+        "Mercado E2E fixture missing after environment gates (fixture/product failure).",
+      );
     }
   });
 
   test("GP-V167-01: Mercado cockpit loads against real API", async ({
     page,
   }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedMercadoBrowserState(page, {
       accountId: fixture.accountId,
       workspaceId: fixture.workspaceId,
@@ -71,7 +59,7 @@ test.describe("GP-V167 — Mercado integrated browser journey", () => {
   });
 
   test("GP-V167-02: Mercado has no primary COMPRAR CTA", async ({ page }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedMercadoBrowserState(page, {
       accountId: fixture.accountId,
       workspaceId: fixture.workspaceId,
@@ -87,7 +75,7 @@ test.describe("GP-V167 — Mercado integrated browser journey", () => {
   });
 
   test("GP-V167-03: decision surface sections visible", async ({ page }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedMercadoBrowserState(page, {
       accountId: fixture.accountId,
       workspaceId: fixture.workspaceId,
@@ -105,7 +93,7 @@ test.describe("GP-V167 — Mercado integrated browser journey", () => {
   test("GP-V167-04: position or entry surface matches portfolio seed", async ({
     page,
   }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedMercadoBrowserState(page, {
       accountId: fixture.accountId,
       workspaceId: fixture.workspaceId,
@@ -115,20 +103,19 @@ test.describe("GP-V167 — Mercado integrated browser journey", () => {
     await expect(page.getByTestId("operativa-cockpit")).toBeVisible({
       timeout: 20_000,
     });
-    if (fixture.hasOpenPosition) {
-      await expect(
-        page.getByTestId("position-operational-star-card"),
-      ).toBeVisible();
-      await expect(page.getByTestId("position-decision-stop")).toBeVisible();
-    } else {
-      await expect(page.getByTestId("entry-decision-surface")).toBeVisible();
+    if (!fixture.hasOpenPosition) {
+      throw new Error("Requires portfolio buy seed");
     }
+    await expect(
+      page.getByTestId("position-operational-star-card"),
+    ).toBeVisible();
+    await expect(page.getByTestId("position-decision-stop")).toBeVisible();
   });
 
   test("GP-V167-05: ¿Por qué? opens decision explain panel", async ({
     page,
   }) => {
-    if (!fixture) return;
+    if (!fixture) throw new Error("fixture required");
     await seedMercadoBrowserState(page, {
       accountId: fixture.accountId,
       workspaceId: fixture.workspaceId,

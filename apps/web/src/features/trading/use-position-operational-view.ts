@@ -1,7 +1,8 @@
 /**
  * V1.60 — PositionOperationalView desde PositionDto wire (tarjeta estrella Mercado).
  * V1.61 — source canonical · recon fail-closed.
- * V1.70 — sin fallback cliente: fail-closed si falta wire/blob.
+ * V1.70 — sin fallback de PositionDto plano: fail-closed si falta wire/blob.
+ * V1.71 — source wire vs blob · overlay recon live sobre wire · warn DEV.
  * Proyección cliente; autoridad en backend persistido.
  */
 
@@ -13,11 +14,12 @@ import type {
 } from "@bolsa/shared";
 import {
   MESA_NEXT_ACTION_LABELS,
+  assertNever,
   mapPortfolioReconToPovRecon,
   positionOperationalViewFromBlob,
 } from "@bolsa/shared";
 
-export type PositionOperationalViewSourceV1 = "canonical";
+export type PositionOperationalViewSourceV1 = "canonical" | "blob";
 
 export type PositionOperationalViewResultV1 = {
   view: PositionOperationalViewV1;
@@ -74,6 +76,35 @@ function isWireOperationalView(
   );
 }
 
+function applyLiveReconToView(
+  view: PositionOperationalViewV1,
+  portfolioReconStatus?: string | null,
+): PositionOperationalViewV1 {
+  const reconStatus = mapPortfolioReconToPovRecon(portfolioReconStatus);
+  if (
+    reconStatus === "drift" &&
+    view.operatingState !== "RECONCILIATION_DRIFT"
+  ) {
+    return {
+      ...view,
+      operatingState: "RECONCILIATION_DRIFT",
+      primaryAction: "BLOQUEADO",
+    };
+  }
+  if (
+    reconStatus === "unavailable" &&
+    view.operatingState !== "RECONCILIATION_ERROR" &&
+    view.operatingState !== "RECONCILIATION_DRIFT"
+  ) {
+    return {
+      ...view,
+      operatingState: "RECONCILIATION_ERROR",
+      primaryAction: "BLOQUEADO",
+    };
+  }
+  return view;
+}
+
 export function buildPositionOperationalViewFromDto(
   position: PositionDto,
   portfolioReconStatus?: string | null,
@@ -81,14 +112,25 @@ export function buildPositionOperationalViewFromDto(
   const reconStatus = mapPortfolioReconToPovRecon(portfolioReconStatus);
   const wireView = position.operational?.operationalView;
   if (isWireOperationalView(wireView)) {
-    return { view: wireView, source: "canonical" };
+    return {
+      view: applyLiveReconToView(wireView, portfolioReconStatus),
+      source: "canonical",
+    };
   }
 
   if (position.operational) {
     const blob = operationalBlobFromPositionDto(position);
     if (blob) {
       const fromBlob = positionOperationalViewFromBlob(blob, { reconStatus });
-      if (fromBlob) return { view: fromBlob, source: "canonical" };
+      if (fromBlob) {
+        if (import.meta.env?.DEV) {
+          console.warn(
+            "[POV] blob rebuild — wire operationalView missing",
+            position.id,
+          );
+        }
+        return { view: fromBlob, source: "blob" };
+      }
     }
   }
 
@@ -125,7 +167,8 @@ export function formatPovPrimaryActionLabel(
       return MESA_NEXT_ACTION_LABELS.watch;
     case "MONITOR":
     case "MANTENER":
-    default:
       return MESA_NEXT_ACTION_LABELS.maintain;
+    default:
+      return assertNever(action);
   }
 }

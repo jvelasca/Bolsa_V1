@@ -115,6 +115,8 @@ export function ChartToolbarGlobalBar({
             onOpenCatalog={onOpenIndicatorsCatalog}
             chartIndicatorCount={chartIndicatorCount}
             finalistTop1={finalistTop1}
+            instrumentId={instrumentId}
+            symbol={symbol}
             className={CHART_TOOLBAR_EMBEDDED_CLASS}
           />
           <ChartNewChartTemplatePinButton className="shrink-0" />
