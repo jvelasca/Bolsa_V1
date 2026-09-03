@@ -4,7 +4,7 @@ Copia en chat nuevo (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **candidato `v1.96-beta`** (partida **`v1.95-beta` → `6f262293`** · Release-tag CI V1.95 **GREEN** [run 33804374800](https://github.com/jvelasca/Bolsa_V1/actions/runs/33804374800) · V1.95 = PASS con 1 P1 de cobertura T2). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **candidato `v1.96-beta` → `30479e97`** (partida **`v1.95-beta` → `6f262293`** · Release-tag CI **GREEN** [run 33808076820](https://github.com/jvelasca/Bolsa_V1/actions/runs/33808076820) · lifecycle-pg **25 passed** · V1.95 = PASS con 1 P1 de cobertura T2). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
 
 **Alcance V1.96 (certificación T2, no arquitectura nueva):**
 

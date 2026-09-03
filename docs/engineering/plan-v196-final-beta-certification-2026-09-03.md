@@ -1,7 +1,7 @@
 # Plan — V1.96 Final Beta Certification / T2
 
 > **Padre:** [`spec-v196-final-beta-certification-2026-09-03.md`](./spec-v196-final-beta-certification-2026-09-03.md).  
-> **Estado:** **CÓDIGO LISTO** (pendiente tag/CI GREEN remoto).
+> **Estado:** **CI GREEN** · tip [`v1.96-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.96-beta) → [`30479e97`](https://github.com/jvelasca/Bolsa_V1/commit/30479e97) · [run 33808076820](https://github.com/jvelasca/Bolsa_V1/actions/runs/33808076820).
 
 | ID    | Entrega                                                       | Estado |
 | ----- | ------------------------------------------------------------- | ------ |
@@ -10,6 +10,7 @@
 | P1-02 | reason_code en outbox payload + drain                         | DONE   |
 | P1-03 | Idempotencia T2 distinta de T1                                | DONE   |
 | P1-04 | Golden HTTP V1.96 + units + lifecycle-pg include              | DONE   |
+| CI    | Python/Frontend/Release-tag GREEN remoto                      | DONE   |
 
 ## Política
 

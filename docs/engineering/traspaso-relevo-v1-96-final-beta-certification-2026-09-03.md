@@ -2,7 +2,7 @@
 
 > **Padre:** [`respuesta-auditor-v195-beta-certification-2026-09-03.md`](./respuesta-auditor-v195-beta-certification-2026-09-03.md).  
 > **Spec/plan:** [`spec-v196-final-beta-certification-2026-09-03.md`](./spec-v196-final-beta-certification-2026-09-03.md) · [`plan-v196-final-beta-certification-2026-09-03.md`](./plan-v196-final-beta-certification-2026-09-03.md).  
-> **Estado:** **CÓDIGO LISTO** — pendiente push/tag `v1.96-beta` / Release-tag CI GREEN.  
+> **Estado:** **CI GREEN** · tip [`v1.96-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.96-beta) → [`30479e97`](https://github.com/jvelasca/Bolsa_V1/commit/30479e97) · [run 33808076820](https://github.com/jvelasca/Bolsa_V1/actions/runs/33808076820).  
 > **Partida:** tip [`v1.95-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.95-beta) → [`6f262293`](https://github.com/jvelasca/Bolsa_V1/commit/6f262293) · [run 33804374800](https://github.com/jvelasca/Bolsa_V1/actions/runs/33804374800).
 
 ## Objetivo
@@ -21,8 +21,8 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` off · no unificar ledger · no `queue_s
 4. Golden HTTP V1.96 OPEN→T1→T2→EXIT→corrupt T2→OPEN DENY — DONE
 5. Units fill mapping + `test_t2_fill_missing_in_ledger` — DONE
 6. CURRENT_SYSTEM ya en V1.96 en el commit etiquetable — DONE
-7. Tag + Release-tag CI GREEN — PENDIENTE
+7. Tag + Release-tag CI GREEN — DONE
 
 ## Next
 
-Tag `v1.96-beta` **después** de CI GREEN. Arranque auditor tip ([arranque](./arranque-auditor-v1-96-final-beta-certification-2026-09-03.md)). **Sin** LIVE. **Sin** auto-declarar BETA estable. E2E integrado sigue como último pendiente post-V1.96.
+Arranque auditor tip ([arranque](./arranque-auditor-v1-96-final-beta-certification-2026-09-03.md) · [relevo tag](./traspaso-relevo-tag-v1-96-beta-2026-09-03.md)). **Sin** LIVE. **Sin** auto-declarar BETA estable. E2E integrado sigue como último pendiente post-V1.96.

@@ -1,6 +1,6 @@
 # Spec — V1.96 Final Beta Certification / T2 + operational freeze (2026-09-03)
 
-> **AsOf:** 2026-09-03 · **Estado:** **CÓDIGO LISTO** (pendiente tag/CI GREEN remoto).  
+> **AsOf:** 2026-09-03 · **Estado:** **CI GREEN** · tip [`v1.96-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.96-beta) → [`30479e97`](https://github.com/jvelasca/Bolsa_V1/commit/30479e97) · [run 33808076820](https://github.com/jvelasca/Bolsa_V1/actions/runs/33808076820).  
 > **Padre:** [`respuesta-auditor-v195-beta-certification-2026-09-03.md`](./respuesta-auditor-v195-beta-certification-2026-09-03.md).  
 > **Partida:** [`v1.95-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.95-beta) → [`6f262293`](https://github.com/jvelasca/Bolsa_V1/commit/6f262293) · CI GREEN ([run 33804374800](https://github.com/jvelasca/Bolsa_V1/actions/runs/33804374800)).  
 > **No** LIVE · **no** bump · **no** unificar cash ledger · `PAPER_D_EXECUTE` **off**.  
