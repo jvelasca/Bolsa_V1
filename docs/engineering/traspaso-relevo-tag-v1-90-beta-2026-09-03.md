@@ -2,6 +2,7 @@
 
 > **Padre:** [`traspaso-relevo-v1-90-lifecycle-reliability-2026-09-03.md`](./traspaso-relevo-v1-90-lifecycle-reliability-2026-09-03.md).  
 > **Estado:** **CI GREEN** — tip `v1.90-beta` → `0c2e3af7` · Release-tag CI **GREEN** ([run 33726147414](https://github.com/jvelasca/Bolsa_V1/actions/runs/33726147414)).  
+> **Docs stamp:** [`84a0321f`](https://github.com/jvelasca/Bolsa_V1/commit/84a0321f) (post-GREEN; no exige retag).  
 > **Partida:** V1.89 PASS arquitectónico [`58806be1`](https://github.com/jvelasca/Bolsa_V1/commit/58806be1) · [`respuesta-auditor-v189`](./respuesta-auditor-v189-paper-desk-truth-2026-09-03.md).
 
 ## Release
