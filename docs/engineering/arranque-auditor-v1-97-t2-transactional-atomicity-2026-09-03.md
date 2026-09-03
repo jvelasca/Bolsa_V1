@@ -4,7 +4,7 @@ Copia en chat nuevo (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **candidato `v1.97-beta`** (partida **`v1.96-beta` → `30479e97`** · Release-tag CI **GREEN** [run 33808076820](https://github.com/jvelasca/Bolsa_V1/actions/runs/33808076820) · V1.96 = PASS P0=0 P1=0 · BETA PAPER técnicamente certificada). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **candidato `v1.97-beta` → `363dfcea`** (partida **`v1.96-beta` → `30479e97`** · Python CI **GREEN** [run 33811212221](https://github.com/jvelasca/Bolsa_V1/actions/runs/33811212221) · V1.96 = PASS P0=0 P1=0 · BETA PAPER técnicamente certificada). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
 
 **Alcance V1.97 (endurecimiento T2, no arquitectura nueva):**
 
@@ -18,7 +18,7 @@ Eres auditor externo de Bolsa V1 **candidato `v1.97-beta`** (partida **`v1.96-be
 
 **Regla:** NINGÚN estado ambiguo → COMPRAR. DryRun honesto. No unificar ledger/mesa. No LIVE.
 
-Lee: `CURRENT_SYSTEM.md` · `respuesta-auditor-v196` · `spec-v197` · `lifecycle_t2_bridge.py` · `lifecycle_event_store.py` · tests V1.97 · [`relevo`](./traspaso-relevo-v1-97-t2-transactional-atomicity-2026-09-03.md).
+Lee: `CURRENT_SYSTEM.md` · `respuesta-auditor-v196` · `spec-v197` · `lifecycle_t2_bridge.py` · `lifecycle_event_store.py` · `test_lifecycle_t2_atomicity_v197.py` · `test_lifecycle_event_store_pg.py` (T2 mid-pair) · `test_lifecycle_outbox_worker_pg.py` (T2 reclaim) · [`relevo`](./traspaso-relevo-v1-97-t2-transactional-atomicity-2026-09-03.md).
 
 **Foco:**
 

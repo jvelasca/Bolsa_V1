@@ -2,7 +2,7 @@
 
 > **Padre:** [`respuesta-auditor-v196-final-beta-certification-2026-09-03.md`](./respuesta-auditor-v196-final-beta-certification-2026-09-03.md).  
 > **Spec/plan:** [`spec-v197-t2-transactional-atomicity-2026-09-03.md`](./spec-v197-t2-transactional-atomicity-2026-09-03.md) · [`plan-v197-t2-transactional-atomicity-2026-09-03.md`](./plan-v197-t2-transactional-atomicity-2026-09-03.md).  
-> **Estado:** **ABIERTA** · candidata tip `v1.97-beta`.  
+> **Estado:** **CI GREEN tip** · tip [`v1.97-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.97-beta) → [`363dfcea`](https://github.com/jvelasca/Bolsa_V1/commit/363dfcea) · Python CI ([run 33811212221](https://github.com/jvelasca/Bolsa_V1/actions/runs/33811212221)).  
 > **Partida:** tip [`v1.96-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.96-beta) → [`30479e97`](https://github.com/jvelasca/Bolsa_V1/commit/30479e97) · [run 33808076820](https://github.com/jvelasca/Bolsa_V1/actions/runs/33808076820).
 
 ## Objetivo
@@ -18,8 +18,8 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` off · no unificar ledger · no `queue_s
 1. `append_many` + un savepoint para el par T2 — DONE
 2. `AppendLifecycleEvent` inserta el par desde `t1_executed` (SEMI + AUTO + outbox) — DONE
 3. Batería crash mid-pair / retry (unit + PG store + worker) — DONE
-4. CURRENT_SYSTEM + tag sobre stamp — DOING
+4. CURRENT_SYSTEM + tag sobre stamp — DONE
 
 ## Next
 
-Tras CI GREEN: stamp SHA/run · tag `v1.97-beta` · arranque auditor. **Sin** LIVE. Después: Beta Stabilization (no arquitectura nueva).
+Arranque auditor tip ([arranque](./arranque-auditor-v1-97-t2-transactional-atomicity-2026-09-03.md) · [relevo tag](./traspaso-relevo-tag-v1-97-beta-2026-09-03.md)). **Sin** LIVE. Después: Beta Stabilization (no arquitectura nueva).

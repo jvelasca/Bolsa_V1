@@ -1,16 +1,17 @@
 # RELEVO — tag v1.97-beta → auditoría tip (2026-09-03)
 
 > **Padre:** [`traspaso-relevo-v1-97-t2-transactional-atomicity-2026-09-03.md`](./traspaso-relevo-v1-97-t2-transactional-atomicity-2026-09-03.md).  
-> **Estado:** **pendiente Release-tag CI** — tip `v1.97-beta` (stamp en este commit).  
+> **Estado:** tip `v1.97-beta` → `363dfcea` · Python CI **GREEN** ([run 33811212221](https://github.com/jvelasca/Bolsa_V1/actions/runs/33811212221)) · Release-tag CI al push del tip.  
 > **Partida:** V1.96 tip [`30479e97`](https://github.com/jvelasca/Bolsa_V1/commit/30479e97) · [`respuesta-auditor-v196`](./respuesta-auditor-v196-final-beta-certification-2026-09-03.md).
 
 ## Release
 
-| Pieza        | Valor                                         |
-| ------------ | --------------------------------------------- |
-| Tag tip      | `v1.97-beta` (SHA en CURRENT_SYSTEM)          |
-| CI           | Release-tag pendiente tras push del tip       |
-| lifecycle-pg | unit+PG store+worker T2 mid-pair (local PASS) |
+| Pieza        | Valor                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------- |
+| Tag tip      | `v1.97-beta` → `363dfcea`                                                                    |
+| Python CI    | **GREEN** · [run 33811212221](https://github.com/jvelasca/Bolsa_V1/actions/runs/33811212221) |
+| Pre-release  | https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.97-beta                                 |
+| lifecycle-pg | unit + PG store + worker T2 mid-pair (local PASS; Release-tag certifica)                     |
 
 ## Hecho certificado (código)
 
