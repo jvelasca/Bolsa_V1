@@ -5,9 +5,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleStoreEvent, reduce_lifecycle_events
-
 from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
+from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleStoreEvent, reduce_lifecycle_events
 
 
 def t2_trigger_at_before(exec_at: str | None) -> str | None:

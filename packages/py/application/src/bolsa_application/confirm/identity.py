@@ -11,14 +11,13 @@ from bolsa_analytics.cognitive.trade_plan import (
     build_v0_trade_plan_dict,
     parse_wyckoff_spring_anchor,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
-
 from bolsa_application.confirm.actions import (
     _CLOSING_ACTIONS,
     _TRADE_ACTIONS,
     PRICE_REVALIDATION_MAX_REL_DEVIATION,
     is_closing_action,
 )
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 
 def resolve_session_decision_package(

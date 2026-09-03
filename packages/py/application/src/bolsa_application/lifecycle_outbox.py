@@ -15,7 +15,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import uuid4
 
-from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
 from sqlalchemy import and_, exists, not_, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +22,7 @@ from sqlalchemy.orm import aliased
 
 from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 from bolsa_application.lifecycle_from_fill import append_lifecycle_from_confirm_fill
+from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
 
 logger = logging.getLogger(__name__)
 

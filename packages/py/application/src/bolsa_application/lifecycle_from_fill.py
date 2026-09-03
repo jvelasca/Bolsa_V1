@@ -14,11 +14,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
-from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleEventKind
-
 from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 from bolsa_application.lifecycle_t2_bridge import maybe_append_t2_triggered_bridge
 from bolsa_application.persist_position_from_fill import ledger_position_id_from_trade
+from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleEventKind
 
 logger = logging.getLogger(__name__)
 
