@@ -2,7 +2,7 @@
 
 > **Padre:** [`traspaso-relevo-v1-91-operational-atomicity-2026-09-03.md`](./traspaso-relevo-v1-91-operational-atomicity-2026-09-03.md).  
 > **Estado:** **CI GREEN** — tip `v1.91-beta` → `4644fef9` · Release-tag CI **GREEN** ([run 33748255004](https://github.com/jvelasca/Bolsa_V1/actions/runs/33748255004)).  
-> **Docs stamp:** `[50efbc26](https://github.com/jvelasca/Bolsa_V1/commit/50efbc26)` (post-GREEN; no exige retag).  
+> **Docs stamp:** [`50efbc26`](https://github.com/jvelasca/Bolsa_V1/commit/50efbc26) (post-GREEN; no exige retag).  
 > **Partida:** V1.90 PASS arquitectónico [`0c2e3af7`](https://github.com/jvelasca/Bolsa_V1/commit/0c2e3af7) · [`respuesta-auditor-v190`](./respuesta-auditor-v190-lifecycle-reliability-2026-09-03.md).
 
 ## Release
