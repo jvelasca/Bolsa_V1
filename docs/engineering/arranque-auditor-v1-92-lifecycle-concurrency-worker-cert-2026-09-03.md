@@ -4,7 +4,7 @@ Copia en chat nuevo (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **tip `v1.92-beta` (pendiente stamp)** · partida **`v1.91-beta` → `4644fef9`** (PASS arquitectónico · P1=2 worker cert + orden). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **tip `v1.92-beta` → `752918ef`** · CI GREEN [run 33754485267](https://github.com/jvelasca/Bolsa_V1/actions/runs/33754485267). Partida **`v1.91-beta` → `4644fef9`** (PASS arquitectónico · P1=2 worker cert + orden). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
 
 **Alcance V1.92:**
 
@@ -15,7 +15,7 @@ Eres auditor externo de Bolsa V1 **tip `v1.92-beta` (pendiente stamp)** · parti
 
 **Regla:** NINGÚN estado ambiguo → COMPRAR. DryRun honesto. No unificar ledger/mesa. No LIVE. No features de producto.
 
-Lee: `CURRENT_SYSTEM.md` · `respuesta-auditor-v191` · `spec-v192` · `lifecycle_outbox.py` · `lifecycle_outbox_worker.py` · `test_lifecycle_outbox_worker_pg.py` · `test_lifecycle_golden_v191.py` · Consola outbox stats · [`relevo`](./traspaso-relevo-v1-92-lifecycle-concurrency-worker-cert-2026-09-03.md).
+Lee: `CURRENT_SYSTEM.md` · `respuesta-auditor-v191` · `spec-v192` · `lifecycle_outbox.py` · `lifecycle_outbox_worker.py` · `test_lifecycle_outbox_worker_pg.py` · `test_lifecycle_golden_v191.py` · Consola outbox stats · [`relevo`](./traspaso-relevo-v1-92-lifecycle-concurrency-worker-cert-2026-09-03.md) · [`relevo tag`](./traspaso-relevo-tag-v1-92-beta-2026-09-03.md).
 
 **Foco:**
 

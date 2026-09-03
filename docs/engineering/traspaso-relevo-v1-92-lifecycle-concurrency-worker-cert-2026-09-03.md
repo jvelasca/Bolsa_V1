@@ -2,7 +2,8 @@
 
 > **Padre:** [`respuesta-auditor-v191-operational-atomicity-2026-09-03.md`](./respuesta-auditor-v191-operational-atomicity-2026-09-03.md).  
 > **Spec/plan:** [`spec-v192-lifecycle-concurrency-worker-cert-2026-09-03.md`](./spec-v192-lifecycle-concurrency-worker-cert-2026-09-03.md) · [`plan-v192-lifecycle-concurrency-worker-cert-2026-09-03.md`](./plan-v192-lifecycle-concurrency-worker-cert-2026-09-03.md).  
-> **Estado:** **CÓDIGO LISTO** · pendiente tip `v1.92-beta` · partida `v1.91-beta` → `4644fef9`.
+> **Estado:** **CERRADA (CI GREEN)** — tip [`v1.92-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.92-beta) → [`752918ef`](https://github.com/jvelasca/Bolsa_V1/commit/752918ef) · [run 33754485267](https://github.com/jvelasca/Bolsa_V1/actions/runs/33754485267).  
+> **Partida:** `v1.91-beta` → `4644fef9`.
 
 ## Objetivo
 
@@ -21,4 +22,4 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` off · no unificar ledger · integrated 
 
 ## Next
 
-Auditoría tip V1.92 ([arranque](./arranque-auditor-v1-92-lifecycle-concurrency-worker-cert-2026-09-03.md)). **Sin** LIVE.
+Auditoría tip V1.92 ([arranque](./arranque-auditor-v1-92-lifecycle-concurrency-worker-cert-2026-09-03.md) · [relevo tag](./traspaso-relevo-tag-v1-92-beta-2026-09-03.md)). **Sin** LIVE.

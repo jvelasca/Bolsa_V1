@@ -1,6 +1,6 @@
 # Spec — V1.92 Lifecycle Concurrency & Worker Certification (2026-09-03)
 
-> **AsOf:** 2026-09-03 · **Estado:** **CÓDIGO LISTO** · pendiente tip CI.  
+> **AsOf:** 2026-09-03 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.92-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.92-beta) → [`752918ef`](https://github.com/jvelasca/Bolsa_V1/commit/752918ef) · [run 33754485267](https://github.com/jvelasca/Bolsa_V1/actions/runs/33754485267) **success**.  
 > **Padre:** [`respuesta-auditor-v191-operational-atomicity-2026-09-03.md`](./respuesta-auditor-v191-operational-atomicity-2026-09-03.md).  
 > **Partida tip:** `v1.91-beta` → [`4644fef9`](https://github.com/jvelasca/Bolsa_V1/commit/4644fef9). **No** LIVE · **no** bump · **no** unificar cash ledger · `PAPER_D_EXECUTE` **off**.
 
@@ -44,4 +44,4 @@ AUTO preparado, **no** activado por defecto.
 
 ## 3. Criterio de cierre
 
-CI `lifecycle-pg` GREEN con worker real + dos workers misma posición + crash/stale. Freeze intacto. **Aún no** declarar «beta PAPER explotable» hasta auditoría tip V1.92.
+CI `lifecycle-pg` GREEN con worker real + dos workers misma posición + crash/stale + golden V1.88/V1.90/V1.91. Freeze intacto. **Aún no** declarar «beta PAPER explotable» hasta auditoría tip V1.92.

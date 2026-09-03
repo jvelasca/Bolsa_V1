@@ -1,7 +1,7 @@
 # Plan — V1.92 Lifecycle Concurrency & Worker Certification
 
 > **Padre:** [`spec-v192-lifecycle-concurrency-worker-cert-2026-09-03.md`](./spec-v192-lifecycle-concurrency-worker-cert-2026-09-03.md).  
-> **Estado:** **CÓDIGO LISTO** · pendiente tip `v1.92-beta` + CI GREEN remoto. Partida [`v1.91-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.91-beta) → [`4644fef9`](https://github.com/jvelasca/Bolsa_V1/commit/4644fef9).
+> **Estado:** **CERRADA** · **stamp CI GREEN remoto DONE** — [`v1.92-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.92-beta) → [`752918ef`](https://github.com/jvelasca/Bolsa_V1/commit/752918ef) · [run 33754485267](https://github.com/jvelasca/Bolsa_V1/actions/runs/33754485267) · partida [`v1.91-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.91-beta) → [`4644fef9`](https://github.com/jvelasca/Bolsa_V1/commit/4644fef9).
 
 | ID  | Entrega                                                              | Estado |
 | --- | -------------------------------------------------------------------- | ------ |
