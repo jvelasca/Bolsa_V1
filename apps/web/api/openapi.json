@@ -10515,13 +10515,119 @@
         "title": "LifecycleAccountingDto",
         "type": "object"
       },
+      "LifecycleAppendDataDto": {
+        "additionalProperties": false,
+        "description": "Typed append success/error payload (replaces dict[str, Any]).",
+        "properties": {
+          "accounting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LifecycleAccountingDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LifecycleAppendErrorDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LifecycleStoreEventDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "idempotent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotent"
+          },
+          "lineagePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lineagepath"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "LifecycleAppendDataDto",
+        "type": "object"
+      },
+      "LifecycleAppendErrorDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "LifecycleAppendErrorDto",
+        "type": "object"
+      },
       "LifecycleAppendResponseDto": {
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
           "data": {
-            "additionalProperties": true,
-            "title": "Data",
-            "type": "object"
+            "$ref": "#/components/schemas/LifecycleAppendDataDto"
           }
         },
         "required": [
@@ -10806,6 +10912,58 @@
         "title": "LifecycleEventRequestDto",
         "type": "object"
       },
+      "LifecycleOutboxRequeueDataDto": {
+        "additionalProperties": false,
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "positionId": {
+            "title": "Positionid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "transactionId": {
+            "title": "Transactionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "attempts",
+          "transactionId",
+          "accountId",
+          "positionId"
+        ],
+        "title": "LifecycleOutboxRequeueDataDto",
+        "type": "object"
+      },
+      "LifecycleOutboxRequeueResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LifecycleOutboxRequeueDataDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "LifecycleOutboxRequeueResponseDto",
+        "type": "object"
+      },
       "LifecycleSnapshotDataDto": {
         "additionalProperties": false,
         "properties": {
@@ -10862,8 +11020,8 @@
         "type": "object"
       },
       "LifecycleStoreEventDto": {
-        "additionalProperties": true,
-        "description": "Canonical event shape from to_canonical_dict (extra allowed for evolution).",
+        "additionalProperties": false,
+        "description": "Canonical event shape from to_canonical_dict (strict known fields).",
         "properties": {
           "accountId": {
             "anyOf": [
@@ -10887,6 +11045,50 @@
             ],
             "title": "At"
           },
+          "causationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Causationid"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "decisionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionid"
+          },
           "eventId": {
             "anyOf": [
               {
@@ -10897,6 +11099,20 @@
               }
             ],
             "title": "Eventid"
+          },
+          "fees": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees"
           },
           "fillId": {
             "anyOf": [
@@ -10924,6 +11140,31 @@
             "title": "Kind",
             "type": "string"
           },
+          "newStop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newstop"
+          },
+          "payloadHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payloadhash"
+          },
           "positionId": {
             "anyOf": [
               {
@@ -10934,6 +11175,20 @@
               }
             ],
             "title": "Positionid"
+          },
+          "previousStop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previousstop"
           },
           "price": {
             "anyOf": [
@@ -10963,6 +11218,39 @@
             ],
             "title": "Quantity"
           },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "revisionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisionid"
+          },
+          "schemaVersion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schemaversion"
+          },
           "sequenceNo": {
             "anyOf": [
               {
@@ -10973,6 +11261,61 @@
               }
             ],
             "title": "Sequenceno"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "tradePlanId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tradeplanid"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          },
+          "venueOrderId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venueorderid"
           }
         },
         "required": [
@@ -12146,6 +12489,17 @@
               }
             ],
             "title": "Initialstop"
+          },
+          "lifecycleStage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifecyclestage"
           },
           "operationalView": {
             "anyOf": [
@@ -25343,6 +25697,49 @@
           }
         },
         "summary": "Post Lifecycle Event",
+        "tags": [
+          "lifecycle"
+        ]
+      }
+    },
+    "/api/lifecycle/outbox/{outbox_id}/requeue": {
+      "post": {
+        "description": "V1.91 P2 — operator requeue: dead → pending (audited).",
+        "operationId": "requeue_lifecycle_outbox_api_lifecycle_outbox__outbox_id__requeue_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outbox_id",
+            "required": true,
+            "schema": {
+              "title": "Outbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOutboxRequeueResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Requeue Lifecycle Outbox",
         "tags": [
           "lifecycle"
         ]

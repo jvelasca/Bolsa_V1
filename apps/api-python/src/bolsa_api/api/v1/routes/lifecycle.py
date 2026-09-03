@@ -75,9 +75,9 @@ class LifecycleAccountingDto(BaseModel):
 
 
 class LifecycleStoreEventDto(BaseModel):
-    """Canonical event shape from to_canonical_dict (extra allowed for evolution)."""
+    """Canonical event shape from to_canonical_dict (strict known fields)."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     kind: str
     at: str | None = None
@@ -85,10 +85,26 @@ class LifecycleStoreEventDto(BaseModel):
     position_id: str | None = Field(default=None, alias="positionId")
     account_id: str | None = Field(default=None, alias="accountId")
     instrument_id: str | None = Field(default=None, alias="instrumentId")
+    decision_id: str | None = Field(default=None, alias="decisionId")
+    trade_plan_id: str | None = Field(default=None, alias="tradePlanId")
+    symbol: str | None = None
+    side: str | None = None
+    currency: str | None = None
     sequence_no: int | None = Field(default=None, alias="sequenceNo")
     fill_id: str | None = Field(default=None, alias="fillId")
     quantity: float | int | None = None
     price: float | int | None = None
+    fees: float | int | None = None
+    venue: str | None = None
+    venue_order_id: str | None = Field(default=None, alias="venueOrderId")
+    previous_stop: float | int | None = Field(default=None, alias="previousStop")
+    new_stop: float | int | None = Field(default=None, alias="newStop")
+    reason: str | None = None
+    revision_id: str | None = Field(default=None, alias="revisionId")
+    payload_hash: str | None = Field(default=None, alias="payloadHash")
+    schema_version: int | None = Field(default=None, alias="schemaVersion")
+    causation_id: str | None = Field(default=None, alias="causationId")
+    correlation_id: str | None = Field(default=None, alias="correlationId")
 
 
 class LifecycleSnapshotDataDto(BaseModel):
@@ -107,10 +123,49 @@ class LifecycleSnapshotResponseDto(BaseModel):
     data: LifecycleSnapshotDataDto
 
 
-class LifecycleAppendResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
+class LifecycleAppendErrorDto(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    data: dict[str, Any]
+    code: str
+    message: str
+
+
+class LifecycleAppendDataDto(BaseModel):
+    """Typed append success/error payload (replaces dict[str, Any])."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    ok: bool
+    idempotent: bool | None = None
+    count: int | None = None
+    stage: str | None = None
+    lineage_path: str | None = Field(default=None, alias="lineagePath")
+    event: LifecycleStoreEventDto | None = None
+    accounting: LifecycleAccountingDto | None = None
+    error: LifecycleAppendErrorDto | None = None
+
+
+class LifecycleAppendResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    data: LifecycleAppendDataDto
+
+
+class LifecycleOutboxRequeueDataDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    id: str
+    status: str
+    attempts: int
+    transaction_id: str = Field(alias="transactionId")
+    account_id: str = Field(alias="accountId")
+    position_id: str = Field(alias="positionId")
+
+
+class LifecycleOutboxRequeueResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    data: LifecycleOutboxRequeueDataDto
 
 
 async def _assert_account_owned(
@@ -201,3 +256,59 @@ async def get_lifecycle_snapshot(
         )
     await _assert_account_owned(session, principal, account_id)
     return {"data": snap}
+
+
+@router.post(
+    "/outbox/{outbox_id}/requeue",
+    response_model=LifecycleOutboxRequeueResponseDto,
+)
+async def requeue_lifecycle_outbox(
+    outbox_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    principal: Annotated[str, Depends(require_jwt_principal)],
+) -> dict[str, Any]:
+    """V1.91 P2 — operator requeue: dead → pending (audited)."""
+    import logging
+
+    from bolsa_application.lifecycle_outbox import PostgresLifecycleOutboxStore
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+
+    row = await session.get(LifecycleOutboxRow, outbox_id)
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "outbox row not found"},
+        )
+    await _assert_account_owned(session, principal, row.account_id)
+    if row.status != "dead":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "not_dead",
+                "message": f"outbox status is {row.status}, expected dead",
+            },
+        )
+    store = PostgresLifecycleOutboxStore(session)
+    revived = await store.requeue(outbox_id)
+    if revived is None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "requeue_failed", "message": "could not requeue"},
+        )
+    logging.getLogger(__name__).info(
+        "lifecycle_outbox requeue operator=%s outbox_id=%s tx=%s account=%s",
+        principal,
+        revived.id,
+        revived.transaction_id,
+        revived.account_id,
+    )
+    return {
+        "data": {
+            "id": revived.id,
+            "status": revived.status,
+            "attempts": revived.attempts,
+            "transactionId": revived.transaction_id,
+            "accountId": revived.account_id,
+            "positionId": revived.position_id,
+        }
+    }

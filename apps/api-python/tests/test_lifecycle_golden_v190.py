@@ -27,7 +27,10 @@ from bolsa_application.lifecycle_event_store import (
     AppendLifecycleEvent,
     PostgresLifecycleEventStore,
 )
-from bolsa_application.lifecycle_outbox import PostgresLifecycleOutboxStore
+from bolsa_application.lifecycle_outbox import (
+    PostgresLifecycleOutboxStore,
+    drain_lifecycle_outbox,
+)
 from bolsa_application.persist_position_from_exit import PersistPositionFromExit
 from bolsa_application.persist_position_from_fill import PersistPositionFromFill
 from bolsa_domain.entities.portfolio import (
@@ -163,19 +166,20 @@ async def _insert_instrument(
     factory: async_sessionmaker[AsyncSession],
     *,
     instrument_id: str,
-    symbol: str = "AAPL",
+    symbol: str | None = None,
 ) -> None:
     now = _now()
+    sym = symbol or f"G190{instrument_id[-6:].upper()}"
     async with factory() as session:
         if await session.get(InstrumentRow, instrument_id) is None:
             session.add(
                 InstrumentRow(
                     id=instrument_id,
-                    symbol=symbol,
-                    yahoo_symbol=f"{symbol}-{instrument_id[:8]}",
+                    symbol=sym,
+                    yahoo_symbol=f"{sym}-{instrument_id}",
                     isin=None,
-                    name=symbol,
-                    exchange="NASDAQ",
+                    name=sym,
+                    exchange="TEST",
                     country="US",
                     currency="USD",
                     sector=None,
@@ -351,107 +355,98 @@ async def test_v190_golden_confirm_position_sync_lifecycle_snapshot(
             tx_id=open_tx,
         )
 
-        async with factory() as session:
-            repo = SqlAlchemyPositionStateRepository(session)
-            sync = PositionSyncCoordinator(
-                position_from_fill=PersistPositionFromFill(repo),
-                position_from_exit=PersistPositionFromExit(repo),
-                lifecycle_append=AppendLifecycleEvent(
-                    PostgresLifecycleEventStore(session)
-                ),
-                lifecycle_outbox=PostgresLifecycleOutboxStore(session),
-            )
+        async def _sync_and_drain(
+            *,
+            action: str,
+            qty: float,
+            price: float,
+            tx_id: str,
+            at: str,
+            side: str = "buy",
+        ) -> dict[str, Any]:
+            async with factory() as session:
+                repo = SqlAlchemyPositionStateRepository(session)
+                sync = PositionSyncCoordinator(
+                    position_from_fill=PersistPositionFromFill(repo),
+                    position_from_exit=PersistPositionFromExit(repo),
+                    lifecycle_append=AppendLifecycleEvent(
+                        PostgresLifecycleEventStore(session)
+                    ),
+                    lifecycle_outbox=PostgresLifecycleOutboxStore(session),
+                )
+                result = await sync.sync_after_fill(
+                    rec=SimpleNamespace(action=action, decision_id="dec-g190"),
+                    intent=SimpleNamespace(
+                        quantity=qty, instrument_id=instrument_id
+                    ),
+                    price=price,
+                    account_id=acc_a,
+                    trade=_trade(
+                        tx_id=tx_id,
+                        instrument_id=instrument_id,
+                        position_id=position_id,
+                        qty=qty,
+                        price=price,
+                        side=side,
+                        at=at,
+                    ),
+                    trade_plan_dict=plan,
+                    tx_id=tx_id,
+                )
+                await session.commit()
+            async with factory() as drain_session:
+                await drain_lifecycle_outbox(
+                    PostgresLifecycleOutboxStore(drain_session),
+                    AppendLifecycleEvent(
+                        PostgresLifecycleEventStore(drain_session)
+                    ),
+                )
+                await drain_session.commit()
+            return result
 
-            open_result = await sync.sync_after_fill(
-                rec=SimpleNamespace(
-                    action="recommend_long", decision_id="dec-g190"
-                ),
-                intent=SimpleNamespace(quantity=10.0, instrument_id=instrument_id),
-                price=100.0,
-                account_id=acc_a,
-                trade=_trade(
-                    tx_id=open_tx,
-                    instrument_id=instrument_id,
-                    position_id=position_id,
-                    qty=10.0,
-                    price=100.0,
-                    at="2026-09-03T10:00:00.000Z",
-                ),
-                trade_plan_dict=plan,
-                tx_id=open_tx,
-            )
-            assert open_result["status"] == "applied", open_result
-            assert open_result.get("lifecycle", {}).get("status") in (
-                "applied",
-                "pending",
-            ), open_result
-            await session.commit()
+        open_result = await _sync_and_drain(
+            action="recommend_long",
+            qty=10.0,
+            price=100.0,
+            tx_id=open_tx,
+            at="2026-09-03T10:00:00.000Z",
+        )
+        assert open_result["status"] == "applied", open_result
+        assert open_result.get("lifecycle", {}).get("status") == "pending", open_result
 
-            # Replay OPEN same tx → idempotent / no duplicate
-            replay = await sync.sync_after_fill(
-                rec=SimpleNamespace(
-                    action="recommend_long", decision_id="dec-g190"
-                ),
-                intent=SimpleNamespace(quantity=10.0, instrument_id=instrument_id),
-                price=100.0,
-                account_id=acc_a,
-                trade=_trade(
-                    tx_id=open_tx,
-                    instrument_id=instrument_id,
-                    position_id=position_id,
-                    qty=10.0,
-                    price=100.0,
-                    at="2026-09-03T10:00:00.000Z",
-                ),
-                trade_plan_dict=plan,
-                tx_id=open_tx,
-            )
-            assert replay["status"] == "applied"
-            await session.commit()
+        # Replay OPEN same tx → idempotent / no duplicate
+        replay = await _sync_and_drain(
+            action="recommend_long",
+            qty=10.0,
+            price=100.0,
+            tx_id=open_tx,
+            at="2026-09-03T10:00:00.000Z",
+        )
+        assert replay["status"] == "applied"
 
-            # REDUCE T1
-            reduce_tx = f"tx-t1-{uuid4().hex[:10]}"
-            reduce_result = await sync.sync_after_fill(
-                rec=SimpleNamespace(action="reduce", decision_id="dec-g190"),
-                intent=SimpleNamespace(quantity=5.0, instrument_id=instrument_id),
-                price=105.0,
-                account_id=acc_a,
-                trade=_trade(
-                    tx_id=reduce_tx,
-                    instrument_id=instrument_id,
-                    position_id=position_id,
-                    qty=5.0,
-                    price=105.0,
-                    side="sell",
-                    at="2026-09-03T11:00:00.000Z",
-                ),
-                trade_plan_dict=plan,
-                tx_id=reduce_tx,
-            )
-            assert reduce_result["status"] == "applied", reduce_result
-            await session.commit()
+        # REDUCE T1
+        reduce_tx = f"tx-t1-{uuid4().hex[:10]}"
+        reduce_result = await _sync_and_drain(
+            action="reduce",
+            qty=5.0,
+            price=105.0,
+            tx_id=reduce_tx,
+            at="2026-09-03T11:00:00.000Z",
+            side="sell",
+        )
+        assert reduce_result["status"] == "applied", reduce_result
 
-            # EXIT
-            exit_tx = f"tx-exit-{uuid4().hex[:10]}"
-            exit_result = await sync.sync_after_fill(
-                rec=SimpleNamespace(action="exit_hint", decision_id="dec-g190"),
-                intent=SimpleNamespace(quantity=5.0, instrument_id=instrument_id),
-                price=108.0,
-                account_id=acc_a,
-                trade=_trade(
-                    tx_id=exit_tx,
-                    instrument_id=instrument_id,
-                    position_id=position_id,
-                    qty=5.0,
-                    price=108.0,
-                    side="sell",
-                    at="2026-09-03T12:00:00.000Z",
-                ),
-                trade_plan_dict=plan,
-                tx_id=exit_tx,
-            )
-            assert exit_result["status"] == "applied", exit_result
-            await session.commit()
+        # EXIT
+        exit_tx = f"tx-exit-{uuid4().hex[:10]}"
+        exit_result = await _sync_and_drain(
+            action="exit_hint",
+            qty=5.0,
+            price=108.0,
+            tx_id=exit_tx,
+            at="2026-09-03T12:00:00.000Z",
+            side="sell",
+        )
+        assert exit_result["status"] == "applied", exit_result
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

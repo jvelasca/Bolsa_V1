@@ -293,6 +293,8 @@ export interface OperationalPositionDto {
   initialStop?: number | null;
   exitPlan?: OperationalExitPlanDto | null;
   originThesis?: OriginThesisSnapshotDto | null;
+  /** V1.91 — lifecycle FSM stage (from portfolio; Mesa avoids N+1 snapshot). */
+  lifecycleStage?: string | null;
 }
 
 export interface PositionDto {

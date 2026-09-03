@@ -2,7 +2,7 @@
  * Fila comprimida de posición para Mesa · Hoy (P2 + V1.16).
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   DecisionJournalStudyViewV1,
@@ -36,7 +36,6 @@ import {
   pickSubmitIntentForInstrument,
   useInFlightSubmitIntents,
 } from "@/features/operations/use-in-flight-submit-intents";
-import { api } from "@/lib/api";
 
 function formatR(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -255,21 +254,8 @@ export function MesaPositionRow({
 }) {
   const operational = position.operational ?? null;
   const pnlUp = (position.unrealizedPnl ?? 0) >= 0;
-  const [lifecycleStage, setLifecycleStage] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void api
-      .getLifecycleSnapshot(position.id)
-      .then((res) => {
-        if (!cancelled) setLifecycleStage(res.data.stage);
-      })
-      .catch(() => {
-        if (!cancelled) setLifecycleStage(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [position.id]);
+  // V1.91 — stage comes from portfolio DTO (no per-row GET snapshot).
+  const lifecycleStage = operational?.lifecycleStage ?? null;
   const dims = mapMesaStatusDimensions({
     study,
     positionStatus:

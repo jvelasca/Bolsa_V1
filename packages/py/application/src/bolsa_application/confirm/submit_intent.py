@@ -9,6 +9,7 @@ from bolsa_analytics.cognitive.paper_order import (
     stable_order_id_from_decision,
     transition_paper_order,
 )
+from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
 from bolsa_analytics.cognitive.submit_intent import (
     bind_venue_order,
     mark_send_attempted,
@@ -92,7 +93,9 @@ class SubmitIntentCoordinator:
             venue = await self._resolve_broker_venue(account_id)
         durable = record_submit_intent(
             decision_id=decision_id,
-            intent_id=intent.intent_id,
+            # V1.91: decision_id may be composite (decision|action|side) so OPEN/T1/EXIT
+            # each get a unique intent_id under submit_intents_intent_id_key.
+            intent_id=stable_intent_id_from_decision(decision_id),
             order_id=stable_order_id_from_decision(decision_id),
             account_id=account_id,
             venue=venue,

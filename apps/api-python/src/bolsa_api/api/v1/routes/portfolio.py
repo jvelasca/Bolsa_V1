@@ -72,8 +72,35 @@ async def get_portfolio(
         records,
         policy_template_id=template_id,
         recon_status=await _portfolio_recon_status(session, scope.account.id),
+        lifecycle_stages=await _lifecycle_stages_for_positions(
+            session, [p.id for p in dto.positions]
+        ),
     )
     return PortfolioSummaryResponseDto(data=dto)
+
+
+async def _lifecycle_stages_for_positions(
+    session: AsyncSession, position_ids: list[str]
+) -> dict[str, str]:
+    """V1.91 — batch lifecycle stage for Mesa (one portfolio GET, no FE N+1)."""
+    if not position_ids:
+        return {}
+    from bolsa_application.lifecycle_event_store import PostgresLifecycleEventStore
+    from bolsa_domain.lifecycle import reduce_lifecycle_events
+
+    store = PostgresLifecycleEventStore(session)
+    stages: dict[str, str] = {}
+    for pid in position_ids:
+        try:
+            events = await store.list_by_position(pid)
+        except Exception:  # noqa: BLE001
+            continue
+        if not events:
+            continue
+        stage, _ = reduce_lifecycle_events(events)
+        if isinstance(stage, str) and stage:
+            stages[pid] = stage
+    return stages
 
 
 async def _portfolio_recon_status(session: AsyncSession, account_id: str) -> str:

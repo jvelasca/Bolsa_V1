@@ -50,6 +50,8 @@ class OperationalPositionDto(BaseModel):
     exit_plan: OperationalExitPlanDto | None = Field(default=None, alias="exitPlan")
     # V1.18 L2a — tesis de nacimiento congelada al fill (≠ study evolución).
     origin_thesis: dict[str, Any] | None = Field(default=None, alias="originThesis")
+    # V1.91 — lifecycle FSM stage for Mesa (avoids per-row snapshot N+1).
+    lifecycle_stage: str | None = Field(default=None, alias="lifecycleStage")
 
 
 class PositionDto(BaseModel):

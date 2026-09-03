@@ -33,6 +33,7 @@ from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluat
 from bolsa_api.background.estudio_eod_opinion_worker import start_estudio_eod_opinion_worker
 from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
 from bolsa_api.background.index_subscribe_worker import start_index_subscribe_worker
+from bolsa_api.background.lifecycle_outbox_worker import start_lifecycle_outbox_worker
 from bolsa_api.background.opportunity_daily_scan_worker import (
     start_opportunity_daily_scan_worker,
 )
@@ -58,6 +59,7 @@ def _event_loop_starters() -> list[Any]:
         start_opportunity_daily_scan_worker,
         start_auto_sync_worker,
         start_index_subscribe_worker,
+        start_lifecycle_outbox_worker,
     ]
 
 

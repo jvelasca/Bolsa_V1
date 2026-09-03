@@ -2200,6 +2200,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lifecycle/outbox/{outbox_id}/requeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Requeue Lifecycle Outbox
+         * @description V1.91 P2 — operator requeue: dead → pending (audited).
+         */
+        post: operations["requeue_lifecycle_outbox_api_lifecycle_outbox__outbox_id__requeue_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lifecycle/positions/{position_id}/snapshot": {
         parameters: {
             query?: never;
@@ -7250,14 +7270,35 @@ export interface components {
             /** Unrealizedpnl */
             unrealizedPnl: number;
         };
+        /**
+         * LifecycleAppendDataDto
+         * @description Typed append success/error payload (replaces dict[str, Any]).
+         */
+        LifecycleAppendDataDto: {
+            accounting?: components["schemas"]["LifecycleAccountingDto"] | null;
+            /** Count */
+            count?: number | null;
+            error?: components["schemas"]["LifecycleAppendErrorDto"] | null;
+            event?: components["schemas"]["LifecycleStoreEventDto"] | null;
+            /** Idempotent */
+            idempotent?: boolean | null;
+            /** Lineagepath */
+            lineagePath?: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Stage */
+            stage?: string | null;
+        };
+        /** LifecycleAppendErrorDto */
+        LifecycleAppendErrorDto: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
         /** LifecycleAppendResponseDto */
         LifecycleAppendResponseDto: {
-            /** Data */
-            data: {
-                [key: string]: unknown;
-            };
-        } & {
-            [key: string]: unknown;
+            data: components["schemas"]["LifecycleAppendDataDto"];
         };
         /** LifecycleEventRequestDto */
         LifecycleEventRequestDto: {
@@ -7308,6 +7349,25 @@ export interface components {
             /** Venueorderid */
             venueOrderId?: string | null;
         };
+        /** LifecycleOutboxRequeueDataDto */
+        LifecycleOutboxRequeueDataDto: {
+            /** Accountid */
+            accountId: string;
+            /** Attempts */
+            attempts: number;
+            /** Id */
+            id: string;
+            /** Positionid */
+            positionId: string;
+            /** Status */
+            status: string;
+            /** Transactionid */
+            transactionId: string;
+        };
+        /** LifecycleOutboxRequeueResponseDto */
+        LifecycleOutboxRequeueResponseDto: {
+            data: components["schemas"]["LifecycleOutboxRequeueDataDto"];
+        };
         /** LifecycleSnapshotDataDto */
         LifecycleSnapshotDataDto: {
             accounting?: components["schemas"]["LifecycleAccountingDto"] | null;
@@ -7326,31 +7386,61 @@ export interface components {
         };
         /**
          * LifecycleStoreEventDto
-         * @description Canonical event shape from to_canonical_dict (extra allowed for evolution).
+         * @description Canonical event shape from to_canonical_dict (strict known fields).
          */
         LifecycleStoreEventDto: {
             /** Accountid */
             accountId?: string | null;
             /** At */
             at?: string | null;
+            /** Causationid */
+            causationId?: string | null;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Decisionid */
+            decisionId?: string | null;
             /** Eventid */
             eventId?: string | null;
+            /** Fees */
+            fees?: number | null;
             /** Fillid */
             fillId?: string | null;
             /** Instrumentid */
             instrumentId?: string | null;
             /** Kind */
             kind: string;
+            /** Newstop */
+            newStop?: number | null;
+            /** Payloadhash */
+            payloadHash?: string | null;
             /** Positionid */
             positionId?: string | null;
+            /** Previousstop */
+            previousStop?: number | null;
             /** Price */
             price?: number | null;
             /** Quantity */
             quantity?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Revisionid */
+            revisionId?: string | null;
+            /** Schemaversion */
+            schemaVersion?: number | null;
             /** Sequenceno */
             sequenceNo?: number | null;
-        } & {
-            [key: string]: unknown;
+            /** Side */
+            side?: string | null;
+            /** Symbol */
+            symbol?: string | null;
+            /** Tradeplanid */
+            tradePlanId?: string | null;
+            /** Venue */
+            venue?: string | null;
+            /** Venueorderid */
+            venueOrderId?: string | null;
         };
         /** LinkTrialHypothesisRequestDto */
         LinkTrialHypothesisRequestDto: {
@@ -7746,6 +7836,8 @@ export interface components {
             exitPlan?: components["schemas"]["OperationalExitPlanDto"] | null;
             /** Initialstop */
             initialStop?: number | null;
+            /** Lifecyclestage */
+            lifecycleStage?: string | null;
             /** Operationalview */
             operationalView?: {
                 [key: string]: unknown;
@@ -14306,6 +14398,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LifecycleAppendResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    requeue_lifecycle_outbox_api_lifecycle_outbox__outbox_id__requeue_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleOutboxRequeueResponseDto"];
                 };
             };
             /** @description Validation Error */

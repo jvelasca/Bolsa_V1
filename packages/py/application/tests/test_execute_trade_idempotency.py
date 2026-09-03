@@ -479,7 +479,7 @@ async def test_execute_trade_zero_fee_trade_balance_equals_fee_balance() -> None
 
 @pytest.mark.asyncio
 async def test_confirm_recommendation_forwards_decision_id_as_idempotency_key() -> None:
-    """ConfirmRecommendationIntent deriva la clave lógica (decision_id) al trade."""
+    """ConfirmRecommendationIntent: clave lógica = decision|action|side (V1.91 OPEN/T1/EXIT)."""
     fake_trade = _FakeExecuteTrade()
     use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
 
@@ -495,7 +495,7 @@ async def test_confirm_recommendation_forwards_decision_id_as_idempotency_key() 
     )
 
     assert len(fake_trade.calls) == 1
-    assert fake_trade.calls[0]["idempotency_key"] == "DEC-123"
+    assert fake_trade.calls[0]["idempotency_key"] == "DEC-123|recommend_long|buy"
 
 
 class _FakeCognitiveStore:

@@ -119,9 +119,11 @@ def attach_operational_positions(
     *,
     policy_template_id: str | None = None,
     recon_status: str | None = None,
+    lifecycle_stages: dict[str, str] | None = None,
 ) -> PortfolioSummaryDto:
     """P1 — adjunta snapshot de autoridad al holding, por instrumento.
     V1.29 — ExitPolicy del perfil activo parametriza advisory ExitPlan.
+    V1.91 — lifecycle_stages keyed by ledger position id (Mesa stage without N+1).
     """
     from bolsa_analytics.cognitive.position_operational_view import (
         build_position_operational_view,
@@ -131,6 +133,7 @@ def attach_operational_positions(
     from bolsa_application.evaluate_exit_plan import advisory_exit_plan
     from bolsa_application.origin_decision_package import origin_thesis_from_position_state
 
+    stages = lifecycle_stages or {}
     pov_recon = map_portfolio_recon_to_pov_recon(recon_status)
     by_instrument: dict[str, Any] = {}
     for rec in records:
@@ -181,6 +184,7 @@ def attach_operational_positions(
             raw_dec = origin_thesis.get("decisionId")
             if isinstance(raw_dec, str) and raw_dec.strip():
                 decision_id = raw_dec.strip()
+        stage = stages.get(pos.id)
         pos.operational = OperationalPositionDto(
             status=str(state_dict.get("status") or getattr(rec, "status", "") or ""),
             direction=str(state_dict.get("direction") or ""),
@@ -204,6 +208,7 @@ def attach_operational_positions(
             initial_stop=_finite_or_none(state_dict.get("initialStop")),
             exit_plan=exit_plan,
             origin_thesis=origin_thesis,
+            lifecycle_stage=stage if isinstance(stage, str) else None,
         )
     return dto
 

@@ -160,31 +160,32 @@ async def append_lifecycle_from_auto(
     mapping: LifecycleAutoMapping,
     outbox: Any | None = None,
 ) -> dict[str, Any]:
-    """Fail-soft sidecar append for AUTO. Never rolls back PositionState."""
+    """Enqueue lifecycle sidecar for AUTO (same TX as PositionState when outbox).
+
+    V1.91: with outbox, enqueue failure propagates (rollback with PositionState).
+    Drain is post-COMMIT. Without outbox, legacy direct append remains fail-soft.
+    """
     if append is None and outbox is None:
         return {"status": "skipped", "reason": "lifecycle_append_not_wired"}
 
+    if outbox is not None:
+        # Same TX discipline as PositionSync — do not swallow enqueue errors.
+        await outbox.enqueue(
+            position_id=mapping.position_id,
+            account_id=mapping.account_id,
+            transaction_id=mapping.event_id,
+            kind=mapping.kind,
+            payload=auto_mapping_to_direct_payload(mapping),
+        )
+        return {
+            "status": "pending",
+            "kind": mapping.kind,
+            "positionId": mapping.position_id,
+            "eventId": mapping.event_id,
+        }
+
+    assert append is not None
     try:
-        if outbox is not None:
-            await outbox.enqueue(
-                position_id=mapping.position_id,
-                account_id=mapping.account_id,
-                transaction_id=mapping.event_id,
-                kind=mapping.kind,
-                payload=auto_mapping_to_direct_payload(mapping),
-            )
-            from bolsa_application.lifecycle_outbox import drain_lifecycle_outbox
-
-            drain = await drain_lifecycle_outbox(outbox, append)
-            return {
-                "status": "applied" if drain.get("applied") else "pending",
-                "outbox": drain,
-                "kind": mapping.kind,
-                "positionId": mapping.position_id,
-                "eventId": mapping.event_id,
-            }
-
-        assert append is not None
         # Inherit identity from open event when present.
         existing = await append.store.list_by_position(mapping.position_id)
         input_event = auto_mapping_to_input(mapping)

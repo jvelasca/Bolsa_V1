@@ -1359,12 +1359,17 @@ class LifecycleAggregateRow(Base):
 
 
 class LifecycleOutboxRow(Base):
-    """V1.90 — durable pending lifecycle append (fail-soft without loss)."""
+    """V1.90/V1.91 — durable lifecycle append intent (pending→processing→applied|dead)."""
 
     __tablename__ = "lifecycle_outbox"
     __table_args__ = (
         UniqueConstraint("transaction_id", name="lifecycle_outbox_transaction_id_uidx"),
         Index("lifecycle_outbox_status_idx", "status"),
+        Index(
+            "lifecycle_outbox_status_next_attempt_idx",
+            "status",
+            "next_attempt_at",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -1378,6 +1383,12 @@ class LifecycleOutboxRow(Base):
     status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(
+        "next_attempt_at", DateTime(timezone=True), nullable=True
+    )
+    claimed_at: Mapped[datetime | None] = mapped_column(
+        "claimed_at", DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", DateTime(timezone=True), nullable=False
     )

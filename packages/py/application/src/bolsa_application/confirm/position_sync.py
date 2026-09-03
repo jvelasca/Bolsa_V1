@@ -10,7 +10,6 @@ from bolsa_application.lifecycle_from_fill import (
     build_lifecycle_fill_mapping,
     map_confirm_fill_action,
 )
-from bolsa_application.lifecycle_outbox import drain_lifecycle_outbox
 from bolsa_application.persist_position_from_exit import (
     PersistPositionFromExitInput,
     row_position_id,
@@ -27,8 +26,9 @@ class PositionSyncCoordinator:
     V1.89: after successful PositionState persist, fail-soft append to lifecycle
     sidecar (never merges cash ledger).
 
-    V1.90: enqueue lifecycle_outbox (same session) then drain best-effort so a
-    crash between PositionSync and AppendLifecycleEvent is recoverable.
+    V1.90/V1.91: enqueue lifecycle_outbox in the same TX as PositionState.
+    Drain runs post-COMMIT (HTTP kick / LifecycleOutboxWorker), never inside
+    the persist transaction. Enqueue failure propagates → rollback both.
     """
 
     def __init__(
@@ -203,24 +203,18 @@ class PositionSyncCoordinator:
                 "trade_plan_dict": trade_plan_dict,
                 "ledger_positions": ledger_positions,
             }
-            try:
-                await self._lifecycle_outbox.enqueue(
-                    position_id=position_id,
-                    account_id=account_id,
-                    transaction_id=tx_id,
-                    kind=kind,
-                    payload=payload,
-                )
-            except Exception as exc:  # noqa: BLE001
-                return {"status": "error", "reason": f"outbox_enqueue:{exc}"}
-
-            drain = await drain_lifecycle_outbox(
-                self._lifecycle_outbox,
-                self._lifecycle_append,
+            # V1.91: enqueue must succeed in the same TX as PositionState.
+            # Do NOT swallow — failure rolls back PositionState + outbox together.
+            # Drain is post-COMMIT (get_db_session kick / LifecycleOutboxWorker).
+            await self._lifecycle_outbox.enqueue(
+                position_id=position_id,
+                account_id=account_id,
+                transaction_id=tx_id,
+                kind=kind,
+                payload=payload,
             )
             return {
-                "status": "applied" if drain.get("applied") else "pending",
-                "outbox": drain,
+                "status": "pending",
                 "positionId": position_id,
                 "eventId": tx_id,
             }

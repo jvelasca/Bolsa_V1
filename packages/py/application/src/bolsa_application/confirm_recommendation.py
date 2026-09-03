@@ -807,8 +807,10 @@ class ConfirmRecommendationIntent:
         trade_plan_dict: dict[str, Any] | None,
         session_payload: dict[str, Any] | None,
     ) -> None:
-        idem_key = (rec.decision_id or "").strip()
-        if not idem_key:
+        # FE reuses operational.decisionId for OPEN → T1 → EXIT. Submit/idempotency
+        # must distinguish action+side or reduce/exit collide with the opening fill.
+        decision = (rec.decision_id or "").strip()
+        if not decision:
             result["trade"] = {"status": "error", "reason": "decision_id_required"}
             result["intent"] = {
                 **intent.to_dict(),
@@ -816,6 +818,9 @@ class ConfirmRecommendationIntent:
                 "contract": contract_status,
             }
             return
+        action = str(rec.action or "").strip() or "unknown"
+        side = str(intent.side or "").strip() or "unknown"
+        idem_key = f"{decision}|{action}|{side}"
 
         existing_fill = await self._execution.find_existing_fill(
             account_id=account_id,

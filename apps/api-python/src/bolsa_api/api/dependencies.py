@@ -282,10 +282,42 @@ async def get_db_session(
     async with factory() as session:
         try:
             yield session
+            needs_outbox_drain = bool(
+                session.info.get("lifecycle_outbox_enqueued")
+            )
             await session.commit()
         except Exception:
             await session.rollback()
             raise
+        else:
+            # V1.91 — drain post-COMMIT in a fresh session (best-effort kick).
+            # Continuous repair lives in LifecycleOutboxWorker.
+            if needs_outbox_drain:
+                try:
+                    from bolsa_application.lifecycle_event_store import (
+                        AppendLifecycleEvent,
+                        PostgresLifecycleEventStore,
+                    )
+                    from bolsa_application.lifecycle_outbox import (
+                        PostgresLifecycleOutboxStore,
+                        drain_lifecycle_outbox,
+                    )
+
+                    async with factory() as drain_session:
+                        await drain_lifecycle_outbox(
+                            PostgresLifecycleOutboxStore(drain_session),
+                            AppendLifecycleEvent(
+                                PostgresLifecycleEventStore(drain_session)
+                            ),
+                        )
+                        await drain_session.commit()
+                except Exception:  # noqa: BLE001
+                    import logging
+
+                    logging.getLogger(__name__).warning(
+                        "lifecycle_outbox post-commit drain kick failed",
+                        exc_info=True,
+                    )
 
 
 def get_account_repository(session: AsyncSession) -> SqlAlchemyAccountRepository:
