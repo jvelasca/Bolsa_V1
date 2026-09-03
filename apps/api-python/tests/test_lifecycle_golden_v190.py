@@ -45,6 +45,8 @@ from bolsa_infrastructure.database.models import (
     InvestmentPortfolioRow,
     LedgerEntryRow,
     PortfolioRow,
+    PositionRow,
+    TransactionRow,
     UserRow,
 )
 from bolsa_infrastructure.database.repositories.position_state_repository import (
@@ -88,7 +90,8 @@ async def _insert_account(
     *,
     user_id: str,
     name: str,
-) -> str:
+) -> tuple[str, str]:
+    """Returns (account_id, legacy_portfolio_id) for ledger FK seeding."""
     account_id = f"lc-g190-{uuid4().hex[:12]}"
     legacy_id = f"pf-g190-{uuid4().hex[:12]}"
     inv_pf_id = f"ip-g190-{uuid4().hex[:12]}"
@@ -153,7 +156,7 @@ async def _insert_account(
             )
         )
         await session.commit()
-    return account_id
+    return account_id, legacy_id
 
 
 async def _insert_instrument(
@@ -183,6 +186,49 @@ async def _insert_instrument(
                 )
             )
             await session.commit()
+
+
+async def _seed_open_ledger_fks(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    portfolio_id: str,
+    instrument_id: str,
+    position_id: str,
+    tx_id: str,
+    qty: float = 10.0,
+    price: float = 100.0,
+) -> None:
+    """Seed positions + transactions rows required by position_states FKs."""
+    now = _now()
+    q = Decimal(str(qty))
+    p = Decimal(str(price))
+    async with factory() as session:
+        if await session.get(PositionRow, position_id) is None:
+            session.add(
+                PositionRow(
+                    id=position_id,
+                    portfolio_id=portfolio_id,
+                    instrument_id=instrument_id,
+                    quantity=q,
+                    avg_cost=p,
+                    updated_at=now,
+                )
+            )
+        if await session.get(TransactionRow, tx_id) is None:
+            session.add(
+                TransactionRow(
+                    id=tx_id,
+                    portfolio_id=portfolio_id,
+                    instrument_id=instrument_id,
+                    type="buy",
+                    quantity=q,
+                    price=p,
+                    total=q * p,
+                    executed_at=now,
+                    idempotency_key=None,
+                )
+            )
+        await session.commit()
 
 
 async def _jwt(factory: async_sessionmaker[AsyncSession], user_id: str) -> str:
@@ -287,11 +333,23 @@ async def test_v190_golden_confirm_position_sync_lifecycle_snapshot(
         await _insert_user(factory, user_id=user_a)
         await _insert_user(factory, user_id=user_b)
         await _insert_instrument(factory, instrument_id=instrument_id)
-        acc_a = await _insert_account(factory, user_id=user_a, name="Golden V190 A")
+        acc_a, pf_a = await _insert_account(
+            factory, user_id=user_a, name="Golden V190 A"
+        )
         await _insert_account(factory, user_id=user_b, name="Golden V190 B")
         token_a = await _jwt(factory, user_a)
         token_b = await _jwt(factory, user_b)
         plan = _plan(instrument_id)
+
+        # OPEN
+        open_tx = f"tx-open-{uuid4().hex[:10]}"
+        await _seed_open_ledger_fks(
+            factory,
+            portfolio_id=pf_a,
+            instrument_id=instrument_id,
+            position_id=position_id,
+            tx_id=open_tx,
+        )
 
         async with factory() as session:
             repo = SqlAlchemyPositionStateRepository(session)
@@ -304,8 +362,6 @@ async def test_v190_golden_confirm_position_sync_lifecycle_snapshot(
                 lifecycle_outbox=PostgresLifecycleOutboxStore(session),
             )
 
-            # OPEN
-            open_tx = f"tx-open-{uuid4().hex[:10]}"
             open_result = await sync.sync_after_fill(
                 rec=SimpleNamespace(
                     action="recommend_long", decision_id="dec-g190"
