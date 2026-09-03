@@ -8,6 +8,8 @@ V1.92: ``tick_seconds`` injectable for PG certification without sleeping 3s×N.
 
 V1.93: TX split — claim+commit (processing durable), then per-row
 append+mark+commit so a crash between phases is recoverable via stale reclaim.
+
+V1.97: ``on_after_append_index`` injects mid ``append_many`` (T2 pair atomicity).
 """
 
 from __future__ import annotations
@@ -27,6 +29,8 @@ _ENV_ENABLED = "LIFECYCLE_OUTBOX_WORKER_ENABLED"
 
 AfterClaimHook = Callable[[list[Any]], Awaitable[None]]
 BeforeApplyCommitHook = Callable[[str], Awaitable[None]]
+# Re-export shape: (index, event) — same as AppendManyHook.
+AfterAppendIndexHook = Callable[[int, Any], Awaitable[None] | None]
 
 
 def _worker_enabled() -> bool:
@@ -39,6 +43,7 @@ async def _drain_once(
     *,
     on_after_claim: AfterClaimHook | None = None,
     on_before_apply_commit: BeforeApplyCommitHook | None = None,
+    on_after_append_index: AfterAppendIndexHook | None = None,
 ) -> dict[str, Any]:
     """Claim in TX1, apply each row in its own TX2 (V1.93 failure window)."""
     from bolsa_application.lifecycle_event_store import (
@@ -68,7 +73,12 @@ async def _drain_once(
         async with session_factory() as session:
             try:
                 store = PostgresLifecycleOutboxStore(session)
-                append = AppendLifecycleEvent(PostgresLifecycleEventStore(session))
+                append = AppendLifecycleEvent(
+                    PostgresLifecycleEventStore(
+                        session,
+                        on_after_append_index=on_after_append_index,
+                    )
+                )
                 # Re-load record from this session's claim snapshot fields.
                 result = await apply_lifecycle_outbox_row(store, append, row)
                 if on_before_apply_commit is not None:
@@ -97,6 +107,7 @@ async def lifecycle_outbox_worker_loop(
     tick_seconds: float = TICK_SECONDS,
     on_after_claim: AfterClaimHook | None = None,
     on_before_apply_commit: BeforeApplyCommitHook | None = None,
+    on_after_append_index: AfterAppendIndexHook | None = None,
 ) -> None:
     logger.info("LifecycleOutboxWorker iniciado (tick=%ss)", tick_seconds)
     while True:
@@ -108,6 +119,7 @@ async def lifecycle_outbox_worker_loop(
                 session_factory,
                 on_after_claim=on_after_claim,
                 on_before_apply_commit=on_before_apply_commit,
+                on_after_append_index=on_after_append_index,
             )
             if drain.get("drained"):
                 logger.info("lifecycle_outbox worker drain: %s", drain)
@@ -121,6 +133,7 @@ def start_lifecycle_outbox_worker(
     tick_seconds: float = TICK_SECONDS,
     on_after_claim: AfterClaimHook | None = None,
     on_before_apply_commit: BeforeApplyCommitHook | None = None,
+    on_after_append_index: AfterAppendIndexHook | None = None,
 ) -> asyncio.Task[None] | None:
     if not _worker_enabled():
         logger.info(
@@ -134,5 +147,6 @@ def start_lifecycle_outbox_worker(
             tick_seconds=tick_seconds,
             on_after_claim=on_after_claim,
             on_before_apply_commit=on_before_apply_commit,
+            on_after_append_index=on_after_append_index,
         )
     )

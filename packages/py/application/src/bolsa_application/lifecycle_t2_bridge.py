@@ -1,11 +1,14 @@
-"""V1.96 — Shared FSM bridge: T2_TRIGGERED before T2_EXECUTED (SEMI + AUTO)."""
+"""V1.96/V1.97 — Shared FSM bridge: atomic T2_TRIGGERED + T2_EXECUTED (SEMI + AUTO).
+
+V1.97: the pair is validated in memory and persisted in one savepoint via
+``AppendLifecycleEvent`` (``append_many``). Callers that only ``execute(T2_EXECUTED)``
+also get the atomic pair — including outbox ``direct_input``.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any
 
-from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleStoreEvent, reduce_lifecycle_events
 
 
@@ -20,23 +23,10 @@ def t2_trigger_at_before(exec_at: str | None) -> str | None:
         return exec_at
 
 
-async def maybe_append_t2_triggered_bridge(
-    append: AppendLifecycleEvent,
-    *,
-    existing: list[LifecycleStoreEvent],
-    execute_event: LifecycleEventInput,
-) -> dict[str, Any] | None:
-    """Insert T2_TRIGGERED when appending T2_EXECUTED from stage t1_executed.
-
-    Returns an error dict if the bridge append fails; None if skipped or applied.
-    """
-    if execute_event.kind != "T2_EXECUTED" or not existing:
-        return None
-    stage, _ = reduce_lifecycle_events(existing)
-    if stage != "t1_executed":
-        return None
+def build_t2_triggered_input(execute_event: LifecycleEventInput) -> LifecycleEventInput:
+    """Synthesize T2_TRIGGERED identity envelope for an imminent T2_EXECUTED."""
     bridge_at = t2_trigger_at_before(execute_event.at) or execute_event.at
-    bridge = LifecycleEventInput(
+    return LifecycleEventInput(
         kind="T2_TRIGGERED",
         at=bridge_at,
         event_id=f"{execute_event.event_id}:t2_trigger",
@@ -49,17 +39,39 @@ async def maybe_append_t2_triggered_bridge(
         side=execute_event.side,
         reason=execute_event.reason,
     )
-    bridge_result = await append.execute(bridge)
-    if not bridge_result.ok:
-        return {
-            "status": "error",
-            "reason": (
-                bridge_result.error.code if bridge_result.error else "t2_trigger_failed"
-            ),
-            "kind": "T2_TRIGGERED",
-            "positionId": execute_event.position_id,
-        }
+
+
+def needs_atomic_t2_pair(
+    existing: list[LifecycleStoreEvent],
+    execute_event: LifecycleEventInput,
+) -> bool:
+    """True when T2_EXECUTED must be paired with a fresh T2_TRIGGERED from t1_executed."""
+    if execute_event.kind != "T2_EXECUTED" or not existing:
+        return False
+    stage, _ = reduce_lifecycle_events(existing)
+    return stage == "t1_executed"
+
+
+# Backward-compatible name: V1.97 AppendLifecycleEvent.execute owns the pair.
+# Kept so SEMI/AUTO call sites remain valid during transition; returns None (no-op).
+async def maybe_append_t2_triggered_bridge(
+    append: object,
+    *,
+    existing: list[LifecycleStoreEvent],
+    execute_event: LifecycleEventInput,
+) -> dict[str, object] | None:
+    """V1.97 no-op — atomic pair lives in ``AppendLifecycleEvent.execute``.
+
+    Previously appended T2_TRIGGERED in a separate savepoint. That path is removed
+    so a mid-pair failure cannot leave a trigger without execute.
+    """
+    _ = (append, existing, execute_event)
     return None
 
 
-__all__ = ["maybe_append_t2_triggered_bridge", "t2_trigger_at_before"]
+__all__ = [
+    "build_t2_triggered_input",
+    "maybe_append_t2_triggered_bridge",
+    "needs_atomic_t2_pair",
+    "t2_trigger_at_before",
+]

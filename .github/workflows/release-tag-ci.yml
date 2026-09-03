@@ -358,7 +358,7 @@ jobs:
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
-      - name: Pytest lifecycle PG + auth + golden V1.88–V1.91/V1.95/V1.96 + worker V1.92/V1.93 + integrity V1.94 (fail if skipped)
+      - name: Pytest lifecycle PG + auth + golden V1.88–V1.91/V1.95/V1.96 + worker V1.92/V1.93/V1.97 + integrity V1.94 (fail if skipped)
         run: >
           uv run pytest
           packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py

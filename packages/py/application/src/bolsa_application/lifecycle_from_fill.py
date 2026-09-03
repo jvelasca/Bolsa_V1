@@ -4,7 +4,7 @@ V1.90 — Never use wall-clock `now()` in the idempotent payload. Timestamp must
 come from the execution event (or a durable ledger lookup). Missing timestamp
 ⇒ skip append with an explicit reason (fail-soft, no conflict on replay).
 
-V1.96 — Confirm reduce + TARGET_2 → T2_EXECUTED (+ T2_TRIGGERED bridge).
+V1.96 — Confirm reduce + TARGET_2 → T2_EXECUTED (+ atomic T2_TRIGGERED bridge via AppendLifecycleEvent).
 Default reduce remains T1_EXECUTED.
 """
 

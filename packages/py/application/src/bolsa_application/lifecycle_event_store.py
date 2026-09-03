@@ -1,20 +1,18 @@
-"""V1.87 — Lifecycle event store (append-only) + aggregate lock + sequence_no."""
+"""V1.87 — Lifecycle event store (append-only) + aggregate lock + sequence_no.
+
+V1.97 — ``append_many`` persists N events in one savepoint (T2 pair atomicity).
+"""
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal, Protocol
 from uuid import uuid4
-
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_domain.lifecycle import (
     AppendFail,
@@ -33,8 +31,32 @@ from bolsa_infrastructure.database.models.tables import (
     LifecycleAggregateRow,
     LifecycleEventRow,
 )
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from bolsa_application.lifecycle_t2_bridge import (
+    build_t2_triggered_input,
+    needs_atomic_t2_pair,
+)
+
+# Optional inject: called after flushing event at index ``i`` inside append_many.
+AppendManyHook = Callable[[int, LifecycleStoreEvent], Awaitable[None] | None]
 
 IntegrityKind = Literal["event_id_conflict", "duplicate_fill_id", "sequence_conflict"]
+
+
+async def _run_append_hook(
+    hook: AppendManyHook | None,
+    index: int,
+    event: LifecycleStoreEvent,
+) -> None:
+    if hook is None:
+        return
+    maybe = hook(index, event)
+    if maybe is not None:
+        await maybe
 
 
 def _parse_at(iso: str) -> datetime:
@@ -173,6 +195,10 @@ class LifecycleEventStore(Protocol):
 
     async def append(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent: ...
 
+    async def append_many(
+        self, events: list[LifecycleStoreEvent]
+    ) -> list[LifecycleStoreEvent]: ...
+
     async def get_by_event_id(self, event_id: str) -> LifecycleStoreEvent | None: ...
 
     async def get_account_id(self, position_id: str) -> str | None: ...
@@ -181,8 +207,14 @@ class LifecycleEventStore(Protocol):
 class PostgresLifecycleEventStore:
     """Append-only PostgreSQL store. No UPDATE/DELETE API. Serializes per position."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        on_after_append_index: AppendManyHook | None = None,
+    ) -> None:
         self._session = session
+        self.on_after_append_index = on_after_append_index
 
     @asynccontextmanager
     async def locked(self, position_id: str, account_id: str) -> AsyncIterator[None]:
@@ -248,37 +280,58 @@ class PostgresLifecycleEventStore:
         return None
 
     async def append(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent:
-        agg = await self._session.get(LifecycleAggregateRow, event.position_id)
+        stored = await self.append_many([event])
+        return stored[0]
+
+    async def append_many(
+        self, events: list[LifecycleStoreEvent]
+    ) -> list[LifecycleStoreEvent]:
+        """Persist N events in one savepoint. Failure rolls back the whole batch."""
+        if not events:
+            return []
+        position_id = events[0].position_id
+        if any(e.position_id != position_id for e in events):
+            raise ValueError("append_many requires a single position_id")
+        agg = await self._session.get(LifecycleAggregateRow, position_id)
         last = agg.last_sequence_no if agg is not None else 0
-        stored = replace(event, sequence_no=last + 1)
+        stored_list: list[LifecycleStoreEvent] = []
         async with self._session.begin_nested():
-            self._session.add(event_to_row(stored))
-            if agg is not None:
-                agg.last_sequence_no = stored.sequence_no or last + 1
-                if stored.account_id and not agg.account_id:
-                    agg.account_id = stored.account_id
-            else:
-                self._session.add(
-                    LifecycleAggregateRow(
+            for index, event in enumerate(events):
+                last += 1
+                stored = replace(event, sequence_no=last)
+                self._session.add(event_to_row(stored))
+                if agg is not None:
+                    agg.last_sequence_no = last
+                    if stored.account_id and not agg.account_id:
+                        agg.account_id = stored.account_id
+                else:
+                    agg = LifecycleAggregateRow(
                         position_id=stored.position_id,
                         account_id=stored.account_id or "",
-                        last_sequence_no=stored.sequence_no or 1,
+                        last_sequence_no=last,
                         created_at=datetime.now(UTC),
                     )
-                )
-            await self._session.flush()
-        return stored
+                    self._session.add(agg)
+                await self._session.flush()
+                stored_list.append(stored)
+                await _run_append_hook(self.on_after_append_index, index, stored)
+        return stored_list
 
 
 class InMemoryLifecycleEventStore:
     """Process-local store for unit tests (no PG)."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        on_after_append_index: AppendManyHook | None = None,
+    ) -> None:
         self._by_position: dict[str, list[LifecycleStoreEvent]] = {}
         self._by_event_id: dict[str, LifecycleStoreEvent] = {}
         self._account: dict[str, str] = {}
         self._seq: dict[str, int] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self.on_after_append_index = on_after_append_index
 
     @asynccontextmanager
     async def locked(self, position_id: str, account_id: str) -> AsyncIterator[None]:
@@ -320,7 +373,7 @@ class InMemoryLifecycleEventStore:
         events = await self.list_by_position(position_id)
         return events[0].account_id if events else None
 
-    async def append(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent:
+    def _append_one_unlocked(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent:
         if event.event_id in self._by_event_id:
             raise IntegrityError(
                 "INSERT",
@@ -343,6 +396,47 @@ class InMemoryLifecycleEventStore:
         if stored.account_id:
             self._account.setdefault(event.position_id, stored.account_id)
         return stored
+
+    async def append(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent:
+        stored = await self.append_many([event])
+        return stored[0]
+
+    async def append_many(
+        self, events: list[LifecycleStoreEvent]
+    ) -> list[LifecycleStoreEvent]:
+        """All-or-nothing: on failure after partial apply, restore prior snapshot."""
+        if not events:
+            return []
+        position_id = events[0].position_id
+        if any(e.position_id != position_id for e in events):
+            raise ValueError("append_many requires a single position_id")
+
+        snap_pos = list(self._by_position.get(position_id, []))
+        snap_seq = self._seq.get(position_id, 0)
+        snap_account = self._account.get(position_id)
+        snap_ids = {e.event_id for e in snap_pos}
+
+        stored_list: list[LifecycleStoreEvent] = []
+        try:
+            for index, event in enumerate(events):
+                stored = self._append_one_unlocked(event)
+                stored_list.append(stored)
+                await _run_append_hook(self.on_after_append_index, index, stored)
+            return stored_list
+        except Exception:
+            # Roll back this position's appends from this batch.
+            self._by_position[position_id] = snap_pos
+            self._seq[position_id] = snap_seq
+            if snap_account is None:
+                self._account.pop(position_id, None)
+            else:
+                self._account[position_id] = snap_account
+            for eid in list(self._by_event_id.keys()):
+                if eid not in snap_ids and any(
+                    e.event_id == eid for e in stored_list
+                ):
+                    del self._by_event_id[eid]
+            raise
 
 
 class AppendLifecycleResult:
@@ -416,6 +510,12 @@ class AppendLifecycleEvent:
         pos: str,
     ) -> AppendLifecycleResult:
         log = await self._store.list_by_position(pos)
+
+        # V1.97 — from t1_executed, T2_EXECUTED must arrive with T2_TRIGGERED
+        # in one savepoint (SEMI Confirm, AUTO, and outbox direct_input).
+        if needs_atomic_t2_pair(log, input_event):
+            return await self._execute_t2_pair_locked(input_event, pos, log)
+
         result = append_validated_lifecycle_event(log, input_event)
         if isinstance(result, AppendFail):
             return AppendLifecycleResult(ok=False, error=result.error, log=log)
@@ -438,62 +538,8 @@ class AppendLifecycleEvent:
         try:
             stored = await self._store.append(result.event)
         except IntegrityError as exc:
-            kind = classify_lifecycle_integrity_error(exc)
-            if kind == "duplicate_fill_id":
-                return AppendLifecycleResult(
-                    ok=False,
-                    error=LifecycleAppendError(
-                        code="duplicate_fill_id",
-                        message=(
-                            f"fillId {result.event.fill_id} already persisted"
-                        ),
-                    ),
-                    log=log,
-                )
-            if kind == "sequence_conflict":
-                return AppendLifecycleResult(
-                    ok=False,
-                    error=LifecycleAppendError(
-                        code="illegal_transition",
-                        message="concurrent sequence conflict on position",
-                    ),
-                    log=log,
-                )
-            existing = await self._store.get_by_event_id(result.event.event_id)
-            if existing is None:
-                return AppendLifecycleResult(
-                    ok=False,
-                    error=LifecycleAppendError(
-                        code="event_id_conflict",
-                        message="event_id unique violation without existing row",
-                    ),
-                    log=log,
-                )
-            existing_hash = existing.payload_hash or compute_payload_hash(existing)
-            new_hash = result.event.payload_hash or compute_payload_hash(result.event)
-            if existing_hash == new_hash:
-                fresh = await self._store.list_by_position(pos)
-                acct = account_lifecycle_fills(fresh)
-                assert_equity_invariant(acct)
-                return AppendLifecycleResult(
-                    ok=True,
-                    idempotent=True,
-                    event=existing,
-                    log=fresh,
-                    stage=result.stage,
-                    lineage_path=result.lineage_path,
-                    accounting=acct,
-                )
-            return AppendLifecycleResult(
-                ok=False,
-                error=LifecycleAppendError(
-                    code="event_id_conflict",
-                    message=(
-                        f"eventId {result.event.event_id} already exists "
-                        "with different payload"
-                    ),
-                ),
-                log=log,
+            return await self._integrity_result(
+                exc, result.event, pos, log, result.stage, result.lineage_path
             )
 
         fresh = await self._store.list_by_position(pos)
@@ -507,6 +553,180 @@ class AppendLifecycleEvent:
             stage=result.stage,
             lineage_path=result.lineage_path,
             accounting=acct,
+        )
+
+    async def _execute_t2_pair_locked(
+        self,
+        execute_event: LifecycleEventInput,
+        pos: str,
+        log: list[LifecycleStoreEvent],
+    ) -> AppendLifecycleResult:
+        """Validate T2_TRIGGERED + T2_EXECUTED in memory, then append_many."""
+        trigger_input = build_t2_triggered_input(execute_event)
+        trigger_result = append_validated_lifecycle_event(log, trigger_input)
+        if isinstance(trigger_result, AppendFail):
+            return AppendLifecycleResult(
+                ok=False, error=trigger_result.error, log=log
+            )
+        assert isinstance(trigger_result, AppendOk)
+        if trigger_result.idempotent:
+            # Trigger already present — fall through to single EXECUTED path.
+            return await self._execute_single_validated(execute_event, pos, log)
+
+        mid_log = list(trigger_result.log)
+        execute_result = append_validated_lifecycle_event(mid_log, execute_event)
+        if isinstance(execute_result, AppendFail):
+            return AppendLifecycleResult(
+                ok=False, error=execute_result.error, log=log
+            )
+        assert isinstance(execute_result, AppendOk)
+        if execute_result.idempotent:
+            return AppendLifecycleResult(
+                ok=True,
+                idempotent=True,
+                event=execute_result.event,
+                log=list(execute_result.log),
+                stage=execute_result.stage,
+                lineage_path=execute_result.lineage_path,
+                accounting=account_lifecycle_fills(list(execute_result.log)),
+            )
+
+        try:
+            stored_pair = await self._store.append_many(
+                [trigger_result.event, execute_result.event]
+            )
+        except IntegrityError as exc:
+            return await self._integrity_result(
+                exc,
+                execute_result.event,
+                pos,
+                log,
+                execute_result.stage,
+                execute_result.lineage_path,
+            )
+        except Exception:
+            # Injected crash mid-pair (or unexpected): savepoint / in-memory
+            # rollback leaves zero new events; propagate so outer TX can abort.
+            raise
+
+        fresh = await self._store.list_by_position(pos)
+        acct = account_lifecycle_fills(fresh)
+        assert_equity_invariant(acct)
+        return AppendLifecycleResult(
+            ok=True,
+            idempotent=False,
+            event=stored_pair[-1],
+            log=fresh,
+            stage=execute_result.stage,
+            lineage_path=execute_result.lineage_path,
+            accounting=acct,
+        )
+
+    async def _execute_single_validated(
+        self,
+        input_event: LifecycleEventInput,
+        pos: str,
+        log: list[LifecycleStoreEvent],
+    ) -> AppendLifecycleResult:
+        result = append_validated_lifecycle_event(log, input_event)
+        if isinstance(result, AppendFail):
+            return AppendLifecycleResult(ok=False, error=result.error, log=log)
+        assert isinstance(result, AppendOk)
+        if result.idempotent:
+            acct = account_lifecycle_fills(result.log) if result.log else None
+            if acct:
+                assert_equity_invariant(acct)
+            return AppendLifecycleResult(
+                ok=True,
+                idempotent=True,
+                event=result.event,
+                log=list(result.log),
+                stage=result.stage,
+                lineage_path=result.lineage_path,
+                accounting=acct,
+            )
+        try:
+            stored = await self._store.append(result.event)
+        except IntegrityError as exc:
+            return await self._integrity_result(
+                exc, result.event, pos, log, result.stage, result.lineage_path
+            )
+        fresh = await self._store.list_by_position(pos)
+        acct = account_lifecycle_fills(fresh)
+        assert_equity_invariant(acct)
+        return AppendLifecycleResult(
+            ok=True,
+            idempotent=False,
+            event=stored,
+            log=fresh,
+            stage=result.stage,
+            lineage_path=result.lineage_path,
+            accounting=acct,
+        )
+
+    async def _integrity_result(
+        self,
+        exc: IntegrityError,
+        event: LifecycleStoreEvent,
+        pos: str,
+        log: list[LifecycleStoreEvent],
+        stage: str | None,
+        lineage_path: str | None,
+    ) -> AppendLifecycleResult:
+        kind = classify_lifecycle_integrity_error(exc)
+        if kind == "duplicate_fill_id":
+            return AppendLifecycleResult(
+                ok=False,
+                error=LifecycleAppendError(
+                    code="duplicate_fill_id",
+                    message=f"fillId {event.fill_id} already persisted",
+                ),
+                log=log,
+            )
+        if kind == "sequence_conflict":
+            return AppendLifecycleResult(
+                ok=False,
+                error=LifecycleAppendError(
+                    code="illegal_transition",
+                    message="concurrent sequence conflict on position",
+                ),
+                log=log,
+            )
+        existing = await self._store.get_by_event_id(event.event_id)
+        if existing is None:
+            return AppendLifecycleResult(
+                ok=False,
+                error=LifecycleAppendError(
+                    code="event_id_conflict",
+                    message="event_id unique violation without existing row",
+                ),
+                log=log,
+            )
+        existing_hash = existing.payload_hash or compute_payload_hash(existing)
+        new_hash = event.payload_hash or compute_payload_hash(event)
+        if existing_hash == new_hash:
+            fresh = await self._store.list_by_position(pos)
+            acct = account_lifecycle_fills(fresh)
+            assert_equity_invariant(acct)
+            return AppendLifecycleResult(
+                ok=True,
+                idempotent=True,
+                event=existing,
+                log=fresh,
+                stage=stage,
+                lineage_path=lineage_path,
+                accounting=acct,
+            )
+        return AppendLifecycleResult(
+            ok=False,
+            error=LifecycleAppendError(
+                code="event_id_conflict",
+                message=(
+                    f"eventId {event.event_id} already exists "
+                    "with different payload"
+                ),
+            ),
+            log=log,
         )
 
 

@@ -817,3 +817,133 @@ async def test_kick_and_worker_concurrent_single_event(
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
         await _cleanup(session_factory, position_id=pos)
+
+
+@pytest.mark.asyncio
+async def test_t2_crash_mid_pair_then_reclaim_exactly_one_each(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V1.97 — crash after T2_TRIGGERED inside append_many → reclaim → 1+1 events."""
+    from bolsa_api.background.lifecycle_outbox_worker import (
+        start_lifecycle_outbox_worker,
+    )
+    from bolsa_application.lifecycle_event_store import (
+        AppendLifecycleEvent,
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_application.lifecycle_outbox import OUTBOX_STALE_PROCESSING_SECONDS
+    from bolsa_domain.lifecycle import LifecycleEventInput
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+
+    pos = f"pos-w-t2-atom-{uuid4().hex[:10]}"
+    acc = f"acc-w-{uuid4().hex[:8]}"
+    tx_t2 = f"tx-w-t2-{uuid4().hex[:8]}"
+    await _cleanup(session_factory, position_id=pos)
+
+    async with session_factory() as session:
+        append = AppendLifecycleEvent(PostgresLifecycleEventStore(session))
+        for kind, at, eid, extra in (
+            (
+                "POSITION_OPENED",
+                "2026-09-03T10:00:00.000Z",
+                f"{pos}-open",
+                {},
+            ),
+            (
+                "T1_EXECUTED",
+                "2026-09-03T11:00:00.000Z",
+                f"{pos}-t1",
+                {"fill_id": f"{pos}-t1", "quantity": 5, "price": 105, "fees": 0},
+            ),
+        ):
+            result = await append.execute(
+                LifecycleEventInput(
+                    kind=kind,  # type: ignore[arg-type]
+                    position_id=pos,
+                    account_id=acc,
+                    at=at,
+                    event_id=eid,
+                    instrument_id="inst-w",
+                    **extra,
+                )
+            )
+            assert result.ok, getattr(result.error, "message", None)
+        await session.commit()
+
+    oid = await _enqueue(
+        session_factory,
+        position_id=pos,
+        account_id=acc,
+        transaction_id=tx_t2,
+        kind="T2_EXECUTED",
+        payload={
+            "direct_input": {
+                "kind": "T2_EXECUTED",
+                "positionId": pos,
+                "accountId": acc,
+                "eventId": tx_t2,
+                "at": "2026-09-03T12:00:00.000Z",
+                "instrumentId": "inst-w",
+                "fillId": tx_t2,
+                "quantity": 3,
+                "price": 110,
+                "fees": 0,
+                "reason": "TARGET_2",
+            }
+        },
+    )
+
+    boom = {"n": 0}
+    inject_armed = {"on": True}
+
+    async def _crash_after_trigger(index: int, _event: Any) -> None:
+        if inject_armed["on"] and index == 0:
+            boom["n"] += 1
+            if boom["n"] == 1:
+                raise RuntimeError("injected crash after T2_TRIGGERED")
+
+    task = start_lifecycle_outbox_worker(
+        session_factory,
+        tick_seconds=0.05,
+        on_after_append_index=_crash_after_trigger,
+    )
+    assert task is not None
+    try:
+        await _wait_status(session_factory, oid, "processing", timeout=5.0)
+        # Confirm orphan trigger was NOT committed.
+        async with session_factory() as session:
+            snap_mid = await GetLifecycleSnapshot(
+                PostgresLifecycleEventStore(session)
+            ).execute(pos)
+        kinds_mid = [e["kind"] for e in snap_mid["events"]]
+        assert "T2_TRIGGERED" not in kinds_mid
+        assert "T2_EXECUTED" not in kinds_mid
+
+        inject_armed["on"] = False
+        async with session_factory() as session:
+            row = await session.get(LifecycleOutboxRow, oid)
+            assert row is not None
+            row.claimed_at = datetime.now(UTC) - timedelta(
+                seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
+            )
+            await session.commit()
+
+        await _wait_status(session_factory, oid, "applied", timeout=8.0)
+        async with session_factory() as session:
+            snap = await GetLifecycleSnapshot(
+                PostgresLifecycleEventStore(session)
+            ).execute(pos)
+        kinds = [e["kind"] for e in snap["events"]]
+        assert kinds.count("T2_TRIGGERED") == 1
+        assert kinds.count("T2_EXECUTED") == 1
+        assert kinds == [
+            "POSITION_OPENED",
+            "T1_EXECUTED",
+            "T2_TRIGGERED",
+            "T2_EXECUTED",
+        ]
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await _cleanup(session_factory, position_id=pos)

@@ -278,3 +278,82 @@ async def test_pg_concurrent_duplicate_t1_one_wins(
     assert kinds == ["POSITION_OPENED", "T1_EXECUTED"]
 
     await _cleanup(db_session, pos)
+
+
+@pytest.mark.asyncio
+async def test_pg_t2_append_many_crash_mid_pair_rolls_back(
+    db_session: AsyncSession,
+) -> None:
+    """V1.97 — inject after T2_TRIGGERED inside one savepoint → 0 orphan trigger."""
+    from bolsa_application.lifecycle_event_store import (
+        AppendLifecycleEvent,
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_domain.lifecycle import LifecycleEventInput
+
+    pos = f"pos-t2-atom-{uuid4().hex[:12]}"
+    boom = {"n": 0}
+
+    async def _crash(index: int, _event: object) -> None:
+        if index == 0:
+            boom["n"] += 1
+            if boom["n"] == 1:
+                raise RuntimeError("injected crash after T2_TRIGGERED")
+
+    store = PostgresLifecycleEventStore(db_session)
+    append = AppendLifecycleEvent(store)
+    for kind, at, eid in (
+        ("POSITION_OPENED", "2026-09-03T10:00:00.000Z", f"{pos}-open"),
+        ("T1_EXECUTED", "2026-09-03T11:00:00.000Z", f"{pos}-t1"),
+    ):
+        kwargs: dict = {"kind": kind, "position_id": pos, "at": at, "event_id": eid}
+        if kind == "T1_EXECUTED":
+            kwargs.update(fill_id=eid, quantity=5, price=105, fees=0)
+        result = await append.execute(LifecycleEventInput(**kwargs))  # type: ignore[arg-type]
+        assert result.ok, getattr(result.error, "message", None)
+
+    store.on_after_append_index = _crash
+    with pytest.raises(RuntimeError, match="injected crash"):
+        await append.execute(
+            LifecycleEventInput(
+                kind="T2_EXECUTED",
+                position_id=pos,
+                at="2026-09-03T12:00:00.000Z",
+                event_id=f"{pos}-t2",
+                fill_id=f"{pos}-t2",
+                quantity=3,
+                price=110,
+                fees=0,
+                reason="TARGET_2",
+            )
+        )
+
+    # Outer TX may still be open; rollback nested left no new events.
+    snap = await GetLifecycleSnapshot(store).execute(pos)
+    kinds = [e["kind"] for e in snap["events"]]
+    assert kinds == ["POSITION_OPENED", "T1_EXECUTED"]
+    assert "T2_TRIGGERED" not in kinds
+
+    store.on_after_append_index = None
+    ok = await append.execute(
+        LifecycleEventInput(
+            kind="T2_EXECUTED",
+            position_id=pos,
+            at="2026-09-03T12:00:00.000Z",
+            event_id=f"{pos}-t2",
+            fill_id=f"{pos}-t2",
+            quantity=3,
+            price=110,
+            fees=0,
+            reason="TARGET_2",
+        )
+    )
+    assert ok.ok, getattr(ok.error, "message", None)
+    await db_session.commit()
+    snap2 = await GetLifecycleSnapshot(store).execute(pos)
+    kinds2 = [e["kind"] for e in snap2["events"]]
+    assert kinds2.count("T2_TRIGGERED") == 1
+    assert kinds2.count("T2_EXECUTED") == 1
+
+    await _cleanup(db_session, pos)
