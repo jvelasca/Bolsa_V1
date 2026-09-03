@@ -1,7 +1,7 @@
 # Plan — V1.97 T2 Transactional Atomicity
 
 > **Padre:** [`spec-v197-t2-transactional-atomicity-2026-09-03.md`](./spec-v197-t2-transactional-atomicity-2026-09-03.md).  
-> **Estado:** **CI GREEN tip** · tip [`v1.97-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.97-beta) → [`363dfcea`](https://github.com/jvelasca/Bolsa_V1/commit/363dfcea) · Python CI ([run 33811212221](https://github.com/jvelasca/Bolsa_V1/actions/runs/33811212221)).
+> **Estado:** **CI GREEN** · tip [`v1.97-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.97-beta) → [`2e9d4675`](https://github.com/jvelasca/Bolsa_V1/commit/2e9d4675) · Release-tag CI ([run 33812286022](https://github.com/jvelasca/Bolsa_V1/actions/runs/33812286022)).
 
 | ID    | Entrega                                                       | Estado |
 | ----- | ------------------------------------------------------------- | ------ |
