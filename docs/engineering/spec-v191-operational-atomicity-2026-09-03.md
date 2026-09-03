@@ -1,6 +1,6 @@
 # Spec — V1.91 Operational Atomicity & Full Confirm Golden (2026-09-03)
 
-> **AsOf:** 2026-09-03 · **Estado:** **ABIERTA**.  
+> **AsOf:** 2026-09-03 · **Estado:** **CERRADA** · **stamp CI GREEN remoto** — tag [`v1.91-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.91-beta) → [`4644fef9`](https://github.com/jvelasca/Bolsa_V1/commit/4644fef9) · [run 33748255004](https://github.com/jvelasca/Bolsa_V1/actions/runs/33748255004) **success**.  
 > **Padre:** [`respuesta-auditor-v190-lifecycle-reliability-2026-09-03.md`](./respuesta-auditor-v190-lifecycle-reliability-2026-09-03.md).  
 > **Partida tip:** `v1.90-beta` → [`0c2e3af7`](https://github.com/jvelasca/Bolsa_V1/commit/0c2e3af7). **No** LIVE · **no** bump · **no** unificar cash ledger · `PAPER_D_EXECUTE` **off**.
 

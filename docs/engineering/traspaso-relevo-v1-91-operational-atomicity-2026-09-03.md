@@ -2,7 +2,7 @@
 
 > **Padre:** [`respuesta-auditor-v190-lifecycle-reliability-2026-09-03.md`](./respuesta-auditor-v190-lifecycle-reliability-2026-09-03.md).  
 > **Spec/plan:** [`spec-v191-operational-atomicity-2026-09-03.md`](./spec-v191-operational-atomicity-2026-09-03.md) · [`plan-v191-operational-atomicity-2026-09-03.md`](./plan-v191-operational-atomicity-2026-09-03.md).  
-> **Estado:** **ABIERTA**.  
+> **Estado:** **CERRADA (CI GREEN)** — tip [`v1.91-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.91-beta) → [`4644fef9`](https://github.com/jvelasca/Bolsa_V1/commit/4644fef9) · [run 33748255004](https://github.com/jvelasca/Bolsa_V1/actions/runs/33748255004).  
 > **Partida:** `v1.90-beta` → `0c2e3af7`.
 
 ## Objetivo
@@ -22,4 +22,4 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` off · no unificar ledger · integrated 
 
 ## Next
 
-Implementación · stamp CI · auditoría tip V1.91. **Sin** LIVE.
+Auditoría tip V1.91 ([arranque](./arranque-auditor-v1-91-operational-atomicity-2026-09-03.md) · [relevo tag](./traspaso-relevo-tag-v1-91-beta-2026-09-03.md)). **Sin** LIVE.

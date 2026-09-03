@@ -4,7 +4,7 @@ Copia en chat nuevo (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **tip `v1.91-beta`** (cuando exista stamp). Partida **`v1.90-beta` → `0c2e3af7`** (PASS arquitectónico · NO beta PAPER · P1=3). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **tip `v1.91-beta` → `4644fef9`** · CI GREEN [run 33748255004](https://github.com/jvelasca/Bolsa_V1/actions/runs/33748255004). Partida **`v1.90-beta` → `0c2e3af7`** (PASS arquitectónico · NO beta PAPER · P1=3). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
 
 **Alcance V1.91:**
 
@@ -15,7 +15,7 @@ Eres auditor externo de Bolsa V1 **tip `v1.91-beta`** (cuando exista stamp). Par
 
 **Regla:** NINGÚN estado ambiguo → COMPRAR. DryRun honesto. No unificar ledger/mesa. No LIVE.
 
-Lee: `CURRENT_SYSTEM.md` · `respuesta-auditor-v190` · `spec-v191` · `confirm/position_sync.py` · `lifecycle_outbox.py` · `lifecycle_outbox_worker.py` · `test_lifecycle_golden_v191.py` · OperationalPositionDto · [`relevo`](./traspaso-relevo-v1-91-operational-atomicity-2026-09-03.md).
+Lee: `CURRENT_SYSTEM.md` · `respuesta-auditor-v190` · `spec-v191` · `confirm/position_sync.py` · `lifecycle_outbox.py` · `lifecycle_outbox_worker.py` · `test_lifecycle_golden_v191.py` · OperationalPositionDto · [`relevo`](./traspaso-relevo-v1-91-operational-atomicity-2026-09-03.md) · [`relevo tag`](./traspaso-relevo-tag-v1-91-beta-2026-09-03.md).
 
 **Foco:**
 
