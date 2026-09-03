@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import uuid4
 
+from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
 from sqlalchemy import and_, exists, not_, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +23,6 @@ from sqlalchemy.orm import aliased
 
 from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 from bolsa_application.lifecycle_from_fill import append_lifecycle_from_confirm_fill
-from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
 
 logger = logging.getLogger(__name__)
 
@@ -502,6 +502,9 @@ async def apply_lifecycle_outbox_row(
         open_position_id=row.position_id,
         filled_at=payload.get("filled_at")
         if isinstance(payload.get("filled_at"), str)
+        else None,
+        reason_code=payload.get("reason_code")
+        if isinstance(payload.get("reason_code"), str)
         else None,
     )
     status = result_dict.get("status")

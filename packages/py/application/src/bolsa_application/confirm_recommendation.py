@@ -33,6 +33,8 @@ from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.recommendation import Recommendation
 from bolsa_analytics.cognitive.risk_signature import apply_signed_levels_to_trade_plan
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.broker_adapter import IBrokerAdapter, resolve_broker_adapter
@@ -51,6 +53,7 @@ from bolsa_application.confirm.exit_gate import ExitGateCoordinator
 from bolsa_application.confirm.identity import (
     IdentityCoordinator,
     build_recommendation_from_raw,
+    exit_reason_code_from_meta,
     extract_operativa_exit_meta,
     extract_operativa_protect_meta,
     price_revalidation_reason,
@@ -80,7 +83,6 @@ from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 # Compat: nombres privados históricos usados por tests internos / re-exports.
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
@@ -105,6 +107,7 @@ __all__ = [
     "confirm_leg_idempotency_key",
     "extract_operativa_protect_meta",
     "extract_operativa_exit_meta",
+    "exit_reason_code_from_meta",
     "price_revalidation_reason",
     "recommendation_is_expired",
     "resolve_confirm_trade_plan",
@@ -113,11 +116,24 @@ __all__ = [
 ]
 
 
-def confirm_leg_idempotency_key(decision_id: str, action: str, side: str) -> str:
-    """V1.91 — clave submit/trade por pierna Confirm (OPEN/T1/EXIT reusan decisionId)."""
+def confirm_leg_idempotency_key(
+    decision_id: str,
+    action: str,
+    side: str,
+    *,
+    reason_code: str | None = None,
+) -> str:
+    """V1.91 — clave submit/trade por pierna Confirm (OPEN/T1/EXIT reusan decisionId).
+
+    V1.96 — T2 reduce (TARGET_2) no colisiona con T1: mismo action+side, distinta pierna.
+    """
     a = (action or "").strip() or "unknown"
     s = (side or "").strip() or "unknown"
-    return f"{decision_id.strip()}|{a}|{s}"
+    key = f"{decision_id.strip()}|{a}|{s}"
+    reason = (reason_code or "").strip().upper()
+    if a == "reduce" and reason == "TARGET_2":
+        return f"{key}|TARGET_2"
+    return key
 
 
 def _attach_execution_record(result: dict[str, Any]) -> None:
@@ -769,6 +785,7 @@ class ConfirmRecommendationIntent:
             price=price,
             trade_plan_dict=signed_plan if isinstance(signed_plan, dict) else trade_plan_dict,
             session_payload=session_payload,
+            reason_code=exit_reason_code_from_meta(exit_meta),
         )
 
     async def _reject_gate(
@@ -817,6 +834,7 @@ class ConfirmRecommendationIntent:
         price: float,
         trade_plan_dict: dict[str, Any] | None,
         session_payload: dict[str, Any] | None,
+        reason_code: str | None = None,
     ) -> None:
         # FE reuses operational.decisionId for OPEN → T1 → EXIT. Submit/idempotency
         # must distinguish action+side or reduce/exit collide with the opening fill.
@@ -833,6 +851,7 @@ class ConfirmRecommendationIntent:
             decision,
             str(rec.action or ""),
             str(intent.side or ""),
+            reason_code=reason_code,
         )
 
         existing_fill = await self._execution.find_existing_fill(
@@ -936,6 +955,7 @@ class ConfirmRecommendationIntent:
                     trade=trade,
                     trade_plan_dict=trade_plan_dict,
                     tx_id=tx_id,
+                    reason_code=reason_code,
                 )
             except Exception as exc:  # noqa: BLE001
                 position_persist = {"status": "error", "reason": str(exc)}

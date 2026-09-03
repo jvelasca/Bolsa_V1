@@ -3,6 +3,9 @@
 V1.90 — Never use wall-clock `now()` in the idempotent payload. Timestamp must
 come from the execution event (or a durable ledger lookup). Missing timestamp
 ⇒ skip append with an explicit reason (fail-soft, no conflict on replay).
+
+V1.96 — Confirm reduce + TARGET_2 → T2_EXECUTED (+ T2_TRIGGERED bridge).
+Default reduce remains T1_EXECUTED.
 """
 
 from __future__ import annotations
@@ -11,9 +14,11 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
-from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
-from bolsa_application.persist_position_from_fill import ledger_position_id_from_trade
 from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleEventKind
+
+from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
+from bolsa_application.lifecycle_t2_bridge import maybe_append_t2_triggered_bridge
+from bolsa_application.persist_position_from_fill import ledger_position_id_from_trade
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +51,7 @@ class LifecycleFillMapping:
     symbol: str | None = None
     at: str | None = None
     venue: str = "PAPER"
+    reason: str | None = None
 
 
 def map_confirm_fill_action(action: str) -> LifecycleFillAction:
@@ -109,6 +115,7 @@ def build_lifecycle_fill_mapping(
     symbol: str | None = None,
     open_position_id: str | None = None,
     filled_at: str | None = None,
+    reason_code: str | None = None,
 ) -> LifecycleFillMapping | None:
     mapped = map_confirm_fill_action(action)
     if mapped in ("skip", "reject_short"):
@@ -125,11 +132,12 @@ def build_lifecycle_fill_mapping(
     if not at:
         return None
 
+    reason_norm = (reason_code or "").strip().upper() or None
     kind: LifecycleEventKind
     if mapped == "open":
         kind = "POSITION_OPENED"
     elif mapped == "reduce":
-        kind = "T1_EXECUTED"
+        kind = "T2_EXECUTED" if reason_norm == "TARGET_2" else "T1_EXECUTED"
     else:
         kind = "POSITION_CLOSED"
 
@@ -155,6 +163,7 @@ def build_lifecycle_fill_mapping(
         symbol=sym,
         at=at,
         venue="PAPER",
+        reason=reason_norm,
     )
 
 
@@ -174,6 +183,7 @@ def mapping_to_input(mapping: LifecycleFillMapping) -> LifecycleEventInput:
         price=mapping.price,
         venue=mapping.venue,
         fees=0,
+        reason=mapping.reason,
     )
 
 
@@ -193,6 +203,7 @@ async def append_lifecycle_from_confirm_fill(
     open_position_id: str | None = None,
     filled_at: str | None = None,
     timestamp_lookup: ExecutionTimestampLookup | None = None,
+    reason_code: str | None = None,
 ) -> dict[str, Any]:
     """Fail-soft sidecar append. Never rolls back cash/PositionSync."""
     if append is None:
@@ -233,6 +244,7 @@ async def append_lifecycle_from_confirm_fill(
         symbol=symbol,
         open_position_id=open_position_id,
         filled_at=resolved_at,
+        reason_code=reason_code,
     )
     if mapping is None:
         return {"status": "skipped", "reason": "unmapped_action_or_missing_ids"}
@@ -258,10 +270,21 @@ async def append_lifecycle_from_confirm_fill(
                 symbol=mapping.symbol or anchor.symbol,
                 at=mapping.at,
                 venue=mapping.venue,
+                reason=mapping.reason,
             )
 
+        execute_event = mapping_to_input(mapping)
+        # FSM requires T2_TRIGGERED before T2_EXECUTED (shared with AUTO).
+        bridge_error = await maybe_append_t2_triggered_bridge(
+            append,
+            existing=existing,
+            execute_event=execute_event,
+        )
+        if bridge_error is not None:
+            return bridge_error
+
         # Full exit from open/t1: domain allows POSITION_CLOSED directly (V1.89).
-        result = await append.execute(mapping_to_input(mapping))
+        result = await append.execute(execute_event)
         if not result.ok:
             code = result.error.code if result.error else "append_failed"
             logger.warning(

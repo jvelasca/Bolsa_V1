@@ -144,6 +144,33 @@ def test_t1_fill_missing_in_ledger() -> None:
     )
 
 
+def test_t2_fill_missing_in_ledger() -> None:
+    issues = build_fill_link_issues(
+        positions=[
+            PositionStateSnap(
+                position_id="pos-1",
+                status="OPEN",
+                remaining=2.0,
+                open_transaction_id="tx-open",
+            )
+        ],
+        snapshots_by_position={
+            "pos-1": {
+                "events": [
+                    {"kind": "POSITION_OPENED", "fillId": "tx-open"},
+                    {"kind": "T1_EXECUTED", "fillId": "tx-t1"},
+                    {"kind": "T2_EXECUTED", "fillId": "tx-t2"},
+                ],
+            }
+        },
+        ledger_reference_ids={"tx-open", "tx-t1"},
+    )
+    assert any(
+        i.code == "missing_fill_in_ledger" and "T2_EXECUTED" in i.detail
+        for i in issues
+    )
+
+
 def test_exit_fill_missing_in_ledger() -> None:
     issues = build_fill_link_issues(
         positions=[

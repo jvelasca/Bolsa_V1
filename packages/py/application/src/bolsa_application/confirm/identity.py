@@ -11,13 +11,14 @@ from bolsa_analytics.cognitive.trade_plan import (
     build_v0_trade_plan_dict,
     parse_wyckoff_spring_anchor,
 )
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+
 from bolsa_application.confirm.actions import (
     _CLOSING_ACTIONS,
     _TRADE_ACTIONS,
     PRICE_REVALIDATION_MAX_REL_DEVIATION,
     is_closing_action,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 
 def resolve_session_decision_package(
@@ -213,6 +214,21 @@ def extract_operativa_exit_meta(raw: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(planned, (int, float)) or float(planned) <= 0:
         return None
     return pkg
+
+
+def exit_reason_code_from_meta(exit_meta: dict[str, Any] | None) -> str | None:
+    """V1.96 — ExitPlan.primaryReason for Confirm reduce T1 vs T2 mapping."""
+    if not isinstance(exit_meta, dict):
+        return None
+    plan = exit_meta.get("exitPlan")
+    raw = None
+    if isinstance(plan, dict):
+        raw = plan.get("primaryReason") or plan.get("primary_reason")
+    if raw is None:
+        raw = exit_meta.get("primaryReason") or exit_meta.get("primary_reason")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().upper()
+    return None
 
 
 def build_recommendation_from_raw(

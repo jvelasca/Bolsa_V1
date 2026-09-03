@@ -54,6 +54,7 @@ class PositionSyncCoordinator:
         trade: Any,
         trade_plan_dict: dict[str, Any] | None,
         tx_id: Any,
+        reason_code: str | None = None,
     ) -> dict[str, Any]:
         position_persist: dict[str, Any] = {"status": "applied"}
         open_position_id: str | None = None
@@ -96,6 +97,10 @@ class PositionSyncCoordinator:
                     if getter is not None:
                         existing = await getter(account_id, intent.instrument_id)
                     open_position_id = row_position_id(existing) if existing else None
+                    is_t2_reduce = (
+                        rec.action == "reduce"
+                        and (reason_code or "").strip().upper() == "TARGET_2"
+                    )
                     await self._position_from_exit.persist(
                         PersistPositionFromExitInput(
                             account_id=account_id,
@@ -104,8 +109,8 @@ class PositionSyncCoordinator:
                             fill_price=price,
                             exit_transaction_id=tx_id,
                             filled_at=str(filled_at) if filled_at else None,
-                            mark_target1_achieved=rec.action == "reduce",
-                            mark_target2_achieved=rec.action == "exit_hint",
+                            mark_target1_achieved=rec.action == "reduce" and not is_t2_reduce,
+                            mark_target2_achieved=is_t2_reduce or rec.action == "exit_hint",
                         )
                     )
         except Exception as exc:  # noqa: BLE001
@@ -133,6 +138,7 @@ class PositionSyncCoordinator:
                 tx_id=tx_id,
                 open_position_id=open_position_id,
                 filled_at=filled_at_s,
+                reason_code=reason_code,
             )
             position_persist["lifecycle"] = lifecycle
         return position_persist
@@ -149,6 +155,7 @@ class PositionSyncCoordinator:
         tx_id: str,
         open_position_id: str | None,
         filled_at: str | None,
+        reason_code: str | None = None,
     ) -> dict[str, Any]:
         mapped = map_confirm_fill_action(rec.action)
         if mapped == "reject_short":
@@ -170,6 +177,7 @@ class PositionSyncCoordinator:
                 decision_id=getattr(rec, "decision_id", None),
                 open_position_id=open_position_id,
                 filled_at=filled_at,
+                reason_code=reason_code,
             )
             # Even without mapping (missing timestamp), enqueue so drain can retry
             # after lookup — but only if we have a position id.
@@ -202,6 +210,7 @@ class PositionSyncCoordinator:
                 "decision_id": getattr(rec, "decision_id", None),
                 "trade_plan_dict": trade_plan_dict,
                 "ledger_positions": ledger_positions,
+                "reason_code": reason_code,
             }
             # V1.91: enqueue must succeed in the same TX as PositionState.
             # Do NOT swallow — failure rolls back PositionState + outbox together.
@@ -233,4 +242,5 @@ class PositionSyncCoordinator:
             decision_id=getattr(rec, "decision_id", None),
             open_position_id=open_position_id,
             filled_at=filled_at,
+            reason_code=reason_code,
         )

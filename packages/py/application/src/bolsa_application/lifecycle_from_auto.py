@@ -1,7 +1,7 @@
 """V1.90 — Map AUTO PositionPolicyDecision outcomes to lifecycle sidecar events.
 
-Distinct from Confirm SEMI vocabulary (reduce=T1, exit_hint=close). AUTO can
-emit T2_EXECUTED for TARGET_2 partial reduces and TRAIL_APPLIED for protect/trail.
+Confirm SEMI reduce defaults to T1; V1.96 TARGET_2 reduce is T2 (same bridge).
+AUTO emits T2_EXECUTED for TARGET_2 partial reduces and TRAIL_APPLIED for protect/trail.
 """
 
 from __future__ import annotations
@@ -10,8 +10,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleEventKind
+
+from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
+from bolsa_application.lifecycle_t2_bridge import maybe_append_t2_triggered_bridge
 
 logger = logging.getLogger(__name__)
 
@@ -213,54 +215,13 @@ async def append_lifecycle_from_auto(
                 side=anchor.side,
             )
 
-        # FSM requires T2_TRIGGERED before T2_EXECUTED — insert bridge if needed.
-        if mapping.kind == "T2_EXECUTED" and existing:
-            from bolsa_domain.lifecycle import reduce_lifecycle_events
-
-            stage, _ = reduce_lifecycle_events(existing)
-            if stage == "t1_executed":
-                bridge_at = mapping.at
-                # T2_EXECUTED must be strictly after T2_TRIGGERED.
-                exec_at = mapping.at
-                if isinstance(exec_at, str) and exec_at.endswith("Z"):
-                    # bump execute by 1ms for time_regression invariant
-                    try:
-                        from datetime import datetime, timedelta
-
-                        dt = datetime.fromisoformat(exec_at.replace("Z", "+00:00"))
-                        bridge_at = (
-                            (dt - timedelta(milliseconds=1))
-                            .strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
-                            + "Z"
-                        )
-                    except ValueError:
-                        bridge_at = exec_at
-                bridge = LifecycleEventInput(
-                    kind="T2_TRIGGERED",
-                    at=bridge_at,
-                    event_id=f"{mapping.event_id}:t2_trigger",
-                    position_id=input_event.position_id,
-                    account_id=input_event.account_id,
-                    instrument_id=input_event.instrument_id,
-                    decision_id=input_event.decision_id,
-                    trade_plan_id=input_event.trade_plan_id,
-                    symbol=input_event.symbol,
-                    side=getattr(input_event, "side", None),
-                    reason=mapping.reason,
-                )
-                bridge_result = await append.execute(bridge)
-                if not bridge_result.ok:
-                    bridge_reason: str = (
-                        bridge_result.error.code
-                        if bridge_result.error
-                        else "t2_trigger_failed"
-                    )
-                    return {
-                        "status": "error",
-                        "reason": bridge_reason,
-                        "kind": "T2_TRIGGERED",
-                        "positionId": mapping.position_id,
-                    }
+        bridge_error = await maybe_append_t2_triggered_bridge(
+            append,
+            existing=existing,
+            execute_event=input_event,
+        )
+        if bridge_error is not None:
+            return bridge_error
 
         result = await append.execute(input_event)
         if not result.ok:

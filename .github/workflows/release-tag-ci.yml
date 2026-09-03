@@ -313,6 +313,7 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_golden_v190.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v191.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v195.py
+          --ignore=apps/api-python/tests/test_lifecycle_golden_v196.py
           --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           --ignore=apps/api-python/tests/test_financial_integrity_pg.py
           -q
@@ -357,7 +358,7 @@ jobs:
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
-      - name: Pytest lifecycle PG + auth + golden V1.88–V1.91/V1.95 + worker V1.92/V1.93 + integrity V1.94 (fail if skipped)
+      - name: Pytest lifecycle PG + auth + golden V1.88–V1.91/V1.95/V1.96 + worker V1.92/V1.93 + integrity V1.94 (fail if skipped)
         run: >
           uv run pytest
           packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
@@ -366,6 +367,7 @@ jobs:
           apps/api-python/tests/test_lifecycle_golden_v190.py
           apps/api-python/tests/test_lifecycle_golden_v191.py
           apps/api-python/tests/test_lifecycle_golden_v195.py
+          apps/api-python/tests/test_lifecycle_golden_v196.py
           apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           apps/api-python/tests/test_financial_integrity_pg.py
           -q

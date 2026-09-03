@@ -91,6 +91,131 @@ def test_recommend_short_does_not_build_mapping() -> None:
     assert mapping is None
 
 
+def test_build_mapping_reduce_default_is_t1() -> None:
+    trade = SimpleNamespace(
+        summary=SimpleNamespace(
+            positions=[SimpleNamespace(id="pos-ledger-1", instrument_id="inst-a")]
+        )
+    )
+    mapping = build_lifecycle_fill_mapping(
+        action="reduce",
+        account_id="acc-1",
+        instrument_id="inst-a",
+        quantity=5.0,
+        price=10.5,
+        tx_id="tx-t1",
+        trade=trade,
+        filled_at="2026-09-02T11:30:00.000Z",
+        reason_code="TARGET_1",
+    )
+    assert mapping is not None
+    assert mapping.kind == "T1_EXECUTED"
+
+
+def test_build_mapping_reduce_target2_is_t2() -> None:
+    trade = SimpleNamespace(
+        summary=SimpleNamespace(
+            positions=[SimpleNamespace(id="pos-ledger-1", instrument_id="inst-a")]
+        )
+    )
+    mapping = build_lifecycle_fill_mapping(
+        action="reduce",
+        account_id="acc-1",
+        instrument_id="inst-a",
+        quantity=3.0,
+        price=11.0,
+        tx_id="tx-t2",
+        trade=trade,
+        filled_at="2026-09-02T12:45:00.000Z",
+        reason_code="TARGET_2",
+    )
+    assert mapping is not None
+    assert mapping.kind == "T2_EXECUTED"
+    assert mapping.reason == "TARGET_2"
+
+
+@pytest.mark.asyncio
+async def test_append_open_then_t1_t2_exit() -> None:
+    store = InMemoryLifecycleEventStore()
+    append = AppendLifecycleEvent(store)
+    trade = SimpleNamespace(
+        summary=SimpleNamespace(
+            positions=[SimpleNamespace(id="pos-t2", instrument_id="inst-a")]
+        )
+    )
+    opened = await append_lifecycle_from_confirm_fill(
+        append,
+        action="recommend_long",
+        account_id="acc-1",
+        instrument_id="inst-a",
+        quantity=10.0,
+        price=100.0,
+        tx_id="tx-o-t2",
+        trade=trade,
+        decision_id="dec-t2",
+        trade_plan_dict={"id": "tp-t2", "symbol": "AAPL"},
+        filled_at="2026-09-02T10:00:00.000Z",
+    )
+    assert opened["status"] == "applied"
+
+    t1 = await append_lifecycle_from_confirm_fill(
+        append,
+        action="reduce",
+        account_id="acc-1",
+        instrument_id="inst-a",
+        quantity=5.0,
+        price=105.0,
+        tx_id="tx-t1",
+        trade=trade,
+        open_position_id="pos-t2",
+        filled_at="2026-09-02T11:30:00.000Z",
+        reason_code="TARGET_1",
+    )
+    assert t1["status"] == "applied"
+    assert t1["kind"] == "T1_EXECUTED"
+
+    t2 = await append_lifecycle_from_confirm_fill(
+        append,
+        action="reduce",
+        account_id="acc-1",
+        instrument_id="inst-a",
+        quantity=3.0,
+        price=110.0,
+        tx_id="tx-t2",
+        trade=trade,
+        open_position_id="pos-t2",
+        filled_at="2026-09-02T12:45:00.000Z",
+        reason_code="TARGET_2",
+    )
+    assert t2["status"] == "applied", t2
+    assert t2["kind"] == "T2_EXECUTED"
+    assert t2["stage"] == "t2_executed"
+
+    closed = await append_lifecycle_from_confirm_fill(
+        append,
+        action="exit_hint",
+        account_id="acc-1",
+        instrument_id="inst-a",
+        quantity=2.0,
+        price=111.0,
+        tx_id="tx-x-t2",
+        trade=trade,
+        open_position_id="pos-t2",
+        filled_at="2026-09-02T15:00:00.000Z",
+    )
+    assert closed["status"] == "applied"
+    assert closed["stage"] == "closed"
+
+    snap = await GetLifecycleSnapshot(store).execute("pos-t2")
+    assert [e["kind"] for e in snap["events"]] == [
+        "POSITION_OPENED",
+        "T1_EXECUTED",
+        "T2_TRIGGERED",
+        "T2_EXECUTED",
+        "POSITION_CLOSED",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_append_open_then_exit_from_open_closes() -> None:
     store = InMemoryLifecycleEventStore()
@@ -278,3 +403,12 @@ async def test_append_idempotent_via_timestamp_lookup() -> None:
     second = await append_lifecycle_from_confirm_fill(append, **kwargs)
     assert first["status"] == "applied"
     assert second["idempotent"] is True
+
+
+def test_confirm_t2_idempotency_key_distinct_from_t1() -> None:
+    from bolsa_application.confirm_recommendation import confirm_leg_idempotency_key
+
+    t1 = confirm_leg_idempotency_key("dec-1", "reduce", "sell", reason_code="TARGET_1")
+    t2 = confirm_leg_idempotency_key("dec-1", "reduce", "sell", reason_code="TARGET_2")
+    assert t1 != t2
+    assert t1 == confirm_leg_idempotency_key("dec-1", "reduce", "sell")
