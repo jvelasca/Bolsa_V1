@@ -52,6 +52,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await database_bootstrap(engine=engine, session_factory=app.state.session_factory)
     configure_ai_governance_proxy()
     _warn_if_routes_missing(app)
+    # V1.90 — drain pending lifecycle outbox (crash recovery between PositionSync
+    # and AppendLifecycleEvent). Best-effort; never blocks startup hard.
+    try:
+        from bolsa_application.lifecycle_event_store import (
+            AppendLifecycleEvent,
+            PostgresLifecycleEventStore,
+        )
+        from bolsa_application.lifecycle_outbox import (
+            PostgresLifecycleOutboxStore,
+            drain_lifecycle_outbox,
+        )
+
+        async with app.state.session_factory() as session:
+            drain = await drain_lifecycle_outbox(
+                PostgresLifecycleOutboxStore(session),
+                AppendLifecycleEvent(PostgresLifecycleEventStore(session)),
+            )
+            await session.commit()
+            if drain.get("drained"):
+                import logging
+
+                logging.getLogger("uvicorn.error").info(
+                    "lifecycle_outbox drain on startup: %s", drain
+                )
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger("uvicorn.error").warning(
+            "lifecycle_outbox drain on startup skipped: %s", exc
+        )
     # F3a (D3): los workers/schedulers/crons ya NO se lanzan aquí. Viven en el
     # proceso dedicado `python -m bolsa_api.workers.scheduler_worker`
     # (P0.4: evitar duplicación de crons con `--workers N`).

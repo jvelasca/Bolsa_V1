@@ -4,6 +4,8 @@ POST /lifecycle/events — append validated event
 GET  /lifecycle/positions/{position_id}/snapshot — reduce log → snapshot
 Does NOT replace /portfolio or mock Playwright routes.
 accountId in the body is a claim to verify, never authority.
+
+V1.90 — typed response DTOs for OpenAPI / contract:check.
 """
 
 from __future__ import annotations
@@ -57,6 +59,60 @@ class LifecycleEventRequestDto(BaseModel):
     correlation_id: str | None = Field(default=None, alias="correlationId")
 
 
+class LifecycleAccountingDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    cash: float | int
+    remaining: float | int
+    realized_pnl: float | int = Field(alias="realizedPnl")
+    unrealized_pnl: float | int = Field(alias="unrealizedPnl")
+    total_pnl: float | int = Field(alias="totalPnl")
+    last_price: float | int = Field(alias="lastPrice")
+    market_value: float | int = Field(alias="marketValue")
+    total_equity: float | int = Field(alias="totalEquity")
+    avg_cost: float | int = Field(alias="avgCost")
+    initial_equity: float | int = Field(alias="initialEquity")
+
+
+class LifecycleStoreEventDto(BaseModel):
+    """Canonical event shape from to_canonical_dict (extra allowed for evolution)."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    kind: str
+    at: str | None = None
+    event_id: str | None = Field(default=None, alias="eventId")
+    position_id: str | None = Field(default=None, alias="positionId")
+    account_id: str | None = Field(default=None, alias="accountId")
+    instrument_id: str | None = Field(default=None, alias="instrumentId")
+    sequence_no: int | None = Field(default=None, alias="sequenceNo")
+    fill_id: str | None = Field(default=None, alias="fillId")
+    quantity: float | int | None = None
+    price: float | int | None = None
+
+
+class LifecycleSnapshotDataDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    position_id: str = Field(alias="positionId")
+    stage: str
+    lineage_path: str = Field(alias="lineagePath")
+    events: list[LifecycleStoreEventDto]
+    accounting: LifecycleAccountingDto | None = None
+
+
+class LifecycleSnapshotResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    data: LifecycleSnapshotDataDto
+
+
+class LifecycleAppendResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    data: dict[str, Any]
+
+
 async def _assert_account_owned(
     session: AsyncSession, principal: str, account_id: str
 ) -> None:
@@ -71,7 +127,7 @@ async def _assert_account_owned(
         ) from exc
 
 
-@router.post("/events")
+@router.post("/events", response_model=LifecycleAppendResponseDto)
 async def post_lifecycle_event(
     body: LifecycleEventRequestDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -120,7 +176,10 @@ async def post_lifecycle_event(
     return {"data": result.to_dict()}
 
 
-@router.get("/positions/{position_id}/snapshot")
+@router.get(
+    "/positions/{position_id}/snapshot",
+    response_model=LifecycleSnapshotResponseDto,
+)
 async def get_lifecycle_snapshot(
     position_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],

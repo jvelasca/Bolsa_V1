@@ -70,6 +70,7 @@ export * from "./confirm-opening-sizing.js";
 export * from "./confirm-portfolio-scenario.js";
 export * from "./unified-alerts.js";
 export * from "./mesa-next-action.js";
+export * from "./lifecycle-stage-label.js";
 export * from "./paper-auto-posture.js";
 export * from "./mesa-protection-state.js";
 export * from "./mesa-operable-ranking.js";

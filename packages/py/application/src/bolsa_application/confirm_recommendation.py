@@ -182,6 +182,7 @@ class ConfirmRecommendationIntent:
         position_from_exit: Any | None = None,
         position_from_protect: Any | None = None,
         lifecycle_append: Any | None = None,
+        lifecycle_outbox: Any | None = None,
         broker_adapter: IBrokerAdapter | None = None,
         submit_intent_store: Any | None = None,
     ) -> None:
@@ -204,6 +205,7 @@ class ConfirmRecommendationIntent:
         self._position_from_exit = position_from_exit
         self._position_from_protect = position_from_protect
         self._lifecycle_append = lifecycle_append
+        self._lifecycle_outbox = lifecycle_outbox
 
         self._identity = IdentityCoordinator(
             cognitive_store=cognitive_store,
@@ -241,6 +243,7 @@ class ConfirmRecommendationIntent:
             position_from_fill=position_from_fill,
             position_from_exit=position_from_exit,
             lifecycle_append=lifecycle_append,
+            lifecycle_outbox=lifecycle_outbox,
         )
 
     async def _resolve_broker_venue_for_account(self, account_id: str) -> str:

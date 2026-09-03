@@ -719,11 +719,21 @@ def _validate_payload(
                 code="trail_relaxation",
                 message=f"LONG trail newStop {new} < previousStop {prev}",
             )
+        if side == "SHORT" and new > prev:
+            return LifecycleAppendError(
+                code="trail_relaxation",
+                message=f"SHORT trail newStop {new} > previousStop {prev}",
+            )
         last_price = last_price_for_stage(stage, lineage_path)
         if side == "LONG" and new >= last_price:
             return LifecycleAppendError(
                 code="invalid_payload",
                 message=f"LONG trail newStop {new} must be < lastPrice {last_price}",
+            )
+        if side == "SHORT" and new <= last_price:
+            return LifecycleAppendError(
+                code="invalid_payload",
+                message=f"SHORT trail newStop {new} must be > lastPrice {last_price}",
             )
     return None
 
@@ -782,6 +792,24 @@ def append_validated_lifecycle_event(
             existing_hash = existing.payload_hash or compute_payload_hash(existing)
             new_hash = candidate.payload_hash or compute_payload_hash(candidate)
             if existing_hash == new_hash:
+                return AppendOk(
+                    log=tuple(log_list),
+                    event=existing,
+                    idempotent=True,
+                    stage=stage,
+                    lineage_path=lineage_path,
+                )
+            # V1.90 — same eventId+fillId + same economic fields ⇒ idempotent
+            # even if `at` drifted on replay (never use wall-clock in payload).
+            if (
+                existing.fill_id
+                and candidate.fill_id
+                and existing.fill_id == candidate.fill_id
+                and existing.kind == candidate.kind
+                and existing.quantity == candidate.quantity
+                and existing.price == candidate.price
+                and existing.position_id == candidate.position_id
+            ):
                 return AppendOk(
                     log=tuple(log_list),
                     event=existing,

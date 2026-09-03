@@ -1306,6 +1306,7 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         AppendLifecycleEvent,
         PostgresLifecycleEventStore,
     )
+    from bolsa_application.lifecycle_outbox import PostgresLifecycleOutboxStore
     from bolsa_application.persist_position_from_exit import (
         PersistPositionFromExit,
         PositionStateExitStore,
@@ -1345,6 +1346,7 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
         position_from_protect=PersistPositionFromProtect(cast(PositionStateProtectStore, repo)),
         lifecycle_append=AppendLifecycleEvent(PostgresLifecycleEventStore(session)),
+        lifecycle_outbox=PostgresLifecycleOutboxStore(session),
         submit_intent_store=PostgresSubmitIntentStore(session),
         incident_store=get_operational_incident_store(session),
         instrument_data_status=get_instrument_data_status_use_case(session),
@@ -1509,6 +1511,11 @@ def get_execute_position_policy_auto_use_case(
         ExecutePositionPolicyAuto,
         PaperPositionSellResult,
     )
+    from bolsa_application.lifecycle_event_store import (
+        AppendLifecycleEvent,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_application.lifecycle_outbox import PostgresLifecycleOutboxStore
     from bolsa_application.persist_position_from_exit import (
         PersistPositionFromExit,
         PositionStateExitStore,
@@ -1546,6 +1553,8 @@ def get_execute_position_policy_auto_use_case(
         protect=protect,
         exit_persist=exit_persist,
         sell=sell,
+        lifecycle_append=AppendLifecycleEvent(PostgresLifecycleEventStore(session)),
+        lifecycle_outbox=PostgresLifecycleOutboxStore(session),
     )
     return uc, protect
 

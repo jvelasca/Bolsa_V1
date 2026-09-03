@@ -2183,6 +2183,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lifecycle/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Lifecycle Event */
+        post: operations["post_lifecycle_event_api_lifecycle_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lifecycle/positions/{position_id}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Lifecycle Snapshot */
+        get: operations["get_lifecycle_snapshot_api_lifecycle_positions__position_id__snapshot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lists": {
         parameters: {
             query?: never;
@@ -2474,6 +2508,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/paper-desk/cycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Paper Desk Cycle
+         * @description V1.47 — un ciclo EntryTick + PositionTick. dryRun default true.
+         */
+        post: operations["paper_desk_cycle_api_paper_desk_cycle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/paper-desk/daily-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Paper Desk Daily Report
+         * @description V1.47 — DailyOpsReport de consulta. autoDesk vía dry-run evaluate. Nunca muta.
+         */
+        get: operations["paper_desk_daily_report_api_paper_desk_daily_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pending-orders": {
         parameters: {
             query?: never;
@@ -2588,6 +2662,26 @@ export interface paths {
         get: operations["list_transactions_api_portfolio_transactions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/position-automation/execute-auto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Execute Position Policy Auto
+         * @description V1.47 — Policy → JIT Permission → protect|reduce|exit. Contexto servidor.
+         */
+        post: operations["execute_position_policy_auto_api_position_automation_execute_auto_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5479,6 +5573,36 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ExecutePositionPolicyAutoRequestDto */
+        ExecutePositionPolicyAutoRequestDto: {
+            /**
+             * Dryrun
+             * @default false
+             */
+            dryRun: boolean;
+            /**
+             * Templateid
+             * @default moderate
+             */
+            templateId: string | null;
+        };
+        /** ExecutePositionPolicyAutoResponseDto */
+        ExecutePositionPolicyAutoResponseDto: {
+            /** Decision */
+            decision?: {
+                [key: string]: unknown;
+            } | null;
+            /** Dryrun */
+            dryRun: boolean;
+            /** Permission */
+            permission?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reason */
+            reason?: string | null;
+            /** Status */
+            status: string;
+        };
         /** ExecuteScanJobRequestDto */
         ExecuteScanJobRequestDto: {
             /** Policyid */
@@ -7103,6 +7227,131 @@ export interface components {
             /** Data */
             data: components["schemas"]["LedgerEntryDto"][];
         };
+        /** LifecycleAccountingDto */
+        LifecycleAccountingDto: {
+            /** Avgcost */
+            avgCost: number;
+            /** Cash */
+            cash: number;
+            /** Initialequity */
+            initialEquity: number;
+            /** Lastprice */
+            lastPrice: number;
+            /** Marketvalue */
+            marketValue: number;
+            /** Realizedpnl */
+            realizedPnl: number;
+            /** Remaining */
+            remaining: number;
+            /** Totalequity */
+            totalEquity: number;
+            /** Totalpnl */
+            totalPnl: number;
+            /** Unrealizedpnl */
+            unrealizedPnl: number;
+        };
+        /** LifecycleAppendResponseDto */
+        LifecycleAppendResponseDto: {
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+        } & {
+            [key: string]: unknown;
+        };
+        /** LifecycleEventRequestDto */
+        LifecycleEventRequestDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** At */
+            at?: string | null;
+            /** Causationid */
+            causationId?: string | null;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Decisionid */
+            decisionId?: string | null;
+            /** Eventid */
+            eventId?: string | null;
+            /** Fees */
+            fees?: number | string | null;
+            /** Fillid */
+            fillId?: string | null;
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /** Kind */
+            kind: string;
+            /** Newstop */
+            newStop?: number | string | null;
+            /** Positionid */
+            positionId?: string | null;
+            /** Previousstop */
+            previousStop?: number | string | null;
+            /** Price */
+            price?: number | string | null;
+            /** Quantity */
+            quantity?: number | string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Revisionid */
+            revisionId?: string | null;
+            /** Side */
+            side?: string | null;
+            /** Symbol */
+            symbol?: string | null;
+            /** Tradeplanid */
+            tradePlanId?: string | null;
+            /** Venue */
+            venue?: string | null;
+            /** Venueorderid */
+            venueOrderId?: string | null;
+        };
+        /** LifecycleSnapshotDataDto */
+        LifecycleSnapshotDataDto: {
+            accounting?: components["schemas"]["LifecycleAccountingDto"] | null;
+            /** Events */
+            events: components["schemas"]["LifecycleStoreEventDto"][];
+            /** Lineagepath */
+            lineagePath: string;
+            /** Positionid */
+            positionId: string;
+            /** Stage */
+            stage: string;
+        };
+        /** LifecycleSnapshotResponseDto */
+        LifecycleSnapshotResponseDto: {
+            data: components["schemas"]["LifecycleSnapshotDataDto"];
+        };
+        /**
+         * LifecycleStoreEventDto
+         * @description Canonical event shape from to_canonical_dict (extra allowed for evolution).
+         */
+        LifecycleStoreEventDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** At */
+            at?: string | null;
+            /** Eventid */
+            eventId?: string | null;
+            /** Fillid */
+            fillId?: string | null;
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /** Kind */
+            kind: string;
+            /** Positionid */
+            positionId?: string | null;
+            /** Price */
+            price?: number | null;
+            /** Quantity */
+            quantity?: number | null;
+            /** Sequenceno */
+            sequenceNo?: number | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** LinkTrialHypothesisRequestDto */
         LinkTrialHypothesisRequestDto: {
             /** Hypothesisid */
@@ -7497,6 +7746,10 @@ export interface components {
             exitPlan?: components["schemas"]["OperationalExitPlanDto"] | null;
             /** Initialstop */
             initialStop?: number | null;
+            /** Operationalview */
+            operationalView?: {
+                [key: string]: unknown;
+            } | null;
             /** Originthesis */
             originThesis?: {
                 [key: string]: unknown;
@@ -7511,10 +7764,6 @@ export interface components {
             target1AchievedAt?: string | null;
             /** Target2 */
             target2?: number | null;
-            /** Operationalview */
-            operationalView?: {
-                [key: string]: unknown;
-            } | null;
             /** Tradeplanid */
             tradePlanId: string;
             /** Unrealizedr */
@@ -7760,6 +8009,21 @@ export interface components {
             instrumentIds?: string[] | null;
             /** Listid */
             listId?: string | null;
+        };
+        /** PaperDeskCycleRequestDto */
+        PaperDeskCycleRequestDto: {
+            /** Asof */
+            asOf?: string | null;
+            /**
+             * Dryrun
+             * @default true
+             */
+            dryRun: boolean;
+            /**
+             * Templateid
+             * @default moderate
+             */
+            templateId: string | null;
         };
         /** PendingOrderDto */
         PendingOrderDto: {
@@ -14022,6 +14286,70 @@ export interface operations {
             };
         };
     };
+    post_lifecycle_event_api_lifecycle_events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LifecycleEventRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleAppendResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lifecycle_snapshot_api_lifecycle_positions__position_id__snapshot_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleSnapshotResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_lists_api_lists_get: {
         parameters: {
             query?: never;
@@ -14590,6 +14918,80 @@ export interface operations {
             };
         };
     };
+    paper_desk_cycle_api_paper_desk_cycle_post: {
+        parameters: {
+            query: {
+                accountId: string;
+                executionPolicyId?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaperDeskCycleRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    paper_desk_daily_report_api_paper_desk_daily_report_get: {
+        parameters: {
+            query: {
+                accountId: string;
+                asOf?: string | null;
+                executionPolicyId?: string | null;
+                templateId?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_pending_orders_api_pending_orders_get: {
         parameters: {
             query?: never;
@@ -14854,6 +15256,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TransactionsResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_position_policy_auto_api_position_automation_execute_auto_post: {
+        parameters: {
+            query: {
+                accountId: string;
+                instrumentId: string;
+                executionPolicyId?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecutePositionPolicyAutoRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutePositionPolicyAutoResponseDto"];
                 };
             };
             /** @description Validation Error */

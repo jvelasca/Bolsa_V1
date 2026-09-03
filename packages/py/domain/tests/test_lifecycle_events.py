@@ -242,6 +242,61 @@ def test_trail_relaxation_rejected() -> None:
     assert result.error.code == "trail_relaxation"
 
 
+def test_trail_relaxation_short() -> None:
+    """SHORT ratchet: stop must never rise (relax toward higher prices)."""
+    log: list = []
+    for kind, kwargs in (
+        ("POSITION_OPENED", {"side": "SHORT", "event_id": "open-short"}),
+        ("T1_EXECUTED", {"side": "SHORT", "event_id": "t1-short"}),
+    ):
+        result = append_validated_lifecycle_event(
+            log,
+            LifecycleEventInput(kind=kind, **kwargs),  # type: ignore[arg-type]
+        )
+        assert isinstance(result, AppendOk), getattr(result, "error", None)
+        log = list(result.log)
+    result = append_validated_lifecycle_event(
+        log,
+        LifecycleEventInput(
+            kind="TRAIL_APPLIED",
+            event_id="evt-relax-short",
+            side="SHORT",
+            previous_stop=110,
+            new_stop=115,
+        ),
+    )
+    assert isinstance(result, AppendFail)
+    assert result.error.code == "trail_relaxation"
+
+
+def test_trail_wrong_side_short() -> None:
+    """SHORT stop must stay above last price (symmetric to LONG < last)."""
+    log: list = []
+    for kind, kwargs in (
+        ("POSITION_OPENED", {"side": "SHORT", "event_id": "open-short-2"}),
+        ("T1_EXECUTED", {"side": "SHORT", "event_id": "t1-short-2"}),
+    ):
+        result = append_validated_lifecycle_event(
+            log,
+            LifecycleEventInput(kind=kind, **kwargs),  # type: ignore[arg-type]
+        )
+        assert isinstance(result, AppendOk), getattr(result, "error", None)
+        log = list(result.log)
+    # After T1, last_price is 105 (default mock). SHORT stop ≤ 105 is wrong side.
+    result = append_validated_lifecycle_event(
+        log,
+        LifecycleEventInput(
+            kind="TRAIL_APPLIED",
+            event_id="evt-wrong-short",
+            side="SHORT",
+            previous_stop=110,
+            new_stop=100,
+        ),
+    )
+    assert isinstance(result, AppendFail)
+    assert result.error.code == "invalid_payload"
+
+
 def test_invalid_timestamp() -> None:
     result = append_validated_lifecycle_event(
         [],

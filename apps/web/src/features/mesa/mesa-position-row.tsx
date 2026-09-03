@@ -15,6 +15,7 @@ import {
   buildMesaProtectionState,
   buildPositionOperatingTruth,
   formatPositionOperatingExecutionCopy,
+  lifecycleStageLabel,
   mapMesaStatusDimensions,
   mesaNextActionFromPositionOperatingTruth,
   stopDistancePct,
@@ -328,12 +329,13 @@ export function MesaPositionRow({
           >
             Acción: {actionLabel}
           </div>
-          {lifecycleStage && lifecycleStage !== "candidate" ? (
+          {lifecycleStage && lifecycleStageLabel(lifecycleStage) ? (
             <div
               className="text-[10px] text-muted-foreground"
               data-testid={`mesa-position-lifecycle-stage-${position.symbol}`}
+              data-lifecycle-stage={lifecycleStage}
             >
-              Ciclo: {lifecycleStage}
+              Ciclo: {lifecycleStageLabel(lifecycleStage)}
             </div>
           ) : null}
           {executionCopy ? (

@@ -1358,6 +1358,34 @@ class LifecycleAggregateRow(Base):
     )
 
 
+class LifecycleOutboxRow(Base):
+    """V1.90 — durable pending lifecycle append (fail-soft without loss)."""
+
+    __tablename__ = "lifecycle_outbox"
+    __table_args__ = (
+        UniqueConstraint("transaction_id", name="lifecycle_outbox_transaction_id_uidx"),
+        Index("lifecycle_outbox_status_idx", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    position_id: Mapped[str] = mapped_column("position_id", String, nullable=False)
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    transaction_id: Mapped[str] = mapped_column(
+        "transaction_id", String, nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=False
+    )
+
+
 class InvestorProfileRow(Base):
     """ART-PROFILE — catálogo (RFC-008)."""
 

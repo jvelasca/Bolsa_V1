@@ -131,7 +131,11 @@ def _resolve_position(
 
 
 class ExecutePositionPolicyAuto:
-    """Orquestador V1.45 — no sustituye Confirm; no enciende env."""
+    """Orquestador V1.45 — no sustituye Confirm; no enciende env.
+
+    V1.90: after protect/exit persist, fail-soft append to lifecycle sidecar
+    (same outbox semantics as Confirm PositionSync).
+    """
 
     def __init__(
         self,
@@ -139,10 +143,58 @@ class ExecutePositionPolicyAuto:
         protect: PersistPositionFromProtect,
         exit_persist: PersistPositionFromExit,
         sell: PaperPositionSellPort,
+        lifecycle_append: Any | None = None,
+        lifecycle_outbox: Any | None = None,
     ) -> None:
         self._protect = protect
         self._exit_persist = exit_persist
         self._sell = sell
+        self._lifecycle_append = lifecycle_append
+        self._lifecycle_outbox = lifecycle_outbox
+
+    async def _append_lifecycle_auto(
+        self,
+        *,
+        decision: PositionPolicyDecision,
+        inp: ExecutePositionPolicyAutoInput,
+        position: PositionState | None,
+        position_id: str,
+        event_id: str,
+        quantity: float | None = None,
+        price: float | None = None,
+        previous_stop: float | None = None,
+        new_stop: float | None = None,
+    ) -> dict[str, Any] | None:
+        from bolsa_application.lifecycle_from_auto import (
+            append_lifecycle_from_auto,
+            build_lifecycle_auto_mapping,
+        )
+
+        filled_at = inp.as_of or decision.as_of
+        mapping = build_lifecycle_auto_mapping(
+            verdict=decision.verdict,
+            reason_code=decision.reason_code,
+            account_id=inp.account_id,
+            instrument_id=inp.instrument_id,
+            position_id=position_id,
+            event_id=event_id,
+            quantity=quantity,
+            price=price,
+            previous_stop=previous_stop,
+            new_stop=new_stop,
+            filled_at=filled_at,
+            decision_id=(position.decision_id or position.trade_plan_id)
+            if position
+            else None,
+            trade_plan_id=position.trade_plan_id if position else None,
+        )
+        if mapping is None:
+            return {"status": "skipped", "reason": "unmapped_or_missing_timestamp"}
+        return await append_lifecycle_from_auto(
+            self._lifecycle_append,
+            mapping=mapping,
+            outbox=self._lifecycle_outbox,
+        )
 
     async def execute(
         self, inp: ExecutePositionPolicyAutoInput
@@ -235,11 +287,34 @@ class ExecutePositionPolicyAuto:
                     policy_id=inp.operating_policy.template_id,
                 )
             )
+            pos_id = (
+                (position.position_id if position is not None else None)
+                or getattr(row, "id", None)
+                or (row.get("id") if isinstance(row, dict) else None)
+                or inp.instrument_id
+            )
+            trail_event_id = (
+                f"auto-trail-{pos_id}-{decision.as_of or inp.as_of or 'na'}"
+            )
+            lifecycle = await self._append_lifecycle_auto(
+                decision=decision,
+                inp=inp,
+                position=position,
+                position_id=str(pos_id),
+                event_id=trail_event_id,
+                previous_stop=float(position.current_stop)
+                if position and position.current_stop is not None
+                else None,
+                new_stop=float(stop),
+            )
             return ExecutePositionPolicyAutoResult(
                 status="protected",
                 decision=decision,
                 permission=permission,
                 position_row=row,
+                reason=None
+                if lifecycle is None or lifecycle.get("status") == "applied"
+                else f"lifecycle:{lifecycle.get('reason')}",
             )
 
         # REDUCE | EXIT — solo EXIT puede asumir remaining; REDUCE sin qty = error.
@@ -376,6 +451,15 @@ class ExecutePositionPolicyAuto:
                 event_id=event_id,
                 fill_id=tx,
             )
+        await self._append_lifecycle_auto(
+            decision=decision,
+            inp=inp,
+            position=position,
+            position_id=str(pos_id),
+            event_id=tx,
+            quantity=fill_qty,
+            price=fill_price,
+        )
         return ExecutePositionPolicyAutoResult(
             status="exited" if full_exit or (row and getattr(row, "status", None) == "CLOSED")
             or (

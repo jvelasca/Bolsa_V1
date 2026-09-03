@@ -1,11 +1,15 @@
-"""V1.89 — Map Confirm/paper fills to lifecycle sidecar events (no cash merge)."""
+"""V1.89 — Map Confirm/paper fills to lifecycle sidecar events (no cash merge).
+
+V1.90 — Never use wall-clock `now()` in the idempotent payload. Timestamp must
+come from the execution event (or a durable ledger lookup). Missing timestamp
+⇒ skip append with an explicit reason (fail-soft, no conflict on replay).
+"""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 from bolsa_application.persist_position_from_fill import ledger_position_id_from_trade
@@ -13,11 +17,18 @@ from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleEventKind
 
 logger = logging.getLogger(__name__)
 
-# Mirror confirm.actions — avoid circular import via confirm.__init__.
-_OPENING_ACTIONS = frozenset({"recommend_long", "recommend_short"})
+# Long-only product: recommend_short must NOT open a LONG lifecycle event.
+_OPENING_ACTIONS = frozenset({"recommend_long"})
+_REJECTED_OPENING = frozenset({"recommend_short"})
 _CLOSING_ACTIONS = frozenset({"exit_hint", "reduce"})
 
-LifecycleFillAction = Literal["open", "reduce", "exit", "skip"]
+LifecycleFillAction = Literal["open", "reduce", "exit", "skip", "reject_short"]
+
+
+class ExecutionTimestampLookup(Protocol):
+    """Optional durable lookup: transaction_id → executed_at ISO."""
+
+    async def executed_at_for_transaction(self, transaction_id: str) -> str | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,11 +48,9 @@ class LifecycleFillMapping:
     venue: str = "PAPER"
 
 
-def _iso_now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-
-
 def map_confirm_fill_action(action: str) -> LifecycleFillAction:
+    if action in _REJECTED_OPENING:
+        return "reject_short"
     if action in _OPENING_ACTIONS:
         return "open"
     if action == "reduce":
@@ -62,6 +71,30 @@ def resolve_lifecycle_position_id(
     return ledger_position_id_from_trade(trade, instrument_id)
 
 
+def resolve_execution_timestamp(
+    *,
+    filled_at: str | None,
+    trade: Any = None,
+) -> str | None:
+    """Prefer explicit filled_at, then trade.transaction.executed_at. Never now()."""
+    if isinstance(filled_at, str) and filled_at.strip():
+        return filled_at.strip()
+    if trade is not None:
+        tx = getattr(trade, "transaction", None)
+        raw = getattr(tx, "executed_at", None) if tx is not None else None
+        if raw is None:
+            raw = getattr(trade, "executed_at", None)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+        # datetime-like
+        iso = getattr(raw, "isoformat", None)
+        if callable(iso):
+            s = iso()
+            if isinstance(s, str) and s.strip():
+                return s.replace("+00:00", "Z") if s.endswith("+00:00") else s.strip()
+    return None
+
+
 def build_lifecycle_fill_mapping(
     *,
     action: str,
@@ -78,7 +111,7 @@ def build_lifecycle_fill_mapping(
     filled_at: str | None = None,
 ) -> LifecycleFillMapping | None:
     mapped = map_confirm_fill_action(action)
-    if mapped == "skip":
+    if mapped in ("skip", "reject_short"):
         return None
     position_id = resolve_lifecycle_position_id(
         trade=trade,
@@ -86,6 +119,10 @@ def build_lifecycle_fill_mapping(
         open_position_id=open_position_id,
     )
     if not position_id or not tx_id.strip():
+        return None
+
+    at = resolve_execution_timestamp(filled_at=filled_at, trade=trade)
+    if not at:
         return None
 
     kind: LifecycleEventKind
@@ -116,7 +153,7 @@ def build_lifecycle_fill_mapping(
         decision_id=decision_id,
         trade_plan_id=plan_id_s,
         symbol=sym,
-        at=filled_at or _iso_now(),
+        at=at,
         venue="PAPER",
     )
 
@@ -155,10 +192,34 @@ async def append_lifecycle_from_confirm_fill(
     symbol: str | None = None,
     open_position_id: str | None = None,
     filled_at: str | None = None,
+    timestamp_lookup: ExecutionTimestampLookup | None = None,
 ) -> dict[str, Any]:
     """Fail-soft sidecar append. Never rolls back cash/PositionSync."""
     if append is None:
         return {"status": "skipped", "reason": "lifecycle_append_not_wired"}
+
+    mapped = map_confirm_fill_action(action)
+    if mapped == "reject_short":
+        logger.warning(
+            "lifecycle_from_fill reject recommend_short (long-only product)"
+        )
+        return {"status": "skipped", "reason": "recommend_short_rejected"}
+
+    resolved_at = resolve_execution_timestamp(filled_at=filled_at, trade=trade)
+    if not resolved_at and timestamp_lookup is not None and tx_id.strip():
+        try:
+            resolved_at = await timestamp_lookup.executed_at_for_transaction(tx_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("lifecycle timestamp lookup failed: %s", exc)
+            resolved_at = None
+
+    if not resolved_at:
+        logger.warning(
+            "lifecycle_from_fill missing execution timestamp tx=%s",
+            tx_id,
+        )
+        return {"status": "error", "reason": "missing_execution_timestamp"}
+
     mapping = build_lifecycle_fill_mapping(
         action=action,
         account_id=account_id,
@@ -171,7 +232,7 @@ async def append_lifecycle_from_confirm_fill(
         decision_id=decision_id,
         symbol=symbol,
         open_position_id=open_position_id,
-        filled_at=filled_at,
+        filled_at=resolved_at,
     )
     if mapping is None:
         return {"status": "skipped", "reason": "unmapped_action_or_missing_ids"}
@@ -234,5 +295,6 @@ __all__ = [
     "build_lifecycle_fill_mapping",
     "map_confirm_fill_action",
     "mapping_to_input",
+    "resolve_execution_timestamp",
     "resolve_lifecycle_position_id",
 ]
