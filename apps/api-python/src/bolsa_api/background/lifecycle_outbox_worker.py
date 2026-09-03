@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -24,7 +25,7 @@ def _worker_enabled() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
-async def _drain_once(session_factory: async_sessionmaker[AsyncSession]) -> dict:
+async def _drain_once(session_factory: async_sessionmaker[AsyncSession]) -> dict[str, Any]:
     from bolsa_application.lifecycle_event_store import (
         AppendLifecycleEvent,
         PostgresLifecycleEventStore,

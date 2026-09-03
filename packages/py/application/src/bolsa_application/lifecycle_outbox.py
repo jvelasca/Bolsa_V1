@@ -35,7 +35,7 @@ def _now() -> datetime:
 
 def _backoff_seconds(attempts: int) -> int:
     """Exponential backoff: 2^attempts seconds (capped)."""
-    return min(2 ** max(attempts, 1), 300)
+    return int(min(2 ** max(attempts, 1), 300))
 
 
 @dataclass(frozen=True, slots=True)
