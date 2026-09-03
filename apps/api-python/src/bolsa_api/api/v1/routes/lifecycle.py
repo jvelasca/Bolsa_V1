@@ -339,12 +339,13 @@ async def get_lifecycle_outbox_stats(
     now = datetime.now(UTC)
 
     def _age_seconds(value: Any) -> float | None:
-        if value is None:
+        if value is None or not isinstance(value, datetime):
             return None
         created = value
         if created.tzinfo is None:
             created = created.replace(tzinfo=UTC)
-        return max(0.0, (now - created).total_seconds())
+        age = float((now - created).total_seconds())
+        return max(0.0, age)
 
     oldest_pending = (
         await session.execute(
