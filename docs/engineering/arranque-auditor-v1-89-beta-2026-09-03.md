@@ -16,7 +16,8 @@ Eres auditor externo de Bolsa V1 **tip `v1.89-beta`**. Tip funcional **`58806be1
 
 **Regla:** NINGÚN estado ambiguo → COMPRAR. DryRun honesto. No unificar ledger/mesa. No LIVE.
 
-**CI:** tag `v1.89-beta` → `58806be1` · GREEN [run 33718828984](https://github.com/jvelasca/Bolsa_V1/actions/runs/33718828984).
+**CI:** tag `v1.89-beta` → `58806be1` · GREEN [run 33718828984](https://github.com/jvelasca/Bolsa_V1/actions/runs/33718828984).  
+**Docs stamp:** [`ccd0fff6`](https://github.com/jvelasca/Bolsa_V1/commit/ccd0fff6) (post-GREEN; no retag).
 
 Lee: `CURRENT_SYSTEM.md` · `traspaso-relevo-tag-v1-89-beta` · `respuesta-auditor-v188` · `spec-v189` · `lifecycle_from_fill.py` · `confirm/position_sync.py` · `test_lifecycle_golden_v188.py` · mesa-position-row.
 
