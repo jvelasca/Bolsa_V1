@@ -1,9 +1,9 @@
 # Spec — V1.95 Beta Certification / Financial Integrity Close (2026-09-03)
 
-> **AsOf:** 2026-09-03 · **Estado:** **CÓDIGO LOCAL LISTO** (pendiente push + tag/CI GREEN remoto) · partida tip [`v1.94-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.94-beta) → [`363984d2`](https://github.com/jvelasca/Bolsa_V1/commit/363984d2).  
+> **AsOf:** 2026-09-03 · **Estado:** **CI GREEN** · tip [`v1.95-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.95-beta) → [`6f262293`](https://github.com/jvelasca/Bolsa_V1/commit/6f262293) · [run 33804374800](https://github.com/jvelasca/Bolsa_V1/actions/runs/33804374800) · partida [`v1.94-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.94-beta) → [`363984d2`](https://github.com/jvelasca/Bolsa_V1/commit/363984d2).  
 > **Padre:** [`respuesta-auditor-v194-financial-integrity-2026-09-03.md`](./respuesta-auditor-v194-financial-integrity-2026-09-03.md) + AUDITORIA 2 (borde HTTP + FIFO tz).  
 > **No** LIVE · **no** bump · **no** unificar cash ledger · `PAPER_D_EXECUTE` **off**.  
-> **No** declarar BETA estable hasta Release-tag CI GREEN + auditoría tip V1.95.
+> **No** declarar BETA estable / PAPER explotable hasta auditoría tip V1.95.
 
 ```text
 Confirm OPEN → T1 → EXIT

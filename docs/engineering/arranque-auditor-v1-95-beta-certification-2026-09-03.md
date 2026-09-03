@@ -4,7 +4,7 @@ Copia en chat nuevo (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **candidato `v1.95-beta`** (partida **`v1.94-beta` → `363984d2`** · P0=0 · V1.94 CI rojo + P1 fail-closed + AUDITORIA 2 borde HTTP/FIFO). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **candidato `v1.95-beta` → `6f262293`** (partida **`v1.94-beta` → `363984d2`** · Release-tag CI **GREEN** [run 33804374800](https://github.com/jvelasca/Bolsa_V1/actions/runs/33804374800) · P0=0 · V1.94 tenía CI rojo + P1 fail-closed + AUDITORIA 2). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
 
 **Alcance V1.95 (certificación, no arquitectura nueva):**
 
