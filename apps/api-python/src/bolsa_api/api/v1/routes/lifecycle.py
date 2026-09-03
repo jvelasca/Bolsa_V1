@@ -13,8 +13,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import get_account_repository, get_db_session
@@ -168,6 +169,23 @@ class LifecycleOutboxRequeueResponseDto(BaseModel):
     data: LifecycleOutboxRequeueDataDto
 
 
+class LifecycleOutboxStatsDataDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    pending: int
+    processing: int
+    dead: int
+    oldest_pending_age_seconds: float | None = Field(
+        default=None, alias="oldestPendingAgeSeconds"
+    )
+
+
+class LifecycleOutboxStatsResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    data: LifecycleOutboxStatsDataDto
+
+
 async def _assert_account_owned(
     session: AsyncSession, principal: str, account_id: str
 ) -> None:
@@ -256,6 +274,58 @@ async def get_lifecycle_snapshot(
         )
     await _assert_account_owned(session, principal, account_id)
     return {"data": snap}
+
+
+@router.get(
+    "/outbox/stats",
+    response_model=LifecycleOutboxStatsResponseDto,
+)
+async def get_lifecycle_outbox_stats(
+    account_id: Annotated[str, Query(alias="accountId")],
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    """V1.92 P2 — outbox queue depth for Consola Operativa (account-scoped).
+
+    Auth: middleware JWT when APP_PASSWORD on; principal + ownership always.
+    """
+    from datetime import UTC, datetime
+
+    from bolsa_api.auth.request_principal import get_request_principal
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+
+    principal = get_request_principal(request)
+    await _assert_account_owned(session, principal, account_id)
+    counts = (
+        await session.execute(
+            select(LifecycleOutboxRow.status, func.count())
+            .where(LifecycleOutboxRow.account_id == account_id)
+            .group_by(LifecycleOutboxRow.status)
+        )
+    ).all()
+    by_status = {str(status): int(n) for status, n in counts}
+    oldest_pending = (
+        await session.execute(
+            select(func.min(LifecycleOutboxRow.created_at)).where(
+                LifecycleOutboxRow.account_id == account_id,
+                LifecycleOutboxRow.status == "pending",
+            )
+        )
+    ).scalar_one_or_none()
+    age: float | None = None
+    if oldest_pending is not None:
+        created = oldest_pending
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        age = max(0.0, (datetime.now(UTC) - created).total_seconds())
+    return {
+        "data": {
+            "pending": by_status.get("pending", 0),
+            "processing": by_status.get("processing", 0),
+            "dead": by_status.get("dead", 0),
+            "oldestPendingAgeSeconds": age,
+        }
+    }
 
 
 @router.post(

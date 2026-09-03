@@ -926,6 +926,21 @@ export const api = {
       }),
     ),
 
+  /** V1.92 — outbox queue depth for Consola Operativa. */
+  getLifecycleOutboxStats: (accountId: string) =>
+    call<{
+      data: {
+        pending: number;
+        processing: number;
+        dead: number;
+        oldestPendingAgeSeconds: number | null;
+      };
+    }>(() =>
+      client.GET("/api/lifecycle/outbox/stats", {
+        params: { query: { accountId } },
+      }),
+    ),
+
   updateAccount: (
     accountId: string,
     body: import("@bolsa/shared").UpdateInvestmentAccountRequestDto,

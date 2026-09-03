@@ -199,3 +199,117 @@ async def test_claim_batch_marks_processing() -> None:
     assert len(claimed) == 1
     assert claimed[0].status == "processing"
     assert await outbox.list_pending() == []
+
+
+@pytest.mark.asyncio
+async def test_claim_batch_fifo_one_per_position() -> None:
+    """V1.92: same position → only oldest pending is claimable."""
+    outbox = InMemoryLifecycleOutboxStore()
+    first = await outbox.enqueue(
+        position_id="pos-fifo",
+        account_id="acc-1",
+        transaction_id="tx-open",
+        kind="POSITION_OPENED",
+        payload={},
+    )
+    await outbox.enqueue(
+        position_id="pos-fifo",
+        account_id="acc-1",
+        transaction_id="tx-t1",
+        kind="T1_EXECUTED",
+        payload={},
+    )
+    claimed = await outbox.claim_batch(limit=10)
+    assert len(claimed) == 1
+    assert claimed[0].id == first.id
+    assert claimed[0].transaction_id == "tx-open"
+
+
+@pytest.mark.asyncio
+async def test_claim_batch_blocks_while_head_processing() -> None:
+    outbox = InMemoryLifecycleOutboxStore()
+    head = await outbox.enqueue(
+        position_id="pos-proc",
+        account_id="acc-1",
+        transaction_id="tx-h",
+        kind="POSITION_OPENED",
+        payload={},
+    )
+    await outbox.enqueue(
+        position_id="pos-proc",
+        account_id="acc-1",
+        transaction_id="tx-n",
+        kind="T1_EXECUTED",
+        payload={},
+    )
+    first = await outbox.claim_batch(limit=10)
+    assert len(first) == 1 and first[0].id == head.id
+    second = await outbox.claim_batch(limit=10)
+    assert second == []
+
+
+@pytest.mark.asyncio
+async def test_claim_batch_next_after_applied() -> None:
+    outbox = InMemoryLifecycleOutboxStore()
+    head = await outbox.enqueue(
+        position_id="pos-next",
+        account_id="acc-1",
+        transaction_id="tx-a",
+        kind="POSITION_OPENED",
+        payload={},
+    )
+    nxt = await outbox.enqueue(
+        position_id="pos-next",
+        account_id="acc-1",
+        transaction_id="tx-b",
+        kind="T1_EXECUTED",
+        payload={},
+    )
+    claimed = await outbox.claim_batch(limit=10)
+    assert claimed[0].id == head.id
+    await outbox.mark_applied(head.id)
+    claimed2 = await outbox.claim_batch(limit=10)
+    assert len(claimed2) == 1
+    assert claimed2[0].id == nxt.id
+
+
+@pytest.mark.asyncio
+async def test_claim_batch_dead_blocks_queue() -> None:
+    outbox = InMemoryLifecycleOutboxStore()
+    head = await outbox.enqueue(
+        position_id="pos-dead",
+        account_id="acc-1",
+        transaction_id="tx-d1",
+        kind="POSITION_OPENED",
+        payload={},
+    )
+    await outbox.enqueue(
+        position_id="pos-dead",
+        account_id="acc-1",
+        transaction_id="tx-d2",
+        kind="POSITION_CLOSED",
+        payload={},
+    )
+    await outbox.mark_attempt(head.id, error="boom", dead=True)
+    assert await outbox.claim_batch(limit=10) == []
+
+
+@pytest.mark.asyncio
+async def test_claim_batch_distinct_positions_parallel() -> None:
+    outbox = InMemoryLifecycleOutboxStore()
+    a = await outbox.enqueue(
+        position_id="pos-a",
+        account_id="acc-1",
+        transaction_id="tx-pa",
+        kind="POSITION_OPENED",
+        payload={},
+    )
+    b = await outbox.enqueue(
+        position_id="pos-b",
+        account_id="acc-1",
+        transaction_id="tx-pb",
+        kind="POSITION_OPENED",
+        payload={},
+    )
+    claimed = await outbox.claim_batch(limit=10)
+    assert {c.id for c in claimed} == {a.id, b.id}

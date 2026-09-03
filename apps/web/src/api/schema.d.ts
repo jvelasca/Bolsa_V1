@@ -2200,6 +2200,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lifecycle/outbox/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lifecycle Outbox Stats
+         * @description V1.92 P2 — outbox queue depth for Consola Operativa (account-scoped).
+         *
+         *     Auth: middleware JWT when APP_PASSWORD on; principal + ownership always.
+         */
+        get: operations["get_lifecycle_outbox_stats_api_lifecycle_outbox_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lifecycle/outbox/{outbox_id}/requeue": {
         parameters: {
             query?: never;
@@ -7367,6 +7389,21 @@ export interface components {
         /** LifecycleOutboxRequeueResponseDto */
         LifecycleOutboxRequeueResponseDto: {
             data: components["schemas"]["LifecycleOutboxRequeueDataDto"];
+        };
+        /** LifecycleOutboxStatsDataDto */
+        LifecycleOutboxStatsDataDto: {
+            /** Dead */
+            dead: number;
+            /** Oldestpendingageseconds */
+            oldestPendingAgeSeconds?: number | null;
+            /** Pending */
+            pending: number;
+            /** Processing */
+            processing: number;
+        };
+        /** LifecycleOutboxStatsResponseDto */
+        LifecycleOutboxStatsResponseDto: {
+            data: components["schemas"]["LifecycleOutboxStatsDataDto"];
         };
         /** LifecycleSnapshotDataDto */
         LifecycleSnapshotDataDto: {
@@ -14398,6 +14435,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LifecycleAppendResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lifecycle_outbox_stats_api_lifecycle_outbox_stats_get: {
+        parameters: {
+            query: {
+                accountId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleOutboxStatsResponseDto"];
                 };
             };
             /** @description Validation Error */

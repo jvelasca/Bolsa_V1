@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { OpsSelfEvalReport } from "@/features/operational-console/use-ops-self-eval";
 import type { EstudioAutoTelemetry } from "@/features/operational-console/use-estudio-auto-telemetry";
+import type { LifecycleOutboxStats } from "@/features/operational-console/use-lifecycle-outbox-stats";
 import { fetchEstudioInstrumentIds } from "@/features/trading/estudio-membership";
 import { api } from "@/lib/api";
 import { formatDateTimeCompact } from "@/lib/format";
@@ -22,6 +23,79 @@ function markClasses(mark: string): string {
     return "border-border text-muted-foreground";
   }
   return "border-rose-500/40 text-rose-800 dark:text-rose-200";
+}
+
+export function OpsLifecycleOutboxSection({
+  stats,
+  isLoading,
+  isError,
+}: {
+  stats: LifecycleOutboxStats | undefined;
+  isLoading?: boolean;
+  isError?: boolean;
+}) {
+  return (
+    <Card data-testid="ops-lifecycle-outbox-section">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Lifecycle outbox</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Cargando cola…</p>
+        ) : null}
+        {isError ? (
+          <p className="text-xs text-destructive">
+            No se pudo cargar outbox stats.
+          </p>
+        ) : null}
+        {!isLoading && !isError ? (
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div>
+              <dt className="text-xs text-muted-foreground">pending</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-pending"
+              >
+                {stats?.pending ?? 0}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">processing</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-processing"
+              >
+                {stats?.processing ?? 0}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">dead</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-dead"
+              >
+                {stats?.dead ?? 0}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">oldest pending</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-oldest-age"
+              >
+                {stats?.oldestPendingAgeSeconds == null
+                  ? "—"
+                  : `${Math.round(stats.oldestPendingAgeSeconds)}s`}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+        <p className="text-xs text-muted-foreground">
+          Cola durable PositionState→Lifecycle · no sustituye el ledger.
+        </p>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function OpsReadinessSection({

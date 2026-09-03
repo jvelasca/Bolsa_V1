@@ -1370,6 +1370,11 @@ class LifecycleOutboxRow(Base):
             "status",
             "next_attempt_at",
         ),
+        Index(
+            "lifecycle_outbox_position_created_idx",
+            "position_id",
+            "created_at",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)

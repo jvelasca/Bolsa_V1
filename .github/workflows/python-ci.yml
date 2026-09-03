@@ -84,4 +84,5 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_golden_v188.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v190.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v191.py
+          --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           -q

@@ -10964,6 +10964,54 @@
         "title": "LifecycleOutboxRequeueResponseDto",
         "type": "object"
       },
+      "LifecycleOutboxStatsDataDto": {
+        "additionalProperties": false,
+        "properties": {
+          "dead": {
+            "title": "Dead",
+            "type": "integer"
+          },
+          "oldestPendingAgeSeconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldestpendingageseconds"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "processing": {
+            "title": "Processing",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pending",
+          "processing",
+          "dead"
+        ],
+        "title": "LifecycleOutboxStatsDataDto",
+        "type": "object"
+      },
+      "LifecycleOutboxStatsResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LifecycleOutboxStatsDataDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "LifecycleOutboxStatsResponseDto",
+        "type": "object"
+      },
       "LifecycleSnapshotDataDto": {
         "additionalProperties": false,
         "properties": {
@@ -25697,6 +25745,49 @@
           }
         },
         "summary": "Post Lifecycle Event",
+        "tags": [
+          "lifecycle"
+        ]
+      }
+    },
+    "/api/lifecycle/outbox/stats": {
+      "get": {
+        "description": "V1.92 P2 — outbox queue depth for Consola Operativa (account-scoped).\n\nAuth: middleware JWT when APP_PASSWORD on; principal + ownership always.",
+        "operationId": "get_lifecycle_outbox_stats_api_lifecycle_outbox_stats_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": true,
+            "schema": {
+              "title": "Accountid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOutboxStatsResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Lifecycle Outbox Stats",
         "tags": [
           "lifecycle"
         ]

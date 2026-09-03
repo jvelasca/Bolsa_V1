@@ -81,9 +81,10 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
                 text("SELECT version_num FROM alembic_version")
             )
             versions = {row[0] for row in version}
-            if "018_lifecycle_outbox_worker" not in versions:
+            if "019_outbox_position_fifo" not in versions:
                 raise RuntimeError(
-                    f"alembic_version is {versions!r}; expected 018_lifecycle_outbox_worker"
+                    f"alembic_version is {versions!r}; "
+                    "expected 019_outbox_position_fifo"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
@@ -127,7 +128,7 @@ async def test_alembic_head_has_sequence_and_aggregates(
     version = (
         await db_session.execute(text("SELECT version_num FROM alembic_version"))
     ).scalar_one()
-    assert str(version).startswith("018")
+    assert str(version).startswith("019")
     seq = (
         await db_session.execute(
             text(

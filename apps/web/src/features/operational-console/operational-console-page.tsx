@@ -13,6 +13,7 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { MesaIncidentBanner } from "@/features/operations/mesa-incident-banner";
 import {
   OpsEstudioAutoSection,
+  OpsLifecycleOutboxSection,
   OpsReadinessSection,
   OpsReconSection,
   OpsRuntimeSection,
@@ -23,6 +24,7 @@ import {
   OpsQuickLinksSection,
 } from "@/features/operational-console/ops-incidents-and-links";
 import { useEstudioAutoTelemetry } from "@/features/operational-console/use-estudio-auto-telemetry";
+import { useLifecycleOutboxStats } from "@/features/operational-console/use-lifecycle-outbox-stats";
 import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
@@ -33,6 +35,7 @@ export function OperationalConsolePage() {
   const { effectiveAccountId, account } = useActiveAccount();
   const selfEvalQuery = useOpsSelfEval(effectiveAccountId);
   const a6Query = useEstudioAutoTelemetry(effectiveAccountId);
+  const outboxQuery = useLifecycleOutboxStats(effectiveAccountId);
   const report = selfEvalQuery.data;
   const a6 = a6Query.data?.data;
   const portfolioReconStatus = portfolioReconStatusFromReport(report);
@@ -128,6 +131,11 @@ export function OperationalConsolePage() {
           />
         ) : null}
         <OpsQuickLinksSection pendingConfirm={pendingConfirm} />
+        <OpsLifecycleOutboxSection
+          stats={outboxQuery.data}
+          isLoading={outboxQuery.isLoading}
+          isError={outboxQuery.isError}
+        />
       </div>
 
       <details className="rounded-lg border border-border/60 p-4">

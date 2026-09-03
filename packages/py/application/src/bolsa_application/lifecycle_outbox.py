@@ -1,21 +1,24 @@
-"""V1.90/V1.91 — Lifecycle outbox: durable pending appends (fail-soft without loss).
+"""V1.90–V1.92 — Lifecycle outbox: durable pending appends (fail-soft without loss).
 
 PositionSync / AUTO persist principal state + enqueue outbox in the same TX,
 then drain post-COMMIT (HTTP kick and/or LifecycleOutboxWorker). Crash between
 persist and append leaves a pending row that worker / lifespan drain recovers.
+
+V1.92: claim_batch is FIFO per position_id (at most one claimable head).
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import uuid4
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, exists, not_, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 from bolsa_application.lifecycle_from_fill import append_lifecycle_from_confirm_fill
@@ -27,6 +30,7 @@ OUTBOX_MAX_ATTEMPTS = 5
 OUTBOX_STALE_PROCESSING_SECONDS = 120
 SESSION_OUTBOX_ENQUEUED = "lifecycle_outbox_enqueued"
 OutboxStatus = str  # pending | processing | applied | dead
+_ACTIVE_STATUSES = ("pending", "processing", "dead")
 
 
 def _now() -> datetime:
@@ -51,6 +55,7 @@ class LifecycleOutboxRecord:
     last_error: str | None
     next_attempt_at: datetime | None = None
     claimed_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class LifecycleOutboxStore(Protocol):
@@ -94,6 +99,7 @@ class InMemoryLifecycleOutboxStore:
     def __init__(self) -> None:
         self._by_id: dict[str, LifecycleOutboxRecord] = {}
         self._by_tx: dict[str, str] = {}
+        self._seq = 0
 
     async def enqueue(
         self,
@@ -107,6 +113,9 @@ class InMemoryLifecycleOutboxStore:
         existing_id = self._by_tx.get(transaction_id)
         if existing_id:
             return self._by_id[existing_id]
+        self._seq += 1
+        # Monotonic created_at so FIFO is stable even within the same wall-clock ms.
+        created = datetime.fromtimestamp(self._seq, tz=UTC)
         row = LifecycleOutboxRecord(
             id=f"lox-{uuid4().hex[:16]}",
             position_id=position_id,
@@ -119,6 +128,7 @@ class InMemoryLifecycleOutboxStore:
             last_error=None,
             next_attempt_at=None,
             claimed_at=None,
+            created_at=created,
         )
         self._by_id[row.id] = row
         self._by_tx[transaction_id] = row.id
@@ -139,10 +149,29 @@ class InMemoryLifecycleOutboxStore:
     async def claim_batch(
         self, *, limit: int = 50
     ) -> list[LifecycleOutboxRecord]:
+        """V1.92: claim at most one event per position (FIFO head of queue)."""
         now = _now()
         stale_before = now - timedelta(seconds=OUTBOX_STALE_PROCESSING_SECONDS)
+        active = [
+            r for r in self._by_id.values() if r.status in _ACTIVE_STATUSES
+        ]
+        heads: dict[str, LifecycleOutboxRecord] = {}
+        for row in sorted(
+            active,
+            key=lambda r: (
+                r.position_id,
+                r.created_at or datetime.min.replace(tzinfo=UTC),
+                r.id,
+            ),
+        ):
+            if row.position_id not in heads:
+                heads[row.position_id] = row
+
         claimed: list[LifecycleOutboxRecord] = []
-        for row in list(self._by_id.values()):
+        for row in sorted(
+            heads.values(),
+            key=lambda r: (r.created_at or datetime.min.replace(tzinfo=UTC), r.id),
+        ):
             if len(claimed) >= limit:
                 break
             due = row.next_attempt_at is None or row.next_attempt_at <= now
@@ -151,37 +180,20 @@ class InMemoryLifecycleOutboxStore:
                 and row.claimed_at is not None
                 and row.claimed_at <= stale_before
             )
-            if (row.status == "pending" and due) or stale:
-                updated = LifecycleOutboxRecord(
-                    id=row.id,
-                    position_id=row.position_id,
-                    account_id=row.account_id,
-                    transaction_id=row.transaction_id,
-                    kind=row.kind,
-                    payload=row.payload,
-                    status="processing",
-                    attempts=row.attempts,
-                    last_error=row.last_error,
-                    next_attempt_at=row.next_attempt_at,
-                    claimed_at=now,
-                )
-                self._by_id[row.id] = updated
-                claimed.append(updated)
+            if not ((row.status == "pending" and due) or stale):
+                continue
+            updated = replace(row, status="processing", claimed_at=now)
+            self._by_id[row.id] = updated
+            claimed.append(updated)
         return claimed
 
     async def mark_applied(self, outbox_id: str) -> None:
         row = self._by_id.get(outbox_id)
         if row is None:
             return
-        self._by_id[outbox_id] = LifecycleOutboxRecord(
-            id=row.id,
-            position_id=row.position_id,
-            account_id=row.account_id,
-            transaction_id=row.transaction_id,
-            kind=row.kind,
-            payload=row.payload,
+        self._by_id[outbox_id] = replace(
+            row,
             status="applied",
-            attempts=row.attempts,
             last_error=None,
             next_attempt_at=None,
             claimed_at=None,
@@ -199,13 +211,8 @@ class InMemoryLifecycleOutboxStore:
             return
         attempts = row.attempts + 1
         next_at = None if dead else _now() + timedelta(seconds=_backoff_seconds(attempts))
-        self._by_id[outbox_id] = LifecycleOutboxRecord(
-            id=row.id,
-            position_id=row.position_id,
-            account_id=row.account_id,
-            transaction_id=row.transaction_id,
-            kind=row.kind,
-            payload=row.payload,
+        self._by_id[outbox_id] = replace(
+            row,
             status="dead" if dead else "pending",
             attempts=attempts,
             last_error=error,
@@ -222,13 +229,8 @@ class InMemoryLifecycleOutboxStore:
         row = self._by_id.get(outbox_id)
         if row is None or row.status != "dead":
             return None
-        updated = LifecycleOutboxRecord(
-            id=row.id,
-            position_id=row.position_id,
-            account_id=row.account_id,
-            transaction_id=row.transaction_id,
-            kind=row.kind,
-            payload=row.payload,
+        updated = replace(
+            row,
             status="pending",
             attempts=0 if reset_attempts else row.attempts,
             last_error=None,
@@ -252,6 +254,7 @@ def _row_to_record(row: LifecycleOutboxRow) -> LifecycleOutboxRecord:
         last_error=row.last_error,
         next_attempt_at=getattr(row, "next_attempt_at", None),
         claimed_at=getattr(row, "claimed_at", None),
+        created_at=getattr(row, "created_at", None),
     )
 
 
@@ -332,12 +335,31 @@ class PostgresLifecycleOutboxStore:
     async def claim_batch(
         self, *, limit: int = 50
     ) -> list[LifecycleOutboxRecord]:
+        """V1.92: claim FIFO head per position_id (SKIP LOCKED)."""
         now = _now()
         stale_before = now - timedelta(seconds=OUTBOX_STALE_PROCESSING_SECONDS)
-        # Select candidates with SKIP LOCKED, then mark processing.
+        earlier = aliased(LifecycleOutboxRow)
+        is_head = not_(
+            exists(
+                select(1)
+                .select_from(earlier)
+                .where(
+                    earlier.position_id == LifecycleOutboxRow.position_id,
+                    earlier.status.in_(_ACTIVE_STATUSES),
+                    or_(
+                        earlier.created_at < LifecycleOutboxRow.created_at,
+                        and_(
+                            earlier.created_at == LifecycleOutboxRow.created_at,
+                            earlier.id < LifecycleOutboxRow.id,
+                        ),
+                    ),
+                )
+            )
+        )
         stmt = (
             select(LifecycleOutboxRow)
             .where(
+                is_head,
                 or_(
                     and_(
                         LifecycleOutboxRow.status == "pending",
@@ -351,9 +373,9 @@ class PostgresLifecycleOutboxStore:
                         LifecycleOutboxRow.claimed_at.is_not(None),
                         LifecycleOutboxRow.claimed_at <= stale_before,
                     ),
-                )
+                ),
             )
-            .order_by(LifecycleOutboxRow.created_at.asc())
+            .order_by(LifecycleOutboxRow.created_at.asc(), LifecycleOutboxRow.id.asc())
             .limit(limit)
             .with_for_update(skip_locked=True)
         )

@@ -386,6 +386,16 @@ async def test_v191_golden_confirm_http_paper_lifecycle_snapshot(
                 },
             )
             assert replay_resp.status_code == 200, replay_resp.text
+            replay_data = replay_resp.json()["data"]
+            replay_trade = replay_data.get("trade") or {}
+            # Confirm idempotency: no second broker execution / transactionId
+            if replay_trade.get("status") == "executed":
+                assert replay_trade.get("transactionId") == open_tx, (
+                    f"replay minted new tx: {replay_trade.get('transactionId')} "
+                    f"!= open_tx {open_tx}"
+                )
+            else:
+                assert replay_trade.get("transactionId") in (None, "", open_tx)
 
             # T1 reduce — same decisionId as OPEN (lifecycle identity envelope)
             t1_resp = await client.post(
@@ -451,7 +461,8 @@ async def test_v191_golden_confirm_http_paper_lifecycle_snapshot(
                     AppendLifecycleEvent(PostgresLifecycleEventStore(drain_session)),
                 )
                 await drain_session.commit()
-            assert drain.get("errors", 0) == 0 or drain.get("applied", 0) >= 0, drain
+            assert drain.get("errors", 0) == 0, drain
+            assert drain.get("applied", 0) >= 1, drain
 
             snap_resp = await client.get(
                 f"/api/lifecycle/positions/{position_id}/snapshot"

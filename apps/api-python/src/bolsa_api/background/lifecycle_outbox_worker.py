@@ -1,8 +1,10 @@
-"""V1.91 — continuous LifecycleOutboxWorker (pending → processing → applied|dead).
+"""V1.91/V1.92 — continuous LifecycleOutboxWorker (pending → processing → applied|dead).
 
 On-by-default: runs in ``scheduler_worker`` (not FastAPI lifespan). Polls every
 few seconds, claims with SKIP LOCKED, drains via AppendLifecycleEvent.
 Disable with ``LIFECYCLE_OUTBOX_WORKER_ENABLED=0``.
+
+V1.92: ``tick_seconds`` injectable for PG certification without sleeping 3s×N.
 """
 
 from __future__ import annotations
@@ -50,10 +52,12 @@ async def _drain_once(session_factory: async_sessionmaker[AsyncSession]) -> dict
 
 async def lifecycle_outbox_worker_loop(
     session_factory: async_sessionmaker[AsyncSession],
+    *,
+    tick_seconds: float = TICK_SECONDS,
 ) -> None:
-    logger.info("LifecycleOutboxWorker iniciado (tick=%ss)", TICK_SECONDS)
+    logger.info("LifecycleOutboxWorker iniciado (tick=%ss)", tick_seconds)
     while True:
-        await asyncio.sleep(TICK_SECONDS)
+        await asyncio.sleep(tick_seconds)
         if not _worker_enabled():
             continue
         try:
@@ -66,6 +70,8 @@ async def lifecycle_outbox_worker_loop(
 
 def start_lifecycle_outbox_worker(
     session_factory: async_sessionmaker[AsyncSession],
+    *,
+    tick_seconds: float = TICK_SECONDS,
 ) -> asyncio.Task[None] | None:
     if not _worker_enabled():
         logger.info(
@@ -73,4 +79,6 @@ def start_lifecycle_outbox_worker(
             _ENV_ENABLED,
         )
         return None
-    return asyncio.create_task(lifecycle_outbox_worker_loop(session_factory))
+    return asyncio.create_task(
+        lifecycle_outbox_worker_loop(session_factory, tick_seconds=tick_seconds)
+    )

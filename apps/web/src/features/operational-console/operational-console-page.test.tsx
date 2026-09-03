@@ -35,6 +35,14 @@ vi.mock("@/features/operational-console/use-estudio-auto-telemetry", () => ({
   }),
 }));
 
+vi.mock("@/features/operational-console/use-lifecycle-outbox-stats", () => ({
+  useLifecycleOutboxStats: () => ({
+    data: { pending: 0, processing: 0, dead: 0, oldestPendingAgeSeconds: null },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 vi.mock("@/features/operations/mesa-incident-banner", () => ({
   MesaIncidentBanner: () => null,
 }));
@@ -45,6 +53,7 @@ vi.mock("@/features/operational-console/operational-console-sections", () => ({
   OpsSelfEvalSection: () => <div data-testid="ops-self-eval" />,
   OpsEstudioAutoSection: () => <div data-testid="ops-estudio-auto" />,
   OpsReconSection: () => <div data-testid="ops-recon" />,
+  OpsLifecycleOutboxSection: () => <div data-testid="ops-lifecycle-outbox" />,
 }));
 
 vi.mock("@/features/operational-console/ops-incidents-and-links", () => ({
