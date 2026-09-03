@@ -2,7 +2,8 @@
 
 > **Padre:** [`respuesta-auditor-v189-paper-desk-truth-2026-09-03.md`](./respuesta-auditor-v189-paper-desk-truth-2026-09-03.md).  
 > **Spec/plan:** [`spec-v190-lifecycle-reliability-2026-09-03.md`](./spec-v190-lifecycle-reliability-2026-09-03.md) · [`plan-v190-lifecycle-reliability-2026-09-03.md`](./plan-v190-lifecycle-reliability-2026-09-03.md).  
-> **Estado:** EN CURSO · partida `v1.89-beta` → `58806be1`.
+> **Estado:** **CERRADA (CI GREEN)** · tip [`v1.90-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.90-beta) → [`0c2e3af7`](https://github.com/jvelasca/Bolsa_V1/commit/0c2e3af7) · [run 33726147414](https://github.com/jvelasca/Bolsa_V1/actions/runs/33726147414).  
+> **Partida:** `v1.89-beta` → `58806be1`.
 
 ## Objetivo
 
@@ -21,6 +22,6 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` off · no unificar ledger · integrated 
 5. SHORT ratchet + reject recommend_short
 6. Mesa vocabulario + OpenAPI tipado
 
-## Next tras GREEN
+## Next
 
-Tag `v1.90-beta` · arranque auditor externo · criterio beta PAPER explotable.
+Auditoría externa tip V1.90 ([arranque](./arranque-auditor-v1-90-lifecycle-reliability-2026-09-03.md)) · criterio beta PAPER explotable. **Sin** LIVE.

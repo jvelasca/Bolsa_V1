@@ -1,10 +1,12 @@
 # Arranque auditor externo — V1.90 tip (Lifecycle Reliability) (2026-09-03)
 
-Copia en chat nuevo (auditor) tras Release-tag CI GREEN:
+Copia en chat nuevo (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **tip `v1.90-beta`**. Partida **`v1.89-beta` → `58806be1`** (PASS arquitectónico · NO beta PAPER). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **tip `v1.90-beta`**. Tip funcional **`0c2e3af7`**. Partida **`v1.89-beta` → `58806be1`** (PASS arquitectónico · NO beta PAPER). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
+
+**CI:** tag `v1.90-beta` → `0c2e3af7` · GREEN [run 33726147414](https://github.com/jvelasca/Bolsa_V1/actions/runs/33726147414).
 
 **Alcance V1.90:**
 
@@ -17,7 +19,7 @@ Eres auditor externo de Bolsa V1 **tip `v1.90-beta`**. Partida **`v1.89-beta` �
 
 **Regla:** NINGÚN estado ambiguo → COMPRAR. DryRun honesto. No unificar ledger/mesa. No LIVE.
 
-Lee: `CURRENT_SYSTEM.md` · `respuesta-auditor-v189` · `spec-v190` · `lifecycle_from_fill.py` · `lifecycle_from_auto.py` · `confirm/position_sync.py` · `test_lifecycle_golden_v190.py` · mesa-position-row · openapi lifecycle snapshot.
+Lee: `CURRENT_SYSTEM.md` · `respuesta-auditor-v189` · `spec-v190` · `lifecycle_from_fill.py` · `lifecycle_from_auto.py` · `confirm/position_sync.py` · `test_lifecycle_golden_v190.py` · mesa-position-row · openapi lifecycle snapshot · [`relevo tag`](./traspaso-relevo-tag-v1-90-beta-2026-09-03.md).
 
 **Foco:**
 
