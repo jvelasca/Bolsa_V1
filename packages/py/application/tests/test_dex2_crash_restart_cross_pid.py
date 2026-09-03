@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+
 from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.submit_intent import (
@@ -17,15 +18,14 @@ from bolsa_analytics.cognitive.submit_intent import (
     mark_send_attempted,
     record_submit_intent,
 )
-from bolsa_infrastructure.database.models.tables import SubmitIntentRow
-from bolsa_market.providers import XtbBridgeOrderResult
-
 from bolsa_application.broker_adapter import XtbBrokerAdapter
 from bolsa_application.confirm_recommendation import (
     ConfirmRecommendationIntent,
     confirm_leg_idempotency_key,
 )
 from bolsa_application.submit_intent_store import PostgresSubmitIntentStore
+from bolsa_infrastructure.database.models.tables import SubmitIntentRow
+from bolsa_market.providers import XtbBridgeOrderResult
 
 
 def _decision_id_from_stmt(stmt: Any) -> str:

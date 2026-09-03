@@ -21,6 +21,12 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from bolsa_api.auth.jwt import encode_access_token
+from bolsa_api.auth.session import SESSION_COOKIE_NAME
+from bolsa_api.main import create_app, lifespan
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_infrastructure.auth.passwords import hash_password
 from bolsa_infrastructure.config import get_settings
@@ -35,12 +41,6 @@ from bolsa_infrastructure.database.models import (
 from bolsa_infrastructure.database.repositories.cognitive_repository import (
     SqlAlchemyCognitiveRepository,
 )
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
-from bolsa_api.auth.jwt import encode_access_token
-from bolsa_api.auth.session import SESSION_COOKIE_NAME
-from bolsa_api.main import create_app, lifespan
 from tests.opening_gate_seed import seed_http_opening_allow
 
 

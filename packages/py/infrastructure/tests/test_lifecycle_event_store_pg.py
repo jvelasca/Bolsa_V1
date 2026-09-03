@@ -127,7 +127,7 @@ async def test_alembic_head_has_sequence_and_aggregates(
     version = (
         await db_session.execute(text("SELECT version_num FROM alembic_version"))
     ).scalar_one()
-    assert str(version).startswith("017")
+    assert str(version).startswith("018")
     seq = (
         await db_session.execute(
             text(

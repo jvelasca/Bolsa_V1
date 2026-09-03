@@ -19,18 +19,18 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+
+from bolsa_application.accounts import ExecuteTrade
+from bolsa_application.confirm_recommendation import (
+    ConfirmRecommendationIntent,
+    confirm_leg_idempotency_key,
+)
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     TradeResult,
     Transaction,
-)
-
-from bolsa_application.accounts import ExecuteTrade
-from bolsa_application.confirm_recommendation import (
-    ConfirmRecommendationIntent,
-    confirm_leg_idempotency_key,
 )
 
 

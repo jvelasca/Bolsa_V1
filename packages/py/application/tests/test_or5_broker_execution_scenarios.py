@@ -8,18 +8,12 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pytest
+
 from bolsa_analytics.cognitive.exit_plan import build_exit_plan_from_position
 from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
 from bolsa_analytics.cognitive.submit_intent import record_submit_intent
-from bolsa_domain.entities.portfolio import (
-    Portfolio,
-    PortfolioSummary,
-    TradeResult,
-    Transaction,
-)
-
 from bolsa_application.broker_adapter import MockBrokerAdapter
 from bolsa_application.confirm_recommendation import (
     ConfirmRecommendationIntent,
@@ -36,6 +30,12 @@ from bolsa_application.reconciliation_opening_gate import (
     reconciliation_opening_veto_reason,
 )
 from bolsa_application.submit_intent_store import InMemorySubmitIntentStore
+from bolsa_domain.entities.portfolio import (
+    Portfolio,
+    PortfolioSummary,
+    TradeResult,
+    Transaction,
+)
 
 
 def _triggered(**overrides: object) -> dict[str, Any]:

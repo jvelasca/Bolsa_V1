@@ -12,6 +12,7 @@ import random
 from typing import Any
 
 import pytest
+
 from bolsa_analytics.cognitive.operational_invariants import (
     adverse_exposure,
     filled_le_ordered,
@@ -33,8 +34,6 @@ from bolsa_analytics.cognitive.position_state import (
     apply_position_current_stop,
     build_position_state_from_fill,
 )
-from bolsa_domain.entities.portfolio import TradeResult, Transaction
-
 from bolsa_application.confirm_recommendation import (
     ConfirmRecommendationIntent,
     confirm_leg_idempotency_key,
@@ -43,6 +42,7 @@ from bolsa_application.reconciliation_opening_gate import (
     reconciliation_opening_veto_reason,
 )
 from bolsa_application.risk_engine import check_opening
+from bolsa_domain.entities.portfolio import TradeResult, Transaction
 
 _OPEN_STATUSES: tuple[PaperOrderStatus, ...] = (
     "CREATED",
