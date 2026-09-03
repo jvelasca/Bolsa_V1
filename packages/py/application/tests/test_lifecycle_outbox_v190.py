@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from bolsa_application.confirm.position_sync import PositionSyncCoordinator
 from bolsa_application.lifecycle_event_store import (
     AppendLifecycleEvent,
     GetLifecycleSnapshot,
@@ -15,7 +16,6 @@ from bolsa_application.lifecycle_outbox import (
     InMemoryLifecycleOutboxStore,
     drain_lifecycle_outbox,
 )
-from bolsa_application.confirm.position_sync import PositionSyncCoordinator
 
 
 class _FailOnceAppend:
