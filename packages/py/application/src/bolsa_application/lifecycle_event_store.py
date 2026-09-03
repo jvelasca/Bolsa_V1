@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bolsa_application.lifecycle_t2_bridge import (
     build_t2_triggered_input,
     needs_atomic_t2_pair,
+    to_lifecycle_at,
 )
 from bolsa_domain.lifecycle import (
     AppendFail,
@@ -562,6 +563,12 @@ class AppendLifecycleEvent:
         log: list[LifecycleStoreEvent],
     ) -> AppendLifecycleResult:
         """Validate T2_TRIGGERED + T2_EXECUTED in memory, then append_many."""
+        # Canonical Z timestamps so trigger is always strictly before execute
+        # even when paper fills use ``+00:00`` / ``str(datetime)``.
+        norm_at = to_lifecycle_at(execute_event.at)
+        if norm_at and norm_at != execute_event.at:
+            execute_event = replace(execute_event, at=norm_at)
+
         trigger_input = build_t2_triggered_input(execute_event)
         trigger_result = append_validated_lifecycle_event(log, trigger_input)
         if isinstance(trigger_result, AppendFail):

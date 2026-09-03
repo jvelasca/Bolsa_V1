@@ -7,25 +7,54 @@ also get the atomic pair — including outbox ``direct_input``.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from bolsa_domain.lifecycle import LifecycleEventInput, LifecycleStoreEvent, reduce_lifecycle_events
 
 
+def _parse_exec_at(exec_at: str) -> datetime | None:
+    """Parse paper/ledger timestamps (Z, +00:00, or space-separated str(datetime))."""
+    raw = exec_at.strip().replace(" ", "T")
+    if raw.endswith("+00:00"):
+        raw = raw[:-6] + "Z"
+    try:
+        if raw.endswith("Z"):
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def to_lifecycle_at(exec_at: str | None) -> str | None:
+    """Normalize to canonical ``...SSS Z`` lifecycle timestamps."""
+    if not isinstance(exec_at, str) or not exec_at.strip():
+        return exec_at
+    dt = _parse_exec_at(exec_at)
+    if dt is None:
+        return exec_at.strip()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
 def t2_trigger_at_before(exec_at: str | None) -> str | None:
     """T2_EXECUTED must be strictly after T2_TRIGGERED (time_regression)."""
-    if not isinstance(exec_at, str) or not exec_at.endswith("Z"):
+    if not isinstance(exec_at, str) or not exec_at.strip():
         return exec_at
-    try:
-        dt = datetime.fromisoformat(exec_at.replace("Z", "+00:00"))
-        return (dt - timedelta(milliseconds=1)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-    except ValueError:
+    dt = _parse_exec_at(exec_at)
+    if dt is None:
         return exec_at
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return (dt - timedelta(milliseconds=1)).astimezone(UTC).strftime(
+        "%Y-%m-%dT%H:%M:%S.%f"
+    )[:-3] + "Z"
 
 
 def build_t2_triggered_input(execute_event: LifecycleEventInput) -> LifecycleEventInput:
     """Synthesize T2_TRIGGERED identity envelope for an imminent T2_EXECUTED."""
-    bridge_at = t2_trigger_at_before(execute_event.at) or execute_event.at
+    exec_at = to_lifecycle_at(execute_event.at) or execute_event.at
+    bridge_at = t2_trigger_at_before(exec_at) or exec_at
     return LifecycleEventInput(
         kind="T2_TRIGGERED",
         at=bridge_at,
@@ -74,4 +103,5 @@ __all__ = [
     "maybe_append_t2_triggered_bridge",
     "needs_atomic_t2_pair",
     "t2_trigger_at_before",
+    "to_lifecycle_at",
 ]

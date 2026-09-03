@@ -217,6 +217,19 @@ def test_build_t2_triggered_input_event_id_suffix() -> None:
     assert trig.at == "2026-09-02T12:44:59.999Z"
 
 
+def test_t2_trigger_at_before_accepts_offset_and_str_datetime() -> None:
+    from bolsa_application.lifecycle_t2_bridge import t2_trigger_at_before
+
+    assert (
+        t2_trigger_at_before("2026-09-02T12:45:00.000+00:00")
+        == "2026-09-02T12:44:59.999Z"
+    )
+    assert (
+        t2_trigger_at_before("2026-09-02 12:45:00.000000+00:00")
+        == "2026-09-02T12:44:59.999Z"
+    )
+
+
 @pytest.mark.asyncio
 async def test_append_many_integrity_rolls_back_first() -> None:
     from bolsa_domain.lifecycle import AppendOk, append_validated_lifecycle_event
