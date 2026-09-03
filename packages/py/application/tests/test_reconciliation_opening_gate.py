@@ -88,13 +88,13 @@ def test_lifecycle_blocked_denies() -> None:
     )
 
 
-def test_lifecycle_lag_allows() -> None:
+def test_lifecycle_lag_denies() -> None:
     assert (
         reconciliation_opening_veto_reason(
             lifecycle_recon_status="lag",
             require=True,
         )
-        is None
+        == "reconciliation:lifecycle_lag"
     )
 
 

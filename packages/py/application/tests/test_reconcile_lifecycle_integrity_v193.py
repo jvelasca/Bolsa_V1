@@ -140,7 +140,7 @@ def test_recon_orphan_with_pending_outbox_is_lag() -> None:
     assert any(i.code == "lifecycle_lag" for i in report.issues)
 
 
-def test_recon_dead_non_head_not_blocked() -> None:
+def test_recon_dead_non_head_not_clean() -> None:
     t0 = datetime(2026, 9, 1, tzinfo=UTC)
     t1 = datetime(2026, 9, 2, tzinfo=UTC)
     t2 = datetime(2026, 9, 3, tzinfo=UTC)
@@ -182,7 +182,9 @@ def test_recon_dead_non_head_not_blocked() -> None:
             ),
         ],
     )
+    # FIFO head is pending → not dead_head / not blocked; still never clean (V1.95).
     assert report.status != "blocked"
+    assert report.status != "clean"
     assert report.blocked_count == 0
     assert any(i.code == "dead_non_head" for i in report.issues)
 
@@ -215,3 +217,70 @@ def test_recon_exit_dead_as_head_is_blocked() -> None:
     )
     assert report.status == "blocked"
     assert any(i.code == "dead_head" for i in report.issues)
+
+
+def test_fifo_outbox_head_none_created_at_with_aware_no_typeerror() -> None:
+    """V1.95 P1-B — naive fallback must not TypeError vs TIMESTAMPTZ-aware."""
+    from bolsa_application.reconcile_lifecycle_integrity import fifo_outbox_head
+
+    aware = datetime(2026, 9, 2, tzinfo=UTC)
+    head = fifo_outbox_head(
+        [
+            OutboxSnap(
+                position_id="pos-1",
+                kind="T1_EXECUTED",
+                status="dead",
+                created_at=aware,
+                id="ox-later",
+            ),
+            OutboxSnap(
+                position_id="pos-1",
+                kind="POSITION_OPENED",
+                status="pending",
+                created_at=None,
+                id="ox-none",
+            ),
+        ]
+    )
+    assert head is not None
+    assert head.id == "ox-none"
+
+
+def test_fifo_outbox_head_naive_promoted_to_utc() -> None:
+    from bolsa_application.reconcile_lifecycle_integrity import fifo_outbox_head
+
+    naive = datetime(2026, 9, 1)  # no tz
+    aware = datetime(2026, 9, 2, tzinfo=UTC)
+    head = fifo_outbox_head(
+        [
+            OutboxSnap(
+                position_id="pos-1",
+                kind="T1_EXECUTED",
+                status="dead",
+                created_at=aware,
+                id="ox-later",
+            ),
+            OutboxSnap(
+                position_id="pos-1",
+                kind="POSITION_OPENED",
+                status="pending",
+                created_at=naive,
+                id="ox-naive",
+            ),
+        ]
+    )
+    assert head is not None
+    assert head.id == "ox-naive"
+
+
+def test_unavailable_lifecycle_reconciliation_is_blocked() -> None:
+    from bolsa_application.reconcile_lifecycle_integrity import (
+        unavailable_lifecycle_reconciliation,
+    )
+
+    report = unavailable_lifecycle_reconciliation("acc-x")
+    assert report.status == "blocked"
+    d = report.to_dict()
+    assert d["accountId"] == "acc-x"
+    assert d["status"] == "blocked"
+    assert d["issues"] == []

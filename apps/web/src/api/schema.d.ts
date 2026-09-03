@@ -2200,6 +2200,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lifecycle/integrity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Financial Integrity
+         * @description V1.94 — compose OI-6 + lifecycle recon + fill links (detect/report).
+         */
+        get: operations["get_financial_integrity_api_lifecycle_integrity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lifecycle/outbox/stats": {
         parameters: {
             query?: never;
@@ -5834,6 +5854,34 @@ export interface components {
             /** Transactionid */
             transactionId?: string | null;
         };
+        /** FinancialIntegrityDataDto */
+        FinancialIntegrityDataDto: {
+            /** Accountid */
+            accountId: string;
+            /** Filllinkissues */
+            fillLinkIssues?: components["schemas"]["LifecycleReconIssueDto"][];
+            lifecycle: components["schemas"]["LifecycleReconciliationDataDto"];
+            /** Operationalstate */
+            operationalState: string;
+            /**
+             * Outboxdead
+             * @default 0
+             */
+            outboxDead: number;
+            /** Portfoliostatus */
+            portfolioStatus?: string | null;
+            /**
+             * Slabreached
+             * @default false
+             */
+            slaBreached: boolean;
+            /** Status */
+            status: string;
+        };
+        /** FinancialIntegrityResponseDto */
+        FinancialIntegrityResponseDto: {
+            data: components["schemas"]["FinancialIntegrityDataDto"];
+        };
         /** FundamentalCardDto */
         FundamentalCardDto: {
             /** Assessmentid */
@@ -7418,6 +7466,11 @@ export interface components {
             oldestPendingAgeSeconds?: number | null;
             /** Oldestprocessingageseconds */
             oldestProcessingAgeSeconds?: number | null;
+            /**
+             * Operationalstate
+             * @default OK
+             */
+            operationalState: string;
             /** Pending */
             pending: number;
             /** Processing */
@@ -14492,6 +14545,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LifecycleAppendResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_financial_integrity_api_lifecycle_integrity_get: {
+        parameters: {
+            query: {
+                accountId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancialIntegrityResponseDto"];
                 };
             };
             /** @description Validation Error */

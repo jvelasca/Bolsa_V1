@@ -555,23 +555,28 @@ def get_portfolio_recon_lookup(session: AsyncSession) -> Any:
 
 
 def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
-    """OR-4 V1.94 — status lifecycle integrity para check_opening."""
+    """OR-4 V1.95 — composed financial integrity status for check_opening."""
+    from sqlalchemy import func, select
+
     from bolsa_application.lifecycle_event_store import (
         GetLifecycleSnapshot,
         PostgresLifecycleEventStore,
+    )
+    from bolsa_application.reconcile_financial_integrity import (
+        ReconcileFinancialIntegrity,
+        ReconcileFinancialIntegrityInput,
     )
     from bolsa_application.reconcile_lifecycle_integrity import (
         OutboxSnap,
         ReconcileLifecycleIntegrity,
     )
-    from bolsa_application.reconciliation_opening_gate import (
-        ReconcileLifecycleIntegrityLookup,
-    )
     from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
-    from sqlalchemy import select
 
     class _OutboxAdapter:
         async def list_for_account(self, acc: str) -> list[OutboxSnap]:
@@ -596,12 +601,55 @@ def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
                 for r in rows
             ]
 
-    uc = ReconcileLifecycleIntegrity(
-        positions=SqlAlchemyPositionStateRepository(session),
-        snapshots=GetLifecycleSnapshot(PostgresLifecycleEventStore(session)),
+    class _LedgerRefs:
+        async def list_reference_ids(self, acc: str) -> list[str]:
+            return await SqlAlchemyLedgerRepository(session).list_reference_ids(acc)
+
+    positions = SqlAlchemyPositionStateRepository(session)
+    snapshots = GetLifecycleSnapshot(PostgresLifecycleEventStore(session))
+    lifecycle_uc = ReconcileLifecycleIntegrity(
+        positions=positions,
+        snapshots=snapshots,
         outbox=_OutboxAdapter(),
     )
-    return ReconcileLifecycleIntegrityLookup(uc)
+    portfolio = get_portfolio_recon_lookup(session)
+
+    class _ComposeLookup:
+        async def lifecycle_recon_status(self, account_id: str) -> Any:
+            dead = int(
+                (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(LifecycleOutboxRow)
+                        .where(
+                            LifecycleOutboxRow.account_id == account_id,
+                            LifecycleOutboxRow.status == "dead",
+                        )
+                    )
+                ).scalar_one()
+                or 0
+            )
+            report = await ReconcileFinancialIntegrity(
+                lifecycle=lifecycle_uc,
+                positions=positions,
+                snapshots_by_account=snapshots,
+                ledger_refs=_LedgerRefs(),
+                portfolio=portfolio,
+            ).reconcile(
+                ReconcileFinancialIntegrityInput(
+                    account_id=account_id,
+                    outbox_dead=dead,
+                )
+            )
+            # V1.95: named unavailable (gate → lifecycle_unavailable), never raise.
+            if report is None:
+                return "unavailable"
+            status = getattr(report, "status", None)
+            if status in ("clean", "lag", "drift", "blocked"):
+                return status
+            return "unavailable"
+
+    return _ComposeLookup()
 
 
 def get_live_recon_lookup(session: AsyncSession) -> Any:

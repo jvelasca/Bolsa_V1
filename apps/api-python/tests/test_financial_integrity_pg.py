@@ -170,9 +170,9 @@ async def test_dead_head_vs_dead_non_head(
 ) -> None:
     from bolsa_application.lifecycle_outbox import PostgresLifecycleOutboxStore
     from bolsa_application.reconcile_lifecycle_integrity import (
+        OutboxSnap,
         PositionStateSnap,
         build_lifecycle_reconciliation,
-        OutboxSnap,
     )
     from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
 
@@ -267,6 +267,7 @@ async def test_dead_head_vs_dead_non_head(
         ],
     )
     assert report2.status != "blocked"
+    assert report2.status != "clean"
     assert any(i.code == "dead_non_head" for i in report2.issues)
 
 

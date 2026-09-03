@@ -445,6 +445,7 @@ async def get_lifecycle_reconciliation(
         OutboxSnap,
         ReconcileLifecycleIntegrity,
         ReconcileLifecycleIntegrityInput,
+        unavailable_lifecycle_reconciliation,
     )
     from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
     from bolsa_infrastructure.database.repositories.position_state_repository import (
@@ -481,7 +482,9 @@ async def get_lifecycle_reconciliation(
         snapshots=GetLifecycleSnapshot(PostgresLifecycleEventStore(session)),
         outbox=_OutboxAdapter(),
     ).reconcile(ReconcileLifecycleIntegrityInput(account_id=account_id))
-    assert report is not None
+    # V1.95: named fail-closed JSON — never assert/500 on None.
+    if report is None:
+        return {"data": unavailable_lifecycle_reconciliation(account_id).to_dict()}
     return {"data": report.to_dict()}
 
 
@@ -495,6 +498,8 @@ async def get_financial_integrity(
     principal: Annotated[str, Depends(require_jwt_principal)],
 ) -> dict[str, Any]:
     """V1.94 — compose OI-6 + lifecycle recon + fill links (detect/report)."""
+    from sqlalchemy import func, select
+
     from bolsa_api.api.dependencies import get_portfolio_recon_lookup
     from bolsa_application.lifecycle_event_store import (
         GetLifecycleSnapshot,
@@ -507,6 +512,7 @@ async def get_financial_integrity(
     from bolsa_application.reconcile_financial_integrity import (
         ReconcileFinancialIntegrity,
         ReconcileFinancialIntegrityInput,
+        unavailable_financial_integrity,
     )
     from bolsa_application.reconcile_lifecycle_integrity import (
         OutboxSnap,
@@ -519,7 +525,6 @@ async def get_financial_integrity(
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
-    from sqlalchemy import func, select
 
     await _assert_account_owned(session, principal, account_id)
 
@@ -621,7 +626,9 @@ async def get_financial_integrity(
             sla_breached=sla_breached,
         )
     )
-    assert report is not None
+    # V1.95: named fail-closed JSON — never assert/500 on None.
+    if report is None:
+        return {"data": unavailable_financial_integrity(account_id).to_dict()}
     return {"data": report.to_dict()}
 
 

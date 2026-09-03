@@ -5914,6 +5914,75 @@
         "title": "FillPendingOrderResultDto",
         "type": "object"
       },
+      "FinancialIntegrityDataDto": {
+        "additionalProperties": false,
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "fillLinkIssues": {
+            "items": {
+              "$ref": "#/components/schemas/LifecycleReconIssueDto"
+            },
+            "title": "Filllinkissues",
+            "type": "array"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/LifecycleReconciliationDataDto"
+          },
+          "operationalState": {
+            "title": "Operationalstate",
+            "type": "string"
+          },
+          "outboxDead": {
+            "default": 0,
+            "title": "Outboxdead",
+            "type": "integer"
+          },
+          "portfolioStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfoliostatus"
+          },
+          "slaBreached": {
+            "default": false,
+            "title": "Slabreached",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "status",
+          "operationalState",
+          "lifecycle"
+        ],
+        "title": "FinancialIntegrityDataDto",
+        "type": "object"
+      },
+      "FinancialIntegrityResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FinancialIntegrityDataDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "FinancialIntegrityResponseDto",
+        "type": "object"
+      },
       "FundamentalCardDto": {
         "properties": {
           "assessmentId": {
@@ -11003,6 +11072,11 @@
               }
             ],
             "title": "Oldestprocessingageseconds"
+          },
+          "operationalState": {
+            "default": "OK",
+            "title": "Operationalstate",
+            "type": "string"
           },
           "pending": {
             "title": "Pending",
@@ -25856,6 +25930,49 @@
           }
         },
         "summary": "Post Lifecycle Event",
+        "tags": [
+          "lifecycle"
+        ]
+      }
+    },
+    "/api/lifecycle/integrity": {
+      "get": {
+        "description": "V1.94 — compose OI-6 + lifecycle recon + fill links (detect/report).",
+        "operationId": "get_financial_integrity_api_lifecycle_integrity_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": true,
+            "schema": {
+              "title": "Accountid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialIntegrityResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Financial Integrity",
         "tags": [
           "lifecycle"
         ]

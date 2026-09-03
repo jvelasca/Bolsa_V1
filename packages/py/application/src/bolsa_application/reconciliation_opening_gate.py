@@ -7,7 +7,7 @@ Nunca auto-heal.
 
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 
 from bolsa_application.reconcile_live_ledger import (
     ReconcileLiveLedger,
@@ -38,8 +38,9 @@ def reconciliation_opening_veto_reason(
 
     - ``require=False`` y sin statuses → gate off (compat tests / wiring legado).
     - ``portfolio_recon_status=drift`` → ``reconciliation:portfolio_drift`` (cualquier venue).
-    - V1.94: ``lifecycle_recon_status=drift|blocked`` → lifecycle_drift / lifecycle_blocked.
-      ``lag`` / ``clean`` no vetan. ``unavailable`` con gate on → fail-closed.
+    - V1.95: ``lifecycle_recon_status`` = compose (lifecycle ⊕ fill ⊕ portfolio).
+      ``clean`` permite; ``lag`` / ``drift`` / ``blocked`` / ``unavailable`` vetan.
+      (Fail-closed: ambiguo → no comprar.)
     - Venue ``live``: ``live_drift`` / ``live_unavailable`` vetan; status ausente con
       ``require`` → ``live_unavailable`` fail-closed.
     - Venue paper (default): ignora live status (bridge ausente no tumba paper).
@@ -61,6 +62,8 @@ def reconciliation_opening_veto_reason(
         return "reconciliation:lifecycle_blocked"
     if lifecycle_recon_status == "drift":
         return "reconciliation:lifecycle_drift"
+    if lifecycle_recon_status == "lag":
+        return "reconciliation:lifecycle_lag"
     if lifecycle_recon_status == "unavailable":
         return "reconciliation:lifecycle_unavailable"
 
@@ -135,7 +138,7 @@ class ReconcileLiveLedgerLookup:
 
 
 class ReconcileLifecycleIntegrityLookup:
-    """Adapter V1.94 lifecycle/integrity → status para el opening veto."""
+    """Adapter V1.94 lifecycle-only → status (legacy / unit). Prefer financial compose."""
 
     def __init__(self, uc: Any) -> None:
         self._uc = uc
@@ -150,11 +153,37 @@ class ReconcileLifecycleIntegrityLookup:
         report = await self._uc.reconcile(
             ReconcileLifecycleIntegrityInput(account_id=account_id)
         )
+        # V1.95: named unavailable (never raise → generic deny).
         if report is None:
-            raise RuntimeError("lifecycle recon unavailable")
+            return "unavailable"
         status = getattr(report, "status", None)
         if status in ("clean", "lag", "drift", "blocked"):
-            return status  # type: ignore[return-value]
+            return cast(LifecycleReconGateStatus, status)
+        return "unavailable"
+
+
+class ReconcileFinancialIntegrityLookup:
+    """V1.95 OR-4 — composed financial integrity status (lifecycle ⊕ fill ⊕ portfolio)."""
+
+    def __init__(self, uc: Any) -> None:
+        self._uc = uc
+
+    async def lifecycle_recon_status(
+        self, account_id: str
+    ) -> LifecycleReconGateStatus:
+        from bolsa_application.reconcile_financial_integrity import (
+            ReconcileFinancialIntegrityInput,
+        )
+
+        report = await self._uc.reconcile(
+            ReconcileFinancialIntegrityInput(account_id=account_id)
+        )
+        # V1.95: named unavailable → reconciliation:lifecycle_unavailable.
+        if report is None:
+            return "unavailable"
+        status = getattr(report, "status", None)
+        if status in ("clean", "lag", "drift", "blocked"):
+            return cast(LifecycleReconGateStatus, status)
         return "unavailable"
 
 

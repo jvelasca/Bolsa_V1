@@ -196,7 +196,14 @@ export function OpsFinancialIntegritySection({
             <div>
               <dt className="text-xs text-muted-foreground">ops state</dt>
               <dd
-                className="font-medium"
+                className={cn(
+                  "font-medium text-base",
+                  report?.operationalState === "BLOCKED"
+                    ? "text-rose-700 dark:text-rose-300"
+                    : report?.operationalState === "DEGRADED"
+                      ? "text-amber-800 dark:text-amber-200"
+                      : "text-emerald-700 dark:text-emerald-300",
+                )}
                 data-testid="ops-financial-integrity-ops"
               >
                 {report?.operationalState ?? "—"}
@@ -233,8 +240,8 @@ export function OpsFinancialIntegritySection({
           </dl>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          Detect/report OI-6 ⊕ Lifecycle ↔ PositionState ⊕ fill/tx · no
-          auto-heal · ≠ unificar ledger.
+          operationalState es la salud operativa (OK / DEGRADED / BLOCKED). SLA
+          ok no implica sano. Detect/report · no auto-heal · ≠ unificar ledger.
         </p>
       </CardContent>
     </Card>

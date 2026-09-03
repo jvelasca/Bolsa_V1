@@ -8,8 +8,10 @@ Does NOT unify with cash ledger (OI-6 remains separate).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
+
+_FALLBACK_MIN = datetime.min.replace(tzinfo=UTC)
 
 LifecycleReconStatus = Literal["clean", "lag", "drift", "blocked"]
 LifecycleReconIssueCode = Literal[
@@ -38,28 +40,6 @@ class LifecycleReconIssue:
 
 
 @dataclass(frozen=True, slots=True)
-class LifecycleReconciliation:
-    account_id: str
-    status: LifecycleReconStatus
-    checked: int
-    drift_count: int
-    lag_count: int
-    blocked_count: int
-    issues: tuple[LifecycleReconIssue, ...] = field(default_factory=tuple)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "accountId": self.account_id,
-            "status": self.status,
-            "checked": self.checked,
-            "driftCount": self.drift_count,
-            "lagCount": self.lag_count,
-            "blockedCount": self.blocked_count,
-            "issues": [i.to_dict() for i in self.issues],
-        }
-
-
-@dataclass(frozen=True, slots=True)
 class PositionStateSnap:
     position_id: str
     status: str
@@ -75,6 +55,39 @@ class OutboxSnap:
     status: str
     created_at: Any = None
     id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LifecycleReconciliation:
+    account_id: str
+    status: LifecycleReconStatus
+    checked: int
+    drift_count: int
+    lag_count: int
+    blocked_count: int
+    issues: tuple[LifecycleReconIssue, ...] = field(default_factory=tuple)
+    # V1.95 P2-02 — reuse in financial compose (not serialized).
+    positions: tuple[PositionStateSnap, ...] = field(default_factory=tuple, repr=False)
+    snapshots_by_position: dict[str, dict[str, Any]] = field(
+        default_factory=dict, repr=False
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "accountId": self.account_id,
+            "status": self.status,
+            "checked": self.checked,
+            "driftCount": self.drift_count,
+            "lagCount": self.lag_count,
+            "blockedCount": self.blocked_count,
+            "issues": [i.to_dict() for i in self.issues],
+        }
+
+    def has_dead_non_head(self) -> bool:
+        return any(i.code == "dead_non_head" for i in self.issues)
+
+    def has_dead_head(self) -> bool:
+        return any(i.code == "dead_head" for i in self.issues)
 
 
 class PositionStatesPort(Protocol):
@@ -173,11 +186,27 @@ def _lifecycle_keys(pos: PositionStateSnap) -> list[str]:
 
 
 def _outbox_sort_key(row: OutboxSnap) -> tuple[Any, str]:
+    """FIFO key: aware UTC timestamps only (never mix naive/aware)."""
     created = row.created_at
     if created is None:
-        created = datetime.min
+        created = _FALLBACK_MIN
+    elif isinstance(created, datetime) and created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
     rid = row.id or ""
     return (created, rid)
+
+
+def unavailable_lifecycle_reconciliation(account_id: str) -> LifecycleReconciliation:
+    """Named fail-closed report when reconcile cannot compute (never assert/500)."""
+    return LifecycleReconciliation(
+        account_id=account_id,
+        status="blocked",
+        checked=0,
+        drift_count=0,
+        lag_count=0,
+        blocked_count=0,
+        issues=(),
+    )
 
 
 def fifo_outbox_head(rows: list[OutboxSnap]) -> OutboxSnap | None:
@@ -359,12 +388,18 @@ def build_lifecycle_reconciliation(
     }
     lag_count = sum(1 for i in issues if i.code == "lifecycle_lag")
     blocked_count = sum(1 for i in issues if i.code == "dead_head")
+    dead_non_head_count = sum(1 for i in issues if i.code == "dead_non_head")
     drift_count = sum(1 for i in issues if i.code in drift_codes)
+    # Priority: dead_head blocked > drift > lag > dead_non_head (never clean).
+    # dead_non_head keeps issue.code distinct from FIFO dead_head; status uses the
+    # lag wire bucket so compose/operationalState can stay DEGRADED (not BLOCKED).
     if blocked_count:
         status: LifecycleReconStatus = "blocked"
     elif drift_count:
         status = "drift"
     elif lag_count:
+        status = "lag"
+    elif dead_non_head_count:
         status = "lag"
     else:
         status = "clean"
@@ -378,6 +413,8 @@ def build_lifecycle_reconciliation(
         lag_count=lag_count,
         blocked_count=blocked_count,
         issues=tuple(issues),
+        positions=tuple(positions),
+        snapshots_by_position=dict(snapshots_by_position),
     )
 
 
@@ -434,7 +471,9 @@ class ReconcileLifecycleIntegrity:
         if callable(batch):
             snapshots_by_position = dict(await batch(account_id))
         else:
-            execute = getattr(self._snapshots, "execute")
+            execute = getattr(self._snapshots, "execute", None)
+            if not callable(execute):
+                raise TypeError("snapshots port must provide execute()")
             needed: set[str] = set()
             for pos in snaps:
                 needed.update(_lifecycle_keys(pos))
@@ -446,9 +485,9 @@ class ReconcileLifecycleIntegrity:
         for pos in snaps:
             for key in _lifecycle_keys(pos):
                 if key not in snapshots_by_position:
-                    execute = getattr(self._snapshots, "execute", None)
-                    if callable(execute):
-                        snapshots_by_position[key] = await execute(key)
+                    execute_one = getattr(self._snapshots, "execute", None)
+                    if callable(execute_one):
+                        snapshots_by_position[key] = await execute_one(key)
                     else:
                         snapshots_by_position[key] = {
                             "positionId": key,
@@ -475,4 +514,5 @@ __all__ = [
     "ReconcileLifecycleIntegrityInput",
     "build_lifecycle_reconciliation",
     "fifo_outbox_head",
+    "unavailable_lifecycle_reconciliation",
 ]

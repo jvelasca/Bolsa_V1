@@ -28,8 +28,8 @@ from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_application.account_mandate_gate import account_mandate_veto_reason
 from bolsa_application.reconciliation_opening_gate import (
-    LiveReconStatus,
     LifecycleReconGateStatus,
+    LiveReconStatus,
     PortfolioReconStatus,
     reconciliation_opening_veto_reason,
 )

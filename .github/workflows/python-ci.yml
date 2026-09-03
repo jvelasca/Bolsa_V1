@@ -67,6 +67,9 @@ jobs:
           packages/py/market/tests
           packages/py/analytics/tests
           packages/py/application/tests/test_lifecycle_event_store.py
+          packages/py/application/tests/test_reconcile_lifecycle_integrity_v193.py
+          packages/py/application/tests/test_reconcile_financial_integrity_v194.py
+          packages/py/application/tests/test_reconciliation_opening_gate.py
           packages/py/infrastructure/tests/test_verify_financial_invariants.py
           apps/api-python/tests
           --ignore=apps/api-python/tests/integration
@@ -84,5 +87,7 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_golden_v188.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v190.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v191.py
+          --ignore=apps/api-python/tests/test_lifecycle_golden_v195.py
           --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
+          --ignore=apps/api-python/tests/test_financial_integrity_pg.py
           -q
