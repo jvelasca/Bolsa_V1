@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
 from bolsa_analytics.cognitive.paper_order import (
     build_paper_order,
     stable_order_id_from_decision,
     transition_paper_order,
 )
-from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
 from bolsa_analytics.cognitive.submit_intent import (
     bind_venue_order,
     mark_send_attempted,

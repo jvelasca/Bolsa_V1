@@ -5,17 +5,20 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.submit_intent import (
     bind_venue_order,
     record_submit_intent,
 )
-from bolsa_application.broker_adapter import XtbBrokerAdapter
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
-from bolsa_application.submit_intent_store import InMemorySubmitIntentStore
 from bolsa_market.providers import XtbBridgeOrderResult
+
+from bolsa_application.broker_adapter import XtbBrokerAdapter
+from bolsa_application.confirm_recommendation import (
+    ConfirmRecommendationIntent,
+    confirm_leg_idempotency_key,
+)
+from bolsa_application.submit_intent_store import InMemorySubmitIntentStore
 
 
 class _CountingAdapter:
@@ -85,10 +88,11 @@ async def test_or2_crash_after_record_reconstructs_unknown_without_submit() -> N
     """Crash post-recorded (antes de venue) → UNKNOWN + mismos ids · 0 submit."""
     store = InMemorySubmitIntentStore()
     decision_id = "DEC-OR2-CRASH"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     recorded = record_submit_intent(
-        decision_id=decision_id,
-        intent_id=stable_intent_id_from_decision(decision_id),
-        order_id=stable_order_id_from_decision(decision_id),
+        decision_id=leg_key,
+        intent_id=stable_intent_id_from_decision(leg_key),
+        order_id=stable_order_id_from_decision(leg_key),
         account_id="acc-1",
     )
     await store.put(recorded)
@@ -110,9 +114,9 @@ async def test_or2_crash_after_record_reconstructs_unknown_without_submit() -> N
     assert result["executionRecord"]["outcome"] == "unknown"
     assert result["executionRecord"]["sendAttempted"] is True
     assert result["intent"]["intentId"] == stable_intent_id_from_decision(decision_id)
-    assert result["submitIntent"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert result["submitIntent"]["orderId"] == stable_order_id_from_decision(leg_key)
     assert result["paperOrder"]["status"] == "UNKNOWN"
-    assert result["paperOrder"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert result["paperOrder"]["orderId"] == stable_order_id_from_decision(leg_key)
 
 
 @pytest.mark.asyncio
@@ -120,10 +124,11 @@ async def test_or2_crash_after_venue_bind_preserves_mapping_without_repost() -> 
     """Crash post-venue_order_id → UNKNOWN + mapeo · 0 re-POST."""
     store = InMemorySubmitIntentStore()
     decision_id = "DEC-OR2-VENUE"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     recorded = record_submit_intent(
-        decision_id=decision_id,
-        intent_id=stable_intent_id_from_decision(decision_id),
-        order_id=stable_order_id_from_decision(decision_id),
+        decision_id=leg_key,
+        intent_id=stable_intent_id_from_decision(leg_key),
+        order_id=stable_order_id_from_decision(leg_key),
         account_id="acc-1",
     )
     await store.put(bind_venue_order(recorded, venue_order_id="xtb-crash-1"))
@@ -173,12 +178,13 @@ async def test_or2_local_fill_still_wins_over_in_flight() -> None:
     """OR-1 intacto: fill local gana al intento durable (replay executed)."""
     store = InMemorySubmitIntentStore()
     decision_id = "DEC-OR2-FILL"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     execute = _OkExecute()
-    await execute.execute(idempotency_key=decision_id)
+    await execute.execute(idempotency_key=leg_key)
     recorded = record_submit_intent(
-        decision_id=decision_id,
-        intent_id=stable_intent_id_from_decision(decision_id),
-        order_id=stable_order_id_from_decision(decision_id),
+        decision_id=leg_key,
+        intent_id=stable_intent_id_from_decision(leg_key),
+        order_id=stable_order_id_from_decision(leg_key),
         account_id="acc-1",
     )
     await store.put(recorded)

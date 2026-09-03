@@ -10,7 +10,6 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-
 from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.submit_intent import (
@@ -18,11 +17,15 @@ from bolsa_analytics.cognitive.submit_intent import (
     mark_send_attempted,
     record_submit_intent,
 )
-from bolsa_application.broker_adapter import XtbBrokerAdapter
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
-from bolsa_application.submit_intent_store import PostgresSubmitIntentStore
 from bolsa_infrastructure.database.models.tables import SubmitIntentRow
 from bolsa_market.providers import XtbBridgeOrderResult
+
+from bolsa_application.broker_adapter import XtbBrokerAdapter
+from bolsa_application.confirm_recommendation import (
+    ConfirmRecommendationIntent,
+    confirm_leg_idempotency_key,
+)
+from bolsa_application.submit_intent_store import PostgresSubmitIntentStore
 
 
 def _decision_id_from_stmt(stmt: Any) -> str:
@@ -135,11 +138,12 @@ async def test_dex2_postgres_store_survives_new_session_instance() -> None:
     table = _SharedPgTable()
     store_a = _fresh_store(table)
     decision_id = "DEC-DEX2-PG"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     intent = mark_send_attempted(
         record_submit_intent(
-            decision_id=decision_id,
-            intent_id=stable_intent_id_from_decision(decision_id),
-            order_id=stable_order_id_from_decision(decision_id),
+            decision_id=leg_key,
+            intent_id=stable_intent_id_from_decision(leg_key),
+            order_id=stable_order_id_from_decision(leg_key),
             account_id="acc-1",
             venue="live",
         )
@@ -150,12 +154,12 @@ async def test_dex2_postgres_store_survives_new_session_instance() -> None:
 
     store_b = _fresh_store(table)
     assert id(store_b) != store_a_id
-    got = await store_b.get(decision_id)
+    got = await store_b.get(leg_key)
     assert got is not None
     assert got.phase == "send_attempted"
-    assert got.decision_id == decision_id
-    assert got.intent_id == stable_intent_id_from_decision(decision_id)
-    assert got.order_id == stable_order_id_from_decision(decision_id)
+    assert got.decision_id == leg_key
+    assert got.intent_id == stable_intent_id_from_decision(leg_key)
+    assert got.order_id == stable_order_id_from_decision(leg_key)
     assert got.send_attempted_at is not None
 
 
@@ -165,10 +169,11 @@ async def test_dex2_fresh_client_reconstructs_unknown_without_submit() -> None:
     table = _SharedPgTable()
     store_a = _fresh_store(table)
     decision_id = "DEC-DEX2-CRASH"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     recorded = record_submit_intent(
-        decision_id=decision_id,
-        intent_id=stable_intent_id_from_decision(decision_id),
-        order_id=stable_order_id_from_decision(decision_id),
+        decision_id=leg_key,
+        intent_id=stable_intent_id_from_decision(leg_key),
+        order_id=stable_order_id_from_decision(leg_key),
         account_id="acc-1",
     )
     await store_a.put(recorded)
@@ -190,9 +195,9 @@ async def test_dex2_fresh_client_reconstructs_unknown_without_submit() -> None:
     assert result["trade"]["crashRecovery"] is True
     assert result["trade"]["reason"] == "crash_before_venue_ack"
     assert result["intent"]["intentId"] == stable_intent_id_from_decision(decision_id)
-    assert result["submitIntent"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert result["submitIntent"]["orderId"] == stable_order_id_from_decision(leg_key)
     assert result["paperOrder"]["status"] == "UNKNOWN"
-    assert result["paperOrder"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert result["paperOrder"]["orderId"] == stable_order_id_from_decision(leg_key)
 
 
 @pytest.mark.asyncio
@@ -201,10 +206,11 @@ async def test_dex2_fresh_client_preserves_venue_mapping_without_repost() -> Non
     table = _SharedPgTable()
     store_a = _fresh_store(table)
     decision_id = "DEC-DEX2-VENUE"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     recorded = record_submit_intent(
-        decision_id=decision_id,
-        intent_id=stable_intent_id_from_decision(decision_id),
-        order_id=stable_order_id_from_decision(decision_id),
+        decision_id=leg_key,
+        intent_id=stable_intent_id_from_decision(leg_key),
+        order_id=stable_order_id_from_decision(leg_key),
         account_id="acc-1",
     )
     await store_a.put(bind_venue_order(recorded, venue_order_id="xtb-dex2-1"))
@@ -269,10 +275,11 @@ async def test_dex2_put_update_visible_to_fresh_store() -> None:
     table = _SharedPgTable()
     store_a = _fresh_store(table)
     decision_id = "DEC-DEX2-PHASE"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     base = record_submit_intent(
-        decision_id=decision_id,
-        intent_id=stable_intent_id_from_decision(decision_id),
-        order_id=stable_order_id_from_decision(decision_id),
+        decision_id=leg_key,
+        intent_id=stable_intent_id_from_decision(leg_key),
+        order_id=stable_order_id_from_decision(leg_key),
         account_id="acc-1",
     )
     await store_a.put(base)
@@ -280,7 +287,7 @@ async def test_dex2_put_update_visible_to_fresh_store() -> None:
     del store_a
 
     store_b = _fresh_store(table)
-    got = await store_b.get(decision_id)
+    got = await store_b.get(leg_key)
     assert got is not None
     assert got.phase == "send_attempted"
     assert got.send_attempted_at is not None

@@ -19,15 +19,18 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-
-from bolsa_application.accounts import ExecuteTrade
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     TradeResult,
     Transaction,
+)
+
+from bolsa_application.accounts import ExecuteTrade
+from bolsa_application.confirm_recommendation import (
+    ConfirmRecommendationIntent,
+    confirm_leg_idempotency_key,
 )
 
 
@@ -1688,6 +1691,7 @@ async def test_or1_confirm_retry_post_fill_short_circuits_without_submit() -> No
     fake_trade = _IdempotentPeekExecuteTrade()
     journal = _CountingJournal()
     decision_id = "DEC-OR1-RETRY"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         journal_writer=journal,
@@ -1719,7 +1723,7 @@ async def test_or1_confirm_retry_post_fill_short_circuits_without_submit() -> No
     assert first["intent"]["intentId"] == second["intent"]["intentId"]
     assert first["intent"]["intentId"] == stable_intent_id_from_decision(decision_id)
     assert first["paperOrder"]["orderId"] == second["paperOrder"]["orderId"]
-    assert first["paperOrder"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert first["paperOrder"]["orderId"] == stable_order_id_from_decision(leg_key)
     assert first["paperOrder"]["status"] == "FILLED"
     assert second["paperOrder"]["status"] == "FILLED"
     assert second["executionRecord"]["outcome"] == "executed"
@@ -1759,6 +1763,7 @@ async def test_or1_stable_intent_and_order_ids_from_decision() -> None:
     from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 
     decision_id = "DEC-OR1-STABLE"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     fake_trade = _FakeExecuteTrade()
     use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
     raw = _opening_recommendation(
@@ -1771,7 +1776,7 @@ async def test_or1_stable_intent_and_order_ids_from_decision() -> None:
     r2 = await use_case.execute(recommendation_raw=raw, account_id="acc-1", execute=True)
     assert r1["intent"]["intentId"] == stable_intent_id_from_decision(decision_id)
     assert r2["intent"]["intentId"] == r1["intent"]["intentId"]
-    assert r1["paperOrder"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert r1["paperOrder"]["orderId"] == stable_order_id_from_decision(leg_key)
     assert r2["paperOrder"]["orderId"] == r1["paperOrder"]["orderId"]
 
 

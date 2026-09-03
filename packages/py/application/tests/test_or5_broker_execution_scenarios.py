@@ -8,14 +8,23 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pytest
-
 from bolsa_analytics.cognitive.exit_plan import build_exit_plan_from_position
 from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
 from bolsa_analytics.cognitive.submit_intent import record_submit_intent
+from bolsa_domain.entities.portfolio import (
+    Portfolio,
+    PortfolioSummary,
+    TradeResult,
+    Transaction,
+)
+
 from bolsa_application.broker_adapter import MockBrokerAdapter
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+from bolsa_application.confirm_recommendation import (
+    ConfirmRecommendationIntent,
+    confirm_leg_idempotency_key,
+)
 from bolsa_application.execute_gated_portfolio_trade import ExecuteGatedPortfolioTrade
 from bolsa_application.persist_position_from_exit import (
     LAST_EXIT_TRANSACTION_KEY,
@@ -27,12 +36,6 @@ from bolsa_application.reconciliation_opening_gate import (
     reconciliation_opening_veto_reason,
 )
 from bolsa_application.submit_intent_store import InMemorySubmitIntentStore
-from bolsa_domain.entities.portfolio import (
-    Portfolio,
-    PortfolioSummary,
-    TradeResult,
-    Transaction,
-)
 
 
 def _triggered(**overrides: object) -> dict[str, Any]:
@@ -474,6 +477,7 @@ async def test_or5_l_mock_live_adapter_not_wired() -> None:
 async def test_or5_retry_confirm_short_circuits_without_second_execute() -> None:
     fake = _IdempotentPeekExecute()
     decision_id = "DEC-OR5-RETRY"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     uc = ConfirmRecommendationIntent(execute_trade=fake)
     raw = _opening_raw(decision_id=decision_id, qty=5.0)
     first = await uc.execute(recommendation_raw=raw, account_id="acc-1", execute=True)
@@ -484,17 +488,18 @@ async def test_or5_retry_confirm_short_circuits_without_second_execute() -> None
     assert second["trade"].get("idempotentReplay") is True
     assert first["trade"]["transactionId"] == second["trade"]["transactionId"]
     assert first["intent"]["intentId"] == stable_intent_id_from_decision(decision_id)
-    assert first["paperOrder"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert first["paperOrder"]["orderId"] == stable_order_id_from_decision(leg_key)
 
 
 @pytest.mark.asyncio
 async def test_or5_crash_recovery_unknown_without_repost() -> None:
     store = InMemorySubmitIntentStore()
     decision_id = "DEC-OR5-CRASH"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     recorded = record_submit_intent(
-        decision_id=decision_id,
-        intent_id=stable_intent_id_from_decision(decision_id),
-        order_id=stable_order_id_from_decision(decision_id),
+        decision_id=leg_key,
+        intent_id=stable_intent_id_from_decision(leg_key),
+        order_id=stable_order_id_from_decision(leg_key),
         account_id="acc-1",
     )
     await store.put(recorded)

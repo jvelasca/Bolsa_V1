@@ -81,9 +81,9 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
                 text("SELECT version_num FROM alembic_version")
             )
             versions = {row[0] for row in version}
-            if "017_lifecycle_outbox" not in versions:
+            if "018_lifecycle_outbox_worker" not in versions:
                 raise RuntimeError(
-                    f"alembic_version is {versions!r}; expected 017_lifecycle_outbox"
+                    f"alembic_version is {versions!r}; expected 018_lifecycle_outbox_worker"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()

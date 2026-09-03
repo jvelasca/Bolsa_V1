@@ -33,6 +33,8 @@ from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
 from bolsa_analytics.cognitive.recommendation import Recommendation
 from bolsa_analytics.cognitive.risk_signature import apply_signed_levels_to_trade_plan
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.broker_adapter import IBrokerAdapter, resolve_broker_adapter
@@ -80,7 +82,6 @@ from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 # Compat: nombres privados históricos usados por tests internos / re-exports.
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
@@ -102,6 +103,7 @@ from bolsa_application.confirm.risk_gate import (  # noqa: E402
 __all__ = [
     "ConfirmRecommendationIntent",
     "PRICE_REVALIDATION_MAX_REL_DEVIATION",
+    "confirm_leg_idempotency_key",
     "extract_operativa_protect_meta",
     "extract_operativa_exit_meta",
     "price_revalidation_reason",
@@ -110,6 +112,13 @@ __all__ = [
     "resolve_session_decision_package",
     "risk_signature_reject_reason",
 ]
+
+
+def confirm_leg_idempotency_key(decision_id: str, action: str, side: str) -> str:
+    """V1.91 — clave submit/trade por pierna Confirm (OPEN/T1/EXIT reusan decisionId)."""
+    a = (action or "").strip() or "unknown"
+    s = (side or "").strip() or "unknown"
+    return f"{decision_id.strip()}|{a}|{s}"
 
 
 def _attach_execution_record(result: dict[str, Any]) -> None:
@@ -818,9 +827,11 @@ class ConfirmRecommendationIntent:
                 "contract": contract_status,
             }
             return
-        action = str(rec.action or "").strip() or "unknown"
-        side = str(intent.side or "").strip() or "unknown"
-        idem_key = f"{decision}|{action}|{side}"
+        idem_key = confirm_leg_idempotency_key(
+            decision,
+            str(rec.action or ""),
+            str(intent.side or ""),
+        )
 
         existing_fill = await self._execution.find_existing_fill(
             account_id=account_id,

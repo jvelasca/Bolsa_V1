@@ -12,7 +12,6 @@ import random
 from typing import Any
 
 import pytest
-
 from bolsa_analytics.cognitive.operational_invariants import (
     adverse_exposure,
     filled_le_ordered,
@@ -34,12 +33,16 @@ from bolsa_analytics.cognitive.position_state import (
     apply_position_current_stop,
     build_position_state_from_fill,
 )
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+from bolsa_domain.entities.portfolio import TradeResult, Transaction
+
+from bolsa_application.confirm_recommendation import (
+    ConfirmRecommendationIntent,
+    confirm_leg_idempotency_key,
+)
 from bolsa_application.reconciliation_opening_gate import (
     reconciliation_opening_veto_reason,
 )
 from bolsa_application.risk_engine import check_opening
-from bolsa_domain.entities.portfolio import TradeResult, Transaction
 
 _OPEN_STATUSES: tuple[PaperOrderStatus, ...] = (
     "CREATED",
@@ -274,12 +277,13 @@ def test_dex5_property_stable_order_id_deterministic() -> None:
 @pytest.mark.asyncio
 async def test_dex5_one_decision_one_live_order_confirm_replay() -> None:
     decision_id = "DEC-DEX5-ONE"
+    leg_key = confirm_leg_idempotency_key(decision_id, "recommend_long", "buy")
     fake = _IdempotentTrade()
     uc = ConfirmRecommendationIntent(execute_trade=fake)
     raw = _opening_raw(decision_id=decision_id)
     first = await uc.execute(recommendation_raw=raw, account_id="acc-1", execute=True)
     second = await uc.execute(recommendation_raw=raw, account_id="acc-1", execute=True)
-    assert first["paperOrder"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert first["paperOrder"]["orderId"] == stable_order_id_from_decision(leg_key)
     assert second["paperOrder"]["orderId"] == first["paperOrder"]["orderId"]
     assert fake.unique_fills == 1
     assert first["paperOrder"]["status"] == "FILLED"
