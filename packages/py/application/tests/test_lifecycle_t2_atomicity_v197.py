@@ -5,7 +5,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from bolsa_domain.lifecycle import LifecycleEventInput
 from sqlalchemy.exc import IntegrityError
 
 from bolsa_application.lifecycle_event_store import (
@@ -18,6 +17,7 @@ from bolsa_application.lifecycle_t2_bridge import (
     build_t2_triggered_input,
     needs_atomic_t2_pair,
 )
+from bolsa_domain.lifecycle import LifecycleEventInput
 
 
 async def _seed_open_t1(store: InMemoryLifecycleEventStore, pos: str = "pos-t2-atom") -> None:

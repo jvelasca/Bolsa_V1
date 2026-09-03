@@ -14,6 +14,15 @@ from decimal import Decimal
 from typing import Any, Literal, Protocol
 from uuid import uuid4
 
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from bolsa_application.lifecycle_t2_bridge import (
+    build_t2_triggered_input,
+    needs_atomic_t2_pair,
+)
 from bolsa_domain.lifecycle import (
     AppendFail,
     AppendOk,
@@ -30,15 +39,6 @@ from bolsa_domain.lifecycle import (
 from bolsa_infrastructure.database.models.tables import (
     LifecycleAggregateRow,
     LifecycleEventRow,
-)
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from bolsa_application.lifecycle_t2_bridge import (
-    build_t2_triggered_input,
-    needs_atomic_t2_pair,
 )
 
 # Optional inject: called after flushing event at index ``i`` inside append_many.
