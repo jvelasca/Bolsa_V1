@@ -22,6 +22,7 @@ class OpeningGateCoordinator:
         mandates: Any | None = None,
         portfolio_recon: Any | None = None,
         live_recon: Any | None = None,
+        lifecycle_recon: Any | None = None,
         incident_store: Any | None = None,
         instrument_data_status: Any | None = None,
         resolve_broker_venue: Any | None = None,
@@ -34,6 +35,7 @@ class OpeningGateCoordinator:
         self._mandates = mandates
         self._portfolio_recon = portfolio_recon
         self._live_recon = live_recon
+        self._lifecycle_recon = lifecycle_recon
         self._incident_store = incident_store
         self._instrument_data_status = instrument_data_status
         self._resolve_broker_venue = resolve_broker_venue
@@ -58,6 +60,7 @@ class OpeningGateCoordinator:
             mandates=self._mandates,
             portfolio_recon=self._portfolio_recon,
             live_recon=self._live_recon,
+            lifecycle_recon=self._lifecycle_recon,
             incident_store=self._incident_store,
             instrument_data_status=self._instrument_data_status,
             broker_venue=venue,

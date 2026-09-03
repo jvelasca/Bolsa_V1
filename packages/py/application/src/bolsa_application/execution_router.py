@@ -316,6 +316,7 @@ class ExecutionRouter:
         mandates: AccountMandateLookup | None = None,
         portfolio_recon: PortfolioReconLookup | None = None,
         live_recon: LiveReconLookup | None = None,
+        lifecycle_recon: Any | None = None,
         incident_store: OperationalIncidentStore | None = None,
         journal_writer: Any | None = None,
         instrument_data_status: Any | None = None,
@@ -337,6 +338,7 @@ class ExecutionRouter:
         self._mandates = mandates
         self._portfolio_recon = portfolio_recon
         self._live_recon = live_recon
+        self._lifecycle_recon = lifecycle_recon
         self._incident_store = incident_store
         self._journal_writer = journal_writer
         self._instrument_data_status = instrument_data_status
@@ -370,6 +372,7 @@ class ExecutionRouter:
         """OR-4 — statuses para check_opening, o DENY si lookup falla."""
         portfolio_status = None
         live_status = None
+        lifecycle_status = None
         require = False
         if self._portfolio_recon is not None:
             require = True
@@ -381,6 +384,18 @@ class ExecutionRouter:
                 return RiskDecision(
                     verdict="DENY",
                     reasons=("reconciliation:portfolio_lookup_failed",),
+                    guard=None,
+                )
+        if self._lifecycle_recon is not None:
+            require = True
+            try:
+                lifecycle_status = await self._lifecycle_recon.lifecycle_recon_status(
+                    account_id
+                )
+            except Exception:  # noqa: BLE001
+                return RiskDecision(
+                    verdict="DENY",
+                    reasons=("reconciliation:lifecycle_lookup_failed",),
                     guard=None,
                 )
         venue = (broker_venue or "paper").strip().lower()
@@ -415,6 +430,7 @@ class ExecutionRouter:
         return {
             "portfolio_recon_status": portfolio_status,
             "live_recon_status": live_status,
+            "lifecycle_recon_status": lifecycle_status,
             "broker_venue": venue,
             "require_recon_veto": require,
             "incident_status": incident_status,

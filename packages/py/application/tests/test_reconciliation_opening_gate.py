@@ -72,3 +72,34 @@ def test_live_require_without_status_fail_closed() -> None:
         )
         == "reconciliation:live_unavailable"
     )
+
+
+def test_lifecycle_drift_denies() -> None:
+    assert (
+        reconciliation_opening_veto_reason(lifecycle_recon_status="drift")
+        == "reconciliation:lifecycle_drift"
+    )
+
+
+def test_lifecycle_blocked_denies() -> None:
+    assert (
+        reconciliation_opening_veto_reason(lifecycle_recon_status="blocked")
+        == "reconciliation:lifecycle_blocked"
+    )
+
+
+def test_lifecycle_lag_allows() -> None:
+    assert (
+        reconciliation_opening_veto_reason(
+            lifecycle_recon_status="lag",
+            require=True,
+        )
+        is None
+    )
+
+
+def test_lifecycle_unavailable_denies() -> None:
+    assert (
+        reconciliation_opening_veto_reason(lifecycle_recon_status="unavailable")
+        == "reconciliation:lifecycle_unavailable"
+    )

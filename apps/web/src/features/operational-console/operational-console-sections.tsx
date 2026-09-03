@@ -129,11 +129,112 @@ export function OpsLifecycleOutboxSection({
                   {stats?.slaBreached ? "BREACHED" : "ok"}
                 </dd>
               </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">ops state</dt>
+                <dd
+                  className={cn(
+                    "font-medium",
+                    stats?.operationalState === "BLOCKED"
+                      ? "text-rose-700 dark:text-rose-300"
+                      : stats?.operationalState === "DEGRADED"
+                        ? "text-amber-800 dark:text-amber-200"
+                        : "text-emerald-700 dark:text-emerald-300",
+                  )}
+                  data-testid="ops-outbox-operational-state"
+                >
+                  {stats?.operationalState ?? "—"}
+                </dd>
+              </div>
             </dl>
           </>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          Cola durable PositionState→Lifecycle · no sustituye el ledger.
+          Cola durable PositionState→Lifecycle · SLA ok + dead≠0 ≠ sano · no
+          sustituye el ledger.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function OpsFinancialIntegritySection({
+  report,
+  isLoading,
+  isError,
+}: {
+  report:
+    | import("@/features/operational-console/use-financial-integrity").FinancialIntegrity
+    | undefined;
+  isLoading?: boolean;
+  isError?: boolean;
+}) {
+  return (
+    <Card data-testid="ops-financial-integrity-section">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Financial integrity</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Cargando integridad…</p>
+        ) : null}
+        {isError ? (
+          <p className="text-xs text-destructive">
+            No se pudo cargar financial integrity.
+          </p>
+        ) : null}
+        {!isLoading && !isError ? (
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div>
+              <dt className="text-xs text-muted-foreground">status</dt>
+              <dd
+                className="font-medium"
+                data-testid="ops-financial-integrity-status"
+              >
+                {report?.status ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">ops state</dt>
+              <dd
+                className="font-medium"
+                data-testid="ops-financial-integrity-ops"
+              >
+                {report?.operationalState ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">portfolio</dt>
+              <dd className="font-medium tabular-nums">
+                {report?.portfolioStatus ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">fill links</dt>
+              <dd className="font-medium tabular-nums">
+                {report?.fillLinkIssues?.length ?? 0}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">lifecycle</dt>
+              <dd className="font-medium">
+                {report?.lifecycle?.status ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                drift / lag / blocked
+              </dt>
+              <dd className="font-medium tabular-nums">
+                {report?.lifecycle?.driftCount ?? 0} /{" "}
+                {report?.lifecycle?.lagCount ?? 0} /{" "}
+                {report?.lifecycle?.blockedCount ?? 0}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+        <p className="text-xs text-muted-foreground">
+          Detect/report OI-6 ⊕ Lifecycle ↔ PositionState ⊕ fill/tx · no
+          auto-heal · ≠ unificar ledger.
         </p>
       </CardContent>
     </Card>

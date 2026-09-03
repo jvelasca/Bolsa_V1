@@ -167,6 +167,10 @@ class LifecycleEventStore(Protocol):
 
     async def list_by_position(self, position_id: str) -> list[LifecycleStoreEvent]: ...
 
+    async def list_events_for_account(
+        self, account_id: str
+    ) -> list[LifecycleStoreEvent]: ...
+
     async def append(self, event: LifecycleStoreEvent) -> LifecycleStoreEvent: ...
 
     async def get_by_event_id(self, event_id: str) -> LifecycleStoreEvent | None: ...
@@ -207,6 +211,24 @@ class PostgresLifecycleEventStore:
             select(LifecycleEventRow)
             .where(LifecycleEventRow.position_id == position_id)
             .order_by(LifecycleEventRow.sequence_no.asc())
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [row_to_event(row) for row in rows]
+
+    async def list_events_for_account(
+        self, account_id: str
+    ) -> list[LifecycleStoreEvent]:
+        """V1.94 — batch read for account-scoped integrity (no N+1)."""
+        aid = account_id.strip() if account_id else ""
+        if not aid:
+            return []
+        stmt = (
+            select(LifecycleEventRow)
+            .where(LifecycleEventRow.account_id == aid)
+            .order_by(
+                LifecycleEventRow.position_id.asc(),
+                LifecycleEventRow.sequence_no.asc(),
+            )
         )
         rows = (await self._session.execute(stmt)).scalars().all()
         return [row_to_event(row) for row in rows]
@@ -269,6 +291,25 @@ class InMemoryLifecycleEventStore:
     async def list_by_position(self, position_id: str) -> list[LifecycleStoreEvent]:
         rows = list(self._by_position.get(position_id, []))
         return sorted(rows, key=lambda e: e.sequence_no or 0)
+
+    async def list_events_for_account(
+        self, account_id: str
+    ) -> list[LifecycleStoreEvent]:
+        aid = account_id.strip() if account_id else ""
+        if not aid:
+            return []
+        out: list[LifecycleStoreEvent] = []
+        for pid, acc in self._account.items():
+            if acc == aid:
+                out.extend(await self.list_by_position(pid))
+        # Also catch events whose account_id matches even if aggregate map missed.
+        for ev in self._by_event_id.values():
+            if ev.account_id == aid and ev not in out:
+                out.append(ev)
+        return sorted(
+            out,
+            key=lambda e: (e.position_id, e.sequence_no or 0),
+        )
 
     async def get_by_event_id(self, event_id: str) -> LifecycleStoreEvent | None:
         return self._by_event_id.get(event_id)
@@ -469,29 +510,47 @@ class AppendLifecycleEvent:
         )
 
 
+def snapshot_from_log(
+    position_id: str, log: list[LifecycleStoreEvent]
+) -> dict[str, Any]:
+    if not log:
+        return {
+            "positionId": position_id,
+            "stage": "candidate",
+            "lineagePath": "trail",
+            "events": [],
+            "accounting": None,
+        }
+    stage, lineage_path = reduce_lifecycle_events(log)
+    acct = account_lifecycle_fills(log)
+    assert_equity_invariant(acct)
+    return {
+        "positionId": position_id,
+        "stage": stage,
+        "lineagePath": lineage_path,
+        "events": [e.to_canonical_dict() for e in log],
+        "accounting": accounting_to_dict(acct),
+    }
+
+
 class GetLifecycleSnapshot:
     def __init__(self, store: LifecycleEventStore) -> None:
         self._store = store
 
     async def execute(self, position_id: str) -> dict[str, Any]:
         log = await self._store.list_by_position(position_id)
-        if not log:
-            return {
-                "positionId": position_id,
-                "stage": "candidate",
-                "lineagePath": "trail",
-                "events": [],
-                "accounting": None,
-            }
-        stage, lineage_path = reduce_lifecycle_events(log)
-        acct = account_lifecycle_fills(log)
-        assert_equity_invariant(acct)
+        return snapshot_from_log(position_id, log)
+
+    async def execute_for_account(
+        self, account_id: str
+    ) -> dict[str, dict[str, Any]]:
+        """V1.94 — one query → snapshots keyed by position_id."""
+        events = await self._store.list_events_for_account(account_id)
+        by_pos: dict[str, list[LifecycleStoreEvent]] = {}
+        for ev in events:
+            by_pos.setdefault(ev.position_id, []).append(ev)
         return {
-            "positionId": position_id,
-            "stage": stage,
-            "lineagePath": lineage_path,
-            "events": [e.to_canonical_dict() for e in log],
-            "accounting": accounting_to_dict(acct),
+            pid: snapshot_from_log(pid, log) for pid, log in by_pos.items()
         }
 
 

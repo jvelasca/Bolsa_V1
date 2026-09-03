@@ -29,6 +29,7 @@ from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_application.account_mandate_gate import account_mandate_veto_reason
 from bolsa_application.reconciliation_opening_gate import (
     LiveReconStatus,
+    LifecycleReconGateStatus,
     PortfolioReconStatus,
     reconciliation_opening_veto_reason,
 )
@@ -141,6 +142,7 @@ def check_opening(
     proposal_strategy_id: str | None = None,
     portfolio_recon_status: PortfolioReconStatus | None = None,
     live_recon_status: LiveReconStatus | None = None,
+    lifecycle_recon_status: LifecycleReconGateStatus | None = None,
     broker_venue: Literal["paper", "live"] | str | None = None,
     require_recon_veto: bool = False,
     incident_status: IncidentOpeningStatus | None = None,
@@ -211,14 +213,17 @@ def check_opening(
         require_recon_veto
         or portfolio_recon_status is not None
         or live_recon_status is not None
+        or lifecycle_recon_status is not None
     ):
         recon_reason = reconciliation_opening_veto_reason(
             portfolio_recon_status=portfolio_recon_status,
             live_recon_status=live_recon_status,
+            lifecycle_recon_status=lifecycle_recon_status,
             broker_venue=broker_venue,
             require=require_recon_veto
             or portfolio_recon_status is not None
-            or live_recon_status is not None,
+            or live_recon_status is not None
+            or lifecycle_recon_status is not None,
         )
         if recon_reason is not None:
             return RiskDecision(

@@ -54,6 +54,7 @@ class ExecuteGatedPortfolioTrade:
         mandates: AccountMandateLookup | None = None,
         portfolio_recon: PortfolioReconLookup | None = None,
         live_recon: LiveReconLookup | None = None,
+        lifecycle_recon: Any | None = None,
         incident_store: Any | None = None,
         instrument_data_status: Any | None = None,
         position_from_fill: PersistPositionFromFill | None = None,
@@ -68,6 +69,7 @@ class ExecuteGatedPortfolioTrade:
         self._mandates = mandates
         self._portfolio_recon = portfolio_recon
         self._live_recon = live_recon
+        self._lifecycle_recon = lifecycle_recon
         self._incident_store = incident_store
         self._instrument_data_status = instrument_data_status
         self._position_from_fill = position_from_fill
@@ -103,6 +105,7 @@ class ExecuteGatedPortfolioTrade:
                 mandates=self._mandates,
                 portfolio_recon=self._portfolio_recon,
                 live_recon=self._live_recon,
+                lifecycle_recon=self._lifecycle_recon,
                 incident_store=self._incident_store,
                 instrument_data_status=self._instrument_data_status,
                 broker_venue=venue,

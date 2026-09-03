@@ -45,6 +45,7 @@ vi.mock("@/features/operational-console/use-lifecycle-outbox-stats", () => ({
       oldestProcessingAgeSeconds: null,
       oldestDeadAgeSeconds: null,
       slaBreached: false,
+      operationalState: "OK",
     },
     isLoading: false,
     isError: false,
@@ -67,6 +68,31 @@ vi.mock("@/features/operational-console/use-lifecycle-reconciliation", () => ({
   }),
 }));
 
+vi.mock("@/features/operational-console/use-financial-integrity", () => ({
+  useFinancialIntegrity: () => ({
+    data: {
+      accountId: "acc-1",
+      status: "clean",
+      operationalState: "OK",
+      portfolioStatus: "clean",
+      lifecycle: {
+        accountId: "acc-1",
+        status: "clean",
+        checked: 0,
+        driftCount: 0,
+        lagCount: 0,
+        blockedCount: 0,
+        issues: [],
+      },
+      fillLinkIssues: [],
+      outboxDead: 0,
+      slaBreached: false,
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 vi.mock("@/features/operations/mesa-incident-banner", () => ({
   MesaIncidentBanner: () => null,
 }));
@@ -78,6 +104,9 @@ vi.mock("@/features/operational-console/operational-console-sections", () => ({
   OpsEstudioAutoSection: () => <div data-testid="ops-estudio-auto" />,
   OpsReconSection: () => <div data-testid="ops-recon" />,
   OpsLifecycleOutboxSection: () => <div data-testid="ops-lifecycle-outbox" />,
+  OpsFinancialIntegritySection: () => (
+    <div data-testid="ops-financial-integrity" />
+  ),
   OpsLifecycleReconSection: () => <div data-testid="ops-lifecycle-recon" />,
 }));
 

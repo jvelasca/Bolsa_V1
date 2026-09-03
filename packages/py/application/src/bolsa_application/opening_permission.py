@@ -25,8 +25,10 @@ from bolsa_application.operational_incident_store import (
     sync_opening_incidents,
 )
 from bolsa_application.reconciliation_opening_gate import (
+    LifecycleReconLookup,
     LiveReconLookup,
     LiveReconStatus,
+    LifecycleReconGateStatus,
     PortfolioReconLookup,
     PortfolioReconStatus,
 )
@@ -140,6 +142,7 @@ async def allow_opening_fill(
     mandates: AccountMandateLookup | None = None,
     portfolio_recon: PortfolioReconLookup | None = None,
     live_recon: LiveReconLookup | None = None,
+    lifecycle_recon: LifecycleReconLookup | None = None,
     broker_venue: Literal["paper", "live"] | str | None = None,
     incident_store: OperationalIncidentStore | None = None,
     instrument_data_status: Any | None = None,
@@ -181,6 +184,7 @@ async def allow_opening_fill(
             return False
     portfolio_recon_status: PortfolioReconStatus | None = None
     live_recon_status: LiveReconStatus | None = None
+    lifecycle_recon_status: LifecycleReconGateStatus | None = None
     require_recon_veto = False
     if portfolio_recon is not None:
         require_recon_veto = True
@@ -189,6 +193,14 @@ async def allow_opening_fill(
                 account_id
             )
         except Exception:  # noqa: BLE001 — OR-4: indisponibilidad = veto
+            return False
+    if lifecycle_recon is not None:
+        require_recon_veto = True
+        try:
+            lifecycle_recon_status = await lifecycle_recon.lifecycle_recon_status(
+                account_id
+            )
+        except Exception:  # noqa: BLE001 — OR-4 lifecycle: indisponibilidad = veto
             return False
     venue = (broker_venue or "paper").strip().lower()
     if live_recon is not None and venue == "live":
@@ -247,6 +259,7 @@ async def allow_opening_fill(
         require_account_mandate=require_account_mandate,
         portfolio_recon_status=portfolio_recon_status,
         live_recon_status=live_recon_status,
+        lifecycle_recon_status=lifecycle_recon_status,
         broker_venue=venue,
         require_recon_veto=require_recon_veto,
         incident_status=incident_status,

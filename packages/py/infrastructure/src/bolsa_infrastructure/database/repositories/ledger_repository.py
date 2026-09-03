@@ -152,6 +152,22 @@ class SqlAlchemyLedgerRepository:
         )
         return (await self._session.execute(stmt)).scalar_one_or_none() is not None
 
+    async def list_reference_ids(
+        self, account_id: str, *, reference_type: str = "transaction"
+    ) -> list[str]:
+        """V1.94 — fill-link integrity: ledger reference_id set for account."""
+        stmt = (
+            select(LedgerEntryRow.reference_id)
+            .where(
+                LedgerEntryRow.account_id == account_id,
+                LedgerEntryRow.reference_type == reference_type,
+                LedgerEntryRow.reference_id.is_not(None),
+            )
+            .distinct()
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [r for r in rows if isinstance(r, str) and r.strip()]
+
     async def find_cash_movement_by_reference(
         self,
         reference_type: str,

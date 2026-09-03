@@ -937,6 +937,7 @@ export const api = {
         oldestProcessingAgeSeconds: number | null;
         oldestDeadAgeSeconds: number | null;
         slaBreached: boolean;
+        operationalState: string;
       };
     }>(() =>
       client.GET("/api/lifecycle/outbox/stats", {
@@ -962,6 +963,41 @@ export const api = {
       };
     }>(() =>
       client.GET("/api/lifecycle/reconciliation", {
+        params: { query: { accountId } },
+      }),
+    ),
+
+  /** V1.94 — Financial integrity compose (OI-6 + lifecycle + fill links). */
+  getFinancialIntegrity: (accountId: string) =>
+    call<{
+      data: {
+        accountId: string;
+        status: string;
+        operationalState: string;
+        portfolioStatus: string | null;
+        lifecycle: {
+          accountId: string;
+          status: string;
+          checked: number;
+          driftCount: number;
+          lagCount: number;
+          blockedCount: number;
+          issues: Array<{
+            code: string;
+            positionId: string;
+            detail: string;
+          }>;
+        };
+        fillLinkIssues: Array<{
+          code: string;
+          positionId: string;
+          detail: string;
+        }>;
+        outboxDead: number;
+        slaBreached: boolean;
+      };
+    }>(() =>
+      client.GET("/api/lifecycle/integrity", {
         params: { query: { accountId } },
       }),
     ),

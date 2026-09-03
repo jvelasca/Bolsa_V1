@@ -554,6 +554,56 @@ def get_portfolio_recon_lookup(session: AsyncSession) -> Any:
     )
 
 
+def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
+    """OR-4 V1.94 — status lifecycle integrity para check_opening."""
+    from bolsa_application.lifecycle_event_store import (
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_application.reconcile_lifecycle_integrity import (
+        OutboxSnap,
+        ReconcileLifecycleIntegrity,
+    )
+    from bolsa_application.reconciliation_opening_gate import (
+        ReconcileLifecycleIntegrityLookup,
+    )
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
+    from sqlalchemy import select
+
+    class _OutboxAdapter:
+        async def list_for_account(self, acc: str) -> list[OutboxSnap]:
+            rows = (
+                await session.execute(
+                    select(LifecycleOutboxRow).where(
+                        LifecycleOutboxRow.account_id == acc,
+                        LifecycleOutboxRow.status.in_(
+                            ("pending", "processing", "dead")
+                        ),
+                    )
+                )
+            ).scalars().all()
+            return [
+                OutboxSnap(
+                    position_id=r.position_id,
+                    kind=r.kind,
+                    status=r.status,
+                    created_at=r.created_at,
+                    id=r.id,
+                )
+                for r in rows
+            ]
+
+    uc = ReconcileLifecycleIntegrity(
+        positions=SqlAlchemyPositionStateRepository(session),
+        snapshots=GetLifecycleSnapshot(PostgresLifecycleEventStore(session)),
+        outbox=_OutboxAdapter(),
+    )
+    return ReconcileLifecycleIntegrityLookup(uc)
+
+
 def get_live_recon_lookup(session: AsyncSession) -> Any:
     """OR-4 — status LR-1 (bridge opcional; sin client → unavailable)."""
     from bolsa_application.reconcile_live_ledger import ReconcileLiveLedger
@@ -675,6 +725,7 @@ def get_execute_gated_portfolio_trade_use_case(session: AsyncSession) -> Any:
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
         portfolio_recon=get_portfolio_recon_lookup(session),
         live_recon=get_live_recon_lookup(session),
+        lifecycle_recon=get_lifecycle_recon_lookup(session),
         incident_store=get_operational_incident_store(session),
         instrument_data_status=get_instrument_data_status_use_case(session),
         position_from_fill=PersistPositionFromFill(
@@ -1370,6 +1421,7 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
         portfolio_recon=get_portfolio_recon_lookup(session),
         live_recon=get_live_recon_lookup(session),
+        lifecycle_recon=get_lifecycle_recon_lookup(session),
         journal_writer=get_journal_writer(session),
         position_from_fill=PersistPositionFromFill(
             cast(PositionStateStore, repo),
@@ -1428,6 +1480,7 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
         portfolio_recon=get_portfolio_recon_lookup(session),
         live_recon=get_live_recon_lookup(session),
+        lifecycle_recon=get_lifecycle_recon_lookup(session),
         incident_store=get_operational_incident_store(session),
         journal_writer=journal,
         instrument_data_status=get_instrument_data_status_use_case(session),
@@ -1745,6 +1798,7 @@ async def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingO
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
         portfolio_recon=get_portfolio_recon_lookup(session),
         live_recon=get_live_recon_lookup(session),
+        lifecycle_recon=get_lifecycle_recon_lookup(session),
         incident_store=get_operational_incident_store(session),
         instrument_data_status=get_instrument_data_status_use_case(session),
         position_from_fill=PersistPositionFromFill(

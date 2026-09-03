@@ -1,6 +1,6 @@
 # Spec — V1.93 Operational Failure Injection (2026-09-03)
 
-> **AsOf:** 2026-09-03 · **Estado:** **CÓDIGO LISTO** (pendiente tag/CI GREEN remoto) · partida tip [`v1.92-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.92-beta) → [`752918ef`](https://github.com/jvelasca/Bolsa_V1/commit/752918ef) · CI [run 33754485267](https://github.com/jvelasca/Bolsa_V1/actions/runs/33754485267).  
+> **AsOf:** 2026-09-03 · **Estado:** **CERRADA (CI GREEN)** · tip [`v1.93-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.93-beta) → [`7168de3a`](https://github.com/jvelasca/Bolsa_V1/commit/7168de3a) · CI [run 33759914125](https://github.com/jvelasca/Bolsa_V1/actions/runs/33759914125) · partida [`v1.92-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.92-beta) → [`752918ef`](https://github.com/jvelasca/Bolsa_V1/commit/752918ef).  
 > **Padre:** [`respuesta-auditor-v192-lifecycle-concurrency-worker-cert-2026-09-03.md`](./respuesta-auditor-v192-lifecycle-concurrency-worker-cert-2026-09-03.md).  
 > **No** LIVE · **no** bump · **no** unificar cash ledger · `PAPER_D_EXECUTE` **off**.
 

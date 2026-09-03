@@ -185,6 +185,7 @@ class LifecycleOutboxStatsDataDto(BaseModel):
         default=None, alias="oldestDeadAgeSeconds"
     )
     sla_breached: bool = Field(default=False, alias="slaBreached")
+    operational_state: str = Field(default="OK", alias="operationalState")
 
 
 class LifecycleOutboxStatsResponseDto(BaseModel):
@@ -217,6 +218,27 @@ class LifecycleReconciliationResponseDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     data: LifecycleReconciliationDataDto
+
+
+class FinancialIntegrityDataDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    account_id: str = Field(alias="accountId")
+    status: str
+    operational_state: str = Field(alias="operationalState")
+    portfolio_status: str | None = Field(default=None, alias="portfolioStatus")
+    lifecycle: LifecycleReconciliationDataDto
+    fill_link_issues: list[LifecycleReconIssueDto] = Field(
+        default_factory=list, alias="fillLinkIssues"
+    )
+    outbox_dead: int = Field(default=0, alias="outboxDead")
+    sla_breached: bool = Field(default=False, alias="slaBreached")
+
+
+class FinancialIntegrityResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    data: FinancialIntegrityDataDto
 
 
 async def _assert_account_owned(
@@ -381,15 +403,26 @@ async def get_lifecycle_outbox_stats(
             and processing_age > OUTBOX_SLA_PROCESSING_SECONDS
         )
     )
+    from bolsa_application.reconcile_financial_integrity import (
+        compute_operational_state,
+    )
+
+    dead_count = by_status.get("dead", 0)
+    operational_state = compute_operational_state(
+        integrity_status="clean",
+        outbox_dead=dead_count,
+        sla_breached=sla_breached,
+    )
     return {
         "data": {
             "pending": by_status.get("pending", 0),
             "processing": by_status.get("processing", 0),
-            "dead": by_status.get("dead", 0),
+            "dead": dead_count,
             "oldestPendingAgeSeconds": pending_age,
             "oldestProcessingAgeSeconds": processing_age,
             "oldestDeadAgeSeconds": dead_age,
             "slaBreached": sla_breached,
+            "operationalState": operational_state,
         }
     }
 
@@ -438,6 +471,7 @@ async def get_lifecycle_reconciliation(
                     kind=r.kind,
                     status=r.status,
                     created_at=r.created_at,
+                    id=r.id,
                 )
                 for r in rows
             ]
@@ -447,6 +481,146 @@ async def get_lifecycle_reconciliation(
         snapshots=GetLifecycleSnapshot(PostgresLifecycleEventStore(session)),
         outbox=_OutboxAdapter(),
     ).reconcile(ReconcileLifecycleIntegrityInput(account_id=account_id))
+    assert report is not None
+    return {"data": report.to_dict()}
+
+
+@router.get(
+    "/integrity",
+    response_model=FinancialIntegrityResponseDto,
+)
+async def get_financial_integrity(
+    account_id: Annotated[str, Query(alias="accountId")],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    principal: Annotated[str, Depends(require_jwt_principal)],
+) -> dict[str, Any]:
+    """V1.94 — compose OI-6 + lifecycle recon + fill links (detect/report)."""
+    from bolsa_api.api.dependencies import get_portfolio_recon_lookup
+    from bolsa_application.lifecycle_event_store import (
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_application.lifecycle_outbox import (
+        OUTBOX_SLA_PENDING_SECONDS,
+        OUTBOX_SLA_PROCESSING_SECONDS,
+    )
+    from bolsa_application.reconcile_financial_integrity import (
+        ReconcileFinancialIntegrity,
+        ReconcileFinancialIntegrityInput,
+    )
+    from bolsa_application.reconcile_lifecycle_integrity import (
+        OutboxSnap,
+        ReconcileLifecycleIntegrity,
+    )
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
+    from sqlalchemy import func, select
+
+    await _assert_account_owned(session, principal, account_id)
+
+    class _OutboxAdapter:
+        async def list_for_account(self, acc: str) -> list[OutboxSnap]:
+            rows = (
+                await session.execute(
+                    select(LifecycleOutboxRow).where(
+                        LifecycleOutboxRow.account_id == acc,
+                        LifecycleOutboxRow.status.in_(
+                            ("pending", "processing", "dead")
+                        ),
+                    )
+                )
+            ).scalars().all()
+            return [
+                OutboxSnap(
+                    position_id=r.position_id,
+                    kind=r.kind,
+                    status=r.status,
+                    created_at=r.created_at,
+                    id=r.id,
+                )
+                for r in rows
+            ]
+
+    class _LedgerRefs:
+        async def list_reference_ids(self, acc: str) -> list[str]:
+            return await SqlAlchemyLedgerRepository(session).list_reference_ids(acc)
+
+    # Outbox dead + SLA ages for operationalState
+    dead = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(LifecycleOutboxRow)
+                .where(
+                    LifecycleOutboxRow.account_id == account_id,
+                    LifecycleOutboxRow.status == "dead",
+                )
+            )
+        ).scalar_one()
+        or 0
+    )
+    oldest_pending = (
+        await session.execute(
+            select(func.min(LifecycleOutboxRow.created_at)).where(
+                LifecycleOutboxRow.account_id == account_id,
+                LifecycleOutboxRow.status == "pending",
+            )
+        )
+    ).scalar_one_or_none()
+    oldest_processing = (
+        await session.execute(
+            select(func.min(LifecycleOutboxRow.claimed_at)).where(
+                LifecycleOutboxRow.account_id == account_id,
+                LifecycleOutboxRow.status == "processing",
+            )
+        )
+    ).scalar_one_or_none()
+
+    def _age_seconds(ts: Any) -> float | None:
+        if ts is None:
+            return None
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)
+        return max(0.0, (now - ts).total_seconds())
+
+    pending_age = _age_seconds(oldest_pending)
+    processing_age = _age_seconds(oldest_processing)
+    sla_breached = (
+        (pending_age is not None and pending_age > OUTBOX_SLA_PENDING_SECONDS)
+        or (
+            processing_age is not None
+            and processing_age > OUTBOX_SLA_PROCESSING_SECONDS
+        )
+    )
+
+    positions = SqlAlchemyPositionStateRepository(session)
+    snapshots = GetLifecycleSnapshot(PostgresLifecycleEventStore(session))
+    lifecycle_uc = ReconcileLifecycleIntegrity(
+        positions=positions,
+        snapshots=snapshots,
+        outbox=_OutboxAdapter(),
+    )
+    report = await ReconcileFinancialIntegrity(
+        lifecycle=lifecycle_uc,
+        positions=positions,
+        snapshots_by_account=snapshots,
+        ledger_refs=_LedgerRefs(),
+        portfolio=get_portfolio_recon_lookup(session),
+    ).reconcile(
+        ReconcileFinancialIntegrityInput(
+            account_id=account_id,
+            outbox_dead=dead,
+            sla_breached=sla_breached,
+        )
+    )
     assert report is not None
     return {"data": report.to_dict()}
 

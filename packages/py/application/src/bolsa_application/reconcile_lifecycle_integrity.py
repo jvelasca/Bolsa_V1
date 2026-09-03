@@ -1,11 +1,14 @@
-"""V1.93 — Reconcile PositionState ↔ Lifecycle Event Store / Outbox (detect/report).
+"""V1.93/V1.94 — Reconcile PositionState ↔ Lifecycle Event Store / Outbox.
 
-Does NOT mutate. Does NOT unify with cash ledger (OI-6 remains separate).
+V1.94: bidirectional (orphan lifecycle), FIFO dead_head vs dead_non_head,
+batch snapshots via list_events_for_account. Detect/report only. No heal.
+Does NOT unify with cash ledger (OI-6 remains separate).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Literal, Protocol
 
 LifecycleReconStatus = Literal["clean", "lag", "drift", "blocked"]
@@ -15,6 +18,8 @@ LifecycleReconIssueCode = Literal[
     "lifecycle_lag",
     "qty_mismatch",
     "dead_head",
+    "dead_non_head",
+    "orphan_lifecycle",
 ]
 
 
@@ -60,6 +65,7 @@ class PositionStateSnap:
     status: str
     remaining: float | None
     ledger_position_id: str | None = None
+    open_transaction_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +74,7 @@ class OutboxSnap:
     kind: str
     status: str
     created_at: Any = None
+    id: str | None = None
 
 
 class PositionStatesPort(Protocol):
@@ -76,6 +83,12 @@ class PositionStatesPort(Protocol):
 
 class LifecycleSnapshotPort(Protocol):
     async def execute(self, position_id: str) -> dict[str, Any]: ...
+
+
+class LifecycleBatchSnapshotPort(Protocol):
+    async def execute_for_account(
+        self, account_id: str
+    ) -> dict[str, dict[str, Any]]: ...
 
 
 class OutboxListPort(Protocol):
@@ -96,6 +109,7 @@ def _row_to_snap(row: Any) -> PositionStateSnap | None:
                 if not pid:
                     pid = blob.get("positionId")
         ledger = row.get("ledger_position_id") or row.get("ledgerPositionId")
+        open_tx = row.get("open_transaction_id") or row.get("openTransactionId")
     else:
         pid = getattr(row, "id", None) or getattr(row, "position_id", None)
         status = str(getattr(row, "status", "") or "")
@@ -106,6 +120,7 @@ def _row_to_snap(row: Any) -> PositionStateSnap | None:
             if not pid:
                 pid = blob.get("positionId")
         ledger = getattr(row, "ledger_position_id", None)
+        open_tx = getattr(row, "open_transaction_id", None)
     if not isinstance(pid, str) or not pid.strip():
         return None
     remaining: float | None
@@ -114,11 +129,15 @@ def _row_to_snap(row: Any) -> PositionStateSnap | None:
     except (TypeError, ValueError):
         remaining = None
     ledger_s = ledger.strip() if isinstance(ledger, str) and ledger.strip() else None
+    open_tx_s = (
+        open_tx.strip() if isinstance(open_tx, str) and open_tx.strip() else None
+    )
     return PositionStateSnap(
         position_id=pid.strip(),
         status=status.strip() or "OPEN",
         remaining=remaining,
         ledger_position_id=ledger_s,
+        open_transaction_id=open_tx_s,
     )
 
 
@@ -153,18 +172,77 @@ def _lifecycle_keys(pos: PositionStateSnap) -> list[str]:
     return keys
 
 
+def _outbox_sort_key(row: OutboxSnap) -> tuple[Any, str]:
+    created = row.created_at
+    if created is None:
+        created = datetime.min
+    rid = row.id or ""
+    return (created, rid)
+
+
+def fifo_outbox_head(rows: list[OutboxSnap]) -> OutboxSnap | None:
+    """Same head rule as claim_batch: earliest active among pending|processing|dead."""
+    active = [r for r in rows if r.status in ("pending", "processing", "dead")]
+    if not active:
+        return None
+    return sorted(active, key=_outbox_sort_key)[0]
+
+
+def _collect_outbox(
+    outbox_by_pos: dict[str, list[OutboxSnap]], keys: list[str]
+) -> list[OutboxSnap]:
+    active: list[OutboxSnap] = []
+    for key in keys:
+        active.extend(outbox_by_pos.get(key, []))
+    return active
+
+
+def _append_dead_issues(
+    issues: list[LifecycleReconIssue],
+    *,
+    position_id: str,
+    active_outbox: list[OutboxSnap],
+) -> None:
+    head = fifo_outbox_head(active_outbox)
+    if head is not None and head.status == "dead":
+        issues.append(
+            LifecycleReconIssue(
+                code="dead_head",
+                position_id=position_id,
+                detail="outbox dead blocks FIFO head for this position",
+            )
+        )
+        return
+    non_head_dead = any(o.status == "dead" for o in active_outbox)
+    if non_head_dead:
+        issues.append(
+            LifecycleReconIssue(
+                code="dead_non_head",
+                position_id=position_id,
+                detail="outbox has dead row that is not the FIFO head",
+            )
+        )
+
+
 def build_lifecycle_reconciliation(
     *,
     account_id: str,
     positions: list[PositionStateSnap],
     snapshots_by_position: dict[str, dict[str, Any]],
     outbox: list[OutboxSnap],
+    opening_fill_position_ids: set[str] | frozenset[str] | None = None,
 ) -> LifecycleReconciliation:
-    """Pure detect/report. Prefer lag over drift when close is still in flight."""
+    """Pure detect/report. Prefer lag over drift when close/open is still in flight."""
     issues: list[LifecycleReconIssue] = []
     outbox_by_pos: dict[str, list[OutboxSnap]] = {}
     for row in outbox:
         outbox_by_pos.setdefault(row.position_id, []).append(row)
+
+    handles = opening_fill_position_ids or frozenset()
+    pos_ids: set[str] = set()
+    for pos in positions:
+        for key in _lifecycle_keys(pos):
+            pos_ids.add(key)
 
     for pos in positions:
         keys = _lifecycle_keys(pos)
@@ -176,19 +254,10 @@ def build_lifecycle_reconciliation(
             if rem_lc is None:
                 rem_lc = _snapshot_remaining(snap)
 
-        active_outbox: list[OutboxSnap] = []
-        for key in keys:
-            active_outbox.extend(outbox_by_pos.get(key, []))
-
-        dead_head = any(o.status == "dead" for o in active_outbox)
-        if dead_head:
-            issues.append(
-                LifecycleReconIssue(
-                    code="dead_head",
-                    position_id=pos.position_id,
-                    detail="outbox dead blocks FIFO head for this position",
-                )
-            )
+        active_outbox = _collect_outbox(outbox_by_pos, keys)
+        _append_dead_issues(
+            issues, position_id=pos.position_id, active_outbox=active_outbox
+        )
 
         open_statuses = {"OPEN", "PARTIAL", "PROTECTED"}
         if pos.status in open_statuses and "POSITION_OPENED" not in kinds:
@@ -252,10 +321,41 @@ def build_lifecycle_reconciliation(
                 )
             )
 
+    # V1.94 — Lifecycle → PositionState (orphans).
+    lifecycle_ids = set(snapshots_by_position.keys()) | set(outbox_by_pos.keys())
+    for pid in sorted(lifecycle_ids - pos_ids):
+        snap = snapshots_by_position.get(pid) or {}
+        kinds = _event_kinds(snap)
+        active_outbox = list(outbox_by_pos.get(pid, []))
+        _append_dead_issues(issues, position_id=pid, active_outbox=active_outbox)
+        if not kinds and not active_outbox:
+            continue
+        pending = any(o.status in ("pending", "processing") for o in active_outbox)
+        if pending or pid in handles:
+            issues.append(
+                LifecycleReconIssue(
+                    code="lifecycle_lag",
+                    position_id=pid,
+                    detail=(
+                        "lifecycle/outbox without PositionState "
+                        "(pending outbox or opening-fill handle)"
+                    ),
+                )
+            )
+        else:
+            issues.append(
+                LifecycleReconIssue(
+                    code="orphan_lifecycle",
+                    position_id=pid,
+                    detail="lifecycle events/outbox without matching PositionState",
+                )
+            )
+
     drift_codes = {
         "missing_open_event",
         "missing_close_event",
         "qty_mismatch",
+        "orphan_lifecycle",
     }
     lag_count = sum(1 for i in issues if i.code == "lifecycle_lag")
     blocked_count = sum(1 for i in issues if i.code == "dead_head")
@@ -269,15 +369,30 @@ def build_lifecycle_reconciliation(
     else:
         status = "clean"
 
+    checked = len({*_lifecycle_union_ids(positions, snapshots_by_position, outbox)})
     return LifecycleReconciliation(
         account_id=account_id,
         status=status,
-        checked=len(positions),
+        checked=checked,
         drift_count=drift_count,
         lag_count=lag_count,
         blocked_count=blocked_count,
         issues=tuple(issues),
     )
+
+
+def _lifecycle_union_ids(
+    positions: list[PositionStateSnap],
+    snapshots_by_position: dict[str, dict[str, Any]],
+    outbox: list[OutboxSnap],
+) -> set[str]:
+    ids: set[str] = set()
+    for pos in positions:
+        ids.add(pos.position_id)
+    ids.update(snapshots_by_position.keys())
+    for row in outbox:
+        ids.add(row.position_id)
+    return ids
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,12 +407,14 @@ class ReconcileLifecycleIntegrity:
         self,
         *,
         positions: PositionStatesPort,
-        snapshots: LifecycleSnapshotPort,
+        snapshots: LifecycleSnapshotPort | LifecycleBatchSnapshotPort,
         outbox: OutboxListPort,
+        opening_fill_position_ids: set[str] | frozenset[str] | None = None,
     ) -> None:
         self._positions = positions
         self._snapshots = snapshots
         self._outbox = outbox
+        self._opening_fill_ids = opening_fill_position_ids
 
     async def reconcile(
         self, inp: ReconcileLifecycleIntegrityInput
@@ -311,17 +428,41 @@ class ReconcileLifecycleIntegrity:
             snap = _row_to_snap(row)
             if snap is not None:
                 snaps.append(snap)
+
         snapshots_by_position: dict[str, dict[str, Any]] = {}
+        batch = getattr(self._snapshots, "execute_for_account", None)
+        if callable(batch):
+            snapshots_by_position = dict(await batch(account_id))
+        else:
+            execute = getattr(self._snapshots, "execute")
+            needed: set[str] = set()
+            for pos in snaps:
+                needed.update(_lifecycle_keys(pos))
+            for key in needed:
+                snapshots_by_position[key] = await execute(key)
+
+        # Ensure PositionState keys without events still have empty snaps when
+        # batch path omitted them (no events for that id).
         for pos in snaps:
             for key in _lifecycle_keys(pos):
                 if key not in snapshots_by_position:
-                    snapshots_by_position[key] = await self._snapshots.execute(key)
+                    execute = getattr(self._snapshots, "execute", None)
+                    if callable(execute):
+                        snapshots_by_position[key] = await execute(key)
+                    else:
+                        snapshots_by_position[key] = {
+                            "positionId": key,
+                            "events": [],
+                            "accounting": None,
+                        }
+
         outbox_rows = await self._outbox.list_for_account(account_id)
         return build_lifecycle_reconciliation(
             account_id=account_id,
             positions=snaps,
             snapshots_by_position=snapshots_by_position,
             outbox=list(outbox_rows),
+            opening_fill_position_ids=self._opening_fill_ids,
         )
 
 
@@ -333,4 +474,5 @@ __all__ = [
     "ReconcileLifecycleIntegrity",
     "ReconcileLifecycleIntegrityInput",
     "build_lifecycle_reconciliation",
+    "fifo_outbox_head",
 ]

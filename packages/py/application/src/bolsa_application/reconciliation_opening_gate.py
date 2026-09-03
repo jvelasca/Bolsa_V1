@@ -20,6 +20,9 @@ from bolsa_application.reconcile_portfolio_integrity import (
 
 PortfolioReconStatus = Literal["clean", "drift", "unavailable"]
 LiveReconStatus = Literal["clean", "drift", "unavailable"]
+LifecycleReconGateStatus = Literal[
+    "clean", "lag", "drift", "blocked", "unavailable"
+]
 BrokerVenue = Literal["paper", "live"]
 
 
@@ -27,6 +30,7 @@ def reconciliation_opening_veto_reason(
     *,
     portfolio_recon_status: PortfolioReconStatus | None = None,
     live_recon_status: LiveReconStatus | None = None,
+    lifecycle_recon_status: LifecycleReconGateStatus | None = None,
     broker_venue: BrokerVenue | str | None = None,
     require: bool = False,
 ) -> str | None:
@@ -34,6 +38,8 @@ def reconciliation_opening_veto_reason(
 
     - ``require=False`` y sin statuses → gate off (compat tests / wiring legado).
     - ``portfolio_recon_status=drift`` → ``reconciliation:portfolio_drift`` (cualquier venue).
+    - V1.94: ``lifecycle_recon_status=drift|blocked`` → lifecycle_drift / lifecycle_blocked.
+      ``lag`` / ``clean`` no vetan. ``unavailable`` con gate on → fail-closed.
     - Venue ``live``: ``live_drift`` / ``live_unavailable`` vetan; status ausente con
       ``require`` → ``live_unavailable`` fail-closed.
     - Venue paper (default): ignora live status (bridge ausente no tumba paper).
@@ -42,6 +48,7 @@ def reconciliation_opening_veto_reason(
         not require
         and portfolio_recon_status is None
         and live_recon_status is None
+        and lifecycle_recon_status is None
     ):
         return None
 
@@ -49,6 +56,13 @@ def reconciliation_opening_veto_reason(
         return "reconciliation:portfolio_drift"
     if portfolio_recon_status == "unavailable":
         return "reconciliation:portfolio_unavailable"
+
+    if lifecycle_recon_status == "blocked":
+        return "reconciliation:lifecycle_blocked"
+    if lifecycle_recon_status == "drift":
+        return "reconciliation:lifecycle_drift"
+    if lifecycle_recon_status == "unavailable":
+        return "reconciliation:lifecycle_unavailable"
 
     venue = (broker_venue or "paper").strip().lower()
     if venue == "live":
@@ -74,6 +88,16 @@ class LiveReconLookup(Protocol):
 
     async def live_recon_status(self, account_id: str) -> LiveReconStatus:
         """``clean`` | ``drift`` | ``unavailable``. Lanza si infra falla."""
+        ...
+
+
+class LifecycleReconLookup(Protocol):
+    """Puerto OR-4 V1.94 — status lifecycle/integrity por cuenta."""
+
+    async def lifecycle_recon_status(
+        self, account_id: str
+    ) -> LifecycleReconGateStatus:
+        """``clean`` | ``lag`` | ``drift`` | ``blocked`` | ``unavailable``."""
         ...
 
 
@@ -108,6 +132,30 @@ class ReconcileLiveLedgerLookup:
         if report is None:
             raise RuntimeError("live recon unavailable")
         return report.status
+
+
+class ReconcileLifecycleIntegrityLookup:
+    """Adapter V1.94 lifecycle/integrity → status para el opening veto."""
+
+    def __init__(self, uc: Any) -> None:
+        self._uc = uc
+
+    async def lifecycle_recon_status(
+        self, account_id: str
+    ) -> LifecycleReconGateStatus:
+        from bolsa_application.reconcile_lifecycle_integrity import (
+            ReconcileLifecycleIntegrityInput,
+        )
+
+        report = await self._uc.reconcile(
+            ReconcileLifecycleIntegrityInput(account_id=account_id)
+        )
+        if report is None:
+            raise RuntimeError("lifecycle recon unavailable")
+        status = getattr(report, "status", None)
+        if status in ("clean", "lag", "drift", "blocked"):
+            return status  # type: ignore[return-value]
+        return "unavailable"
 
 
 class PortfolioCashFromSummary:

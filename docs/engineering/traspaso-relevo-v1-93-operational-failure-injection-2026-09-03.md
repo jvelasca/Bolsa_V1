@@ -2,7 +2,7 @@
 
 > **Padre:** [`respuesta-auditor-v192-lifecycle-concurrency-worker-cert-2026-09-03.md`](./respuesta-auditor-v192-lifecycle-concurrency-worker-cert-2026-09-03.md).  
 > **Spec/plan:** [`spec-v193-operational-failure-injection-2026-09-03.md`](./spec-v193-operational-failure-injection-2026-09-03.md) · [`plan-v193-operational-failure-injection-2026-09-03.md`](./plan-v193-operational-failure-injection-2026-09-03.md).  
-> **Estado:** **CÓDIGO LISTO** · partida tip [`v1.92-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.92-beta) → [`752918ef`](https://github.com/jvelasca/Bolsa_V1/commit/752918ef).
+> **Estado:** **CERRADA (CI GREEN)** · tip [`v1.93-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.93-beta) → [`7168de3a`](https://github.com/jvelasca/Bolsa_V1/commit/7168de3a) · partida [`v1.92-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.92-beta) → [`752918ef`](https://github.com/jvelasca/Bolsa_V1/commit/752918ef).
 
 ## Objetivo
 
@@ -21,4 +21,4 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` off · no unificar ledger · no `queue_s
 
 ## Next
 
-Tag `v1.93-beta` + CI GREEN + arranque auditor tip. **Sin** LIVE.
+Auditoría tip **PASS fuerte** → [`respuesta-auditor-v193`](./respuesta-auditor-v193-operational-failure-injection-2026-09-03.md). Siguiente: **V1.94 Financial Integrity**. **Sin** LIVE.
