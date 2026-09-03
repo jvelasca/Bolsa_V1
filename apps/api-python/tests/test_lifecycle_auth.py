@@ -104,6 +104,16 @@ async def test_lifecycle_unauthenticated_is_401(auth_secret: None) -> None:
             assert post.status_code == 401
             get = await client.get("/api/lifecycle/positions/p/snapshot")
             assert get.status_code == 401
+            stats = await client.get(
+                "/api/lifecycle/outbox/stats",
+                params={"accountId": "x"},
+            )
+            assert stats.status_code == 401
+            recon = await client.get(
+                "/api/lifecycle/reconciliation",
+                params={"accountId": "x"},
+            )
+            assert recon.status_code == 401
 
 
 @pytest.mark.asyncio

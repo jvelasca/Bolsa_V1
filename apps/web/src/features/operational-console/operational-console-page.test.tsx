@@ -37,7 +37,31 @@ vi.mock("@/features/operational-console/use-estudio-auto-telemetry", () => ({
 
 vi.mock("@/features/operational-console/use-lifecycle-outbox-stats", () => ({
   useLifecycleOutboxStats: () => ({
-    data: { pending: 0, processing: 0, dead: 0, oldestPendingAgeSeconds: null },
+    data: {
+      pending: 0,
+      processing: 0,
+      dead: 0,
+      oldestPendingAgeSeconds: null,
+      oldestProcessingAgeSeconds: null,
+      oldestDeadAgeSeconds: null,
+      slaBreached: false,
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("@/features/operational-console/use-lifecycle-reconciliation", () => ({
+  useLifecycleReconciliation: () => ({
+    data: {
+      accountId: "acc-1",
+      status: "clean",
+      checked: 0,
+      driftCount: 0,
+      lagCount: 0,
+      blockedCount: 0,
+      issues: [],
+    },
     isLoading: false,
     isError: false,
   }),
@@ -54,6 +78,7 @@ vi.mock("@/features/operational-console/operational-console-sections", () => ({
   OpsEstudioAutoSection: () => <div data-testid="ops-estudio-auto" />,
   OpsReconSection: () => <div data-testid="ops-recon" />,
   OpsLifecycleOutboxSection: () => <div data-testid="ops-lifecycle-outbox" />,
+  OpsLifecycleReconSection: () => <div data-testid="ops-lifecycle-recon" />,
 }));
 
 vi.mock("@/features/operational-console/ops-incidents-and-links", () => ({

@@ -14,6 +14,7 @@ import { MesaIncidentBanner } from "@/features/operations/mesa-incident-banner";
 import {
   OpsEstudioAutoSection,
   OpsLifecycleOutboxSection,
+  OpsLifecycleReconSection,
   OpsReadinessSection,
   OpsReconSection,
   OpsRuntimeSection,
@@ -25,6 +26,7 @@ import {
 } from "@/features/operational-console/ops-incidents-and-links";
 import { useEstudioAutoTelemetry } from "@/features/operational-console/use-estudio-auto-telemetry";
 import { useLifecycleOutboxStats } from "@/features/operational-console/use-lifecycle-outbox-stats";
+import { useLifecycleReconciliation } from "@/features/operational-console/use-lifecycle-reconciliation";
 import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
@@ -36,6 +38,7 @@ export function OperationalConsolePage() {
   const selfEvalQuery = useOpsSelfEval(effectiveAccountId);
   const a6Query = useEstudioAutoTelemetry(effectiveAccountId);
   const outboxQuery = useLifecycleOutboxStats(effectiveAccountId);
+  const lifecycleReconQuery = useLifecycleReconciliation(effectiveAccountId);
   const report = selfEvalQuery.data;
   const a6 = a6Query.data?.data;
   const portfolioReconStatus = portfolioReconStatusFromReport(report);
@@ -135,6 +138,11 @@ export function OperationalConsolePage() {
           stats={outboxQuery.data}
           isLoading={outboxQuery.isLoading}
           isError={outboxQuery.isError}
+        />
+        <OpsLifecycleReconSection
+          report={lifecycleReconQuery.data}
+          isLoading={lifecycleReconQuery.isLoading}
+          isError={lifecycleReconQuery.isError}
         />
       </div>
 

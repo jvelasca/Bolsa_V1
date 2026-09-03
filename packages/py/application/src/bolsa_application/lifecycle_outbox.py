@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 OUTBOX_MAX_ATTEMPTS = 5
 OUTBOX_STALE_PROCESSING_SECONDS = 120
+# V1.93 — Consola SLA thresholds (observability only; not a pager).
+OUTBOX_SLA_PENDING_SECONDS = 60
+OUTBOX_SLA_PROCESSING_SECONDS = 120
 SESSION_OUTBOX_ENQUEUED = "lifecycle_outbox_enqueued"
 OutboxStatus = str  # pending | processing | applied | dead
 _ACTIVE_STATUSES = ("pending", "processing", "dead")
@@ -445,6 +448,83 @@ class PostgresLifecycleOutboxStore:
         return _row_to_record(row)
 
 
+async def apply_lifecycle_outbox_row(
+    outbox: LifecycleOutboxStore,
+    append: AppendLifecycleEvent,
+    row: LifecycleOutboxRecord,
+    *,
+    max_attempts: int = OUTBOX_MAX_ATTEMPTS,
+) -> dict[str, int]:
+    """Apply one already-claimed outbox row (mark applied|attempt).
+
+    Domain / mapped failures call ``mark_attempt``. Unexpected exceptions
+    propagate so a worker TX can rollback and leave ``processing`` durable.
+    """
+    payload = row.payload
+    direct = payload.get("direct_input")
+    if isinstance(direct, dict):
+        from bolsa_application.lifecycle_event_store import input_from_body
+
+        result = await append.execute(input_from_body(direct))
+        if result.ok:
+            await outbox.mark_applied(row.id)
+            return {"applied": 1, "errors": 0}
+        code = result.error.code if result.error else "append_failed"
+        dead = row.attempts + 1 >= max_attempts
+        await outbox.mark_attempt(row.id, error=code, dead=dead)
+        if dead:
+            logger.warning(
+                "lifecycle_outbox dead id=%s tx=%s code=%s",
+                row.id,
+                row.transaction_id,
+                code,
+            )
+        return {"applied": 0, "errors": 1}
+
+    result_dict = await append_lifecycle_from_confirm_fill(
+        append,
+        action=str(payload.get("action") or ""),
+        account_id=row.account_id,
+        instrument_id=str(payload.get("instrument_id") or ""),
+        quantity=float(payload.get("quantity") or 0),
+        price=float(payload.get("price") or 0),
+        tx_id=row.transaction_id,
+        trade=_TradeShim(payload),
+        trade_plan_dict=payload.get("trade_plan_dict")
+        if isinstance(payload.get("trade_plan_dict"), dict)
+        else None,
+        decision_id=payload.get("decision_id")
+        if isinstance(payload.get("decision_id"), str)
+        else None,
+        symbol=payload.get("symbol")
+        if isinstance(payload.get("symbol"), str)
+        else None,
+        open_position_id=row.position_id,
+        filled_at=payload.get("filled_at")
+        if isinstance(payload.get("filled_at"), str)
+        else None,
+    )
+    status = result_dict.get("status")
+    if status == "applied" or (
+        status == "skipped"
+        and result_dict.get("reason")
+        in ("recommend_short_rejected", "unmapped_action_or_missing_ids")
+    ):
+        await outbox.mark_applied(row.id)
+        return {"applied": 1, "errors": 0}
+    reason = str(result_dict.get("reason") or status or "unknown")
+    dead = row.attempts + 1 >= max_attempts
+    await outbox.mark_attempt(row.id, error=reason, dead=dead)
+    if dead:
+        logger.warning(
+            "lifecycle_outbox dead id=%s tx=%s reason=%s",
+            row.id,
+            row.transaction_id,
+            reason,
+        )
+    return {"applied": 0, "errors": 1}
+
+
 async def drain_lifecycle_outbox(
     outbox: LifecycleOutboxStore,
     append: AppendLifecycleEvent | None,
@@ -452,7 +532,11 @@ async def drain_lifecycle_outbox(
     max_attempts: int = OUTBOX_MAX_ATTEMPTS,
     limit: int = 50,
 ) -> dict[str, Any]:
-    """Best-effort drain: claim pending → AppendLifecycleEvent → applied/dead."""
+    """Best-effort drain: claim pending → AppendLifecycleEvent → applied/dead.
+
+    Single-session helper for HTTP kick / in-memory tests. The continuous
+    worker uses TX-split claim vs apply (V1.93).
+    """
     if append is None:
         return {"drained": 0, "applied": 0, "errors": 0, "reason": "no_append"}
     claim = getattr(outbox, "claim_batch", None)
@@ -463,74 +547,12 @@ async def drain_lifecycle_outbox(
     applied = 0
     errors = 0
     for row in pending:
-        payload = row.payload
         try:
-            # AUTO path may plant a pre-built input under "direct_input"
-            direct = payload.get("direct_input")
-            if isinstance(direct, dict):
-                from bolsa_application.lifecycle_event_store import input_from_body
-
-                result = await append.execute(input_from_body(direct))
-                if result.ok:
-                    await outbox.mark_applied(row.id)
-                    applied += 1
-                    continue
-                code = result.error.code if result.error else "append_failed"
-                dead = row.attempts + 1 >= max_attempts
-                await outbox.mark_attempt(row.id, error=code, dead=dead)
-                errors += 1
-                if dead:
-                    logger.warning(
-                        "lifecycle_outbox dead id=%s tx=%s code=%s",
-                        row.id,
-                        row.transaction_id,
-                        code,
-                    )
-                continue
-
-            result_dict = await append_lifecycle_from_confirm_fill(
-                append,
-                action=str(payload.get("action") or ""),
-                account_id=row.account_id,
-                instrument_id=str(payload.get("instrument_id") or ""),
-                quantity=float(payload.get("quantity") or 0),
-                price=float(payload.get("price") or 0),
-                tx_id=row.transaction_id,
-                trade=_TradeShim(payload),
-                trade_plan_dict=payload.get("trade_plan_dict")
-                if isinstance(payload.get("trade_plan_dict"), dict)
-                else None,
-                decision_id=payload.get("decision_id")
-                if isinstance(payload.get("decision_id"), str)
-                else None,
-                symbol=payload.get("symbol")
-                if isinstance(payload.get("symbol"), str)
-                else None,
-                open_position_id=row.position_id,
-                filled_at=payload.get("filled_at")
-                if isinstance(payload.get("filled_at"), str)
-                else None,
+            result = await apply_lifecycle_outbox_row(
+                outbox, append, row, max_attempts=max_attempts
             )
-            status = result_dict.get("status")
-            if status == "applied" or (
-                status == "skipped"
-                and result_dict.get("reason")
-                in ("recommend_short_rejected", "unmapped_action_or_missing_ids")
-            ):
-                await outbox.mark_applied(row.id)
-                applied += 1
-                continue
-            reason = str(result_dict.get("reason") or status or "unknown")
-            dead = row.attempts + 1 >= max_attempts
-            await outbox.mark_attempt(row.id, error=reason, dead=dead)
-            errors += 1
-            if dead:
-                logger.warning(
-                    "lifecycle_outbox dead id=%s tx=%s reason=%s",
-                    row.id,
-                    row.transaction_id,
-                    reason,
-                )
+            applied += result["applied"]
+            errors += result["errors"]
         except Exception as exc:  # noqa: BLE001
             dead = row.attempts + 1 >= max_attempts
             await outbox.mark_attempt(row.id, error=str(exc), dead=dead)
@@ -577,8 +599,11 @@ __all__ = [
     "LifecycleOutboxRecord",
     "LifecycleOutboxStore",
     "OUTBOX_MAX_ATTEMPTS",
+    "OUTBOX_SLA_PENDING_SECONDS",
+    "OUTBOX_SLA_PROCESSING_SECONDS",
     "OUTBOX_STALE_PROCESSING_SECONDS",
     "PostgresLifecycleOutboxStore",
     "SESSION_OUTBOX_ENQUEUED",
+    "apply_lifecycle_outbox_row",
     "drain_lifecycle_outbox",
 ]

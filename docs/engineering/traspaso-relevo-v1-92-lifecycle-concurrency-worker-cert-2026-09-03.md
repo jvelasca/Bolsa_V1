@@ -22,4 +22,4 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` off · no unificar ledger · integrated 
 
 ## Next
 
-Auditoría tip V1.92 ([arranque](./arranque-auditor-v1-92-lifecycle-concurrency-worker-cert-2026-09-03.md) · [relevo tag](./traspaso-relevo-tag-v1-92-beta-2026-09-03.md)). **Sin** LIVE.
+Auditoría tip V1.92 **DONE** — [`respuesta-auditor-v192`](./respuesta-auditor-v192-lifecycle-concurrency-worker-cert-2026-09-03.md). Next = [V1.93 Failure Injection](./traspaso-relevo-v1-93-operational-failure-injection-2026-09-03.md). **Sin** LIVE.

@@ -407,3 +407,413 @@ async def test_two_workers_same_position_fifo_open_t1_exit(
         task_b.cancel()
         await asyncio.gather(task_a, task_b, return_exceptions=True)
         await _cleanup(session_factory, position_id=pos)
+
+
+@pytest.mark.asyncio
+async def test_crash_after_claim_then_stale_reclaim(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V1.93 — TX1 commits processing; crash before apply; stale reclaim → applied."""
+    from bolsa_api.background.lifecycle_outbox_worker import (
+        start_lifecycle_outbox_worker,
+    )
+    from bolsa_application.lifecycle_event_store import (
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_application.lifecycle_outbox import OUTBOX_STALE_PROCESSING_SECONDS
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+
+    pos = f"pos-w-crash-claim-{uuid4().hex[:10]}"
+    acc = f"acc-w-{uuid4().hex[:8]}"
+    tx = f"tx-w-crash-claim-{uuid4().hex[:8]}"
+    await _cleanup(session_factory, position_id=pos)
+    oid = await _enqueue(
+        session_factory,
+        position_id=pos,
+        account_id=acc,
+        transaction_id=tx,
+        kind="POSITION_OPENED",
+        payload=_direct(
+            kind="POSITION_OPENED",
+            position_id=pos,
+            account_id=acc,
+            event_id=tx,
+            at="2026-09-03T10:00:00.000Z",
+        ),
+    )
+
+    boom = {"n": 0}
+
+    async def _after_claim(claimed: list[Any]) -> None:
+        boom["n"] += 1
+        if boom["n"] == 1:
+            raise RuntimeError("injected crash after claim")
+
+    task = start_lifecycle_outbox_worker(
+        session_factory,
+        tick_seconds=0.05,
+        on_after_claim=_after_claim,
+    )
+    assert task is not None
+    try:
+        await _wait_status(session_factory, oid, "processing", timeout=5.0)
+        async with session_factory() as session:
+            row = await session.get(LifecycleOutboxRow, oid)
+            assert row is not None
+            row.claimed_at = datetime.now(UTC) - timedelta(
+                seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
+            )
+            await session.commit()
+        await _wait_status(session_factory, oid, "applied", timeout=8.0)
+        async with session_factory() as session:
+            snap = await GetLifecycleSnapshot(
+                PostgresLifecycleEventStore(session)
+            ).execute(pos)
+        assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await _cleanup(session_factory, position_id=pos)
+
+
+@pytest.mark.asyncio
+async def test_crash_mid_apply_before_commit_then_reclaim(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V1.93 — append in session then raise before TX2 commit → reclaim → 1 event."""
+    from bolsa_api.background.lifecycle_outbox_worker import (
+        start_lifecycle_outbox_worker,
+    )
+    from bolsa_application.lifecycle_event_store import (
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_application.lifecycle_outbox import OUTBOX_STALE_PROCESSING_SECONDS
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+
+    pos = f"pos-w-crash-mid-{uuid4().hex[:10]}"
+    acc = f"acc-w-{uuid4().hex[:8]}"
+    tx = f"tx-w-crash-mid-{uuid4().hex[:8]}"
+    await _cleanup(session_factory, position_id=pos)
+    oid = await _enqueue(
+        session_factory,
+        position_id=pos,
+        account_id=acc,
+        transaction_id=tx,
+        kind="POSITION_OPENED",
+        payload=_direct(
+            kind="POSITION_OPENED",
+            position_id=pos,
+            account_id=acc,
+            event_id=tx,
+            at="2026-09-03T10:00:00.000Z",
+        ),
+    )
+
+    boom = {"n": 0}
+
+    async def _before_commit(_outbox_id: str) -> None:
+        boom["n"] += 1
+        if boom["n"] == 1:
+            raise RuntimeError("injected crash before apply commit")
+
+    task = start_lifecycle_outbox_worker(
+        session_factory,
+        tick_seconds=0.05,
+        on_before_apply_commit=_before_commit,
+    )
+    assert task is not None
+    try:
+        await _wait_status(session_factory, oid, "processing", timeout=5.0)
+        async with session_factory() as session:
+            row = await session.get(LifecycleOutboxRow, oid)
+            assert row is not None
+            row.claimed_at = datetime.now(UTC) - timedelta(
+                seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
+            )
+            await session.commit()
+        await _wait_status(session_factory, oid, "applied", timeout=8.0)
+        async with session_factory() as session:
+            snap = await GetLifecycleSnapshot(
+                PostgresLifecycleEventStore(session)
+            ).execute(pos)
+        assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await _cleanup(session_factory, position_id=pos)
+
+
+@pytest.mark.asyncio
+async def test_idempotent_reclaim_after_append_without_mark(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V1.93 — event already in store + processing row → reclaim → applied, 1 event."""
+    from bolsa_api.background.lifecycle_outbox_worker import (
+        start_lifecycle_outbox_worker,
+    )
+    from bolsa_application.lifecycle_event_store import (
+        AppendLifecycleEvent,
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+        input_from_body,
+    )
+    from bolsa_application.lifecycle_outbox import OUTBOX_STALE_PROCESSING_SECONDS
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+
+    pos = f"pos-w-idem-{uuid4().hex[:10]}"
+    acc = f"acc-w-{uuid4().hex[:8]}"
+    tx = f"tx-w-idem-{uuid4().hex[:8]}"
+    await _cleanup(session_factory, position_id=pos)
+    oid = await _enqueue(
+        session_factory,
+        position_id=pos,
+        account_id=acc,
+        transaction_id=tx,
+        kind="POSITION_OPENED",
+        payload=_direct(
+            kind="POSITION_OPENED",
+            position_id=pos,
+            account_id=acc,
+            event_id=tx,
+            at="2026-09-03T10:00:00.000Z",
+        ),
+    )
+    async with session_factory() as session:
+        result = await AppendLifecycleEvent(
+            PostgresLifecycleEventStore(session)
+        ).execute(
+            input_from_body(
+                _direct(
+                    kind="POSITION_OPENED",
+                    position_id=pos,
+                    account_id=acc,
+                    event_id=tx,
+                    at="2026-09-03T10:00:00.000Z",
+                )["direct_input"]
+            )
+        )
+        assert result.ok
+        row = await session.get(LifecycleOutboxRow, oid)
+        assert row is not None
+        row.status = "processing"
+        row.claimed_at = datetime.now(UTC) - timedelta(
+            seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
+        )
+        await session.commit()
+
+    task = start_lifecycle_outbox_worker(session_factory, tick_seconds=0.05)
+    assert task is not None
+    try:
+        await _wait_status(session_factory, oid, "applied", timeout=8.0)
+        async with session_factory() as session:
+            snap = await GetLifecycleSnapshot(
+                PostgresLifecycleEventStore(session)
+            ).execute(pos)
+        assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await _cleanup(session_factory, position_id=pos)
+
+
+@pytest.mark.asyncio
+async def test_three_workers_same_position_fifo(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    from bolsa_api.background.lifecycle_outbox_worker import (
+        start_lifecycle_outbox_worker,
+    )
+    from bolsa_application.lifecycle_event_store import (
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+
+    pos = f"pos-w-3w-{uuid4().hex[:10]}"
+    acc = f"acc-w-{uuid4().hex[:8]}"
+    await _cleanup(session_factory, position_id=pos)
+    base = datetime(2026, 9, 3, 14, 0, 0, tzinfo=UTC)
+    events = [
+        ("tx-open", "POSITION_OPENED", "2026-09-03T14:00:00.000Z", base),
+        ("tx-t1", "T1_EXECUTED", "2026-09-03T14:30:00.000Z", base + timedelta(seconds=1)),
+        (
+            "tx-exit",
+            "POSITION_CLOSED",
+            "2026-09-03T15:00:00.000Z",
+            base + timedelta(seconds=2),
+        ),
+    ]
+    ids: list[str] = []
+    for tx, kind, at, created in events:
+        oid = await _enqueue(
+            session_factory,
+            position_id=pos,
+            account_id=acc,
+            transaction_id=tx,
+            kind=kind,
+            payload=_direct(
+                kind=kind,
+                position_id=pos,
+                account_id=acc,
+                event_id=tx,
+                at=at,
+            ),
+            created_at=created,
+        )
+        ids.append(oid)
+
+    tasks = [
+        start_lifecycle_outbox_worker(session_factory, tick_seconds=0.05)
+        for _ in range(3)
+    ]
+    assert all(t is not None for t in tasks)
+    try:
+        for oid in ids:
+            await _wait_status(session_factory, oid, "applied", timeout=12.0)
+        async with session_factory() as session:
+            snap = await GetLifecycleSnapshot(
+                PostgresLifecycleEventStore(session)
+            ).execute(pos)
+            dead = (
+                await session.execute(
+                    select(LifecycleOutboxRow).where(
+                        LifecycleOutboxRow.position_id == pos,
+                        LifecycleOutboxRow.status == "dead",
+                    )
+                )
+            ).scalars().all()
+        assert [e["kind"] for e in snap["events"]] == [
+            "POSITION_OPENED",
+            "T1_EXECUTED",
+            "POSITION_CLOSED",
+        ]
+        assert dead == []
+    finally:
+        for t in tasks:
+            assert t is not None
+            t.cancel()
+        await asyncio.gather(*[t for t in tasks if t is not None], return_exceptions=True)
+        await _cleanup(session_factory, position_id=pos)
+
+
+@pytest.mark.asyncio
+async def test_worker_reconnect_after_engine_dispose(
+    session_factory: async_sessionmaker[AsyncSession],
+    pg_engine: AsyncEngine,
+) -> None:
+    """V1.93 — dispose engine mid-flight; new factory continues to apply."""
+    from bolsa_api.background.lifecycle_outbox_worker import (
+        start_lifecycle_outbox_worker,
+    )
+    from bolsa_infrastructure.database.session import create_session_factory
+
+    pos = f"pos-w-reconn-{uuid4().hex[:10]}"
+    acc = f"acc-w-{uuid4().hex[:8]}"
+    tx = f"tx-w-reconn-{uuid4().hex[:8]}"
+    await _cleanup(session_factory, position_id=pos)
+    oid = await _enqueue(
+        session_factory,
+        position_id=pos,
+        account_id=acc,
+        transaction_id=tx,
+        kind="POSITION_OPENED",
+        payload=_direct(
+            kind="POSITION_OPENED",
+            position_id=pos,
+            account_id=acc,
+            event_id=tx,
+            at="2026-09-03T10:00:00.000Z",
+        ),
+    )
+
+    holder: dict[str, async_sessionmaker[AsyncSession]] = {"factory": session_factory}
+
+    class _ProxyFactory:
+        def __call__(self) -> Any:
+            return holder["factory"]()
+
+    task = start_lifecycle_outbox_worker(_ProxyFactory(), tick_seconds=0.05)  # type: ignore[arg-type]
+    assert task is not None
+    try:
+        await asyncio.sleep(0.08)
+        await pg_engine.dispose()
+        holder["factory"] = create_session_factory(pg_engine)
+        await _wait_status(holder["factory"], oid, "applied", timeout=10.0)
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await _cleanup(holder["factory"], position_id=pos)
+
+
+@pytest.mark.asyncio
+async def test_kick_and_worker_concurrent_single_event(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V1.93 — HTTP kick drain + worker race → exactly one event, no dead."""
+    from bolsa_api.background.lifecycle_outbox_worker import (
+        start_lifecycle_outbox_worker,
+    )
+    from bolsa_application.lifecycle_event_store import (
+        AppendLifecycleEvent,
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_application.lifecycle_outbox import (
+        PostgresLifecycleOutboxStore,
+        drain_lifecycle_outbox,
+    )
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+
+    pos = f"pos-w-kick-{uuid4().hex[:10]}"
+    acc = f"acc-w-{uuid4().hex[:8]}"
+    tx = f"tx-w-kick-{uuid4().hex[:8]}"
+    await _cleanup(session_factory, position_id=pos)
+    oid = await _enqueue(
+        session_factory,
+        position_id=pos,
+        account_id=acc,
+        transaction_id=tx,
+        kind="POSITION_OPENED",
+        payload=_direct(
+            kind="POSITION_OPENED",
+            position_id=pos,
+            account_id=acc,
+            event_id=tx,
+            at="2026-09-03T10:00:00.000Z",
+        ),
+    )
+
+    task = start_lifecycle_outbox_worker(session_factory, tick_seconds=0.05)
+    assert task is not None
+    try:
+
+        async def _kick() -> None:
+            async with session_factory() as session:
+                await drain_lifecycle_outbox(
+                    PostgresLifecycleOutboxStore(session),
+                    AppendLifecycleEvent(PostgresLifecycleEventStore(session)),
+                )
+                await session.commit()
+
+        await asyncio.gather(_kick(), _kick(), _kick())
+        await _wait_status(session_factory, oid, "applied", timeout=8.0)
+        async with session_factory() as session:
+            snap = await GetLifecycleSnapshot(
+                PostgresLifecycleEventStore(session)
+            ).execute(pos)
+            dead = (
+                await session.execute(
+                    select(LifecycleOutboxRow).where(
+                        LifecycleOutboxRow.position_id == pos,
+                        LifecycleOutboxRow.status == "dead",
+                    )
+                )
+            ).scalars().all()
+        assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
+        assert dead == []
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await _cleanup(session_factory, position_id=pos)

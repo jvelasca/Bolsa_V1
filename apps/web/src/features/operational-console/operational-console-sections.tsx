@@ -49,49 +49,155 @@ export function OpsLifecycleOutboxSection({
           </p>
         ) : null}
         {!isLoading && !isError ? (
+          <>
+            <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div>
+                <dt className="text-xs text-muted-foreground">pending</dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="ops-outbox-pending"
+                >
+                  {stats?.pending ?? 0}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">processing</dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="ops-outbox-processing"
+                >
+                  {stats?.processing ?? 0}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">dead</dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="ops-outbox-dead"
+                >
+                  {stats?.dead ?? 0}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">
+                  oldest pending
+                </dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="ops-outbox-oldest-age"
+                >
+                  {stats?.oldestPendingAgeSeconds == null
+                    ? "—"
+                    : `${Math.round(stats.oldestPendingAgeSeconds)}s`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">
+                  oldest processing
+                </dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="ops-outbox-oldest-processing"
+                >
+                  {stats?.oldestProcessingAgeSeconds == null
+                    ? "—"
+                    : `${Math.round(stats.oldestProcessingAgeSeconds)}s`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">oldest dead</dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="ops-outbox-oldest-dead"
+                >
+                  {stats?.oldestDeadAgeSeconds == null
+                    ? "—"
+                    : `${Math.round(stats.oldestDeadAgeSeconds)}s`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">SLA</dt>
+                <dd
+                  className={cn(
+                    "font-medium",
+                    stats?.slaBreached
+                      ? "text-rose-700 dark:text-rose-300"
+                      : "text-emerald-700 dark:text-emerald-300",
+                  )}
+                  data-testid="ops-outbox-sla"
+                >
+                  {stats?.slaBreached ? "BREACHED" : "ok"}
+                </dd>
+              </div>
+            </dl>
+          </>
+        ) : null}
+        <p className="text-xs text-muted-foreground">
+          Cola durable PositionState→Lifecycle · no sustituye el ledger.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function OpsLifecycleReconSection({
+  report,
+  isLoading,
+  isError,
+}: {
+  report:
+    | import("@/features/operational-console/use-lifecycle-reconciliation").LifecycleReconciliation
+    | undefined;
+  isLoading?: boolean;
+  isError?: boolean;
+}) {
+  return (
+    <Card data-testid="ops-lifecycle-recon-section">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Lifecycle recon</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Cargando recon…</p>
+        ) : null}
+        {isError ? (
+          <p className="text-xs text-destructive">
+            No se pudo cargar lifecycle recon.
+          </p>
+        ) : null}
+        {!isLoading && !isError ? (
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>
-              <dt className="text-xs text-muted-foreground">pending</dt>
+              <dt className="text-xs text-muted-foreground">status</dt>
               <dd
-                className="font-medium tabular-nums"
-                data-testid="ops-outbox-pending"
+                className="font-medium"
+                data-testid="ops-lifecycle-recon-status"
               >
-                {stats?.pending ?? 0}
+                {report?.status ?? "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">processing</dt>
-              <dd
-                className="font-medium tabular-nums"
-                data-testid="ops-outbox-processing"
-              >
-                {stats?.processing ?? 0}
+              <dt className="text-xs text-muted-foreground">checked</dt>
+              <dd className="font-medium tabular-nums">
+                {report?.checked ?? 0}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">dead</dt>
-              <dd
-                className="font-medium tabular-nums"
-                data-testid="ops-outbox-dead"
-              >
-                {stats?.dead ?? 0}
+              <dt className="text-xs text-muted-foreground">drift</dt>
+              <dd className="font-medium tabular-nums">
+                {report?.driftCount ?? 0}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">oldest pending</dt>
-              <dd
-                className="font-medium tabular-nums"
-                data-testid="ops-outbox-oldest-age"
-              >
-                {stats?.oldestPendingAgeSeconds == null
-                  ? "—"
-                  : `${Math.round(stats.oldestPendingAgeSeconds)}s`}
+              <dt className="text-xs text-muted-foreground">lag / blocked</dt>
+              <dd className="font-medium tabular-nums">
+                {report?.lagCount ?? 0} / {report?.blockedCount ?? 0}
               </dd>
             </div>
           </dl>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          Cola durable PositionState→Lifecycle · no sustituye el ledger.
+          Detect/report PositionState↔Lifecycle · no auto-heal · ≠ OI-6 cash.
         </p>
       </CardContent>
     </Card>

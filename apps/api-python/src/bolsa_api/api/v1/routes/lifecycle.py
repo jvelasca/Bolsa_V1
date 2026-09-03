@@ -13,7 +13,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -178,12 +178,45 @@ class LifecycleOutboxStatsDataDto(BaseModel):
     oldest_pending_age_seconds: float | None = Field(
         default=None, alias="oldestPendingAgeSeconds"
     )
+    oldest_processing_age_seconds: float | None = Field(
+        default=None, alias="oldestProcessingAgeSeconds"
+    )
+    oldest_dead_age_seconds: float | None = Field(
+        default=None, alias="oldestDeadAgeSeconds"
+    )
+    sla_breached: bool = Field(default=False, alias="slaBreached")
 
 
 class LifecycleOutboxStatsResponseDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     data: LifecycleOutboxStatsDataDto
+
+
+class LifecycleReconIssueDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    code: str
+    position_id: str = Field(alias="positionId")
+    detail: str
+
+
+class LifecycleReconciliationDataDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    account_id: str = Field(alias="accountId")
+    status: str
+    checked: int
+    drift_count: int = Field(alias="driftCount")
+    lag_count: int = Field(alias="lagCount")
+    blocked_count: int = Field(alias="blockedCount")
+    issues: list[LifecycleReconIssueDto]
+
+
+class LifecycleReconciliationResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    data: LifecycleReconciliationDataDto
 
 
 async def _assert_account_owned(
@@ -282,19 +315,18 @@ async def get_lifecycle_snapshot(
 )
 async def get_lifecycle_outbox_stats(
     account_id: Annotated[str, Query(alias="accountId")],
-    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    principal: Annotated[str, Depends(require_jwt_principal)],
 ) -> dict[str, Any]:
-    """V1.92 P2 — outbox queue depth for Consola Operativa (account-scoped).
-
-    Auth: middleware JWT when APP_PASSWORD on; principal + ownership always.
-    """
+    """V1.92/V1.93 — outbox queue depth + SLA ages for Consola Operativa."""
     from datetime import UTC, datetime
 
-    from bolsa_api.auth.request_principal import get_request_principal
+    from bolsa_application.lifecycle_outbox import (
+        OUTBOX_SLA_PENDING_SECONDS,
+        OUTBOX_SLA_PROCESSING_SECONDS,
+    )
     from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
 
-    principal = get_request_principal(request)
     await _assert_account_owned(session, principal, account_id)
     counts = (
         await session.execute(
@@ -304,6 +336,16 @@ async def get_lifecycle_outbox_stats(
         )
     ).all()
     by_status = {str(status): int(n) for status, n in counts}
+    now = datetime.now(UTC)
+
+    def _age_seconds(value: Any) -> float | None:
+        if value is None:
+            return None
+        created = value
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        return max(0.0, (now - created).total_seconds())
+
     oldest_pending = (
         await session.execute(
             select(func.min(LifecycleOutboxRow.created_at)).where(
@@ -312,20 +354,100 @@ async def get_lifecycle_outbox_stats(
             )
         )
     ).scalar_one_or_none()
-    age: float | None = None
-    if oldest_pending is not None:
-        created = oldest_pending
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=UTC)
-        age = max(0.0, (datetime.now(UTC) - created).total_seconds())
+    oldest_processing = (
+        await session.execute(
+            select(func.min(LifecycleOutboxRow.claimed_at)).where(
+                LifecycleOutboxRow.account_id == account_id,
+                LifecycleOutboxRow.status == "processing",
+            )
+        )
+    ).scalar_one_or_none()
+    oldest_dead = (
+        await session.execute(
+            select(func.min(LifecycleOutboxRow.created_at)).where(
+                LifecycleOutboxRow.account_id == account_id,
+                LifecycleOutboxRow.status == "dead",
+            )
+        )
+    ).scalar_one_or_none()
+    pending_age = _age_seconds(oldest_pending)
+    processing_age = _age_seconds(oldest_processing)
+    dead_age = _age_seconds(oldest_dead)
+    sla_breached = (
+        (pending_age is not None and pending_age > OUTBOX_SLA_PENDING_SECONDS)
+        or (
+            processing_age is not None
+            and processing_age > OUTBOX_SLA_PROCESSING_SECONDS
+        )
+    )
     return {
         "data": {
             "pending": by_status.get("pending", 0),
             "processing": by_status.get("processing", 0),
             "dead": by_status.get("dead", 0),
-            "oldestPendingAgeSeconds": age,
+            "oldestPendingAgeSeconds": pending_age,
+            "oldestProcessingAgeSeconds": processing_age,
+            "oldestDeadAgeSeconds": dead_age,
+            "slaBreached": sla_breached,
         }
     }
+
+
+@router.get(
+    "/reconciliation",
+    response_model=LifecycleReconciliationResponseDto,
+)
+async def get_lifecycle_reconciliation(
+    account_id: Annotated[str, Query(alias="accountId")],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    principal: Annotated[str, Depends(require_jwt_principal)],
+) -> dict[str, Any]:
+    """V1.93 — PositionState ↔ Lifecycle detect/report (no auto-heal)."""
+    from bolsa_application.lifecycle_event_store import (
+        GetLifecycleSnapshot,
+        PostgresLifecycleEventStore,
+    )
+    from bolsa_application.reconcile_lifecycle_integrity import (
+        OutboxSnap,
+        ReconcileLifecycleIntegrity,
+        ReconcileLifecycleIntegrityInput,
+    )
+    from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
+
+    await _assert_account_owned(session, principal, account_id)
+
+    class _OutboxAdapter:
+        async def list_for_account(self, acc: str) -> list[OutboxSnap]:
+            rows = (
+                await session.execute(
+                    select(LifecycleOutboxRow).where(
+                        LifecycleOutboxRow.account_id == acc,
+                        LifecycleOutboxRow.status.in_(
+                            ("pending", "processing", "dead")
+                        ),
+                    )
+                )
+            ).scalars().all()
+            return [
+                OutboxSnap(
+                    position_id=r.position_id,
+                    kind=r.kind,
+                    status=r.status,
+                    created_at=r.created_at,
+                )
+                for r in rows
+            ]
+
+    report = await ReconcileLifecycleIntegrity(
+        positions=SqlAlchemyPositionStateRepository(session),
+        snapshots=GetLifecycleSnapshot(PostgresLifecycleEventStore(session)),
+        outbox=_OutboxAdapter(),
+    ).reconcile(ReconcileLifecycleIntegrityInput(account_id=account_id))
+    assert report is not None
+    return {"data": report.to_dict()}
 
 
 @router.post(

@@ -27,4 +27,4 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` off · no unificar ledger · integrated 
 
 ## Next
 
-Arranque auditor externo tip V1.92 · criterio **beta PAPER explotable**. **Sin** LIVE aún.
+Auditoría tip V1.92 **DONE** — [`respuesta-auditor-v192`](./respuesta-auditor-v192-lifecycle-concurrency-worker-cert-2026-09-03.md) (**PASS · P0=0 · P1=0**). Next = [`spec-v193`](./spec-v193-operational-failure-injection-2026-09-03.md) Operational Failure Injection. **Sin** LIVE aún.

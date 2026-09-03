@@ -10971,6 +10971,17 @@
             "title": "Dead",
             "type": "integer"
           },
+          "oldestDeadAgeSeconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldestdeadageseconds"
+          },
           "oldestPendingAgeSeconds": {
             "anyOf": [
               {
@@ -10982,6 +10993,17 @@
             ],
             "title": "Oldestpendingageseconds"
           },
+          "oldestProcessingAgeSeconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldestprocessingageseconds"
+          },
           "pending": {
             "title": "Pending",
             "type": "integer"
@@ -10989,6 +11011,11 @@
           "processing": {
             "title": "Processing",
             "type": "integer"
+          },
+          "slaBreached": {
+            "default": false,
+            "title": "Slabreached",
+            "type": "boolean"
           }
         },
         "required": [
@@ -11010,6 +11037,90 @@
           "data"
         ],
         "title": "LifecycleOutboxStatsResponseDto",
+        "type": "object"
+      },
+      "LifecycleReconIssueDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "positionId": {
+            "title": "Positionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "positionId",
+          "detail"
+        ],
+        "title": "LifecycleReconIssueDto",
+        "type": "object"
+      },
+      "LifecycleReconciliationDataDto": {
+        "additionalProperties": false,
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "blockedCount": {
+            "title": "Blockedcount",
+            "type": "integer"
+          },
+          "checked": {
+            "title": "Checked",
+            "type": "integer"
+          },
+          "driftCount": {
+            "title": "Driftcount",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/LifecycleReconIssueDto"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "lagCount": {
+            "title": "Lagcount",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "status",
+          "checked",
+          "driftCount",
+          "lagCount",
+          "blockedCount",
+          "issues"
+        ],
+        "title": "LifecycleReconciliationDataDto",
+        "type": "object"
+      },
+      "LifecycleReconciliationResponseDto": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LifecycleReconciliationDataDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "LifecycleReconciliationResponseDto",
         "type": "object"
       },
       "LifecycleSnapshotDataDto": {
@@ -25752,7 +25863,7 @@
     },
     "/api/lifecycle/outbox/stats": {
       "get": {
-        "description": "V1.92 P2 — outbox queue depth for Consola Operativa (account-scoped).\n\nAuth: middleware JWT when APP_PASSWORD on; principal + ownership always.",
+        "description": "V1.92/V1.93 — outbox queue depth + SLA ages for Consola Operativa.",
         "operationId": "get_lifecycle_outbox_stats_api_lifecycle_outbox_stats_get",
         "parameters": [
           {
@@ -25873,6 +25984,49 @@
           }
         },
         "summary": "Get Lifecycle Snapshot",
+        "tags": [
+          "lifecycle"
+        ]
+      }
+    },
+    "/api/lifecycle/reconciliation": {
+      "get": {
+        "description": "V1.93 — PositionState ↔ Lifecycle detect/report (no auto-heal).",
+        "operationId": "get_lifecycle_reconciliation_api_lifecycle_reconciliation_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": true,
+            "schema": {
+              "title": "Accountid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleReconciliationResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Lifecycle Reconciliation",
         "tags": [
           "lifecycle"
         ]

@@ -2209,9 +2209,7 @@ export interface paths {
         };
         /**
          * Get Lifecycle Outbox Stats
-         * @description V1.92 P2 — outbox queue depth for Consola Operativa (account-scoped).
-         *
-         *     Auth: middleware JWT when APP_PASSWORD on; principal + ownership always.
+         * @description V1.92/V1.93 — outbox queue depth + SLA ages for Consola Operativa.
          */
         get: operations["get_lifecycle_outbox_stats_api_lifecycle_outbox_stats_get"];
         put?: never;
@@ -2251,6 +2249,26 @@ export interface paths {
         };
         /** Get Lifecycle Snapshot */
         get: operations["get_lifecycle_snapshot_api_lifecycle_positions__position_id__snapshot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lifecycle/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lifecycle Reconciliation
+         * @description V1.93 — PositionState ↔ Lifecycle detect/report (no auto-heal).
+         */
+        get: operations["get_lifecycle_reconciliation_api_lifecycle_reconciliation_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7394,16 +7412,55 @@ export interface components {
         LifecycleOutboxStatsDataDto: {
             /** Dead */
             dead: number;
+            /** Oldestdeadageseconds */
+            oldestDeadAgeSeconds?: number | null;
             /** Oldestpendingageseconds */
             oldestPendingAgeSeconds?: number | null;
+            /** Oldestprocessingageseconds */
+            oldestProcessingAgeSeconds?: number | null;
             /** Pending */
             pending: number;
             /** Processing */
             processing: number;
+            /**
+             * Slabreached
+             * @default false
+             */
+            slaBreached: boolean;
         };
         /** LifecycleOutboxStatsResponseDto */
         LifecycleOutboxStatsResponseDto: {
             data: components["schemas"]["LifecycleOutboxStatsDataDto"];
+        };
+        /** LifecycleReconIssueDto */
+        LifecycleReconIssueDto: {
+            /** Code */
+            code: string;
+            /** Detail */
+            detail: string;
+            /** Positionid */
+            positionId: string;
+        };
+        /** LifecycleReconciliationDataDto */
+        LifecycleReconciliationDataDto: {
+            /** Accountid */
+            accountId: string;
+            /** Blockedcount */
+            blockedCount: number;
+            /** Checked */
+            checked: number;
+            /** Driftcount */
+            driftCount: number;
+            /** Issues */
+            issues: components["schemas"]["LifecycleReconIssueDto"][];
+            /** Lagcount */
+            lagCount: number;
+            /** Status */
+            status: string;
+        };
+        /** LifecycleReconciliationResponseDto */
+        LifecycleReconciliationResponseDto: {
+            data: components["schemas"]["LifecycleReconciliationDataDto"];
         };
         /** LifecycleSnapshotDataDto */
         LifecycleSnapshotDataDto: {
@@ -14528,6 +14585,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LifecycleSnapshotResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lifecycle_reconciliation_api_lifecycle_reconciliation_get: {
+        parameters: {
+            query: {
+                accountId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleReconciliationResponseDto"];
                 };
             };
             /** @description Validation Error */

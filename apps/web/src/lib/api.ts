@@ -926,7 +926,7 @@ export const api = {
       }),
     ),
 
-  /** V1.92 — outbox queue depth for Consola Operativa. */
+  /** V1.92/V1.93 — outbox queue depth + SLA for Consola Operativa. */
   getLifecycleOutboxStats: (accountId: string) =>
     call<{
       data: {
@@ -934,9 +934,34 @@ export const api = {
         processing: number;
         dead: number;
         oldestPendingAgeSeconds: number | null;
+        oldestProcessingAgeSeconds: number | null;
+        oldestDeadAgeSeconds: number | null;
+        slaBreached: boolean;
       };
     }>(() =>
       client.GET("/api/lifecycle/outbox/stats", {
+        params: { query: { accountId } },
+      }),
+    ),
+
+  /** V1.93 — PositionState ↔ Lifecycle detect/report. */
+  getLifecycleReconciliation: (accountId: string) =>
+    call<{
+      data: {
+        accountId: string;
+        status: string;
+        checked: number;
+        driftCount: number;
+        lagCount: number;
+        blockedCount: number;
+        issues: Array<{
+          code: string;
+          positionId: string;
+          detail: string;
+        }>;
+      };
+    }>(() =>
+      client.GET("/api/lifecycle/reconciliation", {
         params: { query: { accountId } },
       }),
     ),

@@ -128,6 +128,16 @@ class SqlAlchemyPositionStateRepository:
         result = await self._session.execute(stmt)
         return [_to_record(row) for row in result.scalars().all()]
 
+    async def list_for_account(self, account_id: str) -> list[PositionStateRecord]:
+        """V1.93 — all PositionState rows for account (open + closed) for lifecycle recon."""
+        stmt = (
+            select(PositionStateRow)
+            .where(PositionStateRow.account_id == account_id)
+            .order_by(PositionStateRow.created_at.desc())
+        )
+        result = await self._session.execute(stmt)
+        return [_to_record(row) for row in result.scalars().all()]
+
     async def insert(
         self,
         *,
