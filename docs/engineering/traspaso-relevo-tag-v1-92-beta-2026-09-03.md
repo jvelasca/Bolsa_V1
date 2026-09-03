@@ -2,7 +2,7 @@
 
 > **Padre:** [`traspaso-relevo-v1-92-lifecycle-concurrency-worker-cert-2026-09-03.md`](./traspaso-relevo-v1-92-lifecycle-concurrency-worker-cert-2026-09-03.md).  
 > **Estado:** **CI GREEN** — tip `v1.92-beta` → `752918ef` · Release-tag CI **GREEN** ([run 33754485267](https://github.com/jvelasca/Bolsa_V1/actions/runs/33754485267)).  
-> **Docs stamp:** (este commit; post-GREEN; no exige retag).  
+> **Docs stamp:** [`ae169caa`](https://github.com/jvelasca/Bolsa_V1/commit/ae169caa) (post-GREEN; no exige retag).  
 > **Partida:** V1.91 PASS arquitectónico [`4644fef9`](https://github.com/jvelasca/Bolsa_V1/commit/4644fef9) · [`respuesta-auditor-v191`](./respuesta-auditor-v191-operational-atomicity-2026-09-03.md).
 
 ## Release
