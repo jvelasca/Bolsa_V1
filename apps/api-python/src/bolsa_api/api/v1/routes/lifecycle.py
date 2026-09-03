@@ -594,7 +594,7 @@ async def get_financial_integrity(
         now = datetime.now(UTC)
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=UTC)
-        return max(0.0, (now - ts).total_seconds())
+        return float(max(0.0, (now - ts).total_seconds()))
 
     pending_age = _age_seconds(oldest_pending)
     processing_age = _age_seconds(oldest_processing)
