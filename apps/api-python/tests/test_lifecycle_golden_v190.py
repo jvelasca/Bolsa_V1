@@ -40,6 +40,7 @@ from bolsa_domain.entities.portfolio import (
 from bolsa_infrastructure.auth.passwords import hash_password
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.models import (
+    InstrumentRow,
     InvestmentAccountRow,
     InvestmentPortfolioRow,
     LedgerEntryRow,
@@ -155,6 +156,35 @@ async def _insert_account(
     return account_id
 
 
+async def _insert_instrument(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    instrument_id: str,
+    symbol: str = "AAPL",
+) -> None:
+    now = _now()
+    async with factory() as session:
+        if await session.get(InstrumentRow, instrument_id) is None:
+            session.add(
+                InstrumentRow(
+                    id=instrument_id,
+                    symbol=symbol,
+                    yahoo_symbol=f"{symbol}-{instrument_id[:8]}",
+                    isin=None,
+                    name=symbol,
+                    exchange="NASDAQ",
+                    country="US",
+                    currency="USD",
+                    sector=None,
+                    type="stock",
+                    is_active=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            await session.commit()
+
+
 async def _jwt(factory: async_sessionmaker[AsyncSession], user_id: str) -> str:
     settings = get_settings()
     async with factory() as session:
@@ -256,6 +286,7 @@ async def test_v190_golden_confirm_position_sync_lifecycle_snapshot(
         factory = app.state.session_factory
         await _insert_user(factory, user_id=user_a)
         await _insert_user(factory, user_id=user_b)
+        await _insert_instrument(factory, instrument_id=instrument_id)
         acc_a = await _insert_account(factory, user_id=user_a, name="Golden V190 A")
         await _insert_account(factory, user_id=user_b, name="Golden V190 B")
         token_a = await _jwt(factory, user_a)

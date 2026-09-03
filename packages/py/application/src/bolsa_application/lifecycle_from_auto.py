@@ -249,29 +249,31 @@ async def append_lifecycle_from_auto(
                 )
                 bridge_result = await append.execute(bridge)
                 if not bridge_result.ok:
-                    code = (
+                    bridge_reason: str = (
                         bridge_result.error.code
                         if bridge_result.error
                         else "t2_trigger_failed"
                     )
                     return {
                         "status": "error",
-                        "reason": code,
+                        "reason": bridge_reason,
                         "kind": "T2_TRIGGERED",
                         "positionId": mapping.position_id,
                     }
 
         result = await append.execute(input_event)
         if not result.ok:
-            code = result.error.code if result.error else "append_failed"
+            append_reason: str = (
+                result.error.code if result.error else "append_failed"
+            )
             logger.warning(
                 "lifecycle_from_auto append failed kind=%s code=%s",
                 mapping.kind,
-                code,
+                append_reason,
             )
             return {
                 "status": "error",
-                "reason": code,
+                "reason": append_reason,
                 "kind": mapping.kind,
                 "positionId": mapping.position_id,
             }
