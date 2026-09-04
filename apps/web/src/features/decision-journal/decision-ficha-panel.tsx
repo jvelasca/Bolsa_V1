@@ -10,7 +10,6 @@ import {
   buildJournalSpineView,
   buildPositionOperatingTruth,
   buildTradeStory,
-  formatJournalMfeMaeLine,
   journalStudyConsensusPercents,
   type DecisionJournalEntryV1,
   type DecisionJournalStudyViewV1,
@@ -566,13 +565,43 @@ export function DecisionFichaPanel({
             </dl>
             {spine.result.mfeMae ? (
               <div className="mt-3" data-testid="journal-mfe-mae">
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                  Excursión
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Resultado
                 </p>
-                <p className="mt-1 text-sm tabular-nums">
-                  {formatJournalMfeMaeLine(spine.result.mfeMae)}
-                </p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                <dl className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <dt className="text-[11px] text-muted-foreground">Final</dt>
+                    <dd
+                      className="font-semibold tabular-nums text-foreground"
+                      data-testid="journal-mfe-mae-final"
+                    >
+                      {formatRMetric(spine.result.finalR)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] text-muted-foreground">MFE</dt>
+                    <dd
+                      className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-300"
+                      data-testid="journal-mfe-mae-mfe"
+                    >
+                      {spine.result.mfeMae.mfeR != null
+                        ? `+${spine.result.mfeMae.mfeR}R`
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] text-muted-foreground">MAE</dt>
+                    <dd
+                      className="font-semibold tabular-nums text-rose-700 dark:text-rose-300"
+                      data-testid="journal-mfe-mae-mae"
+                    >
+                      {spine.result.mfeMae.maeR != null
+                        ? `${spine.result.mfeMae.maeR}R`
+                        : "—"}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-1 text-[11px] text-muted-foreground">
                   Máximo a favor / máximo en contra (foto de sesión).
                 </p>
               </div>

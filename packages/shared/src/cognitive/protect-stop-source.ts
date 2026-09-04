@@ -4,6 +4,7 @@
  *
  * Bootstrap −5% is an emergency floor when OPEN_UNPROTECTED has no structural stop.
  * It must NEVER be presented as the strategy / technical stop.
+ * V2.33 — bootstrap kind iff the number is the −5% floor (never initialStop).
  */
 
 export const BOOTSTRAP_PROTECT_STOP_PCT = 0.05;
@@ -15,7 +16,10 @@ export type ResolveBootstrapProtectStopInputV1 = {
   direction?: string | null;
   /** Prefer actual → planned → avgCost → lastPrice. */
   entry: number | null | undefined;
-  /** If the plan already carried an initialStop, use it (still bootstrap context). */
+  /**
+   * @deprecated V2.33 — ignored. Plan initialStop is kind "plan", not bootstrap.
+   * Kept optional for call-site compatibility.
+   */
   initialStop?: number | null;
 };
 
@@ -44,6 +48,7 @@ export function resolveEmergencyBootstrapStopPrice(input: {
 /**
  * True when the executed/suggested stop is the emergency −5 % floor,
  * not a technical strategy stop.
+ * V2.33 — protectKind "bootstrap" alone is not enough; price must match floor.
  */
 export function isEmergencyBootstrapStop(input: {
   direction?: string | null;
@@ -51,9 +56,6 @@ export function isEmergencyBootstrapStop(input: {
   stop: number | null | undefined;
   protectKind?: ProtectStopKindV1 | null;
 }): boolean {
-  if (input.protectKind === "bootstrap") {
-    return finitePositive(input.stop);
-  }
   if (
     input.protectKind === "hint" ||
     input.protectKind === "trail" ||
@@ -70,12 +72,22 @@ export function isEmergencyBootstrapStop(input: {
 /**
  * Emergency stop for unprotected open positions without ExitPlan/protect_hint stop.
  * LONG → entry × (1 − 5%); SHORT → entry × (1 + 5%).
+ * V2.33 — never prefers initialStop (that is kind "plan").
  */
 export function resolveBootstrapProtectStop(
   input: ResolveBootstrapProtectStopInputV1,
 ): number | null {
-  if (finitePositive(input.initialStop)) return input.initialStop;
   return resolveEmergencyBootstrapStopPrice(input);
+}
+
+/** True when position has no structural stop (birth or residual). */
+export function positionLacksStructuralStop(input: {
+  currentStop?: number | null;
+  initialStop?: number | null;
+}): boolean {
+  return (
+    !finitePositive(input.currentStop) && !finitePositive(input.initialStop)
+  );
 }
 
 /** Operator-facing copy for Confirm / tooltips. */

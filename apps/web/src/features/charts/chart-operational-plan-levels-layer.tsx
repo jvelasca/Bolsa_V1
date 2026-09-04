@@ -120,16 +120,23 @@ export function ChartOperationalPlanLevelsLayer({
       ? resolveBootstrapProtectStop(context.position)
       : null;
   const executedStop = context.position?.operational?.currentStop ?? null;
+  const initialStop = context.position?.operational?.initialStop ?? null;
+  const lacksStructural =
+    (executedStop == null ||
+      !(Number.isFinite(executedStop) && executedStop > 0)) &&
+    (initialStop == null || !(Number.isFinite(initialStop) && initialStop > 0));
+  // V2.33 — bootstrap paint only when there is truly no structural stop.
   const stopIsBootstrap =
-    (executedStop == null && bootstrapStopPrice != null) ||
-    (context.plan != null &&
-      isEmergencyBootstrapStop({
-        direction: context.plan.direction,
-        entry: context.plan.entry,
-        stop: context.plan.stopVigente,
-        protectKind: executedStop == null ? "bootstrap" : null,
-      }) &&
-      executedStop == null);
+    lacksStructural &&
+    ((executedStop == null && bootstrapStopPrice != null) ||
+      (context.plan != null &&
+        isEmergencyBootstrapStop({
+          direction: context.plan.direction,
+          entry: context.plan.entry,
+          stop: context.plan.stopVigente,
+          protectKind: "bootstrap",
+        }) &&
+        executedStop == null));
   const exitPolicy = resolveExitPolicy(null);
   const levels =
     chartReady && series && instrumentId

@@ -94,8 +94,11 @@ describe("DecisionFichaPanel V2.27 spine + RESULTADO", () => {
     expect(screen.getByTestId("journal-spine-step-tesis")).toBeTruthy();
     expect(screen.getByTestId("journal-spine-step-resultado")).toBeTruthy();
     expect(screen.getByTestId("journal-result-metrics")).toBeTruthy();
-    expect(screen.getByTestId("journal-mfe-mae").textContent).toMatch(
-      /MFE 1\.8R/,
+    expect(screen.getByTestId("journal-mfe-mae-mfe").textContent).toMatch(
+      /\+1\.8R/,
+    );
+    expect(screen.getByTestId("journal-mfe-mae-mae").textContent).toMatch(
+      /0\.2R/,
     );
     expect(screen.getByTestId("journal-initial-risk-r").textContent).toMatch(
       /1R/,

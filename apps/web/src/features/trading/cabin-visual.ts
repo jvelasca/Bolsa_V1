@@ -1,5 +1,5 @@
 /**
- * V2.31 — Premium Visual System (cabina Mercado A–B).
+ * V2.31 / V2.34 — Premium Visual System (cabina Mercado A–B).
  * Tres tamaños: héroe · operativa · meta. Números financieros tabulares.
  * Display-only · sin paneles nuevos · sin controles AUTO.
  *
@@ -8,11 +8,12 @@
 
 import { cn } from "@/lib/utils";
 
-export const CABIN_VISUAL_VERSION = "v2.31";
+export const CABIN_VISUAL_VERSION = "v2.34";
 
 /**
  * Tipografía de cabina — solo 3 tamaños.
- * Floor = meta (~11px). No usar text-[9px] / text-[10px] en nivel A–B.
+ * Floor = meta (~12px). No usar text-[9px] / text-[10px] en nivel A–B.
+ * V2.34 — hero ~24px · operativa ~15px · meta ~12px.
  */
 export const CABIN_TYPE = {
   hero: "cabin-type-hero text-foreground",
@@ -28,6 +29,10 @@ export const CABIN_TYPE = {
   value:
     "cabin-type-operativa font-semibold tabular-nums tracking-tight text-foreground",
 } as const;
+
+/** Hit area mínima para controles primarios de cabina / gráfico (~40px). */
+export const CABIN_TOUCH_TARGET =
+  "min-h-10 min-w-10 inline-flex items-center justify-center";
 
 export type CabinTypeSize = "hero" | "operativa" | "meta";
 export type CabinNumTone = "pos" | "neg" | "neu";
@@ -64,6 +69,6 @@ export function cabinNumClass(opts?: {
   );
 }
 
-/** Grid B-level (Entrada · Stop · Riesgo · T1…). Labels = meta. */
+/** Grid B-level (Entrada · Stop · Riesgo · T1…). Labels = meta · valores operativa. */
 export const CABIN_KV_GRID =
-  "grid grid-cols-2 gap-x-3 gap-y-0.5 cabin-type-meta text-muted-foreground";
+  "grid grid-cols-2 gap-x-3 gap-y-1 cabin-type-meta text-muted-foreground";

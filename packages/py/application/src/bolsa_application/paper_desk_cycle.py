@@ -358,6 +358,8 @@ def _row_with_next(
             has_protect_revision=has_protect,
             recon_status=recon_status,  # type: ignore[arg-type]
             has_unresolved_exit=has_unresolved_exit,
+            current_stop=position.current_stop,
+            initial_stop=position.initial_stop,
         )
     return PaperDeskPositionTickRow(
         instrument_id=instrument_id,

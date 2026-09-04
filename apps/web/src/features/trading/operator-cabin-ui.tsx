@@ -604,7 +604,7 @@ export function OperatorPositionPlan({
               </div>
               {!isLast ? (
                 <div
-                  className="mx-3 h-2 w-px bg-border/70"
+                  className="mx-3 h-3 w-px bg-border/80"
                   aria-hidden="true"
                   data-testid="exit-ladder-connector"
                 />
@@ -615,11 +615,17 @@ export function OperatorPositionPlan({
       </ol>
       {plan.remainingDetail != null || plan.remainingPct != null ? (
         <p
-          className={cn("mt-1", CABIN_TYPE.meta)}
+          className={cn(
+            "mt-1.5 flex items-baseline justify-between gap-2 rounded-md border border-border/50 bg-muted/20 px-2 py-1",
+            CABIN_TYPE.operativa,
+          )}
           data-testid="exit-ladder-remaining"
         >
-          RESTANTE{" "}
-          <span className={cn(CABIN_NUM.base, CABIN_NUM.neu)}>
+          <span className={cn(CABIN_TYPE.eyebrow, "opacity-90")}>RESTANTE</span>
+          <span
+            className={cn(CABIN_NUM.hero, CABIN_NUM.neu, "font-bold")}
+            data-testid="exit-ladder-remaining-value"
+          >
             {plan.remainingDetail ??
               (plan.remainingPct != null ? `${plan.remainingPct}%` : "—")}
           </span>
@@ -652,7 +658,7 @@ export function OperatorExitLadder({
         rung.id === "stop"
           ? "Protección"
           : rung.id === "trail"
-            ? "Gestión / trailing"
+            ? "Gestión · Trailing activo"
             : rung.label,
       detail: rung.detail,
       status: rung.status,

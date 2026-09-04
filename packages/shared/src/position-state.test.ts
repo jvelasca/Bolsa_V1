@@ -9,6 +9,7 @@ import {
   applyPositionReduce,
   applyTargetLeg,
   buildPositionStateFromFill,
+  doesStopWorsen,
   targetLegFromUnknown,
   type PositionStateV1,
 } from "./cognitive/position-state.js";
@@ -329,5 +330,15 @@ describe("H2 invariantes from_fill / stop", () => {
   it("V1.52 legacy snapshot hydrates executed from achievedAt", () => {
     const leg = targetLegFromUnknown(undefined, 105, "2026-08-25T16:00:00Z");
     expect(leg?.status).toBe("executed");
+  });
+});
+
+describe("doesStopWorsen H2 LONG/SHORT parity", () => {
+  it("long worsens when next is lower; short when higher", () => {
+    expect(doesStopWorsen("long", 100, 99)).toBe(true);
+    expect(doesStopWorsen("long", 100, 101)).toBe(false);
+    expect(doesStopWorsen("short", 100, 101)).toBe(true);
+    expect(doesStopWorsen("short", 100, 99)).toBe(false);
+    expect(doesStopWorsen("long", null, 99)).toBe(false);
   });
 });

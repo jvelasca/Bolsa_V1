@@ -76,6 +76,8 @@ def resolve_position_operating_state(
     has_protect_revision: bool,
     recon_status: str = "clean",
     has_unresolved_exit: bool = False,
+    current_stop: float | None = None,
+    initial_stop: float | None = None,
 ) -> PositionOperatingState:
     if recon_status == "unavailable":
         return "RECONCILIATION_ERROR"
@@ -92,6 +94,12 @@ def resolve_position_operating_state(
     if has_trail_revision:
         return "TRAILING"
     if has_protect_revision or (position_status or "").upper() == "PROTECTED":
+        return "PROTECTED"
+    # V2.33 — birth fill with signed structural stop is not OPEN_UNPROTECTED.
+    def _finite_positive(n: float | None) -> bool:
+        return n is not None and isinstance(n, (int, float)) and float(n) > 0
+
+    if _finite_positive(current_stop) or _finite_positive(initial_stop):
         return "PROTECTED"
     return "OPEN_UNPROTECTED"
 
@@ -236,6 +244,8 @@ def _resolve_extended_operating_state(
         has_protect_revision=any(r.origin == "protect" for r in position.revisions),
         recon_status=recon,
         has_unresolved_exit=exit_pending,
+        current_stop=position.current_stop,
+        initial_stop=position.initial_stop,
     )
     if base in ("RECONCILIATION_ERROR", "RECONCILIATION_DRIFT", "CLOSED"):
         return base
@@ -251,12 +261,7 @@ def _resolve_extended_operating_state(
         return "T1_EXECUTED"
     if t1 is not None and t1.status == "triggered":
         return "T1_READY"
-    if (
-        base == "OPEN_UNPROTECTED"
-        and position.current_stop is not None
-        and not position.revisions
-    ):
-        return "PROTECT_REQUIRED"
+    # V2.33 — birth with structural stop is PROTECTED (phase Planificado in cabin).
     return base
 
 

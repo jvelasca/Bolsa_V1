@@ -1,7 +1,8 @@
 /**
- * G-OPERATOR-03 — protection journey (V2.23).
- * OPEN_UNPROTECTED → PROTEGER → Confirm bootstrap → never «stop técnico».
- * Signed technical stop → protection.kind technical.
+ * G-OPERATOR-03 — protection journey (V2.23 / V2.33).
+ * No structural stop → PROTEGER · bootstrap −5%.
+ * Birth with signed plan stop → MANTENER · Planificado (not emergency).
+ * Protect/trail revision → Protegida técnica.
  */
 
 import { describe, expect, it } from "vitest";
@@ -57,7 +58,7 @@ function unprotectedJourney(): PositionJourneyReadoutV1 {
 }
 
 describe("G-OPERATOR-03 protect journey", () => {
-  it("OPEN_UNPROTECTED → PROTEGER on Mercado and Hoy", () => {
+  it("no structural stop → PROTEGER on Mercado and Hoy", () => {
     const j = unprotectedJourney();
     const decision = buildOperatorDecision({
       kind: "position",
@@ -81,7 +82,7 @@ describe("G-OPERATOR-03 protect journey", () => {
     expect(label.suggestedLine).not.toMatch(/técnico/i);
   });
 
-  it("signed bootstrap stop → emergency, not technical", () => {
+  it("signed bootstrap stop (floor) → emergency, not technical", () => {
     const j = unprotectedJourney();
     j.trail.currentStop = 174.99;
     const decision = buildOperatorDecision({
@@ -97,7 +98,7 @@ describe("G-OPERATOR-03 protect journey", () => {
     expect(decision.protection.label).not.toMatch(/técnico/i);
   });
 
-  it("signed technical stop → Protegida", () => {
+  it("V2.33 — protect revision → Protegida técnica", () => {
     const j = unprotectedJourney();
     j.trail.currentStop = 176.8;
     j.risk.initialStop = 176.8;
@@ -107,25 +108,57 @@ describe("G-OPERATOR-03 protect journey", () => {
       journey: j,
       protectKind: "plan",
       currentStop: 176.8,
+      plannedStop: 176.8,
+      hasProtectRevision: true,
     });
     expect(decision.protection.kind).toBe("technical");
+    expect(decision.protection.phase).toBe("protected");
     expect(decision.currentAction.title).toBe("MANTENER");
   });
 
-  it("planned stop only (not executed) never counts as technical protection", () => {
+  it("V2.33 — planned stop at birth → MANTENER · Planificado (not PROTEGER)", () => {
+    const j = unprotectedJourney();
+    j.risk.initialStop = 176.8;
+    j.trail.currentStop = 176.8;
+    const next = resolveOperatorNextAction({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: j,
+      currentStop: 176.8,
+      plannedStop: 176.8,
+    });
+    expect(next.title).toBe("MANTENER");
+    const decision = buildOperatorDecision({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: j,
+      currentStop: 176.8,
+      plannedStop: 176.8,
+    });
+    expect(decision.protection.kind).toBe("none");
+    expect(decision.protection.phase).toBe("planned");
+    expect(decision.protection.phaseLabel).toMatch(/Planificado/i);
+    expect(decision.currentAction.title).toBe("MANTENER");
+    expect(decision.currentAction.subtitle).not.toMatch(/emergencia/i);
+  });
+
+  it("V2.33 — planned stop only (no currentStop) → MANTENER · Planificado", () => {
     const j = unprotectedJourney();
     j.risk.initialStop = 176.8;
     const next = resolveOperatorNextAction({
       kind: "position",
       primaryAction: "MANTENER",
       journey: j,
+      plannedStop: 176.8,
     });
-    expect(next.title).toBe("PROTEGER");
+    expect(next.title).toBe("MANTENER");
     const decision = buildOperatorDecision({
       kind: "position",
       primaryAction: "MANTENER",
       journey: j,
+      plannedStop: 176.8,
     });
     expect(decision.protection.kind).toBe("none");
+    expect(decision.protection.phase).toBe("planned");
   });
 });

@@ -350,8 +350,20 @@ export function operatorCabinTruthFromPot(
   truth: PositionOperatingTruthV1,
 ): OperatorCabinTruthV1 {
   const view = truth.operationalView;
-  const executedStop =
+  const currentStop =
     view?.levels.currentStop ?? truth.operational.levels.stopOperativo ?? null;
+  const plannedRaw = truth.operational.levels.stopInicial;
+  const plannedStop =
+    typeof plannedRaw === "number" &&
+    Number.isFinite(plannedRaw) &&
+    plannedRaw > 0
+      ? plannedRaw
+      : null;
+  const stopHistory = view?.stopHistory ?? [];
+  const hasProtectRevision = stopHistory.some((h) => h.origin === "protect");
+  const hasTrailRevision =
+    stopHistory.some((h) => h.origin === "trail") ||
+    view?.operatingState === "TRAILING";
   const primaryAction: PaperDeskNextActionV1 =
     view?.primaryAction ??
     (truth.primaryCta.kind === "exit"
@@ -368,7 +380,10 @@ export function operatorCabinTruthFromPot(
     primaryAction,
     persistSkipped: truth.protectionDiscrepancy,
     protectionDiscrepancy: truth.protectionDiscrepancy,
-    currentStop: executedStop,
+    currentStop,
+    plannedStop,
+    hasProtectRevision,
+    hasTrailRevision,
     entry: view?.levels.entry ?? truth.operational.levels.entry,
     birthQuantity: view?.quantity ?? null,
     remainingQuantity: view?.remainingQuantity ?? null,

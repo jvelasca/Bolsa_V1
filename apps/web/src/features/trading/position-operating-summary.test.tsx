@@ -205,6 +205,11 @@ describe("PositionOperatingSummary V1.39", () => {
       screen
         .getByTestId("journal-protection-kind")
         .getAttribute("data-protection-kind"),
-    ).toMatch(/technical|emergency/);
+    ).toBe("none");
+    expect(
+      screen
+        .getByTestId("journal-protection-kind")
+        .getAttribute("data-protection-phase"),
+    ).toBe("planned");
   });
 });

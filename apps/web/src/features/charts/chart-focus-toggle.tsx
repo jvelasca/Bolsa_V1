@@ -1,5 +1,6 @@
 /**
- * V2.30 — Toggle Simple / Completo en chrome del gráfico (sin panel nuevo).
+ * V2.30 / V2.34 — Toggle Simple / Completo en chrome del gráfico (sin panel nuevo).
+ * V2.34 — touch target ~40px · texto 12px (no text-[9px]).
  */
 
 import { cn } from "@/lib/utils";
@@ -8,6 +9,7 @@ import {
   useChartFocusPrefs,
   useSetChartFocusMode,
 } from "@/features/charts/use-chart-focus-prefs";
+import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 
 const MODES: { id: ChartFocusModeV1; label: string }[] = [
   { id: "simple", label: "Simple" },
@@ -40,7 +42,8 @@ export function ChartFocusToggle({ className }: ChartFocusToggleProps) {
             key={m.id}
             type="button"
             className={cn(
-              "rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide transition-colors",
+              CABIN_TOUCH_TARGET,
+              "rounded px-3 text-xs font-semibold uppercase tracking-wide transition-colors",
               active
                 ? "bg-foreground/10 text-foreground"
                 : "text-muted-foreground hover:text-foreground",

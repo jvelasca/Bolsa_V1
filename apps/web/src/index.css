@@ -18,12 +18,12 @@
   --color-destructive: var(--bolsa-destructive);
   --color-success: var(--bolsa-success);
   --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
-  /* V2.31 Premium Visual System — 3 tamaños cabina (héroe / operativa / meta). */
-  --text-cabin-hero: 1.125rem;
+  /* V2.34 Premium Visual System — hero ~24px · operativa 15px · meta 12px. */
+  --text-cabin-hero: 1.5rem;
   --text-cabin-hero--line-height: 1.15;
-  --text-cabin-operativa: 0.8125rem;
+  --text-cabin-operativa: 0.9375rem;
   --text-cabin-operativa--line-height: 1.35;
-  --text-cabin-meta: 0.6875rem;
+  --text-cabin-meta: 0.75rem;
   --text-cabin-meta--line-height: 1.4;
 }
 
@@ -106,7 +106,7 @@ body {
   --density-topbar-py: 0.375rem;
   --density-topbar-h: 3rem;
   --density-font-shell: 1rem;
-  /* V2.31 — floor tipográfico cabina = meta (11px). Sin 9px/10px en A–B. */
+  /* V2.34 — floor tipográfico cabina = meta (12px). Sin 9px/10px en A–B. */
   --cabin-type-hero: var(--text-cabin-hero);
   --cabin-type-operativa: var(--text-cabin-operativa);
   --cabin-type-meta: var(--text-cabin-meta);

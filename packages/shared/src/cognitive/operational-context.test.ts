@@ -77,6 +77,33 @@ describe("operational-context", () => {
     ).toBe("PARTIALLY_REDUCED");
   });
 
+  it("V2.33 — birth with structural stop → PROTECTED not OPEN_UNPROTECTED", () => {
+    expect(
+      resolvePositionOperatingState({
+        positionStatus: "OPEN",
+        remainingQuantity: 10,
+        quantity: 10,
+        currentStop: 95,
+        initialStop: 95,
+      }),
+    ).toBe("PROTECTED");
+    expect(
+      resolvePositionOperatingState({
+        positionStatus: "OPEN",
+        remainingQuantity: 10,
+        quantity: 10,
+        initialStop: 95,
+      }),
+    ).toBe("PROTECTED");
+    expect(
+      resolvePositionOperatingState({
+        positionStatus: "OPEN",
+        remainingQuantity: 10,
+        quantity: 10,
+      }),
+    ).toBe("OPEN_UNPROTECTED");
+  });
+
   it("V1.57: drift → RECONCILIATION_DRIFT; unavailable → RECONCILIATION_ERROR", () => {
     expect(
       resolvePositionOperatingState({

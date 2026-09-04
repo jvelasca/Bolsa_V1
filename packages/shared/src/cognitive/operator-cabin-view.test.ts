@@ -334,7 +334,7 @@ describe("V2.19–V2.22 OperatorDecision + protection + remaining", () => {
     killOn: false,
   } as PositionJourneyReadoutV1;
 
-  it("planned initialStop without executed stop → PROTEGER not MANTENER", () => {
+  it("V2.33 — planned initialStop without ratified stop → MANTENER · Planificado", () => {
     const j = {
       ...protectedJourney,
       trail: { ...protectedJourney.trail, currentStop: null },
@@ -344,8 +344,14 @@ describe("V2.19–V2.22 OperatorDecision + protection + remaining", () => {
       primaryAction: "MANTENER",
       journey: j,
     });
-    expect(next.title).toBe("PROTEGER");
-    expect(next.tone).toBe("protect");
+    expect(next.title).toBe("MANTENER");
+    expect(next.tone).toBe("maintain");
+    const decision = buildOperatorDecision({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: j,
+    });
+    expect(decision.protection.phase).toBe("planned");
   });
 
   it("persistSkipped → PROTEGER never MANTENER", () => {
@@ -367,11 +373,12 @@ describe("V2.19–V2.22 OperatorDecision + protection + remaining", () => {
     expect(mesaNextActionFromOperatorDecision(decision).kind).toBe("protect");
   });
 
-  it("executed technical stop → Protegida + MANTENER", () => {
+  it("executed technical stop (protect revision) → Protegida + MANTENER", () => {
     const decision = buildOperatorDecision({
       kind: "position",
       primaryAction: "MANTENER",
       journey: protectedJourney,
+      hasProtectRevision: true,
     });
     expect(decision.currentAction.title).toBe("MANTENER");
     expect(decision.protection.kind).toBe("technical");

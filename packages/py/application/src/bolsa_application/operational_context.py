@@ -543,6 +543,8 @@ def resolve_position_operating_state(
     has_protect_revision: bool,
     recon_status: PortfolioReconStatus = "clean",
     has_unresolved_exit: bool = False,
+    current_stop: float | None = None,
+    initial_stop: float | None = None,
 ) -> PositionOperatingState:
     if recon_status == "unavailable":
         return "RECONCILIATION_ERROR"
@@ -559,6 +561,12 @@ def resolve_position_operating_state(
     if has_trail_revision:
         return "TRAILING"
     if has_protect_revision or (position_status or "").upper() == "PROTECTED":
+        return "PROTECTED"
+    # V2.33 — birth fill with signed structural stop is not OPEN_UNPROTECTED.
+    def _finite_positive(n: float | None) -> bool:
+        return n is not None and isinstance(n, (int, float)) and float(n) > 0
+
+    if _finite_positive(current_stop) or _finite_positive(initial_stop):
         return "PROTECTED"
     return "OPEN_UNPROTECTED"
 

@@ -124,6 +124,8 @@ function resolveExtendedOperatingState(input: {
     ),
     reconStatus: coerceReconForOperatingState(input.reconStatus),
     hasUnresolvedExit: input.exitPending ?? false,
+    currentStop: input.position.currentStop,
+    initialStop: input.position.initialStop,
   });
   if (base === "RECONCILIATION_ERROR" || base === "RECONCILIATION_DRIFT") {
     return base;
@@ -138,13 +140,8 @@ function resolveExtendedOperatingState(input: {
   const t1 = input.position.target1Leg;
   if (t1?.status === "executed") return "T1_EXECUTED";
   if (t1?.status === "triggered") return "T1_READY";
-  if (
-    base === "OPEN_UNPROTECTED" &&
-    input.position.currentStop != null &&
-    input.position.revisions.length === 0
-  ) {
-    return "PROTECT_REQUIRED";
-  }
+  // V2.33 — birth with structural stop is PROTECTED (phase Planificado in cabin).
+  // PROTECT_REQUIRED reserved for persist/discrepancy paths, not healthy birth.
   return base;
 }
 

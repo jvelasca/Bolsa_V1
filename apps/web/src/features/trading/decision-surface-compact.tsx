@@ -506,9 +506,15 @@ function formatLegStatus(
 function JourneyHudBlock({
   journey,
   birthQuantity,
+  hasProtectRevision,
+  hasTrailRevision,
+  plannedStop,
 }: {
   journey: PositionJourneyReadoutV1;
   birthQuantity?: number | null;
+  hasProtectRevision?: boolean;
+  hasTrailRevision?: boolean;
+  plannedStop?: number | null;
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const decision = buildOperatorDecision({
@@ -517,6 +523,10 @@ function JourneyHudBlock({
     journey,
     birthQuantity: birthQuantity ?? null,
     currentStop: journey.trail.currentStop,
+    plannedStop: plannedStop ?? journey.risk.initialStop,
+    hasProtectRevision: hasProtectRevision === true,
+    hasTrailRevision:
+      hasTrailRevision === true || journey.trail.active === true,
     entry: journey.entry,
   });
   const nextAction = decision.currentAction;
@@ -831,6 +841,13 @@ function PositionCompactBody({
                     primaryAction: view.primaryAction,
                     journey: null,
                     currentStop: view.levels.currentStop,
+                    plannedStop: view.levels.currentStop,
+                    hasProtectRevision: view.stopHistory.some(
+                      (h) => h.origin === "protect",
+                    ),
+                    hasTrailRevision:
+                      view.stopHistory.some((h) => h.origin === "trail") ||
+                      view.operatingState === "TRAILING",
                     entry: view.levels.entry,
                     birthQuantity: view.quantity,
                     templateId: view.templateId,
@@ -873,7 +890,18 @@ function PositionCompactBody({
           </>
         )}
         {!hud && journey ? (
-          <JourneyHudBlock journey={journey} birthQuantity={view.quantity} />
+          <JourneyHudBlock
+            journey={journey}
+            birthQuantity={view.quantity}
+            hasProtectRevision={view.stopHistory.some(
+              (h) => h.origin === "protect",
+            )}
+            hasTrailRevision={
+              view.stopHistory.some((h) => h.origin === "trail") ||
+              view.operatingState === "TRAILING"
+            }
+            plannedStop={journey.risk.initialStop}
+          />
         ) : null}
       </div>
 

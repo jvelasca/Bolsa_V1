@@ -177,6 +177,10 @@ export function resolvePaperDeskNextAction(input: {
   return "MANTENER";
 }
 
+function finitePositiveStop(n: unknown): n is number {
+  return typeof n === "number" && Number.isFinite(n) && n > 0;
+}
+
 export function resolvePositionOperatingState(input: {
   positionStatus?: string | null;
   remainingQuantity?: number | null;
@@ -185,6 +189,9 @@ export function resolvePositionOperatingState(input: {
   hasProtectRevision?: boolean;
   reconStatus?: PortfolioReconStatusV1;
   hasUnresolvedExit?: boolean;
+  /** V2.33 — structural stop at birth counts as protected (honesty = phase). */
+  currentStop?: number | null;
+  initialStop?: number | null;
 }): PositionOperatingStateV1 {
   const reconOverride = resolveReconOperatingState(input.reconStatus);
   if (reconOverride) return reconOverride;
@@ -197,6 +204,13 @@ export function resolvePositionOperatingState(input: {
   if (
     input.hasProtectRevision ||
     (input.positionStatus ?? "").toUpperCase() === "PROTECTED"
+  ) {
+    return "PROTECTED";
+  }
+  // V2.33 — birth fill with signed structural stop is not OPEN_UNPROTECTED.
+  if (
+    finitePositiveStop(input.currentStop) ||
+    finitePositiveStop(input.initialStop)
   ) {
     return "PROTECTED";
   }

@@ -181,22 +181,25 @@ function resolveEntryForBootstrap(position: PositionDto): number | null {
 }
 
 /**
- * Stop inicial sugerido cuando no hay ExitPlan/protect_hint:
- * long → entry×(1−5%); short → entry×(1+5%). Usa initialStop si ya venía en el plan.
+ * Stop de emergencia −5 % cuando no hay stop estructural.
+ * V2.33 — never uses initialStop (that is kind "plan").
  */
 export function resolveBootstrapProtectStop(
   position: PositionDto,
 ): number | null {
   const op = position.operational;
   if (!op?.tradePlanId || !positionIsOpenUnprotected(position)) return null;
+  // Only when truly no structural stop — else plan stop is not bootstrap.
+  if (finitePositive(op.currentStop) || finitePositive(op.initialStop)) {
+    return null;
+  }
   return resolveBootstrapProtectStopShared({
     direction: op.direction,
     entry: resolveEntryForBootstrap(position),
-    initialStop: op.initialStop,
   });
 }
 
-/** V2.10 — classify protect stop origin for Confirm / UI semantics. */
+/** V2.10 / V2.33 — classify protect stop origin for Confirm / UI semantics. */
 export function resolveProtectStopKind(
   position: PositionDto,
   protectPlan?: ProtectPlanV1 | null,
@@ -206,7 +209,15 @@ export function resolveProtectStopKind(
   const exitAction = position.operational?.exitPlan?.suggestedAction;
   if (exitAction === "protect") return "plan";
   if (protectPlan?.status === "protect_hint") return "hint";
-  if (positionIsOpenUnprotected(position)) return "bootstrap";
+  const op = position.operational;
+  // Bootstrap only when there is no structural stop — matches the −5% number.
+  if (
+    positionIsOpenUnprotected(position) &&
+    !finitePositive(op?.currentStop) &&
+    !finitePositive(op?.initialStop)
+  ) {
+    return "bootstrap";
+  }
   return "plan";
 }
 

@@ -225,6 +225,7 @@ describe("G-OPERATOR-02 full journey — one OperatorDecision", () => {
       primaryAction: "MANTENER",
       journey: j,
       birthQuantity: 62,
+      hasProtectRevision: true,
     });
     expect(decision.protection.kind).toBe("technical");
     expect(decision.remaining?.remainingPct).toBe(100);
@@ -401,6 +402,7 @@ describe("G-OPERATOR-02 Journey 2 — contractual surfaces V2.32", () => {
         journey: j,
         birthQuantity: 62,
         templateId: "moderate",
+        hasProtectRevision: true,
       },
       { birthQuantity: 62, templateId: "moderate" },
     );

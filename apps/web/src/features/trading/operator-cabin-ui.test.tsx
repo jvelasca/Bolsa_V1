@@ -177,7 +177,7 @@ describe("operator-cabin-ui V2.25 polish", () => {
     ).toBe("v2.25");
     expect(
       screen.getByTestId("next-action-hero").getAttribute("data-cabin-visual"),
-    ).toBe("v2.31");
+    ).toBe("v2.34");
     expect(screen.getByTestId("next-action-title").className).toMatch(
       /cabin-type-hero/,
     );
@@ -205,7 +205,7 @@ describe("operator-cabin-ui V2.25 polish", () => {
       />,
     );
     const box = screen.getByTestId("operator-risk-box");
-    expect(box.getAttribute("data-cabin-visual")).toBe("v2.31");
+    expect(box.getAttribute("data-cabin-visual")).toBe("v2.34");
     expect(box.className).not.toMatch(/rounded-md/);
     expect(box.className).not.toMatch(/\bborder\b/);
     expect(screen.getByTestId("risk-box-quantity").className).toMatch(
@@ -286,6 +286,6 @@ describe("operator-cabin-ui V2.25 polish", () => {
       screen
         .getByTestId("operator-position-plan")
         .getAttribute("data-cabin-visual"),
-    ).toBe("v2.31");
+    ).toBe("v2.34");
   });
 });

@@ -163,8 +163,16 @@ export type OperatorCabinTruthV1 =
       persistSkipped?: boolean;
       protectionDiscrepancy?: boolean;
       protectKind?: ProtectStopKindV1 | null;
-      /** Executed stop override when journey is absent. */
+      /**
+       * Wire/current stop price. V2.33 — not automatically «ejecutado»:
+       * birth copies structuralStop here; ratification needs revision flags.
+       */
       currentStop?: number | null;
+      /** Plan geometry — birth initialStop / structuralStop. */
+      plannedStop?: number | null;
+      /** V2.33 — protect/trail revision on the book → stop is executed. */
+      hasProtectRevision?: boolean;
+      hasTrailRevision?: boolean;
       entry?: number | null;
       direction?: "long" | "short" | null;
       birthQuantity?: number | null;
@@ -267,16 +275,30 @@ function positionFacts(
   const journey = truth.journey ?? null;
   const persistFailed =
     truth.persistSkipped === true || truth.protectionDiscrepancy === true;
-  const executedStop = persistFailed
+  const rawCurrent = persistFailed
     ? null
     : finite(truth.currentStop)
       ? truth.currentStop
       : finite(journey?.trail.currentStop)
         ? journey!.trail.currentStop
         : null;
-  const plannedStop = finite(journey?.risk.initialStop)
-    ? journey!.risk.initialStop
-    : null;
+  const plannedStop = finite(truth.plannedStop)
+    ? truth.plannedStop
+    : finite(journey?.risk.initialStop)
+      ? journey!.risk.initialStop
+      : null;
+  /**
+   * V2.33 — birth copies structuralStop → currentStop without a protect/trail
+   * revision. That is Planificado, not Protegido. Ratification:
+   * protect/trail revision · trail active · emergency bootstrap signed.
+   */
+  const stopRatified =
+    truth.hasProtectRevision === true ||
+    truth.hasTrailRevision === true ||
+    journey?.trail.active === true ||
+    journey?.logHasTrailApplied === true ||
+    (truth.protectKind === "bootstrap" && finite(rawCurrent));
+  const executedStop = stopRatified && finite(rawCurrent) ? rawCurrent : null;
   const entry = finite(truth.entry)
     ? truth.entry
     : finite(journey?.entry)
@@ -290,13 +312,25 @@ function positionFacts(
         ? truth.remainingQuantity
         : null;
   const hasPositionContext =
-    journey != null || truth.currentStop !== undefined || persistFailed;
-  const unprotected = hasPositionContext && !finite(executedStop);
+    journey != null ||
+    truth.currentStop !== undefined ||
+    truth.plannedStop !== undefined ||
+    persistFailed;
+  // Emergency only when neither planned nor executed stop exists.
+  const unprotected =
+    hasPositionContext && !finite(executedStop) && !finite(plannedStop);
+  const protectKind =
+    truth.protectKind ??
+    (unprotected
+      ? "bootstrap"
+      : finite(plannedStop) || finite(executedStop)
+        ? "plan"
+        : null);
   return {
     primaryAction: truth.primaryAction,
     journey,
     persistFailed,
-    protectKind: truth.protectKind ?? null,
+    protectKind,
     executedStop,
     plannedStop,
     displayStop: executedStop ?? plannedStop,
@@ -310,11 +344,21 @@ function positionFacts(
   };
 }
 
-/** Executed stop is the only authority. Planned initialStop ≠ protection. */
+/**
+ * V2.33 — executed authority requires ratification (revision / trail),
+ * not merely a birth currentStop equal to initialStop.
+ */
 export function positionHasExecutedStop(
   journey?: PositionJourneyReadoutV1 | null,
   currentStop?: number | null,
+  opts?: { hasProtectRevision?: boolean; hasTrailRevision?: boolean },
 ): boolean {
+  const ratified =
+    opts?.hasProtectRevision === true ||
+    opts?.hasTrailRevision === true ||
+    journey?.trail.active === true ||
+    journey?.logHasTrailApplied === true;
+  if (!ratified) return false;
   if (finite(currentStop)) return true;
   return finite(journey?.trail.currentStop);
 }
@@ -810,7 +854,7 @@ export function buildOperatorNextActionFromPosition(
           : null;
 
   const forceProtect =
-    unprotected &&
+    (unprotected || facts.persistFailed) &&
     (primaryAction === "MANTENER" ||
       primaryAction === "MONITOR" ||
       primaryAction === "ESPERAR_APERTURA" ||
@@ -861,8 +905,8 @@ export function buildOperatorNextActionFromPosition(
     case "MONITOR":
     case "MANTENER":
     default:
-      // V2.20 — no executed stop (or persist fail) → PROTEGER, never MANTENER
-      if (unprotected) {
+      // V2.20 / V2.33 — no planned/executed stop → PROTEGER; persist fail always
+      if (unprotected || facts.persistFailed) {
         return emergencyProtectAction();
       }
       return {
@@ -870,7 +914,11 @@ export function buildOperatorNextActionFromPosition(
         title: "MANTENER",
         subtitle:
           [
-            finite(stop) ? `Stop ${formatLevel(stop)}` : null,
+            finite(stop)
+              ? `Stop ${formatLevel(stop)}`
+              : finite(facts.plannedStop)
+                ? `Stop plan ${formatLevel(facts.plannedStop)}`
+                : null,
             t1Done ? "T1 alcanzado" : null,
             nextTarget ? `Próximo: ${nextTarget}` : null,
           ]
@@ -1126,10 +1174,16 @@ export function buildOperatorPositionPlan(
     });
   }
   if (trail) {
+    const trailActive = journey.trail.active === true;
+    const trailEligible = journey.trail.activationEligible === true;
     steps.push({
       id: "trail",
       missionId: "trail",
-      label: "Gestión / trailing",
+      label: trailActive
+        ? "Gestión · Trailing activo"
+        : trailEligible
+          ? "Gestión · Stop dinámico"
+          : "Gestión · Mantener mientras tesis válida",
       detail: trail.detail,
       status: trail.status,
       reducePct: null,
@@ -1244,7 +1298,11 @@ export function buildOperatorPositionPlanFromDecision(
   steps.push({
     id: "trail",
     missionId: "trail",
-    label: "Gestión / trailing",
+    label: trailActive
+      ? "Gestión · Trailing activo"
+      : opts?.t1Done === true
+        ? "Gestión · Stop dinámico"
+        : "Gestión · Mantener mientras tesis válida",
     detail: trailActive
       ? "Activo"
       : opts?.t1Done === true
@@ -1614,16 +1672,15 @@ export function buildOperatorProtectionState(input: {
     : finite(input.executedStop)
       ? input.executedStop
       : null;
+  // V2.33 — emergency only when price matches −5% floor (not kind alone).
   const emergency =
     finite(executed) &&
-    (input.protectKind === "bootstrap" ||
-      (!finite(input.plannedStop) &&
-        isEmergencyBootstrapStop({
-          direction: input.direction,
-          entry: input.entry,
-          stop: executed,
-          protectKind: input.protectKind,
-        })));
+    isEmergencyBootstrapStop({
+      direction: input.direction,
+      entry: input.entry,
+      stop: executed,
+      protectKind: input.protectKind,
+    });
   let kind: OperatorProtectionKindV1 = "none";
   if (finite(executed) && emergency) kind = "emergency";
   else if (finite(executed)) kind = "technical";
@@ -1631,7 +1688,9 @@ export function buildOperatorProtectionState(input: {
   let honesty: OperatorProtectionHonestyV1 = "none";
   if (persistFailed) honesty = "sent";
   else if (finite(executed)) honesty = "confirmed";
-  else if (finite(plannedStop) || input.protectKind === "bootstrap") {
+  else if (finite(plannedStop)) {
+    // V2.33 — Planificado only when there is a structural plan stop.
+    // Bootstrap emergency without plan stop stays phase none (SIN PROTECCIÓN).
     honesty = "calculated";
   }
 

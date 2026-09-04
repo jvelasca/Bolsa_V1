@@ -77,7 +77,7 @@ describe("DecisionFichaPanel honesty wiring (V1.41.2)", () => {
     expect(ficha).toMatch(/journal-spine-step-\$/);
     expect(ficha).toMatch(/data-testid="journal-result-metrics"/);
     expect(ficha).toMatch(/data-testid="journal-mfe-mae"/);
-    expect(ficha).toMatch(/formatJournalMfeMaeLine/);
+    expect(ficha).toMatch(/journal-mfe-mae-mfe/);
     expect(ficha).toMatch(/positionState: null/);
   });
 });
