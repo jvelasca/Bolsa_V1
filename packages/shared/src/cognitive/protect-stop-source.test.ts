@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   BOOTSTRAP_PROTECT_STOP_PCT,
   bootstrapProtectStopLabel,
+  isEmergencyBootstrapStop,
   resolveBootstrapProtectStop,
+  resolveEmergencyBootstrapStopPrice,
 } from "./protect-stop-source.js";
 
 describe("protect-stop-source V2.10", () => {
@@ -36,6 +38,35 @@ describe("protect-stop-source V2.10", () => {
     expect(
       resolveBootstrapProtectStop({ direction: "long", entry: null }),
     ).toBe(null);
+  });
+
+  it("raw emergency floor ignores planned initialStop", () => {
+    expect(
+      resolveEmergencyBootstrapStopPrice({ direction: "long", entry: 100 }),
+    ).toBe(95);
+    expect(
+      isEmergencyBootstrapStop({
+        direction: "long",
+        entry: 100,
+        stop: 95,
+      }),
+    ).toBe(true);
+    expect(
+      isEmergencyBootstrapStop({
+        direction: "long",
+        entry: 184.2,
+        stop: 176.8,
+        protectKind: "plan",
+      }),
+    ).toBe(false);
+    expect(
+      isEmergencyBootstrapStop({
+        direction: "long",
+        entry: 184.2,
+        stop: 174.99,
+        protectKind: "bootstrap",
+      }),
+    ).toBe(true);
   });
 
   it("label is emergency language, not strategy stop", () => {

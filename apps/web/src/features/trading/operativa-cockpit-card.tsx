@@ -69,7 +69,13 @@ import { DecisionSurfacePlacementToggle } from "@/features/trading/decision-surf
 import { DecisionExplainPanel } from "@/features/trading/decision-explain-panel";
 import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
 import { AutoDeskPanel } from "@/features/trading/auto-desk-panel";
-import { NextActionHero } from "@/features/trading/operator-cabin-ui";
+import {
+  CABIN_FOCUS_RING,
+  CABIN_INTERACTIVE,
+  NextActionHero,
+  OperatorCabinLevel,
+  OperatorCabinStatus,
+} from "@/features/trading/operator-cabin-ui";
 
 type OperativaCockpitCardProps = {
   instrumentId: string | null;
@@ -328,14 +334,19 @@ export function OperativaCockpitCard({
         )}
         data-testid="operativa-cockpit"
         data-phase="sin_contexto"
+        data-cabin-composition="4-levels"
       >
-        <NextActionHero
-          action={resolveOperatorNextAction({
-            kind: "cockpit_phase",
-            phase: "sin_contexto",
-          })}
-        />
-        <p className="text-xs text-muted-foreground">{noLevelsCopy}</p>
+        <OperatorCabinLevel level={1} showQuestion={false}>
+          <NextActionHero
+            action={resolveOperatorNextAction({
+              kind: "cockpit_phase",
+              phase: "sin_contexto",
+            })}
+          />
+        </OperatorCabinLevel>
+        <OperatorCabinStatus kind="empty">
+          {noLevelsCopy ?? "Selecciona un valor en ESTUDIO para decidir."}
+        </OperatorCabinStatus>
       </div>
     );
   }
@@ -343,11 +354,13 @@ export function OperativaCockpitCard({
   return (
     <section
       className={cn(
-        "space-y-2 rounded-md border px-3 py-2",
+        "min-w-0 space-y-2 rounded-md border px-3 py-2",
         phaseTone(phase, { povTone, entryTone }),
         className,
       )}
       data-testid="operativa-cockpit"
+      data-cabin-composition="4-levels"
+      data-cabin-density="v2.25"
       data-phase={phase}
       data-instrument-id={instrumentId}
       data-symbol={symbol}
@@ -405,7 +418,9 @@ export function OperativaCockpitCard({
           <DecisionSurfacePlacementToggle />
         </div>
         {context.loading ? (
-          <p className="text-[11px] text-muted-foreground">Cargando plan…</p>
+          <OperatorCabinStatus kind="loading">
+            Cargando plan…
+          </OperatorCabinStatus>
         ) : decisionSurfacePlacement === "chart" &&
           (phase === "posicion" && position ? true : Boolean(entryTruth)) ? (
           <p
@@ -447,30 +462,39 @@ export function OperativaCockpitCard({
           />
         ) : (
           <div className="space-y-1.5">
-            <NextActionHero
-              action={resolveOperatorNextAction({
-                kind: "cockpit_phase",
-                phase,
-              })}
-            />
-            <p
-              className="text-[11px] leading-snug text-muted-foreground"
-              data-testid="operativa-cockpit-no-levels"
+            <OperatorCabinLevel level={1} showQuestion={false}>
+              <NextActionHero
+                action={resolveOperatorNextAction({
+                  kind: "cockpit_phase",
+                  phase,
+                })}
+              />
+            </OperatorCabinLevel>
+            <OperatorCabinStatus
+              kind="empty"
+              testId="operativa-cockpit-no-levels"
             >
               {noLevelsCopy ?? plan.emptyCopy}
-            </p>
+            </OperatorCabinStatus>
           </div>
         )}
       </div>
 
-      {/* ACCIÓN — una CTA primaria */}
-      <div className="flex flex-col gap-1" data-testid="decision-accion">
+      {/* ACCIÓN — L1 companion (CTA firma / prepare) */}
+      <div
+        className="flex flex-col gap-1"
+        data-testid="decision-accion"
+        data-cabin-level={1}
+      >
         <SectionLabel>Acción</SectionLabel>
 
         {showOpsCta ? (
           <button
             type="button"
-            className="rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-amber-500/20"
+            className={cn(
+              "rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-amber-500/20",
+              CABIN_FOCUS_RING,
+            )}
             onClick={() => {
               if (!operationsOpen) toggleOperations();
             }}
@@ -491,7 +515,10 @@ export function OperativaCockpitCard({
         onAddToEstudio ? (
           <button
             type="button"
-            className="rounded-md border border-violet-600/35 bg-violet-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-violet-500/20"
+            className={cn(
+              "rounded-md border border-violet-600/35 bg-violet-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-violet-500/20",
+              CABIN_FOCUS_RING,
+            )}
             onClick={onAddToEstudio}
             data-testid="operativa-cockpit-cta-estudio"
           >
@@ -507,7 +534,10 @@ export function OperativaCockpitCard({
               !canPropose ||
               entryTruth?.primaryCta.kind === "none"
             }
-            className="rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1.5 text-left text-xs font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50"
+            className={cn(
+              "rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1.5 text-left text-xs font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50",
+              CABIN_FOCUS_RING,
+            )}
             onClick={onPropose}
             data-testid="operativa-cockpit-cta-preparar"
             title="Propose → cola Confirm · Ranking ≠ BUY · Confirm = firma"
@@ -534,7 +564,10 @@ export function OperativaCockpitCard({
         {showConfirm ? (
           <button
             type="button"
-            className="rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-amber-500/20"
+            className={cn(
+              "rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-amber-500/20",
+              CABIN_FOCUS_RING,
+            )}
             onClick={() => openConfirmDrawer()}
             data-testid="operativa-cockpit-cta-confirm"
             title="Confirm es la única firma — no ejecuta desde DECISIÓN"
@@ -564,7 +597,10 @@ export function OperativaCockpitCard({
           phase === "caducada") ? (
           <button
             type="button"
-            className="w-fit rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
+            className={cn(
+              "w-fit rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent",
+              CABIN_FOCUS_RING,
+            )}
             onClick={() => setWhyOpen(true)}
             data-testid={
               phase === "vigilar"
@@ -584,14 +620,20 @@ export function OperativaCockpitCard({
         ) : null}
       </div>
 
-      {/* AUTO Desk — autonomía visible en Mercado */}
-      <AutoDeskPanel templateId={templateId} journey={positionJourney} />
+      {/* AUTO Desk — L3 «qué pasa después» */}
+      <OperatorCabinLevel level={3} showQuestion={false}>
+        <AutoDeskPanel templateId={templateId} journey={positionJourney} />
+      </OperatorCabinLevel>
 
-      {/* Avanzado colapsado: Gate · DS-05 · TTL · UNKNOWN detail */}
-      <div className="border-t border-border/50 pt-1.5">
+      {/* Avanzado colapsado: Gate · DS-05 · TTL · UNKNOWN detail → L4 */}
+      <OperatorCabinLevel
+        level={4}
+        showQuestion={false}
+        className="border-t border-border/50 pt-1.5"
+      >
         <button
           type="button"
-          className="text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline"
+          className={CABIN_INTERACTIVE}
           onClick={() => setWhyOpen((v) => !v)}
           data-testid="operativa-cockpit-why"
         >
@@ -600,7 +642,7 @@ export function OperativaCockpitCard({
         {whyOpen ? (
           <DecisionExplainPanel view={explainView} loading={opinionLoading} />
         ) : null}
-      </div>
+      </OperatorCabinLevel>
     </section>
   );
 }

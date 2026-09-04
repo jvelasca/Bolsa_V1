@@ -80,6 +80,9 @@ export function buildOperationalPlanChartLevels(input: {
    * V2.14 — when plan has no stop but we have an emergency suggestion, paint it advisory.
    */
   bootstrapStopPrice?: number | null;
+  /** V2.26 — ExitPolicy reduce % for T1/T2 titles (never hardcode 25). */
+  t1ReducePct?: number | null;
+  t2ReducePct?: number | null;
 }): OperationalPlanChartLevel[] {
   const plan = input.plan;
   if (!input.showLevels || !plan || !plan.hasPlan) return [];
@@ -169,11 +172,15 @@ export function buildOperationalPlanChartLevels(input: {
     });
   }
   if (finite(plan.target1)) {
+    const t1Pct =
+      input.t1ReducePct != null && Number.isFinite(input.t1ReducePct)
+        ? Math.round(input.t1ReducePct)
+        : null;
     levels.push({
       id: levelId("target1"),
       kind: "target1",
       price: plan.target1,
-      title: "T1",
+      title: t1Pct != null ? `T1 · ${t1Pct}%` : "T1",
       color: LEVEL_COLORS.target1,
       style: "solid",
       width: 2,
@@ -181,11 +188,15 @@ export function buildOperationalPlanChartLevels(input: {
     });
   }
   if (finite(plan.target2)) {
+    const t2Pct =
+      input.t2ReducePct != null && Number.isFinite(input.t2ReducePct)
+        ? Math.round(input.t2ReducePct)
+        : null;
     levels.push({
       id: levelId("target2"),
       kind: "target2",
       price: plan.target2,
-      title: "T2",
+      title: t2Pct != null ? `T2 · ${t2Pct}%` : "T2",
       color: LEVEL_COLORS.target2,
       style: "dashed",
       width: 1,

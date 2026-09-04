@@ -27,5 +27,6 @@ NO LIVE · no bump `1.35.0-beta` · `PAPER_D_EXECUTE` default off · no `TRANSIT
 
 ## Next
 
-- Auditor tip `v2.1-beta` (UX + cabina operativa)
+- ~~Auditor tip `v2.1-beta`~~ **PASS conceptual** (0 P0 · 0 P1 · 4 P2) · 2026-09-04
+- [V2.2 Operator Certification](./traspaso-relevo-v2-2-operator-certification-2026-09-04.md) — no features; protección real vs calculada · remaining · NEXT ACTION razón · G-OPERATOR-02/03/04
 - No reabrir motor FSM PAPER AUTO (`v2.0-beta`)

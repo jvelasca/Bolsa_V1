@@ -17,6 +17,10 @@ import {
   type ExitPolicyV1,
   type ExitTrailWidthV1,
 } from "./exit-policy.js";
+import type { MesaNextActionV1 } from "./mesa-next-action.js";
+import { MESA_NEXT_ACTION_LABELS } from "./mesa-next-action.js";
+import type { ProtectStopKindV1 } from "./protect-stop-source.js";
+import { isEmergencyBootstrapStop } from "./protect-stop-source.js";
 
 /** Visual tone for NEXT ACTION hero. */
 export type OperatorNextActionToneV1 =
@@ -50,6 +54,66 @@ export type OperatorNextActionV1 = {
     trigger?: number | null;
     stop?: number | null;
   } | null;
+  /** V2.22 — checklist «Porque». */
+  reasons?: ReadonlyArray<OperatorDecisionReasonV1> | null;
+  /** V2.22 — «Próximo cambio: T2 @ 205». */
+  nextChange?: string | null;
+};
+
+/** V2.20 — operator-facing protection (executed stop, not plan geometry). */
+export type OperatorProtectionKindV1 = "none" | "emergency" | "technical";
+
+/** Honesty pipeline — calculated ≠ accepted ≠ sent ≠ confirmed. */
+export type OperatorProtectionHonestyV1 =
+  | "none"
+  | "calculated"
+  | "accepted"
+  | "sent"
+  | "confirmed";
+
+export type OperatorProtectionStateV1 = {
+  kind: OperatorProtectionKindV1;
+  label: string;
+  stop: number | null;
+  honesty: OperatorProtectionHonestyV1;
+  /** True only for confirmed technical stop. */
+  isTechnical: boolean;
+};
+
+export type OperatorDecisionReasonV1 = {
+  id: string;
+  label: string;
+  ok: boolean;
+};
+
+export type OperatorDecisionPlanV1 = {
+  entry: number | null;
+  stop: number | null;
+  t1: number | null;
+  t2: number | null;
+  t1Pct: number | null;
+  t2Pct: number | null;
+  trailActive: boolean;
+};
+
+/**
+ * V2.19 — single Operating Truth for Mercado / Hoy / Position Card / AUTO / Journal.
+ * Projection only — not a second FSM.
+ */
+export type OperatorDecisionV1 = {
+  currentAction: OperatorNextActionV1;
+  protection: OperatorProtectionStateV1;
+  remaining: PositionReductionReadoutV1 | null;
+  plan: OperatorDecisionPlanV1;
+};
+
+export const OPERATOR_PROTECTION_LABEL: Record<
+  OperatorProtectionKindV1,
+  string
+> = {
+  none: "SIN PROTECCIÓN",
+  emergency: "Protección de emergencia",
+  technical: "Protegida",
 };
 
 /** V2.11 — single facade input; React must not fork if-chains. */
@@ -67,6 +131,17 @@ export type OperatorCabinTruthV1 =
       kind: "position";
       primaryAction: PaperDeskNextActionV1;
       journey?: PositionJourneyReadoutV1 | null;
+      /** V2.20 — persist skip / Confirm fail. Forces PROTEGER. */
+      persistSkipped?: boolean;
+      protectionDiscrepancy?: boolean;
+      protectKind?: ProtectStopKindV1 | null;
+      /** Executed stop override when journey is absent. */
+      currentStop?: number | null;
+      entry?: number | null;
+      direction?: "long" | "short" | null;
+      birthQuantity?: number | null;
+      templateId?: string | null;
+      closed?: boolean;
     };
 
 /**
@@ -81,35 +156,41 @@ export function resolveOperatorNextAction(
       return enrichNextAction(
         buildOperatorNextActionFromCockpitPhase(truth.phase),
       );
-    case "entry":
-      return enrichNextAction(
-        buildOperatorNextActionFromEntry(truth.truth, {
-          paperAuto: truth.paperAuto,
-        }),
-        {
-          condition: entryCondition(truth.truth),
-          expires: truth.truth.expiryLabel,
-          levels: {
-            entry: truth.truth.plan.entry,
-            trigger: truth.truth.plan.entry,
-            stop: truth.truth.plan.stopVigente,
-          },
+    case "entry": {
+      const next = buildOperatorNextActionFromEntry(truth.truth, {
+        paperAuto: truth.paperAuto,
+      });
+      return enrichNextAction(next, {
+        condition: entryCondition(truth.truth),
+        expires: truth.truth.expiryLabel,
+        levels: {
+          entry: truth.truth.plan.entry,
+          trigger: truth.truth.plan.entry,
+          stop: truth.truth.plan.stopVigente,
         },
+        reasons: entryReasons(next, truth.truth),
+        nextChange: entryNextChange(truth.truth),
+      });
+    }
+    case "position": {
+      const facts = positionFacts(truth);
+      const next = buildOperatorNextActionFromPosition(
+        truth.primaryAction,
+        truth.journey,
+        facts,
       );
-    case "position":
-      return enrichNextAction(
-        buildOperatorNextActionFromPosition(truth.primaryAction, truth.journey),
-        {
-          condition: positionCondition(truth.primaryAction, truth.journey),
-          levels: {
-            entry: truth.journey?.entry ?? null,
-            stop:
-              truth.journey?.trail.currentStop ??
-              truth.journey?.risk.initialStop ??
-              null,
-          },
+      const reasons = next.reasons ?? positionReasons(next, facts);
+      const nextChange = next.nextChange ?? positionNextChange(next, facts);
+      return enrichNextAction(next, {
+        condition: positionCondition(truth.primaryAction, facts),
+        levels: {
+          entry: facts.entry,
+          stop: facts.displayStop,
         },
-      );
+        reasons,
+        nextChange,
+      });
+    }
   }
 }
 
@@ -119,6 +200,8 @@ function enrichNextAction(
     condition?: string | null;
     expires?: string | null;
     levels?: OperatorNextActionV1["levels"];
+    reasons?: ReadonlyArray<OperatorDecisionReasonV1> | null;
+    nextChange?: string | null;
   },
 ): OperatorNextActionV1 {
   return {
@@ -126,7 +209,115 @@ function enrichNextAction(
     condition: extra?.condition ?? base.condition ?? null,
     expires: extra?.expires ?? base.expires ?? null,
     levels: extra?.levels ?? base.levels ?? null,
+    reasons: extra?.reasons ?? base.reasons ?? null,
+    nextChange: extra?.nextChange ?? base.nextChange ?? null,
   };
+}
+
+type PositionFactsV1 = {
+  primaryAction: PaperDeskNextActionV1;
+  journey: PositionJourneyReadoutV1 | null;
+  persistFailed: boolean;
+  protectKind: ProtectStopKindV1 | null;
+  executedStop: number | null;
+  plannedStop: number | null;
+  displayStop: number | null;
+  entry: number | null;
+  direction: "long" | "short" | null;
+  unprotected: boolean;
+  birthQuantity: number | null;
+  remainingQuantity: number | null;
+  templateId: string | null;
+  closed: boolean;
+};
+
+function positionFacts(
+  truth: Extract<OperatorCabinTruthV1, { kind: "position" }>,
+): PositionFactsV1 {
+  const journey = truth.journey ?? null;
+  const persistFailed =
+    truth.persistSkipped === true || truth.protectionDiscrepancy === true;
+  const executedStop = persistFailed
+    ? null
+    : finite(truth.currentStop)
+      ? truth.currentStop
+      : finite(journey?.trail.currentStop)
+        ? journey!.trail.currentStop
+        : null;
+  const plannedStop = finite(journey?.risk.initialStop)
+    ? journey!.risk.initialStop
+    : null;
+  const entry = finite(truth.entry)
+    ? truth.entry
+    : finite(journey?.entry)
+      ? journey!.entry
+      : null;
+  const remainingQuantity = finite(journey?.remainingQuantity)
+    ? journey!.remainingQuantity
+    : finite(journey?.risk.remainingQuantity)
+      ? journey!.risk.remainingQuantity
+      : null;
+  const hasPositionContext =
+    journey != null || truth.currentStop !== undefined || persistFailed;
+  const unprotected = hasPositionContext && !finite(executedStop);
+  return {
+    primaryAction: truth.primaryAction,
+    journey,
+    persistFailed,
+    protectKind: truth.protectKind ?? null,
+    executedStop,
+    plannedStop,
+    displayStop: executedStop ?? plannedStop,
+    entry,
+    direction: truth.direction ?? null,
+    unprotected,
+    birthQuantity: finite(truth.birthQuantity) ? truth.birthQuantity : null,
+    remainingQuantity,
+    templateId: truth.templateId ?? null,
+    closed: truth.closed === true,
+  };
+}
+
+/** Executed stop is the only authority. Planned initialStop ≠ protection. */
+export function positionHasExecutedStop(
+  journey?: PositionJourneyReadoutV1 | null,
+  currentStop?: number | null,
+): boolean {
+  if (finite(currentStop)) return true;
+  return finite(journey?.trail.currentStop);
+}
+
+function entryReasons(
+  next: OperatorNextActionV1,
+  truth: EntryOperatingTruthV1,
+): OperatorDecisionReasonV1[] {
+  if (next.title === "ESPERAR TRIGGER") {
+    return [
+      { id: "setup", label: "Setup válido", ok: true },
+      {
+        id: "risk",
+        label: "Riesgo válido",
+        ok: finite(truth.plan.stopVigente),
+      },
+    ];
+  }
+  if (next.title === "ENTRADA LISTA") {
+    return [
+      { id: "setup", label: "Setup válido", ok: true },
+      { id: "trigger", label: "Trigger confirmado", ok: true },
+    ];
+  }
+  return [];
+}
+
+function entryNextChange(truth: EntryOperatingTruthV1): string | null {
+  if (truth.phase === "preparada" && finite(truth.plan.entry)) {
+    return `cierre > ${formatLevel(truth.plan.entry)}`;
+  }
+  if (truth.phase === "disparada" || truth.phase === "propuesta") {
+    return "Revisar y firmar en Confirm";
+  }
+  return null;
 }
 
 function entryCondition(truth: EntryOperatingTruthV1): string | null {
@@ -144,14 +335,11 @@ function entryCondition(truth: EntryOperatingTruthV1): string | null {
 
 function positionCondition(
   primaryAction: PaperDeskNextActionV1,
-  journey?: PositionJourneyReadoutV1 | null,
+  facts: PositionFactsV1,
 ): string | null {
-  const stop = journey?.trail.currentStop ?? journey?.risk.initialStop ?? null;
-  const unprotected =
-    journey != null &&
-    !finite(journey.trail.currentStop) &&
-    !finite(journey.risk.initialStop);
-  if (unprotected) {
+  const journey = facts.journey;
+  const stop = facts.executedStop;
+  if (facts.unprotected) {
     return "Aplicar stop de emergencia (−5 %) o definir stop técnico";
   }
   if (primaryAction === "SUBIR_STOP" && finite(stop)) {
@@ -171,6 +359,78 @@ function positionCondition(
     journey?.t1.trigger != null
   ) {
     return `Mantener hasta T1 ${formatLevel(journey.t1.trigger)}`;
+  }
+  return null;
+}
+
+function positionReasons(
+  next: OperatorNextActionV1,
+  facts: PositionFactsV1,
+): OperatorDecisionReasonV1[] {
+  const journey = facts.journey;
+  if (next.title === "PROTEGER" && facts.unprotected) {
+    return [
+      { id: "executed_stop", label: "Stop ejecutado", ok: false },
+      {
+        id: "emergency",
+        label: "Protección de emergencia (−5 %) disponible",
+        ok: true,
+      },
+    ];
+  }
+  if (next.title === "ESPERAR TRIGGER") {
+    return [
+      { id: "setup", label: "Setup válido", ok: true },
+      { id: "risk", label: "Riesgo válido", ok: finite(facts.displayStop) },
+    ];
+  }
+  if (next.title === "ENTRADA LISTA") {
+    return [
+      { id: "trigger", label: "Trigger confirmado", ok: true },
+      { id: "confirm", label: "Confirm = firma", ok: true },
+    ];
+  }
+  const stopProtected = finite(facts.executedStop);
+  return [
+    { id: "thesis", label: "Tesis intacta", ok: next.title !== "SALIR" },
+    {
+      id: "stop",
+      label:
+        facts.protectKind === "bootstrap"
+          ? "Stop de emergencia"
+          : "Stop protegido",
+      ok: stopProtected,
+    },
+    {
+      id: "t1",
+      label: journey?.t1.executed ? "T1 alcanzado" : "T1 pendiente",
+      ok: journey?.t1.executed === true,
+    },
+    {
+      id: "momentum",
+      label: "Momentum positivo",
+      ok: (journey?.risk.unrealizedR ?? 0) > 0,
+    },
+  ];
+}
+
+function positionNextChange(
+  next: OperatorNextActionV1,
+  facts: PositionFactsV1,
+): string | null {
+  const journey = facts.journey;
+  if (facts.unprotected) {
+    return "Stop de emergencia (−5 %) o stop técnico";
+  }
+  if (next.title === "SALIR") return null;
+  if (journey && !journey.t1.executed && journey.t1.trigger != null) {
+    return `T1 @ ${formatLevel(journey.t1.trigger)}`;
+  }
+  if (journey && !journey.t2.executed && journey.t2.trigger != null) {
+    return `T2 @ ${formatLevel(journey.t2.trigger)}`;
+  }
+  if (journey?.trail.active) {
+    return `Trailing · stop ${formatLevel(journey.trail.currentStop)}`;
   }
   return null;
 }
@@ -235,10 +495,35 @@ export type OperatorMissionStepStatusV1 =
   | "absent";
 
 export type OperatorMissionStepV1 = {
-  id: "entry" | "stop" | "t1" | "t2" | "trail" | "exit";
+  id: "entry" | "stop" | "t1" | "t2" | "trail" | "exit" | "remaining";
   label: string;
   status: OperatorMissionStepStatusV1;
   detail: string | null;
+};
+
+/** V2.26 — rungs of the visual exit ladder (Entrada→…→Trail). */
+export type OperatorExitLadderRungIdV1 =
+  | "entry"
+  | "stop"
+  | "t1"
+  | "t2"
+  | "trail";
+
+export type OperatorExitLadderRungV1 = {
+  id: OperatorExitLadderRungIdV1;
+  label: string;
+  detail: string | null;
+  status: OperatorMissionStepStatusV1;
+  /** ExitPolicy reduce % for T1/T2 — never hardcode 25. */
+  reducePct: number | null;
+};
+
+export type OperatorExitLadderV1 = {
+  rungs: OperatorExitLadderRungV1[];
+  /** Profile label from template (Moderado · …). */
+  profileLabel: string | null;
+  remainingPct: number | null;
+  remainingDetail: string | null;
 };
 
 export type OperatorAutoChecklistV1 = {
@@ -440,12 +725,17 @@ export function buildOperatorNextActionFromEntry(
 export function buildOperatorNextActionFromPosition(
   primaryAction: PaperDeskNextActionV1,
   journey?: PositionJourneyReadoutV1 | null,
+  factsArg?: PositionFactsV1,
 ): OperatorNextActionV1 {
-  const stop = journey?.trail.currentStop ?? journey?.risk.initialStop ?? null;
-  const unprotected =
-    journey != null &&
-    !finite(journey.trail.currentStop) &&
-    !finite(journey.risk.initialStop);
+  const facts =
+    factsArg ??
+    positionFacts({
+      kind: "position",
+      primaryAction,
+      journey,
+    });
+  const stop = facts.executedStop;
+  const unprotected = facts.unprotected;
   const t1Done = journey?.t1.executed === true;
   const t2Done = journey?.t2.executed === true;
   const nextTarget =
@@ -456,6 +746,13 @@ export function buildOperatorNextActionFromPosition(
         : journey?.trail.active
           ? "Trailing activo"
           : null;
+
+  const forceProtect =
+    unprotected &&
+    (primaryAction === "MANTENER" ||
+      primaryAction === "MONITOR" ||
+      primaryAction === "ESPERAR_APERTURA" ||
+      facts.persistFailed);
 
   switch (primaryAction) {
     case "SALIR":
@@ -490,6 +787,9 @@ export function buildOperatorNextActionFromPosition(
         ctaHint: "Revisar",
       };
     case "ESPERAR_APERTURA":
+      if (forceProtect) {
+        return emergencyProtectAction();
+      }
       return {
         tone: "watch",
         title: "ESPERAR",
@@ -499,15 +799,9 @@ export function buildOperatorNextActionFromPosition(
     case "MONITOR":
     case "MANTENER":
     default:
-      // V2.10 — OPEN_UNPROTECTED without stop: hero = PROTEGER (emergency), not MANTENER
+      // V2.20 — no executed stop (or persist fail) → PROTEGER, never MANTENER
       if (unprotected) {
-        return {
-          tone: "protect",
-          title: "PROTEGER",
-          subtitle:
-            "Sin stop técnico · emergencia −5 % sugerida (no es stop de estrategia)",
-          ctaHint: "Proteger (Confirm = firma)",
-        };
+        return emergencyProtectAction();
       }
       return {
         tone: "maintain",
@@ -523,6 +817,16 @@ export function buildOperatorNextActionFromPosition(
         ctaHint: "Mantener",
       };
   }
+}
+
+function emergencyProtectAction(): OperatorNextActionV1 {
+  return {
+    tone: "protect",
+    title: "PROTEGER",
+    subtitle:
+      "Sin stop técnico · emergencia −5 % sugerida (no es stop de estrategia)",
+    ctaHint: "Proteger (Confirm = firma)",
+  };
 }
 
 export function buildOperatorFourAnswers(input: {
@@ -625,6 +929,7 @@ export function buildOperatorRiskBox(input: {
 
 export function buildOperatorMissionSteps(
   journey: PositionJourneyReadoutV1,
+  opts?: { birthQuantity?: number | null; closed?: boolean },
 ): OperatorMissionStepV1[] {
   const entryDone = finite(journey.entry);
   const stopDone =
@@ -693,7 +998,88 @@ export function buildOperatorMissionSteps(
           ? `Activo · stop ${formatLevel(trail.currentStop)}`
           : "Listo",
     },
+    remainingMissionStep(journey, opts),
+  ].filter((s): s is OperatorMissionStepV1 => s != null);
+}
+
+/**
+ * V2.26 — visual exit ladder from journey (ExitPolicy % via qtyFractionPct).
+ * Display-only · never invents 25/25.
+ */
+export function buildOperatorExitLadder(
+  journey: PositionJourneyReadoutV1,
+  opts?: { birthQuantity?: number | null; closed?: boolean },
+): OperatorExitLadderV1 {
+  const steps = buildOperatorMissionSteps(journey, opts);
+  const rungIds: OperatorExitLadderRungIdV1[] = [
+    "entry",
+    "stop",
+    "t1",
+    "t2",
+    "trail",
   ];
+  const rungs: OperatorExitLadderRungV1[] = [];
+  for (const id of rungIds) {
+    const step = steps.find((s) => s.id === id);
+    if (!step) continue;
+    rungs.push({
+      id,
+      label: step.label,
+      detail: step.detail,
+      status: step.status,
+      reducePct:
+        id === "t1"
+          ? journey.t1.qtyFractionPct
+          : id === "t2"
+            ? journey.t2.qtyFractionPct
+            : null,
+    });
+  }
+  const remainingStep = remainingMissionStep(journey, opts);
+  const readout = buildPositionReductionReadout({
+    birthQuantity: finite(opts?.birthQuantity)
+      ? opts!.birthQuantity
+      : journey.remainingQuantity,
+    remainingQuantity:
+      opts?.closed === true || journey.remainingQuantity <= 0
+        ? 0
+        : journey.remainingQuantity,
+    t1QtyFractionPct: journey.t1.qtyFractionPct,
+    t2QtyFractionPct: journey.t2.qtyFractionPct,
+  });
+  return {
+    rungs,
+    profileLabel: null,
+    remainingPct: readout.remainingPct,
+    remainingDetail: remainingStep?.detail ?? null,
+  };
+}
+
+function remainingMissionStep(
+  journey: PositionJourneyReadoutV1,
+  opts?: { birthQuantity?: number | null; closed?: boolean },
+): OperatorMissionStepV1 | null {
+  const closed = opts?.closed === true || journey.remainingQuantity <= 0;
+  const birth = finite(opts?.birthQuantity)
+    ? opts!.birthQuantity
+    : journey.remainingQuantity;
+  const remaining = closed ? 0 : journey.remainingQuantity;
+  const readout = buildPositionReductionReadout({
+    birthQuantity: birth,
+    remainingQuantity: remaining,
+    t1QtyFractionPct: journey.t1.qtyFractionPct,
+    t2QtyFractionPct: journey.t2.qtyFractionPct,
+  });
+  if (readout.remainingPct == null && !closed) return null;
+  return {
+    id: "remaining",
+    label: "RESTANTE",
+    status: closed ? "done" : "active",
+    detail:
+      readout.remainingPct != null
+        ? `${readout.remainingPct}%`
+        : String(remaining),
+  };
 }
 
 function trailWidthLabel(w: ExitTrailWidthV1): string {
@@ -826,14 +1212,27 @@ export function buildPositionReductionReadout(input: {
   };
 }
 
-/** V2.13 — what AUTO will do for this instrument (ExitPolicy + journey). */
+/** V2.13 / V2.21 — what AUTO will do for this instrument (ExitPolicy + journey). */
 export type OperatorAutoPlanPreviewV1 = {
   profileLabel: string;
+  /** V2.21 — operator headline. */
+  headline: string;
   nextActionTitle: string;
   items: ReadonlyArray<{ id: string; label: string; done: boolean }>;
   ifReachesLines: string[];
   trailingLine: string | null;
   honestyLine: string;
+  entry: number | null;
+  quantity: number | null;
+  stop: number | null;
+  riskAmount: number | null;
+  t1Pct: number;
+  t2Pct: number;
+  t1Price: number | null;
+  t2Price: number | null;
+  remainingPct: number | null;
+  remainingQuantity: number | null;
+  trailingAutomatic: boolean;
 };
 
 export function buildOperatorAutoPlanPreview(input: {
@@ -842,14 +1241,13 @@ export function buildOperatorAutoPlanPreview(input: {
   nextAction: OperatorNextActionV1;
   posture?: PaperAutoPostureV1 | null;
   killOn?: boolean | null;
+  birthQuantity?: number | null;
 }): OperatorAutoPlanPreviewV1 {
   const policy = resolveExitPolicy(input.templateId);
   const t1Pct = Math.round(policy.t1ReduceFraction * 100);
   const t2Pct = Math.round(policy.t2ReduceFraction * 100);
   const journey = input.journey;
-  const stopDone =
-    journey != null &&
-    (finite(journey.risk.initialStop) || finite(journey.trail.currentStop));
+  const stopDone = journey != null && finite(journey.trail.currentStop);
   const items = [
     {
       id: "stop",
@@ -901,12 +1299,219 @@ export function buildOperatorAutoPlanPreview(input: {
     formatOperatorAutoHonesty(input.posture, input.killOn) ??
     "Confirm = firma · armado ≠ ejecución";
 
+  const remainingQty = journey?.remainingQuantity ?? null;
+  const birth =
+    finite(input.birthQuantity) && input.birthQuantity > 0
+      ? input.birthQuantity
+      : remainingQty;
+  const remaining =
+    birth != null && remainingQty != null
+      ? buildPositionReductionReadout({
+          birthQuantity: birth,
+          remainingQuantity: remainingQty,
+          t1QtyFractionPct: journey?.t1.qtyFractionPct,
+          t2QtyFractionPct: journey?.t2.qtyFractionPct,
+        })
+      : null;
+
   return {
     profileLabel: profileLabel(input.templateId),
+    headline: "AUTO HARÁ ESTO",
     nextActionTitle: input.nextAction.title,
     items,
     ifReachesLines,
     trailingLine,
     honestyLine: honesty,
+    entry: finite(journey?.entry) ? journey!.entry : null,
+    quantity: remainingQty,
+    stop: finite(journey?.trail.currentStop)
+      ? journey!.trail.currentStop
+      : finite(journey?.risk.initialStop)
+        ? journey!.risk.initialStop
+        : null,
+    riskAmount: finite(journey?.risk.initialRisk)
+      ? journey!.risk.initialRisk
+      : null,
+    t1Pct,
+    t2Pct,
+    t1Price: journey?.t1.trigger ?? null,
+    t2Price: journey?.t2.trigger ?? null,
+    remainingPct: remaining?.remainingPct ?? null,
+    remainingQuantity: remainingQty,
+    trailingAutomatic: true,
+  };
+}
+
+export function buildOperatorProtectionState(input: {
+  executedStop?: number | null;
+  plannedStop?: number | null;
+  persistSkipped?: boolean;
+  protectKind?: ProtectStopKindV1 | null;
+  entry?: number | null;
+  direction?: "long" | "short" | null;
+}): OperatorProtectionStateV1 {
+  const persistFailed = input.persistSkipped === true;
+  const executed = persistFailed
+    ? null
+    : finite(input.executedStop)
+      ? input.executedStop
+      : null;
+  const emergency =
+    finite(executed) &&
+    (input.protectKind === "bootstrap" ||
+      (!finite(input.plannedStop) &&
+        isEmergencyBootstrapStop({
+          direction: input.direction,
+          entry: input.entry,
+          stop: executed,
+          protectKind: input.protectKind,
+        })));
+  let kind: OperatorProtectionKindV1 = "none";
+  if (finite(executed) && emergency) kind = "emergency";
+  else if (finite(executed)) kind = "technical";
+
+  let honesty: OperatorProtectionHonestyV1 = "none";
+  if (persistFailed) honesty = "sent";
+  else if (finite(executed)) honesty = "confirmed";
+  else if (finite(input.plannedStop) || input.protectKind === "bootstrap") {
+    honesty = "calculated";
+  }
+
+  return {
+    kind,
+    label: OPERATOR_PROTECTION_LABEL[kind],
+    stop: executed ?? (kind === "none" ? null : (input.plannedStop ?? null)),
+    honesty,
+    isTechnical: kind === "technical",
+  };
+}
+
+/** V2.19 — canonical operator decision. React display-only. */
+export function buildOperatorDecision(
+  truth: OperatorCabinTruthV1,
+): OperatorDecisionV1 {
+  const currentAction = resolveOperatorNextAction(truth);
+  if (truth.kind === "position") {
+    const facts = positionFacts(truth);
+    const protection = buildOperatorProtectionState({
+      executedStop: facts.executedStop,
+      plannedStop: facts.plannedStop,
+      persistSkipped: facts.persistFailed,
+      protectKind: facts.protectKind,
+      entry: facts.entry,
+      direction: facts.direction,
+    });
+    const remainingQty = facts.closed ? 0 : (facts.remainingQuantity ?? 0);
+    const birth = facts.birthQuantity ?? facts.remainingQuantity;
+    const remaining =
+      finite(birth) || facts.closed
+        ? buildPositionReductionReadout({
+            birthQuantity: birth ?? remainingQty,
+            remainingQuantity: remainingQty,
+            t1QtyFractionPct: facts.journey?.t1.qtyFractionPct,
+            t2QtyFractionPct: facts.journey?.t2.qtyFractionPct,
+          })
+        : null;
+    const policy = resolveExitPolicy(facts.templateId);
+    return {
+      currentAction,
+      protection,
+      remaining,
+      plan: {
+        entry: facts.entry,
+        stop: facts.executedStop ?? facts.plannedStop,
+        t1: facts.journey?.t1.trigger ?? null,
+        t2: facts.journey?.t2.trigger ?? null,
+        t1Pct: Math.round(policy.t1ReduceFraction * 100),
+        t2Pct: Math.round(policy.t2ReduceFraction * 100),
+        trailActive: facts.journey?.trail.active === true,
+      },
+    };
+  }
+  if (truth.kind === "entry") {
+    const stop = truth.truth.plan.stopVigente;
+    const policy = resolveExitPolicy(null);
+    return {
+      currentAction,
+      protection: buildOperatorProtectionState({
+        executedStop: null,
+        plannedStop: stop,
+        protectKind: "plan",
+        entry: truth.truth.plan.entry,
+      }),
+      remaining: truth.truth.sizing.quantity
+        ? buildPositionReductionReadout({
+            birthQuantity: truth.truth.sizing.quantity,
+            remainingQuantity: truth.truth.sizing.quantity,
+          })
+        : null,
+      plan: {
+        entry: truth.truth.plan.entry,
+        stop,
+        t1: truth.truth.plan.target1,
+        t2: truth.truth.plan.target2,
+        t1Pct: Math.round(policy.t1ReduceFraction * 100),
+        t2Pct: Math.round(policy.t2ReduceFraction * 100),
+        trailActive: false,
+      },
+    };
+  }
+  return {
+    currentAction,
+    protection: buildOperatorProtectionState({}),
+    remaining: null,
+    plan: {
+      entry: null,
+      stop: null,
+      t1: null,
+      t2: null,
+      t1Pct: null,
+      t2Pct: null,
+      trailActive: false,
+    },
+  };
+}
+
+/** Adapter: operator title → Mesa CTA kind (Hoy buttons / Daily Desk). */
+export function mesaNextActionFromOperatorDecision(
+  decision: OperatorDecisionV1,
+): MesaNextActionV1 {
+  const title = decision.currentAction.title;
+  const kind = ((): MesaNextActionV1["kind"] => {
+    switch (title) {
+      case "SALIR":
+        return "exit";
+      case "REDUCIR":
+        return "reduce";
+      case "PROTEGER":
+        return "protect";
+      case "MANTENER":
+        return "maintain";
+      case "REVISAR":
+        return "review";
+      case "ENTRADA LISTA":
+        return "review_proposal";
+      case "ESPERAR TRIGGER":
+        return "view_thesis";
+      case "VIGILAR":
+      case "CANDIDATO":
+      case "CADUCADA":
+      case "ESPERAR":
+        return "watch";
+      case "SIN ACCIÓN":
+      case "SIN VALOR":
+        return "none";
+      default:
+        if (decision.currentAction.tone === "protect") return "protect";
+        if (decision.currentAction.tone === "exit") return "exit";
+        if (decision.currentAction.tone === "maintain") return "maintain";
+        if (decision.currentAction.tone === "review") return "review";
+        return "watch";
+    }
+  })();
+  return {
+    kind,
+    label: MESA_NEXT_ACTION_LABELS[kind],
+    allowsEntry: false,
   };
 }

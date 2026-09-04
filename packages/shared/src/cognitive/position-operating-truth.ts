@@ -45,6 +45,11 @@ import {
 import { positionStateFromPositionDto } from "./position-state-from-dto.js";
 import type { PaperDeskNextActionV1 } from "./operational-context.js";
 import { mapPortfolioReconToPovRecon } from "./reconciliation-opening-veto.js";
+import {
+  buildOperatorDecision,
+  mesaNextActionFromOperatorDecision,
+  type OperatorCabinTruthV1,
+} from "./operator-cabin-view.js";
 
 export type PositionSecondaryConditionKindV1 =
   | "protection_discrepancy"
@@ -341,25 +346,53 @@ export function positionOperatingTruthSurfaceSnapshot(
   };
 }
 
+export function operatorCabinTruthFromPot(
+  truth: PositionOperatingTruthV1,
+): OperatorCabinTruthV1 {
+  const view = truth.operationalView;
+  const executedStop =
+    view?.levels.currentStop ?? truth.operational.levels.stopOperativo ?? null;
+  const primaryAction: PaperDeskNextActionV1 =
+    view?.primaryAction ??
+    (truth.primaryCta.kind === "exit"
+      ? "SALIR"
+      : truth.primaryCta.kind === "reduce"
+        ? "REDUCIR"
+        : truth.primaryCta.kind === "protect"
+          ? "SUBIR_STOP"
+          : truth.primaryCta.kind === "review"
+            ? "REVISAR_DATOS_NO_FRESCOS"
+            : "MANTENER");
+  return {
+    kind: "position",
+    primaryAction,
+    persistSkipped: truth.protectionDiscrepancy,
+    protectionDiscrepancy: truth.protectionDiscrepancy,
+    currentStop: executedStop,
+    entry: view?.levels.entry ?? truth.operational.levels.entry,
+    birthQuantity: view?.quantity ?? null,
+    closed: view?.operatingState === "CLOSED",
+  };
+}
+
 export function mesaNextActionFromPositionOperatingTruth(
   truth: PositionOperatingTruthV1,
 ): MesaNextActionV1 {
-  if (truth.operationalView?.primaryAction) {
-    const mapped = truth.operationalView.primaryAction;
-    if (mapped === "MONITOR") {
-      return truth.primaryCta;
-    }
+  const cta = truth.primaryCta;
+  if (cta.kind === "exit" || cta.kind === "reduce") {
     return {
-      kind: mapDeskActionToCtaKind(mapped),
-      label: MESA_NEXT_ACTION_LABELS[mapDeskActionToCtaKind(mapped)],
+      kind: cta.kind,
+      label: cta.label,
       allowsEntry: false,
     };
   }
-  return {
-    kind: truth.primaryCta.kind,
-    label: truth.primaryCta.label,
-    allowsEntry: false,
-  };
+  const decision = buildOperatorDecision(operatorCabinTruthFromPot(truth));
+  const mesa = mesaNextActionFromOperatorDecision(decision);
+  if (mesa.kind === "protect") return mesa;
+  if (cta.kind === "review") {
+    return { kind: cta.kind, label: cta.label, allowsEntry: false };
+  }
+  return mesa;
 }
 
 /** Compat: PositionOperatingCta from POT primary (subset of mesa kinds). */
@@ -395,28 +428,6 @@ export function formatPositionOperatingExecutionCopy(
     formatExecutionStateCopy(truth.execution) ??
     formatExecutionHintCopy(truth.operational)
   );
-}
-
-function mapDeskActionToCtaKind(
-  action: PaperDeskNextActionV1,
-): MesaNextActionV1["kind"] {
-  switch (action) {
-    case "SUBIR_STOP":
-      return "protect";
-    case "REDUCIR":
-      return "reduce";
-    case "SALIR":
-      return "exit";
-    case "REVISAR_DATOS_NO_FRESCOS":
-    case "BLOQUEADO":
-      return "review";
-    case "ESPERAR_APERTURA":
-      return "watch";
-    case "MONITOR":
-    case "MANTENER":
-    default:
-      return "maintain";
-  }
 }
 
 function mapOperatingStateToDeskStatusFromCta(cta: MesaNextActionV1): string {

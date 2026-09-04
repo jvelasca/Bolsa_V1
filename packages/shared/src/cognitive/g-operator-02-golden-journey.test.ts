@@ -1,18 +1,15 @@
 /**
- * G-OPERATOR-01 — Golden Operator Journey (V2.15).
- * Matrix: WAIT_TRIGGER → ENTRY_READY → OPEN unprotected → PROTECTED → T1 → TRAIL → T2 → EXIT
- * Asserts NEXT ACTION · Risk Box · Mission · AUTO preview · chart kinds per stage.
+ * G-OPERATOR-02 — full operator journey (V2.23).
+ * ESTUDIO → PREPARADA → TRIGGER → ENTRY → PROTECTED → T1 → TRAIL → TRAIL → T2 → TRAIL → EXIT
+ * Same OperatorDecision on Mercado / Hoy CTA / AUTO / remaining.
  * Projection-only — not a second FSM.
  */
 
 import { describe, expect, it } from "vitest";
-import { buildPaperAutoPosture } from "./paper-auto-posture.js";
 import {
   buildOperatorAutoPlanPreview,
   buildOperatorDecision,
   buildOperatorMissionSteps,
-  buildOperatorRiskBox,
-  buildPositionReductionReadout,
   mesaNextActionFromOperatorDecision,
   resolveOperatorNextAction,
 } from "./operator-cabin-view.js";
@@ -134,118 +131,82 @@ function journey(
   };
 }
 
-describe("G-OPERATOR-01 Golden Operator Journey", () => {
-  it("WAIT_TRIGGER — NEXT ACTION + condition + expires + risk sizing", () => {
-    const truth = entryTruth("preparada");
-    const next = resolveOperatorNextAction({ kind: "entry", truth });
-    expect(next.title).toBe("ESPERAR TRIGGER");
-    expect(next.tone).toBe("wait_trigger");
-    expect(next.condition).toMatch(/cierre > 184\.20/i);
-    expect(next.expires).toMatch(/06 SEP/);
-    expect(next.levels?.entry).toBe(184.2);
-    expect(next.levels?.stop).toBe(176.8);
-    const box = buildOperatorRiskBox({
-      entry: 184.2,
-      stop: 176.8,
-      quantity: 62,
-      positionValue: 11420,
-      maxLoss: 400,
-      target1: 195,
-      target2: 205,
+function sameAction(
+  title: string,
+  truth: Parameters<typeof buildOperatorDecision>[0],
+) {
+  const decision = buildOperatorDecision(truth);
+  const mercado = resolveOperatorNextAction(truth);
+  const hoy = mesaNextActionFromOperatorDecision(decision);
+  expect(mercado.title).toBe(title);
+  expect(decision.currentAction.title).toBe(title);
+  expect(hoy.label.toUpperCase()).toBe(
+    title === "ESPERAR TRIGGER"
+      ? "VER TESIS"
+      : title === "ENTRADA LISTA"
+        ? "REVISAR PROPUESTA"
+        : title,
+  );
+  return { decision, mercado, hoy };
+}
+
+describe("G-OPERATOR-02 full journey — one OperatorDecision", () => {
+  it("ESTUDIO — VIGILAR on cockpit, not COMPRAR", () => {
+    const next = resolveOperatorNextAction({
+      kind: "cockpit_phase",
+      phase: "vigilar",
     });
-    expect(box.quantity).toBe(62);
-    expect(box.positionValue).toBe(11420);
-    expect(box.stopDistancePct).toBeGreaterThan(0);
+    expect(next.title).toBe("VIGILAR");
+    expect(next.title).not.toMatch(/COMPRAR|BUY/i);
+    expect(next.ctaHint).not.toMatch(/COMPRAR/i);
   });
 
-  it("ENTRY_READY — Confirm hint, no COMPRAR", () => {
-    const next = resolveOperatorNextAction({
+  it("PREPARADA — ESPERAR TRIGGER + condition + expires", () => {
+    const { mercado } = sameAction("ESPERAR TRIGGER", {
+      kind: "entry",
+      truth: entryTruth("preparada"),
+    });
+    expect(mercado.condition).toMatch(/cierre > 184\.20/i);
+    expect(mercado.expires).toMatch(/06 SEP/);
+    expect(mercado.reasons?.some((r) => r.id === "setup" && r.ok)).toBe(true);
+    expect(mercado.nextChange).toMatch(/cierre >/);
+  });
+
+  it("TRIGGER / ENTRY — ENTRADA LISTA", () => {
+    sameAction("ENTRADA LISTA", {
       kind: "entry",
       truth: entryTruth("disparada"),
     });
-    expect(next.title).toBe("ENTRADA LISTA");
-    expect(next.tone).toBe("entry_ready");
-    expect(next.ctaHint).toMatch(/Revisar y confirmar/i);
-    expect(JSON.stringify(next)).not.toMatch(/COMPRAR|BUY/i);
   });
 
-  it("OPEN unprotected — PROTEGER emergency, not MANTENER", () => {
-    const j = journey({
-      primaryAction: "MANTENER",
-      risk: {
-        initialRisk: null,
-        initialStop: null,
-        currentProtected: null,
-        realizedR: null,
-        unrealizedR: null,
-        remainingQuantity: 10,
-      },
-      trail: {
-        active: false,
-        activationEligible: false,
-        currentStop: null,
-        lastRatchet: null,
-        trailWidth: null,
-      },
-      remainingQuantity: 10,
-    });
-    const next = resolveOperatorNextAction({
-      kind: "position",
-      primaryAction: "MANTENER",
-      journey: j,
-    });
-    expect(next.title).toBe("PROTEGER");
-    expect(next.tone).toBe("protect");
-    expect(next.subtitle).toMatch(/emergencia|−5/i);
-    expect(next.condition).toMatch(/emergencia|técnico/i);
-    const decision = buildOperatorDecision({
-      kind: "position",
-      primaryAction: "MANTENER",
-      journey: j,
-    });
-    expect(decision.protection.kind).toBe("none");
-    expect(mesaNextActionFromOperatorDecision(decision).kind).toBe("protect");
-  });
-
-  it("PROTECTED — MANTENER + mission + AUTO preview", () => {
+  it("PROTECTED — MANTENER + technical protection + AUTO remaining 100%", () => {
     const j = journey({ primaryAction: "MANTENER" });
-    const next = resolveOperatorNextAction({
+    const { decision } = sameAction("MANTENER", {
       kind: "position",
       primaryAction: "MANTENER",
       journey: j,
-    });
-    expect(next.title).toBe("MANTENER");
-    const decision = buildOperatorDecision({
-      kind: "position",
-      primaryAction: "MANTENER",
-      journey: j,
+      birthQuantity: 62,
     });
     expect(decision.protection.kind).toBe("technical");
-    expect(decision.currentAction.reasons?.length).toBeGreaterThan(0);
-    const steps = buildOperatorMissionSteps(j);
-    expect(steps.find((s) => s.id === "entry")?.status).toBe("done");
-    expect(steps.find((s) => s.id === "stop")?.status).toBe("done");
-    expect(steps.find((s) => s.id === "t1")?.detail).toMatch(/195/);
-    const posture = buildPaperAutoPosture({
-      bookMode: "auto",
-      autoArmed: true,
-      paperDExecuteEnv: false,
-    });
+    expect(decision.remaining?.remainingPct).toBe(100);
     const preview = buildOperatorAutoPlanPreview({
       journey: j,
       templateId: "moderate",
-      nextAction: next,
-      posture,
+      nextAction: decision.currentAction,
+      birthQuantity: 62,
     });
+    expect(preview.headline).toBe("AUTO HARÁ ESTO");
+    expect(preview.t1Pct).toBe(30);
+    expect(preview.remainingPct).toBe(100);
     expect(
-      preview.items.some((i) => i.id === "t1" && i.label.includes("30%")),
+      buildOperatorMissionSteps(j, { birthQuantity: 62 }).some(
+        (s) => s.id === "remaining",
+      ),
     ).toBe(true);
-    expect(preview.ifReachesLines[0]).toMatch(/195\.00/);
-    expect(preview.honestyLine).not.toMatch(/PAPER_D_EXECUTE/);
   });
 
-  it("T1 executed → TRAILING — remaining qty + realized %", () => {
-    const j = journey({
+  it("T1 then TRAIL then TRAIL — remaining drops, trail active", () => {
+    const afterT1 = journey({
       primaryAction: "MANTENER",
       remainingQuantity: 43,
       risk: {
@@ -266,24 +227,40 @@ describe("G-OPERATOR-01 Golden Operator Journey", () => {
         active: true,
         activationEligible: true,
         currentStop: 191.2,
-        lastRatchet: null,
+        lastRatchet: { stop: 191.2, origin: "trail", label: "Trail" },
         trailWidth: "medium",
       },
     });
-    const steps = buildOperatorMissionSteps(j);
-    expect(steps.find((s) => s.id === "t1")?.status).toBe("done");
-    expect(steps.find((s) => s.id === "trail")?.status).toBe("active");
-    const reduction = buildPositionReductionReadout({
+    const firstTrail = buildOperatorDecision({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: afterT1,
       birthQuantity: 62,
-      remainingQuantity: 43,
-      t1QtyFractionPct: 30,
-      t2QtyFractionPct: 30,
     });
-    expect(reduction.remainingPct).toBeCloseTo(69.4, 0);
-    expect(reduction.realizedPct).toBeCloseTo(30.6, 0);
+    expect(firstTrail.currentAction.title).toBe("MANTENER");
+    expect(firstTrail.remaining?.remainingPct).toBeCloseTo(69.4, 0);
+    expect(firstTrail.plan.trailActive).toBe(true);
+
+    const secondTrail = journey({
+      ...afterT1,
+      trail: {
+        ...afterT1.trail,
+        currentStop: 193.5,
+        lastRatchet: { stop: 193.5, origin: "trail", label: "Trail" },
+      },
+    });
+    const again = buildOperatorDecision({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: secondTrail,
+      birthQuantity: 62,
+    });
+    expect(again.currentAction.title).toBe("MANTENER");
+    expect(again.protection.kind).toBe("technical");
+    expect(mesaNextActionFromOperatorDecision(again).kind).toBe("maintain");
   });
 
-  it("T2 then EXIT", () => {
+  it("T2 then TRAIL then EXIT — Hoy CTA matches Mercado", () => {
     const afterT2 = journey({
       primaryAction: "MANTENER",
       remainingQuantity: 31,
@@ -303,20 +280,25 @@ describe("G-OPERATOR-01 Golden Operator Journey", () => {
         active: true,
         activationEligible: true,
         currentStop: 200,
-        lastRatchet: null,
+        lastRatchet: { stop: 200, origin: "trail", label: "Trail" },
         trailWidth: "medium",
       },
     });
-    expect(
-      buildOperatorMissionSteps(afterT2).find((s) => s.id === "t2")?.status,
-    ).toBe("done");
-
-    const exit = resolveOperatorNextAction({
+    const trail = buildOperatorDecision({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: afterT2,
+      birthQuantity: 62,
+    });
+    expect(trail.remaining?.remainingPct).toBeCloseTo(50, 0);
+    const exit = sameAction("SALIR", {
       kind: "position",
       primaryAction: "SALIR",
       journey: afterT2,
+      closed: true,
+      birthQuantity: 62,
     });
-    expect(exit.title).toBe("SALIR");
-    expect(exit.tone).toBe("exit");
+    expect(exit.decision.remaining?.remainingPct).toBe(0);
+    expect(exit.hoy.kind).toBe("exit");
   });
 });

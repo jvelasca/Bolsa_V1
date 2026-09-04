@@ -24,6 +24,50 @@ function finitePositive(n: unknown): n is number {
 }
 
 /**
+ * Raw emergency floor −5 % from entry. Never uses a planned initialStop.
+ * Use this to classify an executed stop as emergency vs technical.
+ */
+export function resolveEmergencyBootstrapStopPrice(input: {
+  direction?: string | null;
+  entry: number | null | undefined;
+}): number | null {
+  const entry = finitePositive(input.entry) ? input.entry : null;
+  if (entry == null) return null;
+  const direction = (input.direction ?? "long").toLowerCase();
+  const raw =
+    direction === "short"
+      ? entry * (1 + BOOTSTRAP_PROTECT_STOP_PCT)
+      : entry * (1 - BOOTSTRAP_PROTECT_STOP_PCT);
+  return Math.round(raw * 1e4) / 1e4;
+}
+
+/**
+ * True when the executed/suggested stop is the emergency −5 % floor,
+ * not a technical strategy stop.
+ */
+export function isEmergencyBootstrapStop(input: {
+  direction?: string | null;
+  entry: number | null | undefined;
+  stop: number | null | undefined;
+  protectKind?: ProtectStopKindV1 | null;
+}): boolean {
+  if (input.protectKind === "bootstrap") {
+    return finitePositive(input.stop);
+  }
+  if (
+    input.protectKind === "hint" ||
+    input.protectKind === "trail" ||
+    input.protectKind === "plan"
+  ) {
+    return false;
+  }
+  const expected = resolveEmergencyBootstrapStopPrice(input);
+  const stop = finitePositive(input.stop) ? input.stop : null;
+  if (expected == null || stop == null) return false;
+  return Math.abs(stop - expected) <= Math.max(0.01, expected * 0.001);
+}
+
+/**
  * Emergency stop for unprotected open positions without ExitPlan/protect_hint stop.
  * LONG → entry × (1 − 5%); SHORT → entry × (1 + 5%).
  */
@@ -31,15 +75,7 @@ export function resolveBootstrapProtectStop(
   input: ResolveBootstrapProtectStopInputV1,
 ): number | null {
   if (finitePositive(input.initialStop)) return input.initialStop;
-  const entry = finitePositive(input.entry) ? input.entry : null;
-  if (entry == null) return null;
-
-  const direction = (input.direction ?? "long").toLowerCase();
-  const raw =
-    direction === "short"
-      ? entry * (1 + BOOTSTRAP_PROTECT_STOP_PCT)
-      : entry * (1 - BOOTSTRAP_PROTECT_STOP_PCT);
-  return Math.round(raw * 1e4) / 1e4;
+  return resolveEmergencyBootstrapStopPrice(input);
 }
 
 /** Operator-facing copy for Confirm / tooltips. */

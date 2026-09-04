@@ -39,6 +39,8 @@ No inventar `OPEN_UNPLANNED` en FSM; lenguaje operador sobre `OPEN_UNPROTECTED` 
 - ~~**V2.18**~~ ADR-040 thaw: strip `Hoy →` en `TradingHealthStrip` (enlace only · L1 intacta)
 - ~~Heal PRINCIPAL lifecycle~~ ops local: `POSITION_OPENED` BBVA `0f59aac9-…` → reconcile clean (DB; no código)
 - Tip GitHub `v2.1-beta` → [relevo tip](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md) (pedido explícito post-smoke)
+- ~~Veredicto auditor V2.1-beta~~ **PASS conceptual** (0 P0 · 0 P1 · 4 P2 certificación) · 2026-09-04
+- **Next:** [relevo V2.2 Operator Certification](./traspaso-relevo-v2-2-operator-certification-2026-09-04.md)
 
 ## Hecho (este arco)
 

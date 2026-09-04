@@ -116,6 +116,24 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
     expect(screen.getByTestId("next-action-title").textContent).toBe(
       "MANTENER",
     );
+    expect(screen.getByTestId("next-action-reasons")).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("operator-protection-line")
+        .getAttribute("data-protection-kind"),
+    ).toBe("technical");
+    expect(screen.getByTestId("journey-remaining").textContent).toMatch(/%/);
+    expect(screen.getByTestId("operator-exit-ladder")).toBeTruthy();
+    expect(
+      screen.getByTestId("exit-ladder-rung-t1").getAttribute("data-reduce-pct"),
+    ).toBe("30");
+    expect(
+      screen.getByTestId("exit-ladder-rung-t2").getAttribute("data-reduce-pct"),
+    ).toBe("30");
+    expect(screen.getByTestId("exit-ladder-pct-t1").textContent).not.toMatch(
+      /25/,
+    );
+    expect(screen.getByTestId("mission-step-remaining")).toBeTruthy();
     expect(screen.getByTestId("operator-mission-checklist")).toBeTruthy();
     expect(screen.getByTestId("operator-risk-box")).toBeTruthy();
     expect(
@@ -130,5 +148,60 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
     expect(screen.getByTestId("journey-auto-posture").textContent).toMatch(
       /ejecución demo off|armado ≠ ejecución/i,
     );
+  });
+
+  it("V2.24 — journey HUD exposes cabin levels 1–4", () => {
+    const journey = buildPositionJourneyReadout({
+      view,
+      initialRisk: 50,
+      initialStop: 95,
+      realizedR: 3,
+      direction: "long",
+      lifecycle: {
+        stage: "trailing",
+        lineagePath: "trail",
+        events: [
+          { kind: "T1_EXECUTED" },
+          { kind: "T2_EXECUTED" },
+          { kind: "TRAIL_APPLIED" },
+        ],
+      },
+    });
+
+    render(
+      <DecisionSurfaceCompact
+        variant="position"
+        position={position}
+        symbol="NVDA"
+        view={view}
+        journey={journey}
+      />,
+    );
+
+    const hud = screen.getByTestId("position-journey-hud");
+    expect(hud.getAttribute("data-cabin-composition")).toBe("4-levels");
+    expect(hud.querySelector('[data-testid="cabin-level-1"]')).toBeTruthy();
+    expect(hud.querySelector('[data-testid="cabin-level-2"]')).toBeTruthy();
+    expect(hud.querySelector('[data-testid="cabin-level-3"]')).toBeTruthy();
+    expect(hud.querySelector('[data-testid="cabin-level-4"]')).toBeTruthy();
+    expect(
+      hud.querySelector('[data-testid="cabin-level-2-label"]')?.textContent,
+    ).toMatch(/riesgo/i);
+    expect(
+      hud.querySelector('[data-testid="cabin-level-3-label"]')?.textContent,
+    ).toMatch(/después/i);
+    expect(
+      screen
+        .getByTestId("journey-next-action")
+        .closest('[data-cabin-level="1"]'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("operator-risk-box").closest('[data-cabin-level="2"]'),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("operator-mission-checklist")
+        .closest('[data-cabin-level="3"]'),
+    ).toBeTruthy();
   });
 });

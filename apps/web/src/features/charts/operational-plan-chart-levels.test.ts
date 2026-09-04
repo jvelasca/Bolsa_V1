@@ -124,4 +124,29 @@ describe("buildOperationalPlanChartLevels", () => {
     expect(boot.title).toMatch(/emergencia/i);
     expect(levels.some((l) => l.kind === "stopVigente")).toBe(false);
   });
+
+  it("V2.20 — OPEN_UNPROTECTED stopVigente paints bootstrap not technical red", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({ stopVigente: 95 }),
+      showLevels: true,
+      stopIsBootstrap: true,
+      bootstrapStopPrice: 95,
+    });
+    expect(levels.some((l) => l.kind === "stopVigente")).toBe(false);
+    expect(levels.find((l) => l.kind === "stopBootstrap")?.color).toBe(
+      "#f59e0b",
+    );
+  });
+
+  it("V2.26 — T1/T2 titles carry ExitPolicy reduce % (not 25)", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan(),
+      showLevels: true,
+      t1ReducePct: 30,
+      t2ReducePct: 30,
+    });
+    expect(levels.find((l) => l.kind === "target1")!.title).toBe("T1 · 30%");
+    expect(levels.find((l) => l.kind === "target2")!.title).toBe("T2 · 30%");
+    expect(levels.find((l) => l.kind === "target1")!.title).not.toMatch(/25/);
+  });
 });

@@ -156,6 +156,12 @@ export function AutoDeskPanel({
         </fieldset>
 
         <div data-testid="auto-desk-plan-preview">
+          <p
+            className="text-[10px] font-semibold uppercase tracking-wider text-foreground"
+            data-testid="auto-desk-headline"
+          >
+            {planPreview.headline}
+          </p>
           <p className="text-[10px] font-semibold text-foreground">
             AUTO · {planPreview.profileLabel}
           </p>
@@ -165,6 +171,78 @@ export function AutoDeskPanel({
           >
             Próxima acción: {planPreview.nextActionTitle}
           </p>
+          <dl
+            className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground"
+            data-testid="auto-desk-plan-amounts"
+          >
+            {planPreview.entry != null ? (
+              <div className="flex justify-between gap-2">
+                <dt>Entrada</dt>
+                <dd className="tabular-nums font-medium text-foreground">
+                  {planPreview.entry.toFixed(2)} €
+                </dd>
+              </div>
+            ) : null}
+            {planPreview.quantity != null ? (
+              <div className="flex justify-between gap-2">
+                <dt>Cantidad</dt>
+                <dd className="tabular-nums font-medium text-foreground">
+                  {planPreview.quantity}
+                </dd>
+              </div>
+            ) : null}
+            {planPreview.stop != null ? (
+              <div className="flex justify-between gap-2">
+                <dt>Stop</dt>
+                <dd className="tabular-nums font-medium text-foreground">
+                  {planPreview.stop.toFixed(2)} €
+                </dd>
+              </div>
+            ) : null}
+            {planPreview.riskAmount != null ? (
+              <div className="flex justify-between gap-2">
+                <dt>Riesgo</dt>
+                <dd className="tabular-nums font-medium text-foreground">
+                  {Math.round(planPreview.riskAmount)} €
+                </dd>
+              </div>
+            ) : null}
+            {planPreview.t1Price != null ? (
+              <div className="flex justify-between gap-2 col-span-2">
+                <dt>T1</dt>
+                <dd className="tabular-nums font-medium text-foreground">
+                  {planPreview.t1Price.toFixed(2)} € · vende {planPreview.t1Pct}
+                  %
+                </dd>
+              </div>
+            ) : null}
+            {planPreview.t2Price != null ? (
+              <div className="flex justify-between gap-2 col-span-2">
+                <dt>T2</dt>
+                <dd className="tabular-nums font-medium text-foreground">
+                  {planPreview.t2Price.toFixed(2)} € · vende {planPreview.t2Pct}
+                  %
+                </dd>
+              </div>
+            ) : null}
+            {planPreview.remainingPct != null ? (
+              <div className="flex justify-between gap-2 col-span-2">
+                <dt>RESTANTE</dt>
+                <dd
+                  className="tabular-nums font-medium text-foreground"
+                  data-testid="auto-desk-remaining"
+                >
+                  {planPreview.remainingPct}%
+                </dd>
+              </div>
+            ) : null}
+            <div className="flex justify-between gap-2 col-span-2">
+              <dt>Trailing</dt>
+              <dd className="font-medium text-foreground">
+                {planPreview.trailingAutomatic ? "Automático ✓" : "—"}
+              </dd>
+            </div>
+          </dl>
           <ul className="mt-1 space-y-0.5 text-[10px]">
             {planPreview.items.map((item) => (
               <li

@@ -15,6 +15,8 @@ import type {
 import {
   assertNever,
   buildExecutionState,
+  buildOperatorDecision,
+  buildOperatorExitLadder,
   buildOperatorFourAnswers,
   buildOperatorMissionSteps,
   buildOperatorRiskBox,
@@ -49,9 +51,13 @@ import {
   usePositionOperationalView,
 } from "@/features/trading/use-position-operational-view";
 import {
+  CABIN_INTERACTIVE,
   NextActionHero,
+  OperatorCabinLevel,
+  OperatorExitLadder,
   OperatorFourAnswersBlock,
   OperatorMissionChecklist,
+  OperatorProtectionLine,
   OperatorRiskBox,
 } from "@/features/trading/operator-cabin-ui";
 
@@ -246,7 +252,11 @@ function EntryCompactBody({
 
   return (
     <>
-      {!hud ? <NextActionHero action={nextAction} /> : null}
+      {!hud ? (
+        <OperatorCabinLevel level={1} showQuestion={false}>
+          <NextActionHero action={nextAction} />
+        </OperatorCabinLevel>
+      ) : null}
 
       <div className="space-y-1">
         {!hud ? <SectionLabel>Oportunidad</SectionLabel> : null}
@@ -304,105 +314,125 @@ function EntryCompactBody({
           </p>
         ) : (
           <>
-            <OperatorRiskBox box={riskBox} />
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
-              <div className="flex justify-between gap-2">
-                <dt>Entrada</dt>
-                <dd
-                  className="font-medium tabular-nums text-foreground"
-                  data-testid="entry-decision-entry"
-                >
-                  {formatEntryLevel(plan.entry)}
-                </dd>
-              </div>
-              {plan.currentPrice != null &&
-              Number.isFinite(plan.currentPrice) ? (
+            <OperatorCabinLevel level={2}>
+              <OperatorRiskBox box={riskBox} />
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
                 <div className="flex justify-between gap-2">
-                  <dt>Precio actual</dt>
+                  <dt>Entrada</dt>
                   <dd
                     className="font-medium tabular-nums text-foreground"
-                    data-testid="entry-decision-mark"
+                    data-testid="entry-decision-entry"
                   >
-                    {formatEntryLevel(plan.currentPrice)}
+                    {formatEntryLevel(plan.entry)}
                   </dd>
                 </div>
-              ) : null}
-              {formatDistance(plan.entry, plan.currentPrice) ? (
+                {plan.currentPrice != null &&
+                Number.isFinite(plan.currentPrice) ? (
+                  <div className="flex justify-between gap-2">
+                    <dt>Precio actual</dt>
+                    <dd
+                      className="font-medium tabular-nums text-foreground"
+                      data-testid="entry-decision-mark"
+                    >
+                      {formatEntryLevel(plan.currentPrice)}
+                    </dd>
+                  </div>
+                ) : null}
+                {formatDistance(plan.entry, plan.currentPrice) ? (
+                  <div className="flex justify-between gap-2">
+                    <dt>Distancia</dt>
+                    <dd
+                      className="font-medium tabular-nums text-foreground"
+                      data-testid="entry-decision-distance"
+                    >
+                      {formatDistance(plan.entry, plan.currentPrice)}
+                    </dd>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-2">
-                  <dt>Distancia</dt>
+                  <dt>Stop</dt>
                   <dd
                     className="font-medium tabular-nums text-foreground"
-                    data-testid="entry-decision-distance"
+                    data-testid="entry-decision-stop"
                   >
-                    {formatDistance(plan.entry, plan.currentPrice)}
+                    {formatEntryLevel(plan.stopVigente)}
                   </dd>
                 </div>
-              ) : null}
-              <div className="flex justify-between gap-2">
-                <dt>Stop</dt>
-                <dd
-                  className="font-medium tabular-nums text-foreground"
-                  data-testid="entry-decision-stop"
-                >
-                  {formatEntryLevel(plan.stopVigente)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt>T1</dt>
-                <dd
-                  className="font-medium tabular-nums text-foreground"
-                  data-testid="entry-decision-t1"
-                >
-                  {formatEntryLevel(plan.target1)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt>T2</dt>
-                <dd
-                  className="font-medium tabular-nums text-foreground"
-                  data-testid="entry-decision-t2"
-                >
-                  {formatEntryLevel(plan.target2)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt>Tamaño</dt>
-                <dd className="font-medium tabular-nums text-foreground">
-                  {qty} acciones
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt>Riesgo</dt>
-                <dd
-                  className="font-medium tabular-nums text-foreground"
-                  data-testid="entry-decision-risk"
-                >
-                  {formatMoney(sizing.riskAmount)}
-                  {sizing.riskR != null && Number.isFinite(sizing.riskR)
-                    ? ` · ${sizing.riskR.toFixed(2)}R`
-                    : ""}
-                </dd>
-              </div>
-              {truth.expiryLabel ? (
-                <div className="col-span-2 flex justify-between gap-2">
-                  <dt>Vigencia</dt>
-                  <dd className="font-medium text-foreground">
-                    {truth.expiryLabel}
+                <div className="flex justify-between gap-2">
+                  <dt>Tamaño</dt>
+                  <dd className="font-medium tabular-nums text-foreground">
+                    {qty} acciones
                   </dd>
                 </div>
+                <div className="flex justify-between gap-2">
+                  <dt>Riesgo</dt>
+                  <dd
+                    className="font-medium tabular-nums text-foreground"
+                    data-testid="entry-decision-risk"
+                  >
+                    {formatMoney(sizing.riskAmount)}
+                    {sizing.riskR != null && Number.isFinite(sizing.riskR)
+                      ? ` · ${sizing.riskR.toFixed(2)}R`
+                      : ""}
+                  </dd>
+                </div>
+                {truth.expiryLabel ? (
+                  <div className="col-span-2 flex justify-between gap-2">
+                    <dt>Vigencia</dt>
+                    <dd className="font-medium text-foreground">
+                      {truth.expiryLabel}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </OperatorCabinLevel>
+
+            <OperatorCabinLevel level={3}>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                <div className="flex justify-between gap-2">
+                  <dt>T1</dt>
+                  <dd
+                    className="font-medium tabular-nums text-foreground"
+                    data-testid="entry-decision-t1"
+                  >
+                    {formatEntryLevel(plan.target1)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>T2</dt>
+                  <dd
+                    className="font-medium tabular-nums text-foreground"
+                    data-testid="entry-decision-t2"
+                  >
+                    {formatEntryLevel(plan.target2)}
+                  </dd>
+                </div>
+              </dl>
+            </OperatorCabinLevel>
+
+            <OperatorCabinLevel level={4}>
+              <button
+                type="button"
+                className={CABIN_INTERACTIVE}
+                onClick={() => setAdvancedOpen((v) => !v)}
+                data-testid="entry-advanced-toggle"
+              >
+                {advancedOpen ? "Ocultar detalles" : "Detalles avanzados"}
+              </button>
+              {advancedOpen ? (
+                <OperatorFourAnswersBlock answers={fourAnswers} />
               ) : null}
-            </dl>
-            <button
-              type="button"
-              className="text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline"
-              onClick={() => setAdvancedOpen((v) => !v)}
-              data-testid="entry-advanced-toggle"
-            >
-              {advancedOpen ? "Ocultar detalles" : "Detalles avanzados"}
-            </button>
-            {advancedOpen ? (
-              <OperatorFourAnswersBlock answers={fourAnswers} />
-            ) : null}
+              {onOpenWhy ? (
+                <button
+                  type="button"
+                  className={CABIN_INTERACTIVE}
+                  onClick={onOpenWhy}
+                  data-testid="entry-decision-why-toggle"
+                >
+                  ¿Por qué?
+                </button>
+              ) : null}
+            </OperatorCabinLevel>
           </>
         )}
       </div>
@@ -448,19 +478,6 @@ function EntryCompactBody({
           </div>
         </div>
       )}
-
-      {!hud && onOpenWhy ? (
-        <div className="border-t border-border/40 pt-1">
-          <button
-            type="button"
-            className="text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline"
-            onClick={onOpenWhy}
-            data-testid="entry-decision-why-toggle"
-          >
-            ¿Por qué?
-          </button>
-        </div>
-      ) : null}
     </>
   );
 }
@@ -492,12 +509,21 @@ function JourneyHudBlock({
   birthQuantity?: number | null;
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const nextAction = resolveOperatorNextAction({
+  const decision = buildOperatorDecision({
     kind: "position",
     primaryAction: journey.primaryAction,
     journey,
+    birthQuantity: birthQuantity ?? null,
+    currentStop: journey.trail.currentStop,
+    entry: journey.entry,
   });
-  const steps = buildOperatorMissionSteps(journey);
+  const nextAction = decision.currentAction;
+  const steps = buildOperatorMissionSteps(journey, {
+    birthQuantity: birthQuantity ?? null,
+  });
+  const ladder = buildOperatorExitLadder(journey, {
+    birthQuantity: birthQuantity ?? null,
+  });
   const reduction = buildPositionReductionReadout({
     birthQuantity: birthQuantity ?? journey.remainingQuantity,
     remainingQuantity: journey.remainingQuantity,
@@ -524,162 +550,175 @@ function JourneyHudBlock({
     <div
       className="space-y-1.5 border-t border-border/40 pt-1.5"
       data-testid="position-journey-hud"
+      data-cabin-composition="4-levels"
       data-lifecycle-stage={journey.stageMachine ?? undefined}
       data-lineage-path={journey.lineagePathLabel ?? undefined}
       data-log-has-t2={journey.logHasT2Executed ? "1" : "0"}
     >
-      <NextActionHero action={nextAction} testId="journey-next-action" />
+      <OperatorCabinLevel level={1} showQuestion={false}>
+        <NextActionHero action={nextAction} testId="journey-next-action" />
+      </OperatorCabinLevel>
 
-      <SectionLabel>Misión de la posición</SectionLabel>
-      <OperatorMissionChecklist steps={steps} />
+      <OperatorCabinLevel level={2}>
+        <OperatorProtectionLine protection={decision.protection} />
+        <OperatorRiskBox box={riskBox} />
+        <dl
+          className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground"
+          data-testid="position-card-risk-levels"
+        >
+          <div className="flex justify-between gap-2">
+            <dt>Stop inicial</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="journey-initial-stop"
+            >
+              {formatLevel(journey.risk.initialStop)}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt>Stop vigente</dt>
+            <dd className="font-medium tabular-nums text-foreground">
+              {formatLevel(journey.trail.currentStop)}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt>Riesgo inicial</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="journey-initial-risk"
+            >
+              {journey.risk.initialRisk != null
+                ? String(journey.risk.initialRisk)
+                : "—"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt>R realizado</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="journey-realized-r"
+            >
+              {journey.risk.realizedR != null
+                ? formatRSigned(journey.risk.realizedR)
+                : "—"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt>Posición</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="journey-birth-qty"
+            >
+              {reduction.birthQuantity}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt>RESTANTE</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="journey-remaining"
+            >
+              {reduction.remainingQuantity}
+              {reduction.remainingPct != null
+                ? ` · ${reduction.remainingPct}%`
+                : ""}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt>Realizado</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="journey-realized-pct"
+            >
+              {reduction.realizedPct != null
+                ? `${reduction.realizedPct}%`
+                : "—"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt>Entrada</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="journey-entry"
+            >
+              {formatLevel(journey.entry)}
+            </dd>
+          </div>
+        </dl>
+      </OperatorCabinLevel>
 
-      <OperatorRiskBox box={riskBox} />
+      <OperatorCabinLevel level={3}>
+        <OperatorExitLadder ladder={ladder} />
+        {/* Checklist compacto (testids mission-step-* + remaining) */}
+        <div className="sr-only">
+          <OperatorMissionChecklist steps={steps} />
+        </div>
+        {/* Precios T1/T2/Trail para tests journey-* existentes */}
+        <dl className="sr-only" data-testid="position-card-plan-levels">
+          <div>
+            <dt>T1</dt>
+            <dd data-testid="journey-t1">
+              {formatLevel(journey.t1.trigger)}
+              {journey.t1.qtyFractionPct != null
+                ? ` · ${journey.t1.qtyFractionPct}%`
+                : ""}{" "}
+              · {formatLegStatus(journey.t1.status)}
+            </dd>
+          </div>
+          <div>
+            <dt>T2</dt>
+            <dd data-testid="journey-t2">
+              {formatLevel(journey.t2.trigger)}
+              {journey.t2.qtyFractionPct != null
+                ? ` · ${journey.t2.qtyFractionPct}%`
+                : ""}{" "}
+              · {formatLegStatus(journey.t2.status)}
+            </dd>
+          </div>
+          <div>
+            <dt>Trailing</dt>
+            <dd data-testid="journey-trail">
+              {!journey.trail.activationEligible
+                ? "Tras T1"
+                : journey.trail.active
+                  ? `Activo · stop ${formatLevel(journey.trail.currentStop)}`
+                  : "Listo · sin ratchet"}
+            </dd>
+          </div>
+        </dl>
+        {autoHonesty ? (
+          <p
+            className="text-[9px] leading-snug text-muted-foreground"
+            data-testid="journey-auto-posture"
+          >
+            {autoHonesty}
+          </p>
+        ) : null}
+      </OperatorCabinLevel>
 
-      <dl
-        className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground"
-        data-testid="position-card-levels"
-      >
-        <div className="flex justify-between gap-2">
-          <dt>Stop inicial</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-initial-stop"
+      <OperatorCabinLevel level={4}>
+        <button
+          type="button"
+          className={CABIN_INTERACTIVE}
+          onClick={() => setAdvancedOpen((v) => !v)}
+          data-testid="journey-advanced-toggle"
+        >
+          {advancedOpen ? "Ocultar auditoría" : "Detalles avanzados"}
+        </button>
+        {advancedOpen ? (
+          <p
+            className="text-[9px] leading-snug text-muted-foreground"
+            data-testid="journey-stage-label"
+            title="stage derivado · el log es la historia"
           >
-            {formatLevel(journey.risk.initialStop)}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Stop vigente</dt>
-          <dd className="font-medium tabular-nums text-foreground">
-            {formatLevel(journey.trail.currentStop)}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Riesgo inicial</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-initial-risk"
-          >
-            {journey.risk.initialRisk != null
-              ? String(journey.risk.initialRisk)
-              : "—"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>R realizado</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-realized-r"
-          >
-            {journey.risk.realizedR != null
-              ? formatRSigned(journey.risk.realizedR)
-              : "—"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Posición</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-birth-qty"
-          >
-            {reduction.birthQuantity}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Restante</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-remaining"
-          >
-            {reduction.remainingQuantity}
-            {reduction.remainingPct != null
-              ? ` · ${reduction.remainingPct}%`
+            Ciclo: {journey.stageLabel ?? "—"}
+            {journey.lineagePathLabel
+              ? ` · clasificación ${journey.lineagePathLabel}`
               : ""}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Realizado</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-realized-pct"
-          >
-            {reduction.realizedPct != null ? `${reduction.realizedPct}%` : "—"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Entrada</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-entry"
-          >
-            {formatLevel(journey.entry)}
-          </dd>
-        </div>
-        <div className="col-span-2 flex justify-between gap-2">
-          <dt>T1</dt>
-          <dd data-testid="journey-t1" className="text-right text-foreground">
-            {formatLevel(journey.t1.trigger)}
-            {journey.t1.qtyFractionPct != null
-              ? ` · ${journey.t1.qtyFractionPct}%`
-              : ""}{" "}
-            · {formatLegStatus(journey.t1.status)}
-          </dd>
-        </div>
-        <div className="col-span-2 flex justify-between gap-2">
-          <dt>T2</dt>
-          <dd data-testid="journey-t2" className="text-right text-foreground">
-            {formatLevel(journey.t2.trigger)}
-            {journey.t2.qtyFractionPct != null
-              ? ` · ${journey.t2.qtyFractionPct}%`
-              : ""}{" "}
-            · {formatLegStatus(journey.t2.status)}
-          </dd>
-        </div>
-        <div className="col-span-2 flex justify-between gap-2">
-          <dt>Trailing</dt>
-          <dd
-            data-testid="journey-trail"
-            className="text-right text-foreground"
-          >
-            {!journey.trail.activationEligible
-              ? "Tras T1"
-              : journey.trail.active
-                ? `Activo · stop ${formatLevel(journey.trail.currentStop)}`
-                : "Listo · sin ratchet"}
-          </dd>
-        </div>
-      </dl>
-
-      {autoHonesty ? (
-        <p
-          className="text-[9px] leading-snug text-muted-foreground"
-          data-testid="journey-auto-posture"
-        >
-          {autoHonesty}
-        </p>
-      ) : null}
-
-      <button
-        type="button"
-        className="text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline"
-        onClick={() => setAdvancedOpen((v) => !v)}
-        data-testid="journey-advanced-toggle"
-      >
-        {advancedOpen ? "Ocultar auditoría" : "Detalles avanzados"}
-      </button>
-      {advancedOpen ? (
-        <p
-          className="text-[9px] leading-snug text-muted-foreground"
-          data-testid="journey-stage-label"
-          title="stage derivado · el log es la historia"
-        >
-          Ciclo: {journey.stageLabel ?? "—"}
-          {journey.lineagePathLabel
-            ? ` · clasificación ${journey.lineagePathLabel}`
-            : ""}
-          {journey.logHasT2Executed ? " · log incluye T2" : ""}
-        </p>
-      ) : null}
+            {journey.logHasT2Executed ? " · log incluye T2" : ""}
+          </p>
+        ) : null}
+      </OperatorCabinLevel>
     </div>
   );
 }
@@ -716,11 +755,18 @@ function PositionCompactBody({
     kind: "position",
     primaryAction: journey?.primaryAction ?? view.primaryAction,
     journey,
+    currentStop: view.levels.currentStop,
+    entry: view.levels.entry,
+    birthQuantity: view.quantity,
   });
 
   return (
     <>
-      {!hud && !journey ? <NextActionHero action={nextAction} /> : null}
+      {!hud && !journey ? (
+        <OperatorCabinLevel level={1} showQuestion={false}>
+          <NextActionHero action={nextAction} />
+        </OperatorCabinLevel>
+      ) : null}
 
       <div className="space-y-1">
         {!hud ? <SectionLabel>Posición</SectionLabel> : null}
@@ -801,42 +847,50 @@ function PositionCompactBody({
               T2 {formatLevel(view.levels.target2)}
             </span>
           </p>
-        ) : (
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
-            <div className="flex justify-between gap-2">
-              <dt>Stop</dt>
-              <dd
-                className="font-medium tabular-nums text-foreground"
-                data-testid="position-decision-stop"
-              >
-                {formatLevel(view.levels.currentStop)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>T1</dt>
-              <dd
-                className="font-medium tabular-nums text-foreground"
-                data-testid="position-decision-t1"
-              >
-                {formatLevel(view.levels.target1)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>T2</dt>
-              <dd
-                className="font-medium tabular-nums text-foreground"
-                data-testid="position-decision-t2"
-              >
-                {formatLevel(view.levels.target2)}
-              </dd>
-            </div>
-            {view.operatingState === "TRAILING" ? (
-              <div className="flex justify-between gap-2">
-                <dt>Trail</dt>
-                <dd className="font-medium text-foreground">Activo</dd>
-              </div>
-            ) : null}
-          </dl>
+        ) : journey ? null : (
+          <>
+            <OperatorCabinLevel level={2}>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                <div className="flex justify-between gap-2">
+                  <dt>Stop</dt>
+                  <dd
+                    className="font-medium tabular-nums text-foreground"
+                    data-testid="position-decision-stop"
+                  >
+                    {formatLevel(view.levels.currentStop)}
+                  </dd>
+                </div>
+              </dl>
+            </OperatorCabinLevel>
+            <OperatorCabinLevel level={3}>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                <div className="flex justify-between gap-2">
+                  <dt>T1</dt>
+                  <dd
+                    className="font-medium tabular-nums text-foreground"
+                    data-testid="position-decision-t1"
+                  >
+                    {formatLevel(view.levels.target1)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>T2</dt>
+                  <dd
+                    className="font-medium tabular-nums text-foreground"
+                    data-testid="position-decision-t2"
+                  >
+                    {formatLevel(view.levels.target2)}
+                  </dd>
+                </div>
+                {view.operatingState === "TRAILING" ? (
+                  <div className="flex justify-between gap-2">
+                    <dt>Trail</dt>
+                    <dd className="font-medium text-foreground">Activo</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </OperatorCabinLevel>
+          </>
         )}
         {!hud && journey ? (
           <JourneyHudBlock journey={journey} birthQuantity={view.quantity} />
@@ -871,12 +925,12 @@ function PositionCompactBody({
         </div>
       </div>
 
-      {!hud ? (
+      {!hud && journey ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-1">
           {onOpenWhy ? (
             <button
               type="button"
-              className="text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline"
+              className={CABIN_INTERACTIVE}
               onClick={onOpenWhy}
               data-testid="position-decision-why-toggle"
             >
@@ -886,7 +940,7 @@ function PositionCompactBody({
           {view.stopHistory.length > 0 ? (
             <button
               type="button"
-              className="text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline"
+              className={CABIN_INTERACTIVE}
               onClick={() => setHistoryOpen((v) => !v)}
               aria-expanded={historyOpen}
               data-testid="operativa-cockpit-stop-history-toggle"
@@ -894,29 +948,82 @@ function PositionCompactBody({
               {historyOpen ? "Ocultar historial de stop" : "Historial de stop"}
             </button>
           ) : null}
+          {historyOpen && view.stopHistory.length > 0 ? (
+            <ul
+              className="w-full space-y-0.5 text-[10px] text-muted-foreground"
+              data-testid="operativa-cockpit-stop-history"
+            >
+              {view.stopHistory.map((entry, idx) => (
+                <li
+                  key={`${entry.label}-${entry.stop}-${idx}`}
+                  className="flex justify-between gap-2"
+                >
+                  <span className="truncate">{entry.label}</span>
+                  <span className="shrink-0 font-medium tabular-nums text-foreground">
+                    {entry.stop.toFixed(2)}
+                    {formatStopDelta(entry.delta)
+                      ? ` (${formatStopDelta(entry.delta)})`
+                      : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 
-      {!hud && historyOpen && view.stopHistory.length > 0 ? (
-        <ul
-          className="space-y-0.5 text-[10px] text-muted-foreground"
-          data-testid="operativa-cockpit-stop-history"
+      {!hud && !journey ? (
+        <OperatorCabinLevel
+          level={4}
+          className="border-t border-border/40 pt-1"
         >
-          {view.stopHistory.map((entry, idx) => (
-            <li
-              key={`${entry.label}-${entry.stop}-${idx}`}
-              className="flex justify-between gap-2"
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenWhy ? (
+              <button
+                type="button"
+                className={CABIN_INTERACTIVE}
+                onClick={onOpenWhy}
+                data-testid="position-decision-why-toggle"
+              >
+                ¿Por qué?
+              </button>
+            ) : null}
+            {view.stopHistory.length > 0 ? (
+              <button
+                type="button"
+                className={CABIN_INTERACTIVE}
+                onClick={() => setHistoryOpen((v) => !v)}
+                aria-expanded={historyOpen}
+                data-testid="operativa-cockpit-stop-history-toggle"
+              >
+                {historyOpen
+                  ? "Ocultar historial de stop"
+                  : "Historial de stop"}
+              </button>
+            ) : null}
+          </div>
+          {historyOpen && view.stopHistory.length > 0 ? (
+            <ul
+              className="space-y-0.5 text-[10px] text-muted-foreground"
+              data-testid="operativa-cockpit-stop-history"
             >
-              <span className="truncate">{entry.label}</span>
-              <span className="shrink-0 font-medium tabular-nums text-foreground">
-                {entry.stop.toFixed(2)}
-                {formatStopDelta(entry.delta)
-                  ? ` (${formatStopDelta(entry.delta)})`
-                  : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
+              {view.stopHistory.map((entry, idx) => (
+                <li
+                  key={`${entry.label}-${entry.stop}-${idx}`}
+                  className="flex justify-between gap-2"
+                >
+                  <span className="truncate">{entry.label}</span>
+                  <span className="shrink-0 font-medium tabular-nums text-foreground">
+                    {entry.stop.toFixed(2)}
+                    {formatStopDelta(entry.delta)
+                      ? ` (${formatStopDelta(entry.delta)})`
+                      : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </OperatorCabinLevel>
       ) : null}
     </>
   );

@@ -20,6 +20,7 @@ import {
   operationalPlanChartLevelsSignature,
   type OperationalPlanChartLevel,
 } from "@/features/charts/operational-plan-chart-levels";
+import { isEmergencyBootstrapStop, resolveExitPolicy } from "@bolsa/shared";
 import { resolveBootstrapProtectStop } from "@/features/operations/propose-position-exit";
 import {
   canDragOperationalStop,
@@ -108,16 +109,36 @@ export function ChartOperationalPlanLevelsLayer({
   const [ghostValid, setGhostValid] = useState(true);
   const [dragging, setDragging] = useState(false);
 
+  const bootstrapStopPrice =
+    chartReady &&
+    series &&
+    instrumentId &&
+    context.phase === "posicion" &&
+    context.position
+      ? resolveBootstrapProtectStop(context.position)
+      : null;
+  const executedStop = context.position?.operational?.currentStop ?? null;
+  const stopIsBootstrap =
+    (executedStop == null && bootstrapStopPrice != null) ||
+    (context.plan != null &&
+      isEmergencyBootstrapStop({
+        direction: context.plan.direction,
+        entry: context.plan.entry,
+        stop: context.plan.stopVigente,
+        protectKind: executedStop == null ? "bootstrap" : null,
+      }) &&
+      executedStop == null);
+  const exitPolicy = resolveExitPolicy(null);
   const levels =
     chartReady && series && instrumentId
       ? buildOperationalPlanChartLevels({
           plan: context.plan,
           showLevels: context.showsPlanLevels,
           includeTrailing: context.phase === "posicion",
-          bootstrapStopPrice:
-            context.phase === "posicion" && context.position
-              ? resolveBootstrapProtectStop(context.position)
-              : null,
+          stopIsBootstrap,
+          bootstrapStopPrice,
+          t1ReducePct: Math.round(exitPolicy.t1ReduceFraction * 100),
+          t2ReducePct: Math.round(exitPolicy.t2ReduceFraction * 100),
         })
       : [];
   const signature = operationalPlanChartLevelsSignature(levels);

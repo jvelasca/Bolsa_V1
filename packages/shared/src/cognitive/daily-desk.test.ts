@@ -346,4 +346,31 @@ describe("dailyDesk V2.05 four buckets", () => {
     expect(inbox.items[0]?.bucket).toBe("requiere_accion");
     expect(inbox.items[0]?.ctaLabel).toMatch(/operaciones/i);
   });
+
+  it("V2.19 — OPEN without executed stop → Requiere atención / Proteger (same as Mercado)", () => {
+    const pos = aaplOpen({
+      operational: {
+        status: "OPEN",
+        direction: "long",
+        tradePlanId: "tp-aapl",
+        plannedEntry: 100,
+        actualEntry: 100,
+        initialStop: 95,
+        currentStop: null,
+        target1: 105,
+        target2: 110,
+        unrealizedR: 0.4,
+        exitPlan: { suggestedAction: "hold" },
+      },
+    });
+    const inbox = buildDailyDeskInbox({
+      positions: [pos],
+      portfolioReconStatus: "ok",
+      pendingConfirm: 0,
+    });
+    const item = inbox.items.find((i) => i.symbol === "AAPL");
+    expect(item?.bucket).toBe("requiere_accion");
+    expect(item?.ctaKind).toBe("protect");
+    expect(item?.ctaLabel).toMatch(/proteger/i);
+  });
 });

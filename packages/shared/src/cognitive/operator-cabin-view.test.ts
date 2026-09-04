@@ -6,12 +6,16 @@ import { describe, expect, it } from "vitest";
 import { buildPaperAutoPosture } from "./paper-auto-posture.js";
 import {
   buildOperatorAutoChecklist,
+  buildOperatorAutoPlanPreview,
+  buildOperatorDecision,
   buildOperatorFourAnswers,
   buildOperatorMissionSteps,
   buildOperatorNextActionFromCockpitPhase,
   buildOperatorNextActionFromEntry,
   buildOperatorNextActionFromPosition,
+  buildOperatorProtectionState,
   buildOperatorRiskBox,
+  mesaNextActionFromOperatorDecision,
   operatorStageFromCockpitPhase,
   resolveOperatorNextAction,
 } from "./operator-cabin-view.js";
@@ -284,5 +288,165 @@ describe("mission + AUTO checklist", () => {
     expect(c.interveneHint).toMatch(/intervenir/i);
     expect(c.honestyLine).not.toMatch(/PAPER_D_EXECUTE/);
     expect(c.profilePreview).toMatch(/Moderado/);
+  });
+});
+
+describe("V2.19–V2.22 OperatorDecision + protection + remaining", () => {
+  const protectedJourney = {
+    entry: 184.2,
+    risk: {
+      initialRisk: 400,
+      initialStop: 176.8,
+      currentProtected: 50,
+      realizedR: 0,
+      unrealizedR: 0.2,
+      remainingQuantity: 62,
+    },
+    t1: {
+      trigger: 195,
+      status: "pending",
+      qtyFractionPct: 30,
+      executed: false,
+    },
+    t2: {
+      trigger: 205,
+      status: "pending",
+      qtyFractionPct: 30,
+      executed: false,
+    },
+    trail: {
+      active: false,
+      activationEligible: false,
+      currentStop: 176.8,
+      lastRatchet: null,
+      trailWidth: "medium",
+    },
+    remainingQuantity: 62,
+    primaryAction: "MANTENER",
+    stageLabel: null,
+    stageMachine: null,
+    lineagePathLabel: null,
+    logHasT2Executed: false,
+    logHasTrailApplied: false,
+    eventKinds: [],
+    autoPosture: null,
+    killOn: false,
+  } as PositionJourneyReadoutV1;
+
+  it("planned initialStop without executed stop → PROTEGER not MANTENER", () => {
+    const j = {
+      ...protectedJourney,
+      trail: { ...protectedJourney.trail, currentStop: null },
+    };
+    const next = resolveOperatorNextAction({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: j,
+    });
+    expect(next.title).toBe("PROTEGER");
+    expect(next.tone).toBe("protect");
+  });
+
+  it("persistSkipped → PROTEGER never MANTENER", () => {
+    const next = resolveOperatorNextAction({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: protectedJourney,
+      persistSkipped: true,
+    });
+    expect(next.title).toBe("PROTEGER");
+    const decision = buildOperatorDecision({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: protectedJourney,
+      persistSkipped: true,
+    });
+    expect(decision.protection.kind).toBe("none");
+    expect(decision.protection.honesty).toBe("sent");
+    expect(mesaNextActionFromOperatorDecision(decision).kind).toBe("protect");
+  });
+
+  it("executed technical stop → Protegida + MANTENER", () => {
+    const decision = buildOperatorDecision({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: protectedJourney,
+    });
+    expect(decision.currentAction.title).toBe("MANTENER");
+    expect(decision.protection.kind).toBe("technical");
+    expect(decision.protection.honesty).toBe("confirmed");
+    expect(
+      decision.currentAction.reasons?.some((r) => r.id === "stop" && r.ok),
+    ).toBe(true);
+    expect(decision.currentAction.nextChange).toMatch(/T1 @/);
+  });
+
+  it("bootstrap protectKind with executed stop → emergency not technical", () => {
+    const decision = buildOperatorDecision({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: {
+        ...protectedJourney,
+        trail: { ...protectedJourney.trail, currentStop: 174.99 },
+      },
+      protectKind: "bootstrap",
+      entry: 184.2,
+    });
+    expect(decision.protection.kind).toBe("emergency");
+    expect(decision.protection.isTechnical).toBe(false);
+    expect(decision.protection.label).toMatch(/emergencia/i);
+  });
+
+  it("entry ESPERAR TRIGGER exposes Porque + nextChange", () => {
+    const next = resolveOperatorNextAction({
+      kind: "entry",
+      truth: entryTruth("preparada", { expiryLabel: "06 SEP" }),
+    });
+    expect(next.reasons?.map((r) => r.id)).toEqual(["setup", "risk"]);
+    expect(next.nextChange).toMatch(/cierre >/);
+  });
+
+  it("AUTO preview remaining + ExitPolicy percents", () => {
+    const next = resolveOperatorNextAction({
+      kind: "position",
+      primaryAction: "MANTENER",
+      journey: {
+        ...protectedJourney,
+        remainingQuantity: 43,
+        t1: { ...protectedJourney.t1, executed: true, status: "executed" },
+      },
+    });
+    const preview = buildOperatorAutoPlanPreview({
+      journey: {
+        ...protectedJourney,
+        remainingQuantity: 43,
+        t1: { ...protectedJourney.t1, executed: true, status: "executed" },
+      },
+      templateId: "moderate",
+      nextAction: next,
+      birthQuantity: 62,
+    });
+    expect(preview.headline).toBe("AUTO HARÁ ESTO");
+    expect(preview.t1Pct).toBe(30);
+    expect(preview.t2Pct).toBe(30);
+    expect(preview.remainingPct).toBeCloseTo(69.4, 0);
+    expect(preview.entry).toBe(184.2);
+  });
+
+  it("mission includes RESTANTE", () => {
+    const steps = buildOperatorMissionSteps(protectedJourney, {
+      birthQuantity: 62,
+    });
+    expect(steps.find((s) => s.id === "remaining")?.detail).toMatch(/100/);
+  });
+
+  it("protection state none vs technical", () => {
+    expect(buildOperatorProtectionState({ executedStop: null }).kind).toBe(
+      "none",
+    );
+    expect(
+      buildOperatorProtectionState({ executedStop: 176.8, protectKind: "plan" })
+        .kind,
+    ).toBe("technical");
   });
 });

@@ -26,6 +26,7 @@ import type { MesaNextActionKindV1 } from "./mesa-next-action.js";
 import { MERCADO_COCKPIT_PHASE_LABEL } from "./mercado-cockpit-phase.js";
 import {
   buildPositionOperatingTruth,
+  mesaNextActionFromPositionOperatingTruth,
   type PositionOperatingTruthV1,
 } from "./position-operating-truth.js";
 import type { OperationalTruthV1 } from "./operational-truth.js";
@@ -264,7 +265,9 @@ export function bucketFromPositionTruth(
   ) {
     return "requiere_accion";
   }
-  switch (truth.primaryCta.kind) {
+  const mesa = mesaNextActionFromPositionOperatingTruth(truth);
+  const kind = mesa.kind === "protect" ? "protect" : truth.primaryCta.kind;
+  switch (kind) {
     case "exit":
     case "reduce":
     case "review":
@@ -323,6 +326,7 @@ function dailyDeskItemFromPot(
   truth: PositionOperatingTruthV1,
 ): DailyDeskItemV1 {
   const bucket = bucketFromPositionTruth(truth);
+  const mesa = mesaNextActionFromPositionOperatingTruth(truth);
   return {
     id: `position-${truth.positionId}`,
     kind: "position",
@@ -330,9 +334,9 @@ function dailyDeskItemFromPot(
     symbol: truth.symbol,
     attention: truth.attention,
     phrase: phraseForPosition(truth),
-    reason: truth.phrase || truth.primaryCta.label,
-    ctaLabel: truth.primaryCta.label,
-    ctaKind: truth.primaryCta.kind,
+    reason: truth.phrase || mesa.label,
+    ctaLabel: mesa.label,
+    ctaKind: mesa.kind,
     phaseLabel: MERCADO_COCKPIT_PHASE_LABEL.posicion,
     positionId: truth.positionId,
     instrumentId: truth.instrumentId,

@@ -15,6 +15,7 @@ import {
   RECON_HEALTH_COPY,
   buildExecutionState,
   buildOperationalTruth,
+  buildOperatorDecision,
   buildPositionOperatingTruth,
   formatExecutionHintCopy,
   formatExecutionStateCopy,
@@ -23,6 +24,7 @@ import {
   formatPositionDecisionPhrase,
   formatPositionOperatingExecutionCopy,
   formatProtectionLabel,
+  operatorCabinTruthFromPot,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 
@@ -189,6 +191,8 @@ function PositionOperatingSummaryFromPot({
       ? "Existe una discrepancia de cartera. Reconciliación necesaria antes de abrir nuevas posiciones."
       : null;
   void portfolioReconStatus;
+  const operator = buildOperatorDecision(operatorCabinTruthFromPot(pot));
+  const mesaCta = operator.currentAction.title;
 
   return (
     <div
@@ -205,6 +209,7 @@ function PositionOperatingSummaryFromPot({
       data-execution-lifecycle={execution.lifecycle}
       data-execution-order={execution.orderState}
       data-protection-discrepancy={pot.protectionDiscrepancy ? "1" : "0"}
+      data-operator-action={mesaCta}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p
@@ -243,6 +248,29 @@ function PositionOperatingSummaryFromPot({
       >
         {phrase}
       </p>
+      <dl className="grid gap-1 text-[10px]">
+        <div className="flex justify-between gap-2">
+          <dt className="text-muted-foreground">PROTECCIÓN</dt>
+          <dd
+            className="font-medium"
+            data-testid="journal-protection-kind"
+            data-protection-kind={operator.protection.kind}
+          >
+            {operator.protection.label}
+          </dd>
+        </div>
+        {operator.remaining?.remainingPct != null ? (
+          <div className="flex justify-between gap-2">
+            <dt className="text-muted-foreground">RESTANTE</dt>
+            <dd
+              className="font-medium tabular-nums"
+              data-testid="journal-remaining"
+            >
+              {operator.remaining.remainingPct}%
+            </dd>
+          </div>
+        ) : null}
+      </dl>
       {secondaryConditions.length > 0 ? (
         <ul
           className="space-y-0.5 text-[10px] text-amber-800 dark:text-amber-200"
