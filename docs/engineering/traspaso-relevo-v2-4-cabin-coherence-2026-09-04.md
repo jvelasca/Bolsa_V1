@@ -1,8 +1,8 @@
 # RELEVO — V2.4 Cabin Coherence (2026-09-04)
 
 > **Padre:** [relevo V2.3 Mercado Polish](./traspaso-relevo-v2-3-mercado-polish-2026-09-04.md) · tip producto [`v2.1-beta`](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md) `5f095d67`.  
-> **Estado:** **CERRADO en código** · IDs V2.28–V2.32 · next = tip `v2.4-*` solo con petición · ops smoke 10 s paralelo.  
-> **Para quién:** ops · tip · no reabrir motor FSM ni paneles.  
+> **Estado:** **CERRADO en código** · tip [`v2.4-beta`](./traspaso-relevo-tag-v2-4-beta-2026-09-04.md) → [`8fda4d62`](https://github.com/jvelasca/Bolsa_V1/commit/8fda4d62) · ops smoke 10 s paralelo.  
+> **Para quién:** ops · no reabrir motor FSM ni paneles.  
 > **Arranque:** [arranque post-V2.32](./arranque-agente-post-v2-32-2026-09-04.md).
 
 ## Objetivo
@@ -39,6 +39,7 @@ NO LIVE · no bump `1.35.0-beta` · `PAPER_D_EXECUTE` default off · no `TRANSIT
 
 ## OUT / tip
 
-- Tip `v2.4-*` solo con petición explícita.
+- Tip [`v2.4-beta`](./traspaso-relevo-tag-v2-4-beta-2026-09-04.md) → [`8fda4d62`](https://github.com/jvelasca/Bolsa_V1/commit/8fda4d62) **hecho**.
+- Ops smoke browser 10 s (**V2.3-ops**, paralelo).
 - No reabrir Journal / PLAN DE POSICIÓN / Protection State / Chart Focus / Premium Visual System / Journey 2 salvo regresión.
 - No reabrir motor FSM / Operating Truth builders salvo proyección display.

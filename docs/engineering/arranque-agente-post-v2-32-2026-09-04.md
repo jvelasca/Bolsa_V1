@@ -49,7 +49,7 @@ cd apps/web && npx vitest run src/features/trading/decision-surface-journey.test
 
 ## Stamp
 
-| Pieza               | Valor               |
-| ------------------- | ------------------- |
-| Branch              | `main`              |
-| Tip GitHub `v2.4-*` | no (salvo petición) |
+| Pieza                  | Valor                                                              |
+| ---------------------- | ------------------------------------------------------------------ |
+| Branch                 | `main`                                                             |
+| Tip GitHub `v2.4-beta` | [`8fda4d62`](https://github.com/jvelasca/Bolsa_V1/commit/8fda4d62) |
