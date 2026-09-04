@@ -8,9 +8,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildOperatorDecision,
   buildOperatorJourney2Surfaces,
+  mesaNextActionFromOperatorDecision,
   operatorJourney2LevelsEqual,
   type OperatorCabinTruthV1,
 } from "./operator-cabin-view.js";
+import type { EntryOperatingTruthV1 } from "./entry-operating-truth.js";
 import type { PositionJourneyReadoutV1 } from "./position-journey-readout.js";
 import { resolvePositionOperatingState } from "./operational-context.js";
 import { buildPositionOperationalView } from "./position-operational-view.js";
@@ -155,6 +157,164 @@ describe("G-OPERATOR-05 V2.35 UI Truth", () => {
     expect(surfaces.mercado.t2).toBe(205);
     expect(surfaces.mercado.remainingPct).toBe(100);
     expect(surfaces.decision.protection.phase).toBe("planned");
+    // V2.38 — Hoy CTA is mesa-mapped (not string-identical to Mercado NEXT).
+    expect(
+      operatorJourney2LevelsEqual(surfaces.mercado, surfaces.hoy, {
+        ignoreNextAction: true,
+      }),
+    ).toBe(true);
+    expect(surfaces.hoy.nextAction).toBe("MANTENER");
+    expect(surfaces.hoy.nextAction).toBe(surfaces.mercado.nextAction);
+  });
+
+  it("V2.38 Hoy↔Mercado levels equal · mesa kind mapped (not CTA string identity)", () => {
+    const unprotected: PositionJourneyReadoutV1 = birthJourney({
+      primaryAction: "MANTENER",
+      risk: {
+        initialRisk: null,
+        initialStop: null,
+        currentProtected: null,
+        realizedR: null,
+        unrealizedR: null,
+        remainingQuantity: 62,
+      },
+      trail: {
+        active: false,
+        activationEligible: false,
+        currentStop: null,
+        lastRatchet: null,
+        trailWidth: null,
+      },
+      t1: {
+        trigger: 195,
+        status: "pending",
+        qtyFractionPct: 30,
+        executed: false,
+      },
+      t2: {
+        trigger: 205,
+        status: "pending",
+        qtyFractionPct: 30,
+        executed: false,
+      },
+    });
+    const protectSurfaces = buildOperatorJourney2Surfaces(
+      {
+        kind: "position",
+        primaryAction: "MANTENER",
+        journey: unprotected,
+        protectKind: "bootstrap",
+        birthQuantity: 62,
+        templateId: "moderate",
+      },
+      { birthQuantity: 62, templateId: "moderate" },
+    );
+    const protectMesa = mesaNextActionFromOperatorDecision(
+      protectSurfaces.decision,
+    );
+    expect(protectSurfaces.mercado.nextAction).toBe("PROTEGER");
+    expect(protectMesa.kind).toBe("protect");
+    expect(protectMesa.label.toUpperCase()).toBe("PROTEGER");
+    expect(protectSurfaces.hoy.nextAction).toBe(
+      protectMesa.label.toUpperCase(),
+    );
+    expect(
+      operatorJourney2LevelsEqual(
+        protectSurfaces.mercado,
+        protectSurfaces.hoy,
+        {
+          ignoreNextAction: true,
+        },
+      ),
+    ).toBe(true);
+    expect(
+      operatorJourney2LevelsEqual(
+        protectSurfaces.mercado,
+        protectSurfaces.auto,
+        { ignoreNextAction: true },
+      ),
+    ).toBe(true);
+    expect(
+      operatorJourney2LevelsEqual(
+        protectSurfaces.mercado,
+        protectSurfaces.chart,
+      ),
+    ).toBe(true);
+    expect(protectSurfaces.mercado.t1).toBe(195);
+    expect(protectSurfaces.hoy.t1).toBe(195);
+    expect(protectSurfaces.auto.t1Pct).toBe(30);
+    expect(protectSurfaces.auto.t2Pct).toBe(30);
+
+    const entryTruth: EntryOperatingTruthV1 = {
+      instrumentId: "inst-aapl",
+      symbol: "AAPL",
+      asOf: "2026-09-04T10:00:00.000Z",
+      phase: "preparada",
+      phaseLabel: "preparada",
+      triggerLabel: "Pendiente",
+      phrase: "test",
+      primaryCta: { kind: "prepare", label: "Preparar operación" },
+      plan: {
+        phase: "prepared",
+        phaseLabel: "Preparada",
+        direction: "long",
+        entry: 184.2,
+        stopVigente: 176.8,
+        stopInicial: 176.8,
+        target1: 195,
+        target2: 205,
+        target1Reached: false,
+        target2Reached: false,
+        target1Touched: false,
+        target1Managed: false,
+        target2Touched: false,
+        target2Managed: false,
+        expectedRR: 1.46,
+        riskR: 0.8,
+        currentPrice: 183.5,
+        unrealizedR: null,
+        trailingActive: false,
+        trailingPeakMfeR: null,
+        trailingPeakPrice: null,
+        trailingStopHint: null,
+        trailingDistanceR: null,
+        exitAuthorityHint: null,
+        hasPlan: true,
+        emptyCopy: "",
+      },
+      sizing: {
+        quantity: 62,
+        riskAmount: 400,
+        expectedRR: 1.46,
+        riskR: 0.8,
+        positionValue: 11420,
+      },
+      entriesBlocked: false,
+      gateStatus: null,
+      expiryLabel: "06 SEP 18:00",
+    };
+    const entrySurfaces = buildOperatorJourney2Surfaces({
+      kind: "entry",
+      truth: entryTruth,
+    });
+    const entryMesa = mesaNextActionFromOperatorDecision(
+      entrySurfaces.decision,
+    );
+    expect(entrySurfaces.mercado.nextAction).toBe("ESPERAR TRIGGER");
+    expect(entryMesa.kind).toBe("view_thesis");
+    expect(entryMesa.label.toUpperCase()).toBe("VER TESIS");
+    expect(entrySurfaces.hoy.nextAction).toBe("VER TESIS");
+    expect(entrySurfaces.hoy.nextAction).not.toBe(
+      entrySurfaces.mercado.nextAction,
+    );
+    expect(
+      operatorJourney2LevelsEqual(entrySurfaces.mercado, entrySurfaces.hoy, {
+        ignoreNextAction: true,
+      }),
+    ).toBe(true);
+    expect(
+      operatorJourney2LevelsEqual(entrySurfaces.mercado, entrySurfaces.chart),
+    ).toBe(true);
   });
 
   it("PROTECTED after revision → technical · surfaces equal", () => {

@@ -11,9 +11,9 @@ import {
   cabinNumTone,
 } from "@/features/trading/cabin-visual";
 
-describe("cabin-visual V2.34", () => {
+describe("cabin-visual V2.37", () => {
   it("exposes three type sizes: hero / operativa / meta", () => {
-    expect(CABIN_VISUAL_VERSION).toBe("v2.34");
+    expect(CABIN_VISUAL_VERSION).toBe("v2.37");
     expect(CABIN_TYPE.hero).toMatch(/cabin-type-hero/);
     expect(CABIN_TYPE.operativa).toMatch(/cabin-type-operativa/);
     expect(CABIN_TYPE.meta).toMatch(/cabin-type-meta/);

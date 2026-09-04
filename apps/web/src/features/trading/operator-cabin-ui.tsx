@@ -525,6 +525,7 @@ function ladderRungTone(status: OperatorExitLadderRungV1["status"]): string {
 
 /**
  * V2.28 — single PLAN DE LA POSICIÓN (Mission + Exit Route).
+ * V2.37 — numbers-first: detail operativa · labels meta.
  * Exposes mission-step-* + exit-ladder-* testids for contractual surfaces.
  */
 export function OperatorPositionPlan({
@@ -575,30 +576,43 @@ export function OperatorPositionPlan({
               <div
                 className={cn(
                   "flex items-baseline justify-between gap-2 py-0.5",
-                  CABIN_TYPE.operativa,
                   ladderRungTone(step.status),
                 )}
                 data-testid={`mission-step-${step.missionId}`}
                 data-status={step.status}
               >
-                <span>
+                <span className={cn(CABIN_TYPE.meta, "min-w-0")}>
                   <span className="sr-only">{mark.sr}. </span>
-                  <span className="mr-1 font-semibold" aria-hidden="true">
+                  <span
+                    className="mr-1 font-semibold text-foreground"
+                    aria-hidden="true"
+                  >
                     {mark.symbol}
                   </span>
-                  <span className="font-semibold text-foreground">
+                  <span className="font-medium text-muted-foreground">
                     {step.label}
                   </span>
                   {step.reducePct != null ? (
                     <span
-                      className={cn("ml-1 opacity-90", CABIN_NUM.base)}
+                      className={cn(
+                        "ml-1",
+                        CABIN_TYPE.operativa,
+                        CABIN_NUM.base,
+                        "text-foreground",
+                      )}
                       data-testid={`exit-ladder-pct-${ladderId ?? step.id}`}
                     >
                       · {step.reducePct}%
                     </span>
                   ) : null}
                 </span>
-                <span className={cn(CABIN_NUM.base, CABIN_NUM.neu)}>
+                <span
+                  className={cn(
+                    CABIN_TYPE.operativa,
+                    CABIN_NUM.base,
+                    CABIN_NUM.neu,
+                  )}
+                >
                   {step.detail ?? "—"}
                 </span>
               </div>
@@ -615,10 +629,7 @@ export function OperatorPositionPlan({
       </ol>
       {plan.remainingDetail != null || plan.remainingPct != null ? (
         <p
-          className={cn(
-            "mt-1.5 flex items-baseline justify-between gap-2 rounded-md border border-border/50 bg-muted/20 px-2 py-1",
-            CABIN_TYPE.operativa,
-          )}
+          className="mt-1.5 flex items-baseline justify-between gap-2 rounded-md border border-border/50 bg-muted/20 px-2 py-1"
           data-testid="exit-ladder-remaining"
         >
           <span className={cn(CABIN_TYPE.eyebrow, "opacity-90")}>RESTANTE</span>

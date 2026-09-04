@@ -1,19 +1,20 @@
 /**
- * V2.31 / V2.34 — Premium Visual System (cabina Mercado A–B).
+ * V2.31 / V2.34 / V2.37 — Premium Visual System (cabina Mercado A–B + AUTO).
  * Tres tamaños: héroe · operativa · meta. Números financieros tabulares.
+ * V2.37 — numbers-first: valores operativa/hero · labels meta.
  * Display-only · sin paneles nuevos · sin controles AUTO.
  *
- * @see docs/engineering/traspaso-relevo-v2-4-cabin-coherence-2026-09-04.md
+ * @see docs/engineering/traspaso-relevo-v2-6-pixel-premium-2026-09-05.md
  */
 
 import { cn } from "@/lib/utils";
 
-export const CABIN_VISUAL_VERSION = "v2.34";
+export const CABIN_VISUAL_VERSION = "v2.37";
 
 /**
  * Tipografía de cabina — solo 3 tamaños.
  * Floor = meta (~12px). No usar text-[9px] / text-[10px] en nivel A–B.
- * V2.34 — hero ~24px · operativa ~15px · meta ~12px.
+ * V2.34 / V2.37 — hero ~24px · operativa ~15px · meta ~12px.
  */
 export const CABIN_TYPE = {
   hero: "cabin-type-hero text-foreground",

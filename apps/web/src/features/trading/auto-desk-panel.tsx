@@ -1,12 +1,14 @@
 /**
  * V2.04 — AUTO Desk inside Mercado DECISIÓN.
  * V2.13 — shows what AUTO will do for this instrument (ExitPolicy + journey).
+ * V2.36 — timeline = OperatorPositionPlan ladder (same as Mercado L3).
  * Arm ≠ execute · Confirm = firma · Ranking ≠ BUY.
  */
 
 import {
   buildOperatorAutoChecklist,
   buildOperatorAutoPlanPreview,
+  buildOperatorPositionPlan,
   resolveOperatorNextAction,
   type PaperBookModeV1,
   type PositionJourneyReadoutV1,
@@ -23,6 +25,12 @@ import {
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
+import {
+  CABIN_KV_GRID,
+  CABIN_TYPE,
+  cabinNumClass,
+  OperatorPositionPlan,
+} from "@/features/trading/operator-cabin-ui";
 
 const AUTONOMY_OPTIONS: Array<{
   mode: DemoBookMode;
@@ -53,6 +61,8 @@ type AutoDeskPanelProps = {
   defaultOpen?: boolean;
   /** V2.13 — instrument journey for «qué hará AUTO». */
   journey?: PositionJourneyReadoutV1 | null;
+  /** V2.36 — birth qty for RESTANTE % (same projection as Mercado L3). */
+  birthQuantity?: number | null;
 };
 
 export function AutoDeskPanel({
@@ -60,6 +70,7 @@ export function AutoDeskPanel({
   className,
   defaultOpen = false,
   journey = null,
+  birthQuantity = null,
 }: AutoDeskPanelProps) {
   const bookPrefs = useDemoBookPrefs();
   const { paperDExecuteEnv, killOn } = useMesaEntriesBlocked();
@@ -89,7 +100,12 @@ export function AutoDeskPanel({
     nextAction,
     posture,
     killOn,
+    birthQuantity,
   });
+  const positionPlan =
+    journey != null
+      ? buildOperatorPositionPlan(journey, { birthQuantity })
+      : null;
 
   function setAutonomy(mode: DemoBookMode) {
     if (mode === "auto") {
@@ -117,7 +133,10 @@ export function AutoDeskPanel({
       open={defaultOpen || undefined}
     >
       <summary
-        className="cursor-pointer list-none px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground marker:content-none [&::-webkit-details-marker]:hidden"
+        className={cn(
+          CABIN_TYPE.eyebrow,
+          "cursor-pointer list-none px-2 py-1.5 marker:content-none [&::-webkit-details-marker]:hidden",
+        )}
         data-testid="auto-desk-summary"
       >
         <span className="sr-only">Panel de </span>
@@ -137,9 +156,10 @@ export function AutoDeskPanel({
                   key={opt.mode}
                   type="button"
                   className={cn(
-                    "rounded-md border px-2 py-1 text-[10px] font-medium",
+                    CABIN_TYPE.meta,
+                    "rounded-md border px-2 py-1 font-medium text-foreground",
                     active
-                      ? "border-sky-600/50 bg-sky-500/15 text-foreground"
+                      ? "border-sky-600/50 bg-sky-500/15"
                       : "border-border/60 bg-muted/10 text-muted-foreground hover:bg-accent",
                   )}
                   aria-pressed={active}
@@ -157,28 +177,28 @@ export function AutoDeskPanel({
 
         <div data-testid="auto-desk-plan-preview">
           <p
-            className="text-[10px] font-semibold uppercase tracking-wider text-foreground"
+            className={cn(CABIN_TYPE.eyebrow, "text-foreground")}
             data-testid="auto-desk-headline"
           >
             {planPreview.headline}
           </p>
-          <p className="text-[10px] font-semibold text-foreground">
+          <p className={cn(CABIN_TYPE.operativa, "font-semibold")}>
             AUTO · {planPreview.profileLabel}
           </p>
-          <p
-            className="text-[10px] text-muted-foreground"
-            data-testid="auto-desk-next-action"
-          >
-            Próxima acción: {planPreview.nextActionTitle}
+          <p className={CABIN_TYPE.meta} data-testid="auto-desk-next-action">
+            Próxima acción:{" "}
+            <span className={cn(CABIN_TYPE.operativa, "font-semibold")}>
+              {planPreview.nextActionTitle}
+            </span>
           </p>
           <dl
-            className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground"
+            className={cn(CABIN_KV_GRID, "mt-1")}
             data-testid="auto-desk-plan-amounts"
           >
             {planPreview.entry != null ? (
               <div className="flex justify-between gap-2">
                 <dt>Entrada</dt>
-                <dd className="tabular-nums font-medium text-foreground">
+                <dd className={cabinNumClass()}>
                   {planPreview.entry.toFixed(2)} €
                 </dd>
               </div>
@@ -186,15 +206,13 @@ export function AutoDeskPanel({
             {planPreview.quantity != null ? (
               <div className="flex justify-between gap-2">
                 <dt>Cantidad</dt>
-                <dd className="tabular-nums font-medium text-foreground">
-                  {planPreview.quantity}
-                </dd>
+                <dd className={cabinNumClass()}>{planPreview.quantity}</dd>
               </div>
             ) : null}
             {planPreview.stop != null ? (
               <div className="flex justify-between gap-2">
                 <dt>Stop</dt>
-                <dd className="tabular-nums font-medium text-foreground">
+                <dd className={cabinNumClass()}>
                   {planPreview.stop.toFixed(2)} €
                 </dd>
               </div>
@@ -202,7 +220,7 @@ export function AutoDeskPanel({
             {planPreview.riskAmount != null ? (
               <div className="flex justify-between gap-2">
                 <dt>Riesgo</dt>
-                <dd className="tabular-nums font-medium text-foreground">
+                <dd className={cabinNumClass()}>
                   {Math.round(planPreview.riskAmount)} €
                 </dd>
               </div>
@@ -210,7 +228,7 @@ export function AutoDeskPanel({
             {planPreview.t1Price != null ? (
               <div className="flex justify-between gap-2 col-span-2">
                 <dt>T1</dt>
-                <dd className="tabular-nums font-medium text-foreground">
+                <dd className={cabinNumClass()}>
                   {planPreview.t1Price.toFixed(2)} € · vende {planPreview.t1Pct}
                   %
                 </dd>
@@ -219,7 +237,7 @@ export function AutoDeskPanel({
             {planPreview.t2Price != null ? (
               <div className="flex justify-between gap-2 col-span-2">
                 <dt>T2</dt>
-                <dd className="tabular-nums font-medium text-foreground">
+                <dd className={cabinNumClass()}>
                   {planPreview.t2Price.toFixed(2)} € · vende {planPreview.t2Pct}
                   %
                 </dd>
@@ -229,7 +247,7 @@ export function AutoDeskPanel({
               <div className="flex justify-between gap-2 col-span-2">
                 <dt>RESTANTE</dt>
                 <dd
-                  className="tabular-nums font-medium text-foreground"
+                  className={cabinNumClass()}
                   data-testid="auto-desk-remaining"
                 >
                   {planPreview.remainingPct}%
@@ -238,52 +256,47 @@ export function AutoDeskPanel({
             ) : null}
             <div className="flex justify-between gap-2 col-span-2">
               <dt>Trailing</dt>
-              <dd className="font-medium text-foreground">
+              <dd
+                className={cn(
+                  CABIN_TYPE.operativa,
+                  "font-medium text-foreground",
+                )}
+              >
                 {planPreview.trailingAutomatic ? "Automático ✓" : "—"}
               </dd>
             </div>
           </dl>
-          <ul className="mt-1 space-y-0.5 text-[10px]">
-            {planPreview.items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-1.5 text-muted-foreground"
-                data-done={item.done ? "1" : "0"}
-              >
-                <span className="font-semibold text-foreground">
-                  {item.done ? "✓" : "○"}
-                </span>
-                {item.label}
-              </li>
-            ))}
-          </ul>
+          {positionPlan != null ? (
+            <div className="mt-1.5" data-testid="auto-desk-position-plan">
+              <OperatorPositionPlan plan={positionPlan} />
+            </div>
+          ) : null}
           {planPreview.ifReachesLines.length > 0 ? (
             <div
               className="mt-1 space-y-0.5"
               data-testid="auto-desk-if-reaches"
             >
-              <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Si alcanza
-              </p>
+              <p className={CABIN_TYPE.eyebrow}>Si alcanza</p>
               {planPreview.ifReachesLines.map((line) => (
-                <p key={line} className="text-[10px] text-foreground">
+                <p
+                  key={line}
+                  className={cn(CABIN_TYPE.operativa, "text-foreground")}
+                >
                   {line}
                 </p>
               ))}
             </div>
           ) : null}
           {planPreview.trailingLine ? (
-            <p className="mt-1 text-[10px] text-muted-foreground">
+            <p className={cn(CABIN_TYPE.meta, "mt-1")}>
               Trailing: {planPreview.trailingLine}
             </p>
           ) : null}
         </div>
 
-        <p className="text-[10px] text-muted-foreground">
-          {checklist.interveneHint}
-        </p>
+        <p className={CABIN_TYPE.meta}>{checklist.interveneHint}</p>
         <p
-          className="text-[10px] leading-snug text-muted-foreground"
+          className={cn(CABIN_TYPE.meta, "leading-snug")}
           data-testid="auto-desk-honesty"
         >
           {planPreview.honestyLine}
