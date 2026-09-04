@@ -1,7 +1,7 @@
 # RELEVO — V2.6 Pixel Premium + UI Truth Hoy (2026-09-05)
 
 > **Padre:** [relevo V2.5 UI Finishing](./traspaso-relevo-v2-5-ui-finishing-2026-09-05.md) · tip [`v2.5-beta`](./traspaso-relevo-tag-v2-5-beta-2026-09-05.md) `df57f0a9`.  
-> **Estado:** **CERRADO en código** · tip `v2.6-beta` / bump `1.36.0-beta` **pendiente stamp** (pedido auditoría externa).  
+> **Estado:** **CERRADO en código** · tip [2.6-beta](./traspaso-relevo-tag-v2-6-beta-2026-09-05.md) → [`50abd31d`](https://github.com/jvelasca/Bolsa_V1/commit/50abd31d) · package `1.36.0-beta` (bump auditoría externa).  
 > **Para quién:** tip/stamp · **NO MÁS PANELES** · no reabrir motor FSM · no reabrir V2.33–V2.38 salvo regresión.  
 > **Arranque:** [arranque post-V2.38](./arranque-agente-post-v2-38-2026-09-05.md).
 
@@ -30,6 +30,6 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 ## OUT
 
-- Tip `v2.6-beta` + package `1.36.0-beta` (pedido auditoría externa) — stamp pendiente.
+- Tip [2.6-beta](./traspaso-relevo-tag-v2-6-beta-2026-09-05.md) → [`50abd31d`](https://github.com/jvelasca/Bolsa_V1/commit/50abd31d) + package `1.36.0-beta` — **stampado**.
 - No reabrir V2.28–V2.38 salvo regresión display-only.
 - No reabrir motor FSM / PAPER AUTO.

@@ -1,17 +1,17 @@
 # RELEVO — tag v2.6-beta → tip Pixel Premium (2026-09-05)
 
 > **Padre:** [relevo V2.6 Pixel Premium](./traspaso-relevo-v2-6-pixel-premium-2026-09-05.md) · tip previo [`v2.5-beta`](./traspaso-relevo-tag-v2-5-beta-2026-09-05.md) `df57f0a9`.  
-> **Estado:** tip `v2.6-beta` → **TBD_SHA** · package `1.36.0-beta` (bump autorizado para auditoría externa).  
+> **Estado:** tip `v2.6-beta` → [`50abd31d`](https://github.com/jvelasca/Bolsa_V1/commit/50abd31d) · package `1.36.0-beta` (bump autorizado para auditoría externa).  
 > **Partida código tip previo:** `v2.5-beta` → `df57f0a9`.
 
 ## Release
 
-| Pieza       | Valor                                                       |
-| ----------- | ----------------------------------------------------------- |
-| Tag tip     | `v2.6-beta` → **TBD_SHA**                                   |
-| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-V2.38        |
-| Package     | `1.36.0-beta` (**bump** desde `1.35.0-beta`)                |
-| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.6-beta |
+| Pieza       | Valor                                                                            |
+| ----------- | -------------------------------------------------------------------------------- |
+| Tag tip     | `v2.6-beta` → [`50abd31d`](https://github.com/jvelasca/Bolsa_V1/commit/50abd31d) |
+| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-V2.38                             |
+| Package     | `1.36.0-beta` (**bump** desde `1.35.0-beta`)                                     |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.6-beta                      |
 
 ## Hecho (código tip)
 

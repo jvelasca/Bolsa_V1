@@ -1,7 +1,7 @@
 # ARRANQUE — siguiente agente · post V2.38 (2026-09-05)
 
 > **Leer primero:** [relevo V2.6 Pixel Premium](./traspaso-relevo-v2-6-pixel-premium-2026-09-05.md).  
-> **Tip producto vigente:** pendiente stamp `v2.6-beta` / package `1.36.0-beta` (auditoría externa).  
+> **Tip producto vigente:** [2.6-beta](./traspaso-relevo-tag-v2-6-beta-2026-09-05.md) `50abd31d` / package `1.36.0-beta`.  
 > **Para quién:** agente nuevo · V2.6 display-only · **NO MÁS PANELES** · no reabrir motor FSM · no rehacer IDs V2.33–V2.38 salvo regresión.
 
 ## Estado al relevo
@@ -12,7 +12,7 @@
 | V2.36 AUTO timeline                  | **hecho** (código)                     |
 | V2.37 Numbers-first                  | **hecho** (`cabin-visual` v2.37)       |
 | V2.38 UI Truth Hoy↔Mercado           | **hecho** (`g-operator-05` + e2e mock) |
-| Tip `v2.6-beta` / bump `1.36.0-beta` | pendiente stamp                        |
+| Tip `v2.6-beta` / bump `1.36.0-beta` | **hecho** → `50abd31d`                 |
 
 ## Primer ID a implementar
 
