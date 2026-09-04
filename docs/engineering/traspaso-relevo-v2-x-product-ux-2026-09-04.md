@@ -12,14 +12,14 @@ Transición de «motor PAPER AUTO robusto» a **producto usable**: Mercado como 
 
 ## Commits (cadena tip UX → `origin/main`)
 
-| SHA            | Mensaje                                                           |
-| -------------- | ----------------------------------------------------------------- |
-| `a39595ce`     | feat(v2.x): Mercado operator cabin with NEXT ACTION and AUTO Desk |
-| `3a71f47f`     | docs: stamp V2.x smoke PARTIAL (Position Card pendiente)          |
-| `e17c51c1`     | docs: stamp V2.x Position+protect smoke OK                        |
-| `fd16181e`     | feat(v2.08): Proteger CTA for OPEN_UNPROTECTED                    |
-| `b8192d3a`     | feat(v2.09): cabin typography and a11y polish                     |
-| _(este stamp)_ | docs: arranque auditor V2.x + cierre relevo auditoría             |
+| SHA        | Mensaje                                                           |
+| ---------- | ----------------------------------------------------------------- |
+| `a39595ce` | feat(v2.x): Mercado operator cabin with NEXT ACTION and AUTO Desk |
+| `3a71f47f` | docs: stamp V2.x smoke PARTIAL (Position Card pendiente)          |
+| `e17c51c1` | docs: stamp V2.x Position+protect smoke OK                        |
+| `fd16181e` | feat(v2.08): Proteger CTA for OPEN_UNPROTECTED                    |
+| `b8192d3a` | feat(v2.09): cabin typography and a11y polish                     |
+| `67d30188` | docs: arranque auditor V2.x + cierre relevo auditoría             |
 
 ## Hecho (V2.01–V2.09)
 
