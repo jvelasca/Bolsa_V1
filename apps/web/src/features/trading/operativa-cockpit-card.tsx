@@ -50,6 +50,7 @@ import {
   usePositionOperationalView,
   formatPovPrimaryActionLabel,
 } from "@/features/trading/use-position-operational-view";
+import { usePositionJourneyReadout } from "@/features/trading/use-position-journey-readout";
 import { EntryDecisionSurfaceCard } from "@/features/trading/entry-decision-surface-card";
 import {
   entryPhaseTone,
@@ -150,7 +151,7 @@ export function OperativaCockpitCard({
 }: OperativaCockpitCardProps) {
   const [whyOpen, setWhyOpen] = useState(false);
   const context = useInstrumentOperationalContext(instrumentId);
-  const { entriesBlocked, paperDExecuteEnv } = useMesaEntriesBlocked();
+  const { entriesBlocked, paperDExecuteEnv, killOn } = useMesaEntriesBlocked();
   const bookPrefs = useDemoBookPrefs();
   const paperAuto = resolvePaperAutoPosture({
     bookMode: bookPrefs.mode,
@@ -170,6 +171,13 @@ export function OperativaCockpitCard({
     reconStatus,
   );
   const positionPov = positionPovResult?.view ?? null;
+  const positionJourney = usePositionJourneyReadout({
+    position: phase === "posicion" ? position : null,
+    view: positionPov,
+    autoPosture: paperAuto,
+    killOn,
+    enabled: phase === "posicion",
+  });
   const resolvedMark =
     (typeof markPrice === "number" && Number.isFinite(markPrice)
       ? markPrice
@@ -392,6 +400,9 @@ export function OperativaCockpitCard({
               position={position}
               symbol={symbol}
               portfolioReconStatus={reconStatus}
+              view={positionPov ?? undefined}
+              viewSource={positionPovResult?.source}
+              journey={positionJourney}
               onOpenWhy={() => setWhyOpen(true)}
             />
             <ExitRouteView

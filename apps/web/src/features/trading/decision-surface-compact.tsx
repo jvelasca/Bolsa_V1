@@ -7,6 +7,7 @@ import { useState } from "react";
 import type {
   EntryOperatingTruthV1,
   PositionDto,
+  PositionJourneyReadoutV1,
   PositionOperationalStateV1,
   PositionOperationalViewV1,
   SubmitIntentListItemV1,
@@ -65,6 +66,8 @@ type PositionCompactProps = {
   /** Evita doble hook cuando el padre ya resolvió la vista. */
   view?: PositionOperationalViewV1;
   viewSource?: "canonical" | "blob";
+  /** V2.0 — journey HUD (lifecycle + risk). */
+  journey?: PositionJourneyReadoutV1 | null;
   onOpenWhy?: () => void;
   className?: string;
   testId?: string;
@@ -404,12 +407,181 @@ function EntryCompactBody({
   );
 }
 
+function formatLegStatus(
+  status: PositionJourneyReadoutV1["t1"]["status"],
+): string {
+  switch (status) {
+    case "executed":
+      return "✓ ejecutado";
+    case "triggered":
+      return "● disparado";
+    case "pending":
+      return "○ pendiente";
+    case "failed":
+      return "fallido";
+    case "absent":
+      return "—";
+    default:
+      return String(status);
+  }
+}
+
+function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
+  const posture = journey.autoPosture;
+  return (
+    <div
+      className="space-y-1 border-t border-border/40 pt-1.5"
+      data-testid="position-journey-hud"
+      data-lifecycle-stage={journey.stageMachine ?? undefined}
+      data-lineage-path={journey.lineagePathLabel ?? undefined}
+      data-log-has-t2={journey.logHasT2Executed ? "1" : "0"}
+    >
+      <SectionLabel>Journey posición</SectionLabel>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+        <div className="flex justify-between gap-2">
+          <dt>Entrada</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-entry"
+          >
+            {formatLevel(journey.entry)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt>Initial stop</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-initial-stop"
+          >
+            {formatLevel(journey.risk.initialStop)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt>Initial risk</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-initial-risk"
+          >
+            {journey.risk.initialRisk != null
+              ? String(journey.risk.initialRisk)
+              : "—"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt>Protected ahora</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-current-protected"
+          >
+            {journey.risk.currentProtected != null
+              ? formatLevel(journey.risk.currentProtected)
+              : "—"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt>Realized R</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-realized-r"
+          >
+            {journey.risk.realizedR != null
+              ? formatRSigned(journey.risk.realizedR)
+              : "—"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt>Remaining</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-remaining"
+          >
+            {journey.remainingQuantity}
+          </dd>
+        </div>
+        <div className="col-span-2 flex justify-between gap-2">
+          <dt>T1</dt>
+          <dd data-testid="journey-t1" className="text-right text-foreground">
+            {formatLevel(journey.t1.trigger)}
+            {journey.t1.qtyFractionPct != null
+              ? ` · ${journey.t1.qtyFractionPct}%`
+              : ""}{" "}
+            · {formatLegStatus(journey.t1.status)}
+          </dd>
+        </div>
+        <div className="col-span-2 flex justify-between gap-2">
+          <dt>T2</dt>
+          <dd data-testid="journey-t2" className="text-right text-foreground">
+            {formatLevel(journey.t2.trigger)}
+            {journey.t2.qtyFractionPct != null
+              ? ` · ${journey.t2.qtyFractionPct}%`
+              : ""}{" "}
+            · {formatLegStatus(journey.t2.status)}
+            {journey.logHasT2Executed && journey.trail.active
+              ? " · (log ⊃ T2)"
+              : ""}
+          </dd>
+        </div>
+        <div className="col-span-2 flex justify-between gap-2">
+          <dt>Trail</dt>
+          <dd
+            data-testid="journey-trail"
+            className="text-right text-foreground"
+          >
+            {!journey.trail.activationEligible
+              ? "tras T1"
+              : journey.trail.active
+                ? `activo · stop ${formatLevel(journey.trail.currentStop)}${
+                    journey.trail.lastRatchet
+                      ? ` · ${journey.trail.lastRatchet.label}`
+                      : ""
+                  }`
+                : "eligible · sin ratchet"}
+          </dd>
+        </div>
+        {journey.stageLabel ? (
+          <div className="col-span-2 flex justify-between gap-2">
+            <dt>Ciclo (derivado)</dt>
+            <dd
+              className="text-foreground"
+              data-testid="journey-stage-label"
+              title="stage derivado · el log es la historia"
+            >
+              {journey.stageLabel}
+              {journey.lineagePathLabel
+                ? ` · lineage ${journey.lineagePathLabel}`
+                : ""}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+      {posture || journey.killOn != null ? (
+        <p
+          className="text-[9px] leading-snug text-muted-foreground"
+          data-testid="journey-auto-posture"
+        >
+          {posture?.statusBadge ?? posture?.modeLabel ?? "SEMI"}
+          {posture?.paperDExecuteEnv
+            ? " · env execute ON"
+            : " · env execute OFF"}
+          {journey.killOn === true
+            ? " · kill ON"
+            : journey.killOn === false
+              ? " · kill OFF"
+              : ""}
+          {" · arm ≠ execute"}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function PositionCompactBody({
   position,
   symbol,
   portfolioReconStatus,
   view,
   viewSource,
+  journey,
   onOpenWhy,
   density,
 }: Omit<PositionCompactProps, "variant" | "className" | "testId"> & {
@@ -550,6 +722,7 @@ function PositionCompactBody({
             ) : null}
           </dl>
         )}
+        {!hud && journey ? <JourneyHudBlock journey={journey} /> : null}
       </div>
 
       <div

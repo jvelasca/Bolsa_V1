@@ -76,7 +76,7 @@ from bolsa_application.opening_permission import (
     InstrumentSectorLookup,
     LatestBarLookup,
 )
-from bolsa_application.persist_position_from_exit import row_position_state
+from bolsa_application.persist_position_from_exit import row_position_id, row_position_state
 from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
@@ -552,6 +552,52 @@ class ConfirmRecommendationIntent:
                 },
             ),
         )
+        # V2.0.3 — SEMI protect → TRAIL_APPLIED when stage allows (no TRANSITIONS change).
+        lifecycle_semi: dict[str, Any] = {"status": "skipped"}
+        try:
+            from bolsa_application.lifecycle_from_semi_protect import (
+                maybe_append_lifecycle_semi_protect,
+            )
+
+            pos_id = row_position_id(applied_row) or str(rec.instrument_id or "")
+            blob = row_position_state(applied_row) or {}
+            rev_id = None
+            revs = blob.get("revisions") if isinstance(blob, dict) else None
+            if isinstance(revs, list) and revs:
+                last = revs[-1]
+                if isinstance(last, dict):
+                    rev_id = last.get("revisionId") or last.get("revision_id")
+            prev_stop = protect_meta.get("currentStop")
+            try:
+                prev_f = float(prev_stop) if prev_stop is not None else None
+            except (TypeError, ValueError):
+                prev_f = None
+            event_id = (
+                str(rev_id).strip()
+                if rev_id
+                else f"semi-trail-{pos_id}-{suggested_stop}"
+            )
+            lifecycle_semi = await maybe_append_lifecycle_semi_protect(
+                lifecycle_append=self._lifecycle_append,
+                lifecycle_outbox=self._lifecycle_outbox,
+                account_id=account_id,
+                instrument_id=str(rec.instrument_id or ""),
+                position_id=str(pos_id),
+                previous_stop=prev_f,
+                new_stop=float(suggested_stop),
+                event_id=event_id,
+                decision_id=str(rec.decision_id or "") or None,
+                trade_plan_id=(
+                    str(blob.get("tradePlanId") or blob.get("trade_plan_id") or "")
+                    or None
+                    if isinstance(blob, dict)
+                    else None
+                ),
+                origin=revision_origin,
+            )
+        except Exception as exc:  # noqa: BLE001
+            lifecycle_semi = {"status": "error", "reason": str(exc)}
+        position_persist["lifecycle"] = lifecycle_semi
         result["trade"] = {"status": "protect_applied"}
         result["intent"] = {
             **intent.to_dict(),

@@ -2,7 +2,7 @@
 
 > **Padre:** [`spec-v199`](./spec-v199-position-management-certification-2026-09-04.md) · [`plan-v199`](./plan-v199-position-management-certification-2026-09-04.md).  
 > **Partida:** tip [`v1.98-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.98-beta) → `7b5b1052`.  
-> **Estado:** tip [`v1.99-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.99-beta) → [`bf57899b`](https://github.com/jvelasca/Bolsa_V1/commit/bf57899b) · Release-tag CI en curso ([run 33847460567](https://github.com/jvelasca/Bolsa_V1/actions/runs/33847460567)) · stamp GREEN + PASS auditor pendientes.
+> **Estado:** tip [`v1.99-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.99-beta) → [`bf57899b`](https://github.com/jvelasca/Bolsa_V1/commit/bf57899b) · Release-tag CI **GREEN** ([run 33847460567](https://github.com/jvelasca/Bolsa_V1/actions/runs/33847460567)) · [relevo tag](./traspaso-relevo-tag-v1-99-beta-2026-09-04.md) · PASS auditor pendiente (no inventar).
 
 ## Hecho
 
@@ -16,14 +16,15 @@
 ## Residuales (OUT)
 
 - `open` → TRAIL / T2 · LineagePath flags · cuarteto de riesgo persistido
-- SEMI protect → `TRAIL_APPLIED` · UI MERCADO / AUTO Desk (V2.0)
+- ~~SEMI protect → `TRAIL_APPLIED`~~ → V2.0.3 sidecar (sin tocar `TRANSITIONS`)
+- ~~UI MERCADO / AUTO Desk~~ → V2.0.2 journey HUD
 - HTTP golden de 8 caminos (G2/G3 siguen en V1.95/V1.96)
 
 ## Next
 
-1. Release-tag GREEN del tip · stamp `traspaso-relevo-tag-v1-99-beta` + CURRENT_SYSTEM
+1. ~~Release-tag GREEN + stamp~~ → [relevo tag](./traspaso-relevo-tag-v1-99-beta-2026-09-04.md)
 2. Arranque auditor tip ([arranque](./arranque-auditor-v1-99-position-management-certification-2026-09-04.md)) — **auditoría actual se mantiene**
-3. Plan cierre PAPER AUTO (siguiente agente): [relevo planificador](./traspaso-relevo-post-v199-plan-cierre-paper-auto-2026-09-04.md) → ENGINE FREEZE → V2.0 AUTO Desk
+3. ~~V2.0 cierre PAPER AUTO~~ → **CÓDIGO** ([relevo V2.0](./traspaso-relevo-v2-0-cierre-paper-auto-2026-09-04.md)) — commit/tag `v2.0-beta` pendiente
 
 ## Freeze
 

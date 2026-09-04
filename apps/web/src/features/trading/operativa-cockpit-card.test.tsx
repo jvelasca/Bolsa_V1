@@ -39,6 +39,10 @@ vi.mock("@/features/mesa/use-mesa-entries-blocked", () => ({
   useMesaEntriesBlocked: (...args: unknown[]) => useMesaEntriesBlocked(...args),
 }));
 
+vi.mock("@/features/trading/use-position-journey-readout", () => ({
+  usePositionJourneyReadout: () => null,
+}));
+
 vi.mock("@/features/accounts/use-active-account", () => ({
   useActiveAccount: () => ({
     effectiveAccountId: "acc-1",

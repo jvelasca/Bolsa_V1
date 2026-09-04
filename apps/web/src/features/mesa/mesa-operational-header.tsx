@@ -171,9 +171,9 @@ export function MesaOperationalHeaderStrip({
               <dd>{header.brokerVenue ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Automatización</dt>
-              <dd>
-                {header.paperDExecuteEnv ? "PAPER_D armado (env)" : "OFF"}
+              <dt className="text-muted-foreground">PAPER_D execute (env)</dt>
+              <dd data-testid="mesa-paper-d-execute-env">
+                {header.paperDExecuteEnv ? "ON · arm UI ≠ execute" : "OFF"}
               </dd>
             </div>
             <div>
