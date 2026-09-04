@@ -1,7 +1,7 @@
 # RELEVO — V2.x Product UX (cabina Mercado) (2026-09-04)
 
 > **Padre:** tip [`v2.0-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.0-beta) → [`e05fc6b0`](https://github.com/jvelasca/Bolsa_V1/commit/e05fc6b0) · [relevo V2.0 PAPER AUTO](./traspaso-relevo-v2-0-cierre-paper-auto-2026-09-04.md).  
-> **Estado:** código en working tree (sin tip / sin bump) · ENGINE FREEZE intacto.  
+> **Estado:** código tip local [`a39595ce`](https://github.com/jvelasca/Bolsa_V1/commit/a39595ce) (sin tag / sin bump) · ENGINE FREEZE intacto.  
 > **Para quién:** siguiente agente UX / ops smoke con posición PAPER abierta.
 
 ## Objetivo
@@ -28,11 +28,19 @@ NO LIVE · no bump `1.35.0-beta` · `PAPER_D_EXECUTE` default off · no `TRANSIT
 
 Al seleccionar un valor: NEXT ACTION visible (también en vigilar/descubierto). Con plan: tesis / trigger / stop+riesgo / plan. Con posición: misión Entrada→Stop→T1→T2→Trailing + Risk Box.
 
+## Ops local (post-commit)
+
+| Check                        | Resultado                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| Commit                       | `a39595ce` · `feat(v2.x): Mercado operator cabin with NEXT ACTION and AUTO Desk` |
+| Smoke `/trading` NEXT ACTION | **OK** — `CANDIDATO` / AUTO Desk en DECISIÓN                                     |
+| Smoke Position Card (misión) | **PARTIAL** — cuenta PRINCIPAL sin posiciones PAPER abiertas (0)                 |
+
 ## OUT / next
 
 - Smoke browser con **posición PAPER abierta** (mission HUD real)
+- Push / tip producto UX (cuando el usuario lo pida) — no confundir con tip motor V2.0
 - V2.08 polish tipografía/a11y · V2.09 user test · colapso nav L1 (ADR-040) solo tras cabina estable
-- Tip producto UX (cuando el usuario lo pida) — no confundir con tip motor V2.0
 
 ## Pre-flight
 
