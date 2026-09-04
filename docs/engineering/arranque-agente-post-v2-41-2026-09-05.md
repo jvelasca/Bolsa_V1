@@ -1,7 +1,7 @@
 # ARRANQUE — post V2.41 / tip v2.7-beta (2026-09-05)
 
 > **Leer primero:** [relevo tag v2.7-beta](./traspaso-relevo-tag-v2-7-beta-2026-09-05.md) · [relevo V2.7](./traspaso-relevo-v2-7-operator-hardening-2026-09-05.md).  
-> **Tip producto vigente:** `v2.7-beta` / package `1.37.0-beta` (stamp en relevo tag).  
+> **Tip producto vigente:** [`v2.7-beta`](./traspaso-relevo-tag-v2-7-beta-2026-09-05.md) `8e7a5f95` / package `1.37.0-beta`.  
 > **Para quién:** agente post-cierre · **NO MÁS PANELES** · no tip/bump salvo pedido · no reabrir motor FSM.
 
 ## Estado

@@ -1,17 +1,18 @@
 # RELEVO — tag v2.7-beta → tip Operator Hardening (2026-09-05)
 
 > **Padre:** [relevo V2.7 Operator Hardening](./traspaso-relevo-v2-7-operator-hardening-2026-09-05.md) · tip previo [`v2.6-beta`](./traspaso-relevo-tag-v2-6-beta-2026-09-05.md) `50abd31d`.  
-> **Estado:** tip `v2.7-beta` → **PENDING_STAMP** · package `1.37.0-beta` (bump autorizado para auditoría externa).  
+> **Estado:** tip `v2.7-beta` → [`8e7a5f95`](https://github.com/jvelasca/Bolsa_V1/commit/8e7a5f95) · package `1.37.0-beta` (bump autorizado para auditoría externa).  
 > **Partida código tip previo:** `v2.6-beta` → `50abd31d`.
 
 ## Release
 
-| Pieza       | Valor                                                       |
-| ----------- | ----------------------------------------------------------- |
-| Tag tip     | `v2.7-beta` → **PENDING_STAMP**                             |
-| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-V2.41        |
-| Package     | `1.37.0-beta` (**bump** desde `1.36.0-beta`)                |
-| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.7-beta |
+| Pieza       | Valor                                                                            |
+| ----------- | -------------------------------------------------------------------------------- |
+| Tag tip     | `v2.7-beta` → [`8e7a5f95`](https://github.com/jvelasca/Bolsa_V1/commit/8e7a5f95) |
+| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-V2.41                             |
+| Package     | `1.37.0-beta` (**bump** desde `1.36.0-beta`)                                     |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.7-beta                      |
+| Código tip  | `5ec02e67` (feat) + `8e7a5f95` (bump/docs tip)                                   |
 
 ## Hecho (código tip)
 
