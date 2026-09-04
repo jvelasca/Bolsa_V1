@@ -2,7 +2,7 @@
 
 > **Leer primero:** [relevo V2.4 Cabin Coherence](./traspaso-relevo-v2-4-cabin-coherence-2026-09-04.md) (**CERRADO en código**).  
 > **Tip producto previo:** [`v2.1-beta`](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md) `5f095d67`.  
-> **Para quién:** agente nuevo · V2.4 cerrado · tip `v2.4-*` solo con petición · ops smoke 10 s paralelo · **NO MÁS PANELES** · no reabrir motor FSM · no rehacer IDs V2.28–V2.32 salvo regresión.
+> **Para quién:** agente nuevo · V2.4 cerrado · tip [`v2.4-beta`](./traspaso-relevo-tag-v2-4-beta-2026-09-04.md) `8fda4d62` · ops smoke 10 s paralelo · **NO MÁS PANELES** · no reabrir motor FSM · no rehacer IDs V2.28–V2.32 salvo regresión.
 
 ## Estado al relevo
 
@@ -14,15 +14,15 @@
 | V2.31 Premium Visual System     | **hecho**                       |
 | V2.32 Golden Operator Journey 2 | **hecho en código**             |
 | V2.3-ops smoke 10 s             | pendiente sesión ops (paralelo) |
-| Tip `v2.4-*`                    | solo con petición explícita     |
+| Tip `v2.4-beta`                 | **hecho** → `8fda4d62`          |
 
 ## Primer ID a implementar
 
 **Ninguno de producto en V2.4** — arco cerrado.
 
-Si el usuario pide tip: stamp `v2.4-*` según protocolo de tip (no bump `1.35.0-beta`).  
 Si ops: smoke browser 10 s (criterio auditor V2.3-ops).  
-Si regresión: freeze intacto · display-only · NO MÁS PANELES.
+Si regresión: freeze intacto · display-only · NO MÁS PANELES.  
+Tip `v2.4-beta` ya stampado → `8fda4d62` (no bump `1.35.0-beta`).
 
 ## Freeze (copiar al chat)
 
