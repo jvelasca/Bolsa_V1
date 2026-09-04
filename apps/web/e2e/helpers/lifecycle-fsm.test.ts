@@ -8,7 +8,9 @@ import {
   accountLifecycleFills,
   appendValidatedLifecycleEvent,
   buildLifecycleSnapshotFromEvents,
+  lastFillPrice,
   reduceLifecycleEvents,
+  stopWorsens,
   validateTransition,
   type LifecycleEventInput,
   type LifecycleStoreEvent,
@@ -263,6 +265,243 @@ describe("V1.98 trail + T2 coexist", () => {
     });
     expect(trail.ok).toBe(true);
     if (trail.ok) expect(trail.stage).toBe("trailing");
+  });
+});
+
+describe("V1.99 position management", () => {
+  it("G1 OPEN → EXIT (birth stop, no TRAIL)", () => {
+    const log = appendAll(["POSITION_OPENED", "POSITION_CLOSED"]);
+    const reduced = reduceLifecycleEvents(log);
+    expect(reduced.stage).toBe("closed");
+    expect(log.some((e) => e.kind === "TRAIL_APPLIED")).toBe(false);
+    expect(accountLifecycleFills(log).remaining).toBe(0);
+  });
+
+  it("G4 OPEN → T1 → TRAIL → TRAIL → EXIT", () => {
+    let log = appendAll(["POSITION_OPENED", "T1_EXECUTED"]);
+    const t1 = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "g4-trail-1",
+      at: "2026-09-02T12:00:00.000Z",
+      previousStop: 95,
+      newStop: 98,
+    });
+    expect(t1.ok).toBe(true);
+    if (!t1.ok) return;
+    log = t1.log;
+    const t2 = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "g4-trail-2",
+      at: "2026-09-02T12:10:00.000Z",
+      previousStop: 98,
+      newStop: 100,
+    });
+    expect(t2.ok).toBe(true);
+    if (!t2.ok) return;
+    log = t2.log;
+    expect(log.filter((e) => e.kind === "TRAIL_APPLIED")).toHaveLength(2);
+    const closed = appendValidatedLifecycleEvent(log, {
+      kind: "POSITION_CLOSED",
+      eventId: "g4-exit",
+      at: "2026-09-02T15:00:00.000Z",
+      fillId: "fill-g4-exit",
+    });
+    expect(closed.ok).toBe(true);
+    if (closed.ok) expect(closed.stage).toBe("closed");
+  });
+
+  it("G5 aggressive T1→TRAIL×2→T2→TRAIL→EXIT + lineage ≠ history", () => {
+    let log: LifecycleStoreEvent[] = [];
+    const open = appendValidatedLifecycleEvent(log, {
+      kind: "POSITION_OPENED",
+      eventId: "g5-open",
+      quantity: 10,
+      price: 100,
+      fillId: "fill-g5-open",
+    });
+    expect(open.ok).toBe(true);
+    if (!open.ok) return;
+    log = open.log;
+
+    const t1 = appendValidatedLifecycleEvent(log, {
+      kind: "T1_EXECUTED",
+      eventId: "g5-t1",
+      at: "2026-09-02T11:30:00.000Z",
+      quantity: 5,
+      price: 120,
+      fillId: "fill-g5-t1",
+    });
+    expect(t1.ok).toBe(true);
+    if (!t1.ok) return;
+    log = t1.log;
+    expect(lastFillPrice(log, "t1_executed", "trail")).toBe(120);
+
+    for (const [id, prev, next, at] of [
+      ["g5-trail-1", 95, 100, "2026-09-02T12:00:00.000Z"],
+      ["g5-trail-2", 100, 105, "2026-09-02T12:10:00.000Z"],
+    ] as const) {
+      expect(stopWorsens("LONG", prev, next)).toBe(false);
+      const trail = appendValidatedLifecycleEvent(log, {
+        kind: "TRAIL_APPLIED",
+        eventId: id,
+        at,
+        previousStop: prev,
+        newStop: next,
+      });
+      expect(trail.ok).toBe(true);
+      if (!trail.ok) return;
+      log = trail.log;
+    }
+
+    const trig = appendValidatedLifecycleEvent(log, {
+      kind: "T2_TRIGGERED",
+      eventId: "g5-t2-trig",
+      at: "2026-09-02T12:15:00.000Z",
+    });
+    expect(trig.ok).toBe(true);
+    if (!trig.ok) return;
+    log = trig.log;
+
+    const exec = appendValidatedLifecycleEvent(log, {
+      kind: "T2_EXECUTED",
+      eventId: "g5-t2-exec",
+      at: "2026-09-02T12:45:00.000Z",
+      quantity: 3,
+      price: 125,
+      fillId: "fill-g5-t2",
+    });
+    expect(exec.ok).toBe(true);
+    if (!exec.ok) return;
+    log = exec.log;
+    expect(accountLifecycleFills(log).remaining).toBe(2);
+    expect(lastFillPrice(log, "t2_executed", "t2")).toBe(125);
+
+    const trail3 = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "g5-trail-3",
+      at: "2026-09-02T13:00:00.000Z",
+      previousStop: 105,
+      newStop: 110,
+    });
+    expect(trail3.ok).toBe(true);
+    if (!trail3.ok) return;
+    log = trail3.log;
+    const afterTrail = reduceLifecycleEvents(log);
+    expect(afterTrail.stage).toBe("trailing");
+    expect(afterTrail.lineagePath).toBe("trail");
+    expect(log.some((e) => e.kind === "T2_EXECUTED")).toBe(true);
+    expect(lastFillPrice(log, afterTrail.stage, afterTrail.lineagePath)).toBe(
+      125,
+    );
+
+    const exit = appendValidatedLifecycleEvent(log, {
+      kind: "POSITION_CLOSED",
+      eventId: "g5-exit",
+      at: "2026-09-02T15:00:00.000Z",
+      fillId: "fill-g5-exit",
+      quantity: 2,
+      price: 125,
+    });
+    expect(exit.ok).toBe(true);
+    if (exit.ok) {
+      expect(exit.stage).toBe("closed");
+      expect(accountLifecycleFills(exit.log).remaining).toBe(0);
+    }
+  });
+
+  it("G6 OPEN → T1 → T2 → TRAIL → TRAIL → EXIT", () => {
+    let log = appendAll([
+      "POSITION_OPENED",
+      "T1_EXECUTED",
+      "T2_TRIGGERED",
+      "T2_EXECUTED",
+    ]);
+    const trail1 = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "g6-trail-1",
+      at: "2026-09-02T13:00:00.000Z",
+      previousStop: 98,
+      newStop: 101,
+    });
+    expect(trail1.ok).toBe(true);
+    if (!trail1.ok) return;
+    log = trail1.log;
+    const trail2 = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "g6-trail-2",
+      at: "2026-09-02T13:10:00.000Z",
+      previousStop: 101,
+      newStop: 104,
+    });
+    expect(trail2.ok).toBe(true);
+    if (!trail2.ok) return;
+    log = trail2.log;
+    expect(reduceLifecycleEvents(log).lineagePath).toBe("trail");
+    expect(log.some((e) => e.kind === "T2_EXECUTED")).toBe(true);
+    const exit = appendValidatedLifecycleEvent(log, {
+      kind: "POSITION_CLOSED",
+      eventId: "g6-exit",
+      at: "2026-09-02T15:00:00.000Z",
+      fillId: "fill-g6-exit",
+    });
+    expect(exit.ok).toBe(true);
+    if (exit.ok) expect(exit.stage).toBe("closed");
+  });
+
+  it("G8 stop worsen LONG/SHORT ratchets", () => {
+    expect(stopWorsens("LONG", 100, 105)).toBe(false);
+    expect(stopWorsens("LONG", 105, 110)).toBe(false);
+    expect(stopWorsens("LONG", 110, 105)).toBe(true);
+    expect(stopWorsens("SHORT", 100, 95)).toBe(false);
+    expect(stopWorsens("SHORT", 95, 90)).toBe(false);
+    expect(stopWorsens("SHORT", 90, 95)).toBe(true);
+
+    let log: LifecycleStoreEvent[] = [];
+    const open = appendValidatedLifecycleEvent(log, {
+      kind: "POSITION_OPENED",
+      eventId: "g8-open",
+      quantity: 10,
+      price: 100,
+      fillId: "fill-g8-open",
+    });
+    expect(open.ok).toBe(true);
+    if (!open.ok) return;
+    log = open.log;
+    const t1 = appendValidatedLifecycleEvent(log, {
+      kind: "T1_EXECUTED",
+      eventId: "g8-t1",
+      at: "2026-09-02T11:30:00.000Z",
+      quantity: 5,
+      price: 120,
+      fillId: "fill-g8-t1",
+    });
+    expect(t1.ok).toBe(true);
+    if (!t1.ok) return;
+    log = t1.log;
+    for (const [id, prev, next, at] of [
+      ["g8-l1", 100, 105, "2026-09-02T12:00:00.000Z"],
+      ["g8-l2", 105, 110, "2026-09-02T12:10:00.000Z"],
+    ] as const) {
+      const ok = appendValidatedLifecycleEvent(log, {
+        kind: "TRAIL_APPLIED",
+        eventId: id,
+        at,
+        previousStop: prev,
+        newStop: next,
+      });
+      expect(ok.ok).toBe(true);
+      if (!ok.ok) return;
+      log = ok.log;
+    }
+    const deny = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "g8-deny",
+      at: "2026-09-02T12:20:00.000Z",
+      previousStop: 110,
+      newStop: 105,
+    });
+    expect(deny.ok).toBe(false);
+    if (!deny.ok) expect(deny.error.code).toBe("trail_relaxation");
   });
 });
 

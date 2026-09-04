@@ -95,6 +95,7 @@ async def test_t2_pair_happy_path_one_trigger_one_execute() -> None:
 
 @pytest.mark.asyncio
 async def test_crash_mid_pair_rolls_back_then_retry_exactly_once() -> None:
+    """V1.97 crash mid T2 pair · **V1.99 Golden 7** (exactly-once after retry)."""
     boom = {"n": 0}
 
     async def _crash_after_trigger(index: int, _event: object) -> None:

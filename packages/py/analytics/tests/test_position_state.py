@@ -323,3 +323,45 @@ def test_v152_jit_deny_does_not_mark_failed_from_pending() -> None:
     failed = apply_target_leg(pos, which="t1", status="failed", at="t")
     assert failed.target1_leg is not None
     assert failed.target1_leg.status == "pending"
+
+
+def test_v199_trail_and_reduce_preserve_initial_risk() -> None:
+    """V1.99 P2: trail/T1 must not rewrite birth initialRisk / initialStop."""
+    pos = _open_long()
+    assert pos.initial_risk == 5.0
+    assert pos.initial_stop == 95.0
+    birth_risk = pos.initial_risk
+    birth_stop = pos.initial_stop
+    birth_qty = pos.quantity
+
+    trailed = apply_position_current_stop(pos, 100.0, at="2026-09-04T12:00:00Z")
+    assert trailed is not None
+    assert trailed.current_stop == 100.0
+    assert trailed.initial_stop == birth_stop
+    assert trailed.initial_risk == birth_risk
+    assert trailed.quantity == birth_qty
+
+    # Worsen denied — state unchanged when None returned
+    assert apply_position_current_stop(trailed, 90.0) is None
+
+    reduced = apply_position_reduce(
+        trailed,
+        5.0,
+        exit_price=120.0,
+        at="2026-09-04T12:30:00Z",
+        mark_target1_achieved=True,
+    )
+    assert reduced is not None
+    assert reduced.remaining_quantity == 5.0
+    assert reduced.initial_stop == birth_stop
+    assert reduced.initial_risk == birth_risk
+    assert reduced.quantity == birth_qty
+    assert reduced.current_stop == 100.0
+
+    trailed2 = apply_position_current_stop(reduced, 105.0, at="2026-09-04T13:00:00Z")
+    assert trailed2 is not None
+    assert trailed2.current_stop == 105.0
+    assert trailed2.initial_stop == birth_stop
+    assert trailed2.initial_risk == birth_risk
+    assert trailed2.remaining_quantity == 5.0
+

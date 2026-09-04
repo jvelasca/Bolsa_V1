@@ -475,7 +475,7 @@ function validateIdentity(
   return null;
 }
 
-function lastFillPrice(
+export function lastFillPrice(
   log: LifecycleStoreEvent[],
   stage: E2eGoldenPositionStage,
   lineagePath: LifecycleLineagePath,
@@ -489,7 +489,7 @@ function lastFillPrice(
   return lifecycleLastPriceForStage(stage, lineagePath);
 }
 
-function stopWorsens(
+export function stopWorsens(
   side: string,
   previous: number | undefined,
   next: number,
