@@ -2,7 +2,7 @@
 
 > **Padre:** [`traspaso-relevo-post-v199-plan-cierre-paper-auto-2026-09-04.md`](./traspaso-relevo-post-v199-plan-cierre-paper-auto-2026-09-04.md) · tip [`v1.99-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.99-beta) → [`bf57899b`](https://github.com/jvelasca/Bolsa_V1/commit/bf57899b).  
 > **Estado:** tip producto [`v2.0-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.0-beta) → [`e05fc6b0`](https://github.com/jvelasca/Bolsa_V1/commit/e05fc6b0) · Release-tag CI **GREEN** ([run 33849921728](https://github.com/jvelasca/Bolsa_V1/actions/runs/33849921728)) · [relevo tag](./traspaso-relevo-tag-v2-0-beta-2026-09-04.md) · sin bump package `1.35.0-beta` · auditoría tip V1.99 **sigue abierta**.  
-> **Para quién:** ops residual (journey con posición abierta / policy demo) · auditor V1.99 en chat aparte.
+> **Para quién:** auditor V1.99 (motor) · follow-on producto [V2.x Product UX](./traspaso-relevo-v2-x-product-ux-2026-09-04.md) (`b8192d3a`, auditoría externa abierta).
 
 ## Hecho (este arco)
 
@@ -32,12 +32,12 @@ NO LIVE · no bump · `PAPER_D_EXECUTE` default off · no Alembic · no unificar
 ## OUT / pendiente explícito
 
 - PASS auditor V1.99 (chat aparte) → sello formal P0b «ENGINE FREEZE tip»
-- Smoke journey HUD con posición PAPER abierta
+- ~~Smoke journey HUD con posición PAPER abierta~~ → ejercitado en arco **V2.x Product UX** (BBVA + protect; ver relevo V2.x)
 - DEMO EntryTick completo cuando la cuenta demo tenga `executionPolicyId`
 - LIVE · scheduler · bump · ledger unify
 
 ## Next inmediato
 
-1. Auditor V1.99: [arranque](./arranque-auditor-v1-99-position-management-certification-2026-09-04.md) **sin** mezclar V2.0.
-2. Ops: abrir posición PAPER demo → verificar journey/risk en DECISIÓN.
+1. Auditor V1.99: [arranque](./arranque-auditor-v1-99-position-management-certification-2026-09-04.md) **sin** mezclar V2.0 ni V2.x UX.
+2. Auditor V2.x Product UX: [arranque](./arranque-auditor-v2-x-product-ux-2026-09-04.md) **sin** reabrir FSM.
 3. Ops: crear/asignar execution policy en cuenta PRINCIPAL si se quiere un ciclo DEMO mutante.

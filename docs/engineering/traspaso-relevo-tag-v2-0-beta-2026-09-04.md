@@ -37,6 +37,6 @@ NO LIVE · no bump `1.35.0-beta` · `PAPER_D_EXECUTE` off · no Alembic · no un
 
 ## Next
 
-- Smoke journey HUD con posición PAPER abierta (ops)
+- ~~Smoke journey HUD con posición PAPER abierta~~ → [V2.x Product UX](./traspaso-relevo-v2-x-product-ux-2026-09-04.md)
 - Completar DEMO execute cuando exista `executionPolicyId` en cuenta demo
-- Auditor V1.99 en chat aparte
+- Auditor V1.99 en chat aparte · auditor V2.x UX: [arranque](./arranque-auditor-v2-x-product-ux-2026-09-04.md)

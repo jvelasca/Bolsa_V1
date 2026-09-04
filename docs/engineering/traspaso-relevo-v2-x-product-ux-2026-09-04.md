@@ -1,13 +1,25 @@
 # RELEVO — V2.x Product UX (cabina Mercado) (2026-09-04)
 
-> **Padre:** tip [`v2.0-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.0-beta) → [`e05fc6b0`](https://github.com/jvelasca/Bolsa_V1/commit/e05fc6b0) · [relevo V2.0 PAPER AUTO](./traspaso-relevo-v2-0-cierre-paper-auto-2026-09-04.md).  
-> **Estado:** tip local [`fd16181e`](https://github.com/jvelasca/Bolsa_V1/commit/fd16181e) (V2.08) · base cabina [`a39595ce`](https://github.com/jvelasca/Bolsa_V1/commit/a39595ce) · ENGINE FREEZE intacto.  
-> **Smoke browser (2026-09-04):** Position Card + protect **OK** (ver Ops local).  
-> **Para quién:** V2.09 user test (checklist abajo) · tip producto cuando se pida · colapso L1 solo tras cabina estable.
+> **Padre:** tip motor [`v2.0-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.0-beta) → [`e05fc6b0`](https://github.com/jvelasca/Bolsa_V1/commit/e05fc6b0) · [relevo V2.0 PAPER AUTO](./traspaso-relevo-v2-0-cierre-paper-auto-2026-09-04.md).  
+> **Estado:** **CERRADO para auditoría externa** · tip cadena UX [`b8192d3a`](https://github.com/jvelasca/Bolsa_V1/commit/b8192d3a) (V2.09) · base [`a39595ce`](https://github.com/jvelasca/Bolsa_V1/commit/a39595ce) · **sin tip GitHub** `v2.x-*` (≠ tip motor V2.0).  
+> **Arranque auditor:** [`arranque-auditor-v2-x-product-ux-2026-09-04.md`](./arranque-auditor-v2-x-product-ux-2026-09-04.md).  
+> **Smoke browser (2026-09-04):** Position Card + protect **OK** (ver Ops).  
+> **Para quién:** auditor externo · ops (user test) · no reabrir motor FSM.
 
 ## Objetivo
 
 Transición de «motor PAPER AUTO robusto» a **producto usable**: Mercado como cabina; NEXT ACTION como héroe; jerga de motor en avanzado.
+
+## Commits (cadena tip UX → `origin/main`)
+
+| SHA            | Mensaje                                                           |
+| -------------- | ----------------------------------------------------------------- |
+| `a39595ce`     | feat(v2.x): Mercado operator cabin with NEXT ACTION and AUTO Desk |
+| `3a71f47f`     | docs: stamp V2.x smoke PARTIAL (Position Card pendiente)          |
+| `e17c51c1`     | docs: stamp V2.x Position+protect smoke OK                        |
+| `fd16181e`     | feat(v2.08): Proteger CTA for OPEN_UNPROTECTED                    |
+| `b8192d3a`     | feat(v2.09): cabin typography and a11y polish                     |
+| _(este stamp)_ | docs: arranque auditor V2.x + cierre relevo auditoría             |
 
 ## Hecho (V2.01–V2.09)
 
@@ -41,6 +53,7 @@ Al seleccionar un valor: NEXT ACTION visible (también en vigilar/descubierto). 
 | Smoke Position Card (misión) | **OK** — PRINCIPAL · BBVA 1× @ 25.40 · DECISIÓN `MANTENER` · misión Entrada✓ · Risk Box · AUTO Desk Asistido                         |
 | Smoke protect (Confirm SEMI) | **OK** — stop operativo **24.00** · `trade=protect_applied` · API `PROTECTED` / `MONITOR` · Hoy PROTECCIÓN **1/1** · ruta Stop 24.00 |
 | V2.08 CTA                    | `fd16181e` · Proteger secundaria OPEN_UNPROTECTED                                                                                    |
+| V2.09 polish                 | `b8192d3a` · tipografía/a11y                                                                                                         |
 
 ### User test V2.09 (ops propietario · ~10 min)
 
@@ -50,13 +63,13 @@ Al seleccionar un valor: NEXT ACTION visible (también en vigilar/descubierto). 
 4. Posición protegida → misión Entrada✓ Stop✓ · Risk Box · AUTO Desk Asistido/Auto honestos?
 5. Hoy · 4 cubos · menú Avanzado · ¿misma frase que Mercado?
 
-## OUT / next
+## OUT / next (post-auditoría)
 
 - ~~Smoke browser con posición PAPER abierta~~ **hecho 2026-09-04**
-- ~~V2.08: CTA Proteger para `OPEN_UNPROTECTED`~~ **hecho** (`fd16181e`)
-- ~~V2.09 polish tipografía/a11y~~ **hecho** (user test checklist arriba)
-- Colapso nav L1 (ADR-040) solo tras cabina estable
-- Push / tip producto UX (cuando el usuario lo pida) — no confundir con tip motor V2.0
+- ~~V2.08 / V2.09~~ **hecho**
+- ~~Arranque + push `main` para auditor externo~~ **este relevo**
+- Colapso nav L1 (ADR-040) solo tras cabina estable **y** veredicto auditor
+- Tip GitHub `v2.x-*` **solo si** se pide explícitamente (no confundir con `v2.0-beta` motor)
 
 ## Pre-flight
 
