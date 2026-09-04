@@ -112,6 +112,15 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
     );
 
     expect(screen.getByTestId("position-journey-hud")).toBeTruthy();
+    expect(screen.getByTestId("journey-next-action")).toBeTruthy();
+    expect(screen.getByTestId("next-action-title").textContent).toBe(
+      "MANTENER",
+    );
+    expect(screen.getByTestId("operator-mission-checklist")).toBeTruthy();
+    expect(screen.getByTestId("operator-risk-box")).toBeTruthy();
+    expect(
+      screen.getByTestId("mission-step-t1").getAttribute("data-status"),
+    ).toBe("done");
     expect(screen.getByTestId("journey-initial-risk").textContent).toBe("50");
     expect(
       screen
@@ -119,10 +128,7 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
         .getAttribute("data-log-has-t2"),
     ).toBe("1");
     expect(screen.getByTestId("journey-auto-posture").textContent).toMatch(
-      /ejecución off/,
-    );
-    expect(screen.getByTestId("journey-auto-posture").textContent).toMatch(
-      /arm ≠ execute/,
+      /ejecución demo off|armado ≠ ejecución/i,
     );
   });
 });

@@ -21,8 +21,11 @@ import {
   buildDecisionExplainView,
   buildEntryOperatingTruth,
   buildExecutionState,
+  buildOperatorNextActionFromCockpitPhase,
   buildPositionOperatingTruth,
   mapReconStatusToHealth,
+  operatorStageFromCockpitPhase,
+  OPERATOR_JOURNEY_STAGE_LABEL,
   RECON_HEALTH_COPY,
 } from "@bolsa/shared";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
@@ -65,6 +68,8 @@ import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
 import { DecisionSurfacePlacementToggle } from "@/features/trading/decision-surface-placement-toggle";
 import { DecisionExplainPanel } from "@/features/trading/decision-explain-panel";
 import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
+import { AutoDeskPanel } from "@/features/trading/auto-desk-panel";
+import { NextActionHero } from "@/features/trading/operator-cabin-ui";
 
 type OperativaCockpitCardProps = {
   instrumentId: string | null;
@@ -242,6 +247,14 @@ export function OperativaCockpitCard({
     phase === "posicion"
       ? mercadoCockpitPosicionPhaseLabel(positionPov?.operatingState)
       : MERCADO_COCKPIT_PHASE_LABEL[phase];
+  const operatorStage = operatorStageFromCockpitPhase(phase);
+  const operatorStageLabel = OPERATOR_JOURNEY_STAGE_LABEL[operatorStage];
+  const templateId =
+    position?.operational &&
+    typeof (position.operational as { templateId?: unknown }).templateId ===
+      "string"
+      ? ((position.operational as { templateId?: string }).templateId ?? null)
+      : ((study as { templateId?: string } | null)?.templateId ?? null);
 
   const potExitKind =
     positionPov != null
@@ -310,13 +323,16 @@ export function OperativaCockpitCard({
     return (
       <div
         className={cn(
-          "rounded-md border border-border/60 px-3 py-2 text-xs text-muted-foreground",
+          "space-y-2 rounded-md border border-border/60 px-3 py-2",
           className,
         )}
         data-testid="operativa-cockpit"
         data-phase="sin_contexto"
       >
-        {noLevelsCopy}
+        <NextActionHero
+          action={buildOperatorNextActionFromCockpitPhase("sin_contexto")}
+        />
+        <p className="text-xs text-muted-foreground">{noLevelsCopy}</p>
       </div>
     );
   }
@@ -371,8 +387,9 @@ export function OperativaCockpitCard({
             <span
               className="rounded border border-border/70 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
               data-testid="operativa-cockpit-phase"
+              title={`${operatorStageLabel} · ${phaseLabel}`}
             >
-              {phaseLabel}
+              {phase === "posicion" ? phaseLabel : operatorStageLabel}
             </span>
           </div>
         </div>
@@ -426,12 +443,17 @@ export function OperativaCockpitCard({
             testId={`operativa-cockpit-plan-${symbol}`}
           />
         ) : (
-          <p
-            className="text-[11px] leading-snug text-muted-foreground"
-            data-testid="operativa-cockpit-no-levels"
-          >
-            {noLevelsCopy ?? plan.emptyCopy}
-          </p>
+          <div className="space-y-1.5">
+            <NextActionHero
+              action={buildOperatorNextActionFromCockpitPhase(phase)}
+            />
+            <p
+              className="text-[11px] leading-snug text-muted-foreground"
+              data-testid="operativa-cockpit-no-levels"
+            >
+              {noLevelsCopy ?? plan.emptyCopy}
+            </p>
+          </div>
         )}
       </div>
 
@@ -494,11 +516,11 @@ export function OperativaCockpitCard({
             data-testid="operativa-cockpit-auto-posture"
             title={paperAuto.modeDetail}
           >
-            {paperAuto.statusBadge ?? primaryLabel}
+            {paperAuto.executeEligible
+              ? "ENTRADA LISTA · AUTO ejecutará si está armado"
+              : "ENTRADA LISTA · AUTO armado · ejecución off"}
             <p className="mt-0.5 text-[10px] font-normal text-muted-foreground">
-              {paperAuto.executeEligible
-                ? "Sin Confirm · misma spine SEMI (paper)"
-                : "Arm ≠ execute · PAPER_D_EXECUTE off"}
+              Armado ≠ ejecución · puedes intervenir
             </p>
           </div>
         ) : null}
@@ -555,6 +577,9 @@ export function OperativaCockpitCard({
           </button>
         ) : null}
       </div>
+
+      {/* AUTO Desk — autonomía visible en Mercado */}
+      <AutoDeskPanel templateId={templateId} />
 
       {/* Avanzado colapsado: Gate · DS-05 · TTL · UNKNOWN detail */}
       <div className="border-t border-border/50 pt-1.5">

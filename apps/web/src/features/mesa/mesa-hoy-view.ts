@@ -2,7 +2,7 @@
  * Vistas de Hoy (`?view=`) + compat `?focus=` (ADR-040).
  *
  * V1.42 F6 — chrome = cuatro cubos §B.7. Detalles detrás de
- * «Ver detalles» o deep-link `?view=` (no segundo Mercado).
+ * «Avanzado» o deep-link `?view=` (no segundo Mercado).
  */
 
 import {
@@ -47,7 +47,7 @@ export const HOY_INBOX_BLOCKS: ReadonlyArray<{
 
 export type HoyInboxBlockId = (typeof HOY_INBOX_BLOCKS)[number]["id"];
 
-/** Menú «Ver detalles» — no son puertas L1 ni pestañas ni quinto cubo. */
+/** Menú «Avanzado» — no son puertas L1 ni pestañas ni quinto cubo. */
 export const HOY_DETAIL_ITEMS: ReadonlyArray<{
   id: string;
   label: string;

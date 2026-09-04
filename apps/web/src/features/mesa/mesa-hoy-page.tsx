@@ -1,9 +1,9 @@
 /**
  * Hoy — Daily Desk 2.0 (ADR-037 + ADR-040 · V1.42 F6).
  *
- * Cuatro cubos §B.7 (requiere acción / oportunidades / vigilar / sin acción).
+ * Cuatro cubos (requiere atención / oportunidades / posiciones / sin acción).
  * Misma CTA/frase que Mercado (POT/EOT). Sin ranking/KPI en el chrome
- * (no segundo Mercado). Detalles detrás de «Ver detalles» / `?view=`.
+ * (no segundo Mercado). Detalles detrás de «Avanzado» / `?view=`.
  * Confirm = firma (drawer / `/confirm`).
  */
 

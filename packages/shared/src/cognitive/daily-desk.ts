@@ -1,10 +1,10 @@
 /**
- * Daily Desk — Hoy 2.0 four buckets (V1.42 F6).
- * Composición: EntryOperatingTruth / PositionOperatingTruth / ExecutionState +
- * board attention. No DailyEngine. Hoy ≠ segundo Mercado.
+ * Daily Desk — Hoy exception center (V2.05).
+ * Four buckets: Requiere atención · Oportunidades · Posiciones · Sin acción.
+ * Proteger folds into Requiere atención. No DailyEngine. Hoy ≠ segundo Mercado.
  *
- * Spec §B.7:
- * 🔴 REQUIERE ACCIÓN · 🟢 OPORTUNIDADES · 🟡 VIGILAR · ⚪ SIN ACCIÓN
+ * Spec §B.7 (product V2.x):
+ * 🔴 REQUIERE ATENCIÓN · 🟢 OPORTUNIDADES · 🔵 POSICIONES · ⚪ SIN ACCIÓN
  */
 
 import type { DecisionBoardV1 } from "../decision-board.js";
@@ -34,35 +34,44 @@ import type { ProtectPlanV1 } from "./protect-plan.js";
 
 export type DailyDeskBucketIdV1 =
   | "requiere_accion"
+  /** @deprecated V2.05 — folded into requiere_accion; kept for wire/compat. */
   | "proteger"
   | "posiciones"
   | "oportunidades"
   | "no_operar";
 
+/** Chrome order — four product buckets (proteger no longer a chrome cubo). */
 export const DAILY_DESK_BUCKET_ORDER: readonly DailyDeskBucketIdV1[] = [
   "requiere_accion",
-  "proteger",
-  "posiciones",
   "oportunidades",
+  "posiciones",
   "no_operar",
 ] as const;
 
 /** Chrome labels — human copy, never WATCH/ARMED/TRIGGERED enums. */
 export const DAILY_DESK_BUCKET_LABEL: Record<DailyDeskBucketIdV1, string> = {
-  requiere_accion: "Requiere acción",
+  requiere_accion: "Requiere atención",
   proteger: "Proteger",
   posiciones: "Posiciones",
   oportunidades: "Oportunidades",
-  no_operar: "No operar",
+  no_operar: "Sin acción",
 };
 
 export const DAILY_DESK_BUCKET_EMPTY: Record<DailyDeskBucketIdV1, string> = {
-  requiere_accion: "Nada requiere tu firma ni una salida ahora",
+  requiere_accion: "Nada requiere tu atención ahora",
   proteger: "Sin posiciones pendientes de protección",
   posiciones: "Sin posiciones abiertas en seguimiento",
   oportunidades: "Sin preparadas, disparadas ni propuestas",
-  no_operar: "Sin bloqueos ni vigilar hoy",
+  no_operar: "Sin bloqueos ni vigilancia pasiva hoy",
 };
+
+/** Fold legacy `proteger` into attention chrome. */
+export function normalizeDailyDeskBucket(
+  bucket: DailyDeskBucketIdV1,
+): Exclude<DailyDeskBucketIdV1, "proteger"> {
+  if (bucket === "proteger") return "requiere_accion";
+  return bucket;
+}
 
 export type DailyDeskItemKindV1 =
   | "pending_confirm"
@@ -162,9 +171,11 @@ export type BuildDailyDeskInboxInputV1 = {
 
 function sortDeskItems(items: DailyDeskItemV1[]): void {
   items.sort((a, b) => {
+    const aBucket = normalizeDailyDeskBucket(a.bucket);
+    const bBucket = normalizeDailyDeskBucket(b.bucket);
     const bucketRank =
-      DAILY_DESK_BUCKET_ORDER.indexOf(a.bucket) -
-      DAILY_DESK_BUCKET_ORDER.indexOf(b.bucket);
+      DAILY_DESK_BUCKET_ORDER.indexOf(aBucket) -
+      DAILY_DESK_BUCKET_ORDER.indexOf(bBucket);
     if (bucketRank !== 0) return bucketRank;
     const rank = attentionRank(b.attention) - attentionRank(a.attention);
     if (rank !== 0) return rank;
@@ -178,7 +189,8 @@ function groupBuckets(items: DailyDeskItemV1[]): DailyDeskBucketV1[] {
   const byId = new Map<DailyDeskBucketIdV1, DailyDeskItemV1[]>();
   for (const id of DAILY_DESK_BUCKET_ORDER) byId.set(id, []);
   for (const item of items) {
-    byId.get(item.bucket)!.push(item);
+    const bucket = normalizeDailyDeskBucket(item.bucket);
+    byId.get(bucket)!.push({ ...item, bucket });
   }
   return DAILY_DESK_BUCKET_ORDER.map((id) => {
     const bucketItems = byId.get(id) ?? [];
@@ -216,7 +228,7 @@ export function bucketFromPositionTruth(
     case "review_proposal":
       return "requiere_accion";
     case "protect":
-      return "proteger";
+      return "requiere_accion";
     case "maintain":
     case "none":
       return "posiciones";
@@ -322,7 +334,7 @@ export function dailyDeskItemFromTruth(
   const kind = truth.primaryCta.kind as MesaNextActionKindV1;
   const bucket: DailyDeskBucketIdV1 =
     kind === "protect"
-      ? "proteger"
+      ? "requiere_accion"
       : kind === "maintain" || kind === "none"
         ? "posiciones"
         : kind === "watch"
@@ -503,7 +515,7 @@ export function buildDailyDeskInbox(
     const isExit = item.recommendedAction === "REVISAR SALIDA";
     const isBlocked = item.kind === "BLOCKED";
     const bucket: DailyDeskBucketIdV1 = isProtect
-      ? "proteger"
+      ? "requiere_accion"
       : isExit || isBlocked
         ? "requiere_accion"
         : "no_operar";

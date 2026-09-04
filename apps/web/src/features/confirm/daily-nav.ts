@@ -102,7 +102,7 @@ export const HOY_VIEW = {
 export type HoyView = (typeof HOY_VIEW)[keyof typeof HOY_VIEW];
 
 /** Menú de detalles en Hoy (sustituye a las pestañas L2). */
-export const HOY_DETALLES_LABEL = "Ver detalles" as const;
+export const HOY_DETALLES_LABEL = "Avanzado" as const;
 
 export function hoyViewHref(view: HoyView): string {
   if (view === HOY_VIEW.resumen) return MESA_PATH;

@@ -300,7 +300,7 @@ describe("OperativaCockpitCard POSICIÓN V1.40", () => {
     expect(screen.queryByTestId("entry-operating-summary")).toBeNull();
     expect(screen.getByTestId("entry-decision-surface")).toBeTruthy();
     expect(screen.getByTestId("entry-decision-headline").textContent).toBe(
-      "Entrada preparada",
+      "AAPL · Oportunidad · Esperar trigger",
     );
     expect(
       screen.getByTestId("operativa-cockpit-entry-action").textContent,

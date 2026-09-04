@@ -262,8 +262,9 @@ export function DecisionJournalPage() {
             Decision Journal
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Estudios con análisis (propose) — no es el listado de membresía de
-            Estudio. Sin propose reciente = no aparece aquí.
+            Memoria de decisiones: tesis → entrada → riesgo → resultado. Solo
+            lectura — no opera. El aprendizaje del motor sigue en sesiones IA;
+            aquí se conserva el historial para evaluar el plan.
           </p>
         </div>
         <div className="flex items-center gap-3">

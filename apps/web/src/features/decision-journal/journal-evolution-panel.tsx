@@ -28,6 +28,11 @@ function formatStudiedAt(iso: string): string {
   });
 }
 
+function hitRateLabel(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(rate)) return "—";
+  return `${Math.round(rate * 100)}%`;
+}
+
 export function JournalEvolutionPanel({
   accountId,
   studiesCatalog,
@@ -64,8 +69,22 @@ export function JournalEvolutionPanel({
     queryFn: () => api.getDecisionStudyHistory(accountId, instrumentId),
   });
 
+  /** V2.07 — learning summary (SoT = decision_sessions, not journal). */
+  const learningQuery = useQuery({
+    queryKey: ["decision-learning", accountId, instrumentId, "journal"],
+    enabled: Boolean(accountId && instrumentId),
+    queryFn: () =>
+      api.getDecisionSessionLearningSummary({
+        accountId,
+        instrumentId,
+        limit: 40,
+      }),
+    staleTime: 60_000,
+  });
+
   const studies = historyQuery.data?.data.studies ?? [];
   const meta = historyQuery.data?.data;
+  const learning = learningQuery.data?.data;
 
   const selectedIndex = useMemo(() => {
     if (!selectedSessionId) return 0;
@@ -94,8 +113,9 @@ export function JournalEvolutionPanel({
     >
       <Card className="rounded-xl border-border bg-card/60 px-3 py-2">
         <p className="text-xs text-muted-foreground">
-          Evolución de análisis IA — compara snapshots propose del motor (no
-          dictamen diario).
+          Memoria de la tesis — compara snapshots propose. El aprendizaje del
+          motor (acierto / fallo) se muestra debajo; la fuente sigue siendo
+          decision_sessions.
         </p>
         <label className="mt-2 flex flex-col gap-0.5 text-[10px] text-muted-foreground">
           Activo
@@ -120,6 +140,24 @@ export function JournalEvolutionPanel({
             )}
           </select>
         </label>
+        {instrumentId ? (
+          <p
+            className="mt-2 text-[10px] text-muted-foreground"
+            data-testid="journal-learning-strip"
+          >
+            {learningQuery.isLoading
+              ? "Cargando resultados…"
+              : learning
+                ? `Resultados: cerradas ${learning.sampleClosed}${
+                    learning.matureScored != null
+                      ? ` · maduras ${learning.matureScored}`
+                      : ""
+                  } · acierto ${hitRateLabel(
+                    learning.matureHitRate ?? learning.hitRate,
+                  )} · H/M ${learning.hits ?? 0}/${learning.misses ?? 0}`
+                : "Sin sesiones de aprendizaje para este valor aún."}
+          </p>
+        ) : null}
       </Card>
 
       {historyQuery.isLoading ? (

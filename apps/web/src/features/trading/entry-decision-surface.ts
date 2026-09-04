@@ -54,11 +54,11 @@ export function entryPhaseToneClasses(tone: EntryVisualToneV1): string {
 export function entryPhaseHeadline(phase: EntryOperatingPhaseV1): string {
   switch (phase) {
     case "preparada":
-      return "Entrada preparada";
+      return "Oportunidad · Esperar trigger";
     case "disparada":
-      return "Disparo activo";
+      return "Trigger confirmado · Entrada lista";
     case "propuesta":
-      return "Propuesta lista";
+      return "Entrada lista · Firmar en Confirm";
     case "confirmada":
       return "En ejecución";
     default:

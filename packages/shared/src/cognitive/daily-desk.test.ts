@@ -88,19 +88,19 @@ function armedStudy(
   } as DecisionJournalStudyViewV1;
 }
 
-describe("dailyDesk V1.55 five buckets", () => {
-  it("always exposes five chrome buckets in §B.7 order", () => {
+describe("dailyDesk V2.05 four buckets", () => {
+  it("always exposes four chrome buckets (proteger folded)", () => {
     const inbox = buildDailyDeskInbox({ positions: [], pendingConfirm: 0 });
     expect(inbox.buckets.map((b) => b.id)).toEqual([
       ...DAILY_DESK_BUCKET_ORDER,
     ]);
     expect(inbox.buckets.map((b) => b.label)).toEqual([
       DAILY_DESK_BUCKET_LABEL.requiere_accion,
-      DAILY_DESK_BUCKET_LABEL.proteger,
-      DAILY_DESK_BUCKET_LABEL.posiciones,
       DAILY_DESK_BUCKET_LABEL.oportunidades,
+      DAILY_DESK_BUCKET_LABEL.posiciones,
       DAILY_DESK_BUCKET_LABEL.no_operar,
     ]);
+    expect(inbox.buckets).toHaveLength(4);
   });
 
   it("HOLD clean → posiciones bucket lists open book", () => {
@@ -156,7 +156,7 @@ describe("dailyDesk V1.55 five buckets", () => {
     expect(inbox.items[0]?.ctaLabel).toBe("Revisar");
   });
 
-  it("protection discrepancy → 🟠 Proteger", () => {
+  it("protection discrepancy → 🔴 Requiere atención (proteger folded)", () => {
     const inbox = buildDailyDeskInbox({
       positions: [],
       protectionDiscrepancies: [
@@ -167,7 +167,7 @@ describe("dailyDesk V1.55 five buckets", () => {
         },
       ],
     });
-    expect(inbox.items[0]?.bucket).toBe("proteger");
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
     expect(inbox.items[0]?.ctaLabel).toBe("Proteger");
   });
 
@@ -241,7 +241,9 @@ describe("dailyDesk V1.55 five buckets", () => {
     expect(item.phaseLabel).toMatch(/Preparada/i);
     expect(item.phaseLabel).not.toMatch(/ARMED|WATCH|TRIGGERED/);
     expect(item.ctaLabel.toUpperCase()).not.toContain("BUY");
-    expect(item.phrase).toMatch(/Plan armado|Disparador/i);
+    expect(item.phrase).toMatch(
+      /Oportunidad armada|Esperar trigger|Plan armado|Disparador/i,
+    );
   });
 
   it("WATCH without operable plan → 🟡 VIGILAR (not Ranking BUY)", () => {

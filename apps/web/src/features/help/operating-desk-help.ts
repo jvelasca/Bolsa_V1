@@ -19,7 +19,7 @@ export const OPERATING_DESK_SUMMARY = {
   title: "En pocas palabras",
   body: "Estás en fase de pruebas (BETA / demo). La mesa diaria te dice qué mirar y qué firmar; no compra sola. Hoy resume; Mercado opera; Confirm es la única firma.",
   bullets: [
-    "Hoy — inbox del día (requiere acción, oportunidades, vigilar). Detalles detrás de «Ver detalles».",
+    "Hoy — inbox del día (requiere atención, oportunidades, posiciones). Detalles detrás de «Avanzado».",
     "Mercado — listas, gráfico con niveles y operativa del valor. Ranking / calidad ≠ orden de compra.",
     "Confirm — firmas tú (SEMI). La app propone; nunca envía órdenes sola.",
     "Misma situación = misma frase y mismo botón en Hoy, Mercado, Journal y Operaciones.",
@@ -119,7 +119,7 @@ export const OPERATING_DESK_NAV = {
     {
       label: "Hoy",
       route: "/mesa",
-      plain: "¿Qué debo hacer hoy? Inbox + Ver detalles.",
+      plain: "¿Qué debo hacer hoy? Inbox + Avanzado.",
     },
     {
       label: "Mercado",
@@ -129,7 +129,7 @@ export const OPERATING_DESK_NAV = {
     {
       label: "Cartera",
       route: "/mesa?view=posiciones",
-      plain: "Posiciones / órdenes / historial (también bajo Ver detalles).",
+      plain: "Posiciones / órdenes / historial (también bajo Avanzado).",
     },
     {
       label: "Confirmar",

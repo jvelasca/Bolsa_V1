@@ -38,32 +38,30 @@ describe("parseHoyView", () => {
   });
 });
 
-describe("Hoy Daily Desk chrome (V1.55)", () => {
-  it("lists five §B.7 inbox cubes", () => {
+describe("Hoy Daily Desk chrome (V2.05)", () => {
+  it("lists four inbox cubes (proteger folded into atención)", () => {
     expect(HOY_INBOX_BLOCKS.map((b) => b.id)).toEqual([
       "requiere_accion",
-      "proteger",
-      "posiciones",
       "oportunidades",
+      "posiciones",
       "no_operar",
     ]);
     expect(HOY_INBOX_BLOCKS.map((b) => b.title)).toEqual([
-      "Requiere acción",
-      "Proteger",
-      "Posiciones",
+      "Requiere atención",
       "Oportunidades",
-      "No operar",
+      "Posiciones",
+      "Sin acción",
     ]);
   });
 
-  it("keeps Ranking / Libro / Decisiones / Consola behind Ver detalles (not a 5th cube)", () => {
+  it("keeps Ranking / Libro / Decisiones / Consola behind Avanzado (not a 5th cube)", () => {
     const byId = new Map(HOY_DETAIL_ITEMS.map((i) => [i.id, i.href]));
     expect(byId.get("oportunidades")).toBe("/mesa?view=oportunidades");
     expect(byId.get("decisiones")).toBe("/mesa?view=decisiones");
     expect(byId.get("journal")).toBe("/mesa?view=journal");
     expect(byId.get("posiciones")).toBe("/mesa?view=posiciones");
     expect(byId.get("consola")).toBe("/operational-console");
-    expect(HOY_INBOX_BLOCKS).toHaveLength(5);
+    expect(HOY_INBOX_BLOCKS).toHaveLength(4);
   });
 
   it("does not offer Confirmar as a detail entry", () => {

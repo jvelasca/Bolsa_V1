@@ -446,15 +446,25 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         </p>
 
         <div className="flex flex-wrap items-center justify-between gap-1">
-          <DecisionPackageChipsBar
-            action={packageChips.action}
-            fit={packageChips.fit}
-          />
-          <div className="flex items-center gap-0.5">
-            <MesaTipButton tip="operativa-fit-chip" />
-            <MesaTipButton tip="chart-f3-projection" />
-            <MesaTipButton tip="operativa-recomendacion" />
-          </div>
+          <details className="w-full">
+            <summary
+              className="cursor-pointer text-[10px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+              data-testid="decision-package-chips-advanced"
+            >
+              Detalle técnico (avanzado)
+            </summary>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
+              <DecisionPackageChipsBar
+                action={packageChips.action}
+                fit={packageChips.fit}
+              />
+              <div className="flex items-center gap-0.5">
+                <MesaTipButton tip="operativa-fit-chip" />
+                <MesaTipButton tip="chart-f3-projection" />
+                <MesaTipButton tip="operativa-recomendacion" />
+              </div>
+            </div>
+          </details>
         </div>
 
         <OperativaPulseBlock

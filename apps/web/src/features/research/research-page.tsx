@@ -173,13 +173,16 @@ export function ResearchPage() {
           Asesor
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Análisis, tesis, journal e investigación. Explica el porqué — no
-          ejecuta ni firma. Actuar en{" "}
+          Capa de explicación: ¿por qué esta tesis, este riesgo, esta acción? No
+          es una mesa de operaciones. Actuar en{" "}
           <Link to="/trading" className="text-primary hover:underline">
             Mercado
           </Link>{" "}
-          · firmar en Confirm. Ruta <code className="text-xs">/research</code>{" "}
-          (API sin cambios).
+          · excepciones en{" "}
+          <Link to="/mesa" className="text-primary hover:underline">
+            Hoy
+          </Link>{" "}
+          · firmar en Confirm.
         </p>
       </div>
 

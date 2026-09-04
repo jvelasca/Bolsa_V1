@@ -89,8 +89,12 @@ describe("entry-decision-surface GP-V162-02/04/05", () => {
   });
 
   it("headlines are human-readable", () => {
-    expect(entryPhaseHeadline("preparada")).toBe("Entrada preparada");
-    expect(entryPhaseHeadline("disparada")).toBe("Disparo activo");
+    expect(entryPhaseHeadline("preparada")).toBe(
+      "Oportunidad · Esperar trigger",
+    );
+    expect(entryPhaseHeadline("disparada")).toBe(
+      "Trigger confirmado · Entrada lista",
+    );
     expect(entryPhaseHeadline("confirmada")).toBe("En ejecución");
   });
 });

@@ -25,8 +25,8 @@ export function HoyEnLaMesaBlock() {
           <Link to="/mesa" className="font-medium text-primary hover:underline">
             Hoy
           </Link>
-          ) — inbox: requiere acción, oportunidades, vigilar. Detalles detrás de
-          «Ver detalles».
+          ) — inbox: requiere atención, oportunidades, posiciones, sin acción.
+          Detalles detrás de «Avanzado».
         </li>
         <li>
           <strong className="text-foreground">Operar en Mercado</strong> (
@@ -62,7 +62,7 @@ export function HoyEnLaMesaBlock() {
         >
           Cartera · Posiciones
         </Link>{" "}
-        y Journal viven en «Ver detalles» / Asesor.
+        y Journal viven en «Avanzado» / Asesor.
       </p>
     </section>
   );

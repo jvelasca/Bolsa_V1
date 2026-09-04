@@ -147,11 +147,11 @@ export function formatEntryOperatingPhrase(
   }
   switch (phase) {
     case "preparada":
-      return "Plan armado. Disparador de entrada aún no cruzado — Ranking ≠ BUY.";
+      return "Oportunidad armada. Esperar trigger — Ranking ≠ BUY.";
     case "disparada":
-      return "Disparo confirmado. Revisa niveles y firma en Confirm — no ejecuta solo.";
+      return "Trigger confirmado. Revisa niveles y firma en Confirm — no ejecuta solo.";
     case "propuesta":
-      return "Propuesta SEMI en cola. Confirm es la única firma.";
+      return "Propuesta en cola. Confirm es la única firma.";
     case "confirmada":
       return "Firma hecha — fill pendiente. Mira Operaciones para el estado de la orden.";
     default:

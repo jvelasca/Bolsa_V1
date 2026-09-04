@@ -15,7 +15,13 @@ import type {
 import {
   assertNever,
   buildExecutionState,
+  buildOperatorFourAnswers,
+  buildOperatorMissionSteps,
+  buildOperatorNextActionFromEntry,
+  buildOperatorNextActionFromPosition,
+  buildOperatorRiskBox,
   buildPositionDecisionFromDto,
+  formatOperatorAutoHonesty,
   formatPositionDecisionPhrase,
   reconPhraseFromPortfolioStatus,
 } from "@bolsa/shared";
@@ -42,6 +48,12 @@ import {
   formatPovPrimaryActionLabel,
   usePositionOperationalView,
 } from "@/features/trading/use-position-operational-view";
+import {
+  NextActionHero,
+  OperatorFourAnswersBlock,
+  OperatorMissionChecklist,
+  OperatorRiskBox,
+} from "@/features/trading/operator-cabin-ui";
 
 type Density = "full" | "hud";
 
@@ -88,11 +100,6 @@ function SectionLabel({ children }: { children: string }) {
 function formatMoney(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return formatPrice(value);
-}
-
-function formatRR(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return `${value.toFixed(1)}:1`;
 }
 
 function formatDistance(
@@ -212,11 +219,33 @@ function EntryCompactBody({
       : "—";
   const headline = entryPhaseHeadline(phase);
   const hud = density === "hud";
+  const nextAction = buildOperatorNextActionFromEntry(truth);
+  const fourAnswers = buildOperatorFourAnswers({
+    phase,
+    thesisSummary: headline,
+    entry: plan.entry,
+    stop: plan.stopVigente,
+    triggerLabel: truth.triggerLabel,
+    riskAmount: sizing.riskAmount,
+    riskR: sizing.riskR,
+    target1: plan.target1,
+    target2: plan.target2,
+  });
+  const riskBox = buildOperatorRiskBox({
+    entry: plan.entry,
+    stop: plan.stopVigente,
+    lossAtStop: sizing.riskAmount,
+    maxLoss: sizing.riskAmount,
+    target1: plan.target1,
+    target2: plan.target2,
+  });
 
   return (
     <>
+      {!hud ? <NextActionHero action={nextAction} /> : null}
+
       <div className="space-y-1">
-        {!hud ? <SectionLabel>Estado de la entrada</SectionLabel> : null}
+        {!hud ? <SectionLabel>Oportunidad</SectionLabel> : null}
         <div
           className="space-y-0.5"
           data-testid="operativa-cockpit-entry-state"
@@ -230,7 +259,7 @@ function EntryCompactBody({
             )}
             data-testid="entry-decision-headline"
           >
-            {headline}
+            {symbol} · {headline}
           </p>
           <p
             className={cn(
@@ -270,126 +299,141 @@ function EntryCompactBody({
             </span>
           </p>
         ) : (
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
-            <div className="flex justify-between gap-2">
-              <dt>Entrada</dt>
-              <dd
-                className="font-medium tabular-nums text-foreground"
-                data-testid="entry-decision-entry"
-              >
-                {formatEntryLevel(plan.entry)}
-              </dd>
-            </div>
-            {plan.currentPrice != null && Number.isFinite(plan.currentPrice) ? (
+          <>
+            <OperatorFourAnswersBlock answers={fourAnswers} />
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
               <div className="flex justify-between gap-2">
-                <dt>Precio actual</dt>
+                <dt>Entrada</dt>
                 <dd
                   className="font-medium tabular-nums text-foreground"
-                  data-testid="entry-decision-mark"
+                  data-testid="entry-decision-entry"
                 >
-                  {formatEntryLevel(plan.currentPrice)}
+                  {formatEntryLevel(plan.entry)}
                 </dd>
               </div>
-            ) : null}
-            {formatDistance(plan.entry, plan.currentPrice) ? (
+              {plan.currentPrice != null &&
+              Number.isFinite(plan.currentPrice) ? (
+                <div className="flex justify-between gap-2">
+                  <dt>Precio actual</dt>
+                  <dd
+                    className="font-medium tabular-nums text-foreground"
+                    data-testid="entry-decision-mark"
+                  >
+                    {formatEntryLevel(plan.currentPrice)}
+                  </dd>
+                </div>
+              ) : null}
+              {formatDistance(plan.entry, plan.currentPrice) ? (
+                <div className="flex justify-between gap-2">
+                  <dt>Distancia</dt>
+                  <dd
+                    className="font-medium tabular-nums text-foreground"
+                    data-testid="entry-decision-distance"
+                  >
+                    {formatDistance(plan.entry, plan.currentPrice)}
+                  </dd>
+                </div>
+              ) : null}
               <div className="flex justify-between gap-2">
-                <dt>Distancia</dt>
+                <dt>Stop</dt>
                 <dd
                   className="font-medium tabular-nums text-foreground"
-                  data-testid="entry-decision-distance"
+                  data-testid="entry-decision-stop"
                 >
-                  {formatDistance(plan.entry, plan.currentPrice)}
+                  {formatEntryLevel(plan.stopVigente)}
                 </dd>
               </div>
-            ) : null}
-            <div className="flex justify-between gap-2">
-              <dt>Stop</dt>
-              <dd
-                className="font-medium tabular-nums text-foreground"
-                data-testid="entry-decision-stop"
-              >
-                {formatEntryLevel(plan.stopVigente)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>T1</dt>
-              <dd
-                className="font-medium tabular-nums text-foreground"
-                data-testid="entry-decision-t1"
-              >
-                {formatEntryLevel(plan.target1)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>T2</dt>
-              <dd
-                className="font-medium tabular-nums text-foreground"
-                data-testid="entry-decision-t2"
-              >
-                {formatEntryLevel(plan.target2)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>Tamaño</dt>
-              <dd className="font-medium tabular-nums text-foreground">
-                {qty}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>Riesgo</dt>
-              <dd
-                className="font-medium tabular-nums text-foreground"
-                data-testid="entry-decision-risk"
-              >
-                {formatMoney(sizing.riskAmount)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt>R/R</dt>
-              <dd className="font-medium tabular-nums text-foreground">
-                {formatRR(sizing.expectedRR)}
-              </dd>
-            </div>
-            {truth.expiryLabel ? (
-              <div className="col-span-2 flex justify-between gap-2">
-                <dt>Vigencia</dt>
-                <dd className="font-medium text-foreground">
-                  {truth.expiryLabel}
+              <div className="flex justify-between gap-2">
+                <dt>T1</dt>
+                <dd
+                  className="font-medium tabular-nums text-foreground"
+                  data-testid="entry-decision-t1"
+                >
+                  {formatEntryLevel(plan.target1)}
                 </dd>
               </div>
-            ) : null}
-          </dl>
+              <div className="flex justify-between gap-2">
+                <dt>T2</dt>
+                <dd
+                  className="font-medium tabular-nums text-foreground"
+                  data-testid="entry-decision-t2"
+                >
+                  {formatEntryLevel(plan.target2)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt>Tamaño</dt>
+                <dd className="font-medium tabular-nums text-foreground">
+                  {qty} acciones
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt>Riesgo</dt>
+                <dd
+                  className="font-medium tabular-nums text-foreground"
+                  data-testid="entry-decision-risk"
+                >
+                  {formatMoney(sizing.riskAmount)}
+                  {sizing.riskR != null && Number.isFinite(sizing.riskR)
+                    ? ` · ${sizing.riskR.toFixed(2)}R`
+                    : ""}
+                </dd>
+              </div>
+              {truth.expiryLabel ? (
+                <div className="col-span-2 flex justify-between gap-2">
+                  <dt>Vigencia</dt>
+                  <dd className="font-medium text-foreground">
+                    {truth.expiryLabel}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            <OperatorRiskBox box={riskBox} />
+          </>
         )}
       </div>
 
-      <div
-        className={cn(
-          "space-y-0.5",
-          hud ? "pt-0.5" : "border-t border-border/40 pt-1.5",
-        )}
-        data-testid="entry-decision-action-block"
-      >
-        {!hud ? <SectionLabel>Próxima acción</SectionLabel> : null}
+      {hud ? (
         <div
-          className={cn(
-            "flex flex-wrap items-baseline justify-between gap-2",
-            hud ? "text-[9px]" : "text-[10px]",
-          )}
+          className="space-y-0.5 pt-0.5"
+          data-testid="entry-decision-action-block"
         >
-          <p data-testid="operativa-cockpit-entry-action">
-            <span className="text-muted-foreground">Decisión</span>{" "}
-            <span className="font-semibold text-foreground">
-              {decisionLabel}
-            </span>
-          </p>
-          <p data-testid="entry-decision-execution">
-            <span className="text-muted-foreground">Ejecución</span>{" "}
-            <span className="font-medium text-foreground">
-              {executionLabel}
-            </span>
-          </p>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 text-[9px]">
+            <p data-testid="operativa-cockpit-entry-action">
+              <span className="text-muted-foreground">Decisión</span>{" "}
+              <span className="font-semibold text-foreground">
+                {decisionLabel}
+              </span>
+            </p>
+            <p data-testid="entry-decision-execution">
+              <span className="text-muted-foreground">Ejecución</span>{" "}
+              <span className="font-medium text-foreground">
+                {executionLabel}
+              </span>
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          className="space-y-0.5 border-t border-border/40 pt-1.5"
+          data-testid="entry-decision-action-block"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2 text-[10px]">
+            <p data-testid="operativa-cockpit-entry-action">
+              <span className="text-muted-foreground">Decisión</span>{" "}
+              <span className="font-semibold text-foreground">
+                {decisionLabel}
+              </span>
+            </p>
+            <p data-testid="entry-decision-execution">
+              <span className="text-muted-foreground">Ejecución</span>{" "}
+              <span className="font-medium text-foreground">
+                {executionLabel}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {!hud && onOpenWhy ? (
         <div className="border-t border-border/40 pt-1">
@@ -399,7 +443,7 @@ function EntryCompactBody({
             onClick={onOpenWhy}
             data-testid="entry-decision-why-toggle"
           >
-            Ver por qué
+            ¿Por qué?
           </button>
         </div>
       ) : null}
@@ -427,28 +471,43 @@ function formatLegStatus(
 }
 
 function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
-  const posture = journey.autoPosture;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const nextAction = buildOperatorNextActionFromPosition(
+    journey.primaryAction,
+    journey,
+  );
+  const steps = buildOperatorMissionSteps(journey);
+  const riskBox = buildOperatorRiskBox({
+    entry: journey.entry,
+    stop: journey.trail.currentStop ?? journey.risk.initialStop,
+    lossAtStop: journey.risk.currentProtected,
+    maxLoss: journey.risk.initialRisk,
+    target1: journey.t1.trigger,
+    target2: journey.t2.trigger,
+  });
+  const autoHonesty = formatOperatorAutoHonesty(
+    journey.autoPosture,
+    journey.killOn,
+  );
+
   return (
     <div
-      className="space-y-1 border-t border-border/40 pt-1.5"
+      className="space-y-1.5 border-t border-border/40 pt-1.5"
       data-testid="position-journey-hud"
       data-lifecycle-stage={journey.stageMachine ?? undefined}
       data-lineage-path={journey.lineagePathLabel ?? undefined}
       data-log-has-t2={journey.logHasT2Executed ? "1" : "0"}
     >
-      <SectionLabel>Journey posición</SectionLabel>
+      <NextActionHero action={nextAction} testId="journey-next-action" />
+
+      <SectionLabel>Misión de la posición</SectionLabel>
+      <OperatorMissionChecklist steps={steps} />
+
+      <OperatorRiskBox box={riskBox} />
+
       <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
         <div className="flex justify-between gap-2">
-          <dt>Entrada</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-entry"
-          >
-            {formatLevel(journey.entry)}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Initial stop</dt>
+          <dt>Stop inicial</dt>
           <dd
             className="font-medium tabular-nums text-foreground"
             data-testid="journey-initial-stop"
@@ -457,7 +516,7 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
           </dd>
         </div>
         <div className="flex justify-between gap-2">
-          <dt>Initial risk</dt>
+          <dt>Riesgo inicial</dt>
           <dd
             className="font-medium tabular-nums text-foreground"
             data-testid="journey-initial-risk"
@@ -468,7 +527,7 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
           </dd>
         </div>
         <div className="flex justify-between gap-2">
-          <dt>Protected ahora</dt>
+          <dt>Protegido ahora</dt>
           <dd
             className="font-medium tabular-nums text-foreground"
             data-testid="journey-current-protected"
@@ -479,7 +538,7 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
           </dd>
         </div>
         <div className="flex justify-between gap-2">
-          <dt>Realized R</dt>
+          <dt>R realizado</dt>
           <dd
             className="font-medium tabular-nums text-foreground"
             data-testid="journey-realized-r"
@@ -490,12 +549,21 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
           </dd>
         </div>
         <div className="flex justify-between gap-2">
-          <dt>Remaining</dt>
+          <dt>Restante</dt>
           <dd
             className="font-medium tabular-nums text-foreground"
             data-testid="journey-remaining"
           >
             {journey.remainingQuantity}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt>Entrada</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-entry"
+          >
+            {formatLevel(journey.entry)}
           </dd>
         </div>
         <div className="col-span-2 flex justify-between gap-2">
@@ -516,59 +584,51 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
               ? ` · ${journey.t2.qtyFractionPct}%`
               : ""}{" "}
             · {formatLegStatus(journey.t2.status)}
-            {journey.logHasT2Executed && journey.trail.active
-              ? " · (log ⊃ T2)"
-              : ""}
           </dd>
         </div>
         <div className="col-span-2 flex justify-between gap-2">
-          <dt>Trail</dt>
+          <dt>Trailing</dt>
           <dd
             data-testid="journey-trail"
             className="text-right text-foreground"
           >
             {!journey.trail.activationEligible
-              ? "tras T1"
+              ? "Tras T1"
               : journey.trail.active
-                ? `activo · stop ${formatLevel(journey.trail.currentStop)}${
-                    journey.trail.lastRatchet
-                      ? ` · ${journey.trail.lastRatchet.label}`
-                      : ""
-                  }`
-                : "eligible · sin ratchet"}
+                ? `Activo · stop ${formatLevel(journey.trail.currentStop)}`
+                : "Listo · sin ratchet"}
           </dd>
         </div>
-        {journey.stageLabel ? (
-          <div className="col-span-2 flex justify-between gap-2">
-            <dt>Ciclo (derivado)</dt>
-            <dd
-              className="text-foreground"
-              data-testid="journey-stage-label"
-              title="stage derivado · el log es la historia"
-            >
-              {journey.stageLabel}
-              {journey.lineagePathLabel
-                ? ` · lineage ${journey.lineagePathLabel}`
-                : ""}
-            </dd>
-          </div>
-        ) : null}
       </dl>
-      {posture || journey.killOn != null ? (
+
+      {autoHonesty ? (
         <p
           className="text-[9px] leading-snug text-muted-foreground"
           data-testid="journey-auto-posture"
         >
-          {posture?.statusBadge ?? posture?.modeLabel ?? "SEMI"}
-          {posture?.paperDExecuteEnv
-            ? " · env execute ON"
-            : " · env execute OFF"}
-          {journey.killOn === true
-            ? " · kill ON"
-            : journey.killOn === false
-              ? " · kill OFF"
-              : ""}
-          {" · arm ≠ execute"}
+          {autoHonesty}
+        </p>
+      ) : null}
+
+      <button
+        type="button"
+        className="text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline"
+        onClick={() => setAdvancedOpen((v) => !v)}
+        data-testid="journey-advanced-toggle"
+      >
+        {advancedOpen ? "Ocultar auditoría" : "Auditoría avanzada"}
+      </button>
+      {advancedOpen ? (
+        <p
+          className="text-[9px] leading-snug text-muted-foreground"
+          data-testid="journey-stage-label"
+          title="stage derivado · el log es la historia"
+        >
+          Ciclo: {journey.stageLabel ?? "—"}
+          {journey.lineagePathLabel
+            ? ` · clasificación ${journey.lineagePathLabel}`
+            : ""}
+          {journey.logHasT2Executed ? " · log incluye T2" : ""}
         </p>
       ) : null}
     </div>
@@ -603,11 +663,17 @@ function PositionCompactBody({
   const unrealizedR =
     view.levels.unrealizedR ?? position.operational?.unrealizedR;
   const hud = density === "hud";
+  const nextAction = buildOperatorNextActionFromPosition(
+    journey?.primaryAction ?? view.primaryAction,
+    journey,
+  );
 
   return (
     <>
+      {!hud && !journey ? <NextActionHero action={nextAction} /> : null}
+
       <div className="space-y-1">
-        {!hud ? <SectionLabel>Estado de la operación</SectionLabel> : null}
+        {!hud ? <SectionLabel>Posición</SectionLabel> : null}
         <div
           className="space-y-0.5"
           data-testid="operativa-cockpit-pov-state"
@@ -732,7 +798,6 @@ function PositionCompactBody({
         )}
         data-testid="position-decision-action-block"
       >
-        {!hud ? <SectionLabel>Próxima acción</SectionLabel> : null}
         <div
           className={cn(
             "flex flex-wrap items-baseline justify-between gap-2",
@@ -763,7 +828,7 @@ function PositionCompactBody({
               onClick={onOpenWhy}
               data-testid="position-decision-why-toggle"
             >
-              Ver por qué
+              ¿Por qué?
             </button>
           ) : null}
           {view.stopHistory.length > 0 ? (

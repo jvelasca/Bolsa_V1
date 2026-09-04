@@ -74,9 +74,8 @@ test.describe("GP-V168 — Hoy Paper Autonomous Desk integrated", () => {
     });
     for (const bucketId of [
       "requiere_accion",
-      "proteger",
-      "posiciones",
       "oportunidades",
+      "posiciones",
       "no_operar",
     ]) {
       await expect(

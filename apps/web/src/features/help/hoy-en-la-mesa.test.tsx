@@ -34,8 +34,8 @@ describe("help operating desk / Hoy", () => {
     );
     const text = screen.getByTestId("hoy-en-la-mesa").textContent ?? "";
     expect(text).toMatch(/inbox/i);
-    expect(text).toMatch(/requiere acción/i);
-    expect(text).toMatch(/Ver detalles/i);
+    expect(text).toMatch(/requiere atención/i);
+    expect(text).toMatch(/Avanzado/i);
     expect(text).toMatch(/Mercado/i);
     expect(text).toMatch(/Ranking ≠ orden/i);
     expect(text).toMatch(/Confirm/i);
