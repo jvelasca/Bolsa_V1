@@ -57,14 +57,13 @@ def protect_stop_worsens_exposure(
     """True si el nuevo stop empeora (↑ exposición) vs current.
 
     long: stop más bajo empeora. short: stop más alto empeora.
+    Delegates to domain ``stop_worsens`` (V1.98 single house).
     """
-    if current_stop is None or current_stop <= 0:
-        return False
+    from bolsa_domain.lifecycle import stop_worsens
+
     if next_stop != next_stop or next_stop <= 0:
         return False
-    if direction == "long":
-        return next_stop < current_stop - 1e-9
-    return next_stop > current_stop + 1e-9
+    return stop_worsens(direction, current_stop, next_stop)
 
 
 def risk_distance(entry: float, stop: float) -> float:

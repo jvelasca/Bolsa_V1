@@ -177,20 +177,37 @@ const HASH_KEYS = [
   "revisionId",
 ] as const;
 
-/** Legal FSM edges (preserve GP-V184 goldens: optional T1_TRIGGERED; T2 closes without EXIT). */
+/** Legal FSM edges (V1.98: trail + T2 coexist; V1.89 close shortcuts). */
 const TRANSITIONS: Record<
   E2eGoldenPositionStage,
   Partial<Record<LifecycleStoreEventKind, E2eGoldenPositionStage>>
 > = {
   clean: {},
   candidate: { POSITION_OPENED: "open" },
-  open: { T1_TRIGGERED: "t1_ready", T1_EXECUTED: "t1_executed" },
-  t1_ready: { T1_EXECUTED: "t1_executed" },
-  t1_executed: { TRAIL_APPLIED: "trailing", T2_TRIGGERED: "t2_ready" },
-  trailing: { EXIT_REQUIRED: "exit_required" },
+  open: {
+    T1_TRIGGERED: "t1_ready",
+    T1_EXECUTED: "t1_executed",
+    POSITION_CLOSED: "closed",
+  },
+  t1_ready: { T1_EXECUTED: "t1_executed", POSITION_CLOSED: "closed" },
+  t1_executed: {
+    TRAIL_APPLIED: "trailing",
+    T2_TRIGGERED: "t2_ready",
+    POSITION_CLOSED: "closed",
+  },
+  trailing: {
+    TRAIL_APPLIED: "trailing",
+    T2_TRIGGERED: "t2_ready",
+    EXIT_REQUIRED: "exit_required",
+    POSITION_CLOSED: "closed",
+  },
   exit_required: { POSITION_CLOSED: "closed" },
-  t2_ready: { T2_EXECUTED: "t2_executed" },
-  t2_executed: { POSITION_CLOSED: "closed" },
+  t2_ready: { T2_EXECUTED: "t2_executed", POSITION_CLOSED: "closed" },
+  t2_executed: {
+    TRAIL_APPLIED: "trailing",
+    EXIT_REQUIRED: "exit_required",
+    POSITION_CLOSED: "closed",
+  },
   closed: {},
 };
 
@@ -458,11 +475,39 @@ function validateIdentity(
   return null;
 }
 
+function lastFillPrice(
+  log: LifecycleStoreEvent[],
+  stage: E2eGoldenPositionStage,
+  lineagePath: LifecycleLineagePath,
+): number {
+  for (let i = log.length - 1; i >= 0; i -= 1) {
+    const ev = log[i]!;
+    if (FILL_KINDS.has(ev.kind) && ev.price !== undefined && ev.price > 0) {
+      return ev.price;
+    }
+  }
+  return lifecycleLastPriceForStage(stage, lineagePath);
+}
+
+function stopWorsens(
+  side: string,
+  previous: number | undefined,
+  next: number,
+): boolean {
+  if (previous === undefined || previous <= 0) return false;
+  if (!Number.isFinite(previous) || !Number.isFinite(next)) return false;
+  const norm = side.trim().toUpperCase();
+  if (norm === "LONG") return next < previous - 1e-9;
+  if (norm === "SHORT") return next > previous + 1e-9;
+  return false;
+}
+
 function validatePayload(
   event: LifecycleStoreEvent,
   remainingBefore: number,
   stage: E2eGoldenPositionStage,
   lineagePath: LifecycleLineagePath,
+  log: LifecycleStoreEvent[] = [],
 ): LifecycleAppendError | null {
   if (FILL_KINDS.has(event.kind)) {
     const qty = event.quantity;
@@ -517,17 +562,23 @@ function validatePayload(
       return { code: "invalid_payload", message: "trail stops must be finite" };
     }
     const side = (event.side ?? "LONG").toUpperCase();
-    if (side === "LONG" && next < prev) {
+    if (stopWorsens(side, prev, next)) {
       return {
         code: "trail_relaxation",
-        message: `LONG trail newStop ${next} < previousStop ${prev}`,
+        message: `${side} trail newStop ${next} worsens previousStop ${prev}`,
       };
     }
-    const lastPrice = lifecycleLastPriceForStage(stage, lineagePath);
+    const lastPrice = lastFillPrice(log, stage, lineagePath);
     if (side === "LONG" && next >= lastPrice) {
       return {
         code: "invalid_payload",
         message: `LONG trail newStop ${next} must be < lastPrice ${lastPrice}`,
+      };
+    }
+    if (side === "SHORT" && next <= lastPrice) {
+      return {
+        code: "invalid_payload",
+        message: `SHORT trail newStop ${next} must be > lastPrice ${lastPrice}`,
       };
     }
   }
@@ -631,6 +682,7 @@ export function appendValidatedLifecycleEvent(
     remainingBefore,
     reduced.stage,
     reduced.lineagePath,
+    log,
   );
   if (payloadError) return { ok: false, error: payloadError };
 

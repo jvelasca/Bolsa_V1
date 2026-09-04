@@ -103,10 +103,21 @@ TRANSITIONS: dict[str, dict[str, str]] = {
         "T2_TRIGGERED": "t2_ready",
         "POSITION_CLOSED": "closed",
     },
-    "trailing": {"EXIT_REQUIRED": "exit_required", "POSITION_CLOSED": "closed"},
+    # V1.98: trail + T2 coexist (ExitPolicy T1/T2/trail_width); N ratchets.
+    "trailing": {
+        "TRAIL_APPLIED": "trailing",
+        "T2_TRIGGERED": "t2_ready",
+        "EXIT_REQUIRED": "exit_required",
+        "POSITION_CLOSED": "closed",
+    },
     "exit_required": {"POSITION_CLOSED": "closed"},
-    "t2_ready": {"T2_EXECUTED": "t2_executed"},
-    "t2_executed": {"POSITION_CLOSED": "closed"},
+    # V1.98: leftover t2_ready may EXIT without completing T2 execute.
+    "t2_ready": {"T2_EXECUTED": "t2_executed", "POSITION_CLOSED": "closed"},
+    "t2_executed": {
+        "TRAIL_APPLIED": "trailing",
+        "EXIT_REQUIRED": "exit_required",
+        "POSITION_CLOSED": "closed",
+    },
     "closed": {},
 }
 
@@ -313,11 +324,46 @@ def _ms(iso: str) -> float | LifecycleAppendError:
 
 
 def last_price_for_stage(stage: LifecycleStage, lineage_path: LineagePath) -> Decimal:
+    """Mock mark for snapshot/accounting goldens (GP-V183/V184). Not trail geometry."""
     if stage in ("t2_ready", "t2_executed"):
         return Decimal("110")
     if stage == "closed":
         return Decimal("110") if lineage_path == "t2" else Decimal("106")
     return Decimal("106")
+
+
+def last_fill_price(
+    log: list[LifecycleStoreEvent] | tuple[LifecycleStoreEvent, ...],
+    *,
+    stage: LifecycleStage,
+    lineage_path: LineagePath,
+) -> Decimal:
+    """Mark for TRAIL_APPLIED geometry: last cash fill, else mock stage mark."""
+    for ev in reversed(log):
+        if ev.kind in FILL_KINDS and ev.price is not None and ev.price > 0:
+            return ev.price
+    return last_price_for_stage(stage, lineage_path)
+
+
+def stop_worsens(
+    side: str,
+    previous: Decimal | float | None,
+    new: Decimal | float,
+) -> bool:
+    """Domain H2 — stop never relaxes exposure. side: LONG/SHORT or long/short."""
+    if previous is None:
+        return False
+    prev = Decimal(str(previous))
+    nxt = Decimal(str(new))
+    if prev <= 0 or not prev.is_finite() or not nxt.is_finite():
+        return False
+    norm = side.strip().upper()
+    eps = Decimal("0.000000001")
+    if norm == "LONG":
+        return nxt < prev - eps
+    if norm == "SHORT":
+        return nxt > prev + eps
+    return False
 
 
 def validate_transition_result(
@@ -663,6 +709,7 @@ def _validate_payload(
     remaining_before: Decimal,
     stage: LifecycleStage,
     lineage_path: LineagePath,
+    log: list[LifecycleStoreEvent] | tuple[LifecycleStoreEvent, ...] = (),
 ) -> LifecycleAppendError | None:
     if event.kind in FILL_KINDS:
         qty = event.quantity
@@ -714,17 +761,13 @@ def _validate_payload(
                 message="trail stops must be finite",
             )
         side = (event.side or "LONG").upper()
-        if side == "LONG" and new < prev:
+        if stop_worsens(side, prev, new):
             return LifecycleAppendError(
                 code="trail_relaxation",
-                message=f"LONG trail newStop {new} < previousStop {prev}",
+                message=f"{side} trail newStop {new} worsens previousStop {prev}",
             )
-        if side == "SHORT" and new > prev:
-            return LifecycleAppendError(
-                code="trail_relaxation",
-                message=f"SHORT trail newStop {new} > previousStop {prev}",
-            )
-        last_price = last_price_for_stage(stage, lineage_path)
+        # V1.98: geometry vs last fill (PAPER), not mock stage mark 106/110.
+        last_price = last_fill_price(log, stage=stage, lineage_path=lineage_path)
         if side == "LONG" and new >= last_price:
             return LifecycleAppendError(
                 code="invalid_payload",
@@ -873,6 +916,7 @@ def append_validated_lifecycle_event(
         remaining_before=remaining_before,
         stage=stage,
         lineage_path=lineage_path,
+        log=log_list,
     )
     if payload_err:
         return AppendFail(error=payload_err)
@@ -966,7 +1010,9 @@ __all__ = [
     "append_validated_lifecycle_event",
     "assert_equity_invariant",
     "compute_payload_hash",
+    "last_fill_price",
     "last_price_for_stage",
+    "stop_worsens",
     "normalize_lifecycle_event",
     "reduce_lifecycle_events",
     "remaining_after_log",

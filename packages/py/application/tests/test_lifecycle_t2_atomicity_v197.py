@@ -204,6 +204,61 @@ async def test_recovery_from_t2_ready_appends_execute_only() -> None:
     assert kinds.count("T2_EXECUTED") == 1
 
 
+@pytest.mark.asyncio
+async def test_needs_atomic_t2_pair_from_trailing_v198() -> None:
+    """V1.98: T2 after TRAIL_APPLIED still gets atomic trigger+execute."""
+    store = InMemoryLifecycleEventStore()
+    await _seed_open_t1(store, pos="pos-trail-t2")
+    append = AppendLifecycleEvent(store)
+    log = await store.list_by_position("pos-trail-t2")
+    anchor = log[0]
+    trail = await append.execute(
+        LifecycleEventInput(
+            kind="TRAIL_APPLIED",
+            at="2026-09-02T12:00:00.000Z",
+            event_id="evt-trail-pre-t2",
+            position_id="pos-trail-t2",
+            account_id=anchor.account_id,
+            instrument_id=anchor.instrument_id,
+            decision_id=anchor.decision_id,
+            trade_plan_id=anchor.trade_plan_id,
+            symbol=anchor.symbol,
+            side=anchor.side,
+            previous_stop=95,
+            new_stop=98,
+            reason="TRAIL",
+        )
+    )
+    assert trail.ok, trail.error
+    existing = await store.list_by_position("pos-trail-t2")
+    execute = LifecycleEventInput(
+        kind="T2_EXECUTED",
+        at="2026-09-02T12:45:00.000Z",
+        event_id="tx-t2-after-trail",
+        position_id="pos-trail-t2",
+        account_id=anchor.account_id,
+        instrument_id=anchor.instrument_id,
+        decision_id=anchor.decision_id,
+        trade_plan_id=anchor.trade_plan_id,
+        symbol=anchor.symbol,
+        fill_id="tx-t2-after-trail",
+        quantity=3.0,
+        price=110.0,
+        fees=0,
+        venue="PAPER",
+        reason="TARGET_2",
+    )
+    assert needs_atomic_t2_pair(existing, execute) is True
+    result = await append.execute(execute)
+    assert result.ok, result.error
+    snap = await GetLifecycleSnapshot(store).execute("pos-trail-t2")
+    kinds = [e["kind"] for e in snap["events"]]
+    assert kinds.count("TRAIL_APPLIED") == 1
+    assert kinds.count("T2_TRIGGERED") == 1
+    assert kinds.count("T2_EXECUTED") == 1
+    assert snap["stage"] == "t2_executed"
+
+
 def test_build_t2_triggered_input_event_id_suffix() -> None:
     exe = LifecycleEventInput(
         kind="T2_EXECUTED",

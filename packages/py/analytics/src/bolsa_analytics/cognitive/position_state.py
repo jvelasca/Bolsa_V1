@@ -182,14 +182,13 @@ def _stop_worsens(
 def does_stop_worsen(
     direction: str, current: float | None, nxt: float
 ) -> bool:
-    """H2 — long: new stop lower than current; short: new stop higher."""
-    if current is None or current <= 0:
-        return False
-    if direction == "long":
-        return nxt < current - 1e-9
-    if direction == "short":
-        return nxt > current + 1e-9
-    return False
+    """H2 — long: new stop lower than current; short: new stop higher.
+
+    Thin wrapper over ``bolsa_domain.lifecycle.stop_worsens`` (single house).
+    """
+    from bolsa_domain.lifecycle import stop_worsens
+
+    return stop_worsens(direction, current, nxt)
 
 
 def clamp_stop_not_worsen(

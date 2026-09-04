@@ -143,6 +143,126 @@ describe("V1.85 lifecycle FSM", () => {
     expect(validateTransition("candidate", "POSITION_OPENED").ok).toBe(true);
     expect(validateTransition("open", "T2_EXECUTED").ok).toBe(false);
     expect(validateTransition("closed", "POSITION_OPENED").ok).toBe(false);
+    expect(validateTransition("trailing", "TRAIL_APPLIED").ok).toBe(true);
+    expect(validateTransition("trailing", "T2_TRIGGERED").ok).toBe(true);
+    expect(validateTransition("t2_executed", "TRAIL_APPLIED").ok).toBe(true);
+    expect(validateTransition("t2_ready", "POSITION_CLOSED").ok).toBe(true);
+  });
+});
+
+describe("V1.98 trail + T2 coexist", () => {
+  it("allows two TRAIL_APPLIED ratchets in trailing", () => {
+    const log = appendAll(["POSITION_OPENED", "T1_EXECUTED", "TRAIL_APPLIED"]);
+    const second = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "evt-trail-2",
+      at: "2026-09-02T12:10:00.000Z",
+      previousStop: 98,
+      newStop: 100,
+    });
+    expect(second.ok).toBe(true);
+    if (second.ok) {
+      expect(second.stage).toBe("trailing");
+      expect(second.log.filter((e) => e.kind === "TRAIL_APPLIED")).toHaveLength(
+        2,
+      );
+    }
+  });
+
+  it("allows TRAIL then T2", () => {
+    const log = appendAll([
+      "POSITION_OPENED",
+      "T1_EXECUTED",
+      "TRAIL_APPLIED",
+      "T2_TRIGGERED",
+      "T2_EXECUTED",
+    ]);
+    const reduced = reduceLifecycleEvents(log);
+    expect(reduced.stage).toBe("t2_executed");
+    expect(reduced.lineagePath).toBe("t2");
+  });
+
+  it("allows T2 then TRAIL", () => {
+    const log = appendAll([
+      "POSITION_OPENED",
+      "T1_EXECUTED",
+      "T2_TRIGGERED",
+      "T2_EXECUTED",
+    ]);
+    const trail = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "evt-trail-after-t2",
+      at: "2026-09-02T13:00:00.000Z",
+      previousStop: 98,
+      newStop: 101,
+    });
+    expect(trail.ok).toBe(true);
+    if (trail.ok) {
+      expect(trail.stage).toBe("trailing");
+      expect(trail.lineagePath).toBe("trail");
+    }
+  });
+
+  it("rejects SHORT trail relaxation", () => {
+    let log: LifecycleStoreEvent[] = [];
+    const open = appendValidatedLifecycleEvent(log, {
+      kind: "POSITION_OPENED",
+      eventId: "open-short",
+      side: "SHORT",
+    });
+    expect(open.ok).toBe(true);
+    if (!open.ok) return;
+    log = open.log;
+    const t1 = appendValidatedLifecycleEvent(log, {
+      kind: "T1_EXECUTED",
+      eventId: "t1-short",
+      side: "SHORT",
+    });
+    expect(t1.ok).toBe(true);
+    if (!t1.ok) return;
+    log = t1.log;
+    const relax = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "evt-relax-short",
+      side: "SHORT",
+      previousStop: 110,
+      newStop: 115,
+    });
+    expect(relax.ok).toBe(false);
+    if (!relax.ok) expect(relax.error.code).toBe("trail_relaxation");
+  });
+
+  it("trail geometry uses last fill not mock 106", () => {
+    let log: LifecycleStoreEvent[] = [];
+    const open = appendValidatedLifecycleEvent(log, {
+      kind: "POSITION_OPENED",
+      eventId: "open-hi",
+      quantity: 10,
+      price: 200,
+      fillId: "fill-open-hi",
+    });
+    expect(open.ok).toBe(true);
+    if (!open.ok) return;
+    log = open.log;
+    const t1 = appendValidatedLifecycleEvent(log, {
+      kind: "T1_EXECUTED",
+      eventId: "t1-hi",
+      quantity: 5,
+      price: 230,
+      fillId: "fill-t1-hi",
+    });
+    expect(t1.ok).toBe(true);
+    if (!t1.ok) return;
+    log = t1.log;
+    const trail = appendValidatedLifecycleEvent(log, {
+      kind: "TRAIL_APPLIED",
+      eventId: "evt-trail-hi",
+      at: "2026-09-02T12:00:00.000Z",
+      previousStop: 190,
+      newStop: 220,
+    });
+    expect(trail.ok).toBe(true);
+    if (trail.ok) expect(trail.stage).toBe("trailing");
   });
 });
 

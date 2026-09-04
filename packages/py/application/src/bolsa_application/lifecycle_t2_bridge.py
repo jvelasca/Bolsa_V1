@@ -74,11 +74,14 @@ def needs_atomic_t2_pair(
     existing: list[LifecycleStoreEvent],
     execute_event: LifecycleEventInput,
 ) -> bool:
-    """True when T2_EXECUTED must be paired with a fresh T2_TRIGGERED from t1_executed."""
+    """True when T2_EXECUTED must be paired with a fresh T2_TRIGGERED.
+
+    V1.98: legal from ``t1_executed`` or ``trailing`` (trail + T2 coexist).
+    """
     if execute_event.kind != "T2_EXECUTED" or not existing:
         return False
     stage, _ = reduce_lifecycle_events(existing)
-    return stage == "t1_executed"
+    return stage in ("t1_executed", "trailing")
 
 
 # Backward-compatible name: V1.97 AppendLifecycleEvent.execute owns the pair.
