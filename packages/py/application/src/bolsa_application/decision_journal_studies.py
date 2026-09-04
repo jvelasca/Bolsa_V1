@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from bolsa_analytics.cognitive.operational_levels import validate_operational_levels
 from bolsa_application.decision_board import (
+    extract_session_mfe_mae,
     extract_session_thesis_health,
     extract_session_trade_plan,
 )
@@ -522,9 +523,13 @@ class DecisionJournalStudyView:
     next_review_at: str | None = None
     trade_plan_status: str | None = None
     action: str | None = None
+    # V2.27 — eco runtime.mfeMae (advisory). No inventar picos de vida.
+    mfe_mae: dict[str, Any] | None = None
+    # V2.27 — SessionOutcome.verdict only (≠ Final R / returnPct).
+    learning_verdict: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "artifactType": ARTIFACT_TYPE,
             "schemaVersion": SCHEMA_VERSION,
             "sessionId": self.session_id,
@@ -563,6 +568,11 @@ class DecisionJournalStudyView:
             "tradePlanStatus": self.trade_plan_status,
             "action": self.action,
         }
+        if self.mfe_mae is not None:
+            out["mfeMae"] = dict(self.mfe_mae)
+        if self.learning_verdict is not None:
+            out["learningVerdict"] = self.learning_verdict
+        return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -634,6 +644,24 @@ def _exit_reason_from_position(record: Any) -> str | None:
         return None
     reason = exit_plan.get("primaryReason") or exit_plan.get("primary_reason")
     return str(reason) if reason else None
+
+
+_LEARNING_VERDICTS = frozenset({"hit", "miss", "neutral", "invalid", "skipped"})
+
+
+def extract_session_learning_verdict(
+    payload: dict[str, Any] | None,
+) -> str | None:
+    """Lee ``payload.outcome.verdict`` (learning). No usa returnPct como R."""
+    if not isinstance(payload, dict):
+        return None
+    outcome = payload.get("outcome")
+    if not isinstance(outcome, dict):
+        return None
+    verdict = outcome.get("verdict")
+    if isinstance(verdict, str) and verdict in _LEARNING_VERDICTS:
+        return verdict
+    return None
 
 
 def build_study_view(
@@ -742,6 +770,8 @@ def build_study_view(
         next_review_at=expires_at,
         trade_plan_status=plan_status,
         action=action,
+        mfe_mae=extract_session_mfe_mae(payload),
+        learning_verdict=extract_session_learning_verdict(payload),
     )
 
 

@@ -1,10 +1,10 @@
 # RELEVO — V2.3 Mercado Polish (2026-09-04)
 
 > **Padre:** [relevo V2.2 Operator Certification](./traspaso-relevo-v2-2-operator-certification-2026-09-04.md) · tip [`v2.1-beta`](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md) `5f095d67`.  
-> **Estado:** **ABIERTO** · IDs V2.24–V2.28 · **V2.24–V2.26 hechos** · tip código [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) · next agente = V2.27.  
+> **Estado:** **CERRADO en código** · IDs V2.24–V2.27 · tip previo [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) · V2.27 Journal spine entregado.  
 > **Para quién:** ops · UX operativa · no reabrir motor FSM · no tip `v2.3-*` salvo petición explícita.  
-> **Partida:** V2.2 CERRADO en código (Operating Truth + golden 02/03/04) · smoke browser V2.2 aún pendiente ops.  
-> **Arranque nuevo agente:** [arranque post-V2.26](./arranque-agente-post-v2-26-2026-09-04.md).
+> **Partida:** V2.2 CERRADO · smoke browser **V2.3-ops** (criterio 10 s) aún pendiente sesión ops.  
+> **Next:** [V2.4 Cabin Coherence](./traspaso-relevo-v2-4-cabin-coherence-2026-09-04.md) · [arranque post-V2.27](./arranque-agente-post-v2-27-2026-09-04.md).
 
 ## Objetivo
 
@@ -27,13 +27,15 @@ Todo lo demás (Avanzado, jerga motor, debug) queda bajo nivel 4 o colapsado.
 
 ## IDs (orden)
 
-| ID        | Entrega                                             | Notas                                                                                             |
-| --------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **V2.24** | Composición 4 niveles en DECISIÓN                   | Layout explícito L1→L4 · sin reordenar autoridad · testids por nivel                              |
-| **V2.25** | Densidad · tipografía · espaciado · color semántico | Jerarquía de tamaños · estados vacíos/loading/error · a11y teclado · responsive cabina            |
-| **V2.26** | Escalera trailing visual                            | Entrada→Stop→T1→T2→Trail en Position Card / chart · % ExitPolicy 30/30 · no hardcode 25/25        |
-| **V2.27** | Journal spine + MFE/MAE                             | TESIS→…→RESULTADO · Initial Risk · Realized/Final R · MFE · MAE · SoT `decision_sessions` intacto |
-| **V2.28** | Ops smoke criterio 10 s                             | Browser: valor ESTUDIO → entiende acción/riesgo/protección/plan sin salir de MERCADO              |
+| ID           | Entrega                                             | Notas                                                                                     |
+| ------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **V2.24**    | Composición 4 niveles en DECISIÓN                   | Layout explícito L1→L4 · sin reordenar autoridad · testids por nivel                      |
+| **V2.25**    | Densidad · tipografía · espaciado · color semántico | Jerarquía de tamaños · estados vacíos/loading/error · a11y teclado · responsive cabina    |
+| **V2.26**    | Escalera trailing visual                            | Entrada→Stop→T1→T2·Trail · % ExitPolicy 30/30 · no hardcode 25/25                         |
+| **V2.27**    | Journal spine + MFE/MAE                             | TESIS→…→RESULTADO · Initial Risk · Realized/Final R · MFE · MAE · SoT `decision_sessions` |
+| **V2.3-ops** | Ops smoke criterio 10 s                             | Browser (sesión ops, paralelo) · **no** es el ID de producto V2.28 de V2.4                |
+
+> **Nota ID:** el producto **V2.28** = PLAN DE POSICIÓN vive en [V2.4](./traspaso-relevo-v2-4-cabin-coherence-2026-09-04.md). El smoke 10 s se etiqueta **V2.3-ops** para no colisionar.
 
 ## Principio
 
@@ -48,20 +50,21 @@ V2.3 es **polish de composición**, no nueva Operating Truth. Reutilizar `Operat
 | **V2.24** | Composición 4 niveles DECISIÓN   | `OperatorCabinLevel` · journey HUD L1–L4 · entry L1–L4 · cockpit `data-cabin-composition`         |
 | **V2.25** | Densidad · color · a11y · status | `CABIN_TYPE` / `CABIN_FOCUS_RING` · protección semántica · `OperatorCabinStatus` · mission active |
 | **V2.26** | Escalera trailing visual         | `buildOperatorExitLadder` · `OperatorExitLadder` · chart `T1 · 30%` / `T2 · 30%` (ExitPolicy)     |
+| **V2.27** | Journal spine + MFE/MAE          | `buildJournalSpineView` · ficha `journal-spine` / `journal-mfe-mae` · eco `runtime.mfeMae`        |
 
 ## OUT / next
 
-- **Siguiente agente:** [arranque post-V2.26](./arranque-agente-post-v2-26-2026-09-04.md) → **V2.27** Journal spine + MFE/MAE
-- V2.28 Ops smoke criterio 10 s (sesión ops; puede ir en paralelo)
+- **Siguiente agente:** [arranque post-V2.27](./arranque-agente-post-v2-27-2026-09-04.md) → **V2.28** PLAN DE POSICIÓN (V2.4)
+- **V2.3-ops** smoke browser 10 s (sesión ops; paralelo; no bloquea V2.4)
 - Tip `v2.3-*` solo con petición explícita post-smoke
 - No reabrir certificación V2.19–V2.23 salvo regresión
-- V2.26 auditable en GitHub tras push de este corte
+- **NO MÁS PANELES** en Mercado — coherencia de cabina = V2.4
 
-## Pre-flight (partida = suite V2.2)
+## Pre-flight (partida = suite V2.2 + Journal)
 
 ```bash
-cd packages/shared && npm run build && npx vitest run src/cognitive/operator-cabin-view.test.ts src/cognitive/daily-desk.test.ts src/cognitive/protect-stop-source.test.ts src/cognitive/g-operator-01-golden-journey.test.ts src/cognitive/g-operator-02-golden-journey.test.ts src/cognitive/g-operator-03-protect-journey.test.ts src/cognitive/g-operator-04-protect-fail.test.ts src/cognitive/same-operational-truth-across-surfaces.test.ts src/cognitive/position-operating-truth.test.ts
-cd apps/web && npx vitest run src/features/operations/propose-position-exit.test.ts src/features/trading/f3-protect-stop-block.test.tsx src/features/charts/operational-plan-chart-levels.test.ts src/features/trading/decision-surface-journey.test.tsx src/features/mesa/mesa-hoy-view.test.ts src/features/trading/position-operating-summary.test.tsx
+cd packages/shared && npm run build && npx vitest run src/cognitive/operator-cabin-view.test.ts src/cognitive/journal-spine-view.test.ts src/cognitive/g-operator-02-golden-journey.test.ts
+cd apps/web && npx vitest run src/features/decision-journal/decision-ficha-panel.test.ts src/features/decision-journal/decision-ficha-panel.render.test.tsx src/features/trading/operator-cabin-ui.test.tsx
 ```
 
 ## Ops smoke (pendiente)

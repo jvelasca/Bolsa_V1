@@ -1,10 +1,12 @@
 /**
  * V2.0 — Journey HUD on DecisionSurfaceCompact (position).
+ * V2.32 — contractual stop / T1 / T2 / remaining / next action = OperatorDecision.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildOperatorDecision,
   buildPaperAutoPosture,
   buildPositionJourneyReadout,
   type PositionDto,
@@ -123,6 +125,7 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
         .getAttribute("data-protection-kind"),
     ).toBe("technical");
     expect(screen.getByTestId("journey-remaining").textContent).toMatch(/%/);
+    expect(screen.getByTestId("operator-position-plan")).toBeTruthy();
     expect(screen.getByTestId("operator-exit-ladder")).toBeTruthy();
     expect(
       screen.getByTestId("exit-ladder-rung-t1").getAttribute("data-reduce-pct"),
@@ -145,6 +148,7 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
         .getByTestId("position-journey-hud")
         .getAttribute("data-log-has-t2"),
     ).toBe("1");
+    fireEvent.click(screen.getByTestId("journey-advanced-toggle"));
     expect(screen.getByTestId("journey-auto-posture").textContent).toMatch(
       /ejecución demo off|armado ≠ ejecución/i,
     );
@@ -189,7 +193,7 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
     ).toMatch(/riesgo/i);
     expect(
       hud.querySelector('[data-testid="cabin-level-3-label"]')?.textContent,
-    ).toMatch(/después/i);
+    ).toMatch(/plan/i);
     expect(
       screen
         .getByTestId("journey-next-action")
@@ -203,5 +207,66 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
         .getByTestId("operator-mission-checklist")
         .closest('[data-cabin-level="3"]'),
     ).toBeTruthy();
+  });
+
+  it("V2.32 — Mercado HUD matches OperatorDecision stop/T1/T2/remaining/next", () => {
+    const journey = buildPositionJourneyReadout({
+      view,
+      initialRisk: 50,
+      initialStop: 95,
+      realizedR: 3,
+      direction: "long",
+      lifecycle: {
+        stage: "trailing",
+        lineagePath: "trail",
+        events: [
+          { kind: "T1_EXECUTED" },
+          { kind: "T2_EXECUTED" },
+          { kind: "TRAIL_APPLIED" },
+        ],
+      },
+    });
+    const decision = buildOperatorDecision({
+      kind: "position",
+      primaryAction: journey.primaryAction,
+      journey,
+      birthQuantity: 10,
+      currentStop: journey.trail.currentStop,
+      entry: journey.entry,
+    });
+
+    render(
+      <DecisionSurfaceCompact
+        variant="position"
+        position={position}
+        symbol="NVDA"
+        view={view}
+        journey={journey}
+      />,
+    );
+
+    const hud = screen.getByTestId("position-journey-hud");
+    expect(hud.getAttribute("data-operator-journey")).toBe("v2.32");
+    expect(screen.getByTestId("next-action-title").textContent).toBe(
+      decision.currentAction.title,
+    );
+    expect(screen.getByTestId("journey-current-stop").textContent).toMatch(
+      String(decision.plan.stop),
+    );
+    expect(screen.getByTestId("journey-t1").textContent).toMatch(
+      String(decision.plan.t1),
+    );
+    expect(screen.getByTestId("journey-t2").textContent).toMatch(
+      String(decision.plan.t2),
+    );
+    expect(screen.getByTestId("journey-remaining").textContent).toMatch(
+      String(decision.remaining?.remainingPct),
+    );
+    expect(
+      screen.getByTestId("exit-ladder-rung-t1").getAttribute("data-reduce-pct"),
+    ).toBe(String(decision.plan.t1Pct));
+    expect(
+      screen.getByTestId("exit-ladder-rung-t2").getAttribute("data-reduce-pct"),
+    ).toBe(String(decision.plan.t2Pct));
   });
 });

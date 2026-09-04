@@ -5,7 +5,9 @@
  */
 
 import type { DecisionAction } from "./decision-package.js";
+import type { SessionOutcomeVerdict } from "./decision-session.js";
 import type { ExitReasonV1 } from "./exit-plan.js";
+import type { MfeMaeV1 } from "./mfe-mae.js";
 import { validateOperationalLevels } from "./operational-levels.js";
 import type { PositionStatusV1 } from "./position-state.js";
 import type { DirectionalBias } from "./technical-assessment.js";
@@ -163,6 +165,14 @@ export type DecisionJournalStudyViewV1 = {
   nextReviewAt: string | null;
   tradePlanStatus: TradePlanStatusV1 | null;
   action: DecisionAction | null;
+  /**
+   * V2.27 — eco opcional de `runtime.mfeMae` (session SoT). No es pico de vida completa.
+   */
+  mfeMae?: MfeMaeV1 | null;
+  /**
+   * V2.27 — veredicto de aprendizaje (`SessionOutcome.verdict`). No es Final R.
+   */
+  learningVerdict?: SessionOutcomeVerdict | null;
 };
 
 export type MapJournalStudyStatusInput = {
@@ -212,6 +222,10 @@ export type BuildJournalStudyViewInput = {
   reevaluateWhen?: string[] | null;
   thesisHealthWhy?: string[] | null;
   expiresAt?: string | null;
+  /** V2.27 — session runtime.mfeMae echo. */
+  mfeMae?: MfeMaeV1 | null;
+  /** V2.27 — SessionOutcome.verdict only (not returnPct). */
+  learningVerdict?: SessionOutcomeVerdict | null;
 };
 
 const EMPTY_GEOMETRY: JournalStudyGeometryV1 = {
@@ -740,6 +754,8 @@ export function buildJournalStudyView(
     nextReviewAt: input.expiresAt ?? input.tradePlan?.expiresAt ?? null,
     tradePlanStatus: input.tradePlan?.status ?? null,
     action: input.action ?? null,
+    mfeMae: input.mfeMae ?? null,
+    learningVerdict: input.learningVerdict ?? null,
   };
 }
 

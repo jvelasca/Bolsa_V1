@@ -98,7 +98,7 @@ export function ExitRouteView({
         </div>
       ))}
       <p className="mt-1 text-[9px] text-muted-foreground">
-        Stop operativo ≠ orden broker · T2 trailing = propuesta thin.
+        Stop planificado ≠ stop confirmado en libro.
       </p>
     </div>
   );

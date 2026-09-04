@@ -83,20 +83,18 @@ export function buildMesaProtectionState(
   }
 
   let summaryLabel = "Sin protección";
-  if (discrepancy) {
-    summaryLabel = "Discrepancia";
+  if (input.persistSkipped) {
+    summaryLabel = "Enviado";
   } else if (hasExecuted) {
-    summaryLabel = "Confirmada";
-  } else if (hasProposal) {
-    summaryLabel = "Planificada";
-  } else if (hasPlan) {
-    summaryLabel = "Plan";
+    summaryLabel = "Protegido";
+  } else if (hasProposal || hasPlan) {
+    summaryLabel = "Planificado";
   }
 
   return {
     plan: line("plan", "Plan (inicial)", planStop),
-    proposal: line("proposal", "Propuesta", proposalStop),
-    executed: line("executed", "Stop vigente", executedStop),
+    proposal: line("proposal", "Sugerido", proposalStop),
+    executed: line("executed", "Ejecución", executedStop),
     discrepancy,
     summaryLabel,
   };
@@ -119,7 +117,7 @@ export function stopDistancePct(
   return Math.round(((lastPrice - stop) / lastPrice) * 1000) / 10;
 }
 
-/** KPI cartera — posiciones con stop Confirmada / N abiertas. */
+/** KPI cartera — posiciones con stop Protegido / N abiertas. */
 export type MesaProtectionKpiV1 = {
   protected: number;
   open: number;
@@ -137,7 +135,7 @@ export function aggregateMesaProtectionKpi(
   let protectedCount = 0;
   let discrepancies = 0;
   for (const s of states) {
-    if (s.summaryLabel === "Confirmada") protectedCount += 1;
+    if (s.summaryLabel === "Protegido") protectedCount += 1;
     if (s.discrepancy) discrepancies += 1;
   }
   return {

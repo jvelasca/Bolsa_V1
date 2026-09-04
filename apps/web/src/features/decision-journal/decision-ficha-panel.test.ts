@@ -57,7 +57,7 @@ describe("DecisionFichaPanel honesty wiring (V1.41.2)", () => {
     );
     expect(ficha).toMatch(/buildTradeStory\(\{/);
     expect(ficha).toMatch(/data-testid="ficha-trade-story"/);
-    expect(ficha).toMatch(/Historia de la operación/);
+    expect(ficha).toMatch(/Eventos con marca de tiempo/);
     expect(ficha).toMatch(/journalEntries/);
     const page = readFileSync(
       resolve(__dirname, "decision-journal-page.tsx"),
@@ -65,5 +65,19 @@ describe("DecisionFichaPanel honesty wiring (V1.41.2)", () => {
     );
     expect(page).toMatch(/journalEntries=\{selectedJournalEntries\}/);
     expect(page).toMatch(/decision-journal-story/);
+  });
+
+  it("V2.27 wires journal spine + RESULTADO metrics (display-only)", () => {
+    const ficha = readFileSync(
+      resolve(__dirname, "decision-ficha-panel.tsx"),
+      "utf8",
+    );
+    expect(ficha).toMatch(/buildJournalSpineView\(\{/);
+    expect(ficha).toMatch(/data-testid="journal-spine"/);
+    expect(ficha).toMatch(/journal-spine-step-\$/);
+    expect(ficha).toMatch(/data-testid="journal-result-metrics"/);
+    expect(ficha).toMatch(/data-testid="journal-mfe-mae"/);
+    expect(ficha).toMatch(/formatJournalMfeMaeLine/);
+    expect(ficha).toMatch(/positionState: null/);
   });
 });

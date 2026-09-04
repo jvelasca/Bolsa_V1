@@ -18,6 +18,13 @@
   --color-destructive: var(--bolsa-destructive);
   --color-success: var(--bolsa-success);
   --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  /* V2.31 Premium Visual System — 3 tamaños cabina (héroe / operativa / meta). */
+  --text-cabin-hero: 1.125rem;
+  --text-cabin-hero--line-height: 1.15;
+  --text-cabin-operativa: 0.8125rem;
+  --text-cabin-operativa--line-height: 1.35;
+  --text-cabin-meta: 0.6875rem;
+  --text-cabin-meta--line-height: 1.4;
 }
 
 /* Tokens runtime — default dark (producto histórico). */
@@ -73,6 +80,24 @@ body {
   min-height: 100vh;
 }
 
+/* V2.31 — tamaños de cabina como clases propias (no `text-*`, evita choque con color en twMerge). */
+.cabin-type-hero {
+  font-size: var(--cabin-type-hero, 1.125rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+}
+
+.cabin-type-operativa {
+  font-size: var(--cabin-type-operativa, 0.8125rem);
+  line-height: 1.35;
+}
+
+.cabin-type-meta {
+  font-size: var(--cabin-type-meta, 0.6875rem);
+  line-height: 1.4;
+}
+
 /* Scrollbars finos */
 :root {
   --density-pad: 0.75rem;
@@ -81,6 +106,11 @@ body {
   --density-topbar-py: 0.375rem;
   --density-topbar-h: 3rem;
   --density-font-shell: 1rem;
+  /* V2.31 — floor tipográfico cabina = meta (11px). Sin 9px/10px en A–B. */
+  --cabin-type-hero: var(--text-cabin-hero);
+  --cabin-type-operativa: var(--text-cabin-operativa);
+  --cabin-type-meta: var(--text-cabin-meta);
+  --cabin-num-weight: 600;
   scrollbar-color: color-mix(in srgb, var(--color-border) 85%, transparent)
     transparent;
   scrollbar-width: thin;

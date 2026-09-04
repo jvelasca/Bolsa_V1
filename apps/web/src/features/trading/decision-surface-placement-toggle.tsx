@@ -3,6 +3,7 @@
  */
 
 import { cn } from "@/lib/utils";
+import { CABIN_TYPE } from "@/features/trading/cabin-visual";
 import {
   useMercadoDecisionSurfacePrefs,
   useSetDecisionSurfacePlacement,
@@ -40,7 +41,7 @@ export function DecisionSurfacePlacementToggle({
           type="button"
           className={cn(
             "rounded px-1.5 font-medium transition-colors",
-            size === "sm" ? "text-[9px]" : "text-[11px]",
+            size === "md" ? CABIN_TYPE.operativa : CABIN_TYPE.meta,
             placement === opt.id
               ? "bg-accent text-foreground"
               : "text-muted-foreground hover:text-foreground",

@@ -50,6 +50,7 @@ import { ChartCursorStyleOverlay } from "@/features/charts/chart-cursor-style-ov
 import { ChartF3OrderProjectionLayer } from "@/features/charts/chart-f3-order-projection-layer";
 import { ChartOperationalPlanLevelsLayer } from "@/features/charts/chart-operational-plan-levels-layer";
 import { ChartDecisionSurfaceHud } from "@/features/charts/chart-decision-surface-hud";
+import { ChartFocusToggle } from "@/features/charts/chart-focus-toggle";
 import type { DecisionSurfacePlacementV1 } from "@/features/trading/mercado-decision-surface-prefs";
 import { ChartTimeAxisLabel } from "@/features/charts/chart-time-axis-label";
 import {
@@ -1110,6 +1111,9 @@ export function OhlcvChart({
           instrumentId={instrumentId}
           chartReady={chartReady}
         />
+      ) : null}
+      {showOperationalPlanLevels && chartReady && hasChartData(bars) ? (
+        <ChartFocusToggle className="absolute bottom-2 left-2 z-20" />
       ) : null}
       {showOperationalPlanLevels &&
       decisionSurfacePlacement === "chart" &&

@@ -189,4 +189,22 @@ describe("PositionOperatingSummary V1.39", () => {
       screen.getByTestId("position-operating-secondary").textContent,
     ).toMatch(/protección discrepante/i);
   });
+
+  it("V2.32 — Journal remaining/next come from OperatorDecision", () => {
+    render(
+      <PositionOperatingSummary
+        position={openPosition()}
+        portfolioReconStatus="ok"
+      />,
+    );
+    const root = screen.getByTestId("position-operating-summary");
+    expect(root.getAttribute("data-operator-journey")).toBe("v2.32");
+    expect(root.getAttribute("data-operator-action")).toBe("MANTENER");
+    expect(screen.getByTestId("journal-remaining").textContent).toMatch(/%/);
+    expect(
+      screen
+        .getByTestId("journal-protection-kind")
+        .getAttribute("data-protection-kind"),
+    ).toMatch(/technical|emergency/);
+  });
 });

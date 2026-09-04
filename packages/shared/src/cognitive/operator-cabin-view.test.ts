@@ -13,6 +13,7 @@ import {
   buildOperatorNextActionFromCockpitPhase,
   buildOperatorNextActionFromEntry,
   buildOperatorNextActionFromPosition,
+  buildOperatorPositionPlan,
   buildOperatorProtectionState,
   buildOperatorRiskBox,
   mesaNextActionFromOperatorDecision,
@@ -440,13 +441,70 @@ describe("V2.19–V2.22 OperatorDecision + protection + remaining", () => {
     expect(steps.find((s) => s.id === "remaining")?.detail).toMatch(/100/);
   });
 
+  it("V2.28 PLAN DE LA POSICIÓN fuses mission + remaining", () => {
+    const plan = buildOperatorPositionPlan(protectedJourney, {
+      birthQuantity: 62,
+    });
+    expect(plan.steps.map((s) => s.id)).toEqual([
+      "entry",
+      "protection",
+      "t1",
+      "t2",
+      "trail",
+      "exit",
+    ]);
+    expect(plan.steps.find((s) => s.id === "protection")?.label).toBe(
+      "Protección",
+    );
+    expect(plan.steps.find((s) => s.id === "trail")?.label).toMatch(/Gestión/);
+    expect(plan.steps.find((s) => s.id === "exit")?.detail).toMatch(/RESTANTE/);
+    expect(plan.remainingPct).toBe(100);
+  });
+
   it("protection state none vs technical", () => {
     expect(buildOperatorProtectionState({ executedStop: null }).kind).toBe(
+      "none",
+    );
+    expect(buildOperatorProtectionState({ executedStop: null }).phase).toBe(
       "none",
     );
     expect(
       buildOperatorProtectionState({ executedStop: 176.8, protectKind: "plan" })
         .kind,
     ).toBe("technical");
+    expect(
+      buildOperatorProtectionState({ executedStop: 176.8, protectKind: "plan" })
+        .phase,
+    ).toBe("protected");
+  });
+
+  it("V2.29 planned stop → Planificado, executed → Protegido, persist → Enviado", () => {
+    const planned = buildOperatorProtectionState({
+      plannedStop: 176.8,
+      executedStop: null,
+    });
+    expect(planned.kind).toBe("none");
+    expect(planned.phase).toBe("planned");
+    expect(planned.phaseLabel).toBe("Planificado");
+    expect(planned.stop).toBeNull();
+    expect(planned.plannedStop).toBe(176.8);
+
+    const protectedState = buildOperatorProtectionState({
+      plannedStop: 176.8,
+      executedStop: 176.8,
+      protectKind: "plan",
+    });
+    expect(protectedState.phase).toBe("protected");
+    expect(protectedState.phaseLabel).toBe("Protegido");
+    expect(protectedState.stop).toBe(176.8);
+
+    const sent = buildOperatorProtectionState({
+      plannedStop: 176.8,
+      executedStop: 176.8,
+      persistSkipped: true,
+    });
+    expect(sent.phase).toBe("sent");
+    expect(sent.phaseLabel).toBe("Enviado");
+    expect(sent.stop).toBeNull();
   });
 });

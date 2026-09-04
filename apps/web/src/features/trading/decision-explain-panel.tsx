@@ -5,6 +5,11 @@
 
 import type { DecisionExplainViewV1 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import {
+  CABIN_TYPE,
+  CabinSectionLabel,
+  cabinNumClass,
+} from "@/features/trading/operator-cabin-ui";
 
 type DecisionExplainPanelProps = {
   view: DecisionExplainViewV1 | null;
@@ -13,11 +18,7 @@ type DecisionExplainPanelProps = {
 };
 
 function SectionLabel({ children }: { children: string }) {
-  return (
-    <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/90">
-      {children}
-    </p>
-  );
+  return <CabinSectionLabel>{children}</CabinSectionLabel>;
 }
 
 function KeyValueRows({
@@ -29,15 +30,12 @@ function KeyValueRows({
 }) {
   if (rows.length === 0) return null;
   return (
-    <dl
-      className="space-y-0.5 text-[10px] text-muted-foreground"
-      data-testid={testId}
-    >
+    <dl className={cn("space-y-0.5", CABIN_TYPE.meta)} data-testid={testId}>
       {rows.map((row) => (
         <div key={row.label} className="flex justify-between gap-2">
           <dt>{row.label}</dt>
           <dd
-            className="text-right font-medium text-foreground"
+            className={cn("text-right", cabinNumClass())}
             data-testid={row.testId}
           >
             {row.value}
@@ -51,7 +49,7 @@ function KeyValueRows({
 function BulletList({ items }: { items: string[] }) {
   if (items.length === 0) return null;
   return (
-    <ul className="list-disc space-y-0.5 pl-4 text-[10px] text-foreground">
+    <ul className={cn("list-disc space-y-0.5 pl-4", CABIN_TYPE.operativa)}>
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}
@@ -86,7 +84,7 @@ export function DecisionExplainPanel({
   if (loading) {
     return (
       <p
-        className={cn("mt-1.5 text-[10px] text-muted-foreground", className)}
+        className={cn("mt-1.5", CABIN_TYPE.meta, className)}
         data-testid="decision-explain-panel"
       >
         Cargando explicación…
@@ -96,7 +94,7 @@ export function DecisionExplainPanel({
   if (!view) {
     return (
       <p
-        className={cn("mt-1.5 text-[10px] text-muted-foreground", className)}
+        className={cn("mt-1.5", CABIN_TYPE.meta, className)}
         data-testid="decision-explain-panel"
       >
         Sin explicación disponible.
@@ -233,7 +231,7 @@ export function DecisionExplainPanel({
   if (!hasContent) {
     return (
       <p
-        className={cn("mt-1.5 text-[10px] text-muted-foreground", className)}
+        className={cn("mt-1.5", CABIN_TYPE.meta, className)}
         data-testid="decision-explain-panel"
       >
         Sin explicación disponible.
@@ -273,7 +271,7 @@ export function DecisionExplainPanel({
       {view.factors?.length ? (
         <section data-testid="decision-explain-section-why">
           <SectionLabel>Por qué</SectionLabel>
-          <ul className="space-y-0.5 text-[10px] text-foreground">
+          <ul className={cn("space-y-0.5", CABIN_TYPE.operativa)}>
             {view.factors.map((item) => (
               <li
                 key={item.id}
@@ -326,9 +324,7 @@ export function DecisionExplainPanel({
 
       <section data-testid="decision-explain-section-authorization">
         <SectionLabel>Autorización</SectionLabel>
-        <p className="text-[10px] text-muted-foreground">
-          {view.authorization.copy}
-        </p>
+        <p className={CABIN_TYPE.meta}>{view.authorization.copy}</p>
         <KeyValueRows rows={authRows} />
       </section>
 

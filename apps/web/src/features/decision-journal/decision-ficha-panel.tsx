@@ -7,8 +7,10 @@ import {
   buildOperationalPlanFromStudy,
   buildEntryOperatingTruth,
   buildExecutionState,
+  buildJournalSpineView,
   buildPositionOperatingTruth,
   buildTradeStory,
+  formatJournalMfeMaeLine,
   journalStudyConsensusPercents,
   type DecisionJournalEntryV1,
   type DecisionJournalStudyViewV1,
@@ -98,6 +100,31 @@ function formatStoryAsOf(asOf: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatRMetric(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const abs = Math.abs(value);
+  const body = Number.isInteger(abs) ? String(abs) : abs.toFixed(2);
+  return `${value < 0 ? "−" : ""}${body}R`;
+}
+
+const LEARNING_VERDICT_LABELS: Record<string, string> = {
+  hit: "Acierto",
+  miss: "Fallo",
+  neutral: "Neutral",
+  invalid: "Inválido",
+  skipped: "Omitido",
+};
+
+function spineStepTone(state: string): string {
+  if (state === "done")
+    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200";
+  if (state === "current")
+    return "border-primary/50 bg-primary/10 text-foreground font-semibold";
+  if (state === "unknown")
+    return "border-amber-500/30 bg-amber-500/5 text-amber-900 dark:text-amber-200";
+  return "border-border/60 bg-muted/20 text-muted-foreground";
 }
 
 export function DecisionFichaPanel({
@@ -198,6 +225,19 @@ export function DecisionFichaPanel({
     submitIntent: submitIntent ?? null,
     executionState: tradeStoryExecution,
   });
+  const spine = buildJournalSpineView({
+    study,
+    tradeStory,
+    // Thin PositionDto does not carry realizedR / life peaks — do not invent.
+    positionState: null,
+  });
+  const showResultMetrics =
+    spine.result.initialRiskR != null ||
+    spine.result.realizedR != null ||
+    spine.result.finalR != null ||
+    spine.result.mfeMae != null ||
+    spine.result.learningVerdict != null ||
+    study.status === "closed";
 
   return (
     <aside
@@ -442,17 +482,134 @@ export function DecisionFichaPanel({
           </p>
         ) : null}
 
-        <section data-testid="ficha-trade-story">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Historia de la operación
+        <section
+          className="rounded-lg border border-border/70 bg-muted/10 p-3"
+          data-testid="journal-spine"
+          aria-label="Cadena de la operación"
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Cadena de la operación
           </p>
+          <ol className="mt-2 flex flex-wrap gap-1.5">
+            {spine.steps.map((step) => (
+              <li
+                key={step.id}
+                className={cn(
+                  "rounded-md border px-2 py-1 text-[11px]",
+                  spineStepTone(step.state),
+                )}
+                data-testid={`journal-spine-step-${step.id}`}
+                data-state={step.state}
+                title={
+                  step.asOf
+                    ? `${step.label} · ${formatStoryAsOf(step.asOf)}`
+                    : step.label
+                }
+              >
+                <span>{step.label}</span>
+                {step.state === "done" ? (
+                  <span className="ml-1 opacity-70" aria-hidden>
+                    ✓
+                  </span>
+                ) : null}
+                {step.state === "current" ? (
+                  <span className="ml-1 opacity-70" aria-hidden>
+                    ●
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Solo hechos con marca de tiempo. Plan ≠ alcanzado. Trail hint ≠
+            aplicado.
+          </p>
+        </section>
+
+        {showResultMetrics ? (
+          <section
+            className="rounded-lg border border-border/70 bg-card p-3"
+            data-testid="journal-result-metrics"
+            aria-label="Resultado"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Resultado
+            </p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs sm:grid-cols-3">
+              <div>
+                <dt className="text-muted-foreground">Riesgo inicial</dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="journal-initial-risk-r"
+                >
+                  {formatRMetric(spine.result.initialRiskR)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">R realizado</dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="journal-realized-r"
+                >
+                  {formatRMetric(spine.result.realizedR)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">R final</dt>
+                <dd
+                  className="font-medium tabular-nums"
+                  data-testid="journal-final-r"
+                >
+                  {formatRMetric(spine.result.finalR)}
+                </dd>
+              </div>
+            </dl>
+            {spine.result.mfeMae ? (
+              <div className="mt-3" data-testid="journal-mfe-mae">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Excursión
+                </p>
+                <p className="mt-1 text-sm tabular-nums">
+                  {formatJournalMfeMaeLine(spine.result.mfeMae)}
+                </p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                  Máximo a favor / máximo en contra (foto de sesión).
+                </p>
+              </div>
+            ) : null}
+            {spine.result.learningVerdict ? (
+              <p
+                className="mt-2 text-[11px] text-muted-foreground"
+                data-testid="journal-learning-verdict"
+              >
+                Aprendizaje tesis:{" "}
+                <span className="font-medium text-foreground">
+                  {LEARNING_VERDICT_LABELS[spine.result.learningVerdict] ??
+                    spine.result.learningVerdict}
+                </span>
+                <span className="ml-1">· no es R final</span>
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
+        <details
+          className="rounded-md border border-border/60 p-2"
+          data-testid="ficha-trade-story"
+        >
+          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Eventos con marca de tiempo
+            {tradeStory.events.length > 0
+              ? ` · ${tradeStory.events.length}`
+              : ""}
+          </summary>
           {tradeStory.events.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               Sin eventos con marca de tiempo. No se inventan fases desde el
               estado actual (preparada/trigger/T1 sin stamp).
             </p>
           ) : (
-            <ol className="space-y-1.5 text-xs">
+            <ol className="mt-2 space-y-1.5 text-xs">
               {tradeStory.events.map((ev) => (
                 <li
                   key={ev.eventId}
@@ -472,7 +629,7 @@ export function DecisionFichaPanel({
           <p className="mt-1 text-[10px] text-muted-foreground">
             Distinto del Historial técnico (audit spine). Trail hint ≠ aplicado.
           </p>
-        </section>
+        </details>
 
         <details
           className="rounded-md border border-border/60 p-2"

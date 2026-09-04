@@ -1,6 +1,7 @@
 /**
- * Protección Cartera — KPI Confirmada / N en Hoy.
+ * Protección Cartera — KPI Protegido / N en Hoy.
  * V1.31.2 — agregado sobre buildMesaProtectionState (≠ Cobertura Estudio).
+ * V2.29 — sin «propuesta thin» · Planificado ≠ Protegido.
  */
 
 import { cn } from "@/lib/utils";
@@ -76,7 +77,7 @@ export function MesaProteccionKpi({
         {protectedCount}
         <span className="text-muted-foreground"> / {open}</span>
         <span className="ml-2 text-sm font-medium text-muted-foreground">
-          confirmadas
+          protegidas
           {pct != null ? ` · ${pct}%` : ""}
         </span>
       </p>
@@ -85,11 +86,13 @@ export function MesaProteccionKpi({
           <>Sin posiciones abiertas — no hay stop que confirmar.</>
         ) : warn ? (
           <>
-            {discrepancies} con discrepancia (plan/propuesta ≠ stop vigente).
-            Revisa en Atención.
+            {discrepancies} con plan/sugerido ≠ ejecución. Revisa en Atención.
           </>
         ) : (
-          <>Stop vigente Confirmado vía Confirm (PH-1). ≠ Cobertura Estudio.</>
+          <>
+            Stop en libro (Protegido) vía Confirm. Plan ≠ ejecución. ≠ Cobertura
+            Estudio.
+          </>
         )}
       </p>
     </div>

@@ -43,6 +43,7 @@ export * from "./execution-plan.js";
 export * from "./execution-record.js";
 export * from "./execution-state.js";
 export * from "./trade-story.js";
+export * from "./journal-spine-view.js";
 export * from "./submit-intent.js";
 export * from "./paper-order.js";
 export * from "./paper-broker.js";

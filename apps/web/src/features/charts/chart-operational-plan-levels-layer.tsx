@@ -20,6 +20,7 @@ import {
   operationalPlanChartLevelsSignature,
   type OperationalPlanChartLevel,
 } from "@/features/charts/operational-plan-chart-levels";
+import { useChartFocusPrefs } from "@/features/charts/use-chart-focus-prefs";
 import { isEmergencyBootstrapStop, resolveExitPolicy } from "@bolsa/shared";
 import { resolveBootstrapProtectStop } from "@/features/operations/propose-position-exit";
 import {
@@ -92,6 +93,7 @@ export function ChartOperationalPlanLevelsLayer({
   chartReady: boolean;
 }) {
   const context = useInstrumentOperationalContext(instrumentId ?? null);
+  const { mode: focusMode } = useChartFocusPrefs();
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
@@ -139,6 +141,7 @@ export function ChartOperationalPlanLevelsLayer({
           bootstrapStopPrice,
           t1ReducePct: Math.round(exitPolicy.t1ReduceFraction * 100),
           t2ReducePct: Math.round(exitPolicy.t2ReduceFraction * 100),
+          focusMode,
         })
       : [];
   const signature = operationalPlanChartLevelsSignature(levels);
@@ -328,6 +331,7 @@ export function ChartOperationalPlanLevelsLayer({
       className="pointer-events-none absolute inset-0 z-[4]"
       data-testid="chart-operational-plan-levels"
       data-phase={context.phase}
+      data-chart-focus={focusMode}
       data-levels={levels.map((level) => level.kind).join(",")}
       data-stop-drag={dragAllowed ? "allowed" : "blocked"}
       aria-hidden={!dragAllowed}

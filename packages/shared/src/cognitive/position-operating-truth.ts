@@ -371,7 +371,9 @@ export function operatorCabinTruthFromPot(
     currentStop: executedStop,
     entry: view?.levels.entry ?? truth.operational.levels.entry,
     birthQuantity: view?.quantity ?? null,
+    remainingQuantity: view?.remainingQuantity ?? null,
     closed: view?.operatingState === "CLOSED",
+    templateId: view?.templateId ?? null,
   };
 }
 

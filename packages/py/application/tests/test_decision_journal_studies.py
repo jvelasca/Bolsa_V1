@@ -261,3 +261,76 @@ async def test_study_history_returns_all_propose_for_instrument() -> None:
     assert result.studies[0].session_id == "s-new"
     assert result.studies[1].session_id == "s-old"
     assert all(s.instrument_id == "inst-1" for s in result.studies)
+
+
+def test_study_view_echoes_mfe_mae_and_learning_verdict() -> None:
+    """V2.27 — eco runtime.mfeMae + outcome.verdict; returnPct no es R."""
+    from bolsa_application.decision_journal_studies import build_study_view
+
+    payload = {
+        "sessionId": "s-mfe",
+        "kind": "propose",
+        "timeframe": "1d",
+        "assessments": [{"type": "technical", "metadata": {"bias": "bullish"}}],
+        "runtime": {
+            "decisionPackage": {
+                "action": "buy",
+                "overallConfidence": 0.7,
+                "timestamp": "2026-09-02T08:00:00Z",
+                "notes": ["ok"],
+            },
+            "tradePlan": {
+                "status": "TRIGGERED",
+                "direction": "long",
+                "whyNot": [],
+                "entry": 100,
+                "structuralStop": 95,
+                "target1": 110,
+                "initialRiskR": 1,
+                "executionAllowed": True,
+            },
+            "mfeMae": {
+                "status": "favorable",
+                "mfeR": 1.8,
+                "maeR": 0.2,
+                "currentR": 0.9,
+                "why": ["peak_from_bars", "mfe_ge_1_5r"],
+                "source": "bars",
+            },
+        },
+        "recommendation": {"status": "open"},
+        "outcome": {
+            "verdict": "hit",
+            "returnPct": 12.5,
+            "criteriaVersion": "1",
+            "source": "manual",
+            "evaluatedAt": "2026-09-10T16:00:00Z",
+            "horizon": "1d",
+            "evalBars": 5,
+            "recommendedAction": "buy",
+        },
+    }
+    session = DecisionSessionRecord(
+        id="s-mfe",
+        kind="propose",
+        status="closed",
+        instrument_id="inst-1",
+        created_at="2026-09-02T08:00:00Z",
+        account_id="acc-1",
+        symbol="AAPL",
+        decision_id="d1",
+        payload=payload,
+    )
+    view = build_study_view(
+        session=session,
+        name="Apple",
+        position_status="CLOSED",
+        has_open_position=False,
+        exit_primary_reason=None,
+        now=datetime(2026, 9, 10, 16, 0, tzinfo=UTC),
+    )
+    wire = view.to_dict()
+    assert wire["mfeMae"]["mfeR"] == 1.8
+    assert wire["learningVerdict"] == "hit"
+    assert "returnPct" not in wire
+    assert "finalR" not in wire

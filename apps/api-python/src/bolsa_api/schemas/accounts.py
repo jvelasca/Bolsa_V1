@@ -493,6 +493,10 @@ class DecisionJournalStudyDto(BaseModel):
     next_review_at: str | None = Field(default=None, alias="nextReviewAt")
     trade_plan_status: str | None = Field(default=None, alias="tradePlanStatus")
     action: str | None = None
+    # V2.27 — eco session runtime.mfeMae (optional).
+    mfe_mae: dict[str, Any] | None = Field(default=None, alias="mfeMae")
+    # V2.27 — SessionOutcome.verdict only (≠ Final R).
+    learning_verdict: str | None = Field(default=None, alias="learningVerdict")
 
 
 class DecisionJournalStudyListDto(BaseModel):

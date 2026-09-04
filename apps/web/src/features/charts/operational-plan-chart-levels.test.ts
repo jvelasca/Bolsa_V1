@@ -149,4 +149,106 @@ describe("buildOperationalPlanChartLevels", () => {
     expect(levels.find((l) => l.kind === "target2")!.title).toBe("T2 · 30%");
     expect(levels.find((l) => l.kind === "target1")!.title).not.toMatch(/25/);
   });
+
+  it("V2.30 — Simple: Entrada · Stop · próximo objetivo (sin T2 ni trail)", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({ trailingActive: true, trailingStopHint: 101 }),
+      showLevels: true,
+      includeTrailing: true,
+      focusMode: "simple",
+      t1ReducePct: 30,
+      t2ReducePct: 30,
+    });
+    expect(levels.map((l) => l.kind)).toEqual([
+      "entry",
+      "stopVigente",
+      "target1",
+    ]);
+    expect(levels.find((l) => l.kind === "target1")!.title).toBe("T1 · 30%");
+  });
+
+  it("V2.30 — Simple + T1 alcanzado: solo T2 como siguiente (T1 oculto)", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({ target1Reached: true, target1Touched: true }),
+      showLevels: true,
+      focusMode: "simple",
+      t1ReducePct: 30,
+      t2ReducePct: 30,
+    });
+    expect(levels.map((l) => l.kind)).toEqual([
+      "entry",
+      "stopVigente",
+      "target2",
+    ]);
+    const t2 = levels.find((l) => l.kind === "target2")!;
+    expect(t2.title).toMatch(/T2 · siguiente/);
+    expect(t2.width).toBe(2);
+    expect(t2.style).toBe("solid");
+  });
+
+  it("V2.30 — Completo + T1 alcanzado: T1 discreto · T2 siguiente", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({ target1Touched: true, target1Reached: true }),
+      showLevels: true,
+      focusMode: "completo",
+      t1ReducePct: 30,
+      t2ReducePct: 30,
+    });
+    const t1 = levels.find((l) => l.kind === "target1")!;
+    const t2 = levels.find((l) => l.kind === "target2")!;
+    expect(t1.dimmed).toBe(true);
+    expect(t1.style).toBe("dashed");
+    expect(t1.width).toBe(1);
+    expect(t1.title).toBe("✓ T1 alcanzado · 30 %");
+    expect(t2.title).toMatch(/T2 · siguiente/);
+    expect(t2.width).toBe(2);
+    expect(t2.style).toBe("solid");
+  });
+
+  it("V2.30 — Completo conserva trail; Simple lo omite", () => {
+    const base = {
+      plan: plan({ trailingActive: true, trailingStopHint: 101 }),
+      showLevels: true,
+      includeTrailing: true,
+    } as const;
+    expect(
+      buildOperationalPlanChartLevels({
+        ...base,
+        focusMode: "completo",
+      }).some((l) => l.kind === "trailingHint"),
+    ).toBe(true);
+    expect(
+      buildOperationalPlanChartLevels({
+        ...base,
+        focusMode: "simple",
+      }).some((l) => l.kind === "trailingHint"),
+    ).toBe(false);
+  });
+
+  it("V2.32 — chart stop/T1/T2 match OperatorDecision plan levels", () => {
+    const decisionPlan = {
+      stop: 176.8,
+      t1: 195,
+      t2: 205,
+      entry: 184.2,
+    };
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({
+        entry: decisionPlan.entry,
+        stopVigente: decisionPlan.stop,
+        stopInicial: decisionPlan.stop,
+        target1: decisionPlan.t1,
+        target2: decisionPlan.t2,
+      }),
+      showLevels: true,
+      focusMode: "completo",
+      t1ReducePct: 30,
+      t2ReducePct: 30,
+    });
+    const byKind = Object.fromEntries(levels.map((l) => [l.kind, l.price]));
+    expect(byKind.stopVigente).toBe(decisionPlan.stop);
+    expect(byKind.target1).toBe(decisionPlan.t1);
+    expect(byKind.target2).toBe(decisionPlan.t2);
+    expect(byKind.entry).toBe(decisionPlan.entry);
+  });
 });

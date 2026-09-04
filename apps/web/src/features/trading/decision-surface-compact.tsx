@@ -16,9 +16,9 @@ import {
   assertNever,
   buildExecutionState,
   buildOperatorDecision,
-  buildOperatorExitLadder,
   buildOperatorFourAnswers,
-  buildOperatorMissionSteps,
+  buildOperatorPositionPlan,
+  buildOperatorPositionPlanFromDecision,
   buildOperatorRiskBox,
   buildPositionDecisionFromDto,
   buildPositionReductionReadout,
@@ -52,13 +52,17 @@ import {
 } from "@/features/trading/use-position-operational-view";
 import {
   CABIN_INTERACTIVE,
+  CABIN_KV_GRID,
+  CABIN_TYPE,
+  CABIN_VISUAL_VERSION,
+  CabinSectionLabel,
   NextActionHero,
   OperatorCabinLevel,
-  OperatorExitLadder,
   OperatorFourAnswersBlock,
-  OperatorMissionChecklist,
+  OperatorPositionPlan,
   OperatorProtectionLine,
   OperatorRiskBox,
+  cabinNumClass,
 } from "@/features/trading/operator-cabin-ui";
 
 type Density = "full" | "hud";
@@ -96,11 +100,7 @@ export type DecisionSurfaceCompactProps =
   | PositionCompactProps;
 
 function SectionLabel({ children }: { children: string }) {
-  return (
-    <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/90">
-      {children}
-    </p>
-  );
+  return <CabinSectionLabel>{children}</CabinSectionLabel>;
 }
 
 function formatMoney(value: number | null | undefined): string {
@@ -269,17 +269,14 @@ function EntryCompactBody({
           <p
             className={cn(
               "font-semibold leading-snug text-foreground",
-              hud ? "text-[10px]" : "text-[11px]",
+              CABIN_TYPE.operativa,
             )}
             data-testid="entry-decision-headline"
           >
             {symbol} · {headline}
           </p>
           <p
-            className={cn(
-              "leading-snug text-muted-foreground",
-              hud ? "text-[9px] line-clamp-2" : "text-[10px]",
-            )}
+            className={cn(CABIN_TYPE.meta, hud && "line-clamp-2")}
             data-testid="entry-operating-phrase"
           >
             {truth.phrase}
@@ -287,19 +284,16 @@ function EntryCompactBody({
         </div>
 
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          <p className="text-[10px] text-muted-foreground">
+          <p className={CABIN_TYPE.meta}>
             <span className="font-medium text-foreground">{symbol}</span>
           </p>
-          <p
-            className="text-[10px] font-medium tabular-nums text-foreground"
-            data-testid="entry-operating-trigger"
-          >
+          <p className={cabinNumClass()} data-testid="entry-operating-trigger">
             Trigger {truth.triggerLabel}
           </p>
         </div>
 
         {hud ? (
-          <p className="text-[9px] tabular-nums text-muted-foreground">
+          <p className={cn(cabinNumClass({ size: "meta" }))}>
             <span data-testid="entry-decision-entry">
               E {formatEntryLevel(plan.entry)}
             </span>
@@ -316,11 +310,11 @@ function EntryCompactBody({
           <>
             <OperatorCabinLevel level={2}>
               <OperatorRiskBox box={riskBox} />
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+              <dl className={CABIN_KV_GRID}>
                 <div className="flex justify-between gap-2">
                   <dt>Entrada</dt>
                   <dd
-                    className="font-medium tabular-nums text-foreground"
+                    className={cabinNumClass()}
                     data-testid="entry-decision-entry"
                   >
                     {formatEntryLevel(plan.entry)}
@@ -331,7 +325,7 @@ function EntryCompactBody({
                   <div className="flex justify-between gap-2">
                     <dt>Precio actual</dt>
                     <dd
-                      className="font-medium tabular-nums text-foreground"
+                      className={cabinNumClass()}
                       data-testid="entry-decision-mark"
                     >
                       {formatEntryLevel(plan.currentPrice)}
@@ -342,7 +336,7 @@ function EntryCompactBody({
                   <div className="flex justify-between gap-2">
                     <dt>Distancia</dt>
                     <dd
-                      className="font-medium tabular-nums text-foreground"
+                      className={cabinNumClass()}
                       data-testid="entry-decision-distance"
                     >
                       {formatDistance(plan.entry, plan.currentPrice)}
@@ -352,7 +346,7 @@ function EntryCompactBody({
                 <div className="flex justify-between gap-2">
                   <dt>Stop</dt>
                   <dd
-                    className="font-medium tabular-nums text-foreground"
+                    className={cabinNumClass()}
                     data-testid="entry-decision-stop"
                   >
                     {formatEntryLevel(plan.stopVigente)}
@@ -360,14 +354,12 @@ function EntryCompactBody({
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt>Tamaño</dt>
-                  <dd className="font-medium tabular-nums text-foreground">
-                    {qty} acciones
-                  </dd>
+                  <dd className={cabinNumClass()}>{qty} acciones</dd>
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt>Riesgo</dt>
                   <dd
-                    className="font-medium tabular-nums text-foreground"
+                    className={cabinNumClass()}
                     data-testid="entry-decision-risk"
                   >
                     {formatMoney(sizing.riskAmount)}
@@ -379,7 +371,7 @@ function EntryCompactBody({
                 {truth.expiryLabel ? (
                   <div className="col-span-2 flex justify-between gap-2">
                     <dt>Vigencia</dt>
-                    <dd className="font-medium text-foreground">
+                    <dd className={cn(CABIN_TYPE.operativa, "font-medium")}>
                       {truth.expiryLabel}
                     </dd>
                   </div>
@@ -388,11 +380,11 @@ function EntryCompactBody({
             </OperatorCabinLevel>
 
             <OperatorCabinLevel level={3}>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+              <dl className={CABIN_KV_GRID}>
                 <div className="flex justify-between gap-2">
                   <dt>T1</dt>
                   <dd
-                    className="font-medium tabular-nums text-foreground"
+                    className={cabinNumClass()}
                     data-testid="entry-decision-t1"
                   >
                     {formatEntryLevel(plan.target1)}
@@ -401,7 +393,7 @@ function EntryCompactBody({
                 <div className="flex justify-between gap-2">
                   <dt>T2</dt>
                   <dd
-                    className="font-medium tabular-nums text-foreground"
+                    className={cabinNumClass()}
                     data-testid="entry-decision-t2"
                   >
                     {formatEntryLevel(plan.target2)}
@@ -442,7 +434,12 @@ function EntryCompactBody({
           className="space-y-0.5 pt-0.5"
           data-testid="entry-decision-action-block"
         >
-          <div className="flex flex-wrap items-baseline justify-between gap-2 text-[9px]">
+          <div
+            className={cn(
+              "flex flex-wrap items-baseline justify-between gap-2",
+              CABIN_TYPE.meta,
+            )}
+          >
             <p data-testid="operativa-cockpit-entry-action">
               <span className="text-muted-foreground">Decisión</span>{" "}
               <span className="font-semibold text-foreground">
@@ -462,7 +459,12 @@ function EntryCompactBody({
           className="space-y-0.5 border-t border-border/40 pt-1.5"
           data-testid="entry-decision-action-block"
         >
-          <div className="flex flex-wrap items-baseline justify-between gap-2 text-[10px]">
+          <div
+            className={cn(
+              "flex flex-wrap items-baseline justify-between gap-2",
+              CABIN_TYPE.meta,
+            )}
+          >
             <p data-testid="operativa-cockpit-entry-action">
               <span className="text-muted-foreground">Decisión</span>{" "}
               <span className="font-semibold text-foreground">
@@ -518,10 +520,7 @@ function JourneyHudBlock({
     entry: journey.entry,
   });
   const nextAction = decision.currentAction;
-  const steps = buildOperatorMissionSteps(journey, {
-    birthQuantity: birthQuantity ?? null,
-  });
-  const ladder = buildOperatorExitLadder(journey, {
+  const positionPlan = buildOperatorPositionPlan(journey, {
     birthQuantity: birthQuantity ?? null,
   });
   const reduction = buildPositionReductionReadout({
@@ -551,6 +550,7 @@ function JourneyHudBlock({
       className="space-y-1.5 border-t border-border/40 pt-1.5"
       data-testid="position-journey-hud"
       data-cabin-composition="4-levels"
+      data-operator-journey="v2.32"
       data-lifecycle-stage={journey.stageMachine ?? undefined}
       data-lineage-path={journey.lineagePathLabel ?? undefined}
       data-log-has-t2={journey.logHasT2Executed ? "1" : "0"}
@@ -562,31 +562,22 @@ function JourneyHudBlock({
       <OperatorCabinLevel level={2}>
         <OperatorProtectionLine protection={decision.protection} />
         <OperatorRiskBox box={riskBox} />
-        <dl
-          className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground"
-          data-testid="position-card-risk-levels"
-        >
+        <dl className={CABIN_KV_GRID} data-testid="position-card-risk-levels">
           <div className="flex justify-between gap-2">
             <dt>Stop inicial</dt>
-            <dd
-              className="font-medium tabular-nums text-foreground"
-              data-testid="journey-initial-stop"
-            >
+            <dd className={cabinNumClass()} data-testid="journey-initial-stop">
               {formatLevel(journey.risk.initialStop)}
             </dd>
           </div>
           <div className="flex justify-between gap-2">
             <dt>Stop vigente</dt>
-            <dd className="font-medium tabular-nums text-foreground">
+            <dd className={cabinNumClass()} data-testid="journey-current-stop">
               {formatLevel(journey.trail.currentStop)}
             </dd>
           </div>
           <div className="flex justify-between gap-2">
             <dt>Riesgo inicial</dt>
-            <dd
-              className="font-medium tabular-nums text-foreground"
-              data-testid="journey-initial-risk"
-            >
+            <dd className={cabinNumClass()} data-testid="journey-initial-risk">
               {journey.risk.initialRisk != null
                 ? String(journey.risk.initialRisk)
                 : "—"}
@@ -594,10 +585,7 @@ function JourneyHudBlock({
           </div>
           <div className="flex justify-between gap-2">
             <dt>R realizado</dt>
-            <dd
-              className="font-medium tabular-nums text-foreground"
-              data-testid="journey-realized-r"
-            >
+            <dd className={cabinNumClass()} data-testid="journey-realized-r">
               {journey.risk.realizedR != null
                 ? formatRSigned(journey.risk.realizedR)
                 : "—"}
@@ -605,19 +593,13 @@ function JourneyHudBlock({
           </div>
           <div className="flex justify-between gap-2">
             <dt>Posición</dt>
-            <dd
-              className="font-medium tabular-nums text-foreground"
-              data-testid="journey-birth-qty"
-            >
+            <dd className={cabinNumClass()} data-testid="journey-birth-qty">
               {reduction.birthQuantity}
             </dd>
           </div>
           <div className="flex justify-between gap-2">
             <dt>RESTANTE</dt>
-            <dd
-              className="font-medium tabular-nums text-foreground"
-              data-testid="journey-remaining"
-            >
+            <dd className={cabinNumClass()} data-testid="journey-remaining">
               {reduction.remainingQuantity}
               {reduction.remainingPct != null
                 ? ` · ${reduction.remainingPct}%`
@@ -626,10 +608,7 @@ function JourneyHudBlock({
           </div>
           <div className="flex justify-between gap-2">
             <dt>Realizado</dt>
-            <dd
-              className="font-medium tabular-nums text-foreground"
-              data-testid="journey-realized-pct"
-            >
+            <dd className={cabinNumClass()} data-testid="journey-realized-pct">
               {reduction.realizedPct != null
                 ? `${reduction.realizedPct}%`
                 : "—"}
@@ -637,10 +616,7 @@ function JourneyHudBlock({
           </div>
           <div className="flex justify-between gap-2">
             <dt>Entrada</dt>
-            <dd
-              className="font-medium tabular-nums text-foreground"
-              data-testid="journey-entry"
-            >
+            <dd className={cabinNumClass()} data-testid="journey-entry">
               {formatLevel(journey.entry)}
             </dd>
           </div>
@@ -648,10 +624,8 @@ function JourneyHudBlock({
       </OperatorCabinLevel>
 
       <OperatorCabinLevel level={3}>
-        <OperatorExitLadder ladder={ladder} />
-        {/* Checklist compacto (testids mission-step-* + remaining) */}
-        <div className="sr-only">
-          <OperatorMissionChecklist steps={steps} />
+        <div data-testid="operator-exit-ladder">
+          <OperatorPositionPlan plan={positionPlan} />
         </div>
         {/* Precios T1/T2/Trail para tests journey-* existentes */}
         <dl className="sr-only" data-testid="position-card-plan-levels">
@@ -686,14 +660,6 @@ function JourneyHudBlock({
             </dd>
           </div>
         </dl>
-        {autoHonesty ? (
-          <p
-            className="text-[9px] leading-snug text-muted-foreground"
-            data-testid="journey-auto-posture"
-          >
-            {autoHonesty}
-          </p>
-        ) : null}
       </OperatorCabinLevel>
 
       <OperatorCabinLevel level={4}>
@@ -703,20 +669,27 @@ function JourneyHudBlock({
           onClick={() => setAdvancedOpen((v) => !v)}
           data-testid="journey-advanced-toggle"
         >
-          {advancedOpen ? "Ocultar auditoría" : "Detalles avanzados"}
+          {advancedOpen ? "Ocultar detalles" : "¿Por qué? · AUTO"}
         </button>
         {advancedOpen ? (
-          <p
-            className="text-[9px] leading-snug text-muted-foreground"
-            data-testid="journey-stage-label"
-            title="stage derivado · el log es la historia"
-          >
-            Ciclo: {journey.stageLabel ?? "—"}
-            {journey.lineagePathLabel
-              ? ` · clasificación ${journey.lineagePathLabel}`
-              : ""}
-            {journey.logHasT2Executed ? " · log incluye T2" : ""}
-          </p>
+          <div className="space-y-1">
+            {autoHonesty ? (
+              <p className={CABIN_TYPE.meta} data-testid="journey-auto-posture">
+                {autoHonesty}
+              </p>
+            ) : null}
+            <p
+              className={CABIN_TYPE.meta}
+              data-testid="journey-stage-label"
+              title="stage derivado · el log es la historia"
+            >
+              Ciclo: {journey.stageLabel ?? "—"}
+              {journey.lineagePathLabel
+                ? ` · clasificación ${journey.lineagePathLabel}`
+                : ""}
+              {journey.logHasT2Executed ? " · log incluye T2" : ""}
+            </p>
+          </div>
         ) : null}
       </OperatorCabinLevel>
     </div>
@@ -782,31 +755,26 @@ function PositionCompactBody({
           <p
             className={cn(
               "font-semibold leading-snug text-foreground",
-              hud ? "text-[10px]" : "text-[11px]",
+              CABIN_TYPE.operativa,
             )}
             data-testid="position-decision-headline"
           >
             {headline}
           </p>
-          <p
-            className={cn(
-              "leading-snug text-muted-foreground",
-              hud ? "text-[9px] line-clamp-2" : "text-[10px]",
-            )}
-          >
+          <p className={cn(CABIN_TYPE.meta, hud && "line-clamp-2")}>
             {statePhrase}
           </p>
         </div>
 
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          <p className="text-[10px] text-muted-foreground">
+          <p className={CABIN_TYPE.meta}>
             <span className="font-medium text-foreground">{symbol}</span>
             {position.lastPrice != null ? (
               <>
                 {" "}
                 ·{" "}
                 <span
-                  className="tabular-nums text-foreground"
+                  className={cabinNumClass()}
                   data-testid="position-decision-price"
                 >
                   {formatLevel(position.lastPrice)}
@@ -816,14 +784,7 @@ function PositionCompactBody({
           </p>
           {!hud && (pnlPct != null || unrealizedR != null) ? (
             <p
-              className={cn(
-                "text-[10px] font-medium tabular-nums",
-                pnlPct != null && pnlPct >= 0
-                  ? "text-emerald-800 dark:text-emerald-200"
-                  : pnlPct != null
-                    ? "text-rose-800 dark:text-rose-200"
-                    : "text-foreground",
-              )}
+              className={cabinNumClass({ signed: true, value: pnlPct })}
               data-testid="position-decision-pnl"
             >
               {pnlPct != null ? formatPctSigned(pnlPct) : null}
@@ -834,7 +795,7 @@ function PositionCompactBody({
         </div>
 
         {hud ? (
-          <p className="text-[9px] tabular-nums text-muted-foreground">
+          <p className={cabinNumClass({ size: "meta" })}>
             <span data-testid="position-decision-stop">
               S {formatLevel(view.levels.currentStop)}
             </span>
@@ -850,11 +811,11 @@ function PositionCompactBody({
         ) : journey ? null : (
           <>
             <OperatorCabinLevel level={2}>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+              <dl className={CABIN_KV_GRID}>
                 <div className="flex justify-between gap-2">
                   <dt>Stop</dt>
                   <dd
-                    className="font-medium tabular-nums text-foreground"
+                    className={cabinNumClass()}
                     data-testid="position-decision-stop"
                   >
                     {formatLevel(view.levels.currentStop)}
@@ -863,31 +824,50 @@ function PositionCompactBody({
               </dl>
             </OperatorCabinLevel>
             <OperatorCabinLevel level={3}>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
-                <div className="flex justify-between gap-2">
-                  <dt>T1</dt>
-                  <dd
-                    className="font-medium tabular-nums text-foreground"
-                    data-testid="position-decision-t1"
-                  >
-                    {formatLevel(view.levels.target1)}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt>T2</dt>
-                  <dd
-                    className="font-medium tabular-nums text-foreground"
-                    data-testid="position-decision-t2"
-                  >
-                    {formatLevel(view.levels.target2)}
-                  </dd>
-                </div>
-                {view.operatingState === "TRAILING" ? (
-                  <div className="flex justify-between gap-2">
-                    <dt>Trail</dt>
-                    <dd className="font-medium text-foreground">Activo</dd>
-                  </div>
-                ) : null}
+              <OperatorPositionPlan
+                plan={(() => {
+                  const decision = buildOperatorDecision({
+                    kind: "position",
+                    primaryAction: view.primaryAction,
+                    journey: null,
+                    currentStop: view.levels.currentStop,
+                    entry: view.levels.entry,
+                    birthQuantity: view.quantity,
+                    templateId: view.templateId,
+                  });
+                  return buildOperatorPositionPlanFromDecision(
+                    {
+                      ...decision,
+                      plan: {
+                        ...decision.plan,
+                        entry: view.levels.entry ?? decision.plan.entry,
+                        stop: view.levels.currentStop ?? decision.plan.stop,
+                        t1: view.levels.target1 ?? decision.plan.t1,
+                        t2: view.levels.target2 ?? decision.plan.t2,
+                      },
+                      remaining: buildPositionReductionReadout({
+                        birthQuantity: view.quantity,
+                        remainingQuantity: view.remainingQuantity,
+                        t1QtyFractionPct: decision.plan.t1Pct,
+                        t2QtyFractionPct: decision.plan.t2Pct,
+                      }),
+                    },
+                    {
+                      t1Done: view.t1.status === "executed",
+                      t2Done: view.t2.status === "executed",
+                      trailActive: view.operatingState === "TRAILING",
+                    },
+                  );
+                })()}
+              />
+              {/* Compat testids for surface without journey HUD */}
+              <dl className="sr-only">
+                <dd data-testid="position-decision-t1">
+                  {formatLevel(view.levels.target1)}
+                </dd>
+                <dd data-testid="position-decision-t2">
+                  {formatLevel(view.levels.target2)}
+                </dd>
               </dl>
             </OperatorCabinLevel>
           </>
@@ -907,7 +887,7 @@ function PositionCompactBody({
         <div
           className={cn(
             "flex flex-wrap items-baseline justify-between gap-2",
-            hud ? "text-[9px]" : "text-[10px]",
+            CABIN_TYPE.meta,
           )}
         >
           <p data-testid="operativa-cockpit-pov-action">
@@ -950,7 +930,7 @@ function PositionCompactBody({
           ) : null}
           {historyOpen && view.stopHistory.length > 0 ? (
             <ul
-              className="w-full space-y-0.5 text-[10px] text-muted-foreground"
+              className={cn("w-full space-y-0.5", CABIN_TYPE.meta)}
               data-testid="operativa-cockpit-stop-history"
             >
               {view.stopHistory.map((entry, idx) => (
@@ -959,7 +939,7 @@ function PositionCompactBody({
                   className="flex justify-between gap-2"
                 >
                   <span className="truncate">{entry.label}</span>
-                  <span className="shrink-0 font-medium tabular-nums text-foreground">
+                  <span className={cn("shrink-0", cabinNumClass())}>
                     {entry.stop.toFixed(2)}
                     {formatStopDelta(entry.delta)
                       ? ` (${formatStopDelta(entry.delta)})`
@@ -1004,7 +984,7 @@ function PositionCompactBody({
           </div>
           {historyOpen && view.stopHistory.length > 0 ? (
             <ul
-              className="space-y-0.5 text-[10px] text-muted-foreground"
+              className={cn("space-y-0.5", CABIN_TYPE.meta)}
               data-testid="operativa-cockpit-stop-history"
             >
               {view.stopHistory.map((entry, idx) => (
@@ -1013,7 +993,7 @@ function PositionCompactBody({
                   className="flex justify-between gap-2"
                 >
                   <span className="truncate">{entry.label}</span>
-                  <span className="shrink-0 font-medium tabular-nums text-foreground">
+                  <span className={cn("shrink-0", cabinNumClass())}>
                     {entry.stop.toFixed(2)}
                     {formatStopDelta(entry.delta)
                       ? ` (${formatStopDelta(entry.delta)})`
@@ -1045,13 +1025,13 @@ export function DecisionSurfaceCompact(props: DecisionSurfaceCompactProps) {
     return (
       <div
         className={cn(
-          "rounded-md border",
-          hud ? "space-y-1 px-2 py-1" : "space-y-2 px-2 py-1.5",
-          entryPhaseToneClasses(tone),
+          hud ? "space-y-1 px-2 py-1 rounded-md border" : "space-y-2",
+          hud ? entryPhaseToneClasses(tone) : null,
           props.className,
         )}
         data-testid={props.testId ?? "decision-surface-compact-entry"}
         data-tone={tone}
+        data-cabin-visual={CABIN_VISUAL_VERSION}
       >
         <EntryCompactBody {...props} density={density} />
       </div>
@@ -1065,13 +1045,13 @@ export function DecisionSurfaceCompact(props: DecisionSurfaceCompactProps) {
   return (
     <div
       className={cn(
-        "rounded-md border",
-        hud ? "space-y-1 px-2 py-1" : "space-y-2 px-2 py-1.5",
-        povOperatingStateToneClasses(tone),
+        hud ? "space-y-1 px-2 py-1 rounded-md border" : "space-y-2",
+        hud ? povOperatingStateToneClasses(tone) : null,
         props.className,
       )}
       data-testid={props.testId ?? "decision-surface-compact-position"}
       data-tone={tone}
+      data-cabin-visual={CABIN_VISUAL_VERSION}
     >
       <PositionCompactBody
         {...props}

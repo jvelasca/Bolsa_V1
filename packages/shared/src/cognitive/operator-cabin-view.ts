@@ -71,11 +71,28 @@ export type OperatorProtectionHonestyV1 =
   | "sent"
   | "confirmed";
 
+/**
+ * V2.29 — operator phase (PLAN ≠ EJECUCIÓN).
+ * Planificado → Confirmado → Enviado → Protegido. Never «propuesta thin».
+ */
+export type OperatorProtectionPhaseV1 =
+  | "none"
+  | "planned"
+  | "confirmed"
+  | "sent"
+  | "protected";
+
 export type OperatorProtectionStateV1 = {
   kind: OperatorProtectionKindV1;
   label: string;
+  /** Executed stop authority — null if not on the book. */
   stop: number | null;
+  /** Plan geometry — may exist without executed protection. */
+  plannedStop: number | null;
   honesty: OperatorProtectionHonestyV1;
+  /** V2.29 — Planificado / Confirmado / Enviado / Protegido. */
+  phase: OperatorProtectionPhaseV1;
+  phaseLabel: string;
   /** True only for confirmed technical stop. */
   isTechnical: boolean;
 };
@@ -116,6 +133,17 @@ export const OPERATOR_PROTECTION_LABEL: Record<
   technical: "Protegida",
 };
 
+export const OPERATOR_PROTECTION_PHASE_LABEL: Record<
+  OperatorProtectionPhaseV1,
+  string
+> = {
+  none: "Sin protección",
+  planned: "Planificado",
+  confirmed: "Confirmado",
+  sent: "Enviado",
+  protected: "Protegido",
+};
+
 /** V2.11 — single facade input; React must not fork if-chains. */
 export type OperatorCabinTruthV1 =
   | {
@@ -140,6 +168,8 @@ export type OperatorCabinTruthV1 =
       entry?: number | null;
       direction?: "long" | "short" | null;
       birthQuantity?: number | null;
+      /** V2.32 — remaining when journey HUD is absent (Journal / thin POT). */
+      remainingQuantity?: number | null;
       templateId?: string | null;
       closed?: boolean;
     };
@@ -256,7 +286,9 @@ function positionFacts(
     ? journey!.remainingQuantity
     : finite(journey?.risk.remainingQuantity)
       ? journey!.risk.remainingQuantity
-      : null;
+      : finite(truth.remainingQuantity)
+        ? truth.remainingQuantity
+        : null;
   const hasPositionContext =
     journey != null || truth.currentStop !== undefined || persistFailed;
   const unprotected = hasPositionContext && !finite(executedStop);
@@ -521,6 +553,36 @@ export type OperatorExitLadderRungV1 = {
 export type OperatorExitLadderV1 = {
   rungs: OperatorExitLadderRungV1[];
   /** Profile label from template (Moderado · …). */
+  profileLabel: string | null;
+  remainingPct: number | null;
+  remainingDetail: string | null;
+};
+
+/**
+ * V2.28 — single PLAN DE LA POSICIÓN (Mission + Exit Route fused).
+ * Display-only · ExitPolicy % · RESTANTE on final step.
+ */
+export type OperatorPositionPlanStepIdV1 =
+  | "entry"
+  | "protection"
+  | "t1"
+  | "t2"
+  | "trail"
+  | "exit";
+
+export type OperatorPositionPlanStepV1 = {
+  id: OperatorPositionPlanStepIdV1;
+  /** Legacy mission-step testid id (stop / remaining). */
+  missionId: OperatorMissionStepV1["id"];
+  label: string;
+  detail: string | null;
+  status: OperatorMissionStepStatusV1;
+  /** ExitPolicy reduce % for T1/T2 — never hardcode 25. */
+  reducePct: number | null;
+};
+
+export type OperatorPositionPlanV1 = {
+  steps: OperatorPositionPlanStepV1[];
   profileLabel: string | null;
   remainingPct: number | null;
   remainingDetail: string | null;
@@ -1003,39 +1065,90 @@ export function buildOperatorMissionSteps(
 }
 
 /**
- * V2.26 — visual exit ladder from journey (ExitPolicy % via qtyFractionPct).
+ * V2.28 — PLAN DE LA POSICIÓN from journey (Mission + Exit Route fused).
+ * Order: Entrada → Protección → T1 → T2 → Gestión/trailing → Salida final · RESTANTE.
  * Display-only · never invents 25/25.
  */
-export function buildOperatorExitLadder(
+export function buildOperatorPositionPlan(
   journey: PositionJourneyReadoutV1,
   opts?: { birthQuantity?: number | null; closed?: boolean },
-): OperatorExitLadderV1 {
-  const steps = buildOperatorMissionSteps(journey, opts);
-  const rungIds: OperatorExitLadderRungIdV1[] = [
-    "entry",
-    "stop",
-    "t1",
-    "t2",
-    "trail",
-  ];
-  const rungs: OperatorExitLadderRungV1[] = [];
-  for (const id of rungIds) {
-    const step = steps.find((s) => s.id === id);
-    if (!step) continue;
-    rungs.push({
-      id,
-      label: step.label,
-      detail: step.detail,
-      status: step.status,
-      reducePct:
-        id === "t1"
-          ? journey.t1.qtyFractionPct
-          : id === "t2"
-            ? journey.t2.qtyFractionPct
-            : null,
+): OperatorPositionPlanV1 {
+  const stepsRaw = buildOperatorMissionSteps(journey, opts);
+  const byId = (id: OperatorMissionStepV1["id"]) =>
+    stepsRaw.find((s) => s.id === id);
+
+  const entry = byId("entry");
+  const stop = byId("stop");
+  const t1 = byId("t1");
+  const t2 = byId("t2");
+  const trail = byId("trail");
+  const remaining = remainingMissionStep(journey, opts);
+
+  const steps: OperatorPositionPlanStepV1[] = [];
+  if (entry) {
+    steps.push({
+      id: "entry",
+      missionId: "entry",
+      label: "Entrada",
+      detail: entry.detail,
+      status: entry.status,
+      reducePct: null,
     });
   }
-  const remainingStep = remainingMissionStep(journey, opts);
+  if (stop) {
+    steps.push({
+      id: "protection",
+      missionId: "stop",
+      label: "Protección",
+      detail: stop.detail,
+      status: stop.status,
+      reducePct: null,
+    });
+  }
+  if (t1 && t1.status !== "absent") {
+    steps.push({
+      id: "t1",
+      missionId: "t1",
+      label: "T1",
+      detail: t1.detail,
+      status: t1.status,
+      reducePct: journey.t1.qtyFractionPct,
+    });
+  }
+  if (t2 && t2.status !== "absent") {
+    steps.push({
+      id: "t2",
+      missionId: "t2",
+      label: "T2",
+      detail: t2.detail,
+      status: t2.status,
+      reducePct: journey.t2.qtyFractionPct,
+    });
+  }
+  if (trail) {
+    steps.push({
+      id: "trail",
+      missionId: "trail",
+      label: "Gestión / trailing",
+      detail: trail.detail,
+      status: trail.status,
+      reducePct: null,
+    });
+  }
+  if (remaining) {
+    steps.push({
+      id: "exit",
+      missionId: "remaining",
+      label: "Salida final",
+      detail:
+        remaining.detail != null
+          ? `RESTANTE ${remaining.detail}`
+          : "RESTANTE —",
+      status: remaining.status,
+      reducePct: null,
+    });
+  }
+
   const readout = buildPositionReductionReadout({
     birthQuantity: finite(opts?.birthQuantity)
       ? opts!.birthQuantity
@@ -1047,11 +1160,152 @@ export function buildOperatorExitLadder(
     t1QtyFractionPct: journey.t1.qtyFractionPct,
     t2QtyFractionPct: journey.t2.qtyFractionPct,
   });
+
   return {
-    rungs,
+    steps,
     profileLabel: null,
     remainingPct: readout.remainingPct,
-    remainingDetail: remainingStep?.detail ?? null,
+    remainingDetail: remaining?.detail ?? null,
+  };
+}
+
+/**
+ * V2.28 — PLAN from OperatorDecision levels when journey HUD is absent.
+ * Still display-only; ExitPolicy % from decision.plan.
+ */
+export function buildOperatorPositionPlanFromDecision(
+  decision: OperatorDecisionV1,
+  opts?: {
+    t1Done?: boolean;
+    t2Done?: boolean;
+    trailActive?: boolean;
+  },
+): OperatorPositionPlanV1 {
+  const plan = decision.plan;
+  const remaining = decision.remaining;
+  const protection = decision.protection;
+  const steps: OperatorPositionPlanStepV1[] = [];
+
+  if (finite(plan.entry)) {
+    steps.push({
+      id: "entry",
+      missionId: "entry",
+      label: "Entrada",
+      detail: formatLevel(plan.entry),
+      status: "done",
+      reducePct: null,
+    });
+  }
+
+  steps.push({
+    id: "protection",
+    missionId: "stop",
+    label: "Protección",
+    detail: finite(plan.stop) ? formatLevel(plan.stop) : null,
+    status: protection.kind !== "none" ? "done" : "pending",
+    reducePct: null,
+  });
+
+  if (finite(plan.t1) || plan.t1Pct != null) {
+    steps.push({
+      id: "t1",
+      missionId: "t1",
+      label: "T1",
+      detail:
+        [
+          finite(plan.t1) ? formatLevel(plan.t1) : null,
+          plan.t1Pct != null ? `${plan.t1Pct}%` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || null,
+      status: opts?.t1Done === true ? "done" : "pending",
+      reducePct: plan.t1Pct,
+    });
+  }
+
+  if (finite(plan.t2) || plan.t2Pct != null) {
+    steps.push({
+      id: "t2",
+      missionId: "t2",
+      label: "T2",
+      detail:
+        [
+          finite(plan.t2) ? formatLevel(plan.t2) : null,
+          plan.t2Pct != null ? `${plan.t2Pct}%` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || null,
+      status: opts?.t2Done === true ? "done" : "pending",
+      reducePct: plan.t2Pct,
+    });
+  }
+
+  const trailActive = opts?.trailActive === true || plan.trailActive;
+  steps.push({
+    id: "trail",
+    missionId: "trail",
+    label: "Gestión / trailing",
+    detail: trailActive
+      ? "Activo"
+      : opts?.t1Done === true
+        ? "Listo"
+        : "Tras T1",
+    status: trailActive ? "active" : "pending",
+    reducePct: null,
+  });
+
+  if (remaining?.remainingPct != null) {
+    steps.push({
+      id: "exit",
+      missionId: "remaining",
+      label: "Salida final",
+      detail: `RESTANTE ${remaining.remainingPct}%`,
+      status: remaining.remainingQuantity <= 0 ? "done" : "active",
+      reducePct: null,
+    });
+  }
+
+  return {
+    steps,
+    profileLabel: null,
+    remainingPct: remaining?.remainingPct ?? null,
+    remainingDetail:
+      remaining?.remainingPct != null ? `${remaining.remainingPct}%` : null,
+  };
+}
+
+/**
+ * V2.26 — visual exit ladder from journey (ExitPolicy % via qtyFractionPct).
+ * V2.28 — thin adapter over buildOperatorPositionPlan (compat).
+ */
+export function buildOperatorExitLadder(
+  journey: PositionJourneyReadoutV1,
+  opts?: { birthQuantity?: number | null; closed?: boolean },
+): OperatorExitLadderV1 {
+  const plan = buildOperatorPositionPlan(journey, opts);
+  const rungs: OperatorExitLadderRungV1[] = [];
+  for (const step of plan.steps) {
+    if (step.id === "exit") continue;
+    const id: OperatorExitLadderRungIdV1 =
+      step.id === "protection" ? "stop" : step.id;
+    rungs.push({
+      id,
+      label:
+        step.id === "protection"
+          ? "Stop"
+          : step.id === "trail"
+            ? "Trailing"
+            : step.label,
+      detail: step.detail,
+      status: step.status,
+      reducePct: step.reducePct,
+    });
+  }
+  return {
+    rungs,
+    profileLabel: plan.profileLabel,
+    remainingPct: plan.remainingPct,
+    remainingDetail: plan.remainingDetail,
   };
 }
 
@@ -1242,11 +1496,14 @@ export function buildOperatorAutoPlanPreview(input: {
   posture?: PaperAutoPostureV1 | null;
   killOn?: boolean | null;
   birthQuantity?: number | null;
+  /** V2.32 — closed position → remaining 0 (same as OperatorDecision). */
+  closed?: boolean | null;
 }): OperatorAutoPlanPreviewV1 {
   const policy = resolveExitPolicy(input.templateId);
   const t1Pct = Math.round(policy.t1ReduceFraction * 100);
   const t2Pct = Math.round(policy.t2ReduceFraction * 100);
   const journey = input.journey;
+  const closed = input.closed === true;
   const stopDone = journey != null && finite(journey.trail.currentStop);
   const items = [
     {
@@ -1272,7 +1529,7 @@ export function buildOperatorAutoPlanPreview(input: {
     {
       id: "exit",
       label: "Salida final",
-      done: false,
+      done: closed || input.nextAction.title === "SALIR",
     },
   ];
 
@@ -1299,11 +1556,11 @@ export function buildOperatorAutoPlanPreview(input: {
     formatOperatorAutoHonesty(input.posture, input.killOn) ??
     "Confirm = firma · armado ≠ ejecución";
 
-  const remainingQty = journey?.remainingQuantity ?? null;
+  const remainingQty = closed ? 0 : (journey?.remainingQuantity ?? null);
   const birth =
     finite(input.birthQuantity) && input.birthQuantity > 0
       ? input.birthQuantity
-      : remainingQty;
+      : (journey?.remainingQuantity ?? null);
   const remaining =
     birth != null && remainingQty != null
       ? buildPositionReductionReadout({
@@ -1351,6 +1608,7 @@ export function buildOperatorProtectionState(input: {
   direction?: "long" | "short" | null;
 }): OperatorProtectionStateV1 {
   const persistFailed = input.persistSkipped === true;
+  const plannedStop = finite(input.plannedStop) ? input.plannedStop : null;
   const executed = persistFailed
     ? null
     : finite(input.executedStop)
@@ -1373,17 +1631,47 @@ export function buildOperatorProtectionState(input: {
   let honesty: OperatorProtectionHonestyV1 = "none";
   if (persistFailed) honesty = "sent";
   else if (finite(executed)) honesty = "confirmed";
-  else if (finite(input.plannedStop) || input.protectKind === "bootstrap") {
+  else if (finite(plannedStop) || input.protectKind === "bootstrap") {
     honesty = "calculated";
   }
+
+  const phase = resolveOperatorProtectionPhase({
+    kind,
+    honesty,
+    plannedStop,
+  });
 
   return {
     kind,
     label: OPERATOR_PROTECTION_LABEL[kind],
-    stop: executed ?? (kind === "none" ? null : (input.plannedStop ?? null)),
+    /** Executed authority only — planned ≠ protected. */
+    stop: executed,
+    plannedStop,
     honesty,
+    phase,
+    phaseLabel: OPERATOR_PROTECTION_PHASE_LABEL[phase],
     isTechnical: kind === "technical",
   };
+}
+
+/** V2.29 — map honesty pipeline → operator phase (no «propuesta thin»). */
+export function resolveOperatorProtectionPhase(input: {
+  kind: OperatorProtectionKindV1;
+  honesty: OperatorProtectionHonestyV1;
+  plannedStop?: number | null;
+}): OperatorProtectionPhaseV1 {
+  if (input.honesty === "sent") return "sent";
+  if (input.honesty === "accepted") return "confirmed";
+  if (input.honesty === "confirmed" && input.kind !== "none") {
+    return "protected";
+  }
+  if (input.kind === "technical" || input.kind === "emergency") {
+    return "protected";
+  }
+  if (input.honesty === "calculated" || finite(input.plannedStop)) {
+    return "planned";
+  }
+  return "none";
 }
 
 /** V2.19 — canonical operator decision. React display-only. */
@@ -1514,4 +1802,188 @@ export function mesaNextActionFromOperatorDecision(
     label: MESA_NEXT_ACTION_LABELS[kind],
     allowsEntry: false,
   };
+}
+
+/**
+ * V2.32 — contractual levels: same stop / T1 / T2 / remaining / next action
+ * on Mercado · Gráfico · NEXT · Risk · Plan · AUTO · Hoy · Journal.
+ * Projection only — not a second FSM.
+ */
+export type OperatorJourney2LevelsV1 = {
+  nextAction: string;
+  stop: number | null;
+  t1: number | null;
+  t2: number | null;
+  remainingPct: number | null;
+  t1Pct: number | null;
+  t2Pct: number | null;
+};
+
+export type OperatorJourney2SurfacesV1 = {
+  decision: OperatorDecisionV1;
+  mercado: OperatorJourney2LevelsV1;
+  next: OperatorJourney2LevelsV1;
+  risk: OperatorJourney2LevelsV1;
+  plan: OperatorJourney2LevelsV1;
+  auto: OperatorJourney2LevelsV1;
+  hoy: OperatorJourney2LevelsV1;
+  journal: OperatorJourney2LevelsV1;
+  chart: OperatorJourney2LevelsV1;
+};
+
+function journey2LevelsFromDecision(
+  decision: OperatorDecisionV1,
+): OperatorJourney2LevelsV1 {
+  return {
+    nextAction: decision.currentAction.title,
+    stop: decision.plan.stop,
+    t1: decision.plan.t1,
+    t2: decision.plan.t2,
+    remainingPct: decision.remaining?.remainingPct ?? null,
+    t1Pct: decision.plan.t1Pct,
+    t2Pct: decision.plan.t2Pct,
+  };
+}
+
+/**
+ * Build the Journey 2 surface bundle from one OperatorCabinTruth.
+ * Callers assert mercado ≡ next ≡ risk ≡ plan ≡ auto ≡ hoy ≡ journal ≡ chart
+ * on stop / T1 / T2 / remaining / nextAction (Hoy maps title → mesa label).
+ */
+export function buildOperatorJourney2Surfaces(
+  truth: OperatorCabinTruthV1,
+  opts?: { birthQuantity?: number | null; templateId?: string | null },
+): OperatorJourney2SurfacesV1 {
+  const birthQuantity = opts?.birthQuantity ?? null;
+  const templateId =
+    opts?.templateId ??
+    (truth.kind === "position" ? (truth.templateId ?? null) : null);
+  const decision =
+    truth.kind === "position" && birthQuantity != null
+      ? buildOperatorDecision({ ...truth, birthQuantity })
+      : buildOperatorDecision(truth);
+  const canonical = journey2LevelsFromDecision(decision);
+  const hoyCta = mesaNextActionFromOperatorDecision(decision);
+
+  let risk: OperatorJourney2LevelsV1 = { ...canonical };
+  let plan: OperatorJourney2LevelsV1 = { ...canonical };
+  let auto: OperatorJourney2LevelsV1 = { ...canonical };
+  const chart: OperatorJourney2LevelsV1 = { ...canonical };
+
+  if (truth.kind === "entry") {
+    const e = truth.truth;
+    const riskBox = buildOperatorRiskBox({
+      entry: e.plan.entry,
+      stop: e.plan.stopVigente,
+      lossAtStop: e.sizing.riskAmount,
+      maxLoss: e.sizing.riskAmount,
+      target1: e.plan.target1,
+      target2: e.plan.target2,
+      quantity: e.sizing.quantity,
+      positionValue: e.sizing.positionValue,
+    });
+    risk = {
+      ...canonical,
+      stop: riskBox.stop,
+      t1: e.plan.target1,
+      t2: e.plan.target2,
+    };
+    const fromDecision = buildOperatorPositionPlanFromDecision(decision);
+    plan = {
+      ...canonical,
+      stop: decision.plan.stop,
+      t1: decision.plan.t1,
+      t2: decision.plan.t2,
+      remainingPct: fromDecision.remainingPct,
+    };
+  } else if (truth.kind === "position" && truth.journey) {
+    const journey = truth.journey;
+    const birth = birthQuantity ?? truth.birthQuantity ?? null;
+    const riskBox = buildOperatorRiskBox({
+      entry: journey.entry,
+      stop: journey.trail.currentStop ?? journey.risk.initialStop,
+      lossAtStop: journey.risk.currentProtected,
+      maxLoss: journey.risk.initialRisk,
+      target1: journey.t1.trigger,
+      target2: journey.t2.trigger,
+      quantity: journey.remainingQuantity,
+      positionValue:
+        journey.entry != null
+          ? journey.remainingQuantity * journey.entry
+          : null,
+    });
+    risk = {
+      ...canonical,
+      stop: riskBox.stop,
+      t1: journey.t1.trigger,
+      t2: journey.t2.trigger,
+    };
+    const positionPlan = buildOperatorPositionPlan(journey, {
+      birthQuantity: birth,
+      closed: truth.closed,
+    });
+    const t1Step = positionPlan.steps.find((s) => s.id === "t1");
+    const t2Step = positionPlan.steps.find((s) => s.id === "t2");
+    const stopStep = positionPlan.steps.find((s) => s.id === "protection");
+    plan = {
+      ...canonical,
+      stop: decision.plan.stop,
+      t1: journey.t1.trigger,
+      t2: journey.t2.trigger,
+      remainingPct: positionPlan.remainingPct,
+      t1Pct: t1Step?.reducePct ?? decision.plan.t1Pct,
+      t2Pct: t2Step?.reducePct ?? decision.plan.t2Pct,
+    };
+    void stopStep;
+    const preview = buildOperatorAutoPlanPreview({
+      journey,
+      templateId,
+      nextAction: decision.currentAction,
+      birthQuantity: birth,
+      closed: truth.closed,
+    });
+    auto = {
+      nextAction: preview.nextActionTitle,
+      stop: preview.stop,
+      t1: preview.t1Price,
+      t2: preview.t2Price,
+      remainingPct: preview.remainingPct,
+      t1Pct: preview.t1Pct,
+      t2Pct: preview.t2Pct,
+    };
+  }
+
+  const hoy: OperatorJourney2LevelsV1 = {
+    ...canonical,
+    nextAction: hoyCta.label.toUpperCase(),
+  };
+
+  return {
+    decision,
+    mercado: canonical,
+    next: canonical,
+    risk,
+    plan,
+    auto,
+    hoy,
+    journal: canonical,
+    chart,
+  };
+}
+
+/** Assert helper for Journey 2 goldens — levels only (not Hoy CTA wording). */
+export function operatorJourney2LevelsEqual(
+  a: OperatorJourney2LevelsV1,
+  b: OperatorJourney2LevelsV1,
+  opts?: { ignoreNextAction?: boolean },
+): boolean {
+  if (!opts?.ignoreNextAction && a.nextAction !== b.nextAction) return false;
+  return (
+    a.stop === b.stop &&
+    a.t1 === b.t1 &&
+    a.t2 === b.t2 &&
+    a.remainingPct === b.remainingPct &&
+    a.t1Pct === b.t1Pct &&
+    a.t2Pct === b.t2Pct
+  );
 }

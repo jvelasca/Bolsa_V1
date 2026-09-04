@@ -1,7 +1,8 @@
-/**
- * V2.x — NEXT ACTION hero + Risk Box (operator cabin).
+/** V2.x — NEXT ACTION hero + Risk Box (operator cabin).
  * V2.24 — composición 4 niveles (auditor §6).
  * V2.25 — densidad · tipografía · color semántico · vacíos/loading · a11y.
+ * V2.28 — PLAN DE LA POSICIÓN (Mission + Exit Route fused).
+ * V2.31 — Premium Visual System (3 tamaños · números tabulares · menos cards).
  * Display-only · Ranking ≠ BUY · Confirm = firma.
  */
 
@@ -16,36 +17,49 @@ import type {
   OperatorProtectionStateV1,
   OperatorExitLadderV1,
   OperatorExitLadderRungV1,
+  OperatorPositionPlanV1,
+  OperatorPositionPlanStepV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
+import {
+  CABIN_KV_GRID,
+  CABIN_NUM,
+  CABIN_TYPE,
+  CABIN_VISUAL_VERSION,
+  cabinNumClass,
+} from "@/features/trading/cabin-visual";
 
-/** V2.24 — jerarquía definitiva de la cabina DECISIÓN. */
+export {
+  CABIN_KV_GRID,
+  CABIN_NUM,
+  CABIN_TYPE,
+  CABIN_VISUAL_VERSION,
+  cabinNumClass,
+  cabinNumTone,
+} from "@/features/trading/cabin-visual";
+
+/** V2.24 / V2.28 — jerarquía definitiva de la cabina DECISIÓN. */
 export const CABIN_LEVEL_QUESTIONS = {
   1: "¿Qué hago ahora?",
   2: "¿Con qué riesgo?",
-  3: "¿Qué pasa después?",
+  3: "¿Cuál es el plan?",
   4: "¿Por qué?",
 } as const;
 
 export type OperatorCabinLevelId = 1 | 2 | 3 | 4;
 
-/** V2.25 — tipografía / densidad compartida. */
-export const CABIN_TYPE = {
-  eyebrow:
-    "text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/90",
-  meta: "text-[10px] leading-snug text-muted-foreground",
-  body: "text-[11px] leading-snug text-foreground",
-  heroTitle: "text-base font-bold leading-tight tracking-tight",
-  value: "font-medium tabular-nums text-foreground",
-} as const;
+export function CabinSectionLabel({ children }: { children: string }) {
+  return <p className={CABIN_TYPE.eyebrow}>{children}</p>;
+}
 
 /** V2.25 — foco teclado en controles de cabina. */
 export const CABIN_FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600/45 focus-visible:ring-offset-1 focus-visible:ring-offset-background";
 
 export const CABIN_INTERACTIVE = cn(
-  "text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline",
+  CABIN_TYPE.meta,
+  "font-medium text-foreground/90 underline-offset-2 hover:underline",
   CABIN_FOCUS_RING,
 );
 
@@ -75,6 +89,7 @@ export function OperatorCabinLevel({
       data-testid={`cabin-level-${level}`}
       data-cabin-level={level}
       data-cabin-density="v2.25"
+      data-cabin-visual={CABIN_VISUAL_VERSION}
       aria-label={question}
     >
       {showQuestion ? (
@@ -107,7 +122,8 @@ export function OperatorCabinStatus({
   return (
     <p
       className={cn(
-        "rounded-md border px-2 py-1.5 text-[11px] leading-snug",
+        "rounded-md border px-2 py-1.5",
+        CABIN_TYPE.operativa,
         kind === "loading" &&
           "border-border/50 bg-muted/15 text-muted-foreground",
         kind === "empty" &&
@@ -181,16 +197,15 @@ export function NextActionHero({
       data-next-action-tone={action.tone}
       data-next-action-title={action.title}
       data-cabin-density="v2.25"
+      data-cabin-visual={CABIN_VISUAL_VERSION}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-80">
-        Próxima acción
-      </p>
-      <p className={CABIN_TYPE.heroTitle} data-testid="next-action-title">
+      <p className={cn(CABIN_TYPE.eyebrow, "opacity-80")}>Próxima acción</p>
+      <p className={CABIN_TYPE.hero} data-testid="next-action-title">
         {action.title}
       </p>
       {action.subtitle ? (
         <p
-          className="mt-0.5 text-[11px] leading-snug opacity-90"
+          className={cn("mt-0.5 opacity-90", CABIN_TYPE.operativa)}
           data-testid="next-action-subtitle"
         >
           {action.subtitle}
@@ -198,7 +213,7 @@ export function NextActionHero({
       ) : null}
       {action.reasons && action.reasons.length > 0 ? (
         <ul
-          className="mt-1 space-y-0.5 text-[10px] leading-snug opacity-90"
+          className={cn("mt-1 space-y-0.5 opacity-90", CABIN_TYPE.meta)}
           data-testid="next-action-reasons"
         >
           <li className="font-semibold">Porque:</li>
@@ -215,7 +230,7 @@ export function NextActionHero({
       ) : null}
       {action.nextChange ? (
         <p
-          className="mt-0.5 text-[10px] leading-snug opacity-90"
+          className={cn("mt-0.5 opacity-90", CABIN_TYPE.meta)}
           data-testid="next-action-next-change"
         >
           <span className="font-semibold">Próximo cambio:</span>{" "}
@@ -224,7 +239,7 @@ export function NextActionHero({
       ) : null}
       {levelBits.length > 0 ? (
         <p
-          className="mt-0.5 text-[10px] tabular-nums opacity-85"
+          className={cn("mt-0.5 opacity-85", cabinNumClass())}
           data-testid="next-action-levels"
         >
           {levelBits.join(" · ")}
@@ -232,7 +247,7 @@ export function NextActionHero({
       ) : null}
       {action.condition ? (
         <p
-          className="mt-0.5 text-[10px] leading-snug opacity-75"
+          className={cn("mt-0.5 opacity-75", CABIN_TYPE.meta)}
           data-testid="next-action-condition"
         >
           <span className="font-semibold">Condición:</span> {action.condition}
@@ -240,7 +255,7 @@ export function NextActionHero({
       ) : null}
       {action.expires ? (
         <p
-          className="mt-0.5 text-[10px] leading-snug opacity-70"
+          className={cn("mt-0.5 opacity-70", CABIN_TYPE.meta)}
           data-testid="next-action-expires"
         >
           <span className="font-semibold">Caduca:</span> {action.expires}
@@ -248,7 +263,7 @@ export function NextActionHero({
       ) : null}
       {action.ctaHint ? (
         <p
-          className="mt-1 text-[10px] font-medium opacity-80"
+          className={cn("mt-1 font-medium opacity-80", CABIN_TYPE.meta)}
           data-testid="next-action-cta-hint"
         >
           {action.ctaHint}
@@ -292,18 +307,16 @@ export function OperatorRiskBox({
 
   return (
     <div
-      className={cn(
-        "min-w-0 space-y-1 rounded-md border border-border/60 bg-background/40 px-2 py-1.5",
-        className,
-      )}
+      className={cn("min-w-0 space-y-1", className)}
       data-testid="operator-risk-box"
       data-cabin-density="v2.25"
+      data-cabin-visual={CABIN_VISUAL_VERSION}
       aria-labelledby={labelId}
     >
       <p id={labelId} className={CABIN_TYPE.eyebrow}>
         Riesgo · tamaño
       </p>
-      <dl className="grid grid-cols-1 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground sm:grid-cols-2">
+      <dl className={CABIN_KV_GRID}>
         {box.capital != null ? (
           <div className="flex justify-between gap-2">
             <dt>Capital</dt>
@@ -406,7 +419,7 @@ export function OperatorFourAnswersBlock({
         Resumen
       </p>
       <dl
-        className="space-y-0.5 text-[10px] text-muted-foreground"
+        className={cn("space-y-0.5", CABIN_TYPE.meta)}
         aria-labelledby={labelId}
       >
         {rows.map((r) =>
@@ -414,7 +427,7 @@ export function OperatorFourAnswersBlock({
             <div key={r.id} className="flex justify-between gap-2">
               <dt className="shrink-0">{r.label}</dt>
               <dd
-                className="text-right font-medium text-foreground"
+                className={cn(CABIN_TYPE.operativa, "text-right font-medium")}
                 data-testid={`four-answers-${r.id}`}
               >
                 {r.value}
@@ -446,7 +459,7 @@ function missionMark(status: OperatorMissionStepV1["status"]): {
 function missionStepClasses(status: OperatorMissionStepV1["status"]): string {
   switch (status) {
     case "active":
-      return "rounded-sm bg-sky-500/10 px-1 text-sky-950 dark:text-sky-50";
+      return "border-l-2 border-sky-600/70 pl-1.5 font-semibold text-sky-950 dark:text-sky-50";
     case "done":
       return "opacity-80";
     case "pending":
@@ -462,7 +475,7 @@ export function OperatorMissionChecklist({
 }) {
   return (
     <ul
-      className="space-y-0.5 text-[10px]"
+      className={cn("space-y-0.5", CABIN_TYPE.operativa)}
       data-testid="operator-mission-checklist"
       aria-label="Misión de la posición"
     >
@@ -488,7 +501,7 @@ export function OperatorMissionChecklist({
               </span>
               {step.label}
             </span>
-            <span className="tabular-nums font-medium text-foreground">
+            <span className={cn(CABIN_NUM.base, CABIN_NUM.neu)}>
               {step.detail ?? "—"}
             </span>
           </li>
@@ -501,49 +514,72 @@ export function OperatorMissionChecklist({
 function ladderRungTone(status: OperatorExitLadderRungV1["status"]): string {
   switch (status) {
     case "done":
-      return "border-emerald-600/35 bg-emerald-500/10 text-emerald-950 dark:text-emerald-50";
+      return "text-emerald-800 dark:text-emerald-200";
     case "active":
-      return "border-sky-600/45 bg-sky-500/15 text-sky-950 dark:text-sky-50";
+      return "border-l-2 border-sky-600/70 pl-1.5 font-semibold text-sky-950 dark:text-sky-50";
     case "pending":
     default:
-      return "border-border/60 bg-background/40 text-muted-foreground";
+      return "text-muted-foreground";
   }
 }
 
-/** V2.26 — escalera Entrada→Stop→T1→T2→Trail (ExitPolicy %). */
-export function OperatorExitLadder({
-  ladder,
+/**
+ * V2.28 — single PLAN DE LA POSICIÓN (Mission + Exit Route).
+ * Exposes mission-step-* + exit-ladder-* testids for contractual surfaces.
+ */
+export function OperatorPositionPlan({
+  plan,
+  className,
 }: {
-  ladder: OperatorExitLadderV1;
+  plan: OperatorPositionPlanV1;
+  className?: string;
 }) {
-  if (ladder.rungs.length === 0) return null;
+  if (plan.steps.length === 0) return null;
   return (
     <div
-      className="min-w-0 space-y-0"
-      data-testid="operator-exit-ladder"
+      className={cn("min-w-0 space-y-0", className)}
+      data-testid="operator-position-plan"
       data-cabin-density="v2.25"
-      aria-label="Escalera de salida Entrada a Trailing"
+      data-cabin-visual={CABIN_VISUAL_VERSION}
+      aria-label="Plan de la posición"
     >
-      <p className={CABIN_TYPE.eyebrow}>Escalera de salida</p>
-      <ol className="mt-1 space-y-0">
-        {ladder.rungs.map((rung, idx) => {
-          const mark = missionMark(rung.status);
-          const isLast = idx === ladder.rungs.length - 1;
+      <p className={CABIN_TYPE.eyebrow}>Plan de la posición</p>
+      <ol
+        className="mt-1 space-y-0"
+        data-testid="operator-mission-checklist"
+        aria-label="Plan de la posición"
+      >
+        {plan.steps.map((step, idx) => {
+          const mark = missionMark(step.status);
+          const isLast = idx === plan.steps.length - 1;
+          const ladderId =
+            step.id === "protection"
+              ? "stop"
+              : step.id === "exit"
+                ? null
+                : step.id;
           return (
             <li
-              key={rung.id}
+              key={step.id}
               className="relative"
-              data-testid={`exit-ladder-rung-${rung.id}`}
-              data-status={rung.status}
+              data-testid={
+                ladderId != null
+                  ? `exit-ladder-rung-${ladderId}`
+                  : `position-plan-step-${step.id}`
+              }
+              data-status={step.status}
               data-reduce-pct={
-                rung.reducePct != null ? String(rung.reducePct) : undefined
+                step.reducePct != null ? String(step.reducePct) : undefined
               }
             >
               <div
                 className={cn(
-                  "flex items-baseline justify-between gap-2 rounded-md border px-2 py-1 text-[10px]",
-                  ladderRungTone(rung.status),
+                  "flex items-baseline justify-between gap-2 py-0.5",
+                  CABIN_TYPE.operativa,
+                  ladderRungTone(step.status),
                 )}
+                data-testid={`mission-step-${step.missionId}`}
+                data-status={step.status}
               >
                 <span>
                   <span className="sr-only">{mark.sr}. </span>
@@ -551,19 +587,19 @@ export function OperatorExitLadder({
                     {mark.symbol}
                   </span>
                   <span className="font-semibold text-foreground">
-                    {rung.label}
+                    {step.label}
                   </span>
-                  {rung.reducePct != null ? (
+                  {step.reducePct != null ? (
                     <span
-                      className="ml-1 tabular-nums opacity-90"
-                      data-testid={`exit-ladder-pct-${rung.id}`}
+                      className={cn("ml-1 opacity-90", CABIN_NUM.base)}
+                      data-testid={`exit-ladder-pct-${ladderId ?? step.id}`}
                     >
-                      · {rung.reducePct}%
+                      · {step.reducePct}%
                     </span>
                   ) : null}
                 </span>
-                <span className="tabular-nums font-medium text-foreground">
-                  {rung.detail ?? "—"}
+                <span className={cn(CABIN_NUM.base, CABIN_NUM.neu)}>
+                  {step.detail ?? "—"}
                 </span>
               </div>
               {!isLast ? (
@@ -577,15 +613,15 @@ export function OperatorExitLadder({
           );
         })}
       </ol>
-      {ladder.remainingDetail != null || ladder.remainingPct != null ? (
+      {plan.remainingDetail != null || plan.remainingPct != null ? (
         <p
-          className="mt-1 text-[10px] text-muted-foreground"
+          className={cn("mt-1", CABIN_TYPE.meta)}
           data-testid="exit-ladder-remaining"
         >
           RESTANTE{" "}
-          <span className="font-medium tabular-nums text-foreground">
-            {ladder.remainingDetail ??
-              (ladder.remainingPct != null ? `${ladder.remainingPct}%` : "—")}
+          <span className={cn(CABIN_NUM.base, CABIN_NUM.neu)}>
+            {plan.remainingDetail ??
+              (plan.remainingPct != null ? `${plan.remainingPct}%` : "—")}
           </span>
         </p>
       ) : null}
@@ -593,62 +629,162 @@ export function OperatorExitLadder({
   );
 }
 
-function protectionToneClasses(
-  kind: OperatorProtectionStateV1["kind"],
-): string {
-  switch (kind) {
-    case "technical":
-      return "border-emerald-600/40 bg-emerald-500/10 text-emerald-950 dark:text-emerald-50";
-    case "emergency":
-      return "border-orange-600/45 bg-orange-500/10 text-orange-950 dark:text-orange-50";
-    case "none":
-    default:
-      return "border-rose-600/45 bg-rose-500/10 text-rose-950 dark:text-rose-50";
+/** @deprecated V2.28 — use OperatorPositionPlan. Thin adapter for ladder-shaped props. */
+export function OperatorExitLadder({
+  ladder,
+}: {
+  ladder: OperatorExitLadderV1;
+}) {
+  const steps: OperatorPositionPlanStepV1[] = ladder.rungs.map(
+    (rung): OperatorPositionPlanStepV1 => ({
+      id: rung.id === "stop" ? "protection" : rung.id,
+      missionId:
+        rung.id === "stop"
+          ? "stop"
+          : rung.id === "entry"
+            ? "entry"
+            : rung.id === "t1"
+              ? "t1"
+              : rung.id === "t2"
+                ? "t2"
+                : "trail",
+      label:
+        rung.id === "stop"
+          ? "Protección"
+          : rung.id === "trail"
+            ? "Gestión / trailing"
+            : rung.label,
+      detail: rung.detail,
+      status: rung.status,
+      reducePct: rung.reducePct,
+    }),
+  );
+  if (ladder.remainingPct != null || ladder.remainingDetail != null) {
+    steps.push({
+      id: "exit",
+      missionId: "remaining",
+      label: "Salida final",
+      detail:
+        ladder.remainingDetail != null
+          ? `RESTANTE ${ladder.remainingDetail}`
+          : ladder.remainingPct != null
+            ? `RESTANTE ${ladder.remainingPct}%`
+            : null,
+      status: "active",
+      reducePct: null,
+    });
   }
+  const plan: OperatorPositionPlanV1 = {
+    profileLabel: ladder.profileLabel,
+    remainingPct: ladder.remainingPct,
+    remainingDetail: ladder.remainingDetail,
+    steps,
+  };
+  return (
+    <div data-testid="operator-exit-ladder">
+      <OperatorPositionPlan plan={plan} />
+    </div>
+  );
 }
 
+function protectionToneClasses(protection: OperatorProtectionStateV1): string {
+  if (protection.kind === "emergency") {
+    return "border-orange-600/45 bg-orange-500/10 text-orange-950 dark:text-orange-50";
+  }
+  if (protection.phase === "protected" || protection.kind === "technical") {
+    return "border-emerald-600/40 bg-emerald-500/10 text-emerald-950 dark:text-emerald-50";
+  }
+  if (protection.phase === "sent" || protection.phase === "confirmed") {
+    return "border-amber-600/45 bg-amber-500/10 text-amber-950 dark:text-amber-50";
+  }
+  if (protection.phase === "planned") {
+    return "border-sky-600/40 bg-sky-500/10 text-sky-950 dark:text-sky-50";
+  }
+  return "border-rose-600/45 bg-rose-500/10 text-rose-950 dark:text-rose-50";
+}
+
+/** V2.29 — Protection State: Planificado / Confirmado / Enviado / Protegido. */
 export function OperatorProtectionLine({
   protection,
 }: {
   protection: OperatorProtectionStateV1;
 }) {
-  const honesty =
-    protection.honesty === "confirmed"
-      ? "CONFIRMADA"
-      : protection.honesty === "sent"
-        ? "ENVIADA"
-        : protection.honesty === "calculated"
-          ? "CALCULADA"
-          : null;
+  const executed =
+    protection.stop != null && Number.isFinite(protection.stop)
+      ? formatPrice(protection.stop)
+      : null;
+  const planned =
+    protection.plannedStop != null && Number.isFinite(protection.plannedStop)
+      ? formatPrice(protection.plannedStop)
+      : null;
+  const showPlanVsExec =
+    planned != null &&
+    (executed == null ||
+      (protection.stop != null &&
+        protection.plannedStop != null &&
+        Math.abs(protection.stop - protection.plannedStop) > 0.0001));
+
   const mark =
-    protection.kind === "technical"
-      ? "●"
-      : protection.kind === "emergency"
+    protection.phase === "protected"
+      ? protection.kind === "emergency"
         ? "▲"
-        : "■";
+        : "●"
+      : protection.phase === "sent" || protection.phase === "confirmed"
+        ? "◐"
+        : protection.phase === "planned"
+          ? "○"
+          : "■";
+
+  const detailBits: string[] = [];
+  if (protection.kind === "emergency" && protection.phase === "protected") {
+    detailBits.push("emergencia");
+  } else if (protection.isTechnical) {
+    detailBits.push("técnico");
+  }
+  if (executed) {
+    detailBits.unshift(executed);
+  } else if (planned && protection.phase === "planned") {
+    detailBits.unshift(`Plan ${planned}`);
+  }
+
   return (
     <div
       className={cn(
-        "flex min-w-0 items-baseline justify-between gap-2 rounded-md border px-2 py-1 text-[10px]",
-        protectionToneClasses(protection.kind),
+        "flex min-w-0 flex-col gap-0.5 rounded-md border px-2 py-1",
+        CABIN_TYPE.operativa,
+        protectionToneClasses(protection),
       )}
       role="status"
       aria-live="polite"
-      aria-label={`Protección: ${protection.label}${honesty ? ` ${honesty}` : ""}`}
+      aria-label={`Protección: ${protection.phaseLabel}${executed ? ` ${executed}` : planned ? ` plan ${planned}` : ""}`}
       data-testid="operator-protection-line"
       data-protection-kind={protection.kind}
       data-protection-honesty={protection.honesty}
+      data-protection-phase={protection.phase}
       data-protection-technical={protection.isTechnical ? "1" : "0"}
       data-cabin-density="v2.25"
+      data-cabin-visual={CABIN_VISUAL_VERSION}
     >
-      <span className="font-semibold uppercase tracking-wide opacity-80">
-        Protección
-      </span>
-      <span className="font-medium" data-testid="operator-protection-label">
-        <span aria-hidden="true">{mark} </span>
-        {protection.label}
-        {honesty && protection.kind === "technical" ? ` · ${honesty}` : ""}
-      </span>
+      <div className="flex min-w-0 items-baseline justify-between gap-2">
+        <span className="font-semibold uppercase tracking-wide opacity-80">
+          Protección
+        </span>
+        <span className="font-medium" data-testid="operator-protection-label">
+          <span aria-hidden="true">{mark} </span>
+          {protection.phaseLabel}
+          {detailBits.length > 0 ? ` · ${detailBits.join(" · ")}` : ""}
+        </span>
+      </div>
+      {showPlanVsExec ? (
+        <p
+          className={cn("leading-snug opacity-85", CABIN_TYPE.meta)}
+          data-testid="operator-protection-plan-vs-exec"
+        >
+          Plan {planned}
+          {" · "}
+          {executed ? `Ejecución ${executed}` : "Ejecución pendiente"}
+        </p>
+      ) : null}
     </div>
   );
 }

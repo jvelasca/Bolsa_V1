@@ -373,7 +373,7 @@ export function MesaPositionRow({
               : "—"}
           </p>
           <p className="text-muted-foreground">
-            Prop.{" "}
+            Sug.{" "}
             {protection.proposal.value != null
               ? formatPrice(protection.proposal.value)
               : "—"}
@@ -390,7 +390,7 @@ export function MesaPositionRow({
             "text-[10px] font-medium",
             protection.discrepancy
               ? "text-rose-600 dark:text-rose-400"
-              : protection.summaryLabel === "Confirmada"
+              : protection.summaryLabel === "Protegido"
                 ? "text-emerald-700 dark:text-emerald-300"
                 : "text-muted-foreground",
           )}

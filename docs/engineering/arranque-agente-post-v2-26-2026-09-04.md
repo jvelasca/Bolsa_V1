@@ -1,9 +1,10 @@
 # ARRANQUE — siguiente agente · post V2.26 (2026-09-04)
 
+> **Superseded:** tras V2.27 usar [arranque post-V2.27](./arranque-agente-post-v2-27-2026-09-04.md) · [relevo V2.4](./traspaso-relevo-v2-4-cabin-coherence-2026-09-04.md).  
 > **Leer primero:** [relevo V2.3 Mercado Polish](./traspaso-relevo-v2-3-mercado-polish-2026-09-04.md) · padre [V2.2 Certification](./traspaso-relevo-v2-2-operator-certification-2026-09-04.md).  
 > **Tip producto previo:** [`v2.1-beta`](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md) `5f095d67`.  
 > **Código en `main`:** tip push [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) (V2.2 + V2.24–V2.26).  
-> **Para quién:** agente nuevo · arrancar **V2.27** (Journal) · no reabrir motor FSM.
+> **Para quién:** histórico · V2.27 **hecho** · next = V2.28 PLAN DE POSICIÓN.
 
 ## Estado al relevo
 
@@ -13,13 +14,13 @@
 | V2.24 Composición 4 niveles               | **hecho**                                                                          |
 | V2.25 Densidad / a11y / status            | **hecho**                                                                          |
 | V2.26 Escalera trailing visual            | **hecho** · tip [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) |
-| V2.27 Journal spine + MFE/MAE             | **SIGUIENTE**                                                                      |
-| V2.28 Ops smoke 10 s                      | pendiente sesión ops                                                               |
+| V2.27 Journal spine + MFE/MAE             | **hecho** · ver [arranque post-V2.27](./arranque-agente-post-v2-27-2026-09-04.md)  |
+| V2.3-ops smoke 10 s                       | pendiente sesión ops                                                               |
 | Tip `v2.3-*`                              | solo con petición explícita                                                        |
 
 ## Primer ID a implementar
 
-**V2.27 — Journal spine + MFE/MAE**
+**V2.27 — Journal spine + MFE/MAE** _(cerrado — no reabrir)_
 
 - Cadena visible: TESIS → DECISIÓN → ENTRADA → RIESGO → T1 → T2 → TRAILING → EXIT → RESULTADO
 - Métricas: Initial Risk · Realized R · Final R · **MFE** · **MAE**
@@ -39,6 +40,7 @@ NO LIVE · no bump `1.35.0-beta` · `PAPER_D_EXECUTE` default off · no `TRANSIT
 - `apps/web/src/features/trading/decision-surface-compact.tsx` · `operativa-cockpit-card.tsx`
 - `apps/web/src/features/charts/operational-plan-chart-levels.ts` — títulos `T1 · 30%`
 - Goldens: `g-operator-02/03/04-*.test.ts`
+- Journal V2.27: `journal-spine-view.ts` · `decision-ficha-panel.tsx`
 
 ## Pre-flight mínimo antes de tocar Journal
 
@@ -49,7 +51,7 @@ cd apps/web && npx vitest run src/features/trading/operator-cabin-ui.test.tsx sr
 
 ## Prompt sugerido al abrir chat
 
-> Lee `docs/engineering/arranque-agente-post-v2-26-2026-09-04.md` y el relevo V2.3. Arranca **V2.27** Journal spine + MFE/MAE. Freeze intacto. No tip `v2.3-*` sin pedirlo.
+> Lee `docs/engineering/arranque-agente-post-v2-27-2026-09-04.md` y el relevo V2.4. Arranca **V2.28** PLAN DE POSICIÓN. Freeze intacto. NO MÁS PANELES.
 
 ## Stamp push
 

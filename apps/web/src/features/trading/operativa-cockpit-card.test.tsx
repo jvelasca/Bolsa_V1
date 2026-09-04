@@ -247,17 +247,16 @@ describe("OperativaCockpitCard POSICIÓN V1.40", () => {
     expect(screen.getByTestId("position-decision-price")).toBeTruthy();
   });
 
-  it("shows exit route with Proteger and T1/T2 in posición", () => {
+  it("shows PLAN DE LA POSICIÓN (not separate Exit Route) in posición", () => {
     renderCockpit(
       <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
     );
-    expect(screen.getByTestId("exit-route-AAPL")).toBeTruthy();
-    expect(screen.getByTestId("exit-route-AAPL-node-stop").textContent).toMatch(
-      /Proteger/,
+    expect(screen.queryByTestId("exit-route-AAPL")).toBeNull();
+    expect(screen.getByTestId("operator-position-plan")).toBeTruthy();
+    expect(screen.getByTestId("mission-step-stop").textContent).toMatch(
+      /Protección/,
     );
-    expect(
-      screen.getByTestId("exit-route-AAPL-node-target1").textContent,
-    ).toMatch(/T1/);
+    expect(screen.getByTestId("mission-step-t1").textContent).toMatch(/T1/);
   });
 
   it("shows single primary CTA Mantener in posición (no secondary exit buttons)", () => {

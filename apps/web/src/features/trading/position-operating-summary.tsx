@@ -201,6 +201,7 @@ function PositionOperatingSummaryFromPot({
         className,
       )}
       data-testid="position-operating-summary"
+      data-operator-journey="v2.32"
       data-action={decision.action}
       data-cta={primaryCta.kind}
       data-next-event={decision.nextEvent}
@@ -255,8 +256,10 @@ function PositionOperatingSummaryFromPot({
             className="font-medium"
             data-testid="journal-protection-kind"
             data-protection-kind={operator.protection.kind}
+            data-protection-phase={operator.protection.phase}
           >
-            {operator.protection.label}
+            {operator.protection.phaseLabel}
+            {operator.protection.kind === "emergency" ? " · emergencia" : ""}
           </dd>
         </div>
         {operator.remaining?.remainingPct != null ? (

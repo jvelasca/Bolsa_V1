@@ -153,7 +153,7 @@ describe("mesa-hoy-page invariants", () => {
     expect(protection.summaryLabel).toBe("Sin protección");
   });
 
-  it("protect_hint maps to Proteger, not Confirmada", () => {
+  it("protect_hint maps to Proteger, not Protegido", () => {
     const next = mapMesaNextAction({
       protectPlan: { status: "protect_hint" },
     });
@@ -162,6 +162,7 @@ describe("mesa-hoy-page invariants", () => {
     const protection = buildMesaProtectionState({
       protectPlan: { status: "protect_hint", suggestedProtectStop: 95 },
     });
+    expect(protection.summaryLabel).not.toBe("Protegido");
     expect(protection.summaryLabel).not.toBe("Confirmada");
   });
 

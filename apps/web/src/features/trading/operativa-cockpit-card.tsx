@@ -59,7 +59,6 @@ import {
   entryPhaseTone,
   entryPhaseToneClasses,
 } from "@/features/trading/entry-decision-surface";
-import { ExitRouteView } from "@/features/trading/exit-route-view";
 import { useInstrumentOperationalContext } from "@/features/trading/use-instrument-operational-context";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
@@ -72,6 +71,9 @@ import { AutoDeskPanel } from "@/features/trading/auto-desk-panel";
 import {
   CABIN_FOCUS_RING,
   CABIN_INTERACTIVE,
+  CABIN_TYPE,
+  CABIN_VISUAL_VERSION,
+  CabinSectionLabel,
   NextActionHero,
   OperatorCabinLevel,
   OperatorCabinStatus,
@@ -141,11 +143,7 @@ function phaseTone(
 }
 
 function SectionLabel({ children }: { children: string }) {
-  return (
-    <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/90">
-      {children}
-    </p>
-  );
+  return <CabinSectionLabel>{children}</CabinSectionLabel>;
 }
 
 export function OperativaCockpitCard({
@@ -335,6 +333,7 @@ export function OperativaCockpitCard({
         data-testid="operativa-cockpit"
         data-phase="sin_contexto"
         data-cabin-composition="4-levels"
+        data-cabin-visual={CABIN_VISUAL_VERSION}
       >
         <OperatorCabinLevel level={1} showQuestion={false}>
           <NextActionHero
@@ -361,6 +360,7 @@ export function OperativaCockpitCard({
       data-testid="operativa-cockpit"
       data-cabin-composition="4-levels"
       data-cabin-density="v2.25"
+      data-cabin-visual={CABIN_VISUAL_VERSION}
       data-phase={phase}
       data-instrument-id={instrumentId}
       data-symbol={symbol}
@@ -378,7 +378,7 @@ export function OperativaCockpitCard({
             <p className="truncate text-sm font-semibold tracking-tight">
               {symbol}
             </p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className={CABIN_TYPE.meta}>
               Universo: {context.inEstudio ? "Estudio" : "fuera de Estudio"}
               {opinion?.asOfBarDate ? ` · as-of ${opinion.asOfBarDate}` : null}
             </p>
@@ -387,7 +387,8 @@ export function OperativaCockpitCard({
             {reconHealth ? (
               <span
                 className={cn(
-                  "rounded border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide",
+                  "rounded border px-1.5 py-0.5 font-semibold tracking-wide",
+                  CABIN_TYPE.meta,
                   reconHealth === "CRITICAL"
                     ? "border-rose-600/50 bg-rose-500/10"
                     : reconHealth === "ATTENTION"
@@ -401,7 +402,10 @@ export function OperativaCockpitCard({
               </span>
             ) : null}
             <span
-              className="rounded border border-border/70 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+              className={cn(
+                "rounded border border-border/70 bg-background/60 px-1.5 py-0.5 font-semibold uppercase tracking-wide",
+                CABIN_TYPE.meta,
+              )}
               data-testid="operativa-cockpit-phase"
               title={`${operatorStageLabel} · ${phaseLabel}`}
             >
@@ -430,23 +434,15 @@ export function OperativaCockpitCard({
             Estado operativo en el gráfico · ACCIÓN sigue aquí
           </p>
         ) : phase === "posicion" && position ? (
-          <>
-            <PositionOperationalStarCard
-              position={position}
-              symbol={symbol}
-              portfolioReconStatus={reconStatus}
-              view={positionPov ?? undefined}
-              viewSource={positionPovResult?.source}
-              journey={positionJourney}
-              onOpenWhy={() => setWhyOpen(true)}
-            />
-            <ExitRouteView
-              truth={positionPot?.operational ?? null}
-              position={position}
-              study={study}
-              originStudy={context.originStudy}
-            />
-          </>
+          <PositionOperationalStarCard
+            position={position}
+            symbol={symbol}
+            portfolioReconStatus={reconStatus}
+            view={positionPov ?? undefined}
+            viewSource={positionPovResult?.source}
+            journey={positionJourney}
+            onOpenWhy={() => setWhyOpen(true)}
+          />
         ) : entryTruth ? (
           <EntryDecisionSurfaceCard
             truth={entryTruth}
@@ -555,7 +551,7 @@ export function OperativaCockpitCard({
             {paperAuto.executeEligible
               ? "ENTRADA LISTA · AUTO ejecutará si está armado"
               : "ENTRADA LISTA · AUTO armado · ejecución off"}
-            <p className="mt-0.5 text-[10px] font-normal text-muted-foreground">
+            <p className={cn("mt-0.5 font-normal", CABIN_TYPE.meta)}>
               Armado ≠ ejecución · puedes intervenir
             </p>
           </div>
@@ -620,12 +616,7 @@ export function OperativaCockpitCard({
         ) : null}
       </div>
 
-      {/* AUTO Desk — L3 «qué pasa después» */}
-      <OperatorCabinLevel level={3} showQuestion={false}>
-        <AutoDeskPanel templateId={templateId} journey={positionJourney} />
-      </OperatorCabinLevel>
-
-      {/* Avanzado colapsado: Gate · DS-05 · TTL · UNKNOWN detail → L4 */}
+      {/* L4 — ¿Por qué? · AUTO (plegados) */}
       <OperatorCabinLevel
         level={4}
         showQuestion={false}
@@ -642,6 +633,7 @@ export function OperativaCockpitCard({
         {whyOpen ? (
           <DecisionExplainPanel view={explainView} loading={opinionLoading} />
         ) : null}
+        <AutoDeskPanel templateId={templateId} journey={positionJourney} />
       </OperatorCabinLevel>
     </section>
   );
