@@ -183,8 +183,8 @@ export function PositionExitDrawerActions({
               revisionOriginFromExitReason(exitPlan?.primaryReason) === "trail"
                 ? "Trail → Confirm (firma SEMI · hint ≠ currentStop hasta revision)"
                 : hasProtectHint
-                  ? "Proteger → cola Confirm (firma SEMI · hint ≠ stop)"
-                  : "Proteger → cola Confirm (stop inicial · OPEN_UNPROTECTED · firma SEMI)"
+                  ? "Proteger → cola Confirm (stop técnico · firma SEMI)"
+                  : "Proteger → cola Confirm (stop de emergencia −5 % · no es stop técnico · firma SEMI)"
             }
           >
             Proteger

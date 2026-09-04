@@ -47,6 +47,14 @@ export function NextActionHero({
   const statusLabel = action.subtitle
     ? `${action.title}. ${action.subtitle}`
     : action.title;
+  const levels = action.levels;
+  const levelBits = [
+    levels?.entry != null ? `Entrada ${formatPrice(levels.entry)}` : null,
+    levels?.trigger != null && levels.trigger !== levels.entry
+      ? `Trigger ${formatPrice(levels.trigger)}`
+      : null,
+    levels?.stop != null ? `Stop ${formatPrice(levels.stop)}` : null,
+  ].filter(Boolean);
   return (
     <div
       className={cn(
@@ -76,6 +84,30 @@ export function NextActionHero({
           data-testid="next-action-subtitle"
         >
           {action.subtitle}
+        </p>
+      ) : null}
+      {levelBits.length > 0 ? (
+        <p
+          className="mt-0.5 text-[10px] tabular-nums opacity-85"
+          data-testid="next-action-levels"
+        >
+          {levelBits.join(" · ")}
+        </p>
+      ) : null}
+      {action.condition ? (
+        <p
+          className="mt-0.5 text-[10px] leading-snug opacity-90"
+          data-testid="next-action-condition"
+        >
+          <span className="font-semibold">Condición:</span> {action.condition}
+        </p>
+      ) : null}
+      {action.expires ? (
+        <p
+          className="mt-0.5 text-[10px] leading-snug opacity-80"
+          data-testid="next-action-expires"
+        >
+          <span className="font-semibold">Caduca:</span> {action.expires}
         </p>
       ) : null}
       {action.ctaHint ? (
@@ -118,7 +150,8 @@ export function OperatorRiskBox({
     box.stop != null ||
     box.lossAtStop != null ||
     box.maxLoss != null ||
-    box.rrT1 != null;
+    box.rrT1 != null ||
+    box.quantity != null;
   if (!hasAny) return null;
 
   return (
@@ -134,7 +167,7 @@ export function OperatorRiskBox({
         id={labelId}
         className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground"
       >
-        Riesgo
+        Riesgo · tamaño
       </p>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
         {box.capital != null ? (
@@ -147,7 +180,7 @@ export function OperatorRiskBox({
         ) : null}
         {box.riskPct != null ? (
           <div className="flex justify-between gap-2">
-            <dt>Riesgo</dt>
+            <dt>Riesgo %</dt>
             <dd className="font-medium tabular-nums text-foreground">
               {box.riskPct.toFixed(1)}%
             </dd>
@@ -176,6 +209,50 @@ export function OperatorRiskBox({
             {level(box.stop)}
           </dd>
         </div>
+        {box.stopDistancePct != null ? (
+          <div className="flex justify-between gap-2">
+            <dt>Distancia</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="risk-box-distance"
+            >
+              {box.stopDistancePct.toFixed(1)}%
+            </dd>
+          </div>
+        ) : null}
+        {box.quantity != null ? (
+          <div className="flex justify-between gap-2">
+            <dt>Cantidad</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="risk-box-quantity"
+            >
+              {box.quantity}
+            </dd>
+          </div>
+        ) : null}
+        {box.positionValue != null ? (
+          <div className="flex justify-between gap-2">
+            <dt>Valor</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="risk-box-position-value"
+            >
+              {money(box.positionValue)}
+            </dd>
+          </div>
+        ) : null}
+        {box.portfolioPct != null ? (
+          <div className="flex justify-between gap-2">
+            <dt>% cartera</dt>
+            <dd
+              className="font-medium tabular-nums text-foreground"
+              data-testid="risk-box-portfolio-pct"
+            >
+              {box.portfolioPct.toFixed(1)}%
+            </dd>
+          </div>
+        ) : null}
         <div className="flex justify-between gap-2">
           <dt>R/R T1</dt>
           <dd

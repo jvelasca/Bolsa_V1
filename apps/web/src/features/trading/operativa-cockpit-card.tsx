@@ -21,7 +21,7 @@ import {
   buildDecisionExplainView,
   buildEntryOperatingTruth,
   buildExecutionState,
-  buildOperatorNextActionFromCockpitPhase,
+  resolveOperatorNextAction,
   buildPositionOperatingTruth,
   mapReconStatusToHealth,
   operatorStageFromCockpitPhase,
@@ -330,7 +330,10 @@ export function OperativaCockpitCard({
         data-phase="sin_contexto"
       >
         <NextActionHero
-          action={buildOperatorNextActionFromCockpitPhase("sin_contexto")}
+          action={resolveOperatorNextAction({
+            kind: "cockpit_phase",
+            phase: "sin_contexto",
+          })}
         />
         <p className="text-xs text-muted-foreground">{noLevelsCopy}</p>
       </div>
@@ -445,7 +448,10 @@ export function OperativaCockpitCard({
         ) : (
           <div className="space-y-1.5">
             <NextActionHero
-              action={buildOperatorNextActionFromCockpitPhase(phase)}
+              action={resolveOperatorNextAction({
+                kind: "cockpit_phase",
+                phase,
+              })}
             />
             <p
               className="text-[11px] leading-snug text-muted-foreground"
@@ -579,7 +585,7 @@ export function OperativaCockpitCard({
       </div>
 
       {/* AUTO Desk — autonomía visible en Mercado */}
-      <AutoDeskPanel templateId={templateId} />
+      <AutoDeskPanel templateId={templateId} journey={positionJourney} />
 
       {/* Avanzado colapsado: Gate · DS-05 · TTL · UNKNOWN detail */}
       <div className="border-t border-border/50 pt-1.5">

@@ -76,8 +76,9 @@ export function povOperatingStateHeadline(
       return "Recon no disponible";
     case "T1_READY":
     case "PROTECT_REQUIRED":
-    case "OPEN_UNPROTECTED":
       return "Requiere atención";
+    case "OPEN_UNPROTECTED":
+      return "Sin protección";
     case "T2_READY":
       return "T2 alcanzado";
     case "CLOSED":

@@ -180,7 +180,7 @@ export function MesaPositionNextActionButton({
                 )}
                 onClick={() => enqueueExit("protect")}
                 data-testid={`mesa-next-action-protect-${position.symbol}`}
-                title="Proteger → cola Confirm (stop inicial · OPEN_UNPROTECTED · firma SEMI)"
+                title="Proteger → cola Confirm (stop de emergencia −5 % · no es stop técnico · firma SEMI)"
               >
                 Proteger
               </button>

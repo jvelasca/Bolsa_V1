@@ -15,6 +15,7 @@ import {
   DAILY_DESK_BUCKET_LABEL,
   PAPER_AUTO_ARMED_EXEC_OFF,
   PAPER_AUTO_ARMED_EXEC_ON,
+  dailyDeskBucketDefaultExpanded,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -157,9 +158,17 @@ export function DailyDeskInbox({
           ) : null}
         </div>
       </header>
+      {inbox.exceptionSummary ? (
+        <p
+          className="text-xs font-medium text-foreground"
+          data-testid="daily-desk-exception-summary"
+        >
+          {inbox.exceptionSummary.headline}
+        </p>
+      ) : null}
       <p className="text-xs text-muted-foreground">
-        Cuatro cubos · misma CTA/frase que Mercado · Ranking ≠ BUY · Confirm =
-        firma. No es Mercado.
+        Exception desk · misma CTA/frase que Mercado · Ranking ≠ BUY · Confirm =
+        firma. Si no requiere acción, no ocupa espacio.
       </p>
       <div
         className="grid gap-3 md:grid-cols-2"
@@ -171,6 +180,7 @@ export function DailyDeskInbox({
             bucket={bucket}
             positionsById={positionsById}
             protectPlanByInstrument={protectPlanByInstrument}
+            defaultExpanded={dailyDeskBucketDefaultExpanded(bucket.id)}
           />
         ))}
       </div>
@@ -182,11 +192,18 @@ function DailyDeskBucket({
   bucket,
   positionsById,
   protectPlanByInstrument,
+  defaultExpanded = true,
 }: {
   bucket: DailyDeskBucketV1;
   positionsById: Map<string, PositionDto>;
   protectPlanByInstrument?: Map<string, ProtectPlanV1> | null;
+  defaultExpanded?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const collapseHold =
+    (bucket.id === "posiciones" || bucket.id === "no_operar") &&
+    bucket.count > 0;
+
   return (
     <section
       className={cn(
@@ -195,6 +212,7 @@ function DailyDeskBucket({
       )}
       data-testid={`daily-desk-bucket-${bucket.id}`}
       data-count={bucket.count}
+      data-collapsed={collapseHold && !expanded ? "1" : "0"}
       aria-labelledby={`daily-desk-bucket-title-${bucket.id}`}
     >
       <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
@@ -207,11 +225,23 @@ function DailyDeskBucket({
           </span>
           {bucket.label}
         </h3>
-        {bucket.count > 0 ? (
-          <span className="text-[11px] tabular-nums text-muted-foreground">
-            {bucket.count}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {bucket.count > 0 ? (
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {bucket.count}
+            </span>
+          ) : null}
+          {collapseHold ? (
+            <button
+              type="button"
+              className="text-[10px] font-medium text-foreground/80 underline-offset-2 hover:underline"
+              onClick={() => setExpanded((v) => !v)}
+              data-testid={`daily-desk-expand-${bucket.id}`}
+            >
+              {expanded ? "Ocultar" : "Ver"}
+            </button>
+          ) : null}
+        </div>
       </header>
       {bucket.count === 0 ? (
         <p
@@ -219,6 +249,13 @@ function DailyDeskBucket({
           data-testid={`daily-desk-empty-${bucket.id}`}
         >
           {bucket.emptyLabel}
+        </p>
+      ) : collapseHold && !expanded ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid={`daily-desk-collapsed-${bucket.id}`}
+        >
+          {bucket.count} sin acción requerida — todo lo demás está bien.
         </p>
       ) : (
         <ul className="space-y-2" data-testid={`daily-desk-items-${bucket.id}`}>

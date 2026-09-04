@@ -13,9 +13,11 @@ import type {
 import {
   clampStopNotWorsen,
   doesStopWorsen,
+  resolveBootstrapProtectStop as resolveBootstrapProtectStopShared,
   resolveExitPolicy,
   revisionOriginFromExitReason,
   suggestionFromExitPolicy,
+  type ProtectStopKindV1,
 } from "@bolsa/shared";
 import type { SupervisedProposePayload } from "@/stores/supervised-f3-queue-store";
 import {
@@ -37,6 +39,11 @@ export type OperativaProtectMetaV1 = {
    */
   revisionOrigin?: "protect" | "trail";
   primaryReason?: string | null;
+  /**
+   * V2.10 — bootstrap = emergency −5%; hint/trail/plan = technical.
+   * Confirm must not present bootstrap as strategy stop.
+   */
+  protectKind?: ProtectStopKindV1;
 };
 
 /** V1.32 — snapshot ExitPlan + fuente evento|manual en enqueue reduce/exit. */
@@ -134,8 +141,12 @@ export function resolveExitQuantity(
 /**
  * Distancia % advisory para bootstrap de stop en `OPEN_UNPROTECTED`
  * (compra manual / sin structuralStop). Confirm sigue firmando; no es broker stop.
+ * V2.10 — re-export from shared (Operating Truth, not React invention).
  */
-export const BOOTSTRAP_PROTECT_STOP_PCT = 0.05;
+export {
+  BOOTSTRAP_PROTECT_STOP_PCT,
+  bootstrapProtectStopLabel,
+} from "@bolsa/shared";
 
 function finitePositive(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n) && n > 0;
@@ -160,6 +171,15 @@ export function positionIsOpenUnprotected(position: PositionDto): boolean {
   return !finitePositive(op.currentStop);
 }
 
+function resolveEntryForBootstrap(position: PositionDto): number | null {
+  const op = position.operational;
+  if (finitePositive(op?.actualEntry)) return op!.actualEntry!;
+  if (finitePositive(op?.plannedEntry)) return op!.plannedEntry!;
+  if (finitePositive(position.avgCost)) return position.avgCost;
+  if (finitePositive(position.lastPrice)) return position.lastPrice;
+  return null;
+}
+
 /**
  * Stop inicial sugerido cuando no hay ExitPlan/protect_hint:
  * long → entry×(1−5%); short → entry×(1+5%). Usa initialStop si ya venía en el plan.
@@ -169,23 +189,25 @@ export function resolveBootstrapProtectStop(
 ): number | null {
   const op = position.operational;
   if (!op?.tradePlanId || !positionIsOpenUnprotected(position)) return null;
-  if (finitePositive(op.initialStop)) return op.initialStop;
+  return resolveBootstrapProtectStopShared({
+    direction: op.direction,
+    entry: resolveEntryForBootstrap(position),
+    initialStop: op.initialStop,
+  });
+}
 
-  const entry =
-    (finitePositive(op.actualEntry) && op.actualEntry) ||
-    (finitePositive(op.plannedEntry) && op.plannedEntry) ||
-    (finitePositive(position.avgCost) && position.avgCost) ||
-    (finitePositive(position.lastPrice) && position.lastPrice) ||
-    null;
-  if (entry == null) return null;
-
-  const direction = (op.direction ?? "long").toLowerCase();
-  const raw =
-    direction === "short"
-      ? entry * (1 + BOOTSTRAP_PROTECT_STOP_PCT)
-      : entry * (1 - BOOTSTRAP_PROTECT_STOP_PCT);
-  // 4 decimales max — suficiente para equities; Confirm puede editar.
-  return Math.round(raw * 1e4) / 1e4;
+/** V2.10 — classify protect stop origin for Confirm / UI semantics. */
+export function resolveProtectStopKind(
+  position: PositionDto,
+  protectPlan?: ProtectPlanV1 | null,
+  opts?: { revisionOrigin?: "protect" | "trail" },
+): ProtectStopKindV1 {
+  if (opts?.revisionOrigin === "trail") return "trail";
+  const exitAction = position.operational?.exitPlan?.suggestedAction;
+  if (exitAction === "protect") return "plan";
+  if (protectPlan?.status === "protect_hint") return "hint";
+  if (positionIsOpenUnprotected(position)) return "bootstrap";
+  return "plan";
 }
 
 export function resolveProtectSuggestedStop(
@@ -369,6 +391,9 @@ export function buildPositionExitPayload(opts: {
         ? operational.exitPlan.primaryReason
         : null;
     const revisionOrigin = revisionOriginFromExitReason(primaryReason);
+    const protectKind = resolveProtectStopKind(position, protectPlan, {
+      revisionOrigin,
+    });
     const protectMeta: OperativaProtectMetaV1 = {
       operativaIntent: "protect",
       suggestedStop,
@@ -377,12 +402,10 @@ export function buildPositionExitPayload(opts: {
       stopOverrideRequired: overrideRequired,
       revisionOrigin,
       primaryReason,
+      protectKind,
     };
 
-    const bootstrapNote =
-      positionIsOpenUnprotected(position) &&
-      operational.exitPlan?.suggestedAction !== "protect" &&
-      protectPlan?.status !== "protect_hint";
+    const bootstrapNote = protectKind === "bootstrap";
 
     return {
       artifactType: "ART-RECOMMENDATION",
@@ -403,7 +426,7 @@ export function buildPositionExitPayload(opts: {
         revisionOrigin === "trail"
           ? "Trail → Confirm (stop amend · revision origin=trail · P4.2)"
           : bootstrapNote
-            ? "Proteger (stop inicial) OPEN_UNPROTECTED → Confirm (V2.08)"
+            ? "Proteger · stop de emergencia (−5 %) OPEN_UNPROTECTED → Confirm (V2.10 · no es stop técnico)"
             : "Proteger (stop amend) desde Consola de Mesa (P4.2)",
       ],
       decisionPackage: protectMeta,

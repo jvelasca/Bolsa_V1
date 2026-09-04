@@ -35,6 +35,7 @@ export * from "./operational-context.js";
 export * from "./position-operational-view.js";
 export * from "./position-journey-readout.js";
 export * from "./operator-cabin-view.js";
+export * from "./protect-stop-source.js";
 export * from "./mercado-cockpit-phase.js";
 export * from "./entry-operating-copy.js";
 export * from "./entry-operating-truth.js";

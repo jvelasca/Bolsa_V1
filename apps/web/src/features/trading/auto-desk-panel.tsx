@@ -1,12 +1,15 @@
 /**
  * V2.04 — AUTO Desk inside Mercado DECISIÓN.
- * Explains autonomy (Manual / Asistido / Automático) without engineer jargon.
+ * V2.13 — shows what AUTO will do for this instrument (ExitPolicy + journey).
  * Arm ≠ execute · Confirm = firma · Ranking ≠ BUY.
  */
 
 import {
   buildOperatorAutoChecklist,
+  buildOperatorAutoPlanPreview,
+  resolveOperatorNextAction,
   type PaperBookModeV1,
+  type PositionJourneyReadoutV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import {
@@ -48,12 +51,15 @@ type AutoDeskPanelProps = {
   className?: string;
   /** Collapsed by default in density-normal; parent can force open. */
   defaultOpen?: boolean;
+  /** V2.13 — instrument journey for «qué hará AUTO». */
+  journey?: PositionJourneyReadoutV1 | null;
 };
 
 export function AutoDeskPanel({
   templateId,
   className,
   defaultOpen = false,
+  journey = null,
 }: AutoDeskPanelProps) {
   const bookPrefs = useDemoBookPrefs();
   const { paperDExecuteEnv, killOn } = useMesaEntriesBlocked();
@@ -66,6 +72,22 @@ export function AutoDeskPanel({
   const checklist = buildOperatorAutoChecklist({
     posture,
     templateId,
+    killOn,
+  });
+  const nextAction = resolveOperatorNextAction(
+    journey
+      ? {
+          kind: "position",
+          primaryAction: journey.primaryAction,
+          journey,
+        }
+      : { kind: "cockpit_phase", phase: "posicion" },
+  );
+  const planPreview = buildOperatorAutoPlanPreview({
+    journey,
+    templateId,
+    nextAction,
+    posture,
     killOn,
   });
 
@@ -133,23 +155,51 @@ export function AutoDeskPanel({
           </div>
         </fieldset>
 
-        <ul
-          className="space-y-0.5 text-[10px]"
-          data-testid="auto-desk-checklist"
-        >
-          {checklist.items.map((item) => (
-            <li
-              key={item.id}
-              className="flex items-center gap-1.5 text-muted-foreground"
-              data-done={item.done ? "1" : "0"}
+        <div data-testid="auto-desk-plan-preview">
+          <p className="text-[10px] font-semibold text-foreground">
+            AUTO · {planPreview.profileLabel}
+          </p>
+          <p
+            className="text-[10px] text-muted-foreground"
+            data-testid="auto-desk-next-action"
+          >
+            Próxima acción: {planPreview.nextActionTitle}
+          </p>
+          <ul className="mt-1 space-y-0.5 text-[10px]">
+            {planPreview.items.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-center gap-1.5 text-muted-foreground"
+                data-done={item.done ? "1" : "0"}
+              >
+                <span className="font-semibold text-foreground">
+                  {item.done ? "✓" : "○"}
+                </span>
+                {item.label}
+              </li>
+            ))}
+          </ul>
+          {planPreview.ifReachesLines.length > 0 ? (
+            <div
+              className="mt-1 space-y-0.5"
+              data-testid="auto-desk-if-reaches"
             >
-              <span className="font-semibold text-foreground">
-                {item.done ? "✓" : "○"}
-              </span>
-              {item.label}
-            </li>
-          ))}
-        </ul>
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Si alcanza
+              </p>
+              {planPreview.ifReachesLines.map((line) => (
+                <p key={line} className="text-[10px] text-foreground">
+                  {line}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          {planPreview.trailingLine ? (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Trailing: {planPreview.trailingLine}
+            </p>
+          ) : null}
+        </div>
 
         <p className="text-[10px] text-muted-foreground">
           {checklist.interveneHint}
@@ -158,16 +208,8 @@ export function AutoDeskPanel({
           className="text-[10px] leading-snug text-muted-foreground"
           data-testid="auto-desk-honesty"
         >
-          {checklist.honestyLine}
+          {planPreview.honestyLine}
         </p>
-        {checklist.profilePreview ? (
-          <p
-            className="text-[10px] text-muted-foreground"
-            data-testid="auto-desk-profile"
-          >
-            Perfil: {checklist.profilePreview}
-          </p>
-        ) : null}
       </div>
     </details>
   );

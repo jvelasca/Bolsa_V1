@@ -50,4 +50,30 @@ describe("F3ProtectStopBlock", () => {
     });
     expect(onChange).toHaveBeenCalledWith("ajuste manual");
   });
+
+  it("V2.10 — bootstrap shows emergency copy, not technical stop", () => {
+    render(
+      <F3ProtectStopBlock
+        meta={{
+          operativaIntent: "protect",
+          suggestedStop: 95,
+          currentStop: null,
+          direction: "long",
+          stopOverrideRequired: false,
+          protectKind: "bootstrap",
+        }}
+        currency="EUR"
+        overrideReason=""
+        onOverrideReasonChange={() => {}}
+      />,
+    );
+    const block = screen.getByTestId("f3-protect-stop");
+    expect(block.getAttribute("data-protect-kind")).toBe("bootstrap");
+    expect(screen.getByTestId("f3-protect-bootstrap-banner")).toBeTruthy();
+    expect(screen.getByText(/Posición sin protección/i)).toBeTruthy();
+    expect(screen.getAllByText(/Stop de emergencia/i).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getByText(/No sustituye al stop técnico/i)).toBeTruthy();
+  });
 });

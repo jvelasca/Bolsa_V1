@@ -450,8 +450,10 @@ describe("V2.08 OPEN_UNPROTECTED bootstrap protect", () => {
       operativaIntent: "protect",
       suggestedStop: 24.13,
       currentStop: null,
+      protectKind: "bootstrap",
     });
-    expect(payload.notes?.[0]).toMatch(/OPEN_UNPROTECTED/i);
+    expect(payload.notes?.[0]).toMatch(/emergencia/i);
+    expect(payload.notes?.[0]).toMatch(/no es stop técnico/i);
   });
 
   it("positionShowsProtectCta true for unprotected; hint false", () => {

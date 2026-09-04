@@ -1,7 +1,8 @@
 # RELEVO — V2.x Product UX (cabina Mercado) (2026-09-04)
 
 > **Padre:** tip motor [`v2.0-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.0-beta) → [`e05fc6b0`](https://github.com/jvelasca/Bolsa_V1/commit/e05fc6b0) · [relevo V2.0 PAPER AUTO](./traspaso-relevo-v2-0-cierre-paper-auto-2026-09-04.md).  
-> **Estado:** **CERRADO para auditoría externa** · tip cadena UX [`b8192d3a`](https://github.com/jvelasca/Bolsa_V1/commit/b8192d3a) (V2.09) · base [`a39595ce`](https://github.com/jvelasca/Bolsa_V1/commit/a39595ce) · **sin tip GitHub** `v2.x-*` (≠ tip motor V2.0).  
+> **Estado:** **CERRADO** · auditoría tip [`5cc982e`](https://github.com/jvelasca/Bolsa_V1/commit/5cc982e) · veredicto: dirección correcta · UX ~8,7/10 · **0 P0** · tip cadena UX [`b8192d3a`](https://github.com/jvelasca/Bolsa_V1/commit/b8192d3a) (V2.09) · base [`a39595ce`](https://github.com/jvelasca/Bolsa_V1/commit/a39595ce) · **sin tip GitHub** `v2.x-*` (≠ tip motor V2.0).  
+> **Next:** [relevo V2.1 Operator Journey](./traspaso-relevo-v2-1-operator-journey-2026-09-04.md) (P1 bootstrap stop → cabina integrada).  
 > **Arranque auditor:** [`arranque-auditor-v2-x-product-ux-2026-09-04.md`](./arranque-auditor-v2-x-product-ux-2026-09-04.md).  
 > **Smoke browser (2026-09-04):** Position Card + protect **OK** (ver Ops).  
 > **Para quién:** auditor externo · ops (user test) · no reabrir motor FSM.
@@ -67,8 +68,10 @@ Al seleccionar un valor: NEXT ACTION visible (también en vigilar/descubierto). 
 
 - ~~Smoke browser con posición PAPER abierta~~ **hecho 2026-09-04**
 - ~~V2.08 / V2.09~~ **hecho**
-- ~~Arranque + push `main` para auditor externo~~ **este relevo**
-- Colapso nav L1 (ADR-040) solo tras cabina estable **y** veredicto auditor
+- ~~Arranque + push `main` para auditor externo~~ **hecho**
+- ~~Veredicto auditor (tip `5cc982e`)~~ **recibido** — PASS conceptual; P1 UX = bootstrap 5 %; next = integrar cabina
+- Follow-on: [V2.1 Operator Journey](./traspaso-relevo-v2-1-operator-journey-2026-09-04.md)
+- Colapso nav L1 (ADR-040) solo tras cabina estable **post-V2.1**
 - Tip GitHub `v2.x-*` **solo si** se pide explícitamente (no confundir con `v2.0-beta` motor)
 
 ## Pre-flight

@@ -17,13 +17,13 @@ import {
   buildExecutionState,
   buildOperatorFourAnswers,
   buildOperatorMissionSteps,
-  buildOperatorNextActionFromEntry,
-  buildOperatorNextActionFromPosition,
   buildOperatorRiskBox,
   buildPositionDecisionFromDto,
+  buildPositionReductionReadout,
   formatOperatorAutoHonesty,
   formatPositionDecisionPhrase,
   reconPhraseFromPortfolioStatus,
+  resolveOperatorNextAction,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
@@ -158,7 +158,7 @@ function formatOperatingStatePhrase(
     case "PROTECT_REQUIRED":
       return "Protección requerida · falta stop operativo.";
     case "OPEN_UNPROTECTED":
-      return "Posición abierta sin protección registrada.";
+      return "Sin stop técnico · protección de emergencia (−5 %) disponible.";
     case "EXIT_REQUIRED":
       return "Salida requerida · stop alcanzado o inminente.";
     case "EXIT_PENDING":
@@ -219,7 +219,7 @@ function EntryCompactBody({
       : "—";
   const headline = entryPhaseHeadline(phase);
   const hud = density === "hud";
-  const nextAction = buildOperatorNextActionFromEntry(truth);
+  const nextAction = resolveOperatorNextAction({ kind: "entry", truth });
   const fourAnswers = buildOperatorFourAnswers({
     phase,
     thesisSummary: headline,
@@ -238,7 +238,11 @@ function EntryCompactBody({
     maxLoss: sizing.riskAmount,
     target1: plan.target1,
     target2: plan.target2,
+    quantity: sizing.quantity,
+    positionValue: sizing.positionValue,
+    riskPct: sizing.riskR != null ? sizing.riskR : null,
   });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   return (
     <>
@@ -300,7 +304,7 @@ function EntryCompactBody({
           </p>
         ) : (
           <>
-            <OperatorFourAnswersBlock answers={fourAnswers} />
+            <OperatorRiskBox box={riskBox} />
             <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
               <div className="flex justify-between gap-2">
                 <dt>Entrada</dt>
@@ -388,7 +392,17 @@ function EntryCompactBody({
                 </div>
               ) : null}
             </dl>
-            <OperatorRiskBox box={riskBox} />
+            <button
+              type="button"
+              className="text-[10px] font-medium text-foreground/90 underline-offset-2 hover:underline"
+              onClick={() => setAdvancedOpen((v) => !v)}
+              data-testid="entry-advanced-toggle"
+            >
+              {advancedOpen ? "Ocultar detalles" : "Detalles avanzados"}
+            </button>
+            {advancedOpen ? (
+              <OperatorFourAnswersBlock answers={fourAnswers} />
+            ) : null}
           </>
         )}
       </div>
@@ -470,13 +484,26 @@ function formatLegStatus(
   }
 }
 
-function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
+function JourneyHudBlock({
+  journey,
+  birthQuantity,
+}: {
+  journey: PositionJourneyReadoutV1;
+  birthQuantity?: number | null;
+}) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const nextAction = buildOperatorNextActionFromPosition(
-    journey.primaryAction,
+  const nextAction = resolveOperatorNextAction({
+    kind: "position",
+    primaryAction: journey.primaryAction,
     journey,
-  );
+  });
   const steps = buildOperatorMissionSteps(journey);
+  const reduction = buildPositionReductionReadout({
+    birthQuantity: birthQuantity ?? journey.remainingQuantity,
+    remainingQuantity: journey.remainingQuantity,
+    t1QtyFractionPct: journey.t1.qtyFractionPct,
+    t2QtyFractionPct: journey.t2.qtyFractionPct,
+  });
   const riskBox = buildOperatorRiskBox({
     entry: journey.entry,
     stop: journey.trail.currentStop ?? journey.risk.initialStop,
@@ -484,6 +511,9 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
     maxLoss: journey.risk.initialRisk,
     target1: journey.t1.trigger,
     target2: journey.t2.trigger,
+    quantity: journey.remainingQuantity,
+    positionValue:
+      journey.entry != null ? journey.remainingQuantity * journey.entry : null,
   });
   const autoHonesty = formatOperatorAutoHonesty(
     journey.autoPosture,
@@ -505,7 +535,10 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
 
       <OperatorRiskBox box={riskBox} />
 
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+      <dl
+        className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground"
+        data-testid="position-card-levels"
+      >
         <div className="flex justify-between gap-2">
           <dt>Stop inicial</dt>
           <dd
@@ -516,6 +549,12 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
           </dd>
         </div>
         <div className="flex justify-between gap-2">
+          <dt>Stop vigente</dt>
+          <dd className="font-medium tabular-nums text-foreground">
+            {formatLevel(journey.trail.currentStop)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
           <dt>Riesgo inicial</dt>
           <dd
             className="font-medium tabular-nums text-foreground"
@@ -523,17 +562,6 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
           >
             {journey.risk.initialRisk != null
               ? String(journey.risk.initialRisk)
-              : "—"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Protegido ahora</dt>
-          <dd
-            className="font-medium tabular-nums text-foreground"
-            data-testid="journey-current-protected"
-          >
-            {journey.risk.currentProtected != null
-              ? formatLevel(journey.risk.currentProtected)
               : "—"}
           </dd>
         </div>
@@ -549,12 +577,33 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
           </dd>
         </div>
         <div className="flex justify-between gap-2">
+          <dt>Posición</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-birth-qty"
+          >
+            {reduction.birthQuantity}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
           <dt>Restante</dt>
           <dd
             className="font-medium tabular-nums text-foreground"
             data-testid="journey-remaining"
           >
-            {journey.remainingQuantity}
+            {reduction.remainingQuantity}
+            {reduction.remainingPct != null
+              ? ` · ${reduction.remainingPct}%`
+              : ""}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt>Realizado</dt>
+          <dd
+            className="font-medium tabular-nums text-foreground"
+            data-testid="journey-realized-pct"
+          >
+            {reduction.realizedPct != null ? `${reduction.realizedPct}%` : "—"}
           </dd>
         </div>
         <div className="flex justify-between gap-2">
@@ -616,7 +665,7 @@ function JourneyHudBlock({ journey }: { journey: PositionJourneyReadoutV1 }) {
         onClick={() => setAdvancedOpen((v) => !v)}
         data-testid="journey-advanced-toggle"
       >
-        {advancedOpen ? "Ocultar auditoría" : "Auditoría avanzada"}
+        {advancedOpen ? "Ocultar auditoría" : "Detalles avanzados"}
       </button>
       {advancedOpen ? (
         <p
@@ -663,10 +712,11 @@ function PositionCompactBody({
   const unrealizedR =
     view.levels.unrealizedR ?? position.operational?.unrealizedR;
   const hud = density === "hud";
-  const nextAction = buildOperatorNextActionFromPosition(
-    journey?.primaryAction ?? view.primaryAction,
+  const nextAction = resolveOperatorNextAction({
+    kind: "position",
+    primaryAction: journey?.primaryAction ?? view.primaryAction,
     journey,
-  );
+  });
 
   return (
     <>
@@ -788,7 +838,9 @@ function PositionCompactBody({
             ) : null}
           </dl>
         )}
-        {!hud && journey ? <JourneyHudBlock journey={journey} /> : null}
+        {!hud && journey ? (
+          <JourneyHudBlock journey={journey} birthQuantity={view.quantity} />
+        ) : null}
       </div>
 
       <div

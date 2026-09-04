@@ -115,7 +115,51 @@ export type DailyDeskInboxV1 = {
   buckets: DailyDeskBucketV1[];
   count: number;
   emptyLabel: string;
+  /**
+   * V2.16 — Exception Desk header counts.
+   * posicionesOk = HOLD in posiciones bucket (no action needed).
+   */
+  exceptionSummary?: DailyDeskExceptionSummaryV1;
 };
+
+/** V2.16 — compact header for Exception Desk. */
+export type DailyDeskExceptionSummaryV1 = {
+  requiereAtencion: number;
+  oportunidades: number;
+  posicionesOk: number;
+  noOperar: number;
+  headline: string;
+};
+
+export function buildDailyDeskExceptionSummary(
+  buckets: readonly DailyDeskBucketV1[],
+): DailyDeskExceptionSummaryV1 {
+  const countOf = (id: DailyDeskBucketIdV1) =>
+    buckets.find((b) => b.id === id)?.count ?? 0;
+  const requiereAtencion = countOf("requiere_accion");
+  const oportunidades = countOf("oportunidades");
+  const posicionesOk = countOf("posiciones");
+  const noOperar = countOf("no_operar");
+  const headline = [
+    `🔴 ${requiereAtencion} requieren atención`,
+    `🟠 ${oportunidades} oportunidades`,
+    `🟢 ${posicionesOk} posiciones OK`,
+  ].join(" · ");
+  return {
+    requiereAtencion,
+    oportunidades,
+    posicionesOk,
+    noOperar,
+    headline,
+  };
+}
+
+/** Buckets that expand by default in Exception Desk. */
+export function dailyDeskBucketDefaultExpanded(
+  id: DailyDeskBucketIdV1,
+): boolean {
+  return id === "requiere_accion" || id === "oportunidades";
+}
 
 export type DailyDeskSurfaceSnapshotV1 = {
   count: number;
@@ -541,12 +585,14 @@ export function buildDailyDeskInbox(
 
   sortDeskItems(items);
   const buckets = groupBuckets(items);
+  const exceptionSummary = buildDailyDeskExceptionSummary(buckets);
 
   return {
     items,
     buckets,
     count: items.length,
     emptyLabel: "Nada requiere tu atención",
+    exceptionSummary,
   };
 }
 
@@ -562,6 +608,7 @@ export function finalizeDailyDeskInbox(
     buckets,
     count: items.length,
     emptyLabel,
+    exceptionSummary: buildDailyDeskExceptionSummary(buckets),
   };
 }
 

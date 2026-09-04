@@ -323,6 +323,18 @@ describe("dailyDesk V2.05 four buckets", () => {
     }
   });
 
+  it("V2.16 — exceptionSummary headline for Exception Desk", () => {
+    const inbox = buildDailyDeskInbox({
+      positions: [aaplOpen()],
+      pendingConfirm: 1,
+      portfolioReconStatus: "ok",
+    });
+    expect(inbox.exceptionSummary).toBeTruthy();
+    expect(inbox.exceptionSummary!.requiereAtencion).toBeGreaterThanOrEqual(1);
+    expect(inbox.exceptionSummary!.headline).toMatch(/requieren atención/);
+    expect(inbox.exceptionSummary!.headline).toMatch(/posiciones OK/);
+  });
+
   it("orderPending on T1 → 🔴 Ver operaciones (same POT/ExecutionState as Mercado)", () => {
     const pos = aaplOpen({ lastPrice: 105 });
     const inbox = buildDailyDeskInbox({

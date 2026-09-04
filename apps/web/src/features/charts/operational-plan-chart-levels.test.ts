@@ -8,6 +8,7 @@ function plan(
   return {
     phase: "position",
     phaseLabel: "Posición activa",
+    direction: "long",
     entry: 100,
     stopVigente: 95,
     stopInicial: 95,
@@ -99,5 +100,28 @@ describe("buildOperationalPlanChartLevels", () => {
       includeTrailing: false,
     });
     expect(levels.some((l) => l.kind === "trailingHint")).toBe(false);
+  });
+
+  it("V2.14 — prepared phase draws trigger (not entry duplicate)", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({ phase: "prepared", phaseLabel: "Preparada" }),
+      showLevels: true,
+    });
+    expect(levels.some((l) => l.kind === "trigger")).toBe(true);
+    expect(levels.find((l) => l.kind === "trigger")?.title).toBe("Trigger");
+    expect(levels.some((l) => l.kind === "entry")).toBe(false);
+  });
+
+  it("V2.14 — bootstrap stop is advisory amber, not technical red", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan(),
+      showLevels: true,
+      stopIsBootstrap: true,
+    });
+    const boot = levels.find((l) => l.kind === "stopBootstrap")!;
+    expect(boot.advisory).toBe(true);
+    expect(boot.style).toBe("dashed");
+    expect(boot.title).toMatch(/emergencia/i);
+    expect(levels.some((l) => l.kind === "stopVigente")).toBe(false);
   });
 });

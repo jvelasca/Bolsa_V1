@@ -20,6 +20,7 @@ import {
   operationalPlanChartLevelsSignature,
   type OperationalPlanChartLevel,
 } from "@/features/charts/operational-plan-chart-levels";
+import { resolveBootstrapProtectStop } from "@/features/operations/propose-position-exit";
 import {
   canDragOperationalStop,
   evaluateChartStopDragGeometry,
@@ -113,6 +114,10 @@ export function ChartOperationalPlanLevelsLayer({
           plan: context.plan,
           showLevels: context.showsPlanLevels,
           includeTrailing: context.phase === "posicion",
+          bootstrapStopPrice:
+            context.phase === "posicion" && context.position
+              ? resolveBootstrapProtectStop(context.position)
+              : null,
         })
       : [];
   const signature = operationalPlanChartLevelsSignature(levels);

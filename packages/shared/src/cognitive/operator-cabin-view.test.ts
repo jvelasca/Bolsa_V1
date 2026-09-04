@@ -13,6 +13,7 @@ import {
   buildOperatorNextActionFromPosition,
   buildOperatorRiskBox,
   operatorStageFromCockpitPhase,
+  resolveOperatorNextAction,
 } from "./operator-cabin-view.js";
 import type { EntryOperatingTruthV1 } from "./entry-operating-truth.js";
 import type { PositionJourneyReadoutV1 } from "./position-journey-readout.js";
@@ -150,6 +151,40 @@ describe("buildOperatorNextActionFromPosition", () => {
       "protect",
     );
     expect(buildOperatorNextActionFromPosition("SALIR").tone).toBe("exit");
+  });
+});
+
+describe("resolveOperatorNextAction facade V2.11", () => {
+  it("entry preparada enriches condition + expires", () => {
+    const next = resolveOperatorNextAction({
+      kind: "entry",
+      truth: entryTruth("preparada", { expiryLabel: "06 SEP 18:00" }),
+    });
+    expect(next.title).toBe("ESPERAR TRIGGER");
+    expect(next.condition).toMatch(/184\.20/);
+    expect(next.expires).toBe("06 SEP 18:00");
+  });
+
+  it("cockpit phase delegates", () => {
+    const next = resolveOperatorNextAction({
+      kind: "cockpit_phase",
+      phase: "vigilar",
+    });
+    expect(next.title).toBe("VIGILAR");
+  });
+});
+
+describe("buildOperatorRiskBox V2.12 sizing", () => {
+  it("fills quantity / positionValue / stopDistancePct", () => {
+    const box = buildOperatorRiskBox({
+      entry: 100,
+      stop: 95,
+      quantity: 10,
+      maxLoss: 50,
+    });
+    expect(box.quantity).toBe(10);
+    expect(box.positionValue).toBe(1000);
+    expect(box.stopDistancePct).toBe(5);
   });
 });
 
