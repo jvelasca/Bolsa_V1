@@ -1,5 +1,6 @@
 /**
  * Coach-mark compacto «?» → diálogo de tip de mesa operativa (no branding IA).
+ * V2.41 — hit ≥32px · texto ≥12px (no micro 11px).
  */
 
 import { useState } from "react";
@@ -25,7 +26,7 @@ export function MesaTipButton({ tip, className }: Props) {
         variant="ghost"
         size="sm"
         className={cn(
-          "h-5 w-5 shrink-0 p-0 text-[11px] font-semibold text-muted-foreground hover:text-foreground",
+          "h-8 w-8 shrink-0 p-0 text-xs font-semibold text-muted-foreground hover:text-foreground",
           className,
         )}
         title={info.title}

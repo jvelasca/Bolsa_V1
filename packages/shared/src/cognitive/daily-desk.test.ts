@@ -367,10 +367,36 @@ describe("dailyDesk V2.05 four buckets", () => {
       positions: [pos],
       portfolioReconStatus: "ok",
       pendingConfirm: 0,
+      // Discrepancy wire = same Mercado protect path when stop no está en libro.
+      protectionDiscrepancies: [
+        {
+          symbol: "AAPL",
+          reason: "Stop no ejecutado en libro",
+          recommendedAction: "PROTEGER",
+        },
+      ],
     });
     const item = inbox.items.find((i) => i.symbol === "AAPL");
     expect(item?.bucket).toBe("requiere_accion");
     expect(item?.ctaKind).toBe("protect");
     expect(item?.ctaLabel).toMatch(/proteger/i);
+  });
+
+  it("V2.41 — Posiciones empty is honest when open position lives in Atención", () => {
+    const pos = aaplOpen({
+      lastPrice: 105,
+      marketValue: 1050,
+      unrealizedPnl: 50,
+    });
+    const inbox = buildDailyDeskInbox({
+      positions: [pos],
+      portfolioReconStatus: "ok",
+    });
+    expect(inbox.items[0]?.kind).toBe("position");
+    expect(inbox.items[0]?.bucket).toBe("requiere_accion");
+    const posiciones = inbox.buckets.find((b) => b.id === "posiciones");
+    expect(posiciones?.count).toBe(0);
+    expect(posiciones?.emptyLabel).toMatch(/Atención/i);
+    expect(posiciones?.emptyLabel).not.toMatch(/Sin posiciones abiertas/i);
   });
 });

@@ -18,7 +18,9 @@
 
 **Ninguno de producto en V2.6** — arco cerrado en código tras stamp.
 
-Si regresión: freeze intacto · display-only · NO MÁS PANELES.
+**Next:** [arranque V2.7](./arranque-agente-v2-7-2026-09-05.md) · primer ID **V2.39** (AUTO arm honesty).
+
+Si regresión V2.6: freeze intacto · display-only · NO MÁS PANELES.
 
 ## Freeze (copiar al chat)
 

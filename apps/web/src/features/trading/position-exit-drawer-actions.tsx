@@ -28,6 +28,7 @@ import {
   positionShowsProtectHint,
   type PositionExitIntent,
 } from "@/features/operations/propose-position-exit";
+import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 
 export function PositionExitDrawerActions({
@@ -88,9 +89,16 @@ export function PositionExitDrawerActions({
     }
   }
 
+  // V2.40 — CTAs L1 DECISIÓN ≥ ~40px hit (CABIN_TOUCH_TARGET).
   const btnClass = compact
-    ? "rounded border px-2 py-1 text-[10px] font-medium hover:bg-accent"
-    : "rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent";
+    ? cn(
+        CABIN_TOUCH_TARGET,
+        "rounded border px-2 text-[10px] font-medium hover:bg-accent",
+      )
+    : cn(
+        CABIN_TOUCH_TARGET,
+        "rounded-md border px-3 text-xs font-medium hover:bg-accent",
+      );
 
   const primaryBtnClass = compact
     ? "ring-1 ring-primary/45 bg-primary/10 font-semibold"
@@ -151,7 +159,8 @@ export function PositionExitDrawerActions({
         {showMaintainBadge ? (
           <span
             className={cn(
-              "rounded-md border border-border px-2 py-1 text-xs text-muted-foreground",
+              CABIN_TOUCH_TARGET,
+              "rounded-md border border-border px-3 text-xs text-muted-foreground",
               effectivePrimary === "maintain" ? primaryBtnClass : null,
             )}
           >

@@ -2,9 +2,11 @@
  * V2.04 — AUTO Desk inside Mercado DECISIÓN.
  * V2.13 — shows what AUTO will do for this instrument (ExitPolicy + journey).
  * V2.36 — timeline = OperatorPositionPlan ladder (same as Mercado L3).
+ * V2.39 — AUTO arm honesty: misma puerta A3 que Cuentas (tryArmAuto + frase).
  * Arm ≠ execute · Confirm = firma · Ranking ≠ BUY.
  */
 
+import { useState } from "react";
 import {
   buildOperatorAutoChecklist,
   buildOperatorAutoPlanPreview,
@@ -19,12 +21,13 @@ import {
   type DemoBookMode,
 } from "@/features/trading/demo-book-prefs";
 import {
-  loadAutoArm,
-  saveAutoArm,
-} from "@/features/trading/demo-book-auto-arm";
+  DemoBookAutoArmForm,
+  useAutoArmState,
+} from "@/features/trading/demo-book-auto-arm-form";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
+import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 import {
   CABIN_KV_GRID,
   CABIN_TYPE,
@@ -74,10 +77,11 @@ export function AutoDeskPanel({
 }: AutoDeskPanelProps) {
   const bookPrefs = useDemoBookPrefs();
   const { paperDExecuteEnv, killOn } = useMesaEntriesBlocked();
-  const autoArmed = loadAutoArm().armed;
+  const arm = useAutoArmState();
+  const [armOpen, setArmOpen] = useState(false);
   const posture = resolvePaperAutoPosture({
     bookMode: bookPrefs.mode,
-    autoArmed,
+    autoArmed: arm.armed,
     paperDExecuteEnv,
   });
   const checklist = buildOperatorAutoChecklist({
@@ -107,20 +111,23 @@ export function AutoDeskPanel({
       ? buildOperatorPositionPlan(journey, { birthQuantity })
       : null;
 
+  function requestAutoMode() {
+    if (arm.armed) {
+      patchDemoBookPrefs({ mode: "auto" });
+      setArmOpen(false);
+      return;
+    }
+    setArmOpen(true);
+  }
+
   function setAutonomy(mode: DemoBookMode) {
     if (mode === "auto") {
-      saveAutoArm({
-        armed: true,
-        armedAt: new Date().toISOString(),
-        confirmPhrase: "ACTIVAR AUTO",
-      });
-      patchDemoBookPrefs({ mode: "auto" });
-    } else {
-      if (bookPrefs.mode === "auto") {
-        saveAutoArm({ armed: false, armedAt: null, confirmPhrase: null });
-      }
-      patchDemoBookPrefs({ mode });
+      requestAutoMode();
+      return;
     }
+    setArmOpen(false);
+    // D3: patchDemoBookPrefs desarma al salir de auto.
+    patchDemoBookPrefs({ mode });
   }
 
   return (
@@ -156,8 +163,9 @@ export function AutoDeskPanel({
                   key={opt.mode}
                   type="button"
                   className={cn(
+                    CABIN_TOUCH_TARGET,
                     CABIN_TYPE.meta,
-                    "rounded-md border px-2 py-1 font-medium text-foreground",
+                    "rounded-md border px-3 font-medium text-foreground",
                     active
                       ? "border-sky-600/50 bg-sky-500/15"
                       : "border-border/60 bg-muted/10 text-muted-foreground hover:bg-accent",
@@ -174,6 +182,16 @@ export function AutoDeskPanel({
             })}
           </div>
         </fieldset>
+
+        {armOpen ? (
+          <DemoBookAutoArmForm
+            onArmed={() => {
+              patchDemoBookPrefs({ mode: "auto" });
+              setArmOpen(false);
+            }}
+            onCancel={() => setArmOpen(false)}
+          />
+        ) : null}
 
         <div data-testid="auto-desk-plan-preview">
           <p

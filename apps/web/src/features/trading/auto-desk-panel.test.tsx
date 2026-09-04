@@ -1,15 +1,18 @@
 /**
  * V2.36 — AUTO timeline uses OperatorPositionPlan ladder (not flat checklist).
+ * V2.39 — AUTO arm honesty: one click does not arm; phrase via tryArmAuto.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PositionJourneyReadoutV1 } from "@bolsa/shared";
 import { AutoDeskPanel } from "@/features/trading/auto-desk-panel";
-
-vi.mock("@/features/trading/use-demo-book-prefs", () => ({
-  useDemoBookPrefs: () => ({ mode: "manual" as const }),
-}));
+import {
+  AUTO_ARM_CONFIRM_PHRASE,
+  loadAutoArm,
+  tryArmAuto,
+} from "@/features/trading/demo-book-auto-arm";
+import { loadDemoBookPrefs } from "@/features/trading/demo-book-prefs";
 
 vi.mock("@/features/mesa/use-mesa-entries-blocked", () => ({
   useMesaEntriesBlocked: () => ({
@@ -18,26 +21,11 @@ vi.mock("@/features/mesa/use-mesa-entries-blocked", () => ({
   }),
 }));
 
-vi.mock("@/features/trading/demo-book-auto-arm", () => ({
-  loadAutoArm: () => ({
-    armed: false,
-    armedAt: null,
-    confirmPhrase: null,
-  }),
-  saveAutoArm: vi.fn(),
-}));
-
-vi.mock("@/features/trading/demo-book-prefs", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/features/trading/demo-book-prefs")
-  >("@/features/trading/demo-book-prefs");
-  return {
-    ...actual,
-    patchDemoBookPrefs: vi.fn(),
-  };
-});
-
 afterEach(() => cleanup());
+
+beforeEach(() => {
+  localStorage.clear();
+});
 
 function journey(): PositionJourneyReadoutV1 {
   return {
@@ -82,16 +70,20 @@ function journey(): PositionJourneyReadoutV1 {
   };
 }
 
+function renderOpen() {
+  return render(
+    <AutoDeskPanel
+      defaultOpen
+      templateId="moderate"
+      journey={journey()}
+      birthQuantity={62}
+    />,
+  );
+}
+
 describe("AutoDeskPanel V2.36 timeline", () => {
   it("renders OperatorPositionPlan ladder · no flat checklist items", () => {
-    render(
-      <AutoDeskPanel
-        defaultOpen
-        templateId="moderate"
-        journey={journey()}
-        birthQuantity={62}
-      />,
-    );
+    renderOpen();
     expect(screen.getByTestId("auto-desk-panel")).toBeTruthy();
     expect(screen.getByTestId("auto-desk-position-plan")).toBeTruthy();
     expect(screen.getByTestId("operator-position-plan")).toBeTruthy();
@@ -107,5 +99,62 @@ describe("AutoDeskPanel V2.36 timeline", () => {
     const preview = screen.getByTestId("auto-desk-plan-preview");
     expect(preview.querySelectorAll("ul li[data-done]").length).toBe(0);
     expect(preview.textContent).not.toMatch(/○ Stop inicial/);
+  });
+});
+
+describe("AutoDeskPanel V2.39 arm honesty", () => {
+  it("one click on Automático opens A3 form and does not arm or set auto", () => {
+    renderOpen();
+    fireEvent.click(screen.getByTestId("auto-desk-mode-auto"));
+    expect(screen.getByTestId("demo-book-auto-arm-form")).toBeTruthy();
+    expect(loadAutoArm().armed).toBe(false);
+    expect(loadAutoArm().confirmPhrase).toBeNull();
+    expect(loadDemoBookPrefs().mode).not.toBe("auto");
+  });
+
+  it("wrong phrase fails; exact ACTIVAR AUTO arms via tryArmAuto", () => {
+    renderOpen();
+    fireEvent.click(screen.getByTestId("auto-desk-mode-auto"));
+    fireEvent.change(screen.getByTestId("demo-book-auto-arm-phrase"), {
+      target: { value: "activar auto" },
+    });
+    fireEvent.click(screen.getByTestId("demo-book-auto-arm-confirm"));
+    expect(screen.getByTestId("demo-book-auto-arm-error")).toBeTruthy();
+    expect(loadAutoArm().armed).toBe(false);
+    expect(loadDemoBookPrefs().mode).not.toBe("auto");
+
+    fireEvent.change(screen.getByTestId("demo-book-auto-arm-phrase"), {
+      target: { value: AUTO_ARM_CONFIRM_PHRASE },
+    });
+    fireEvent.click(screen.getByTestId("demo-book-auto-arm-confirm"));
+    expect(loadAutoArm().armed).toBe(true);
+    expect(loadAutoArm().confirmPhrase).toBe(AUTO_ARM_CONFIRM_PHRASE);
+    expect(loadDemoBookPrefs().mode).toBe("auto");
+    expect(screen.queryByTestId("demo-book-auto-arm-form")).toBeNull();
+  });
+
+  it("already armed allows mode auto without forging phrase again", () => {
+    expect(tryArmAuto(AUTO_ARM_CONFIRM_PHRASE).ok).toBe(true);
+    renderOpen();
+    fireEvent.click(screen.getByTestId("auto-desk-mode-auto"));
+    expect(screen.queryByTestId("demo-book-auto-arm-form")).toBeNull();
+    expect(loadDemoBookPrefs().mode).toBe("auto");
+    expect(loadAutoArm().confirmPhrase).toBe(AUTO_ARM_CONFIRM_PHRASE);
+  });
+
+  it("honesty line keeps arm ≠ execute semantics", () => {
+    renderOpen();
+    expect(screen.getByTestId("auto-desk-honesty").textContent).toMatch(
+      /armado ≠ ejecución|arm ≠ execute|Confirm = firma/i,
+    );
+  });
+
+  it("V2.40 — autonomy mode buttons use CABIN_TOUCH_TARGET (min-h-10)", () => {
+    renderOpen();
+    for (const mode of ["manual", "semi", "auto"] as const) {
+      expect(screen.getByTestId(`auto-desk-mode-${mode}`).className).toMatch(
+        /min-h-10/,
+      );
+    }
   });
 });

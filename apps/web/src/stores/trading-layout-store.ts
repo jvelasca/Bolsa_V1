@@ -19,12 +19,13 @@ import {
 
 const DEFAULT_LISTS_WIDTH_PCT = 26;
 const DEFAULT_OPERATIONS_HEIGHT_PCT = 22;
-const DEFAULT_OPERATIVA_WIDTH_PCT = 24;
+/** V2.41 — DECISIÓN floor ~28% so tablet ≥ ~280px (was ~215 @1024). */
+const DEFAULT_OPERATIVA_WIDTH_PCT = 28;
 const MIN_LISTS_WIDTH_PCT = 18;
 const MAX_LISTS_WIDTH_PCT = 45;
 const MIN_OPERATIONS_HEIGHT_PCT = 12;
 const MAX_OPERATIONS_HEIGHT_PCT = 50;
-const MIN_OPERATIVA_WIDTH_PCT = 16;
+const MIN_OPERATIVA_WIDTH_PCT = 20;
 const MAX_OPERATIVA_WIDTH_PCT = 42;
 
 const MIN_OPERATIVA_SECTION_HEIGHT_PX = 72;
@@ -78,13 +79,13 @@ function clamp(value: number, min: number, max: number) {
 }
 
 /**
- * `recommendation` arranca colapsada: en Mercado 2.0 el idioma principal es la
- * tarjeta de fase del valor; Pulso / dictamen / Lab son «¿Por qué?».
+ * `recommendation` / info / config arrancan colapsadas (V2.41 densidad):
+ * el idioma principal es la tarjeta DECISIÓN; el resto es «¿Por qué?».
  */
 const DEFAULT_OPERATIVA_SECTIONS: Record<OperativaSectionId, boolean> = {
   recommendation: false,
-  info: true,
-  config: true,
+  info: false,
+  config: false,
 };
 
 export const useTradingLayoutStore = create<TradingLayoutState>()(

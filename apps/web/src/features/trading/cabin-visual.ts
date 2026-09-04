@@ -2,9 +2,10 @@
  * V2.31 / V2.34 / V2.37 — Premium Visual System (cabina Mercado A–B + AUTO).
  * Tres tamaños: héroe · operativa · meta. Números financieros tabulares.
  * V2.37 — numbers-first: valores operativa/hero · labels meta.
- * Display-only · sin paneles nuevos · sin controles AUTO.
+ * V2.40 — CABIN_TOUCH_TARGET en autonomía AUTO + CTAs L1 DECISIÓN + Confirm primary.
+ * Display-only · sin paneles nuevos · sin controles AUTO de trading.
  *
- * @see docs/engineering/traspaso-relevo-v2-6-pixel-premium-2026-09-05.md
+ * @see docs/engineering/traspaso-relevo-v2-7-operator-hardening-2026-09-05.md
  */
 
 import { cn } from "@/lib/utils";

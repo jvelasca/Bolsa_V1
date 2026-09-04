@@ -48,6 +48,7 @@ import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broke
 import { api } from "@/lib/api";
 import { formatNumber0 } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 import {
   resolveSupervisedQueueOrigin,
   supervisedQueueOriginLabel,
@@ -1186,7 +1187,11 @@ export function SupervisedF3Panel() {
           </button>
           <button
             type="button"
-            className="rounded-md border border-border px-3 py-1.5 hover:bg-accent disabled:opacity-50"
+            className={cn(
+              CABIN_TOUCH_TARGET,
+              "rounded-md border border-border px-3 hover:bg-accent disabled:opacity-50",
+            )}
+            data-testid="confirm-intent-cta"
             disabled={!pending || confirm.isPending}
             onClick={() => confirm.mutate(false)}
           >
@@ -1203,7 +1208,10 @@ export function SupervisedF3Panel() {
           ) : null}
           <button
             type="button"
-            className="rounded-md border border-primary/40 px-3 py-1.5 text-primary hover:bg-accent disabled:opacity-50"
+            className={cn(
+              CABIN_TOUCH_TARGET,
+              "rounded-md border border-primary/40 px-3 text-primary hover:bg-accent disabled:opacity-50",
+            )}
             data-testid="confirm-execute-cta"
             disabled={
               !pending ||

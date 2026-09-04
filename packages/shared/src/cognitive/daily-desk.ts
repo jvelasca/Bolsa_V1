@@ -61,10 +61,15 @@ export const DAILY_DESK_BUCKET_LABEL: Record<DailyDeskBucketIdV1, string> = {
 export const DAILY_DESK_BUCKET_EMPTY: Record<DailyDeskBucketIdV1, string> = {
   requiere_accion: "Nada requiere tu atención ahora",
   proteger: "Sin posiciones pendientes de protección",
-  posiciones: "Sin posiciones abiertas en seguimiento",
+  /** HOLD-only bucket; abiertas con acción viven en Atención (V2.41 honesty). */
+  posiciones: "Sin posiciones OK sin acción",
   oportunidades: "Sin preparadas, disparadas ni propuestas",
   no_operar: "Sin bloqueos ni vigilancia pasiva hoy",
 };
+
+/** V2.41 — empty Posiciones when opens live in Atención (not «sin libro»). */
+export const DAILY_DESK_POSICIONES_EMPTY_IN_ATENCION =
+  "Ninguna OK sin acción — abiertas en Atención";
 
 /** Fold legacy `proteger` into attention chrome. */
 export function normalizeDailyDeskBucket(
@@ -237,14 +242,23 @@ function groupBuckets(items: DailyDeskItemV1[]): DailyDeskBucketV1[] {
     const bucket = normalizeDailyDeskBucket(item.bucket);
     byId.get(bucket)!.push({ ...item, bucket });
   }
+  const attentionHasOpenPosition = (byId.get("requiere_accion") ?? []).some(
+    (item) => item.kind === "position",
+  );
   return DAILY_DESK_BUCKET_ORDER.map((id) => {
     const bucketItems = byId.get(id) ?? [];
+    const emptyLabel =
+      id === "posiciones" &&
+      bucketItems.length === 0 &&
+      attentionHasOpenPosition
+        ? DAILY_DESK_POSICIONES_EMPTY_IN_ATENCION
+        : DAILY_DESK_BUCKET_EMPTY[id];
     return {
       id,
       label: DAILY_DESK_BUCKET_LABEL[id],
       items: bucketItems,
       count: bucketItems.length,
-      emptyLabel: DAILY_DESK_BUCKET_EMPTY[id],
+      emptyLabel,
     };
   });
 }

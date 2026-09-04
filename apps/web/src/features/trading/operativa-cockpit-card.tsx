@@ -10,7 +10,7 @@
  * @see docs/adr/042-operating-excellence.md
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 import type {
   InstrumentDailyOpinionV1,
@@ -68,6 +68,7 @@ import { DecisionSurfacePlacementToggle } from "@/features/trading/decision-surf
 import { DecisionExplainPanel } from "@/features/trading/decision-explain-panel";
 import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
 import { AutoDeskPanel } from "@/features/trading/auto-desk-panel";
+import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 import {
   CABIN_FOCUS_RING,
   CABIN_INTERACTIVE,
@@ -159,6 +160,7 @@ export function OperativaCockpitCard({
   markPrice,
 }: OperativaCockpitCardProps) {
   const [whyOpen, setWhyOpen] = useState(false);
+  const actionFocusRef = useRef<HTMLDivElement>(null);
   const context = useInstrumentOperationalContext(instrumentId);
   const { entriesBlocked, paperDExecuteEnv, killOn } = useMesaEntriesBlocked();
   const bookPrefs = useDemoBookPrefs();
@@ -171,6 +173,20 @@ export function OperativaCockpitCard({
   const toggleOperations = useTradingLayoutStore((s) => s.toggleOperations);
   const { placement: decisionSurfacePlacement } =
     useMercadoDecisionSurfacePrefs();
+
+  // V2.41 — land keyboard focus on primary L1 CTA when cabin has an action
+  // and focus is still on the document body (first Tab path from shell).
+  useEffect(() => {
+    if (!instrumentId) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const root = actionFocusRef.current;
+    if (!root) return;
+    const btn = root.querySelector<HTMLElement>(
+      "button:not([disabled]), [role='button']",
+    );
+    btn?.focus({ preventScroll: true });
+  }, [instrumentId, symbol]);
 
   const { phase, plan, study, position } = context;
   const opsEval = useOpsSelfEval(context.accountId);
@@ -478,6 +494,7 @@ export function OperativaCockpitCard({
 
       {/* ACCIÓN — L1 companion (CTA firma / prepare) */}
       <div
+        ref={actionFocusRef}
         className="flex flex-col gap-1"
         data-testid="decision-accion"
         data-cabin-level={1}
@@ -488,7 +505,8 @@ export function OperativaCockpitCard({
           <button
             type="button"
             className={cn(
-              "rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-amber-500/20",
+              CABIN_TOUCH_TARGET,
+              "w-full justify-start rounded-md border border-amber-700/35 bg-amber-500/10 px-3 text-left text-xs font-medium hover:bg-amber-500/20",
               CABIN_FOCUS_RING,
             )}
             onClick={() => {
@@ -512,7 +530,8 @@ export function OperativaCockpitCard({
           <button
             type="button"
             className={cn(
-              "rounded-md border border-violet-600/35 bg-violet-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-violet-500/20",
+              CABIN_TOUCH_TARGET,
+              "w-full justify-start rounded-md border border-violet-600/35 bg-violet-500/10 px-3 text-left text-xs font-medium hover:bg-violet-500/20",
               CABIN_FOCUS_RING,
             )}
             onClick={onAddToEstudio}
@@ -531,7 +550,8 @@ export function OperativaCockpitCard({
               entryTruth?.primaryCta.kind === "none"
             }
             className={cn(
-              "rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1.5 text-left text-xs font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50",
+              CABIN_TOUCH_TARGET,
+              "w-full justify-start rounded-md border border-emerald-700/35 bg-emerald-500/10 px-3 text-left text-xs font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50",
               CABIN_FOCUS_RING,
             )}
             onClick={onPropose}
@@ -544,7 +564,7 @@ export function OperativaCockpitCard({
 
         {showAutoPosture ? (
           <div
-            className="rounded-md border border-sky-700/35 bg-sky-500/10 px-2 py-1.5 text-left text-xs font-medium"
+            className="rounded-md border border-sky-700/35 bg-sky-500/10 px-3 py-2 text-left text-xs font-medium"
             data-testid="operativa-cockpit-auto-posture"
             title={paperAuto.modeDetail}
           >
@@ -561,7 +581,8 @@ export function OperativaCockpitCard({
           <button
             type="button"
             className={cn(
-              "rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-amber-500/20",
+              CABIN_TOUCH_TARGET,
+              "w-full justify-start rounded-md border border-amber-700/35 bg-amber-500/10 px-3 text-left text-xs font-medium hover:bg-amber-500/20",
               CABIN_FOCUS_RING,
             )}
             onClick={() => openConfirmDrawer()}
@@ -594,7 +615,8 @@ export function OperativaCockpitCard({
           <button
             type="button"
             className={cn(
-              "w-fit rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent",
+              CABIN_TOUCH_TARGET,
+              "w-fit justify-start rounded-md border border-border px-3 text-[11px] font-medium hover:bg-accent",
               CABIN_FOCUS_RING,
             )}
             onClick={() => setWhyOpen(true)}

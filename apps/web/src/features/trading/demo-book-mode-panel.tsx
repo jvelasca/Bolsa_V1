@@ -3,22 +3,21 @@
  * A3-wire (BETA-D): pill Auto exige armado local (`ACTIVAR AUTO`) antes de persistir mode.
  * Execute sigue detrás de `PAPER_D_EXECUTE` (server). Arm ≠ execute.
  * Título UI = nombre de la cuenta activa (no «Libro DEMO»).
+ * V2.39 — formulario A3 compartido con AUTO Desk (`DemoBookAutoArmForm`).
  *
  * No confundir con Lista AUTO del Laboratorio (`list-auto-activity-store`).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import {
-  AUTO_ARM_CONFIRM_PHRASE,
-  loadAutoArm,
-  tryArmAuto,
-  type DemoBookAutoArm,
-} from "@/features/trading/demo-book-auto-arm";
+  DemoBookAutoArmForm,
+  useAutoArmState,
+} from "@/features/trading/demo-book-auto-arm-form";
 import {
   DEMO_BOOK_AUTO_FOOTER,
   DEMO_BOOK_AUTO_TOOLTIP,
@@ -37,7 +36,6 @@ import {
 } from "@/features/trading/demo-book-prefs";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
-import { PAPER_AUTO_ARMED_EXEC_OFF } from "@bolsa/shared";
 
 const MODE_LABEL: Record<DemoBookMode, string> = {
   manual: "MANUAL",
@@ -62,17 +60,6 @@ type Props = {
   compact?: boolean;
 };
 
-function useAutoArmState(): DemoBookAutoArm {
-  const [arm, setArm] = useState<DemoBookAutoArm>(() => loadAutoArm());
-  const refresh = useCallback(() => setArm(loadAutoArm()), []);
-  useEffect(() => {
-    const onArm = () => refresh();
-    window.addEventListener("bolsa-demo-book-auto-arm", onArm);
-    return () => window.removeEventListener("bolsa-demo-book-auto-arm", onArm);
-  }, [refresh]);
-  return arm;
-}
-
 export function DemoBookModePanel({ className, compact }: Props) {
   const { account } = useActiveAccount();
   const prefs = useDemoBookPrefs();
@@ -81,8 +68,6 @@ export function DemoBookModePanel({ className, compact }: Props) {
   const qc = useQueryClient();
 
   const [armOpen, setArmOpen] = useState(false);
-  const [phrase, setPhrase] = useState("");
-  const [armError, setArmError] = useState<string | null>(null);
 
   const killQ = useQuery({
     queryKey: ["risk-kill-switch"],
@@ -105,30 +90,13 @@ export function DemoBookModePanel({ className, compact }: Props) {
     if (arm.armed) {
       update({ mode: "auto" });
       setArmOpen(false);
-      setArmError(null);
-      setPhrase("");
       return;
     }
     setArmOpen(true);
-    setArmError(null);
-  }
-
-  function confirmArm() {
-    const result = tryArmAuto(phrase);
-    if (!result.ok) {
-      setArmError(result.error);
-      return;
-    }
-    update({ mode: "auto" });
-    setArmOpen(false);
-    setPhrase("");
-    setArmError(null);
   }
 
   function selectNonAuto(mode: Exclude<DemoBookMode, "auto">) {
     setArmOpen(false);
-    setPhrase("");
-    setArmError(null);
     update({ mode });
   }
 
@@ -267,58 +235,13 @@ export function DemoBookModePanel({ className, compact }: Props) {
         </p>
       ) : null}
       {armOpen ? (
-        <div
-          className="space-y-1.5 rounded border border-amber-500/40 bg-amber-500/10 p-2"
-          data-testid="demo-book-auto-arm-form"
-        >
-          <p className="text-[10px] leading-snug text-foreground">
-            Armar AUTO (doble confirmación). Escribe exactamente{" "}
-            <span className="font-semibold">{AUTO_ARM_CONFIRM_PHRASE}</span>.
-            Arm ≠ execute — con env off verás «{PAPER_AUTO_ARMED_EXEC_OFF}».
-          </p>
-          <input
-            type="text"
-            value={phrase}
-            onChange={(e) => setPhrase(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") confirmArm();
-            }}
-            placeholder={AUTO_ARM_CONFIRM_PHRASE}
-            autoComplete="off"
-            data-testid="demo-book-auto-arm-phrase"
-            className="w-full rounded border border-border bg-background px-1.5 py-1 text-foreground"
-          />
-          {armError ? (
-            <p
-              className="text-[10px] text-red-700 dark:text-red-300"
-              data-testid="demo-book-auto-arm-error"
-            >
-              {armError}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              data-testid="demo-book-auto-arm-confirm"
-              onClick={() => confirmArm()}
-              className="rounded border border-emerald-500/60 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:text-emerald-300"
-            >
-              Confirmar armado
-            </button>
-            <button
-              type="button"
-              data-testid="demo-book-auto-arm-cancel"
-              onClick={() => {
-                setArmOpen(false);
-                setPhrase("");
-                setArmError(null);
-              }}
-              className="rounded border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
+        <DemoBookAutoArmForm
+          onArmed={() => {
+            update({ mode: "auto" });
+            setArmOpen(false);
+          }}
+          onCancel={() => setArmOpen(false)}
+        />
       ) : null}
 
       <div

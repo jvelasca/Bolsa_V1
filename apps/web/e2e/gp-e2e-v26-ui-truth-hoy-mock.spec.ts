@@ -34,4 +34,21 @@ test.describe("GP-E2E-V26 — UI Truth Hoy mock", () => {
     await auto.getByTestId("auto-desk-summary").click();
     await expect(auto.getByTestId("auto-desk-plan-preview")).toBeVisible();
   });
+
+  test("V2.41 — Hoy Posiciones empty is honest when Atención has opens", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/hoy");
+    const empty = page.getByTestId("daily-desk-empty-posiciones");
+    const emptyCount = await empty.count();
+    const attention = page.getByTestId("daily-desk-items-requiere_accion");
+    const attentionCount = await attention.count();
+    test.skip(
+      emptyCount === 0 || attentionCount === 0,
+      "needs empty Posiciones + items in Atención",
+    );
+    await expect(empty).not.toHaveText(/Sin posiciones abiertas/i);
+    await expect(empty).toContainText(/Atención/i);
+  });
 });

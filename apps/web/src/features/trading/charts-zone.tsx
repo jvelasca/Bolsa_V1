@@ -21,7 +21,7 @@ export function ChartsZone({ children }: { children: ReactNode }) {
             <div
               key={tab.id}
               role="button"
-              tabIndex={0}
+              tabIndex={tab.id === activeChartId ? 0 : -1}
               data-testid={
                 tab.id === activeChartId ? "chart-active-tab" : undefined
               }

@@ -74,4 +74,17 @@ describe("MesaTipButton", () => {
     expect(screen.getByText("Firmar en Confirmar")).toBeTruthy();
     expect(screen.getByText(/Nunca se envían órdenes solas/i)).toBeTruthy();
   });
+
+  it("V2.41 — tip hit area is ≥32px (h-8 w-8) and text ≥12px", () => {
+    render(
+      <MemoryRouter>
+        <MesaTipButton tip="confirm-firmar" />
+      </MemoryRouter>,
+    );
+    const btn = screen.getByTestId("mesa-tip-confirm-firmar");
+    expect(btn.className).toMatch(/h-8/);
+    expect(btn.className).toMatch(/w-8/);
+    expect(btn.className).toMatch(/text-xs/);
+    expect(btn.className).not.toMatch(/text-\[11px\]/);
+  });
 });

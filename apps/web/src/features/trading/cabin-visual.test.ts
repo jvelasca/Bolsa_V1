@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CABIN_NUM,
+  CABIN_TOUCH_TARGET,
   CABIN_TYPE,
   CABIN_VISUAL_VERSION,
   cabinNumClass,
@@ -35,5 +36,10 @@ describe("cabin-visual V2.37", () => {
     expect(cabinNumTone(null)).toBe("neu");
     expect(cabinNumClass({ signed: true, value: 2 })).toMatch(/emerald/);
     expect(cabinNumClass()).toMatch(/tabular-nums/);
+  });
+
+  it("V2.40 — CABIN_TOUCH_TARGET is ≥40px (min-h-10 / min-w-10)", () => {
+    expect(CABIN_TOUCH_TARGET).toMatch(/min-h-10/);
+    expect(CABIN_TOUCH_TARGET).toMatch(/min-w-10/);
   });
 });

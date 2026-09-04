@@ -33,3 +33,4 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 - Tip [2.6-beta](./traspaso-relevo-tag-v2-6-beta-2026-09-05.md) → [`50abd31d`](https://github.com/jvelasca/Bolsa_V1/commit/50abd31d) + package `1.36.0-beta` — **stampado**.
 - No reabrir V2.28–V2.38 salvo regresión display-only.
 - No reabrir motor FSM / PAPER AUTO.
+- **Next:** [relevo V2.7 Operator Hardening](./traspaso-relevo-v2-7-operator-hardening-2026-09-05.md) · [arranque V2.7](./arranque-agente-v2-7-2026-09-05.md).

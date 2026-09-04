@@ -141,6 +141,25 @@ describe("PositionExitDrawerActions V1.36 / F7", () => {
     expect(screen.getByTestId("position-exit-protect-TEST")).toBeTruthy();
   });
 
+  it("V2.40 — Proteger L1 uses CABIN_TOUCH_TARGET (min-h-10)", () => {
+    render(
+      <PositionExitDrawerActions
+        position={position(undefined, {
+          status: "ARMED",
+          suggestedAction: "protect",
+          suggestedStop: 98,
+          primaryReason: "TRAIL",
+          policyTemplateId: "moderate",
+        })}
+        primaryCtaKind="protect"
+        portfolioReconStatus="ok"
+      />,
+    );
+    expect(screen.getByTestId("position-exit-protect-TEST").className).toMatch(
+      /min-h-10/,
+    );
+  });
+
   it("V2.08 — secondary Proteger on OPEN_UNPROTECTED while Mantener is primary", () => {
     render(
       <PositionExitDrawerActions

@@ -273,7 +273,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
                   MIN_OPERATIVA_WIDTH_PCT,
                   MAX_OPERATIVA_WIDTH_PCT,
                 )}%`,
-                minWidth: 180,
+                minWidth: 260,
                 maxWidth: 420,
               }}
             >
