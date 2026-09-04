@@ -98,6 +98,7 @@ export function AutoDeskPanel({
         className="cursor-pointer list-none px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground marker:content-none [&::-webkit-details-marker]:hidden"
         data-testid="auto-desk-summary"
       >
+        <span className="sr-only">Panel de </span>
         Gestión automática · {checklist.autonomyLabel}
       </summary>
       <div className="space-y-2 border-t border-border/40 px-2 py-1.5">

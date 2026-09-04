@@ -3,6 +3,7 @@
  * Display-only · Ranking ≠ BUY · Confirm = firma.
  */
 
+import { useId } from "react";
 import type {
   OperatorNextActionToneV1,
   OperatorNextActionV1,
@@ -43,29 +44,35 @@ export function NextActionHero({
   className?: string;
   testId?: string;
 }) {
+  const statusLabel = action.subtitle
+    ? `${action.title}. ${action.subtitle}`
+    : action.title;
   return (
     <div
       className={cn(
-        "rounded-md border px-2 py-1.5",
+        "rounded-md border px-2.5 py-2",
         nextActionToneClasses(action.tone),
         className,
       )}
+      role="status"
+      aria-live="polite"
+      aria-label={`Próxima acción: ${statusLabel}`}
       data-testid={testId}
       data-next-action-tone={action.tone}
       data-next-action-title={action.title}
     >
-      <p className="text-[9px] font-semibold uppercase tracking-wider opacity-80">
+      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-80">
         Próxima acción
       </p>
       <p
-        className="text-sm font-bold tracking-tight"
+        className="text-base font-bold leading-tight tracking-tight"
         data-testid="next-action-title"
       >
         {action.title}
       </p>
       {action.subtitle ? (
         <p
-          className="mt-0.5 text-[10px] leading-snug opacity-90"
+          className="mt-0.5 text-[11px] leading-snug opacity-90"
           data-testid="next-action-subtitle"
         >
           {action.subtitle}
@@ -73,7 +80,7 @@ export function NextActionHero({
       ) : null}
       {action.ctaHint ? (
         <p
-          className="mt-0.5 text-[10px] font-medium opacity-80"
+          className="mt-1 text-[10px] font-medium opacity-80"
           data-testid="next-action-cta-hint"
         >
           {action.ctaHint}
@@ -105,6 +112,7 @@ export function OperatorRiskBox({
   box: OperatorRiskBoxV1;
   className?: string;
 }) {
+  const labelId = useId();
   const hasAny =
     box.entry != null ||
     box.stop != null ||
@@ -120,8 +128,12 @@ export function OperatorRiskBox({
         className,
       )}
       data-testid="operator-risk-box"
+      aria-labelledby={labelId}
     >
-      <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <p
+        id={labelId}
+        className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground"
+      >
         Riesgo
       </p>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
@@ -192,6 +204,7 @@ export function OperatorFourAnswersBlock({
 }: {
   answers: OperatorFourAnswersV1;
 }) {
+  const labelId = useId();
   const rows: Array<{ id: string; label: string; value: string | null }> = [
     { id: "thesis", label: "Tesis", value: answers.thesis },
     { id: "trigger", label: "Trigger", value: answers.trigger },
@@ -201,10 +214,16 @@ export function OperatorFourAnswersBlock({
   if (!rows.some((r) => r.value)) return null;
   return (
     <div className="space-y-0.5" data-testid="operator-four-answers">
-      <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <p
+        id={labelId}
+        className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground"
+      >
         Resumen
       </p>
-      <dl className="space-y-0.5 text-[10px] text-muted-foreground">
+      <dl
+        className="space-y-0.5 text-[10px] text-muted-foreground"
+        aria-labelledby={labelId}
+      >
         {rows.map((r) =>
           r.value ? (
             <div key={r.id} className="flex justify-between gap-2">
@@ -223,16 +242,19 @@ export function OperatorFourAnswersBlock({
   );
 }
 
-function missionMark(status: OperatorMissionStepV1["status"]): string {
+function missionMark(status: OperatorMissionStepV1["status"]): {
+  symbol: string;
+  sr: string;
+} {
   switch (status) {
     case "done":
-      return "✓";
+      return { symbol: "✓", sr: "hecho" };
     case "active":
-      return "●";
+      return { symbol: "●", sr: "en curso" };
     case "pending":
-      return "○";
+      return { symbol: "○", sr: "pendiente" };
     default:
-      return "—";
+      return { symbol: "—", sr: "sin estado" };
   }
 }
 
@@ -245,25 +267,33 @@ export function OperatorMissionChecklist({
     <ul
       className="space-y-0.5 text-[10px]"
       data-testid="operator-mission-checklist"
+      aria-label="Misión de la posición"
     >
-      {steps.map((step) => (
-        <li
-          key={step.id}
-          className="flex items-baseline justify-between gap-2 text-muted-foreground"
-          data-testid={`mission-step-${step.id}`}
-          data-status={step.status}
-        >
-          <span>
-            <span className="mr-1 font-semibold text-foreground">
-              {missionMark(step.status)}
+      {steps.map((step) => {
+        const mark = missionMark(step.status);
+        return (
+          <li
+            key={step.id}
+            className="flex items-baseline justify-between gap-2 text-muted-foreground"
+            data-testid={`mission-step-${step.id}`}
+            data-status={step.status}
+          >
+            <span>
+              <span className="sr-only">{mark.sr}. </span>
+              <span
+                className="mr-1 font-semibold text-foreground"
+                aria-hidden="true"
+              >
+                {mark.symbol}
+              </span>
+              {step.label}
             </span>
-            {step.label}
-          </span>
-          <span className="tabular-nums font-medium text-foreground">
-            {step.detail ?? "—"}
-          </span>
-        </li>
-      ))}
+            <span className="tabular-nums font-medium text-foreground">
+              {step.detail ?? "—"}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
