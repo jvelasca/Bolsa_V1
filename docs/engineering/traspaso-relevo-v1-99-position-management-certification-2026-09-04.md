@@ -2,7 +2,7 @@
 
 > **Padre:** [`spec-v199`](./spec-v199-position-management-certification-2026-09-04.md) · [`plan-v199`](./plan-v199-position-management-certification-2026-09-04.md).  
 > **Partida:** tip [`v1.98-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.98-beta) → `7b5b1052`.  
-> **Estado:** certificación lista para CI / tip (tag `v1.99-beta` pendiente de Release-tag GREEN).
+> **Estado:** tip [`v1.99-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.99-beta) → [`bf57899b`](https://github.com/jvelasca/Bolsa_V1/commit/bf57899b) · Release-tag CI en curso ([run 33847460567](https://github.com/jvelasca/Bolsa_V1/actions/runs/33847460567)) · stamp GREEN + PASS auditor pendientes.
 
 ## Hecho
 
@@ -21,9 +21,9 @@
 
 ## Next
 
-1. CI local (domain + application + vitest FSM) · Release-tag cuando se etiquete `v1.99-beta`
-2. Arranque auditor tip ([arranque](./arranque-auditor-v1-99-position-management-certification-2026-09-04.md))
-3. Tras PASS auditor: **ENGINE FREEZE** → V2.0 Operational UX / AUTO Desk
+1. Release-tag GREEN del tip · stamp `traspaso-relevo-tag-v1-99-beta` + CURRENT_SYSTEM
+2. Arranque auditor tip ([arranque](./arranque-auditor-v1-99-position-management-certification-2026-09-04.md)) — **auditoría actual se mantiene**
+3. Plan cierre PAPER AUTO (siguiente agente): [relevo planificador](./traspaso-relevo-post-v199-plan-cierre-paper-auto-2026-09-04.md) → ENGINE FREEZE → V2.0 AUTO Desk
 
 ## Freeze
 
