@@ -1,17 +1,17 @@
 # RELEVO — tag v2.5-beta → tip UI Finishing (2026-09-05)
 
 > **Padre:** [relevo V2.5 UI Finishing](./traspaso-relevo-v2-5-ui-finishing-2026-09-05.md) · tip previo [`v2.4-beta`](./traspaso-relevo-tag-v2-4-beta-2026-09-04.md) `8fda4d62`.  
-> **Estado:** tip `v2.5-beta` → **TBD_SHA** (producto UI Finishing · ≠ tip motor `v2.0-beta`) · pedido explícito post ops + pre-flight.  
+> **Estado:** tip `v2.5-beta` → [`df57f0a9`](https://github.com/jvelasca/Bolsa_V1/commit/df57f0a9) (producto UI Finishing · ≠ tip motor `v2.0-beta`) · pedido explícito post ops + pre-flight.  
 > **Partida código tip previo:** `v2.4-beta` → `8fda4d62`.
 
 ## Release
 
-| Pieza       | Valor                                                       |
-| ----------- | ----------------------------------------------------------- |
-| Tag tip     | `v2.5-beta` → **TBD_SHA**                                   |
-| Stamp docs  | este relevo + `CURRENT_SYSTEM`                              |
-| Package     | `1.35.0-beta` **sin bump**                                  |
-| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.5-beta |
+| Pieza       | Valor                                                                            |
+| ----------- | -------------------------------------------------------------------------------- |
+| Tag tip     | `v2.5-beta` → [`df57f0a9`](https://github.com/jvelasca/Bolsa_V1/commit/df57f0a9) |
+| Stamp docs  | este relevo + `CURRENT_SYSTEM`                                                   |
+| Package     | `1.35.0-beta` **sin bump**                                                       |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.5-beta                      |
 
 ## Hecho (código tip)
 

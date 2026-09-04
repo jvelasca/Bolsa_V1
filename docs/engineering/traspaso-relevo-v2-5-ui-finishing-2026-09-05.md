@@ -1,7 +1,7 @@
 # RELEVO — V2.5 UI Finishing + Protection honesty (2026-09-05)
 
 > **Padre:** [relevo V2.4 Cabin Coherence](./traspaso-relevo-v2-4-cabin-coherence-2026-09-04.md) · tip producto [`v2.4-beta`](./traspaso-relevo-tag-v2-4-beta-2026-09-04.md) `8fda4d62`.  
-> **Estado:** **CERRADO en código** (working tree) · tip `v2.5-beta` **no stampado** · sin bump `1.35.0-beta`.  
+> **Estado:** **CERRADO en código** · tip [`v2.5-beta`](./traspaso-relevo-tag-v2-5-beta-2026-09-05.md) → [`df57f0a9`](https://github.com/jvelasca/Bolsa_V1/commit/df57f0a9) · sin bump `1.35.0-beta`.  
 > **Para quién:** ops · commit/tip solo con pedido explícito · **NO MÁS PANELES** · no reabrir motor FSM.  
 > **Arranque:** [arranque post-V2.35](./arranque-agente-post-v2-35-2026-09-05.md).
 
@@ -51,9 +51,8 @@ NO LIVE · no bump `1.35.0-beta` · `PAPER_D_EXECUTE` default off · no `TRANSIT
 
 ## OUT / tip
 
-- Tip `v2.5-beta` — **pendiente** (solo si se pide).
-- Commit working tree — **pendiente** (solo si se pide).
-- **Reiniciar API Python** para que el wire deje de emitir `PROTECT_REQUIRED` en fills sanos (frontend ya reconstruye; wire antiguo puede quedar en proceso).
-- Ops smoke browser 10 s (**V2.3-ops**, paralelo) — sigue pendiente.
+- Tip `v2.5-beta` → [`df57f0a9`](https://github.com/jvelasca/Bolsa_V1/commit/df57f0a9) (**stampado**).
+- Commit producto V2.5 → `df57f0a9` (**hecho**).
+- API Python reiniciada · V2.3-ops smoke L1–L4 + criterio 10 s **PASS**.
 - No reabrir V2.28–V2.35 salvo regresión display-only.
 - No reabrir motor FSM / PAPER AUTO.
