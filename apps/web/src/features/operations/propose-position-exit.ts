@@ -131,6 +131,63 @@ export function resolveExitQuantity(
   return qty;
 }
 
+/**
+ * Distancia % advisory para bootstrap de stop en `OPEN_UNPROTECTED`
+ * (compra manual / sin structuralStop). Confirm sigue firmando; no es broker stop.
+ */
+export const BOOTSTRAP_PROTECT_STOP_PCT = 0.05;
+
+function finitePositive(n: unknown): n is number {
+  return typeof n === "number" && Number.isFinite(n) && n > 0;
+}
+
+/** OPEN + tradePlanId + sin currentStop (o operatingState OPEN_UNPROTECTED). */
+export function positionIsOpenUnprotected(position: PositionDto): boolean {
+  const op = position.operational;
+  if (!op?.tradePlanId) return false;
+  const viewState = op.operationalView?.operatingState;
+  if (viewState === "OPEN_UNPROTECTED") return true;
+  if (
+    viewState === "PROTECTED" ||
+    viewState === "TRAILING" ||
+    viewState === "PARTIALLY_REDUCED" ||
+    viewState === "EXIT_PENDING" ||
+    viewState === "CLOSED"
+  ) {
+    return false;
+  }
+  if (op.status !== "OPEN" && op.status !== "PARTIAL") return false;
+  return !finitePositive(op.currentStop);
+}
+
+/**
+ * Stop inicial sugerido cuando no hay ExitPlan/protect_hint:
+ * long → entry×(1−5%); short → entry×(1+5%). Usa initialStop si ya venía en el plan.
+ */
+export function resolveBootstrapProtectStop(
+  position: PositionDto,
+): number | null {
+  const op = position.operational;
+  if (!op?.tradePlanId || !positionIsOpenUnprotected(position)) return null;
+  if (finitePositive(op.initialStop)) return op.initialStop;
+
+  const entry =
+    (finitePositive(op.actualEntry) && op.actualEntry) ||
+    (finitePositive(op.plannedEntry) && op.plannedEntry) ||
+    (finitePositive(position.avgCost) && position.avgCost) ||
+    (finitePositive(position.lastPrice) && position.lastPrice) ||
+    null;
+  if (entry == null) return null;
+
+  const direction = (op.direction ?? "long").toLowerCase();
+  const raw =
+    direction === "short"
+      ? entry * (1 + BOOTSTRAP_PROTECT_STOP_PCT)
+      : entry * (1 - BOOTSTRAP_PROTECT_STOP_PCT);
+  // 4 decimales max — suficiente para equities; Confirm puede editar.
+  return Math.round(raw * 1e4) / 1e4;
+}
+
 export function resolveProtectSuggestedStop(
   position: PositionDto,
   protectPlan?: ProtectPlanV1 | null,
@@ -144,11 +201,25 @@ export function resolveProtectSuggestedStop(
     const fromProtect = protectPlan?.suggestedProtectStop;
     if (fromProtect != null && fromProtect > 0) raw = fromProtect;
   }
+  if (raw == null) {
+    raw = resolveBootstrapProtectStop(position);
+  }
   if (raw == null) return null;
   const direction = operational?.direction ?? "long";
   const current = operational?.currentStop;
   // V1.29 — trail no empeora riesgo: clamp al vigente.
   return clampStopNotWorsen(direction, current, raw);
+}
+
+function protectStopDiffersFromCurrent(
+  position: PositionDto,
+  stop: number,
+): boolean {
+  const current = position.operational?.currentStop;
+  if (current != null && current > 0 && Math.abs(stop - current) < 1e-9) {
+    return false;
+  }
+  return true;
 }
 
 export function positionShowsProtectHint(
@@ -159,23 +230,28 @@ export function positionShowsProtectHint(
   if (action === "protect") {
     const stop = resolveProtectSuggestedStop(position, protectPlan);
     if (stop == null) return false;
-    const current = position.operational?.currentStop;
-    // Si el clamp dejó el stop igual al vigente, no hay CTA (nada que firmar).
-    if (current != null && current > 0 && Math.abs(stop - current) < 1e-9) {
-      return false;
-    }
-    return true;
+    return protectStopDiffersFromCurrent(position, stop);
   }
   if (protectPlan?.status === "protect_hint") {
     const stop = resolveProtectSuggestedStop(position, protectPlan);
     if (stop == null) return false;
-    const current = position.operational?.currentStop;
-    if (current != null && current > 0 && Math.abs(stop - current) < 1e-9) {
-      return false;
-    }
-    return true;
+    return protectStopDiffersFromCurrent(position, stop);
   }
   return false;
+}
+
+/**
+ * V2.08 — CTA Proteger también en OPEN_UNPROTECTED (bootstrap stop),
+ * no solo con protect_hint / ExitPlan.protect.
+ */
+export function positionShowsProtectCta(
+  position: PositionDto,
+  protectPlan?: ProtectPlanV1 | null,
+): boolean {
+  if (positionShowsProtectHint(position, protectPlan)) return true;
+  if (!positionIsOpenUnprotected(position)) return false;
+  const stop = resolveProtectSuggestedStop(position, protectPlan);
+  return stop != null && protectStopDiffersFromCurrent(position, stop);
 }
 
 export function evaluateProtectStopOverride(opts: {
@@ -303,6 +379,11 @@ export function buildPositionExitPayload(opts: {
       primaryReason,
     };
 
+    const bootstrapNote =
+      positionIsOpenUnprotected(position) &&
+      operational.exitPlan?.suggestedAction !== "protect" &&
+      protectPlan?.status !== "protect_hint";
+
     return {
       artifactType: "ART-RECOMMENDATION",
       schemaVersion: "1.0.0",
@@ -321,7 +402,9 @@ export function buildPositionExitPayload(opts: {
       notes: [
         revisionOrigin === "trail"
           ? "Trail → Confirm (stop amend · revision origin=trail · P4.2)"
-          : "Proteger (stop amend) desde Consola de Mesa (P4.2)",
+          : bootstrapNote
+            ? "Proteger (stop inicial) OPEN_UNPROTECTED → Confirm (V2.08)"
+            : "Proteger (stop amend) desde Consola de Mesa (P4.2)",
       ],
       decisionPackage: protectMeta,
     };

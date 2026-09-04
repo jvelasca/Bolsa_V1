@@ -140,4 +140,60 @@ describe("PositionExitDrawerActions V1.36 / F7", () => {
     );
     expect(screen.getByTestId("position-exit-protect-TEST")).toBeTruthy();
   });
+
+  it("V2.08 — secondary Proteger on OPEN_UNPROTECTED while Mantener is primary", () => {
+    render(
+      <PositionExitDrawerActions
+        position={position(
+          {
+            operational: {
+              status: "OPEN",
+              direction: "long",
+              tradePlanId: "manual-1",
+              plannedEntry: 100,
+              actualEntry: 100,
+              initialStop: null,
+              currentStop: null,
+              target1: null,
+              target2: null,
+              operationalView: {
+                positionId: "p1",
+                instrumentId: "inst-1",
+                tradePlanId: "manual-1",
+                decisionId: "manual-1",
+                lineageCollapsed: false,
+                operatingState: "OPEN_UNPROTECTED",
+                primaryAction: "MANTENER",
+                levels: {
+                  entry: 100,
+                  currentStop: null,
+                  target1: null,
+                  target2: null,
+                  unrealizedR: null,
+                },
+                t1: null,
+                t2: null,
+                stopHistory: [],
+                events: [],
+                quantity: 10,
+                remainingQuantity: 10,
+                templateId: null,
+                analysisAsOf: null,
+              },
+            },
+          },
+          {
+            status: "IDLE",
+            suggestedAction: "hold",
+            primaryReason: null,
+            policyTemplateId: "moderate",
+          },
+        )}
+        primaryCtaKind="maintain"
+        portfolioReconStatus="ok"
+      />,
+    );
+    expect(screen.getByText("Mantener")).toBeTruthy();
+    expect(screen.getByTestId("position-exit-protect-TEST")).toBeTruthy();
+  });
 });

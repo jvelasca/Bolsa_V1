@@ -24,6 +24,7 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import {
   buildPositionExitPayload,
+  positionShowsProtectCta,
   positionShowsProtectHint,
   type PositionExitIntent,
 } from "@/features/operations/propose-position-exit";
@@ -110,18 +111,19 @@ export function PositionExitDrawerActions({
   }
 
   const hasProtectHint = positionShowsProtectHint(position, protectPlan);
-  // Primary protect, or secondary «Proteger» when Mantener + hint (trail/protect → Confirm).
+  const showProtectCta = positionShowsProtectCta(position, protectPlan);
+  // Primary protect, or secondary «Proteger» when Mantener + hint/bootstrap (→ Confirm).
   const showProtect =
     !reconBlocked &&
     (effectivePrimary === "protect" ||
       decision?.action === "PROTECT" ||
-      hasProtectHint);
+      showProtectCta);
   const showProtectAsPrimary =
     effectivePrimary === "protect" || decision?.action === "PROTECT";
   const showProtectSecondary =
     primaryOnly &&
     effectivePrimary === "maintain" &&
-    hasProtectHint &&
+    showProtectCta &&
     !showProtectAsPrimary;
   const showMaintainBadge = primaryOnly
     ? effectivePrimary === "maintain"
@@ -180,7 +182,9 @@ export function PositionExitDrawerActions({
             title={
               revisionOriginFromExitReason(exitPlan?.primaryReason) === "trail"
                 ? "Trail → Confirm (firma SEMI · hint ≠ currentStop hasta revision)"
-                : "Proteger → cola Confirm (firma SEMI · hint ≠ stop)"
+                : hasProtectHint
+                  ? "Proteger → cola Confirm (firma SEMI · hint ≠ stop)"
+                  : "Proteger → cola Confirm (stop inicial · OPEN_UNPROTECTED · firma SEMI)"
             }
           >
             Proteger

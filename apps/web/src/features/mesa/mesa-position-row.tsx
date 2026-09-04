@@ -26,7 +26,10 @@ import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
-import { buildPositionExitPayload } from "@/features/operations/propose-position-exit";
+import {
+  buildPositionExitPayload,
+  positionShowsProtectCta,
+} from "@/features/operations/propose-position-exit";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
@@ -166,7 +169,23 @@ export function MesaPositionNextActionButton({
         );
       case "maintain":
         return (
-          <span className="text-[10px] text-muted-foreground">Mantener</span>
+          <span className="inline-flex flex-wrap items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Mantener</span>
+            {positionShowsProtectCta(position, protectPlan) ? (
+              <button
+                type="button"
+                className={cn(
+                  btnClass,
+                  "border-emerald-500/40 text-emerald-900 dark:text-emerald-100 opacity-75",
+                )}
+                onClick={() => enqueueExit("protect")}
+                data-testid={`mesa-next-action-protect-${position.symbol}`}
+                title="Proteger → cola Confirm (stop inicial · OPEN_UNPROTECTED · firma SEMI)"
+              >
+                Proteger
+              </button>
+            ) : null}
+          </span>
         );
       case "view_thesis":
         return study ? (

@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   buildPositionExitPayload,
   evaluateProtectStopOverride,
+  positionShowsProtectCta,
   positionShowsProtectHint,
   resolveProtectSuggestedStop,
 } from "@/features/operations/propose-position-exit";
@@ -397,5 +398,73 @@ describe("buildPositionExitPayload", () => {
       },
     );
     expect(stop).toBe(102);
+  });
+});
+
+describe("V2.08 OPEN_UNPROTECTED bootstrap protect", () => {
+  it("resolves 5% stop below entry for long without hint", () => {
+    const stop = resolveProtectSuggestedStop(
+      position({
+        avgCost: 100,
+        lastPrice: 100,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          tradePlanId: "manual-1",
+          actualEntry: 100,
+          plannedEntry: 100,
+          currentStop: null,
+          initialStop: null,
+        },
+      }),
+    );
+    expect(stop).toBe(95);
+  });
+
+  it("buildPositionExitPayload protect works without ExitPlan stop", () => {
+    const payload = buildPositionExitPayload({
+      position: position({
+        avgCost: 25.4,
+        lastPrice: 25.4,
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          tradePlanId: "manual-bbva",
+          decisionId: "manual-bbva",
+          actualEntry: 25.4,
+          plannedEntry: 25.4,
+          currentStop: null,
+          initialStop: null,
+          exitPlan: {
+            status: "IDLE",
+            suggestedAction: "hold",
+            primaryReason: null,
+            policyTemplateId: "moderate",
+          },
+        },
+      }),
+      accountId: "acc-1",
+      intent: "protect",
+    });
+    expect(payload.decisionPackage).toMatchObject({
+      operativaIntent: "protect",
+      suggestedStop: 24.13,
+      currentStop: null,
+    });
+    expect(payload.notes?.[0]).toMatch(/OPEN_UNPROTECTED/i);
+  });
+
+  it("positionShowsProtectCta true for unprotected; hint false", () => {
+    const unprotected = position({
+      operational: {
+        status: "OPEN",
+        direction: "long",
+        tradePlanId: "manual-1",
+        actualEntry: 100,
+        currentStop: null,
+      },
+    });
+    expect(positionShowsProtectHint(unprotected)).toBe(false);
+    expect(positionShowsProtectCta(unprotected)).toBe(true);
   });
 });

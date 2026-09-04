@@ -1,15 +1,15 @@
 # RELEVO — V2.x Product UX (cabina Mercado) (2026-09-04)
 
 > **Padre:** tip [`v2.0-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.0-beta) → [`e05fc6b0`](https://github.com/jvelasca/Bolsa_V1/commit/e05fc6b0) · [relevo V2.0 PAPER AUTO](./traspaso-relevo-v2-0-cierre-paper-auto-2026-09-04.md).  
-> **Estado:** código tip local [`a39595ce`](https://github.com/jvelasca/Bolsa_V1/commit/a39595ce) (sin tag / sin bump) · ENGINE FREEZE intacto.  
+> **Estado:** código tip local [`a39595ce`](https://github.com/jvelasca/Bolsa_V1/commit/a39595ce) + V2.08 CTA (working tree / tip siguiente) · ENGINE FREEZE intacto.  
 > **Smoke browser (2026-09-04):** Position Card + protect **OK** (ver Ops local).  
-> **Para quién:** polish V2.08 / CTA Proteger `OPEN_UNPROTECTED` / tip producto cuando se pida.
+> **Para quién:** polish tipografía/a11y · V2.09 user test · tip producto cuando se pida.
 
 ## Objetivo
 
 Transición de «motor PAPER AUTO robusto» a **producto usable**: Mercado como cabina; NEXT ACTION como héroe; jerga de motor en avanzado.
 
-## Hecho (V2.01–V2.07)
+## Hecho (V2.01–V2.08)
 
 | ID        | Entrega                                            | Evidencia                                                                                  |
 | --------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -20,6 +20,7 @@ Transición de «motor PAPER AUTO robusto» a **producto usable**: Mercado como 
 | **V2.05** | Hoy 4 cubos                                        | `daily-desk.ts` · Requiere atención (absorbe Proteger) · menú «Avanzado»                   |
 | **V2.06** | Asesor = explicación                               | copy `/research` · no segunda mesa                                                         |
 | **V2.07** | Journal = memoria + learning strip                 | `decision-journal-page` framing · Evolución lee `decision_sessions` learning (SoT intacto) |
+| **V2.08** | CTA Proteger en `OPEN_UNPROTECTED`                 | `positionShowsProtectCta` · bootstrap stop 5% · DECISIÓN + Hoy · Confirm sigue firmando    |
 
 ## Freeze intacto
 
@@ -39,15 +40,15 @@ Al seleccionar un valor: NEXT ACTION visible (también en vigilar/descubierto). 
 | Smoke Position Card (misión) | **OK** — PRINCIPAL · BBVA 1× @ 25.40 · DECISIÓN `MANTENER` · misión Entrada✓ · Risk Box · AUTO Desk Asistido                         |
 | Smoke protect (Confirm SEMI) | **OK** — stop operativo **24.00** · `trade=protect_applied` · API `PROTECTED` / `MONITOR` · Hoy PROTECCIÓN **1/1** · ruta Stop 24.00 |
 
-### Hallazgo UX (no bloquea stamp)
+### Hallazgo UX (cerrado V2.08)
 
-Compra de mercado → plan `manual-*` + `OPEN_UNPROTECTED`, pero **sin CTA «Proteger»** en DECISIÓN hasta `protect_hint` / ExitPlan `protect`. Firma de stop vía cola Confirm (SEMI). Orden VENTA con posición abierta → `position_exit_requires_confirm` (esperado). Candidato V2.08: CTA Proteger secundaria cuando `operatingState=OPEN_UNPROTECTED` y hay `tradePlanId`.
+Compra de mercado → plan `manual-*` + `OPEN_UNPROTECTED` ahora muestra **Proteger** secundaria (Mantener primary) con stop bootstrap 5% bajo entrada (long). Confirm sigue siendo la firma. Orden VENTA con posición abierta → `position_exit_requires_confirm` (esperado).
 
 ## OUT / next
 
 - ~~Smoke browser con posición PAPER abierta~~ **hecho 2026-09-04**
-- V2.08: CTA Proteger para `OPEN_UNPROTECTED` (hallazgo arriba) · polish tipografía/a11y
-- V2.09 user test · colapso nav L1 (ADR-040) solo tras cabina estable
+- ~~V2.08: CTA Proteger para `OPEN_UNPROTECTED`~~ **hecho**
+- V2.09 user test · polish tipografía/a11y · colapso nav L1 (ADR-040) solo tras cabina estable
 - Push / tip producto UX (cuando el usuario lo pida) — no confundir con tip motor V2.0
 
 ## Pre-flight
