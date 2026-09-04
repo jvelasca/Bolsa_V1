@@ -2,20 +2,20 @@
 
 > **Leer primero:** [relevo V2.3 Mercado Polish](./traspaso-relevo-v2-3-mercado-polish-2026-09-04.md) · padre [V2.2 Certification](./traspaso-relevo-v2-2-operator-certification-2026-09-04.md).  
 > **Tip producto previo:** [`v2.1-beta`](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md) `5f095d67`.  
-> **Código en `main`:** commit de push V2.2+V2.3-partial (stamp abajo tras push).  
+> **Código en `main`:** tip push [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) (V2.2 + V2.24–V2.26).  
 > **Para quién:** agente nuevo · arrancar **V2.27** (Journal) · no reabrir motor FSM.
 
 ## Estado al relevo
 
-| Corte                                     | Estado                                           |
-| ----------------------------------------- | ------------------------------------------------ |
-| V2.2 Operator Certification (V2.19–V2.23) | **hecho en código** · golden G-OPERATOR-02/03/04 |
-| V2.24 Composición 4 niveles               | **hecho**                                        |
-| V2.25 Densidad / a11y / status            | **hecho**                                        |
-| V2.26 Escalera trailing visual            | **hecho** · auditable en GitHub tras este push   |
-| V2.27 Journal spine + MFE/MAE             | **SIGUIENTE**                                    |
-| V2.28 Ops smoke 10 s                      | pendiente sesión ops                             |
-| Tip `v2.3-*`                              | solo con petición explícita                      |
+| Corte                                     | Estado                                                                             |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| V2.2 Operator Certification (V2.19–V2.23) | **hecho en código** · golden G-OPERATOR-02/03/04                                   |
+| V2.24 Composición 4 niveles               | **hecho**                                                                          |
+| V2.25 Densidad / a11y / status            | **hecho**                                                                          |
+| V2.26 Escalera trailing visual            | **hecho** · tip [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) |
+| V2.27 Journal spine + MFE/MAE             | **SIGUIENTE**                                                                      |
+| V2.28 Ops smoke 10 s                      | pendiente sesión ops                                                               |
+| Tip `v2.3-*`                              | solo con petición explícita                                                        |
 
 ## Primer ID a implementar
 
@@ -53,8 +53,8 @@ cd apps/web && npx vitest run src/features/trading/operator-cabin-ui.test.tsx sr
 
 ## Stamp push
 
-| Pieza                           | Valor                       |
-| ------------------------------- | --------------------------- |
-| Commit tip (V2.2 + V2.24–V2.26) | _pendiente stamp post-push_ |
-| Branch                          | `main`                      |
-| Tip GitHub `v2.3-*`             | no (salvo petición)         |
+| Pieza                           | Valor                                                              |
+| ------------------------------- | ------------------------------------------------------------------ |
+| Commit tip (V2.2 + V2.24–V2.26) | [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) |
+| Branch                          | `main`                                                             |
+| Tip GitHub `v2.3-*`             | no (salvo petición)                                                |

@@ -1,9 +1,10 @@
 # RELEVO — V2.2 Operator Certification (2026-09-04)
 
 > **Padre:** [relevo V2.1 Operator Journey](./traspaso-relevo-v2-1-operator-journey-2026-09-04.md) · tip [`v2.1-beta`](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md) `5f095d67`.  
-> **Estado:** **CERRADO en código** · IDs V2.19–V2.23 · pre-flight vitest **PASS**.  
+> **Estado:** **CERRADO en código** · IDs V2.19–V2.23 · tip código [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) · pre-flight vitest **PASS**.  
 > **Para quién:** ops · certificación de journeys · no reabrir motor FSM.  
-> **Veredicto auditor V2.1-beta:** PASS conceptual · 0 P0 · 0 P1 · 4 P2 de certificación (no features).
+> **Veredicto auditor V2.1-beta:** PASS conceptual · 0 P0 · 0 P1 · 4 P2 de certificación (no features).  
+> **Next:** [V2.3 Mercado Polish](./traspaso-relevo-v2-3-mercado-polish-2026-09-04.md) · [arranque post-V2.26](./arranque-agente-post-v2-26-2026-09-04.md).
 
 ## Objetivo
 

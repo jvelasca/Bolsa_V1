@@ -1,9 +1,10 @@
 # RELEVO — V2.3 Mercado Polish (2026-09-04)
 
 > **Padre:** [relevo V2.2 Operator Certification](./traspaso-relevo-v2-2-operator-certification-2026-09-04.md) · tip [`v2.1-beta`](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md) `5f095d67`.  
-> **Estado:** **ABIERTO** · IDs V2.24–V2.28 · **V2.24–V2.26 hechos** · pre-flight V2.2 **PASS** (punto de partida).  
+> **Estado:** **ABIERTO** · IDs V2.24–V2.28 · **V2.24–V2.26 hechos** · tip código [`d434ebe2`](https://github.com/jvelasca/Bolsa_V1/commit/d434ebe2) · next agente = V2.27.  
 > **Para quién:** ops · UX operativa · no reabrir motor FSM · no tip `v2.3-*` salvo petición explícita.  
-> **Partida:** V2.2 CERRADO en código (Operating Truth + golden 02/03/04) · smoke browser V2.2 aún pendiente ops.
+> **Partida:** V2.2 CERRADO en código (Operating Truth + golden 02/03/04) · smoke browser V2.2 aún pendiente ops.  
+> **Arranque nuevo agente:** [arranque post-V2.26](./arranque-agente-post-v2-26-2026-09-04.md).
 
 ## Objetivo
 
