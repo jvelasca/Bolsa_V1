@@ -127,7 +127,7 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 
    («No operar» es resultado de primera clase cuando Estudio está ok y no hay triggers válidos.)
 
-2. **Cinco puertas L1 intactas.** Rechazado colapsar Hoy dentro de Mercado como única app. Hoy sigue respondiendo UX-01 («¿qué debo hacer hoy?»). Un strip compacto «Hoy» _dentro_ de Mercado (enlace, sin borrar la puerta) queda **aparcado** a V1.27.
+2. **Cinco puertas L1 intactas.** Rechazado colapsar Hoy dentro de Mercado como única app. Hoy sigue respondiendo UX-01 («¿qué debo hacer hoy?»). Thaw V2.1 (2026-09-04): strip compacto «Hoy →» en `TradingHealthStrip` = enlace only (sin candidatos/F3/venue toggle; no remonta `HoyCommandStrip`); puerta L1 Hoy intacta; **no** collapse.
 
 3. **Shell Mercado congelado:** `LISTAS | GRÁFICO | DECISIÓN` (etiqueta de producto; [ADR-042](./042-operating-excellence.md) · [diseño Mercado 2.0](../engineering/diseno-mercado-2-0-cockpit-2026-08-27.md)). Geometría intacta. El peso operacional sigue siendo Mercado opera / Hoy resume (§8). No nuevas barras ni paneles L1.
 

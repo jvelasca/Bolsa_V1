@@ -1,6 +1,7 @@
 /**
- * Línea mínima de salud operativa en el terminal Mercado (ADR-040).
- * Sin candidatos, sin cola F3, sin «Hoy», sin venue toggle.
+ * Línea mínima de salud operativa en el terminal Mercado (ADR-040 §10).
+ * Thaw V2.1 (post-smoke): strip compacto «Hoy →» = enlace only a `/mesa`.
+ * Sin candidatos, sin cola F3, sin venue toggle; no remonta HoyCommandStrip.
  * V1.24 — chip Barrido = frescura del último scan Estudio (48h).
  */
 
@@ -138,8 +139,10 @@ export function TradingHealthStrip({ className }: TradingHealthStripProps) {
       </span>
       <Link
         to={MESA_PATH}
+        data-testid="trading-hoy-strip"
         className="ml-auto shrink-0 text-primary hover:underline"
-        title="Abrir Hoy — atención y oportunidades"
+        title="Abrir Hoy — ¿qué debo hacer hoy?"
+        aria-label="Ir a Hoy: briefing diario de atención y oportunidades"
       >
         Hoy →
       </Link>

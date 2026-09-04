@@ -70,9 +70,9 @@ Al seleccionar un valor: NEXT ACTION visible (también en vigilar/descubierto). 
 - ~~V2.08 / V2.09~~ **hecho**
 - ~~Arranque + push `main` para auditor externo~~ **hecho**
 - ~~Veredicto auditor (tip `5cc982e`)~~ **recibido** — PASS conceptual; P1 UX = bootstrap 5 %; next = integrar cabina
-- Follow-on: [V2.1 Operator Journey](./traspaso-relevo-v2-1-operator-journey-2026-09-04.md)
-- Colapso nav L1 (ADR-040) solo tras cabina estable **post-V2.1**
-- Tip GitHub `v2.x-*` **solo si** se pide explícitamente (no confundir con `v2.0-beta` motor)
+- Follow-on: [V2.1 Operator Journey](./traspaso-relevo-v2-1-operator-journey-2026-09-04.md) · tip [`v2.1-beta`](./traspaso-relevo-tag-v2-1-beta-2026-09-04.md)
+- ~~Colapso nav L1~~ **rechazado**; thaw strip enlace Hoy-en-Mercado (V2.18)
+- Tip producto `v2.1-beta` (≠ `v2.0-beta` motor)
 
 ## Pre-flight
 

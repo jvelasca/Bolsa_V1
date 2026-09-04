@@ -1154,6 +1154,15 @@ export function SupervisedF3Panel() {
             )}
           </>
         ) : null}
+        {/* V2.17 — protect/bootstrap stop must be visible without opening Avanzado (smoke V2.10). */}
+        {protectMeta ? (
+          <F3ProtectStopBlock
+            meta={protectMeta}
+            currency={accountCurrency}
+            overrideReason={riskOverrideReason}
+            onOverrideReasonChange={setRiskOverrideReason}
+          />
+        ) : null}
         <button
           type="button"
           className="text-[11px] font-medium text-primary underline-offset-2 hover:underline"
@@ -1164,14 +1173,6 @@ export function SupervisedF3Panel() {
         </button>
         {advancedOpen && ticketPreview ? (
           <F3TicketPreviewBlock ticket={ticketPreview} />
-        ) : null}
-        {advancedOpen && protectMeta ? (
-          <F3ProtectStopBlock
-            meta={protectMeta}
-            currency={accountCurrency}
-            overrideReason={riskOverrideReason}
-            onOverrideReasonChange={setRiskOverrideReason}
-          />
         ) : null}
 
         <div className="flex flex-wrap gap-2">
