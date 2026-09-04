@@ -1,7 +1,7 @@
 # RELEVO — tag v2.1-beta → tip producto UX / Operator Journey (2026-09-04)
 
 > **Padre:** [relevo V2.1 Operator Journey](./traspaso-relevo-v2-1-operator-journey-2026-09-04.md) · [V2.x Product UX](./traspaso-relevo-v2-x-product-ux-2026-09-04.md).  
-> **Estado:** tip `v2.1-beta` (producto UX · ≠ tip motor `v2.0-beta`) · pedido explícito post-smoke PASS.  
+> **Estado:** tip `v2.1-beta` → [`5f095d67`](https://github.com/jvelasca/Bolsa_V1/commit/5f095d67) (producto UX · ≠ tip motor `v2.0-beta`) · pedido explícito post-smoke PASS.  
 > **Partida motor:** `v2.0-beta` → [`e05fc6b0`](https://github.com/jvelasca/Bolsa_V1/commit/e05fc6b0).
 
 ## Release
