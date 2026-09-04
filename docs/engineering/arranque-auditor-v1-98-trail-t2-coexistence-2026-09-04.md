@@ -4,7 +4,7 @@ Copia en chat nuevo (auditor):
 
 ---
 
-Eres auditor externo de Bolsa V1 **candidato `v1.98-beta` → `7b5b1052`** (partida **`v1.97-beta` → `2e9d4675`** · push CI **GREEN** Python/Frontend/Gitleaks · feature trail+T2). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
+Eres auditor externo de Bolsa V1 **candidato `v1.98-beta` → `7b5b1052`** (partida **`v1.97-beta` → `2e9d4675`** · push CI **GREEN** · Release-tag CI **GREEN** [run 33844531875](https://github.com/jvelasca/Bolsa_V1/actions/runs/33844531875)). **No** LIVE · `PAPER_D_EXECUTE` off · package **`1.35.0-beta`**.
 
 **Alcance V1.98 (alinear FSM con ExitPolicy, no arquitectura nueva):**
 
