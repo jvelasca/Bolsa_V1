@@ -6,12 +6,12 @@
 
 ## Release
 
-| Pieza       | Valor                             |
-| ----------- | --------------------------------- |
-| Tag tip     | `v2.1-beta` → _(SHA al tipar)_    |
-| Stamp docs  | este relevo + V2.1 smoke/ADR thaw |
-| Package     | `1.35.0-beta` **sin bump**        |
-| Pre-release | GitHub Releases `v2.1-beta`       |
+| Pieza       | Valor                                                                            |
+| ----------- | -------------------------------------------------------------------------------- |
+| Tag tip     | `v2.1-beta` → [`5f095d67`](https://github.com/jvelasca/Bolsa_V1/commit/5f095d67) |
+| Stamp docs  | este relevo + V2.1 smoke/ADR thaw                                                |
+| Package     | `1.35.0-beta` **sin bump**                                                       |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.1-beta                      |
 
 ## Hecho (código tip)
 
