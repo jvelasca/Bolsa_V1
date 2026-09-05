@@ -336,6 +336,7 @@ describe("DailyDeskInbox V1.42 F6/F7", () => {
       </MemoryRouter>,
     );
 
+    fireEvent.click(screen.getByTestId("daily-desk-expand-no_operar"));
     const row = screen.getByTestId("daily-desk-item-auto-deny-inst-msft");
     expect(row.getAttribute("data-attention")).toBe("BLOCKED");
     expect(row.getAttribute("data-reason-code")).toBe("ENTRY_STALE_DATA");

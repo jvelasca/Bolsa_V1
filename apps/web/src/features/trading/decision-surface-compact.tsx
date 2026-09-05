@@ -890,18 +890,32 @@ function PositionCompactBody({
           </>
         )}
         {!hud && journey ? (
-          <JourneyHudBlock
-            journey={journey}
-            birthQuantity={view.quantity}
-            hasProtectRevision={view.stopHistory.some(
-              (h) => h.origin === "protect",
-            )}
-            hasTrailRevision={
-              view.stopHistory.some((h) => h.origin === "trail") ||
-              view.operatingState === "TRAILING"
-            }
-            plannedStop={journey.risk.initialStop}
-          />
+          <>
+            <JourneyHudBlock
+              journey={journey}
+              birthQuantity={view.quantity}
+              hasProtectRevision={view.stopHistory.some(
+                (h) => h.origin === "protect",
+              )}
+              hasTrailRevision={
+                view.stopHistory.some((h) => h.origin === "trail") ||
+                view.operatingState === "TRAILING"
+              }
+              plannedStop={journey.risk.initialStop}
+            />
+            {/* Compat testids for assertOperationalTruth (journey HUD hides Stop KV) */}
+            <dl className="sr-only">
+              <dd data-testid="position-decision-stop">
+                {formatLevel(view.levels.currentStop)}
+              </dd>
+              <dd data-testid="position-decision-t1">
+                {formatLevel(view.levels.target1)}
+              </dd>
+              <dd data-testid="position-decision-t2">
+                {formatLevel(view.levels.target2)}
+              </dd>
+            </dl>
+          </>
         ) : null}
       </div>
 

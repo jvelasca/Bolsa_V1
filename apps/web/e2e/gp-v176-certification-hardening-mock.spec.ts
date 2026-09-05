@@ -14,6 +14,7 @@ import {
   setMercadoMockWorkspaceDocument,
 } from "./fixtures";
 import {
+  expandDailyDeskBucketIfCollapsed,
   mercadoListFocusWorkspaceDocument,
   paperAutonomousDaySlice,
   seedStaleNoExecuteBrowserState,
@@ -70,6 +71,7 @@ test.describe("GP-V176 — Certification Hardening mock", () => {
     await expect(page.getByTestId("daily-desk-inbox")).toBeVisible({
       timeout: 20_000,
     });
+    await expandDailyDeskBucketIfCollapsed(page, "no_operar");
     const deny = page.getByTestId("daily-desk-item-auto-deny-inst-msft");
     await expect(deny).toHaveAttribute("data-attention", "BLOCKED");
     await expect(deny).toHaveAttribute("data-reason-code", "ENTRY_STALE_DATA");

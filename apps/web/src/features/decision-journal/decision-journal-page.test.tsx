@@ -222,7 +222,9 @@ describe("DecisionJournalPage", () => {
     await waitFor(() =>
       expect(screen.getByTestId("decision-journal")).toBeTruthy(),
     );
-    expect(screen.getByText(/Estudios con análisis \(propose\)/i)).toBeTruthy();
+    expect(
+      screen.getByText(/Memoria de decisiones: tesis → entrada → riesgo/i),
+    ).toBeTruthy();
     expect(screen.getByTestId("tab-tesis")).toBeTruthy();
     expect(screen.getByTestId("journal-study-filters")).toBeTruthy();
     expect((screen.getByTestId("filter-list") as HTMLSelectElement).value).toBe(
@@ -332,8 +334,8 @@ describe("DecisionJournalPage", () => {
     vi.mocked(api.getDecisionStudies).mockResolvedValue({
       data: {
         accountId: "acc1",
-        studies: [makeStudy()],
-        total: 1,
+        studies: [],
+        total: 0,
         limit: 50,
         offset: 0,
       },
@@ -343,7 +345,7 @@ describe("DecisionJournalPage", () => {
     await waitFor(() =>
       expect(screen.getByTestId("evolution-panel")).toBeTruthy(),
     );
-    expect(screen.getByText(/Evolución de análisis IA/i)).toBeTruthy();
+    expect(screen.getByText(/Memoria de la tesis/i)).toBeTruthy();
     await waitFor(() =>
       expect(screen.getByTestId("evolution-empty")).toBeTruthy(),
     );

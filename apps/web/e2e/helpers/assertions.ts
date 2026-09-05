@@ -169,6 +169,22 @@ export async function assertPositionCertification(
   await expect(page.getByRole("button", { name: /^COMPRAR$/i })).toHaveCount(0);
 }
 
+/**
+ * V2.10.1 — Exception Desk colapsa `no_operar` / `posiciones` por defecto.
+ * Expande el bucket si hace falta antes de assert sobre filas deny.
+ */
+export async function expandDailyDeskBucketIfCollapsed(
+  page: Page,
+  bucketId: "no_operar" | "posiciones",
+): Promise<void> {
+  const bucket = page.getByTestId(`daily-desk-bucket-${bucketId}`);
+  await expect(bucket).toBeVisible({ timeout: 20_000 });
+  if ((await bucket.getAttribute("data-collapsed")) === "1") {
+    await page.getByTestId(`daily-desk-expand-${bucketId}`).click();
+  }
+  await expect(bucket).toHaveAttribute("data-collapsed", "0");
+}
+
 /** V1.78 — entry-only candidato (sin posición). */
 export async function assertEntryCandidateTruth(
   page: Page,

@@ -17,6 +17,7 @@ import {
   E2E_ENTRY_ONLY_INSTRUMENT,
   E2E_INSTRUMENT_ID,
   E2E_SYMBOL,
+  expandDailyDeskBucketIfCollapsed,
   mercadoEntryPositionWorkspaceDocument,
   mercadoListFocusWorkspaceDocument,
   paperAutonomousDaySlice,
@@ -73,6 +74,7 @@ test.describe("GP-V175 — stale deny mock", () => {
     await expect(page.getByTestId("daily-desk-inbox")).toBeVisible({
       timeout: 20_000,
     });
+    await expandDailyDeskBucketIfCollapsed(page, "no_operar");
     const deny = page.getByTestId("daily-desk-item-auto-deny-inst-msft");
     await expect(deny).toBeVisible();
     await expect(deny).toHaveAttribute("data-attention", "BLOCKED");
@@ -99,6 +101,7 @@ test.describe("GP-V175 — stale deny mock", () => {
     await expect(
       page.getByTestId("daily-desk-bucket-no_operar"),
     ).not.toHaveAttribute("data-count", "0");
+    await expandDailyDeskBucketIfCollapsed(page, "no_operar");
     await expect(
       page.getByText(/Datos obsoletos|ENTRY_STALE_DATA|stale/i).first(),
     ).toBeVisible();

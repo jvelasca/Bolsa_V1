@@ -43,7 +43,7 @@ describe("EntryOperatingSummary V1.38", () => {
       "Revisar y confirmar",
     );
     expect(screen.getByTestId("entry-operating-phrase").textContent).toMatch(
-      /Disparo confirmado/i,
+      /Trigger confirmado/i,
     );
   });
 

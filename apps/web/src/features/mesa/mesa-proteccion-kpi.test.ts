@@ -13,7 +13,7 @@ describe("MesaProteccionKpi", () => {
     expect(html).toContain('data-testid="mesa-proteccion-kpi"');
     expect(html).toContain('data-protected="2"');
     expect(html).toContain('data-open="5"');
-    expect(html).toContain("confirmadas");
+    expect(html).toContain("protegidas");
     expect(html).toContain("40%");
     expect(html).not.toContain("disc.");
   });
@@ -25,7 +25,7 @@ describe("MesaProteccionKpi", () => {
       }),
     );
     expect(html).toContain('data-discrepancies="2"');
-    expect(html).toContain("discrepancia");
+    expect(html).toContain("plan/sugerido");
   });
 
   it("compact chip", () => {

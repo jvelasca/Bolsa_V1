@@ -118,7 +118,7 @@ describe("ChartDecisionSurfaceHud (V1.63)", () => {
     expect(hud.getAttribute("data-instrument-id")).toBe("inst-aapl");
     expect(hud.getAttribute("data-symbol")).toBe("AAPL");
     expect(screen.getByTestId("entry-decision-headline").textContent).toBe(
-      "Entrada preparada",
+      "AAPL · Oportunidad · Esperar trigger",
     );
     expect(screen.getByTestId("operativa-cockpit-entry-action")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /comprar/i })).toBeNull();

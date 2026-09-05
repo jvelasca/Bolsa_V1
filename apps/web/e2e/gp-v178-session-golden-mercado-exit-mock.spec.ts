@@ -23,6 +23,7 @@ import {
   assertOperationalTruth,
   assertPovOperatingStage,
   E2E_ENTRY_ONLY_INSTRUMENT,
+  expandDailyDeskBucketIfCollapsed,
   mercadoEntryPositionWorkspaceDocument,
   mercadoListFocusWorkspaceDocument,
   mercadoMultiInstrumentSlicesFromMock,
@@ -124,6 +125,7 @@ test.describe("GP-V178 — Session golden MERCADO→EXIT mock", () => {
     await expect(page.getByTestId("daily-desk-inbox")).toBeVisible({
       timeout: 20_000,
     });
+    await expandDailyDeskBucketIfCollapsed(page, "no_operar");
     const deny = page.getByTestId("daily-desk-item-auto-deny-inst-msft");
     await expect(deny).toBeVisible();
     await expect(deny).toHaveAttribute("data-attention", "BLOCKED");

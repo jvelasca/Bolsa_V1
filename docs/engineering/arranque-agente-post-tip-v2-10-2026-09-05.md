@@ -27,10 +27,11 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 ## Next (fuera de tip)
 
-- Release-tag CI **stampado** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` — **no GREEN**
-- Auditoría externa (usuario) del conjunto tip `v2.10-beta`
+- Hotfix **V2.10.1** listo localmente ([relevo](./traspaso-relevo-v2-10-1-ci-green-2026-09-05.md)) — tip `v2.10-beta` sigue **NO CERTIFICABLE** hasta Release-tag CI `conclusion=success`
+- Commit + `workflow_dispatch` o tip `v2.10.1-beta` (pedido explícito)
+- Auditoría final V2.10 tras GREEN — no V2.11
 - No reabrir seed ops salvo regresión del runbook
 
 ## Prompt sugerido
 
-> Lee `docs/engineering/arranque-agente-post-tip-v2-10-2026-09-05.md`. Freeze intacto. NO MÁS PANELES. Solo auditoría o regresión display-only bajo pedido. No tip/bump. No afirmar CI GREEN sin `conclusion=success`.
+> Lee `docs/engineering/arranque-agente-post-tip-v2-10-2026-09-05.md` y `docs/engineering/traspaso-relevo-v2-10-1-ci-green-2026-09-05.md`. Freeze intacto. NO MÁS PANELES. Hotfix CI listo; no tip/bump sin pedido. No afirmar CI GREEN sin `conclusion=success`.

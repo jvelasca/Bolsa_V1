@@ -30,6 +30,7 @@ import {
   assertLifecycleFinancialInvariants,
   assertPositionCertification,
   buildLifecycleSnapshot,
+  expandDailyDeskBucketIfCollapsed,
   lifecycleInstrumentSlice,
   mercadoWorkspaceDocument,
   seedMercadoBrowserState,
@@ -132,6 +133,7 @@ test.describe("GP-V179 — Stateful position lifecycle mock", () => {
     await expect(page.getByTestId("daily-desk-inbox")).toBeVisible({
       timeout: 20_000,
     });
+    await expandDailyDeskBucketIfCollapsed(page, "no_operar");
     const deny = page.getByTestId(DENY_AAPL);
     await expect(deny).toBeVisible();
     await expect(deny).toHaveAttribute("data-attention", "BLOCKED");
