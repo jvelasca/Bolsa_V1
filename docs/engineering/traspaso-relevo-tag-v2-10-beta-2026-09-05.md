@@ -1,20 +1,20 @@
 # RELEVO — tag v2.10-beta → tip Seed Ops + Visual/Operational Certification (2026-09-05)
 
 > **Padre:** [relevo V2.10 Seed Ops](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · [relevo V2.9](./traspaso-relevo-v2-9-visual-operational-certification-2026-09-05.md) · tip previo [`v2.8-beta`](./traspaso-relevo-tag-v2-8-beta-2026-09-05.md) `a9ec6424`.  
-> **Estado:** tip `v2.10-beta` → SHA **pending stamp** · package `1.39.0-beta` (bump autorizado).  
+> **Estado:** tip `v2.10-beta` → [`6495dd5f`](https://github.com/jvelasca/Bolsa_V1/commit/6495dd5f) · package `1.39.0-beta` (bump autorizado).  
 > **Partida código tip previo:** `v2.8-beta` → `a9ec6424`.  
 > **Código feat:** [`aa356b1f`](https://github.com/jvelasca/Bolsa_V1/commit/aa356b1f) (V2.46–V2.53).
 
 ## Release
 
-| Pieza       | Valor                                                         |
-| ----------- | ------------------------------------------------------------- |
-| Tag tip     | `v2.10-beta` → SHA **pending stamp**                          |
-| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-tip            |
-| Package     | `1.39.0-beta` (**bump** desde `1.38.0-beta`)                  |
-| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10-beta  |
-| Código tip  | `aa356b1f` (feat V2.9+V2.10) + bump/docs tip                  |
-| CI          | **NO CERTIFICABLE** hasta Release-tag CI `conclusion=success` |
+| Pieza       | Valor                                                                             |
+| ----------- | --------------------------------------------------------------------------------- |
+| Tag tip     | `v2.10-beta` → [`6495dd5f`](https://github.com/jvelasca/Bolsa_V1/commit/6495dd5f) |
+| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-tip                                |
+| Package     | `1.39.0-beta` (**bump** desde `1.38.0-beta`)                                      |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10-beta                      |
+| Código tip  | `aa356b1f` (feat V2.9+V2.10) + `6495dd5f` (bump/docs tip)                         |
+| CI          | **NO CERTIFICABLE** hasta Release-tag CI `conclusion=success`                     |
 
 No se publica `v2.9-beta` aparte: V2.46–V2.51 van en este tip.
 

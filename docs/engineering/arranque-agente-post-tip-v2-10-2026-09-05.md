@@ -1,7 +1,7 @@
 # ARRANQUE — post tip v2.10-beta (2026-09-05)
 
 > **Leer primero:** [relevo tag v2.10-beta](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) · [relevo V2.10](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · [relevo V2.9](./traspaso-relevo-v2-9-visual-operational-certification-2026-09-05.md).  
-> **Tip producto vigente:** [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) SHA **pending stamp** / package `1.39.0-beta`.  
+> **Tip producto vigente:** [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) `6495dd5f` / package `1.39.0-beta`.  
 > **Para quién:** agente post-tip · **NO MÁS PANELES** · no tip/bump salvo pedido · no reabrir motor FSM.
 
 ## Estado
