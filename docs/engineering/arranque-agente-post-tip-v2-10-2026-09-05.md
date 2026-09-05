@@ -29,9 +29,9 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 - Hotfix **V2.10.1** en `main` (`7156169f`) · **CI GREEN** [run 33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success`
 - Pack auditoría final: [audit-pack-v2-10-final-certification-2026-09-05.md](./audit-pack-v2-10-final-certification-2026-09-05.md)
-- Tip opcional `v2.10.1-beta` — solo con pedido explícito
-- No V2.11 · no reabrir seed ops salvo regresión del runbook
+- Tip vigente: [`v2.10.1-beta`](./traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md) · [arranque post-tip V2.10.1](./arranque-agente-post-tip-v2-10-1-2026-09-05.md)
+- **PRODUCT FREEZE** · no V2.11 · no reabrir seed ops salvo regresión del runbook
 
 ## Prompt sugerido
 
-> Lee `docs/engineering/audit-pack-v2-10-final-certification-2026-09-05.md`. Freeze intacto. NO MÁS PANELES. V2.10 CERTIFICABLE (CI GREEN). Auditoría externa OK; no tip/bump ni V2.11 sin pedido.
+> Lee `docs/engineering/traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md`. PRODUCT FREEZE V2.10.1. NO MÁS PANELES. No tip/bump ni V2.11 sin pedido.

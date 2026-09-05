@@ -1,10 +1,10 @@
 # RELEVO — V2.10.1 CI GREEN / Certification Fix (2026-09-05)
 
 > **Padre:** [relevo tag v2.10-beta](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) · [relevo V2.10](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · auditoría externa tip `v2.10-beta`.  
-> **Estado:** **CÓDIGO + CI GREEN** · hotfix `7156169f` · tip producto vigente `v2.10-beta` · package `1.39.0-beta`.  
-> **Para quién:** certificación CI · **NO MÁS PANELES** · no reabrir motor FSM.  
+> **Estado:** **CÓDIGO + CI GREEN** · hotfix `7156169f` · tip producto vigente [`v2.10.1-beta`](./traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md) · package `1.39.1-beta`.  
+> **Para quién:** certificación CI · **NO MÁS PANELES** · **PRODUCT FREEZE** · no reabrir motor FSM.  
 > **Origen CI rojo:** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure`.  
-> **Stamp GREEN:** [run 33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success` · SHA `7156169f`.
+> **Stamp GREEN (código):** [run 33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success` · SHA `7156169f`.
 
 ## Objetivo
 
@@ -17,7 +17,7 @@ No es regresión del motor financiero ni de V2.46–V2.53 cabina (v28/v29 ya PAS
 
 ## Freeze intacto
 
-NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM · Confirm = firma · Ranking ≠ BUY · chrome DECISIÓN (ADR-042) · **NO MÁS PANELES** · package `1.39.0-beta` · **no afirmar CI GREEN sin `conclusion=success`**.
+NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM · Confirm = firma · Ranking ≠ BUY · chrome DECISIÓN (ADR-042) · **NO MÁS PANELES** · **PRODUCT FREEZE en V2.10.1** · package `1.39.1-beta` · **no afirmar CI GREEN sin `conclusion=success`**.
 
 ## Entrega
 
@@ -54,6 +54,6 @@ CI GREEN ≠ pixel-perfect. Contrast = **Operational Contrast Smoke**, no audito
 
 1. ~~Commit hotfix + Release-tag CI~~ **hecho** · stamp [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success`.
 2. ~~Auditoría final pack~~ **hecho** · [audit-pack-v2-10-final-certification-2026-09-05.md](./audit-pack-v2-10-final-certification-2026-09-05.md).
-3. Tip opcional `v2.10.1-beta` / bump `1.39.1-beta` — solo con pedido explícito.
-4. Auditoría externa sobre el pack — **no** V2.11 todavía.
-5. No reabrir motor FSM / PAPER AUTO execute / paneles.
+3. ~~Tip `v2.10.1-beta` / bump `1.39.1-beta`~~ **autorizado / en curso** · [relevo tag](./traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md).
+4. Stamp Release-tag CI del tip `v2.10.1-beta` (pendiente tras push).
+5. **PRODUCT FREEZE** · no V2.11 · no reabrir motor FSM / PAPER AUTO execute / paneles.

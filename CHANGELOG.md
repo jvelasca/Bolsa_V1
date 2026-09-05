@@ -2,6 +2,17 @@
 
 All notable releases of Bolsa V1.
 
+## [1.39.1-beta] — 2026-09-05
+
+V2.10.1 CI certification hotfix + tip de provenance. Producto **BETA / no producción**. Tip **`v2.10.1-beta`**. Hotfix código **`7156169f`** (tests/selectores; **no** motor). Package **`1.39.1-beta`**. Tip previo **`v2.10-beta` → `6495dd5f`** (inmutable; Release-tag CI [33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `failure`). Código hotfix CI [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `success`. Release-tag CI tip `v2.10.1-beta` — **pendiente stamp** tras push. Confirm = firma. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE. **NO MÁS PANELES**. **PRODUCT FREEZE** en V2.10.1.
+
+### V2.10.1 — CI GREEN / Certification Fix
+
+- **Cluster A:** expand Daily Desk `no_operar` antes de assert deny stale.
+- **Cluster B:** `sr-only` `position-decision-stop` / t1 / t2 con Journey HUD.
+- Vitest copy alineado a cabina actual.
+- Relevo [`traspaso-relevo-v2-10-1-ci-green-2026-09-05.md`](./docs/engineering/traspaso-relevo-v2-10-1-ci-green-2026-09-05.md) · relevo tag [`traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md`](./docs/engineering/traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md).
+
 ## [1.39.0-beta] — 2026-09-05
 
 V2.9 Visual and Operational Certification + V2.10 Seed Ops. Producto **BETA / no producción**. Tip **`v2.10-beta`** (sin tip `v2.9-beta` aparte). Partida **`v2.8-beta` → `a9ec6424`**. Package **`1.39.0-beta`**. Confirm = firma. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE. **NO MÁS PANELES**. Release-tag CI **NO CERTIFICABLE** — [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure`.
