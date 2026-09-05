@@ -146,6 +146,9 @@ def _collect_exception_facts(cycle: PaperDeskCycleResult) -> list[dict[str, Any]
             break
         _add("position_birth_failed", **ctx)
 
+    if any("orphan_recovery_failed" in n for n in all_notes):
+        _add("orphan_recovery_failed")
+
     if any(n == "portfolio_drift" or "portfolio_drift" in n for n in all_notes):
         _add("portfolio_recon_drift")
 

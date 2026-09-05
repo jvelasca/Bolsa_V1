@@ -4,6 +4,7 @@
  * V2.36 — timeline = OperatorPositionPlan ladder (same as Mercado L3).
  * V2.39 — AUTO arm honesty: misma puerta A3 que Cuentas (tryArmAuto + frase).
  * V2.43 — chrome ESTADO AUTO DESARMADO/ARMADO · EJECUCIÓN PAPER · Arm ≠ autorización.
+ * V2.46 — data-arm from autoActive (not the raw latch).
  * Arm ≠ execute · Confirm = firma · Ranking ≠ BUY.
  */
 
@@ -30,6 +31,7 @@ import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 import {
+  CABIN_FOCUS_RING,
   CABIN_KV_GRID,
   CABIN_TYPE,
   cabinNumClass,
@@ -165,7 +167,8 @@ export function AutoDeskPanel({
                   type="button"
                   className={cn(
                     CABIN_TOUCH_TARGET,
-                    CABIN_TYPE.meta,
+                    CABIN_FOCUS_RING,
+                    CABIN_TYPE.operativa,
                     "rounded-md border px-3 font-medium text-foreground",
                     active
                       ? "border-sky-600/50 bg-sky-500/15"
@@ -187,7 +190,7 @@ export function AutoDeskPanel({
         <div
           className="space-y-0.5 rounded-md border border-border/50 bg-muted/15 px-2 py-1.5"
           data-testid="auto-desk-arm-state"
-          data-arm={arm.armed ? "armed" : "disarmed"}
+          data-arm={posture.autoActive ? "armed" : "disarmed"}
         >
           <p className={cn(CABIN_TYPE.eyebrow, "text-foreground")}>Estado</p>
           <p

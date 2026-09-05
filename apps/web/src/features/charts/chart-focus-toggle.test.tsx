@@ -22,8 +22,8 @@ describe("ChartFocusToggle V2.34 touch", () => {
     expect(group).toBeTruthy();
     const simple = screen.getByTestId("chart-focus-mode-simple");
     const completo = screen.getByTestId("chart-focus-mode-completo");
-    expect(simple.className).toMatch(/min-h-10/);
-    expect(completo.className).toMatch(/min-h-10/);
+    expect(simple.className).toMatch(/min-h-11/);
+    expect(completo.className).toMatch(/min-h-11/);
     expect(simple.className).toMatch(/text-xs/);
     expect(simple.className).not.toMatch(/text-\[9px\]/);
     expect(simple.getAttribute("aria-pressed")).toBe("true");

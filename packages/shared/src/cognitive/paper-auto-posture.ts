@@ -2,6 +2,7 @@
  * V1.42 F8 — PAPER AUTO posture (product honesty).
  * Same spine as SEMI; AUTO omits human Confirm. Arm ≠ execute.
  * V2.43 — operator cabin labels: ARM ≠ autorización de operación.
+ * V2.46 — arm chrome from autoActive (mode=auto ∧ armed). MANUAL/SEMI never AUTO ARMADO.
  * LIVE broker / thaw estricto / PAPER_D_EXECUTE default-on: out of scope.
  *
  * @see docs/engineering/spec-v142-operating-excellence-2026-08-31.md §D F8
@@ -38,7 +39,10 @@ export type PaperAutoPostureV1 = {
   executeEligible: boolean;
   /** One-line spine for tooltips / footers. */
   spineLine: string;
-  /** V2.43 — chrome ESTADO. */
+  /**
+   * V2.43 / V2.46 — chrome ESTADO.
+   * Derived from autoActive (AUTO mode ∧ armed), not the raw latch.
+   */
   armStateLabel: PaperAutoArmStateLabelV1;
   /** V2.43 — chrome RESULTADO / venue (siempre PAPER en BETA). */
   executionVenueLabel: string;
@@ -73,13 +77,13 @@ export const PAPER_AUTO_ARM_PERMISSION_LINE =
   "Arm = permiso de motor · no autoriza una operación · Confirm = firma";
 
 function cabinArmLabels(
-  autoArmed: boolean,
+  autoActive: boolean,
 ): Pick<
   PaperAutoPostureV1,
   "armStateLabel" | "executionVenueLabel" | "armPermissionLine"
 > {
   return {
-    armStateLabel: autoArmed
+    armStateLabel: autoActive
       ? PAPER_AUTO_ARM_STATE_ARMED
       : PAPER_AUTO_ARM_STATE_DISARMED,
     executionVenueLabel: PAPER_AUTO_EXECUTION_VENUE,
@@ -101,7 +105,7 @@ export function buildPaperAutoPosture(input: {
   const autoArmed = input.autoArmed === true;
   const paperDExecuteEnv = input.paperDExecuteEnv === true;
   const autoActive = bookMode === "auto" && autoArmed;
-  const armChrome = cabinArmLabels(autoArmed);
+  const armChrome = cabinArmLabels(autoActive);
 
   if (bookMode === "manual") {
     return {

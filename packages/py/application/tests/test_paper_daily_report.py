@@ -238,3 +238,14 @@ def test_v154_exception_facts_position_birth_failed_from_entry_reason() -> None:
     )
     d = report.to_dict()
     assert any(f["kind"] == "position_birth_failed" for f in d["exceptionFacts"])
+
+
+def test_v29_exception_facts_orphan_recovery_failed_from_note() -> None:
+    report = build_paper_daily_report(
+        _cycle(
+            notes=("orphan_recovery_failed",),
+        )
+    )
+    d = report.to_dict()
+    kinds = [f["kind"] for f in d["exceptionFacts"]]
+    assert "orphan_recovery_failed" in kinds

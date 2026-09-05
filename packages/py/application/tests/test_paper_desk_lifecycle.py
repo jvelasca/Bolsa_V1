@@ -409,3 +409,35 @@ async def test_gp_crash_01_fill_without_position_recovers_once(
     )
     assert direct is not None
     assert len(store.inserts) == 1
+
+
+class _BoomRecover:
+    async def recover(self, account_id: str) -> int:
+        _ = account_id
+        raise RuntimeError("orphan store timeout")
+
+
+@pytest.mark.asyncio
+async def test_orphan_recovery_failure_is_visible_in_notes() -> None:
+    """V2.47 — recover() exception ≠ silent 0 recovered."""
+    cycle = PaperDeskCycle(
+        entry=HonestStubPaperDeskEntry(),
+        open_positions=_Store(None),
+        recover_orphans=_BoomRecover(),
+    )
+    result = await cycle.execute(
+        PaperDeskCycleInput(
+            account_id="acc-demo",
+            as_of="2026-09-01T09:05:00Z",
+            dry_run=True,
+        )
+    )
+    assert "orphan_recovery_failed" in result.notes
+    assert not any(n.startswith("orphan_opening_recovered=") for n in result.notes)
+    assert result.blocked is False
+
+    from bolsa_application.paper_daily_report import build_paper_daily_report
+
+    report = build_paper_daily_report(result)
+    kinds = [f["kind"] for f in report.to_dict().get("exceptionFacts", [])]
+    assert "orphan_recovery_failed" in kinds

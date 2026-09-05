@@ -13,6 +13,7 @@ import {
   projectDeskExceptionFacts,
   reconDriftPhraseParityCheck,
   POSITION_BIRTH_FAILED_PHRASE,
+  ORPHAN_RECOVERY_FAILED_PHRASE,
 } from "./cognitive/daily-desk-auto-projection.js";
 import {
   buildPaperDailyReport,
@@ -208,6 +209,18 @@ describe("GP-DESK-UI-04 position_birth_failed → red row", () => {
     expect(red?.items.some((i) => i.reason === "position_birth_failed")).toBe(
       true,
     );
+  });
+});
+
+describe("V2.47 orphan_recovery_failed → red row URGENT", () => {
+  it("exception fact → requiere_accion URGENT", () => {
+    const item = dailyDeskItemFromExceptionFact({
+      kind: "orphan_recovery_failed",
+    });
+    expect(item.bucket).toBe("requiere_accion");
+    expect(item.attention).toBe("URGENT");
+    expect(item.phrase).toBe(ORPHAN_RECOVERY_FAILED_PHRASE);
+    expect(item.ctaLabel).toMatch(/Revisar/i);
   });
 });
 

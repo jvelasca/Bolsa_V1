@@ -3,6 +3,7 @@
  * Tres tamaños: héroe · operativa · meta. Números financieros tabulares.
  * V2.37 — numbers-first: valores operativa/hero · labels meta.
  * V2.40 — CABIN_TOUCH_TARGET en autonomía AUTO + CTAs L1 DECISIÓN + Confirm primary.
+ * V2.48 — hit area 44px (min-h-11) · meta no se usa en controles operativos.
  * Display-only · sin paneles nuevos · sin controles AUTO de trading.
  *
  * @see docs/engineering/traspaso-relevo-v2-7-operator-hardening-2026-09-05.md
@@ -32,9 +33,9 @@ export const CABIN_TYPE = {
     "cabin-type-operativa font-semibold tabular-nums tracking-tight text-foreground",
 } as const;
 
-/** Hit area mínima para controles primarios de cabina / gráfico (~40px). */
+/** Hit area mínima para controles primarios de cabina / gráfico (~44px). */
 export const CABIN_TOUCH_TARGET =
-  "min-h-10 min-w-10 inline-flex items-center justify-center";
+  "min-h-11 min-w-11 inline-flex items-center justify-center";
 
 export type CabinTypeSize = "hero" | "operativa" | "meta";
 export type CabinNumTone = "pos" | "neg" | "neu";

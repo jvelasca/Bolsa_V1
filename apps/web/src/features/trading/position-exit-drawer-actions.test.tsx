@@ -141,7 +141,7 @@ describe("PositionExitDrawerActions V1.36 / F7", () => {
     expect(screen.getByTestId("position-exit-protect-TEST")).toBeTruthy();
   });
 
-  it("V2.40 — Proteger L1 uses CABIN_TOUCH_TARGET (min-h-10)", () => {
+  it("V2.40 / V2.48 — Proteger L1 uses CABIN_TOUCH_TARGET (min-h-11)", () => {
     render(
       <PositionExitDrawerActions
         position={position(undefined, {
@@ -156,7 +156,7 @@ describe("PositionExitDrawerActions V1.36 / F7", () => {
       />,
     );
     expect(screen.getByTestId("position-exit-protect-TEST").className).toMatch(
-      /min-h-10/,
+      /min-h-11/,
     );
   });
 

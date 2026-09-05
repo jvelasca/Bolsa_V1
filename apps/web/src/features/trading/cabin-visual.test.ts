@@ -38,8 +38,9 @@ describe("cabin-visual V2.37", () => {
     expect(cabinNumClass()).toMatch(/tabular-nums/);
   });
 
-  it("V2.40 — CABIN_TOUCH_TARGET is ≥40px (min-h-10 / min-w-10)", () => {
-    expect(CABIN_TOUCH_TARGET).toMatch(/min-h-10/);
-    expect(CABIN_TOUCH_TARGET).toMatch(/min-w-10/);
+  it("V2.48 — CABIN_TOUCH_TARGET is ≥44px (min-h-11 / min-w-11)", () => {
+    expect(CABIN_TOUCH_TARGET).toMatch(/min-h-11/);
+    expect(CABIN_TOUCH_TARGET).toMatch(/min-w-11/);
+    expect(CABIN_TOUCH_TARGET).not.toMatch(/min-h-10(?!\d)/);
   });
 });

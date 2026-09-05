@@ -150,16 +150,22 @@ describe("AutoDeskPanel V2.39 arm honesty", () => {
     );
   });
 
-  it("V2.40 — autonomy mode buttons use CABIN_TOUCH_TARGET (min-h-10)", () => {
+  it("V2.40 — autonomy mode buttons use CABIN_TOUCH_TARGET (min-h-11)", () => {
     renderOpen();
     for (const mode of ["manual", "semi", "auto"] as const) {
       expect(screen.getByTestId(`auto-desk-mode-${mode}`).className).toMatch(
-        /min-h-10/,
+        /min-h-11/,
+      );
+      expect(screen.getByTestId(`auto-desk-mode-${mode}`).className).toMatch(
+        /cabin-type-operativa/,
+      );
+      expect(screen.getByTestId(`auto-desk-mode-${mode}`).className).toMatch(
+        /focus-visible:ring/,
       );
     }
   });
 
-  it("V2.42 — A3 confirm/cancel/phrase use CABIN_TOUCH_TARGET (min-h-10)", () => {
+  it("V2.42 — A3 confirm/cancel/phrase use CABIN_TOUCH_TARGET (min-h-11)", () => {
     renderOpen();
     fireEvent.click(screen.getByTestId("auto-desk-mode-auto"));
     for (const id of [
@@ -167,10 +173,16 @@ describe("AutoDeskPanel V2.39 arm honesty", () => {
       "demo-book-auto-arm-cancel",
       "demo-book-auto-arm-phrase",
     ] as const) {
-      expect(screen.getByTestId(id).className).toMatch(/min-h-10/);
+      expect(screen.getByTestId(id).className).toMatch(/min-h-11/);
       expect(screen.getByTestId(id).className).toMatch(/focus-visible:ring/);
       expect(screen.getByTestId(id).className).not.toMatch(/text-\[10px\]/);
     }
+    expect(screen.getByTestId("demo-book-auto-arm-confirm").className).toMatch(
+      /cabin-type-operativa/,
+    );
+    expect(screen.getByTestId("demo-book-auto-arm-cancel").className).toMatch(
+      /cabin-type-operativa/,
+    );
   });
 
   it("V2.43 — arm-state chrome shows DESARMADO then ARMADO · never operación autorizada", () => {
@@ -205,6 +217,26 @@ describe("AutoDeskPanel V2.39 arm honesty", () => {
       target: { value: AUTO_ARM_CONFIRM_PHRASE },
     });
     fireEvent.click(screen.getByTestId("demo-book-auto-arm-confirm"));
+    expect(
+      screen.getByTestId("auto-desk-arm-state").getAttribute("data-arm"),
+    ).toBe("armed");
+    expect(screen.getByTestId("auto-desk-arm-state-label").textContent).toBe(
+      "AUTO ARMADO",
+    );
+  });
+
+  it("V2.46 — stale arm latch in SEMI chrome stays DESARMADO until AUTO active", () => {
+    expect(tryArmAuto(AUTO_ARM_CONFIRM_PHRASE).ok).toBe(true);
+    renderOpen();
+    expect(loadDemoBookPrefs().mode).not.toBe("auto");
+    expect(
+      screen.getByTestId("auto-desk-arm-state").getAttribute("data-arm"),
+    ).toBe("disarmed");
+    expect(screen.getByTestId("auto-desk-arm-state-label").textContent).toBe(
+      "AUTO DESARMADO",
+    );
+    fireEvent.click(screen.getByTestId("auto-desk-mode-auto"));
+    expect(loadDemoBookPrefs().mode).toBe("auto");
     expect(
       screen.getByTestId("auto-desk-arm-state").getAttribute("data-arm"),
     ).toBe("armed");

@@ -29,6 +29,12 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
   },
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.03,
+      animations: "disabled",
+    },
+  },
   webServer: e2eRun
     ? {
         command: "pnpm dev",

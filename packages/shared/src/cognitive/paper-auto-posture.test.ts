@@ -92,7 +92,113 @@ describe("buildPaperAutoPosture", () => {
     expect(p.requiresHumanConfirm).toBe(true);
     expect(p.executeEligible).toBe(false);
     expect(p.statusBadge).toBeNull();
-    expect(p.armStateLabel).toBe(PAPER_AUTO_ARM_STATE_ARMED);
+    expect(p.autoArmed).toBe(true);
+    expect(p.autoActive).toBe(false);
+    expect(p.armStateLabel).toBe(PAPER_AUTO_ARM_STATE_DISARMED);
+  });
+
+  it("V2.46 — MANUAL with stale arm latch never shows AUTO ARMADO", () => {
+    const p = buildPaperAutoPosture({
+      bookMode: "manual",
+      autoArmed: true,
+      paperDExecuteEnv: true,
+    });
+    expect(p.autoArmed).toBe(true);
+    expect(p.autoActive).toBe(false);
+    expect(p.modeLabel).toBe("MANUAL");
+    expect(p.armStateLabel).toBe(PAPER_AUTO_ARM_STATE_DISARMED);
+    expect(p.executeEligible).toBe(false);
+  });
+
+  it("V2.46 — AUTO state matrix: chrome ARMADO only when autoActive", () => {
+    const rows: Array<{
+      name: string;
+      bookMode: "manual" | "semi" | "auto";
+      autoArmed: boolean;
+      paperDExecuteEnv: boolean;
+      modeLabel: string;
+      autoActive: boolean;
+      armState:
+        | typeof PAPER_AUTO_ARM_STATE_ARMED
+        | typeof PAPER_AUTO_ARM_STATE_DISARMED;
+      executeEligible: boolean;
+      statusBadge: string | null;
+    }> = [
+      {
+        name: "MANUAL",
+        bookMode: "manual",
+        autoArmed: false,
+        paperDExecuteEnv: false,
+        modeLabel: "MANUAL",
+        autoActive: false,
+        armState: PAPER_AUTO_ARM_STATE_DISARMED,
+        executeEligible: false,
+        statusBadge: null,
+      },
+      {
+        name: "SEMI",
+        bookMode: "semi",
+        autoArmed: false,
+        paperDExecuteEnv: false,
+        modeLabel: "SEMI",
+        autoActive: false,
+        armState: PAPER_AUTO_ARM_STATE_DISARMED,
+        executeEligible: false,
+        statusBadge: null,
+      },
+      {
+        name: "AUTO DESARMADO",
+        bookMode: "auto",
+        autoArmed: false,
+        paperDExecuteEnv: false,
+        modeLabel: "SEMI",
+        autoActive: false,
+        armState: PAPER_AUTO_ARM_STATE_DISARMED,
+        executeEligible: false,
+        statusBadge: null,
+      },
+      {
+        name: "AUTO ARMADO · PAPER EXEC OFF",
+        bookMode: "auto",
+        autoArmed: true,
+        paperDExecuteEnv: false,
+        modeLabel: "AUTO",
+        autoActive: true,
+        armState: PAPER_AUTO_ARM_STATE_ARMED,
+        executeEligible: false,
+        statusBadge: PAPER_AUTO_ARMED_EXEC_OFF,
+      },
+      {
+        name: "AUTO ARMADO · PAPER EXEC ON",
+        bookMode: "auto",
+        autoArmed: true,
+        paperDExecuteEnv: true,
+        modeLabel: "AUTO",
+        autoActive: true,
+        armState: PAPER_AUTO_ARM_STATE_ARMED,
+        executeEligible: true,
+        statusBadge: PAPER_AUTO_ARMED_EXEC_ON,
+      },
+    ];
+    for (const row of rows) {
+      const p = buildPaperAutoPosture({
+        bookMode: row.bookMode,
+        autoArmed: row.autoArmed,
+        paperDExecuteEnv: row.paperDExecuteEnv,
+      });
+      expect(p.modeLabel, row.name).toBe(row.modeLabel);
+      expect(p.autoActive, row.name).toBe(row.autoActive);
+      expect(p.armStateLabel, row.name).toBe(row.armState);
+      expect(p.executeEligible, row.name).toBe(row.executeEligible);
+      expect(p.statusBadge, row.name).toBe(row.statusBadge);
+      if (p.modeLabel === "MANUAL" || p.modeLabel === "SEMI") {
+        expect(p.armStateLabel, row.name).toBe(PAPER_AUTO_ARM_STATE_DISARMED);
+      }
+      if (p.armStateLabel === PAPER_AUTO_ARM_STATE_ARMED) {
+        expect(p.autoActive, row.name).toBe(true);
+        expect(p.bookMode, row.name).toBe("auto");
+      }
+    }
   });
 
   it("V2.43 — arm chrome never claims operación autorizada", () => {

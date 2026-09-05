@@ -77,6 +77,11 @@ export const POSITION_BIRTH_FAILED_PHRASE =
 
 export const POSITION_BIRTH_FAILED_CTA = "Reconciliar";
 
+export const ORPHAN_RECOVERY_FAILED_PHRASE =
+  "La recuperación de posiciones huérfanas falló — no asumir que el libro está sano.";
+
+export const ORPHAN_RECOVERY_FAILED_CTA = "Revisar";
+
 const RECON_DRIFT_PHRASE =
   "No operes: discrepancia de cartera. Reconcilia antes de cualquier acción.";
 
@@ -270,6 +275,8 @@ export function exceptionPhrase(kind: DailyDeskExceptionKindV1): string {
   switch (kind) {
     case "position_birth_failed":
       return POSITION_BIRTH_FAILED_PHRASE;
+    case "orphan_recovery_failed":
+      return ORPHAN_RECOVERY_FAILED_PHRASE;
     case "portfolio_recon_drift":
       return RECON_DRIFT_PHRASE;
     case "portfolio_recon_unavailable":
@@ -283,6 +290,8 @@ export function exceptionCta(kind: DailyDeskExceptionKindV1): string {
   switch (kind) {
     case "position_birth_failed":
       return POSITION_BIRTH_FAILED_CTA;
+    case "orphan_recovery_failed":
+      return ORPHAN_RECOVERY_FAILED_CTA;
     case "portfolio_recon_drift":
     case "portfolio_recon_unavailable":
       return "Reconciliar";
@@ -301,7 +310,11 @@ export function dailyDeskItemFromExceptionFact(
     kind: "incident",
     bucket: "requiere_accion",
     symbol,
-    attention: fact.kind === "position_birth_failed" ? "URGENT" : "BLOCKED",
+    attention:
+      fact.kind === "position_birth_failed" ||
+      fact.kind === "orphan_recovery_failed"
+        ? "URGENT"
+        : "BLOCKED",
     phrase,
     reason: fact.kind,
     ctaLabel: exceptionCta(fact.kind),

@@ -28,7 +28,11 @@ import {
   positionShowsProtectHint,
   type PositionExitIntent,
 } from "@/features/operations/propose-position-exit";
-import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
+import {
+  CABIN_TOUCH_TARGET,
+  CABIN_TYPE,
+} from "@/features/trading/cabin-visual";
+import { CABIN_FOCUS_RING } from "@/features/trading/operator-cabin-ui";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 
 export function PositionExitDrawerActions({
@@ -89,15 +93,19 @@ export function PositionExitDrawerActions({
     }
   }
 
-  // V2.40 — CTAs L1 DECISIÓN ≥ ~40px hit (CABIN_TOUCH_TARGET).
+  // V2.40 / V2.48 — CTAs L1 DECISIÓN ≥ ~44px hit (CABIN_TOUCH_TARGET).
   const btnClass = compact
     ? cn(
         CABIN_TOUCH_TARGET,
-        "rounded border px-2 text-[10px] font-medium hover:bg-accent",
+        CABIN_FOCUS_RING,
+        CABIN_TYPE.operativa,
+        "rounded border px-2 font-medium hover:bg-accent",
       )
     : cn(
         CABIN_TOUCH_TARGET,
-        "rounded-md border px-3 text-xs font-medium hover:bg-accent",
+        CABIN_FOCUS_RING,
+        CABIN_TYPE.operativa,
+        "rounded-md border px-3 font-medium hover:bg-accent",
       );
 
   const primaryBtnClass = compact
@@ -160,7 +168,8 @@ export function PositionExitDrawerActions({
           <span
             className={cn(
               CABIN_TOUCH_TARGET,
-              "rounded-md border border-border px-3 text-xs text-muted-foreground",
+              CABIN_TYPE.operativa,
+              "rounded-md border border-border px-3 text-muted-foreground",
               effectivePrimary === "maintain" ? primaryBtnClass : null,
             )}
           >

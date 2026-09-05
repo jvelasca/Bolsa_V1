@@ -549,6 +549,7 @@ class PaperDeskCycle:
                 recovered = int(await self._recover_orphans.recover(account_id) or 0)
             except Exception:  # noqa: BLE001 — fail-closed: no inventar Position
                 recovered = 0
+                notes.append("orphan_recovery_failed")
             if recovered:
                 notes.append(f"orphan_opening_recovered={recovered}")
 

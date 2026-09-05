@@ -149,7 +149,7 @@ export function DemoBookAutoArmForm({
           className={cn(
             CABIN_TOUCH_TARGET,
             CABIN_FOCUS_RING,
-            CABIN_TYPE.meta,
+            CABIN_TYPE.operativa,
             "rounded-md border border-emerald-500/60 bg-emerald-500/15 px-3 font-medium text-emerald-800 dark:text-emerald-300",
           )}
         >
@@ -166,7 +166,7 @@ export function DemoBookAutoArmForm({
           className={cn(
             CABIN_TOUCH_TARGET,
             CABIN_FOCUS_RING,
-            CABIN_TYPE.meta,
+            CABIN_TYPE.operativa,
             "rounded-md border border-border px-3 text-muted-foreground hover:text-foreground",
           )}
         >

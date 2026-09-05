@@ -53,6 +53,7 @@ export type PaperDeskCandidateSnapshotV1 = {
 /** V1.54 — excepciones operativas para cubo 🔴 (sin auto-heal). */
 export type DailyDeskExceptionKindV1 =
   | "position_birth_failed"
+  | "orphan_recovery_failed"
   | "portfolio_recon_drift"
   | "portfolio_recon_unavailable";
 
