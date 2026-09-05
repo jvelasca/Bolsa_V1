@@ -7,14 +7,14 @@
 
 ## Release
 
-| Pieza       | Valor                                                                             |
-| ----------- | --------------------------------------------------------------------------------- |
-| Tag tip     | `v2.10-beta` → [`6495dd5f`](https://github.com/jvelasca/Bolsa_V1/commit/6495dd5f) |
-| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-tip                                |
-| Package     | `1.39.0-beta` (**bump** desde `1.38.0-beta`)                                      |
-| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10-beta                      |
-| Código tip  | `aa356b1f` (feat V2.9+V2.10) + `6495dd5f` (bump/docs tip)                         |
-| CI          | **NO CERTIFICABLE** hasta Release-tag CI `conclusion=success`                     |
+| Pieza       | Valor                                                                                                                       |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Tag tip     | `v2.10-beta` → [`6495dd5f`](https://github.com/jvelasca/Bolsa_V1/commit/6495dd5f)                                           |
+| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-tip                                                                          |
+| Package     | `1.39.0-beta` (**bump** desde `1.38.0-beta`)                                                                                |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10-beta                                                                |
+| Código tip  | `aa356b1f` (feat V2.9+V2.10) + `6495dd5f` (bump/docs tip)                                                                   |
+| CI          | **NO CERTIFICABLE** · [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` |
 
 No se publica `v2.9-beta` aparte: V2.46–V2.51 van en este tip.
 
@@ -37,6 +37,6 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 ## Next
 
-- Release-tag CI sobre `v2.10-beta` — stamp GREEN solo con `conclusion=success`
+- Release-tag CI **stampado:** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` (frontend Test web 7 fails · playwright-mock · certify). **No GREEN.**
 - Auditoría externa del conjunto tip `v2.10-beta` (V2.8 + V2.9 + V2.10)
 - No reabrir motor FSM / PAPER AUTO execute / paneles

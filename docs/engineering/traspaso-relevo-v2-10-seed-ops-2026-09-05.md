@@ -32,15 +32,15 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 | -------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Birth vía Confirm + stop estructural (fixture OHLCV flat @ 10) | Que propose live `action=wait` abra sin seed BD                             |
 | Journal MFE/MAE como foto de sesión en Tesis                   | Final R / life-peak PositionState · status siempre `closed`                 |
-| Smoke local con wrapper Node + DATABASE_URL                    | CI GREEN / tip `v2.10-beta` (CI NO CERTIFICABLE hasta `conclusion=success`) |
+| Smoke local con wrapper Node + DATABASE_URL                    | CI GREEN / tip `v2.10-beta` (CI NO CERTIFICABLE · run `conclusion=failure`) |
 
 ## Smoke stamp (2026-09-05 local)
 
-| Check                                                                                                   | Resultado                                                                                                 |
-| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `node scripts/ops_seed_cabin_smoke.mjs birth-structural --apply --account-id c0f692cf67f941ae8529f145c` | **PASS** · Confirm executed · `operatingState=PROTECTED` · `currentStop=9.7`                              |
-| `node scripts/ops_seed_cabin_smoke.mjs journal-mfe-mae --apply --account-id 516fc66a90ae40a0bdb83eecd`  | **PASS** · study con mfeR/maeR                                                                            |
-| Tip / bump / Release-tag CI                                                                             | tip `v2.10-beta` + bump `1.39.0-beta` **autorizados** · CI **NO CERTIFICABLE** hasta `conclusion=success` |
+| Check                                                                                                   | Resultado                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node scripts/ops_seed_cabin_smoke.mjs birth-structural --apply --account-id c0f692cf67f941ae8529f145c` | **PASS** · Confirm executed · `operatingState=PROTECTED` · `currentStop=9.7`                                                                                           |
+| `node scripts/ops_seed_cabin_smoke.mjs journal-mfe-mae --apply --account-id 516fc66a90ae40a0bdb83eecd`  | **PASS** · study con mfeR/maeR                                                                                                                                         |
+| Tip / bump / Release-tag CI                                                                             | tip `v2.10-beta` + bump `1.39.0-beta` · CI [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` · **NO CERTIFICABLE** |
 
 Nota: cuenta `debug-opening` puede `risk_veto` por estado de recon/cesta; usar cuenta limpia (`ops-v210-seed`) para birth.
 
@@ -56,5 +56,5 @@ node scripts/ops_seed_cabin_smoke.mjs journal-mfe-mae --apply --account-id <id>
 
 - Tip [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) + bump `1.39.0-beta` — **autorizado**.
 - Auditoría externa del conjunto tip `v2.10-beta` (V2.8 + V2.9 + V2.10).
-- Release-tag CI — GREEN solo con `conclusion=success`.
+- Release-tag CI **stampado** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` — **no GREEN**.
 - No reabrir motor FSM / PAPER AUTO execute / paneles.

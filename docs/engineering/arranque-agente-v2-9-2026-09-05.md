@@ -6,12 +6,12 @@
 
 ## Estado
 
-| Corte                             | Estado                                                 |
-| --------------------------------- | ------------------------------------------------------ |
-| V2.8 Operator Cabin Certification | **cerrado** · tip `v2.8-beta`                          |
-| V2.46–V2.51                       | **hecho** (código)                                     |
-| Tip `v2.9-beta`                   | **no** (incluido en `v2.10-beta`)                      |
-| CI GREEN V2.10                    | **NO CERTIFICABLE** hasta run con `conclusion=success` |
+| Corte                             | Estado                                                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| V2.8 Operator Cabin Certification | **cerrado** · tip `v2.8-beta`                                                                                               |
+| V2.46–V2.51                       | **hecho** (código)                                                                                                          |
+| Tip `v2.9-beta`                   | **no** (incluido en `v2.10-beta`)                                                                                           |
+| CI GREEN V2.10                    | **NO CERTIFICABLE** · [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` |
 
 ## Qué no reabrir
 
@@ -28,4 +28,4 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 - Seed ops: stop estructural / Journal MFE·MAE → **cerrado en V2.10** ([relevo](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md))
 - Tip [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) · [arranque post-tip](./arranque-agente-post-tip-v2-10-2026-09-05.md)
-- Dispatch Release-tag CI → stamp URL + conclusion (o NO CERTIFICABLE)
+- Release-tag CI **stampado** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` — **no GREEN**

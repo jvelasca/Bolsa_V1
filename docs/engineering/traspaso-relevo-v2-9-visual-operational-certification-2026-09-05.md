@@ -47,11 +47,11 @@ No se tocó el algoritmo de `RecoverOrphanOpeningFills.recover()`. El ciclo no s
 
 ## V2.51 — CI
 
-| Pieza       | Valor                                                                                                        |
-| ----------- | ------------------------------------------------------------------------------------------------------------ |
-| Tip vigente | `v2.10-beta` (incluye V2.46–V2.51) · package `1.39.0-beta`                                                   |
-| V2.9 código | este relevo · **sin** tip `v2.9-beta` aparte                                                                 |
-| Stamp       | **CI GREEN: NO CERTIFICABLE** hasta run de Release-tag CI con `conclusion=success` sobre el SHA `v2.10-beta` |
+| Pieza       | Valor                                                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Tip vigente | `v2.10-beta` (incluye V2.46–V2.51) · package `1.39.0-beta`                                                                            |
+| V2.9 código | este relevo · **sin** tip `v2.9-beta` aparte                                                                                          |
+| Stamp       | **CI GREEN: NO CERTIFICABLE** — [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` |
 
 Tras tip/dispatch: stamp **solo** con URL de run + `conclusion`. Si `statuses: []` / `workflow runs: []` → seguir **NO CERTIFICABLE**.
 
@@ -71,6 +71,6 @@ E2E_RUN=1 pnpm e2e -- gp-e2e-v29
 
 - Tip [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) + bump `1.39.0-beta` — **autorizado** (incluye este corte; sin `v2.9-beta` aparte).
 - **Next corte:** [V2.10 Seed Ops](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · [arranque](./arranque-agente-v2-10-2026-09-05.md) · [runbook](./runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md) — birth estructural + Journal MFE·MAE (**incluido en el mismo tip**).
-- Release-tag CI sobre `v2.10-beta` — GREEN solo con `conclusion=success`.
+- Release-tag CI **stampado** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` — **no GREEN**.
 - Operator Cabin feature-complete salvo necesidad funcional real.
 - No reabrir motor FSM / PAPER AUTO execute.

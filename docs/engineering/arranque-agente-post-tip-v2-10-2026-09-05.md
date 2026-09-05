@@ -6,13 +6,13 @@
 
 ## Estado
 
-| Corte                             | Estado                                                 |
-| --------------------------------- | ------------------------------------------------------ |
-| V2.8 Operator Cabin Certification | **cerrado** · tip `v2.8-beta`                          |
-| V2.9 Visual/Operational           | **incluido** en `v2.10-beta` (sin tip `v2.9-beta`)     |
-| V2.10 Seed Ops                    | **cerrado** · tip `v2.10-beta`                         |
-| Package `1.39.0-beta`             | **bump** tip                                           |
-| CI GREEN V2.10                    | **NO CERTIFICABLE** hasta run con `conclusion=success` |
+| Corte                             | Estado                                                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| V2.8 Operator Cabin Certification | **cerrado** · tip `v2.8-beta`                                                                                               |
+| V2.9 Visual/Operational           | **incluido** en `v2.10-beta` (sin tip `v2.9-beta`)                                                                          |
+| V2.10 Seed Ops                    | **cerrado** · tip `v2.10-beta`                                                                                              |
+| Package `1.39.0-beta`             | **bump** tip                                                                                                                |
+| CI GREEN V2.10                    | **NO CERTIFICABLE** · [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` |
 
 ## Qué no reabrir
 
@@ -27,7 +27,7 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 ## Next (fuera de tip)
 
-- Confirmar Release-tag CI del tag `v2.10-beta` → stamp GREEN solo si success
+- Release-tag CI **stampado** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` — **no GREEN**
 - Auditoría externa (usuario) del conjunto tip `v2.10-beta`
 - No reabrir seed ops salvo regresión del runbook
 
