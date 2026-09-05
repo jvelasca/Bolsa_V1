@@ -1,19 +1,19 @@
 # RELEVO — tag v2.8-beta → tip Operator Cabin Certification (2026-09-05)
 
 > **Padre:** [relevo V2.8 Operator Cabin Certification](./traspaso-relevo-v2-8-operator-certification-2026-09-05.md) · tip previo [`v2.7-beta`](./traspaso-relevo-tag-v2-7-beta-2026-09-05.md) `8e7a5f95`.  
-> **Estado:** tip `v2.8-beta` · package `1.38.0-beta` (bump autorizado para auditoría externa).  
+> **Estado:** tip `v2.8-beta` → [`a9ec6424`](https://github.com/jvelasca/Bolsa_V1/commit/a9ec6424) · package `1.38.0-beta` (bump autorizado para auditoría externa).  
 > **Partida código tip previo:** `v2.7-beta` → `8e7a5f95`.  
 > **Código feat:** [`65d5844f`](https://github.com/jvelasca/Bolsa_V1/commit/65d5844f) (V2.42–V2.45).
 
 ## Release
 
-| Pieza       | Valor                                                       |
-| ----------- | ----------------------------------------------------------- |
-| Tag tip     | `v2.8-beta` → bump commit (stamp tras tag)                  |
-| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-V2.44        |
-| Package     | `1.38.0-beta` (**bump** desde `1.37.0-beta`)                |
-| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.8-beta |
-| Código tip  | `65d5844f` (feat) + bump/docs tip                           |
+| Pieza       | Valor                                                                            |
+| ----------- | -------------------------------------------------------------------------------- |
+| Tag tip     | `v2.8-beta` → [`a9ec6424`](https://github.com/jvelasca/Bolsa_V1/commit/a9ec6424) |
+| Stamp docs  | este relevo + `CURRENT_SYSTEM` + arranque post-tip                               |
+| Package     | `1.38.0-beta` (**bump** desde `1.37.0-beta`)                                     |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.8-beta                      |
+| Código tip  | `65d5844f` (feat) + `a9ec6424` (bump/docs tip)                                   |
 
 ## Hecho (código tip)
 
