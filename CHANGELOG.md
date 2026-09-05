@@ -4,7 +4,7 @@ All notable releases of Bolsa V1.
 
 ## [1.39.1-beta] — 2026-09-05
 
-V2.10.1 CI certification hotfix + tip de provenance. Producto **BETA / no producción**. Tip **`v2.10.1-beta`**. Hotfix código **`7156169f`** (tests/selectores; **no** motor). Package **`1.39.1-beta`**. Tip previo **`v2.10-beta` → `6495dd5f`** (inmutable; Release-tag CI [33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `failure`). Código hotfix CI [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `success`. Release-tag CI tip `v2.10.1-beta` — **pendiente stamp** tras push. Confirm = firma. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE. **NO MÁS PANELES**. **PRODUCT FREEZE** en V2.10.1.
+V2.10.1 CI certification hotfix + tip de provenance. Producto **BETA / no producción**. Tip **`v2.10.1-beta` → `a060af37`**. Hotfix código **`7156169f`** (tests/selectores; **no** motor). Package **`1.39.1-beta`**. Tip previo **`v2.10-beta` → `6495dd5f`** (inmutable; Release-tag CI [33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `failure`). Código hotfix CI [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `success`. Release-tag CI tip **CERTIFICABLE** — [run 33983574346](https://github.com/jvelasca/Bolsa_V1/actions/runs/33983574346) `conclusion=success`. Confirm = firma. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE. **NO MÁS PANELES**. **PRODUCT FREEZE** en V2.10.1.
 
 ### V2.10.1 — CI GREEN / Certification Fix
 

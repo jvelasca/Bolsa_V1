@@ -1,6 +1,6 @@
 # Audit pack — V2.10 final certification (BETA cabina)
 
-> **AsOf:** 2026-09-05 · **Conjunto:** tip vigente [`v2.10.1-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10.1-beta) · package `1.39.1-beta` · hotfix `7156169f` · tip histórico [`v2.10-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10-beta) → `6495dd5f` (inmutable).  
+> **AsOf:** 2026-09-05 · **Conjunto:** tip vigente [`v2.10.1-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10.1-beta) → [`a060af37`](https://github.com/jvelasca/Bolsa_V1/commit/a060af37) · package `1.39.1-beta` · hotfix `7156169f` · tip histórico [`v2.10-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10-beta) → `6495dd5f` (inmutable).  
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [relevo tag v2.10.1](./traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md) · [relevo tag v2.10](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) · [V2.10.1 CI](./traspaso-relevo-v2-10-1-ci-green-2026-09-05.md) · [V2.9](./traspaso-relevo-v2-9-visual-operational-certification-2026-09-05.md) · [V2.10 Seed Ops](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · tip previo [`v2.8-beta`](./traspaso-relevo-tag-v2-8-beta-2026-09-05.md).  
 > **Para:** auditoría externa de certificación final · **PRODUCT FREEZE** · **no** V2.11.
 
@@ -8,20 +8,20 @@
 
 ## 0. Veredicto interno
 
-**V2.10 = CERTIFICABLE (BETA / no producción).** Tip de provenance vigente: **`v2.10.1-beta`**.
+**V2.10 = CERTIFICABLE (BETA / no producción).** Tip de provenance vigente: **`v2.10.1-beta` → `a060af37`**.
 
 El tip funcional histórico `v2.10-beta` integra V2.46–V2.53 sobre V2.8. El Release-tag CI del tip SHA falló ([33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `failure`). El hotfix V2.10.1 cerró únicamente tests/selectores desfasados (no motor). Release-tag CI post-hotfix (código):
 
-| Pieza           | Valor                                                                        |
-| --------------- | ---------------------------------------------------------------------------- |
-| Run             | [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) |
-| `conclusion`    | **`success`**                                                                |
-| SHA certificado | `7156169f`                                                                   |
-| Package tip     | `1.39.1-beta` (bump tip `v2.10.1-beta`)                                      |
+| Pieza         | Valor                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| Run código    | [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373)                      |
+| `conclusion`  | **`success`**                                                                                     |
+| SHA hotfix    | `7156169f`                                                                                        |
+| Tip publicado | `v2.10.1-beta` → `a060af37`                                                                       |
+| Package tip   | `1.39.1-beta`                                                                                     |
+| Run tip       | [33983574346](https://github.com/jvelasca/Bolsa_V1/actions/runs/33983574346) `conclusion=success` |
 
-Jobs GREEN (código hotfix): security · shared · decision-spine · frontend · python · playwright-mock · lifecycle-pg · certify.
-
-Release-tag CI del tip `v2.10.1-beta`: **pendiente stamp** tras publicación (no reutilizar 33981998373 como stamp del tag).
+Jobs GREEN (tip): security · shared · decision-spine · frontend · python · playwright-mock · lifecycle-pg · certify.
 
 `PAPER_D_EXECUTE` **OFF** · LIVE **bloqueado** · Confirm = firma · Arm ≠ Execute · Ranking ≠ BUY · **NO MÁS PANELES** · **PRODUCT FREEZE** · FSM / outbox / Alembic `019` **congelados**.
 
@@ -91,10 +91,10 @@ FSM · `TRANSITIONS` · outbox · financial ledger · Alembic `019` · Decision 
 
 ## 6. Lectura para el auditor externo
 
-1. Tip vigente: [`v2.10.1-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10.1-beta) · package `1.39.1-beta` · [relevo tag](./traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md).
+1. Tip vigente: [`v2.10.1-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10.1-beta) → `a060af37` · package `1.39.1-beta` · [relevo tag](./traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md).
 2. Tip histórico: [`v2.10-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.10-beta) → `6495dd5f` (inmutable; CI failure).
 3. Hotfix certificación: `7156169f` · [relevo V2.10.1](./traspaso-relevo-v2-10-1-ci-green-2026-09-05.md) · CI código [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `success`.
-4. Stamp CI tip `v2.10.1-beta`: pendiente tras push (no confundir con 33981998373).
+4. Stamp CI tip: [run 33983574346](https://github.com/jvelasca/Bolsa_V1/actions/runs/33983574346) `conclusion=success`.
 5. Freeze + matriz honestidad en este pack §3–§5 · **PRODUCT FREEZE**.
 
 **Mensaje clave:** la cabina V2.10 es la mejor versión BETA hasta ahora; el P1 CI está cerrado y la provenance del tip está alineada en `v2.10.1-beta`. **PRODUCT FREEZE** — **no** V2.11 ni producción.

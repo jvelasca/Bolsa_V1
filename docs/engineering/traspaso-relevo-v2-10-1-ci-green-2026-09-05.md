@@ -54,6 +54,6 @@ CI GREEN ≠ pixel-perfect. Contrast = **Operational Contrast Smoke**, no audito
 
 1. ~~Commit hotfix + Release-tag CI~~ **hecho** · stamp [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success`.
 2. ~~Auditoría final pack~~ **hecho** · [audit-pack-v2-10-final-certification-2026-09-05.md](./audit-pack-v2-10-final-certification-2026-09-05.md).
-3. ~~Tip `v2.10.1-beta` / bump `1.39.1-beta`~~ **autorizado / en curso** · [relevo tag](./traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md).
-4. Stamp Release-tag CI del tip `v2.10.1-beta` (pendiente tras push).
+3. ~~Tip `v2.10.1-beta` / bump `1.39.1-beta`~~ **hecho** · tip `a060af37` · [relevo tag](./traspaso-relevo-tag-v2-10-1-beta-2026-09-05.md).
+4. ~~Stamp Release-tag CI del tip~~ **hecho** · [run 33983574346](https://github.com/jvelasca/Bolsa_V1/actions/runs/33983574346) `conclusion=success`.
 5. **PRODUCT FREEZE** · no V2.11 · no reabrir motor FSM / PAPER AUTO execute / paneles.
