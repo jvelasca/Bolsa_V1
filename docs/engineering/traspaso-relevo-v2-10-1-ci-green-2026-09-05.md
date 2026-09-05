@@ -1,9 +1,10 @@
 # RELEVO — V2.10.1 CI GREEN / Certification Fix (2026-09-05)
 
 > **Padre:** [relevo tag v2.10-beta](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) · [relevo V2.10](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · auditoría externa tip `v2.10-beta`.  
-> **Estado:** **CÓDIGO HOTFIX LISTO** · tip producto vigente sigue `v2.10-beta` · package `1.39.0-beta` (sin bump hasta tip/dispatch).  
+> **Estado:** **CÓDIGO + CI GREEN** · hotfix `7156169f` · tip producto vigente `v2.10-beta` · package `1.39.0-beta`.  
 > **Para quién:** certificación CI · **NO MÁS PANELES** · no reabrir motor FSM.  
-> **Origen CI rojo:** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure`.
+> **Origen CI rojo:** [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure`.  
+> **Stamp GREEN:** [run 33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success` · SHA `7156169f`.
 
 ## Objetivo
 
@@ -27,20 +28,22 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 | **Frontend**  | Vitest alineados a copy cabina actual                                                            | web **1253/1253** PASS            |
 | **Docs**      | este relevo · P2 diferidos · honestidad CI                                                       | —                                 |
 
-## Smoke stamp (local 2026-09-05)
+## Smoke stamp (local 2026-09-05 + Release-tag CI)
 
-| Check                                                                           | Resultado                                                                                                                   |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm --filter @bolsa/web test`                                                 | **PASS** · 1253 tests                                                                                                       |
-| `E2E_RUN=1 pnpm e2e -- gp-v175 gp-v176 gp-v177 gp-v178 gp-v179 gp-v181 gp-v183` | **PASS** · 24/24                                                                                                            |
-| Release-tag CI tip `v2.10-beta`                                                 | [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` · **NO CERTIFICABLE** |
-| Release-tag CI post-hotfix                                                      | **pendiente** commit + `workflow_dispatch` o tip `v2.10.1-beta`                                                             |
+| Check                                                                           | Resultado                                                                                                                |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm --filter @bolsa/web test`                                                 | **PASS** · 1253 tests                                                                                                    |
+| `E2E_RUN=1 pnpm e2e -- gp-v175 gp-v176 gp-v177 gp-v178 gp-v179 gp-v181 gp-v183` | **PASS** · 24/24                                                                                                         |
+| Release-tag CI tip `v2.10-beta` (pre-fix)                                       | [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure`                    |
+| Release-tag CI hotfix `7156169f`                                                | [run 33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success` · **CERTIFICABLE** |
+
+Jobs GREEN: security · shared · spine · frontend · python · playwright-mock · lifecycle-pg · certify.
 
 ## Matriz UI Certification (honestidad · P2-01)
 
 | Certificación               | Local Win          | CI Linux                   |
 | --------------------------- | ------------------ | -------------------------- |
-| Functional E2E              | sí                 | sí (tras GREEN)            |
+| Functional E2E              | sí                 | sí                         |
 | Keyboard / Touch / Overflow | sí                 | sí                         |
 | Contrast WCAG-ish 4.5:1     | sí                 | sí                         |
 | Pixel snapshots             | sí (`*-win32.png`) | **no** (`test.skip` en CI) |
@@ -49,8 +52,7 @@ CI GREEN ≠ pixel-perfect. Contrast = **Operational Contrast Smoke**, no audito
 
 ## OUT / Next
 
-1. Commit hotfix (pedido explícito) · opcional tip `v2.10.1-beta` / bump `1.39.1-beta`.
-2. Release-tag CI → exigir `conclusion=success` en security · shared · spine · frontend · python · playwright-mock · lifecycle-pg · certify.
-3. Stamp CI **solo** con URL + `conclusion=success` → entonces V2.10 = **CERTIFICABLE**.
-4. Auditoría final V2.10 — **no** V2.11 todavía.
-5. No reabrir motor FSM / PAPER AUTO execute / paneles.
+1. ~~Commit hotfix + Release-tag CI~~ **hecho** · stamp [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success`.
+2. Tip opcional `v2.10.1-beta` / bump `1.39.1-beta` — solo con pedido explícito (hotfix ya en `main`).
+3. Auditoría final V2.10 — **no** V2.11 todavía.
+4. No reabrir motor FSM / PAPER AUTO execute / paneles.

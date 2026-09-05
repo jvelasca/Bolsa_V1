@@ -6,13 +6,13 @@
 
 ## Estado
 
-| Corte                             | Estado                                                                                                                      |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| V2.8 Operator Cabin Certification | **cerrado** · tip `v2.8-beta`                                                                                               |
-| V2.9 Visual/Operational           | **incluido** en `v2.10-beta` (sin tip `v2.9-beta`)                                                                          |
-| V2.10 Seed Ops                    | **cerrado** · tip `v2.10-beta`                                                                                              |
-| Package `1.39.0-beta`             | **bump** tip                                                                                                                |
-| CI GREEN V2.10                    | **NO CERTIFICABLE** · [run 33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `conclusion=failure` |
+| Corte                             | Estado                                                                                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| V2.8 Operator Cabin Certification | **cerrado** · tip `v2.8-beta`                                                                                                                |
+| V2.9 Visual/Operational           | **incluido** en `v2.10-beta` (sin tip `v2.9-beta`)                                                                                           |
+| V2.10 Seed Ops                    | **cerrado** · tip `v2.10-beta`                                                                                                               |
+| Package `1.39.0-beta`             | **bump** tip                                                                                                                                 |
+| CI GREEN V2.10                    | **CERTIFICABLE** · hotfix `7156169f` · [run 33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success` |
 
 ## Qué no reabrir
 
@@ -27,11 +27,11 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 ## Next (fuera de tip)
 
-- Hotfix **V2.10.1** listo localmente ([relevo](./traspaso-relevo-v2-10-1-ci-green-2026-09-05.md)) — tip `v2.10-beta` sigue **NO CERTIFICABLE** hasta Release-tag CI `conclusion=success`
-- Commit + `workflow_dispatch` o tip `v2.10.1-beta` (pedido explícito)
-- Auditoría final V2.10 tras GREEN — no V2.11
+- Hotfix **V2.10.1** en `main` (`7156169f`) · **CI GREEN** [run 33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success` ([relevo](./traspaso-relevo-v2-10-1-ci-green-2026-09-05.md))
+- Tip opcional `v2.10.1-beta` — solo con pedido explícito
+- Auditoría final V2.10 — no V2.11
 - No reabrir seed ops salvo regresión del runbook
 
 ## Prompt sugerido
 
-> Lee `docs/engineering/arranque-agente-post-tip-v2-10-2026-09-05.md` y `docs/engineering/traspaso-relevo-v2-10-1-ci-green-2026-09-05.md`. Freeze intacto. NO MÁS PANELES. Hotfix CI listo; no tip/bump sin pedido. No afirmar CI GREEN sin `conclusion=success`.
+> Lee `docs/engineering/arranque-agente-post-tip-v2-10-2026-09-05.md` y `docs/engineering/traspaso-relevo-v2-10-1-ci-green-2026-09-05.md`. Freeze intacto. NO MÁS PANELES. V2.10.1 CI GREEN stampado. No tip/bump sin pedido. Auditoría final V2.10 OK; no V2.11.
