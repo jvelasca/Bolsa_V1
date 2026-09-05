@@ -74,12 +74,12 @@ CI GREEN ≠ pixel-perfect · Contrast ≠ auditoría WCAG completa · `text-[9p
 
 ## 4. P2 diferidos (no bloquean BETA)
 
-| ID        | Tema                      | Política                                                     |
-| --------- | ------------------------- | ------------------------------------------------------------ |
-| **P2-01** | Snapshots multiplataforma | Mantener skip CI hasta entorno render determinista           |
-| **P2-02** | `assertReadableContrast`  | Nombrar smoke; no promover a WCAG Certification              |
-| **P2-03** | Densidad 9px en hints     | Vigilar que no migre a verdad operacional                    |
-| **P2-04** | Provenance tip            | **Cerrado** · tip `v2.10.1-beta` (no retaguear `v2.10-beta`) |
+| ID        | Tema                      | Política                                                                                                |
+| --------- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **P2-01** | Snapshots multiplataforma | Mantener skip CI hasta entorno render determinista · [triage](./triage-p2-v2-10-deferred-2026-09-05.md) |
+| **P2-02** | `assertReadableContrast`  | Nombrar smoke; no promover a WCAG Certification · [triage](./triage-p2-v2-10-deferred-2026-09-05.md)    |
+| **P2-03** | Densidad 9px en hints     | Vigilar que no migre a verdad operacional · [triage](./triage-p2-v2-10-deferred-2026-09-05.md)          |
+| **P2-04** | Provenance tip            | **Cerrado** · tip `v2.10.1-beta` (no retaguear `v2.10-beta`)                                            |
 
 ---
 
@@ -96,5 +96,6 @@ FSM · `TRANSITIONS` · outbox · financial ledger · Alembic `019` · Decision 
 3. Hotfix certificación: `7156169f` · [relevo V2.10.1](./traspaso-relevo-v2-10-1-ci-green-2026-09-05.md) · CI código [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `success`.
 4. Stamp CI tip: [run 33983574346](https://github.com/jvelasca/Bolsa_V1/actions/runs/33983574346) `conclusion=success`.
 5. Freeze + matriz honestidad en este pack §3–§5 · **PRODUCT FREEZE**.
+6. Post-freeze (docs): [operational readiness](./audit-pack-v2-10-1-operational-readiness-2026-09-05.md) · [paper prep](./traspaso-relevo-paper-prep-post-v2101-2026-09-05.md) · [triage P2](./triage-p2-v2-10-deferred-2026-09-05.md).
 
 **Mensaje clave:** la cabina V2.10 es la mejor versión BETA hasta ahora; el P1 CI está cerrado y la provenance del tip está alineada en `v2.10.1-beta`. **PRODUCT FREEZE** — **no** V2.11 ni producción.

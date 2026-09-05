@@ -29,8 +29,9 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 ## Next (fuera de tip)
 
 - ~~Stamp CI tip `v2.10.1-beta`~~ **hecho** · [33983574346](https://github.com/jvelasca/Bolsa_V1/actions/runs/33983574346) `success`
-- P2 diferidos: pixel Linux · WCAG completa · meta 9 px (no bloquean BETA)
-- Auditoría de uso real / carga / resiliencia / observabilidad — **no** V2.11 todavía
+- [Auditoría operacional](./audit-pack-v2-10-1-operational-readiness-2026-09-05.md) · [arranque](./arranque-agente-post-freeze-operational-2026-09-05.md)
+- [Preparación PAPER](./traspaso-relevo-paper-prep-post-v2101-2026-09-05.md) (LIVE bloqueado · `PAPER_D_EXECUTE` off)
+- [Triage P2](./triage-p2-v2-10-deferred-2026-09-05.md) (pixel · contraste smoke · meta 9px)
 
 ## Prompt sugerido
 
