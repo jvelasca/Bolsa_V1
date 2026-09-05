@@ -21,13 +21,19 @@ Alinear la **preparación** PAPER/DEMO con honestidad de señales, dejando el ex
 
 ## Inventario (no reinventar)
 
-| Pieza                      | Path                                                                                                   |
-| -------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Runbook ciclo DEMO execute | [runbook-demo-paper-d-execute-2026-09-04.md](./runbook-demo-paper-d-execute-2026-09-04.md)             |
-| Seed birth / Journal       | [runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md](./runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md) |
-| OE-1 / measure             | [ops-autoeval-checklist-2026-08-26.md](./ops-autoeval-checklist-2026-08-26.md)                         |
-| Deuda thaw estricto        | [deuda-thaw-estricto-runbook-2026-08-25.md](./deuda-thaw-estricto-runbook-2026-08-25.md)               |
-| ADR camino D               | [023-camino-d-thaw.md](../adr/023-camino-d-thaw.md) Accepted **BETA-D**                                |
+| Pieza                        | Path                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Runbook prep (flags OFF)** | [runbook-paper-prep-post-v2101](./runbook-paper-prep-post-v2101-2026-09-05.md)                         |
+| Runbook ciclo DEMO execute   | [runbook-demo-paper-d-execute-2026-09-04.md](./runbook-demo-paper-d-execute-2026-09-04.md)             |
+| Seed birth / Journal         | [runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md](./runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md) |
+| OE-1 / measure               | [ops-autoeval-checklist-2026-08-26.md](./ops-autoeval-checklist-2026-08-26.md)                         |
+| Deuda thaw estricto          | [deuda-thaw-estricto-runbook-2026-08-25.md](./deuda-thaw-estricto-runbook-2026-08-25.md)               |
+| ADR camino D                 | [023-camino-d-thaw.md](../adr/023-camino-d-thaw.md) Accepted **BETA-D**                                |
+| Premises DEMO vs PAPER       | [account-premises-demo-vs-paper](./account-premises-demo-vs-paper-2026-07-31.md)                       |
+
+## Léxico
+
+DEMO (`simulated`) ≠ PAPER venue ≠ `PAPER_D_EXECUTE` opt-in ≠ LIVE. Prep PAPER **no** desbloquea LIVE.
 
 ## Checklist preparación (sin dejar flag on)
 
@@ -50,11 +56,12 @@ Alinear la **preparación** PAPER/DEMO con honestidad de señales, dejando el ex
 
 ## Huecos (docs)
 
-| ID        | Hueco                                                     | Política                                                |
-| --------- | --------------------------------------------------------- | ------------------------------------------------------- |
-| **PP-01** | Smoke tip V2.0 DEMO quedó PARTIAL sin `executionPolicyId` | Documentar; no fingir ciclo execute completo sin policy |
-| **PP-02** | Thaw estricto sigue deuda                                 | No Accept; ADR-023 BETA-D intacto                       |
-| **PP-03** | Un solo runbook execute · no playbook multi-día PAPER     | Suficiente para prep; ampliar solo con pedido           |
+| ID        | Hueco                                                     | Política                                                                                           |
+| --------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **PP-01** | Smoke tip V2.0 DEMO quedó PARTIAL sin `executionPolicyId` | Documentar; no fingir ciclo execute completo sin policy                                            |
+| **PP-02** | Thaw estricto sigue deuda                                 | No Accept; ADR-023 BETA-D intacto                                                                  |
+| **PP-03** | Un solo runbook execute · no playbook multi-día PAPER     | Prep = [runbook flags OFF](./runbook-paper-prep-post-v2101-2026-09-05.md); execute = opt-in aparte |
+| **PP-04** | Conflar «preparación PAPER/Live» en un solo thaw          | Split duro: PAPER prep OK · LIVE sigue bloqueado                                                   |
 
 ## Freeze
 

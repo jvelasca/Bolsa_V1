@@ -33,7 +33,7 @@ Seguir checklist §2 del [audit pack](./audit-pack-v2-10-1-operational-readiness
 ## Next en la cadena freeze
 
 1. Completar checklist operacional (humano).
-2. [Preparación PAPER](./traspaso-relevo-paper-prep-post-v2101-2026-09-05.md) — sin encender execute por defecto.
+2. [Preparación PAPER](./traspaso-relevo-paper-prep-post-v2101-2026-09-05.md) · [runbook prep OFF](./runbook-paper-prep-post-v2101-2026-09-05.md) — sin encender execute por defecto.
 3. [Triage P2](./triage-p2-v2-10-deferred-2026-09-05.md) — documentar, no implementar.
 
 ## Prompt sugerido
