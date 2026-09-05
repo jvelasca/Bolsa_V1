@@ -870,8 +870,8 @@ function PositionCompactBody({
                       }),
                     },
                     {
-                      t1Done: view.t1.status === "executed",
-                      t2Done: view.t2.status === "executed",
+                      t1Done: view.t1?.status === "executed",
+                      t2Done: view.t2?.status === "executed",
                       trailActive: view.operatingState === "TRAILING",
                     },
                   );

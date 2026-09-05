@@ -1117,7 +1117,7 @@ export function OhlcvChart({
         <ChartFocusToggle className="absolute bottom-2 left-2 z-30" />
       ) : null}
       {showOperationalPlanLevels && chartReady && hasChartData(bars) ? (
-        <ChartPlanContextStrip />
+        <ChartPlanContextStrip instrumentId={instrumentId ?? null} />
       ) : null}
       {showOperationalPlanLevels &&
       decisionSurfacePlacement === "chart" &&

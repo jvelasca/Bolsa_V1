@@ -150,6 +150,7 @@ jobs:
         run: pnpm --filter @bolsa/web exec playwright install --with-deps chromium
 
       # V1.86 tip honesty: gp-e2e + certification mocks V1.73–V1.86 (no PG · no LIVE)
+      # V2.45: filtro `gp-e2e` ya incluye gp-e2e-v25/v26/v28 (cabin cert) — sin glob extra.
       - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v186)
         working-directory: apps/web
         env:

@@ -9,7 +9,11 @@
  *   E2E_RUN=1 pnpm e2e -- gp-e2e-v25
  */
 import { test, expect } from "@playwright/test";
-import { e2eEnabled, E2E_SKIP_REASON, installApiMocks } from "./fixtures";
+import {
+  e2eEnabled,
+  E2E_SKIP_REASON,
+  installMercadoApiMocks,
+} from "./fixtures";
 
 const VIEWPORTS = [
   { name: "desktop", width: 1920, height: 1080 },
@@ -20,7 +24,7 @@ const VIEWPORTS = [
 test.describe("GP-E2E-V25 — UI Truth / responsive / touch", () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!e2eEnabled(), E2E_SKIP_REASON);
-    await installApiMocks(page);
+    await installMercadoApiMocks(page);
   });
 
   for (const vp of VIEWPORTS) {
@@ -80,6 +84,33 @@ test.describe("GP-E2E-V25 — UI Truth / responsive / touch", () => {
     const box = await autoMode.boundingBox();
     expect(box).toBeTruthy();
     expect(box!.height).toBeGreaterThanOrEqual(36);
+  });
+
+  test("V2.42 — A3 confirm has ≥36px hit area when form open", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/trading");
+    await expect(page.getByTestId("operativa-cockpit")).toBeVisible({
+      timeout: 15_000,
+    });
+    const desk = page.getByTestId("auto-desk-panel");
+    const deskCount = await desk.count();
+    test.skip(deskCount === 0, "AUTO desk not mounted in this mock");
+    const summary = desk.getByTestId("auto-desk-summary");
+    const open = await desk.evaluate((el) => (el as HTMLDetailsElement).open);
+    if (!open) await summary.click();
+    await desk.getByTestId("auto-desk-mode-auto").click();
+    const form = desk.getByTestId("demo-book-auto-arm-form");
+    await expect(form).toBeVisible();
+    const confirm = form.getByTestId("demo-book-auto-arm-confirm");
+    const box = await confirm.boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.height).toBeGreaterThanOrEqual(36);
+    const cancel = form.getByTestId("demo-book-auto-arm-cancel");
+    const cancelBox = await cancel.boundingBox();
+    expect(cancelBox).toBeTruthy();
+    expect(cancelBox!.height).toBeGreaterThanOrEqual(36);
   });
 
   test("V2.41 — Chart Focus visible at 1024 when plan levels on", async ({

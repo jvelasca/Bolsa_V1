@@ -8,15 +8,20 @@
  *   E2E_RUN=1 pnpm e2e -- gp-e2e-v26
  */
 import { test, expect } from "@playwright/test";
-import { e2eEnabled, E2E_SKIP_REASON, installApiMocks } from "./fixtures";
+import {
+  e2eEnabled,
+  E2E_SKIP_REASON,
+  installHoyPaperDayApiMocks,
+  installMercadoApiMocks,
+} from "./fixtures";
 
 test.describe("GP-E2E-V26 — UI Truth Hoy mock", () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!e2eEnabled(), E2E_SKIP_REASON);
-    await installApiMocks(page);
   });
 
   test("Mercado cockpit + AUTO desk chrome · no COMPRAR", async ({ page }) => {
+    await installMercadoApiMocks(page);
     await page.setViewportSize({ width: 1366, height: 768 });
     await page.goto("/trading");
     const cockpit = page.getByTestId("operativa-cockpit");
@@ -38,6 +43,7 @@ test.describe("GP-E2E-V26 — UI Truth Hoy mock", () => {
   test("V2.41 — Hoy Posiciones empty is honest when Atención has opens", async ({
     page,
   }) => {
+    await installHoyPaperDayApiMocks(page);
     await page.setViewportSize({ width: 1366, height: 768 });
     await page.goto("/hoy");
     const empty = page.getByTestId("daily-desk-empty-posiciones");

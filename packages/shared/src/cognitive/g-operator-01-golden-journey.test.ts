@@ -215,10 +215,12 @@ describe("G-OPERATOR-01 Golden Operator Journey", () => {
       journey: j,
     });
     expect(next.title).toBe("MANTENER");
+    // V2.33 — birth currentStop alone is Planificado; protect revision = Protegido.
     const decision = buildOperatorDecision({
       kind: "position",
       primaryAction: "MANTENER",
       journey: j,
+      hasProtectRevision: true,
     });
     expect(decision.protection.kind).toBe("technical");
     expect(decision.currentAction.reasons?.length).toBeGreaterThan(0);

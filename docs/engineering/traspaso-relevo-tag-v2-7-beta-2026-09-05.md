@@ -28,7 +28,9 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 ## Next
 
+- [V2.8 Operator Cabin Certification](./traspaso-relevo-v2-8-operator-certification-2026-09-05.md) · [arranque post-V2.44](./arranque-agente-post-v2-44-2026-09-05.md)
 - Auditoría walk browser (1024 / 1366 / 1920) sobre este tip
 - No reabrir V2.39–V2.41 salvo regresión display-only
 - Seed ops: posición con stop estructural · Journal MFE/MAE (paralelo ops)
 - No reabrir motor FSM PAPER AUTO (`v2.0-beta`)
+- **CI:** no afirmar GREEN sin status checks — ver runs en relevo V2.8 §V2.45

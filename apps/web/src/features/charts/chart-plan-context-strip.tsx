@@ -12,8 +12,14 @@ function formatLevel(n: number | null | undefined): string | null {
   return n.toFixed(2);
 }
 
-export function ChartPlanContextStrip({ className }: { className?: string }) {
-  const context = useInstrumentOperationalContext();
+export function ChartPlanContextStrip({
+  instrumentId,
+  className,
+}: {
+  instrumentId: string | null;
+  className?: string;
+}) {
+  const context = useInstrumentOperationalContext(instrumentId);
   const plan = context.plan;
   if (!plan || !context.showsPlanLevels) return null;
 

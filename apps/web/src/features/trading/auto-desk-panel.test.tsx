@@ -1,6 +1,7 @@
 /**
  * V2.36 — AUTO timeline uses OperatorPositionPlan ladder (not flat checklist).
  * V2.39 — AUTO arm honesty: one click does not arm; phrase via tryArmAuto.
+ * V2.42 — A3 cabin touch · V2.43 — ARM chrome DESARMADO/ARMADO.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -156,5 +157,59 @@ describe("AutoDeskPanel V2.39 arm honesty", () => {
         /min-h-10/,
       );
     }
+  });
+
+  it("V2.42 — A3 confirm/cancel/phrase use CABIN_TOUCH_TARGET (min-h-10)", () => {
+    renderOpen();
+    fireEvent.click(screen.getByTestId("auto-desk-mode-auto"));
+    for (const id of [
+      "demo-book-auto-arm-confirm",
+      "demo-book-auto-arm-cancel",
+      "demo-book-auto-arm-phrase",
+    ] as const) {
+      expect(screen.getByTestId(id).className).toMatch(/min-h-10/);
+      expect(screen.getByTestId(id).className).toMatch(/focus-visible:ring/);
+      expect(screen.getByTestId(id).className).not.toMatch(/text-\[10px\]/);
+    }
+  });
+
+  it("V2.43 — arm-state chrome shows DESARMADO then ARMADO · never operación autorizada", () => {
+    renderOpen();
+    const state = screen.getByTestId("auto-desk-arm-state");
+    expect(state.getAttribute("data-arm")).toBe("disarmed");
+    expect(screen.getByTestId("auto-desk-arm-state-label").textContent).toBe(
+      "AUTO DESARMADO",
+    );
+    expect(screen.getByTestId("auto-desk-execution-venue").textContent).toBe(
+      "EJECUCIÓN: PAPER",
+    );
+    expect(screen.getByTestId("auto-desk-arm-permission").textContent).toMatch(
+      /permiso de motor/i,
+    );
+    expect(
+      screen.getByTestId("auto-desk-arm-permission").textContent,
+    ).not.toMatch(/operaci[oó]n autorizad/i);
+
+    fireEvent.click(screen.getByTestId("auto-desk-mode-auto"));
+    expect(screen.getByTestId("demo-book-auto-arm-estado").textContent).toBe(
+      "AUTO DESARMADO",
+    );
+    expect(screen.getByTestId("demo-book-auto-arm-accion").textContent).toMatch(
+      /Solicitar armado/,
+    );
+    expect(
+      screen.getByTestId("demo-book-auto-arm-permission").textContent,
+    ).not.toMatch(/operaci[oó]n autorizad/i);
+
+    fireEvent.change(screen.getByTestId("demo-book-auto-arm-phrase"), {
+      target: { value: AUTO_ARM_CONFIRM_PHRASE },
+    });
+    fireEvent.click(screen.getByTestId("demo-book-auto-arm-confirm"));
+    expect(
+      screen.getByTestId("auto-desk-arm-state").getAttribute("data-arm"),
+    ).toBe("armed");
+    expect(screen.getByTestId("auto-desk-arm-state-label").textContent).toBe(
+      "AUTO ARMADO",
+    );
   });
 });

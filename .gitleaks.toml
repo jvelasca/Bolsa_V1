@@ -1,0 +1,20 @@
+# V2.45 — gitleaks allowlist for known false positives (localStorage / prefs keys).
+# generic-api-key flags strings like `bolsa-*-v1` and `*_KEY = "…"`.
+# These are UI storage keys / test fixtures — not credentials.
+# @see docs/engineering/traspaso-relevo-v2-8-operator-certification-2026-09-05.md §V2.45
+
+title = "Bolsa V1"
+
+[allowlist]
+description = "Client storage keys and test fixture identifiers (not secrets)"
+regexes = [
+  '''bolsa-[a-z0-9-]+-v\d+''',
+  '''(?i)(SESSION_KEY|NOTIFICATION_PREFS_KEY|DIA_D_FAVORITES_KEY|hybridGatePresetKey|gate_preset_key)\s*[:=]\s*['"][^'"]+['"]''',
+]
+paths = [
+  '''apps/web/src/features/config/notification-prefs\.ts''',
+  '''apps/web/src/features/backtests/dia-d-favorites\.ts''',
+  '''apps/web/src/features/backtests/backtest-oos-evidence\.ts''',
+  '''apps/web/src/features/screeners/scan-runner-form\.tsx''',
+  '''packages/py/analytics/tests/.*''',
+]

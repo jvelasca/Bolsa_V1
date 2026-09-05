@@ -3,6 +3,7 @@
  * V2.13 — shows what AUTO will do for this instrument (ExitPolicy + journey).
  * V2.36 — timeline = OperatorPositionPlan ladder (same as Mercado L3).
  * V2.39 — AUTO arm honesty: misma puerta A3 que Cuentas (tryArmAuto + frase).
+ * V2.43 — chrome ESTADO AUTO DESARMADO/ARMADO · EJECUCIÓN PAPER · Arm ≠ autorización.
  * Arm ≠ execute · Confirm = firma · Ranking ≠ BUY.
  */
 
@@ -182,6 +183,35 @@ export function AutoDeskPanel({
             })}
           </div>
         </fieldset>
+
+        <div
+          className="space-y-0.5 rounded-md border border-border/50 bg-muted/15 px-2 py-1.5"
+          data-testid="auto-desk-arm-state"
+          data-arm={arm.armed ? "armed" : "disarmed"}
+        >
+          <p className={cn(CABIN_TYPE.eyebrow, "text-foreground")}>Estado</p>
+          <p
+            className={cn(
+              CABIN_TYPE.operativa,
+              "font-semibold text-foreground",
+            )}
+            data-testid="auto-desk-arm-state-label"
+          >
+            {posture.armStateLabel}
+          </p>
+          <p
+            className={cn(CABIN_TYPE.meta, "text-foreground")}
+            data-testid="auto-desk-execution-venue"
+          >
+            {posture.executionVenueLabel}
+          </p>
+          <p
+            className={cn(CABIN_TYPE.meta, "leading-snug")}
+            data-testid="auto-desk-arm-permission"
+          >
+            {posture.armPermissionLine}
+          </p>
+        </div>
 
         {armOpen ? (
           <DemoBookAutoArmForm

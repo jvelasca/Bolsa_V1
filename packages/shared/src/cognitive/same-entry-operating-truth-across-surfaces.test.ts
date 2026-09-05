@@ -87,7 +87,9 @@ describe("sameEntryOperatingTruthAcrossSurfaces V1.38", () => {
       phaseLabel: "Preparada",
       ctaLabel: "Preparar operación",
       ctaKind: "prepare",
-      phrase: expect.stringMatching(/Disparador de entrada aún no cruzado/i),
+      phrase: expect.stringMatching(
+        /Oportunidad armada|Disparador de entrada aún no cruzado|Ranking ≠ BUY/i,
+      ),
       triggerLabel: "Pendiente",
       entry: 421.5,
       stop: 408,

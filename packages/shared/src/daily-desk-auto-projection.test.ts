@@ -118,6 +118,10 @@ describe("GP-DESK-UI-01 TRIGGERED candidate → green row", () => {
         requiresHumanConfirm: false,
         executeEligible: false,
         spineLine: "",
+        armStateLabel: "AUTO ARMADO",
+        executionVenueLabel: "EJECUCIÓN: PAPER",
+        armPermissionLine:
+          "Arm = permiso de motor · no autoriza una operación · Confirm = firma",
       },
     });
     expect(item?.bucket).toBe("oportunidades");
@@ -236,7 +240,8 @@ describe("GP-DESK-UI-08 autoDesk absent → no crash", () => {
   it("buildOperatingDeskInbox without autoDesk equals base + exceptions only", () => {
     const inbox = buildOperatingDeskInbox({ positions: [] });
     expect(inbox.count).toBe(0);
-    expect(inbox.buckets).toHaveLength(5);
+    // V2.05 / F6 — four chrome buckets (proteger folded into Atención).
+    expect(inbox.buckets).toHaveLength(4);
   });
 
   it("legacy PaperDailyReport without candidates field is safe", () => {
