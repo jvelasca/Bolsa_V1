@@ -53,6 +53,7 @@ CI GREEN ≠ pixel-perfect. Contrast = **Operational Contrast Smoke**, no audito
 ## OUT / Next
 
 1. ~~Commit hotfix + Release-tag CI~~ **hecho** · stamp [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success`.
-2. Tip opcional `v2.10.1-beta` / bump `1.39.1-beta` — solo con pedido explícito (hotfix ya en `main`).
-3. Auditoría final V2.10 — **no** V2.11 todavía.
-4. No reabrir motor FSM / PAPER AUTO execute / paneles.
+2. ~~Auditoría final pack~~ **hecho** · [audit-pack-v2-10-final-certification-2026-09-05.md](./audit-pack-v2-10-final-certification-2026-09-05.md).
+3. Tip opcional `v2.10.1-beta` / bump `1.39.1-beta` — solo con pedido explícito.
+4. Auditoría externa sobre el pack — **no** V2.11 todavía.
+5. No reabrir motor FSM / PAPER AUTO execute / paneles.

@@ -38,5 +38,5 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 ## Next
 
 - Hotfix V2.10.1 `7156169f` · Release-tag CI **GREEN:** [run 33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `conclusion=success` ([relevo](./traspaso-relevo-v2-10-1-ci-green-2026-09-05.md)).
-- Auditoría final del conjunto tip `v2.10-beta` + hotfix (V2.8 + V2.9 + V2.10).
+- Pack auditoría final: [audit-pack-v2-10-final-certification-2026-09-05.md](./audit-pack-v2-10-final-certification-2026-09-05.md).
 - No reabrir motor FSM / PAPER AUTO execute / paneles
