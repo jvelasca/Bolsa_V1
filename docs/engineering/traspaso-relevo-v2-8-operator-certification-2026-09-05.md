@@ -1,9 +1,9 @@
 # RELEVO — V2.8 Operator Cabin Certification (2026-09-05)
 
 > **Padre:** [relevo V2.7 Operator Hardening](./traspaso-relevo-v2-7-operator-hardening-2026-09-05.md) · tip [`v2.7-beta`](./traspaso-relevo-tag-v2-7-beta-2026-09-05.md) `8e7a5f95`.  
-> **Estado:** **CERRADO en código** · IDs V2.42–V2.45 · package `1.37.0-beta` hasta tip · tip `v2.8-beta` solo con petición.  
+> **Estado:** **CERRADO** · tip [`v2.8-beta`](./traspaso-relevo-tag-v2-8-beta-2026-09-05.md) · package `1.38.0-beta`.  
 > **Para quién:** certificación cabina (A3 · ARM semántico · touch · a11y · CI) · **NO MÁS PANELES** · no reabrir motor FSM.  
-> **Arranque:** [arranque V2.8 / V2.42](./arranque-agente-v2-8-2026-09-05.md) · **post-código:** [arranque post-V2.44](./arranque-agente-post-v2-44-2026-09-05.md).  
+> **Arranque:** [arranque V2.8 / V2.42](./arranque-agente-v2-8-2026-09-05.md) · **post-código:** [arranque post-V2.44](./arranque-agente-post-v2-44-2026-09-05.md) · **post-tip:** [arranque post-tip v2.8](./arranque-agente-post-tip-v2-8-2026-09-05.md).  
 > **Veredicto auditor V2.7:** PASS conceptual · 9,8/10 · 0 P0 · 0 P1 · 5 P2 de certificación (no features).
 
 ## Objetivo
@@ -20,7 +20,7 @@ Nombre distingue de [V2.2 Operator Certification](./traspaso-relevo-v2-2-operato
 
 ## Freeze intacto
 
-NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM · Confirm = firma · Ranking ≠ BUY · chrome DECISIÓN (ADR-042) · 5 puertas L1 (ADR-040) · ExitPolicy **30/30** · HOY strip congelado · **AUTO sin controles de trading nuevos** · `OperatorDecision` = proyección shared · **NO MÁS PANELES** · birth stop = Planificado + MANTENER · Chart Focus / RESTANTE / Protection honesty **intactos** · package `1.37.0-beta` hasta tip · **no afirmar CI GREEN sin status checks del SHA**.
+NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM · Confirm = firma · Ranking ≠ BUY · chrome DECISIÓN (ADR-042) · 5 puertas L1 (ADR-040) · ExitPolicy **30/30** · HOY strip congelado · **AUTO sin controles de trading nuevos** · `OperatorDecision` = proyección shared · **NO MÁS PANELES** · birth stop = Planificado + MANTENER · Chart Focus / RESTANTE / Protection honesty **intactos** · package `1.38.0-beta` · **no afirmar CI GREEN sin status checks del SHA**.
 
 **Arm ≠ Execute · Arm ≠ autorización de operación · Confirm = firma · Ranking ≠ BUY.**
 
@@ -66,8 +66,8 @@ shared posture + cabin **PASS** · web A3/AUTO **18/18 PASS**.
 
 ## OUT / Next
 
-- Tip `v2.8-beta` + bump `1.38.0-beta` **solo con petición explícita**.
-- Commit/push de fixes CI (tests · typecheck · mercado mocks · `.gitleaks.toml`) → re-verificar Release-tag CI.
-- Ops walk browser: e2e mock v25+v28 **22/22 PASS** local; walk humano opcional.
+- Tip [`v2.8-beta`](./traspaso-relevo-tag-v2-8-beta-2026-09-05.md) + bump `1.38.0-beta` — stamp en relevo tag.
+- Release-tag CI sobre tip — GREEN solo con success.
+- Ops walk browser opcional (e2e mock v25+v28 **22/22 PASS** local).
 - No reabrir motor FSM / PAPER AUTO execute.
 - Seed ops (stop estructural / Journal MFE·MAE) paralelo.
