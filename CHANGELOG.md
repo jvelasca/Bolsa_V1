@@ -2,6 +2,21 @@
 
 All notable releases of Bolsa V1.
 
+## [1.39.0-beta] — 2026-09-05
+
+V2.9 Visual and Operational Certification + V2.10 Seed Ops. Producto **BETA / no producción**. Tip **`v2.10-beta`** (sin tip `v2.9-beta` aparte). Partida **`v2.8-beta` → `a9ec6424`**. Package **`1.39.0-beta`**. Confirm = firma. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE. **NO MÁS PANELES**. Release-tag CI **NO CERTIFICABLE** hasta `conclusion=success`.
+
+### V2.9 — Visual and Operational Certification (2026-09-05)
+
+- **V2.46–V2.51:** ARM chrome `autoActive` · `orphan_recovery_failed` visible · touch 44px · layout zoom 100/125/150 · snapshots/contraste `gp-e2e-v29` (pixel skip CI linux) · teclado cabina.
+- Relevo [`traspaso-relevo-v2-9-visual-operational-certification-2026-09-05.md`](./docs/engineering/traspaso-relevo-v2-9-visual-operational-certification-2026-09-05.md).
+
+### V2.10 — Seed Ops (2026-09-05)
+
+- **V2.52–V2.53:** seed birth Confirm + `signedStop` estructural → `PROTECTED` / Planificado · Journal `runtime.mfeMae` · `scripts/ops_seed_cabin_smoke`.
+- Relevo [`traspaso-relevo-v2-10-seed-ops-2026-09-05.md`](./docs/engineering/traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · runbook [`runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md`](./docs/engineering/runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md).
+- Relevo tag [`traspaso-relevo-tag-v2-10-beta-2026-09-05.md`](./docs/engineering/traspaso-relevo-tag-v2-10-beta-2026-09-05.md).
+
 ## [Unreleased]
 
 ### V1.60 — UX Mercado (tarjeta estrella DECISIÓN) (2026-09-02)

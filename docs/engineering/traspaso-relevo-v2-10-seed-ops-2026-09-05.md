@@ -1,7 +1,7 @@
 # RELEVO — V2.10 Seed Ops (birth estructural + Journal MFE·MAE) (2026-09-05)
 
-> **Padre:** [relevo V2.9 Visual and Operational Certification](./traspaso-relevo-v2-9-visual-operational-certification-2026-09-05.md) · tip vigente [`v2.8-beta`](./traspaso-relevo-tag-v2-8-beta-2026-09-05.md) `a9ec6424`.  
-> **Estado:** **CÓDIGO + OPS CERRADO** · tip GitHub **no** (sin bump; package `1.38.0-beta`).  
+> **Padre:** [relevo V2.9 Visual and Operational Certification](./traspaso-relevo-v2-9-visual-operational-certification-2026-09-05.md) · tip [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md).  
+> **Estado:** **CÓDIGO + OPS CERRADO** · tip [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) · package `1.39.0-beta`.  
 > **Para quién:** seed ops cabina · **NO MÁS PANELES** · no reabrir motor FSM.  
 > **Arranque:** [arranque V2.10](./arranque-agente-v2-10-2026-09-05.md) · **Runbook:** [seed cabin smoke](./runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md).
 
@@ -14,7 +14,7 @@ Cerrar el hueco ops bloqueado desde v2.6 (birth protegido live **BLOCKED** · Jo
 
 ## Freeze intacto
 
-NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM · Confirm = firma · Ranking ≠ BUY · chrome DECISIÓN (ADR-042) · 5 puertas L1 (ADR-040) · ExitPolicy **30/30** · HOY strip congelado · **AUTO sin controles de trading nuevos** · `OperatorDecision` = proyección shared · **NO MÁS PANELES** · birth stop = Planificado + MANTENER · Chart Focus / RESTANTE / Protection honesty **intactos** · package `1.38.0-beta` · **no tip/bump** · **no afirmar CI GREEN sin `conclusion=success`**.
+NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM · Confirm = firma · Ranking ≠ BUY · chrome DECISIÓN (ADR-042) · 5 puertas L1 (ADR-040) · ExitPolicy **30/30** · HOY strip congelado · **AUTO sin controles de trading nuevos** · `OperatorDecision` = proyección shared · **NO MÁS PANELES** · birth stop = Planificado + MANTENER · Chart Focus / RESTANTE / Protection honesty **intactos** · package `1.39.0-beta` · **no afirmar CI GREEN sin `conclusion=success`**.
 
 **Arm ≠ Execute · Arm ≠ autorización de operación · Confirm = firma · Ranking ≠ BUY.**
 
@@ -28,19 +28,19 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM �
 
 ## Matriz de certificación (honestidad)
 
-| Cubierto                                                       | Aproximación — no afirmar                                   |
-| -------------------------------------------------------------- | ----------------------------------------------------------- |
-| Birth vía Confirm + stop estructural (fixture OHLCV flat @ 10) | Que propose live `action=wait` abra sin seed BD             |
-| Journal MFE/MAE como foto de sesión en Tesis                   | Final R / life-peak PositionState · status siempre `closed` |
-| Smoke local con wrapper Node + DATABASE_URL                    | CI GREEN / tip `v2.10-beta` (no autorizados)                |
+| Cubierto                                                       | Aproximación — no afirmar                                                   |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Birth vía Confirm + stop estructural (fixture OHLCV flat @ 10) | Que propose live `action=wait` abra sin seed BD                             |
+| Journal MFE/MAE como foto de sesión en Tesis                   | Final R / life-peak PositionState · status siempre `closed`                 |
+| Smoke local con wrapper Node + DATABASE_URL                    | CI GREEN / tip `v2.10-beta` (CI NO CERTIFICABLE hasta `conclusion=success`) |
 
 ## Smoke stamp (2026-09-05 local)
 
-| Check                                                                                                   | Resultado                                                                    |
-| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `node scripts/ops_seed_cabin_smoke.mjs birth-structural --apply --account-id c0f692cf67f941ae8529f145c` | **PASS** · Confirm executed · `operatingState=PROTECTED` · `currentStop=9.7` |
-| `node scripts/ops_seed_cabin_smoke.mjs journal-mfe-mae --apply --account-id 516fc66a90ae40a0bdb83eecd`  | **PASS** · study con mfeR/maeR                                               |
-| Tip / bump / Release-tag CI                                                                             | **NO** · tip vigente sigue `v2.8-beta` · CI V2.9 **NO CERTIFICABLE**         |
+| Check                                                                                                   | Resultado                                                                                                 |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `node scripts/ops_seed_cabin_smoke.mjs birth-structural --apply --account-id c0f692cf67f941ae8529f145c` | **PASS** · Confirm executed · `operatingState=PROTECTED` · `currentStop=9.7`                              |
+| `node scripts/ops_seed_cabin_smoke.mjs journal-mfe-mae --apply --account-id 516fc66a90ae40a0bdb83eecd`  | **PASS** · study con mfeR/maeR                                                                            |
+| Tip / bump / Release-tag CI                                                                             | tip `v2.10-beta` + bump `1.39.0-beta` **autorizados** · CI **NO CERTIFICABLE** hasta `conclusion=success` |
 
 Nota: cuenta `debug-opening` puede `risk_veto` por estado de recon/cesta; usar cuenta limpia (`ops-v210-seed`) para birth.
 
@@ -54,6 +54,7 @@ node scripts/ops_seed_cabin_smoke.mjs journal-mfe-mae --apply --account-id <id>
 
 ## OUT / Next
 
-- Auditoría externa del conjunto: tip `v2.8-beta` + código V2.9 (sin tip) + seeds V2.10.
-- Tip `v2.9-beta` / `v2.10-beta` + bump **solo si se autoriza**.
+- Tip [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) + bump `1.39.0-beta` — **autorizado**.
+- Auditoría externa del conjunto tip `v2.10-beta` (V2.8 + V2.9 + V2.10).
+- Release-tag CI — GREEN solo con `conclusion=success`.
 - No reabrir motor FSM / PAPER AUTO execute / paneles.

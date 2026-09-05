@@ -1,7 +1,7 @@
 # RELEVO — V2.9 Visual and Operational Certification (2026-09-05)
 
 > **Padre:** [relevo V2.8 Operator Cabin Certification](./traspaso-relevo-v2-8-operator-certification-2026-09-05.md) · tip [`v2.8-beta`](./traspaso-relevo-tag-v2-8-beta-2026-09-05.md) `a9ec6424`.  
-> **Estado:** **CÓDIGO CERRADO** · tip GitHub **pendiente** (sin bump; package sigue `1.38.0-beta` hasta autorización).  
+> **Estado:** **CÓDIGO CERRADO** · incluido en tip [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) · package `1.39.0-beta` (sin tip `v2.9-beta` aparte).  
 > **Para quién:** certificación visual/operacional de cabina · **NO MÁS PANELES** · no reabrir motor FSM.  
 > **Arranque:** [arranque V2.9](./arranque-agente-v2-9-2026-09-05.md).
 
@@ -19,7 +19,7 @@ V2.9 **no añade funcionalidad de trading** ni paneles. Cierra P2 de certificaci
 
 ## Freeze intacto
 
-NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM · Confirm = firma · Ranking ≠ BUY · chrome DECISIÓN (ADR-042) · 5 puertas L1 (ADR-040) · ExitPolicy **30/30** · HOY strip congelado · **AUTO sin controles de trading nuevos** · `OperatorDecision` = proyección shared · **NO MÁS PANELES** · birth stop = Planificado + MANTENER · Chart Focus / RESTANTE / Protection honesty **intactos** · package `1.38.0-beta` · **no afirmar CI GREEN sin status checks del SHA**.
+NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · no segundo FSM · Confirm = firma · Ranking ≠ BUY · chrome DECISIÓN (ADR-042) · 5 puertas L1 (ADR-040) · ExitPolicy **30/30** · HOY strip congelado · **AUTO sin controles de trading nuevos** · `OperatorDecision` = proyección shared · **NO MÁS PANELES** · birth stop = Planificado + MANTENER · Chart Focus / RESTANTE / Protection honesty **intactos** · package `1.39.0-beta` · **no afirmar CI GREEN sin status checks del SHA**.
 
 **Arm ≠ Execute · Arm ≠ autorización de operación · Confirm = firma · Ranking ≠ BUY.**
 
@@ -47,11 +47,11 @@ No se tocó el algoritmo de `RecoverOrphanOpeningFills.recover()`. El ciclo no s
 
 ## V2.51 — CI
 
-| Pieza       | Valor                                                                                                |
-| ----------- | ---------------------------------------------------------------------------------------------------- |
-| Tip vigente | `v2.8-beta` → `a9ec6424` · package `1.38.0-beta`                                                     |
-| V2.9 código | este relevo · **sin tip** hasta autorización                                                         |
-| Stamp       | **CI GREEN: NO CERTIFICABLE** hasta run de Release-tag CI con `conclusion=success` sobre el SHA V2.9 |
+| Pieza       | Valor                                                                                                        |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
+| Tip vigente | `v2.10-beta` (incluye V2.46–V2.51) · package `1.39.0-beta`                                                   |
+| V2.9 código | este relevo · **sin** tip `v2.9-beta` aparte                                                                 |
+| Stamp       | **CI GREEN: NO CERTIFICABLE** hasta run de Release-tag CI con `conclusion=success` sobre el SHA `v2.10-beta` |
 
 Tras tip/dispatch: stamp **solo** con URL de run + `conclusion`. Si `statuses: []` / `workflow runs: []` → seguir **NO CERTIFICABLE**.
 
@@ -69,8 +69,8 @@ E2E_RUN=1 pnpm e2e -- gp-e2e-v29
 
 ## OUT / Next
 
-- Tip `v2.9-beta` + bump `1.39.0-beta` **solo si se autoriza**.
-- **Next corte:** [V2.10 Seed Ops](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · [arranque](./arranque-agente-v2-10-2026-09-05.md) · [runbook](./runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md) — birth estructural + Journal MFE·MAE (**hecho** · sin tip).
-- Release-tag CI sobre SHA tip — GREEN solo con success.
+- Tip [`v2.10-beta`](./traspaso-relevo-tag-v2-10-beta-2026-09-05.md) + bump `1.39.0-beta` — **autorizado** (incluye este corte; sin `v2.9-beta` aparte).
+- **Next corte:** [V2.10 Seed Ops](./traspaso-relevo-v2-10-seed-ops-2026-09-05.md) · [arranque](./arranque-agente-v2-10-2026-09-05.md) · [runbook](./runbook-v2-10-seed-ops-cabin-smoke-2026-09-05.md) — birth estructural + Journal MFE·MAE (**incluido en el mismo tip**).
+- Release-tag CI sobre `v2.10-beta` — GREEN solo con `conclusion=success`.
 - Operator Cabin feature-complete salvo necesidad funcional real.
 - No reabrir motor FSM / PAPER AUTO execute.
