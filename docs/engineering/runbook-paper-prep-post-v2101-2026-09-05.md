@@ -69,4 +69,4 @@ Código de referencia: `paper_d_execute_allowed()` · `operational_readiness.py`
 1. Sin `PAPER_D_EXECUTE` en `.env`.
 2. AUTO desarmado.
 3. Venue paper.
-4. Stamp local: PASS/PARTIAL de este runbook (sin inventar).
+4. Stamp local: [PASS flags OFF 2026-09-06](./traspaso-relevo-stamp-paper-prep-post-v2101-2026-09-06.md) (sin inventar; Arm UI badge N/A).

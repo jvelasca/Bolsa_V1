@@ -118,3 +118,4 @@ Siguiente corte relacionado (docs): [preparación PAPER](./traspaso-relevo-paper
 2. Este pack = **readiness operacional**, no re-score de cabina.
 3. Arranque: [arranque operacional](./arranque-agente-post-freeze-operational-2026-09-05.md).
 4. Evidencias = checklist §2 con stamps locales; sin stamp → PARTIAL/N/A.
+5. Stamp local 2026-09-06: [PARTIAL](./traspaso-relevo-stamp-v2-10-1-operational-readiness-2026-09-06.md) (smokes + UI parcial · no certificación operacional completa).

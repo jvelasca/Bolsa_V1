@@ -6,12 +6,15 @@
 
 ## Estado
 
-| Corte           | Estado                                                                      |
-| --------------- | --------------------------------------------------------------------------- |
-| Cabina V2.10.1  | **CERTIFICABLE** · CI tip GREEN                                             |
-| PRODUCT FREEZE  | **sí**                                                                      |
-| Este corte      | **auditoría operacional** (uso real · carga · resiliencia · observabilidad) |
-| Código producto | **no tocar** salvo regresión freeze-compatible pedida explícita             |
+| Corte           | Estado                                                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Cabina V2.10.1  | **CERTIFICABLE** · CI tip GREEN                                                                                                  |
+| PRODUCT FREEZE  | **sí**                                                                                                                           |
+| Este corte      | **auditoría operacional** (uso real · carga · resiliencia · observabilidad)                                                      |
+| Stamp §2        | [PARTIAL 2026-09-06](./traspaso-relevo-stamp-v2-10-1-operational-readiness-2026-09-06.md) · A4·A5 PASS · A6/C3 PARTIAL           |
+| Prep PAPER      | [PASS flags OFF 2026-09-06](./traspaso-relevo-stamp-paper-prep-post-v2101-2026-09-06.md) · execute shipped off                   |
+| DEMO execute    | [stamp 2026-09-06](./traspaso-relevo-stamp-demo-paper-d-execute-2026-09-06.md) · un ciclo + apagado · entry blocked (sin policy) |
+| Código producto | **no tocar** salvo regresión freeze-compatible pedida explícita                                                                  |
 
 ## Freeze (copiar al chat)
 
@@ -32,9 +35,9 @@ Seguir checklist §2 del [audit pack](./audit-pack-v2-10-1-operational-readiness
 
 ## Next en la cadena freeze
 
-1. Completar checklist operacional (humano).
-2. [Preparación PAPER](./traspaso-relevo-paper-prep-post-v2101-2026-09-05.md) · [runbook prep OFF](./runbook-paper-prep-post-v2101-2026-09-05.md) — sin encender execute por defecto.
-3. [Triage P2](./triage-p2-v2-10-deferred-2026-09-05.md) — documentar, no implementar.
+1. A5 **cerrado**; residual A6 (wire `ok`≠parser) · C3 (401 efímero owner) — no código bajo freeze.
+2. Prep PAPER / DEMO execute stampados · `PAPER_D_EXECUTE` **off**.
+3. [Triage P2](./triage-p2-v2-10-deferred-2026-09-05.md) — diferidos aceptados; no implementar.
 
 ## Prompt sugerido
 

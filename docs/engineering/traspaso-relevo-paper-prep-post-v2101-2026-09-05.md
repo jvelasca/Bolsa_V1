@@ -69,6 +69,6 @@ NO LIVE · `PAPER_D_EXECUTE` default off · no `TRANSITIONS` · Confirm = firma 
 
 ## OUT / Next
 
-1. Operador completa checklist § preparación con stamps locales.
+1. Stamp local: [PASS flags OFF 2026-09-06](./traspaso-relevo-stamp-paper-prep-post-v2101-2026-09-06.md) (403 gate · dry-run · env off · venue paper).
 2. [Triage P2](./triage-p2-v2-10-deferred-2026-09-05.md).
 3. No tip · no V2.11 · no encender execute en CI.
