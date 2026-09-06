@@ -129,6 +129,20 @@
  *
  * **2026-08-31e** — V1.33.4 Consola: dry-run Estudio AUTO + histórico A6;
  * dry-run ≠ execute · arm ≠ PAPER_D_EXECUTE.
+ * **2026-09-06** — Tip producto **v2.10.1-beta** (cabina certificable ·
+ * PRODUCT FREEZE UI) · package `1.39.1-beta`. Ayuda: camino usuario básico
+ * «Del activo a la operación» (lista Estudio → TA/FA → Confirm → stops) ·
+ * LIVE = **VIRTUAL** hasta APP 100% (meses) · pasarela visual: diseño UI
+ * híbrido documentado · UI producto no implementada · PAPER_D_EXECUTE off ·
+ * Accept estricto abierto (0/5) · no paneles nuevos en freeze.
+ * **2026-09-07** — Sync copy ayuda + pasarela híbrida **en Confirm**
+ * (`live-virtual-*`) · CTA LIVE VIRTUAL (simulado) · ≠ settlement · ≠ Accept.
+ * **2026-09-07b** — Excepción owner freeze: híbrido LIVE VIRTUAL shipped
+ * **dentro de Confirm** (banner · telegrama · por qué · CTA simulado).
+ * Sin mesa nueva · sin flip venue/execute · settlement real PARKED.
+ *
+ * **2026-09-07c** — Tip **v2.11-beta** · package `1.40.0-beta` ·
+ * Confirm LIVE VIRTUAL shipped · ≠ settlement · ≠ Accept LIVE · W+5 0/5 fondo.
  *
  * Verificar: `pnpm test:fa` · `pnpm test:operativa` · `pnpm test:coach`
  *
@@ -141,4 +155,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-31" as const;
+export const HELP_CONTENT_AS_OF = "2026-09-07" as const;

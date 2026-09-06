@@ -57,7 +57,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "apps/web/src/features/help/operating-desk-help.ts",
         role: "tracker",
-        note: "Mesa diaria: resumen básico + experto (fase pruebas)",
+        note: "Mesa diaria: resumen básico + camino activo→operar + experto (v2.10.1)",
       },
       { path: "docs/HELP.md", role: "doc", note: "Mapa Ayuda ↔ trackers" },
       { path: "docs/ONBOARDING.md", role: "doc" },
@@ -72,7 +72,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "apps/web/src/features/help/operating-desk-help.ts",
         role: "tracker",
-        note: "Hoy · Mercado · Confirm · honestidad operativa",
+        note: "Hoy · Mercado · Confirm · Del activo a la operación · honestidad",
       },
       {
         path: "docs/engineering/research-lifecycle.md",
@@ -130,7 +130,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "apps/web/src/features/help/operating-desk-help.ts",
         role: "tracker",
-        note: "Resumen básico + experto (fase pruebas v1.41.3)",
+        note: "Resumen básico + Del activo a la operación + experto (v2.10.1-beta)",
       },
       { path: "docs/CHART_DATA_BAR.md", role: "doc" },
       {

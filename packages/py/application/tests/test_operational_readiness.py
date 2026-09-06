@@ -117,5 +117,10 @@ def test_live_adapter_not_wired_blocks() -> None:
 
 def test_execute_cta_labels_venue() -> None:
     assert execute_cta_label("paper") == "Ejecutar en PAPER"
-    assert execute_cta_label("live") == "Ejecutar en LIVE"
+    assert (
+        execute_cta_label("live")
+        == "Firmar · Ejecutar en LIVE VIRTUAL (simulado)"
+    )
+    assert "VIRTUAL" in execute_cta_label("live")
+    assert "simulado" in execute_cta_label("live")
     assert execute_cta_label("paper", kind="protect") == "Confirmar protección"

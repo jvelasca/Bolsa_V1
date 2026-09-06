@@ -109,5 +109,8 @@ export function executeCtaLabel(
   kind: ExecuteCtaKindV1 = "execute",
 ): string {
   if (kind === "protect") return "Confirmar protección";
-  return normVenue(venue) === "live" ? "Ejecutar en LIVE" : "Ejecutar en PAPER";
+  // LIVE de estudio = VIRTUAL / SIMULADO — nunca implicar capital real.
+  return normVenue(venue) === "live"
+    ? "Firmar · Ejecutar en LIVE VIRTUAL (simulado)"
+    : "Ejecutar en PAPER";
 }

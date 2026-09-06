@@ -2,6 +2,17 @@
 
 All notable releases of Bolsa V1.
 
+## [1.40.0-beta] — 2026-09-07
+
+V2.11 Confirm LIVE VIRTUAL (UI honesty). Producto **BETA / no producción**. Tip **`v2.11-beta`**. Package **`1.40.0-beta`**. Tip previo **`v2.10.1-beta` → `a060af37`** / `1.39.1-beta` (inmutable). Confirm = firma. CTA live = **Firmar · Ejecutar en LIVE VIRTUAL (simulado)**. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE capital. **NO MÁS PANELES** (híbrido dentro de Confirm · excepción owner). **≠** Accept estricto · **≠** thaw venue · **≠** settlement.
+
+### V2.11 — Confirm LIVE VIRTUAL
+
+- Pasarela híbrida telegrama + por qué + banner **LIVE VIRTUAL · SIMULADO** en Confirm (`live-virtual-*`).
+- CTA TS+PY honesty; badge manual ticket alineado.
+- E2E mock `gp-e2e-live-virtual-confirm-mock`.
+- Pack [`audit-pack-v2-11-live-virtual-confirm-2026-09-07.md`](./docs/engineering/audit-pack-v2-11-live-virtual-confirm-2026-09-07.md) · relevo tag [`traspaso-relevo-tag-v2-11-beta-2026-09-07.md`](./docs/engineering/traspaso-relevo-tag-v2-11-beta-2026-09-07.md) · arranque auditor [`arranque-auditor-v2-11-live-virtual-2026-09-07.md`](./docs/engineering/arranque-auditor-v2-11-live-virtual-2026-09-07.md).
+
 ## [1.39.1-beta] — 2026-09-05
 
 V2.10.1 CI certification hotfix + tip de provenance. Producto **BETA / no producción**. Tip **`v2.10.1-beta` → `a060af37`**. Hotfix código **`7156169f`** (tests/selectores; **no** motor). Package **`1.39.1-beta`**. Tip previo **`v2.10-beta` → `6495dd5f`** (inmutable; Release-tag CI [33980277268](https://github.com/jvelasca/Bolsa_V1/actions/runs/33980277268) `failure`). Código hotfix CI [33981998373](https://github.com/jvelasca/Bolsa_V1/actions/runs/33981998373) `success`. Release-tag CI tip **CERTIFICABLE** — [run 33983574346](https://github.com/jvelasca/Bolsa_V1/actions/runs/33983574346) `conclusion=success`. Confirm = firma. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE. **NO MÁS PANELES**. **PRODUCT FREEZE** en V2.10.1.

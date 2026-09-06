@@ -92,6 +92,7 @@ def execute_cta_label(
 
     if kind == "protect":
         return "Confirmar protección"
+    # LIVE de estudio = VIRTUAL / SIMULADO — nunca implicar capital real.
     if _norm_venue(venue) == "live":
-        return "Ejecutar en LIVE"
+        return "Firmar · Ejecutar en LIVE VIRTUAL (simulado)"
     return "Ejecutar en PAPER"

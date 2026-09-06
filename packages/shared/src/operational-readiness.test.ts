@@ -55,7 +55,12 @@ describe("OR-6 deriveOperationalReadiness", () => {
 describe("OR-6 executeCtaLabel", () => {
   it("names the venue on execute and keeps protect copy", () => {
     expect(executeCtaLabel("paper")).toBe("Ejecutar en PAPER");
-    expect(executeCtaLabel("live")).toBe("Ejecutar en LIVE");
+    expect(executeCtaLabel("live")).toBe(
+      "Firmar · Ejecutar en LIVE VIRTUAL (simulado)",
+    );
+    expect(executeCtaLabel("live")).toMatch(/VIRTUAL/i);
+    expect(executeCtaLabel("live")).toMatch(/simulado/i);
+    expect(executeCtaLabel("live")).not.toMatch(/^Ejecutar en LIVE$/);
     expect(executeCtaLabel("paper", "protect")).toBe("Confirmar protección");
   });
 });

@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
 import {
+  OperatingDeskAssetJourneyBlock,
   OperatingDeskBasicBlocks,
   OperatingDeskExpertDetails,
 } from "@/features/help/operating-desk-help-blocks";
@@ -41,7 +42,9 @@ export function WorkflowModulesSection() {
     <div className="space-y-5 text-sm">
       <HoyEnLaMesaBlock />
 
-      <OperatingDeskBasicBlocks />
+      <OperatingDeskAssetJourneyBlock />
+
+      <OperatingDeskBasicBlocks showJourney={false} />
 
       <OperatingDeskExpertDetails />
 
@@ -50,12 +53,16 @@ export function WorkflowModulesSection() {
         (simular estrategias en el pasado) con{" "}
         <strong className="text-foreground">operar en demo</strong> (cuenta
         simulada con libro contable). Estás en{" "}
-        <strong className="text-foreground">fase de pruebas</strong>: todo gira
-        en torno a una{" "}
+        <strong className="text-foreground">fase de pruebas</strong> (tip{" "}
+        <strong className="text-foreground">v2.10.1-beta</strong>
+        ): todo gira en torno a una{" "}
         <strong className="text-foreground">cuenta activa DEMO</strong> y a dos
         universos separados: el{" "}
         <strong className="text-foreground">Laboratorio</strong> y la{" "}
-        <strong className="text-foreground">mesa de Trading</strong>.
+        <strong className="text-foreground">mesa de Trading</strong>. LIVE
+        capital está cerrado; cualquier estudio LIVE es{" "}
+        <strong className="text-foreground">VIRTUAL</strong> hasta que la app
+        esté 100% probada.
       </p>
 
       <section>
@@ -93,7 +100,7 @@ export function WorkflowModulesSection() {
 
       <section>
         <h3 className="mb-2 font-semibold">
-          Flujo típico (de la idea a la operación)
+          Flujo típico (resumen — ver camino completo arriba)
         </h3>
         <ol className="list-decimal space-y-2 pl-5 text-muted-foreground">
           <li>
@@ -103,38 +110,31 @@ export function WorkflowModulesSection() {
             Importa tickers y sincroniza datos (Ayuda → Datos de mercado).
           </li>
           <li>
+            <strong className="text-foreground">Analizar</strong> — gráfico +
+            indicadores (TA) · ficha FA · gauges en Operativa. Ranking ≠ compra.
+          </li>
+          <li>
             <strong className="text-foreground">Pasar a Estudio</strong> — añade
-            el valor al universo supervisable (lista API Estudio). Sin Estudio
-            no hay supervisión ni propuestas SEMI para ese ticker.
+            el valor al universo supervisable. Sin Estudio no hay supervisión ni
+            propuestas SEMI para ese ticker.
           </li>
           <li>
-            <strong className="text-foreground">Investigar en el Lab</strong> —{" "}
-            <RouteLink to="/backtests">Laboratorio</RouteLink> → Probar → Play
-            (embudo automático) o pasos manuales → Finalistas. Opcional: DÍA D
-            para verificar una fecha pasada (Ayuda → Backtesting).
+            <strong className="text-foreground">Investigar en el Lab</strong>{" "}
+            (opcional) — <RouteLink to="/backtests">Laboratorio</RouteLink> →
+            Play / Finalistas → Adoptar mandato (Ayuda → Backtesting).
           </li>
           <li>
-            <strong className="text-foreground">Adoptar estrategia</strong> — en
-            Finalistas, Checklist / Adoptar enlaza la estrategia #1 con tu
-            cuenta demo (mandato operativo en Trading → DECISIÓN → Info).
-          </li>
-          <li>
-            <strong className="text-foreground">Supervisar</strong> — en
-            Estudio, activa <em>Supervisión ON</em> (velas, frescura,
-            redescubrimiento). El Monitor y CORE-R avisan si conviene revisar
-            (Ayuda → Backtesting).
-          </li>
-          <li>
-            <strong className="text-foreground">Operar en SEMI</strong> — cuenta
-            en modo SEMI. Alarmas Radar o propuestas F3 van a{" "}
+            <strong className="text-foreground">Operar en SEMI</strong> — Hoy /
+            Mercado · Proponer F3 →{" "}
             <RouteLink to="/confirm">Confirmar</RouteLink>: tú firmas; la app{" "}
             <em>nunca</em> envía órdenes solas.
           </li>
           <li>
-            <strong className="text-foreground">Revisar resultado</strong> —{" "}
-            <RouteLink to="/operations">Operaciones</RouteLink>,{" "}
-            <RouteLink to="/history">Historial</RouteLink>,{" "}
-            <RouteLink to="/fiscal">Fiscal</RouteLink> y Asesor → Diario.
+            <strong className="text-foreground">
+              Gestionar stop / objetivos / salida
+            </strong>{" "}
+            — stop operativo · T1/T2 · trail · Proteger / salir vía Confirm ·{" "}
+            <RouteLink to="/operations">Operaciones</RouteLink>.
           </li>
         </ol>
       </section>

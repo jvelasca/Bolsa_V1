@@ -93,3 +93,15 @@ export async function installUnknownOrderMocks(page: Page): Promise<void> {
   setMercadoMockWorkspaceDocument(null);
   await installApiMocks(page, { hoyUnknown: true });
 }
+
+/**
+ * Confirm LIVE VIRTUAL (venue=live simulado + cola F3).
+ * UI honesty smoke — no capital · no Accept LIVE · no execute flip.
+ */
+export async function installLiveVirtualConfirmMocks(
+  page: Page,
+): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  resetE2eMockRuntimeFlags();
+  await installApiMocks(page, { liveVenue: true });
+}

@@ -70,7 +70,7 @@ export const MESA_TIPS: Record<MesaTipId, MesaTip> = {
   "confirm-ticket-preview": {
     id: "confirm-ticket-preview",
     title: "Preview de ticket",
-    body: "Antes de firmar verás notional, comisión (perfil de la cuenta) y margen estimado (libre / orden). Es solo información: no envía la orden. Confirmar Intent inspecciona; Ejecutar en PAPER|LIVE sigue siendo la firma humana SEMI.",
+    body: "Antes de firmar verás notional, comisión (perfil de la cuenta) y margen estimado (libre / orden). Es solo información: no envía la orden. Confirmar Intent inspecciona; Ejecutar en PAPER o Firmar · LIVE VIRTUAL (simulado) sigue siendo la firma humana SEMI.",
     linkTo: "/confirm",
     linkLabel: "Abrir Confirmar",
   },

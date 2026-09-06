@@ -16,11 +16,12 @@ export const WATCHLIST_SYNC = {
 
 export const WATCHLIST_SUMMARY = {
   title: "En pocas palabras",
-  body: "El panel izquierdo de la watchlist tiene dos vistas: Listas (gestión) y Valores (contenido + carrusel). Hay dos familias claras: listas personales (tú editas) e índices de mercado (IBEX, S&P… sincronizados). Comparten la misma lista activa y el carrusel del espacio.",
+  body: "El panel izquierdo de la watchlist tiene dos vistas: Listas (gestión) y Valores (contenido + carrusel). Hay dos familias claras: listas personales (tú editas) e índices de mercado (IBEX, S&P… sincronizados). Comparten la misma lista activa y el carrusel del espacio. Para operar en SEMI, el valor debe pasar además a la lista Estudio (Ayuda → Flujo → Del activo a la operación).",
   bullets: [
     "Listas — secciones Sistema / Índices / Personales; crear, fijar al carrusel, congelar copia desde un índice.",
     "Índices — catálogo + búsqueda; Suscribir importa constitutivos (misma tubería A→B→C para todos).",
     "Valores — tickers de la lista activa; carrusel y menú ⋯; quitar de lista ≠ borrar de BD.",
+    "Estudio — membresía supervisable («A Estudio»); distinta de Visualizados (pestañas de gráfico).",
     `Atajos al expandir — ${SEÑALES_LABEL} / Alertas / ${LABORATORIO_LABEL} (con ?listId=).`,
   ],
 } as const;

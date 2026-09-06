@@ -97,6 +97,16 @@ import {
   consumeChartSignedStopPrefill,
 } from "@/features/charts/chart-signed-stop-prefill";
 import { PAPER_PATH_SUPERVISED } from "@/features/settings/paper-paths-copy";
+import {
+  LiveVirtualBanner,
+  LiveVirtualVenueBadge,
+} from "@/features/confirm/live-virtual-banner";
+import { LiveVirtualOrderGateway } from "@/features/confirm/live-virtual-order-gateway";
+import {
+  resolveLiveVirtualLadderStep,
+  type LiveVirtualLadderStep,
+} from "@/features/confirm/live-virtual-ladder";
+import { buildLiveVirtualWhyBlocks } from "@/features/confirm/live-virtual-why";
 
 type ProposePayload = SupervisedProposePayload;
 
@@ -223,6 +233,9 @@ export function SupervisedF3Panel() {
   const [countryPrefer, setCountryPrefer] = useState<DemoBookCountryPrefer>(
     () => loadDemoBookPrefs().countryPrefer,
   );
+  /** Escalera LIVE VIRTUAL (simulado) — solo UI Confirm; no flip venue. */
+  const [liveVirtualStep, setLiveVirtualStep] =
+    useState<LiveVirtualLadderStep>("proposed");
 
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
   const activeId = useSupervisedF3QueueStore((s) => s.activeId);
@@ -272,6 +285,10 @@ export function SupervisedF3Panel() {
   useEffect(() => {
     setRiskOverrideReason("");
   }, [activeId, quantity, price, stopField]);
+
+  useEffect(() => {
+    setLiveVirtualStep("proposed");
+  }, [activeId]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -427,6 +444,7 @@ export function SupervisedF3Panel() {
     },
     onSuccess: (rec) => {
       setPending(rec);
+      setLiveVirtualStep("proposed");
       enqueue(rec, { origin: "manual" });
       if (rec.lastClose != null && !price.trim()) {
         setPrice(String(rec.lastClose));
@@ -470,7 +488,7 @@ export function SupervisedF3Panel() {
         signedStop: signedStop ?? undefined,
       });
     },
-    onSuccess: (res) => {
+    onSuccess: (res, execute) => {
       const intent = res.data.intent;
       const trade = res.data.trade;
       const positionPersist = res.data.positionPersist as
@@ -532,6 +550,17 @@ export function SupervisedF3Panel() {
         brokerAdapter?.venue === "PAPER" || brokerAdapter?.venue === "LIVE"
           ? ` · ${brokerAdapterVenueCopy(brokerAdapter.venue)}`
           : "";
+      setLiveVirtualStep((prev) =>
+        resolveLiveVirtualLadderStep({
+          hasPending: true,
+          intentStatus: intent.status,
+          execute: Boolean(execute),
+          fillStatus:
+            brokerAdapter?.fillStatus ??
+            (trade?.status != null ? String(trade.status) : null),
+          previous: prev,
+        }),
+      );
       setLog(
         `Intent ${intent.intentId} · ${intent.status}` +
           (trade
@@ -850,6 +879,49 @@ export function SupervisedF3Panel() {
     protectMeta!.stopOverrideRequired &&
     !riskOverrideReason.trim();
 
+  const liveVirtualSymbol =
+    activeItem?.symbol ??
+    instrumentsForSelect.find((i) => i.id === pending?.instrumentId)?.symbol ??
+    pending?.instrumentId?.slice(0, 8) ??
+    "—";
+
+  const liveVirtualWhy = useMemo(
+    () =>
+      buildLiveVirtualWhyBlocks({
+        action: pending?.action,
+        weightContext: pending?.weightContext,
+        tradePlan: pending?.tradePlan,
+        ticket: ticketPreview,
+        stop:
+          signedStop ??
+          protectMeta?.suggestedStop ??
+          protectMeta?.currentStop ??
+          pending?.tradePlan?.structuralStop ??
+          null,
+        riskPct: displayRiskPct,
+        policyGateStatus: pending?.policyGate?.status ?? null,
+        bookMode,
+        originLabel: activeOrigin
+          ? supervisedQueueOriginLabel(activeOrigin)
+          : null,
+      }),
+    [
+      pending?.action,
+      pending?.weightContext,
+      pending?.tradePlan,
+      pending?.policyGate?.status,
+      ticketPreview,
+      signedStop,
+      protectMeta?.suggestedStop,
+      protectMeta?.currentStop,
+      displayRiskPct,
+      bookMode,
+      activeOrigin,
+    ],
+  );
+
+  const showLiveVirtualPath = brokerVenue === "live";
+
   return (
     <Card id="supervised-f3-panel">
       <CardHeader>
@@ -865,6 +937,7 @@ export function SupervisedF3Panel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
+        {showLiveVirtualPath && !pending ? <LiveVirtualBanner compact /> : null}
         {rankedQueueItems.length > 0 ? (
           <div className="rounded-md border border-border px-3 py-2 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1176,6 +1249,28 @@ export function SupervisedF3Panel() {
           <F3TicketPreviewBlock ticket={ticketPreview} />
         ) : null}
 
+        {showLiveVirtualPath && pending ? (
+          <LiveVirtualOrderGateway
+            symbol={liveVirtualSymbol}
+            proposalRef={pending.recommendationId || pending.decisionId || "—"}
+            ticket={ticketPreview}
+            stop={
+              signedStop ??
+              protectMeta?.suggestedStop ??
+              protectMeta?.currentStop ??
+              pending.tradePlan?.structuralStop ??
+              null
+            }
+            orderTypeHint={
+              price.trim() || pending.suggestedPrice != null
+                ? "LIMIT"
+                : "MARKET"
+            }
+            ladderStep={liveVirtualStep}
+            whyBlocks={liveVirtualWhy}
+          />
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -1197,14 +1292,8 @@ export function SupervisedF3Panel() {
           >
             Confirmar Intent
           </button>
-          {brokerVenue === "live" ? (
-            <span
-              className="inline-flex items-center rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100"
-              data-testid="confirm-live-venue-badge"
-              title="LIVE experimental · submitted ≠ fill · trading not accepted"
-            >
-              LIVE
-            </span>
+          {showLiveVirtualPath ? (
+            <LiveVirtualVenueBadge testId="confirm-live-venue-badge" />
           ) : null}
           <button
             type="button"

@@ -1,5 +1,5 @@
 /**
- * Tests — Ayuda Hoy + mesa operativa (fase pruebas v1.41.3).
+ * Tests — Ayuda Hoy + mesa operativa (fase pruebas v2.10.1).
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -8,10 +8,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { HELP_CONTENT_AS_OF } from "@/features/help/help-content-as-of";
 import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
 import {
+  OperatingDeskAssetJourneyBlock,
   OperatingDeskBasicBlocks,
   OperatingDeskExpertDetails,
 } from "@/features/help/operating-desk-help-blocks";
 import {
+  OPERATING_DESK_ASSET_JOURNEY,
   OPERATING_DESK_EXPERT,
   OPERATING_DESK_SUMMARY,
   OPERATING_DESK_SYNC,
@@ -20,10 +22,11 @@ import {
 afterEach(() => cleanup());
 
 describe("help operating desk / Hoy", () => {
-  it("HELP_CONTENT_AS_OF is 2026-08-31", () => {
-    expect(HELP_CONTENT_AS_OF).toBe("2026-08-31");
+  it("HELP_CONTENT_AS_OF is 2026-09-07", () => {
+    expect(HELP_CONTENT_AS_OF).toBe("2026-09-07");
     expect(OPERATING_DESK_SYNC.asOf).toBe(HELP_CONTENT_AS_OF);
     expect(OPERATING_DESK_SYNC.phase).toBe("pruebas");
+    expect(OPERATING_DESK_SYNC.tipLabel).toBe("v2.10.1-beta");
   });
 
   it("Hoy en la mesa describes inbox → Mercado → Confirm", () => {
@@ -59,6 +62,24 @@ describe("help operating desk / Hoy", () => {
     );
   });
 
+  it("asset journey covers Estudio → Confirm → stops", () => {
+    render(
+      <MemoryRouter>
+        <OperatingDeskAssetJourneyBlock />
+      </MemoryRouter>,
+    );
+    const text =
+      screen.getByTestId("operating-desk-asset-journey").textContent ?? "";
+    expect(text).toContain(OPERATING_DESK_ASSET_JOURNEY.title);
+    expect(text).toMatch(/Pasar a lista Estudio/i);
+    expect(text).toMatch(/Indicadores técnicos/i);
+    expect(text).toMatch(/Análisis fundamental/i);
+    expect(text).toMatch(/Firmar en Confirm/i);
+    expect(text).toMatch(/Stop loss/i);
+    expect(text).toMatch(/T1 \/ T2/i);
+    expect(text).not.toMatch(/docs\/engineering/);
+  });
+
   it("basic summary then expert details without dumping ADR paths", () => {
     render(
       <MemoryRouter>
@@ -71,6 +92,7 @@ describe("help operating desk / Hoy", () => {
     expect(summary).toContain(OPERATING_DESK_SUMMARY.title);
     expect(summary).toMatch(/fase de pruebas/i);
     expect(summary).toMatch(/Confirm/i);
+    expect(summary).toMatch(/v2\.10\.1-beta/);
     expect(summary).not.toMatch(/docs\/engineering/);
 
     const expert =
@@ -78,6 +100,7 @@ describe("help operating desk / Hoy", () => {
     expect(expert).toContain(OPERATING_DESK_EXPERT.title);
     expect(expert).toMatch(/Daily Desk/i);
     expect(expert).toMatch(/misma CTA/i);
+    expect(expert).toMatch(/LIVE VIRTUAL/i);
     expect(expert).not.toMatch(/traspaso-relevo/);
     expect(expert).not.toMatch(/CURRENT_SYSTEM/);
   });

@@ -109,9 +109,11 @@ function GuideContent() {
         y las operaciones se gestionan por <strong>cuenta de inversión</strong>{" "}
         (modelo estilo XTB). Estás en{" "}
         <strong className="text-foreground">
-          fase de pruebas (BETA / demo)
+          fase de pruebas (BETA / demo · tip v2.10.1-beta)
         </strong>
-        . Para el mapa Laboratorio → mesa y módulos, abre{" "}
+        . Empieza por{" "}
+        <strong className="text-foreground">Del activo a la operación</strong>{" "}
+        (abajo / Flujo). Para el mapa Laboratorio → mesa y módulos, abre{" "}
         <strong className="text-foreground">Flujo y módulos</strong> en esta
         ventana.
       </p>
@@ -805,8 +807,9 @@ function AboutContent() {
       <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-muted-foreground">
         <p className="text-xs uppercase tracking-wide">Modo actual</p>
         <p className="mt-1">
-          Fase de pruebas · tip v1.41.3-beta · Cuentas simuladas · Sin broker
-          live por defecto · Datos Yahoo Finance · AUTO execute off
+          Fase de pruebas · tip v2.10.1-beta · Cuentas simuladas · LIVE capital
+          cerrado (VIRTUAL hasta APP 100%) · Datos Yahoo Finance · AUTO execute
+          off · PAPER_D_EXECUTE off por defecto
         </p>
       </div>
       <div>

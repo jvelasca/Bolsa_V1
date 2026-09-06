@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
+  OPERATING_DESK_ASSET_JOURNEY,
   OPERATING_DESK_EXPERT,
   OPERATING_DESK_NAV,
   OPERATING_DESK_READ_RULES,
@@ -21,11 +22,45 @@ function RouteLink({ to, children }: { to: string; children: ReactNode }) {
   );
 }
 
-/** Resumen + cómo probar + lectura diaria (usuario básico). */
+/** Camino completo: activo → Estudio → operar (usuario básico). */
+export function OperatingDeskAssetJourneyBlock() {
+  return (
+    <section
+      className="rounded-md border border-border bg-muted/20 px-3 py-2.5"
+      data-testid="operating-desk-asset-journey"
+    >
+      <h3 className="text-sm font-semibold text-foreground">
+        {OPERATING_DESK_ASSET_JOURNEY.title}
+      </h3>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        {OPERATING_DESK_ASSET_JOURNEY.intro}
+      </p>
+      <ol className="mt-2 list-none space-y-2.5 text-sm text-muted-foreground">
+        {OPERATING_DESK_ASSET_JOURNEY.steps.map((step) => (
+          <li key={step.title}>
+            <strong className="text-foreground">{step.title}</strong>
+            <p className="mt-0.5">{step.body}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {OPERATING_DESK_ASSET_JOURNEY.pause}
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Detalle de listas: Ayuda → Watchlist. Datos: Ayuda → Datos de mercado.
+        FA: Ayuda → Análisis del valor. Lab: Ayuda → Backtesting.
+      </p>
+    </section>
+  );
+}
+
+/** Resumen + camino + cómo probar + lectura diaria (usuario básico). */
 export function OperatingDeskBasicBlocks({
   showNav = false,
+  showJourney = true,
 }: {
   showNav?: boolean;
+  showJourney?: boolean;
 }) {
   return (
     <div className="space-y-4 text-sm">
@@ -51,6 +86,8 @@ export function OperatingDeskBasicBlocks({
           ))}
         </ul>
       </section>
+
+      {showJourney ? <OperatingDeskAssetJourneyBlock /> : null}
 
       <section>
         <h3 className="mb-1.5 font-semibold text-foreground">

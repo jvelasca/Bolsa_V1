@@ -1,6 +1,7 @@
 import type { AccountSettings } from "@bolsa/shared";
 import { calculateTradeFees, executeCtaLabel } from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { LiveVirtualVenueBadge } from "@/features/confirm/live-virtual-banner";
 import { cn } from "@/lib/utils";
 
 export interface TradeConfirmDetails {
@@ -66,13 +67,7 @@ export function TradeConfirmPanel({
             Confirmar {orderLabel ?? sideLabel.toLowerCase()}
           </p>
           {venue === "live" ? (
-            <span
-              className="rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100"
-              data-testid="manual-live-venue-badge"
-              title="LIVE experimental · submitted ≠ fill · trading not accepted"
-            >
-              LIVE
-            </span>
+            <LiveVirtualVenueBadge testId="manual-live-venue-badge" />
           ) : null}
         </div>
         <p className="mt-2 text-lg font-semibold">

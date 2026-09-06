@@ -31,4 +31,12 @@ describe("SupervisedF3Panel V1.25 contract", () => {
     expect(src).toMatch(/resolveSupervisedOpeningQuantity/);
     expect(src).not.toMatch(/suggestQuantityFromCash/);
   });
+
+  it("LIVE VIRTUAL hybrid gateway inside Confirm (no experimental-only badge)", () => {
+    expect(src).toMatch(/LiveVirtualOrderGateway/);
+    expect(src).toMatch(/live-virtual-order-gateway|LiveVirtualOrderGateway/);
+    expect(src).toMatch(/LiveVirtualVenueBadge/);
+    expect(src).not.toMatch(/LIVE experimental/);
+    expect(src).toMatch(/executeCtaLabel\(brokerVenue\)/);
+  });
 });

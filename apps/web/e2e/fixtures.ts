@@ -26,4 +26,5 @@ export {
   installHoyPaperDayApiMocks,
   installHoyStaleNoExecuteMocks,
   installUnknownOrderMocks,
+  installLiveVirtualConfirmMocks,
 } from "./helpers/e2e-mock-installers";

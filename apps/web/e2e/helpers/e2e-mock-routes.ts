@@ -157,7 +157,52 @@ export type E2eMockRouteOpts = {
   hoyStale?: boolean;
   /** V1.76 — UNKNOWN order aislado (sin stale, sin incidente). */
   hoyUnknown?: boolean;
+  /**
+   * Confirm LIVE VIRTUAL smoke — venue=live (simulado) + cola F3 mínima.
+   * ≠ flip capital / ≠ Accept LIVE / ≠ PAPER_D_EXECUTE.
+   */
+  liveVenue?: boolean;
 };
+
+/** Cola mínima para hidratar SupervisedF3 en smoke LIVE VIRTUAL. */
+function liveVirtualSupervisedF3Bundle() {
+  const itemId = "e2e-live-virtual-f3-1";
+  return {
+    accountId: E2E_ACCOUNT_ID,
+    activeId: itemId,
+    updatedAt: "2026-09-07T12:00:00.000Z",
+    items: [
+      {
+        id: itemId,
+        enqueuedAt: "2026-09-07T12:00:00.000Z",
+        symbol: E2E_SYMBOL,
+        origin: "manual",
+        payload: {
+          artifactType: "ART-RECOMMENDATION",
+          schemaVersion: "1.0.0",
+          recommendationId: "REC-E2E-LIVE-VIRTUAL",
+          decisionId: "DEC-E2E-LIVE-VIRTUAL",
+          instrumentId: E2E_INSTRUMENT_ID,
+          symbol: E2E_SYMBOL,
+          action: "recommend_long",
+          suggestedQuantity: 10,
+          suggestedPrice: 192.4,
+          metrics: {
+            confidence: 0.5,
+            consensus: 0.5,
+            evidenceStrength: 0.5,
+            stability: 0.5,
+            conviction: 0.5,
+          },
+          status: "awaiting_human",
+          createdAt: "2026-09-07T12:00:00.000Z",
+          source: "manual",
+          lastClose: 192.4,
+        },
+      },
+    ],
+  };
+}
 
 export function routeBody(
   route: Route,
@@ -688,7 +733,36 @@ export function routeBody(
     return { data: { enabled: false } };
   }
   if (path === "/api/risk/broker-venue") {
-    return { data: { venue: "paper" } };
+    // Shape = BrokerVenueResponse (top-level); mock antiguo `{ venue }` era noop → paper.
+    const venue = opts?.liveVenue ? "live" : "paper";
+    return {
+      brokerVenue: venue,
+      env: venue,
+      runtimeMemory: null,
+      redis: null,
+    };
+  }
+  if (path.match(/^\/api\/accounts\/[^/]+\/broker-venue$/)) {
+    const venue = opts?.liveVenue ? "live" : "paper";
+    const accountId = path.split("/")[3] ?? E2E_ACCOUNT_ID;
+    return {
+      accountId,
+      preference: opts?.liveVenue ? venue : null,
+      effective: venue,
+    };
+  }
+  if (path.match(/^\/api\/accounts\/[^/]+\/supervised-f3-queue$/)) {
+    if (opts?.liveVenue) {
+      return { data: liveVirtualSupervisedF3Bundle() };
+    }
+    return {
+      data: {
+        accountId: path.split("/")[3] ?? E2E_ACCOUNT_ID,
+        items: [],
+        activeId: null,
+        updatedAt: null,
+      },
+    };
   }
   if (path === "/api/ai/status") {
     return {
