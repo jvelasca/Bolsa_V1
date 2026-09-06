@@ -45,6 +45,12 @@ def build_ops_self_eval_report(
     portfolio_reconciliation_status: Literal[
         "ok", "not_wired", "unavailable", "error", "drift"
     ] = "not_wired",
+    live_reconciliation_status: Literal[
+        "clean", "drift", "unavailable"
+    ]
+    | None = None,
+    live_adapter_wired: bool | None = None,
+    live_reconciliation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Informe JSON-friendly: carriles SEMI y AUTO + honesty."""
 
@@ -107,8 +113,18 @@ def build_ops_self_eval_report(
         broker_venue=broker_venue,
         kill_switch_effective=kill_switch_effective,
         portfolio_reconciliation_status=portfolio_reconciliation_status,
+        live_reconciliation_status=live_reconciliation_status,
+        live_adapter_wired=live_adapter_wired,
         semi_path_mark=semi_lane,
     )
+
+    live_recon_out: dict[str, Any] | None = None
+    if broker_venue == "live":
+        live_recon_out = live_reconciliation or {
+            "status": live_reconciliation_status or "unavailable",
+            "note": "LR-1 detect/report; no heal · OR-6 fail-closed if unmeasured",
+            "adapterWired": live_adapter_wired is True,
+        }
 
     return {
         "schemaVersion": "ops_self_eval_v0",
@@ -161,7 +177,9 @@ def build_ops_self_eval_report(
             "accountVenuePreference": account_venue_preference,
             "paperDExecuteEnv": paper_d_execute_env,
             "confirmPathHonesty": "SEMI Confirm = única firma; AUTO execute solo opt-in env",
+            "liveAdapterWired": live_adapter_wired,
         },
         "portfolioReconciliation": recon,
+        "liveReconciliation": live_recon_out,
         "operationalReadiness": readiness,
     }

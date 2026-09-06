@@ -86,18 +86,47 @@ def test_live_clean_is_experimental_never_ready() -> None:
     report = derive_operational_readiness(
         broker_venue="live",
         portfolio_reconciliation_status="ok",
+        live_reconciliation_status="clean",
+        live_adapter_wired=True,
         semi_path_mark="PASS",
     )
     assert report["state"] == "LIVE_EXPERIMENTAL"
     assert "live_not_accepted" in report["notes"]
     assert report["state"] != "PAPER_READY"
+    assert "live_unavailable" not in report["reasons"]
+    assert "live_adapter_not_wired" not in report["reasons"]
+
+
+def test_live_unmeasured_recon_blocks() -> None:
+    """Ausencia de LR-1 = fail-closed LIVE_BLOCKED (≠ EXPERIMENTAL)."""
+    report = derive_operational_readiness(
+        broker_venue="live",
+        portfolio_reconciliation_status="ok",
+        live_adapter_wired=True,
+        semi_path_mark="PASS",
+    )
+    assert report["state"] == "LIVE_BLOCKED"
+    assert "live_unavailable" in report["reasons"]
 
 
 def test_live_drift_blocks() -> None:
     report = derive_operational_readiness(
         broker_venue="live",
         portfolio_reconciliation_status="ok",
+        live_reconciliation_status="drift",
+        live_adapter_wired=True,
+        semi_path_mark="PASS",
+    )
+    assert report["state"] == "LIVE_BLOCKED"
+    assert "live_drift" in report["reasons"]
+
+
+def test_live_unavailable_blocks() -> None:
+    report = derive_operational_readiness(
+        broker_venue="live",
+        portfolio_reconciliation_status="ok",
         live_reconciliation_status="unavailable",
+        live_adapter_wired=True,
         semi_path_mark="PASS",
     )
     assert report["state"] == "LIVE_BLOCKED"
@@ -108,7 +137,20 @@ def test_live_adapter_not_wired_blocks() -> None:
     report = derive_operational_readiness(
         broker_venue="live",
         portfolio_reconciliation_status="ok",
+        live_reconciliation_status="clean",
         live_adapter_wired=False,
+        semi_path_mark="PASS",
+    )
+    assert report["state"] == "LIVE_BLOCKED"
+    assert "live_adapter_not_wired" in report["reasons"]
+
+
+def test_live_adapter_none_blocks() -> None:
+    report = derive_operational_readiness(
+        broker_venue="live",
+        portfolio_reconciliation_status="ok",
+        live_reconciliation_status="clean",
+        live_adapter_wired=None,
         semi_path_mark="PASS",
     )
     assert report["state"] == "LIVE_BLOCKED"

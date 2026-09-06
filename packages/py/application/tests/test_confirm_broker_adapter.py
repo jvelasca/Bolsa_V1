@@ -102,7 +102,9 @@ class _FakeXtb:
 @pytest.mark.asyncio
 async def test_confirm_xtb_rejected_skips_without_fill() -> None:
     adapter = XtbBrokerAdapter(
-        client=_FakeXtb(XtbBridgeOrderResult(status="rejected", reason="live_orders_disabled"))
+        client=_FakeXtb(XtbBridgeOrderResult(status="rejected", reason="live_orders_disabled")),
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
     )
     uc = ConfirmRecommendationIntent(broker_adapter=adapter)
     result = await uc.execute(
@@ -125,7 +127,9 @@ async def test_confirm_xtb_submitted_is_unknown_not_executed() -> None:
     adapter = XtbBrokerAdapter(
         client=_FakeXtb(
             XtbBridgeOrderResult(status="submitted", venue_order_id="xtb-1")
-        )
+        ),
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
     )
     uc = ConfirmRecommendationIntent(broker_adapter=adapter)
     result = await uc.execute(
@@ -153,6 +157,8 @@ async def test_confirm_xtb_filled_executes_with_transaction_id() -> None:
             )
         ),
         execute_trade=_OkExecute(),
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
     )
     uc = ConfirmRecommendationIntent(broker_adapter=adapter)
     result = await uc.execute(

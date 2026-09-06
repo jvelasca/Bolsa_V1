@@ -94,7 +94,11 @@ async def test_confirm_lazy_live_from_account_settings(
             execute=True,
         )
         assert result["trade"]["status"] == "skipped"
-        assert result["trade"]["reason"] in ("live_not_wired", "xtb_bridge_not_configured")
+        assert result["trade"]["reason"] in (
+            "live_not_wired",
+            "xtb_bridge_not_configured",
+            "live_virtual_sandbox",
+        )
         assert result["brokerAdapter"]["venue"] == "LIVE"
         assert result["brokerAdapter"]["adapter"] == "xtb"
         assert "paperOrder" not in result
@@ -281,7 +285,11 @@ async def test_fill_lazy_live_from_account_settings(
         )
         result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
         assert result["status"] == "skipped"
-        assert result["reason"] in ("live_not_wired", "xtb_bridge_not_configured")
+        assert result["reason"] in (
+            "live_not_wired",
+            "xtb_bridge_not_configured",
+            "live_virtual_sandbox",
+        )
         assert result["brokerAdapter"]["venue"] == "LIVE"
         assert result["brokerAdapter"]["adapter"] == "xtb"
         assert len(fake_trade.calls) == 0

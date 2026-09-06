@@ -34,10 +34,37 @@ describe("OR-6 deriveOperationalReadiness", () => {
     const report = deriveOperationalReadiness({
       brokerVenue: "live",
       portfolioReconciliationStatus: "ok",
+      liveReconciliationStatus: "clean",
+      liveAdapterWired: true,
       semiPathMark: "PASS",
     });
     expect(report.state).toBe("LIVE_EXPERIMENTAL");
     expect(report.notes).toContain("live_not_accepted");
+    expect(report.reasons).not.toContain("live_unavailable");
+    expect(report.reasons).not.toContain("live_adapter_not_wired");
+  });
+
+  it("live unmeasured recon blocks", () => {
+    const report = deriveOperationalReadiness({
+      brokerVenue: "live",
+      portfolioReconciliationStatus: "ok",
+      liveAdapterWired: true,
+      semiPathMark: "PASS",
+    });
+    expect(report.state).toBe("LIVE_BLOCKED");
+    expect(report.reasons).toContain("live_unavailable");
+  });
+
+  it("live drift blocks", () => {
+    const report = deriveOperationalReadiness({
+      brokerVenue: "live",
+      portfolioReconciliationStatus: "ok",
+      liveReconciliationStatus: "drift",
+      liveAdapterWired: true,
+      semiPathMark: "PASS",
+    });
+    expect(report.state).toBe("LIVE_BLOCKED");
+    expect(report.reasons).toContain("live_drift");
   });
 
   it("live unavailable blocks", () => {
@@ -45,10 +72,23 @@ describe("OR-6 deriveOperationalReadiness", () => {
       brokerVenue: "live",
       portfolioReconciliationStatus: "ok",
       liveReconciliationStatus: "unavailable",
+      liveAdapterWired: true,
       semiPathMark: "PASS",
     });
     expect(report.state).toBe("LIVE_BLOCKED");
     expect(report.reasons).toContain("live_unavailable");
+  });
+
+  it("live adapter null blocks", () => {
+    const report = deriveOperationalReadiness({
+      brokerVenue: "live",
+      portfolioReconciliationStatus: "ok",
+      liveReconciliationStatus: "clean",
+      liveAdapterWired: null,
+      semiPathMark: "PASS",
+    });
+    expect(report.state).toBe("LIVE_BLOCKED");
+    expect(report.reasons).toContain("live_adapter_not_wired");
   });
 });
 

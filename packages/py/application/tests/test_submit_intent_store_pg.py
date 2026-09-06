@@ -247,7 +247,11 @@ async def test_confirm_marks_send_attempted_before_adapter() -> None:
     """Confirm: put recorded → put send_attempted → adapter.submit."""
     store = _RecordingStore()
     xtb = _FakeXtb()
-    adapter = XtbBrokerAdapter(client=xtb)
+    adapter = XtbBrokerAdapter(
+        client=xtb,
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
+    )
     uc = ConfirmRecommendationIntent(
         broker_adapter=adapter,
         submit_intent_store=store,

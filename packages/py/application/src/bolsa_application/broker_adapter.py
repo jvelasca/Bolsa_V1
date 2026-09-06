@@ -170,7 +170,11 @@ class _XtbOrderClient(Protocol):
 
 
 class XtbBrokerAdapter:
-    """LIVE vía bridge XTB. submitted ≠ fill; filled→ledger (XL-2)."""
+    """LIVE vía bridge XTB. submitted ≠ fill; filled→ledger (XL-2).
+
+    VIRTUAL sandbox: sin ``LIVE_EXECUTION_UNLOCKED`` no hay POST al bridge.
+    Kill switch se reconsulta aquí (además del OpeningGate).
+    """
 
     def __init__(
         self,
@@ -178,6 +182,8 @@ class XtbBrokerAdapter:
         bridge_url: str | None = None,
         client: _XtbOrderClient | None = None,
         execute_trade: Any | None = None,
+        kill_switch_check: Any | None = None,
+        execution_unlocked_check: Any | None = None,
     ) -> None:
         if client is not None:
             self._client: _XtbOrderClient | None = client
@@ -186,6 +192,27 @@ class XtbBrokerAdapter:
         else:
             self._client = None
         self._execute_trade = execute_trade
+        self._kill_switch_check = kill_switch_check
+        self._execution_unlocked_check = execution_unlocked_check
+
+    async def _kill_on(self) -> bool:
+        check = self._kill_switch_check
+        if check is None:
+            from bolsa_application.risk_runtime import effective_kill_switch
+
+            return bool(await effective_kill_switch())
+        result = check()
+        if hasattr(result, "__await__"):
+            return bool(await result)
+        return bool(result)
+
+    def _unlocked(self) -> bool:
+        check = self._execution_unlocked_check
+        if check is None:
+            from bolsa_application.live_execution_runtime import live_execution_unlocked
+
+            return bool(live_execution_unlocked())
+        return bool(check())
 
     async def submit(
         self,
@@ -199,6 +226,31 @@ class XtbBrokerAdapter:
         order_id: str | None = None,
         intent_id: str | None = None,
     ) -> BrokerAdapterSubmitResult:
+        if await self._kill_on():
+            return BrokerAdapterSubmitResult(
+                venue="LIVE",
+                adapter=BROKER_ADAPTER_XTB,
+                fill_status="rejected",
+                paper_order=None,
+                paper_receipt=None,
+                trade=None,
+                status="rejected",
+                reason="kill_switch_active",
+                transaction_id=None,
+            )
+        if not self._unlocked():
+            # VIRTUAL sandbox: Confirm chrome OK, money path NO.
+            return BrokerAdapterSubmitResult(
+                venue="LIVE",
+                adapter=BROKER_ADAPTER_XTB,
+                fill_status="not_wired",
+                paper_order=None,
+                paper_receipt=None,
+                trade=None,
+                status="not_wired",
+                reason="live_virtual_sandbox",
+                transaction_id=None,
+            )
         if self._client is None:
             return BrokerAdapterSubmitResult(
                 venue="LIVE",

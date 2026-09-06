@@ -214,7 +214,11 @@ async def test_fill_pending_xtb_rejected_keeps_order() -> None:
         repo,  # type: ignore[arg-type]
         _FakeAccountRepo(),  # type: ignore[arg-type]
         execute_trade=fake_trade,
-        broker_adapter=XtbBrokerAdapter(client=_FakeXtb()),
+        broker_adapter=XtbBrokerAdapter(
+            client=_FakeXtb(),
+            kill_switch_check=lambda: False,
+            execution_unlocked_check=lambda: True,
+        ),
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
@@ -245,7 +249,12 @@ async def test_fill_pending_xtb_submitted_keeps_order() -> None:
         repo,  # type: ignore[arg-type]
         _FakeAccountRepo(),  # type: ignore[arg-type]
         execute_trade=fake_trade,
-        broker_adapter=XtbBrokerAdapter(client=_FakeXtb(), execute_trade=fake_trade),
+        broker_adapter=XtbBrokerAdapter(
+            client=_FakeXtb(),
+            execute_trade=fake_trade,
+            kill_switch_check=lambda: False,
+            execution_unlocked_check=lambda: True,
+        ),
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
@@ -277,7 +286,12 @@ async def test_fill_pending_xtb_filled_executes_and_deletes() -> None:
         repo,  # type: ignore[arg-type]
         _FakeAccountRepo(),  # type: ignore[arg-type]
         execute_trade=fake_trade,
-        broker_adapter=XtbBrokerAdapter(client=_FakeXtb(), execute_trade=fake_trade),
+        broker_adapter=XtbBrokerAdapter(
+            client=_FakeXtb(),
+            execute_trade=fake_trade,
+            kill_switch_check=lambda: False,
+            execution_unlocked_check=lambda: True,
+        ),
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)

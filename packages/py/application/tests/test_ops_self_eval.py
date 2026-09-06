@@ -81,6 +81,56 @@ def test_unavailable_when_telemetry_missing() -> None:
     assert report["operationalReadiness"]["state"] == "LIVE_BLOCKED"
     assert "kill_switch" in report["operationalReadiness"]["reasons"]
     assert "recon_not_certified" in report["operationalReadiness"]["reasons"]
+    # OR-6 fail-closed: LR-1 no medido + adapter no cableado
+    assert "live_unavailable" in report["operationalReadiness"]["reasons"]
+    assert "live_adapter_not_wired" in report["operationalReadiness"]["reasons"]
+    assert report["liveReconciliation"]["status"] == "unavailable"
+
+
+def test_live_oe1_wires_lr1_clean_to_experimental() -> None:
+    report = build_ops_self_eval_report(
+        account_id="acc",
+        lookback_days=120,
+        paper_d_execute_env=False,
+        kill_switch_effective=False,
+        broker_venue="live",
+        days_with_opinions=28,
+        buy_precision_5d=None,
+        buy_recall_5d=0.0,
+        confirm_seed=3,
+        journal_seed=8,
+        buys_seed=2,
+        trade_like=2,
+        cash_max_dd_frac=0.002,
+        portfolio_reconciliation_status="ok",
+        portfolio_reconciliation={"ok": True, "issues": []},
+        live_reconciliation_status="clean",
+        live_adapter_wired=True,
+    )
+    assert report["operationalReadiness"]["state"] == "LIVE_EXPERIMENTAL"
+    assert "live_not_accepted" in report["operationalReadiness"]["notes"]
+    assert report["liveReconciliation"]["adapterWired"] is True
+    assert report["runtime"]["liveAdapterWired"] is True
+
+
+def test_live_oe1_unmeasured_lr1_blocks() -> None:
+    report = build_ops_self_eval_report(
+        account_id="acc",
+        lookback_days=120,
+        paper_d_execute_env=False,
+        kill_switch_effective=False,
+        broker_venue="live",
+        confirm_seed=3,
+        journal_seed=8,
+        buys_seed=2,
+        trade_like=2,
+        cash_max_dd_frac=0.002,
+        portfolio_reconciliation_status="ok",
+        live_adapter_wired=True,
+    )
+    assert report["operationalReadiness"]["state"] == "LIVE_BLOCKED"
+    assert "live_unavailable" in report["operationalReadiness"]["reasons"]
+    assert report["liveReconciliation"]["status"] == "unavailable"
 
 
 def test_or6_auto_fail_does_not_average_away_paper_ready() -> None:

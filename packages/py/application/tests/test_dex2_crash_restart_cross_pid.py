@@ -241,7 +241,11 @@ async def test_dex2_live_submit_then_fresh_client_no_second_post() -> None:
     table = _SharedPgTable()
     store_a = _fresh_store(table)
     xtb = _FakeXtb(XtbBridgeOrderResult(status="submitted", venue_order_id="xtb-dex2-live"))
-    adapter = XtbBrokerAdapter(client=xtb)
+    adapter = XtbBrokerAdapter(
+        client=xtb,
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
+    )
     uc_a = ConfirmRecommendationIntent(
         broker_adapter=adapter,
         submit_intent_store=store_a,

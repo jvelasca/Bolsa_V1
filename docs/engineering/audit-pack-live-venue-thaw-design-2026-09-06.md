@@ -9,12 +9,12 @@
 
 ## 0. Honestidad
 
-| Afirmar                                                       | No afirmar                                        |
-| ------------------------------------------------------------- | ------------------------------------------------- |
-| Cableado XL-1/LR-1/XL-2/VS-1/RV-1/PA-1 + OR-4/OR-6 **existe** | Que LIVE TRADING está Accepted                    |
-| Mock bridge fail-closed por defecto                           | Que mock FILL = capital XTB real                  |
-| Scorecard de precondiciones para un thaw **futuro**           | Que este pack autoriza flip `brokerVenue=live`    |
-| `LIVE_EXPERIMENTAL` ≠ Accepted (note `live_not_accepted`)     | Que OE-1 hoy refleja LR-1 en OR-6 (gap de wiring) |
+| Afirmar                                                       | No afirmar                                     |
+| ------------------------------------------------------------- | ---------------------------------------------- |
+| Cableado XL-1/LR-1/XL-2/VS-1/RV-1/PA-1 + OR-4/OR-6 **existe** | Que LIVE TRADING está Accepted                 |
+| Mock bridge fail-closed por defecto                           | Que mock FILL = capital XTB real               |
+| Scorecard de precondiciones para un thaw **futuro**           | Que este pack autoriza flip `brokerVenue=live` |
+| `LIVE_EXPERIMENTAL` ≠ Accepted (note `live_not_accepted`)     | Que `LIVE_EXPERIMENTAL` = listo para capital   |
 
 Freeze: NO LIVE · `PAPER_D_EXECUTE` off · Confirm = firma · Arm ≠ Execute · Ranking ≠ BUY · **NO MÁS PANELES** · **PRODUCT FREEZE**.
 
@@ -32,18 +32,18 @@ Arranque: [LIVE VIRTUAL design](./arranque-agente-pista-a-estricto-2026-09-07.md
 
 ## 1. Inventario cerrado (código) vs parked
 
-| Pieza                                                   | Estado         | Nota                                                         |
-| ------------------------------------------------------- | -------------- | ------------------------------------------------------------ |
-| XL-1 `XtbBrokerAdapter`                                 | CERRADO        | `submitted` ≠ fill · sin bridge → `not_wired`                |
-| LR-1 `LiveLedgerReconciliation`                         | CERRADO        | detect/report · `unavailable` fail-closed · no heal          |
-| XL-2 filled → `execute_trade`                           | CERRADO        | solo tras bridge `filled` · boom → `unknown`                 |
-| VS-1 / RV-1 / PA-1 venue                                | CERRADO        | coalesce memory ?? redis ?? account ?? env ?? **paper**      |
-| OR-4 opening veto live                                  | CERRADO        | `live_drift` / `live_unavailable` solo venue live            |
-| OR-6 readiness 4 estados                                | CERRADO        | `LIVE_BLOCKED` si reasons; else `LIVE_EXPERIMENTAL`          |
-| Money path XTB API real                                 | **PARKED**     | mock ≠ settlement real                                       |
-| Accept LIVE / capital prod                              | **PARKED**     | owner + scorecard                                            |
-| Wire OE-1 → LR-1 / adapter en OR-6                      | **GAP docs**   | params existen; `build_ops_self_eval_report` no los pasa hoy |
-| Typed `AccountSettings.brokerVenue` / Redis per-account | PARKED ADR-034 |                                                              |
+| Pieza                                                   | Estado                   | Nota                                                    |
+| ------------------------------------------------------- | ------------------------ | ------------------------------------------------------- |
+| XL-1 `XtbBrokerAdapter`                                 | CERRADO                  | `submitted` ≠ fill · sin bridge → `not_wired`           |
+| LR-1 `LiveLedgerReconciliation`                         | CERRADO                  | detect/report · `unavailable` fail-closed · no heal     |
+| XL-2 filled → `execute_trade`                           | CERRADO                  | solo tras bridge `filled` · boom → `unknown`            |
+| VS-1 / RV-1 / PA-1 venue                                | CERRADO                  | coalesce memory ?? redis ?? account ?? env ?? **paper** |
+| OR-4 opening veto live                                  | CERRADO                  | `live_drift` / `live_unavailable` solo venue live       |
+| OR-6 readiness 4 estados                                | CERRADO                  | `LIVE_BLOCKED` si reasons; else `LIVE_EXPERIMENTAL`     |
+| Money path XTB API real                                 | **PARKED**               | mock ≠ settlement real                                  |
+| Accept LIVE / capital prod                              | **PARKED**               | owner + scorecard                                       |
+| Wire OE-1 → LR-1 / adapter en OR-6                      | **CERRADO (post V2.11)** | OE-1 mide LR-1 + bridge URL → OR-6 fail-closed          |
+| Typed `AccountSettings.brokerVenue` / Redis per-account | PARKED ADR-034           |                                                         |
 
 ---
 
@@ -99,10 +99,11 @@ Override global mesa **≠** thaw `PAPER_D_EXECUTE` (ortogonal).
 - XL-2 mock filled = settlement XTB real.
 - OI-6 `clean` = LR-1 live-safe.
 - Prep PAPER / DEMO execute / Accept estricto = autorización LIVE.
-- OE-1 refleja hoy LR-1 / adapter wired en OR-6.
+- OE-1 sin LR-1 medido (ya cableado post V2.11; unmeasured → BLOCKED).
 - Que el estudio LIVE VIRTUAL = capital real / pasarela UI **Accepted** o **shipped**.
 - Que el [diseño UI híbrido](./design-live-virtual-order-gateway-ui-2026-09-07.md) autorice thaw o flip venue/execute.
 - Que VIRTUAL (meses) autorice thaw prod antes de APP 100% probada.
+- Que `LIVE_EXECUTION_UNLOCKED` off se salte con solo `brokerVenue=live`.
 
 ---
 
@@ -111,4 +112,4 @@ Override global mesa **≠** thaw `PAPER_D_EXECUTE` (ortogonal).
 1. [Diseño UI pasarela LIVE VIRTUAL (híbrido)](./design-live-virtual-order-gateway-ui-2026-09-07.md) — concepto cerrado · UI producto **no** implementada · [relevo](./traspaso-relevo-design-live-virtual-ui-2026-09-07.md).
 2. [Runbook gates](./runbook-live-venue-thaw-gates-2026-09-06.md) — preflight / flip futuro / abort / restore paper (**sin** ejecutar flip hoy).
 3. Cadena B: Accept estricto — [deuda](./deuda-thaw-estricto-runbook-2026-08-25.md) · **≠** este pack.
-4. Post-freeze opcional: wire OE-1 → `live_reconciliation_status` + `live_adapter_wired`.
+4. Post-freeze: OR-6 fail-closed + OE-1↔LR-1 + VIRTUAL sandbox + XL-3 dominio — ver [roadmap LIVE Execution](./roadmap-live-execution-core-2026-09-07.md).

@@ -156,7 +156,11 @@ async def test_or2_live_submitted_retry_single_submit() -> None:
     """Retry Confirm live submitted (mismo store) → 1 submit + mismo venue_order_id."""
     store = InMemorySubmitIntentStore()
     xtb = _FakeXtb(XtbBridgeOrderResult(status="submitted", venue_order_id="xtb-1"))
-    adapter = XtbBrokerAdapter(client=xtb)
+    adapter = XtbBrokerAdapter(
+        client=xtb,
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
+    )
     uc = ConfirmRecommendationIntent(
         broker_adapter=adapter,
         submit_intent_store=store,

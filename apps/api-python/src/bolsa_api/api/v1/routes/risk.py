@@ -24,6 +24,7 @@ from bolsa_api.api.dependencies import (
     get_account_repository,
     get_daily_opinion_telemetry_service,
     get_db_session,
+    get_live_recon_lookup,
 )
 from bolsa_application.broker_venue_runtime import (
     account_broker_venue_from_settings,
@@ -208,6 +209,32 @@ async def get_ops_self_eval(
     except Exception:  # noqa: BLE001 — OI-6 gap
         recon_status = "error"
 
+    live_recon_status: Literal["clean", "drift", "unavailable"] | None = None
+    live_recon_payload: dict[str, Any] | None = None
+    live_adapter_wired: bool | None = None
+    if venue == "live":
+        from bolsa_infrastructure.config import get_settings
+
+        url = (get_settings().xtb_bridge_url or "").strip()
+        live_adapter_wired = bool(url)
+        live_recon_status = "unavailable"
+        try:
+            status = await get_live_recon_lookup(session).live_recon_status(account_id)
+            if status in ("clean", "drift", "unavailable"):
+                live_recon_status = status
+            live_recon_payload = {
+                "status": live_recon_status,
+                "adapterWired": live_adapter_wired,
+                "note": "LR-1 detect/report; no heal · OR-6 fail-closed if unmeasured",
+            }
+        except Exception:  # noqa: BLE001 — LR-1 gap → unavailable
+            live_recon_status = "unavailable"
+            live_recon_payload = {
+                "status": "unavailable",
+                "adapterWired": live_adapter_wired,
+                "note": "LR-1 measure failed · OR-6 fail-closed",
+            }
+
     return build_ops_self_eval_report(
         account_id=account_id,
         lookback_days=lookback_days,
@@ -227,4 +254,7 @@ async def get_ops_self_eval(
         cash_max_dd_frac=cash_dd,
         portfolio_reconciliation=recon_payload,
         portfolio_reconciliation_status=recon_status,
+        live_reconciliation_status=live_recon_status,
+        live_adapter_wired=live_adapter_wired,
+        live_reconciliation=live_recon_payload,
     )

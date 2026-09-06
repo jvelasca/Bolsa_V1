@@ -777,6 +777,26 @@ export function routeBody(
       },
     };
   }
+  if (path === "/api/ai/intents/confirm" && opts?.liveVenue) {
+    // VIRTUAL sandbox: Confirm firma OK · money path bloqueado (≠ POST bridge).
+    return {
+      data: {
+        intent: {
+          status: "authorized",
+          contract: "ok",
+        },
+        trade: {
+          status: "skipped",
+          reason: "live_virtual_sandbox",
+        },
+        brokerAdapter: {
+          venue: "LIVE",
+          adapter: "xtb",
+          fillStatus: "not_wired",
+        },
+      },
+    };
+  }
   if (path === "/api/scans/jobs") {
     return { data: [] };
   }

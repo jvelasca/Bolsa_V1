@@ -71,16 +71,18 @@ export function deriveOperationalReadiness(
     notes.push("thin_semi_evidence");
   }
 
+  // LR-1: clean (alias ok). Ausencia / cualquier otro valor = fail-closed.
   const live = String(input.liveReconciliationStatus ?? "")
     .trim()
     .toLowerCase();
   if (venue === "live") {
     if (live === "drift") {
       reasons.push("live_drift");
-    } else if (live === "unavailable") {
+    } else if (live !== "clean" && live !== "ok") {
       reasons.push("live_unavailable");
     }
-    if (input.liveAdapterWired === false) {
+    // null / false = no cableado; solo true cuenta como wired.
+    if (input.liveAdapterWired !== true) {
       reasons.push("live_adapter_not_wired");
     }
     notes.push("live_not_accepted");

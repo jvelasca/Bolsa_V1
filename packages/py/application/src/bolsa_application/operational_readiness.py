@@ -57,13 +57,15 @@ def derive_operational_readiness(
     elif semi == "WARN":
         notes.append("thin_semi_evidence")
 
+    # LR-1: clean (alias ok). Ausencia / cualquier otro valor = fail-closed.
     live = (live_reconciliation_status or "").strip().lower()
     if venue == "live":
         if live == "drift":
             reasons.append("live_drift")
-        elif live == "unavailable":
+        elif live not in {"clean", "ok"}:
             reasons.append("live_unavailable")
-        if live_adapter_wired is False:
+        # None / False = no cableado; solo True cuenta como wired.
+        if live_adapter_wired is not True:
             reasons.append("live_adapter_not_wired")
         notes.append("live_not_accepted")
 

@@ -6,6 +6,10 @@
 
 Freeze: NO LIVE capital · LIVE estudio = **VIRTUAL / SIMULADO** · `PAPER_D_EXECUTE` off · Confirm = firma · Ranking ≠ BUY · Arm ≠ Execute · **NO MÁS PANELES** (excepción owner: híbrido **dentro** de Confirm) · FSM / outbox / Alembic `019` intactos.
 
+### Provenance / cronología (P2 docs)
+
+La **GitHub Release** del tip `v2.11-beta` se publicó el **2026-09-06** (UTC) apuntando a `80e891c4`. Los packs/relevos internos de V2.11 llevan **AsOf 2026-09-07** porque la auditoría y el stamp documental se cerraron en esa fecha local de trabajo. **No** reescribir historia: release commit ≠ AsOf de packs. Cadena canónica: commit tip → release body → audit pack → relevo → Help AsOf.
+
 ---
 
 ## 0. Alcance tip

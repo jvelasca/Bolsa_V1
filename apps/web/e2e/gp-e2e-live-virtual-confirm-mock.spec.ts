@@ -60,4 +60,28 @@ test.describe("GP-E2E — Confirm LIVE VIRTUAL (mock)", () => {
     await expect(executeCta).toContainText(/simulado/i);
     await expect(executeCta).not.toHaveText(/^Ejecutar en LIVE$/);
   });
+
+  test("execute CTA stays sandboxed — zero bridge /orders POSTs", async ({
+    page,
+  }) => {
+    const bridgePosts: string[] = [];
+    page.on("request", (req) => {
+      const url = req.url();
+      if (
+        req.method().toUpperCase() === "POST" &&
+        /\/orders(?:\?|$)/.test(url) &&
+        !url.includes("/api/")
+      ) {
+        bridgePosts.push(url);
+      }
+    });
+
+    await page.goto("/confirm");
+    const executeCta = page.getByTestId("confirm-execute-cta");
+    await expect(executeCta).toBeVisible({ timeout: 15_000 });
+    await executeCta.click();
+
+    // Mock Confirm responde live_virtual_sandbox; nunca sale al bridge.
+    await expect.poll(() => bridgePosts.length).toBe(0);
+  });
 });

@@ -46,6 +46,21 @@ class _FakeXtb:
         return self.result
 
 
+def _unlocked_xtb(
+    *,
+    client: _FakeXtb | None = None,
+    execute_trade: Any | None = None,
+    kill: bool = False,
+) -> XtbBrokerAdapter:
+    """Adapter with VIRTUAL sandbox + kill disabled (unless kill=True)."""
+    return XtbBrokerAdapter(
+        client=client,
+        execute_trade=execute_trade,
+        kill_switch_check=lambda: kill,
+        execution_unlocked_check=lambda: True,
+    )
+
+
 @pytest.mark.asyncio
 async def test_paper_adapter_ok_fills() -> None:
     adapter = PaperBrokerAdapter(_OkExecute())
@@ -111,7 +126,10 @@ async def test_mock_adapter_never_calls_execute() -> None:
 
 @pytest.mark.asyncio
 async def test_xtb_without_bridge_is_not_wired() -> None:
-    adapter = XtbBrokerAdapter()
+    adapter = XtbBrokerAdapter(
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
+    )
     result = await adapter.submit(
         instrument_id="inst-1",
         side="buy",
@@ -128,10 +146,56 @@ async def test_xtb_without_bridge_is_not_wired() -> None:
 
 
 @pytest.mark.asyncio
+async def test_xtb_virtual_sandbox_blocks_bridge_post() -> None:
+    """LIVE VIRTUAL: unlock off → no HTTP even with client wired."""
+    fake = _FakeXtb(XtbBridgeOrderResult(status="filled", reason="live_filled"))
+    adapter = XtbBrokerAdapter(
+        client=fake,
+        execute_trade=_SpyExecute(),
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: False,
+    )
+    result = await adapter.submit(
+        instrument_id="inst-1",
+        side="buy",
+        quantity=1.0,
+        price=10.0,
+        account_id="acc-1",
+        idempotency_key="idem-sandbox",
+    )
+    assert fake.calls == 0
+    assert result.status == "not_wired"
+    assert result.reason == "live_virtual_sandbox"
+    assert result.trade is None
+
+
+@pytest.mark.asyncio
+async def test_xtb_kill_switch_rejects_before_bridge() -> None:
+    fake = _FakeXtb(XtbBridgeOrderResult(status="filled", reason="live_filled"))
+    adapter = XtbBrokerAdapter(
+        client=fake,
+        execute_trade=_SpyExecute(),
+        kill_switch_check=lambda: True,
+        execution_unlocked_check=lambda: True,
+    )
+    result = await adapter.submit(
+        instrument_id="inst-1",
+        side="buy",
+        quantity=1.0,
+        price=10.0,
+        account_id="acc-1",
+        idempotency_key="idem-kill",
+    )
+    assert fake.calls == 0
+    assert result.status == "rejected"
+    assert result.reason == "kill_switch_active"
+
+
+@pytest.mark.asyncio
 async def test_xtb_rejected_never_touches_ledger() -> None:
     spy = _SpyExecute()
     fake = _FakeXtb(XtbBridgeOrderResult(status="rejected", reason="live_orders_disabled"))
-    adapter = XtbBrokerAdapter(client=fake, execute_trade=spy)
+    adapter = _unlocked_xtb(client=fake, execute_trade=spy)
     result = await adapter.submit(
         instrument_id="inst-1",
         side="buy",
@@ -160,7 +224,7 @@ async def test_xtb_submitted_is_not_executed_fill() -> None:
             venue_order_id="xtb-ord-1",
         )
     )
-    adapter = XtbBrokerAdapter(client=fake, execute_trade=spy)
+    adapter = _unlocked_xtb(client=fake, execute_trade=spy)
     result = await adapter.submit(
         instrument_id="inst-1",
         side="sell",
@@ -188,7 +252,7 @@ async def test_xtb_filled_executes_ledger() -> None:
             venue_order_id="xtb-fill-1",
         )
     )
-    adapter = XtbBrokerAdapter(client=fake, execute_trade=spy)
+    adapter = _unlocked_xtb(client=fake, execute_trade=spy)
     result = await adapter.submit(
         instrument_id="inst-1",
         side="buy",
@@ -224,7 +288,7 @@ async def test_xtb_filled_without_execute_is_unknown() -> None:
             venue_order_id="xtb-fill-2",
         )
     )
-    adapter = XtbBrokerAdapter(client=fake)
+    adapter = _unlocked_xtb(client=fake)
     result = await adapter.submit(
         instrument_id="inst-1",
         side="buy",

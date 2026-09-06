@@ -79,7 +79,7 @@
  * **2026-08-26o** — OR-4: recon drift / live unavailable → DENY aperturas;
  * exits protectivos ALLOW; sin auto-heal.
  * **2026-08-26p** — OR-6: readiness PAPER_READY / PAPER_DEGRADED /
- * LIVE_EXPERIMENTAL / LIVE_BLOCKED (sin %); CTA Ejecutar en PAPER|LIVE.
+ * LIVE_EXPERIMENTAL / LIVE_BLOCKED (sin %); CTA PAPER | LIVE VIRTUAL (simulado).
  * **2026-08-27** — V1.20 ADR-040: nav L1 Hoy·Mercado·Cartera·Asesor·Laboratorio;
  * strip Hoy y MesaOperationalBar fuera del terminal Mercado; Spine/Consola/
  * Journal/Libro no son puertas L1; OpportunityScore aparcado.
@@ -143,6 +143,9 @@
  *
  * **2026-09-07c** — Tip **v2.11-beta** · package `1.40.0-beta` ·
  * Confirm LIVE VIRTUAL shipped · ≠ settlement · ≠ Accept LIVE · W+5 0/5 fondo.
+ * **2026-09-07d** — OR-6 fail-closed LR-1 · OE-1 cablea live recon ·
+ * `LIVE_EXECUTION_UNLOCKED` default off (sandbox · cero POST bridge) ·
+ * CTA PAPER | LIVE VIRTUAL (simulado).
  *
  * Verificar: `pnpm test:fa` · `pnpm test:operativa` · `pnpm test:coach`
  *

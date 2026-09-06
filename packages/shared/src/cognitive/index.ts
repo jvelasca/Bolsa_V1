@@ -46,6 +46,7 @@ export * from "./trade-story.js";
 export * from "./journal-spine-view.js";
 export * from "./submit-intent.js";
 export * from "./paper-order.js";
+export * from "./live-order.js";
 export * from "./paper-broker.js";
 export * from "./broker-adapter.js";
 export * from "./portfolio-reconciliation.js";
