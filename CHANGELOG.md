@@ -12,6 +12,7 @@ Post-tip hardening (no tip bump). **≠** Accept LIVE · **≠** thaw · `PAPER_
 - OE-1 cablea LR-1 + `liveAdapterWired` (bridge URL) en OR-6.
 - Sandbox VIRTUAL: `XtbBrokerAdapter` sin unlock → `live_virtual_sandbox` (cero POST bridge); kill switch reconsultado en adapter.
 - Dominio XL-3 `LiveOrder` (PY+TS): UNKNOWN first-class · no re-POST · PARTIAL qty · query_broker mock.
+- **Confirm wiring persist-only:** `LiveOrderCoordinator` registra la máquina tras submit LIVE `submitted`/`unknown` y la expone en `result["liveOrder"]`; PAPER/sandbox/rejected/executed(XL-2) no la tocan. Store proceso (InMemory; inyectable); Sled PG para V2.12. Confirm orquestador sigue `<1100` líneas.
 - Docs: [roadmap LIVE Execution](./docs/engineering/roadmap-live-execution-core-2026-09-07.md) · [honesty bridge](./docs/engineering/honesty-pack-xtb-bridge-external-2026-09-07.md) · provenance nota en audit pack V2.11.
 
 ## [1.40.0-beta] — 2026-09-07

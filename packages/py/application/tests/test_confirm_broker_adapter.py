@@ -8,6 +8,7 @@ import pytest
 
 from bolsa_application.broker_adapter import MockBrokerAdapter, XtbBrokerAdapter
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+from bolsa_application.live_order_store import InMemoryLiveOrderStore
 from bolsa_market.providers import XtbBridgeOrderResult
 
 
@@ -75,6 +76,8 @@ async def test_confirm_mock_live_does_not_fill() -> None:
     assert adapter["adapter"] == "mock"
     assert adapter["fillStatus"] == "not_wired"
     assert adapter["fillStatus"] != "executed"
+    # XL-3 persist-only: sandbox not_wired no deja máquina (no rastro cash).
+    assert "liveOrder" not in result
 
 
 @pytest.mark.asyncio
@@ -131,7 +134,8 @@ async def test_confirm_xtb_submitted_is_unknown_not_executed() -> None:
         kill_switch_check=lambda: False,
         execution_unlocked_check=lambda: True,
     )
-    uc = ConfirmRecommendationIntent(broker_adapter=adapter)
+    store = InMemoryLiveOrderStore()
+    uc = ConfirmRecommendationIntent(broker_adapter=adapter, live_order_store=store)
     result = await uc.execute(
         recommendation_raw=_raw(plan=_triggered()),
         account_id="acc-1",
@@ -144,6 +148,63 @@ async def test_confirm_xtb_submitted_is_unknown_not_executed() -> None:
     assert "paperOrder" not in result
     assert result["brokerAdapter"]["fillStatus"] == "submitted"
     assert result["brokerAdapter"]["fillStatus"] != "executed"
+
+    # XL-3 — cable persist: la máquina queda SUBMITTED (bridge la tiene), no fill.
+    live_order = result["liveOrder"]
+    assert live_order["status"] == "SUBMITTED"
+    assert live_order["orderId"].startswith("ORD-dec-1")
+    assert live_order["venueOrderId"] == "xtb-1"
+    assert live_order["venue"] == "LIVE"
+    stored = await store.get(live_order["orderId"])
+    assert stored is not None
+    assert stored.status == "SUBMITTED"
+
+
+@pytest.mark.asyncio
+async def test_confirm_xtb_submitted_then_unknown_advances_machine() -> None:
+    """Primer Confirm → SUBMITTED; reintento (bridge timeout) → SUBMITTED→UNKNOWN."""
+    store = InMemoryLiveOrderStore()
+    adapter = XtbBrokerAdapter(
+        client=_FakeXtb(
+            XtbBridgeOrderResult(status="submitted", venue_order_id="xtb-2")
+        ),
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
+    )
+    uc = ConfirmRecommendationIntent(broker_adapter=adapter, live_order_store=store)
+    first = await uc.execute(
+        recommendation_raw=_raw(plan=_triggered()),
+        account_id="acc-1",
+        execute=True,
+    )
+    assert first["liveOrder"]["status"] == "SUBMITTED"
+
+    class _BrokenClient:
+        async def submit_order(self, **kwargs: Any) -> Any:
+            raise RuntimeError("bridge timeout")
+
+    broken_adapter = XtbBrokerAdapter(
+        client=_BrokenClient(),
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
+    )
+    # Nuevo Confirm (mismo store de proceso) → el puente falla → UNKNOWN first-class,
+    # conservando el venue_order_id previo y sin re-POST (solo query_broker lo resuelve).
+    retry = ConfirmRecommendationIntent(
+        broker_adapter=broken_adapter,
+        live_order_store=store,
+    )
+    second = await retry.execute(
+        recommendation_raw=_raw(plan=_triggered()),
+        account_id="acc-1",
+        execute=True,
+    )
+    assert second["trade"]["status"] == "unknown"
+    assert second["liveOrder"]["status"] == "UNKNOWN"
+    stored = await store.get(second["liveOrder"]["orderId"])
+    assert stored is not None
+    assert stored.status == "UNKNOWN"
+    assert stored.venue_order_id == "xtb-2"  # rastro conserva el venue id previo
 
 
 @pytest.mark.asyncio
@@ -173,3 +234,5 @@ async def test_confirm_xtb_filled_executes_with_transaction_id() -> None:
     assert result["brokerAdapter"]["adapter"] == "xtb"
     assert result["brokerAdapter"]["fillStatus"] == "executed"
     assert "paperOrder" not in result
+    # XL-3 persist-only: executed = slice XL-2 (bridge filled→ledger), máquina cerrada.
+    assert "liveOrder" not in result

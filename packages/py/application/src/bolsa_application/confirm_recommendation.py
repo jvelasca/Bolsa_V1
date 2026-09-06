@@ -36,6 +36,7 @@ from bolsa_analytics.cognitive.risk_signature import apply_signed_levels_to_trad
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.broker_adapter import IBrokerAdapter, resolve_broker_adapter
+from bolsa_application.confirm.live_order_sync import LiveOrderCoordinator
 from bolsa_application.broker_venue_runtime import (
     account_broker_venue_from_settings,
     effective_broker_venue_async,
@@ -209,6 +210,7 @@ class ConfirmRecommendationIntent:
         lifecycle_outbox: Any | None = None,
         broker_adapter: IBrokerAdapter | None = None,
         submit_intent_store: Any | None = None,
+        live_order_store: Any | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
@@ -265,6 +267,7 @@ class ConfirmRecommendationIntent:
             submit_intent_store=submit_intent_store,
             resolve_broker_venue=self._resolve_broker_venue_for_account,
         )
+        self._live_order = LiveOrderCoordinator(live_order_store=live_order_store)
         self._positions = PositionSyncCoordinator(
             position_from_fill=position_from_fill,
             position_from_exit=position_from_exit,
@@ -1011,6 +1014,11 @@ class ConfirmRecommendationIntent:
             pb=pb,
             result=result,
         )
+        await self._live_order.persist_after_submit(
+            result=result, intent=intent, pb=pb,
+            order_id=stable_order_id_from_decision(idem_key),
+        )
+
 
     async def _executed_journal_base(
         self,

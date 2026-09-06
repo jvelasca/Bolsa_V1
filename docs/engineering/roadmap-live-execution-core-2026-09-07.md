@@ -1,7 +1,7 @@
 # Roadmap — LIVE Execution Core (post V2.11)
 
 > **AsOf:** 2026-09-07 · **Padre:** [engineering-index](./engineering-index-2026-08-03.md) · [audit V2.11](./audit-pack-v2-11-live-virtual-confirm-2026-09-07.md) · [audit LIVE venue](./audit-pack-live-venue-thaw-design-2026-09-06.md) · XL-2 [plan cerrado](./plan-xl2-xtb-fill-ledger-2026-08-26.md).  
-> **Estado:** **ABIERTO** (dominio XL-3 + sandbox VIRTUAL + OR-6 fail-closed en código; poll/ledger partial PARKED).  
+> **Estado:** **PARCIAL** (dominio + sandbox VIRTUAL + OR-6 fail-closed + **Confirm wire persist-only** en código; UNKNOWN recovery/poll/partial ledger PARKED).  
 > **≠** thaw · **≠** Accept estricto · **≠** `PAPER_D_EXECUTE` · **≠** default `brokerVenue=live`.
 
 ---
@@ -20,10 +20,10 @@
 
 ## 1. XL-2 cerrado vs XL-3
 
-| Pieza    | Alcance                                                                       | Estado                                                         |
-| -------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **XL-2** | Bridge `filled` síncrono → `execute_trade` → ledger                           | **CERRADO** (2026-08-26)                                       |
-| **XL-3** | Máquina LIVE: AUTHORIZED→…→UNKNOWN/PARTIAL/FILLED · no re-POST · query_broker | **Dominio + tests** · poll real PARKED · partial→ledger PARKED |
+| Pieza    | Alcance                                                                       | Estado                                                                                                               |
+| -------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **XL-2** | Bridge `filled` síncrono → `execute_trade` → ledger                           | **CERRADO** (2026-08-26)                                                                                             |
+| **XL-3** | Máquina LIVE: AUTHORIZED→…→UNKNOWN/PARTIAL/FILLED · no re-POST · query_broker | **Dominio + tests + Confirm wire persist-only** · poll real PARKED · partial→ledger PARKED · UNKNOWN recovery PARKED |
 
 ---
 
@@ -46,6 +46,12 @@
 - `LIVE_EXECUTION_UNLOCKED` default **off** → `live_virtual_sandbox` (cero POST bridge).
 - `XtbBrokerAdapter` reconsulta kill switch antes de submit.
 - Dominio `LiveOrder` (PY+TS) + `LiveOrderQueryPort` mock.
+- **Confirm wiring (persist-only):** `LiveOrderCoordinator` extremo (en `ConfirmRecommendationIntent`,
+  inyección `live_order_store`) persiste/expona `result["liveOrder"]` tras `submit` LIVE que devuelve
+  `submitted` (→ `SUBMITTED` + venue id) o `unknown` (→ `UNKNOWN` first-class). PAPER, sandbox
+  VIRTUAL `not_wired`, `rejected` y `executed`(XL-2 cerr.) NO escriben la máquina. `LiveOrderStore`
+  proceso (InMemory; store inyectable) como fallback — Sled PG para V2.12. Mantiene
+  `dex4_module_is_thin` (<1100 líneas) sin engordar el orquestador.
 
 ---
 
