@@ -4,7 +4,7 @@ All notable releases of Bolsa V1.
 
 ## [1.40.0-beta] — 2026-09-07
 
-V2.11 Confirm LIVE VIRTUAL (UI honesty). Producto **BETA / no producción**. Tip **`v2.11-beta`**. Package **`1.40.0-beta`**. Tip previo **`v2.10.1-beta` → `a060af37`** / `1.39.1-beta` (inmutable). Confirm = firma. CTA live = **Firmar · Ejecutar en LIVE VIRTUAL (simulado)**. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE capital. **NO MÁS PANELES** (híbrido dentro de Confirm · excepción owner). **≠** Accept estricto · **≠** thaw venue · **≠** settlement.
+V2.11 Confirm LIVE VIRTUAL (UI honesty). Producto **BETA / no producción**. Tip **`v2.11-beta` → `80e891c4`**. Package **`1.40.0-beta`**. Tip previo **`v2.10.1-beta` → `a060af37`** / `1.39.1-beta` (inmutable). Release-tag CI tip **CERTIFICABLE** — [run 34027601775](https://github.com/jvelasca/Bolsa_V1/actions/runs/34027601775) `conclusion=success`. Confirm = firma. CTA live = **Firmar · Ejecutar en LIVE VIRTUAL (simulado)**. `PAPER_D_EXECUTE` default **OFF**. **No** LIVE capital. **NO MÁS PANELES** (híbrido dentro de Confirm · excepción owner). **≠** Accept estricto · **≠** thaw venue · **≠** settlement.
 
 ### V2.11 — Confirm LIVE VIRTUAL
 

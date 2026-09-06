@@ -16,13 +16,13 @@
 
 ## Release
 
-| Pieza       | Valor                                                                             |
-| ----------- | --------------------------------------------------------------------------------- |
-| Tag tip     | `v2.11-beta` → [`80e891c4`](https://github.com/jvelasca/Bolsa_V1/commit/80e891c4) |
-| Package     | `1.40.0-beta`                                                                     |
-| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.11-beta                      |
-| CI tip      | stamp Release-tag `conclusion=success` (post-push)                                |
-| Pack        | [audit-pack-v2-11](./audit-pack-v2-11-live-virtual-confirm-2026-09-07.md)         |
+| Pieza       | Valor                                                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Tag tip     | `v2.11-beta` → [`80e891c4`](https://github.com/jvelasca/Bolsa_V1/commit/80e891c4)                                        |
+| Package     | `1.40.0-beta`                                                                                                            |
+| Pre-release | https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.11-beta                                                             |
+| CI tip      | **CERTIFICABLE** · [run 34027601775](https://github.com/jvelasca/Bolsa_V1/actions/runs/34027601775) `conclusion=success` |
+| Pack        | [audit-pack-v2-11](./audit-pack-v2-11-live-virtual-confirm-2026-09-07.md)                                                |
 
 ## Hecho
 
@@ -37,6 +37,6 @@ NO LIVE capital · LIVE estudio = VIRTUAL/SIMULADO · `PAPER_D_EXECUTE` default 
 
 ## Next
 
-- Push tag + GitHub prerelease.
-- Stamp CI tip GREEN.
+- ~~Push tag + GitHub prerelease~~ **hecho** · https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.11-beta
+- ~~Stamp CI tip GREEN~~ **hecho** · [34027601775](https://github.com/jvelasca/Bolsa_V1/actions/runs/34027601775) `success`
 - Auditor externo: [arranque](./arranque-auditor-v2-11-live-virtual-2026-09-07.md) · **auditar el tag**, no `main`.
