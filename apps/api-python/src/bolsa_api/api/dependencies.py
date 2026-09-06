@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
-from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_application.account_blob_state import (
     GetAccountCoreRState,
     GetAccountMandates,
@@ -269,6 +268,8 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 )
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
+
+from bolsa_api.auth.request_principal import get_request_principal
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
@@ -556,8 +557,6 @@ def get_portfolio_recon_lookup(session: AsyncSession) -> Any:
 
 def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
     """OR-4 V1.95 — composed financial integrity status for check_opening."""
-    from sqlalchemy import func, select
-
     from bolsa_application.lifecycle_event_store import (
         GetLifecycleSnapshot,
         PostgresLifecycleEventStore,
@@ -577,6 +576,7 @@ def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
+    from sqlalchemy import func, select
 
     class _OutboxAdapter:
         async def list_for_account(self, acc: str) -> list[OutboxSnap]:
@@ -1438,6 +1438,7 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         PostgresLifecycleEventStore,
     )
     from bolsa_application.lifecycle_outbox import PostgresLifecycleOutboxStore
+    from bolsa_application.live_order_store import PostgresLiveOrderStore
     from bolsa_application.persist_position_from_exit import (
         PersistPositionFromExit,
         PositionStateExitStore,
@@ -1481,6 +1482,7 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         lifecycle_outbox=PostgresLifecycleOutboxStore(session),
         submit_intent_store=PostgresSubmitIntentStore(session),
         incident_store=get_operational_incident_store(session),
+        live_order_store=PostgresLiveOrderStore(session),
         instrument_data_status=get_instrument_data_status_use_case(session),
     )
 

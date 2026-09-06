@@ -24,6 +24,9 @@ import signal
 import sys
 from typing import Any
 
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.migrations import database_bootstrap
+from bolsa_infrastructure.database.session import create_engine, create_session_factory
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
@@ -34,14 +37,14 @@ from bolsa_api.background.estudio_eod_opinion_worker import start_estudio_eod_op
 from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
 from bolsa_api.background.index_subscribe_worker import start_index_subscribe_worker
 from bolsa_api.background.lifecycle_outbox_worker import start_lifecycle_outbox_worker
+from bolsa_api.background.live_order_recovery_worker import (
+    start_live_order_recovery_worker,
+)
 from bolsa_api.background.opportunity_daily_scan_worker import (
     start_opportunity_daily_scan_worker,
 )
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.migrations import database_bootstrap
-from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +63,7 @@ def _event_loop_starters() -> list[Any]:
         start_auto_sync_worker,
         start_index_subscribe_worker,
         start_lifecycle_outbox_worker,
+        start_live_order_recovery_worker,
     ]
 
 

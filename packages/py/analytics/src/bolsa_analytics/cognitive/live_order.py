@@ -30,9 +30,7 @@ LiveOrderVenue = Literal["LIVE"]
 
 LIVE_ORDER_KEY = "liveOrder"
 
-_TERMINAL: frozenset[LiveOrderStatus] = frozenset(
-    {"FILLED", "REJECTED", "CANCELLED"}
-)
+_TERMINAL: frozenset[LiveOrderStatus] = frozenset({"FILLED", "REJECTED", "CANCELLED"})
 
 # UNKNOWN → SUBMITTING (re-POST) is intentionally ABSENT.
 ALLOWED_LIVE_ORDER_TRANSITIONS: dict[LiveOrderStatus, frozenset[LiveOrderStatus]] = {
@@ -62,6 +60,7 @@ class LiveOrder:
     venue_order_id: str | None
     intent_id: str | None
     financial_apply_count: int
+    account_id: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -76,6 +75,7 @@ class LiveOrder:
             "venueOrderId": self.venue_order_id,
             "intentId": self.intent_id,
             "financialApplyCount": self.financial_apply_count,
+            "accountId": self.account_id,
         }
 
 
@@ -87,6 +87,7 @@ def build_live_order(
     quantity: float,
     intent_id: str | None = None,
     status: LiveOrderStatus = "AUTHORIZED",
+    account_id: str | None = None,
 ) -> LiveOrder:
     qty = float(quantity)
     return LiveOrder(
@@ -101,12 +102,11 @@ def build_live_order(
         venue_order_id=None,
         intent_id=intent_id,
         financial_apply_count=0,
+        account_id=account_id,
     )
 
 
-def can_transition_live_order(
-    current: LiveOrderStatus, nxt: LiveOrderStatus
-) -> bool:
+def can_transition_live_order(current: LiveOrderStatus, nxt: LiveOrderStatus) -> bool:
     if current in _TERMINAL and nxt != current:
         return False
     return nxt in ALLOWED_LIVE_ORDER_TRANSITIONS.get(current, frozenset())
@@ -126,9 +126,7 @@ def transition_live_order(
 ) -> LiveOrder:
     """Aplica transición. apply_financial solo en FILLED (idempotente)."""
     if not can_transition_live_order(order.status, nxt):
-        raise LiveOrderTransitionError(
-            f"live_order forbidden: {order.status} → {nxt}"
-        )
+        raise LiveOrderTransitionError(f"live_order forbidden: {order.status} → {nxt}")
 
     filled = order.filled_quantity
     remaining = order.remaining_quantity
@@ -149,9 +147,7 @@ def transition_live_order(
     apply_count = order.financial_apply_count
     if apply_financial:
         if nxt != "FILLED":
-            raise LiveOrderTransitionError(
-                "financial apply only allowed on FILLED"
-            )
+            raise LiveOrderTransitionError("financial apply only allowed on FILLED")
         # Duplicate FILLED events: only one financial effect.
         if apply_count >= 1:
             apply_count = 1
@@ -167,11 +163,10 @@ def transition_live_order(
         quantity=order.quantity,
         filled_quantity=filled,
         remaining_quantity=remaining,
-        venue_order_id=venue_order_id
-        if venue_order_id is not None
-        else order.venue_order_id,
+        venue_order_id=venue_order_id if venue_order_id is not None else order.venue_order_id,
         intent_id=order.intent_id,
         financial_apply_count=apply_count,
+        account_id=order.account_id,
     )
 
 
@@ -186,6 +181,4 @@ def forbid_execute_trade_for_partial(order: LiveOrder) -> None:
 def forbid_repost_from_unknown(order: LiveOrder) -> None:
     """UNKNOWN must not re-POST; only query_broker may resolve."""
     if order.status == "UNKNOWN":
-        raise LiveOrderTransitionError(
-            "UNKNOWN forbids re-POST · query_broker only"
-        )
+        raise LiveOrderTransitionError("UNKNOWN forbids re-POST · query_broker only")

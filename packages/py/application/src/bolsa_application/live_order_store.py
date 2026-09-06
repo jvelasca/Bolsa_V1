@@ -15,6 +15,7 @@ Cableado Confirm (persist only · sin recovery en esta tanda):
 from __future__ import annotations
 
 import dataclasses
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from bolsa_analytics.cognitive.live_order import (
@@ -24,14 +25,16 @@ from bolsa_analytics.cognitive.live_order import (
     can_transition_live_order,
     transition_live_order,
 )
+from bolsa_infrastructure.database.models.tables import LiveOrderRow
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Venues bajo las que el cableado puede escribir rastro LIVE.
 _LIVE_MACHINE_BRIDGED_VENUES: frozenset[str] = frozenset({"LIVE"})
 
 # fill_status/status del adapter que SÍ dejan rastro in-flight persistible.
-_MACHINE_TRACKED_SUBJECT_STATUSES: frozenset[str] = frozenset(
-    {"submitted", "unknown"}
-)
+_MACHINE_TRACKED_SUBJECT_STATUSES: frozenset[str] = frozenset({"submitted", "unknown"})
 
 
 class LiveOrderStore(Protocol):
@@ -39,9 +42,16 @@ class LiveOrderStore(Protocol):
 
     async def get(self, order_id: str) -> LiveOrder | None: ...
 
-    async def put(self, order: LiveOrder) -> None: ...
+    async def put(
+        self,
+        order: LiveOrder,
+        *,
+        account_id: str | None = None,
+    ) -> None: ...
 
     async def delete(self, order_id: str) -> None: ...
+
+    async def list_unknown(self, *, limit: int = 50) -> list[LiveOrder]: ...
 
 
 class InMemoryLiveOrderStore:
@@ -60,7 +70,13 @@ class InMemoryLiveOrderStore:
             return None
         return self._by_order.get(key)
 
-    async def put(self, order: LiveOrder) -> None:
+    async def put(
+        self,
+        order: LiveOrder,
+        *,
+        account_id: str | None = None,
+    ) -> None:
+        _ = account_id  # InMemory no persiste cuenta en la máquina.
         key = (order.order_id or "").strip()
         if not key:
             return
@@ -71,6 +87,10 @@ class InMemoryLiveOrderStore:
         if not key:
             return
         self._by_order.pop(key, None)
+
+    async def list_unknown(self, *, limit: int = 50) -> list[LiveOrder]:
+        cap = max(1, int(limit))
+        return [order for order in self._by_order.values() if order.status == "UNKNOWN"][:cap]
 
 
 _PROCESS_STORE = InMemoryLiveOrderStore()
@@ -167,3 +187,141 @@ def live_order_from_submit_result(
         status=target,
     )
     return _bind_venue(built, venue_order_id)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def live_order_to_row_fields(
+    order: LiveOrder,
+    *,
+    account_id: str,
+    created_at: datetime,
+    updated_at: datetime,
+) -> LiveOrderRow:
+    """Mapea el dominio a fila física (replica las columnas 1:1)."""
+    return LiveOrderRow(
+        order_id=order.order_id,
+        account_id=account_id,
+        status=order.status,
+        venue=order.venue,
+        instrument_id=order.instrument_id,
+        side=order.side,
+        quantity=order.quantity,
+        filled_quantity=order.filled_quantity,
+        remaining_quantity=order.remaining_quantity,
+        venue_order_id=order.venue_order_id,
+        intent_id=order.intent_id,
+        financial_apply_count=order.financial_apply_count,
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+
+def live_order_from_row(row: LiveOrderRow) -> LiveOrder:
+    """Mapea fila física a dominio LiveOrder (confiar en invariantes de BD)."""
+    return LiveOrder(
+        order_id=row.order_id,
+        status=row.status,  # type: ignore[arg-type]
+        venue=row.venue,  # type: ignore[arg-type]
+        instrument_id=row.instrument_id,
+        side=row.side,  # type: ignore[arg-type]
+        quantity=float(row.quantity),
+        filled_quantity=float(row.filled_quantity),
+        remaining_quantity=float(row.remaining_quantity),
+        venue_order_id=row.venue_order_id,
+        intent_id=row.intent_id,
+        financial_apply_count=int(row.financial_apply_count),
+        account_id=row.account_id,
+    )
+
+
+class PostgresLiveOrderStore:
+    """Persistencia física cross-PID de la máquina XL-3.
+
+    ``put``/``delete`` hacen commit (escribe/avanza el rastro durable). El worker
+    de recovery relee las filas ``UNKNOWN`` y las resuelve vía query_broker
+    (NUNCA re-POST), sin depender del worker/request que escribió la fila.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, order_id: str) -> LiveOrder | None:
+        key = (order_id or "").strip()
+        if not key:
+            return None
+        stmt = select(LiveOrderRow).where(LiveOrderRow.order_id == key)
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return live_order_from_row(row) if row is not None else None
+
+    async def put(
+        self,
+        order: LiveOrder,
+        *,
+        account_id: str | None = None,
+    ) -> None:
+        key = (order.order_id or "").strip()
+        if not key:
+            return
+        now = _utcnow()
+        existing = await self.get(key)
+        try:
+            if existing is None:
+                self._session.add(
+                    live_order_to_row_fields(
+                        order,
+                        account_id=account_id or order.account_id or "live",
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+            else:
+                row = await self._load_row(key)
+                if row is not None:
+                    row.status = order.status
+                    row.venue = order.venue
+                    row.side = order.side
+                    row.quantity = float(order.quantity)
+                    row.filled_quantity = float(order.filled_quantity)
+                    row.remaining_quantity = float(order.remaining_quantity)
+                    if order.venue_order_id is not None:
+                        row.venue_order_id = order.venue_order_id
+                    if account_id:
+                        row.account_id = account_id
+                    row.intent_id = order.intent_id
+                    row.financial_apply_count = order.financial_apply_count
+                    row.updated_at = now
+            await self._session.commit()
+        except IntegrityError:
+            await self._session.rollback()
+            raise
+
+    async def delete(self, order_id: str) -> None:
+        key = (order_id or "").strip()
+        if not key:
+            return
+        row = await self._load_row(key)
+        if row is None:
+            return
+        await self._session.delete(row)
+        await self._session.commit()
+
+    async def list_unknown(self, *, limit: int = 50) -> list[LiveOrder]:
+        cap = max(1, int(limit))
+        stmt = (
+            select(LiveOrderRow)
+            .where(LiveOrderRow.status == "UNKNOWN")
+            .order_by(LiveOrderRow.updated_at.asc())
+            .limit(cap)
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [live_order_from_row(r) for r in rows]
+
+    async def _load_row(self, order_id: str) -> LiveOrderRow | None:
+        key = (order_id or "").strip()
+        if not key:
+            return None
+        stmt = select(LiveOrderRow).where(LiveOrderRow.order_id == key)
+        return (await self._session.execute(stmt)).scalar_one_or_none()

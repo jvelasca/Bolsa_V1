@@ -1218,6 +1218,48 @@ class SubmitIntentRow(Base):
     )
 
 
+class LiveOrderRow(Base):
+    """XL-3 — máquina LiveOrder durable en PostgreSQL (UNKNOWN recovery cross-PID).
+
+    Rastro LIVE real que sobrevive al worker/request que lo creó. Keyed por
+    ``order_id`` (estable desde la decisión). NNUNKNOWN se resuelve vía
+    query_broker (NO re-POST) por el LiveOrderRecoveryWorker.
+    """
+
+    __tablename__ = "live_orders"
+    __table_args__ = (
+        Index("live_orders_account_id_status_idx", "account_id", "status"),
+        Index("live_orders_updated_at_idx", "updated_at"),
+    )
+
+    order_id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    venue: Mapped[str] = mapped_column(String, nullable=False)
+    instrument_id: Mapped[str] = mapped_column(String, nullable=False)
+    side: Mapped[str] = mapped_column(String, nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    filled_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    remaining_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    venue_order_id: Mapped[str | None] = mapped_column(
+        "venue_order_id",
+        String,
+        nullable=True,
+    )
+    intent_id: Mapped[str | None] = mapped_column("intent_id", String, nullable=True)
+    financial_apply_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
 class OperationalIncidentRow(Base):
     """DEX-3 — OperationalIncident en PostgreSQL (ADR-035 resolución recon)."""
 

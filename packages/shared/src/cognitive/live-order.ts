@@ -53,6 +53,7 @@ export type LiveOrderV1 = {
   venueOrderId: string | null;
   intentId: string | null;
   financialApplyCount: number;
+  accountId?: string | null;
 };
 
 export function buildLiveOrder(input: {
@@ -62,6 +63,7 @@ export function buildLiveOrder(input: {
   quantity: number;
   intentId?: string | null;
   status?: LiveOrderStatusV1;
+  accountId?: string | null;
 }): LiveOrderV1 {
   const qty = Number(input.quantity);
   return {
@@ -76,6 +78,7 @@ export function buildLiveOrder(input: {
     venueOrderId: null,
     intentId: input.intentId ?? null,
     financialApplyCount: 0,
+    accountId: input.accountId ?? null,
   };
 }
 
@@ -155,6 +158,7 @@ export function transitionLiveOrder(
       opts?.venueOrderId !== undefined ? opts.venueOrderId : order.venueOrderId,
     intentId: order.intentId,
     financialApplyCount: applyCount,
+    accountId: order.accountId ?? null,
   };
 }
 

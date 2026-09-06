@@ -14,6 +14,7 @@ orquestador fino (invariante ``dex4_module_is_thin``), reutilizando el puerto
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from bolsa_application.live_order_store import live_order_from_submit_result
@@ -42,6 +43,7 @@ class LiveOrderCoordinator:
         intent: Any,
         pb: Any,
         order_id: str,
+        account_id: str | None = None,
     ) -> None:
         """Persiste/expona ``result["liveOrder"]`` cuando proceda (ver docstring)."""
         store = self._store
@@ -61,6 +63,8 @@ class LiveOrderCoordinator:
             return
 
         order_id = (order_id or "").strip()
+        # La cuenta durable se deriva del intent cuando el caller no la precisa.
+        effective_account = account_id or getattr(intent, "account_id", None) or None
         try:
             existing = await store.get(order_id) if order_id else None
         except Exception:  # noqa: BLE001 — store read fallo → no cascada
@@ -77,8 +81,10 @@ class LiveOrderCoordinator:
         )
         if target is None:
             return
+        if effective_account and target.account_id is None:
+            target = dataclasses.replace(target, account_id=effective_account)
         try:
-            await store.put(target)
+            await store.put(target, account_id=effective_account)
             result["liveOrder"] = target.to_dict()
         except Exception as exc:  # noqa: BLE001 — persist no tumba el confirm
             result["liveOrderPersist"] = {

@@ -31,6 +31,9 @@ from bolsa_api.background.index_subscribe_worker import (  # type: ignore[import
 from bolsa_api.background.lifecycle_outbox_worker import (  # type: ignore[import-untyped]
     start_lifecycle_outbox_worker,
 )
+from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
+    start_live_order_recovery_worker,
+)
 from bolsa_api.background.opportunity_daily_scan_worker import (  # type: ignore[import-untyped]
     start_opportunity_daily_scan_worker,
 )
@@ -63,6 +66,7 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_custody_job_worker,
         start_opportunity_daily_scan_worker,
         start_lifecycle_outbox_worker,
+        start_live_order_recovery_worker,
     }
     assert set(starters) == expected
 
