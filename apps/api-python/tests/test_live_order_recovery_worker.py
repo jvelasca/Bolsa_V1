@@ -161,3 +161,34 @@ async def test_submitting_repost_target_never_reposts_from_unknown() -> None:
     still = await store.get("lo-rm")
     assert still is not None
     assert still.status == "UNKNOWN"
+
+
+@pytest.mark.asyncio
+async def test_query_cancelled_resolves_unknown_no_op_on_next_drain() -> None:
+    """Test-double hardening: UNKNOWN → CANCELLED se persiste; un segundo drain es
+    no-op (orden terminada no resucita ni se re-procesa / double-transiciona)."""
+    order = _ui_unknown(order_id="lo-cxl", venue_order_id="xtb-cxl")
+    store = InMemoryLiveOrderStore()
+    await store.put(order)
+
+    async def provider(venue: str, account_id: str, vid: str) -> MockLiveOrderQuery:
+        return MockLiveOrderQuery(
+            BrokerOrderQueryResult(
+                outcome="cancelled",
+                venue_order_id=vid,
+                filled_quantity=0.0,
+                remaining_quantity=100.0,
+            )
+        )
+
+    first = await _drain_unknowns(store, query_provider=provider, limit=50)
+    assert first["drained"] == 1
+    assert first["resolved"] == 1
+
+    resolved = await store.get("lo-cxl")
+    assert resolved is not None
+    assert resolved.status == "CANCELLED"
+    # UNKNOWN ya no es listable → el siguiente tick no vuelve a tocar la fila.
+    second = await _drain_unknowns(store, query_provider=provider, limit=50)
+    assert second["drained"] == 0
+    assert second["resolved"] == 0

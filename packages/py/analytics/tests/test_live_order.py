@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import pytest
+from bolsa_application.live_order_query import (
+    BrokerOrderQueryResult,
+    MockLiveOrderQuery,
+)
 
 from bolsa_analytics.cognitive.live_order import (
+    LiveOrder,
     LiveOrderTransitionError,
     build_live_order,
     can_transition_live_order,
     forbid_execute_trade_for_partial,
     forbid_repost_from_unknown,
     transition_live_order,
-)
-from bolsa_application.live_order_query import (
-    BrokerOrderQueryResult,
-    MockLiveOrderQuery,
 )
 
 
@@ -133,3 +134,73 @@ async def test_query_broker_resolves_unknown_without_repost() -> None:
         order, nxt, filled_quantity=10.0, venue_order_id="xtb-q-1"
     )
     assert resolved.status == "FILLED"
+
+
+# ---------------------------------------------------------------------------
+# V2.12 honest cancel hardening (pure domain: the store's cancel is domain +
+# persistence; these assert the machine refuses resurrection/double-terminal and
+# allows cancel from in-flight / UNKNOWN).
+# ---------------------------------------------------------------------------
+
+
+def _submitted(*, order_id: str = "lo-c", venue_order_id: str = "xtb-c") -> LiveOrder:
+    """SUBMITTED machine via legal graph transitions."""
+    order = build_live_order(
+        order_id=order_id,
+        instrument_id="inst-1",
+        side="buy",
+        quantity=100.0,
+    )
+    return transition_live_order(
+        transition_live_order(order, "SUBMITTING"),
+        "SUBMITTED",
+        venue_order_id=venue_order_id,
+    )
+
+
+def test_cancel_from_submitted_and_unknown_are_legal() -> None:
+    submitted = _submitted()
+    assert can_transition_live_order(submitted.status, "CANCELLED")
+    assert transition_live_order(submitted, "CANCELLED").status == "CANCELLED"
+
+    unknown = transition_live_order(submitted, "UNKNOWN")
+    # UNKNOWN → CANCELLED es legal (UNKNOWN se resuelve vía query/cancel, no re-POST).
+    assert can_transition_live_order("UNKNOWN", "CANCELLED")
+    assert transition_live_order(unknown, "CANCELLED").status == "CANCELLED"
+
+
+def test_cancel_of_terminal_filled_rejected_is_refused() -> None:
+    submitted = _submitted()
+    rejected = transition_live_order(submitted, "REJECTED")
+    filled = LiveOrder(
+        order_id="lo-cf",
+        status="FILLED",
+        venue="LIVE",
+        instrument_id="inst-1",
+        side="buy",
+        quantity=100.0,
+        filled_quantity=100.0,
+        remaining_quantity=0.0,
+        venue_order_id="xtb-cf",
+        intent_id=None,
+        financial_apply_count=0,
+    )
+    for order in (filled, rejected):
+        assert can_transition_live_order(order.status, "CANCELLED") is False
+        with pytest.raises(LiveOrderTransitionError):
+            transition_live_order(order, "CANCELLED")
+
+
+def test_cancel_single_terminal_no_resurrection() -> None:
+    working = _submitted(order_id="lo-c", venue_order_id="xtb-c")
+    working = transition_live_order(working, "WORKING", venue_order_id="xtb-c")
+    cancelled = transition_live_order(working, "CANCELLED")
+    assert cancelled.status == "CANCELLED"
+
+    # Ya cancelada (estado terminal único): no admite transición y una orden
+    # terminada jamás resucita a FILLED/en curso.
+    assert can_transition_live_order("CANCELLED", "CANCELLED") is False
+    with pytest.raises(LiveOrderTransitionError):
+        transition_live_order(cancelled, "CANCELLED")
+    with pytest.raises(LiveOrderTransitionError):
+        transition_live_order(cancelled, "FILLED", filled_quantity=100.0)

@@ -10,6 +10,13 @@ Cableado Confirm (persist only · sin recovery en esta tanda):
   slice XL-2 cerrado → a ledger, no machine in-flight. → NINGUNO persiste.
 * ``query_broker`` (movernos fuera de UNKNOWN) queda PARKED en Confirm; solo
   la UI red / tests lo harán. ≠ thaw · ≠ PAPER_D_EXECUTE · ≠ autoriza re-POST.
+
+V2.12 (scope-out "list_open_orders + cancel_order"): este store es **durable y
+dominio-only**. ``cancel_order`` NO hace round-trip de broker real: persiste una
+decisión autorizada de cancelación (el contrato XTB cancel sigue PARKED). Solo un
+llamador que ya puede acreditar cancelación broker-side (o razón interna
+autoritativa) debe invocarlo; aquí nunca se fabrica un resultado de broker
+(fail-closed, misma boundary honesta que el UNKNOWN recovery).
 """
 
 from __future__ import annotations
@@ -19,6 +26,7 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from bolsa_analytics.cognitive.live_order import (
+    NON_TERMINAL_LIVE_STATUSES,
     LiveOrder,
     LiveOrderStatus,
     build_live_order,
@@ -52,6 +60,15 @@ class LiveOrderStore(Protocol):
     async def delete(self, order_id: str) -> None: ...
 
     async def list_unknown(self, *, limit: int = 50) -> list[LiveOrder]: ...
+
+    async def list_open_orders(self, *, limit: int = 50) -> list[LiveOrder]: ...
+
+    async def cancel_order(
+        self,
+        order_id: str,
+        *,
+        reason: str | None = None,
+    ) -> LiveOrder | None: ...
 
 
 class InMemoryLiveOrderStore:
@@ -91,6 +108,58 @@ class InMemoryLiveOrderStore:
     async def list_unknown(self, *, limit: int = 50) -> list[LiveOrder]:
         cap = max(1, int(limit))
         return [order for order in self._by_order.values() if order.status == "UNKNOWN"][:cap]
+
+    async def list_open_orders(self, *, limit: int = 50) -> list[LiveOrder]:
+        """Órdenes **no terminales** (excluye FILLED/REJECTED/CANCELLED).
+
+        "open" = la orden sigue viva / en curso / en riesgo y puede evolucionar
+        (incluye UNKNOWN: en vuelo no resuelto, aún puede cancelarse vía el
+        grafo). Filtra por ``NON_TERMINAL_LIVE_STATUSES`` (derivado de
+        ``_TERMINAL`` del dominio, sin strings mágicos).
+        """
+        cap = max(1, int(limit))
+        return [
+            order
+            for order in self._by_order.values()
+            if order.status in NON_TERMINAL_LIVE_STATUSES
+        ][:cap]
+
+    async def cancel_order(
+        self,
+        order_id: str,
+        *,
+        reason: str | None = None,
+    ) -> LiveOrder | None:
+        """Persiste una cancelación (dominio → CANCELLED) si el grafo lo permite.
+
+        honest-boundary: este método NO consulta/interactúa con el broker real.
+        Solo persiste la decisión autorizada por el llamador; debe invocarse
+        únicamente cuando ya existe una prueba de cancelación broker-side o una
+        razón interna autoritativa equivalente. Un round-trip real de cancel es
+        PARKED (no hay contrato XTB cancel).
+
+        Semántica (idempotente, sin errores):
+        * order_id inexistente → None.
+        * estado terminal (FILLED/REJECTED/CANCELLED) o estado no cancelable por
+          el grafo (p.ej. SUBMITTING) → devuelve la orden sin transicionar.
+        * transición legal → CANCELLED (AUTHORIZED/SUBMITTED/WORKING/PARTIAL/
+          UNKNOWN) y la persiste, devolviendo la orden cancelada.
+        ``reason`` es documental p/ auditoría futura: la store no tiene columna
+        para perseguirla, no se persiste en esta tanda (sin migración).
+        """
+        _ = reason  # no persiste el motivo: no hay columna sin migración (V2.12).
+        key = (order_id or "").strip()
+        if not key:
+            return None
+        current = await self.get(key)
+        if current is None:
+            return None
+        if not can_transition_live_order(current.status, "CANCELLED"):
+            # Terminal u orden no cancelable → no-op idempotente, jamás un falso éxito.
+            return current
+        cancelled = transition_live_order(current, "CANCELLED")
+        await self.put(cancelled, account_id=current.account_id)
+        return cancelled
 
 
 _PROCESS_STORE = InMemoryLiveOrderStore()
@@ -318,6 +387,51 @@ class PostgresLiveOrderStore:
         )
         rows = (await self._session.execute(stmt)).scalars().all()
         return [live_order_from_row(r) for r in rows]
+
+    async def list_open_orders(self, *, limit: int = 50) -> list[LiveOrder]:
+        """Órdenes **no terminales** (excluye FILLED/REJECTED/CANCELLED).
+
+        "open" = orden viva / en curso / en riesgo (incluye UNKNOWN). Filtra por
+        ``NON_TERMINAL_LIVE_STATUSES`` (derivado de ``_TERMINAL`` del dominio,
+        sin strings mágicos), ordena por ``updated_at`` ascendente como
+        ``list_unknown`` y limita el lote.
+        """
+        cap = max(1, int(limit))
+        stmt = (
+            select(LiveOrderRow)
+            .where(LiveOrderRow.status.in_(sorted(NON_TERMINAL_LIVE_STATUSES)))
+            .order_by(LiveOrderRow.updated_at.asc())
+            .limit(cap)
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [live_order_from_row(r) for r in rows]
+
+    async def cancel_order(
+        self,
+        order_id: str,
+        *,
+        reason: str | None = None,
+    ) -> LiveOrder | None:
+        """Persiste una cancelación (dominio → CANCELLED) si el grafo lo permite.
+
+        honest-boundary: igual que en InMemory, NO consulta el broker real; solo
+        persiste la decisión autorizada. Un round-trip real de cancel es PARKED.
+        `idempotente y sin errores`: order_id inexistente → None; terminal o no
+        cancelable → devuelve la orden sin transicionar; transición legal →
+        persiste CANCELLED vía ``put`` y devuelve la orden cancelada.
+        """
+        _ = reason  # no hay columna de motivo en esta tanda (sin migración V2.12).
+        key = (order_id or "").strip()
+        if not key:
+            return None
+        current = await self.get(key)
+        if current is None:
+            return None
+        if not can_transition_live_order(current.status, "CANCELLED"):
+            return current
+        cancelled = transition_live_order(current, "CANCELLED")
+        await self.put(cancelled, account_id=current.account_id)
+        return cancelled
 
     async def _load_row(self, order_id: str) -> LiveOrderRow | None:
         key = (order_id or "").strip()

@@ -30,6 +30,8 @@ LiveOrderVenue = Literal["LIVE"]
 
 LIVE_ORDER_KEY = "liveOrder"
 
+# Terminales: resultado cerrado (FILLED/REJECTED/CANCELLED). Una fila aquí ya no
+# está in-flight: no admite más transiciones ni cuenta como "open".
 _TERMINAL: frozenset[LiveOrderStatus] = frozenset({"FILLED", "REJECTED", "CANCELLED"})
 
 # UNKNOWN → SUBMITTING (re-POST) is intentionally ABSENT.
@@ -45,6 +47,14 @@ ALLOWED_LIVE_ORDER_TRANSITIONS: dict[LiveOrderStatus, frozenset[LiveOrderStatus]
     # Resolve UNKNOWN only via broker query (not re-POST).
     "UNKNOWN": frozenset({"WORKING", "REJECTED", "FILLED", "PARTIAL", "CANCELLED"}),
 }
+
+# "open" = no-terminal: la orden sigue viva / en curso / en riesgo. Complemento
+# de ``_TERMINAL`` sobre las claves del grafo (que cubren todo el literal), para
+# que listar/cancelar no repita strings mágicos y derive de la misma semántica
+# terminal del grafo.
+NON_TERMINAL_LIVE_STATUSES: frozenset[LiveOrderStatus] = frozenset(
+    set(ALLOWED_LIVE_ORDER_TRANSITIONS) - _TERMINAL
+)
 
 
 @dataclass(frozen=True, slots=True)

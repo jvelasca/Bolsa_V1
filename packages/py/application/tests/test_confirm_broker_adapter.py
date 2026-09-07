@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from bolsa_market.providers import XtbBridgeOrderResult
 
 from bolsa_application.broker_adapter import MockBrokerAdapter, XtbBrokerAdapter
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_application.live_order_store import InMemoryLiveOrderStore
-from bolsa_market.providers import XtbBridgeOrderResult
 
 
 class _OkExecute:
@@ -236,3 +236,45 @@ async def test_confirm_xtb_filled_executes_with_transaction_id() -> None:
     assert "paperOrder" not in result
     # XL-3 persist-only: executed = slice XL-2 (bridge filled→ledger), máquina cerrada.
     assert "liveOrder" not in result
+
+
+@pytest.mark.asyncio
+async def test_reconfirm_live_submitted_keeps_single_machine_no_double() -> None:
+    """Test-double _FakeXtb hardening: un segundo submit de la MISMA orden no duplica.
+
+    Con un único InMemory store compartido, re-ejecutar Confirm sobre un bridge que
+    vuelve ``submitted`` (mismo decisionId → mismo order_id estable) debe dejar UNA
+    fila de máquina en SUBMITTED, sin inventar fill y sin doble estado/financial.
+    No hay capa de cancel en Confirm (store/domain only, honest boundary V2.12).
+    """
+    store = InMemoryLiveOrderStore()
+    adapter = XtbBrokerAdapter(
+        client=_FakeXtb(XtbBridgeOrderResult(status="submitted", venue_order_id="xtb-dup")),
+        kill_switch_check=lambda: False,
+        execution_unlocked_check=lambda: True,
+    )
+    uc = ConfirmRecommendationIntent(broker_adapter=adapter, live_order_store=store)
+
+    first = await uc.execute(
+        recommendation_raw=_raw(plan=_triggered()),
+        account_id="acc-1",
+        execute=True,
+    )
+    assert first["liveOrder"]["status"] == "SUBMITTED"
+    order_id = first["liveOrder"]["orderId"]
+
+    # Segundo confirm del mismo flujo (mismo decisionId): no duplica el rastro.
+    second = await uc.execute(
+        recommendation_raw=_raw(plan=_triggered()),
+        account_id="acc-1",
+        execute=True,
+    )
+    assert second["liveOrder"]["orderId"] == order_id
+    assert second["liveOrder"]["status"] == "SUBMITTED"
+
+    # EXACTAMENTE una fila de máquina pendiente para esa orden, y sin apply financiero.
+    rows = await store.list_open_orders(limit=50)
+    pending = [r for r in rows if r.order_id == order_id]
+    assert len(pending) == 1
+    assert pending[0].status == "SUBMITTED"
+    assert pending[0].financial_apply_count == 0
