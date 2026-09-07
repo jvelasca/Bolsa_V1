@@ -235,5 +235,6 @@ financiera / cadena `LiveOrder → Ledger`). Se re-exploró el booking real del 
 
 ## 6. Referencias
 
-- Commit: `34285584` · rama `live-honesty-post-tip-2026-09-07`.
+- **Versión formal sellada:** tag `v2.13-beta` (package `1.42.0-beta`).
+- Commit baseline auditado del núcleo V2.13: `34285584` · rama `live-honesty-post-tip-2026-09-07`.
 - Código: `packages/py/analytics/.../cognitive/live_order.py` · `packages/py/application/.../live_order_store.py` · `apps/api-python/.../background/live_order_recovery_worker.py` · `packages/shared/src/cognitive/live-order.ts` · `packages/py/infrastructure/.../models/tables.py` · migración `021_live_orders_financial_constraints.py`.
