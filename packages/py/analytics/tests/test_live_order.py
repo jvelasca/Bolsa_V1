@@ -3,10 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from bolsa_application.live_order_query import (
-    BrokerOrderQueryResult,
-    MockLiveOrderQuery,
-)
 
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
@@ -16,6 +12,10 @@ from bolsa_analytics.cognitive.live_order import (
     forbid_execute_trade_for_partial,
     forbid_repost_from_unknown,
     transition_live_order,
+)
+from bolsa_application.live_order_query import (
+    BrokerOrderQueryResult,
+    MockLiveOrderQuery,
 )
 
 

@@ -36,7 +36,6 @@ from bolsa_analytics.cognitive.risk_signature import apply_signed_levels_to_trad
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.broker_adapter import IBrokerAdapter, resolve_broker_adapter
-from bolsa_application.confirm.live_order_sync import LiveOrderCoordinator
 from bolsa_application.broker_venue_runtime import (
     account_broker_venue_from_settings,
     effective_broker_venue_async,
@@ -61,6 +60,7 @@ from bolsa_application.confirm.identity import (
     resolve_confirm_trade_plan,
     resolve_protect_revision_origin,
 )
+from bolsa_application.confirm.live_order_sync import LiveOrderCoordinator
 from bolsa_application.confirm.opening_gate import OpeningGateCoordinator
 from bolsa_application.confirm.position_sync import PositionSyncCoordinator
 from bolsa_application.confirm.risk_gate import (

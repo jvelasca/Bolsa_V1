@@ -10,22 +10,22 @@ con `get/put/list_unknown`) de la lógica fail-closed:
 from __future__ import annotations
 
 import pytest
+
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
     build_live_order,
     transition_live_order,
+)
+from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
+    _drain_unknowns,
+    _no_query_provider,
+    resolve_one_unknown,
 )
 from bolsa_application.live_order_query import (
     BrokerOrderQueryResult,
     MockLiveOrderQuery,
 )
 from bolsa_application.live_order_store import InMemoryLiveOrderStore
-
-from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
-    _drain_unknowns,
-    _no_query_provider,
-    resolve_one_unknown,
-)
 
 
 def _ui_unknown(*, order_id: str = "lo-x", venue_order_id: str = "xtb-x") -> LiveOrder:

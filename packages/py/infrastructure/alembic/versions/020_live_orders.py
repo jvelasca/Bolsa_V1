@@ -9,7 +9,6 @@ worker/request que creó la fila. Idempotente: omite tabla/índices si ya existe
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "020_live_orders"

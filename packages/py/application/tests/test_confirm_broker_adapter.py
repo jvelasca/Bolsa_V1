@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bolsa_market.providers import XtbBridgeOrderResult
 
 from bolsa_application.broker_adapter import MockBrokerAdapter, XtbBrokerAdapter
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_application.live_order_store import InMemoryLiveOrderStore
+from bolsa_market.providers import XtbBridgeOrderResult
 
 
 class _OkExecute:
