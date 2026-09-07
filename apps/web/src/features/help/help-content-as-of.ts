@@ -146,6 +146,10 @@
  * **2026-09-07d** — OR-6 fail-closed LR-1 · OE-1 cablea live recon ·
  * `LIVE_EXECUTION_UNLOCKED` default off (sandbox · cero POST bridge) ·
  * CTA PAPER | LIVE VIRTUAL (simulado).
+ * **2026-09-07e** — Tip **v2.12-beta** · package `1.41.0-beta` ·
+ * XL-3 durable core (`live_orders` PG + recovery UNKNOWN vía query ·
+ * sin re-POST · fail-closed) · scope `list_open_orders`/`cancel_order` ·
+ * cancel broker real PARKED · ≠ Accept LIVE · ≠ thaw.
  *
  * Verificar: `pnpm test:fa` · `pnpm test:operativa` · `pnpm test:coach`
  *

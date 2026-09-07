@@ -2,18 +2,27 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — post V2.11 LIVE honesty / Execution Core start
+## [Unreleased] — post V2.12 XL-3 durable core
 
-Post-tip hardening (no tip bump). **≠** Accept LIVE · **≠** thaw · `PAPER_D_EXECUTE` off · `LIVE_EXECUTION_UNLOCKED` default **off**.
+Post-release (no tip bump). **≠** Accept LIVE · **≠** thaw · **≠** settlement.
 
-### LIVE honesty + XL-3 dominio
+## [1.41.0-beta] — 2026-09-07
 
+V2.12 **XL-3 durable core** + scope-out `list_open_orders` / `cancel_order`. Producto **BETA / no producción**. Tip **`v2.12-beta`** → commit de release de esta entrada. Package **`1.41.0-beta`** (**bump** desde `1.40.0-beta`). Tip previo **`v2.11-beta` → `80e891c4`** / `1.40.0-beta` (**inmutable**). Release-tag CI tip según último run sobre este tag. Confirm = firma. `LIVE_EXECUTION_UNLOCKED` default **off** (sandbox · cero POST bridge). **No** LIVE capital. **≠** Accept estricto · **≠** thaw venue · **≠** settlement.
+
+### V2.12 — XL-3 durable core (live_orders PG + UNKNOWN recovery)
+
+- **Tabla `live_orders`** (PK `order_id` · account_id · indicadores 8×) · migración **`020_live_orders`** idempotente (guards table/index; down `019_outbox_position_fifo`).
+- **`PostgresLiveOrderStore`** durable cross-PID: put (insert/update) / get / delete / `list_unknown` / `list_open_orders` / `cancel_order`. Mapeo dominio↔fila 1:1 con `account_id`.
+- **Worker `live_order_recovery_worker`** (por defecto ON · `LIVE_RECOVERY_WORKER_ENABLED`): cada tick relee `UNKNOWN` y resuelve vía `query_broker` (no re-POST). Fail-closed: sin cliente / `unavailable` / intraducible → la fila queda `UNKNOWN` (refresca `updated_at`). **Nunca** sintetiza `execute_trade`/ledger.
+- **Scope-out V2.12:** `list_open_orders` (no terminales via `NON_TERMINAL_LIVE_STATUSES`, ordena `updated_at`, limita) y `cancel_order` (`CANCELLED` solo si el grafo lo permite; idempotente; `reason` documental). Real cancel round-trip XTB **PARKED** (honest-boundary; cero POST en cancel).
+- Wiring: `scheduler_worker` arranca el worker; `dependencies.get_confirm_intent_use_case` inyecta `PostgresLiveOrderStore(session)`.
+- Dominio `LiveOrder` (PY+TS) UNKNOWN first-class · no re-POST · PARTIAL qty · `account_id` en PY+TS.
 - OR-6 fail-closed: live recon no medido → `LIVE_BLOCKED` / `live_unavailable`; adapter `None` → `live_adapter_not_wired` (vocab LR-1 `clean`).
 - OE-1 cablea LR-1 + `liveAdapterWired` (bridge URL) en OR-6.
 - Sandbox VIRTUAL: `XtbBrokerAdapter` sin unlock → `live_virtual_sandbox` (cero POST bridge); kill switch reconsultado en adapter.
-- Dominio XL-3 `LiveOrder` (PY+TS): UNKNOWN first-class · no re-POST · PARTIAL qty · query_broker mock.
-- **Confirm wiring persist-only:** `LiveOrderCoordinator` registra la máquina tras submit LIVE `submitted`/`unknown` y la expone en `result["liveOrder"]`; PAPER/sandbox/rejected/executed(XL-2) no la tocan. Store proceso (InMemory; inyectable); Sled PG para V2.12. Confirm orquestador sigue `<1100` líneas.
-- Docs: [roadmap LIVE Execution](./docs/engineering/roadmap-live-execution-core-2026-09-07.md) · [honesty bridge](./docs/engineering/honesty-pack-xtb-bridge-external-2026-09-07.md) · provenance nota en audit pack V2.11.
+- **Confirm wiring persist-only:** `LiveOrderCoordinator` registra la máquina tras submit LIVE `submitted`/`unknown` y la expone en `result["liveOrder"]`; PAPER/sandbox/rejected/executed(XL-2) no la tocan. Confirm orquestador sigue `<1100` líneas.
+- Docs: [roadmap LIVE Execution](./docs/engineering/roadmap-live-execution-core-2026-09-07.md) · [honesty bridge](./docs/engineering/honesty-pack-xtb-bridge-external-2026-09-07.md) · relevo durable core [`traspaso-relevo-xl3-durable-core-2026-09-07.md`](./docs/engineering/traspaso-relevo-xl3-durable-core-2026-09-07.md) · relevo tag [`traspaso-relevo-tag-v2-12-beta-2026-09-07.md`](./docs/engineering/traspaso-relevo-tag-v2-12-beta-2026-09-07.md).
 
 ## [1.40.0-beta] — 2026-09-07
 
