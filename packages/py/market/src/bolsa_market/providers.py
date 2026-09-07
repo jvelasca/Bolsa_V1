@@ -48,6 +48,31 @@ class XtbBridgeOrderResult:
     venue_order_id: str | None = None
 
 
+XtbBridgeOrderQueryState = Literal[
+    "working",
+    "partial",
+    "filled",
+    "rejected",
+    "cancelled",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class XtbBridgeOrderState:
+    """Respuesta bridge GET /orders/{id} (broker-truth life-cycle de la orden).
+
+    filled/remaining son cantidades del venue (sin aritmética financiera aquí).
+    """
+
+    venue_order_id: str
+    state: XtbBridgeOrderQueryState
+    filled_quantity: float
+    remaining_quantity: float
+    reason: str | None = None
+    instrument_id: str | None = None
+    side: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class XtbBridgeAccountCash:
     """Respuesta bridge GET /account/cash (LR-1 read-only)."""
@@ -277,12 +302,62 @@ class XtbBridgeClient:
             venue_order_id=venue_order_id,
         )
 
+    async def query_order(
+        self,
+        venue_order_id: str,
+    ) -> XtbBridgeOrderState:
+        """GET /orders/{venue_order_id} — broker-truth del estado de una orden.
+
+        Fail-closed: solo ``working|partial|filled|rejected|cancelled`` se
+        consideran respuestas válidas de life-cycle; 404/timeout/HTTP-error
+        lanzan ``RuntimeError`` (el recovery lo trata como ``unavailable`` y la
+        máquina permanece UNKNOWN — no se fabrica cierre).
+        """
+        vid = (venue_order_id or "").strip()
+        if not vid:
+            raise RuntimeError("query_order requires venue_order_id")
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{self._base_url}/orders/{vid}")
+        except Exception as exc:
+            raise RuntimeError(format_xtb_bridge_connect_error(self._base_url, exc)) from exc
+        if not response.is_success:
+            body = response.json() if response.content else {}
+            raise RuntimeError(
+                body.get("reason") or body.get("error")
+                or f"XTB bridge order query error ({response.status_code})"
+            )
+        body = response.json()
+        state_raw = str(body.get("state") or "unavailable").lower()
+        valid = {"working", "partial", "filled", "rejected", "cancelled"}
+        if state_raw not in valid:
+            # No es un life-cycle reconocible → no cierre (fail-closed).
+            raise RuntimeError(f"XTB bridge order state inesperado: {state_raw!r}")
+        def _qty(value: str | float | int | None) -> float:
+            try:
+                return max(0.0, float(value))
+            except (TypeError, ValueError):
+                return 0.0
+
+        body_vid = body.get("venueOrderId") or body.get("orderId") or vid
+        return XtbBridgeOrderState(
+            venue_order_id=str(body_vid),
+            state=state_raw,
+            filled_quantity=_qty(body.get("filledQty")),
+            remaining_quantity=_qty(body.get("remainingQty")),
+            reason=(body.get("reason") or body.get("error") or None),
+            instrument_id=body.get("instrumentId") if isinstance(body.get("instrumentId"), str) else None,
+            side=body.get("side") if isinstance(body.get("side"), str) else None,
+        )
+
 
 __all__ = [
     "XtbBridgeAccountCash",
     "XtbBridgeClient",
     "XtbBridgeHealth",
+    "XtbBridgeOrderQueryState",
     "XtbBridgeOrderResult",
+    "XtbBridgeOrderState",
     "XtbBridgePosition",
     "XtbBridgeQuote",
     "YahooMarketDataProvider",

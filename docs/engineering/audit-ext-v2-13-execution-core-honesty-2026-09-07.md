@@ -174,6 +174,28 @@ Tras la auditoría se cerraron **4 de los 6 puntos de deuda prioritaria** en có
 `live_orders` [H7]. Siguen siendo condición para subir a LIVE READY, junto a
 demuestrar el ciclo completo crash+retry+doble worker+callback duplicado+fallo DB+timeout.
 
+## 5ter. Avance H6 + H7 (segunda iteración post-baseline)
+
+En esta iteración se **cerró parte de la deuda de broker-query y reconcile**, sin
+levantar aún el umbral LIVE READY:
+
+| Deuda                                          | Qué se hizo                                                                                                                                                                                                                                                                                                           | Dónde                                                                                                                                                    |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------- | ------ | ------------------ | ----------------------------- |
+| **H6 contrato query mock**                     | El bridge mock (`scripts/xtb-bridge-mock.mjs`) ahora registra órdenes creadas y expone `GET /orders/{id}` (life-cycle ``working                                                                                                                                                                                       | partial                                                                                                                                                  | filled | rejected | cancelled`con`filledQty/remainingQty`). Parametrizable: `XTB_BRIDGE_ORDER_STATE`. POST conserva shape `submitted | filled | rejected`` legacy. | `scripts/xtb-bridge-mock.mjs` |
+| **H6 query real en cliente**                   | `XtbBridgeClient.query_order` → `GET /orders/{vid}`; fail-closed ante 404/timeout/estado no reconocible lanza (worker lo traduce a `unavailable`/UNKNOWN). Validado con smoke real sobre el mock (submit→working/partial con qty exacta).                                                                             | `packages/py/market/.../providers.py` · `XtbBridgeOrderState` · `XtbBridgeOrderQueryState`                                                               |
+| **H6 adapter real del recovery**               | `XtbLiveOrderQueryAdapter` implementa `LiveOrderQueryPort` mapeando bridge→`BrokerOrderQueryResult` con Decimal(6dp) exacto (tapona el hueco H1 del float en la cadena broker→máquina). Nunca fabrica ledger.                                                                                                         | `packages/py/application/.../broker_adapter.py` · `test_xtb_live_query_adapter.py` (6 tests)                                                             |
+| **H6 wire default provider**                   | El recovery worker por defecto usa un query provider REAL cuando hay `XTB_BRIDGE_URL` (venu LIVE); sin ella cae a fail-closed (UNKNOWN).                                                                                                                                                                              | `apps/api-python/.../live_order_recovery_worker.py` (`build_live_query_provider`)                                                                        |
+| **H7 reconcile máquina `live_orders` (drift)** | Nuevo orquestador read-only que consulta open (SUBMITTED/WORKING/PARTIAL/CANCEL_REQUESTED con id de venue) vía el mismo provider y reporta drift `cancel_broker_side`/`fill_unseen`/`state_mismatch`/`query_unavailable` — **no auto-heal, no muta** (fail-closed). Colgado al tick del recovery tras drenar UNKNOWN. | `packages/py/application/.../live_order_machine_reconcile.py` · `_reconcile_open_orders` en el worker · `test_live_order_machine_reconcile.py` (7 tests) |
+
+**Faltante honesto (no ejecutable sin stack PG + bridge mock levantado):** demostración
+**en runtime** del ciclo completo de 2 workers **reales de PG** resolviendo UNKNOWN
+contra el bridge mock (submit→UNKNOWN→query→working/partial/filled) + callback duplicado
+
+- timeout + drift H7. Hoy el e2e multiworker PG real (H2) valida solo el _claim/lease_;
+  el tramo _query real broker→resolución_ está cubierto por unit del adapter/reconcile y
+  por smoke real de cliente→mock, pero **no** por un e2e PG que integre worker+PG+bridge.
+  Sigue siendo condición del paso a LIVE READY junto a idempotencia financiera (H3).
+
 ---
 
 ## 6. Referencias

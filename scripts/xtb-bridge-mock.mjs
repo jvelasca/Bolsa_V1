@@ -6,6 +6,13 @@ const PORT = Number(process.env.XTB_BRIDGE_PORT ?? 3002);
 const ALLOW_ORDERS = process.env.XTB_BRIDGE_ALLOW_ORDERS === '1';
 /** Con ALLOW + FILL: responde filled (ledger vía adapter XL-2). */
 const FILL_ORDERS = process.env.XTB_BRIDGE_FILL_ORDERS === '1';
+/** Life-cycle simulado de una orden creada con ALLOW. Por defecto queda
+ *  'working' (no se auto-llena), salvo XTB_BRIDGE_ORDER_STATE=filled/partial/... */
+const ORDER_STATE = process.env.XTB_BRIDGE_ORDER_STATE ?? 'working';
+const ORDER_FILLED_RATIO = Number(process.env.XTB_BRIDGE_ORDER_FILLED_RATIO ?? 0);
+
+/** Órdenes creadas en este proceso (estado del mock, no del broker real). */
+const orders = new Map(); // venueOrderId -> { instrumentId, side, quantity, state, reason, filledQty }
 
 function hashSeed(text) {
   let hash = 0;
@@ -140,23 +147,77 @@ const server = createServer((req, res) => {
         side: parsed.side ?? null,
         quantity: parsed.quantity ?? null,
       };
-      if (FILL_ORDERS) {
-        const filled = {
-          status: 'filled',
-          reason: 'live_filled',
-          ...echo,
-        };
-        if (parsed.price != null && parsed.price !== '') {
-          filled.fillPrice = parsed.price;
+      const qty = Number(parsed.quantity);
+
+      // --- Estado del mock para esta nueva orden (visible via GET /orders/{id}) ---
+      // Sin FILL, la orden NO nace llenada: queda en ORDER_STATE (default 'working')
+      // para que el recovery la resuelva por query (cadena honesta H6). Con
+      // FILL_ORDERS nace 'filled' (respuesta síncrona del POST, shape legacy).
+      const MACHINE_STATES = ['working', 'partial', 'filled', 'rejected', 'cancelled'];
+      let state = FILL_ORDERS ? 'filled' : ORDER_STATE;
+      if (MACHINE_STATES.indexOf(state) < 0) state = 'working';
+
+      let filledQty = 0;
+      if (state === 'filled' && Number.isFinite(qty) && qty > 0) {
+        filledQty = qty;
+      } else if (state === 'partial' && Number.isFinite(qty) && qty > 0) {
+        const ratio = Number.isFinite(ORDER_FILLED_RATIO) && ORDER_FILLED_RATIO > 0
+          ? ORDER_FILLED_RATIO : 0.5;
+        filledQty = Math.min(qty, Math.max(1, Math.round(qty * ratio)));
+        if (filledQty >= qty) {
+          state = 'filled';
+          filledQty = qty;
         }
-        sendJson(res, 200, filled);
-        return;
       }
-      sendJson(res, 200, {
-        status: 'submitted',
-        reason: 'live_submitted_no_fill',
-        ...echo,
-      });
+      const remainingQty = Number.isFinite(qty) && qty > 0 ? qty - filledQty : 0;
+
+      const record = {
+        instrumentId: parsed.instrumentId ?? null,
+        side: parsed.side ?? null,
+        quantity: parsed.quantity ?? null,
+        state,
+        filledQty,
+        remainingQty,
+        reason: state === 'filled' ? 'live_filled'
+          : state === 'rejected' ? 'live_rejected'
+          : state === 'cancelled' ? 'live_cancelled'
+          : state === 'partial' ? 'live_partial'
+          : 'live_working',
+      };
+      orders.set(venueOrderId, record);
+
+      // Respuesta POST /orders: shape legacy del adapter (submitted|filled|rejected).
+      const status = state === 'filled' ? 'filled' : (state === 'rejected' ? 'rejected' : 'submitted');
+      // El estado interno queda en `state` para que GET /orders/{id} lo reexponga.
+      const payload = { status, reason: record.reason, ...echo, state: record.state };
+      if (state === 'filled' || state === 'partial') {
+        payload.filledQty = filledQty;
+        payload.remainingQty = remainingQty;
+        if (parsed.price != null && parsed.price !== '') payload.fillPrice = parsed.price;
+      }
+      sendJson(res, 200, payload);
+    });
+    return;
+  }
+
+  const orderIdMatch = url.pathname.match(/^\/orders\/([^/]+)$/);
+  if (req.method === 'GET' && orderIdMatch) {
+    const venueOrderId = decodeURIComponent(orderIdMatch[1]);
+    const record = orders.get(venueOrderId);
+    if (!record) {
+      sendJson(res, 404, { error: 'order_not_found', venueOrderId });
+      return;
+    }
+    // El mock expone el estado "broker-truth" de la orden. No es trade fill real.
+    sendJson(res, 200, {
+      venueOrderId,
+      instrumentId: record.instrumentId,
+      side: record.side,
+      quantity: record.quantity,
+      state: record.state,
+      filledQty: record.filledQty,
+      remainingQty: record.remainingQty,
+      reason: record.reason,
     });
     return;
   }

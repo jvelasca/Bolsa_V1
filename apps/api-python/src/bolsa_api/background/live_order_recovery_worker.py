@@ -68,12 +68,53 @@ async def _no_query_provider(
 ) -> LiveOrderQueryPort | None:
     """Sin cliente real de query cableado → unavailable (fail-closed).
 
-    El contrato XTB ``GET /orders/{venueOrderId}`` no existe todavía (audit
-    Hallazgo 3), así que el poller de verdad no fabrica cierre: devuelve None y
-    la fila permanece UNKNOWN.
+    Util de fallback: devuelve None (la fila permanece UNKNOWN, solo bump). No es
+    el provider que el scheduler cablea por defecto cuando hay ``XTB_BRIDGE_URL``.
     """
     _ = venue, account_id, venue_order_id
     return None
+
+
+def build_live_query_provider(
+    *,
+    bridge_url: str | None,
+) -> QueryProvider:
+    """Provider real de query por venue LIVE (H6), con bridge XTB.
+
+    Devuelve una función dado (venue, account_id, venue_order_id) que entrega un
+    adaptador que consulta ``GET /orders/{id}``:
+
+    * venue ``LIVE`` y bridge URL disponible → ``XtbLiveOrderQueryAdapter``
+      (fail-closed: ante error/timeout/404 del bridge el worker la trata como
+      ``unavailable`` y la fila queda UNKNOWN — no se fabrica cierre);
+    * cualquier otro caso (venue no-LIVE o sin URL) → ``None`` (semántica de
+      ``_no_query_provider``).
+
+    El bridge XTB es una configuración global del repo (``xtb_bridge_url``), no per
+    account, así que el provider no distingue de account (solo filtra venue LIVE).
+    """
+    url = (bridge_url or "").strip()
+    if not url:
+        return _no_query_provider
+
+    from bolsa_application.broker_adapter import XtbLiveOrderQueryAdapter
+    from bolsa_market.providers import XtbBridgeClient
+
+    client = XtbBridgeClient(url)
+
+    async def _provider(
+        venue: str,
+        account_id: str,
+        venue_order_id: str,
+    ) -> LiveOrderQueryPort | None:
+        if (venue or "").strip().upper() != "LIVE":
+            return None
+        # account_id / venue_order_id no afectan la construcción (cliente global);
+        # se referencian solo para reconocer el contrato del provider.
+        _ = account_id, venue_order_id
+        return XtbLiveOrderQueryAdapter(client)
+
+    return _provider
 
 
 async def resolve_one_unknown(
@@ -197,7 +238,45 @@ async def _drain_once(
             worker_id=worker_id or _worker_identity(),
             stale_after_seconds=stale_after_seconds,
         )
+        # H7 — drift reconcile de la máquina (working/partial/cancel-requested):
+        # mismo query_provider y misma sesión, read-only (no escribe). Reporta
+        # diferencias a diagnostic por log; el operador/capa decidirá la acción.
+        await _reconcile_open_orders(
+            store,
+            query_provider=query_provider,
+            limit=limit,
+        )
     return result
+
+
+async def _reconcile_open_orders(
+    store: PostgresLiveOrderStore,
+    *,
+    query_provider: QueryProvider | None,
+    limit: int,
+) -> None:
+    """H7 — consulta open orders vs broker-truth, log-drift (no muta, no heal)."""
+    if query_provider is None:
+        # Sin provider real (fail-closed) no hay destino que consultar.
+        return
+    try:
+        from bolsa_application.live_order_machine_reconcile import (
+            reconcile_live_order_machine,
+        )
+
+        report = await reconcile_live_order_machine(
+            store,
+            query_provider=query_provider,
+            limit=limit,
+        )
+        if report.drifts:
+            logger.warning(
+                "live_order machine reconcile (H7) drift=%s summary=%s",
+                len(report.drifts),
+                report.summary(),
+            )
+    except Exception:  # noqa: BLE001 — una sesión que falle no tumba el tick
+        logger.exception("live_order machine reconcile failed")
 
 
 async def live_order_recovery_worker_loop(
@@ -243,11 +322,22 @@ def start_live_order_recovery_worker(
             _ENV_ENABLED,
         )
         return None
+    # H6: por defecto el recovery se arranca con el query_provider REAL cuando hay
+    # ``XTB_BRIDGE_URL`` configurada (fail-closed sin URL ⇒ ``_no_query_provider``:
+    # las filas permanecen UNKNOWN). Callers que necesiten un prov. específico en
+    # tests pueden inyectarlo explícitamente.
+    effective_query_provider = query_provider
+    if effective_query_provider is None:
+        from bolsa_infrastructure.config import get_settings
+
+        effective_query_provider = build_live_query_provider(
+            bridge_url=get_settings().xtb_bridge_url,
+        )
     return asyncio.create_task(
         live_order_recovery_worker_loop(
             session_factory,
             tick_seconds=tick_seconds,
-            query_provider=query_provider,
+            query_provider=effective_query_provider,
             limit=limit,
             worker_id=worker_id,
         )

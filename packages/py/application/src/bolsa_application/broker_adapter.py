@@ -8,6 +8,7 @@ XtbBrokerAdapter = LIVE vía bridge; submitted ≠ fill; filled→ledger (XL-2).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Literal, Protocol
 
 from bolsa_analytics.cognitive.broker_adapter import (
@@ -22,8 +23,9 @@ from bolsa_analytics.cognitive.broker_adapter import (
 )
 from bolsa_analytics.cognitive.paper_broker import PaperBrokerReceipt
 from bolsa_analytics.cognitive.paper_order import PaperOrder, PaperOrderSide
+from bolsa_application.live_order_query import BrokerOrderQueryResult
 from bolsa_application.paper_broker import PaperBroker
-from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult
+from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult, XtbBridgeOrderState
 
 BrokerAdapterSubmitStatus = Literal[
     "executed",
@@ -357,3 +359,57 @@ def resolve_broker_adapter(
             url = get_settings().xtb_bridge_url
         return XtbBrokerAdapter(bridge_url=url, execute_trade=execute_trade)
     return PaperBrokerAdapter(execute_trade)
+
+
+class XtbLiveOrderQueryAdapter:
+    """Implementa ``LiveOrderQueryPort`` con el bridge XTB real (H6).
+
+    Consulta ``GET /orders/{venue_order_id}`` (broker-truth del life-cycle de la
+    orden) y mapea a ``BrokerOrderQueryResult``:
+    * estados working/partial/filled/rejected/cancelled → outcome equivalente;
+    * cantidades ``filled/remaining`` se cuantifican a ``Decimal(6dp)`` (paridad
+      con la máquina XL-3, que es Decimal desde H1) ANTES de construir el result;
+    * cualquier error/timeout/404 del bridge → resultado ``unavailable`` (fail-
+      closed: la máquina permanece UNKNOWN; no se fabrica cierre terminal).
+
+    No deposita ledger ni ejecuta nada: es lectura pura del contexto del venue.
+    """
+
+    def __init__(self, client: XtbBridgeClient) -> None:
+        self._client = client
+
+    @staticmethod
+    def _qty(value: float | None) -> float:
+        if value is None:
+            return 0.0
+        return max(0.0, float(value))
+
+    async def query_broker_order(self, *, venue_order_id: str) -> BrokerOrderQueryResult:
+        try:
+            st = await self._client.query_order(venue_order_id)
+        except Exception:
+            return BrokerOrderQueryResult(
+                outcome="unavailable",
+                venue_order_id=venue_order_id,
+                filled_quantity=None,
+                remaining_quantity=None,
+                reason="xtb_query_unavailable",
+            )
+        # ``BrokerOrderQueryResult`` mapeará el life-cycle del venue a estado de
+        # la máquina vía ``to_live_status`` (working/partial/filled/rejected/
+        # cancelled → WORKING/PARTIAL/FILLED/REJECTED/CANCELLED).
+        # Decimal(6dp) exacto al construir el result: tapona el hueco H1 del float
+        # en la cadena broker→máquina (working/partial/filled con quantities).
+        def _dec(value: float | None) -> float:
+            q = Decimal(str(self._qty(value))).quantize(
+                Decimal("0.000001"), rounding=ROUND_HALF_UP
+            )
+            return float(q)
+
+        return BrokerOrderQueryResult(
+            outcome=st.state,
+            venue_order_id=st.venue_order_id,
+            filled_quantity=_dec(st.filled_quantity),
+            remaining_quantity=_dec(st.remaining_quantity),
+            reason=st.reason,
+        )
