@@ -185,6 +185,26 @@ function liveVirtualSupervisedF3Bundle() {
           instrumentId: E2E_INSTRUMENT_ID,
           symbol: E2E_SYMBOL,
           action: "recommend_long",
+          // TradePlan TRIGGERED = única autoridad de sizing en Confirm (V1.25).
+          // Sin él, evaluateRiskSignature ⇒ no_tradeplan ⇒ CTA deshabilitado. Con
+          // geometría long válida (stop < entry < t1 < t2) y qty == plan.quantity,
+          // el riesgo firma `allowed` sin override → CTA ejecutable en el sandbox.
+          tradePlan: {
+            decisionId: "DEC-E2E-LIVE-VIRTUAL",
+            instrumentId: E2E_INSTRUMENT_ID,
+            direction: "long",
+            status: "TRIGGERED",
+            entry: 192.4,
+            structuralStop: 191.4,
+            target1: 194,
+            target2: 195.5,
+            quantity: 10,
+            riskPct: 1,
+            riskAmount: 25,
+            initialRiskR: 1,
+            whyNot: [],
+            executionAllowed: true,
+          },
           suggestedQuantity: 10,
           suggestedPrice: 192.4,
           metrics: {
