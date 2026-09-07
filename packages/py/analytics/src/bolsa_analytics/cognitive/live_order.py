@@ -11,6 +11,7 @@ query_broker is the only path out of UNKNOWN (real poll PARKED; mock in tests).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Literal
 
 LiveOrderStatus = Literal[
@@ -21,6 +22,7 @@ LiveOrderStatus = Literal[
     "PARTIAL",
     "FILLED",
     "REJECTED",
+    "CANCEL_REQUESTED",
     "CANCELLED",
     "UNKNOWN",
 ]
@@ -30,22 +32,60 @@ LiveOrderVenue = Literal["LIVE"]
 
 LIVE_ORDER_KEY = "liveOrder"
 
+# ---------------------------------------------------------------------------
+# Cantidades deterministas (Decimal, paridad NUMERIC(18,6) de live_orders).
+# Cierra H1 de la auditoría V2.13: la DB ya es NUMERIC(18,6) (migración 021),
+# pero el dominio seguía casteando a `float`. Aquí toda cantidad se normaliza a
+# ``Decimal`` con 6 decimales (misma escala física), de modo que la aritmética
+# filled/remaining y el invariante ``filled + remaining == quantity`` son
+# EXACTOS en memoria, no aproximados con epsilons de float.
+# ---------------------------------------------------------------------------
+
+_QTY_SCALE = Decimal("0.000001")
+_ZERO = Decimal("0")
+
+
+def _qty(value: object) -> Decimal:
+    """Convierte/redondea a ``Decimal`` de 6 decimales (ROUND_HALF_UP).
+
+    Acepta int/float/str/Decimal (nan/inf → error). ``None`` no es válido.
+    ``int``/``float`` exactos pasan limpios; otros como 0.1 se redondean a 6dp
+    (semántica de ``NUMERIC(18,6)``). Fuera de escala se trunca con redondeo
+    half-up (evita sesgo bancario/even en magnitudes de cuenta).
+    """
+    try:
+        return Decimal(str(value)).quantize(_QTY_SCALE, rounding=ROUND_HALF_UP)
+    except (TypeError, ValueError, InvalidOperation) as exc:  # noqa: BLE001
+        raise ValueError(f"quantity not quantizable: {value!r}") from exc
+
 # Terminales: resultado cerrado (FILLED/REJECTED/CANCELLED). Una fila aquí ya no
 # está in-flight: no admite más transiciones ni cuenta como "open".
 _TERMINAL: frozenset[LiveOrderStatus] = frozenset({"FILLED", "REJECTED", "CANCELLED"})
 
+# V2.13 honest-cancel (intención vs resultado): una cancelación LOCAL = ``DECISION
+# (CANCEL_REQUESTED)``, una cancelación de VERACIDAD broker = ``CANCELLED``.
+# - Cualquier estado en-vuelo puede DECIDIR CancelarRequest → CANCEL_REQUESTED.
+# - CANCEL_REQUESTED NO es terminal: deja de estar in-flight SOLO cuando el broker
+#   confirma (→ CANCELLED) o resuelve por otra vía (UNKNOWN/FILLED/REJECTED…). El
+#   hecho de pedirlo se persiste en ``cancel_requested_*`` (intención) y la
+#   confirmación del venue en ``broker_cancel_confirmed_at`` (resultado).
+# Se conservan los bordes directos → CANCELLED para los flujos que YA tienen la
+# confirmación del venue (reconcilier/worker), sin romper los existentes.
+
 # UNKNOWN → SUBMITTING (re-POST) is intentionally ABSENT.
 ALLOWED_LIVE_ORDER_TRANSITIONS: dict[LiveOrderStatus, frozenset[LiveOrderStatus]] = {
-    "AUTHORIZED": frozenset({"SUBMITTING", "REJECTED", "CANCELLED"}),
-    "SUBMITTING": frozenset({"REJECTED", "UNKNOWN", "SUBMITTED"}),
-    "SUBMITTED": frozenset({"WORKING", "UNKNOWN", "CANCELLED", "REJECTED"}),
-    "WORKING": frozenset({"PARTIAL", "FILLED", "UNKNOWN", "CANCELLED", "REJECTED"}),
-    "PARTIAL": frozenset({"FILLED", "UNKNOWN", "CANCELLED"}),
+    "AUTHORIZED": frozenset({"SUBMITTING", "REJECTED", "CANCELLED", "CANCEL_REQUESTED"}),
+    "SUBMITTING": frozenset({"REJECTED", "UNKNOWN", "SUBMITTED", "CANCEL_REQUESTED"}),
+    "SUBMITTED": frozenset({"WORKING", "UNKNOWN", "CANCELLED", "REJECTED", "CANCEL_REQUESTED"}),
+    "WORKING": frozenset({"PARTIAL", "FILLED", "UNKNOWN", "CANCELLED", "REJECTED", "CANCEL_REQUESTED"}),
+    "PARTIAL": frozenset({"FILLED", "UNKNOWN", "CANCELLED", "CANCEL_REQUESTED"}),
     "FILLED": frozenset(),
     "REJECTED": frozenset(),
+    # CANCEL_REQUESTED = decisión local pendiente de confirmación o desenlace.
+    "CANCEL_REQUESTED": frozenset({"CANCELLED", "UNKNOWN", "REJECTED", "FILLED", "WORKING"}),
     "CANCELLED": frozenset(),
     # Resolve UNKNOWN only via broker query (not re-POST).
-    "UNKNOWN": frozenset({"WORKING", "REJECTED", "FILLED", "PARTIAL", "CANCELLED"}),
+    "UNKNOWN": frozenset({"WORKING", "REJECTED", "FILLED", "PARTIAL", "CANCELLED", "CANCEL_REQUESTED"}),
 }
 
 # "open" = no-terminal: la orden sigue viva / en curso / en riesgo. Complemento
@@ -64,24 +104,37 @@ class LiveOrder:
     venue: LiveOrderVenue
     instrument_id: str
     side: LiveOrderSide
-    quantity: float
-    filled_quantity: float
-    remaining_quantity: float
+    quantity: Decimal
+    filled_quantity: Decimal
+    remaining_quantity: Decimal
     venue_order_id: str | None
     intent_id: str | None
     financial_apply_count: int
     account_id: str | None = None
 
+    def __post_init__(self) -> None:
+        """Coerce cantidades a Decimal(6dp) en CUALQUIER ruta de construcción.
+
+        Garantiza el invariante en memoria: una ``LiveOrder`` siempre guarda
+        Decimal exacto de 6 decimales, nunca float/int suelto. (frozen+slots:
+        escritura temprana vía object.__setattr__).
+        """
+        object.__setattr__(self, "quantity", _qty(self.quantity))
+        object.__setattr__(self, "filled_quantity", _qty(self.filled_quantity))
+        object.__setattr__(self, "remaining_quantity", _qty(self.remaining_quantity))
+
     def to_dict(self) -> dict[str, object]:
+        # La proyección de red/TS consume números (`LiveOrderV1.number`); el valor
+        # de verdad (Decimal) vive en el dominio y en BM `NUMERIC(18,6)`.
         return {
             "orderId": self.order_id,
             "status": self.status,
             "venue": self.venue,
             "instrumentId": self.instrument_id,
             "side": self.side,
-            "quantity": self.quantity,
-            "filledQuantity": self.filled_quantity,
-            "remainingQuantity": self.remaining_quantity,
+            "quantity": float(self.quantity),
+            "filledQuantity": float(self.filled_quantity),
+            "remainingQuantity": float(self.remaining_quantity),
             "venueOrderId": self.venue_order_id,
             "intentId": self.intent_id,
             "financialApplyCount": self.financial_apply_count,
@@ -94,12 +147,12 @@ def build_live_order(
     order_id: str,
     instrument_id: str,
     side: LiveOrderSide,
-    quantity: float,
+    quantity: object,
     intent_id: str | None = None,
     status: LiveOrderStatus = "AUTHORIZED",
     account_id: str | None = None,
 ) -> LiveOrder:
-    qty = float(quantity)
+    qty = _qty(quantity)
     return LiveOrder(
         order_id=order_id,
         status=status,
@@ -107,7 +160,7 @@ def build_live_order(
         instrument_id=instrument_id,
         side=side,
         quantity=qty,
-        filled_quantity=0.0,
+        filled_quantity=_ZERO,
         remaining_quantity=qty,
         venue_order_id=None,
         intent_id=intent_id,
@@ -130,41 +183,49 @@ def transition_live_order(
     order: LiveOrder,
     nxt: LiveOrderStatus,
     *,
-    filled_quantity: float | None = None,
+    filled_quantity: object | None = None,
     venue_order_id: str | None = None,
     apply_financial: bool = False,
 ) -> LiveOrder:
-    """Aplica transición. apply_financial solo en FILLED (idempotente)."""
+    """Aplica transición. apply_financial solo en FILLED (idempotente).
+
+    Decimal(6dp) exacto: filled/remaining CIERRAN en memoria
+    (filled + remaining === quantity), sin epsilon float.
+    """
     if not can_transition_live_order(order.status, nxt):
         raise LiveOrderTransitionError(f"live_order forbidden: {order.status} → {nxt}")
 
     filled = order.filled_quantity
     remaining = order.remaining_quantity
     if filled_quantity is not None:
-        filled = float(filled_quantity)
-        if filled < 0 or filled > order.quantity + 1e-9:
-            raise LiveOrderTransitionError("filled_quantity out of range")
-        remaining = max(0.0, order.quantity - filled)
+        filled = _qty(filled_quantity)
+        if filled < _ZERO or filled > order.quantity:
+            raise LiveOrderTransitionError(
+                f"filled_quantity {filled} out of range (0..{order.quantity})"
+            )
+        remaining = _qty(order.quantity - filled)
+        if remaining < _ZERO:
+            raise LiveOrderTransitionError(
+                f"remaining negative: {order.quantity} - {filled}"
+            )
 
-    if nxt == "PARTIAL" and filled <= 0:
-        raise LiveOrderTransitionError("PARTIAL requires filled_quantity > 0")
-    if nxt == "PARTIAL" and remaining <= 0:
-        raise LiveOrderTransitionError("PARTIAL requires remaining_quantity > 0")
+    if nxt == "PARTIAL":
+        if filled <= _ZERO:
+            raise LiveOrderTransitionError("PARTIAL requires filled_quantity > 0")
+        if remaining <= _ZERO:
+            raise LiveOrderTransitionError("PARTIAL requires remaining_quantity > 0")
     if nxt == "FILLED":
         if filled_quantity is None:
             # FILLED sin detalle de broker → el total capturado es la orden entera.
             filled = order.quantity
-        # Terminal FILLED significa que la cantidad total de la orden se capturó.
-        # Si el broker reporta FILLED con filled < quantity NO inventamos un
-        # FILLED coherente (remaining=0 con filled parcial) : eso es desacuerdo
-        # broker-truth y debe quedarse fail-closed para reconciliar, jamás
-        # normalizarse silenciosamente a un estado terminal que no refleja lo real.
-        elif abs(filled - order.quantity) > 1e-9:
+        elif filled != order.quantity:
+            # FILLED con filled < quantity = desacuerdo broker-truth; fail-closed
+            # para reconciliar, NUNCA un estado terminal normalizado a la fuerza.
             raise LiveOrderTransitionError(
                 "FILLED requires filled_quantity == quantity "
                 f"(order {order.quantity}, broker {filled}) · reconciliation required"
             )
-        remaining = 0.0
+        remaining = _ZERO
 
     apply_count = order.financial_apply_count
     if apply_financial:
@@ -242,14 +303,14 @@ class LiveOrderReconcileReport:
         }
 
 
-_QTY_EPS = 1e-9
+_QTY_EPS = Decimal("0")  # paridad exacta con invariante Decimal(6dp) de dominio
 
 
 def reconcile_live_order_vs_broker(
     *,
     order: LiveOrder,
     broker_status: str | None,
-    broker_filled: float | None,
+    broker_filled: object | None,
 ) -> LiveOrderReconcileReport:
     """Contrasta una respuesta broker-side contra la máquina local de la orden.
 
@@ -257,7 +318,8 @@ def reconcile_live_order_vs_broker(
     ambigüedad o desajuste irreconciliable devuelve ``reconciliation_required``.
     Semántica clave del modelo FILLED (V2.13): el broker nunca da un FILLED
     terminal con filled parcial de la orden; si lo hace → reconciliation_required,
-    jamás un estado terminal fabricado.
+    jamás un estado terminal fabricado. Compara en Decimal exacto (order.quantity
+    es Decimal); un broker_filled float se reduce a la misma escala 6dp.
     """
     oid = order.order_id
     st = (broker_status or "").strip().lower()
@@ -266,8 +328,9 @@ def reconcile_live_order_vs_broker(
         return LiveOrderReconcileReport(oid, "unavailable", "broker unavailable")
 
     if st == "filled":
-        if float(order.quantity) > _QTY_EPS:
-            if broker_filled is None or abs(float(broker_filled) - order.quantity) > _QTY_EPS:
+        if order.quantity > _QTY_EPS:
+            broker = _qty(broker_filled) if broker_filled is not None else None
+            if broker is None or broker != order.quantity:
                 return LiveOrderReconcileReport(
                     oid,
                     "reconciliation_required",
@@ -288,11 +351,8 @@ def reconcile_live_order_vs_broker(
         )
 
     if st == "partial":
-        if (
-            broker_filled is None
-            or not (0 < float(broker_filled))
-            or float(broker_filled) >= order.quantity
-        ):
+        broker = _qty(broker_filled) if broker_filled is not None else None
+        if broker is None or not (_ZERO < broker < order.quantity):
             return LiveOrderReconcileReport(
                 oid,
                 "reconciliation_required",

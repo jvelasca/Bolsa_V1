@@ -10,14 +10,14 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy.exc import IntegrityError
+
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
     build_live_order,
     can_transition_live_order,
     transition_live_order,
 )
-from sqlalchemy.exc import IntegrityError
-
 from bolsa_application.live_order_store import (
     InMemoryLiveOrderStore,
     PostgresLiveOrderStore,
@@ -337,17 +337,18 @@ async def test_inmemory_cancel_roundtrip_is_idempotent_single_state() -> None:
 
     cancelled = await store.cancel_order("lo-cx", reason="usuario")
     assert cancelled is not None
-    assert cancelled.status == "CANCELLED"
+    assert cancelled.status == "CANCEL_REQUESTED"  # decisión local, NO CANCELLED
 
     stored = await store.get("lo-cx")
-    assert stored is not None and stored.status == "CANCELLED"
-    # Estado terminal único: ya no es "open" ni aparece duplicado.
-    assert await store.list_open_orders(limit=50) == []
+    assert stored is not None and stored.status == "CANCEL_REQUESTED"
+    # CANCEL_REQUESTED NO es terminal: sigue in-flight (pendiente de broker).
+    open_orders = await store.list_open_orders(limit=50)
+    assert [o.order_id for o in open_orders] == ["lo-cx"]
     assert len(store._by_order) == 1
 
-    # Re-cancel: idempotente → devuelve la orden CANCELLED sin duplicar estado.
+    # Re-cancel: idempotente → devuelve la orden CANCEL_REQUESTED (no-op).
     again = await store.cancel_order("lo-cx", reason="otra vez")
-    assert again is not None and again.status == "CANCELLED"
+    assert again is not None and again.status == "CANCEL_REQUESTED"
     assert await store.get("lo-cx") is not None
     assert len(store._by_order) == 1
 
@@ -383,9 +384,9 @@ async def test_inmemory_cancel_from_unknown_state_is_legal() -> None:
     store = InMemoryLiveOrderStore()
     await store.put(_to_unknown(_make_order(order_id="lo-cxu", account_id="acc-1")))
     result = await store.cancel_order("lo-cxu")
-    assert result is not None and result.status == "CANCELLED"
+    assert result is not None and result.status == "CANCEL_REQUESTED"
     stored = await store.get("lo-cxu")
-    assert stored is not None and stored.status == "CANCELLED"
+    assert stored is not None and stored.status == "CANCEL_REQUESTED"
 
 
 @pytest.mark.asyncio
@@ -406,8 +407,10 @@ async def test_inmemory_cancel_tracked_local_not_broker_confirmed() -> None:
     assert meta.requested_by == "pepe"
     assert meta.broker_confirmed is False
 
+    # La orden NO se presenta como CANCELLED: sigue CANCEL_REQUESTED (intención
+    # registrada, resultado del broker pendiente).
     stored = await store.get("lo-cc")
-    assert stored is not None and stored.status == "CANCELLED"
+    assert stored is not None and stored.status == "CANCEL_REQUESTED"
     meta_after = await store.get_cancel_meta("lo-cc")
     assert meta_after is not None and meta_after.broker_confirmed is False
 
@@ -425,6 +428,51 @@ async def test_inmemory_cancel_broker_confirm_only_via_explicit_set() -> None:
     confirmed = await store.set_broker_cancel_confirmed("lo-cbrk")
     assert confirmed is not None and confirmed.broker_confirmed is True
     assert (await store.get_cancel_meta("lo-cbrk")).broker_confirmed is True
+    # Tras el ack del broker la orden SÍ se materializa como CANCELLED (terminal).
+    # Antes del ``set_broker_cancel_confirmed`` seguía CANCEL_REQUESTED (decisión
+    # local sin ack del venue).
+    cancelled = await store.get("lo-cbrk")
+    assert cancelled is not None and cancelled.status == "CANCELLED"
+
+
+@pytest.mark.asyncio
+async def test_inmemory_confirm_without_local_cancel_request_is_none() -> None:
+    """QA/H5 guard: sin ``cancel_order`` previo, no fabricamos confirmación."""
+
+    async def _never_cancelled(order_id: str) -> None:
+        store = InMemoryLiveOrderStore()
+        await store.put(_make_order(order_id=order_id, account_id="acc-1"))
+        # La maquina está SUBMITTED (no CANCEL_REQUESTED) y nunca se pidió cancel.
+        confirmed = await store.set_broker_cancel_confirmed(order_id)
+        assert confirmed is None  # no inventa un ack del venue
+        meta = await store.get_cancel_meta(order_id)
+        assert meta is None  # tampoco crea un doc de cancelación fantasma
+        order = await store.get(order_id)
+        assert order is not None and order.status == "SUBMITTED"  # sin cambio
+
+    await _never_cancelled("lo-g-nc")
+
+
+@pytest.mark.asyncio
+async def test_postgres_confirm_without_cancel_request_is_none() -> None:
+    """QA/H5 guard: PG no estampa broker_cancel_confirmed_at sin decision previa."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    existing_row = _row_from(_make_order(order_id="lo-pg-nc", account_id="acc-1"))
+    # Fila real sin decisión previa: columnas de cancelación ausentes (None).
+    existing_row.cancel_requested_at = None
+    existing_row.cancel_reason = None
+    existing_row.broker_cancel_confirmed_at = None
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = existing_row
+    session.execute = AsyncMock(return_value=found)
+
+    store = PostgresLiveOrderStore(session)
+    confirmed = await store.set_broker_cancel_confirmed("lo-pg-nc")
+    assert confirmed is None  # no fabrica confirmación
+    # No toca commit de la confirmación (no paso de escritura del ack).
+    assert existing_row.broker_cancel_confirmed_at is None
+    assert existing_row.status != "CANCELLED"
 
 
 @pytest.mark.asyncio
@@ -465,25 +513,26 @@ async def test_postgres_cancel_persists_cancelled_and_idempotent() -> None:
     session.execute = AsyncMock(return_value=found)
 
     store = PostgresLiveOrderStore(session)
-    cancelled = await store.cancel_order("lo-cxpg")
-    assert cancelled is not None and cancelled.status == "CANCELLED"
+    requested = await store.cancel_order("lo-cxpg")
+    assert requested is not None and requested.status == "CANCEL_REQUESTED"
     session.commit.assert_awaited()
     session.rollback.assert_not_called()
 
-    # El estado CANCELLED se persiste mediante el upsert; verifica que el último
-    # statement execute (el put) escribe CANCELLED sobre el PK.
+    # El estado CANCEL_REQUESTED se persiste mediante el upsert; verifica que el
+    # último statement execute (el put) escribe CANCEL_REQUESTED sobre el PK.
     assert session.execute.await_count >= 1
     calls = session.execute.await_args_list
     put_stmt = calls[-1].args[0]
     rendered = str(put_stmt.compile(compile_kwargs={"literal_binds": True})).upper()
-    assert "CANCELLED" in rendered
+    assert "CANCEL_REQUESTED" in rendered
     assert "ON CONFLICT" in rendered
 
-    # Re-cancel (fila ya CANCELLED): get() devuelve terminal → no transiciona,
-    # pero el resultado sigue siendo la orden CANCELLED (no-op idempotente).
-    existing_row.status = "CANCELLED"
+    # Re-cancel (fila ya CANCEL_REQUESTED): get() devuelve no-terminal cancelable,
+    # pero no hay auto-bucle → transición CANCEL_REQUESTED→CANCEL_REQUESTED ilegal,
+    # se devuelve la orden como no-op idempotente.
+    existing_row.status = "CANCEL_REQUESTED"
     again = await store.cancel_order("lo-cxpg")
-    assert again is not None and again.status == "CANCELLED"
+    assert again is not None and again.status == "CANCEL_REQUESTED"
 
 
 def test_postgres_cancel_and_list_open_are_exported_on_protocol() -> None:
@@ -559,12 +608,13 @@ def test_migration_021_extends_live_order_financials() -> None:
         / "infrastructure"
         / "alembic"
         / "versions"
-        / "021_live_orders_financial_constraints.py"
+        / "021_live_orders_fin.py"
     )
     assert migration_path.exists()
     src = migration_path.read_text(encoding="utf-8")
     assert 'down_revision = "020_live_orders"' in src
-    assert 'revision = "021_live_orders_financial_constraints"' in src
+    # Revision id acortado (19 chars) por alembic_version varchar(32).
+    assert 'revision = "021_live_orders_fin"' in src
     assert "sa.Numeric(18, 6)" in src  # determinismo numérico (no más Float)
     assert "quantity > 0" in src  # CHECK financiero de invariante en la BD
 

@@ -8,6 +8,7 @@ XtbBrokerAdapter = LIVE vía bridge; submitted ≠ fill; filled→ledger (XL-2).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Literal, Protocol
 
 from bolsa_analytics.cognitive.broker_adapter import (
@@ -22,8 +23,8 @@ from bolsa_analytics.cognitive.broker_adapter import (
 )
 from bolsa_analytics.cognitive.paper_broker import PaperBrokerReceipt
 from bolsa_analytics.cognitive.paper_order import PaperOrder, PaperOrderSide
+from bolsa_application.live_order_query import BrokerOrderQueryResult
 from bolsa_application.paper_broker import PaperBroker
-from bolsa_application.persist_position_from_fill import open_transaction_id_from_trade
 from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult
 
 BrokerAdapterSubmitStatus = Literal[
@@ -300,52 +301,24 @@ class XtbBrokerAdapter:
                 venue_order_id=order.venue_order_id,
             )
         if order.status == "filled":
-            if self._execute_trade is None:
-                return BrokerAdapterSubmitResult(
-                    venue="LIVE",
-                    adapter=BROKER_ADAPTER_XTB,
-                    fill_status="unknown",
-                    paper_order=None,
-                    paper_receipt=None,
-                    trade=None,
-                    status="unknown",
-                    reason="xtb_execute_not_wired",
-                    transaction_id=None,
-                    venue_order_id=order.venue_order_id,
-                )
-            try:
-                trade = await self._execute_trade.execute(
-                    instrument_id=instrument_id,
-                    trade_type=side,
-                    quantity=quantity,
-                    price=price,
-                    account_id=account_id,
-                    idempotency_key=idempotency_key,
-                )
-            except Exception as exc:  # noqa: BLE001 — OI-3: UNKNOWN ≠ ERROR
-                return BrokerAdapterSubmitResult(
-                    venue="LIVE",
-                    adapter=BROKER_ADAPTER_XTB,
-                    fill_status="unknown",
-                    paper_order=None,
-                    paper_receipt=None,
-                    trade=None,
-                    status="unknown",
-                    reason=str(exc),
-                    transaction_id=None,
-                    venue_order_id=order.venue_order_id,
-                )
-            tx_id = open_transaction_id_from_trade(trade)
+            # V2.13 · Cierra el atajo síncrono old-XL2 (auditoría H4): un ``filled``
+            # del bridge ya NO empuja a ledger vía ``execute_trade`` por detrás de
+            # la máquina XL-3. Un XTB real es generado A-síncronamente (el bridge
+            # ``filled`` síncrono solo se ve en el mock/test); el depósito financiero
+            # de un LiveOrder debe pasar por la máquina XL-3 + query + apply
+            # financiero (PARKED). Hasta que exista, este *se queda UNKNOWN durable*
+            # (falta resolver el fill === función del query real, no del POST).
+            # Fail-closed: jamás se fabrica un ledger ni un ``executed`` aquí.
             return BrokerAdapterSubmitResult(
                 venue="LIVE",
                 adapter=BROKER_ADAPTER_XTB,
-                fill_status="executed",
+                fill_status="unknown",
                 paper_order=None,
                 paper_receipt=None,
-                trade=trade,
-                status="executed",
-                reason=None,
-                transaction_id=tx_id,
+                trade=None,
+                status="unknown",
+                reason="live_sync_fill_blocked_requires_reconcile",
+                transaction_id=None,
                 venue_order_id=order.venue_order_id,
             )
         return BrokerAdapterSubmitResult(
@@ -386,3 +359,57 @@ def resolve_broker_adapter(
             url = get_settings().xtb_bridge_url
         return XtbBrokerAdapter(bridge_url=url, execute_trade=execute_trade)
     return PaperBrokerAdapter(execute_trade)
+
+
+class XtbLiveOrderQueryAdapter:
+    """Implementa ``LiveOrderQueryPort`` con el bridge XTB real (H6).
+
+    Consulta ``GET /orders/{venue_order_id}`` (broker-truth del life-cycle de la
+    orden) y mapea a ``BrokerOrderQueryResult``:
+    * estados working/partial/filled/rejected/cancelled → outcome equivalente;
+    * cantidades ``filled/remaining`` se cuantifican a ``Decimal(6dp)`` (paridad
+      con la máquina XL-3, que es Decimal desde H1) ANTES de construir el result;
+    * cualquier error/timeout/404 del bridge → resultado ``unavailable`` (fail-
+      closed: la máquina permanece UNKNOWN; no se fabrica cierre terminal).
+
+    No deposita ledger ni ejecuta nada: es lectura pura del contexto del venue.
+    """
+
+    def __init__(self, client: XtbBridgeClient) -> None:
+        self._client = client
+
+    @staticmethod
+    def _qty(value: float | None) -> float:
+        if value is None:
+            return 0.0
+        return max(0.0, float(value))
+
+    async def query_broker_order(self, *, venue_order_id: str) -> BrokerOrderQueryResult:
+        try:
+            st = await self._client.query_order(venue_order_id)
+        except Exception:
+            return BrokerOrderQueryResult(
+                outcome="unavailable",
+                venue_order_id=venue_order_id,
+                filled_quantity=None,
+                remaining_quantity=None,
+                reason="xtb_query_unavailable",
+            )
+        # ``BrokerOrderQueryResult`` mapeará el life-cycle del venue a estado de
+        # la máquina vía ``to_live_status`` (working/partial/filled/rejected/
+        # cancelled → WORKING/PARTIAL/FILLED/REJECTED/CANCELLED).
+        # Decimal(6dp) exacto al construir el result: tapona el hueco H1 del float
+        # en la cadena broker→máquina (working/partial/filled con quantities).
+        def _dec(value: float | None) -> float:
+            q = Decimal(str(self._qty(value))).quantize(
+                Decimal("0.000001"), rounding=ROUND_HALF_UP
+            )
+            return float(q)
+
+        return BrokerOrderQueryResult(
+            outcome=st.state,
+            venue_order_id=st.venue_order_id,
+            filled_quantity=_dec(st.filled_quantity),
+            remaining_quantity=_dec(st.remaining_quantity),
+            reason=st.reason,
+        )

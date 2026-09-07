@@ -3,10 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from bolsa_application.live_order_query import (
-    BrokerOrderQueryResult,
-    MockLiveOrderQuery,
-)
 
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
@@ -16,6 +12,10 @@ from bolsa_analytics.cognitive.live_order import (
     forbid_execute_trade_for_partial,
     forbid_repost_from_unknown,
     transition_live_order,
+)
+from bolsa_application.live_order_query import (
+    BrokerOrderQueryResult,
+    MockLiveOrderQuery,
 )
 
 
@@ -421,3 +421,47 @@ def test_reconcile_broker_unavailable_is_not_conclusive() -> None:
     )
     assert report.status == "unavailable"
     assert report.to_dict()["reconciliationRequired"] is False
+
+
+def test_cancel_requested_is_intent_not_confirmed_result() -> None:
+    """H5 · Decisión local de cancelar = CANCEL_REQUESTED (NO terminal, no CANCELLED)."""
+    from bolsa_analytics.cognitive.live_order import (
+        _TERMINAL,
+        NON_TERMINAL_LIVE_STATUSES,
+    )
+
+    submitted = _working_qty()  # estado en-vuelo (WORKING)
+    # Cualquier estado en-vuelo puede decidir cancelar → CANCEL_REQUESTED.
+    requested = transition_live_order(submitted, "CANCEL_REQUESTED")
+    assert requested.status == "CANCEL_REQUESTED"
+    # NO es terminal: sigue in-flight/open, lista a resolverse por el broker.
+    assert requested.status not in _TERMINAL
+    assert requested.status in NON_TERMINAL_LIVE_STATUSES
+    # No re-transiciona a sí misma (idempotente no-op).
+    assert can_transition_live_order("CANCEL_REQUESTED", "CANCEL_REQUESTED") is False
+
+
+def test_cancel_requested_reaches_cancelled_only_via_confirmation() -> None:
+    """Tras decisión local, CANCELLED solo llega cuando el broker confirma."""
+    from bolsa_analytics.cognitive.live_order import _TERMINAL
+
+    requested = transition_live_order(_working_qty(), "CANCEL_REQUESTED")
+    # El broker confirma → terminal CANCELLED (resultado real).
+    confirmed = transition_live_order(requested, "CANCELLED")
+    assert confirmed.status == "CANCELLED"
+    assert confirmed.status in _TERMINAL
+
+
+def test_cancel_requested_is_open_not_closed_for_reconcile() -> None:
+    """Una CANCEL_REQUESTED pendiente NO se presenta como cancelled del vértice."""
+    from bolsa_analytics.cognitive.live_order import reconcile_live_order_vs_broker
+
+    requested = transition_live_order(_working_qty(), "CANCEL_REQUESTED")
+    # Broker aun no confirma (working): local no debe inventar un CANCELLED.
+    report = reconcile_live_order_vs_broker(
+        order=requested,
+        broker_status="working",
+        broker_filled=None,
+    )
+    assert report.status == "consistent"  # local request no es contradicción con working
+

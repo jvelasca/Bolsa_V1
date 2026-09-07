@@ -1,5 +1,8 @@
 """V2.13 — live_orders restricciones financieras + lease de recovery (desc. 021).
 
+Revision id corto (19 chars) por constraint ``alembic_version.version_num
+varchar(32)`` (Prisma) — convención del repo (precedente 004).
+
 Consolida la segunda línea de defensa sobre la máquina LiveOrder durable:
 * ``quantity/filled_quantity/remaining_quantity`` → ``NUMERIC(18,6)`` (determinismo
   numérico, semántica idéntica al ledger financiero; deja de ser Float adánico).
@@ -15,10 +18,9 @@ sin imports de ORM (offline-safe).
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
-revision = "021_live_orders_financial_constraints"
+revision = "021_live_orders_fin"
 down_revision = "020_live_orders"
 branch_labels = None
 depends_on = None

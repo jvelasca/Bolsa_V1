@@ -2,6 +2,13 @@
  * LiveOrder — XL-3 LIVE execution state machine (domain only).
  * UNKNOWN first-class · no automatic re-POST · PARTIAL qty honesty.
  * Mirror of bolsa_analytics.cognitive.live_order.
+ *
+ * Cantidades: el espejo TS usa `number` para la proyección de UI/red SOLO.
+ * La fuente de verdad de cantidad es Decimal(6dp) en el dominio PY y en el
+ * `NUMERIC(18,6)` de `live_orders` (H1 V2.13): aquí cada `quantity`/`filled`/
+ * `remaining` se trata como valor redondeado a 6 decimales; NO se hace aquí
+ * aritmética financiera de libro (comisiones/precio medio) porque JS `number`
+ * es binario (float). Toda escritura durable pasa por PY/SQL (Decimal exacto).
  */
 
 export type LiveOrderStatusV1 =
@@ -12,6 +19,7 @@ export type LiveOrderStatusV1 =
   | "PARTIAL"
   | "FILLED"
   | "REJECTED"
+  | "CANCEL_REQUESTED"
   | "CANCELLED"
   | "UNKNOWN";
 
@@ -26,19 +34,56 @@ const TERMINAL: ReadonlySet<LiveOrderStatusV1> = new Set([
   "CANCELLED",
 ]);
 
+/**
+ * Cancelación honesta (intención vs resultado): una decisión local = CANCEL_REQUESTED
+ * (NO terminal, sigue in-flight); CANCELLED (terminal) solo llega cuando el broker
+ * confirma. Espejo de live_order.py.
+ */
 /** UNKNOWN → SUBMITTING intentionally ABSENT (no re-POST). */
 export const ALLOWED_LIVE_ORDER_TRANSITIONS: Readonly<
   Record<LiveOrderStatusV1, ReadonlySet<LiveOrderStatusV1>>
 > = {
-  AUTHORIZED: new Set(["SUBMITTING", "REJECTED", "CANCELLED"]),
-  SUBMITTING: new Set(["REJECTED", "UNKNOWN", "SUBMITTED"]),
-  SUBMITTED: new Set(["WORKING", "UNKNOWN", "CANCELLED", "REJECTED"]),
-  WORKING: new Set(["PARTIAL", "FILLED", "UNKNOWN", "CANCELLED", "REJECTED"]),
-  PARTIAL: new Set(["FILLED", "UNKNOWN", "CANCELLED"]),
+  AUTHORIZED: new Set([
+    "SUBMITTING",
+    "REJECTED",
+    "CANCELLED",
+    "CANCEL_REQUESTED",
+  ]),
+  SUBMITTING: new Set(["REJECTED", "UNKNOWN", "SUBMITTED", "CANCEL_REQUESTED"]),
+  SUBMITTED: new Set([
+    "WORKING",
+    "UNKNOWN",
+    "CANCELLED",
+    "REJECTED",
+    "CANCEL_REQUESTED",
+  ]),
+  WORKING: new Set([
+    "PARTIAL",
+    "FILLED",
+    "UNKNOWN",
+    "CANCELLED",
+    "REJECTED",
+    "CANCEL_REQUESTED",
+  ]),
+  PARTIAL: new Set(["FILLED", "UNKNOWN", "CANCELLED", "CANCEL_REQUESTED"]),
   FILLED: new Set(),
   REJECTED: new Set(),
+  CANCEL_REQUESTED: new Set([
+    "CANCELLED",
+    "UNKNOWN",
+    "REJECTED",
+    "FILLED",
+    "WORKING",
+  ]),
   CANCELLED: new Set(),
-  UNKNOWN: new Set(["WORKING", "REJECTED", "FILLED", "PARTIAL", "CANCELLED"]),
+  UNKNOWN: new Set([
+    "WORKING",
+    "REJECTED",
+    "FILLED",
+    "PARTIAL",
+    "CANCELLED",
+    "CANCEL_REQUESTED",
+  ]),
 };
 
 export type LiveOrderV1 = {
