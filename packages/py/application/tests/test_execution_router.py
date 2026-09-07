@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -653,10 +654,13 @@ async def test_gp_desk_05b_real_opening_gate_no_position(monkeypatch) -> None:
         enforce_cognitive_gate=True,
         position_from_fill=PersistPositionFromFill(store),
     )
+    # DS-05 data-freshness gate compara vs now; timestamp relativo evita que un
+    # ws fijo (p.ej. 2026-09-01) envejezca >5 días y vete antes del gate del book.
+    fresh_iso = (datetime.now(UTC) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     signal = SignalEventV1(
         id="sig-desk-05b",
         instrument_id="inst-1",
-        timestamp="2026-09-01T11:00:00Z",
+        timestamp=fresh_iso,
         kind="entry_long",
         strategy_definition_id="st-1",
         strategy_version=1,
