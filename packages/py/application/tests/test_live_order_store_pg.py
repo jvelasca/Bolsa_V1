@@ -10,14 +10,14 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy.exc import IntegrityError
+
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
     build_live_order,
     can_transition_live_order,
     transition_live_order,
 )
-from sqlalchemy.exc import IntegrityError
-
 from bolsa_application.live_order_store import (
     InMemoryLiveOrderStore,
     PostgresLiveOrderStore,
@@ -608,12 +608,13 @@ def test_migration_021_extends_live_order_financials() -> None:
         / "infrastructure"
         / "alembic"
         / "versions"
-        / "021_live_orders_financial_constraints.py"
+        / "021_live_orders_fin.py"
     )
     assert migration_path.exists()
     src = migration_path.read_text(encoding="utf-8")
     assert 'down_revision = "020_live_orders"' in src
-    assert 'revision = "021_live_orders_financial_constraints"' in src
+    # Revision id acortado (19 chars) por alembic_version varchar(32).
+    assert 'revision = "021_live_orders_fin"' in src
     assert "sa.Numeric(18, 6)" in src  # determinismo numérico (no más Float)
     assert "quantity > 0" in src  # CHECK financiero de invariante en la BD
 

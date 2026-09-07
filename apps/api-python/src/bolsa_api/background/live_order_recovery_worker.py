@@ -28,9 +28,10 @@ import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from bolsa_application.live_order_query import LiveOrderQueryPort
 from bolsa_application.live_order_store import PostgresLiveOrderStore
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ QueryProvider = Callable[
 def _worker_identity() -> str:
     """Id estable por worker/proceso para el lease cross-PID."""
     try:
-        pid = os.getpid()
+        pid = str(os.getpid())
     except Exception:  # noqa: BLE001 — portabilidad
         pid = "?"
     return f"live-recovery-{pid}"

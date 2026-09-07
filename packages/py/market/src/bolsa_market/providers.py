@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast, get_args
 
 import httpx
 
@@ -329,11 +329,16 @@ class XtbBridgeClient:
             )
         body = response.json()
         state_raw = str(body.get("state") or "unavailable").lower()
-        valid = {"working", "partial", "filled", "rejected", "cancelled"}
-        if state_raw not in valid:
+        # Fail-closed si el estado no es un life-cycle reconocible: la orden
+        # permanece UNKNOWN (no se fabrica cierre). El literal tipado valida el
+        # conjunto exacto, de modo que el cast es inocuo tras el guard.
+        known_states = get_args(XtbBridgeOrderQueryState)
+        if state_raw not in known_states:
             # No es un life-cycle reconocible → no cierre (fail-closed).
             raise RuntimeError(f"XTB bridge order state inesperado: {state_raw!r}")
         def _qty(value: str | float | int | None) -> float:
+            if value is None:
+                return 0.0
             try:
                 return max(0.0, float(value))
             except (TypeError, ValueError):
@@ -342,7 +347,7 @@ class XtbBridgeClient:
         body_vid = body.get("venueOrderId") or body.get("orderId") or vid
         return XtbBridgeOrderState(
             venue_order_id=str(body_vid),
-            state=state_raw,
+            state=cast(XtbBridgeOrderQueryState, state_raw),
             filled_quantity=_qty(body.get("filledQty")),
             remaining_quantity=_qty(body.get("remainingQty")),
             reason=(body.get("reason") or body.get("error") or None),

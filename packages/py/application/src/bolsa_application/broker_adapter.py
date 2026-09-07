@@ -25,7 +25,7 @@ from bolsa_analytics.cognitive.paper_broker import PaperBrokerReceipt
 from bolsa_analytics.cognitive.paper_order import PaperOrder, PaperOrderSide
 from bolsa_application.live_order_query import BrokerOrderQueryResult
 from bolsa_application.paper_broker import PaperBroker
-from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult, XtbBridgeOrderState
+from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult
 
 BrokerAdapterSubmitStatus = Literal[
     "executed",

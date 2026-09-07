@@ -3,10 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from bolsa_application.live_order_query import (
-    BrokerOrderQueryResult,
-    MockLiveOrderQuery,
-)
 
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
@@ -16,6 +12,10 @@ from bolsa_analytics.cognitive.live_order import (
     forbid_execute_trade_for_partial,
     forbid_repost_from_unknown,
     transition_live_order,
+)
+from bolsa_application.live_order_query import (
+    BrokerOrderQueryResult,
+    MockLiveOrderQuery,
 )
 
 
@@ -426,8 +426,8 @@ def test_reconcile_broker_unavailable_is_not_conclusive() -> None:
 def test_cancel_requested_is_intent_not_confirmed_result() -> None:
     """H5 · Decisión local de cancelar = CANCEL_REQUESTED (NO terminal, no CANCELLED)."""
     from bolsa_analytics.cognitive.live_order import (
-        NON_TERMINAL_LIVE_STATUSES,
         _TERMINAL,
+        NON_TERMINAL_LIVE_STATUSES,
     )
 
     submitted = _working_qty()  # estado en-vuelo (WORKING)

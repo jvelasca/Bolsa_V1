@@ -26,6 +26,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from sqlalchemy import or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_analytics.cognitive.live_order import (
     NON_TERMINAL_LIVE_STATUSES,
     LiveOrder,
@@ -35,10 +40,6 @@ from bolsa_analytics.cognitive.live_order import (
     transition_live_order,
 )
 from bolsa_infrastructure.database.models.tables import LiveOrderRow
-from sqlalchemy import or_, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 # Venues bajo las que el cableado puede escribir rastro LIVE.
 _LIVE_MACHINE_BRIDGED_VENUES: frozenset[str] = frozenset({"LIVE"})
