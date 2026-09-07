@@ -9,10 +9,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal, Protocol
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from bolsa_analytics.cognitive.operational_incident import (
     OperationalIncident,
     OperationalIncidentKind,
@@ -25,6 +21,9 @@ from bolsa_analytics.cognitive.operational_incident import (
 )
 from bolsa_infrastructure.database.models.tables import OperationalIncidentRow
 from bolsa_infrastructure.ids import new_id
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 IncidentOpeningStatus = Literal["clear", "unresolved"]
 
@@ -205,8 +204,25 @@ class PostgresOperationalIncidentStore:
                 _apply_row(row, incident)
             await self._session.commit()
         except IntegrityError:
+            # P2-2 (audit): dedupe de OPEN double-worker activo en (account,kind).
+            # El partial-unique activo (account_id,kind) puede colisionar cuando DOS
+            # pollers abren "a la vez" incidencias fresh (distintos ids) para el mismo
+            # (account,kind). No es doble-CREATE silencioso: el vencedor commitó y el
+            # perdedor debe reconciliarse hacia él (no fabricar un 2º OPEN), jamás
+            # auto-heal ni cerrar. Si tras el winner NO hay activo competidor, sí es
+            # una colisión real (id/otro) y se re-lanza.
             await self._session.rollback()
-            raise
+            existing = None
+            try:
+                existing = await self.get_active(
+                    incident.account_id, incident.kind  # type: ignore[arg-type]
+                )
+            except Exception:  # noqa: BLE001
+                existing = None
+            if existing is None:
+                raise
+            # (account, kind) ya está activo desde otro worker → OPEN deduplicado.
+            return
 
 
 async def sync_opening_incidents(
