@@ -23,9 +23,10 @@ from bolsa_analytics.cognitive.broker_adapter import (
 )
 from bolsa_analytics.cognitive.paper_broker import PaperBrokerReceipt
 from bolsa_analytics.cognitive.paper_order import PaperOrder, PaperOrderSide
+from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult
+
 from bolsa_application.live_order_query import BrokerOrderQueryResult
 from bolsa_application.paper_broker import PaperBroker
-from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult
 
 BrokerAdapterSubmitStatus = Literal[
     "executed",
@@ -379,10 +380,16 @@ class XtbLiveOrderQueryAdapter:
         self._client = client
 
     @staticmethod
-    def _qty(value: float | None) -> float:
+    def _qty(value: object | None) -> Decimal:
         if value is None:
-            return 0.0
-        return max(0.0, float(value))
+            return Decimal("0")
+        try:
+            q = Decimal(str(value))
+        except (ValueError, TypeError):
+            return Decimal("0")
+        if q.is_nan() or q < 0:
+            return Decimal("0")
+        return q
 
     async def query_broker_order(self, *, venue_order_id: str) -> BrokerOrderQueryResult:
         try:
@@ -400,11 +407,10 @@ class XtbLiveOrderQueryAdapter:
         # cancelled → WORKING/PARTIAL/FILLED/REJECTED/CANCELLED).
         # Decimal(6dp) exacto al construir el result: tapona el hueco H1 del float
         # en la cadena broker→máquina (working/partial/filled con quantities).
-        def _dec(value: float | None) -> float:
-            q = Decimal(str(self._qty(value))).quantize(
+        def _dec(value: object | None) -> Decimal:
+            return self._qty(value).quantize(
                 Decimal("0.000001"), rounding=ROUND_HALF_UP
             )
-            return float(q)
 
         return BrokerOrderQueryResult(
             outcome=st.state,

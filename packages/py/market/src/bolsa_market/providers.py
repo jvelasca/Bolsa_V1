@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Literal, cast, get_args
 
 import httpx
@@ -9,6 +10,19 @@ import httpx
 from bolsa_market.yahoo_chart import YahooMarketDataProvider
 
 XtbBridgeOrderStatus = Literal["submitted", "rejected", "filled"]
+
+
+def _to_dec(value: object | None) -> Decimal:
+    """Ningun float debe cruzar al dominio financiero XTB sin cuantificar."""
+    if value is None:
+        return Decimal("0")
+    try:
+        q = Decimal(str(value))
+    except (ValueError, TypeError):
+        return Decimal("0")
+    if q.is_nan() or q < 0:
+        return Decimal("0")
+    return q
 
 
 def format_xtb_bridge_connect_error(base_url: str, exc: Exception) -> str:
@@ -61,13 +75,15 @@ XtbBridgeOrderQueryState = Literal[
 class XtbBridgeOrderState:
     """Respuesta bridge GET /orders/{id} (broker-truth life-cycle de la orden).
 
-    filled/remaining son cantidades del venue (sin aritmética financiera aquí).
+    filled/remaining son cantidades del venue SIN arrastrar float hacia la
+    máquina: se cuantifican a ``Decimal`` (paridad NUMERIC(18,6)). El float solo
+    quedará donde el JSON/UI lo exija (DTO).
     """
 
     venue_order_id: str
     state: XtbBridgeOrderQueryState
-    filled_quantity: float
-    remaining_quantity: float
+    filled_quantity: Decimal
+    remaining_quantity: Decimal
     reason: str | None = None
     instrument_id: str | None = None
     side: str | None = None
@@ -75,18 +91,18 @@ class XtbBridgeOrderState:
 
 @dataclass(frozen=True, slots=True)
 class XtbBridgeAccountCash:
-    """Respuesta bridge GET /account/cash (LR-1 read-only)."""
+    """Respuesta bridge GET /account/cash (LR-1 read-only). Cash en Decimal."""
 
-    cash: float
+    cash: Decimal
     currency: str = "EUR"
 
 
 @dataclass(frozen=True, slots=True)
 class XtbBridgePosition:
-    """Posición live desde bridge GET /account/positions."""
+    """Posición live desde bridge GET /account/positions (quantity Decimal)."""
 
     instrument_id: str
-    quantity: float
+    quantity: Decimal
 
 
 class XtbBridgeClient:
@@ -214,7 +230,7 @@ class XtbBridgeClient:
             )
         data = response.json()
         return XtbBridgeAccountCash(
-            cash=float(data.get("cash", 0)),
+            cash=_to_dec(data.get("cash", 0)),
             currency=str(data.get("currency") or "EUR"),
         )
 
@@ -242,8 +258,10 @@ class XtbBridgeClient:
             if not isinstance(iid, str) or not iid.strip():
                 continue
             try:
-                qty = float(row.get("quantity", 0))
+                qty = Decimal(str(row.get("quantity", 0)))
             except (TypeError, ValueError):
+                continue
+            if qty.is_nan() or qty < 0:
                 continue
             out.append(XtbBridgePosition(instrument_id=iid.strip(), quantity=qty))
         return out
@@ -336,20 +354,12 @@ class XtbBridgeClient:
         if state_raw not in known_states:
             # No es un life-cycle reconocible → no cierre (fail-closed).
             raise RuntimeError(f"XTB bridge order state inesperado: {state_raw!r}")
-        def _qty(value: str | float | int | None) -> float:
-            if value is None:
-                return 0.0
-            try:
-                return max(0.0, float(value))
-            except (TypeError, ValueError):
-                return 0.0
-
         body_vid = body.get("venueOrderId") or body.get("orderId") or vid
         return XtbBridgeOrderState(
             venue_order_id=str(body_vid),
             state=cast(XtbBridgeOrderQueryState, state_raw),
-            filled_quantity=_qty(body.get("filledQty")),
-            remaining_quantity=_qty(body.get("remainingQty")),
+            filled_quantity=_to_dec(body.get("filledQty")),
+            remaining_quantity=_to_dec(body.get("remainingQty")),
             reason=(body.get("reason") or body.get("error") or None),
             instrument_id=body.get("instrumentId") if isinstance(body.get("instrumentId"), str) else None,
             side=body.get("side") if isinstance(body.get("side"), str) else None,

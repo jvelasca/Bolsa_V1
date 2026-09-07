@@ -13,6 +13,7 @@ un estado sugerido (sin aplicarlo). El operador/otra capa decide la acción.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 
 from bolsa_application.live_order_query import BrokerOrderQueryResult
@@ -33,8 +34,8 @@ class LiveOrderDrift:
     broker_state: str | None
     kind: str  # 'cancel_broker_side' | 'fill_unseen' | 'state_mismatch' | 'query_unavailable'
     suggested: str | None  # estado objetivo sugerido (sin auto-aplicar)
-    broker_filled: float | None = None
-    broker_remaining: float | None = None
+    broker_filled: Decimal | None = None
+    broker_remaining: Decimal | None = None
     reason: str | None = None
 
 
@@ -167,8 +168,8 @@ async def reconcile_live_order_machine(
                     broker_state=broker_state,
                     suggested=live_status,
                     kind="fill_unseen",
-                    broker_filled=result.filled_quantity or 0.0,
-                    broker_remaining=result.remaining_quantity or 0.0,
+                    broker_filled=result.filled_quantity,
+                    broker_remaining=result.remaining_quantity,
                     reason="venue_reports_fill_not_seen_locally",
                 )
             )
