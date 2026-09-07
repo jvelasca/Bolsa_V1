@@ -28,10 +28,9 @@ import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 from bolsa_application.live_order_query import LiveOrderQueryPort
 from bolsa_application.live_order_store import PostgresLiveOrderStore
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,18 @@ TICK_SECONDS = 5
 _ENV_ENABLED = "LIVE_RECOVERY_WORKER_ENABLED"
 _DEFAULT_BATCH = 50
 # Ventana de lease del claimed UNKNOWN antes de que otro worker pueda reapropiarlo.
-DEFAULT_CLAIM_STALE_SECONDS = 120
+# Configurable por entorno (no solo parámetro interno): cada deployment puede
+# sintonizar sin editar fuente. Se lee en import para una semántica global estable.
+def _claim_stale_seconds_default() -> int:
+    raw = (os.getenv("LIVE_RECOVERY_CLAIM_STALE_SECONDS") or "120").strip()
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = 120
+    return value if value > 0 else 120
+
+
+DEFAULT_CLAIM_STALE_SECONDS = _claim_stale_seconds_default()
 
 # Provider shape: (venue, account_id, venue_order_id) → query port | None.
 QueryProvider = Callable[

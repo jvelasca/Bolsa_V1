@@ -10,22 +10,23 @@ con `get/put/list_unknown`) de la lógica fail-closed:
 from __future__ import annotations
 
 import pytest
-
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
     build_live_order,
     transition_live_order,
-)
-from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
-    _drain_unknowns,
-    _no_query_provider,
-    resolve_one_unknown,
 )
 from bolsa_application.live_order_query import (
     BrokerOrderQueryResult,
     MockLiveOrderQuery,
 )
 from bolsa_application.live_order_store import InMemoryLiveOrderStore
+
+from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
+    _claim_stale_seconds_default,
+    _drain_unknowns,
+    _no_query_provider,
+    resolve_one_unknown,
+)
 
 
 def _ui_unknown(*, order_id: str = "lo-x", venue_order_id: str = "xtb-x") -> LiveOrder:
@@ -242,3 +243,17 @@ async def test_double_worker_does_not_double_process_unknown() -> None:
     # Nadie duplicó: sigue siendo UNKNOWN y sin doble efecto.
     after = await store.get("lo-two")
     assert after is not None and after.status == "UNKNOWN"
+
+
+def test_claim_stale_seconds_default_env_operations(monkeypatch: pytest.MonkeyPatch) -> None:
+    """P2-04: la ventana de lease es config por entorno (no solo param interno)."""
+    monkeypatch.delenv("LIVE_RECOVERY_CLAIM_STALE_SECONDS", raising=False)
+    assert _claim_stale_seconds_default() == 120
+
+    monkeypatch.setenv("LIVE_RECOVERY_CLAIM_STALE_SECONDS", "45")
+    assert _claim_stale_seconds_default() == 45
+
+    # no numérico / inválido / cero → fallback fail-closed a 120.
+    for bad in ("abc", "", "-3"):
+        monkeypatch.setenv("LIVE_RECOVERY_CLAIM_STALE_SECONDS", bad)
+        assert _claim_stale_seconds_default() == 120
