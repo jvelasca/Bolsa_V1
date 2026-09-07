@@ -29,13 +29,19 @@
 
 ## 2. Versiones siguientes (nombres)
 
-| Versión     | Foco                                                                    | UI                      |
-| ----------- | ----------------------------------------------------------------------- | ----------------------- |
-| **V2.12**   | LIVE Execution Core (XL-3 wire + UNKNOWN recovery + idempotencia)       | Solo estados necesarios |
-| **V2.13**   | Reconciliation & Safety (account/position/order · kill LIVE · incident) | Mínima                  |
-| **V2.14**   | Shadow LIVE (consultar, no enviar)                                      | Comparación             |
-| **V2.15**   | LIVE Certification (evidencia)                                          | —                       |
-| **después** | Micro-LIVE / thaw process                                               | Owner approval          |
+| Versión     | Foco                                                                                       | UI                      |
+| ----------- | ------------------------------------------------------------------------------------------ | ----------------------- |
+| **V2.12**   | LIVE Execution Core (XL-3 wire + UNKNOWN recovery + idempotencia)                          | Solo estados necesarios |
+| **V2.13**   | Reconciliation & Safety (account/position/order · kill LIVE · incident)                    | Mínima                  |
+| **V2.14**   | Financial Execution & Full Reconciliation (fill→ExecutionEvent→Position→Ledger·Full Recon) | No nueva                |
+| **V2.15**   | Shadow LIVE (consultar, no enviar)                                                         | Comparación             |
+| **V2.16**   | LIVE Certification (evidencia)                                                             | —                       |
+| **después** | Micro-LIVE / thaw process                                                                  | Owner approval          |
+
+> **Corrección de numeración (2026-09-07, decree V2.14):** esta tabla antes rotulaba `V2.14 = Shadow LIVE`.
+> Se sella **V2.14 = Financial Execution & Full Reconciliation**, Shadow LIVE pasa a V2.15 y LIVE cert a V2.16,
+> para resolver la colisión con el track operator-journey. Ver
+> [`plan-v2-14-financial-execution-reconciliation`](./plan-v2-14-financial-execution-reconciliation-2026-09-07.md).
 
 ---
 
