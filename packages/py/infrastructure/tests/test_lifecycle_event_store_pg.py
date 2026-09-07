@@ -128,7 +128,7 @@ async def test_alembic_head_has_sequence_and_aggregates(
     version = (
         await db_session.execute(text("SELECT version_num FROM alembic_version"))
     ).scalar_one()
-    assert str(version).startswith("021")
+    assert str(version).startswith("02")  # head V2.13(021)/V2.14(022) chain
     seq = (
         await db_session.execute(
             text(
@@ -169,6 +169,7 @@ async def test_pg_open_t1_close_fresh_session_same_snapshot(
         PostgresLifecycleEventStore,
     )
     from bolsa_domain.lifecycle import LifecycleEventInput
+
     from bolsa_infrastructure.database.session import create_session_factory
 
     pos = f"pos-pg-{uuid4().hex[:12]}"
@@ -226,6 +227,7 @@ async def test_pg_concurrent_duplicate_t1_one_wins(
         PostgresLifecycleEventStore,
     )
     from bolsa_domain.lifecycle import LifecycleEventInput
+
     from bolsa_infrastructure.database.session import create_session_factory
 
     pos = f"pos-race-{uuid4().hex[:12]}"

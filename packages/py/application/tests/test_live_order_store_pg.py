@@ -10,14 +10,14 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy.exc import IntegrityError
-
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
     build_live_order,
     can_transition_live_order,
     transition_live_order,
 )
+from sqlalchemy.exc import IntegrityError
+
 from bolsa_application.live_order_store import (
     InMemoryLiveOrderStore,
     PostgresLiveOrderStore,
@@ -628,3 +628,48 @@ def test_migration_021_extends_live_order_financials() -> None:
         "broker_cancel_confirmed_at",
     }
     assert asserting <= cols
+
+
+def test_migration_022_execution_events_and_ops_columns() -> None:
+    """022 cuelga de 021 (nuevo head) y añade observabilidad + execution_events.
+
+    Guard offline (sin PG): fichero existe, cuelga de 021, modelos exponen columnas
+    de observabilidad en live_orders y tabla execution_events con execution_id PK.
+    """
+    from pathlib import Path
+
+    from bolsa_infrastructure.database.models.tables import (
+        ExecutionEventRow,
+        LiveOrderRow,
+    )
+
+    migration_path = (
+        Path(__file__).resolve().parents[4]
+        / "packages"
+        / "py"
+        / "infrastructure"
+        / "alembic"
+        / "versions"
+        / "022_live_orders_exec.py"
+    )
+    assert migration_path.exists()
+    src = migration_path.read_text(encoding="utf-8")
+    assert 'revision = "022_live_orders_exec"' in src
+    assert 'down_revision = "021_live_orders_fin"' in src
+    assert '"execution_id", sa.String(), primary_key=True' in src
+    assert "sa.Numeric(18, 6)" in src
+
+    lo_cols = {c.name for c in LiveOrderRow.__table__.columns}
+    assert {"attempt_count", "last_error", "claim_expires_at"} <= lo_cols
+    ee_pk = {c.name for c in ExecutionEventRow.__table__.primary_key.columns}
+    assert ee_pk == {"execution_id"}
+    ee_cols = {c.name for c in ExecutionEventRow.__table__.columns}
+    assert {
+        "order_id",
+        "venue",
+        "account_id",
+        "venue_order_id",
+        "fill_seq",
+        "qty",
+        "captured_at",
+    } <= ee_cols

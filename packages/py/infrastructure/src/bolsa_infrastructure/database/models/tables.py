@@ -1297,6 +1297,63 @@ class LiveOrderRow(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    # Observabilidad operacional del recovery worker (V2.14, B2→E1): contadores e
+    # intento/error/expiración de claim del lease. NO son estado de negocio; se
+    # pueblan en el claim/reintento para diagnóstico multi-worker.
+    attempt_count: Mapped[int | None] = mapped_column(
+        "attempt_count",
+        Integer,
+        nullable=True,
+    )
+    last_error: Mapped[str | None] = mapped_column(
+        "last_error",
+        Text,
+        nullable=True,
+    )
+    claim_expires_at: Mapped[datetime | None] = mapped_column(
+        "claim_expires_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class ExecutionEventRow(Base):
+    """V2.14 E1 — ExecutionEvent durable (fill financiero con idempotencia real).
+
+    Cada fill confirmado del venue produce UN ``execution_events`` fila con
+    identity ``execution_id`` (= venue_order_id + secuencia de fill). El unique
+    (``execution_id``) es la clave de idempotencia financiera: dos insert del
+    MISMO fill → solo uno materializa. ``qty`` es NUMERIC(18,6) (paridad 021).
+    La materialización a PositionState/Ledger se decide en otra capa (GATED por
+    consentimiento); esta fila es la traza idempotente previa a dicha decisión.
+    """
+
+    __tablename__ = "execution_events"
+    __table_args__ = (
+        Index("execution_events_order_id_idx", "order_id"),
+        Index("execution_events_venue_order_id_idx", "venue_order_id"),
+    )
+
+    execution_id: Mapped[str] = mapped_column("execution_id", String, primary_key=True)
+    order_id: Mapped[str] = mapped_column("order_id", String, nullable=False)
+    venue: Mapped[str] = mapped_column("venue", String, nullable=False)
+    account_id: Mapped[str | None] = mapped_column(
+        "account_id",
+        String,
+        nullable=True,
+    )
+    venue_order_id: Mapped[str | None] = mapped_column(
+        "venue_order_id",
+        String,
+        nullable=True,
+    )
+    fill_seq: Mapped[int | None] = mapped_column("fill_seq", Integer, nullable=True)
+    qty: Mapped[Decimal] = mapped_column("qty", Numeric(18, 6), nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(
+        "captured_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
 
 
 class OperationalIncidentRow(Base):
