@@ -61,7 +61,7 @@ describe("LiveOrder XL-3", () => {
     expect(() => forbidExecuteTradeForPartial(partial)).toThrow(/PARTIAL/);
   });
 
-  it("duplicate FILLED financial apply stays at 1", () => {
+  it("duplicate FILLED financial apply is idempotent and monotonic", () => {
     const base: LiveOrderV1 = {
       orderId: "lo-4",
       status: "WORKING",
@@ -77,10 +77,53 @@ describe("LiveOrder XL-3", () => {
     };
     const first = transitionLiveOrder(base, "FILLED", { applyFinancial: true });
     expect(first.financialApplyCount).toBe(1);
-    const again: LiveOrderV1 = { ...base, financialApplyCount: 1 };
-    const second = transitionLiveOrder(again, "FILLED", {
+
+    // Already recorded once → stays (idempotent).
+    const once: LiveOrderV1 = { ...base, financialApplyCount: 1 };
+    const second = transitionLiveOrder(once, "FILLED", {
       applyFinancial: true,
     });
     expect(second.financialApplyCount).toBe(1);
+
+    // Pre-existing elevated marker never collapses back to 1.
+    const elevated: LiveOrderV1 = { ...base, financialApplyCount: 3 };
+    const third = transitionLiveOrder(elevated, "FILLED", {
+      applyFinancial: true,
+    });
+    expect(third.financialApplyCount).toBe(3);
+
+    // applyFinancial outside FILLED is vetoed.
+    expect(() =>
+      transitionLiveOrder(base, "PARTIAL", {
+        filledQuantity: 1,
+        applyFinancial: true,
+      }),
+    ).toThrow(/financial apply only/);
+  });
+
+  it("FILLED with partial broker qty is fail-closed (reconciliation)", () => {
+    let order = buildLiveOrder({
+      orderId: "lo-f",
+      instrumentId: "inst-1",
+      side: "buy",
+      quantity: 100,
+    });
+    order = transitionLiveOrder(order, "SUBMITTING");
+    order = transitionLiveOrder(order, "SUBMITTED", { venueOrderId: "xtb-f" });
+    const working = transitionLiveOrder(order, "WORKING");
+
+    // Broker dice FILLED pero llenó sólo 80 de 100 → no normalizar silencio.
+    expect(() =>
+      transitionLiveOrder(working, "FILLED", { filledQuantity: 80 }),
+    ).toThrow(/reconciliation required/);
+    // La orden origen no se ha mutado (sigue WORKING, sin rastro de FILLED).
+    expect(working.status).toBe("WORKING");
+    expect(working.filledQuantity).toBe(0);
+    expect(working.remainingQuantity).toBe(100);
+
+    // FILLED sin filledQuantity → captura la orden entera.
+    const full = transitionLiveOrder(working, "FILLED");
+    expect(full.filledQuantity).toBe(100);
+    expect(full.remainingQuantity).toBe(0);
   });
 });

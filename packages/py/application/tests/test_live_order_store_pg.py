@@ -10,14 +10,14 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy.exc import IntegrityError
-
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
     build_live_order,
     can_transition_live_order,
     transition_live_order,
 )
+from sqlalchemy.exc import IntegrityError
+
 from bolsa_application.live_order_store import (
     InMemoryLiveOrderStore,
     PostgresLiveOrderStore,
@@ -83,31 +83,71 @@ async def test_inmemory_list_unknown_filters_only_unknown() -> None:
 
 
 @pytest.mark.asyncio
+async def test_inmemory_claim_unknown_mutually_excludes_workers() -> None:
+    """Claim garantiza exclusión: un UNKNOWN claim fresco por worker A no lo ve B.
+
+    Reclama exactamente una vez (mismo contrato que el row-lock SKIP LOCKED PG).
+    """
+    store = InMemoryLiveOrderStore()
+    await store.put(_to_unknown(_make_order(order_id="lo-cw", account_id="acc-1")))
+
+    a = await store.claim_unknown_batch(worker_id="worker-a", limit=10)
+    assert [o.order_id for o in a] == ["lo-cw"]
+
+    # Segundo worker (mismo store, worker distinto) NO puede reclamar en fresco.
+    b = await store.claim_unknown_batch(worker_id="worker-b", limit=10)
+    assert b == []
+
+    # Tras liberar el lease, otro worker puede reclamar.
+    await store.release_claim("lo-cw")
+    c = await store.claim_unknown_batch(worker_id="worker-b", limit=10)
+    assert [o.order_id for o in c] == ["lo-cw"]
+
+
+@pytest.mark.asyncio
+async def test_inmemory_claim_stale_allows_reclaim() -> None:
+    """Un claim stale (worker colgado/crash) puede ser reapropiado por otro."""
+    from datetime import UTC, datetime, timedelta
+
+    store = InMemoryLiveOrderStore()
+    await store.put(_to_unknown(_make_order(order_id="lo-st", account_id="acc-1")))
+
+    # Worker A reclama y su lease queda marcado.
+    await store.claim_unknown_batch(worker_id="worker-a", limit=10)
+    # Simular que pasó más que la ventana stale: mover claimed_at al pasado.
+    now = datetime.now(UTC)
+    store._claims["lo-st"] = ("worker-a", now - timedelta(seconds=1000))
+
+    # Worker B puede reclamar el lease stale.
+    b = await store.claim_unknown_batch(worker_id="worker-b", limit=10)
+    assert [o.order_id for o in b] == ["lo-st"]
+
+
+@pytest.mark.asyncio
 async def test_postgres_put_fresh_insert_maps_domain_to_row_and_commits() -> None:
+    """put() es un upsert atómico único (sin get→decide→write ni session.add)."""
     session = AsyncMock()
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
-    session.add = MagicMock()
-    empty = MagicMock()
-    empty.scalar_one_or_none.return_value = None
-    # get() en put() → None (no existing); segundo get() consulta la fila nueva.
-    session.execute = AsyncMock(return_value=empty)
+    session.execute = AsyncMock(return_value=MagicMock())
 
     order = _make_order(order_id="lo-pg", account_id="acc-9")
     store = PostgresLiveOrderStore(session)
     await store.put(order)
 
-    session.add.assert_called_once()
     session.commit.assert_awaited()
-    added = session.add.call_args.args[0]
-    assert added.order_id == "lo-pg"
-    assert added.account_id == "acc-9"
-    assert added.status == "SUBMITTED"
-    assert added.side == "buy"
-    assert added.quantity == 100.0
-    assert added.filled_quantity == 0.0
-    assert added.remaining_quantity == 100.0
-    assert added.venue_order_id == "xtb-1"
+    # Un solo execute para el upsert (no hay get() previo ni add()).
+    session.execute.assert_awaited_once()
+
+    stmt = session.execute.await_args.args[0]
+    rendered = str(stmt.compile(compile_kwargs={"literal_binds": True})).upper()
+    assert "LO-PG" in rendered
+    assert "100.0" in rendered  # quantity
+    assert "ACCOUNT_ID" in rendered
+    assert "STATUS" in rendered
+    # Es un ON CONFLICT DO UPDATE sobre el PK, no un plain INSERT/UPDATE aparte.
+    assert "ON CONFLICT" in rendered
+    assert "DO UPDATE" in rendered
 
 
 @pytest.mark.asyncio
@@ -129,42 +169,72 @@ async def test_postgres_get_maps_row_to_domain_with_account() -> None:
 
 
 @pytest.mark.asyncio
-async def test_postgres_put_updates_existing_row_keeps_account() -> None:
-    """put sobre fila existente re-usa account_id e itera status."""
-    existing = _make_order(order_id="lo-up", account_id="acc-4")
-    existing_row = _row_from(existing)
+async def test_postgres_put_conflict_updates_existing_and_commits() -> None:
+    """El mismo order_id (fila ya presente) se actualiza atómicamente.
+
+    No requiere pre-read ni add: un único upsert ON CONFLICT DO UPDATE persiste
+    la nueva snapshot de la máquina (cambio de estado durable sin carrera).
+    """
     session = AsyncMock()
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
-    # get() en put() devuelve lo existente dos veces (get + _load_row).
-    found = MagicMock()
-    found.scalar_one_or_none.return_value = existing_row
-    session.execute = AsyncMock(return_value=found)
+    session.execute = AsyncMock(return_value=MagicMock())
 
     store = PostgresLiveOrderStore(session)
-    unknown = transition_live_order(existing, "UNKNOWN")
-    await store.put(unknown, account_id="acc-4")
+    advanced = transition_live_order(_make_order(order_id="lo-up", account_id="acc-4"), "UNKNOWN")
+    await store.put(advanced, account_id="acc-4")
 
-    assert existing_row.status == "UNKNOWN"
-    assert existing_row.account_id == "acc-4"
-    assert existing_row.venue_order_id == "xtb-1"
     session.commit.assert_awaited()
+    session.execute.assert_awaited_once()
+
+    stmt = session.execute.await_args.args[0]
+    rendered = str(stmt.compile(compile_kwargs={"literal_binds": True})).upper()
+    assert "UNKNOWN" in rendered  # estado avanzado quemado en el upsert
+    assert "ACC-4" in rendered
+    assert "ON CONFLICT" in rendered
 
 
 @pytest.mark.asyncio
-async def test_postgres_unique_violation_rolls_back() -> None:
+async def test_postgres_put_integrity_error_rolls_back() -> None:
+    """IntegrityError (reserva/otra restricción) → rollback + re-raise."""
     session = AsyncMock()
     session.commit = AsyncMock(side_effect=IntegrityError("stmt", {}, Exception("dup")))
     session.rollback = AsyncMock()
-    session.add = MagicMock()
-    empty = MagicMock()
-    empty.scalar_one_or_none.return_value = None
-    session.execute = AsyncMock(return_value=empty)
+    session.execute = AsyncMock(return_value=MagicMock())
 
     store = PostgresLiveOrderStore(session)
     with pytest.raises(IntegrityError):
         await store.put(_make_order(order_id="lo-dup", account_id="acc-1"))
     session.rollback.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_postgres_put_same_id_is_atomic_upsert_no_toutcou() -> None:
+    """Dos put() cross-PID para el mismo order_id nunca chocan en un INSERT.
+
+    Antes, el patrón get()→decide→write permitía que dos procesos vieran "no
+    existe" y pelearan por un INSERT del mismo PK (IntegrityError + pérdida de la
+    última escritura). El upsert atómico sobre el PK serializa la escritura:
+    PUT N+1 = DO UPDATE de la snapshot más nueva, sin excepción.
+    """
+    session = AsyncMock()
+    session.commit = AsyncMock()  # nunca lanza IntegrityError bajo escrituras concurrentes
+    session.rollback = AsyncMock()
+    session.execute = AsyncMock(return_value=MagicMock())
+
+    store = PostgresLiveOrderStore(session)
+    # writer request A (Confirm) y writer worker B escriben el mismo order_id en
+    # rápida sucesión; al ser un único statement upsert, cada uno commit-ea OK.
+    await store.put(_make_order(order_id="lo-race", account_id="acc-1"))
+    await store.put(
+        transition_live_order(_make_order(order_id="lo-race", account_id="acc-1"), "UNKNOWN"),
+        account_id="acc-1",
+    )
+
+    session.execute.assert_awaited()
+    assert session.execute.await_count == 2
+    session.commit.assert_awaited()
+    session.rollback.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -319,6 +389,72 @@ async def test_inmemory_cancel_from_unknown_state_is_legal() -> None:
 
 
 @pytest.mark.asyncio
+async def test_inmemory_cancel_tracked_local_not_broker_confirmed() -> None:
+    """CANCELLED por decisión local NO es un ack del broker.
+
+    ``get_cancel_meta`` refleja quién/cuándo/por qué y que ``broker_confirmed``
+    sigue False hasta que el venue confirme de verdad. Ninguna capa puede leer
+    CANCELLED y asumir confirmación broker-side.
+    """
+    store = InMemoryLiveOrderStore()
+    await store.put(_make_order(order_id="lo-cc", account_id="acc-1"))
+
+    await store.cancel_order("lo-cc", reason="usuario pide salir", by="pepe")
+    meta = await store.get_cancel_meta("lo-cc")
+    assert meta is not None
+    assert meta.reason == "usuario pide salir"
+    assert meta.requested_by == "pepe"
+    assert meta.broker_confirmed is False
+
+    stored = await store.get("lo-cc")
+    assert stored is not None and stored.status == "CANCELLED"
+    meta_after = await store.get_cancel_meta("lo-cc")
+    assert meta_after is not None and meta_after.broker_confirmed is False
+
+
+@pytest.mark.asyncio
+async def test_inmemory_cancel_broker_confirm_only_via_explicit_set() -> None:
+    """Solo una confirmación broker-side explícita marca broker_confirmed."""
+    store = InMemoryLiveOrderStore()
+    await store.put(_make_order(order_id="lo-cbrk", account_id="acc-1"))
+    await store.cancel_order("lo-cbrk", reason="mkt", by="sistema")
+
+    meta = await store.get_cancel_meta("lo-cbrk")
+    assert meta is not None and meta.broker_confirmed is False
+
+    confirmed = await store.set_broker_cancel_confirmed("lo-cbrk")
+    assert confirmed is not None and confirmed.broker_confirmed is True
+    assert (await store.get_cancel_meta("lo-cbrk")).broker_confirmed is True
+
+
+@pytest.mark.asyncio
+async def test_postgres_cancel_tracks_docs_via_upsert() -> None:
+    """Cancel PG persiste reason/by en las columnas documentales durables."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    existing_row = _row_from(_make_order(order_id="lo-cdocs", account_id="acc-1"))
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = existing_row
+    session.execute = AsyncMock(return_value=found)
+
+    store = PostgresLiveOrderStore(session)
+    await store.cancel_order("lo-cdocs", reason="stop-out", by="risk")
+
+    stmt = session.execute.await_args_list[-1].args[0]
+    rendered = str(stmt.compile(compile_kwargs={"literal_binds": True})).upper()
+    assert "STOP-OUT" in rendered
+    assert "RISK" in rendered
+    # El DO UPDATE no reescribe broker_cancel_confirmed_at (no fabrica el ack del
+    # broker). El INSERT puede listar la columna con NULL (fila nueva ignora esa
+    # columna), pero jamás la asigna a un valor en la cláusula de update.
+    do_update_tail = rendered.split("DO UPDATE SET", 1)[1]
+    assert "BROKER_CANCEL_CONFIRMED_AT" not in do_update_tail
+
+    session.commit.assert_awaited()
+
+
+@pytest.mark.asyncio
 async def test_postgres_cancel_persists_cancelled_and_idempotent() -> None:
     session = AsyncMock()
     session.commit = AsyncMock()
@@ -331,10 +467,20 @@ async def test_postgres_cancel_persists_cancelled_and_idempotent() -> None:
     store = PostgresLiveOrderStore(session)
     cancelled = await store.cancel_order("lo-cxpg")
     assert cancelled is not None and cancelled.status == "CANCELLED"
-    assert existing_row.status == "CANCELLED"
     session.commit.assert_awaited()
+    session.rollback.assert_not_called()
 
-    # Re-cancel (fila ya CANCELLED persistida) → devuelve CANCELLED sin transicionar.
+    # El estado CANCELLED se persiste mediante el upsert; verifica que el último
+    # statement execute (el put) escribe CANCELLED sobre el PK.
+    assert session.execute.await_count >= 1
+    calls = session.execute.await_args_list
+    put_stmt = calls[-1].args[0]
+    rendered = str(put_stmt.compile(compile_kwargs={"literal_binds": True})).upper()
+    assert "CANCELLED" in rendered
+    assert "ON CONFLICT" in rendered
+
+    # Re-cancel (fila ya CANCELLED): get() devuelve terminal → no transiciona,
+    # pero el resultado sigue siendo la orden CANCELLED (no-op idempotente).
     existing_row.status = "CANCELLED"
     again = await store.cancel_order("lo-cxpg")
     assert again is not None and again.status == "CANCELLED"
@@ -345,6 +491,8 @@ def test_postgres_cancel_and_list_open_are_exported_on_protocol() -> None:
     for store_type in (InMemoryLiveOrderStore, PostgresLiveOrderStore):
         assert hasattr(store_type, "list_open_orders")
         assert hasattr(store_type, "cancel_order")
+        assert hasattr(store_type, "get_cancel_meta")
+        assert hasattr(store_type, "set_broker_cancel_confirmed")
 
 
 def test_migration_020_chains_to_live_order_head() -> None:
@@ -392,3 +540,41 @@ def test_migration_020_chains_to_live_order_head() -> None:
         "updated_at",
     }
     assert expecting <= cols
+
+
+def test_migration_021_extends_live_order_financials() -> None:
+    """021 cuelga de 020 (head real) y endurece cantidades + lease recovery.
+
+    Guard offline (sin PG): verifica que el fichero de migración existe, cuelga
+    de 020 y que el modelo expone las columnas que la migración añade.
+    """
+    from pathlib import Path
+
+    from bolsa_infrastructure.database.models.tables import LiveOrderRow
+
+    migration_path = (
+        Path(__file__).resolve().parents[4]
+        / "packages"
+        / "py"
+        / "infrastructure"
+        / "alembic"
+        / "versions"
+        / "021_live_orders_financial_constraints.py"
+    )
+    assert migration_path.exists()
+    src = migration_path.read_text(encoding="utf-8")
+    assert 'down_revision = "020_live_orders"' in src
+    assert 'revision = "021_live_orders_financial_constraints"' in src
+    assert "sa.Numeric(18, 6)" in src  # determinismo numérico (no más Float)
+    assert "quantity > 0" in src  # CHECK financiero de invariante en la BD
+
+    cols = {c.name for c in LiveOrderRow.__table__.columns}
+    asserting = {
+        "recovery_worker_id",
+        "recovery_claimed_at",
+        "cancel_requested_by",
+        "cancel_reason",
+        "cancel_requested_at",
+        "broker_cancel_confirmed_at",
+    }
+    assert asserting <= cols

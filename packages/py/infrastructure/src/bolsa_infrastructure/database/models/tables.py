@@ -1238,9 +1238,9 @@ class LiveOrderRow(Base):
     venue: Mapped[str] = mapped_column(String, nullable=False)
     instrument_id: Mapped[str] = mapped_column(String, nullable=False)
     side: Mapped[str] = mapped_column(String, nullable=False)
-    quantity: Mapped[float] = mapped_column(Float, nullable=False)
-    filled_quantity: Mapped[float] = mapped_column(Float, nullable=False)
-    remaining_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    filled_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    remaining_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     venue_order_id: Mapped[str | None] = mapped_column(
         "venue_order_id",
         String,
@@ -1257,6 +1257,45 @@ class LiveOrderRow(Base):
         "updated_at",
         DateTime(timezone=True),
         nullable=False,
+    )
+    # Claim/lease del LiveOrderRecoveryWorker cross-PID (V2.13): cuando un worker
+    # reclama una fila UNKNOWN marca quién/cuándo; otro worker no la re-procesa
+    # hasta que pase la ventana stale (reclaim tras crash). NO es un estado de
+    # negocio: es un mecanismo técnico de lease (nunca cambia status).
+    recovery_worker_id: Mapped[str | None] = mapped_column(
+        "recovery_worker_id",
+        String,
+        nullable=True,
+    )
+    recovery_claimed_at: Mapped[datetime | None] = mapped_column(
+        "recovery_claimed_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    # Documentación de cancelación (V2.13 honest-cancel). ``cancel_order`` guarda
+    # quién/cuándo/por qué solicitó cancelar como DECISIÓN LOCAL; ``broker_...``
+    # SÓLO se puebla cuando llega confirmación real del broker (hoy PARKED, será
+    # None). Así una capa superior puede distinguir CANCELLED-autorizado de
+    # CANCELLED-confirmado-por-el-broker, sin poner CANCELLED = veracidad broker.
+    cancel_requested_by: Mapped[str | None] = mapped_column(
+        "cancel_requested_by",
+        String,
+        nullable=True,
+    )
+    cancel_reason: Mapped[str | None] = mapped_column(
+        "cancel_reason",
+        String,
+        nullable=True,
+    )
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(
+        "cancel_requested_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    broker_cancel_confirmed_at: Mapped[datetime | None] = mapped_column(
+        "broker_cancel_confirmed_at",
+        DateTime(timezone=True),
+        nullable=True,
     )
 
 

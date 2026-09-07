@@ -151,17 +151,30 @@ def transition_live_order(
     if nxt == "PARTIAL" and remaining <= 0:
         raise LiveOrderTransitionError("PARTIAL requires remaining_quantity > 0")
     if nxt == "FILLED":
-        filled = order.quantity if filled_quantity is None else filled
+        if filled_quantity is None:
+            # FILLED sin detalle de broker → el total capturado es la orden entera.
+            filled = order.quantity
+        # Terminal FILLED significa que la cantidad total de la orden se capturó.
+        # Si el broker reporta FILLED con filled < quantity NO inventamos un
+        # FILLED coherente (remaining=0 con filled parcial) : eso es desacuerdo
+        # broker-truth y debe quedarse fail-closed para reconciliar, jamás
+        # normalizarse silenciosamente a un estado terminal que no refleja lo real.
+        elif abs(filled - order.quantity) > 1e-9:
+            raise LiveOrderTransitionError(
+                "FILLED requires filled_quantity == quantity "
+                f"(order {order.quantity}, broker {filled}) · reconciliation required"
+            )
         remaining = 0.0
 
     apply_count = order.financial_apply_count
     if apply_financial:
         if nxt != "FILLED":
             raise LiveOrderTransitionError("financial apply only allowed on FILLED")
-        # Duplicate FILLED events: only one financial effect.
-        if apply_count >= 1:
-            apply_count = 1
-        else:
+        # Duplicate FILLED events: only one financial effect. The counter is a
+        # monotonic "first financial application recorded" marker: it never
+        # decreases, so a callar que ya aplicó (>=1) no se colapsa a 1 ni se
+        # pierde el hecho de que el efecto financiero ya se aplicó.
+        if apply_count < 1:
             apply_count = 1
 
     return LiveOrder(
@@ -192,3 +205,129 @@ def forbid_repost_from_unknown(order: LiveOrder) -> None:
     """UNKNOWN must not re-POST; only query_broker may resolve."""
     if order.status == "UNKNOWN":
         raise LiveOrderTransitionError("UNKNOWN forbids re-POST · query_broker only")
+
+
+# ---------------------------------------------------------------------------
+# V2.13 — Reconcile LiveOrder vs broker-truth (order-level, read-only report).
+# ---------------------------------------------------------------------------
+
+# Resultado de contrastar la máquina local contra lo que contesta el broker.
+LiveOrderReconcileStatus = Literal[
+    "consistent",
+    "reconciliation_required",
+    "unavailable",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class LiveOrderReconcileReport:
+    """Informe *declarativo* (detecta, no muta ni auto-heal).
+
+    Reconciliación a nivel de orden (broker-truth vs local-truth). Un status
+    ``reconciliation_required`` significa que local y broker no cuadran y NO debe
+    normalizarse; la cancel/shadow real de broker (PARKED) podrá alimentar esto
+    para abrir un incidente / veto OR-4 por cuenta.
+    """
+
+    order_id: str
+    status: LiveOrderReconcileStatus
+    detail: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "orderId": self.order_id,
+            "status": self.status,
+            "detail": self.detail,
+            "reconciliationRequired": self.status == "reconciliation_required",
+        }
+
+
+_QTY_EPS = 1e-9
+
+
+def reconcile_live_order_vs_broker(
+    *,
+    order: LiveOrder,
+    broker_status: str | None,
+    broker_filled: float | None,
+) -> LiveOrderReconcileReport:
+    """Contrasta una respuesta broker-side contra la máquina local de la orden.
+
+    Report puro y declarativo (detecta, no muta ni auto-heal). Fail-closed: ante
+    ambigüedad o desajuste irreconciliable devuelve ``reconciliation_required``.
+    Semántica clave del modelo FILLED (V2.13): el broker nunca da un FILLED
+    terminal con filled parcial de la orden; si lo hace → reconciliation_required,
+    jamás un estado terminal fabricado.
+    """
+    oid = order.order_id
+    st = (broker_status or "").strip().lower()
+
+    if st in {"", "unavailable"}:
+        return LiveOrderReconcileReport(oid, "unavailable", "broker unavailable")
+
+    if st == "filled":
+        if float(order.quantity) > _QTY_EPS:
+            if broker_filled is None or abs(float(broker_filled) - order.quantity) > _QTY_EPS:
+                return LiveOrderReconcileReport(
+                    oid,
+                    "reconciliation_required",
+                    f"broker filled={broker_filled} != order qty={order.quantity}",
+                )
+        if order.status == "FILLED":
+            return LiveOrderReconcileReport(oid, "consistent", "filled (local==broker)")
+        if order.status in {"CANCELLED", "REJECTED", "PARTIAL"}:
+            return LiveOrderReconcileReport(
+                oid,
+                "consistent",
+                "filled posterior coherente con trayectoria local",
+            )
+        return LiveOrderReconcileReport(
+            oid,
+            "consistent",
+            "filled con cantidad completa (aplicar efecto financiero = PARKED)",
+        )
+
+    if st == "partial":
+        if (
+            broker_filled is None
+            or not (0 < float(broker_filled))
+            or float(broker_filled) >= order.quantity
+        ):
+            return LiveOrderReconcileReport(
+                oid,
+                "reconciliation_required",
+                f"partial con filled={broker_filled} fuera de (0, qty={order.quantity})",
+            )
+        if order.status in {"FILLED", "CANCELLED", "REJECTED"}:
+            return LiveOrderReconcileReport(
+                oid,
+                "reconciliation_required",
+                f"broker partial pero local ya {order.status}",
+            )
+        return LiveOrderReconcileReport(
+            oid,
+            "consistent",
+            "partial coherente con la orden en curso",
+        )
+
+    # working / cancelled / rejected
+    if st == "working":
+        if order.status in {"CANCELLED", "REJECTED", "FILLED"}:
+            return LiveOrderReconcileReport(
+                oid,
+                "reconciliation_required",
+                f"broker working pero local ya {order.status}",
+            )
+        return LiveOrderReconcileReport(oid, "consistent", "working (en curso)")
+    if st in {"cancelled", "rejected"}:
+        if order.status == {"cancelled": "CANCELLED", "rejected": "REJECTED"}[st]:
+            return LiveOrderReconcileReport(
+                oid, "consistent", f"{st} corroborado por el broker"
+            )
+        return LiveOrderReconcileReport(
+            oid,
+            "reconciliation_required",
+            f"broker {st} pero local {order.status}",
+        )
+    return LiveOrderReconcileReport(oid, "unavailable", "outcome no reconocido")
+

@@ -28,22 +28,32 @@ import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 from bolsa_application.live_order_query import LiveOrderQueryPort
 from bolsa_application.live_order_store import PostgresLiveOrderStore
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
 TICK_SECONDS = 5
 _ENV_ENABLED = "LIVE_RECOVERY_WORKER_ENABLED"
 _DEFAULT_BATCH = 50
+# Ventana de lease del claimed UNKNOWN antes de que otro worker pueda reapropiarlo.
+DEFAULT_CLAIM_STALE_SECONDS = 120
 
 # Provider shape: (venue, account_id, venue_order_id) → query port | None.
 QueryProvider = Callable[
     [str, str, str],
     Awaitable[LiveOrderQueryPort | None],
 ]
+
+
+def _worker_identity() -> str:
+    """Id estable por worker/proceso para el lease cross-PID."""
+    try:
+        pid = os.getpid()
+    except Exception:  # noqa: BLE001 — portabilidad
+        pid = "?"
+    return f"live-recovery-{pid}"
 
 
 def _worker_enabled() -> bool:
@@ -119,10 +129,26 @@ async def _drain_unknowns(
     *,
     query_provider: QueryProvider | None,
     limit: int,
+    worker_id: str = "live-recovery-inprocess",
+    stale_after_seconds: int = DEFAULT_CLAIM_STALE_SECONDS,
 ) -> dict[str, Any]:
-    """Drena filas UNKNOWN del store dado (testable sin PG)."""
+    """Drena filas UNKNOWN del store (testable sin PG).
+
+    Multi-worker: si el store expone claim/lease de fila (PG), cada tick
+    *reclama* UNKNOWN con ``claim_unknown_batch`` (SKIP LOCKED + lease) en vez de
+    listar a ciegas; dos workers no procesan la misma orden en paralelo. Si no
+    hay mecanismo de claim (store genérico) se cae a ``list_unknown``.
+    """
     provider = query_provider or _no_query_provider
-    rows = await store.list_unknown(limit=limit)
+    claim = getattr(store, "claim_unknown_batch", None)
+    if claim is not None:
+        rows = await claim(
+            limit=limit,
+            worker_id=worker_id,
+            stale_after_seconds=stale_after_seconds,
+        )
+    else:
+        rows = await store.list_unknown(limit=limit)
     resolved: int = 0
     unavailable: int = 0
     errors: int = 0
@@ -138,6 +164,9 @@ async def _drain_unknowns(
             if status == "resolved":
                 resolved += 1
             else:
+                # UNKNOWN irresoluto / sin cliente: la fila sigue UNKNOWN y su
+                # lease envejece; NO se llama a release_claim aquí para evitar
+                # hilar fino (el claim fresco excluye hasta la ventana stale).
                 unavailable += 1
         except Exception:  # noqa: BLE001 — una fila no tumba el tick
             errors += 1
@@ -156,14 +185,17 @@ async def _drain_once(
     *,
     query_provider: QueryProvider | None = None,
     limit: int = _DEFAULT_BATCH,
+    worker_id: str | None = None,
+    stale_after_seconds: int = DEFAULT_CLAIM_STALE_SECONDS,
 ) -> dict[str, Any]:
     async with session_factory() as session:
         store = PostgresLiveOrderStore(session)
-        # Re-put va por otra sesión por fila para límites de bloqueo cortos.
         result = await _drain_unknowns(
             store,
             query_provider=query_provider,
             limit=limit,
+            worker_id=worker_id or _worker_identity(),
+            stale_after_seconds=stale_after_seconds,
         )
     return result
 
@@ -174,8 +206,11 @@ async def live_order_recovery_worker_loop(
     tick_seconds: float = TICK_SECONDS,
     query_provider: QueryProvider | None = None,
     limit: int = _DEFAULT_BATCH,
+    worker_id: str | None = None,
+    stale_after_seconds: int = DEFAULT_CLAIM_STALE_SECONDS,
 ) -> None:
-    logger.info("LiveOrderRecoveryWorker iniciado (tick=%ss)", tick_seconds)
+    wid = worker_id or _worker_identity()
+    logger.info("LiveOrderRecoveryWorker iniciado (tick=%ss worker=%s)", tick_seconds, wid)
     while True:
         await asyncio.sleep(tick_seconds)
         if not _worker_enabled():
@@ -185,6 +220,8 @@ async def live_order_recovery_worker_loop(
                 session_factory,
                 query_provider=query_provider,
                 limit=limit,
+                worker_id=wid,
+                stale_after_seconds=stale_after_seconds,
             )
             if drain["drained"]:
                 logger.info("live_order recovery drain: %s", drain)
@@ -198,6 +235,7 @@ def start_live_order_recovery_worker(
     tick_seconds: float = TICK_SECONDS,
     query_provider: QueryProvider | None = None,
     limit: int = _DEFAULT_BATCH,
+    worker_id: str | None = None,
 ) -> asyncio.Task[None] | None:
     if not _worker_enabled():
         logger.info(
@@ -211,5 +249,6 @@ def start_live_order_recovery_worker(
             tick_seconds=tick_seconds,
             query_provider=query_provider,
             limit=limit,
+            worker_id=worker_id,
         )
     )

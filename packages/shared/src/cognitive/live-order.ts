@@ -131,7 +131,17 @@ export function transitionLiveOrder(
     );
   }
   if (next === "FILLED") {
-    filled = opts?.filledQuantity == null ? order.quantity : filled;
+    if (opts?.filledQuantity == null) {
+      // FILLED sin detalle de broker → el total capturado es la orden entera.
+      filled = order.quantity;
+    } else if (Math.abs(filled - order.quantity) > 1e-9) {
+      // Terminal FILLED significa que la cantidad total de la orden se capturó.
+      // filled < quantity por el broker = desacuerdo broker-truth; quedamos
+      // fail-closed para reconcil (raise) en vez de un FILLED artificial.
+      throw new LiveOrderTransitionError(
+        `FILLED requires filled_quantity == quantity (order ${order.quantity}, broker ${filled}) · reconciliation required`,
+      );
+    }
     remaining = 0;
   }
 
@@ -142,7 +152,12 @@ export function transitionLiveOrder(
         "financial apply only allowed on FILLED",
       );
     }
-    applyCount = 1;
+    // Duplicate FILLED events: only one financial effect. The counter is a
+    // monotonic "first financial application recorded" marker: it never
+    // decreases, so an already-applied marker stays as-is (idempotent).
+    if (applyCount < 1) {
+      applyCount = 1;
+    }
   }
 
   return {

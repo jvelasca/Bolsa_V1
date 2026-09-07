@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from bolsa_application.live_order_query import (
+    BrokerOrderQueryResult,
+    MockLiveOrderQuery,
+)
 
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
@@ -12,10 +16,6 @@ from bolsa_analytics.cognitive.live_order import (
     forbid_execute_trade_for_partial,
     forbid_repost_from_unknown,
     transition_live_order,
-)
-from bolsa_application.live_order_query import (
-    BrokerOrderQueryResult,
-    MockLiveOrderQuery,
 )
 
 
@@ -89,7 +89,10 @@ def test_duplicate_filled_single_financial_apply() -> None:
     first = transition_live_order(working, "FILLED", apply_financial=True)
     assert first.financial_apply_count == 1
 
-    # Duplicate FILLED event path: already counted once → stays 1.
+    # Duplicate FILLED event path: already counted once → stays at the recorded
+    # marker (idempotent; the count never collapses or decrements). We seed a
+    # pre-existing marker of 2 (e.g. replayed/reloaded row) to prove the field
+    # is monotonic: it must NOT be reset back to 1.
     working_again = LiveOrder(
         order_id="lo-4",
         status="WORKING",
@@ -101,10 +104,128 @@ def test_duplicate_filled_single_financial_apply() -> None:
         remaining_quantity=5.0,
         venue_order_id="xtb-1",
         intent_id=None,
-        financial_apply_count=1,
+        financial_apply_count=2,
     )
     second = transition_live_order(working_again, "FILLED", apply_financial=True)
-    assert second.financial_apply_count == 1
+    assert second.financial_apply_count == 2  # nunca vuelve a 1 ni a 0
+
+
+def test_apply_financial_count_increments_once() -> None:
+    """apply_financial registra la primera aplicación; repetir es idempotente.
+
+    El marker ``financial_apply_count`` debe comportarse como "primera vez" vs
+    "repetida": tras aplicar una vez pasa a >=1 y NUNCA decrece ni resetea a 1.
+    """
+    from bolsa_analytics.cognitive.live_order import LiveOrder
+
+    def _working(*, applied: int) -> LiveOrder:
+        return LiveOrder(
+            order_id="lo-a",
+            status="WORKING",
+            venue="LIVE",
+            instrument_id="inst-1",
+            side="buy",
+            quantity=10.0,
+            filled_quantity=0.0,
+            remaining_quantity=10.0,
+            venue_order_id="xtb-a",
+            intent_id=None,
+            financial_apply_count=applied,
+        )
+
+    # Primera vez: 0 → 1 y el llamador puede ver que acaba de aplicarse (==1).
+    first = transition_live_order(_working(applied=0), "FILLED", apply_financial=True)
+    assert first.status == "FILLED"
+    assert first.financial_apply_count == 1
+
+    # Dup / ya aplicado (marker pre-existente elevado) → se conserva, sin reset.
+    already = transition_live_order(_working(applied=1), "FILLED", apply_financial=True)
+    assert already.financial_apply_count == 1
+
+    # Incluso con marker artificialmente >1 → se conserva (monotónico, nunca colapsa a 1).
+    higher = transition_live_order(_working(applied=3), "FILLED", apply_financial=True)
+    assert higher.financial_apply_count == 3
+
+    # apply_financial sin llegar a FILLED está vetado (PARTIAL legal llega a la
+    # rama financiera: filled en (0, qty) pasa los guards y aterriza en el veto).
+    with pytest.raises(LiveOrderTransitionError, match="financial apply only"):
+        transition_live_order(
+            _working(applied=0), "PARTIAL", filled_quantity=5, apply_financial=True
+        )
+
+
+def test_duplicate_filled_single_financial_apply_no_terminal_reapply() -> None:
+    """FILLED terminal no admite reaplicación financiera por segunda transición."""
+    from bolsa_analytics.cognitive.live_order import LiveOrder
+
+    filled = LiveOrder(
+        order_id="lo-t",
+        status="FILLED",
+        venue="LIVE",
+        instrument_id="inst-1",
+        side="buy",
+        quantity=5.0,
+        filled_quantity=5.0,
+        remaining_quantity=0.0,
+        venue_order_id="xtb-1",
+        intent_id=None,
+        financial_apply_count=1,
+    )
+    # Estado terminal: jamás resucita ni se reaplica con otra transición.
+    with pytest.raises(LiveOrderTransitionError):
+        transition_live_order(filled, "FILLED", apply_financial=True)
+    assert filled.financial_apply_count == 1
+
+
+def _working_full(*, quantity: float = 100.0) -> LiveOrder:
+    """WORKING legal vía el grafo (AUTHORIZED→SUBMITTING→SUBMITTED→WORKING)."""
+    order = build_live_order(
+        order_id="lo-f",
+        instrument_id="inst-1",
+        side="buy",
+        quantity=quantity,
+    )
+    return transition_live_order(
+        transition_live_order(
+            transition_live_order(order, "SUBMITTING"),
+            "SUBMITTED",
+            venue_order_id="xtb-f",
+        ),
+        "WORKING",
+    )
+
+
+def test_filled_requires_full_filled_quantity_no_silent_normalize() -> None:
+    """FILLED con filled < quantity es desacuerdo broker-truth → fail-closed.
+
+    Nunca se persiste un FILLED terminal con remaining=0 y filled parcial; eso
+    normalizaría silenciosamente una incoherencia (reconciliation required).
+    """
+    working = _working_full(quantity=100.0)
+    with pytest.raises(LiveOrderTransitionError, match="reconciliation required"):
+        transition_live_order(working, "FILLED", filled_quantity=80.0)
+
+    # El detector no muta la orden origen (sigue WORKING, sin rastro de FILLED).
+    assert working.status == "WORKING"
+    assert working.filled_quantity == 0.0
+    assert working.remaining_quantity == 100.0
+
+
+def test_filled_without_filled_quantity_captures_full_order() -> None:
+    """FILLED sin filled_quantity explícito → filled == quantity, remaining 0."""
+    working = _working_full(quantity=50.0)
+    filled_state = transition_live_order(working, "FILLED")
+    assert filled_state.status == "FILLED"
+    assert filled_state.filled_quantity == 50.0
+    assert filled_state.remaining_quantity == 0.0
+
+
+def test_filled_with_exact_quantity_is_kept_as_full() -> None:
+    working = _working_full(quantity=200.0)
+    filled_state = transition_live_order(working, "FILLED", filled_quantity=200.0)
+    assert filled_state.status == "FILLED"
+    assert filled_state.filled_quantity == 200.0
+    assert filled_state.remaining_quantity == 0.0
 
 
 @pytest.mark.asyncio
@@ -204,3 +325,99 @@ def test_cancel_single_terminal_no_resurrection() -> None:
         transition_live_order(cancelled, "CANCELLED")
     with pytest.raises(LiveOrderTransitionError):
         transition_live_order(cancelled, "FILLED", filled_quantity=100.0)
+
+
+# ---------------------------------------------------------------------------
+# V2.13 Reconcile (order-level, read-only) — broker-truth vs machine local.
+# ---------------------------------------------------------------------------
+
+
+def _working_qty(*, order_id: str = "lo-r", quantity: float = 100.0) -> LiveOrder:
+    order = build_live_order(
+        order_id=order_id,
+        instrument_id="inst-1",
+        side="buy",
+        quantity=quantity,
+    )
+    order = transition_live_order(order, "SUBMITTING")
+    order = transition_live_order(order, "SUBMITTED", venue_order_id=f"xtb-{order_id}")
+    return transition_live_order(order, "WORKING")
+
+
+def test_reconcile_filled_partial_is_reconciliation_required() -> None:
+    """Broker FILLED con filled < quantity NO es terminal coherente → recon."""
+    from bolsa_analytics.cognitive.live_order import reconcile_live_order_vs_broker
+
+    working = _working_qty(quantity=100.0)
+    report = reconcile_live_order_vs_broker(
+        order=working,
+        broker_status="filled",
+        broker_filled=60.0,
+    )
+    assert report.status == "reconciliation_required"
+
+
+def test_reconcile_filled_full_is_consistent() -> None:
+    from bolsa_analytics.cognitive.live_order import reconcile_live_order_vs_broker
+
+    working = _working_qty(quantity=100.0)
+    report = reconcile_live_order_vs_broker(
+        order=working,
+        broker_status="filled",
+        broker_filled=100.0,
+    )
+    assert report.status == "consistent"
+
+
+def test_reconcile_partial_out_of_bounds_is_required() -> None:
+    from bolsa_analytics.cognitive.live_order import reconcile_live_order_vs_broker
+
+    working = _working_qty(quantity=100.0)
+    # partial completo (> qty) o negativo → no es partial coherente.
+    bad = reconcile_live_order_vs_broker(
+        order=working,
+        broker_status="partial",
+        broker_filled=120.0,
+    )
+    assert bad.status == "reconciliation_required"
+    ok = reconcile_live_order_vs_broker(
+        order=working,
+        broker_status="partial",
+        broker_filled=40.0,
+    )
+    assert ok.status == "consistent"
+
+
+def test_reconcile_broker_working_vs_local_terminal_is_required() -> None:
+    from bolsa_analytics.cognitive.live_order import (
+        reconcile_live_order_vs_broker,
+        transition_live_order,
+    )
+
+    cancelled = transition_live_order(_working_qty(), "CANCELLED")
+    report = reconcile_live_order_vs_broker(
+        order=cancelled,
+        broker_status="working",
+        broker_filled=None,
+    )
+    assert report.status == "reconciliation_required"
+
+    # Broker corrobora CANCELLED → consistent.
+    ok = reconcile_live_order_vs_broker(
+        order=cancelled,
+        broker_status="cancelled",
+        broker_filled=None,
+    )
+    assert ok.status == "consistent"
+
+
+def test_reconcile_broker_unavailable_is_not_conclusive() -> None:
+    from bolsa_analytics.cognitive.live_order import reconcile_live_order_vs_broker
+
+    report = reconcile_live_order_vs_broker(
+        order=_working_qty(),
+        broker_status="unavailable",
+        broker_filled=None,
+    )
+    assert report.status == "unavailable"
+    assert report.to_dict()["reconciliationRequired"] is False
