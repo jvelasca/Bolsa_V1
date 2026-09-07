@@ -24,21 +24,21 @@ Método: evidencia sobre **código real** (no documentación). Se consultó domi
 
 ## 1. Tabla de hallazgos (matriz)
 
-| Hallazgo                               | V2.12 | V2.13 | Estado               | Veredicto auditor                                                         |
-| -------------------------------------- | ----- | ----- | -------------------- | ------------------------------------------------------------------------- |
-| UNKNOWN sin re-POST                    | 🟢    | 🟢    | Cerrado              | `ALLOWED_LIVE_ORDER_TRANSITIONS` no contiene `SUBMITTING` desde `UNKNOWN` |
-| UNKNOWN durable                        | 🟢    | 🟢    | Cerrado              | `live_orders` PG + worker persiste la fila; no sintetiza ledger           |
-| Multi-worker recovery                  | 🔴/🟡 | 🟡    | **A comprobar**      | Mecanismo con lease correcto **pero sin test PG real de 2 sesiones**      |
-| Partial fill individual                | 🟡    | 🟡    | A comprobar          | Transición a nivel de orden; `execute_trade` por fill **PARKED**          |
-| Idempotencia financiera                | 🔴    | 🔴    | Sigue abierta        | `financial_apply_count` **cero** llamadores en prod                       |
-| Fill individual (`venue_execution_id`) | 🟡    | 🟡    | A comprobar          | No hay columna/identity por fill en `live_orders`                         |
-| Comisiones                             | 🟡    | 🟡    | A comprobar          | Sin evento de fill/comisión en cadena LIVE                                |
-| Decimal                                | 🔴    | 🔴    | **A medio corregir** | DB=NUMERIC pero dominio+store+TS = `float`/`number`                       |
-| DB invariants                          | 🟡    | 🟢    | Mejorado             | 021 + CHECK; ver §3 caveat de ruta real                                   |
-| Cancel broker-side                     | 🔴    | 🟡    | A comprobar          | Modelo honesto; round-trip real **PARKED**                                |
-| XTB query real                         | 🔴    | 🔴    | No desbloqueado      | `_no_query_provider`=None en prod; cliente XTB sin endpoint query         |
-| Reconciliation                         | 🟡    | 🟡    | A comprobar          | LR-1 cash+positions; **no cubre máquina `live_orders`**                   |
-| LIVE real (fondo)                      | 🔴    | 🔴/🟡 | No desbloquear       | Bridge mock-only; cliente XTB solo `quote/cash/positions/POST /orders`    |
+| Hallazgo                               | V2.12 | V2.13 | Estado               | Veredicto auditor                                                                        |
+| -------------------------------------- | ----- | ----- | -------------------- | ---------------------------------------------------------------------------------------- |
+| UNKNOWN sin re-POST                    | 🟢    | 🟢    | Cerrado              | `ALLOWED_LIVE_ORDER_TRANSITIONS` no contiene `SUBMITTING` desde `UNKNOWN`                |
+| UNKNOWN durable                        | 🟢    | 🟢    | Cerrado              | `live_orders` PG + worker persiste la fila; no sintetiza ledger                          |
+| Multi-worker recovery                  | 🔴/🟡 | 🟢    | **Cerrado (H2)**     | Test PG real de `claim_unknown_batch` con 2 sesiones/tx simultáneas (§5bis)              |
+| Partial fill individual                | 🟡    | 🟡    | Gate (H3)            | Transición a nivel de orden; `execute_trade`/applier por fill **PARKED**                 |
+| Idempotencia financiera                | 🔴    | 🔴    | Sigue abierta (H3)   | `financial_apply_count` **cero** llamadores en prod; decisión §5tetra                    |
+| Fill individual (`venue_execution_id`) | 🟡    | 🟡    | Gate (H3)            | No hay columna/identity por fill en `live_orders` (decisión §5tetra)                     |
+| Comisiones                             | 🟡    | 🟡    | Gate (H3)            | Sin evento de fill/comisión en cadena LIVE (decisión §5tetra)                            |
+| Decimal                                | 🔴    | 🟢    | **Cerrado dominio**  | Dominio+store a `Decimal(6dp)` (invariante exacto); TS = proyección `number` (§5bis)     |
+| DB invariants                          | 🟡    | 🟢    | Mejorado             | 021 + CHECK; ver §3 caveat de ruta real                                                  |
+| Cancel broker-side                     | 🔴    | 🟢    | **Cerrado (H5)**     | `CANCEL_REQUESTED`+`set_broker_cancel_confirmed`; sólo ack del venue→`CANCELLED` (§5bis) |
+| XTB query real                         | 🔴    | 🟢    | **Cerrado contrato** | Provider real por defecto con `XTB_BRIDGE_URL`; fail-closed `unavailable` (H6, §5ter)    |
+| Reconciliation                         | 🟡    | 🟢    | **Mejorado (H7)**    | Reconcile drift de máquina `live_orders` colgado al tick (drift-only) (§5ter)            |
+| LIVE real (fondo)                      | 🔴    | 🔴/🟡 | No desbloquear       | Tramo financiero `Broker→Ledger→Reconciliation` real sigue **gate** (H3·§5tetra)         |
 
 ---
 
@@ -197,6 +197,41 @@ contra el bridge mock (submit→UNKNOWN→query→working/partial/filled) + call
   Sigue siendo condición del paso a LIVE READY junto a idempotencia financiera (H3).
 
 ---
+
+## 5tetra. Cierre de iteración — decisión H3 (mercado NO ampliado) y estado a auditar
+
+Iteración post-§5ter sobre la **última deuda restante al umbral: H3** (idempotencia
+financiera / cadena `LiveOrder → Ledger`). Se re-exploró el booking real del repo
+(`ExecuteTrade.execute` → `portfolio_repo.execute_trade` + `ledger_repo.append_trade` +
+`sync_position_after_ledger_fill`) y el contrato actual del push real (H6).
+
+**Conclusión de la decisión tomada (registro honesto):**
+
+1. El tramo financiero LIVE **no se amplía ni se construye en esta iteración**. La venu
+   real (XTB `GET /orders/{id}`) **no garantiza por contrato** ni precio de ejecución por
+   fill, ni `fills[]` con un `venueExecutionId` por llenada, ni fee desglosado. Hoy el
+   resultado de la query (H6) sólo trae cantidades agregadas (`filledQty/remainingQty`).
+2. Sin esas piezas (importe real por fill + identidad por llenada) **no existe un applier
+   honesto**: abrir `ledger/positions` con un precio que la venu no confirmó **sería
+   síntesis**, exactamente lo que esta auditoría veta. `financial_apply_count` seguiría
+   siendo un marcador in-memory sin productor real y **cero llamadores** en prod.
+3. Por tanto **H3 permanece como deuda + gate**, NO como código parcial "casi listo".
+   Diseño del future H3 (si el contrato del bridge llega a dar `venueExecutionId` + price):
+   reusar el backstop DB real `uq_ledger_entries_account_reference`
+   (`(account_id, reference_type, reference_id, type)`) para idempotencia por fill;
+   identity por llenada = `venue_order_id + fill sequence` (hoy no existe columna/identity);
+   el applier se dispararía en `resolve_one_unknown` (UNKNOWN→PARTIAL/FILLED) y en el
+   drift `fill_unseen` de H7 — con veto XL-3 intacto (no sintetizar `execute_trade`).
+
+**Estado de la versión a subir/auditar:**
+
+- HEAD `/ v2-13-1-rc-honesty-remediation`: `656c8b37` (V2.13.1-rc + H6/H7). Working tree
+  intacto (sin cambios pendientes de cadena LIVE; sólo ediciones ajenas e2e/web-doc logs).
+- Suites locales verdes (unit/integration): H1/H2/H4/H5 (§5bis) + H6/H7 (§5ter).
+- **No se proclama LIVE READY financiero.** El tramo `Broker-Query→Ledger→Reconciliation`
+  sobre una venu REAL sigue pendiente y es **gate**; ver §5 y §5ter.
+- H3 (idempotencia financiera) → **Sigue abierta** (marcador). No hay bypass en
+  Decision/Risk/Authorization (§H8), que se mantiene como buena noticia intacta.
 
 ## 6. Referencias
 
