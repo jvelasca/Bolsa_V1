@@ -23,7 +23,6 @@ from bolsa_analytics.cognitive.broker_adapter import (
 from bolsa_analytics.cognitive.paper_broker import PaperBrokerReceipt
 from bolsa_analytics.cognitive.paper_order import PaperOrder, PaperOrderSide
 from bolsa_application.paper_broker import PaperBroker
-from bolsa_application.persist_position_from_fill import open_transaction_id_from_trade
 from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult
 
 BrokerAdapterSubmitStatus = Literal[
@@ -300,52 +299,24 @@ class XtbBrokerAdapter:
                 venue_order_id=order.venue_order_id,
             )
         if order.status == "filled":
-            if self._execute_trade is None:
-                return BrokerAdapterSubmitResult(
-                    venue="LIVE",
-                    adapter=BROKER_ADAPTER_XTB,
-                    fill_status="unknown",
-                    paper_order=None,
-                    paper_receipt=None,
-                    trade=None,
-                    status="unknown",
-                    reason="xtb_execute_not_wired",
-                    transaction_id=None,
-                    venue_order_id=order.venue_order_id,
-                )
-            try:
-                trade = await self._execute_trade.execute(
-                    instrument_id=instrument_id,
-                    trade_type=side,
-                    quantity=quantity,
-                    price=price,
-                    account_id=account_id,
-                    idempotency_key=idempotency_key,
-                )
-            except Exception as exc:  # noqa: BLE001 — OI-3: UNKNOWN ≠ ERROR
-                return BrokerAdapterSubmitResult(
-                    venue="LIVE",
-                    adapter=BROKER_ADAPTER_XTB,
-                    fill_status="unknown",
-                    paper_order=None,
-                    paper_receipt=None,
-                    trade=None,
-                    status="unknown",
-                    reason=str(exc),
-                    transaction_id=None,
-                    venue_order_id=order.venue_order_id,
-                )
-            tx_id = open_transaction_id_from_trade(trade)
+            # V2.13 · Cierra el atajo síncrono old-XL2 (auditoría H4): un ``filled``
+            # del bridge ya NO empuja a ledger vía ``execute_trade`` por detrás de
+            # la máquina XL-3. Un XTB real es generado A-síncronamente (el bridge
+            # ``filled`` síncrono solo se ve en el mock/test); el depósito financiero
+            # de un LiveOrder debe pasar por la máquina XL-3 + query + apply
+            # financiero (PARKED). Hasta que exista, este *se queda UNKNOWN durable*
+            # (falta resolver el fill === función del query real, no del POST).
+            # Fail-closed: jamás se fabrica un ledger ni un ``executed`` aquí.
             return BrokerAdapterSubmitResult(
                 venue="LIVE",
                 adapter=BROKER_ADAPTER_XTB,
-                fill_status="executed",
+                fill_status="unknown",
                 paper_order=None,
                 paper_receipt=None,
-                trade=trade,
-                status="executed",
-                reason=None,
-                transaction_id=tx_id,
+                trade=None,
+                status="unknown",
+                reason="live_sync_fill_blocked_requires_reconcile",
+                transaction_id=None,
                 venue_order_id=order.venue_order_id,
             )
         return BrokerAdapterSubmitResult(

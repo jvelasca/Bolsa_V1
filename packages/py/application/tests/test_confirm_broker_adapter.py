@@ -208,7 +208,14 @@ async def test_confirm_xtb_submitted_then_unknown_advances_machine() -> None:
 
 
 @pytest.mark.asyncio
-async def test_confirm_xtb_filled_executes_with_transaction_id() -> None:
+async def test_confirm_xtb_sync_filled_is_blocked_no_ledger_shortcut() -> None:
+    """V2.13 (H4): un `filled` SÍNCRONO del bridge NO hace atajo a ledger (XL-2).
+
+    Antes este adapter depositaba a ledger vía ``execute_trade`` (slice XL-2
+    cerrado) por detrás de la máquina XL-3. Ahora el fill queda UNKNOWN durable
+    para resolverse por query/reconcile real (XTB asíncrono); jamás se fabrica
+    un ``executed``/ledger en el POST.
+    """
     adapter = XtbBrokerAdapter(
         client=_FakeXtb(
             XtbBridgeOrderResult(
@@ -217,7 +224,6 @@ async def test_confirm_xtb_filled_executes_with_transaction_id() -> None:
                 venue_order_id="xtb-fill-1",
             )
         ),
-        execute_trade=_OkExecute(),
         kill_switch_check=lambda: False,
         execution_unlocked_check=lambda: True,
     )
@@ -227,15 +233,19 @@ async def test_confirm_xtb_filled_executes_with_transaction_id() -> None:
         account_id="acc-1",
         execute=True,
     )
-    assert result["trade"]["status"] == "executed"
-    assert result["trade"]["transactionId"] == "tx-ok"
-    assert result["intent"]["status"] == "executed"
+    # No ledger/ejecución fabricada: el fill síncrono queda UNKNOWN (por reconciliar).
+    assert result["trade"]["status"] == "unknown"
+    assert result["trade"]["reason"] == "live_sync_fill_blocked_requires_reconcile"
+    assert result["intent"]["status"] == "unknown"
     assert result["brokerAdapter"]["venue"] == "LIVE"
     assert result["brokerAdapter"]["adapter"] == "xtb"
-    assert result["brokerAdapter"]["fillStatus"] == "executed"
+    assert result["brokerAdapter"]["fillStatus"] == "unknown"
+    assert result["brokerAdapter"]["fillStatus"] != "executed"
     assert "paperOrder" not in result
-    # XL-3 persist-only: executed = slice XL-2 (bridge filled→ledger), máquina cerrada.
-    assert "liveOrder" not in result
+    # La máquina (store de proceso) queda UNKNOWN durable, no un falso ejecutado.
+    live_order = result["liveOrder"]
+    assert live_order["status"] == "UNKNOWN"
+    assert live_order["venueOrderId"] == "xtb-fill-1"
 
 
 @pytest.mark.asyncio

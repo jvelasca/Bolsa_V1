@@ -229,17 +229,15 @@ class InMemoryLiveOrderStore:
         reason: str | None = None,
         by: str | None = None,
     ) -> LiveOrder | None:
-        """Persiste una cancelación (dominio → CANCELLED) si el grafo lo permite.
+        """Persiste una DECISIÓN local de cancelar (dominio → CANCEL_REQUESTED).
 
-        honest-boundary: este método NO consulta/interactúa con el broker real.
-        Solo persiste la decisión autorizada por el llamador; debe invocarse
-        únicamente cuando ya existe una prueba de cancelación broker-side o una
-        razón interna autoritativa equivalente. Un round-trip real de cancel es
-        PARKED (no hay contrato XTB cancel).
-
-        La durabilidad de quién/cuándo/por qué queda en ``get_cancel_meta``; un
-        CANCELLED sin ``broker_confirmed`` es una decisión local, NO un ack del
-        venue (PARKED: broker_cancel_confirmed_at nunca se setea hoy).
+        honest-boundary (intención vs resultado): este método NO consulta al
+        broker real. Solo registra la *intención autorizada* de cancelar: pasa la
+        máquina a ``CANCEL_REQUESTED`` (NO terminal, sigue in-flight) y guarda
+        quién/cuándo/por qué en las columnas ``cancel_requested_*``.
+        ``broker_cancel_confirmed_at`` queda NULL: NO se fabrica confirmación del
+        venue. Solo ``set_broker_cancel_confirmed`` (ack real) promueve a
+        ``CANCELLED`` (terminal). Un round-trip real de canc es PARKED.
         """
         key = (order_id or "").strip()
         if not key:
@@ -247,11 +245,11 @@ class InMemoryLiveOrderStore:
         current = await self.get(key)
         if current is None:
             return None
-        if not can_transition_live_order(current.status, "CANCELLED"):
-            # Terminal u orden no cancelable → no-op idempotente, jamás un falso éxito.
+        if not can_transition_live_order(current.status, "CANCEL_REQUESTED"):
+            # Terminal (o no cancelable) → no-op idempotente, jamás un falso éxito.
             return current
-        cancelled = transition_live_order(current, "CANCELLED")
-        await self.put(cancelled, account_id=current.account_id)
+        requested = transition_live_order(current, "CANCEL_REQUESTED")
+        await self.put(requested, account_id=current.account_id)
         self._cancel_docs[key] = CancelDocumentation(
             order_id=key,
             requested_by=by or "operator",
@@ -259,7 +257,7 @@ class InMemoryLiveOrderStore:
             requested_at=_utcnow(),
             broker_confirmed_at=None,
         )
-        return cancelled
+        return requested
 
     async def get_cancel_meta(self, order_id: str) -> CancelDocumentation | None:
         key = (order_id or "").strip()
@@ -273,16 +271,32 @@ class InMemoryLiveOrderStore:
         *,
         when: datetime | None = None,
     ) -> CancelDocumentation | None:
+        """Broker confirma el cancel → CANCEL_REQUESTED se promueve a CANCELLED.
+
+        Es el único sitio que materializa un ``CANCELLED`` *verdadero* (resultado
+        del venue). Sin confirmación el estado queda CANCEL_REQUESTED (decisión
+        local). No promueve si la orden no estaba en CANCEL_REQUESTED.
+        """
         key = (order_id or "").strip()
-        current = self._cancel_docs.get(key)
-        if current is None:
+        confirm_at = when if when is not None else _utcnow()
+        current_doc = self._cancel_docs.get(key)
+        # Sin una decisión local de cancel previa (cancel_order) no hay NADA que
+        # confirmar: devolvemos None y NO depositamos una confirmación fantasma
+        # del venue (honestidad H5: jamás fabricar un ack broker-side).
+        if current_doc is None:
             return None
+        current_order = await self.get(key)
+        # Promoción CANCEL_REQUESTED → CANCELLED si la máquina sigue esperando el
+        # ack; si ya era CANCELLED (confirmado por otra vía) es no-op idempotente.
+        if current_order is not None and current_order.status == "CANCEL_REQUESTED":
+            confirmed = transition_live_order(current_order, "CANCELLED")
+            await self.put(confirmed, account_id=current_order.account_id)
         updated = CancelDocumentation(
             order_id=key,
-            requested_by=current.requested_by,
-            reason=current.reason,
-            requested_at=current.requested_at,
-            broker_confirmed_at=when if when is not None else _utcnow(),
+            requested_by=current_doc.requested_by or "operator",
+            reason=current_doc.reason,
+            requested_at=current_doc.requested_at or confirm_at,
+            broker_confirmed_at=confirm_at,
         )
         self._cancel_docs[key] = updated
         return updated
@@ -415,16 +429,20 @@ def live_order_to_row_fields(
 
 
 def live_order_from_row(row: LiveOrderRow) -> LiveOrder:
-    """Mapea fila física a dominio LiveOrder (confiar en invariantes de BD)."""
+    """Mapea fila física a dominio LiveOrder (confiar en invariantes de BD).
+
+    Se pasan los Decimal del ``NUMERIC(18,6)`` tal cual (sin castear a float);
+    la coerción Decimal(6dp) del dominio queda intacta vía ``__post_init__``.
+    """
     return LiveOrder(
         order_id=row.order_id,
         status=row.status,  # type: ignore[arg-type]
         venue=row.venue,  # type: ignore[arg-type]
         instrument_id=row.instrument_id,
         side=row.side,  # type: ignore[arg-type]
-        quantity=float(row.quantity),
-        filled_quantity=float(row.filled_quantity),
-        remaining_quantity=float(row.remaining_quantity),
+        quantity=row.quantity,
+        filled_quantity=row.filled_quantity,
+        remaining_quantity=row.remaining_quantity,
         venue_order_id=row.venue_order_id,
         intent_id=row.intent_id,
         financial_apply_count=int(row.financial_apply_count),
@@ -617,13 +635,14 @@ class PostgresLiveOrderStore:
         reason: str | None = None,
         by: str | None = None,
     ) -> LiveOrder | None:
-        """Persiste una cancelación (dominio → CANCELLED) + docs si el grafo.
+        """Registra una DECISIÓN local de cancelar (dominio → CANCEL_REQUESTED).
 
-        honest-boundary: igual que en InMemory, NO consulta el broker real; solo
-        persiste la decisión autorizada. Un round-trip real de cancel es PARKED.
-        La cancelación queda como DECISIÓN LOCAL: las columnas
-        ``cancel_requested_by/reason/requested_at`` se rellenan y
-        ``broker_cancel_confirmed_at`` queda NULL (no se fabrica ack del broker).
+        honest-boundary (intención vs resultado): igual que en InMemory, NO
+        consulta el broker real. Pasa la máquina a ``CANCEL_REQUESTED`` (NO
+        terminal: la orden sigue in-flight hasta que el venue confirme) y rellena
+        ``cancel_requested_by/reason/requested_at``. ``broker_cancel_confirmed_at``
+        queda NULL (no se fabrica ack). ``set_broker_cancel_confirmed`` será quien
+        promueva a ``CANCELLED`` cuando llegue la confirmación del broker.
         """
         key = (order_id or "").strip()
         if not key:
@@ -631,13 +650,13 @@ class PostgresLiveOrderStore:
         current = await self.get(key)
         if current is None:
             return None
-        if not can_transition_live_order(current.status, "CANCELLED"):
+        if not can_transition_live_order(current.status, "CANCEL_REQUESTED"):
             return current
-        cancelled = transition_live_order(current, "CANCELLED")
+        requested = transition_live_order(current, "CANCEL_REQUESTED")
         now = _utcnow()
         account = current.account_id or "live"
         row_fields = live_order_to_row_fields(
-            cancelled,
+            requested,
             account_id=account,
             created_at=now,
             updated_at=now,
@@ -647,26 +666,24 @@ class PostgresLiveOrderStore:
             for col in LiveOrderRow.__table__.columns
         }
         update: dict[str, object] = {
-            "status": "CANCELLED",
-            "venue": cancelled.venue,
-            "instrument_id": cancelled.instrument_id,
-            "side": cancelled.side,
-            "quantity": cancelled.quantity,
-            "filled_quantity": cancelled.filled_quantity,
-            "remaining_quantity": cancelled.remaining_quantity,
-            "intent_id": cancelled.intent_id,
-            "financial_apply_count": cancelled.financial_apply_count,
+            "status": "CANCEL_REQUESTED",
+            "venue": requested.venue,
+            "instrument_id": requested.instrument_id,
+            "side": requested.side,
+            "quantity": requested.quantity,
+            "filled_quantity": requested.filled_quantity,
+            "remaining_quantity": requested.remaining_quantity,
+            "intent_id": requested.intent_id,
+            "financial_apply_count": requested.financial_apply_count,
             "account_id": account,
             "cancel_requested_by": by or "operator",
             "cancel_reason": reason,
             "cancel_requested_at": now,
-            # broker_cancel_confirmed_at queda sin tocar (NULL) — no fabricamos
-            # confirmación del venue. Se podría setear cuando el round-trip de
-            # canc confirme realmente (reservado, PARKED).
+            # broker_cancel_confirmed_at queda sin tocar (NULL): intención != ack.
             "updated_at": now,
         }
-        if cancelled.venue_order_id is not None:
-            update["venue_order_id"] = cancelled.venue_order_id
+        if requested.venue_order_id is not None:
+            update["venue_order_id"] = requested.venue_order_id
         stmt = (
             pg_insert(LiveOrderRow)
             .values(**values)
@@ -681,7 +698,7 @@ class PostgresLiveOrderStore:
         except IntegrityError:
             await self._session.rollback()
             raise
-        return cancelled
+        return requested
 
     async def get_cancel_meta(self, order_id: str) -> CancelDocumentation | None:
         key = (order_id or "").strip()
@@ -704,14 +721,29 @@ class PostgresLiveOrderStore:
         *,
         when: datetime | None = None,
     ) -> CancelDocumentation | None:
+        """Broker confirma el cancel → CANCEL_REQUESTED promueve a CANCELLED.
+
+        Es EL sitio que materializa un ``CANCELLED`` verdadero (resultado venue):
+        setea ``broker_cancel_confirmed_at`` y (si la orden seguía en
+        CANCEL_REQUESTED o tiene una decisión local previa ``cancel_requested_at``)
+        actualiza el estado a CANCELLED. Sin una cancelación previamente
+        solicitada devuelve None y NO estampa confirmación (honestidad H5:
+        nunca fabricar un ack broker-side).
+        """
         key = (order_id or "").strip()
         if not key:
             return None
         row = await self._load_row(key)
         if row is None:
             return None
+        # Guard contra confirmación fantasma: solo hay algo que confirmar si hubo
+        # decisión local (cancel_order → CANCEL_REQUESTED + cancel_requested_at).
+        if row.cancel_requested_at is None and row.status != "CANCEL_REQUESTED":
+            return None
         confirmed_at = when if when is not None else _utcnow()
         row.broker_cancel_confirmed_at = confirmed_at
+        if row.status == "CANCEL_REQUESTED":
+            row.status = "CANCELLED"
         row.updated_at = _utcnow()
         await self._session.commit()
         return CancelDocumentation(

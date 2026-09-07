@@ -267,7 +267,8 @@ async def test_fill_pending_xtb_submitted_keeps_order() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fill_pending_xtb_filled_executes_and_deletes() -> None:
+async def test_fill_pending_xtb_filled_is_blocked_keeps_order() -> None:
+    """H4 · El `filled` síncrono NO auto-ledger ni borra el pending (queda UNKNOWN)."""
     from bolsa_application.broker_adapter import XtbBrokerAdapter
     from bolsa_market.providers import XtbBridgeOrderResult
 
@@ -295,11 +296,13 @@ async def test_fill_pending_xtb_filled_executes_and_deletes() -> None:
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
-    assert result["status"] == "executed"
-    assert result["transactionId"] == "tx-po"
+    # Sin atajo a ledger: la orden pendiente NO se auto-cierra/liquida; queda para
+    # resolver el fill vía query/reconcile real (nada se deposita ni se borra).
+    assert result["status"] == "unknown"
+    assert result["reason"] == "live_sync_fill_blocked_requires_reconcile"
     assert result["brokerAdapter"]["venue"] == "LIVE"
     assert result["brokerAdapter"]["adapter"] == "xtb"
-    assert result["brokerAdapter"]["fillStatus"] == "executed"
-    assert len(fake_trade.calls) == 1
-    assert repo.deleted == ["po-1"]
+    assert result["brokerAdapter"]["fillStatus"] == "unknown"
+    assert len(fake_trade.calls) == 0
+    assert repo.deleted == []
     assert "paperOrder" not in result

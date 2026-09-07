@@ -243,7 +243,13 @@ async def test_xtb_submitted_is_not_executed_fill() -> None:
 
 
 @pytest.mark.asyncio
-async def test_xtb_filled_executes_ledger() -> None:
+async def test_xtb_filled_is_blocked_no_ledger_shortcut() -> None:
+    """H4 · El atajo síncrono old-XL2 (filled→execute_trade→ledger) queda cerrado.
+
+    Un `filled` síncrono del bridge (solo visible en el mock; XTB real es
+    asíncrono) ya NO deposita a ledger por detrás de la máquina XL-3. Queda
+    UNKNOWN durable para resolverse por query/reconcile (que será el XTB real).
+    """
     spy = _SpyExecute()
     fake = _FakeXtb(
         XtbBridgeOrderResult(
@@ -261,26 +267,19 @@ async def test_xtb_filled_executes_ledger() -> None:
         account_id="acc-1",
         idempotency_key="idem-xtb-fill",
     )
-    assert spy.calls == 1
-    assert spy.kwargs == {
-        "instrument_id": "inst-1",
-        "trade_type": "buy",
-        "quantity": 4.0,
-        "price": 40.0,
-        "account_id": "acc-1",
-        "idempotency_key": "idem-xtb-fill",
-    }
-    assert result.status == "executed"
-    assert result.fill_status == "executed"
-    assert result.transaction_id == "tx-spy"
-    assert result.trade is not None
+    assert spy.calls == 0  # NUNCA se aplica ledger desde el POST
+    assert result.status == "unknown"
+    assert result.fill_status == "unknown"
+    assert result.reason == "live_sync_fill_blocked_requires_reconcile"
+    assert result.transaction_id is None
+    assert result.trade is None
     assert result.venue_order_id == "xtb-fill-1"
     assert result.paper_order is None
-    assert result.receipt().fill_status == "executed"
+    assert result.receipt().fill_status != "executed"
 
 
 @pytest.mark.asyncio
-async def test_xtb_filled_without_execute_is_unknown() -> None:
+async def test_xtb_filled_without_execute_is_blocked_unknown() -> None:
     fake = _FakeXtb(
         XtbBridgeOrderResult(
             status="filled",
@@ -299,7 +298,7 @@ async def test_xtb_filled_without_execute_is_unknown() -> None:
     )
     assert result.status == "unknown"
     assert result.fill_status == "unknown"
-    assert result.reason == "xtb_execute_not_wired"
+    assert result.reason == "live_sync_fill_blocked_requires_reconcile"
     assert result.trade is None
     assert result.transaction_id is None
     assert result.venue_order_id == "xtb-fill-2"
