@@ -1,26 +1,26 @@
 # RELEVO — tag v2.12-beta → XL-3 durable core (2026-09-07)
 
 > **Padre:** [relevo XL-3 durable core](./traspaso-relevo-xl3-durable-core-2026-09-07.md) · [roadmap LIVE Execution](./roadmap-live-execution-core-2026-09-07.md) · [honesty bridge XTB](./honesty-pack-xtb-bridge-external-2026-09-07.md).  
-> **Estado:** tip `v2.12-beta` → commit de release formal (package `1.41.0-beta`). Partida tip previo: `v2.11-beta` → `80e891c4` / `1.40.0-beta` (**inmutable**).
+> **Estado:** tip `v2.12-beta` → [`6f8c747b`](https://github.com/jvelasca/Bolsa_V1/commit/6f8c747b) · package `1.41.0-beta`. Partida tip previo: `v2.11-beta` → `80e891c4` / `1.40.0-beta` (**inmutable**).
 
 ## Cinco verdades
 
 | Verdad          | Valor                                                                                       |
 | --------------- | ------------------------------------------------------------------------------------------- |
 | Product         | `V2.12` — XL-3 durable core (`live_orders` PG + UNKNOWN recovery)                           |
-| Git tag         | `v2.12-beta` → commit de release formal de la V2.12                                         |
+| Git tag         | `v2.12-beta` → [`6f8c747b`](https://github.com/jvelasca/Bolsa_V1/commit/6f8c747b)           |
 | Package         | `1.41.0-beta` (**bump** desde `1.40.0-beta`)                                                |
 | Tip previo      | `v2.11-beta` → `80e891c4` · **no retaguear**                                                |
 | Motor / capital | **sin** thaw venue · **sin** LIVE capital · execute **off** · cancel broker real **PARKED** |
 
 ## Release
 
-| Pieza   | Valor                                                                        |
-| ------- | ---------------------------------------------------------------------------- |
-| Tag tip | `v2.12-beta`                                                                 |
-| Package | `1.41.0-beta`                                                                |
-| CI tip  | Release-tag CI según run sobre este tag (stamp tras `conclusion`)            |
-| Pack    | [relevo XL-3 durable core](./traspaso-relevo-xl3-durable-core-2026-09-07.md) |
+| Pieza   | Valor                                                                             |
+| ------- | --------------------------------------------------------------------------------- |
+| Tag tip | `v2.12-beta` → [`6f8c747b`](https://github.com/jvelasca/Bolsa_V1/commit/6f8c747b) |
+| Package | `1.41.0-beta`                                                                     |
+| CI tip  | Release-tag CI según run sobre este tag (stamp tras `conclusion`)                 |
+| Pack    | [relevo XL-3 durable core](./traspaso-relevo-xl3-durable-core-2026-09-07.md)      |
 
 ## Hecho
 
