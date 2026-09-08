@@ -2,13 +2,21 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — post V2.14 Financial Execution Core
+## [1.43.1-beta] — 2026-09-08
 
-Post-release (no tip bump de package). **≠** Accept LIVE · **≠** thaw · **≠** settlement · éxodo LIVE no certificado.
+V2.14.1 **hotfix elevation** (`provenance self-reported + contract G12/G13` · `A1 account-isolation` · `schema 023 reconcile`) a `main`. Producto **BETA / no producción**. Tip vigente **`main` → [`da181b76`](https://github.com/jvelasca/Bolsa_V1/commit/da181b76)** (cierre auditoría V2.14 · +hotfixes 2026-09-08). Package **`1.43.1-beta`** (**bump** desde `1.43.0-beta`). **≠** Accept LIVE · **≠** thaw · **≠** settlement · éxodo LIVE no certificado.
 
 ### Hotfix interno — reconciliación upsert OHLCV → schema `023_ohlcv_bars_unique_reconcile` (2026-09-08)
 
 - **Schema-drift (auditoría interna V2.14):** `ohlcv_repository.upsert_bars` (`ON CONFLICT (instrument_id,timeframe,timestamp)`, cd451fea) exigía un índice único que las migraciones Alembic no creaban (solo PK id) → todo el sync de mercado abortaba (500, `InvalidColumnReference`), la BD quedaba sin barras y la UI mostraba listas vacías e "histórico no disponible". Añadida migración **`023_ohlcv_bars_unique_reconcile`** (+índice único declarado en `OhlcvBarRow`) y repoblado el histórico (44.7k barras 1d, 2021→hoy, para los 35 activos IBEX; freshness `current`). Guards tests real-PG/provenance actualizados a head `023`.
+
+### Hotfix interno — provenance self-reported + contract gate G12/G13 (2026-09-08)
+
+- `GET /api/health → provenance` (PRODUCT/PACKAGE/GIT_SHA/DB_SCHEMA/API_CONTRACT desde fuentes únicas, sin DB) · `bolsa_api.provenance` · `contract-check.ts` **G12** `OperationalIncidentV1` + **G13** `SubmitIntentListItemV1` · openapi.json/schema.d.ts regenerados y sincronizados.
+
+### Hotfix interno — A1 account-isolation en rutas de EJECUCIÓN (2026-09-08)
+
+- `require_account_access` en `POST /ai/intents/confirm`, `/position-policies/evaluate-exits`, `/position-automation/execute-auto`, `/paper-desk/cycle`. Rutas de LECTURA/estudio quedan sin gate (deuda residual A1, explotable solo con ≥2º owner real).
 
 ## [1.43.0-beta] — 2026-09-08
 
