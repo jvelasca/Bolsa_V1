@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   mkdirSync,
   readdirSync,
@@ -7,11 +7,17 @@ import {
   rmSync,
   statSync,
   writeFileSync,
-} from 'node:fs';
-import { basename, join } from 'node:path';
-import { findDockerExe } from './docker.mjs';
-import { logError, logInfo, ROOT } from './logger.mjs';
-import { loadEnvFile } from './load-env.mjs';
+} from "node:fs";
+import { basename, join } from "node:path";
+import {
+  clientEnv,
+  findDockerExe,
+  pgDumpBase,
+  psqlBase,
+  useTcpTransport,
+} from "./docker.mjs";
+import { logError, logInfo, ROOT } from "./logger.mjs";
+import { loadEnvFile } from "./load-env.mjs";
 
 /**
  * Copias de seguridad locales de la BD `bolsa_v1` (PREVENCIÓN V2.15).
@@ -27,15 +33,15 @@ import { loadEnvFile } from './load-env.mjs';
  * contra una BD productiva compartida.
  */
 
-export const BACKUP_DIR = join(ROOT, 'db-backups');
+export const BACKUP_DIR = join(ROOT, "db-backups");
 
-const CONTAINER_DEFAULT = 'bolsa-postgres';
-const PG_USER_DEFAULT = 'bolsa';
-const PG_DB_DEFAULT = 'bolsa_v1';
+const CONTAINER_DEFAULT = "bolsa-postgres";
+const PG_USER_DEFAULT = "bolsa";
+const PG_DB_DEFAULT = "bolsa_v1";
 
 /** Sello local `YYYYMMDD-HHMMSS-mmm` (huso de la máquina, no UTC). */
 export function buildFileStamp(date = new Date()) {
-  const pad = (n, w = 2) => String(n).padStart(w, '0');
+  const pad = (n, w = 2) => String(n).padStart(w, "0");
   return (
     `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
     `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}` +
@@ -55,29 +61,32 @@ export function ensureBackupHostDir(dir = BACKUP_DIR) {
 
 /** Sha256 en hex de un buffer (sidecar checksum / manifest). */
 export function sha256Hex(buffer) {
-  return createHash('sha256').update(buffer).digest('hex');
+  return createHash("sha256").update(buffer).digest("hex");
 }
 
 /** Revisión Alembic actual (best-effort) leyendo `alembic_version` en la BD. */
-function readDbSchema(docker, db) {
+function readDbSchema(db) {
   try {
+    const base = psqlBase({
+      db,
+      container: CONTAINER_DEFAULT,
+      user: PG_USER_DEFAULT,
+    });
     const q = spawnSync(
-      docker,
+      base.bin,
       [
-        'exec',
-        CONTAINER_DEFAULT,
-        'psql',
-        '-U',
-        PG_USER_DEFAULT,
-        '-d',
-        db,
-        '-Atc',
-        'SELECT version_num FROM alembic_version LIMIT 1;',
+        ...base.argv,
+        "-Atc",
+        "SELECT version_num FROM alembic_version LIMIT 1;",
       ],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: clientEnv(base),
+      },
     );
     if (q.status !== 0) return null;
-    const rev = (q.stdout ?? '').toString().trim();
+    const rev = (q.stdout ?? "").toString().trim();
     return rev || null;
   } catch {
     return null;
@@ -92,8 +101,8 @@ export function backupSidecarPath(backupFile) {
 /** Devuelve el expect checksum del sidecar, o null si no hay sidecar. */
 export function readSidecarSha256(backupFile) {
   try {
-    const raw = readFileSync(backupSidecarPath(backupFile), 'utf8').trim();
-    const first = raw.split(/\s+/)[0] ?? '';
+    const raw = readFileSync(backupSidecarPath(backupFile), "utf8").trim();
+    const first = raw.split(/\s+/)[0] ?? "";
     return /^[0-9a-f]{64}$/i.test(first) ? first.toLowerCase() : null;
   } catch {
     return null;
@@ -108,20 +117,22 @@ export function readSidecarSha256(backupFile) {
  */
 export function verifyChecksumSidecar(backupFile) {
   const expected = readSidecarSha256(backupFile);
-  if (!expected) return { ok: true, code: 'NO_SIDECAR' };
+  if (!expected) return { ok: true, code: "NO_SIDECAR" };
   const actual = sha256Hex(readFileSync(backupFile));
-  return actual === expected ? { ok: true, code: 'OK' } : { ok: false, code: 'MISMATCH' };
+  return actual === expected
+    ? { ok: true, code: "OK" }
+    : { ok: false, code: "MISMATCH" };
 }
 
 /** Ruta del manifest de backups (historial de artefactos + checksum). */
 function manifestPath(dir) {
-  return join(dir, 'backups-manifest.json');
+  return join(dir, "backups-manifest.json");
 }
 
 /** Lee el manifest JSON (array de entradas) o [] si no existe/corrupto. */
 function readManifest(dir) {
   try {
-    const parsed = JSON.parse(readFileSync(manifestPath(dir), 'utf8'));
+    const parsed = JSON.parse(readFileSync(manifestPath(dir), "utf8"));
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -156,88 +167,103 @@ export function reconcileManifest({ dir = BACKUP_DIR } = {}) {
       schema: known.schema ?? null,
     };
   });
-  const merged = readManifest(dir).filter((e) => seen.has(e.file)).concat(next);
-  const dedup = [...new Map(merged.map((e) => [e.file, e])).values()].sort((a, b) =>
-    a.file < b.file ? -1 : 1
+  const merged = readManifest(dir)
+    .filter((e) => seen.has(e.file))
+    .concat(next);
+  const dedup = [...new Map(merged.map((e) => [e.file, e])).values()].sort(
+    (a, b) => (a.file < b.file ? -1 : 1),
   );
-  writeFileSync(manifestPath(dir), `${JSON.stringify(dedup, null, 2)}\n`, 'utf8');
+  writeFileSync(
+    manifestPath(dir),
+    `${JSON.stringify(dedup, null, 2)}\n`,
+    "utf8",
+  );
   return dedup;
 }
 
 /** ¿Existe un binario `gzip` utilizable? (portable; en Windows suele faltar). */
 function hasGzip() {
-  const probe = spawnSync('gzip', ['--version'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
+  const probe = spawnSync("gzip", ["--version"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
   });
   return probe.status === 0;
 }
 
 /**
- * Ejecuta `docker exec` de un volcado de PostgreSQL a fichero local.
+ * Ejecuta un volcado de PostgreSQL a fichero local (docker exec por defecto o
+ * pg_dump local por TCP si BOLSA_DR_TCP=1; la referencia se deja al transporte).
  *
  * Tras el volcado escribe el backup con ``O_EXCL`` (nunca sobrescribe), un sidecar
  * ``<file>.sha256`` y actualiza `backups-manifest.json` con checksum/bytes/fecha y
  * el esquema Alembic actual (V2.15-09/-10/-11).
  *
  * @param {object} opts
- * @param {string} [opts.docker] binario docker (auto if omitido)
+ * @param {string} [opts.docker] binario docker (solo dev; auto if omitido)
  * @param {string} [opts.db] base de datos a volcar (bolsa_v1)
  * @param {boolean} [opts.gzip] comprimir si hay `gzip` disponible
  * @param {string} [opts.dir] carpeta destino (BACKUP_DIR)
  * @returns {{file:string, bytes:number, gzipped:boolean, sha256:string, schema:string|null}}
  */
 export function pgDumpToFile(opts = {}) {
-  const docker = opts.docker ?? findDockerExe();
   const db = opts.db ?? PG_DB_DEFAULT;
   const wantGzip = opts.gzip !== false;
   const dir = ensureBackupHostDir(opts.dir ?? BACKUP_DIR);
-  if (!docker) {
-    throw new Error('Docker CLI no disponible — no se puede volcar la BD');
+  // Transporte: docker exec (dev, default) o pg_dump local por TCP (CI, BOLSA_DR_TCP).
+  const dump = pgDumpBase({
+    db,
+    container: CONTAINER_DEFAULT,
+    user: PG_USER_DEFAULT,
+  });
+  if (!useTcpTransport() && !findDockerExe()) {
+    throw new Error("Docker CLI no disponible — no se puede volcar la BD");
   }
 
   const gzip = wantGzip && hasGzip();
   const stamp = buildFileStamp();
-  const fileName = `bolsa_v1-${stamp}.sql${gzip ? '.gz' : ''}`;
+  const fileName = `bolsa_v1-${stamp}.sql${gzip ? ".gz" : ""}`;
   const outPath = join(dir, fileName);
 
-  logInfo('backup', `Vaciando ${db} → ${outPath}`);
+  logInfo("backup", `Vaciando ${db} → ${outPath}`);
 
   // Capturamos stdout cruda a buffer y la escribimos aparte (evita que la consola
   // de Windows (PowerShell) reinterprete bytes / añada CRLF al volcado).
-  const result = spawnSync(
-    docker,
-    ['exec', CONTAINER_DEFAULT, 'pg_dump', '-U', PG_USER_DEFAULT, '-d', db],
-    {
-      encoding: 'buffer',
-      maxBuffer: 1024 * 1024 * 512, // hasta ~512 MB de volcado razonable
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
-  const stderr = (result.stderr ?? Buffer.alloc(0)).toString('utf8');
+  const result = spawnSync(dump.bin, dump.argv, {
+    encoding: "buffer",
+    maxBuffer: 1024 * 1024 * 512, // hasta ~512 MB de volcado razonable
+    stdio: ["ignore", "pipe", "pipe"],
+    env: clientEnv(dump),
+  });
+  const stderr = (result.stderr ?? Buffer.alloc(0)).toString("utf8");
   if (result.status !== 0) {
     throw new Error(
-      `pg_dump falló (código ${result.status ?? result.error?.code ?? 1}): ${stderr.trim() || 'sin detalle'}`,
+      `pg_dump falló (código ${result.status ?? result.error?.code ?? 1}): ${stderr.trim() || "sin detalle"}`,
     );
   }
 
-  let payload = Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout ?? '');
+  let payload = Buffer.isBuffer(result.stdout)
+    ? result.stdout
+    : Buffer.from(result.stdout ?? "");
   if (gzip) {
-    const gz = spawnSync('gzip', ['-c'], {
+    const gz = spawnSync("gzip", ["-c"], {
       input: payload,
-      encoding: 'buffer',
+      encoding: "buffer",
       maxBuffer: 1024 * 1024 * 512,
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ["pipe", "pipe", "pipe"],
     });
     if (gz.status !== 0) {
-      throw new Error(`gzip falló: ${(gz.stderr ?? '').toString('utf8').trim()}`);
+      throw new Error(
+        `gzip falló: ${(gz.stderr ?? "").toString("utf8").trim()}`,
+      );
     }
-    payload = Buffer.isBuffer(gz.stdout) ? gz.stdout : Buffer.from(gz.stdout ?? '');
+    payload = Buffer.isBuffer(gz.stdout)
+      ? gz.stdout
+      : Buffer.from(gz.stdout ?? "");
   }
 
   const sha = sha256Hex(payload);
   try {
-    writeFileSync(outPath, payload, { flag: 'wx' });
+    writeFileSync(outPath, payload, { flag: "wx" });
   } catch (error) {
     // 'wx' → O_EXCL: nunca sobrescribir un backup ya existente (V2.15-10).
     throw new Error(
@@ -246,10 +272,10 @@ export function pgDumpToFile(opts = {}) {
   }
 
   // Sidecar checksum `<file>.sha256` (V2.15-11).
-  writeFileSync(`${outPath}.sha256`, `${sha}  ${fileName}\n`, 'utf8');
+  writeFileSync(`${outPath}.sha256`, `${sha}  ${fileName}\n`, "utf8");
 
   // Manifest con checksum/bytes/fecha/esquema actual best-effort (V2.15-09).
-  const schema = readDbSchema(docker, db);
+  const schema = readDbSchema(db);
   const manifest = readManifest(dir);
   manifest.push({
     file: fileName,
@@ -258,9 +284,19 @@ export function pgDumpToFile(opts = {}) {
     created_at: new Date().toISOString(),
     schema,
   });
-  writeFileSync(manifestPath(dir), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+  writeFileSync(
+    manifestPath(dir),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
 
-  return { file: outPath, bytes: payload.length, gzipped: gzip, sha256: sha, schema };
+  return {
+    file: outPath,
+    bytes: payload.length,
+    gzipped: gzip,
+    sha256: sha,
+    schema,
+  };
 }
 
 /** Lista los backups de la carpeta (solo artefactos `.sql`/`.sql.gz`), por mtime desc. */
@@ -277,7 +313,13 @@ export function listBackups({ dir = BACKUP_DIR } = {}) {
     .map((e) => {
       const full = join(dir, e.name);
       const st = statSync(full);
-      return { name: e.name, full, bytes: st.size, mtimeMs: st.mtimeMs, mtime: st.mtime };
+      return {
+        name: e.name,
+        full,
+        bytes: st.size,
+        mtimeMs: st.mtimeMs,
+        mtime: st.mtime,
+      };
     })
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
@@ -306,7 +348,7 @@ export function retentionPrune(keep, { dir = BACKUP_DIR } = {}) {
       }
       removed += 1;
     } catch {
-      logError('backup', `No se pudo podar ${entry.name} (en uso?)`);
+      logError("backup", `No se pudo podar ${entry.name} (en uso?)`);
     }
   }
   try {
@@ -329,13 +371,16 @@ export function resolveKeep(opts = {}) {
   const minKeep = opts.minKeep ?? 1;
   loadEnvFile();
   const envVal = opts.envKeep ?? process.env.DB_BACKUP_KEEP;
-  const raw = (envVal ?? '').toString().trim();
+  const raw = (envVal ?? "").toString().trim();
   const parsed = Number.parseInt(raw, 10);
   if (!raw || !Number.isFinite(parsed)) {
     return opts.defaultKeep ?? 14;
   }
   if (parsed < minKeep) {
-    logError('backup', `DB_BACKUP_KEEP=${raw} < mínimo ${minKeep}; usando mínimo seguro`);
+    logError(
+      "backup",
+      `DB_BACKUP_KEEP=${raw} < mínimo ${minKeep}; usando mínimo seguro`,
+    );
     return minKeep;
   }
   return parsed;
@@ -345,7 +390,9 @@ export function resolveKeep(opts = {}) {
 export function requireBackupFile(file) {
   const st = statSync(file);
   if (!st.isFile() || st.size === 0) {
-    throw new Error(`El fichero ${file} no es un backup válido (vacío/inexistente)`);
+    throw new Error(
+      `El fichero ${file} no es un backup válido (vacío/inexistente)`,
+    );
   }
   return file;
 }

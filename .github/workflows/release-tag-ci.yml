@@ -359,7 +359,7 @@ jobs:
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
-      - name: Pytest lifecycle PG + auth + golden V1.88–V1.91/V1.95/V1.96 + worker V1.92/V1.93/V1.97 + integrity V1.94 (fail if skipped)
+      - name: Pytest lifecycle PG + auth + golden V1.88–V1.91/V1.95/V1.96 + worker V1.92/V1.93/V1.97 + integrity V1.94 + health schema-aware V2.15 (fail if skipped)
         run: >
           uv run pytest
           packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
@@ -371,13 +371,93 @@ jobs:
           apps/api-python/tests/test_lifecycle_golden_v196.py
           apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           apps/api-python/tests/test_financial_integrity_pg.py
+          apps/api-python/tests/test_health.py
           -q
           --tb=short
+
+  dr-verify:
+    # DR honesta en el CI del tag (hallazgo C2-12 P2 / C2-13): `pnpm db:dr:test`
+    # (batería de Disaster Recovery: dump + checksum + restore a scratch + Alembic
+    # heading + integridad financiera C2-02) debía correr en release-tag y NO
+    # lo hacía; además dependía de `docker exec bolsa-postgres`, contenedor que el
+    # CI no tiene.
+    # Este job expone PostgreSQL como `services: postgres` (igual que
+    # lifecycle-pg / playwright-integrated) alcanzable por red en 127.0.0.1:5432,
+    # instala el cliente postgresql-client (psql/pg_dump) porque los runners
+    # ubuntu-latest NO llevan `psql` preinstalado, hace `alembic upgrade head`
+    # sobre bolsa_v1 y ejecuta la batería en modo TCP por red
+    # (BOLSA_DR_TCP=1) contra el service. El usuario bolsa del contenedor de
+    # servicio es role superuser del image oficial → puede DROP/CREATE la BD
+    # scratch `bolsa_v1_dr_test` en el mismo server (no requiere superuser extra).
+    name: dr-verify (battery DB_DR / TCP CI)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bolsa
+          POSTGRES_PASSWORD: bolsa_dev
+          POSTGRES_DB: bolsa_v1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolsa -d bolsa_v1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: bolsa
+      DB_PASSWORD: bolsa_dev
+      DB_NAME: bolsa_v1
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: bolsa
+      PGPASSWORD: bolsa_dev
+      BOLSA_DR_TCP: '1'
+      DR_TARGET_DB: bolsa_v1_dr_test
+      ENVIRONMENT: testing
+      # resolvePython() (lib/python.mjs) respeta PYTHON: db-restore lanza Alembic
+      # contra la scratch con el python del venv de `uv sync` (deps instaladas).
+      PYTHON: ${{ github.workspace }}/.venv/bin/python
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Los runners ubuntu-latest NO traen psql/pg_dump; los necesitamos en modo
+      # TCP (clientes de host). Instalamos el cliente oficial PostgreSQL.
+      - name: Install PostgreSQL client (psql/pg_dump)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Alembic upgrade head (main `bolsa_v1` → head)
+        run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      # Batería DR end-to-end (C2-12/C2-13 + C2-02), ahora por TCP contra el
+      # service. La scratch `bolsa_v1_dr_test` se crea/hace drop en el mismo
+      # service PostgreSQL (rol bolsa = superuser del contenedor oficial).
+      # Un rojo aquí debe romper el tag: no usamos `--ignore`; si `node` sale != 0
+      # el step falla y la cert (needs: dr-verify) pinta el release no-GREEN.
+      - name: Disaster Recovery battery (db:dr:test · TCP)
+        run: node scripts/db-dr-verify.mjs
 
   certify:
     name: certify (aggregate + artifact)
     runs-on: ubuntu-latest
-    needs: [security, shared, spine, frontend, python, playwright-mock, lifecycle-pg]
+    needs: [security, shared, spine, frontend, python, playwright-mock, lifecycle-pg, dr-verify]
     if: always()
     steps:
       - name: Fail if any required job failed
@@ -388,7 +468,8 @@ jobs:
           needs.frontend.result != 'success' ||
           needs.python.result != 'success' ||
           needs.playwright-mock.result != 'success' ||
-          needs.lifecycle-pg.result != 'success'
+          needs.lifecycle-pg.result != 'success' ||
+          needs.dr-verify.result != 'success'
         run: |
           echo "Release tag CI not GREEN"
           echo "security=${{ needs.security.result }}"
@@ -398,6 +479,7 @@ jobs:
           echo "python=${{ needs.python.result }}"
           echo "playwright-mock=${{ needs.playwright-mock.result }}"
           echo "lifecycle-pg=${{ needs.lifecycle-pg.result }}"
+          echo "dr-verify=${{ needs.dr-verify.result }}"
           exit 1
 
       - name: Write summary artifact
@@ -410,6 +492,7 @@ jobs:
           JOB_PYTHON: ${{ needs.python.result }}
           JOB_PLAYWRIGHT_MOCK: ${{ needs.playwright-mock.result }}
           JOB_LIFECYCLE_PG: ${{ needs.lifecycle-pg.result }}
+          JOB_DR_VERIFY: ${{ needs.dr-verify.result }}
         run: |
           mkdir -p artifacts
           python3 - <<'PY'
@@ -430,6 +513,7 @@ jobs:
                   "python": os.environ["JOB_PYTHON"],
                   "playwright-mock": os.environ["JOB_PLAYWRIGHT_MOCK"],
                   "lifecycle-pg": os.environ["JOB_LIFECYCLE_PG"],
+                  "dr-verify": os.environ["JOB_DR_VERIFY"],
               },
           }
           path = "artifacts/release-tag-ci-summary.json"
