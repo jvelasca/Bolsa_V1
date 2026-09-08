@@ -263,7 +263,96 @@ async def _drain_once(
             limit=limit,
             incident_holder=holder,
         )
+        # P1-02/E2 — reconcile de POSICIÓN continuo (LR-1) bajo el MISMO go.
+        # Fallos aquí no tumban el tick (fail-closed: siguiente tick reintenta).
+        try:
+            await _reconcile_live_positions_once(session)
+        except Exception:  # noqa: BLE001 — defensivo, nunca aborta el ciclo
+            logger.exception("live_position reconcile tick failed")
     return result
+
+
+async def _live_position_reconcile_active() -> bool:
+    """Gate P1-02: go del writer durable Y venue efectivo live.
+
+    Sin go o venue no-live → False (sin cambio de runtime por defecto). Venue
+    efectivo via ``effective_broker_venue_async`` (runtime ?? redis ?? env).
+    """
+    from bolsa_application.broker_venue_runtime import effective_broker_venue_async
+    from bolsa_application.order_live_drift_incident import (
+        live_drift_durable_writer_enabled,
+    )
+
+    if not live_drift_durable_writer_enabled():
+        return False
+    return await effective_broker_venue_async() == "live"
+
+
+async def _reconcile_live_positions_once(session: AsyncSession) -> None:
+    """Una pasada de reconcile de posición: LR-1 vs broker-truth (venue live).
+
+    Solo se ejecuta bajo el go del writer durable (default OFF) y venue efectivo
+    live. Compara posiciones/cash locales (``GetPortfolioSummary``) con las del
+    bridge live y abre incidentes durables ``live_drift``/``live_unavailable`` por
+    cuenta vía ``sync_opening_incidents`` (no auto-heal). Fallos → no rompen tick.
+    """
+    if not await _live_position_reconcile_active():
+        return
+    from bolsa_application.accounts.portfolio import GetPortfolioSummary
+    from bolsa_application.operational_incident_store import (
+        PostgresOperationalIncidentStore,
+    )
+    from bolsa_application.reconcile_live_ledger import ReconcileLiveLedger
+    from bolsa_application.reconcile_live_positions import (
+        SyncOpeningIncidentsOpener,
+        reconcile_and_open_position_incidents,
+    )
+    from bolsa_application.reconciliation_opening_gate import (
+        HoldingsFromSummary,
+        PortfolioCashFromSummary,
+        ReconcileLiveLedgerLookup,
+        XtbBridgeLiveVenueAdapter,
+    )
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    # Cuentas activas y repos del resumen local (misma sesión del tick).
+    account_repo = SqlAlchemyAccountRepository(session)
+    accounts = await account_repo.list_active_accounts()
+    ids = [account.id for account in accounts]
+
+    summary = GetPortfolioSummary(
+        account_repo,
+        SqlAlchemyPortfolioRepository(session),
+    )
+
+    from bolsa_infrastructure.config import get_settings
+
+    live = None
+    url = (get_settings().xtb_bridge_url or "").strip()
+    if url:
+        from bolsa_market.providers import XtbBridgeClient
+
+        live = XtbBridgeLiveVenueAdapter(XtbBridgeClient(url))
+    uc = ReconcileLiveLedger(
+        cash=PortfolioCashFromSummary(summary),
+        holdings=HoldingsFromSummary(summary),
+        live=live,
+    )
+    lookup = ReconcileLiveLedgerLookup(uc)
+
+    incident_store = PostgresOperationalIncidentStore(session)
+    opener = SyncOpeningIncidentsOpener(incident_store)
+    result = await reconcile_and_open_position_incidents(
+        ids,
+        live_recon=lookup,
+        opener=opener,
+    )
+    logger.info("live_position reconcile (LR-1) %s", result.summary())
 
 
 async def _drift_incident_holder(

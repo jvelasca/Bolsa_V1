@@ -50,14 +50,22 @@ persistía. Este trozo convierte el drift **accionable** en incidente durable
 
 ## Remanente honesto (E2 NO cerrado)
 
-1. **P1-02 — reconcile POSICIÓN continuo**: detector LR-1 (`ReconcileLiveLedger`)
-   existe pero **solo corre en el path HTTP de apertura**; falta cablearlo al tick
-   de fondo bajo go (borrador `reconcile_live_positions.py`, sin commitear) para
-   que un drift de posición (p.ej. AAPL 120 broker vs 100 local) sea visible sin
-   operar y deje el venue live DENY (OR-4). Scope venue live.
+1. **P1-02 — reconcile POSICIÓN continuo en TICK (NUEVO commit)**: a diferencia del
+   corte P2-01, este traspaso lo **entrega a nivel lógica+gate**. El detector LR-1
+   ya existía pero solo corría en el path HTTP de apertura; se ha añadido que el
+   recovery worker lo ejecute cada tick bajo el MISMO go
+   (`LIVE_LIVE_DRIFT_DURABLE_WRITER_ENABLED`) y venue efectivo `live`. Legibilidad:
+   `packages/py/application/src/bolsa_application/reconcile_live_positions.py`
+   (`reconcile_and_open_position_incidents` + `SyncOpeningIncidentsOpener`) con
+   tests (`test_reconcile_live_positions.py`, 5), y wiring en
+   `live_order_recovery_worker._reconcile_live_positions_once` + gate
+   `_live_position_reconcile_active` (+2 tests). **Verificado a nivel lógica/gate/
+   imports (ruff + pytest); el path DB real (PG) NO se ha ejecutado (C1 exige su
+   propio go la batería sobre PostgreSQL real)**.
 2. **Test PG 2-sesión dedup OPEN determinista real** sobre PostgreSQL en C1 (el
-   corte presente se probó en stub de sesión; C1 requiere el PG real con su go).
-3. **C1**: aplicar migración 022 al PG compartido + batería multi-worker + Release-tag
-   CI (solo con go del operador y observando `conclusion=success`).
+   presente se probó en stub de sesión; C1 requiere PG real con su go).
+3. **C1**: aplicar migración 022 al PG compartido + batería multi-worker (incl. este
+   P1-02 sobre PG real) + Release-tag CI (solo con go del operador y observando
+   `conclusion=success`).
 
-FIN DEL TRASPASO P2-01 (E2 sigue PARTIAL)
+FIN DEL TRASPASO P2-01 + P1-02-lógica (E2 sigue PARTIAL → pendiente C1)

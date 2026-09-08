@@ -24,7 +24,9 @@ from bolsa_application.live_order_store import InMemoryLiveOrderStore
 from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
     _claim_stale_seconds_default,
     _drain_unknowns,
+    _live_position_reconcile_active,
     _no_query_provider,
+    _reconcile_live_positions_once,
     resolve_one_unknown,
 )
 
@@ -257,3 +259,32 @@ def test_claim_stale_seconds_default_env_operations(monkeypatch: pytest.MonkeyPa
     for bad in ("abc", "", "-3"):
         monkeypatch.setenv("LIVE_RECOVERY_CLAIM_STALE_SECONDS", bad)
         assert _claim_stale_seconds_default() == 120
+
+
+# ---- P1-02 (E2 V2.14): gate del reconcile de posición LR-1 en el tick ----
+
+
+@pytest.mark.asyncio
+async def test_live_position_reconcile_gate_defaults_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sin go (default OFF) el reconcile de posición NUNCA se activa."""
+    monkeypatch.delenv("LIVE_LIVE_DRIFT_DURABLE_WRITER_ENABLED", raising=False)
+    monkeypatch.delenv("LIVE_EXECUTION_UNLOCKED", raising=False)
+    assert await _live_position_reconcile_active() is False
+
+
+@pytest.mark.asyncio
+async def test_live_position_reconcile_off_by_default_no_db_hit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Gate OFF → ``_reconcile_live_positions_once`` no toca la DB."""
+    monkeypatch.delenv("LIVE_LIVE_DRIFT_DURABLE_WRITER_ENABLED", raising=False)
+    from unittest.mock import AsyncMock
+
+    async def boom(*_args, **_kwargs):
+        raise AssertionError("reached DB with gate OFF")
+
+    session = AsyncMock()
+    session.execute = boom
+    await _reconcile_live_positions_once(session)
