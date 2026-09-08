@@ -23,7 +23,6 @@ tabla/índice sin imports ORM (offline-safe).
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "023_ohlcv_bars_unique_reconcile"
