@@ -1,6 +1,6 @@
 {
   "name": "bolsa-v1",
-  "version": "1.44.0-beta",
+  "version": "1.45.0-beta",
   "private": true,
   "description": "Plataforma personal de gestión bursátil — IBEX, Europa, acciones",
   "scripts": {
@@ -34,6 +34,7 @@
     "db:restore": "node scripts/db-restore.mjs",
     "db:backup:list": "node scripts/db-backup-list.mjs",
     "db:backup:cron:win": "node scripts/db-backup-cron-win.mjs",
+    "db:dr:test": "node scripts/db-dr-verify.mjs",
     "db:studio": "pnpm --filter @bolsa/database db:studio",
     "test:py": "python -m pytest packages/py/domain/tests packages/py/market/tests packages/py/application/tests packages/py/analytics/tests apps/api-python/tests -q",
     "test:py:install": "pip install -e packages/py/domain -e packages/py/analytics -e packages/py/market -e packages/py/infrastructure -e packages/py/application -e \"apps/api-python[dev]\"",

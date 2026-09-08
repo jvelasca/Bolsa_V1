@@ -2,6 +2,31 @@
 
 All notable releases of Bolsa V1.
 
+## [1.45.0-beta] — 2026-09-08
+
+V2.15 **C2 · cierre de certificación** a `main` (restore seguro + readiness schema-aware + batería DR). Producto **BETA / no producción**.
+Package **`1.45.0-beta`** (**bump** desde `1.44.0-beta`). Alembic head **`023_ohlcv_bars_unique_reconcile`** (sin migración nueva).
+Núcleo financiero (FSM/live_orders/ExecutionEvent/ledger/outbox/reconciliation) **congelado e intacto**. Relevo [`traspaso-relevo-tag-v2-15-1-c2-cierre-certificacion-2026-09-08.md`](./docs/engineering/traspaso-relevo-tag-v2-15-1-c2-cierre-certificacion-2026-09-08.md).
+
+### Cierre certificación — restore 100 % seguro (P1 V2.15-01/02)
+
+- **`db:restore`**: psql con `-v ON_ERROR_STOP=1` (cualquier error SQL ⇒ failed). Alembic tras el restore se dirige **siempre a `--target-db`** (reescritura de `DATABASE_URL` vía `redirectDatabaseUrlTo`), nunca a `bolsa_v1`. Aborta si el sidecar `.sha256` no coincide.
+- `scripts/lib/db.mjs`: `runAlembicUpgrade({ databaseUrl })` + `redirectDatabaseUrlTo(db)`.
+
+### Cierre certificación — readiness schema-aware (P1 V2.15-03)
+
+- **`/api/health/ready`** exige `READY = PostgreSQL AND alembic_version == expected_head` (Alembic): 200/ready solo si ambos; 503 si la BD responde pero el esquema no está al head (fail-closed, nunca "ready" contra una BD vieja). Campo nuevo `schema_status`.
+- `session.py::read_db_schema_current` (lee `alembic_version`, mensajes redactados).
+
+### Batería DR y hardening de backups (P2)
+
+- **`pnpm db:dr:test`** (`scripts/db-dr-verify.mjs`): vuelca, verifica checksum, restaura a scratch vía `db-restore --target-db`, comprueba head/esquema consultable y que `bolsa_v1` no cambia; limpia la scratch. GREEN en local.
+- `backup.mjs`: sello con ms + escritura exclusiva (O_EXCL), sidecar `<file>.sha256`, `backups-manifest.json`, `DB_BACKUP_KEEP` mínimo ≥1.
+
+### Tests y contrato
+
+- `test_health.py`: ready 200-at-head + 503 schema-mismatch + 503 unmigrated. Contrato `openapi.json`/`schema.d.ts` regenerados (solo `schema_status` + descripciones).
+
 ## [1.44.0-beta] — 2026-09-08
 
 V2.15 **1er ciclo de hardening** a `main` (PREVENCIÓN backups + provenance/readiness). Producto **BETA / no producción**.
