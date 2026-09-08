@@ -158,6 +158,11 @@ _CORS_ALLOW_HEADERS = [
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # V2.15 hardening: en producción la identidad de release es obligatoria en el
+    # build (PRODUCT_VERSION / API_CONTRACT_VERSION). En dev/test/staging no aplica.
+    from bolsa_api.provenance import require_release_identity_env
+
+    require_release_identity_env(settings.environment)
     install_log_redact()
 
     app = FastAPI(

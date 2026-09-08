@@ -85,3 +85,56 @@ async def test_health_redacts_internal_details(app) -> None:
     xtb = body["components"].get("xtb") or {}
     if xtb.get("status") == "configured":
         assert "http" not in (xtb.get("message") or "").lower()
+
+
+@pytest.mark.asyncio
+async def test_health_live_returns_200_no_db(app) -> None:
+    """/api/health/live (V2.15) — liveness sin tocar BD: proceso vivo + provenance."""
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/health/live")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "live"
+    assert body["service"] == "bolsa-api-python"
+    assert "timestamp" in body
+    assert "provenance" in body
+
+
+@pytest.mark.asyncio
+async def test_health_ready_ok_when_db_up(app) -> None:
+    """/api/health/ready (V2.15) — 200/ready si PostgreSQL responde (dependencia requerida)."""
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/health/ready")
+
+    # En esta suite se ejecuta con la BD local real arriba (test_health = RBAC real-PG).
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["required"]["status"] == "ok"
+    assert "optional" in body
+
+
+@pytest.mark.asyncio
+async def test_health_ready_503_when_db_down(app, monkeypatch) -> None:
+    """/api/health/ready — si PostgreSQL cae, readiness=503 (no ready) sin detalle crudo."""
+    import bolsa_api.api.v1.routes.health as health_mod
+
+    async def fake_check(_engine) -> tuple[bool, str]:
+        return False, "PostgreSQL inaccesible"
+
+    monkeypatch.setattr(health_mod, "check_database", fake_check)
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/health/ready")
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["required"]["message"] == "PostgreSQL inaccesible"
+

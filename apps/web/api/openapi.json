@@ -11763,6 +11763,33 @@
         "title": "LiveQuoteSourceDto",
         "type": "object"
       },
+      "LiveResponseDto": {
+        "description": "Payload ``GET /api/health/live`` — liveness.\n\nSólo confirma que el proceso de la API responde (sin tocar la BD). Un\norquestador usa este endpoint para decidir si reiniciar el contenedor, por\nlo que NO debe depender del estado de componentes externos.",
+        "properties": {
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceDto"
+          },
+          "service": {
+            "default": "bolsa-api-python",
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "default": "live",
+            "title": "Status",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timestamp"
+        ],
+        "title": "LiveResponseDto",
+        "type": "object"
+      },
       "LoginRequestDto": {
         "properties": {
           "login": {
@@ -14927,6 +14954,69 @@
           "instrumentIds"
         ],
         "title": "QueryInstrumentStrategyTopsDto",
+        "type": "object"
+      },
+      "ReadinessResponseDto": {
+        "description": "Payload ``GET /api/health/ready`` — readiness.\n\nPara esta app local single-writer la dependencia requerida para servir\npeticiones es PostgreSQL. Redis/worker Arq se reportan como ``optional``\ninformativos (degradados no tumban el readiness global).",
+        "properties": {
+          "optional": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ReadyComponentStatusDto"
+            },
+            "title": "Optional",
+            "type": "object"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceDto"
+          },
+          "required": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadyComponentStatusDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "service": {
+            "default": "bolsa-api-python",
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "timestamp"
+        ],
+        "title": "ReadinessResponseDto",
+        "type": "object"
+      },
+      "ReadyComponentStatusDto": {
+        "description": "Estado de un componente requerido para ``/health/ready``.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "ReadyComponentStatusDto",
         "type": "object"
       },
       "RealizedGainLineDto": {
@@ -23647,6 +23737,50 @@
           }
         },
         "summary": "Health Check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "description": "Liveness: el proceso responde sin tocar BD (para reinicio por orquestador).",
+        "operationId": "health_live_api_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Live",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "description": "Readiness: la app puede servir tráfico.\n\nPara esta app local single-writer la dependencia *requerida* es PostgreSQL;\nRedis y el heartbeat del worker Arq se reportan como ``optional`` informativos\ny NO tumban el readiness global (el stack dev los marca ``degraded`` por diseño).\nLa respuesta es 200 cuando PostgreSQL responde; 503 en caso contrario (fail-closed\noperacional: si no hay BD no hay estado consistente que servir).",
+        "operationId": "health_ready_api_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Ready",
         "tags": [
           "health"
         ]
