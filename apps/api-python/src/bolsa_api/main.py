@@ -19,15 +19,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-
-from bolsa_api.ai_bootstrap import configure_ai_governance_proxy, teardown_ai_governance_proxy
-from bolsa_api.api.v1.router import api_v1_router
-from bolsa_api.logging_redact import install_log_redact
-from bolsa_api.middleware.auth import AuthMiddleware
-from bolsa_api.middleware.rate_limit import RateLimitMiddleware
 from bolsa_domain.errors import IdempotencyKeyExists, IdempotencyKeyReused
 from bolsa_infrastructure.config import Settings, get_settings
 from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
@@ -37,6 +28,15 @@ from bolsa_infrastructure.database.session import (
     create_session_factory,
 )
 from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from bolsa_api.ai_bootstrap import configure_ai_governance_proxy, teardown_ai_governance_proxy
+from bolsa_api.api.v1.router import api_v1_router
+from bolsa_api.logging_redact import install_log_redact
+from bolsa_api.middleware.auth import AuthMiddleware
+from bolsa_api.middleware.rate_limit import RateLimitMiddleware
 
 
 @asynccontextmanager
@@ -158,6 +158,11 @@ _CORS_ALLOW_HEADERS = [
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # V2.15 hardening: en producción la identidad de release es obligatoria en el
+    # build (PRODUCT_VERSION / API_CONTRACT_VERSION). En dev/test/staging no aplica.
+    from bolsa_api.provenance import require_release_identity_env
+
+    require_release_identity_env(settings.environment)
     install_log_redact()
 
     app = FastAPI(

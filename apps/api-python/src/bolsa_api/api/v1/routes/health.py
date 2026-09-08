@@ -2,12 +2,11 @@
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field
-
 from bolsa_infrastructure.alerts.estudio_opinion_email import smtp_ready
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.session import check_database
+from fastapi import APIRouter, Request, Response
+from pydantic import BaseModel, Field
 
 router = APIRouter()
 
@@ -52,6 +51,43 @@ class HealthResponseDto(BaseModel):
     database: DatabaseHealthDto | None = None
     components: dict[str, ComponentHealthDto] = Field(default_factory=dict)
     stack: str = Field(default="python-fastapi")
+    provenance: ProvenanceDto = Field(default_factory=ProvenanceDto)
+
+
+class LiveResponseDto(BaseModel):
+    """Payload ``GET /api/health/live`` — liveness.
+
+    Sólo confirma que el proceso de la API responde (sin tocar la BD). Un
+    orquestador usa este endpoint para decidir si reiniciar el contenedor, por
+    lo que NO debe depender del estado de componentes externos.
+    """
+
+    status: str = "live"
+    service: str = "bolsa-api-python"
+    timestamp: str
+    provenance: ProvenanceDto = Field(default_factory=ProvenanceDto)
+
+
+class ReadyComponentStatusDto(BaseModel):
+    """Estado de un componente requerido para ``/health/ready``."""
+
+    status: str
+    message: str
+
+
+class ReadinessResponseDto(BaseModel):
+    """Payload ``GET /api/health/ready`` — readiness.
+
+    Para esta app local single-writer la dependencia requerida para servir
+    peticiones es PostgreSQL. Redis/worker Arq se reportan como ``optional``
+    informativos (degradados no tumban el readiness global).
+    """
+
+    status: str
+    service: str = "bolsa-api-python"
+    timestamp: str
+    required: ReadyComponentStatusDto | None = None
+    optional: dict[str, ReadyComponentStatusDto] = Field(default_factory=dict)
     provenance: ProvenanceDto = Field(default_factory=ProvenanceDto)
 
 
@@ -220,22 +256,29 @@ def _smtp_component() -> ComponentHealthDto:
     )
 
 
-@router.get("/health", response_model=HealthResponseDto)
-async def health_check(request: Request) -> HealthResponseDto:
-    engine = request.app.state.engine
-    db_ok, db_message = await check_database(engine)
-    # Provenance: ensamblado/cacheado en bolsa_api.provenance (identity inequívoca
-    # V2.14). Lectura sin clases fuertes para no afectar al path caliente ni a DB.
+def _provenance_dto() -> ProvenanceDto:
+    """Ensambla el bloque de provenance (identidad inequívoca V2.14/V2.15).
+
+    Delegado a ``bolsa_api.provenance.build_provenance`` (single source, cacheado,
+    sin dependencia de BD). Compartido por /health, /health/live y /health/ready.
+    """
     from bolsa_api.provenance import build_provenance
 
     prov = build_provenance()
-    provenance = ProvenanceDto(
+    return ProvenanceDto(
         product=prov.product,
         package=prov.package,
         git_sha=prov.git_sha,
         schema_revision=prov.schema_revision,
         api_contract=prov.api_contract,
     )
+
+
+@router.get("/health", response_model=HealthResponseDto)
+async def health_check(request: Request) -> HealthResponseDto:
+    engine = request.app.state.engine
+    db_ok, db_message = await check_database(engine)
+    provenance = _provenance_dto()
     components = {
         "database": ComponentHealthDto(
             status="ok" if db_ok else "error",
@@ -260,4 +303,57 @@ async def health_check(request: Request) -> HealthResponseDto:
             message=db_message,
         ),
         components=components,
+    )
+
+
+def _ready_status(msg: str, status: str) -> ReadyComponentStatusDto:
+    return ReadyComponentStatusDto(status=status, message=msg)
+
+
+@router.get("/health/live", response_model=LiveResponseDto)
+async def health_live() -> LiveResponseDto:
+    """Liveness: el proceso responde sin tocar BD (para reinicio por orquestador)."""
+    return LiveResponseDto(
+        timestamp=datetime.now(tz=UTC).isoformat(),
+        provenance=_provenance_dto(),
+    )
+
+
+@router.get("/health/ready", response_model=ReadinessResponseDto)
+async def health_ready(request: Request, response: Response) -> ReadinessResponseDto:
+    """Readiness: la app puede servir tráfico.
+
+    Para esta app local single-writer la dependencia *requerida* es PostgreSQL;
+    Redis y el heartbeat del worker Arq se reportan como ``optional`` informativos
+    y NO tumban el readiness global (el stack dev los marca ``degraded`` por diseño).
+    La respuesta es 200 cuando PostgreSQL responde; 503 en caso contrario (fail-closed
+    operacional: si no hay BD no hay estado consistente que servir).
+    """
+    engine = request.app.state.engine
+    db_ok, db_message = await check_database(engine)
+    new = datetime.now(tz=UTC).isoformat()
+    provenance = _provenance_dto()
+
+    if db_ok:
+        redis_c = await _redis_component()
+        worker_c = await _worker_heartbeat_component()
+        response.status_code = 200
+        return ReadinessResponseDto(
+            status="ready",
+            timestamp=new,
+            required=_ready_status("PostgreSQL listo", "ok"),
+            optional={
+                "redis": _ready_status(redis_c.message, redis_c.status),
+                "worker_arq": _ready_status(worker_c.message, worker_c.status),
+            },
+            provenance=provenance,
+        )
+
+    response.status_code = 503
+    return ReadinessResponseDto(
+        status="not_ready",
+        timestamp=new,
+        required=_ready_status(db_message, "error"),
+        optional={},
+        provenance=provenance,
     )

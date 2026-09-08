@@ -30,10 +30,18 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
+from bolsa_infrastructure.config import is_production_environment
+
 # Ruta del monorepo raíz derivada de este fichero.
 #   <root>/apps/api-python/src/bolsa_api/provenance.py
 # parents[0]=bolsa_api · [1]=src · [2]=api-python · [3]=apps · [4]=<root>
 _ROOT = Path(__file__).resolve().parents[4]
+
+# Etiquetas semánticas de release que deben estar presentes en un build de
+# producción (V2.15 hardening): sin ellas la instancia en marcha no puede
+# identificarse inequívocamente ante una auditoría ni distinguir un binary real
+# de uno local/desarrollador. Ver ``require_release_identity_env``.
+RELEASE_IDENTITY_ENV = ("PRODUCT_VERSION", "API_CONTRACT_VERSION")
 
 
 @dataclass(frozen=True)
@@ -51,6 +59,32 @@ class Provenance:
 def _env(name: str) -> str | None:
     value = os.environ.get(name, "").strip()
     return value or None
+
+
+def missing_release_identity_env() -> list[str]:
+    """Env de identidad de release ausentes (`PRODUCT_VERSION`/`API_CONTRACT_VERSION`)."""
+    return [key for key in RELEASE_IDENTITY_ENV if not _env(key)]
+
+
+def require_release_identity_env(environment: str) -> None:
+    """Fail-fast gate de release: identidad de build obligatoria en producción.
+
+    V2.15 (hardening): en un entorno **productivo** un binary que arranca sin
+    ``PRODUCT_VERSION`` o ``API_CONTRACT_VERSION`` es indistinguible de una build
+    local → bloqueamos el arranque en ``create_app``. En dev/test/staging (allowlist
+    de ``is_production_environment``) estas env siguen siendo opcionales para no
+    romper el arranque local ni el CI (que no las define); el bloque degrada al
+    reporte ``null`` de siempre.
+    """
+    if not is_production_environment(environment):
+        return
+    missing = missing_release_identity_env()
+    if missing:
+        lista = ", ".join(missing)
+        raise RuntimeError(
+            "ENVIRONMENT=production exige identidad de release en build: "
+            f"{lista} ausente(s). Defínela(s) al construir/imagen (no en runtime)."
+        )
 
 
 def _read_root_package_version() -> str | None:

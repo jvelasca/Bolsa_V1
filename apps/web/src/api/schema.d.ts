@@ -1449,6 +1449,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health Live
+         * @description Liveness: el proceso responde sin tocar BD (para reinicio por orquestador).
+         */
+        get: operations["health_live_api_health_live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health Ready
+         * @description Readiness: la app puede servir tráfico.
+         *
+         *     Para esta app local single-writer la dependencia *requerida* es PostgreSQL;
+         *     Redis y el heartbeat del worker Arq se reportan como ``optional`` informativos
+         *     y NO tumban el readiness global (el stack dev los marca ``degraded`` por diseño).
+         *     La respuesta es 200 cuando PostgreSQL responde; 503 en caso contrario (fail-closed
+         *     operacional: si no hay BD no hay estado consistente que servir).
+         */
+        get: operations["health_ready_api_health_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/indicators/compute": {
         parameters: {
             query?: never;
@@ -7654,6 +7700,29 @@ export interface components {
             /** Timestamp */
             timestamp: string;
         };
+        /**
+         * LiveResponseDto
+         * @description Payload ``GET /api/health/live`` — liveness.
+         *
+         *     Sólo confirma que el proceso de la API responde (sin tocar la BD). Un
+         *     orquestador usa este endpoint para decidir si reiniciar el contenedor, por
+         *     lo que NO debe depender del estado de componentes externos.
+         */
+        LiveResponseDto: {
+            provenance?: components["schemas"]["ProvenanceDto"];
+            /**
+             * Service
+             * @default bolsa-api-python
+             */
+            service: string;
+            /**
+             * Status
+             * @default live
+             */
+            status: string;
+            /** Timestamp */
+            timestamp: string;
+        };
         /** LoginRequestDto */
         LoginRequestDto: {
             /** Login */
@@ -8706,6 +8775,41 @@ export interface components {
              * @default 1d
              */
             timeframe: string;
+        };
+        /**
+         * ReadinessResponseDto
+         * @description Payload ``GET /api/health/ready`` — readiness.
+         *
+         *     Para esta app local single-writer la dependencia requerida para servir
+         *     peticiones es PostgreSQL. Redis/worker Arq se reportan como ``optional``
+         *     informativos (degradados no tumban el readiness global).
+         */
+        ReadinessResponseDto: {
+            /** Optional */
+            optional?: {
+                [key: string]: components["schemas"]["ReadyComponentStatusDto"];
+            };
+            provenance?: components["schemas"]["ProvenanceDto"];
+            required?: components["schemas"]["ReadyComponentStatusDto"] | null;
+            /**
+             * Service
+             * @default bolsa-api-python
+             */
+            service: string;
+            /** Status */
+            status: string;
+            /** Timestamp */
+            timestamp: string;
+        };
+        /**
+         * ReadyComponentStatusDto
+         * @description Estado de un componente requerido para ``/health/ready``.
+         */
+        ReadyComponentStatusDto: {
+            /** Message */
+            message: string;
+            /** Status */
+            status: string;
         };
         /** RealizedGainLineDto */
         RealizedGainLineDto: {
@@ -12993,6 +13097,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponseDto"];
+                };
+            };
+        };
+    };
+    health_live_api_health_live_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveResponseDto"];
+                };
+            };
+        };
+    };
+    health_ready_api_health_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponseDto"];
                 };
             };
         };
