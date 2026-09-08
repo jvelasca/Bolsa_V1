@@ -1,7 +1,7 @@
 # RELEVO — V2.15.1 C2 (cierre de certificación: restore seguro, readiness schema-aware, batería DR) — 2026-09-08
 
 > **Padre:** [índice #103+](./engineering-index-2026-08-03.md) · tag previo [`traspaso-relevo-tag-v2-15-beta-2026-09-08.md`](./traspaso-relevo-tag-v2-15-beta-2026-09-08.md) · auditoría que abre este ciclo: (informe externo V2.15 en transcript sesión 2026-09-08 20:0x).
-> **Estado:** trabajo C2 implementado y verificado en local (GREEN battery DR + tests health). **Pendiente de elevar** (bump `1.45.0-beta`, tag `v2.15.1-beta`, CI GREEN real) — NO afirmar GREEN hasta ver el run.
+> **Estado:** C2 **ELEVADO Y VERIFICADO — GREEN real en CI** (2026-09-09). Bump `1.45.0-beta`, tag `v2.15.1-beta` re-apuntado al commit verde tras fix ruff I001 (C1) detectado por el propio Release-tag CI. **Auditable externamente.**
 > **Núcleo congelado (intacto):** FSM / live_orders / ExecutionEvent / ledger / outbox / reconciliation. Este ciclo solo endurece infraestructura de backup/restore y health-readiness.
 
 ## 1. Objetivo (cierre de certificación V2.15 C2)
@@ -28,6 +28,7 @@ Sin nuevas funciones de trading. Cierra los hallazgos P1/P2 del auditor externo 
 - `apps/api-python/.../api/v1/routes/health.py` — `/health/ready` schema-aware; campo `schema_status`.
 - `apps/api-python/tests/test_health.py` — ready 200-at-head / 503-mismatch / 503-unmigrated.
 - `apps/web/api/openapi.json` + `apps/web/src/api/schema.d.ts` — regenerados (contrato).
+- Commits de elevación (en `main` = `origin/main`): `55c293cf` faena C2 · `c49283a0` bump `1.45.0-beta` + CHANGELOG + doc · `2f967fa6` **C1: fix ruff I001 (import order)** hallado por el Release-tag CI (el primer intento `c49283a0` falló en ruff/quality; el tag se re-apuntó al commit verde).
 
 ## 3. Verificación realizada en local (2026-09-08)
 
@@ -37,10 +38,16 @@ Sin nuevas funciones de trading. Cierra los hallazgos P1/P2 del auditor externo 
 - `uv run mypy` (entorno real) sobre `health.py` → **Success** (el aviso local Redis `aclose` es falso positivo fuera del venv).
 - `pnpm db:backup:list` OK con el nuevo sello `-mmm`.
 
-## 4. Estados / decisión de elevación (A EJECUTAR tras OK)
+## 4. Elevación realizada (GREEN real en CI)
 
-- Bump candidato: `1.44.0-beta` → **`1.45.0-beta`** (ciclo de hardening, no menor).
-- Tag candidato: **`v2.15.1-beta`**.
-- No subir rama/tag ni afirmar "GREEN" hasta ver run real del Release-tag CI (`certify=success`).
+Verificado el tag/commit **`2f967fa6`** (= tip de `origin/main`, re-apuntado tras el C1):
 
-FIN DEL RELEVO — faena **V2.15 C2** implementada y verificada en local. Pendiente de bump/tag/CI para quedar **auditable externamente**.
+- Bump **`1.45.0-beta`** (ciclo de hardening, no menor) — commit `c49283a0`.
+- Tag **`v2.15.1-beta`** subido a `origin` y **re-apuntado a `2f967fa6`** (el primer intento en `c49283a0` dio `failure` por ruff I001; el C1 `2f967fa6` lo corrigió).
+- Runs reales sobre `2f967fa6` (todos `completed`·`success`):
+  - **Release tag CI `certify` → success** (run `34263456158`)
+  - Python CI (`34263456091`) · Frontend CI (`34263456123`) · Fase 2 scientific (`34263455822`) · Optimize lab (`34263456279`) · Gitleaks (`34263430870`).
+
+**GREEN confirmado sobre run real** — cumple la regla del cierre ("no afirmar GREEN hasta ver `certify=success`").
+
+FIN DEL RELEVO — faena **V2.15 C2** implementada, elevada y **auditable externamente a GREEN real** (Release-tag CI `certify=success` en `v2.15.1-beta`).

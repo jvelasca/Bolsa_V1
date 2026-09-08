@@ -2,6 +2,12 @@
 
 All notable releases of Bolsa V1.
 
+## [1.45.2-beta] — 2026-09-08
+
+Auditoría externa **V2.15.1 C2** (delta exclusivamente **documental/audit**; núcleo financiero sin tocar). Producto **BETA / no producción**.
+Package **`1.45.2-beta`** (**bump** desde `1.45.0-beta`). Alembic head **`023_ohlcv_bars_unique_reconcile`** (sin migración nueva).
+V2.15.1 C2 re-certificada ≈ **9.1/10 Beta** (ver [`auditoria-v2-15-1-c2`](./docs/engineering/auditoria-v2-15-1-c2-2026-09-08.md)): los tres P1 de V2.15 cerrados; deudas P2/C2-12+13 (DR+readiness no corren en tag-CI) y C2-02 (invariantes financieras en batería DR) decididas antes del "OK final"; account isolation **P2-latente** (no P1-activo, single-owner). Cierres de esta pasada: C2-08 (cash paper/ledger idempotente real-PG, no P1 de doble-abono), C2-06 (sin path de creación por JWT; ops-self-eval cerrado), contrato FE↔BE núcleo **limpio**.
+
 ## [1.45.0-beta] — 2026-09-08
 
 V2.15 **C2 · cierre de certificación** a `main` (restore seguro + readiness schema-aware + batería DR). Producto **BETA / no producción**.
