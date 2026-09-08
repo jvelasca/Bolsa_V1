@@ -63,6 +63,13 @@ pnpm startup:report  # tiempos de arranque (agente / diagnóstico)
 pnpm db:ensure       # Docker + PG + migrate + seed (setup)
 pnpm health          # HTTP check API + Web (con servicios en marcha)
 pnpm dev             # mismo que F5 Dev (terminal)
+
+# Copias de seguridad de bolsa_v1 (PREVENCIÓN V2.15)
+pnpm db:dump               # volcado diario a db-backups/ (gitignored) + prune retención
+pnpm db:backup             # alias de db:dump
+pnpm db:backup:list        # lista los backups ordenados + retención vigente
+pnpm db:restore --file db-backups/bolsa_v1-<estampa>.sql --yes   # restaura + Alembic head 023 (DESTRUCTIVO)
+pnpm db:backup:cron:win    # tarea diaria de Windows (schtasks) alternativa a hacerlo a mano
 ```
 
 ## Si algo falla
@@ -73,6 +80,26 @@ pnpm dev             # mismo que F5 Dev (terminal)
 4. F5 de nuevo con **«Bolsa: F5 Dev (recomendado)»**
 
 Logs: ver [engineering/dev-logs.md](./engineering/dev-logs.md) (`logs/dev/`, `logs/agent/`, `logs/startup/`). No hay README dentro de `logs/` — la doc vive en `docs/`.
+
+## Copias de seguridad y recuperación (`bolsa_v1` local)
+
+La BD de dev (`bolsa_v1` en Docker `bolsa-postgres`) puede perder estados runtime **no versionados**
+(listas de usuario, membresías, posiciones papel...) con un reset/re-drift — lección del
+[incidente 2026-09-08](./engineering/traspaso-incidente-perdida-list-2026-09-08.md), que dejó la BD
+seed-only sin copia. Para que cualquier estado sea recuperable, volcamos por FUERA del contenedor:
+
+- **`pnpm db:dump`** → crea `db-backups/bolsa_v1-<sello>.sql[.gz]` (carpeta **gitignored**): usa
+  `docker exec ... pg_dump` con salida a fichero local. Poda por retención conservando **`DB_BACKUP_KEEP`**
+  (`.env`, default **14**). Reporta bytes/ruta y escribe `logs/agent/db-dump.json`.
+- **`pnpm db:backup:list`** → lista los backups ordenados por fecha y la retención.
+- **`pnpm db:restore --file <backup> --yes`** → **DESTRUCTIVO**: recrea la BD destino (drop + create) y
+  aplica el volcado por stdin; luego re-ejecuta Alembic head (hoy **`023`**). Para probarlo sin tocar la
+  BD principal usa `--target-db bolsa_v1_restore_test`. Añade `--no-alembic` para no re-migrar.
+- **`pnpm db:backup:cron:win`** → genera/registra una tarea `schtasks` **diaria** (`--install` para
+  registrarla; `--at HH:MM` para la hora). Solo Windows y solo entorno local `bolsa_v1`.
+
+> La retención poda solo backups y nunca ficheros fuera de `db-backups/bolsa_v1-*.sql*`. En un entorno
+> productivo compartido NUNCA ejecutar estas rutas automáticamente.
 
 ## Informe de arranque (agente)
 

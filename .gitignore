@@ -73,6 +73,7 @@ yarn-debug.log*
 *.dump
 *.sql.gz
 *.sql.bak
+db-backups/
 pgdata/
 .postgres/
 .postgres-data/
