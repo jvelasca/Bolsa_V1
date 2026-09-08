@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 TICK_SECONDS = 5
 _ENV_ENABLED = "LIVE_RECOVERY_WORKER_ENABLED"
 _DEFAULT_BATCH = 50
+
+
 # Ventana de lease del claimed UNKNOWN antes de que otro worker pueda reapropiarlo.
 # Configurable por entorno (no solo parámetro interno): cada deployment puede
 # sintonizar sin editar fuente. Se lee en import para una semántica global estable.
@@ -250,14 +252,37 @@ async def _drain_once(
             stale_after_seconds=stale_after_seconds,
         )
         # H7 — drift reconcile de la máquina (working/partial/cancel-requested):
-        # mismo query_provider y misma sesión, read-only (no escribe). Reporta
-        # diferencias a diagnostic por log; el operador/capa decidirá la acción.
+        # mismo query_provider y misma sesión. Por defecto read-only (reporta a
+        # log; el operador/otra capa decide la acción). Bajo go explícito
+        # (LIVE_LIVE_DRIFT_DURABLE_WRITER_ENABLED) además persiste incidentes
+        # durables live_drift por cuenta (P2-01/E2) reusando la misma sesión.
+        holder = await _drift_incident_holder(session)
         await _reconcile_open_orders(
             store,
             query_provider=query_provider,
             limit=limit,
+            incident_holder=holder,
         )
     return result
+
+
+async def _drift_incident_holder(
+    session: AsyncSession,
+) -> Any:
+    """Incident store PG para el drift durable, solo si el writer está habilitado.
+
+    Gate ``bajo go`` fail-closed: sin env → None (sin cambio de runtime V2.13).
+    """
+    from bolsa_application.operational_incident_store import (
+        PostgresOperationalIncidentStore,
+    )
+    from bolsa_application.order_live_drift_incident import (
+        live_drift_durable_writer_enabled,
+    )
+
+    if not live_drift_durable_writer_enabled():
+        return None
+    return PostgresOperationalIncidentStore(session)
 
 
 async def _reconcile_open_orders(
@@ -265,16 +290,24 @@ async def _reconcile_open_orders(
     *,
     query_provider: QueryProvider | None,
     limit: int,
+    incident_holder: Any | None = None,
 ) -> None:
-    """H7 — consulta open orders vs broker-truth, log-drift (no muta, no heal)."""
+    """H7 — consulta open orders vs broker-truth, log-drift (nunca auto-heal).
+
+    Con ``incident_holder`` presente (writer durable habilitado bajo go) convierte
+    el drift accionable en incidente durable ``live_drift`` por cuenta.
+    """
+    from bolsa_application.live_order_machine_reconcile import (
+        reconcile_live_order_machine,
+    )
+    from bolsa_application.order_live_drift_incident import (
+        publish_order_live_drifts,
+    )
+
     if query_provider is None:
         # Sin provider real (fail-closed) no hay destino que consultar.
         return
     try:
-        from bolsa_application.live_order_machine_reconcile import (
-            reconcile_live_order_machine,
-        )
-
         report = await reconcile_live_order_machine(
             store,
             query_provider=query_provider,
@@ -285,6 +318,15 @@ async def _reconcile_open_orders(
                 "live_order machine reconcile (H7) drift=%s summary=%s",
                 len(report.drifts),
                 report.summary(),
+            )
+        if incident_holder is not None and report.drifts:
+            published = await publish_order_live_drifts(
+                report,
+                holder=incident_holder,
+            )
+            logger.warning(
+                "live_order durable drift (P2-01) publish=%s",
+                published.summary(),
             )
     except Exception:  # noqa: BLE001 — una sesión que falle no tumba el tick
         logger.exception("live_order machine reconcile failed")
