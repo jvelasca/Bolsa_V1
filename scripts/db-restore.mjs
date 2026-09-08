@@ -109,6 +109,19 @@ async function main() {
   }
 
   const target = flagValue("--target-db") ?? PG_DB_DEFAULT;
+  // C2-01 (V2.15.5): validar el nombre de BD destino ANTES de cualquier DDL
+  // destructivo. El valor se interpola tal cual en `DROP/CREATE DATABASE
+  // "${target}"`; un valor con comillas/`;` podría escapar del identificador y
+  // ejecutar SQL arbitrario. Regex estricta de SQL-name: solo [A-Za-z0-9_.-].
+  if (!/^[a-zA-Z0-9_.-]+$/.test(target)) {
+    logError("db-restore", `--target-db inválido "${target}" (solo [A-Za-z0-9_.-])`);
+    writeAgentLog("db-restore", {
+      status: "failed",
+      step: "validate-target-db",
+      reason: "target-db inválido (C2-01)",
+    });
+    process.exit(1);
+  }
   const runAlembic = !withFlag("--no-alembic");
   const yes = withFlag("--yes");
 

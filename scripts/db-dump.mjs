@@ -3,7 +3,12 @@ import {
   findDockerExe,
   isPostgresReady,
 } from "./lib/docker.mjs";
-import { pgDumpToFile, retentionPrune, resolveKeep } from "./lib/backup.mjs";
+import {
+  pgDumpToFile,
+  resolveMirrorDir,
+  retentionPrune,
+  resolveKeep,
+} from "./lib/backup.mjs";
 import { logError, logInfo, writeAgentLog } from "./lib/logger.mjs";
 
 /**
@@ -43,13 +48,30 @@ async function main() {
   const keep = resolveKeep({
     envKeep: keepFromCli !== undefined ? String(keepFromCli) : undefined,
   });
+  const mirrorDir = resolveMirrorDir(); // env DB_BACKUP_MIRROR_DIR (2º árbol) o null
 
   try {
-    const { file, bytes, gzipped } = pgDumpToFile({ gzip: wantGzip });
+    const t0 = Date.now();
+    const { file, bytes, gzipped, mirrorPath } = pgDumpToFile({
+      gzip: wantGzip,
+      mirrorDir, // espejo 3-2-1: solo si se configura un DIR off-site
+    });
+    const dumpMs = Date.now() - t0;
     logInfo(
       "db-dump",
-      `Backup creado: ${file} (${bytes} bytes${gzipped ? ", gzip" : ""}) · retención ${keep}`,
+      `Backup creado: ${file} (${bytes} bytes${gzipped ? ", gzip" : ""}) · retención ${keep} · dump ${dumpMs} ms`,
     );
+    if (mirrorPath) {
+      logInfo(
+        "db-dump",
+        `Copia espejo 3-2-1 presente en: ${mirrorPath}`,
+      );
+    } else {
+      logInfo(
+        "db-dump",
+        "Sin espejo off-site (DB_BACKUP_MIRROR_DIR vacío) → 1 sola copia en db-backups.",
+      );
+    }
     const pruned = retentionPrune(keep);
     if (pruned > 0) {
       logInfo(
@@ -57,11 +79,17 @@ async function main() {
         `Podados ${pruned} backup(s) más antiguo(s) (keep=${keep})`,
       );
     }
+    // RPO: antigüedad del snapshot más reciente (desde su creation_alembic head).
+    // En este run el backup recién producido es el más reciente → RPO objetivo ~0
+    // salvo el retardo de ejecución ya incluido en dumpMs.
     writeAgentLog("db-dump", {
       status: "ok",
       file,
       bytes,
       gzipped,
+      mirrorPath: mirrorPath ?? null,
+      mirrorEnabled: Boolean(mirrorDir),
+      rpoMs: dumpMs, // tiempo desde el inicio del dump hasta snapshot consistente
       keep,
       pruned,
     });

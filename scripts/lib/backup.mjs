@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  copyFileSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -130,7 +131,7 @@ function manifestPath(dir) {
 }
 
 /** Lee el manifest JSON (array de entradas) o [] si no existe/corrupto. */
-function readManifest(dir) {
+export function readManifest(dir = BACKUP_DIR) {
   try {
     const parsed = JSON.parse(readFileSync(manifestPath(dir), "utf8"));
     return Array.isArray(parsed) ? parsed : [];
@@ -165,6 +166,7 @@ export function reconcileManifest({ dir = BACKUP_DIR } = {}) {
       bytes: b.bytes,
       created_at: known.created_at ?? b.mtime.toISOString(),
       schema: known.schema ?? null,
+      ...(known.mirror ? { mirror: known.mirror } : {}),
     };
   });
   const merged = readManifest(dir)
@@ -274,6 +276,31 @@ export function pgDumpToFile(opts = {}) {
   // Sidecar checksum `<file>.sha256` (V2.15-11).
   writeFileSync(`${outPath}.sha256`, `${sha}  ${fileName}\n`, "utf8");
 
+  // Espejo 3-2-1 (V2.15.5): si el llamante indica un DIR off-site (segundo medio /
+  // ruta configurable por env), copiamos el artefacto y su sidecar a ese árbol
+  // para que exista UNA COPIA en un árbol distinto de `db-backups`. Solo se
+  // dispara si `opts.mirrorDir` viene explícito (db-dump); dr-verify usa un dir
+  // temporal y NO debe espejar. Best-effort y trazado: un fallo de copia NO
+  // tumba el backup ya escrito localmente (el espejo es la 2ª copia).
+  let mirrorPath = null;
+  if (opts.mirrorDir && typeof opts.mirrorDir === "string") {
+    try {
+      const targetDir = join(opts.mirrorDir, "db-backups");
+      mkdirSync(targetDir, { recursive: true });
+      const mirrorFile = join(targetDir, fileName);
+      copyFileSync(outPath, mirrorFile);
+      copyFileSync(`${outPath}.sha256`, `${mirrorFile}.sha256`);
+      mirrorPath = mirrorFile;
+      logInfo("backup", `Espejo 3-2-1 → ${mirrorFile}`);
+    } catch (error) {
+      mirrorPath = null;
+      logError(
+        "backup",
+        `No se pudo espejar ${fileName} al DIR off-site: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   // Manifest con checksum/bytes/fecha/esquema actual best-effort (V2.15-09).
   const schema = readDbSchema(db);
   const manifest = readManifest(dir);
@@ -283,6 +310,9 @@ export function pgDumpToFile(opts = {}) {
     bytes: payload.length,
     created_at: new Date().toISOString(),
     schema,
+    mirror: mirrorPath
+      ? { dir: join(opts.mirrorDir), path: mirrorPath }
+      : null,
   });
   writeFileSync(
     manifestPath(dir),
@@ -296,6 +326,7 @@ export function pgDumpToFile(opts = {}) {
     gzipped: gzip,
     sha256: sha,
     schema,
+    mirrorPath,
   };
 }
 
@@ -357,6 +388,26 @@ export function retentionPrune(keep, { dir = BACKUP_DIR } = {}) {
     /* manifest es best-effort: no debe tumbar la retención */
   }
   return removed;
+}
+
+/**
+ * Resolución del DIR del espejo 3-2-1 desde env `.env`/shell (DB_BACKUP_MIRROR_DIR).
+ * Devuelve la ruta (absoluta o relativa al repo) a usar como 2ª copia "off-site"
+ * escribible, o null si no se configura (solo copia local db-backups).
+ * El espejo es la pata de un 2º medio/árbol distinto; el 3er medio (fuera de la
+ * máquina, p.ej. Rclone/bucket) se deja como cobertura documentada.
+ */
+export function resolveMirrorDir() {
+  loadEnvFile();
+  const raw = (process.env.DB_BACKUP_MIRROR_DIR ?? "").trim();
+  if (!raw) return null;
+  // Absoluta (Windows `X:\…`/`\\…`/`/…`) se usa tal cual; relativa al repo.
+  const isAbs =
+    /^[a-zA-Z]:[\\/]/.test(raw) ||
+    /^\\\\/.test(raw) ||
+    raw.startsWith("/") ||
+    raw.startsWith("\\");
+  return isAbs ? raw : join(ROOT, raw);
 }
 
 /**
