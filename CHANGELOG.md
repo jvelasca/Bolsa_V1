@@ -2,6 +2,33 @@
 
 All notable releases of Bolsa V1.
 
+## [1.44.0-beta] — 2026-09-08
+
+V2.15 **1er ciclo de hardening** a `main` (PREVENCIÓN backups + provenance/readiness). Producto **BETA / no producción**.
+Package **`1.44.0-beta`** (**bump** desde `1.43.2-beta`). Alembic head **`023_ohlcv_bars_unique_reconcile`**.
+**≠** Accept LIVE · **≠** thaw · **≠** settlement · éxodo LIVE no certificado. Relevo [`traspaso-relevo-v2-15-backups-prevencion-2026-09-08.md`](./docs/engineering/traspaso-relevo-v2-15-backups-prevencion-2026-09-08.md).
+
+### Prevention — backups de `bolsa_v1` (faena 1)
+
+- **`pnpm db:dump` / `db:backup`**: volcado local `db-backups/bolsa_v1-<stamp>.sql[.gz]` vía `docker exec pg_dump`
+  (por fuera del contenedor) + poda por retención (`DB_BACKUP_KEEP`, default 14). `db:backup:list` lista.
+- **`pnpm db:restore --file … --yes`**: recrea la BD destino y aplica el dump por stdin, re-aplicando Alembic head `023`.
+  `--target-db` y `--no-alembic` para pruebas seguras. `db:backup:cron:win` genera tarea `schtasks` diaria.
+- `.gitignore db-backups/` (no versiona), `.env.example DB_BACKUP_KEEP`, doc en `docs/DEV_STARTUP.md`.
+  Motivo: [incidente pérdida de listas](./docs/engineering/traspaso-incidente-perdida-list-2026-09-08.md).
+  Helpers [`scripts/lib/backup.mjs`](./scripts/lib/backup.mjs) · scripts `db-dump/db-restore/db-backup-list/db-backup-cron-win`.
+
+### Hardening V2.15 — first cycle (provenance + readiness)
+
+- **Readiness operacional**: nuevo `GET /api/health/live` (liveness sin BD) y `GET /api/health/ready`
+  (readiness, PostgreSQL requerido → 200/ready o 503/not_ready). `/api/health` agregado compatible.
+- **Provenance obligatoria en producción**: `require_release_identity_env()` eleva en `create_app` cuando
+  `PRODUCT_VERSION`/`API_CONTRACT_VERSION` faltan en `ENVIRONMENT=production` (allowlist dev/test/staging
+  las mantiene opcionales para no romper CI/local).
+- Tests offline `test_provenance_gate.py` + tests `live/ready` en `test_health.py`; `openapi.json`/`schema.d.ts`
+  regenerados (solo aditivo). Rama `stage/v2.15-backups-prevencion-2026-09-08` → merge PR **#59**.
+  Núcleo congelado (FSM/live_orders/ExecutionEvent/ledger/outbox/recon) intacto.
+
 ## [1.43.2-beta] — 2026-09-08
 
 V2.14.2 **elevation** (cierre A1: account-isolation ampliada a rutas de LECTURA/estudio) a `main`. Producto **BETA / no producción**. Package **`1.43.2-beta`** (**bump** desde `1.43.1-beta`). **≠** Accept LIVE · **≠** thaw · **≠** settlement · éxodo LIVE no certificado.
