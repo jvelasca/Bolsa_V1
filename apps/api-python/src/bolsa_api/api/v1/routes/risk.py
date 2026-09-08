@@ -16,16 +16,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from bolsa_api.api.dependencies import (
-    get_account_repository,
-    get_daily_opinion_telemetry_service,
-    get_db_session,
-    get_live_recon_lookup,
-)
 from bolsa_application.broker_venue_runtime import (
     account_broker_venue_from_settings,
     broker_venue_status,
@@ -37,6 +27,17 @@ from bolsa_application.ops_self_eval import build_ops_self_eval_report
 from bolsa_application.ops_self_eval_counts import load_semi_account_counts
 from bolsa_application.paper_d_propose import paper_d_execute_allowed
 from bolsa_application.risk_runtime import kill_switch_status, set_kill_switch
+from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from bolsa_api.api.dependencies import (
+    get_account_repository,
+    get_daily_opinion_telemetry_service,
+    get_db_session,
+    get_live_recon_lookup,
+    require_account_access,
+)
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -129,6 +130,7 @@ async def post_broker_venue(body: BrokerVenueBody) -> BrokerVenueResponse:
 
 @router.get("/ops-self-eval")
 async def get_ops_self_eval(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: str = Query(
         "default-account-seed",
@@ -139,6 +141,8 @@ async def get_ops_self_eval(
     lookback_days: int = Query(120, alias="lookbackDays", ge=7, le=366),
 ) -> dict[str, Any]:
     """OE-1 — scorecard SEMI + AUTO (read-only). measure ≠ Accept · ≠ flip env."""
+    # A1: scorecard por cuenta → solo cuenta del principal (404 si ajena).
+    await require_account_access(request, account_id)
     st = await kill_switch_status()
 
     pref: Literal["paper", "live"] | None = None
@@ -190,10 +194,11 @@ async def get_ops_self_eval(
     )
     recon_payload: dict[str, Any] | None = None
     try:
-        from bolsa_api.api.dependencies import get_reconcile_portfolio_integrity_use_case
         from bolsa_application.reconcile_portfolio_integrity import (
             ReconcilePortfolioIntegrityInput,
         )
+
+        from bolsa_api.api.dependencies import get_reconcile_portfolio_integrity_use_case
 
         report = await get_reconcile_portfolio_integrity_use_case(session).reconcile(
             ReconcilePortfolioIntegrityInput(account_id=account_id)

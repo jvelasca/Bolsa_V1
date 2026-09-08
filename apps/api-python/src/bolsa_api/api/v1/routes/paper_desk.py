@@ -9,6 +9,9 @@ from __future__ import annotations
 from datetime import date as date_cls
 from typing import Annotated, Any
 
+from bolsa_application.paper_d_propose import paper_d_execute_allowed
+from bolsa_application.paper_daily_report import build_paper_daily_report
+from bolsa_application.paper_desk_cycle import PaperDeskCycleInput
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,9 +22,6 @@ from bolsa_api.api.dependencies import (
     get_paper_desk_cycle_use_case,
     require_account_access,
 )
-from bolsa_application.paper_d_propose import paper_d_execute_allowed
-from bolsa_application.paper_daily_report import build_paper_daily_report
-from bolsa_application.paper_desk_cycle import PaperDeskCycleInput
 
 router = APIRouter()
 
@@ -83,6 +83,7 @@ async def paper_desk_cycle(
 
 @router.get("/paper-desk/daily-report")
 async def paper_desk_daily_report(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: str = Query(alias="accountId"),
     as_of: str | None = Query(default=None, alias="asOf"),
@@ -90,6 +91,8 @@ async def paper_desk_daily_report(
     template_id: str | None = Query(default="moderate", alias="templateId"),
 ) -> dict[str, Any]:
     """V1.47 — DailyOpsReport de consulta. autoDesk vía dry-run evaluate. Nunca muta."""
+    # A1 residual (lectura/estudio): el informe es de una cuenta concreta → 404 si ajena.
+    await require_account_access(request, account_id)
     as_of_s = _parse_as_of(as_of)
     day: date_cls | None = None
     if as_of_s:
@@ -109,8 +112,9 @@ async def paper_desk_daily_report(
     )
     auto_desk = build_paper_daily_report(cycle).to_dict()
 
-    from bolsa_api.schemas.account_mappers import to_account_summary_dto, to_ledger_entry_dto
     from bolsa_application.daily_ops_report import DAILY_OPS_REPORT_SCHEMA
+
+    from bolsa_api.schemas.account_mappers import to_account_summary_dto, to_ledger_entry_dto
 
     try:
         bundle = await get_daily_ops_report_use_case(session).execute(

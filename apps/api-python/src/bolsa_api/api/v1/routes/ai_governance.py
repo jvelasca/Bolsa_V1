@@ -7,9 +7,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from bolsa_ai import get_default_proxy
 from bolsa_analytics.cognitive import (
     BehaviorTradeSample,
@@ -21,10 +18,20 @@ from bolsa_analytics.cognitive import (
     build_memory_entry,
     observe_investor_profile,
 )
+from bolsa_application.cognitive_persistence import (
+    LoadEffectivenessFromStore,
+    PersistDecisionMemory,
+    PersistEdgeReport,
+    PersistTrial,
+)
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_api.api.dependencies import (
     get_cognitive_repository,
     get_db_session,
     require_account_access,
+    require_owned_account_if_present,
 )
 from bolsa_api.schemas.ai_governance import (
     AiEffectivenessResponseDto,
@@ -44,12 +51,6 @@ from bolsa_api.schemas.ai_governance import (
     FundamentalExplainRequest,
     ListDecisionSessionsResponseDto,
     ProposeRecommendationRequest,
-)
-from bolsa_application.cognitive_persistence import (
-    LoadEffectivenessFromStore,
-    PersistDecisionMemory,
-    PersistEdgeReport,
-    PersistTrial,
 )
 
 router = APIRouter()
@@ -130,10 +131,13 @@ def _demo_effectiveness() -> dict[str, Any]:
 
 @router.get("/ai/effectiveness", response_model=AiEffectivenessResponseDto)
 async def ai_effectiveness(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     demo: bool = Query(False, description="Forzar resumen ilustrativo"),
     account_id: str | None = Query(None, alias="accountId"),
 ) -> AiEffectivenessResponseDto:
+    # A1 residual (lectura/estudio): si piden un account de otro owner → 404.
+    await require_owned_account_if_present(request, account_id)
     if demo:
         return AiEffectivenessResponseDto(data=_demo_effectiveness())
     from bolsa_api.api.dependencies import get_investor_profile_repository
@@ -154,9 +158,11 @@ async def ai_effectiveness(
 
 @router.post("/ai/decision-memory", response_model=AiEffectivenessResponseDto)
 async def append_decision_memory(
+    request: Request,
     body: AppendDecisionMemoryRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
+    await require_owned_account_if_present(request, body.account_id)
     store = get_cognitive_repository(session)
     rec = await PersistDecisionMemory(store).execute(
         decision_id=body.decision_id,
@@ -177,11 +183,13 @@ async def append_decision_memory(
 
 @router.get("/ai/decision-sessions", response_model=ListDecisionSessionsResponseDto)
 async def list_decision_sessions(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: Annotated[str | None, Query(alias="accountId")] = None,
     instrument_id: Annotated[str | None, Query(alias="instrumentId")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 40,
 ) -> ListDecisionSessionsResponseDto:
+    await require_owned_account_if_present(request, account_id)
     store = get_cognitive_repository(session)
     rows = await store.list_decision_sessions(
         limit=limit,
@@ -208,12 +216,14 @@ async def list_decision_sessions(
 
 @router.get("/ai/decision-sessions/learning-summary", response_model=AiEffectivenessResponseDto)
 async def decision_session_learning_summary(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: Annotated[str | None, Query(alias="accountId")] = None,
     instrument_id: Annotated[str | None, Query(alias="instrumentId")] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> dict[str, Any]:
     """Hit-rate agregado de Outcomes (no ajusta WeightRules). Debe ir antes de /{session_id}."""
+    await require_owned_account_if_present(request, account_id)
     from bolsa_application.close_decision_session_outcome import LoadSessionLearningSummary
 
     store = get_cognitive_repository(session)
@@ -228,6 +238,7 @@ async def decision_session_learning_summary(
 @router.get("/ai/decision-sessions/{session_id}", response_model=AiEffectivenessResponseDto)
 async def get_decision_session(
     session_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     store = get_cognitive_repository(session)
@@ -236,23 +247,27 @@ async def get_decision_session(
         from fastapi import HTTPException
 
         raise HTTPException(status_code=404, detail="DecisionSession no encontrada")
+    # A1: si la sesión pertenece a una cuenta, solo visible si es del principal.
+    await require_owned_account_if_present(request, rec.account_id)
     return {"data": rec.payload or {"sessionId": rec.id, "kind": rec.kind, "status": rec.status}}
 
 
 @router.get("/ai/decision-sessions/{session_id}/replay", response_model=AiEffectivenessResponseDto)
 async def get_decision_session_replay(
     session_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """Caja negra: timeline a partir de la fotografía DecisionSession (sin re-ejecutar)."""
-    from fastapi import HTTPException
-
     from bolsa_analytics.cognitive import build_decision_replay
+    from fastapi import HTTPException
 
     store = get_cognitive_repository(session)
     rec = await store.get_decision_session(session_id)
     if rec is None or not rec.payload:
         raise HTTPException(status_code=404, detail="DecisionSession no encontrada")
+    # A1: sesión de cuenta ajena no legible.
+    await require_owned_account_if_present(request, rec.account_id)
     replay = build_decision_replay(rec.payload)
     return {"data": replay.to_dict()}
 
@@ -260,16 +275,21 @@ async def get_decision_session_replay(
 @router.post("/ai/decision-sessions/{session_id}/outcome", response_model=AiEffectivenessResponseDto)
 async def close_decision_session_outcome(
     session_id: str,
+    request: Request,
     body: CloseSessionOutcomeRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """Cierra DecisionSession con Outcome (Learning). auto_mark = close D1 +N horizonte."""
+    from bolsa_application.close_decision_session_outcome import CloseDecisionSessionOutcome
     from fastapi import HTTPException
 
     from bolsa_api.api.dependencies import get_ohlcv_repository
-    from bolsa_application.close_decision_session_outcome import CloseDecisionSessionOutcome
 
     store = get_cognitive_repository(session)
+    rec = await store.get_decision_session(session_id)
+    # A1: no cerrar learning de una sesión de cuenta ajena.
+    if rec is not None:
+        await require_owned_account_if_present(request, rec.account_id)
     use_case = CloseDecisionSessionOutcome(store, ohlcv=get_ohlcv_repository(session))
     try:
         payload = await use_case.execute(
@@ -290,9 +310,11 @@ async def close_decision_session_outcome(
 
 @router.post("/ai/trials", response_model=AiEffectivenessResponseDto)
 async def append_trial(
+    request: Request,
     body: AppendTrialRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
+    await require_owned_account_if_present(request, body.account_id)
     store = get_cognitive_repository(session)
     rec = await PersistTrial(store).execute(
         log_id=body.log_id,
@@ -310,9 +332,11 @@ async def append_trial(
 
 @router.post("/ai/edge-reports", response_model=AiEffectivenessResponseDto)
 async def append_edge_report(
+    request: Request,
     body: AppendEdgeReportRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
+    await require_owned_account_if_present(request, body.account_id)
     store = get_cognitive_repository(session)
     suite = StatisticalSuiteResult(
         trials_n=body.trials_n,
@@ -342,10 +366,12 @@ async def append_edge_report(
 
 @router.post("/ai/recommendations/propose", response_model=AiEffectivenessResponseDto)
 async def propose_recommendation(
+    request: Request,
     body: ProposeRecommendationRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """F3 — OHLCV → Assessments → DecisionRuntime → Recommendation."""
+    await require_owned_account_if_present(request, body.account_id)
     from bolsa_api.api.dependencies import (
         get_investor_profile_repository,
         get_propose_recommendation_use_case,
@@ -480,10 +506,10 @@ async def explain_instrument_fundamentals(
     F1b — copiloto FA. Solo interpreta FundamentalCardDto ya calculado.
     Proxy First; si Ollama no responde → engine=heuristic (prosa desde facts).
     """
+    from bolsa_application.explain_instrument_fundamentals import ExplainInstrumentFundamentals
     from fastapi import HTTPException
 
     from bolsa_api.api.dependencies import get_instrument_fundamentals_use_case
-    from bolsa_application.explain_instrument_fundamentals import ExplainInstrumentFundamentals
 
     use_case = ExplainInstrumentFundamentals(get_instrument_fundamentals_use_case(session))
     result = await use_case.execute(body.instrument_id)
@@ -525,10 +551,10 @@ async def summarize_instrument_filing(
     F2b — resumen narrativo de un filing subido.
     No recalcula ratios ni escribe profile_snapshot.fundamentals.
     """
+    from bolsa_application.instrument_filings import SummarizeInstrumentFiling
     from fastapi import HTTPException
 
     from bolsa_api.api.dependencies import get_instrument_repository
-    from bolsa_application.instrument_filings import SummarizeInstrumentFiling
 
     result = await SummarizeInstrumentFiling(get_instrument_repository(session)).execute(
         body.instrument_id,
@@ -548,10 +574,10 @@ async def ask_instrument_filing(
     F2b++ — Q&A con retrieval TF-IDF local sobre el extracto del filing.
     Sin vectores/Chroma. No altera Score_FUND.
     """
+    from bolsa_application.instrument_filings import AskInstrumentFiling
     from fastapi import HTTPException
 
     from bolsa_api.api.dependencies import get_instrument_repository
-    from bolsa_application.instrument_filings import AskInstrumentFiling
 
     try:
         result = await AskInstrumentFiling(get_instrument_repository(session)).execute(

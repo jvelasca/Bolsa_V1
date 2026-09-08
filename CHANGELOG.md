@@ -2,6 +2,33 @@
 
 All notable releases of Bolsa V1.
 
+## [1.43.2-beta] — 2026-09-08
+
+V2.14.2 **elevation** (cierre A1: account-isolation ampliada a rutas de LECTURA/estudio) a `main`. Producto **BETA / no producción**. Package **`1.43.2-beta`** (**bump** desde `1.43.1-beta`). **≠** Accept LIVE · **≠** thaw · **≠** settlement · éxodo LIVE no certificado.
+
+### Close — A1 account-isolation extendida a rutas de LECTURA/estudio (2026-09-08)
+
+- **Cierre A1 residual (deuda del cierre V2.14.1).** Además de los gates de EJECUCIÓN ya aplicados
+  (confirm/evaluate-exits/execute-auto/paper-desk-cycle), quedó la deuda de que los endpoints de
+  **lectura/estudio/acount-scope** operaban sin `require_account_access` (solo explotable con ≥2.º
+  owner real; hoy single-owner bootstrap). Al añadirse `require_owned_account_if_present`
+  (`dependencies.py`), se bloquea (404) toda lectura/estudio que declare una `account_id` que no
+  pertenezca al principal del request; `account_id` ausente (demo/global) se preserva para la UI.
+- **Rutas gateadas con cuenta visible:**
+  - `ai_governance.py`: `GET /ai/effectiveness`, `POST /ai/decision-memory`, `GET /ai/decision-sessions`,
+    `GET /ai/decision-sessions/learning-summary`, `GET /ai/decision-sessions/{id}` + `/replay`,
+    `POST /ai/decision-sessions/{id}/outcome`, `POST /ai/trials`, `POST /ai/edge-reports`,
+    `POST /ai/recommendations/propose`.
+  - `instrument_daily_opinions.py`: `POST /instrument-daily-opinions/query`,
+    `GET /instrument-daily-opinions/auto-telemetry`, `POST /instrument-daily-opinions/auto-propose`,
+    `POST /instrument-daily-opinions/eod-batch`.
+  - `paper_desk.py`: `GET /paper-desk/daily-report`.
+  - `risk.py`: `GET /risk/ops-self-eval`.
+- Tests de aislamiento por cuenta añadidos en `apps/api-python/tests/test_account_isolation.py`
+  (effectiveness/decision-sessions/ops-self-eval/daily-report → 404 cuenta ajena). En el informe de
+  lectura A1 (`audit-interno-lectura-v2-14-2026-09-08.md`) el hallazgo A1 pasa de **[cerrado parcial]**
+  a **[cerrado]** (la nota cross-account multi-owner sigue `[runtime-aislamiento]`: hoy único owner real).
+
 ## [1.43.1-beta] — 2026-09-08
 
 V2.14.1 **hotfix elevation** (`provenance self-reported + contract G12/G13` · `A1 account-isolation` · `schema 023 reconcile`) a `main`. Producto **BETA / no producción**. Tip vigente **`main` → [`da181b76`](https://github.com/jvelasca/Bolsa_V1/commit/da181b76)** (cierre auditoría V2.14 · +hotfixes 2026-09-08). Package **`1.43.1-beta`** (**bump** desde `1.43.0-beta`). **≠** Accept LIVE · **≠** thaw · **≠** settlement · éxodo LIVE no certificado.

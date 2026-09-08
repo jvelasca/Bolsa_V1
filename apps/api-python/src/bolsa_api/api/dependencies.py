@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
-from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_application.account_blob_state import (
     GetAccountCoreRState,
     GetAccountMandates,
@@ -270,6 +269,8 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
+from bolsa_api.auth.request_principal import get_request_principal
+
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
     return cast(async_sessionmaker[AsyncSession], request.app.state.session_factory)
@@ -391,6 +392,22 @@ async def require_account_header_access(
     """Si ``X-Account-Id`` viene, misma visibilidad que ``require_account_access``.
 
     Header ausente → ``None`` (no 400).
+    """
+    if account_id is None:
+        return None
+    return await require_account_access(request, account_id)
+
+
+async def require_owned_account_if_present(
+    request: Request,
+    account_id: str | None,
+) -> str | None:
+    """A1 residual (lectura/estudio): aislamiento por cuenta visible del principal.
+
+    Rechaza (404) solo cuando la ruta declara un ``account_id`` concreto que NO
+    pertenece al principal. ``account_id`` ausente (consulta acount-less: demo,
+    instrumento/global) se permite pasar, preservando los flujos FE que no fijan
+    cuenta. Con 2º owner real esto bloquea la lectura cross-account en estudio.
     """
     if account_id is None:
         return None
@@ -556,8 +573,6 @@ def get_portfolio_recon_lookup(session: AsyncSession) -> Any:
 
 def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
     """OR-4 V1.95 — composed financial integrity status for check_opening."""
-    from sqlalchemy import func, select
-
     from bolsa_application.lifecycle_event_store import (
         GetLifecycleSnapshot,
         PostgresLifecycleEventStore,
@@ -577,6 +592,7 @@ def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
+    from sqlalchemy import func, select
 
     class _OutboxAdapter:
         async def list_for_account(self, acc: str) -> list[OutboxSnap]:

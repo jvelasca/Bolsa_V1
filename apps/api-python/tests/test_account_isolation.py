@@ -5,6 +5,12 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models import InvestmentAccountRow, InvestorProfileRow
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
+from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,12 +22,6 @@ from bolsa_api.auth.principal import (
 )
 from bolsa_api.auth.session import SESSION_COOKIE_NAME
 from bolsa_api.main import create_app, lifespan
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import InvestmentAccountRow, InvestorProfileRow
-from bolsa_infrastructure.database.repositories.account_repository import (
-    SqlAlchemyAccountRepository,
-)
-from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 
 
 def _now() -> datetime:
@@ -483,3 +483,99 @@ async def test_legacy_null_user_id_core_r_hidden_from_bootstrap() -> None:
                 assert response.status_code == 404
         finally:
             await _delete_raw_account(factory, legacy_id)
+
+
+@pytest.mark.asyncio
+async def test_reading_study_effectiveness_foreign_account_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A1 residual (lectura/estudio): /ai/effectiveness de cuenta ajena → 404."""
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        owner_id = await _insert_raw_account(
+            factory, user_id="user-a", name="Owner A5"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/ai/effectiveness",
+                    params={"accountId": owner_id},
+                )
+                assert response.status_code == 404
+        finally:
+            await _delete_raw_account(factory, owner_id)
+
+
+@pytest.mark.asyncio
+async def test_reading_study_decision_sessions_foreign_account_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A1 residual: /ai/decision-sessions de cuenta ajena → 404."""
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        owner_id = await _insert_raw_account(
+            factory, user_id="user-a", name="Owner A6"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/ai/decision-sessions",
+                    params={"accountId": owner_id},
+                )
+                assert response.status_code == 404
+        finally:
+            await _delete_raw_account(factory, owner_id)
+
+
+@pytest.mark.asyncio
+async def test_risk_ops_self_eval_foreign_account_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A1 residual: /risk/ops-self-eval de cuenta ajena → 404."""
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        owner_id = await _insert_raw_account(
+            factory, user_id="user-a", name="Owner A7"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/risk/ops-self-eval",
+                    params={"accountId": owner_id},
+                )
+                assert response.status_code == 404
+        finally:
+            await _delete_raw_account(factory, owner_id)
+
+
+@pytest.mark.asyncio
+async def test_paper_desk_daily_report_foreign_account_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A1 residual: /paper-desk/daily-report de cuenta ajena → 404."""
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        owner_id = await _insert_raw_account(
+            factory, user_id="user-a", name="Owner A8"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/paper-desk/daily-report",
+                    params={"accountId": owner_id},
+                )
+                assert response.status_code == 404
+        finally:
+            await _delete_raw_account(factory, owner_id)

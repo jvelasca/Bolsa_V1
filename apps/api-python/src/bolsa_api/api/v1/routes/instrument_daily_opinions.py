@@ -5,7 +5,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from bolsa_application.daily_opinion_service import OpinionHint
+from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
+from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
+from bolsa_infrastructure.config import get_settings
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
@@ -14,6 +18,8 @@ from bolsa_api.api.dependencies import (
     get_db_session,
     get_estudio_auto_telemetry_service,
     get_propose_estudio_auto_use_case,
+    require_account_access,
+    require_owned_account_if_present,
 )
 from bolsa_api.schemas.instrument_daily_opinions import (
     EstudioAutoProposeDto,
@@ -27,10 +33,6 @@ from bolsa_api.schemas.instrument_daily_opinions import (
     RunEstudioEodOpinionBatchDto,
     to_instrument_daily_opinion_dto,
 )
-from bolsa_application.daily_opinion_service import OpinionHint
-from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
-from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
-from bolsa_infrastructure.config import get_settings
 
 router = APIRouter()
 
@@ -49,9 +51,12 @@ def _parse_as_of(raw: str | None) -> date | None:
     response_model=InstrumentDailyOpinionsListResponseDto,
 )
 async def query_instrument_daily_opinions(
+    request: Request,
     body: QueryInstrumentDailyOpinionsDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InstrumentDailyOpinionsListResponseDto:
+    # A1: si la consulta es de una cuenta concreta → solo cuenta del principal.
+    await require_owned_account_if_present(request, body.account_id)
     service = get_daily_opinion_service(session)
     hints = [
         OpinionHint(
@@ -148,6 +153,7 @@ async def get_opinion_telemetry(
 
 @router.get("/instrument-daily-opinions/auto-telemetry")
 async def get_estudio_auto_telemetry(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     lookback_days: Annotated[int, Query(alias="lookbackDays", ge=7, le=366)] = 120,
     account_id: Annotated[str, Query(alias="accountId", min_length=1, max_length=128)] = (
@@ -156,6 +162,8 @@ async def get_estudio_auto_telemetry(
     instrument_ids: Annotated[list[str] | None, Query(alias="instrumentIds")] = None,
 ) -> dict[str, Any]:
     """A6 — embudo Estudio AUTO (A-δ). measure ≠ Accept · ≠ flip execute · ≠ Radar/Hoy."""
+    # A1: A6 lee conteos/reconciliación de una cuenta concreta → 404 si ajena.
+    await require_account_access(request, account_id)
     ids = None
     if instrument_ids:
         ids = [i.strip() for i in instrument_ids if isinstance(i, str) and i.strip()]
@@ -205,6 +213,7 @@ async def get_estudio_auto_telemetry(
 
 @router.post("/instrument-daily-opinions/auto-propose")
 async def propose_estudio_auto_openings(
+    request: Request,
     body: EstudioAutoProposeDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
@@ -213,6 +222,8 @@ async def propose_estudio_auto_openings(
     Dry-run por defecto. Execute: ``PAPER_D_EXECUTE=1`` + ``execute=true`` +
     ``executionPolicyId`` (paper_auto). ≠ Paper D Composite · ≠ Radar · ≠ Hoy.
     """
+    # A1: si la propuesta va dirigida a una cuenta → debe ser del principal.
+    await require_owned_account_if_present(request, body.account_id)
     payload = {
         "instrumentIds": body.instrument_ids,
         "asOfBarDate": body.as_of_bar_date,
@@ -234,10 +245,13 @@ async def propose_estudio_auto_openings(
     response_model=EstudioEodOpinionBatchResponseDto,
 )
 async def run_estudio_eod_opinion_batch(
+    request: Request,
     body: RunEstudioEodOpinionBatchDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> EstudioEodOpinionBatchResponseDto:
     """Batch EOD (source=eod_batch). Flag off-by-default; `force` permite dry-run manual."""
+    # A1: el batch EOD lee/envía por cuenta concreta → debe ser del principal.
+    await require_owned_account_if_present(request, body.account_id)
     settings = get_settings()
     enabled = bool(settings.estudio_eod_opinion_enabled)
     if not enabled and not body.force:
