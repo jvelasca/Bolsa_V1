@@ -56,14 +56,12 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
     try:
         async with engine.connect() as conn:
             await conn.execute(select(1))
-            version = await conn.execute(
-                text("SELECT version_num FROM alembic_version")
-            )
+            version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "021_live_orders_fin" not in versions:
+            if "022_live_orders_exec" not in versions:
                 raise RuntimeError(
                     f"alembic_version is {versions!r}; "
-                    "expected 021_live_orders_fin (V2.13 live_orders head)"
+                    "expected 022_live_orders_exec (V2.14 live_orders head)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
@@ -135,9 +133,7 @@ async def _enqueue(
         return row.id
 
 
-async def _status(
-    factory: async_sessionmaker[AsyncSession], outbox_id: str
-) -> str | None:
+async def _status(factory: async_sessionmaker[AsyncSession], outbox_id: str) -> str | None:
     from bolsa_infrastructure.database.models.tables import LifecycleOutboxRow
 
     async with factory() as session:
@@ -161,9 +157,7 @@ async def _wait_status(
     raise AssertionError(f"outbox {outbox_id} status={got!r} expected={expected!r}")
 
 
-async def _cleanup(
-    factory: async_sessionmaker[AsyncSession], *, position_id: str
-) -> None:
+async def _cleanup(factory: async_sessionmaker[AsyncSession], *, position_id: str) -> None:
     async with factory() as session:
         await session.execute(
             text("DELETE FROM lifecycle_outbox WHERE position_id = :p"),
@@ -215,9 +209,7 @@ async def test_worker_pending_to_applied(
     try:
         await _wait_status(session_factory, oid, "applied")
         async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
         assert snap["stage"] == "open"
         assert snap["events"][0]["kind"] == "POSITION_OPENED"
     finally:
@@ -319,9 +311,7 @@ async def test_worker_stale_reclaim_after_crash(
         row = await session.get(LifecycleOutboxRow, oid)
         assert row is not None
         row.status = "processing"
-        row.claimed_at = datetime.now(UTC) - timedelta(
-            seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
-        )
+        row.claimed_at = datetime.now(UTC) - timedelta(seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5)
         await session.commit()
 
     task = start_lifecycle_outbox_worker(session_factory, tick_seconds=0.05)
@@ -387,17 +377,19 @@ async def test_two_workers_same_position_fifo_open_t1_exit(
         for oid in ids:
             await _wait_status(session_factory, oid, "applied", timeout=10.0)
         async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
             dead = (
-                await session.execute(
-                    select(LifecycleOutboxRow).where(
-                        LifecycleOutboxRow.position_id == pos,
-                        LifecycleOutboxRow.status == "dead",
+                (
+                    await session.execute(
+                        select(LifecycleOutboxRow).where(
+                            LifecycleOutboxRow.position_id == pos,
+                            LifecycleOutboxRow.status == "dead",
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
         assert snap["stage"] == "closed"
         kinds = [e["kind"] for e in snap["events"]]
         assert kinds == ["POSITION_OPENED", "T1_EXECUTED", "POSITION_CLOSED"]
@@ -467,9 +459,7 @@ async def test_crash_after_claim_then_stale_reclaim(
             await session.commit()
         await _wait_status(session_factory, oid, "applied", timeout=8.0)
         async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
         assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
     finally:
         task.cancel()
@@ -535,9 +525,7 @@ async def test_crash_mid_apply_before_commit_then_reclaim(
             await session.commit()
         await _wait_status(session_factory, oid, "applied", timeout=8.0)
         async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
         assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
     finally:
         task.cancel()
@@ -581,9 +569,7 @@ async def test_idempotent_reclaim_after_append_without_mark(
         ),
     )
     async with session_factory() as session:
-        result = await AppendLifecycleEvent(
-            PostgresLifecycleEventStore(session)
-        ).execute(
+        result = await AppendLifecycleEvent(PostgresLifecycleEventStore(session)).execute(
             input_from_body(
                 _direct(
                     kind="POSITION_OPENED",
@@ -598,9 +584,7 @@ async def test_idempotent_reclaim_after_append_without_mark(
         row = await session.get(LifecycleOutboxRow, oid)
         assert row is not None
         row.status = "processing"
-        row.claimed_at = datetime.now(UTC) - timedelta(
-            seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
-        )
+        row.claimed_at = datetime.now(UTC) - timedelta(seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5)
         await session.commit()
 
     task = start_lifecycle_outbox_worker(session_factory, tick_seconds=0.05)
@@ -608,9 +592,7 @@ async def test_idempotent_reclaim_after_append_without_mark(
     try:
         await _wait_status(session_factory, oid, "applied", timeout=8.0)
         async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
         assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
     finally:
         task.cancel()
@@ -664,26 +646,25 @@ async def test_three_workers_same_position_fifo(
         )
         ids.append(oid)
 
-    tasks = [
-        start_lifecycle_outbox_worker(session_factory, tick_seconds=0.05)
-        for _ in range(3)
-    ]
+    tasks = [start_lifecycle_outbox_worker(session_factory, tick_seconds=0.05) for _ in range(3)]
     assert all(t is not None for t in tasks)
     try:
         for oid in ids:
             await _wait_status(session_factory, oid, "applied", timeout=12.0)
         async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
             dead = (
-                await session.execute(
-                    select(LifecycleOutboxRow).where(
-                        LifecycleOutboxRow.position_id == pos,
-                        LifecycleOutboxRow.status == "dead",
+                (
+                    await session.execute(
+                        select(LifecycleOutboxRow).where(
+                            LifecycleOutboxRow.position_id == pos,
+                            LifecycleOutboxRow.status == "dead",
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
         assert [e["kind"] for e in snap["events"]] == [
             "POSITION_OPENED",
             "T1_EXECUTED",
@@ -800,17 +781,19 @@ async def test_kick_and_worker_concurrent_single_event(
         await asyncio.gather(_kick(), _kick(), _kick())
         await _wait_status(session_factory, oid, "applied", timeout=8.0)
         async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
             dead = (
-                await session.execute(
-                    select(LifecycleOutboxRow).where(
-                        LifecycleOutboxRow.position_id == pos,
-                        LifecycleOutboxRow.status == "dead",
+                (
+                    await session.execute(
+                        select(LifecycleOutboxRow).where(
+                            LifecycleOutboxRow.position_id == pos,
+                            LifecycleOutboxRow.status == "dead",
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
         assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
         assert dead == []
     finally:
@@ -913,9 +896,7 @@ async def test_t2_crash_mid_pair_then_reclaim_exactly_one_each(
         await _wait_status(session_factory, oid, "processing", timeout=5.0)
         # Confirm orphan trigger was NOT committed.
         async with session_factory() as session:
-            snap_mid = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap_mid = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
         kinds_mid = [e["kind"] for e in snap_mid["events"]]
         assert "T2_TRIGGERED" not in kinds_mid
         assert "T2_EXECUTED" not in kinds_mid
@@ -931,9 +912,7 @@ async def test_t2_crash_mid_pair_then_reclaim_exactly_one_each(
 
         await _wait_status(session_factory, oid, "applied", timeout=8.0)
         async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(
-                PostgresLifecycleEventStore(session)
-            ).execute(pos)
+            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
         kinds = [e["kind"] for e in snap["events"]]
         assert kinds.count("T2_TRIGGERED") == 1
         assert kinds.count("T2_EXECUTED") == 1

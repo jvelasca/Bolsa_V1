@@ -10,14 +10,14 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy.exc import IntegrityError
+
 from bolsa_analytics.cognitive.live_order import (
     LiveOrder,
     build_live_order,
     can_transition_live_order,
     transition_live_order,
 )
-from sqlalchemy.exc import IntegrityError
-
 from bolsa_application.live_order_store import (
     InMemoryLiveOrderStore,
     PostgresLiveOrderStore,

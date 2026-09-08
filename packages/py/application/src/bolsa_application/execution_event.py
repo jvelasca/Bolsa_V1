@@ -93,6 +93,7 @@ class PostgresExecutionEventStore:
 
     async def capture(self, execution: ExecutionEvent) -> CaptureStatus:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
@@ -116,6 +117,7 @@ class PostgresExecutionEventStore:
 
     async def get(self, execution_id: str) -> ExecutionEvent | None:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         row = (

@@ -66,14 +66,12 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
     try:
         async with engine.connect() as conn:
             await conn.execute(select(1))
-            version = await conn.execute(
-                text("SELECT version_num FROM alembic_version")
-            )
+            version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "021_live_orders_fin" not in versions:
+            if "022_live_orders_exec" not in versions:
                 raise RuntimeError(
                     f"alembic_version is {versions!r}; "
-                    "expected 021_live_orders_fin (V2.13 live_orders head)"
+                    "expected 022_live_orders_exec (V2.14 live_orders head)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
@@ -222,6 +220,4 @@ async def test_two_workers_claim_disjoint_unknown_batch(
     # Ninguna fila asignada a dos workers al mismo tiempo.
     assert not overlap, f"doble-claim en la misma ventana: {overlap}"
     # Entre los dos cubren TODO el lote (no pierden filas bajo contención).
-    assert union == seeded, (
-        f"lote no cubierto: missing {seeded - union}, extra {union - seeded}"
-    )
+    assert union == seeded, f"lote no cubierto: missing {seeded - union}, extra {union - seeded}"

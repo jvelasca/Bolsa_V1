@@ -9,6 +9,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal, Protocol
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_analytics.cognitive.operational_incident import (
     OperationalIncident,
     OperationalIncidentKind,
@@ -21,9 +25,6 @@ from bolsa_analytics.cognitive.operational_incident import (
 )
 from bolsa_infrastructure.database.models.tables import OperationalIncidentRow
 from bolsa_infrastructure.ids import new_id
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 IncidentOpeningStatus = Literal["clear", "unresolved"]
 

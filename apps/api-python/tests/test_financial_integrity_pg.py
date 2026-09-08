@@ -56,14 +56,12 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
     try:
         async with engine.connect() as conn:
             await conn.execute(select(1))
-            version = await conn.execute(
-                text("SELECT version_num FROM alembic_version")
-            )
+            version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "021_live_orders_fin" not in versions:
+            if "022_live_orders_exec" not in versions:
                 raise RuntimeError(
                     f"alembic_version is {versions!r}; "
-                    "expected 021_live_orders_fin (V2.13 live_orders head)"
+                    "expected 022_live_orders_exec (V2.14 live_orders head)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
@@ -88,15 +86,17 @@ def _outbox_adapter(session: AsyncSession) -> Any:
     class _Adapter:
         async def list_for_account(self, acc: str) -> list[OutboxSnap]:
             rows = (
-                await session.execute(
-                    select(LifecycleOutboxRow).where(
-                        LifecycleOutboxRow.account_id == acc,
-                        LifecycleOutboxRow.status.in_(
-                            ("pending", "processing", "dead")
-                        ),
+                (
+                    await session.execute(
+                        select(LifecycleOutboxRow).where(
+                            LifecycleOutboxRow.account_id == acc,
+                            LifecycleOutboxRow.status.in_(("pending", "processing", "dead")),
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return [
                 OutboxSnap(
                     position_id=r.position_id,
@@ -217,11 +217,7 @@ async def test_dead_head_vs_dead_non_head(
         ]
         report = build_lifecycle_reconciliation(
             account_id=account_id,
-            positions=[
-                PositionStateSnap(
-                    position_id=position_id, status="OPEN", remaining=10.0
-                )
-            ],
+            positions=[PositionStateSnap(position_id=position_id, status="OPEN", remaining=10.0)],
             snapshots_by_position={
                 position_id: {
                     "events": [
@@ -240,9 +236,7 @@ async def test_dead_head_vs_dead_non_head(
     pos2 = f"fi-pos2-{uuid4().hex[:10]}"
     report2 = build_lifecycle_reconciliation(
         account_id=account_id,
-        positions=[
-            PositionStateSnap(position_id=pos2, status="OPEN", remaining=5.0)
-        ],
+        positions=[PositionStateSnap(position_id=pos2, status="OPEN", remaining=5.0)],
         snapshots_by_position={
             pos2: {
                 "events": [{"kind": "POSITION_OPENED"}, {"kind": "T1_EXECUTED"}],

@@ -20,9 +20,9 @@ from collections import Counter
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_analytics.cognitive.operational_incident import open_incident
 from sqlalchemy.exc import IntegrityError
 
+from bolsa_analytics.cognitive.operational_incident import open_incident
 from bolsa_application.live_order_machine_reconcile import LiveOrderDrift
 from bolsa_application.operational_incident_store import (
     InMemoryOperationalIncidentStore,

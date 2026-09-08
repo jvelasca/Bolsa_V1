@@ -62,9 +62,7 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
                 )
             )
             if events.scalar() is None:
-                raise RuntimeError(
-                    "lifecycle_events missing — run alembic upgrade head"
-                )
+                raise RuntimeError("lifecycle_events missing — run alembic upgrade head")
             seq = await conn.execute(
                 text(
                     "SELECT 1 FROM information_schema.columns "
@@ -74,17 +72,13 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
                 )
             )
             if seq.scalar() is None:
-                raise RuntimeError(
-                    "lifecycle_events.sequence_no missing — Alembic 016 required"
-                )
-            version = await conn.execute(
-                text("SELECT version_num FROM alembic_version")
-            )
+                raise RuntimeError("lifecycle_events.sequence_no missing — Alembic 016 required")
+            version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "021_live_orders_fin" not in versions:
+            if "022_live_orders_exec" not in versions:
                 raise RuntimeError(
                     f"alembic_version is {versions!r}; "
-                    "expected 021_live_orders_fin (V2.13 live_orders head)"
+                    "expected 022_live_orders_exec (V2.14 live_orders head)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
@@ -141,18 +135,14 @@ async def test_alembic_head_has_sequence_and_aggregates(
     agg = (
         await db_session.execute(
             text(
-                "SELECT 1 FROM information_schema.tables "
-                "WHERE table_name = 'lifecycle_aggregates'"
+                "SELECT 1 FROM information_schema.tables WHERE table_name = 'lifecycle_aggregates'"
             )
         )
     ).scalar()
     assert agg == 1
     uidx = (
         await db_session.execute(
-            text(
-                "SELECT 1 FROM pg_indexes "
-                "WHERE indexname = 'lifecycle_events_position_seq_uidx'"
-            )
+            text("SELECT 1 FROM pg_indexes WHERE indexname = 'lifecycle_events_position_seq_uidx'")
         )
     ).scalar()
     assert uidx == 1
@@ -169,7 +159,6 @@ async def test_pg_open_t1_close_fresh_session_same_snapshot(
         PostgresLifecycleEventStore,
     )
     from bolsa_domain.lifecycle import LifecycleEventInput
-
     from bolsa_infrastructure.database.session import create_session_factory
 
     pos = f"pos-pg-{uuid4().hex[:12]}"
@@ -195,14 +184,17 @@ async def test_pg_open_t1_close_fresh_session_same_snapshot(
     assert snap1["accounting"]["totalEquity"] == 100_055
     seqs = [ev["sequenceNo"] for ev in snap1["events"]]
     assert seqs == list(range(1, len(seqs) + 1))
-    assert abs(
-        snap1["accounting"]["totalEquity"]
-        - (
-            snap1["accounting"]["initialEquity"]
-            + snap1["accounting"]["realizedPnl"]
-            + snap1["accounting"]["unrealizedPnl"]
+    assert (
+        abs(
+            snap1["accounting"]["totalEquity"]
+            - (
+                snap1["accounting"]["initialEquity"]
+                + snap1["accounting"]["realizedPnl"]
+                + snap1["accounting"]["unrealizedPnl"]
+            )
         )
-    ) < 1e-6
+        < 1e-6
+    )
 
     factory = create_session_factory(pg_engine)
     async with factory() as session2:
@@ -227,7 +219,6 @@ async def test_pg_concurrent_duplicate_t1_one_wins(
         PostgresLifecycleEventStore,
     )
     from bolsa_domain.lifecycle import LifecycleEventInput
-
     from bolsa_infrastructure.database.session import create_session_factory
 
     pos = f"pos-race-{uuid4().hex[:12]}"

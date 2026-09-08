@@ -16,7 +16,6 @@ sin imports ORM (offline-safe).
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "022_live_orders_exec"
