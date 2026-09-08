@@ -2,6 +2,19 @@
 
 All notable releases of Bolsa V1.
 
+## [1.45.3-beta] — 2026-09-08
+
+Hardening de la auditoría **V2.15.1 C2** (delta en **scripts DR + CI del tag**; núcleo financiero congelado sin tocar; sin migración nueva). Producto **BETA / no producción**.
+Package **`1.45.3-beta`** (**bump** desde `1.45.2-beta`). Alembic head **`023_ohlcv_bars_unique_reconcile`**.
+Cierra tres hallazgos de la pasada anterior:
+
+- **C2-02 (P2-alto)** — `scripts/db-dr-verify.mjs` extiende la batería DR con **invariantes financieras de datos**: inventario canónico de 18 tablas (`FINANCIAL_ENTITIES`, fuente `tables.py`), snapshot `COUNT(*)` + digest md5 del contenido canónico ordenado **BEFORE** sobre la principal y comparación **AFTER** sobre la scratch; checks `dr-snapshot-financiero-leido` y `dr-datos-financieros-integridad`. El restore deja de ser solo "estructural ↔ head" y pasa a ser **financieramente verificable**. (md5 en vez de sha256: `sha256()/encode` viven en `pgcrypto`, no en PostgreSQL 16 core por defecto al restaurar la scratch; md5 built-in basta como guard no-adversarial.)
+- **C2-12 / C2-13 (P2/P3)** — la faena DR y el readiness schema-aware se elevan al **release-tag CI** para que certifiquen en el runner, no solo en local:
+  - transport layer TCP opt-in `BOLSA_DR_TCP=1` (psql/pg*dump de host por `PGHOST/PGPORT/PGUSER/PGPASSWORD`/`DB*\*`) en `docker.mjs`/`backup.mjs`/`db-restore.mjs`/`db-dr-verify.mjs`, con **default Docker intacto** para dev.
+  - job nuevo **`dr-verify`** en `release-tag-ci.yml` (`services: postgres:16-alpine` + `postgresql-client` + `alembic upgrade head` + batería DR por TCP), incorporado a `needs:`/fail-if/summary de `certify` → **un DR rojo rompe el tag**.
+  - `apps/api-python/tests/test_health.py` (readiness `/health/ready` 200/503 schema-aware) entra en el pytest PG de `lifecycle-pg`.
+    Validación local: `pnpm db:dr:test` (Docker) → **8/8 PASS**, incluidas las 2 checks nuevas C2-02. Certificación final del path TCP (runner) vía **Release-tag CI** de este tag.
+
 ## [1.45.2-beta] — 2026-09-08
 
 Auditoría externa **V2.15.1 C2** (delta exclusivamente **documental/audit**; núcleo financiero sin tocar). Producto **BETA / no producción**.
