@@ -69,3 +69,50 @@ persistía. Este trozo convierte el drift **accionable** en incidente durable
    `conclusion=success`).
 
 FIN DEL TRASPASO P2-01 + P1-02-lógica (E2 sigue PARTIAL → pendiente C1)
+
+---
+
+## ADDENDO C1 (2026-09-08) — batería real-PG VERDE sobre PostgreSQL (E2 ya no PARTIAL en PG)
+
+Bajo `go` del operador se ejecutó la batería de PostgreSQL **real** (no stub) del E2.
+Nuevo test durable: `apps/api-python/tests/test_e2_v2_14_incident_dedup_pg.py`.
+
+### Qué se validó contra PostgreSQL real (head `022_live_orders_exec`)
+
+1. **Dedup de OPEN multi-worker real (es el test PG 2-sesión que pedía C1)**:
+   dos sesiones concurrentes (`asyncio.gather`) abren el mismo
+   `(account_id, kind='live_drift')` vía `publish_order_live_drifts` → materializan
+   **exactamente 1 fila OPEN** (quien pierde la carrera parcial-unique deduplica hacia
+   el winner; `IntegrityError`→rollback→`get_active`; sin 2º OPEN, sin auto-heal).
+2. **query_unavailable NO abre** incidente (strict kinds) sobre la BD real.
+3. **P1-02/LR-1 durable**: `sync_opening_incidents` ante LR-1 `unavailable` abre
+   `live_unavailable`; DOS pasadas consecutivas ⇒ 1 OPEN (idempotente por `(account,kind)`).
+4. **CHECKs financieros 021 vigentes bajo 022**: insert deliberado `filled=120 >
+quantity=100`/`remaining=-20` es rechazado por CONSTRAINT con IntegrityError y la
+   fila NO queda materializada (2ª línea de defensa de BD intacta).
+
+### Resultado
+
+```
+4 passed in ~0.9s   (apps/api-python/tests/test_e2_v2_14_incident_dedup_pg.py)
+14 passed           (junto a test_live_order_recovery_worker.py, sin regresión)
+```
+
+### Aislamiento (no se tocó la shared)
+
+- Migración 001→022 aplicada en **`bolsa_c1_scratch`** (BD dedicada creada ad-hoc),
+  apuntando `DATABASE_URL` ahí. `bolsa_v1` (shared, ya estaba en 022 previamente)
+  **no** fue migrada por esta faena ni tiene filas suyas.
+- Tras la batería: scratch limpia (0 filas residuales de las cuentas uuid-sufijadas).
+
+### Cómo re-correr
+
+```
+cd apps/api-python
+$env:DATABASE_URL='postgresql+psycopg://bolsa:bolsa_dev@localhost:5432/bolsa_c1_scratch'
+$env:E2_PG_REQUIRED='1'     # fail hard si la BD no está en head 022
+uv run pytest tests/test_e2_v2_14_incident_dedup_pg.py -v
+```
+
+Queda (no de E2 sino de CI): Release-tag con `conclusion=success` real (go del
+operador en C1-Release-tag).
