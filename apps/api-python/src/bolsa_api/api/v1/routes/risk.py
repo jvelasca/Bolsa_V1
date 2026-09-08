@@ -16,17 +16,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from bolsa_application.broker_venue_runtime import (
-    account_broker_venue_from_settings,
-    broker_venue_status,
-    effective_broker_venue_async,
-    normalize_broker_venue,
-    set_broker_venue,
-)
-from bolsa_application.ops_self_eval import build_ops_self_eval_report
-from bolsa_application.ops_self_eval_counts import load_semi_account_counts
-from bolsa_application.paper_d_propose import paper_d_execute_allowed
-from bolsa_application.risk_runtime import kill_switch_status, set_kill_switch
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +27,17 @@ from bolsa_api.api.dependencies import (
     get_live_recon_lookup,
     require_account_access,
 )
+from bolsa_application.broker_venue_runtime import (
+    account_broker_venue_from_settings,
+    broker_venue_status,
+    effective_broker_venue_async,
+    normalize_broker_venue,
+    set_broker_venue,
+)
+from bolsa_application.ops_self_eval import build_ops_self_eval_report
+from bolsa_application.ops_self_eval_counts import load_semi_account_counts
+from bolsa_application.paper_d_propose import paper_d_execute_allowed
+from bolsa_application.risk_runtime import kill_switch_status, set_kill_switch
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -194,11 +194,10 @@ async def get_ops_self_eval(
     )
     recon_payload: dict[str, Any] | None = None
     try:
+        from bolsa_api.api.dependencies import get_reconcile_portfolio_integrity_use_case
         from bolsa_application.reconcile_portfolio_integrity import (
             ReconcilePortfolioIntegrityInput,
         )
-
-        from bolsa_api.api.dependencies import get_reconcile_portfolio_integrity_use_case
 
         report = await get_reconcile_portfolio_integrity_use_case(session).reconcile(
             ReconcilePortfolioIntegrityInput(account_id=account_id)

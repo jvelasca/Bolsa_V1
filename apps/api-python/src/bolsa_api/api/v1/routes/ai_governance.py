@@ -7,6 +7,9 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_ai import get_default_proxy
 from bolsa_analytics.cognitive import (
     BehaviorTradeSample,
@@ -18,15 +21,6 @@ from bolsa_analytics.cognitive import (
     build_memory_entry,
     observe_investor_profile,
 )
-from bolsa_application.cognitive_persistence import (
-    LoadEffectivenessFromStore,
-    PersistDecisionMemory,
-    PersistEdgeReport,
-    PersistTrial,
-)
-from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from bolsa_api.api.dependencies import (
     get_cognitive_repository,
     get_db_session,
@@ -51,6 +45,12 @@ from bolsa_api.schemas.ai_governance import (
     FundamentalExplainRequest,
     ListDecisionSessionsResponseDto,
     ProposeRecommendationRequest,
+)
+from bolsa_application.cognitive_persistence import (
+    LoadEffectivenessFromStore,
+    PersistDecisionMemory,
+    PersistEdgeReport,
+    PersistTrial,
 )
 
 router = APIRouter()
@@ -259,8 +259,9 @@ async def get_decision_session_replay(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """Caja negra: timeline a partir de la fotografía DecisionSession (sin re-ejecutar)."""
-    from bolsa_analytics.cognitive import build_decision_replay
     from fastapi import HTTPException
+
+    from bolsa_analytics.cognitive import build_decision_replay
 
     store = get_cognitive_repository(session)
     rec = await store.get_decision_session(session_id)
@@ -280,10 +281,10 @@ async def close_decision_session_outcome(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """Cierra DecisionSession con Outcome (Learning). auto_mark = close D1 +N horizonte."""
-    from bolsa_application.close_decision_session_outcome import CloseDecisionSessionOutcome
     from fastapi import HTTPException
 
     from bolsa_api.api.dependencies import get_ohlcv_repository
+    from bolsa_application.close_decision_session_outcome import CloseDecisionSessionOutcome
 
     store = get_cognitive_repository(session)
     rec = await store.get_decision_session(session_id)
@@ -506,10 +507,10 @@ async def explain_instrument_fundamentals(
     F1b — copiloto FA. Solo interpreta FundamentalCardDto ya calculado.
     Proxy First; si Ollama no responde → engine=heuristic (prosa desde facts).
     """
-    from bolsa_application.explain_instrument_fundamentals import ExplainInstrumentFundamentals
     from fastapi import HTTPException
 
     from bolsa_api.api.dependencies import get_instrument_fundamentals_use_case
+    from bolsa_application.explain_instrument_fundamentals import ExplainInstrumentFundamentals
 
     use_case = ExplainInstrumentFundamentals(get_instrument_fundamentals_use_case(session))
     result = await use_case.execute(body.instrument_id)
@@ -551,10 +552,10 @@ async def summarize_instrument_filing(
     F2b — resumen narrativo de un filing subido.
     No recalcula ratios ni escribe profile_snapshot.fundamentals.
     """
-    from bolsa_application.instrument_filings import SummarizeInstrumentFiling
     from fastapi import HTTPException
 
     from bolsa_api.api.dependencies import get_instrument_repository
+    from bolsa_application.instrument_filings import SummarizeInstrumentFiling
 
     result = await SummarizeInstrumentFiling(get_instrument_repository(session)).execute(
         body.instrument_id,
@@ -574,10 +575,10 @@ async def ask_instrument_filing(
     F2b++ — Q&A con retrieval TF-IDF local sobre el extracto del filing.
     Sin vectores/Chroma. No altera Score_FUND.
     """
-    from bolsa_application.instrument_filings import AskInstrumentFiling
     from fastapi import HTTPException
 
     from bolsa_api.api.dependencies import get_instrument_repository
+    from bolsa_application.instrument_filings import AskInstrumentFiling
 
     try:
         result = await AskInstrumentFiling(get_instrument_repository(session)).execute(

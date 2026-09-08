@@ -9,9 +9,6 @@ from __future__ import annotations
 from datetime import date as date_cls
 from typing import Annotated, Any
 
-from bolsa_application.paper_d_propose import paper_d_execute_allowed
-from bolsa_application.paper_daily_report import build_paper_daily_report
-from bolsa_application.paper_desk_cycle import PaperDeskCycleInput
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +19,9 @@ from bolsa_api.api.dependencies import (
     get_paper_desk_cycle_use_case,
     require_account_access,
 )
+from bolsa_application.paper_d_propose import paper_d_execute_allowed
+from bolsa_application.paper_daily_report import build_paper_daily_report
+from bolsa_application.paper_desk_cycle import PaperDeskCycleInput
 
 router = APIRouter()
 
@@ -112,9 +112,8 @@ async def paper_desk_daily_report(
     )
     auto_desk = build_paper_daily_report(cycle).to_dict()
 
-    from bolsa_application.daily_ops_report import DAILY_OPS_REPORT_SCHEMA
-
     from bolsa_api.schemas.account_mappers import to_account_summary_dto, to_ledger_entry_dto
+    from bolsa_application.daily_ops_report import DAILY_OPS_REPORT_SCHEMA
 
     try:
         bundle = await get_daily_ops_report_use_case(session).execute(

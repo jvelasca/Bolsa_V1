@@ -5,10 +5,6 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Any
 
-from bolsa_application.daily_opinion_service import OpinionHint
-from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
-from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
-from bolsa_infrastructure.config import get_settings
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +29,10 @@ from bolsa_api.schemas.instrument_daily_opinions import (
     RunEstudioEodOpinionBatchDto,
     to_instrument_daily_opinion_dto,
 )
+from bolsa_application.daily_opinion_service import OpinionHint
+from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
+from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
+from bolsa_infrastructure.config import get_settings
 
 router = APIRouter()
 
