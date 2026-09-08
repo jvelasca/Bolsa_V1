@@ -2,11 +2,12 @@
 
 from datetime import UTC, datetime
 
+from fastapi import APIRouter, Request, Response
+from pydantic import BaseModel, Field
+
 from bolsa_infrastructure.alerts.estudio_opinion_email import smtp_ready
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.session import check_database
-from fastapi import APIRouter, Request, Response
-from pydantic import BaseModel, Field
 
 router = APIRouter()
 
