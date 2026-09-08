@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from bolsa_analytics.cognitive.operational_incident import (
     OperationalIncident,
@@ -117,7 +117,7 @@ class IncidentHolder(Protocol):
 def _non_empty(value: object) -> str:
     s = getattr(value, "strip", None)
     if callable(s):
-        return s()
+        return cast(str, s())
     return "" if value is None else str(value)
 
 

@@ -97,7 +97,7 @@ class PostgresExecutionEventStore:
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
-            sa.insert(ExecutionEventRow)
+            sa.insert(ExecutionEventRow)  # type: ignore[attr-defined]
             .values(
                 execution_id=execution.execution_id,
                 order_id=execution.order_id,

@@ -215,9 +215,7 @@ class PostgresOperationalIncidentStore:
             await self._session.rollback()
             existing = None
             try:
-                existing = await self.get_active(
-                    incident.account_id, incident.kind  # type: ignore[arg-type]
-                )
+                existing = await self.get_active(incident.account_id, incident.kind)
             except Exception:  # noqa: BLE001
                 existing = None
             if existing is None:
