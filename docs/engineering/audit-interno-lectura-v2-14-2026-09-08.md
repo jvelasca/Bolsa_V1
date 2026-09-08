@@ -9,6 +9,21 @@ Alcance cubierto: árboles/aplica en los 6 bloques pedidos por el auditor (capas
 
 ---
 
+## Adenda 2026-09-08 (post-verificación runtime): schema-drift OHLCV causaba "histórico no disponible"
+
+> Complemento honesto a este informe de LECTURA. Al seguir el síntoma real en la UI
+> ("los activos no se ven / histórico no disponible"), la verificación **runtime** detectó
+> una causa **de esquema** que la lectura no podía cerrar (marcada como `[runtime]`):
+> `ohlcv_repository.upsert_bars` (cd451fea) usa `ON CONFLICT (instrument_id,timeframe,timestamp)`
+> pero las migraciones Alembic no creaban ese índice único → el sync de mercado abortaba en
+> runtime (`InvalidColumnReference`), la BD quedaba sin barras y la UI sin datos. **Remediado**:
+> migración `023_ohlcv_bars_unique_reconcile` (+`UniqueConstraint` en `OhlcvBarRow`) y repoblado
+> el histórico real (35 activos IBEX · 2021→hoy · freshness `current`). Guards real-PG y
+> provenance/tests actualizados a head `023_ohlcv_bars_unique_reconcile`. Este hallazgo subraya
+> que el contrato esquema↔repositorio debe cerrarse también **en runtime contra PG real**, no solo por lectura.
+
+---
+
 ## Resumen ejecutivo
 
 - **Sin hallazgo P0 demostrable por lectura.** La materialización financiera está **GATED** (`permit=False` por defecto, no materializa sin consentimiento); la dedup OPEN está anclada a un partial-UNIQUE en PG y a `SKIP LOCKED`+lease; la cadena Confirm→submit es secuencial y no encontré camino que salte VALIDATION/RISK/CONFIRM llamando al `submit` del adapter en una sola petición.

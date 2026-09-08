@@ -6,6 +6,10 @@ All notable releases of Bolsa V1.
 
 Post-release (no tip bump de package). **≠** Accept LIVE · **≠** thaw · **≠** settlement · éxodo LIVE no certificado.
 
+### Hotfix interno — reconciliación upsert OHLCV → schema `023_ohlcv_bars_unique_reconcile` (2026-09-08)
+
+- **Schema-drift (auditoría interna V2.14):** `ohlcv_repository.upsert_bars` (`ON CONFLICT (instrument_id,timeframe,timestamp)`, cd451fea) exigía un índice único que las migraciones Alembic no creaban (solo PK id) → todo el sync de mercado abortaba (500, `InvalidColumnReference`), la BD quedaba sin barras y la UI mostraba listas vacías e "histórico no disponible". Añadida migración **`023_ohlcv_bars_unique_reconcile`** (+índice único declarado en `OhlcvBarRow`) y repoblado el histórico (44.7k barras 1d, 2021→hoy, para los 35 activos IBEX; freshness `current`). Guards tests real-PG/provenance actualizados a head `023`.
+
 ## [1.43.0-beta] — 2026-09-08
 
 V2.14 **Financial Execution Core** elevation a `main`. Producto **BETA / no producción**. Tip vigente **`main` → [`e76a1942`](https://github.com/jvelasca/Bolsa_V1/commit/e76a1942)** (V2.14 elevation · 08/09 09:23 UTC). Package **`1.43.0-beta`** (**bump** desde `1.42.0-beta`). Tip previo **`v2.13-beta` → `da5c4b2a`** / `1.42.0-beta`. Alembic head **`022_live_orders_exec`**. `LIVE_EXECUTION_UNLOCKED` default **off** (sandbox · cero POST bridge). **No** LIVE capital · cancel XTB real **PARKED** (honest-boundary, cero POST en cancel). Capacidad técnica ≠ permiso operativo (separación deliberada). Provenance auto-reportada vía `GET /api/health → provenance`.

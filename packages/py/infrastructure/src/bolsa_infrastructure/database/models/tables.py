@@ -105,6 +105,18 @@ class InstrumentRow(Base):
 
 class OhlcvBarRow(Base):
     __tablename__ = "ohlcv_bars"
+    __table_args__ = (
+        # Contrato del upsert (ohlcv_repository.upsert_bars ON CONFLICT DO UPDATE
+        # con index_elements=["instrument_id","timeframe","timestamp"]). Reconciliado
+        # en Alembic 023; debe coincidir 1:1 con la migración para no re-driftear.
+        Index(
+            "ohlcv_bars_instrument_timeframe_ts_uidx",
+            "instrument_id",
+            "timeframe",
+            "timestamp",
+            unique=True,
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
