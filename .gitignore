@@ -7,6 +7,10 @@ dist/
 *.log
 logs/**
 !logs/**/.gitkeep
+# Logs runtime en profundidad (p.ej. apps/api-python/logs, packages/py/application/logs)
+**/logs/*.jsonl
+**/logs/
+!**/logs/.gitkeep
 .DS_Store
 coverage/
 .vite/

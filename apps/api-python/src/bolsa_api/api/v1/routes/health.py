@@ -2,12 +2,11 @@
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field
-
 from bolsa_infrastructure.alerts.estudio_opinion_email import smtp_ready
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.session import check_database
+from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
 
 router = APIRouter()
 
@@ -27,6 +26,22 @@ class ComponentHealthDto(BaseModel):
     details: dict[str, object] = Field(default_factory=dict)
 
 
+class ProvenanceDto(BaseModel):
+    """Bloque de provenance: identidad inequívoca de la versión en ejecución.
+
+    Ver ``bolsa_api.provenance``. Ningún campo es obligatorio: si una fuente no
+    está disponible (p.ej. sin árbol git o sin env de release) se reporta ``null``
+    en lugar de inventar un valor que pueda estar desalineado con el tip real de
+    ``main`` (hallazgo de provenance del auditor externo V2.14).
+    """
+
+    product: str | None = None
+    package: str | None = None
+    git_sha: str | None = None
+    schema_revision: str | None = None
+    api_contract: str | None = None
+
+
 class HealthResponseDto(BaseModel):
     """Payload ``GET /api/health``."""
 
@@ -36,6 +51,7 @@ class HealthResponseDto(BaseModel):
     database: DatabaseHealthDto | None = None
     components: dict[str, ComponentHealthDto] = Field(default_factory=dict)
     stack: str = Field(default="python-fastapi")
+    provenance: ProvenanceDto = Field(default_factory=ProvenanceDto)
 
 
 def _yahoo_component() -> ComponentHealthDto:
@@ -207,6 +223,18 @@ def _smtp_component() -> ComponentHealthDto:
 async def health_check(request: Request) -> HealthResponseDto:
     engine = request.app.state.engine
     db_ok, db_message = await check_database(engine)
+    # Provenance: ensamblado/cacheado en bolsa_api.provenance (identity inequívoca
+    # V2.14). Lectura sin clases fuertes para no afectar al path caliente ni a DB.
+    from bolsa_api.provenance import build_provenance
+
+    prov = build_provenance()
+    provenance = ProvenanceDto(
+        product=prov.product,
+        package=prov.package,
+        git_sha=prov.git_sha,
+        schema_revision=prov.schema_revision,
+        api_contract=prov.api_contract,
+    )
     components = {
         "database": ComponentHealthDto(
             status="ok" if db_ok else "error",
@@ -225,6 +253,7 @@ async def health_check(request: Request) -> HealthResponseDto:
     return HealthResponseDto(
         status="degraded" if degraded else "ok",
         timestamp=datetime.now(tz=UTC).isoformat(),
+        provenance=provenance,
         database=DatabaseHealthDto(
             status="ok" if db_ok else "error",
             message=db_message,

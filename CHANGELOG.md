@@ -2,9 +2,39 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — post V2.12 XL-3 durable core
+## [Unreleased] — post V2.14 Financial Execution Core
 
-Post-release (no tip bump). **≠** Accept LIVE · **≠** thaw · **≠** settlement.
+Post-release (no tip bump de package). **≠** Accept LIVE · **≠** thaw · **≠** settlement · éxodo LIVE no certificado.
+
+## [1.43.0-beta] — 2026-09-08
+
+V2.14 **Financial Execution Core** elevation a `main`. Producto **BETA / no producción**. Tip vigente **`main` → [`e76a1942`](https://github.com/jvelasca/Bolsa_V1/commit/e76a1942)** (V2.14 elevation · 08/09 09:23 UTC). Package **`1.43.0-beta`** (**bump** desde `1.42.0-beta`). Tip previo **`v2.13-beta` → `da5c4b2a`** / `1.42.0-beta`. Alembic head **`022_live_orders_exec`**. `LIVE_EXECUTION_UNLOCKED` default **off** (sandbox · cero POST bridge). **No** LIVE capital · cancel XTB real **PARKED** (honest-boundary, cero POST en cancel). Capacidad técnica ≠ permiso operativo (separación deliberada). Provenance auto-reportada vía `GET /api/health → provenance`.
+
+### V2.14 — Financial Execution Core
+
+- **D0 foundation** [`b54c92d8`](https://github.com/jvelasca/Bolsa_V1/commit/b54c92d8): decree Financial Execution & Full Reconciliation.
+- **B1** [`462a30cb`](https://github.com/jvelasca/Bolsa_V1/commit/462a30cb): `Decimal` al boundary financiero (order/cash/position query + drift) — P1-03/P2-02/P2-03.
+- **B2** [`67867a04`](https://github.com/jvelasca/Bolsa_V1/commit/67867a04): lease configurable por env (P2-04) + cancel XTB **PARKED** (P2-05).
+- **E1** [`f29e452c`](https://github.com/jvelasca/Bolsa_V1/commit/f29e452c): `ExecutionEvent` scaffold idempotente **GATED** (P1-01) + migración **`022_live_orders_exec`** + observabilidad `live_orders` (`attempt_count`/`last_error`/`claim_expires_at`).
+- **E2 P2-2** [`2942fec1`](https://github.com/jvelasca/Bolsa_V1/commit/2942fec1): dedup **OPEN** multi-worker en `OperationalIncidentStore` PG (1 incidente, no 2).
+- **E2 P2-01** [`0a44764b`](https://github.com/jvelasca/Bolsa_V1/commit/0a44764b): durable order-drift → `OperationalIncident` `live_drift` (gated).
+- **E2 P1-02** [`660fbd83`](https://github.com/jvelasca/Bolsa_V1/commit/660fbd83): reconcile **POSICIÓN continuo** (LR-1) en tick recovery, gated.
+- **E2 C1 real-PG** [`96778854`](https://github.com/jvelasca/Bolsa_V1/commit/96778854): batería REAL-PG dedup OPEN/drift frente a PostgreSQL.
+- **C1 Release-tag CI** [`095a5ab1`](https://github.com/jvelasca/Bolsa_V1/commit/095a5ab1) → [`78dd3f9a`](https://github.com/jvelasca/Bolsa_V1/commit/78dd3f9a): head real-PG `022` + ruff-I001 whole-tree + fix mypy gate (3 errores) hallados por Release-tag CI real.
+- **Elevation** [`e76a1942`](https://github.com/jvelasca/Bolsa_V1/commit/e76a1942): V2.14 + bump `1.43.0-beta` — tip auditable desde GitHub.
+- Docs: arranque auditor externo [`08cada82`](https://github.com/jvelasca/Bolsa_V1/commit/08cada82) (veredicto V2.13 sin P0/P1) · deuda hallazgos P2/P3 del audit ampliado V2.13 [`0a217468`](https://github.com/jvelasca/Bolsa_V1/commit/0a217468) · relevo de cierre [`c24bbb67`](https://github.com/jvelasca/Bolsa_V1/commit/c24bbb67).
+
+## [1.42.0-beta] — 2026-09-07
+
+V2.13 **live execution gates** + tip formal `v2.13-beta`. Producto **BETA / no producción**. Tip **`v2.13-beta` → `da5c4b2a`**. Package **`1.42.0-beta`** (**bump** desde `1.41.0-beta`). Alembic head **`021_live_orders_fin`**. Release-tag CI tip según último run sobre este tag. Confirm = firma. `LIVE_EXECUTION_UNLOCKED` default **off** (sandbox · cero POST bridge). **No** LIVE capital. **≠** Accept estricto · **≠** thaw venue · **≠** settlement.
+
+### V2.13 — live execution gates (concurrency + financial invariants + honest cancel + reconcile)
+
+- **Baseline** [`34285584`](https://github.com/jvelasca/Bolsa_V1/commit/34285584): live execution gates — XL-3 concurrency + financial invariants + honest cancel + reconcile.
+- **V2.13.1 rc** [`0dce2fa9`](https://github.com/jvelasca/Bolsa_V1/commit/0dce2fa9): honesty remediation (audit H1/H2/H4/H5) post-baseline.
+- **V2.13.2 rc** [`656c8b37`](https://github.com/jvelasca/Bolsa_V1/commit/656c8b37): broker-query real (H6) + reconcile máquina `live_orders` (H7); docs cierre H3 [`0983391c`](https://github.com/jvelasca/Bolsa_V1/commit/0983391c).
+- **Tip formal** [`da5c4b2a`](https://github.com/jvelasca/Bolsa_V1/commit/da5c4b2a): release `v2.13-beta` (`1.42.0-beta`) — broker-query real H6 + reconcile live_orders H7.
+- **V2.13.3 rc CI fix** [`4039087f`](https://github.com/jvelasca/Bolsa_V1/commit/4039087f) · [`4c5dee57`](https://github.com/jvelasca/Bolsa_V1/commit/4c5dee57) · [`e4cfbabd`](https://github.com/jvelasca/Bolsa_V1/commit/e4cfbabd) · [`6e279e2d`](https://github.com/jvelasca/Bolsa_V1/commit/6e279e2d): lifecycle-pg fixtures head-guard a `021_live_orders_fin` (set-membership, no prefijo) + mock E2E live-virtual confirm seed a TRIGGERED tradePlan (CTA sandbox cero POST bridge) + revision corta `varchar32`.
 
 ## [1.41.0-beta] — 2026-09-07
 

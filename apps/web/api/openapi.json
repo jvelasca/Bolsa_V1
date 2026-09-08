@@ -3860,6 +3860,29 @@
             "title": "Invalidation",
             "type": "array"
           },
+          "learningVerdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learningverdict"
+          },
+          "mfeMae": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfemae"
+          },
           "name": {
             "anyOf": [
               {
@@ -6520,6 +6543,9 @@
                 "type": "null"
               }
             ]
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceDto"
           },
           "service": {
             "default": "bolsa-api-python",
@@ -14528,6 +14554,68 @@
         "title": "ProposeRecommendationRequest",
         "type": "object"
       },
+      "ProvenanceDto": {
+        "description": "Bloque de provenance: identidad inequívoca de la versión en ejecución.\n\nVer ``bolsa_api.provenance``. Ningún campo es obligatorio: si una fuente no\nestá disponible (p.ej. sin árbol git o sin env de release) se reporta ``null``\nen lugar de inventar un valor que pueda estar desalineado con el tip real de\n``main`` (hallazgo de provenance del auditor externo V2.14).",
+        "properties": {
+          "api_contract": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Contract"
+          },
+          "git_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Sha"
+          },
+          "package": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package"
+          },
+          "product": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product"
+          },
+          "schema_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Revision"
+          }
+        },
+        "title": "ProvenanceDto",
+        "type": "object"
+      },
       "PruneBacktestsRequestDto": {
         "properties": {
           "keep": {
@@ -22070,7 +22158,7 @@
     },
     "/api/ai/intents/confirm": {
       "post": {
-        "description": "F3 — humano confirma Recommendation → OrderIntent (+ opcional ExecuteTrade) + Session.",
+        "description": "F3 — humano confirma Recommendation → OrderIntent (+ opcional ExecuteTrade) + Session.\n\nGate de aislamiento (P1 A1): la ruta puede ejecutar sobre ``account_id`` del body,\nasí que se exige que la cuenta sea visible para el principal antes de tocar use-case.",
         "operationId": "confirm_intent_api_ai_intents_confirm_post",
         "requestBody": {
           "content": {

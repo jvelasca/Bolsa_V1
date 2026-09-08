@@ -161,6 +161,33 @@ type G11 =
       >
     : false;
 
+/**
+ * P2 (A5): OperationalIncident y SubmitIntentListItem — conceptos críticos de
+ * operativa (resolución humana DEX-3 / durabilidad de envío OR-2) que antes
+ * quedaban sin clave bidireccional aquí. Misma disciplina de CLAVES que G1..G11
+ * (la fidelidad de optionality/value sigue siendo deuda P2.6, no se cubre aquí).
+ */
+type G12 =
+  HasNoMissingKeys<
+    import("@bolsa/shared").OperationalIncidentV1,
+    Contract["OperationalIncidentDto"]
+  > extends true
+    ? CoversContract<
+        Contract["OperationalIncidentDto"],
+        import("@bolsa/shared").OperationalIncidentV1
+      >
+    : false;
+type G13 =
+  HasNoMissingKeys<
+    import("@bolsa/shared").SubmitIntentListItemV1,
+    Contract["SubmitIntentListItemDto"]
+  > extends true
+    ? CoversContract<
+        Contract["SubmitIntentListItemDto"],
+        import("@bolsa/shared").SubmitIntentListItemV1
+      >
+    : false;
+
 const _guard1: G1 = true;
 const _guard2: G2 = true;
 const _guard3: G3 = true;
@@ -172,6 +199,8 @@ const _guard8: G8 = true;
 const _guard9: G9 = true;
 const _guard10: G10 = true;
 const _guard11: G11 = true;
+const _guard12: G12 = true;
+const _guard13: G13 = true;
 
 export {};
 /** Agregado meramente para que el compilador considere usadas las guardas. */
@@ -187,4 +216,6 @@ export const contractContractSentinels = [
   _guard9,
   _guard10,
   _guard11,
+  _guard12,
+  _guard13,
 ] as const;

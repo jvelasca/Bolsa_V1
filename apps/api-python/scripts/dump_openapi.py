@@ -42,7 +42,12 @@ def main() -> int:
 
     n_schemas = len(schema.get("components", {}).get("schemas", {}))
     n_paths = len(schema.get("paths", {}))
-    print(f"OpenAPI volcado → {out_path} ({n_paths} paths, {n_schemas} schemas)")
+    # ASCII-only en el print: evita UnicodeEncodeError (cp1252) al capturar stdout
+    # vía pipe en Windows (GitHub Actions / pnpm --filter contract:check).
+    print(
+        f"OpenAPI dumped -> {out_path} ({n_paths} paths, {n_schemas} schemas)",
+        flush=True,
+    )
     return 0
 
 

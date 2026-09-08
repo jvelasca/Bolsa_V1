@@ -856,6 +856,9 @@ export interface paths {
         /**
          * Confirm Intent
          * @description F3 — humano confirma Recommendation → OrderIntent (+ opcional ExecuteTrade) + Session.
+         *
+         *     Gate de aislamiento (P1 A1): la ruta puede ejecutar sobre ``account_id`` del body,
+         *     así que se exige que la cuenta sea visible para el principal antes de tocar use-case.
          */
         post: operations["confirm_intent_api_ai_intents_confirm_post"];
         delete?: never;
@@ -5146,6 +5149,12 @@ export interface components {
             instrumentId: string;
             /** Invalidation */
             invalidation?: string[];
+            /** Learningverdict */
+            learningVerdict?: string | null;
+            /** Mfemae */
+            mfeMae?: {
+                [key: string]: unknown;
+            } | null;
             /** Name */
             name?: string | null;
             /** Nextreviewat */
@@ -6061,6 +6070,7 @@ export interface components {
                 [key: string]: components["schemas"]["ComponentHealthDto"];
             };
             database?: components["schemas"]["DatabaseHealthDto"] | null;
+            provenance?: components["schemas"]["ProvenanceDto"];
             /**
              * Service
              * @default bolsa-api-python
@@ -8553,6 +8563,27 @@ export interface components {
             suggestedQuantity: number;
             /** Symbol */
             symbol?: string | null;
+        };
+        /**
+         * ProvenanceDto
+         * @description Bloque de provenance: identidad inequívoca de la versión en ejecución.
+         *
+         *     Ver ``bolsa_api.provenance``. Ningún campo es obligatorio: si una fuente no
+         *     está disponible (p.ej. sin árbol git o sin env de release) se reporta ``null``
+         *     en lugar de inventar un valor que pueda estar desalineado con el tip real de
+         *     ``main`` (hallazgo de provenance del auditor externo V2.14).
+         */
+        ProvenanceDto: {
+            /** Api Contract */
+            api_contract?: string | null;
+            /** Git Sha */
+            git_sha?: string | null;
+            /** Package */
+            package?: string | null;
+            /** Product */
+            product?: string | null;
+            /** Schema Revision */
+            schema_revision?: string | null;
         };
         /** PruneBacktestsRequestDto */
         PruneBacktestsRequestDto: {
