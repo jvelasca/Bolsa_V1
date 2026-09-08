@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_ai import get_default_proxy
@@ -21,7 +21,11 @@ from bolsa_analytics.cognitive import (
     build_memory_entry,
     observe_investor_profile,
 )
-from bolsa_api.api.dependencies import get_cognitive_repository, get_db_session
+from bolsa_api.api.dependencies import (
+    get_cognitive_repository,
+    get_db_session,
+    require_account_access,
+)
 from bolsa_api.schemas.ai_governance import (
     AiEffectivenessResponseDto,
     AiGovernanceStatusDto,
@@ -386,9 +390,15 @@ async def propose_recommendation(
 @router.post("/ai/intents/confirm", response_model=AiEffectivenessResponseDto)
 async def confirm_intent(
     body: ConfirmIntentRequest,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
-    """F3 — humano confirma Recommendation → OrderIntent (+ opcional ExecuteTrade) + Session."""
+    """F3 — humano confirma Recommendation → OrderIntent (+ opcional ExecuteTrade) + Session.
+
+    Gate de aislamiento (P1 A1): la ruta puede ejecutar sobre ``account_id`` del body,
+    así que se exige que la cuenta sea visible para el principal antes de tocar use-case.
+    """
+    await require_account_access(request, body.account_id)
     from bolsa_api.api.dependencies import get_confirm_intent_use_case
 
     use_case = await get_confirm_intent_use_case(session)

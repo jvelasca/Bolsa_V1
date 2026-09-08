@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
@@ -14,6 +14,7 @@ from bolsa_api.api.dependencies import (
     get_position_policy_for_holding_use_case,
     get_position_policy_use_case,
     get_update_position_policy_use_case,
+    require_account_access,
 )
 from bolsa_api.schemas.position_policies import (
     CreatePositionPolicyRequestDto,
@@ -151,6 +152,7 @@ async def delete_position_policy(
 
 @router.post("/position-policies/evaluate-exits", response_model=EvaluatePositionExitsResponseDto)
 async def evaluate_position_exits(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: str = Query(alias="accountId"),
     execute_trades: bool = Query(default=False, alias="executeTrades"),
@@ -158,6 +160,8 @@ async def evaluate_position_exits(
 ) -> EvaluatePositionExitsResponseDto:
     if timeframe not in {"1d", "1wk"}:
         raise HTTPException(status_code=400, detail="timeframe must be 1d or 1wk")
+    # Gate de aislamiento (P1 A1): puede ejecutar exits sobre account_id del cliente.
+    await require_account_access(request, account_id)
     use_case: EvaluatePositionExits = get_evaluate_position_exits_use_case(session)
     try:
         result = await use_case.execute(

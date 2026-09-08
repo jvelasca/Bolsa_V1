@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from bolsa_api.api.dependencies import (
     get_db_session,
     get_execute_position_policy_auto_use_case,
     get_operational_context_builder,
+    require_account_access,
 )
 from bolsa_application.execute_position_policy_auto import (
     ExecutePositionPolicyAuto,
@@ -52,6 +53,7 @@ class ExecutePositionPolicyAutoResponseDto(BaseModel):
     response_model=ExecutePositionPolicyAutoResponseDto,
 )
 async def execute_position_policy_auto(
+    request: Request,
     body: ExecutePositionPolicyAutoRequestDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: str = Query(alias="accountId"),
@@ -59,6 +61,8 @@ async def execute_position_policy_auto(
     execution_policy_id: str | None = Query(default=None, alias="executionPolicyId"),
 ) -> ExecutePositionPolicyAutoResponseDto:
     """V1.47 — Policy → JIT Permission → protect|reduce|exit. Contexto servidor."""
+    # Gate de aislamiento (P1 A1): actúa/lee sobre account_id del cliente (incluso dry_run).
+    await require_account_access(request, account_id)
     if not paper_d_execute_allowed() and not body.dry_run:
         raise HTTPException(
             status_code=403,

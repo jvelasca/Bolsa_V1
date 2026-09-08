@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date as date_cls
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from bolsa_api.api.dependencies import (
     get_daily_ops_report_use_case,
     get_db_session,
     get_paper_desk_cycle_use_case,
+    require_account_access,
 )
 from bolsa_application.paper_d_propose import paper_d_execute_allowed
 from bolsa_application.paper_daily_report import build_paper_daily_report
@@ -44,12 +45,15 @@ def _parse_as_of(raw: str | None) -> str | None:
 
 @router.post("/paper-desk/cycle")
 async def paper_desk_cycle(
+    request: Request,
     body: PaperDeskCycleRequestDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: str = Query(alias="accountId"),
     execution_policy_id: str | None = Query(default=None, alias="executionPolicyId"),
 ) -> dict[str, Any]:
     """V1.47 — un ciclo EntryTick + PositionTick. dryRun default true."""
+    # Gate de aislamiento (P1 A1): el ciclo actúa sobre account_id del cliente.
+    await require_account_access(request, account_id)
     if not paper_d_execute_allowed() and not body.dry_run:
         raise HTTPException(
             status_code=403,
