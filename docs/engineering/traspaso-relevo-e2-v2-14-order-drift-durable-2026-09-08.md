@@ -114,5 +114,27 @@ $env:E2_PG_REQUIRED='1'     # fail hard si la BD no está en head 022
 uv run pytest tests/test_e2_v2_14_incident_dedup_pg.py -v
 ```
 
-Queda (no de E2 sino de CI): Release-tag con `conclusion=success` real (go del
-operador en C1-Release-tag).
+---
+
+## STAMP C1 Release-tag (2026-09-08) — Release-tag CI `conclusion=success` REAL
+
+Certificación auténtica de V2.14 obtenida empujando el tag Release real y leyendo
+el resultado de GitHub Actions (disciplina Release-tag CI honesta: GREEN solo con
+`conclusion=success` observado, nunca documental).
+
+- **Rama en origin:** `v2-14-financial-execution` → `78dd3f9a`
+- **Tag Release:** `v2.14-beta` → `78dd3f9a` (movido con el fix de mypy)
+- **Run:** `34208259186` · ref `refs/tags/v2.14-beta` · head `78dd3f9a`
+- **Status artifact (certify job):** `status: "GREEN"` — jobs:
+  `security`=success, `shared`=success, `spine`=success, `frontend`=success,
+  `python`=success (ruff+import-linter+mypy+pytest offline), `playwright-mock`
+  =success, `lifecycle-pg`=success (alembic upgrade head → 022 + battery PG real).
+  (`playwright-integrated` es opt-in por dispatch; no es `needs` de certify.)
+
+Primer run (`34207066169`) falló `python→Mypy` (3 errores), corregidos en `78dd3f9a`
+(no-any-return en `_non_empty`, unused-ignore, attr-defined `on_conflict_do_nothing`).
+Segundo run GREEN confirmado por el artifact
+`actions/artifacts/release-tag-ci-summary.json`.
+
+V2.14 queda auditable en GitHub: rama `v2-14-financial-execution` y tag `v2.14-beta`
+sobre el corte completo (E1..E2-full + C1 real-PG).
