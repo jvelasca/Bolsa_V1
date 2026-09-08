@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_ai import get_default_proxy
@@ -26,6 +26,7 @@ from bolsa_api.api.dependencies import (
     get_db_session,
     require_account_access,
     require_owned_account_if_present,
+    resolve_account_scope_or_default,
 )
 from bolsa_api.schemas.ai_governance import (
     AiEffectivenessResponseDto,
@@ -136,17 +137,22 @@ async def ai_effectiveness(
     demo: bool = Query(False, description="Forzar resumen ilustrativo"),
     account_id: str | None = Query(None, alias="accountId"),
 ) -> AiEffectivenessResponseDto:
-    # A1 residual (lectura/estudio): si piden un account de otro owner → 404.
-    await require_owned_account_if_present(request, account_id)
+    # V2.15.4 A1: un recurso ACCOUNT_SCOPED sin account_id NO es global; se acota
+    # a la cuenta por defecto del principal. Sin cuenta propia activa -> fail-closed.
+    scope = await resolve_account_scope_or_default(request, account_id)
     if demo:
         return AiEffectivenessResponseDto(data=_demo_effectiveness())
+    if scope is None and account_id is None:
+        return AiEffectivenessResponseDto(
+            data=build_effectiveness_summary(status="insufficient_data").to_dict()
+        )
     from bolsa_api.api.dependencies import get_investor_profile_repository
 
     store = get_cognitive_repository(session)
     profile_store = get_investor_profile_repository(session)
     try:
         data = await LoadEffectivenessFromStore(store, profile_store).execute(
-            account_id=account_id,
+            account_id=scope,
             refresh_observed=True,
         )
     except Exception as exc:  # noqa: BLE001 — tablas no migradas / DB caída → fallback UI
@@ -162,7 +168,14 @@ async def append_decision_memory(
     body: AppendDecisionMemoryRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
-    await require_owned_account_if_present(request, body.account_id)
+    # V2.15.4 A1 (deuda #1): escritura acount-less NO queda huérfana/global; se
+    # atribuye a la cuenta por defecto del principal. Sin cuenta propia activa -> 400.
+    scope = await resolve_account_scope_or_default(request, body.account_id)
+    if scope is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Decision memory requiere una cuenta operativa del principal",
+        )
     store = get_cognitive_repository(session)
     rec = await PersistDecisionMemory(store).execute(
         decision_id=body.decision_id,
@@ -174,7 +187,7 @@ async def append_decision_memory(
         opportunity_intact=body.opportunity_intact,
         policy_id=body.policy_id,
         policy_version=body.policy_version,
-        account_id=body.account_id,
+        account_id=scope,
     )
     return AiEffectivenessResponseDto(
         data={"id": rec.id, "outcome": rec.outcome, "decisionId": rec.decision_id}
@@ -189,11 +202,15 @@ async def list_decision_sessions(
     instrument_id: Annotated[str | None, Query(alias="instrumentId")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 40,
 ) -> ListDecisionSessionsResponseDto:
-    await require_owned_account_if_present(request, account_id)
+    # V2.15.4 A1: account-scoped; sin account_id se acota a la cuenta por defecto
+    # del principal (nunca global). Sin cuenta propia activa → vacío (fail-closed).
+    scope = await resolve_account_scope_or_default(request, account_id)
+    if scope is None:
+        return ListDecisionSessionsResponseDto(data=[])
     store = get_cognitive_repository(session)
     rows = await store.list_decision_sessions(
         limit=limit,
-        account_id=account_id,
+        account_id=scope,
         instrument_id=instrument_id,
     )
     return ListDecisionSessionsResponseDto(
@@ -223,12 +240,15 @@ async def decision_session_learning_summary(
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> dict[str, Any]:
     """Hit-rate agregado de Outcomes (no ajusta WeightRules). Debe ir antes de /{session_id}."""
-    await require_owned_account_if_present(request, account_id)
+    # V2.15.4 A1: account-scoped; sin account_id se acota al default del principal.
+    scope = await resolve_account_scope_or_default(request, account_id)
+    if scope is None:
+        return {"data": None}
     from bolsa_application.close_decision_session_outcome import LoadSessionLearningSummary
 
     store = get_cognitive_repository(session)
     data = await LoadSessionLearningSummary(store).execute(
-        account_id=account_id,
+        account_id=scope,
         instrument_id=instrument_id,
         limit=limit,
     )
@@ -315,7 +335,13 @@ async def append_trial(
     body: AppendTrialRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
-    await require_owned_account_if_present(request, body.account_id)
+    # V2.15.4 A1 (deuda #1): trial acount-less no queda huérfano/global.
+    scope = await resolve_account_scope_or_default(request, body.account_id)
+    if scope is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Trial requiere una cuenta operativa del principal",
+        )
     store = get_cognitive_repository(session)
     rec = await PersistTrial(store).execute(
         log_id=body.log_id,
@@ -324,7 +350,7 @@ async def append_trial(
         params_hash=body.params_hash,
         sharpe_is=body.sharpe_is,
         notes=body.notes,
-        account_id=body.account_id,
+        account_id=scope,
     )
     return AiEffectivenessResponseDto(
         data={"id": rec.id, "logId": rec.log_id, "strategyFamilyRef": rec.strategy_family_ref}
@@ -337,7 +363,13 @@ async def append_edge_report(
     body: AppendEdgeReportRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
-    await require_owned_account_if_present(request, body.account_id)
+    # V2.15.4 A1 (deuda #1): edge report acount-less no queda huérfano/global.
+    scope = await resolve_account_scope_or_default(request, body.account_id)
+    if scope is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Edge report requiere una cuenta operativa del principal",
+        )
     store = get_cognitive_repository(session)
     suite = StatisticalSuiteResult(
         trials_n=body.trials_n,
@@ -353,7 +385,7 @@ async def append_edge_report(
         strategy_or_signal_ref=body.strategy_or_signal_ref,
         suite=suite,
         notes=tuple(body.notes),
-        account_id=body.account_id,
+        account_id=scope,
     )
     return AiEffectivenessResponseDto(
         data={
@@ -372,7 +404,14 @@ async def propose_recommendation(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """F3 — OHLCV → Assessments → DecisionRuntime → Recommendation."""
-    await require_owned_account_if_present(request, body.account_id)
+    # V2.15.4 A1 (deuda #1): acount-less se acota al default del principal
+    # (la sesión/recommendación debe quedar atribuida y visible, no huérfana).
+    scope = await resolve_account_scope_or_default(request, body.account_id)
+    if scope is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Propose requiere una cuenta operativa del principal",
+        )
     from bolsa_api.api.dependencies import (
         get_investor_profile_repository,
         get_propose_recommendation_use_case,
@@ -380,12 +419,11 @@ async def propose_recommendation(
 
     profile_ref = None
     policy_version = None
-    if body.account_id:
-        profile_store = get_investor_profile_repository(session)
-        profile = await profile_store.get_for_account(body.account_id)
-        if profile is not None:
-            profile_ref = profile.id
-            policy_version = profile.selected_policy_template_id
+    profile_store = get_investor_profile_repository(session)
+    profile = await profile_store.get_for_account(scope)
+    if profile is not None:
+        profile_ref = profile.id
+        policy_version = profile.selected_policy_template_id
 
     use_case = get_propose_recommendation_use_case(session)
     try:
@@ -393,7 +431,7 @@ async def propose_recommendation(
             instrument_id=body.instrument_id,
             suggested_quantity=body.suggested_quantity,
             suggested_price=body.suggested_price,
-            account_id=body.account_id,
+            account_id=scope,
             symbol=body.symbol,
             action_override=body.action,
             profile_snapshot_ref=profile_ref,
@@ -408,8 +446,6 @@ async def propose_recommendation(
             macro=body.macro,
         )
     except ValueError as exc:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"data": result.to_dict()}
 

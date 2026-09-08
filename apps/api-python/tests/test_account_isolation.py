@@ -17,7 +17,12 @@ from bolsa_api.auth.principal import (
 from bolsa_api.auth.session import SESSION_COOKIE_NAME
 from bolsa_api.main import create_app, lifespan
 from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import InvestmentAccountRow, InvestorProfileRow
+from bolsa_infrastructure.database.models import (
+    DecisionMemoryRow,
+    DecisionSessionRow,
+    InvestmentAccountRow,
+    InvestorProfileRow,
+)
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -65,6 +70,58 @@ async def _delete_raw_account(
         if row is not None:
             await session.delete(row)
             await session.commit()
+
+
+async def _insert_raw_decision_session(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    account_id: str | None,
+    kind: str = "propose",
+) -> str:
+    session_id = f"DS-{uuid4().hex[:12]}"
+    async with factory() as session:
+        session.add(
+            DecisionSessionRow(
+                id=session_id,
+                kind=kind,
+                status="open",
+                instrument_id="IB.ANY",
+                account_id=account_id,
+                symbol="XXX",
+                payload={"probe": "v2154"},
+                created_at=_now(),
+            )
+        )
+        await session.commit()
+    return session_id
+
+
+async def _insert_raw_decision_memory(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    account_id: str | None,
+    outcome: str = "accepted",
+    decision_id: str | None = None,
+) -> str:
+    mem_id = f"DM-{uuid4().hex[:12]}"
+    async with factory() as session:
+        session.add(
+            DecisionMemoryRow(
+                id=mem_id,
+                decision_id=decision_id or f"DEC-{uuid4().hex[:8]}",
+                instrument_id="IB.ANY",
+                account_id=account_id,
+                outcome=outcome,
+                reasons=["Policy PASS"],
+                policy_rule_ids=[],
+                reevaluate_when=[],
+                opportunity_intact=True,
+                payload={"probe": "v2154"},
+                created_at=_now(),
+            )
+        )
+        await session.commit()
+    return mem_id
 
 
 async def _insert_raw_profile(
@@ -579,3 +636,142 @@ async def test_paper_desk_daily_report_foreign_account_404(
                 assert response.status_code == 404
         finally:
             await _delete_raw_account(factory, owner_id)
+
+
+@pytest.mark.asyncio
+async def test_accountless_decision_sessions_scoped_to_principal_default_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """V2.15.4 A1: /ai/decision-sessions SIN accountId NO es global.
+
+    Principal user-a con su cuenta default: la lista acount-less debe devolver solo
+    las sesiones de la cuenta default de user-a, excluyendo las de la cuenta ajena
+    (user-b) y las huérfanas (account_id=None).
+    """
+    _patch_request_principal(monkeypatch, "user-a")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        acc_a = await _insert_raw_account(
+            factory, user_id="user-a", name="A default"
+        )
+        acc_b = await _insert_raw_account(
+            factory, user_id="user-b", name="B account"
+        )
+        session_a = await _insert_raw_decision_session(factory, account_id=acc_a)
+        session_b = await _insert_raw_decision_session(factory, account_id=acc_b)
+        session_orphan = await _insert_raw_decision_session(factory, account_id=None)
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                listed = await client.get("/api/ai/decision-sessions")
+                assert listed.status_code == 200
+                ids = {row["sessionId"] for row in listed.json()["data"]}
+                assert session_a in ids
+                assert session_b not in ids
+                assert session_orphan not in ids
+        finally:
+            await _delete_raw_account(factory, acc_a)
+            await _delete_raw_account(factory, acc_b)
+
+
+@pytest.mark.asyncio
+async def test_accountless_scoped_by_principal_default_not_a_when_b_principal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """V2.15.4 A1: user-b acount-less ve su default, nunca las sesiones de user-a."""
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        acc_a = await _insert_raw_account(
+            factory, user_id="user-a", name="A default"
+        )
+        acc_b = await _insert_raw_account(
+            factory, user_id="user-b", name="B default"
+        )
+        session_a = await _insert_raw_decision_session(factory, account_id=acc_a)
+        session_b = await _insert_raw_decision_session(factory, account_id=acc_b)
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                listed = await client.get("/api/ai/decision-sessions")
+                assert listed.status_code == 200
+                ids = {row["sessionId"] for row in listed.json()["data"]}
+                assert session_a not in ids
+                assert session_b in ids
+        finally:
+            await _delete_raw_account(factory, acc_a)
+            await _delete_raw_account(factory, acc_b)
+
+
+@pytest.mark.asyncio
+async def test_accountless_effectiveness_scoped_to_principal_default_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """V2.15.4 A1: /ai/effectiveness SIN accountId NO es global.
+
+    user-a principal sin memorias propias; user-b y datos huérfanos existen en el
+    store. Account-less debe acotarse a la default de user-a y NO contarlas.
+    """
+    _patch_request_principal(monkeypatch, "user-a")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        acc_a = await _insert_raw_account(factory, user_id="user-a", name="Eff A")
+        acc_b = await _insert_raw_account(factory, user_id="user-b", name="Eff B")
+        _mem_b = await _insert_raw_decision_memory(
+            factory, account_id=acc_b, outcome="rejected"
+        )
+        _mem_or = await _insert_raw_decision_memory(
+            factory, account_id=None, outcome="rejected"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.get("/api/ai/effectiveness")
+                assert resp.status_code == 200
+                body = resp.json()["data"]
+                assert body.get("source") == "postgres"
+                # Scope a acc_a (default de user-a): NO ve memorias de user-b ni huérfanas.
+                assert body["persistence"]["decisionMemoryCount"] == 0
+        finally:
+            await _delete_raw_account(factory, acc_a)
+            await _delete_raw_account(factory, acc_b)
+
+
+@pytest.mark.asyncio
+async def test_refresh_observed_accountless_does_not_read_foreign_or_orphan_memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """V2.15.4 A1: refresh-observed account-less NO lee memorias ajenas/huérfanas.
+
+    Principal user-b sin cuenta propia activa → al omitir accountId (account-less)
+    debe ser fail-closed (404), nunca degradar a memoria global ajena; y si viene un
+    accountId ajeno (cuenta de user-a) también debe ser 404.
+    """
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        acc_a = await _insert_raw_account(factory, user_id="user-a", name="Pfx A")
+        _mem_a = await _insert_raw_decision_memory(factory, account_id=acc_a)
+        _mem_or_global = await _insert_raw_decision_memory(factory, account_id=None)
+        profile_b = await _insert_raw_profile(
+            factory, user_id="user-b", name="Profile B"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                foreign = await client.post(
+                    f"/api/investor-profiles/{profile_b}/refresh-observed",
+                    params={"accountId": acc_a},
+                )
+                assert foreign.status_code == 404
+                accountless = await client.post(
+                    f"/api/investor-profiles/{profile_b}/refresh-observed",
+                )
+                assert accountless.status_code == 404
+        finally:
+            await _delete_raw_profile(factory, profile_b)
+            await _delete_raw_account(factory, acc_a)

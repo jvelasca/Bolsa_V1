@@ -375,6 +375,20 @@ jobs:
           -q
           --tb=short
 
+      - name: Pytest account-isolation gate V2.15.4 (real-PG, cross-owner account-less + workspaces/platform/trackers)
+        # V2.15.4 Bloque C: las suites de aislamiento de cuenta/workspace/plataforma/
+        # tracker se ejecutan aquí frente al PG real y obligatorio de lifecycle-pg.
+        # `certify` depende de lifecycle-pg → un fallo aquí no-GREENea el tag.
+        # (las mismas quedan en --ignore del job python-offline porque requieren PG).
+        run: >
+          uv run pytest
+          apps/api-python/tests/test_account_isolation.py
+          apps/api-python/tests/test_workspaces_isolation.py
+          apps/api-python/tests/test_platform_events_isolation.py
+          apps/api-python/tests/test_trackers_policies_isolation.py
+          -q
+          --tb=short
+
   dr-verify:
     # DR honesta en el CI del tag (hallazgo C2-12 P2 / C2-13): `pnpm db:dr:test`
     # (batería de Disaster Recovery: dump + checksum + restore a scratch + Alembic

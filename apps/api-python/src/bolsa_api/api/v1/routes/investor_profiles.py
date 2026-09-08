@@ -219,8 +219,15 @@ async def refresh_observed_profile(
     store = get_investor_profile_repository(session)
     existing = await GetInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
     _require_profile_access(existing, principal)
+    # V2.15.4 A1: la lectura de memorias es account-scoped. account_id ajeno -> 404;
+    # ausente -> default del principal (nunca global).
+    from bolsa_api.api.dependencies import resolve_account_scope_or_default
+
+    scope = await resolve_account_scope_or_default(request, account_id)
     cognitive = SqlAlchemyCognitiveRepository(session)
-    memories = await cognitive.list_decision_memory(limit=200, account_id=account_id)
+    if scope is None:
+        raise HTTPException(status_code=404, detail="Sin cuenta operativa del principal")
+    memories = await cognitive.list_decision_memory(limit=200, account_id=scope)
     payloads = [
         {
             "outcome": m.outcome,

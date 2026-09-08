@@ -413,6 +413,31 @@ async def require_owned_account_if_present(
     return await require_account_access(request, account_id)
 
 
+async def resolve_account_scope_or_default(
+    request: Request,
+    account_id: str | None,
+) -> str | None:
+    """V2.15.4 A1 — cierra la puerta acount-less->global para recursos ACCOUNT_SCOPED.
+
+    Política aprobada: un ``account_id`` ausente NO degrada a lectura global; se
+    acota a la cuenta por defecto ACTIVA del principal (owner F7c). Devuelve:
+      - el ``account_id`` si venía informado y es del principal (404 si ajeno),
+      - el id de la cuenta por defecto del principal si venía ausente y existe,
+      - ``None`` si el principal no tiene cuenta activa propia (fail-closed: el
+        llamante debe devolver vacío, nunca volver a invocar el repo con None).
+    """
+    if account_id is not None:
+        return await require_account_access(request, account_id)
+    factory = get_session_factory(request)
+    async with factory() as session:
+        try:
+            return await get_account_repository(session).resolve_default_account_for_owner(
+                owner_user_id=get_request_principal(request),
+            )
+        except ValueError:
+            return None
+
+
 def get_list_accounts_use_case(session: AsyncSession) -> ListAccounts:
     return ListAccounts(get_account_repository(session))
 

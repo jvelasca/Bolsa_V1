@@ -148,6 +148,43 @@ class SqlAlchemyAccountRepository:
     ) -> AccountScope:
         return await self._load_scope(account_id, portfolio_id)
 
+    async def resolve_default_account_for_owner(
+        self,
+        *,
+        owner_user_id: str | None = None,
+    ) -> str | None:
+        """Id de la cuenta por defecto VISIBLE al owner (F7c).
+
+        V2.15.4 A1: un recurso ``ACCOUNT_SCOPED`` con ``account_id`` ausente debe
+        acotarse a una cuenta del propio principal, nunca degradar a global.
+        Resolución por owner (nunca ``is_default`` junto a otro tenant):
+          1) la activa con ``is_default is True`` y ``user_id == owner``;
+          2) si no hay default visible, la activa más antigua del owner;
+          3) si no hay cuenta activa del owner → ``None`` (sin filas, fail-closed).
+        Devuelve ``None`` si el owner no tiene cuenta activa propia.
+        """
+        owner = owner_user_id if owner_user_id is not None else _app_owner_id()
+
+        async def _pick(default_only: bool) -> InvestmentAccountRow | None:
+            stmt = select(InvestmentAccountRow).where(
+                InvestmentAccountRow.user_id == owner,
+                InvestmentAccountRow.status == "active",
+            )
+            if default_only:
+                stmt = stmt.where(InvestmentAccountRow.is_default.is_(True))
+            stmt = stmt.order_by(
+                InvestmentAccountRow.created_at.asc(),
+                InvestmentAccountRow.id.asc(),
+            )
+            return (
+                await self._session.execute(stmt)
+            ).scalars().first()
+
+        row = await _pick(default_only=True)
+        if row is None:
+            row = await _pick(default_only=False)
+        return row.id if row is not None else None
+
     async def list_accounts(
         self,
         account_type: str | None = None,
