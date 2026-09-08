@@ -1478,13 +1478,13 @@ export interface paths {
         };
         /**
          * Health Ready
-         * @description Readiness: la app puede servir tráfico.
+         * @description Readiness: la app puede servir tráfico — fail-closed schema-aware.
          *
-         *     Para esta app local single-writer la dependencia *requerida* es PostgreSQL;
-         *     Redis y el heartbeat del worker Arq se reportan como ``optional`` informativos
-         *     y NO tumban el readiness global (el stack dev los marca ``degraded`` por diseño).
-         *     La respuesta es 200 cuando PostgreSQL responde; 503 en caso contrario (fail-closed
-         *     operacional: si no hay BD no hay estado consistente que servir).
+         *     READY ⇔  PostgreSQL responde (DB), AND ``alembic_version == expected_head``
+         *     (Alembic). La conectividad ya no basta: una build más nueva nunca debe quedar
+         *     "ready" corriendo contra una BD sin la última migración (V2.15 C2 / V2.15-03).
+         *     Redis y el heartbeat del worker Arq se reportan opcionales/informativos.
+         *     Respuesta: 200 con `status: ready` si todo ok; 503 en caso contrario.
          */
         get: operations["health_ready_api_health_ready_get"];
         put?: never;
@@ -8780,9 +8780,12 @@ export interface components {
          * ReadinessResponseDto
          * @description Payload ``GET /api/health/ready`` — readiness.
          *
-         *     Para esta app local single-writer la dependencia requerida para servir
-         *     peticiones es PostgreSQL. Redis/worker Arq se reportan como ``optional``
-         *     informativos (degradados no tumban el readiness global).
+         *     Para servir tráfico una app financiera exige (fail-closed):
+         *       - PostgreSQL responde, y
+         *       - el esquema migrado coincide con el head esperado por el código (Alembic).
+         *     Redis/worker Arq se reportan como ``optional`` informativos (degradados no
+         *     tumban el readiness global). ``required`` resume la conectividad de BD y
+         *     ``schema_status`` detalla alineación de esquema con el head (V2.15 C2 / V2.15-03).
          */
         ReadinessResponseDto: {
             /** Optional */
@@ -8791,6 +8794,7 @@ export interface components {
             };
             provenance?: components["schemas"]["ProvenanceDto"];
             required?: components["schemas"]["ReadyComponentStatusDto"] | null;
+            schema_status?: components["schemas"]["ReadyComponentStatusDto"] | null;
             /**
              * Service
              * @default bolsa-api-python

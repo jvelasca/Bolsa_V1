@@ -2,8 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { gunzipSync } from 'node:zlib';
 import { findDockerExe } from './lib/docker.mjs';
-import { readBackupBytes } from './lib/backup.mjs';
-import { runDbMigrateDeploy } from './lib/db.mjs';
+import { readBackupBytes, verifyChecksumSidecar } from './lib/backup.mjs';
+import { runDbMigrateDeploy, redirectDatabaseUrlTo } from './lib/db.mjs';
 import { logError, logInfo, writeAgentLog } from './lib/logger.mjs';
 
 /**
@@ -15,6 +15,11 @@ import { logError, logInfo, writeAgentLog } from './lib/logger.mjs';
  *   node scripts/db-restore.mjs --file db-backups/bolsa_v1-<stamp>.sql --yes
  *   node scripts/db-restore.mjs --file db-backups/bolsa_v1-<stamp>.sql.gz --yes --target-db bolsa_v1_restore_test
  *   node scripts/db-restore.mjs --file ... --yes --no-alembic     # no re-aplicar migraciones
+ *
+ * Garantías de seguridad (V2.15 C2):
+ *   - `psql` corre con `-v ON_ERROR_STOP=1`: cualquier error SQL ⇒ restore FAILED.
+ *   - La re-aplicación de migraciones Alembic se ejecuta SIEMPRE contra `--target-db`
+ *     (re-escribiendo DATABASE_URL al destino), nunca contra la BD principal.
  *
  * SOLO entorno local `bolsa_v1` (o BD de prueba). Nunca una BD productiva.
  */
@@ -42,7 +47,7 @@ function readStdinConfirm(prompt) {
 function runPsqlViaStdin(docker, db, payload) {
   return spawnSync(
     docker,
-    ['exec', '-i', CONTAINER, 'psql', '-U', PG_USER, '-d', db],
+    ['exec', '-i', CONTAINER, 'psql', '-U', PG_USER, '-d', db, '-v', 'ON_ERROR_STOP=1'],
     {
       input: payload,
       encoding: 'buffer',
@@ -56,7 +61,7 @@ function maintenance(query) {
   const docker = findDockerExe();
   const q = spawnSync(
     docker,
-    ['exec', CONTAINER, 'psql', '-U', PG_USER, '-d', 'postgres', '-c', query],
+    ['exec', CONTAINER, 'psql', '-U', PG_USER, '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-c', query],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   );
   return { ok: q.status === 0, stderr: (q.stderr ?? '').toString().trim() };
@@ -80,15 +85,28 @@ async function main() {
   const runAlembic = !withFlag('--no-alembic');
   const yes = withFlag('--yes');
 
-  let payload; let sourceLabel;
+  let raw = Buffer.alloc(0);
+  let payload = Buffer.alloc(0);
+  let sourceLabel = '';
   try {
-    const raw = readBackupBytes(file);
+    raw = readBackupBytes(file);
     const isGz = /\.gz$/i.test(file);
     payload = isGz ? gunzipSync(raw) : raw;
     sourceLabel = isGz ? 'gzip' : 'sql';
   } catch (error) {
     logError('db-restore', error instanceof Error ? error.message : 'No se pudo leer el backup');
     process.exit(1);
+  }
+
+  // Checksum del sidecar (V2.15-11): si existe y no coincide, abortar (un backup
+  // corrupto no debe restaurarse en silencio). Ausencia de sidecar = backup legacy.
+  const check = verifyChecksumSidecar(file);
+  if (check.code === 'MISMATCH') {
+    logError('db-restore', `Checksum del sidecar NO coincide para ${file}; restauración abortada.`);
+    process.exit(1);
+  }
+  if (check.code === 'NO_SIDECAR') {
+    logInfo('db-restore', 'Backup sin sidecar .sha256 (legacy); no se pudo auto-verificar integridad.');
   }
 
   if (!yes) {
@@ -127,12 +145,16 @@ async function main() {
   logInfo('db-restore', `${file} aplicado a "${target}" (${sourceLabel})`);
 
   // 3) Alinear Alembic a head (023) tras la restauración, si procede.
+  //    Crucial: la migración debe ejecutarse contra `target`, NO contra la BD
+  //    principal del .env (V2.15-01). Re-escribimos DATABASE_URL al destino.
   if (runAlembic) {
     try {
-      runDbMigrateDeploy();
-      logInfo('db-restore', 'Alembic aplicado a head (023)');
+      const targetUrl = redirectDatabaseUrlTo(target);
+      logInfo('db-restore', `Alembic → BD "${target}" (destino restaurada, no la principal)`);
+      runDbMigrateDeploy({ databaseUrl: targetUrl });
+      logInfo('db-restore', `Alembic aplicado a head (023) en "${target}"`);
     } catch (error) {
-      logError('db-restore', `Restauración OK pero Alembic falló: ${error.message}`);
+      logError('db-restore', `Restauración OK pero Alembic falló contra "${target}": ${error.message}`);
       writeAgentLog('db-restore', { status: 'partial', file, target, alembic: 'failed' });
       process.exit(1);
     }

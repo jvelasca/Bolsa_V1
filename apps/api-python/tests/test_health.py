@@ -138,3 +138,63 @@ async def test_health_ready_503_when_db_down(app, monkeypatch) -> None:
     assert body["status"] == "not_ready"
     assert body["required"]["message"] == "PostgreSQL inaccesible"
 
+
+@pytest.mark.asyncio
+async def test_health_ready_200_when_db_up_and_schema_at_head(app) -> None:
+    """/api/health/ready — 200/ready sólo si PostgreSQL Y esquema coinciden con el head."""
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/health/ready")
+
+    # En esta suite (RBAC real-PG) `bolsa_v1` está migrada a head → 200/ready.
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["required"]["status"] == "ok"
+    assert body["schema_status"]["status"] == "ok"
+    assert "esquema en head" in body["schema_status"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_health_ready_503_when_schema_mismatch(app, monkeypatch) -> None:
+    """/api/health/ready — BD responde pero schema != head esperado ⇒ 503 not_ready (V2.15-03)."""
+    import bolsa_api.api.v1.routes.health as health_mod
+
+    # Simula una BD en una revisión anterior a la que el binario actual espera.
+    async def fake_schema(_engine):
+        return "022_live_orders_exec", "ok"
+
+    monkeypatch.setattr(health_mod, "read_db_schema_current", fake_schema)
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/health/ready")
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["required"]["status"] == "ok"  # PostgreSQL sigue listo
+    assert body["schema_status"]["status"] == "error"
+    assert "esperado" in body["schema_status"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_health_ready_503_when_db_not_migrated(app, monkeypatch) -> None:
+    """/api/health/ready — BD arriba sin esquema migrado ⇒ 503 not_ready (nunca "ready" ante DB vieja)."""
+    import bolsa_api.api.v1.routes.health as health_mod
+
+    async def fake_schema(_engine):
+        return None, "unmigrated"
+
+    monkeypatch.setattr(health_mod, "read_db_schema_current", fake_schema)
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/health/ready")
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["schema_status"]["status"] == "error"
+

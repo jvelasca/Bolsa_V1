@@ -14957,7 +14957,7 @@
         "type": "object"
       },
       "ReadinessResponseDto": {
-        "description": "Payload ``GET /api/health/ready`` — readiness.\n\nPara esta app local single-writer la dependencia requerida para servir\npeticiones es PostgreSQL. Redis/worker Arq se reportan como ``optional``\ninformativos (degradados no tumban el readiness global).",
+        "description": "Payload ``GET /api/health/ready`` — readiness.\n\nPara servir tráfico una app financiera exige (fail-closed):\n  - PostgreSQL responde, y\n  - el esquema migrado coincide con el head esperado por el código (Alembic).\nRedis/worker Arq se reportan como ``optional`` informativos (degradados no\ntumban el readiness global). ``required`` resume la conectividad de BD y\n``schema_status`` detalla alineación de esquema con el head (V2.15 C2 / V2.15-03).",
         "properties": {
           "optional": {
             "additionalProperties": {
@@ -14970,6 +14970,16 @@
             "$ref": "#/components/schemas/ProvenanceDto"
           },
           "required": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadyComponentStatusDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_status": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ReadyComponentStatusDto"
@@ -23766,7 +23776,7 @@
     },
     "/api/health/ready": {
       "get": {
-        "description": "Readiness: la app puede servir tráfico.\n\nPara esta app local single-writer la dependencia *requerida* es PostgreSQL;\nRedis y el heartbeat del worker Arq se reportan como ``optional`` informativos\ny NO tumban el readiness global (el stack dev los marca ``degraded`` por diseño).\nLa respuesta es 200 cuando PostgreSQL responde; 503 en caso contrario (fail-closed\noperacional: si no hay BD no hay estado consistente que servir).",
+        "description": "Readiness: la app puede servir tráfico — fail-closed schema-aware.\n\nREADY ⇔  PostgreSQL responde (DB), AND ``alembic_version == expected_head``\n(Alembic). La conectividad ya no basta: una build más nueva nunca debe quedar\n\"ready\" corriendo contra una BD sin la última migración (V2.15 C2 / V2.15-03).\nRedis y el heartbeat del worker Arq se reportan opcionales/informativos.\nRespuesta: 200 con `status: ready` si todo ok; 503 en caso contrario.",
         "operationId": "health_ready_api_health_ready_get",
         "responses": {
           "200": {

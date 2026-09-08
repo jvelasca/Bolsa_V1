@@ -2,12 +2,11 @@
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Request, Response
-from pydantic import BaseModel, Field
-
 from bolsa_infrastructure.alerts.estudio_opinion_email import smtp_ready
 from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.session import check_database
+from bolsa_infrastructure.database.session import check_database, read_db_schema_current
+from fastapi import APIRouter, Request, Response
+from pydantic import BaseModel, Field
 
 router = APIRouter()
 
@@ -79,15 +78,19 @@ class ReadyComponentStatusDto(BaseModel):
 class ReadinessResponseDto(BaseModel):
     """Payload ``GET /api/health/ready`` — readiness.
 
-    Para esta app local single-writer la dependencia requerida para servir
-    peticiones es PostgreSQL. Redis/worker Arq se reportan como ``optional``
-    informativos (degradados no tumban el readiness global).
+    Para servir tráfico una app financiera exige (fail-closed):
+      - PostgreSQL responde, y
+      - el esquema migrado coincide con el head esperado por el código (Alembic).
+    Redis/worker Arq se reportan como ``optional`` informativos (degradados no
+    tumban el readiness global). ``required`` resume la conectividad de BD y
+    ``schema_status`` detalla alineación de esquema con el head (V2.15 C2 / V2.15-03).
     """
 
     status: str
     service: str = "bolsa-api-python"
     timestamp: str
     required: ReadyComponentStatusDto | None = None
+    schema_status: ReadyComponentStatusDto | None = None
     optional: dict[str, ReadyComponentStatusDto] = Field(default_factory=dict)
     provenance: ProvenanceDto = Field(default_factory=ProvenanceDto)
 
@@ -322,27 +325,66 @@ async def health_live() -> LiveResponseDto:
 
 @router.get("/health/ready", response_model=ReadinessResponseDto)
 async def health_ready(request: Request, response: Response) -> ReadinessResponseDto:
-    """Readiness: la app puede servir tráfico.
+    """Readiness: la app puede servir tráfico — fail-closed schema-aware.
 
-    Para esta app local single-writer la dependencia *requerida* es PostgreSQL;
-    Redis y el heartbeat del worker Arq se reportan como ``optional`` informativos
-    y NO tumban el readiness global (el stack dev los marca ``degraded`` por diseño).
-    La respuesta es 200 cuando PostgreSQL responde; 503 en caso contrario (fail-closed
-    operacional: si no hay BD no hay estado consistente que servir).
+    READY ⇔  PostgreSQL responde (DB), AND ``alembic_version == expected_head``
+    (Alembic). La conectividad ya no basta: una build más nueva nunca debe quedar
+    "ready" corriendo contra una BD sin la última migración (V2.15 C2 / V2.15-03).
+    Redis y el heartbeat del worker Arq se reportan opcionales/informativos.
+    Respuesta: 200 con `status: ready` si todo ok; 503 en caso contrario.
     """
     engine = request.app.state.engine
     db_ok, db_message = await check_database(engine)
-    new = datetime.now(tz=UTC).isoformat()
     provenance = _provenance_dto()
+    new = datetime.now(tz=UTC).isoformat()
+    expected_head = provenance.schema_revision  # head Alembic esperado por el código
 
-    if db_ok:
+    if not db_ok:
+        response.status_code = 503
+        return ReadinessResponseDto(
+            status="not_ready",
+            timestamp=new,
+            required=_ready_status(db_message, "error"),
+            optional={},
+            provenance=provenance,
+        )
+
+    # DB lista: comprobar alineación de esquema con el head esperado.
+    current, schema_state = await read_db_schema_current(engine)
+    if schema_state == "error":
+        # BD caída justo después del check (carrera) → not_ready.
+        response.status_code = 503
+        return ReadinessResponseDto(
+            status="not_ready",
+            timestamp=new,
+            required=_ready_status("PostgreSQL inaccesible tras el check", "error"),
+            schema_status=_ready_status("esquema no verificable", "error"),
+            optional={},
+            provenance=provenance,
+        )
+
+    if expected_head and current == expected_head:
+        schema_ok = True
+        schema_c = _ready_status(f"esquema en head ({expected_head})", "ok")
+    else:
+        schema_ok = False
+        if not expected_head:
+            detail = "head esperado no resoluble localmente; esquema sin verificar"
+        elif not current:
+            detail = f"BD sin esquema migrado (se esperaba {expected_head})"
+        else:
+            detail = f"esquema {current} ≠ head esperado {expected_head}"
+        schema_c = _ready_status(detail, "error")
+
+    if not schema_ok:
+        response.status_code = 503
         redis_c = await _redis_component()
         worker_c = await _worker_heartbeat_component()
-        response.status_code = 200
         return ReadinessResponseDto(
-            status="ready",
+            status="not_ready",
             timestamp=new,
             required=_ready_status("PostgreSQL listo", "ok"),
+            schema_status=schema_c,
             optional={
                 "redis": _ready_status(redis_c.message, redis_c.status),
                 "worker_arq": _ready_status(worker_c.message, worker_c.status),
@@ -350,11 +392,18 @@ async def health_ready(request: Request, response: Response) -> ReadinessRespons
             provenance=provenance,
         )
 
-    response.status_code = 503
+    # Todo ok (DB + esquema) → ready.
+    redis_c = await _redis_component()
+    worker_c = await _worker_heartbeat_component()
+    response.status_code = 200
     return ReadinessResponseDto(
-        status="not_ready",
+        status="ready",
         timestamp=new,
-        required=_ready_status(db_message, "error"),
-        optional={},
+        required=_ready_status("PostgreSQL listo", "ok"),
+        schema_status=_ready_status(f"esquema en head ({expected_head})", "ok"),
+        optional={
+            "redis": _ready_status(redis_c.message, redis_c.status),
+            "worker_arq": _ready_status(worker_c.message, worker_c.status),
+        },
         provenance=provenance,
     )
