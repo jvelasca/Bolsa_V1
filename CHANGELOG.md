@@ -2,6 +2,38 @@
 
 All notable releases of Bolsa V1.
 
+## [1.46.0-beta] — 2026-09-09
+
+Elevación a `main` de `V2.15.4` (aislamiento account-less) + `V2.15.5` (DR industrial OHLCV/backup 3-2-1) en **un solo tag `v2.16-beta`**; núcleo financiero congelado intacto; sin migración nueva. Producto **BETA / no producción**.
+Package **`1.46.0-beta`** (**bump** desde `1.45.3-beta`). Alembic head **`023_ohlcv_bars_unique_reconcile`**.
+Tip: **`302a3220`** (V2.15.5) == código elevado; este commit es el bump/elevación.
+
+### V2.15.4 — aislamiento account-less fiable (P1 C2-06)
+
+Reads/writes **account-less no degradan a global**; sin cuenta propia quedan fail-closed, nunca asumen tenant del owner ajeno:
+
+- `account_repository.resolve_default_account_for_owner`: el default activo visible al owner F7c (evita colapso `is_default` entre tenants).
+- `resolve_account_scope_or_default`: `account_id` ajeno → 404; ausente → default del principal; sin cuenta propia → `None` (fail-closed).
+- `ai_governance` reads (effectiveness, decision-sessions, learning-summary) y writes (decision-memory, trials, edge-reports, propose): account-less → default del principal; filas huérfanas `NULL` excluidas de listados.
+- `investor_profiles` refresh-observed: valida el owner del account; account-less → default.
+- CI: gate `account-isolation` real-PG en `lifecycle-pg` (fail-closed vía `certify`).
+- Tests: 4 account-less 2-owners (23 ISO + ai_authoring 26 verdes real-PG).
+
+### V2.15.5 — DR industrial: snapshot atómico + digest por bloques + OHLCV + C2-01 + backup 3-2-1/RPO-RTO
+
+Alcance SOLO infraestructura DR (`scripts/`), núcleo financiero congelado:
+
+- **Snapshot atómico `REPEATABLE READ`**: TODAS las tablas (financieras + mercado) se leen en **UNA** transacción `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; … COMMIT;` → imagen consistente. Parser arreglado (psql `-A` emite `|`, no tab) → el digest de tablas no vacías ya reporta cuenta real (antes 0/vacío y el cheque pasaba en vacío).
+- **Digest por BLOQUES** (`CHUNK_SIZE=5000`, md5 por bloque ordenado + concat) en vez de `md5(string_agg total)` → memoria acotada y determinista; añade `MARKET_ENTITIES`: `ohlcv_bars` (167k, fuente de verdad), `instruments`, `data_sync_log`.
+- **RTO** medido del restore + cobertura volcada a `logs/agent/db-dr-verify.json`.
+- **C2-01** (`db-restore`): `--target-db` validado (`^[A-Za-z0-9_.-]+$`) **ANTES** del DDL destructivo.
+- **Backup 3-2-1 + RPO/RTO**: espejo a dir env `DB_BACKUP_MIRROR_DIR` (2º medio/árbol) + manifest registra `mirror`; `db-backup-list` muestra RPO y estado espejo. (3er medio off-site: guía MVP de set-up, ver [`docs/engineering/guia-off-site-3er-medio-2026-09-09.md`](./docs/engineering/guia-off-site-3er-medio-2026-09-09.md).)
+- `db-backup-cron-win`: tarea programada de **restore-test DR diario** (`db:dr:test` con volumen real) junto al backup diario.
+
+### Verificación real
+
+Batería DR local con volumen real (dump → checksum → restore a scratch → integridad md5 por bloques financiero+mercado) **verde** + aislamiento **43 passed** real-PG + `node --check` OK + C2-01 rechaza inyección antes del DDL (`bolsa_v1` intacta). Gate industrial del tag: job `dr-verify` del Release-tag CI (TCP, fail-closed vía `certify`).
+
 ## [1.45.3-beta] — 2026-09-08
 
 Hardening de la auditoría **V2.15.1 C2** (delta en **scripts DR + CI del tag**; núcleo financiero congelado sin tocar; sin migración nueva). Producto **BETA / no producción**.
