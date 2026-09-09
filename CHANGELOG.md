@@ -26,8 +26,9 @@ Package **`1.47.0-beta`** (bump desde `1.46.1-beta`).
 
 ### Verificación
 
-Sin cambios de código: el Release-tag CI solo re-corre el contrato existente (resultado GREEN esperado).
-Relevo del ciclo: [`docs/engineering/traspaso-relevo-a7-iter0-v2-17-beta-2026-09-09.md`](./docs/engineering/traspaso-relevo-a7-iter0-v2-17-beta-2026-09-09.md).
+Sin cambios de código: **Release-tag CI `#34334824584` GREEN** sobre `v2.17-beta` (`conclusion: success`,
+certify ✓), tag remoto apuntando a `79df594c`. Relevo del ciclo:
+[`docs/engineering/traspaso-relevo-a7-iter0-v2-17-beta-2026-09-09.md`](./docs/engineering/traspaso-relevo-a7-iter0-v2-17-beta-2026-09-09.md).
 
 ## [1.46.1-beta] — 2026-09-09
 

@@ -38,10 +38,26 @@ El único 🔴 probado (no suite agregada) es **C3** → primer item de la Iter-
 - Mapa con rutas verificadas (Glob) contra el checkout real; cero afirmaciones de "batería pasando".
 - Checklist manual §3 del plan: cada escenario con evidencia ruta:línea.
 
-## 4. Estado (local, paso del owner en GitHub)
+## 4. Elevación completada en GitHub (2026-09-09) y GREEN final
 
-- Tipo/estado: `main` avanzará a la **elevación `1.47.0-beta` / tag `v2.17-beta`** para correr el
-  Release-tag CI (certify, dr-verify, iso real-PG, playwright) y considerarlo GREEN antes de cerrar.
+Ejecutado hasta dejar el repo dispuesto, con **elevación GREEN del ciclo v2.17-beta**:
 
-FIN DEL RELEVO — Iter-0 de **LIVE Certification / A7** definida (marco + gap-map documental). Núcleo
-congelado intacto. Paso siguiente: elevar a `v2.17-beta` (push + tag → Release-tag CI GREEN).
+- `origin/main` avanzado a **`79df594c`** (commit `docs(v2.17-beta / 1.47.0-beta): Iter-0 de LIVE
+Certification A7`, trabajado limpio).
+- Bump root **`1.47.0-beta`** (`1.46.1-beta → 1.47.0-beta`).
+- Tag anotado remoto **`v2.17-beta`** → `79df594c` (creado vía push → evento `tag push`).
+- **Release-tag CI `#34334824584`** — `conclusion: success`, jobs GREEN (~8 min):
+  - `security (gitleaks)` ✓ · `shared` ✓ · `decision-spine` ✓ · `dr-verify` ✓
+  - `python (ruff/imports/mypy/pytest offline)` ✓ · `lifecycle-pg` (alembic/auth/golden/identity + iso
+    real-PG 43) ✓ · `frontend (+contract:check)` ✓ · `playwright (mock E2E)` ✓
+  - agregador **`certify (aggregate + artifact)` ✓ = GREEN**.
+  - `playwright (integrated E2E, opt-in)` skipped (job opt-in; no es requisito de GREEN).
+- Trabajo local limpio; `main` sincronizado con `origin/main`, sin ahead/behind.
+
+**GREEN FINAL CERTIFICADO para `v2.17-beta` (Iter-0 de LIVE Certification / A7)**, únicamente documental
+(marco + gap-map), núcleo financiero congelado intacto → listo para decidir la Iter-1 (batería A7) con el
+home y el backlog ya fijados.
+
+FIN DEL RELEVO — Iter-0 de **LIVE Certification / A7** definida y elevada a `v2.17-beta`
+(origin/main `79df594c` + tag remoto). Release-tag CI `#34334824584` GREEN (`certify` success). Backlog
+y home de la batería listos para Iter-1.
