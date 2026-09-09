@@ -51,8 +51,9 @@ async def test_health_reports_provenance(app) -> None:
     # Paquete del SDK debe coincidir con la fuente real leída internamente (no drift).
     assert pro.get("package") == build_provenance().package
 
-    # schema deseado = cabecera Alembic (emisora/única) — hoy 023_ohlcv_bars_unique_reconcile.
-    assert isinstance(pro.get("schema_revision"), str) and pro["schema_revision"].startswith("023")
+    # schema = cabecera Alembic real (single source), no un prefijo fijo a una
+    # revisión concreta: avanzar la head (023→024…) no debe romper este test.
+    assert isinstance(pro.get("schema_revision"), str) and len(pro["schema_revision"]) > 0
     assert pro["schema_revision"] == build_provenance().schema_revision
 
     # Los campos no estrictamente derivables se reportan como clave (nunca se inventan).

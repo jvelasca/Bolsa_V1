@@ -3,7 +3,8 @@
 Batería V2.18 que empieza a cerrar el gap principal de la Iter-0 de A7:
 
 * PG REAL aislado (BD dedicada ``bolsa_v1_a7`` en el job CI ``a7-gate``). Si no hay
-  PostgreSQL o el Alembic no está a la head congelada ``023`` → ``pytest.skip`` salvo
+  PostgreSQL o el Alembic no está a la head (hoy ``024_execution_events_state``) →
+  ``pytest.skip`` salvo
   ``LIVE_A7_PG_REQUIRED=1`` (fail duro en CI, patrón `test_live_order_recovery_concurrency_pg`).
 * Crash de **proceso real** (subproceso Python) sobre ``resolve_one_unknown`` +
   ``PostgresLiveOrderStore`` en el punto crítico (claim FOR UPDATE en vivo, sin commit).
@@ -108,7 +109,8 @@ def _require_or_skip(exc: Exception) -> None:
 async def factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Session-factory aislado para la batería C3 (PG real dedicado A7).
 
-    Operativa: conecta (gate por `SELECT 1`) y lleva la BD dedicada a la head 023 vía
+    Operativa: conecta (gate por `SELECT 1`) y lleva la BD dedicada a la head (hoy
+    `024_execution_events_state`) vía
     `ensure_migrated` (idempotente, respeta `DATABASE_URL` de settings) para no depender
     de la migración CLI de `alembic.ini` (que apunta a la DB principal). Un esquema
     inexistente o desalineado se corrige aquí; si PG no responde → skip (o fail duro con
@@ -126,7 +128,7 @@ async def factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         await engine.dispose()
         _require_or_skip(exc)
         raise RuntimeError("unreachable")  # noqa: B904
-    # Esquema listo a head 023 de forma idempotente sobre la BD dedicada.
+    # Esquema listo a la head (024_execution_events_state) de forma idempotente.
     await asyncio.to_thread(ensure_migrated)
     session_factory = create_session_factory(engine)
     try:

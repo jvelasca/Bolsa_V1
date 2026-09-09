@@ -68,10 +68,10 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
             await conn.execute(select(1))
             version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "023_ohlcv_bars_unique_reconcile" not in versions:
+            if "024_execution_events_state" not in versions:
                 raise RuntimeError(
                     f"alembic_version is {versions!r}; "
-                    "expected 023_ohlcv_bars_unique_reconcile (V2.14 ohlcv head)"
+                    "expected 024_execution_events_state (V2.19 head)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
