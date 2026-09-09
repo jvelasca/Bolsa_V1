@@ -172,7 +172,10 @@ class PurgeClosedSimulatedAccounts:
         skipped: list[dict[str, object]] = []
         for account in listed.accounts:
             try:
-                await self._accounts.delete_simulated_account(account.id)
+                # Purga administrativa (cross-owner) legítima de demos cerradas:
+                # scope de sistema como list_active_accounts(for_custody_job=True).
+                # La promoción del default de la fila borrada sigue siendo owner-local.
+                await self._accounts.delete_simulated_account(account.id, for_purge=True)
                 purged.append(account.id)
             except ValueError as exc:
                 skipped.append(

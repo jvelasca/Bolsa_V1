@@ -14,6 +14,13 @@ que esta capa NO invoca ciegamente:
   * solo cuando el go (``permit``) es otorgado por una capa autorizada se llama a
     ``apply_finance(execution)``.
 
+Si el go llega DESPUÉS de la captura (consentimiento en dos fases oídas:
+captura en T0 con ``permit=False`` y aprobación en T1), ``apply_pending_execution``
+retoma la traza ya capturada y materializa sin chocar con ``duplicate_skipped``
+(Auditoría 3). Esta operación no crea una 2ª captura: requiere que la traza
+exista (``event_not_found`` si no), a la vez que con ``execution_id`` idempotente
+evita doble materialización vía un ``apply_finance`` idempotente por execution.
+
 El counter ``financial_apply_count`` del dominio NO es el mecanismo de idempotencia:
 lo es la clave `execution_id` (venue_order_id + fill_seq).
 """
@@ -34,6 +41,7 @@ ApplyDecision = Literal[
     "captured_pending_operator_consent",
     "applied",
     "captured_not_applied",
+    "event_not_found",
 ]
 
 
@@ -166,5 +174,41 @@ async def apply_fill_idempotent(
     if not permit or apply_finance is None:
         # No se toca Position/Ledger: depositar aquí sería el atajo H4 eliminado.
         return "captured_pending_operator_consent"
+    effective = await apply_finance(execution)
+    return "applied" if effective else "captured_not_applied"
+
+
+async def apply_pending_execution(
+    store: ExecutionEventStore,
+    *,
+    execution_id: str,
+    apply_finance: ApplyFinanceCallable,
+) -> ApplyDecision:
+    """Fase 2 (consentimiento del operador/máquina) — materializa un fill capturado.
+
+    Cierra el hueco Auditoría 3 del flujo de dos fases: ``apply_fill_idempotent``
+    captura y NUNCA puede volver sobre una fila ya capturada (2º call →
+    ``duplicate_skipped`` porque el ``execution_id`` ya existe), así que a un go
+    entregado DESPUÉS de la captura no le quedaba salida para materializar el
+    dinero. Esta API separada parte de la traza ya capturada y solo aplica
+    Position/Ledger si existe sin importar duplicate, respetando el GATED:
+
+    * ``event_not_found`` = no hay traza capturada para ``execution_id``:
+      no se unge (y no se materializa) un fill que nunca se capturó (fail-closed).
+    * ``applied`` = la traza existe y ``apply_finance`` fue efectivo.
+    * ``captured_not_applied`` = la traza existe pero el apply no fue efectivo
+      (fallo/no-op): NO se marca como consumado; el caller puede reintentar.
+
+    Honestidad de idempotencia financiera: dentro de esta capa la traza única
+    ``execution_id`` impide la doble CAPTURA; el doble APPLY se evita porque el
+    ``apply_finance`` (kernel Decimal / sincronización Position·Ledger) es
+    idempotente por ``execution_id`` — si la materialización ya se registró,
+    una 2ª confirmación vuelve sin efecto y devuelve ``captured_not_applied``.
+    """
+    if not execution_id or not execution_id.strip():
+        raise ValueError("execution_id is required")
+    execution = await store.get(execution_id.strip())
+    if execution is None:
+        return "event_not_found"
     effective = await apply_finance(execution)
     return "applied" if effective else "captured_not_applied"

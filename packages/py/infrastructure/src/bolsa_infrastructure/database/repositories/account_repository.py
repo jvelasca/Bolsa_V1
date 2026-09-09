@@ -503,15 +503,33 @@ class SqlAlchemyAccountRepository:
         await self._session.flush()
         return _account_from_row(row)
 
-    async def set_default_account(self, account_id: str) -> InvestmentAccount:
+    async def set_default_account(
+        self,
+        account_id: str,
+        *,
+        owner_user_id: str | None = None,
+    ) -> InvestmentAccount:
+        """Marca ``account_id`` como incumplida (``is_default=True``) del OWNER.
+
+        P1-02 (V2.16.1): el desmarcado del resto es estrictamente owner-scoped.
+        Solo las cuentas activas del mismo principal pierden ``is_default``; nunca
+        las de otro tenant. Un ``account_id`` de otro owner se trata como no
+        encontrada (same semantics que ``get_account``), no 500.
+        """
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:
+            raise ValueError("Cuenta no encontrada")
+        owner = owner_user_id if owner_user_id is not None else _app_owner_id()
+        if not _account_visible_to_owner(row.user_id, owner):
             raise ValueError("Cuenta no encontrada")
         if row.status != "active":
             raise ValueError("Solo una cuenta activa puede marcarse como principal")
         await self._session.execute(
             update(InvestmentAccountRow)
-            .where(InvestmentAccountRow.id != account_id)
+            .where(
+                _owner_visibility_clause(owner),
+                InvestmentAccountRow.id != account_id,
+            )
             .values(is_default=False),
         )
         row.is_default = True
@@ -532,10 +550,39 @@ class SqlAlchemyAccountRepository:
         await self._session.flush()
         return _account_from_row(row)
 
-    async def delete_simulated_account(self, account_id: str) -> None:
+    async def delete_simulated_account(
+        self,
+        account_id: str,
+        *,
+        owner_user_id: str | None = None,
+        for_purge: bool = False,
+    ) -> None:
+        """Elimina una cuenta simulada cerrada y re-asigna su default al OWNER.
+
+        P1-03 (V2.16.1): la promoción del siguiente ``is_default`` es SIEMPRE
+        owner-local a la cuenta borrada (``row.user_id``), nunca global.
+
+        Acceso al borrado (misma semántica que ``list_active_accounts``):
+        - ``owner_user_id`` dado → estricto: una cuenta de otro principal se trata
+          como no encontrada (defensa en profundidad, no depender del guard HTTP).
+        - ``for_purge=True`` (mutuamente excluyente con ``owner_user_id``) →
+          scope de sistema (purgas administrativas ``PurgeClosedSimulatedAccounts``);
+          permite borrar demos de cualquier owner, pero la promoción del default
+          sigue acotada al owner de la fila borrada.
+        - ninguno → fallback al owner bootstrap de la app.
+        """
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:
             raise ValueError("Cuenta no encontrada")
+        if for_purge and owner_user_id is not None:
+            raise ValueError("for_purge y owner_user_id son mutuamente excluyentes")
+        owner: str | None
+        if not for_purge:
+            owner = owner_user_id if owner_user_id is not None else _app_owner_id()
+            if not _account_visible_to_owner(row.user_id, owner):
+                raise ValueError("Cuenta no encontrada")
+        else:
+            owner = row.user_id
         if row.type != "simulated":
             raise ValueError("Solo se pueden eliminar cuentas simuladas (modo demo)")
         if row.status != "closed":
@@ -589,10 +636,15 @@ class SqlAlchemyAccountRepository:
         await self._session.delete(row)
         await self._session.flush()
 
-        if was_default:
+        if was_default and owner is not None:
+            # P1-03: promueve el siguiente default SOLO del mismo owner. Nunca
+            # promueve una cuenta activa de otro principal.
             stmt = (
                 select(InvestmentAccountRow)
-                .where(InvestmentAccountRow.status == "active")
+                .where(
+                    _owner_visibility_clause(owner),
+                    InvestmentAccountRow.status == "active",
+                )
                 .order_by(InvestmentAccountRow.created_at.asc())
                 .limit(1)
             )

@@ -103,8 +103,16 @@ class SetDefaultAccount:
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
-    async def execute(self, account_id: str) -> InvestmentAccount:
-        return await self._account_repo.set_default_account(account_id)
+    async def execute(
+        self,
+        account_id: str,
+        *,
+        owner_user_id: str | None = None,
+    ) -> InvestmentAccount:
+        return await self._account_repo.set_default_account(
+            account_id,
+            owner_user_id=owner_user_id,
+        )
 
 
 class CloseAccount:
@@ -121,5 +129,13 @@ class DeleteAccount:
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
-    async def execute(self, account_id: str) -> None:
-        await self._account_repo.delete_simulated_account(account_id)
+    async def execute(
+        self,
+        account_id: str,
+        *,
+        owner_user_id: str | None = None,
+    ) -> None:
+        await self._account_repo.delete_simulated_account(
+            account_id,
+            owner_user_id=owner_user_id,
+        )

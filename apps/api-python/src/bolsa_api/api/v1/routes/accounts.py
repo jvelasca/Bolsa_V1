@@ -213,11 +213,15 @@ async def update_account(
 
 @router.post("/accounts/{account_id}/make-default", response_model=AccountResponseDto)
 async def make_default_account(
+    request: Request,
     account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountResponseDto:
     try:
-        account = await get_set_default_account_use_case(session).execute(account_id)
+        account = await get_set_default_account_use_case(session).execute(
+            account_id,
+            owner_user_id=get_request_principal(request),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AccountResponseDto(data=to_investment_account_dto(account))
@@ -303,11 +307,15 @@ async def close_account(
 
 @router.delete("/accounts/{account_id}", status_code=204)
 async def delete_account(
+    request: Request,
     account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> Response:
     try:
-        await get_delete_account_use_case(session).execute(account_id)
+        await get_delete_account_use_case(session).execute(
+            account_id,
+            owner_user_id=get_request_principal(request),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return Response(status_code=204)

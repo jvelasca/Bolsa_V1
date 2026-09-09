@@ -799,3 +799,91 @@ async def test_refresh_observed_accountless_does_not_read_foreign_or_orphan_memo
         finally:
             await _delete_raw_profile(factory, profile_b)
             await _delete_raw_account(factory, acc_a)
+
+
+async def _account_is_default(
+    factory: async_sessionmaker[AsyncSession],
+    account_id: str,
+) -> bool:
+    async with factory() as session:
+        row = await session.get(InvestmentAccountRow, account_id)
+        assert row is not None
+        return bool(row.is_default)
+
+
+@pytest.mark.asyncio
+async def test_set_default_account_is_owner_scoped() -> None:
+    """P1-02: ``set_default_account`` en user-a NO desmarca el default de user-b.
+
+    Escenario repo-level (frente al repo real, no al guard HTTP): user-a marca su
+    default con dos cuentas propias (A1 default actual, A2), mientras user-b tiene
+    B1 marcada default. Al promocionar A2 a default, A1 debe perder el flag pero
+    B1 de user-b DEBE seguir ``is_default`` — el UPDATE debe ser owner-scoped.
+    """
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        a1 = await _insert_raw_account(factory, user_id="user-a", name="A1 default")
+        a2 = await _insert_raw_account(factory, user_id="user-a", name="A2 candidate")
+        b1 = await _insert_raw_account(factory, user_id="user-b", name="B1 default")
+        try:
+            async with factory() as session:
+                repo = SqlAlchemyAccountRepository(session)
+                # Estado inicial: A1 default de user-a; B1 default de user-b.
+                await repo.set_default_account(a1, owner_user_id="user-a")
+                await repo.set_default_account(b1, owner_user_id="user-b")
+                # Promoción dentro de user-a: A2 deja de ser default de B1.
+                await repo.set_default_account(a2, owner_user_id="user-a")
+                await session.commit()
+
+            assert await _account_is_default(factory, a2) is True
+            assert await _account_is_default(factory, a1) is False
+            # B1 (otro tenant) NO debe haberse tocado.
+            assert await _account_is_default(factory, b1) is True
+        finally:
+            await _delete_raw_account(factory, a1)
+            await _delete_raw_account(factory, a2)
+            await _delete_raw_account(factory, b1)
+
+
+@pytest.mark.asyncio
+async def test_delete_default_promotion_is_owner_local() -> None:
+    """P1-03: eliminar un default promueve el siguiente default del MISMO owner.
+
+    Se dispone el escenario para que la promoción GLOBAL (el bug) eligiera un
+    default AJENO: B1 (de user-b) se inserta PRIMERO → es la 'activa' más antigua
+    global entre las supervivientes. Al borrar el default A1 de user-a, la
+    promoción owner-scoped DEBE elegir A2 (candidata del propio user-a) y NO B1.
+    """
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        # B1 PRIMERO ⇒ created_at más antiguo ⇒ la promoción global caería sobre B1.
+        b1 = await _insert_raw_account(factory, user_id="user-b", name="B1 active foreign")
+        a1 = await _insert_raw_account(factory, user_id="user-a", name="A1 default")
+        a2 = await _insert_raw_account(factory, user_id="user-a", name="A2 candidate")
+        try:
+            async with factory() as session:
+                repo = SqlAlchemyAccountRepository(session)
+                await repo.set_default_account(a1, owner_user_id="user-a")
+                await repo.set_default_account(b1, owner_user_id="user-b")
+                await session.commit()
+
+            # user-a cierra su cuenta default para poder eliminarla.
+            async with factory() as session:
+                repo = SqlAlchemyAccountRepository(session)
+                await repo.close_account(a1)
+                await session.commit()
+            # Elimina la cuenta default de user-a (close previo ya hecho).
+            async with factory() as session:
+                repo = SqlAlchemyAccountRepository(session)
+                await repo.delete_simulated_account(a1, owner_user_id="user-a")
+                await session.commit()
+
+            # A2 se promueve como default de user-a (owner-local), NO B1 a pesar de
+            # que B1 era la 'activa' más antigua del conjunto global.
+            assert await _account_is_default(factory, a2) is True
+            assert await _account_is_default(factory, b1) is True  # default legítimo de user-b
+        finally:
+            await _delete_raw_account(factory, a2)
+            await _delete_raw_account(factory, b1)

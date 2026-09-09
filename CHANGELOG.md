@@ -2,6 +2,51 @@
 
 All notable releases of Bolsa V1.
 
+## [1.46.1-beta] — 2026-09-09
+
+Elevación a `main` (commit local `v2.16.1-beta`, **sin push aún**) del ciclo de cierre de
+hallazgos residuales de la auditoría sobre `v2.16-beta`: owner-scoping de cuenta por defecto
+(**P1-02/03**), **Auditoría 2** (fill_unseen tapado por cancel en el incidente `live_drift`) y
+**Auditoría 3** (consentimiento del operador de ExecutionEvent en dos fases, sin salida).
+Núcleo financiero congelado **intacto** (deuda P3 C2 aceptada como riesgo medido, ver
+[`docs/engineering/deuda-p3-nucleo-aceptada-c2-2026-09-09.md`](./docs/engineering/deuda-p3-nucleo-aceptada-c2-2026-09-09.md)).
+Package **`1.46.1-beta`** (bump desde `1.46.0-beta`). Alembic head **`023_ohlcv_bars_unique_reconcile`**
+(sin migración nueva).
+
+### P1-02/P1-03 — owner-scoping del account default (`set_default_account`/`delete_simulated_account`)
+
+- `set_default_account` y `delete_simulated_account` ya no tratan el `is_default` y la promoción
+  de siguiente default de forma global-cuenta: se ciñen al **owner** que hace la operación
+  (`owner_user_id` desde el principal autenticado en rutas), evitando sobrescribir el default de
+  otro tenant o promover una cuenta activa ajena tras borrar un default.
+- Rutas `accounts.py` pasan `owner_user_id` resuelto del principal; el purge administrativo
+  del ciclo de vida usa `for_purge=True` (scope de sistema) pero la promoción de default sigue
+  siendo owner-local (P1-03).
+- CI iso: gate `account-isolation` real-PG **43 passed**.
+
+### Auditoría 2 — el incidente `live_drift` ya no tapa un `fill_unseen` posterior
+
+- Cuando una cuenta ya tiene un `live_drift` activo (abierto p. ej. por `cancel_broker_side`) y
+  en un tick posterior el recovery entregar un drift de **firma nueva** (order/venue/subtipo,
+  p. ej. `fill_unseen`), el snapshot del incidente vigente se **amplía** de forma idempotente
+  por firma (`publish_order_live_drifts`, campo `merged`) en lugar de descartarlo con un
+  `already_active` silencioso. Un drift ya registrado sigue siendo replay no-op. Nunca se crea
+  un 2º OPEN ni se auto-heal.
+
+### Auditoría 3 — consentimiento del operador de ExecutionEvent con salida real (dos fases)
+
+- `apply_fill_idempotent` captura con idempotencia (1ª fase, `permit=False` no materializa).
+  Nueva `apply_pending_execution(execution_id, apply_finance)` (2ª fase) retoma la traza ya
+  capturada cuando llega el "go" y materializa Position/Ledger sin chocar con
+  `duplicate_skipped`; `event_not_found` si la traza no existe (fail-closed) y
+  `captured_not_applied` si el apply no fue efectivo (reintentable).
+
+### Verificación
+
+Unit (18 drift + execution) + regresión (60) verdes; e2 PG real en scratch `bolsa_c1_scratch`
+(head 023, dedicated) **5/5**, incluido el merge `fill_unseen`; ruff CI-parity 0; mypy src 0.
+Shared `bolsa_v1` intacta en 023.
+
 ## [1.46.0-beta] — 2026-09-09
 
 Elevación a `main` de `V2.15.4` (aislamiento account-less) + `V2.15.5` (DR industrial OHLCV/backup 3-2-1) en **un solo tag `v2.16-beta`**; núcleo financiero congelado intacto; sin migración nueva. Producto **BETA / no producción**.

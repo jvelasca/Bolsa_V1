@@ -6,7 +6,10 @@ Cubre el writer ``order_live_drift_incident``:
 * strict kinds — solo cancel_broker_side / fill_unseen / state_mismatch abren
   incidente; ``query_unavailable`` (bridge que no contestó) NO abre (evita vetos
   falsos de apertura por timeouts);
-* un OPEN por cuenta y kind — replay no-op, no duplica ni sobrescribe snapshot;
+* un OPEN por cuenta y kind — replay del MISMO drift es no-op, no duplica ni
+  sobrescribe snapshot; pero si llega un drift de subtipo nuevo (Auditoría 2), el
+  snapshot del incidente vigente se AMPLÍA con él (fill_unseen ya no queda
+  invisible bajo un cancel_broker_side previo);
 * dedup OPEN multi-worker en ``PostgresOperationalIncidentStore.put`` (stub de
   sesión, patrón test_dex3): dos workers que ven ``get_active=None`` y putean a la
   vez → el commit del 2º choca (IntegrityError por el partial-unique), tras
@@ -221,3 +224,61 @@ async def test_put_integrity_error_no_winner_reraises() -> None:
     with pytest.raises(IntegrityError):
         await store.put(inc)
     session.rollback.assert_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Auditoría 2 — el incidente vigente crece cuando llega un drift de subtipo nuevo
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_publish_append_fill_unseen_into_open_live_drift() -> None:
+    """Un live_drift abierto por cancel no tapa un fill_unseen posterior.
+
+    T0 la cuenta abre un ``live_drift`` (cancel_broker_side). T1 llega un
+    ``fill_unseen`` distinto (firma nueva) para la MISMA cuenta: NO se abre un
+    2º OPEN, pero el snapshot del incidente vigente se AMPLÍA para que el
+    operador vea también la divergencia de dinero real recién aparecida.
+    """
+    store = InMemoryOperationalIncidentStore()
+
+    t0 = _Report(
+        _drift(kind="cancel_broker_side", account_id="acc-1", order_id="o1")
+    )
+    first = await publish_order_live_drifts(t0, holder=store)
+    assert first.opened == 1
+    assert first.merged == 0
+
+    t1 = _Report(
+        _drift(kind="fill_unseen", account_id="acc-1", order_id="o7"),
+    )
+    second = await publish_order_live_drifts(t1, holder=store)
+    # No se abre un 2º open; el snapshot se amplió (fill_unseen ahora visible).
+    assert second.opened == 0
+    assert second.merged == 1
+    assert second.already_active == 0
+
+    active = await store.list_active("acc-1")
+    assert len(active) == 1  # sigue siendo UN live_drift por cuenta
+    snap = active[0].snapshot or ""
+    assert "cancel_broker_side" in snap
+    assert "fill_unseen" in snap  # la divergencia grave (T1) ya no queda invisible
+
+
+@pytest.mark.asyncio
+async def test_publish_replay_of_same_drift_still_noop_after_merge() -> None:
+    """Tras ampliar el snapshot, repetir un drift ya registrado sigue siendo no-op."""
+    store = InMemoryOperationalIncidentStore()
+    t0 = _Report(_drift(kind="cancel_broker_side", account_id="acc-1", order_id="o1"))
+    await publish_order_live_drifts(t0, holder=store)
+
+    t1 = _Report(_drift(kind="fill_unseen", account_id="acc-1", order_id="o7"))
+    await publish_order_live_drifts(t1, holder=store)
+    after_merge = await store.list_active("acc-1")
+
+    # Replay: el MISMO drift (T1) de nuevo → no-op, no cambia el snapshot.
+    replay = await publish_order_live_drifts(t1, holder=store)
+    assert replay.merged == 0
+    assert replay.already_active == 1
+    after_replay = await store.list_active("acc-1")
+    assert after_replay[0].snapshot == after_merge[0].snapshot

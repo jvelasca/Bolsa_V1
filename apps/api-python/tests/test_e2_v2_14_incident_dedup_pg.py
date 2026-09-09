@@ -274,6 +274,84 @@ async def test_publish_live_drift_two_sessions_single_open(
         await _delete_incidents(session_factory, account)
 
 
+@pytest.mark.asyncio
+async def test_publish_live_drift_merges_later_fill_unseen_into_open_on_pg(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Auditoría 2 sobre PG real: un fill_unseen posterior se AÑADE al snapshot
+    del live_drift vigente (abierto antes por cancel), sin crear un 2º OPEN."""
+    from bolsa_application.operational_incident_store import (
+        PostgresOperationalIncidentStore,
+    )
+    from bolsa_application.order_live_drift_incident import publish_order_live_drifts
+
+    account = _cleanup_account()
+    try:
+        # T0 — la cuenta abre por cancel_broker_side.
+        async with session_factory() as session:
+            store = PostgresOperationalIncidentStore(session)
+            res_t0 = await publish_order_live_drifts(
+                _report(
+                    {
+                        "account_id": account,
+                        "order_id": "lo-e2-merge-0",
+                        "venue_order_id": f"x0-{account}",
+                        "machine_state": "CANCEL_REQUESTED",
+                        "broker_state": "CANCELLED",
+                        "kind": "cancel_broker_side",
+                        "suggested": "CANCELLED",
+                    }
+                ),
+                holder=store,
+            )
+            await session.commit()
+        assert res_t0.opened == 1, res_t0.summary()
+
+        # T1 — un fill_unseen (firma nueva) llega un tick después, misma cuenta.
+        async with session_factory() as session:
+            store = PostgresOperationalIncidentStore(session)
+            res_t1 = await publish_order_live_drifts(
+                _report(
+                    {
+                        "account_id": account,
+                        "order_id": "lo-e2-merge-1",
+                        "venue_order_id": f"x1-{account}",
+                        "machine_state": "WORKING",
+                        "broker_state": "FILLED",
+                        "kind": "fill_unseen",
+                        "suggested": None,
+                    }
+                ),
+                holder=store,
+            )
+            await session.commit()
+        assert res_t1.merged == 1, res_t1.summary()
+        assert res_t1.opened == 0
+        assert res_t1.already_active == 0
+
+        # Sigue habiendo UN live_drift activo (no un 2º open).
+        async with session_factory() as session:
+            rows = (
+                (
+                    await session.execute(
+                        text(
+                            "SELECT snapshot FROM operational_incidents "
+                            "WHERE account_id = :a AND kind = 'live_drift' "
+                            "AND status IN ('open','in_review','resolved')"
+                        ),
+                        {"a": account},
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(rows) == 1, "el merge creó un 2º OPEN en PG real"
+            snap = rows[0] or ""
+            assert "cancel_broker_side" in snap and "fill_unseen" in snap
+    finally:
+        await _delete_incidents(session_factory, account)
+
+
 # ---------------------------------------------------------------------------
 # P1-02: sync_opening_incidents (LR-1) → live_unavailable/live_drift (real PG)
 # ---------------------------------------------------------------------------
