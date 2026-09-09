@@ -22,8 +22,11 @@ real-PG/históricas. Este fichero la consolida para decidir el gate de la Iter-1
 > **Estado tras V2.18 (Iter-1 A7, gated a C3):** el gap principal **C3** pasó a 🟡 **cubierto(parcial)**
 > con la batería real-PG `apps/api-python/tests/chaos/live_a7/` + CI `a7-gate` (BD dedicada `bolsa_v1_a7`,
 > fail-hard con `LIVE_A7_PG_REQUIRED=1`). Ver §3 fila C3, §4 (home efectivo) y §5 (backlog: el puente
-> restante es la vertiente financiera del crash, reservada a Iter-2 bajo XL-3). Traspaso-relevo del ciclo:
-> `traspaso-relevo-a7-iter1-c3-v2-18-beta-2026-09-09.md`.
+> restante es la vertiente financiera del crash, reservada a Iter-2 bajo XL-3).
+>
+> - Traspaso-relevo del ciclo: [`traspaso-relevo-a7-iter1-c3-v2-18-beta-2026-09-09.md`](traspaso-relevo-a7-iter1-c3-v2-18-beta-2026-09-09.md).
+> - **Marco de Iter-2 (V2.19, Financial Crash)** y decisión del puente XL-3 (despark real **GATED** bajo go
+>   fail-closed OFF por defecto) y backlog comprometido: [`plan-a7-iter2-financial-crash-v2-19-2026-09-09.md`](plan-a7-iter2-financial-crash-v2-19-2026-09-09.md).
 
 ## 1bis. Hallazgos de contexto frente a la auditoría externa V2.16.1
 

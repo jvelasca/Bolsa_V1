@@ -49,7 +49,9 @@ Núcleo financiero congelado **intacto**. Alembic head `023_ohlcv_bars_unique_re
 - C3: 🔴 → 🟡 **cubierto(parcial)** — crash real-PID + reclaim exacto-una-vez + no-doble (fsm_only).
 - Pendientes Iter-1+: la **vertiente financiera** del crash (C3 extendido a ledger cuando XL-3 habilite el
   apply), A3 (timeout/network real), B2 (partial fill) y P2-01 (ExecutionEvent durable) son los puentes a esa
-  vertiente (ver backlog §5 del gap-map).
+  vertiente (ver backlog §5 del gap-map). El **marco de Iter-2 (V2.19, Financial Crash)** con el puente
+  XL-3 GATED y el backlog comprometido queda fijado en
+  [`plan-a7-iter2-financial-crash-v2-19-2026-09-09.md`](plan-a7-iter2-financial-crash-v2-19-2026-09-09.md).
 
 ## Verificación
 
