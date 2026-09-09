@@ -91,4 +91,5 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_golden_v196.py
           --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           --ignore=apps/api-python/tests/test_financial_integrity_pg.py
+          --ignore=apps/api-python/tests/chaos/live_a7
           -q

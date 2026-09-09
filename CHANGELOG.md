@@ -2,6 +2,40 @@
 
 All notable releases of Bolsa V1.
 
+## [1.48.0-beta] — V2.18 / A7 Iter-1 · C3 — 2026-09-09
+
+Elevación (a elevar por release-tag CI desde `v2.18-beta`) de la **Iter-1 de LIVE Certification / A7**,
+**gated exclusivamente al gap C3** (crash-injection): una batería **real-PG** de crash de **proceso real**
+sobre el worker de recovery/scheduler que cierra el hueco que la Iter-0 (V2.17) dejó mapeado como 🔴.
+Núcleo financiero congelado **intacto** (Alembic head `023_ohlcv_bars_unique_reconcile`, sin migración).
+Como se decidió en V2.18 (`fsm_only`), C3 valida invariantes de **order-state/FSM** (≈ una resolución exacta,
+sin doble transición ni doble materialización) y **NO** cash/position: la vertiente financiera del crash queda
+reservada a Iter-2 bajo el roadmap XL-3 (A3/B2/P2-01 son los puentes hacia ella).
+
+### ¿Qué cambia?
+
+- **Home real-PG C3:** `apps/api-python/tests/chaos/live_a7/` con `test_c3_crash_injection_recovery_worker.py`
+  (escenarios A/B) y harness de proceso `_crash_recovery_probe.py`. La batería lanza un **subproceso Python
+  real** que reclama y resuelve UNKNOWN sobre `PostgresLiveOrderStore` + `live_order_recovery_worker.resolve_one_unknown`
+  (el núcleo no se toca): en C3-A el proceso A es **SIGKILLeado con el claim FOR UPDATE en vivo** y un segundo
+  proceso reaparece y resuelve **exactamente una vez**; en C3-B relanzar la recuperación tras un resolve durable
+  no duplica (idempotencia del `put` + terminal-not-UNKNOWN). Falla-quieto → `financial_apply_count=0` en ambos.
+- **CI:** job **`a7-gate`** en `.github/workflows/release-tag-ci.yml` — Postgres service + BD dedicada
+  `bolsa_v1_a7` (drop+create, esquema a head por `ensure_migrated` idempotente en la propia batería) + pytest
+  `chaos/live_a7` con `LIVE_A7_PG_REQUIRED=1` (fail duro si skip). `a7-gate` se suma a `needs` de `certify` y al
+  resumen del artefacto.
+- El job offline `python` (tag y `python-ci.yml`) y `lifecycle-pg`/iso quedan intactos; se añade
+  `--ignore=.../chaos/live_a7` al pytest offline para mantenerlo hermético (A7 corre en `a7-gate`).
+
+### Verificación
+
+- Live (Postgres real dedicado): `apps/api-python/tests/chaos/live_a7` → **2 passed** (C3-A y C3-B) tanto en
+  primera ejecución (migrando de cero) como en repetición.
+- Ruff `apps/api-python packages/py` → limpio. Suites unitarias de worker:
+  `test_live_order_recovery_worker.py` + `test_scheduler_worker.py` → **12 passed**.
+- Relevo del ciclo (nuevo): `docs/engineering/traspaso-relevo-a7-iter1-c3-v2-18-beta-2026-09-09.md`;
+  estado C3 actualizado en `docs/engineering/plan-a7-live-certification-gap-map-2026-09-09.md` (§1-ter/§3/§4/§5).
+
 ## [1.47.0-beta] — 2026-09-09
 
 Elevación a `main` de la **Iter-0 de LIVE Certification / A7** (ciclo `v2.17-beta`), de acuerdo con el

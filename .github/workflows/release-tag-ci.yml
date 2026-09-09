@@ -317,6 +317,7 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_golden_v196.py
           --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           --ignore=apps/api-python/tests/test_financial_integrity_pg.py
+          --ignore=apps/api-python/tests/chaos/live_a7
           -q
 
   lifecycle-pg:
@@ -506,10 +507,90 @@ jobs:
       - name: Disaster Recovery battery (db:dr:test · TCP)
         run: node scripts/db-dr-verify.mjs
 
+  a7-gate:
+    # V2.18 / A7 Iter-1 (escenario C3 🟡 parcial): crash-injection real-PG sobre el worker de
+    # recovery/scheduler. BD dedicada `bolsa_v1_a7` (drop+create aislada del residuo
+    # de otros jobs). El esquema lo lleva a head la propia batería (`ensure_migrated`,
+    # idempotente, respetando DATABASE_URL) para no depender de la migración CLI de
+    # `alembic.ini` (que apunta a la DB principal). `certify` depende de a7-gate → un
+    # fallo aquí no-GREENea el tag.
+    name: a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bolsa
+          POSTGRES_PASSWORD: bolsa_dev
+          POSTGRES_DB: bolsa_v1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolsa -d bolsa_v1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: bolsa
+      DB_PASSWORD: bolsa_dev
+      DB_NAME: bolsa_v1
+      LIVE_A7_PG_REQUIRED: '1'   # ahora en todos los steps del job: si no hay DB
+                                 # disponible, falla (no skip mudo de A7).
+      JWT_SIGNING_KEY: ci-a7-gate-secret-key
+      APP_AUTH_SECRET: ci-a7-gate-secret-key
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Alembic upgrade head (main prepared service `bolsa_v1`)
+        # Migra la DB principal del service (default de alembic.ini); la scratch la
+        # migra la propia batería con `ensure_migrated`. Mantiene bolsa_v1 operativa
+        # por si cualquier instrumento del service la necesita.
+        run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      - name: Prepare dedicated scratch DB (bolsa_v1_a7) drop+create
+        # DB dedicada aislada del residuo; el esquema lo lleva a head 023 la propia
+        # batería (fixture `factory` → `ensure_migrated` idempotente). El rol `bolsa`
+        # del container postgres:16-alpine es superuser → puede DROP/CREATE.
+        env:
+          DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1_a7
+          DB_NAME: bolsa_v1_a7
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: bolsa
+          PGPASSWORD: bolsa_dev
+        run: |
+          psql -d bolsa_v1 -v ON_ERROR_STOP=1 \
+            -c "DROP DATABASE IF EXISTS bolsa_v1_a7 WITH (FORCE);" \
+            -c "CREATE DATABASE bolsa_v1_a7 OWNER bolsa;"
+
+      - name: Pytest A7 chaos live_a7 (dedicated real-PG, fail if skipped)
+        # C3 on real Postgres; `LIVE_A7_PG_REQUIRED=1` hace fail duro si un
+        # escenario se salta (un grupo que debe ejercitar C3 no puede pasar en verde
+        # sólo porque "no hay DB"). Corre contra la scaffold `bolsa_v1_a7`.
+        env:
+          DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1_a7
+          DB_NAME: bolsa_v1_a7
+          LIVE_A7_PG_REQUIRED: '1'
+        run: >
+          uv run pytest
+          apps/api-python/tests/chaos/live_a7
+          -q
+          --tb=short
+
   certify:
     name: certify (aggregate + artifact)
     runs-on: ubuntu-latest
-    needs: [security, shared, spine, frontend, python, playwright-mock, lifecycle-pg, dr-verify]
+    needs: [security, shared, spine, frontend, python, playwright-mock, lifecycle-pg, dr-verify, a7-gate]
     if: always()
     steps:
       - name: Fail if any required job failed
@@ -521,7 +602,8 @@ jobs:
           needs.python.result != 'success' ||
           needs.playwright-mock.result != 'success' ||
           needs.lifecycle-pg.result != 'success' ||
-          needs.dr-verify.result != 'success'
+          needs.dr-verify.result != 'success' ||
+          needs.a7-gate.result != 'success'
         run: |
           echo "Release tag CI not GREEN"
           echo "security=${{ needs.security.result }}"
@@ -532,6 +614,7 @@ jobs:
           echo "playwright-mock=${{ needs.playwright-mock.result }}"
           echo "lifecycle-pg=${{ needs.lifecycle-pg.result }}"
           echo "dr-verify=${{ needs.dr-verify.result }}"
+          echo "a7-gate=${{ needs.a7-gate.result }}"
           exit 1
 
       - name: Write summary artifact
@@ -545,6 +628,7 @@ jobs:
           JOB_PLAYWRIGHT_MOCK: ${{ needs.playwright-mock.result }}
           JOB_LIFECYCLE_PG: ${{ needs.lifecycle-pg.result }}
           JOB_DR_VERIFY: ${{ needs.dr-verify.result }}
+          JOB_A7_GATE: ${{ needs.a7-gate.result }}
         run: |
           mkdir -p artifacts
           python3 - <<'PY'
@@ -566,6 +650,7 @@ jobs:
                   "playwright-mock": os.environ["JOB_PLAYWRIGHT_MOCK"],
                   "lifecycle-pg": os.environ["JOB_LIFECYCLE_PG"],
                   "dr-verify": os.environ["JOB_DR_VERIFY"],
+                  "a7-gate": os.environ["JOB_A7_GATE"],
               },
           }
           path = "artifacts/release-tag-ci-summary.json"

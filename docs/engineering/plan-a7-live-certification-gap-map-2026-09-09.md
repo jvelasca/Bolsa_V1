@@ -19,6 +19,12 @@ honestidad**: marca por escenario `🟢 cubierto / 🟡 parcial / 🔴 gap` con 
 No hay, hoy, un único "checklist A7 agregado"; hay cobertura de dominio dispersa y varias suites
 real-PG/históricas. Este fichero la consolida para decidir el gate de la Iter-1.
 
+> **Estado tras V2.18 (Iter-1 A7, gated a C3):** el gap principal **C3** pasó a 🟡 **cubierto(parcial)**
+> con la batería real-PG `apps/api-python/tests/chaos/live_a7/` + CI `a7-gate` (BD dedicada `bolsa_v1_a7`,
+> fail-hard con `LIVE_A7_PG_REQUIRED=1`). Ver §3 fila C3, §4 (home efectivo) y §5 (backlog: el puente
+> restante es la vertiente financiera del crash, reservada a Iter-2 bajo XL-3). Traspaso-relevo del ciclo:
+> `traspaso-relevo-a7-iter1-c3-v2-18-beta-2026-09-09.md`.
+
 ## 1bis. Hallazgos de contexto frente a la auditoría externa V2.16.1
 
 - **P2-05 (punto 9 del auditor) YA CERRADO.** La auditoría marcó que
@@ -65,31 +71,38 @@ Leyenda: `🟢` cubierto por suite existente · `🟡` parcial (algún hueco rea
 
 ### Grupo C — Crash / restart / multi-worker (candidato a home real-PG para Iter-1)
 
-| #   | Escenario                                           | Fuentes (ruta:línea)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Dobles a reutilizar      | Estado | Observación                                                                         |
-| --- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------ | ----------------------------------------------------------------------------------- |
-| C1  | **Unknown state / Restart during order / Recovery** | store `packages/py/application/src/bolsa_application/live_order_store.py` (`PostgresLiveOrderStore`, `claim_unknown_batch`/lease `FOR UPDATE SKIP LOCKED`); worker `apps/api-python/src/bolsa_api/background/live_order_recovery_worker.py` (`live_order_recovery_worker_loop`, `_drain_unknowns`, `resolve_one_unknown`); scheduler `apps/api-python/src/bolsa_api/workers/scheduler_worker.py`. Tests: `test_live_order_recovery_worker.py`, `test_dex2_crash_restart_cross_pid.py`, `test_confirm_crash_restart.py` | `MockLiveOrderQuery`     | 🟡     | recovery UNKNOWN cubierto unit+PG; poll/partial→ledger está portal PARKED (roadmap) |
-| C2  | **Multi-worker (2+ reclaimers)**                    | store lease `claim_unknown_batch`; tests `test_live_order_recovery_concurrency_pg.py` (2 workers real-PG), `test_live_order_store_pg.py`                                                                                                                                                                                                                                                                                                                                                                               | `PostgresLiveOrderStore` | 🟢     | concurrency PG existe (job lifecycle-pg)                                            |
-| C3  | **Crash injection sobre `scheduler_worker`**        | NO hay suite agregada ni tool de injerencia única (verificador: no existe bajo `packages/py/infrastructure/tests/chaos/` ni equivalente)                                                                                                                                                                                                                                                                                                                                                                               | —                        | 🔴     | **gap principal** → backlog Iter-1 (home debajo)                                    |
+| #   | Escenario                                             | Fuentes (ruta:línea)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Dobles a reutilizar                       | Estado | Observación                                                                                                  |
+| --- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------ |
+| C1  | **Unknown state / Restart during order / Recovery**   | store `packages/py/application/src/bolsa_application/live_order_store.py` (`PostgresLiveOrderStore`, `claim_unknown_batch`/lease `FOR UPDATE SKIP LOCKED`); worker `apps/api-python/src/bolsa_api/background/live_order_recovery_worker.py` (`live_order_recovery_worker_loop`, `_drain_unknowns`, `resolve_one_unknown`); scheduler `apps/api-python/src/bolsa_api/workers/scheduler_worker.py`. Tests: `test_live_order_recovery_worker.py`, `test_dex2_crash_restart_cross_pid.py`, `test_confirm_crash_restart.py` | `MockLiveOrderQuery`                      | 🟡     | recovery UNKNOWN cubierto unit+PG; poll/partial→ledger está portal PARKED (roadmap)                          |
+| C2  | **Multi-worker (2+ reclaimers)**                      | store lease `claim_unknown_batch`; tests `test_live_order_recovery_concurrency_pg.py` (2 workers real-PG), `test_live_order_store_pg.py`                                                                                                                                                                                                                                                                                                                                                                               | `PostgresLiveOrderStore`                  | 🟢     | concurrency PG existe (job lifecycle-pg)                                                                     |
+| C3  | **Crash injection sobre `scheduler_worker`/recovery** | Iter-1 (V2.18): batería `apps/api-python/tests/chaos/live_a7/` (+probe `_crash_recovery_probe.py`, +CI `a7-gate`). Evidencia ruta:línea: `test_c3_crash_injection_recovery_worker.py` (C3-A: `test_c3a_crash_after_recovery_claim_then_second_is_exact_once`, C3-B: `test_c3b_crash_after_resolve_put_no_double_on_relaunch`); harness proceso `live_a7/_crash_recovery_probe.py` (`_probe_crash_hold`, `_probe_reader`) sobre `live_order_recovery_worker.resolve_one_unknown`                                        | `PostgresLiveOrderStore`+probe subprocess | 🟡     | cubierto(parcial): crash real-PID + reclaim exacto-una vez + no-doble, **fsm_only** (sin dinero, dec. V2.18) |
 
 ## 4. Home futuro de la batería (decisión registrada para Iter-1)
 
-- Área de tests nueva sugerida: **`packages/py/infrastructure/tests/chaos/live_a7/`** (PG-real), que agrega los
-  escenarios A/B/C en un único área bajo el estilo `chaos/` ya usado por `test_crash_consistency.py`.
-- **Gate del contrato de release:** reutilizar/ampliar el job `lifecycle-pg` de
-  [`.github/workflows/release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml) (mismo patrón que ya
-  ejecuta iso 43 real-PG y dr-verify fail-closed vía `certify`). Cualquier escenario A7 que deba bloquear el
-  release pasa por ahí.
+- Área de tests nueva sugerida (Iter-0): **`packages/py/infrastructure/tests/chaos/live_a7/`** (PG-real) bajo estilo
+  `chaos/`. En la **Iter-1 (V2.18, escenario C3) el home efectivo quedó en
+  `apps/api-python/tests/chaos/live_a7/`**: la realización real-PG cruza la costura app (`bolsa_api.background`
+  recovery) + `bolsa_application` (store/lease) y así la batería reusa el mismo camino que
+  `test_live_order_recovery_concurrency_pg.py`/`test_live_order_recovery_worker.py`, sin acoplar infra a la app.
+- **Gate del contrato de release:** en la Iter-1 se añadió el job **`a7-gate`** de
+  [`.github/workflows/release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml) — Postgres service +
+  BD dedicada `bolsa_v1_a7` (drop+create) + pytest `apps/api-python/tests/chaos/live_a7` con
+  `LIVE_A7_PG_REQUIRED=1` (fail duro si skip) y `a7-gate` en `needs` de `certify` (no-GREEN si rojo).
 - **Dobles canónicos a reutilizar en Iter-1:** `MockBrokerAdapter` (nunca envía), `MockLiveOrderQuery`,
   `InMemoryLiveOrderStore`, `InMemoryExecutionEventStore`, fakes `_FakeXtb` (tests confirm), y
-  `scripts/xtb-bridge-mock.mjs` para desplegar el bridge contra el que correr timeout/rejection.
-- **En esta Iter-0 NO se crea** el directorio ni el test: solo se fija el home y el gate.
+  `scripts/xtb-bridge-mock.mjs` para desplegar el bridge contra el que correr timeout/rejection. En C3 se
+  reutilizan `PostgresLiveOrderStore` + `MockLiveOrderQuery` real sobre el probe de proceso.
+- **En esta Iter-0 NO se crea** el directorio ni el test: solo se fija el home y el gate. (Ya creados en V2.18.)
 
 ## 5. Backlog prioritizado para Iter-1+ (los 🔴/🟡 que deciden el siguiente ciclo)
 
 El orden se deriva del mapa anterior y mantiene "infligir fallo en el punto peligroso sin escribir dinero":
 
-1. **C3 🔴 — Crash-injection sobre `scheduler_worker`/recovery** (herramienta única + test que mate el proceso
-   en estados SUBMITTING/UNKNOWN y verifique reclamación por otro worker sin doble materialización). Home C3.
+1. **C3 🟡 (en curso, Iter-1 V2.18) — Crash-injection sobre `scheduler_worker`/recovery** ya no es un gap puro:
+   la batería `apps/api-python/tests/chaos/live_a7/` + CI `a7-gate` cubren crash de proceso real (SIGKILL) con
+   reclaim exacto-una-vez en modo **fsm_only** (ver `test_c3_crash_injection_recovery_worker.py`). Queda abierto
+   en la Iter-2 la vertiente **financiera** del crash (recovery UNKNOWN → apply ledger), hoy PARKED por el roadmap
+   XL-3 (A3/B2/P2-01 son los siguientes puentes hacia esa vertiente).
 2. **A3 🟡 — Broker timeout / network-loss real** frente a `scripts/xtb-bridge-mock.mjs`: prueban el
    fail-closed `unknown` y el recovery en `C1`.
 3. **B2 🟡 — Partial fill** → decidir si materializa ledger en esta iteración del roadmap XL-3 (hoy PARKED)
