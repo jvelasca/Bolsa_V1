@@ -16,6 +16,7 @@ from bolsa_api.auth.principal import (
 )
 from bolsa_api.auth.session import SESSION_COOKIE_NAME
 from bolsa_api.main import create_app, lifespan
+from bolsa_infrastructure.auth.passwords import hash_password
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.models import (
     DecisionMemoryRow,
@@ -31,6 +32,27 @@ from bolsa_infrastructure.database.repositories.user_repository import SqlAlchem
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+async def _ensure_app_user(factory: async_sessionmaker[AsyncSession]) -> None:
+    """Idempotente: crea el user bootstrap ``app`` (login ``app``, password
+    ``s3cret``) si no existe. Los tests auth-ON necesitan un user real para
+    emitir su JWT; NO deben depender del estado previo de seeding de la BD
+    del job (CI puede arrancar sin ``app``). Reutiliza el hash del password
+    del test (``monkeypatch.setenv APP_PASSWORD=s3cret``)."""
+    async with factory() as session:
+        repo = SqlAlchemyUserRepository(session)
+        existing = await repo.get_by_id("app")
+        if existing is not None:
+            return
+        if await repo.get_by_login("app") is not None:
+            return
+        await repo.create_bootstrap_user(
+            user_id="app",
+            login="app",
+            password_hash=hash_password("s3cret"),
+            role="admin",
+        )
 
 
 async def _insert_raw_account(
@@ -332,35 +354,36 @@ async def test_new_account_stamps_user_id_when_auth_enabled(monkeypatch: pytest.
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
     monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
     get_settings.cache_clear()
-
     app = create_app()
-    async with lifespan(app):
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            factory = app.state.session_factory
-            async with factory() as session:
-                repo = SqlAlchemyUserRepository(session)
-                user = await repo.get_by_id("app")
-                assert user is not None
-                token = encode_access_token(
-                    get_settings(),
-                    sub=user.id,
-                    sv=user.session_version,
-                    role=user.role,
+    try:
+        async with lifespan(app):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                factory = app.state.session_factory
+                await _ensure_app_user(factory)
+                async with factory() as session:
+                    repo = SqlAlchemyUserRepository(session)
+                    user = await repo.get_by_id("app")
+                    assert user is not None
+                    token = encode_access_token(
+                        get_settings(),
+                        sub=user.id,
+                        sv=user.session_version,
+                        role=user.role,
+                    )
+                client.cookies.set(SESSION_COOKIE_NAME, token)
+                created = await client.post(
+                    "/api/accounts",
+                    json={
+                        "name": f"Stamp auth-on {uuid4().hex[:8]}",
+                        "currency": "EUR",
+                        "initialDeposit": 1_000,
+                    },
                 )
-            client.cookies.set(SESSION_COOKIE_NAME, token)
-            created = await client.post(
-                "/api/accounts",
-                json={
-                    "name": f"Stamp auth-on {uuid4().hex[:8]}",
-                    "currency": "EUR",
-                    "initialDeposit": 1_000,
-                },
-            )
-            assert created.status_code == 201
-            assert created.json()["data"]["userId"] == DEFAULT_APP_PRINCIPAL
-
-    get_settings.cache_clear()
+                assert created.status_code == 201
+                assert created.json()["data"]["userId"] == DEFAULT_APP_PRINCIPAL
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
@@ -413,33 +436,34 @@ async def test_foreign_account_404_with_session_cookie(monkeypatch: pytest.Monke
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
     monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
     get_settings.cache_clear()
-
     app = create_app()
-    async with lifespan(app):
-        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
-        foreign_id = await _insert_raw_account(
-            factory, user_id="other", name="Foreign cookie isolation"
-        )
-        try:
-            transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                async with factory() as session:
-                    repo = SqlAlchemyUserRepository(session)
-                    user = await repo.get_by_id("app")
-                    assert user is not None
-                    token = encode_access_token(
-                        get_settings(),
-                        sub=user.id,
-                        sv=user.session_version,
-                        role=user.role,
-                    )
-                client.cookies.set(SESSION_COOKIE_NAME, token)
-                response = await client.get(f"/api/accounts/{foreign_id}")
-                assert response.status_code == 404
-        finally:
-            await _delete_raw_account(factory, foreign_id)
-
-    get_settings.cache_clear()
+    try:
+        async with lifespan(app):
+            factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+            await _ensure_app_user(factory)
+            foreign_id = await _insert_raw_account(
+                factory, user_id="other", name="Foreign cookie isolation"
+            )
+            try:
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test") as client:
+                    async with factory() as session:
+                        repo = SqlAlchemyUserRepository(session)
+                        user = await repo.get_by_id("app")
+                        assert user is not None
+                        token = encode_access_token(
+                            get_settings(),
+                            sub=user.id,
+                            sv=user.session_version,
+                            role=user.role,
+                        )
+                    client.cookies.set(SESSION_COOKIE_NAME, token)
+                    response = await client.get(f"/api/accounts/{foreign_id}")
+                    assert response.status_code == 404
+            finally:
+                await _delete_raw_account(factory, foreign_id)
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
