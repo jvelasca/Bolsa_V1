@@ -114,6 +114,31 @@ def _cas_sources_of(nxt: ExecutionEventStatus) -> tuple[ExecutionEventStatus, ..
     return sources
 
 
+def _fence_matches(
+    *,
+    row_status: str,
+    row_owner: str | None,
+    row_generation: int,
+    lease_owner: str | None,
+    lease_generation: int | None,
+) -> bool:
+    """Fencing de terminal (A8·M1). Cuando la fila está en APPLYING y el caller
+    aporta fence (``lease_owner``/``lease_generation``), se exige coincidencia con
+    la fila: si otra instancia la robó (bump de generación) → False (el dueño viejo
+    no finaliza una lease ajena). Sin fila en APPLYING, o sin fence aportado
+    (legacy/transición desde CAPTURED/RETRY/FAILED) → True (no aplica).
+    """
+    if row_status != "APPLYING":
+        return True
+    if lease_owner is None and lease_generation is None:
+        return True  # sin fence (ver orchestrators, que sí lo pasan)
+    if lease_owner is not None and lease_owner != row_owner:
+        return False
+    if lease_generation is not None and lease_generation != row_generation:
+        return False
+    return True
+
+
 @dataclass(frozen=True, slots=True)
 class ExecutionEvent:
     """Fill durable con identidad financiera (no lleva aritmética).
@@ -141,6 +166,11 @@ class ExecutionEvent:
     # Es el reloj que hace distinguir un APPLYING stale (dueño caído) de uno vivo.
     lease_owner: str | None = None
     updated_at: datetime | None = None
+    # V2.21 / A8 (M1 · fencing P1-01b) — token monótono de lease. Cada adquisición
+    # (``start_apply``) y cada ROBO (``reclaim_stale_apply``) lo incrementan. Un
+    # terminal con fencing exige coincidencia ``lease_owner``+``lease_generation``:
+    # un dueño antiguo cuya lease fue robada ya no puede finalizar la fila.
+    lease_generation: int = 0
 
     def __post_init__(self) -> None:
         if not self.execution_id or not self.execution_id.strip():
@@ -164,7 +194,9 @@ class ExecutionEventStore(Protocol):
 
     # V2.20 — retomar un ``APPLYING`` cuyo dueño ha caducado/muerto (lease stale).
     # Solo procede si la fila está en APPLYING y NO pertenece a un dueño vivo
-    # distinto del solicitante (updated_at <= stale_before). True = reclaim efectivo.
+    # distinto del solicitante (updated_at <= stale_before). Incrementa el fence
+    # ``lease_generation`` (robo): cualquier terminal tardío del dueño viejo con
+    # la generación anterior ya no podrá finalizar. True = reclaim efectivo.
     async def reclaim_stale_apply(
         self,
         execution_id: str,
@@ -173,11 +205,50 @@ class ExecutionEventStore(Protocol):
         stale_before: datetime,
     ) -> bool: ...
 
-    async def mark_applied(self, execution_id: str) -> bool: ...
+    # A8/M2 — heartbeat del lease: un dueño LEGÍTIMO en mitad de un apply largo
+    # renueva su ``updated_at`` (sin cambiar el fence ``lease_generation``) para no
+    # ser considerado stale por el reaper mientras sigue con vida. Solo procede si
+    # la fila está en APPLYING y el caller demuestra seguir siendo el dueño (owner +
+    # lease_generation coincidentes). True = lease renovado.
+    async def renew_apply_lease(
+        self,
+        execution_id: str,
+        *,
+        owner: str,
+        lease_generation: int,
+    ) -> bool: ...
 
-    async def mark_failed(self, execution_id: str, *, error: str) -> bool: ...
+    # V2.21/A8 (fencing): los terminales aceptan el fence (``lease_owner`` +
+    # ``lease_generation``) que el dueño demostró al adquirir/reclamar el APPLYING.
+    # Cuando la fila está en APPLYING y el fence se aporta, la marca SOLO procede
+    # si ``lease_owner`` y ``lease_generation`` coinciden con la fila; si otra
+    # instancia robó (bump) → False (el dueño viejo no finaliza una lease ajena).
+    # Desde estados NO-APPLYING (CAPTURED/FAILED/RETRY) el fence no aplica.
+    async def mark_applied(
+        self,
+        execution_id: str,
+        *,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool: ...
 
-    async def mark_retry(self, execution_id: str, *, error: str) -> bool: ...
+    async def mark_failed(
+        self,
+        execution_id: str,
+        *,
+        error: str,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool: ...
+
+    async def mark_retry(
+        self,
+        execution_id: str,
+        *,
+        error: str,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool: ...
 
     # V2.20 — broadcast de lease vencido sobre filas APPLYING huérfanas (P2-02):
     # se usa materializar en SQL un reclaim condicionado por actualidad (ver worker).
@@ -228,7 +299,11 @@ class InMemoryExecutionEventStore:
         owner: str | None,
         now: datetime,
     ) -> bool:
-        """Acquire exclusivo APPLYING (CAS). Espeja `_cas_sources_of("APPLYING")`."""
+        """Acquire exclusivo APPLYING (CAS). Espeja `_cas_sources_of("APPLYING")`.
+
+        Incrementa el fence ``lease_generation`` (el dueño nuevo posee la
+        generación recién emitida; el dueño viejo ya no puede finalizar).
+        """
         current = self._rows.get(execution_id)
         if current is None:
             return False
@@ -239,6 +314,7 @@ class InMemoryExecutionEventStore:
             status="APPLYING",
             lease_owner=owner,
             updated_at=now,
+            lease_generation=current.lease_generation + 1,
             attempt_count=current.attempt_count + 1,
             last_error=current.last_error,
         )
@@ -273,7 +349,29 @@ class InMemoryExecutionEventStore:
             current,
             lease_owner=owner,
             updated_at=now,
+            # Fencing: robar incrementa la generación (el dueño antiguo ya no puede
+            # finalizar con su token viejo).
+            lease_generation=current.lease_generation + 1,
             attempt_count=current.attempt_count + 1,
+        )
+        return True
+
+    async def renew_apply_lease(
+        self,
+        execution_id: str,
+        *,
+        owner: str,
+        lease_generation: int,
+    ) -> bool:
+        """Heartbeat (A8/M2): renueva updated_at de un APPLYING legítimo."""
+        current = self._rows.get(execution_id)
+        if current is None or current.status != "APPLYING":
+            return False
+        if current.lease_owner != owner or current.lease_generation != lease_generation:
+            return False  # no es el dueño vigente → no renovamos.
+        self._rows[execution_id] = replace(
+            current,
+            updated_at=datetime.now(UTC),
         )
         return True
 
@@ -296,10 +394,24 @@ class InMemoryExecutionEventStore:
                 reclaimed.append(exec_id)
         return reclaimed
 
-    async def mark_applied(self, execution_id: str) -> bool:
+    async def mark_applied(
+        self,
+        execution_id: str,
+        *,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool:
         current = self._rows.get(execution_id)
         if current is None or current.status != "APPLYING":
             return False
+        if not _fence_matches(
+            row_status=current.status,
+            row_owner=current.lease_owner,
+            row_generation=current.lease_generation,
+            lease_owner=lease_owner,
+            lease_generation=lease_generation,
+        ):
+            return False  # lease robada (fence inválido): no finalizamos fila ajena.
         self._rows[execution_id] = replace(
             current,
             status="APPLIED",
@@ -309,9 +421,24 @@ class InMemoryExecutionEventStore:
         )
         return True
 
-    async def mark_failed(self, execution_id: str, *, error: str) -> bool:
+    async def mark_failed(
+        self,
+        execution_id: str,
+        *,
+        error: str,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool:
         current = self._rows.get(execution_id)
         if current is None or current.status not in ("CAPTURED", "APPLYING", "FAILED"):
+            return False
+        if not _fence_matches(
+            row_status=current.status,
+            row_owner=current.lease_owner,
+            row_generation=current.lease_generation,
+            lease_owner=lease_owner,
+            lease_generation=lease_generation,
+        ):
             return False
         self._rows[execution_id] = replace(
             current,
@@ -322,13 +449,28 @@ class InMemoryExecutionEventStore:
         )
         return True
 
-    async def mark_retry(self, execution_id: str, *, error: str) -> bool:
+    async def mark_retry(
+        self,
+        execution_id: str,
+        *,
+        error: str,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool:
         current = self._rows.get(execution_id)
         if current is None or current.status not in (
             "CAPTURED",
             "APPLYING",
             "FAILED",
             "RETRY",
+        ):
+            return False
+        if not _fence_matches(
+            row_status=current.status,
+            row_owner=current.lease_owner,
+            row_generation=current.lease_generation,
+            lease_owner=lease_owner,
+            lease_generation=lease_generation,
         ):
             return False
         self._rows[execution_id] = replace(
@@ -356,9 +498,8 @@ class PostgresExecutionEventStore:
         # ON CONFLICT requiere el insert del dialecto PostgreSQL (capture idempotente
         # por execution_id en PG): el ``insert`` genérico de SQLAlchemy no expone
         # ``on_conflict_do_nothing``. Sigue siendo idempotente ante la PK/unique.
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         result = await self._session.execute(
             pg_insert(ExecutionEventRow)
@@ -383,7 +524,6 @@ class PostgresExecutionEventStore:
 
     async def get(self, execution_id: str) -> ExecutionEvent | None:
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         row = (
@@ -408,6 +548,7 @@ class PostgresExecutionEventStore:
             last_error=row.last_error,
             lease_owner=row.lease_owner,
             updated_at=row.updated_at,
+            lease_generation=row.lease_generation,
         )
 
     # ------------------------------------------------------------------
@@ -432,7 +573,6 @@ class PostgresExecutionEventStore:
         ver ya APPLYING (no en el set), hace 0 filas → False. Sin ventana.
         """
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
@@ -444,6 +584,10 @@ class PostgresExecutionEventStore:
                 attempt_count=ExecutionEventRow.attempt_count + 1,
                 lease_owner=owner,
                 updated_at=self._now(),
+                # A8·M1 fencing: cada adquisición emite un token nuevo (generación
+                # previa + 1). El dueño que gana retiene esa generación; un robo
+                # posterior invalidará cualquier terminal con el token viejo.
+                lease_generation=ExecutionEventRow.lease_generation + 1,
             )
         )
         won = bool(result.rowcount)
@@ -465,10 +609,11 @@ class PostgresExecutionEventStore:
         ``owner`` previo: lo que concede el reclaim es la CADUCIDAD, no la identidad
         (un worker caído no puede liberar su propia lease — de ahí que la señal sea
         el paso del tiempo frente a ``stale_before``, exactamente como el claim de
-        ``live_orders``). True si lo reclamó esta instancia (rowcount=1).
+        ``live_orders``). A8·M1: el reclaim ROBA el fence al que lo reclama; el
+        dueño antiguo ya no podrá finalizar con su token anterior. True si lo
+        reclamó esta instancia (rowcount=1).
         """
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
@@ -484,8 +629,39 @@ class PostgresExecutionEventStore:
             .values(
                 lease_owner=owner,
                 updated_at=self._now(),
+                lease_generation=ExecutionEventRow.lease_generation + 1,
                 attempt_count=ExecutionEventRow.attempt_count + 1,
             )
+        )
+        won = bool(result.rowcount)
+        await self._session.commit()
+        return won
+
+    async def renew_apply_lease(
+        self,
+        execution_id: str,
+        *,
+        owner: str,
+        lease_generation: int,
+    ) -> bool:
+        """Heartbeat (A8/M2): renueva ``updated_at`` de un APPLYING legítimo.
+
+        Un dueño en mitad de un apply largo refuerza su lease SIN cambiar el fence
+        (``lease_generation``): extiende ``updated_at`` a ``ahora`` para no ser
+        considerado stale por el reaper. Solo procede si la fila sigue en APPLYING
+        y el caller demuestra ser el dueño vigente (owner + lease_generation). Un ex
+        dueño (lease robada, gen vieja) no puede auto-renovar → False.
+        """
+        import sqlalchemy as sa
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+
+        result = await self._session.execute(
+            sa.update(ExecutionEventRow)
+            .where(ExecutionEventRow.execution_id == execution_id)
+            .where(ExecutionEventRow.status == "APPLYING")
+            .where(ExecutionEventRow.lease_owner == owner)
+            .where(ExecutionEventRow.lease_generation == lease_generation)
+            .values(updated_at=self._now())
         )
         won = bool(result.rowcount)
         await self._session.commit()
@@ -505,7 +681,6 @@ class PostgresExecutionEventStore:
         caller las reaparecerá y las reaplicará por el camino durable idempotente).
         """
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         # SELECT ... FOR UPDATE SKIP LOCKED de candidatas stale, luego reclaim por id.
@@ -533,15 +708,29 @@ class PostgresExecutionEventStore:
                 reclaimed.append(str(exec_id))
         return reclaimed
 
-    async def mark_applied(self, execution_id: str) -> bool:
+    async def mark_applied(
+        self,
+        execution_id: str,
+        *,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool:
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
+        where = [
+            ExecutionEventRow.execution_id == execution_id,
+            ExecutionEventRow.status == "APPLYING",
+        ]
+        # A8·M1 fencing: si el caller demuestra su lease (owner+gen), solo finaliza
+        # si la fila sigue siéndole fiel. Un robo (bump) → 0 filas → False.
+        if lease_owner is not None:
+            where.append(ExecutionEventRow.lease_owner == lease_owner)
+        if lease_generation is not None:
+            where.append(ExecutionEventRow.lease_generation == lease_generation)
         result = await self._session.execute(
             sa.update(ExecutionEventRow)
-            .where(ExecutionEventRow.execution_id == execution_id)
-            .where(ExecutionEventRow.status == "APPLYING")
+            .where(*where)
             .values(
                 status="APPLIED",
                 applied_at=self._now(),
@@ -553,15 +742,28 @@ class PostgresExecutionEventStore:
         await self._session.commit()
         return won
 
-    async def mark_failed(self, execution_id: str, *, error: str) -> bool:
+    async def mark_failed(
+        self,
+        execution_id: str,
+        *,
+        error: str,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool:
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
+        where = [
+            ExecutionEventRow.execution_id == execution_id,
+            ExecutionEventRow.status.in_(("APPLYING", "CAPTURED", "FAILED")),
+        ]
+        if lease_owner is not None:
+            where.append(ExecutionEventRow.lease_owner == lease_owner)
+        if lease_generation is not None:
+            where.append(ExecutionEventRow.lease_generation == lease_generation)
         result = await self._session.execute(
             sa.update(ExecutionEventRow)
-            .where(ExecutionEventRow.execution_id == execution_id)
-            .where(ExecutionEventRow.status.in_(("APPLYING", "CAPTURED", "FAILED")))
+            .where(*where)
             .values(
                 status="FAILED",
                 lease_owner=None,
@@ -573,19 +775,30 @@ class PostgresExecutionEventStore:
         await self._session.commit()
         return won
 
-    async def mark_retry(self, execution_id: str, *, error: str) -> bool:
+    async def mark_retry(
+        self,
+        execution_id: str,
+        *,
+        error: str,
+        lease_owner: str | None = None,
+        lease_generation: int | None = None,
+    ) -> bool:
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
+        where = [
+            ExecutionEventRow.execution_id == execution_id,
+            ExecutionEventRow.status.in_(
+                ("CAPTURED", "APPLYING", "FAILED", "RETRY")
+            ),
+        ]
+        if lease_owner is not None:
+            where.append(ExecutionEventRow.lease_owner == lease_owner)
+        if lease_generation is not None:
+            where.append(ExecutionEventRow.lease_generation == lease_generation)
         result = await self._session.execute(
             sa.update(ExecutionEventRow)
-            .where(ExecutionEventRow.execution_id == execution_id)
-            .where(
-                ExecutionEventRow.status.in_(
-                    ("CAPTURED", "APPLYING", "FAILED", "RETRY")
-                )
-            )
+            .where(*where)
             .values(
                 status="RETRY",
                 lease_owner=None,
@@ -735,18 +948,53 @@ async def apply_execution_financial_once(
             # APPLYING en curso por otro dueño vivo / ilegal → NO hacemos 2º apply;
             # quien tenga el APPLYING completará (crash → reclaim tras lease vencido).
             return "no_apply_another_in_progress"
+    # A8·M1 fencing: releemos la fila para capturar el fence (owner + generation)
+    # recién emitido por start/reclaim. Lo pasamos a los terminales para que, si
+    # otra instancia robara la lease entre medias, nuestro mark_* falle (rowcount 0).
+    owned = await store.get(execution.execution_id)
+    if owned is None:
+        return "no_apply_another_in_progress"
+    fence = owned.lease_generation
     try:
         effective = await apply_finance(execution)
     except Exception:  # noqa: BLE001 — error en la materialización no es un APPLIED.
-        await store.mark_retry(execution.execution_id, error="apply_exception")
+        marked = await store.mark_retry(
+            execution.execution_id,
+            error="apply_exception",
+            lease_owner=owner,
+            lease_generation=fence,
+        )
+        if not marked:
+            return "no_apply_another_in_progress"
         return "retry_scheduled"
     if effective:
-        await store.mark_applied(execution.execution_id)
+        marked = await store.mark_applied(
+            execution.execution_id,
+            lease_owner=owner,
+            lease_generation=fence,
+        )
+        if not marked:
+            # Robado entre finance y terminal: quien robó resolverá la fila; el
+            # apply ya fue idempotente → no hay doble dinero, pero no reclamamos
+            # ser dueños del terminal.
+            return "already_applied"
         return "applied"
     if retryable_on_ineffective:
-        await store.mark_retry(execution.execution_id, error="apply_ineffective")
+        marked = await store.mark_retry(
+            execution.execution_id,
+            error="apply_ineffective",
+            lease_owner=owner,
+            lease_generation=fence,
+        )
+        if not marked:
+            return "no_apply_another_in_progress"
         return "retry_scheduled"
-    await store.mark_failed(execution.execution_id, error="apply_ineffective_no_retry")
+    await store.mark_failed(
+        execution.execution_id,
+        error="apply_ineffective_no_retry",
+        lease_owner=owner,
+        lease_generation=fence,
+    )
     return "failed"
 
 
@@ -807,6 +1055,11 @@ async def reap_stale_applying(
                 await store.mark_retry(execution_id, error="orphan_applying_gone")
                 counts["retry"] += 1
                 continue
+            # A8·M1 fencing: tras el reclaim la batch nos concedió ownership (fence
+            # recién emitido en row.lease_generation). Lo reafirmamos en cada
+            # terminal para que un dueño viejo no pueda finalizar la fila ahora
+            # nuestra (single-owner durante toda la vida del APPLYING).
+            fence = row.lease_generation
             # Seguridad: si entre el claim y aquí la fila ya fue marcada APPLIED por
             # otros medios, no la retocamos (no-doble terminal).
             if row.status == "APPLIED":
@@ -816,24 +1069,51 @@ async def reap_stale_applying(
                 candidate = await resolve_candidate(row)
                 if candidate is None:
                     # Sin candidato re-derivable ahora → RETRY reaplicable (honesto).
-                    await store.mark_retry(execution_id, error="lease_expired_no_candidate")
+                    await store.mark_retry(
+                        execution_id,
+                        error="lease_expired_no_candidate",
+                        lease_owner=owner,
+                        lease_generation=fence,
+                    )
                     counts["retry"] += 1
                     continue
                 try:
                     effective = await apply_finance(candidate)
                 except Exception:  # noqa: BLE001 — no marcar APPLIED por error.
-                    await store.mark_retry(execution_id, error="reap_apply_exception")
+                    await store.mark_retry(
+                        execution_id,
+                        error="reap_apply_exception",
+                        lease_owner=owner,
+                        lease_generation=fence,
+                    )
                     counts["retry"] += 1
                     continue
                 if effective:
-                    await store.mark_applied(execution_id)
+                    ok = await store.mark_applied(
+                        execution_id,
+                        lease_owner=owner,
+                        lease_generation=fence,
+                    )
+                    if not ok:
+                        counts["errors"] += 1  # robado a mitad: no lo re-marcamos.
+                        continue
                     counts["applied"] += 1
                 else:
-                    await store.mark_retry(execution_id, error="reap_apply_ineffective")
+                    await store.mark_retry(
+                        execution_id,
+                        error="reap_apply_ineffective",
+                        lease_owner=owner,
+                        lease_generation=fence,
+                    )
                     counts["retry"] += 1
                 continue
             # Sin resolver/apply (default fail-closed) → RETRY, no varado en APPLYING.
-            await store.mark_retry(execution_id, error="lease_expired_no_candidate")
+            await store.mark_retry(
+                execution_id,
+                error="lease_expired_no_candidate",
+                lease_owner=owner,
+                lease_generation=fence,
+            )
             counts["retry"] += 1
         except Exception:  # noqa: BLE001 — un evento no tumba el barrido
             counts["errors"] += 1

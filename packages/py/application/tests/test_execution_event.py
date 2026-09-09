@@ -465,3 +465,117 @@ async def test_reaper_orphan_without_candidate_becomes_retry() -> None:
     assert row is not None and row.status == "RETRY"
     assert row.lease_owner is None  # lease liberada.
     assert row.last_error == "lease_expired_no_candidate"
+
+
+@pytest.mark.asyncio
+async def test_fence_old_owner_cannot_finalize_after_reclaim() -> None:
+    """A8·M1 (P1-01b): fencing en memoria. Tras robar la lease de worker-A por
+    reclaim, un terminal tardío de A con su token viejo (lease_generation previa)
+    NO puede finalizar la fila; solo el dueño legítimo de la generación nueva."""
+    from datetime import timedelta
+
+    store = InMemoryExecutionEventStore()
+    ev = _exec("ev-fence-owner")
+    await store.capture(ev)
+    eid = ev.execution_id
+
+    # A adquiere APPLYING exclusivo (generación 1).
+    assert await store.start_apply(eid, owner="worker-a") is True
+    a_row = await store.get(eid)
+    assert a_row is not None and a_row.status == "APPLYING"
+    gen_a = a_row.lease_generation
+    assert gen_a == 1
+
+    # A muere; su lease envejece. B la reclama como stale → gen bump.
+    _age_event(store, eid, LEASE_WINDOW_SECONDS + 90)
+    assert await store.reclaim_stale_apply(
+        eid,
+        owner="worker-b",
+        stale_before=datetime.now(UTC) - timedelta(seconds=LEASE_WINDOW_SECONDS),
+    ) is True
+    b_row = await store.get(eid)
+    assert b_row is not None
+    assert b_row.lease_owner == "worker-b"
+    assert b_row.lease_generation > gen_a
+
+    # A intenta terminar tarde (mark_applied / mark_retry / mark_failed) con gen
+    # vieja → NINGUNO finaliza la fila (fence).
+    assert (
+        await store.mark_applied(eid, lease_owner="worker-a", lease_generation=gen_a)
+        is False
+    )
+    assert (
+        await store.mark_retry(eid, error="late", lease_owner="worker-a",
+                                lease_generation=gen_a)
+        is False
+    )
+    assert (
+        await store.mark_failed(eid, error="late", lease_owner="worker-a",
+                                 lease_generation=gen_a)
+        is False
+    )
+    still = await store.get(eid)
+    assert still is not None and still.status == "APPLYING"  # A no finalizó fila ajena.
+
+    # B, dueño legítimo con la generación nueva, sí terminaliza → APPLIED.
+    assert (
+        await store.mark_applied(
+            eid, lease_owner="worker-b", lease_generation=b_row.lease_generation
+        )
+        is True
+    )
+    final = await store.get(eid)
+    assert final is not None and final.status == "APPLIED"
+    assert final.lease_owner is None
+
+
+@pytest.mark.asyncio
+async def test_renew_apply_lease_keeps_legitimate_owner_alive() -> None:
+    """A8/M2 heartbeat: un dueño legítimo en mitad del apply renueva su lease de
+    modo que el reaper NO lo considere stale; un ex-dueño (fence vieja) no puede
+    renovar."""
+    from datetime import timedelta
+
+    store = InMemoryExecutionEventStore()
+    ev = _exec("ev-heartbeat")
+    await store.capture(ev)
+    eid = ev.execution_id
+    assert await store.start_apply(eid, owner="worker-a") is True
+    a_row = await store.get(eid)
+    assert a_row is not None
+    gen_a = a_row.lease_generation
+    _age_event(store, eid, LEASE_WINDOW_SECONDS + 90)  # lease envejece…
+
+    # El dueño A renueva su lease (fence intacto) → deja de parecer stale.
+    assert (
+        await store.renew_apply_lease(eid, owner="worker-a", lease_generation=gen_a)
+        is True
+    )
+    renewed = await store.get(eid)
+    assert renewed is not None and renewed.lease_generation == gen_a
+    fresh = datetime.now(UTC) - timedelta(seconds=LEASE_WINDOW_SECONDS)
+    assert renewed.updated_at is not None and renewed.updated_at > fresh
+
+    # El reaper ya NO lo reclama (lease viva renovada).
+    reclaimed = await store.reclaim_stale_applying_batch(
+        owner="reaper-1",
+        stale_before=datetime.now(UTC) - timedelta(seconds=LEASE_WINDOW_SECONDS),
+    )
+    assert eid not in reclaimed
+
+    # Un ex-dueño (o token viejo) no puede renovar tras un robo.
+    assert await store.start_apply(eid, owner="somebody-else") is False  # ya APPLYING
+    # Robemos la lease (aging) para forzar bump y comprobar que A (gen vieja) ya
+    # no puede renovar la fila que ahora es de otro.
+    _age_event(store, eid, LEASE_WINDOW_SECONDS + 90)
+    assert await store.reclaim_stale_apply(
+        eid,
+        owner="worker-b",
+        stale_before=datetime.now(UTC) - timedelta(seconds=LEASE_WINDOW_SECONDS),
+    ) is True
+    assert (
+        await store.renew_apply_lease(
+            eid, owner="worker-a", lease_generation=gen_a
+        )
+        is False
+    )

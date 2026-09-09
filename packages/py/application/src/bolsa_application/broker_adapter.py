@@ -23,9 +23,10 @@ from bolsa_analytics.cognitive.broker_adapter import (
 )
 from bolsa_analytics.cognitive.paper_broker import PaperBrokerReceipt
 from bolsa_analytics.cognitive.paper_order import PaperOrder, PaperOrderSide
+from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult
+
 from bolsa_application.live_order_query import BrokerOrderQueryResult
 from bolsa_application.paper_broker import PaperBroker
-from bolsa_market.providers import XtbBridgeClient, XtbBridgeOrderResult
 
 BrokerAdapterSubmitStatus = Literal[
     "executed",
@@ -173,8 +174,9 @@ class _XtbOrderClient(Protocol):
 class XtbBrokerAdapter:
     """LIVE vía bridge XTB. submitted ≠ fill; filled→ledger (XL-2).
 
-    VIRTUAL sandbox: sin ``LIVE_EXECUTION_UNLOCKED`` no hay POST al bridge.
-    Kill switch se reconsulta aquí (además del OpeningGate).
+    VIRTUAL sandbox (A8·M0): sin AMBOS ``LIVE_EXECUTION_AUTHORIZED`` y
+    ``LIVE_EXECUTION_UNLOCKED`` no hay POST al bridge (dos barreras
+    independientes). Kill switch se reconsulta aquí (además del OpeningGate).
     """
 
     def __init__(
@@ -207,12 +209,20 @@ class XtbBrokerAdapter:
             return bool(await result)
         return bool(result)
 
-    def _unlocked(self) -> bool:
+    def _live_money_ready(self) -> bool:
+        """Único predicado que abre la vía real (A8·M0): DOS barreras independientes.
+
+        * Sin ``_execution_unlocked_check`` inyectado (producción) → exige AMBAS
+          env: ``live_execution_ready()`` = AUTHORIZED y UNLOCKED (segunda barrera
+          independiente sobre la vía XTB). Fall-closed por defecto.
+        * Con el seam inyectado (DI/tests) → el callback es AUTORIDAD completa
+          del stack de barreras (los tests sustituyen todo el gate por doble).
+        """
         check = self._execution_unlocked_check
         if check is None:
-            from bolsa_application.live_execution_runtime import live_execution_unlocked
+            from bolsa_application.live_execution_runtime import live_execution_ready
 
-            return bool(live_execution_unlocked())
+            return bool(live_execution_ready())
         return bool(check())
 
     async def submit(
@@ -239,8 +249,10 @@ class XtbBrokerAdapter:
                 reason="kill_switch_active",
                 transaction_id=None,
             )
-        if not self._unlocked():
-            # VIRTUAL sandbox: Confirm chrome OK, money path NO.
+        if not self._live_money_ready():
+            # VIRTUAL sandbox (A8·M0): Confirm chrome OK, money path NO. En
+            # producción exige DOS barreras (AUTHORIZED + UNLOCKED); el seam DI
+            # inyectado sustituye el gate completo (tests).
             return BrokerAdapterSubmitResult(
                 venue="LIVE",
                 adapter=BROKER_ADAPTER_XTB,

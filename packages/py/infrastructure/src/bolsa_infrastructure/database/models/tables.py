@@ -1398,6 +1398,17 @@ class ExecutionEventRow(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    # V2.21 / A8 (M1 · fencing P1-01b) — token monótono de lease. Se incrementa en
+    # cada ``start_apply`` y en cada ROBO (``reclaim_stale_apply``). Un terminal
+    # con fencing exige ``lease_owner`` + ``lease_generation`` coincidentes: un
+    # dueño antiguo (lease robada) ya no puede finalizar una fila ajena.
+    lease_generation: Mapped[int] = mapped_column(
+        "lease_generation",
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
 
 
 class OperationalIncidentRow(Base):

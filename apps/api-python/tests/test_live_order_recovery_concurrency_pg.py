@@ -68,10 +68,10 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
             await conn.execute(select(1))
             version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "025_execution_events_lease" not in versions:
+            if "026_execution_events_fence" not in versions:
                 raise RuntimeError(
                     f"alembic_version is {versions!r}; "
-                    "expected 025_execution_events_lease (V2.20 head)"
+                    "expected 026_execution_events_fence (V2.21 head)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()

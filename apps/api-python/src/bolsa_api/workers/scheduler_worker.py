@@ -24,6 +24,9 @@ import signal
 import sys
 from typing import Any
 
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.migrations import database_bootstrap
+from bolsa_infrastructure.database.session import create_engine, create_session_factory
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
@@ -31,6 +34,9 @@ from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
 from bolsa_api.background.custody_job_worker import start_custody_job_worker
 from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluator
 from bolsa_api.background.estudio_eod_opinion_worker import start_estudio_eod_opinion_worker
+from bolsa_api.background.execution_event_reaper_worker import (
+    start_execution_event_reaper_worker,
+)
 from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
 from bolsa_api.background.index_subscribe_worker import start_index_subscribe_worker
 from bolsa_api.background.lifecycle_outbox_worker import start_lifecycle_outbox_worker
@@ -42,9 +48,6 @@ from bolsa_api.background.opportunity_daily_scan_worker import (
 )
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.migrations import database_bootstrap
-from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +67,8 @@ def _event_loop_starters() -> list[Any]:
         start_index_subscribe_worker,
         start_lifecycle_outbox_worker,
         start_live_order_recovery_worker,
+        # V2.21/A8 (M2): reaper autónomo de APPLYING stale (solo tras fencing M1).
+        start_execution_event_reaper_worker,
     ]
 
 

@@ -5,13 +5,17 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from bolsa_market.providers import XtbBridgeOrderResult
 
 from bolsa_application.broker_adapter import (
     MockBrokerAdapter,
     PaperBrokerAdapter,
     XtbBrokerAdapter,
 )
-from bolsa_market.providers import XtbBridgeOrderResult
+from bolsa_application.live_execution_runtime import (
+    LIVE_EXECUTION_AUTHORIZE_ENV,
+    LIVE_EXECUTION_UNLOCK_ENV,
+)
 
 
 class _OkExecute:
@@ -167,6 +171,85 @@ async def test_xtb_virtual_sandbox_blocks_bridge_post() -> None:
     assert result.status == "not_wired"
     assert result.reason == "live_virtual_sandbox"
     assert result.trade is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "authorized, unlocked, reason",
+    [
+        # A8·M0: producción (sin seam DI) abre el POST SOLO con AMBAS barreras.
+        (None, None, "live_virtual_sandbox"),
+        (None, "1", "live_virtual_sandbox"),  # UNLOCKED sin AUTHORIZED → NO POST.
+        ("1", None, "live_virtual_sandbox"),  # AUTHORIZED sin UNLOCKED → NO POST.
+        ("0", "1", "live_virtual_sandbox"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_xtb_production_requires_both_barriers_before_post(
+    monkeypatch: pytest.MonkeyPatch,
+    authorized: str | None,
+    unlocked: str | None,
+    reason: str,
+) -> None:
+    """Barrer (sin ``execution_unlocked_check``): fecha cada env por separado.
+
+    Una sola barrera activa mantiene la vía cerrada (cero POST). Esto protege de
+    "flipear UNA env var" que antes era suficiente para abrir el camino real.
+    """
+    for var, val in (
+        (LIVE_EXECUTION_AUTHORIZE_ENV, authorized),
+        (LIVE_EXECUTION_UNLOCK_ENV, unlocked),
+    ):
+        if val is None:
+            monkeypatch.delenv(var, raising=False)
+        else:
+            monkeypatch.setenv(var, val)
+    fake = _FakeXtb(XtbBridgeOrderResult(status="submitted", venue_order_id="xtb-2bar"))
+    adapter = XtbBrokerAdapter(
+        client=fake,
+        execute_trade=_SpyExecute(),
+        kill_switch_check=lambda: False,
+        # Sin execution_unlocked_check → el adapter usa live_execution_ready()
+        # (require AMBAS env barrier). No hay override que salte la barrera 2.
+    )
+    result = await adapter.submit(
+        instrument_id="inst-1",
+        side="buy",
+        quantity=1.0,
+        price=10.0,
+        account_id="acc-1",
+        idempotency_key="idem-2barrier",
+    )
+    assert fake.calls == 0
+    assert result.status == "not_wired"
+    assert result.reason == reason
+    assert result.trade is None
+
+
+@pytest.mark.asyncio
+async def test_xtb_production_posts_only_when_both_barriers_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con AUTHORIZED + UNLOCKED a la vez, la barrera real deja pasar al bridge."""
+    monkeypatch.setenv(LIVE_EXECUTION_AUTHORIZE_ENV, "1")
+    monkeypatch.setenv(LIVE_EXECUTION_UNLOCK_ENV, "1")
+    fake = _FakeXtb(XtbBridgeOrderResult(status="submitted", venue_order_id="xtb-go"))
+    adapter = XtbBrokerAdapter(
+        client=fake,
+        execute_trade=_SpyExecute(),
+        kill_switch_check=lambda: False,
+    )
+    result = await adapter.submit(
+        instrument_id="inst-1",
+        side="buy",
+        quantity=1.0,
+        price=10.0,
+        account_id="acc-1",
+        idempotency_key="idem-go",
+    )
+    assert fake.calls == 1
+    assert result.status == "submitted"
+    assert result.reason == "live_submitted_no_fill"
 
 
 @pytest.mark.asyncio
