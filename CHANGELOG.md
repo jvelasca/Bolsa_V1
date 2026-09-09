@@ -4,9 +4,9 @@ All notable releases of Bolsa V1.
 
 ## [1.46.1-beta] — 2026-09-09
 
-Elevación a `main` (commit local `v2.16.1-beta`, **sin push aún**) del ciclo de cierre de
-hallazgos residuales de la auditoría sobre `v2.16-beta`: owner-scoping de cuenta por defecto
-(**P1-02/03**), **Auditoría 2** (fill_unseen tapado por cancel en el incidente `live_drift`) y
+Elevación a `main` (tag **`v2.16.1-beta`**, commit `1596f4ad`, push a `origin/main`) del ciclo de
+cierre de hallazgos residuales de la auditoría sobre `v2.16-beta`: owner-scoping de cuenta por
+defecto (**P1-02/03**), **Auditoría 2** (fill_unseen tapado por cancel en el incidente `live_drift`) y
 **Auditoría 3** (consentimiento del operador de ExecutionEvent en dos fases, sin salida).
 Núcleo financiero congelado **intacto** (deuda P3 C2 aceptada como riesgo medido, ver
 [`docs/engineering/deuda-p3-nucleo-aceptada-c2-2026-09-09.md`](./docs/engineering/deuda-p3-nucleo-aceptada-c2-2026-09-09.md)).
@@ -46,6 +46,11 @@ Package **`1.46.1-beta`** (bump desde `1.46.0-beta`). Alembic head **`023_ohlcv_
 Unit (18 drift + execution) + regresión (60) verdes; e2 PG real en scratch `bolsa_c1_scratch`
 (head 023, dedicated) **5/5**, incluido el merge `fill_unseen`; ruff CI-parity 0; mypy src 0.
 Shared `bolsa_v1` intacta en 023.
+
+**Release-tag CI `#34331846887` GREEN** sobre `v2.16.1-beta` (`conclusion: success`, certify ✓):
+security · shared · decision-spine · lifecycle-pg · dr-verify · python (ruff/mypy/pytest) ·
+frontend (+contract) · playwright (mock E2E). Integrated E2E opt-in skipped (no requisito de
+GREEN). Repo dispuesto para **auditoría externa** sobre el tag `v2.16.1-beta`.
 
 ## [1.46.0-beta] — 2026-09-09
 

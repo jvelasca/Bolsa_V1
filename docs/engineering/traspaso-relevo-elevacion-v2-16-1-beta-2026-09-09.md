@@ -33,5 +33,22 @@ Tras las correcciones de sesión (P1-02/03 account default, Auditorías 2 y 3), 
 `origin/main` y creación del tag v2.16.1-beta para correr el Release-tag CI (certify, dr-verify,
 iso real-PG, playwright) y considerarlo GREEN final antes de auditoría externa.
 
-FIN DEL RELEVO — Elevación `v2.16.1-beta` preparada localmente (código + doc P3 + bump + CHANGELOG);
-commit en rama `main` local sin push; tag y CI real quedan a decisión del owner.
+## 4. Elevación completada en GitHub (2026-09-09) y GREEN final
+
+Ejecutado hasta dejar el repo **dispuesto para auditoría externa** sobre el tag `v2.16.1-beta`:
+
+- `origin/main` avanzado a **`1596f4ad`** (fast-forward desde `021671a6`).
+- Tag anotado remoto **`v2.16.1-beta`** → `1596f4ad` (creado vía push → evento `tag push`).
+- **Release-tag CI `#34331846887`** — `conclusion: success`, duración ~8 min, jobs GREEN:
+  - `security (gitleaks)` ✓ · `shared` ✓ · `decision-spine` ✓ · `lifecycle-pg` ✓ · `dr-verify` ✓
+  - `python (ruff/imports/mypy/pytest offline)` ✓ · `frontend (+contract:check)` ✓ ·
+    `playwright (mock E2E)` ✓ → agregador **`certify (aggregate + artifact)` ✓ = GREEN**.
+  - `playwright (integrated E2E, opt-in)` skipped (job opt-in, `run_e2e_integration=false`):
+    correcto, no es requisito de GREEN.
+- Trabajo limpio: `main` sincronizado con `origin/main`, sin ahead/behind.
+
+GREEN FINAL CERTIFICADO para `v2.16.1-beta` → listo para auditoría externa sobre el tag.
+
+FIN DEL RELEVO — Elevación `v2.16.1-beta` completada en GitHub (origin/main `1596f4ad` + tag remoto
+`v2.16.1-beta`) y **Release-tag CI GREEN (`conclusion: success`, certify ✓)**; repo dispuesto para
+auditoría externa sobre el tag `v2.16.1-beta`.
