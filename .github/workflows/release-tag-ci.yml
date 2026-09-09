@@ -375,11 +375,45 @@ jobs:
           -q
           --tb=short
 
-      - name: Pytest account-isolation gate V2.15.4 (real-PG, cross-owner account-less + workspaces/platform/trackers)
+      # V2.16-beta fix CI (relevo iso 2026-09-09): el gate de aislamiento (Bloque C
+      # V2.15.4) NO debe compartir `bolsa_v1` con el paso anterior de lifecycle/
+      # golden/outbox/financial_integrity/health. Ese paso-7 deja residuo persistente
+      # de otros owners/cuentas/sesiones/recuerdos en `bolsa_v1`; 3 tests de la iso
+      # asumen BD sin datos ajenos → 3 failed cuando comparten BD. La iso corre ahora
+      # sobre una BD dedicada propia `bolsa_v1_iso` (drop+create + migración limpia).
+      # Es un cambio de estructura/higiene de estado del job; NO toca el código V2.15.4.
+      - name: Install PostgreSQL client (psql/createdb) para scratch iso
+        # Los runners ubuntu-latest NO traen psql/createdb (ver dr-verify). El rol
+        # bolsa del container de servicio postgres:16-alpine es superuser del servidor
+        # → puede DROP/CREATE una BD scratch dedicada en el mismo server.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Prepare dedicated iso scratch DB (bolsa_v1_iso) drop+create+migrate
+        env:
+          # Solo este step/hijo apunta a la scratch; el resto del job sigue con bolsa_v1.
+          DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1_iso
+          DB_NAME: bolsa_v1_iso
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: bolsa
+          PGPASSWORD: bolsa_dev
+        run: |
+          psql -d bolsa_v1 -v ON_ERROR_STOP=1 \
+            -c "DROP DATABASE IF EXISTS bolsa_v1_iso WITH (FORCE);" \
+            -c "CREATE DATABASE bolsa_v1_iso OWNER bolsa;"
+          cd packages/py/infrastructure && uv run alembic upgrade head
+
+      - name: Pytest account-isolation gate V2.15.4 (dedicated real-PG, account-less + workspaces/platform/trackers)
         # V2.15.4 Bloque C: las suites de aislamiento de cuenta/workspace/plataforma/
-        # tracker se ejecutan aquí frente al PG real y obligatorio de lifecycle-pg.
+        # tracker se ejecutan aquí frente a su BD real dedicada bolsa_v1_iso aislada
+        # del residuo del paso lifecycle (relevo iso 2026-09-09 → 43 passed).
         # `certify` depende de lifecycle-pg → un fallo aquí no-GREENea el tag.
         # (las mismas quedan en --ignore del job python-offline porque requieren PG).
+        env:
+          DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1_iso
+          DB_NAME: bolsa_v1_iso
         run: >
           uv run pytest
           apps/api-python/tests/test_account_isolation.py
