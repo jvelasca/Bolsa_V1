@@ -2,6 +2,33 @@
 
 All notable releases of Bolsa V1.
 
+## [1.47.0-beta] — 2026-09-09
+
+Elevación a `main` de la **Iter-0 de LIVE Certification / A7** (ciclo `v2.17-beta`), de acuerdo con el
+veredicto de la **auditoría externa de V2.16.1**: P0=0 / P1=0 / Global 9.3 → abrir A7 y **no añadir
+features**. Esta iteración es **SÓLO marco y mapa de gaps documental** (sin código ni tests nuevos):
+mapea los 16 escenarios de certificación del auditor contra la cobertura ya existente y registra el home
+futuro de la batería. Núcleo financiero congelado **intacto**. Alembic head `023_ohlcv_bars_unique_reconcile`.
+Package **`1.47.0-beta`** (bump desde `1.46.1-beta`).
+
+### Iter-0 A7 — entregable documental
+
+- **Marco + gap-map:** [`docs/engineering/plan-a7-live-certification-gap-map-2026-09-09.md`](./docs/engineering/plan-a7-live-certification-gap-map-2026-09-09.md)
+  — escenario a escenario (`🟢/🟡/🔴`) con evidencia ruta:línea y dobles a reutilizar.
+- **Hallazgo P2-05 cerrado:** la incoherencia documental que marcó la auditoría (doc de relevo aún decía
+  "sin push") ya fue resuelta por `b8858c2f` (SHA `1596f4ad`, tag `v2.16.1-beta`, CI `#34331846887` GREEN).
+- **Home de la batería (Iter-1):** `packages/py/infrastructure/tests/chaos/live_a7/` (PG-real) con gate en
+  el job `lifecycle-pg` del release-tag CI.
+- **Backlog A7 (Iter-1+):** C3 crash-injection sobre `scheduler_worker` 🔴; A3 broker timeout/network
+  real; B2 partial-fill → materialización; P2-01 Applied durable (APPLYING/APPLIED/FAILED).
+- Deuda P3 C2 del núcleo sigue ACCEPTED sin tocar; la deuda pos-p3 `[runtime/aislamiento] LIVE A7` pasa a
+  "Iter-0 en curso → Iter-1 backlog" (actualizado en `deuda-p3-nucleo-aceptada-c2-2026-09-09.md`).
+
+### Verificación
+
+Sin cambios de código: el Release-tag CI solo re-corre el contrato existente (resultado GREEN esperado).
+Relevo del ciclo: [`docs/engineering/traspaso-relevo-a7-iter0-v2-17-beta-2026-09-09.md`](./docs/engineering/traspaso-relevo-a7-iter0-v2-17-beta-2026-09-09.md).
+
 ## [1.46.1-beta] — 2026-09-09
 
 Elevación a `main` (tag **`v2.16.1-beta`**, commit `1596f4ad`, push a `origin/main`) del ciclo de

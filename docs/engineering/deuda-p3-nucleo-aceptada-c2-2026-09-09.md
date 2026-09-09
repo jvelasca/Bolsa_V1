@@ -125,8 +125,11 @@
 
 - 3er medio off-site del backup 3-2-1 sin automatizar (`guia-off-site-3er-medio-2026-09-09.md`).
 - Retención off-site sin estado propio (poda remota `retentionPrune` local-only).
-- Cola `[runtime/aislamiento]` LIVE A7 (replay idempotente post-crash + doble-writer cancel):
-  exige PG real / 2 workers / broker real; NO LIVE certificado.
+- **Movido a fase LIVE A7 (Iter-0 → Iter-1):** ítem `[runtime/aislamiento]` LIVE A7 (replay
+  idempotente post-crash + doble-writer cancel), que exigía PG real / 2 workers / broker real. La
+  Iter-0 de A7 (ciclo v2.17-beta) definió su home (`packages/py/infrastructure/tests/chaos/live_a7/`)
+  y su gate (`lifecycle-pg`); queda en backlog Iter-1+. Ver
+  [`plan-a7-live-certification-gap-map-2026-09-09.md`](./plan-a7-live-certification-gap-map-2026-09-09.md).
 
 FIN DE LA DECISIÓN — Deuda P3 del núcleo C2 aceptada como riesgo medido y registrada por
 ítem (ruta:línea · riesgo · deferimiento · condición de reapertura). Núcleo congelado NO se
