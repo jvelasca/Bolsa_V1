@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bolsa_market.providers import XtbBridgeOrderResult
 
 from bolsa_application.broker_adapter import (
     MockBrokerAdapter,
@@ -16,6 +15,7 @@ from bolsa_application.live_execution_runtime import (
     LIVE_EXECUTION_AUTHORIZE_ENV,
     LIVE_EXECUTION_UNLOCK_ENV,
 )
+from bolsa_market.providers import XtbBridgeOrderResult
 
 
 class _OkExecute:

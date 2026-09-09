@@ -24,7 +24,6 @@ NO puede finalizar una lease ajena.
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "026_execution_events_fence"

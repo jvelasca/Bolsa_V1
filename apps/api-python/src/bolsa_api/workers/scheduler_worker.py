@@ -24,9 +24,6 @@ import signal
 import sys
 from typing import Any
 
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.migrations import database_bootstrap
-from bolsa_infrastructure.database.session import create_engine, create_session_factory
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
@@ -49,6 +46,9 @@ from bolsa_api.background.opportunity_daily_scan_worker import (
 from bolsa_api.background.paper_auto_engine_worker import start_paper_auto_engine_worker
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.migrations import database_bootstrap
+from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
 logger = logging.getLogger(__name__)
 

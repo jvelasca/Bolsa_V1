@@ -27,8 +27,9 @@ import logging
 import os
 from datetime import UTC, datetime, timedelta
 
-from bolsa_application.execution_event import reap_stale_applying
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from bolsa_application.execution_event import reap_stale_applying
 
 logger = logging.getLogger(__name__)
 

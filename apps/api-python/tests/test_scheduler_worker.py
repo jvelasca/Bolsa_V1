@@ -22,6 +22,9 @@ from bolsa_api.background.daily_alert_evaluator import (  # type: ignore[import-
 from bolsa_api.background.estudio_eod_opinion_worker import (  # type: ignore[import-untyped]
     start_estudio_eod_opinion_worker,
 )
+from bolsa_api.background.execution_event_reaper_worker import (  # type: ignore[import-untyped]
+    start_execution_event_reaper_worker,
+)
 from bolsa_api.background.fa_weekly_worker import (  # type: ignore[import-untyped]
     start_fa_weekly_worker,
 )
@@ -39,6 +42,9 @@ from bolsa_api.background.opportunity_daily_scan_worker import (  # type: ignore
 )
 from bolsa_api.background.optimization_worker import (  # type: ignore[import-untyped]
     start_optimization_worker,
+)
+from bolsa_api.background.paper_auto_engine_worker import (  # type: ignore[import-untyped]
+    start_paper_auto_engine_worker,
 )
 from bolsa_api.background.scan_worker import (  # type: ignore[import-untyped]
     start_scan_worker,
@@ -67,6 +73,10 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_opportunity_daily_scan_worker,
         start_lifecycle_outbox_worker,
         start_live_order_recovery_worker,
+        # V2.21/A8 (M2): reaper autónomo de APPLYING stale.
+        start_execution_event_reaper_worker,
+        # V2.21/A8 (M4): AUTO Engine continuo SAFE/dry.
+        start_paper_auto_engine_worker,
     }
     assert set(starters) == expected
 

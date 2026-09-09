@@ -189,7 +189,7 @@ def start_paper_auto_engine_worker(
     *,
     engine: PaperAutoEngine | None = None,
     interval_seconds: float | None = None,
-):
+) -> asyncio.Task[None] | None:
     """start hook para ``_event_loop_starters()`` del scheduler (SAFE/dry)."""
     if not _enabled():
         logger.info("PaperAutoEngineWorker desactivado (%s=false/off)", _ENV_ENABLED)
