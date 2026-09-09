@@ -199,20 +199,37 @@ async def cleanup_row(factory, order_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _probe_env(*, mode: str, sentinel: str, worker: str) -> dict[str, str]:
+def _probe_env(
+    *,
+    mode: str,
+    sentinel: str,
+    worker: str,
+    extra: dict[str, str] | None = None,
+) -> dict[str, str]:
     env = dict(os.environ)
     env["LIVE_A7_PROBE_MODE"] = mode
     env["LIVE_A7_SENTINEL"] = sentinel
     env["LIVE_A7_WORKER_ID"] = worker
+    # Go fail-closed del apply financiero: solo se materializa dinero vía el
+    # puente V2.19/P2-01 cuando el subproceso lo trae explícito (default OFF).
+    env.setdefault("LIVE_ORDER_RECOVERY_FINANCIAL_APPLY_ENABLED", "1")
+    if extra:
+        env.update(extra)
     return env
 
 
-def launch_probe(*, mode: str, sentinel: Path, worker: str):
+def launch_probe(
+    *,
+    mode: str,
+    sentinel: Path,
+    worker: str,
+    extra: dict[str, str] | None = None,
+):
     """Arranca el probe (proceso real Python) y devuelve el ``Popen`` no bloqueante."""
     sentinel.unlink(missing_ok=True)
     return subprocess.Popen(
         [sys.executable, str(_PROBE)],
-        env=_probe_env(mode=mode, sentinel=str(sentinel), worker=worker),
+        env=_probe_env(mode=mode, sentinel=str(sentinel), worker=worker, extra=extra),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -365,3 +382,442 @@ async def test_c3b_crash_after_resolve_put_no_double_on_relaunch(
         )
     finally:
         await cleanup_row(factory, order_id)
+
+
+# ---------------------------------------------------------------------------
+# C3-C / C3-D — vertiente FINANCIERA del crash (V2.19 · P2-01), PG real.
+# ---------------------------------------------------------------------------
+# Produce un LENADO recuperado REAL (cuenta+cartera+cash en la BD dedicada A7) que
+# el puente V2.19 materializa por fases (CAPTURED→APPLYING→APPLIED) con ExecuteTrade
+# idempotente por `idempotency_key`. La cuenta/cash/posición/ledger las lee un
+# `ExecuteTrade` real vía los repos de producción sobre la MISMA BD.
+_FIN_PRICE = 12.50
+
+
+def fin_extra(*, order_id: str, fill_seq: str) -> dict[str, str]:
+    return {
+        "LIVE_A7_FIN_ORDER_ID": order_id,
+        "LIVE_A7_FIN_FILL_SEQ": fill_seq,
+        "LIVE_A7_FIN_FILL_PRICE": str(_FIN_PRICE),
+    }
+
+
+async def seed_financial_acct_instr(session, *, name: str, instrument_id: str) -> str:
+    """Cuenta simulada REAL + instrumento (id dado) en la BD dedicada A7.
+
+    Patrón canónico heredado de `infrastructure/tests/chaos/test_crash_consistency.py`
+    (``create_simulated_account`` + ``InstrumentRow``) para darle a ``ExecuteTrade``
+    la cuenta/cartera/cash/settings/legacy que necesita. Devuelve el account_id. El
+    ``instrument_id`` se pasa desde el test para que sea el MISMO que el del fill del
+    recovery (ExecuteTrade materializa sobre ese instrument real).
+    """
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models.tables import InstrumentRow
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+
+    scope = await SqlAlchemyAccountRepository(session).create_simulated_account(
+        name=name,
+        initial_deposit=100_000.0,
+    )
+    hexsuffix = uuid4().hex
+    session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"CF{hexsuffix[:5].upper()}",
+            yahoo_symbol=f"CF{hexsuffix[:9]}",
+            isin=None,
+            name=name,
+            exchange="BMAD",
+            country="ES",
+            currency="EUR",
+            type="stock",
+            is_active=True,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+    )
+    await session.flush()
+    await session.commit()
+    return scope.account.id
+
+
+async def seed_financial_unknown(
+    *,
+    session,
+    order_id: str,
+    account_id: str,
+    instrument_id: str,
+    quantity: float = 100.0,
+    side: str = "buy",
+) -> str:
+    """Crea la fila `live_orders` UNKNOWN durable ligada a la cuenta/instrumento reales."""
+    from bolsa_analytics.cognitive.live_order import (
+        build_live_order,
+        transition_live_order,
+    )
+    from bolsa_application.live_order_store import PostgresLiveOrderStore
+
+    vid = f"xtb-{order_id}"
+    built = build_live_order(
+        order_id=order_id,
+        instrument_id=instrument_id,
+        side=side,
+        quantity=quantity,
+        account_id=account_id,
+    )
+    submitted = transition_live_order(built, "SUBMITTING", venue_order_id=vid)
+    unknown = transition_live_order(submitted, "UNKNOWN")
+    await PostgresLiveOrderStore(session).put(unknown, account_id=account_id)
+    await session.commit()
+    return vid
+
+
+async def cleanup_financial(
+    factory,
+    *,
+    account_id: str,
+    instrument_id: str,
+    execution_id: str,
+    order_id: str,
+) -> None:
+    """Borra cuenta (cierre+delete canónico) + instrumento + traza + live_order."""
+    async with factory() as session:
+        from sqlalchemy import delete
+
+        from bolsa_application.live_order_store import PostgresLiveOrderStore
+        from bolsa_infrastructure.database.models.tables import (
+            ExecutionEventRow,
+            InstrumentRow,
+        )
+        from bolsa_infrastructure.database.repositories.account_repository import (
+            SqlAlchemyAccountRepository,
+        )
+
+        try:
+            await PostgresLiveOrderStore(session).delete(order_id)
+        finally:
+            pass
+        try:
+            await session.execute(
+                delete(ExecutionEventRow).where(ExecutionEventRow.execution_id == execution_id)
+            )
+        finally:
+            pass
+        repo = SqlAlchemyAccountRepository(session)
+        try:
+            await repo.close_account(account_id)
+            await repo.delete_simulated_account(account_id)
+        except Exception:  # noqa: BLE001 — best-effort
+            pass
+        try:
+            await session.execute(delete(InstrumentRow).where(InstrumentRow.id == instrument_id))
+        except Exception:  # noqa: BLE001 — best-effort
+            pass
+        try:
+            await session.commit()
+        except Exception:  # noqa: BLE001 — best-effort
+            await session.rollback()
+
+
+async def fin_event_row(factory, *, execution_id: str):
+    async with factory() as session:
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+
+        return (
+            await session.execute(
+                select(ExecutionEventRow).where(ExecutionEventRow.execution_id == execution_id)
+            )
+        ).scalar_one_or_none()
+
+
+async def fin_account_total_cash(factory, *, account_id: str) -> float:
+    async with factory() as session:
+        from decimal import Decimal
+
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import (
+            InvestmentPortfolioRow,
+            PortfolioRow,
+        )
+
+        rows = (
+            await session.execute(
+                select(PortfolioRow.cash)
+                .join(
+                    InvestmentPortfolioRow,
+                    InvestmentPortfolioRow.legacy_portfolio_id == PortfolioRow.id,
+                )
+                .where(InvestmentPortfolioRow.account_id == account_id)
+            )
+        ).scalars().all()
+        return float(sum((c for c in rows), Decimal("0")))
+
+
+async def fin_count_ledger_effects(factory, *, account_id: str) -> int:
+    """Nº de filas ledger del efecto financiero real (buy/sell/trade) del account.
+
+    Invariante A7: tras el crash+reclaim SOLO UNA materialización (1 efecto ledger).
+    Un doble apply dejaría dos. Reutiliza la semántica exacta con la que
+    ``ExecuteTrade`` escribe el ledger (``entry_type`` = 'buy'|'sell').
+    """
+    async with factory() as session:
+        from sqlalchemy import func, select
+
+        from bolsa_infrastructure.database.models.tables import LedgerEntryRow
+
+        return int(
+            (
+                await session.execute(
+                    select(func.count(LedgerEntryRow.id)).where(
+                        LedgerEntryRow.account_id == account_id,
+                        LedgerEntryRow.type.in_(("buy", "sell", "trade")),
+                    )
+                )
+            ).scalar_one()
+        )
+
+
+async def _account_legacy_ids(session, account_id: str):
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import InvestmentPortfolioRow
+
+    return list(
+        (
+            await session.execute(
+                select(InvestmentPortfolioRow.legacy_portfolio_id).where(
+                    InvestmentPortfolioRow.account_id == account_id
+                )
+            )
+        ).scalars()
+    )
+
+
+async def fin_position_for_instrument(factory, *, account_id: str, instrument_id: str) -> float:
+    async with factory() as session:
+        from sqlalchemy import func, select
+
+        from bolsa_infrastructure.database.models.tables import PositionRow
+
+        legacy = await _account_legacy_ids(session, account_id)
+        q = (
+            await session.execute(
+                select(func.coalesce(func.sum(PositionRow.quantity), 0)).where(
+                    PositionRow.portfolio_id.in_(legacy),
+                    PositionRow.instrument_id == instrument_id,
+                )
+            )
+        ).scalar_one()
+        return float(q or 0)
+
+
+async def test_c3c_crash_financial_apply_reexecuted_exact_once(factory, tmp_path: Path) -> None:
+    """C3-C: crash real en MEDIO del apply financiero → re-run materializa UNA sola vez.
+
+    Subproceso A: captura la traza durable, pasa a APPLYING (commit) y ejecuta el
+    ExecuteTrade real (dinero en vuelo, SIN commit) y parkea ahí — el peor instante.
+    El driver hace SIGKILL: la transacción de A (cash/posición/ledger sin commit)
+    cae en ROLLBACK; la traza queda durable en APPLYING. Subproceso B (segundo
+    proceso real): re-encuentra la traza durable APPLYING y la reclama por
+    `apply_execution_financial_once` idempotente → materializa EXACTAMENTE una
+    posición/ledger y deja la traza terminal APPLIED, sin 100+100 ni 100+0.
+    """
+    from uuid import uuid4
+
+    order_id = unique_order_id("c3c")
+    instrument_id = f"inst-c3c-{uuid4().hex[:8]}"
+    exec_id = ""
+    async with factory() as session:
+        # account/cash reales + instrument real (ExecuteTrade los materializa).
+        account_id = await seed_financial_acct_instr(
+            session, name=f"C3C-{order_id}", instrument_id=instrument_id
+        )
+        vid = await seed_financial_unknown(
+            session=session,
+            order_id=order_id,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            quantity=100.0,
+        )
+        await session.commit()
+    exec_id = f"{vid}#1"
+    try:
+        # A — crash point financiero (APPLYING durable + ExecuteTrade en vuelo).
+        sentinel_a = sentinel_write(tmp_path, "c3c-a")
+        proc_a = launch_probe(
+            mode="crasher-financial",
+            sentinel=sentinel_a,
+            worker=worker_id("c3ca"),
+            extra=fin_extra(order_id=order_id, fill_seq="1"),
+        )
+        try:
+            text_a = wait_sentinel_text(sentinel_a, timeout=45.0)
+            assert "financial-applying=1" in text_a, f"crasher financiero no llegó: {text_a!r}"
+            force_kill(proc_a)
+            wait_for_exit(proc_a)
+        finally:
+            force_kill(proc_a)
+            wait_for_exit(proc_a)
+
+        # Tras el kill la traza quedó durable en APPLYING (sin doble materializar).
+        ev_mid = await fin_event_row(factory, execution_id=exec_id)
+        assert ev_mid is not None, "no queda traza durable tras el crash financiero"
+        assert ev_mid.status == "APPLYING", (
+            f"crash en medio del apply debe dejar APPLYING durable, era {ev_mid.status}"
+        )
+
+        # B — segundo proceso real reclama y materializa exactamente una vez.
+        sentinel_b = sentinel_write(tmp_path, "c3c-b")
+        proc_b = launch_probe(
+            mode="reader-financial",
+            sentinel=sentinel_b,
+            worker=worker_id("c3cb"),
+            extra=fin_extra(order_id=order_id, fill_seq="1"),
+        )
+        try:
+            text_b = wait_sentinel_text(sentinel_b, timeout=45.0)
+            assert "finished=applied" in text_b, f"el reclaim financiero falló: {text_b!r}"
+            wait_for_exit(proc_b)
+        finally:
+            force_kill(proc_b)
+            wait_for_exit(proc_b)
+
+        # Evento terminal APPLIED con attempt≥1 y efecto financiero ÚNICO.
+        ev = await fin_event_row(factory, execution_id=exec_id)
+        assert ev is not None and ev.status == "APPLIED", (
+            f"la traza debió quedar APPLIED, era {getattr(ev, 'status', None)!r}"
+        )
+        assert ev.attempt_count >= 1, "attempt_count debió registrar el (re)apply"
+        assert ev.applied_at is not None, "APPLIED debe llevar applied_at"
+        pos = await fin_position_for_instrument(
+            factory, account_id=account_id, instrument_id=instrument_id
+        )
+        # Posición EXACTAMENTE una vez: 100 (no 200) — nunca 100+100.
+        assert pos == float("100.0"), f"posición exactamente-una (100), era {pos}"
+        # Un único efecto ledger del fill (no dos).
+        assert await fin_count_ledger_effects(
+            factory, account_id=account_id
+        ) == 1, "el crash+reclaim debió escribir UN solo efecto ledger de fill"
+        cash = await fin_account_total_cash(factory, account_id=account_id)
+        # cash == 100000 − 100×12.50 − comisiones (una sola vez; si hubiera sido
+        # aplicado dos veces bajaría en > 2×notional).
+        assert cash < 100_000.0 and cash > 100_000.0 - 2 * 100 * _FIN_PRICE, (
+            f"cash NO deducido exactamente una vez: {cash}"
+        )
+    finally:
+        await cleanup_financial(
+            factory,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            execution_id=exec_id,
+            order_id=order_id,
+        )
+
+
+async def test_c3d_reclaim_applying_or_terminal_no_double(factory, tmp_path: Path) -> None:
+    """C3-D: reapply de un fill ya APPLIED → strict no-op (no-doble terminal).
+
+    Tras materializar una vez (traza APPLIED durable con 1 efecto de cash/posición),
+    un segundo proceso real solicita de nuevo el mismo fill recuperado (restart/
+    re-emisión del que autorizó el recovery) y `apply_execution_financial_once`
+    responde `already_applied` SIN tocar dinero: el ledger/cash/posición, el
+    `attempt_count` y el `applied_at` quedan idénticos. Cierra el no-doble 100+100
+    incluso cuando el reclaim se re-entrega sobre un evento ya consumado.
+    """
+    from uuid import uuid4
+
+    order_id = unique_order_id("c3d")
+    instrument_id = f"inst-c3d-{uuid4().hex[:8]}"
+    exec_id = ""
+    async with factory() as session:
+        account_id = await seed_financial_acct_instr(
+            session, name=f"C3D-{order_id}", instrument_id=instrument_id
+        )
+        vid = await seed_financial_unknown(
+            session=session,
+            order_id=order_id,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            quantity=100.0,
+        )
+        await session.commit()
+    exec_id = f"{vid}#1"
+    try:
+        # 1er apply financiero real → APPLIED durable (1 efecto). C3-C prueba el
+        # crash-mitad; aquí verificamos el guard TERMINAL del reclaim repetido.
+        sentinel_1 = sentinel_write(tmp_path, "c3d-1")
+        proc_1 = launch_probe(
+            mode="reader-financial",
+            sentinel=sentinel_1,
+            worker=worker_id("c3d1"),
+            extra=fin_extra(order_id=order_id, fill_seq="1"),
+        )
+        try:
+            text_1 = wait_sentinel_text(sentinel_1, timeout=45.0)
+            assert "finished=applied" in text_1, f"1er apply financiero falló: {text_1!r}"
+            wait_for_exit(proc_1)
+        finally:
+            force_kill(proc_1)
+            wait_for_exit(proc_1)
+
+        row_after_first = await fin_event_row(factory, execution_id=exec_id)
+        cash_first = await fin_account_total_cash(factory, account_id=account_id)
+        pos_first = await fin_position_for_instrument(
+            factory, account_id=account_id, instrument_id=instrument_id
+        )
+        ledger_first = await fin_count_ledger_effects(factory, account_id=account_id)
+        assert row_after_first is not None and row_after_first.status == "APPLIED"
+        assert pos_first == float("100.0")
+        assert ledger_first == 1
+
+        # Reclaim / replay del MISMO fill → already_applied, cero dinero nuevo.
+        sentinel_2 = sentinel_write(tmp_path, "c3d-2")
+        proc_2 = launch_probe(
+            mode="reader-financial",
+            sentinel=sentinel_2,
+            worker=worker_id("c3d2"),
+            extra=fin_extra(order_id=order_id, fill_seq="1"),
+        )
+        try:
+            text_2 = wait_sentinel_text(sentinel_2, timeout=45.0)
+            assert "finished=already_applied" in text_2, (
+                f"reclaim sobre APPLIED debió ser already_applied: {text_2!r}"
+            )
+            wait_for_exit(proc_2)
+        finally:
+            force_kill(proc_2)
+            wait_for_exit(proc_2)
+
+        # Invariante: nada cambió (posición/cash/ledger/attempt/applied_at).
+        ev2 = await fin_event_row(factory, execution_id=exec_id)
+        assert ev2 is not None and ev2.status == "APPLIED"
+        assert getattr(ev2, "attempt_count", None) == row_after_first.attempt_count
+        assert getattr(ev2, "applied_at", None) == row_after_first.applied_at
+        cash_second = await fin_account_total_cash(factory, account_id=account_id)
+        pos_second = await fin_position_for_instrument(
+            factory, account_id=account_id, instrument_id=instrument_id
+        )
+        ledger_second = await fin_count_ledger_effects(factory, account_id=account_id)
+        assert cash_second == cash_first, "reclaim terminal NO debió mover cash"
+        assert pos_second == pos_first == float("100.0"), (
+            "reclaim terminal NO debió duplicar la posición"
+        )
+        assert ledger_second == ledger_first == 1, (
+            "reclaim terminal NO debió añadir efecto ledger"
+        )
+    finally:
+        await cleanup_financial(
+            factory,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            execution_id=exec_id,
+            order_id=order_id,
+        )
+

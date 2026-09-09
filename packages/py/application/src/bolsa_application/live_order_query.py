@@ -52,11 +52,20 @@ class BrokerOrderQueryResult:
     filled_quantity: Decimal | None
     remaining_quantity: Decimal | None
     reason: str | None = None
+    # V2.19 (P2-01) — identidad financiera del fill + precio de materialización.
+    # Opcionales y fail-closed: si el bridge del recovery no los reporta (p.ej.
+    # un fill sin fill_seq constatable o sin precio de ejecución), NO materializar
+    # dinero (fsm_only intacto, firewall H4/H6: nunca fabricar un precio del fill
+    # que el broker no acreditó). ``fill_seq`` completa la identidad financiera
+    # ``execution_id = venue_order_id + fill_seq``.
+    fill_seq: int | None = None
+    fill_price: Decimal | None = None
 
     def __post_init__(self) -> None:
         # mantiene Decimal(6dp) en el dominio; acepta float wire de tests/DTO.
         object.__setattr__(self, "filled_quantity", _to_decimal(self.filled_quantity))
         object.__setattr__(self, "remaining_quantity", _to_decimal(self.remaining_quantity))
+        object.__setattr__(self, "fill_price", _to_decimal(self.fill_price))
 
     def to_live_status(self) -> LiveOrderStatus | None:
         mapping: dict[BrokerQueryOutcome, LiveOrderStatus | None] = {
@@ -73,9 +82,7 @@ class BrokerOrderQueryResult:
 class LiveOrderQueryPort(Protocol):
     """Única vía legítima para salir de UNKNOWN (sin re-POST)."""
 
-    async def query_broker_order(
-        self, *, venue_order_id: str
-    ) -> BrokerOrderQueryResult: ...
+    async def query_broker_order(self, *, venue_order_id: str) -> BrokerOrderQueryResult: ...
 
 
 class MockLiveOrderQuery:
@@ -85,9 +92,7 @@ class MockLiveOrderQuery:
         self.result = result
         self.calls = 0
 
-    async def query_broker_order(
-        self, *, venue_order_id: str
-    ) -> BrokerOrderQueryResult:
+    async def query_broker_order(self, *, venue_order_id: str) -> BrokerOrderQueryResult:
         self.calls += 1
         _ = venue_order_id
         return self.result

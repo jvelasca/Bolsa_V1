@@ -1366,6 +1366,27 @@ class ExecutionEventRow(Base):
         DateTime(timezone=True),
         nullable=False,
     )
+    # V2.19 (P2-01) — workflow durable del apply financiero (por fases, GATED).
+    status: Mapped[str] = mapped_column(
+        "status",
+        String(16),
+        default="CAPTURED",
+        server_default="CAPTURED",
+        nullable=False,
+    )
+    applied_at: Mapped[datetime | None] = mapped_column(
+        "applied_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    attempt_count: Mapped[int] = mapped_column(
+        "attempt_count",
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    last_error: Mapped[str | None] = mapped_column("last_error", Text, nullable=True)
 
 
 class OperationalIncidentRow(Base):

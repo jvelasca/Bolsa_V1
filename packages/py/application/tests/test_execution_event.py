@@ -13,6 +13,7 @@ import pytest
 from bolsa_application.execution_event import (
     ExecutionEvent,
     InMemoryExecutionEventStore,
+    apply_execution_financial_once,
     apply_fill_idempotent,
     apply_pending_execution,
 )
@@ -43,13 +44,9 @@ async def test_duplicate_execution_id_skips_finance_apply() -> None:
         return True
 
     ev = _exec()
-    first = await apply_fill_idempotent(
-        store, execution=ev, permit=True, apply_finance=applier
-    )
+    first = await apply_fill_idempotent(store, execution=ev, permit=True, apply_finance=applier)
     assert first == "applied"
-    second = await apply_fill_idempotent(
-        store, execution=ev, permit=True, apply_finance=applier
-    )
+    second = await apply_fill_idempotent(store, execution=ev, permit=True, apply_finance=applier)
     # El duplicado se descarta: aunque permit=True y haya applier, NO se aplica 2×.
     assert second == "duplicate_skipped"
     assert apply_calls == ["ev-1"]  # una sola materialización
@@ -64,9 +61,7 @@ async def test_permit_false_captures_but_never_materializes() -> None:
         raise AssertionError("apply_finance no debe invocarse sin permit")
 
     ev = _exec()
-    decision = await apply_fill_idempotent(
-        store, execution=ev, permit=False, apply_finance=applier
-    )
+    decision = await apply_fill_idempotent(store, execution=ev, permit=False, apply_finance=applier)
     assert decision == "captured_pending_operator_consent"
     assert await store.get(ev.execution_id) is not None  # traza persistida
 
@@ -79,9 +74,7 @@ async def test_applier_false_returns_captured_not_applied() -> None:
         return False
 
     ev = _exec()
-    decision = await apply_fill_idempotent(
-        store, execution=ev, permit=True, apply_finance=applier
-    )
+    decision = await apply_fill_idempotent(store, execution=ev, permit=True, apply_finance=applier)
     assert decision == "captured_not_applied"
 
 
@@ -90,10 +83,7 @@ async def test_default_no_applier_never_materializes() -> None:
     """Incluso llamando sin applier ni permit: solo captura (fail-closed)."""
     store = InMemoryExecutionEventStore()
     ev = _exec()
-    assert (
-        await apply_fill_idempotent(store, execution=ev)
-        == "captured_pending_operator_consent"
-    )
+    assert await apply_fill_idempotent(store, execution=ev) == "captured_pending_operator_consent"
 
 
 def test_event_requires_execution_id() -> None:
@@ -132,9 +122,7 @@ async def test_two_phase_consent_apply_pending_after_captured() -> None:
     ev = _exec("ev-consent-1")
 
     # T0 — fase de captura, aún sin go: Position/Ledger NO se tocan.
-    capture = await apply_fill_idempotent(
-        store, execution=ev, permit=False, apply_finance=applier
-    )
+    capture = await apply_fill_idempotent(store, execution=ev, permit=False, apply_finance=applier)
     assert capture == "captured_pending_operator_consent"
     assert applied == []  # sin materializar
 
@@ -154,9 +142,7 @@ async def test_apply_pending_requires_existing_capture() -> None:
     async def applier(execution: ExecutionEvent) -> bool:  # noqa: ARG001
         raise AssertionError("apply_finance no debe invocarse sin traza capturada")
 
-    decision = await apply_pending_execution(
-        store, execution_id="ev-ghost", apply_finance=applier
-    )
+    decision = await apply_pending_execution(store, execution_id="ev-ghost", apply_finance=applier)
     assert decision == "event_not_found"
 
 
@@ -218,3 +204,148 @@ async def test_two_phase_no_double_materialization_when_apply_idempotent() -> No
     )
     assert second == "captured_not_applied"
     assert applied == ["ev-double-1"]  # una sola materialización
+
+
+# ---------------------------------------------------------------------------
+# V2.19 (P2-01) — workflow durable (Capture→APPLYING→APPLIED/FAILED/RETRY).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_durable_apply_fresh_materializes_once_and_marks_applied() -> None:
+    """Un pass durable fresh: captura → APPLYING → apply → APPLIED (1 sola apply)."""
+    store = InMemoryExecutionEventStore()
+    calls: list[str] = []
+
+    async def applier(execution: ExecutionEvent) -> bool:
+        calls.append(execution.execution_id)
+        return True
+
+    ev = _exec("ev-durable-1")
+    outcome = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    assert outcome == "applied"
+    assert calls == ["ev-durable-1"]
+    row = await store.get(ev.execution_id)
+    assert row is not None
+    assert row.status == "APPLIED"
+    assert row.applied_at is not None
+    assert row.attempt_count == 1  # un solo APPLYING
+
+
+@pytest.mark.asyncio
+async def test_durable_apply_skips_when_already_applied() -> None:
+    """Re-llamada idéntica tras APPLIED → already_applied; NO se re-materializa."""
+    store = InMemoryExecutionEventStore()
+    calls: list[str] = []
+
+    async def applier(execution: ExecutionEvent) -> bool:
+        calls.append(execution.execution_id)
+        return True
+
+    ev = _exec("ev-durable-2")
+    assert (
+        await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+        == "applied"
+    )
+    outcome = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    assert outcome == "already_applied"
+    assert calls == ["ev-durable-2"]  # una sola materialización
+
+
+@pytest.mark.asyncio
+async def test_durable_apply_retry_after_ineffective_apply() -> None:
+    """Apply no efectivo → RETRY (reaplicable); el siguiente pass sí applica."""
+    store = InMemoryExecutionEventStore()
+    outcomes = iter([False, True])
+    calls: list[str] = []
+
+    async def applier(execution: ExecutionEvent) -> bool:
+        calls.append(execution.execution_id)
+        return next(outcomes)
+
+    ev = _exec("ev-durable-retry")
+    first = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    assert first == "retry_scheduled"
+    assert (await store.get(ev.execution_id)).status == "RETRY"  # type: ignore[union-attr]
+
+    second = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    assert second == "applied"
+    assert calls == ["ev-durable-retry", "ev-durable-retry"]
+
+
+@pytest.mark.asyncio
+async def test_durable_apply_non_retryable_marks_failed() -> None:
+    """Apply inefectivo y NO reaplicable → FAILED (revisión), no se reintenta solo."""
+    store = InMemoryExecutionEventStore()
+
+    async def applier(execution: ExecutionEvent) -> bool:  # noqa: ARG001
+        return False
+
+    ev = _exec("ev-durable-failed")
+    outcome = await apply_execution_financial_once(
+        store,
+        execution=ev,
+        apply_finance=applier,
+        retryable_on_ineffective=False,
+    )
+    assert outcome == "failed"
+    assert (await store.get(ev.execution_id)).status == "FAILED"  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_durable_apply_exception_marks_retry_not_applied() -> None:
+    """Excepción en apply_finance → RETRY; JAMÁS se estampa un APPLIED falso."""
+    store = InMemoryExecutionEventStore()
+
+    async def applier(execution: ExecutionEvent) -> bool:  # noqa: ARG001
+        raise RuntimeError("network blip")
+
+    ev = _exec("ev-durable-exc")
+    outcome = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    assert outcome == "retry_scheduled"
+    row = await store.get(ev.execution_id)
+    assert row is not None
+    assert row.status == "RETRY"
+    assert row.last_error == "apply_exception"
+
+
+@pytest.mark.asyncio
+async def test_durable_apply_reclaims_applying_stale_after_crash() -> None:
+    """Crash tras APPLYING (antes de commit): un pass posterior reapropia y aplica.
+
+    Simula el crash de proceso justo tras ``start_apply`` (fila dejada en
+    APPLYING). Un nuevo pass (relaunch/recovery) es FELIZ desde APPLYING y aplica
+    exactamente una vez — el ledger no se duplicó porque nadie respondió antes.
+    """
+    store = InMemoryExecutionEventStore()
+    calls: list[str] = []
+
+    async def applier(execution: ExecutionEvent) -> bool:
+        calls.append(execution.execution_id)
+        return True
+
+    ev = _exec("ev-durable-crash-apply")
+    await store.capture(ev)
+    assert await store.start_apply(ev.execution_id) is True  # crash aquí en vivo
+
+    # "relaunch" del que reaparece y completa.
+    outcome = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    assert outcome == "applied"
+    assert calls == ["ev-durable-crash-apply"]
+    assert (await store.get(ev.execution_id)).status == "APPLIED"  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_ineffective_reply_leaves_no_false_applied_signal() -> None:
+    """Tras retry no se marca APPLIED por error; status queda coherente."""
+    store = InMemoryExecutionEventStore()
+
+    async def applier(execution: ExecutionEvent) -> bool:  # noqa: ARG001
+        return False
+
+    ev = _exec("ev-durable-sig")
+    await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    row = await store.get(ev.execution_id)
+    assert row.status == "RETRY"
+    assert row.applied_at is None
+    assert row.last_error == "apply_ineffective"

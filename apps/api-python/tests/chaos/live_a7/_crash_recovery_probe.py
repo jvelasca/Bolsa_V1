@@ -190,10 +190,164 @@ def _require_sentinel() -> str:
     return sentinel
 
 
+def _build_financial_result(order: object) -> object:
+    """Resultado broker real (FILLED con precio+secuencia) para el apply financiero.
+
+    Reconstruye el llenado acreditado que materializa el puente V2.19/P2-01: el
+    recovery NO inventa precio/secuencia (fail-closed H4/H6); aquí los recibe el
+    driver (env), porque en el veneno C3-C/C3-D son justamente los campos que
+    ``apply_candidate`` exige para dejar ``fsm_only`` y materializar dinero.
+    """
+    from decimal import Decimal
+
+    from bolsa_application.live_order_query import BrokerOrderQueryResult
+
+    seq = os.environ.get("LIVE_A7_FIN_FILL_SEQ")
+    price = os.environ.get("LIVE_A7_FIN_FILL_PRICE")
+    if not seq:
+        raise RuntimeError("LIVE_A7_FIN_FILL_SEQ no está definido para el apply financiero")
+    if not price:
+        raise RuntimeError("LIVE_A7_FIN_FILL_PRICE no está definido para el apply financiero")
+    qty = getattr(order, "quantity", None) or 1
+    return BrokerOrderQueryResult(
+        outcome="filled",
+        venue_order_id=getattr(order, "venue_order_id", None),
+        filled_quantity=qty,
+        remaining_quantity=0,
+        fill_seq=int(seq),
+        fill_price=Decimal(str(price)),
+    )
+
+
+async def _probe_financial(*, crasher: bool) -> None:
+    """Aplica un UNKNOWN-fill FINANCIERAMENTE (C3-C/C3-D) sobre PG real.
+
+    Reusa el MISMO cable V2.19/P2-01 que el worker cablea en producción
+    (``_apply_recovery_fills_financially``): ``PostgresExecutionEventStore`` +
+    ``apply_execution_financial_once`` + ``ExecuteTrade`` idempotente por
+    ``recovery_idempotency_key`` sobre la cuenta/cartera/cash reales.
+
+    * ``crasher=True`` (subproceso A): tras dejar la traza durable en ``APPLYING``
+      y ejecutar el ``ExecuteTrade`` (con el dinero en vuelo, sin commit), hace
+      parking para que el driver haga SIGKILL — el punto "peor instante" del apply.
+    * ``crasher=False`` (subproceso B): re-encuentra la misma traza (durable) y la
+      re-materializa por el camino durable exacto (``apply_execution_financial_once``
+      idempotente): si un proceso previo la dejó ``APPLYING``/``CAPTURED`` la completa;
+      si ya está ``APPLIED`` devuelve ``already_applied`` sin tocar el dinero.
+    """
+    from bolsa_application.accounts import ExecuteTrade
+    from bolsa_application.execution_event import (
+        PostgresExecutionEventStore,
+        apply_execution_financial_once,
+    )
+    from bolsa_application.live_order_store import PostgresLiveOrderStore
+    from bolsa_application.recovery_apply import (
+        build_recovery_execution_candidate,
+        recovery_idempotency_key,
+    )
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+    from bolsa_infrastructure.database.session import create_session_factory
+
+    get_settings.cache_clear()
+    engine = _new_engine(get_settings())
+    session_factory = create_session_factory(engine)
+    sentinel = _require_sentinel()
+    order_id = os.environ.get("LIVE_A7_FIN_ORDER_ID")
+    if not order_id:
+        raise RuntimeError("LIVE_A7_FIN_ORDER_ID no está definido para el apply financiero")
+
+    try:
+        async with session_factory() as session:
+            store = PostgresLiveOrderStore(session)
+            order = await store.get(order_id)
+            if order is None:
+                raise RuntimeError(f"live_order {order_id} no existe para el apply financiero")
+            result = _build_financial_result(order)
+            candidate = build_recovery_execution_candidate(order, result)
+            if candidate is None:
+                raise RuntimeError(f"order {order_id} no es apply_candidate (¿sin fill_seq/price?)")
+
+            account_repo = SqlAlchemyAccountRepository(session)
+            portfolio_repo = SqlAlchemyPortfolioRepository(session)
+            ledger_repo = SqlAlchemyLedgerRepository(session)
+            exec_store = PostgresExecutionEventStore(session)
+            trade = ExecuteTrade(account_repo, portfolio_repo, ledger_repo)
+            instrument = order.instrument_id
+            side = order.side
+            price = float(result.fill_price)  # type: ignore[union-attr]
+
+            async def _apply(_execution: object) -> bool:
+                try:
+                    await trade.execute(
+                        instrument_id=instrument,
+                        trade_type=side,
+                        quantity=float(_execution.qty),
+                        price=price,
+                        account_id=_execution.account_id,
+                        idempotency_key=recovery_idempotency_key(
+                            _execution.execution_id
+                        ),
+                    )
+                    return True
+                except Exception:  # noqa: BLE001 — no applied; no marcar APPLIED.
+                    return False
+
+            if crasher:
+                # replicate worker durable step; parked INSIDE apply_finance to
+                # represent the crash just after start_apply's durable APPLYING.
+                async def _park_apply(_execution: object) -> bool:
+                    effective = await _apply(_execution)
+                    if not effective:
+                        return False
+                    _write_sentinel(sentinel, "financial-applying=1")
+                    await asyncio.sleep(600)  # parking hasta el SIGKILL del driver
+                    return True  # unreachable a escala de test (es matado antes)
+
+                await apply_execution_financial_once(
+                    exec_store,
+                    execution=candidate,
+                    apply_finance=_park_apply,
+                    retryable_on_ineffective=True,
+                )
+                _write_sentinel(sentinel, "financial-applying=1")
+            else:
+                outcome = await apply_execution_financial_once(
+                    exec_store,
+                    execution=candidate,
+                    apply_finance=_apply,
+                    retryable_on_ineffective=True,
+                )
+                row = await exec_store.get(candidate.execution_id)
+                has = f"status={(row.status if row else 'missing')}"  # type: ignore[union-attr]
+                attempt = (
+                    (" attempt=" + str(row.attempt_count))  # type: ignore[union-attr]
+                    if row
+                    else ""
+                )
+                _write_sentinel(sentinel, f"finished={outcome} {has}{attempt}")
+    except Exception as exc:  # noqa: BLE001 — informar al driver, no morir mudo
+        _write_sentinel(sentinel, f"error: {exc!r}")
+    finally:
+        await engine.dispose()
+
+
 async def _main() -> int:
     mode = os.environ.get("LIVE_A7_PROBE_MODE") or "crasher"
     if mode == "reader":
         await _probe_reader()
+    elif mode == "crasher-financial":
+        await _probe_financial(crasher=True)
+    elif mode == "reader-financial":
+        await _probe_financial(crasher=False)
     else:
         await _probe_crash_hold()
     return 0

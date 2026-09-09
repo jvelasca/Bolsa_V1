@@ -75,6 +75,23 @@ def _worker_enabled() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
+# V2.19 (P2-01/C3) — go fail-closed del apply financiero en el recovery.
+# Según plan: lectura en import (estilo ``live_drift_durable_writer_enabled``),
+# default OFF. Sin go el recovery queda fsm_only exacto de V2.18 (nada de dinero
+# materializado en Position/Ledger desde un fill recuperado).
+_GO_ENV = "LIVE_ORDER_RECOVERY_FINANCIAL_APPLY_ENABLED"
+
+
+def financial_apply_enabled() -> bool:
+    """¿Está encendido el puente financiero del recovery? (default OFF = off).
+
+    Fail-closed: solo ``1|true|yes|on`` lo habilita. Sobre /a7-gate (BD dedicada
+    real-PG) el CI inyecta ``=1`` para que la batería financiera no se auto-salte.
+    """
+    raw = (os.getenv(_GO_ENV) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 async def _no_query_provider(
     venue: str,
     account_id: str,
@@ -137,6 +154,7 @@ async def resolve_one_unknown(
     *,
     store: Any,
     account_id: str,
+    out_result: list[Any] | None = None,
 ) -> str:
     """Resuelve una fila UNKNOWN → devuelve 'resolved'|'unavailable'|'error'.
 
@@ -144,6 +162,10 @@ async def resolve_one_unknown(
     * sin cliente de query o sin venue_order_id → sigue UNKNOWN (updated_at bump).
     * outcome no mapeable / intraducible desde UNKNOWN → sigue UNKNOWN.
     * outcome legal → persiste la transición. NUNCA sintetiza execute_trade.
+    * ``out_result`` (opcional): bucket mutable al que, si se resuelve a un fill
+      real (FILLED/PARTIAL) y se consultó al broker, se le deja el ``result`` de
+      la query para que el caller decida después el paso financiero bajo go. Con
+      ``None`` (default) ni se crea ni se rellena: comporta exacto V2.18.
     """
     from bolsa_analytics.cognitive.live_order import (
         can_transition_live_order,
@@ -170,6 +192,8 @@ async def resolve_one_unknown(
         order.order_id,
         target,
     )
+    if out_result is not None and target in {"FILLED", "PARTIAL"}:
+        out_result[:] = [result]
     return "resolved"
 
 
@@ -186,6 +210,7 @@ async def _drain_unknowns(
     limit: int,
     worker_id: str = "live-recovery-inprocess",
     stale_after_seconds: int = DEFAULT_CLAIM_STALE_SECONDS,
+    _fill_results: list[tuple[Any, Any]] | None = None,
 ) -> dict[str, Any]:
     """Drena filas UNKNOWN del store (testable sin PG).
 
@@ -193,6 +218,12 @@ async def _drain_unknowns(
     *reclama* UNKNOWN con ``claim_unknown_batch`` (SKIP LOCKED + lease) en vez de
     listar a ciegas; dos workers no procesan la misma orden en paralelo. Si no
     hay mecanismo de claim (store genérico) se cae a ``list_unknown``.
+
+    ``_fill_results`` (opcional, test-internal): si el caller quiere saber qué
+    filas se resolvieron a un fill real (para el puente financiero bajo go), este
+    bucket mutable recoge ``(order, query_result)`` por cada UNKNOWN→FILLED/
+    PARTIAL resuelto en este tick. Default ``None`` → mismo comportamiento que
+    siempre; no se crea ni se rellena nada (los tests unit no cambian).
     """
     provider = query_provider or _no_query_provider
     claim = getattr(store, "claim_unknown_batch", None)
@@ -210,14 +241,18 @@ async def _drain_unknowns(
     for order in rows:
         try:
             query = await provider(order.venue, order.account_id, order.venue_order_id)
+            bucket: list[Any] = []
             status = await resolve_one_unknown(
                 order,
                 query,
                 store=store,
                 account_id=order.account_id or "",
+                out_result=bucket,
             )
             if status == "resolved":
                 resolved += 1
+                if _fill_results is not None and bucket:
+                    _fill_results.append((order, bucket[0]))
             else:
                 # UNKNOWN irresoluto / sin cliente: la fila sigue UNKNOWN y su
                 # lease envejece; NO se llama a release_claim aquí para evitar
@@ -235,6 +270,104 @@ async def _drain_unknowns(
     }
 
 
+async def _apply_recovery_fills_financially(
+    session: AsyncSession,
+    fills: list[tuple[Any, Any]],
+) -> None:
+    """Materializa (bajo go) los fills que este tick resolvió el recovery.
+
+    Reiteración del puente por fases elegido (V2.19 · P2-01/C3):
+      1. Se descartan los fills SIN precio/secuencia constatable
+         (``build_recovery_execution_candidate`` → None) → fsm_only intacto.
+      2. Para cada candidato se captura la traza ``execution_events`` y se aplica
+         por ``apply_execution_financial_once`` (CAPTURED→APPLYING→APPLIED/
+         FAILED/RETRY) reusando la idempotencia por ``execution_id`` + la
+         ``idempotency_key`` financiera (ExecuteTrade M4). No-doble even con
+         retry multi-worker / crash.
+
+    ``fills`` = [(LiveOrder origen, BrokerOrderQueryResult)] del tick. Este paso
+    construye sus propios repos sobre la MESMA sesión del recovery; las llamadas
+    son idempotentes así que un crash intermedio reaprovecha los ticks siguientes
+    sin doble materialización.
+    """
+    from bolsa_application.accounts import ExecuteTrade
+    from bolsa_application.execution_event import (
+        PostgresExecutionEventStore,
+        apply_execution_financial_once,
+    )
+    from bolsa_application.recovery_apply import (
+        build_recovery_execution_candidate,
+        recovery_idempotency_key,
+    )
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    account_repo = SqlAlchemyAccountRepository(session)
+    portfolio_repo = SqlAlchemyPortfolioRepository(session)
+    ledger_repo = SqlAlchemyLedgerRepository(session)
+    exec_store = PostgresExecutionEventStore(session)
+    trade = ExecuteTrade(account_repo, portfolio_repo, ledger_repo)
+
+    for order, result in fills:
+        candidate = build_recovery_execution_candidate(order, result)
+        if candidate is None:
+            continue  # sin precio/secuencia → no se toca dinero.
+        # Capturamos por-valor (default-args) para evitar late-binding del loop.
+        _instrument = order.instrument_id
+        _side = order.side
+        _fill_price = float(result.fill_price)
+
+        async def _apply_one(
+            _execution: Any,
+            *,
+            _instrument: str = _instrument,
+            _side: str = _side,
+            _price: float = _fill_price,
+        ) -> bool:
+            try:
+                await trade.execute(
+                    instrument_id=_instrument,
+                    trade_type=_side,
+                    quantity=float(_execution.qty),
+                    price=_price,
+                    account_id=_execution.account_id,
+                    idempotency_key=recovery_idempotency_key(_execution.execution_id),
+                )
+                return True
+            except Exception:  # noqa: BLE001 — NOT applied; no marcar APPLIED.
+                logger.exception(
+                    "recovery financial ExecuteTrade failed execution_id=%s",
+                    _execution.execution_id,
+                )
+                return False
+
+        try:
+            outcome = await apply_execution_financial_once(
+                exec_store,
+                execution=candidate,
+                apply_finance=_apply_one,
+                retryable_on_ineffective=True,
+            )
+            logger.info(
+                "recovery financial fill order=%s execution_id=%s outcome=%s",
+                order.order_id,
+                candidate.execution_id,
+                outcome,
+            )
+        except Exception:  # noqa: BLE001 — un fill no tumba el resto del tick.
+            logger.exception(
+                "recovery financial durable failed execution_id=%s",
+                candidate.execution_id,
+            )
+
+
 async def _drain_once(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -245,13 +378,26 @@ async def _drain_once(
 ) -> dict[str, Any]:
     async with session_factory() as session:
         store = PostgresLiveOrderStore(session)
+        fills: list[tuple[Any, Any]] = []  # (orden_origen, BrokerOrderQueryResult)
         result = await _drain_unknowns(
             store,
             query_provider=query_provider,
             limit=limit,
             worker_id=worker_id or _worker_identity(),
             stale_after_seconds=stale_after_seconds,
+            _fill_results=fills,
         )
+        # V2.19 (P2-01/C3) — puente financiero del recovery bajo go fail-closed.
+        # Tras resolver a FILL/PARTIAL este tick, si el go financiero está ON y el
+        # broker acreditó precio+secuencia, materializa por fases idempotentes en
+        # la MISMA sesión. Sin go (default) o sin precio → cero dinero (fsm_only).
+        # Un fallo financiero NO tumba el tick: fail-closed (siguiente tick
+        # reintenta desde la fila / execution_events ya marcada APPLYING/RETRY).
+        if fills and financial_apply_enabled():
+            try:
+                await _apply_recovery_fills_financially(session, fills)
+            except Exception:  # noqa: BLE001 — nunca aborta el ciclo de recovery
+                logger.exception("recovery financial apply (go) failed")
         # H7 — drift reconcile de la máquina (working/partial/cancel-requested):
         # mismo query_provider y misma sesión. Por defecto read-only (reporta a
         # log; el operador/otra capa decide la acción). Bajo go explícito
