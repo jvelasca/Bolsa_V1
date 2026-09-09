@@ -130,6 +130,9 @@ async def _probe_crash_hold() -> None:
 
 async def _probe_reader() -> None:
     """Segundo worker: reelabora UNKNOWN como ``filled`` y persiste una sola vez."""
+    from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
+        resolve_one_unknown,
+    )
     from bolsa_application.live_order_query import (
         BrokerOrderQueryResult,
         MockLiveOrderQuery,
@@ -137,10 +140,6 @@ async def _probe_reader() -> None:
     from bolsa_application.live_order_store import PostgresLiveOrderStore
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.session import create_session_factory
-
-    from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
-        resolve_one_unknown,
-    )
 
     get_settings.cache_clear()
     engine = _new_engine(get_settings())

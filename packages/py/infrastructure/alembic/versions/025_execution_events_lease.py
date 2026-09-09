@@ -24,7 +24,6 @@ Guard + standalone (estilo 022/023/024): guards por tabla/columna sin imports OR
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "025_execution_events_lease"

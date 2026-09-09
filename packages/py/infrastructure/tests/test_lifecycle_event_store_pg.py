@@ -75,10 +75,10 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
                 raise RuntimeError("lifecycle_events.sequence_no missing — Alembic 016 required")
             version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "024_execution_events_state" not in versions:
+            if "025_execution_events_lease" not in versions:
                 raise RuntimeError(
                     f"alembic_version is {versions!r}; "
-                    "expected 024_execution_events_state (V2.19 head)"
+                    "expected 025_execution_events_lease (V2.20 head)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()

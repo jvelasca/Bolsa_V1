@@ -3,7 +3,7 @@
 Batería V2.18 que empieza a cerrar el gap principal de la Iter-0 de A7:
 
 * PG REAL aislado (BD dedicada ``bolsa_v1_a7`` en el job CI ``a7-gate``). Si no hay
-  PostgreSQL o el Alembic no está a la head (hoy ``024_execution_events_state``) →
+  PostgreSQL o el Alembic no está a la head (hoy ``025_execution_events_lease``) →
   ``pytest.skip`` salvo
   ``LIVE_A7_PG_REQUIRED=1`` (fail duro en CI, patrón `test_live_order_recovery_concurrency_pg`).
 * Crash de **proceso real** (subproceso Python) sobre ``resolve_one_unknown`` +
@@ -78,8 +78,9 @@ def _load_root_env() -> None:
 
 
 def _open_engine() -> AsyncEngine:
-    from bolsa_infrastructure.config import get_settings
     from sqlalchemy.ext.asyncio import create_async_engine
+
+    from bolsa_infrastructure.config import get_settings
 
     get_settings.cache_clear()
     url = get_settings().database_url
@@ -109,7 +110,7 @@ async def factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Session-factory aislado para la batería C3 (PG real dedicado A7).
 
     Operativa: conecta (gate por `SELECT 1`) y lleva la BD dedicada a la head (hoy
-    `024_execution_events_state`) vía
+    `025_execution_events_lease`) vía
     `ensure_migrated` (idempotente, respeta `DATABASE_URL` de settings) para no depender
     de la migración CLI de `alembic.ini` (que apunta a la DB principal). Un esquema
     inexistente o desalineado se corrige aquí; si PG no responde → skip (o fail duro con
@@ -127,7 +128,7 @@ async def factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         await engine.dispose()
         _require_or_skip(exc)
         raise RuntimeError("unreachable")  # noqa: B904
-    # Esquema listo a la head (024_execution_events_state) de forma idempotente.
+    # Esquema listo a la head (025_execution_events_lease) de forma idempotente.
     await asyncio.to_thread(ensure_migrated)
     session_factory = create_session_factory(engine)
     try:
@@ -487,6 +488,8 @@ async def cleanup_financial(
 ) -> None:
     """Borra cuenta (cierre+delete canónico) + instrumento + traza + live_order."""
     async with factory() as session:
+        from sqlalchemy import delete
+
         from bolsa_application.live_order_store import PostgresLiveOrderStore
         from bolsa_infrastructure.database.models.tables import (
             ExecutionEventRow,
@@ -495,7 +498,6 @@ async def cleanup_financial(
         from bolsa_infrastructure.database.repositories.account_repository import (
             SqlAlchemyAccountRepository,
         )
-        from sqlalchemy import delete
 
         try:
             await PostgresLiveOrderStore(session).delete(order_id)
@@ -525,8 +527,9 @@ async def cleanup_financial(
 
 async def fin_event_row(factory, *, execution_id: str):
     async with factory() as session:
-        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         return (
             await session.execute(
@@ -539,11 +542,12 @@ async def fin_account_total_cash(factory, *, account_id: str) -> float:
     async with factory() as session:
         from decimal import Decimal
 
+        from sqlalchemy import select
+
         from bolsa_infrastructure.database.models.tables import (
             InvestmentPortfolioRow,
             PortfolioRow,
         )
-        from sqlalchemy import select
 
         rows = (
             await session.execute(
@@ -566,8 +570,9 @@ async def fin_count_ledger_effects(factory, *, account_id: str) -> int:
     ``ExecuteTrade`` escribe el ledger (``entry_type`` = 'buy'|'sell').
     """
     async with factory() as session:
-        from bolsa_infrastructure.database.models.tables import LedgerEntryRow
         from sqlalchemy import func, select
+
+        from bolsa_infrastructure.database.models.tables import LedgerEntryRow
 
         return int(
             (
@@ -582,8 +587,9 @@ async def fin_count_ledger_effects(factory, *, account_id: str) -> int:
 
 
 async def _account_legacy_ids(session, account_id: str):
-    from bolsa_infrastructure.database.models.tables import InvestmentPortfolioRow
     from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import InvestmentPortfolioRow
 
     return list(
         (
@@ -598,8 +604,9 @@ async def _account_legacy_ids(session, account_id: str):
 
 async def fin_position_for_instrument(factory, *, account_id: str, instrument_id: str) -> float:
     async with factory() as session:
-        from bolsa_infrastructure.database.models.tables import PositionRow
         from sqlalchemy import func, select
+
+        from bolsa_infrastructure.database.models.tables import PositionRow
 
         legacy = await _account_legacy_ids(session, account_id)
         q = (
@@ -658,6 +665,7 @@ async def age_stale_applying(factory, *, execution_id: str, ago_seconds: int) ->
     from datetime import UTC, datetime, timedelta
 
     import sqlalchemy as sa
+
     from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
     past = datetime.now(UTC) - timedelta(seconds=ago_seconds)
@@ -672,8 +680,9 @@ async def age_stale_applying(factory, *, execution_id: str, ago_seconds: int) ->
 
 async def cleanup_execution_event(factory, *, execution_id: str) -> None:
     async with factory() as session:
-        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
         from sqlalchemy import delete
+
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         await session.execute(
             delete(ExecutionEventRow).where(ExecutionEventRow.execution_id == execution_id)
@@ -1217,9 +1226,10 @@ async def test_v220_stale_reaper_converges_orphaned_apply(factory, tmp_path: Pat
         )
         # Limpieza del segundo scope (live-no-robado) y su traza.
         async with factory() as session:
+            from sqlalchemy import delete
+
             from bolsa_application.live_order_store import PostgresLiveOrderStore
             from bolsa_infrastructure.database.models.tables import ExecutionEventRow
-            from sqlalchemy import delete
 
             await session.execute(
                 delete(ExecutionEventRow).where(ExecutionEventRow.execution_id == exec_live)

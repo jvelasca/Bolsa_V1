@@ -558,7 +558,7 @@ jobs:
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
       - name: Prepare dedicated scratch DB (bolsa_v1_a7) drop+create
-        # DB dedicada aislada del residuo; el esquema lo lleva a la head (hoy 024) la
+        # DB dedicada aislada del residuo; el esquema lo lleva a la head (hoy 025) la
         # propia batería (fixture `factory` → `ensure_migrated` idempotente). El rol
         # `bolsa` del container postgres:16-alpine es superuser → puede DROP/CREATE.
         env:

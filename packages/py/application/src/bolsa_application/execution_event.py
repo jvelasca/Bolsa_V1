@@ -356,8 +356,9 @@ class PostgresExecutionEventStore:
         # ON CONFLICT requiere el insert del dialecto PostgreSQL (capture idempotente
         # por execution_id en PG): el ``insert`` genérico de SQLAlchemy no expone
         # ``on_conflict_do_nothing``. Sigue siendo idempotente ante la PK/unique.
-        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
         from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
             pg_insert(ExecutionEventRow)
@@ -382,6 +383,7 @@ class PostgresExecutionEventStore:
 
     async def get(self, execution_id: str) -> ExecutionEvent | None:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         row = (
@@ -430,6 +432,7 @@ class PostgresExecutionEventStore:
         ver ya APPLYING (no en el set), hace 0 filas → False. Sin ventana.
         """
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
@@ -465,6 +468,7 @@ class PostgresExecutionEventStore:
         ``live_orders``). True si lo reclamó esta instancia (rowcount=1).
         """
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
@@ -501,6 +505,7 @@ class PostgresExecutionEventStore:
         caller las reaparecerá y las reaplicará por el camino durable idempotente).
         """
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         # SELECT ... FOR UPDATE SKIP LOCKED de candidatas stale, luego reclaim por id.
@@ -530,6 +535,7 @@ class PostgresExecutionEventStore:
 
     async def mark_applied(self, execution_id: str) -> bool:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
@@ -549,6 +555,7 @@ class PostgresExecutionEventStore:
 
     async def mark_failed(self, execution_id: str, *, error: str) -> bool:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
@@ -568,6 +575,7 @@ class PostgresExecutionEventStore:
 
     async def mark_retry(self, execution_id: str, *, error: str) -> bool:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
         result = await self._session.execute(
