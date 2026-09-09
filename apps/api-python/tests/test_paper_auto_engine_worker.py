@@ -10,12 +10,12 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
-from bolsa_api.background import paper_auto_engine_worker as w
 from bolsa_application.risk_runtime import (
     clear_idempotency_memory_for_tests,
     set_runtime_kill_switch_memory,
 )
+
+from bolsa_api.background import paper_auto_engine_worker as w
 
 
 @pytest.fixture(autouse=True)
@@ -65,6 +65,59 @@ def test_dry_tick_deterministic_gate() -> None:
     rep2 = w.dry_tick(watch=["AAA", "IBEX"], kill_switch=True, venue="paper")
     assert rep2.proposals == 0
     assert rep2.vetoes == 2
+
+
+def test_m3_buy_decider_yields_pending_sim_plan(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A9/M3: un proveedor (ia) que sugiere BUY produce candidato a ExecutionPlan
+    SIM-ONLY a través del RiskGate; el motor no HOLD-único. HOLD default intacto."""
+    from bolsa_application.decision_contract import DecisionPackage
+
+    def buy_decider(sym: str) -> DecisionPackage:
+        return DecisionPackage(
+            action="BUY",
+            instrument_id=sym,
+            quantity=1.0,
+            source="test_m3_ia",
+        )
+
+    monkeypatch.setenv("AUTO_ENGINE_DRY_VENUE", "simulated")
+    monkeypatch.setenv("AUTO_ENGINE_DRY_WATCH", "AAA")
+    # dry_tick directo: decider BUY en sim → propuesta + plan pendiente.
+    rep = w.dry_tick(
+        watch=["AAA"],
+        kill_switch=False,
+        venue="simulated",
+        decider=buy_decider,
+    )
+    assert rep.proposals == 1
+    assert rep.pending_plans == 1
+    assert rep.vetoes == 0
+
+    # En run_tick (telemetría del motor) pendiente suma.
+    eng = w.PaperAutoEngine(decider=buy_decider)
+    eng.run_tick()
+    tel = eng.telemetry()
+    assert tel["state"] == "RUNNING"
+    assert tel["pendingPlans"] >= 1
+
+    # Venue LIVE jamás emite plan (gate tercero / venue AUto-Restringido).
+    rep_live = w.dry_tick(
+        watch=["AAA"],
+        kill_switch=False,
+        venue="live",
+        decider=buy_decider,
+    )
+    assert rep_live.pending_plans == 0
+    assert rep_live.proposals == 0
+
+
+def test_m3_default_engine_still_hold_pending_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A9/M3: sin decider sigue HOLD-safe (0 planes)."""
+    monkeypatch.setenv("AUTO_ENGINE_DRY_VENUE", "paper")
+    monkeypatch.setenv("AUTO_ENGINE_DRY_WATCH", "AAA")
+    eng = w.PaperAutoEngine()
+    eng.run_tick()
+    assert eng.telemetry()["pendingPlans"] == 0
 
 
 def test_start_gated_off_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -127,6 +127,22 @@ def derive_execution_plan(
     )
 
 
+def simulation_gate_allows(venue: str) -> bool:
+    """V2.22/A9 (M6) — 3ª barrera antes de resolver un broker: si alguien (o un env
+    mal configurado: ``AUTO_ENGINE_SIMULATED_VENUE=live``) solicita LIVE desde el
+    camino AUTO, este gate lo BLOQUEA de forma temprana, sin depender de las
+    barreras posteriores (M0/LIVE-adapter).
+
+    Solo deja pasar un venue AUTO-permitido ({paper, simulated}), que es el único
+    destino que jamás abre la vía real. Una sola fuente con el funnel de
+    liquidación (``AUTO_SETTLE_VENUES``) para que un gate y un settle nunca
+    discrepen.
+    """
+    from bolsa_application.simulated_settlement import normalized_auto_venue
+
+    return normalized_auto_venue(venue) is not None
+
+
 def risk_gate_auto_paper_dry(
     pkg: DecisionPackage,
     *,

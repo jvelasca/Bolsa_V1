@@ -43,9 +43,7 @@ def test_ia_happy_proposal_is_only_a_proposal() -> None:
 def test_risk_gate_aborts_non_auto_and_kill(
     action: str, venue: str, kill: bool, expect: bool
 ) -> None:
-    res = risk_gate_auto_paper_dry(
-        _pkg(action, venue=venue), kill_switch_active=kill, venue=venue
-    )
+    res = risk_gate_auto_paper_dry(_pkg(action, venue=venue), kill_switch_active=kill, venue=venue)
     assert res.allow_proposal is expect
 
 
@@ -94,3 +92,17 @@ def test_execution_plan_derived_only_on_sim_allowed() -> None:
     assert derive_execution_plan(hold, venue="paper") is None
     assert derive_execution_plan(buy, venue="paper", kill_switch_active=True) is None
     assert derive_execution_plan(buy, venue="LIVE") is None
+
+
+def test_m6_simulation_gate_is_third_barrier_before_router() -> None:
+    """V2.22/A9 (M6): un env AUTO mal configurado (venue=live) se bloquea en el
+    SimulationGate ANTES de que ninguna barrera posterior resuelva broker."""
+    from bolsa_application.decision_contract import simulation_gate_allows
+
+    # Camino AUTO permitido (|paper, simulated|) pasa.
+    assert simulation_gate_allows("paper") is True
+    assert simulation_gate_allows("simulated") is True
+    assert simulation_gate_allows("SIM") is True
+    # LIVE/xtb/real/broker_live, incluso "autorizado" por quien lo pida, ⇒ BLOCKED.
+    for bad in ("live", "xtb", "real", "broker_live", "LIVE", "AUTo=live"):
+        assert simulation_gate_allows(bad) is False, bad

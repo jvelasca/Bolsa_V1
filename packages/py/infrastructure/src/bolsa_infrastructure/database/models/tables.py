@@ -21,7 +21,15 @@ from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 TIMEFRAME_ENUM = ENUM(
-    "1m", "5m", "15m", "30m", "1h", "4h", "1d", "1wk", "1mo",
+    "1m",
+    "5m",
+    "15m",
+    "30m",
+    "1h",
+    "4h",
+    "1d",
+    "1wk",
+    "1mo",
     name="Timeframe",
     create_type=False,
 )
@@ -54,7 +62,9 @@ BACKTEST_STRATEGY_ENUM = ENUM(
     create_type=False,
 )
 ALERT_CONDITION_ENUM = ENUM("above", "below", name="AlertCondition", create_type=False)
-ALERT_PRICE_SOURCE_ENUM = ENUM("daily_close", "xtb_last", name="AlertPriceSource", create_type=False)
+ALERT_PRICE_SOURCE_ENUM = ENUM(
+    "daily_close", "xtb_last", name="AlertPriceSource", create_type=False
+)
 INSTRUMENT_TYPE_ENUM = ENUM("stock", name="InstrumentType", create_type=False)
 
 
@@ -76,8 +86,12 @@ class InstrumentRow(Base):
     sector: Mapped[str | None] = mapped_column(String, nullable=True)
     type: Mapped[str] = mapped_column(INSTRUMENT_TYPE_ENUM, default="stock")
     is_active: Mapped[bool] = mapped_column("is_active", Boolean, default=True)
-    profile_snapshot: Mapped[dict[str, Any] | None] = mapped_column("profile_snapshot", JSONB, nullable=True)
-    last_xtb_validation: Mapped[dict[str, Any] | None] = mapped_column("last_xtb_validation", JSONB, nullable=True)
+    profile_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        "profile_snapshot", JSONB, nullable=True
+    )
+    last_xtb_validation: Mapped[dict[str, Any] | None] = mapped_column(
+        "last_xtb_validation", JSONB, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
@@ -119,7 +133,9 @@ class OhlcvBarRow(Base):
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     timeframe: Mapped[str] = mapped_column(TIMEFRAME_ENUM, default="1d")
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     open: Mapped[Decimal] = mapped_column(Numeric(18, 6))
@@ -138,7 +154,9 @@ class DataSyncLogRow(Base):
     __tablename__ = "data_sync_log"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     provider: Mapped[str] = mapped_column(DATA_PROVIDER_ENUM)
     status: Mapped[str] = mapped_column(SYNC_STATUS_ENUM)
     bars_added: Mapped[int] = mapped_column("bars_added", Integer, default=0)
@@ -167,7 +185,9 @@ class PositionRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     portfolio_id: Mapped[str] = mapped_column("portfolio_id", ForeignKey("portfolios.id"))
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     avg_cost: Mapped[Decimal] = mapped_column("avg_cost", Numeric(18, 6))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
@@ -179,12 +199,16 @@ class PositionRow(Base):
 class TransactionRow(Base):
     __tablename__ = "transactions"
     __table_args__ = (
-        UniqueConstraint("portfolio_id", "idempotency_key", name="transactions_portfolio_id_idempotency_key_key"),
+        UniqueConstraint(
+            "portfolio_id", "idempotency_key", name="transactions_portfolio_id_idempotency_key_key"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     portfolio_id: Mapped[str] = mapped_column("portfolio_id", ForeignKey("portfolios.id"))
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     type: Mapped[str] = mapped_column(TRANSACTION_TYPE_ENUM)
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     price: Mapped[Decimal] = mapped_column(Numeric(18, 6))
@@ -200,7 +224,9 @@ class BacktestRunRow(Base):
     __tablename__ = "backtest_runs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     strategy_type: Mapped[str] = mapped_column("strategy_type", BACKTEST_STRATEGY_ENUM)
     initial_cash: Mapped[Decimal] = mapped_column("initial_cash", Numeric(18, 6))
     final_equity: Mapped[Decimal] = mapped_column("final_equity", Numeric(18, 6))
@@ -242,15 +268,21 @@ class StrategyDefinitionRow(Base):
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
-    backtest_runs: Mapped[list["BacktestRunRow"]] = relationship(back_populates="strategy_definition")
-    research_trials: Mapped[list["ResearchTrialRow"]] = relationship(back_populates="strategy_definition")
+    backtest_runs: Mapped[list["BacktestRunRow"]] = relationship(
+        back_populates="strategy_definition"
+    )
+    research_trials: Mapped[list["ResearchTrialRow"]] = relationship(
+        back_populates="strategy_definition"
+    )
     signal_alert_subscriptions: Mapped[list["SignalAlertSubscriptionRow"]] = relationship(
         back_populates="strategy_definition",
     )
     tracker_definitions: Mapped[list["TrackerDefinitionRow"]] = relationship(
         back_populates="strategy_definition",
     )
-    scan_manifests: Mapped[list["ScanManifestRow"]] = relationship(back_populates="strategy_definition")
+    scan_manifests: Mapped[list["ScanManifestRow"]] = relationship(
+        back_populates="strategy_definition"
+    )
     execution_policies: Mapped[list["ExecutionPolicyRow"]] = relationship(
         back_populates="strategy_definition",
     )
@@ -324,7 +356,9 @@ class InstrumentListItemRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     list_id: Mapped[str] = mapped_column("list_id", ForeignKey("instrument_lists.id"))
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     sort_order: Mapped[int] = mapped_column("sort_order", Integer, default=0)
 
     list: Mapped[InstrumentListRow] = relationship(back_populates="items")
@@ -335,13 +369,19 @@ class PriceAlertRow(Base):
     __tablename__ = "price_alerts"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     symbol: Mapped[str] = mapped_column(String)
     condition: Mapped[str] = mapped_column(ALERT_CONDITION_ENUM)
-    price_source: Mapped[str] = mapped_column("price_source", ALERT_PRICE_SOURCE_ENUM, default="daily_close")
+    price_source: Mapped[str] = mapped_column(
+        "price_source", ALERT_PRICE_SOURCE_ENUM, default="daily_close"
+    )
     target_price: Mapped[Decimal] = mapped_column("target_price", Numeric(18, 6))
     is_active: Mapped[bool] = mapped_column("is_active", Boolean, default=True)
-    triggered_at: Mapped[datetime | None] = mapped_column("triggered_at", DateTime(timezone=True), nullable=True)
+    triggered_at: Mapped[datetime | None] = mapped_column(
+        "triggered_at", DateTime(timezone=True), nullable=True
+    )
     triggered_price: Mapped[Decimal | None] = mapped_column(
         "triggered_price",
         Numeric(18, 6),
@@ -357,7 +397,9 @@ class SignalAlertSubscriptionRow(Base):
     __tablename__ = "signal_alert_subscriptions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     symbol: Mapped[str] = mapped_column(String)
     strategy_definition_id: Mapped[str | None] = mapped_column(
         "strategy_definition_id",
@@ -376,7 +418,9 @@ class SignalAlertSubscriptionRow(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-    last_bar_timestamp: Mapped[str | None] = mapped_column("last_bar_timestamp", String, nullable=True)
+    last_bar_timestamp: Mapped[str | None] = mapped_column(
+        "last_bar_timestamp", String, nullable=True
+    )
     last_signal_kind: Mapped[str | None] = mapped_column("last_signal_kind", String, nullable=True)
     last_signal_price: Mapped[Decimal | None] = mapped_column(
         "last_signal_price",
@@ -505,7 +549,9 @@ class ExecutionPolicyRow(Base):
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
-    account: Mapped["InvestmentAccountRow | None"] = relationship(back_populates="execution_policies")
+    account: Mapped["InvestmentAccountRow | None"] = relationship(
+        back_populates="execution_policies"
+    )
     strategy_definition: Mapped["StrategyDefinitionRow | None"] = relationship(
         back_populates="execution_policies",
     )
@@ -577,7 +623,9 @@ class LlmCallRow(Base):
     prompt_template_id: Mapped[str] = mapped_column("prompt_template_id", String)
     prompt_rendered: Mapped[str] = mapped_column("prompt_rendered", Text)
     response_raw: Mapped[str | None] = mapped_column("response_raw", Text, nullable=True)
-    response_parsed: Mapped[dict[str, Any] | None] = mapped_column("response_parsed", JSONB, nullable=True)
+    response_parsed: Mapped[dict[str, Any] | None] = mapped_column(
+        "response_parsed", JSONB, nullable=True
+    )
     validation_passed: Mapped[bool] = mapped_column("validation_passed", Boolean)
     validation_errors: Mapped[list[Any]] = mapped_column("validation_errors", JSONB, default=list)
     elapsed_ms: Mapped[int] = mapped_column("elapsed_ms", Integer)
@@ -622,7 +670,9 @@ class DecisionSessionRow(Base):
     instrument_id: Mapped[str] = mapped_column("instrument_id", String)
     account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
     symbol: Mapped[str | None] = mapped_column(String, nullable=True)
-    recommendation_id: Mapped[str | None] = mapped_column("recommendation_id", String, nullable=True)
+    recommendation_id: Mapped[str | None] = mapped_column(
+        "recommendation_id", String, nullable=True
+    )
     decision_id: Mapped[str | None] = mapped_column("decision_id", String, nullable=True)
     payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
@@ -662,7 +712,9 @@ class ModelArtifactRow(Base):
     feature_set_id: Mapped[str] = mapped_column("feature_set_id", String)
     composition_hash: Mapped[str | None] = mapped_column("composition_hash", String, nullable=True)
     model_checksum: Mapped[str | None] = mapped_column("model_checksum", String, nullable=True)
-    trained_at: Mapped[datetime | None] = mapped_column("trained_at", DateTime(timezone=True), nullable=True)
+    trained_at: Mapped[datetime | None] = mapped_column(
+        "trained_at", DateTime(timezone=True), nullable=True
+    )
     payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
@@ -714,7 +766,9 @@ class ConfidenceStateRow(Base):
     confidence_0: Mapped[Decimal] = mapped_column("confidence_0", Numeric(8, 4))
     confidence: Mapped[Decimal] = mapped_column(Numeric(8, 4))
     hint: Mapped[str] = mapped_column(String)
-    expires_at: Mapped[datetime | None] = mapped_column("expires_at", DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(
+        "expires_at", DateTime(timezone=True), nullable=True
+    )
     expired: Mapped[bool] = mapped_column(Boolean, default=False)
     events: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     notes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
@@ -768,14 +822,18 @@ class TrackerDefinitionRow(Base):
         back_populates="tracker_definitions",
     )
     scan_jobs: Mapped[list["ScanJobRow"]] = relationship(back_populates="tracker_definition")
-    scan_manifests: Mapped[list["ScanManifestRow"]] = relationship(back_populates="tracker_definition")
+    scan_manifests: Mapped[list["ScanManifestRow"]] = relationship(
+        back_populates="tracker_definition"
+    )
 
 
 class OptimizationRunRow(Base):
     __tablename__ = "optimization_runs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     symbol: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String, default="pending")
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
@@ -798,7 +856,9 @@ class OptimizationRunRow(Base):
     )
 
     instrument: Mapped[InstrumentRow] = relationship()
-    research_trials: Mapped[list["ResearchTrialRow"]] = relationship(back_populates="optimization_run")
+    research_trials: Mapped[list["ResearchTrialRow"]] = relationship(
+        back_populates="optimization_run"
+    )
 
 
 class HypothesisRow(Base):
@@ -840,9 +900,7 @@ class HypothesisBeliefRow(Base):
     evidence_ids: Mapped[list[Any]] = mapped_column("evidence_ids", JSONB, default=list)
     trial_ids: Mapped[list[Any]] = mapped_column("trial_ids", JSONB, default=list)
     math_version: Mapped[str] = mapped_column("math_version", String)
-    last_reviewed_at: Mapped[datetime] = mapped_column(
-        "last_reviewed_at", DateTime(timezone=True)
-    )
+    last_reviewed_at: Mapped[datetime] = mapped_column("last_reviewed_at", DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
@@ -859,9 +917,7 @@ class KnowledgeNodeRow(Base):
     )
     stage: Mapped[str] = mapped_column(String, default="EMERGING")
     statement: Mapped[str] = mapped_column(Text)
-    knowledge_confidence: Mapped[Decimal] = mapped_column(
-        "knowledge_confidence", Numeric(8, 4)
-    )
+    knowledge_confidence: Mapped[Decimal] = mapped_column("knowledge_confidence", Numeric(8, 4))
     validity_context: Mapped[dict[str, Any]] = mapped_column(
         "validity_context", JSONB, default=dict
     )
@@ -870,9 +926,7 @@ class KnowledgeNodeRow(Base):
     consolidation_report: Mapped[dict[str, Any]] = mapped_column("consolidation_report", JSONB)
     math_version: Mapped[str] = mapped_column("math_version", String)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    consolidated_at: Mapped[datetime] = mapped_column(
-        "consolidated_at", DateTime(timezone=True)
-    )
+    consolidated_at: Mapped[datetime] = mapped_column("consolidated_at", DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
@@ -1018,7 +1072,9 @@ class ResearchTrialRow(Base):
         nullable=True,
     )
     fail_code: Mapped[str | None] = mapped_column("fail_code", String, nullable=True)
-    manifest_ref: Mapped[dict[str, Any] | None] = mapped_column("manifest_ref", JSONB, nullable=True)
+    manifest_ref: Mapped[dict[str, Any] | None] = mapped_column(
+        "manifest_ref", JSONB, nullable=True
+    )
     data_epoch: Mapped[str | None] = mapped_column("data_epoch", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
@@ -1063,7 +1119,9 @@ class SyncQueueItemRow(Base):
     __tablename__ = "sync_queue"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     status: Mapped[str] = mapped_column(String, default="pending")
     priority: Mapped[int] = mapped_column(Integer, default=0)
     scheduled_at: Mapped[datetime] = mapped_column("scheduled_at", DateTime(timezone=True))
@@ -1084,13 +1142,17 @@ class PendingOrderRow(Base):
         ForeignKey("investment_accounts.id"),
         nullable=True,
     )
-    instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", ForeignKey("instruments.id", ondelete="CASCADE")
+    )
     symbol: Mapped[str] = mapped_column(String)
     side: Mapped[str] = mapped_column(String)
     order_type: Mapped[str] = mapped_column("order_type", String, default="stop_limit")
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     limit_price: Mapped[Decimal] = mapped_column("limit_price", Numeric(18, 6))
-    expiry_at: Mapped[datetime | None] = mapped_column("expiry_at", DateTime(timezone=True), nullable=True)
+    expiry_at: Mapped[datetime | None] = mapped_column(
+        "expiry_at", DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     trade_plan_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
         "trade_plan_snapshot",
@@ -1185,8 +1247,12 @@ class PositionStateRow(Base):
         Text,
         nullable=True,
     )
-    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=False
+    )
 
 
 class SubmitIntentRow(Base):
@@ -1509,15 +1575,11 @@ class LifecycleEventRow(Base):
     price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     fees: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     venue: Mapped[str | None] = mapped_column(String, nullable=True)
-    venue_order_id: Mapped[str | None] = mapped_column(
-        "venue_order_id", String, nullable=True
-    )
+    venue_order_id: Mapped[str | None] = mapped_column("venue_order_id", String, nullable=True)
     previous_stop: Mapped[Decimal | None] = mapped_column(
         "previous_stop", Numeric(18, 6), nullable=True
     )
-    new_stop: Mapped[Decimal | None] = mapped_column(
-        "new_stop", Numeric(18, 6), nullable=True
-    )
+    new_stop: Mapped[Decimal | None] = mapped_column("new_stop", Numeric(18, 6), nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     revision_id: Mapped[str | None] = mapped_column("revision_id", String, nullable=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
@@ -1525,12 +1587,8 @@ class LifecycleEventRow(Base):
     schema_version: Mapped[int] = mapped_column(
         "schema_version", Integer, nullable=False, default=1
     )
-    causation_id: Mapped[str | None] = mapped_column(
-        "causation_id", String, nullable=True
-    )
-    correlation_id: Mapped[str | None] = mapped_column(
-        "correlation_id", String, nullable=True
-    )
+    causation_id: Mapped[str | None] = mapped_column("causation_id", String, nullable=True)
+    correlation_id: Mapped[str | None] = mapped_column("correlation_id", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         "created_at", DateTime(timezone=True), nullable=False
     )
@@ -1573,9 +1631,7 @@ class LifecycleOutboxRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     position_id: Mapped[str] = mapped_column("position_id", String, nullable=False)
     account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
-    transaction_id: Mapped[str] = mapped_column(
-        "transaction_id", String, nullable=False
-    )
+    transaction_id: Mapped[str] = mapped_column("transaction_id", String, nullable=False)
     kind: Mapped[str] = mapped_column(String, nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
@@ -1615,10 +1671,10 @@ class InvestorProfileRow(Base):
     suggested_policy_template_id: Mapped[str] = mapped_column(
         "suggested_policy_template_id", String
     )
-    selected_policy_template_id: Mapped[str] = mapped_column(
-        "selected_policy_template_id", String
+    selected_policy_template_id: Mapped[str] = mapped_column("selected_policy_template_id", String)
+    observed_json: Mapped[dict[str, Any] | None] = mapped_column(
+        "observed_json", JSONB, nullable=True
     )
-    observed_json: Mapped[dict[str, Any] | None] = mapped_column("observed_json", JSONB, nullable=True)
     updated_by: Mapped[str] = mapped_column("updated_by", String, default="user")
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
@@ -1636,7 +1692,9 @@ class InvestmentAccountRow(Base):
     status: Mapped[str] = mapped_column(String, default="active")
     currency: Mapped[str] = mapped_column(String, default="EUR")
     base_currency: Mapped[str] = mapped_column("base_currency", String, default="EUR")
-    initial_deposit: Mapped[Decimal] = mapped_column("initial_deposit", Numeric(18, 6), default=Decimal(100000))
+    initial_deposit: Mapped[Decimal] = mapped_column(
+        "initial_deposit", Numeric(18, 6), default=Decimal(100000)
+    )
     leverage: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal(1))
     margin_call_level_pct: Mapped[Decimal | None] = mapped_column(
         "margin_call_level_pct",
@@ -1645,7 +1703,9 @@ class InvestmentAccountRow(Base):
     )
     is_default: Mapped[bool] = mapped_column("is_default", Boolean, default=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
-    settings_json: Mapped[dict[str, Any] | None] = mapped_column("settings_json", JSONB, nullable=True)
+    settings_json: Mapped[dict[str, Any] | None] = mapped_column(
+        "settings_json", JSONB, nullable=True
+    )
     active_profile_id: Mapped[str | None] = mapped_column(
         "active_profile_id",
         String,
@@ -1718,9 +1778,7 @@ class LedgerEntryRow(Base):
             "reference_id",
             "type",
             unique=True,
-            postgresql_where=text(
-                "reference_type IS NOT NULL AND reference_id IS NOT NULL"
-            ),
+            postgresql_where=text("reference_type IS NOT NULL AND reference_id IS NOT NULL"),
         ),
     )
 
@@ -1969,4 +2027,95 @@ class UserRow(Base):
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     disabled_at: Mapped[datetime | None] = mapped_column(
         "disabled_at", DateTime(timezone=True), nullable=True
+    )
+
+
+class AutoEngineRunRow(Base):
+    """V2.22 / A9 (M4) — estado durable del AUTO Engine (una fila por motor).
+
+    Sustituye la telemetría AUTO en-memoria de ``PaperAutoEngine``
+    (``_state|_last_tick|_proposals|_vetoes|_pending_plans|_last_reason``). UNA
+    fila por ``engine_id`` (motor+venue) que un proceso/worker reiniciado puede
+    readoptar (``state=RUNNING`` + contadores) sin un tick doble tras crash.
+
+    ``state`` guarda el AutoEngineState (RUNNING/PAUSED/BLOCKED/DEGRADED/
+    REQUIRES_ATTENTION) como String (convención enum-igual del repo, sin ENUM DDL).
+    Contadores acumulados (proposals/vetoes/pending_plans) son monótonos desde el
+    primer arranque; cada ``run_tick`` vuelve a matricular una fila de tick en
+    ``auto_engine_ticks`` (append-only) y refresca aquí el acumulado + estado.
+    """
+
+    __tablename__ = "auto_engine_runs"
+    __table_args__ = (Index("auto_engine_runs_updated_at_idx", "updated_at"),)
+
+    engine_id: Mapped[str] = mapped_column("engine_id", String, primary_key=True)
+    venue: Mapped[str] = mapped_column(String, nullable=False)
+    state: Mapped[str] = mapped_column(String, nullable=False)
+    last_tick_at: Mapped[datetime | None] = mapped_column(
+        "last_tick_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    proposals: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    vetoes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    pending_plans: Mapped[int] = mapped_column(
+        "pending_plans",
+        BigInteger,
+        nullable=False,
+        default=0,
+    )
+    last_reason: Mapped[str | None] = mapped_column("last_reason", Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
+class AutoEngineTickRow(Base):
+    """V2.22 / A9 (M4) — ledger append-only de ticks del AUTO Engine.
+
+    Cada ``run_tick`` que toca el store crea UNA fila aquí con ``seq`` monótono
+    por ``engine_id`` (UNIQUE). Un crash/relaunch NO re-ejecuta el tick ya
+    matricularizado: se demuestra readoptando la fila de estado y comprobando que
+    la cuenta de ticks no se dobla (invariante exact-una-vez del bucle AUTO).
+    """
+
+    __tablename__ = "auto_engine_ticks"
+    __table_args__ = (
+        UniqueConstraint(
+            "engine_id",
+            "seq",
+            name="auto_engine_ticks_engine_seq_uidx",
+        ),
+        Index("auto_engine_ticks_engine_created_idx", "engine_id", "created_at"),
+    )
+
+    tick_id: Mapped[str] = mapped_column("tick_id", String, primary_key=True)
+    engine_id: Mapped[str] = mapped_column("engine_id", String, nullable=False)
+    seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    state: Mapped[str] = mapped_column(String, nullable=False)
+    proposals: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    vetoes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    pending_plans: Mapped[int] = mapped_column(
+        "pending_plans",
+        BigInteger,
+        nullable=False,
+        default=0,
+    )
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tick_at: Mapped[datetime] = mapped_column(
+        "tick_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
     )

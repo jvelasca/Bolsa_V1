@@ -372,6 +372,10 @@ jobs:
           apps/api-python/tests/test_lifecycle_golden_v196.py
           apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           apps/api-python/tests/test_financial_integrity_pg.py
+          # V2.22/A9 (M4): estado durable AUTO Engine (Alembic 027) readopción crash.
+          apps/api-python/tests/test_auto_engine_state_pg.py
+          # V2.22/A9 (last gap): finance AUTO SIM-ONLY real-PG (ExecuteTrade por fill).
+          apps/api-python/tests/test_simulated_finance_pg.py
           apps/api-python/tests/test_health.py
           -q
           --tb=short
