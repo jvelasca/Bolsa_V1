@@ -4,9 +4,10 @@ All notable releases of Bolsa V1.
 
 ## [1.48.0-beta] — V2.18 / A7 Iter-1 · C3 — 2026-09-09
 
-Elevación (a elevar por release-tag CI desde `v2.18-beta`) de la **Iter-1 de LIVE Certification / A7**,
-**gated exclusivamente al gap C3** (crash-injection): una batería **real-PG** de crash de **proceso real**
-sobre el worker de recovery/scheduler que cierra el hueco que la Iter-0 (V2.17) dejó mapeado como 🔴.
+Elevación (completada: **Release-tag CI `#34341628713` GREEN** sobre `v2.18-beta` `conclusion: success`,
+certify ✓, tag remoto en `bd2bd163`) de la **Iter-1 de LIVE Certification / A7**, **gated exclusivamente
+al gap C3** (crash-injection): una batería **real-PG** de crash de **proceso real** sobre el worker de
+recovery/scheduler que cierra el hueco que la Iter-0 (V2.17) dejó mapeado como 🔴.
 Núcleo financiero congelado **intacto** (Alembic head `023_ohlcv_bars_unique_reconcile`, sin migración).
 Como se decidió en V2.18 (`fsm_only`), C3 valida invariantes de **order-state/FSM** (≈ una resolución exacta,
 sin doble transición ni doble materialización) y **NO** cash/position: la vertiente financiera del crash queda
@@ -29,6 +30,11 @@ reservada a Iter-2 bajo el roadmap XL-3 (A3/B2/P2-01 son los puentes hacia ella)
 
 ### Verificación
 
+- **Elevación en GitHub:** **Release-tag CI `#34341628713` GREEN** sobre el tag remoto `v2.18-beta`
+  (`conclusion: success`; `origin/main` en `bd2bd163`, sin ahead/behind). Jobs: `security (gitleaks)` ✓ ·
+  `shared` ✓ · `decision-spine` ✓ · `python (ruff/imports/mypy/pytest offline)` ✓ · `frontend` ✓ ·
+  `playwright (mock E2E)` ✓ · `dr-verify` ✓ · `lifecycle-pg` ✓ · [`a7-gate` (dedicated real-PG)] ✓ ·
+  `certify (aggregate + artifact)` ✓. `playwright (integrated E2E)` skipped (opt-in, correcto para GREEN).
 - Live (Postgres real dedicado): `apps/api-python/tests/chaos/live_a7` → **2 passed** (C3-A y C3-B) tanto en
   primera ejecución (migrando de cero) como en repetición.
 - Ruff `apps/api-python packages/py` → limpio. Suites unitarias de worker:

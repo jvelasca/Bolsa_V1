@@ -56,5 +56,12 @@ Núcleo financiero congelado **intacto**. Alembic head `023_ohlcv_bars_unique_re
 - Live (PG real dedicado, primera y repetición): `chaos/live_a7` **2 passed**.
 - Ruff `apps/api-python packages/py` limpio; `test_live_order_recovery_worker.py` + `test_scheduler_worker.py`
   → **12 passed**.
-- Golpe de elevación: subir `package.json` (1.48.0-beta / tag `v2.18-beta`) y disparar release-tag CI para
-  registrar `certify` con `a7-gate` en verde.
+- Elevación completada en GitHub: **Release-tag CI `#34341628713` GREEN** sobre el tag remoto `v2.18-beta`
+  (`conclusion: success`; `origin/main` en `bd2bd163`, sin ahead/behind). El nuevo job **`a7-gate`**
+  (Postgres service + BD dedicada `bolsa_v1_a7` drop+create + pytest `chaos/live_a7` con
+  `LIVE_A7_PG_REQUIRED=1`) pasó en verde y `certify` lo agregó; `playwright (integrated)` skipped (opt-in,
+  correcto).
+
+FIN DEL RELEVO — A7 Iter-1 · C3 (V2.18-beta) elevado en GitHub: `origin/main` `bd2bd163` + tag remoto
+`v2.18-beta` y **Release-tag CI `#34341628713` GREEN** (`conclusion: success`, `certify` ✓ con `a7-gate`);
+C3 queda 🔴 → 🟡 cubierto(parcial) certificado por el pipeline, repo dispuesto para Iter-2 / auditoría.
