@@ -22,7 +22,14 @@ class _FakeAccountRepo:
     accounts: list[_Account]
     resolve_calls: list[str]
 
-    async def list_accounts(self, account_type: str | None = None) -> list[_Account]:
+    async def list_accounts(
+        self,
+        account_type: str | None = None,
+        owner_user_id: str | None = None,
+    ) -> list[_Account]:
+        # El fake devuelve todas las cuentas: los filtros de la firma (account_type /
+        # owner_user_id, que la capa ListAccountSummaries delega al repo real) no
+        # aplican sobre un set no filtrable publicado por el test.
         return list(self.accounts)
 
     async def resolve_scope(self, account_id: str, portfolio_id: str | None):

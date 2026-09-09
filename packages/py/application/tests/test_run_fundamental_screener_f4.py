@@ -48,6 +48,17 @@ class _FakeInstruments:
         return None if row is None else row["fund"]
 
 
+def _latest_fetched_at() -> str:
+    """Timestamp UTC reciente (evita drift de staleness con el reloj del run).
+
+    El gate penaliza fundamentals con > ``maxAgeDays``; un fixture con ``fetchedAt``
+    fijo acababa caducando con el paso del tiempo (drift pre-existente a V2.19).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    return (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+
+
 def _fund(pe: float, roe: float = 0.15):
     return {
         "marketCap": 1e10,
@@ -60,7 +71,7 @@ def _fund(pe: float, roe: float = 0.15):
         "fcfYield": 0.03,
         "altmanZ": 2.5,
         "piotroski": 7,
-        "fetchedAt": "2026-07-29T12:00:00Z",
+        "fetchedAt": _latest_fetched_at(),
         "sourceVersion": "yahoo_quote_summary_v3",
     }
 
