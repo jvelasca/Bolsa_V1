@@ -130,9 +130,6 @@ async def _probe_crash_hold() -> None:
 
 async def _probe_reader() -> None:
     """Segundo worker: reelabora UNKNOWN como ``filled`` y persiste una sola vez."""
-    from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
-        resolve_one_unknown,
-    )
     from bolsa_application.live_order_query import (
         BrokerOrderQueryResult,
         MockLiveOrderQuery,
@@ -140,6 +137,10 @@ async def _probe_reader() -> None:
     from bolsa_application.live_order_store import PostgresLiveOrderStore
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.session import create_session_factory
+
+    from bolsa_api.background.live_order_recovery_worker import (  # type: ignore[import-untyped]
+        resolve_one_unknown,
+    )
 
     get_settings.cache_clear()
     engine = _new_engine(get_settings())
@@ -301,29 +302,62 @@ async def _probe_financial(*, crasher: bool) -> None:
                 except Exception:  # noqa: BLE001 — no applied; no marcar APPLIED.
                     return False
 
-            if crasher:
-                # replicate worker durable step; parked INSIDE apply_finance to
-                # represent the crash just after start_apply's durable APPLYING.
-                async def _park_apply(_execution: object) -> bool:
-                    effective = await _apply(_execution)
-                    if not effective:
-                        return False
-                    _write_sentinel(sentinel, "financial-applying=1")
-                    await asyncio.sleep(600)  # parking hasta el SIGKILL del driver
-                    return True  # unreachable a escala de test (es matado antes)
+            # Identidad de lease de este subproceso (single-owner): se usa como
+            # `owner` de los CAS. `lease_window_seconds` desde env (default 0 → el
+            # reclaim de un APPLYING huérfano procede de inmediato; el driver decide
+            # según el escenario). En prod el recovery usará el lease real.
+            lease_owner = os.environ.get("LIVE_A7_WORKER_ID") or "probe-worker"
+            lease_secs = int(
+                (os.environ.get("LIVE_A7_FIN_LEASE_SECONDS") or "0").strip() or "0"
+            )
 
-                await apply_execution_financial_once(
-                    exec_store,
-                    execution=candidate,
-                    apply_finance=_park_apply,
-                    retryable_on_ineffective=True,
+            if crasher:
+                crash_after_commit = (
+                    os.environ.get("LIVE_A7_FIN_CRASH_COMMITTED") == "1"
                 )
-                _write_sentinel(sentinel, "financial-applying=1")
+                if crash_after_commit:
+                    # C3-E (V2.20): crash DESPUÉS del commit FINANCIERO, ANTES del
+                    # APPLIED. Pasos manuales para dejar el dinero DURABLE (commit)
+                    # pero la traza aún en APPLYING en el instante del SIGKILL:
+                    #   capture → grant APPLYING (commit interno) → ExecuteTrade →
+                    #   session.commit() (dinero durable) → park → driver SIGKILL.
+                    await exec_store.capture(candidate)
+                    if not await exec_store.start_apply(
+                        candidate.execution_id, owner=lease_owner
+                    ):
+                        raise RuntimeError("C3-E: no pude adquirir APPLYING para crash")
+                    effective = await _apply(candidate)
+                    if not effective:
+                        raise RuntimeError("C3-E: ExecuteTrade no fue efectivo")
+                    await session.commit()  # dinero durable, traza todavía APPLYING
+                    _write_sentinel(sentinel, "financial-committed=1")
+                    await asyncio.sleep(600)  # parking hasta el SIGKILL del driver
+                else:
+                    # Crash en MEDIO del apply (C3-C): ExecuteTrade en vuelo SIN commit.
+                    async def _park_apply(_execution: object) -> bool:
+                        effective = await _apply(_execution)
+                        if not effective:
+                            return False
+                        _write_sentinel(sentinel, "financial-applying=1")
+                        await asyncio.sleep(600)  # parking hasta el SIGKILL del driver
+                        return True  # unreachable a escala de test (es matado antes)
+
+                    await apply_execution_financial_once(
+                        exec_store,
+                        execution=candidate,
+                        apply_finance=_park_apply,
+                        owner=lease_owner,
+                        lease_window_seconds=lease_secs,
+                        retryable_on_ineffective=True,
+                    )
+                    _write_sentinel(sentinel, "financial-applying=1")
             else:
                 outcome = await apply_execution_financial_once(
                     exec_store,
                     execution=candidate,
                     apply_finance=_apply,
+                    owner=lease_owner,
+                    lease_window_seconds=lease_secs,
                     retryable_on_ineffective=True,
                 )
                 row = await exec_store.get(candidate.execution_id)
@@ -340,6 +374,54 @@ async def _probe_financial(*, crasher: bool) -> None:
         await engine.dispose()
 
 
+async def _probe_cas_contest() -> None:
+    """Probe de CONCURSO CAS (P1-01/#2 V2.20): single-owner APPLYING real-PG.
+
+    Abre su propia sesión PG y ejecuta ``PostgresExecutionEventStore.start_apply``
+    sobre UN ``execution_id`` CAPTURED compartido con otro worker, tras esperar por
+    una señal "go" (barrer de arranque común). Escribe ``won=1`` si GANÓ la
+    adquisición exclusiva (ÚNICO dueño de APPLYING) o ``won=0`` si la perdió.
+    Dos procesos con esto demuestran winner=1/loser=0 real (tu test #2):
+    ``start_apply`` es CAS atómico CAPTURED/RETRY/FAILED→APPLYING (sin auto-reclaim),
+    así que el que no gane ve el estado ya en APPLYING → 0 filas → False.
+    """
+    import time as _time
+
+    from bolsa_application.execution_event import PostgresExecutionEventStore
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.session import create_session_factory
+
+    get_settings.cache_clear()
+    engine = _new_engine(get_settings())
+    session_factory = create_session_factory(engine)
+    sentinel = _require_sentinel()
+    worker_id = os.environ.get("LIVE_A7_WORKER_ID") or "cas-contest"
+    execution_id = os.environ.get("LIVE_A7_CAS_EXECUTION_ID") or ""
+    if not execution_id:
+        raise RuntimeError("LIVE_A7_CAS_EXECUTION_ID no está definido para el concurso CAS")
+
+    try:
+        # Barrer: espera a la señal "go" del driver (fichero en su tmp_path).
+        # Así ambos workers arrancan el CAS en la misma ventana de tiempo.
+        go_file = os.environ.get("LIVE_A7_CAS_GO_FILE") or ""
+        deadline = _time.monotonic() + 40.0
+        while go_file and _time.monotonic() < deadline:
+            try:
+                if os.path.exists(go_file):
+                    break
+            except OSError:
+                pass
+            await asyncio.sleep(0.01)
+        async with session_factory() as session:
+            store = PostgresExecutionEventStore(session)
+            won = await store.start_apply(execution_id, owner=worker_id)
+            _write_sentinel(sentinel, f"won={1 if won else 0}")
+    except Exception as exc:  # noqa: BLE001 — informar al driver, no morir mudo
+        _write_sentinel(sentinel, f"error: {exc!r}")
+    finally:
+        await engine.dispose()
+
+
 async def _main() -> int:
     mode = os.environ.get("LIVE_A7_PROBE_MODE") or "crasher"
     if mode == "reader":
@@ -348,6 +430,8 @@ async def _main() -> int:
         await _probe_financial(crasher=True)
     elif mode == "reader-financial":
         await _probe_financial(crasher=False)
+    elif mode == "cas-contest":
+        await _probe_cas_contest()
     else:
         await _probe_crash_hold()
     return 0

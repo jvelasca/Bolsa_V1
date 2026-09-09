@@ -81,10 +81,11 @@ def build_recovery_execution_candidate(
 ) -> ExecutionEvent | None:
     """Construye el ExecutionEvent candidato SOLO si es apply_candidate (o None).
 
-    La cantidad a aplicar es la del *delta* que el recovery detecta como fill:
-    ``filled_quantity`` del resultado (el recovery la persiste en el order SÍ ya
-    reconcilia en la máquina). Se usa la propia qty del resultado (real del
-    bridge), no una invención del recovery. account_id = el del order LIVE.
+    La cantidad a aplicar es la del *fill* que el recovery confirma EN ESTA traza:
+    cada ``resolve_one_unknown`` materializa UN evento discreto de llenado con su
+    propio fill_seq, así que ``qty`` es el **delta de ESTE fill_seq**, nunca un
+    acumulado (ver ``recovery_fill_quantity_semantics``, V2.20 P2-03). account_id
+    = el del order LIVE.
     """
     if recovery_financial_decision(order, result) != "apply_candidate":
         return None
@@ -146,3 +147,29 @@ def recovery_idempotency_key(execution_id: str) -> str:
     if not slug:
         slug = "unknown"
     return f"recovery-fin-{slug[:100]}"[-128:]
+
+
+# V2.20 (P2-03) — contrato de cantidad de fill parcial: DELTA por fill_seq.
+FillSemantics = Literal["delta_per_fill_seq", "cumulative"]
+
+
+def recovery_fill_quantity_semantics() -> FillSemantics:
+    """Contrato formalizado (V2.20 P2-03) de la cantidad en el ExecutionEvent.
+
+    El recovery materializa UN ``execution_id = f"{venue_order_id}#{fill_seq}"`` por
+    cada confirmación de llenado que resuelve, de modo que la ``qty`` de cada evento
+    es el **DELTA de ESE fill_seq** — no una suma acumulada de fills previos.
+
+    Un llenado parcial se reconstruye, por tanto, sumando los deltas por fill_seq:
+    ``40 + 30 + 30 = 100``. Cada fill_seq distinto de una misma orden parcial
+    produce su propio ``ExecutionEvent``/``execution_id`` (y su propia
+    ``idempotency_key``), así que la suma de las ``qty`` de los eventos de una orden
+    == cantidad total llenada.
+
+    ADVERTENCIA ``owner/bridge``: este es el contrato POR DEFECTO que el recovery
+    asume hoy (la resolución acredita el delta). NO se cambia el comportamiento sin
+    un ruling del owner que confirme el significado exacto de ``filled_quantity``
+    que expone el bridge XTB (delta vs acumulado). Este módulo por tanto no
+    reinterpreta nada: documenta la asunción para que un test la fije.
+    """
+    return "delta_per_fill_seq"

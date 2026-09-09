@@ -8,14 +8,19 @@ captura sin apply hasta go explícito).
 
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import UTC, datetime
+
 import pytest
 
 from bolsa_application.execution_event import (
+    LEASE_WINDOW_SECONDS,
     ExecutionEvent,
     InMemoryExecutionEventStore,
     apply_execution_financial_once,
     apply_fill_idempotent,
     apply_pending_execution,
+    reap_stale_applying,
 )
 
 
@@ -311,12 +316,17 @@ async def test_durable_apply_exception_marks_retry_not_applied() -> None:
 
 @pytest.mark.asyncio
 async def test_durable_apply_reclaims_applying_stale_after_crash() -> None:
-    """Crash tras APPLYING (antes de commit): un pass posterior reapropia y aplica.
+    """Crash tras APPLYING (antes de commit): tras vencer la lease un relaunch
+    reclama y completa, sin que otro worker VIVO pueda robarlo.
 
-    Simula el crash de proceso justo tras ``start_apply`` (fila dejada en
-    APPLYING). Un nuevo pass (relaunch/recovery) es FELIZ desde APPLYING y aplica
-    exactamente una vez — el ledger no se duplicó porque nadie respondió antes.
+    Simula el crash de proceso justo tras ``start_apply`` (fila dejada en APPLYING,
+    dueño en vuelo). Mientras la lease es FRESCA un segundo pass NO puede robar el
+    apply (no_apply_another_in_progress); solo cuando vence (dueño muerto/lease
+    stale) el relaunch/reaper lo reclama por ``reclaim_stale_apply`` y completa
+    exactamente una vez.
     """
+    from datetime import timedelta
+
     store = InMemoryExecutionEventStore()
     calls: list[str] = []
 
@@ -326,10 +336,33 @@ async def test_durable_apply_reclaims_applying_stale_after_crash() -> None:
 
     ev = _exec("ev-durable-crash-apply")
     await store.capture(ev)
-    assert await store.start_apply(ev.execution_id) is True  # crash aquí en vivo
+    assert await store.start_apply(ev.execution_id, owner="worker-a") is True  # crash en vivo.
+    row = await store.get(ev.execution_id)
+    assert row is not None and row.status == "APPLYING"
 
-    # "relaunch" del que reaparece y completa.
-    outcome = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    # Mientras la lease es fresca, un segundo pass NO la roba (single-owner).
+    fresh = await apply_execution_financial_once(
+        store,
+        execution=ev,
+        apply_finance=applier,
+        owner="worker-b",
+    )
+    assert fresh == "no_apply_another_in_progress"
+    assert calls == []  # nadie aplicó todavía.
+
+    # El dueño A ha caído (crash): el lease envejece → un relaunch reclama y aplica.
+    now = datetime.now(UTC)
+    store._rows[ev.execution_id] = replace(
+        store._rows[ev.execution_id],
+        updated_at=now - timedelta(seconds=LEASE_WINDOW_SECONDS + 60),
+    )
+    outcome = await apply_execution_financial_once(
+        store,
+        execution=ev,
+        apply_finance=applier,
+        owner="relaunch",
+        lease_window_seconds=LEASE_WINDOW_SECONDS,
+    )
     assert outcome == "applied"
     assert calls == ["ev-durable-crash-apply"]
     assert (await store.get(ev.execution_id)).status == "APPLIED"  # type: ignore[union-attr]
@@ -349,3 +382,86 @@ async def test_ineffective_reply_leaves_no_false_applied_signal() -> None:
     assert row.status == "RETRY"
     assert row.applied_at is None
     assert row.last_error == "apply_ineffective"
+
+
+# ---------------------------------------------------------------------------
+# V2.20 (P2-02) — reaper de APPLYING stale (lease del dueño caído).
+# ---------------------------------------------------------------------------
+def _age_event(store: InMemoryExecutionEventStore, execution_id: str, ago_s: int) -> None:
+    from datetime import timedelta
+
+    row = store._rows[execution_id]
+    store._rows[execution_id] = replace(
+        row,
+        updated_at=datetime.now(UTC) - timedelta(seconds=ago_s),
+    )
+
+
+@pytest.mark.asyncio
+async def test_reaper_reclaims_lease_stale_apply_to_applied() -> None:
+    """P2-02: un APPLYING cuyo dueño murió (lease vencida) es barrido a APPLIED.
+
+    El reaper reclama por lease (owner nuevo) y, con candidato + apply_finance
+    idempotente, sube la traza a APPLYING→APPLIED UNA sola vez.
+    """
+    from datetime import timedelta
+
+    store = InMemoryExecutionEventStore()
+    calls: list[str] = []
+
+    async def applier(execution: ExecutionEvent) -> bool:
+        calls.append(execution.execution_id)
+        return True
+
+    id1, id2 = "ev-stale-a", "ev-live-b"
+    for eid in (id1, id2):
+        await store.capture(_exec(eid))
+        await store.start_apply(eid, owner=f"dead-{eid}")
+    _age_event(store, id1, LEASE_WINDOW_SECONDS + 90)  # A: dueño muerto → stale.
+    # B: lease fresca (no stale) → el reaper NO la roba (single-owner).
+
+    async def resolve(evt: ExecutionEvent) -> ExecutionEvent | None:
+        return evt  # candidato = la propia fila reclaimada (re-aplicable).
+
+    counts = await reap_stale_applying(
+        store,
+        owner="reaper-1",
+        stale_before=datetime.now(UTC) - timedelta(seconds=LEASE_WINDOW_SECONDS),
+        limit=10,
+        resolve_candidate=resolve,
+        apply_finance=applier,
+    )
+
+    assert counts["reclaimed"] == 1
+    assert counts["applied"] == 1
+    assert (await store.get(id1)).status == "APPLIED"  # type: ignore[union-attr]
+    # B no fue robada (lease viva) ni aplicada.
+    assert (await store.get(id2)).status == "APPLYING"  # type: ignore[union-attr]
+    assert calls == [id1]
+
+
+@pytest.mark.asyncio
+async def test_reaper_orphan_without_candidate_becomes_retry() -> None:
+    """P2-02: sin candidato re-derivable (bridge/sesión ausente) el reaper NO roba
+    la fila ni la deja varada en APPLYING: la baja a RETRY (liberada, reaplicable)."""
+    from datetime import timedelta
+
+    store = InMemoryExecutionEventStore()
+    eid = "ev-stale-orphan"
+    await store.capture(_exec(eid))
+    await store.start_apply(eid, owner="dead-worker")
+    _age_event(store, eid, LEASE_WINDOW_SECONDS + 90)
+
+    # Sin resolve_candidate ni apply_finance (fail-closed default).
+    counts = await reap_stale_applying(
+        store,
+        owner="reaper-orphan",
+        stale_before=datetime.now(UTC) - timedelta(seconds=LEASE_WINDOW_SECONDS),
+    )
+
+    assert counts["reclaimed"] == 1
+    assert counts["retry"] == 1
+    row = await store.get(eid)
+    assert row is not None and row.status == "RETRY"
+    assert row.lease_owner is None  # lease liberada.
+    assert row.last_error == "lease_expired_no_candidate"

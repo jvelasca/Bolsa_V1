@@ -78,9 +78,8 @@ def _load_root_env() -> None:
 
 
 def _open_engine() -> AsyncEngine:
-    from sqlalchemy.ext.asyncio import create_async_engine
-
     from bolsa_infrastructure.config import get_settings
+    from sqlalchemy.ext.asyncio import create_async_engine
 
     get_settings.cache_clear()
     url = get_settings().database_url
@@ -488,8 +487,6 @@ async def cleanup_financial(
 ) -> None:
     """Borra cuenta (cierre+delete canónico) + instrumento + traza + live_order."""
     async with factory() as session:
-        from sqlalchemy import delete
-
         from bolsa_application.live_order_store import PostgresLiveOrderStore
         from bolsa_infrastructure.database.models.tables import (
             ExecutionEventRow,
@@ -498,6 +495,7 @@ async def cleanup_financial(
         from bolsa_infrastructure.database.repositories.account_repository import (
             SqlAlchemyAccountRepository,
         )
+        from sqlalchemy import delete
 
         try:
             await PostgresLiveOrderStore(session).delete(order_id)
@@ -527,9 +525,8 @@ async def cleanup_financial(
 
 async def fin_event_row(factory, *, execution_id: str):
     async with factory() as session:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+        from sqlalchemy import select
 
         return (
             await session.execute(
@@ -542,12 +539,11 @@ async def fin_account_total_cash(factory, *, account_id: str) -> float:
     async with factory() as session:
         from decimal import Decimal
 
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import (
             InvestmentPortfolioRow,
             PortfolioRow,
         )
+        from sqlalchemy import select
 
         rows = (
             await session.execute(
@@ -570,9 +566,8 @@ async def fin_count_ledger_effects(factory, *, account_id: str) -> int:
     ``ExecuteTrade`` escribe el ledger (``entry_type`` = 'buy'|'sell').
     """
     async with factory() as session:
-        from sqlalchemy import func, select
-
         from bolsa_infrastructure.database.models.tables import LedgerEntryRow
+        from sqlalchemy import func, select
 
         return int(
             (
@@ -587,9 +582,8 @@ async def fin_count_ledger_effects(factory, *, account_id: str) -> int:
 
 
 async def _account_legacy_ids(session, account_id: str):
-    from sqlalchemy import select
-
     from bolsa_infrastructure.database.models.tables import InvestmentPortfolioRow
+    from sqlalchemy import select
 
     return list(
         (
@@ -604,9 +598,8 @@ async def _account_legacy_ids(session, account_id: str):
 
 async def fin_position_for_instrument(factory, *, account_id: str, instrument_id: str) -> float:
     async with factory() as session:
-        from sqlalchemy import func, select
-
         from bolsa_infrastructure.database.models.tables import PositionRow
+        from sqlalchemy import func, select
 
         legacy = await _account_legacy_ids(session, account_id)
         q = (
@@ -618,6 +611,74 @@ async def fin_position_for_instrument(factory, *, account_id: str, instrument_id
             )
         ).scalar_one()
         return float(q or 0)
+
+
+async def seed_captured_event(factory, *, execution_id: str, worker: str) -> None:
+    """Siembra una traza ``execution_events`` en CAPTURED (sin order/live_order).
+
+    Es el punto de partida de los CONCURSOS de adquisición (Single-owner): two
+    workers concurrently intentan ``start_apply`` sobre el mismo ``execution_id``
+    CAPTURED. No pasa por ningún puente recovery/ExecuteTrade: se centra en el CAS
+    del execution_event en aislamiento real-PG.
+    """
+    from datetime import UTC, datetime
+    from decimal import Decimal
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+
+    async with factory() as session:
+        session.add(
+            ExecutionEventRow(
+                execution_id=execution_id,
+                order_id=f"cas-{uuid4().hex[:8]}",
+                venue="LIVE",
+                account_id="acc-cas",
+                venue_order_id=execution_id,
+                fill_seq=1,
+                qty=Decimal("10"),
+                captured_at=datetime.now(UTC),
+                status="CAPTURED",
+                attempt_count=0,
+                lease_owner=None,
+                updated_at=datetime.now(UTC),
+            )
+        )
+        await session.commit()
+    _ = worker
+
+
+async def age_stale_applying(factory, *, execution_id: str, ago_seconds: int) -> None:
+    """Envejece el lease ``updated_at`` de una fila APPLYING (simula dueño muerto).
+
+    Solo para pruebas de reclaim/crash: hace retroceder el reloj de lease para que
+    el siguiente reclaim lo considere VENCIDO (equivalente a que el worker real, al
+    caerse, deje de hacer heartbeat de su updated_at por más de ``ago_seconds``).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    import sqlalchemy as sa
+    from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+
+    past = datetime.now(UTC) - timedelta(seconds=ago_seconds)
+    async with factory() as session:
+        await session.execute(
+            sa.update(ExecutionEventRow)
+            .where(ExecutionEventRow.execution_id == execution_id)
+            .values(updated_at=past)
+        )
+        await session.commit()
+
+
+async def cleanup_execution_event(factory, *, execution_id: str) -> None:
+    async with factory() as session:
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+        from sqlalchemy import delete
+
+        await session.execute(
+            delete(ExecutionEventRow).where(ExecutionEventRow.execution_id == execution_id)
+        )
+        await session.commit()
 
 
 async def test_c3c_crash_financial_apply_reexecuted_exact_once(factory, tmp_path: Path) -> None:
@@ -822,4 +883,347 @@ async def test_c3d_reclaim_applying_or_terminal_no_double(factory, tmp_path: Pat
             execution_id=exec_id,
             order_id=order_id,
         )
+
+
+# ---------------------------------------------------------------------------
+# V2.20 (P1-01/#2) — CONCURSO de adquisición real-PG: SINGLE-OWNER (winner=1/loser=0)
+# ---------------------------------------------------------------------------
+# El test obligatorio del audit: dos WORKERS reales (subprocesos) intentan
+# ``start_apply`` sobre EL MISMO ``execution_events`` en CAPTURED. Resultado
+# obligatorio: EXACTAMENTE un winner (``won=1``) y un loser (``won=0``), nunca dos
+# ``won=1``. Es la propiedad que P1-01 asegura ahora con CAS atómico SQL.
+
+
+async def test_v220_two_workers_cas_exactly_one_owner(factory, tmp_path: Path) -> None:
+    from uuid import uuid4
+
+    exec_id = f"cas-{uuid4().hex[:16]}"
+    try:
+        await seed_captured_event(factory, execution_id=exec_id, worker="seed")
+
+        # Dos procesos reales compiten por el MISMO CAPTURED al mismo tiempo.
+        proc_a = launch_probe(
+            mode="cas-contest",
+            sentinel=sentinel_write(tmp_path, "cas-a"),
+            worker=worker_id("casa"),
+            extra={"LIVE_A7_CAS_EXECUTION_ID": exec_id},
+        )
+        proc_b = launch_probe(
+            mode="cas-contest",
+            sentinel=sentinel_write(tmp_path, "cas-b"),
+            worker=worker_id("casb"),
+            extra={"LIVE_A7_CAS_EXECUTION_ID": exec_id},
+        )
+        try:
+            text_a = wait_sentinel_text(sentinel_write(tmp_path, "cas-a"), timeout=45.0)
+            text_b = wait_sentinel_text(sentinel_write(tmp_path, "cas-b"), timeout=45.0)
+        finally:
+            force_kill(proc_a)
+            force_kill(proc_b)
+            wait_for_exit(proc_a)
+            wait_for_exit(proc_b)
+
+        assert "won=1" in text_a or "won=1" in text_b, (
+            f"debe haber EXACTAMENTE un winner, A={text_a!r} B={text_b!r}"
+        )
+        count_won = int("won=1" in text_a) + int("won=1" in text_b)
+        # El test #2 obligatorio: winner=1, loser=0, nunca ambos True.
+        assert count_won == 1, f"CAS roto: ambos workers ganaron o ninguno ({text_a!r}, {text_b!r})"
+        assert ("won=0" in text_a) != ("won=0" in text_b), (
+            f"debe haber exactamente un loser: {text_a!r} {text_b!r}"
+        )
+    finally:
+        await cleanup_execution_event(factory, execution_id=exec_id)
+
+
+# ---------------------------------------------------------------------------
+# V2.20 (C3-E) — crash DESPUÉS del commit financiero y ANTES del APPLIED
+# ---------------------------------------------------------------------------
+# El peor instante "posterior" del apply (tu #9 / Auditoría): el dinero de
+# ExecuteTrade ya está COMMITTED (durable) pero la traza sigue en APPLYING cuando
+# el proceso muere. La recuperación (B) debe re-encajar la traza durable: reclama el
+# APPLYING (lease del dueño caído) y, aunque ExecuteTrade vuelve a ejecutarse, la
+# idempotencia por `recovery_idempotency_key` corta y NO duplica ledger/posición.
+# Invariante: cash/posición/ledger EXACTAMENTE como tras UN solo apply (valor dura
+# del commit de A), y la traza pasa a APPLIED apenas B reclama.
+
+
+async def test_c3e_crash_after_financial_commit_no_second_effect(
+    factory, tmp_path: Path
+) -> None:
+    _ = tmp_path
+    from uuid import uuid4
+
+    order_id = unique_order_id("c3e")
+    instrument_id = f"inst-c3e-{uuid4().hex[:8]}"
+    exec_id = ""
+    async with factory() as session:
+        account_id = await seed_financial_acct_instr(
+            session, name=f"C3E-{order_id}", instrument_id=instrument_id
+        )
+        vid = await seed_financial_unknown(
+            session=session,
+            order_id=order_id,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            quantity=100.0,
+        )
+        await session.commit()
+    exec_id = f"{vid}#1"
+    try:
+        # A: commit FINANCIERO durable (dinero materializado) + la traza en APPLYING.
+        sentinel_a = sentinel_write(tmp_path, "c3e-a")
+        extra = {**fin_extra(order_id=order_id, fill_seq="1"), "LIVE_A7_FIN_CRASH_COMMITTED": "1"}
+        proc_a = launch_probe(
+            mode="crasher-financial",
+            sentinel=sentinel_a,
+            worker=worker_id("c3ea"),
+            extra=extra,
+        )
+        try:
+            text_a = wait_sentinel_text(sentinel_a, timeout=45.0)
+            assert "financial-committed=1" in text_a, f"C3-E crasher no llegó: {text_a!r}"
+        finally:
+            force_kill(proc_a)
+            wait_for_exit(proc_a)
+
+        # Tras el SIGKILL: el dinero de A quedó COMMITTED (cash/posición/ledger
+        # valen ya) pero la traza aún está en APPLYING (sin APPLIED).
+        ev_a = await fin_event_row(factory, execution_id=exec_id)
+        assert ev_a is not None and ev_a.status == "APPLYING", (
+            f"C3-E: crash tras commit debe dejar APPLYING durable, era {ev_a and ev_a.status}"
+        )
+        cash_a = await fin_account_total_cash(factory, account_id=account_id)
+        pos_a = await fin_position_for_instrument(
+            factory, account_id=account_id, instrument_id=instrument_id
+        )
+        ledger_a = await fin_count_ledger_effects(factory, account_id=account_id)
+        assert pos_a == float("100.0"), "el commit financiero de A materializó la posición"
+        assert ledger_a == 1, "el commit financiero de A dejó UNA effect de ledger"
+
+        # B reclama el APPLYING (dueño caído, lease 0) y reaparece la traza.
+        sentinel_b = sentinel_write(tmp_path, "c3e-b")
+        proc_b = launch_probe(
+            mode="reader-financial",
+            sentinel=sentinel_b,
+            worker=worker_id("c3eb"),
+            extra=fin_extra(order_id=order_id, fill_seq="1"),
+        )
+        try:
+            text_b = wait_sentinel_text(sentinel_b, timeout=45.0)
+            assert "finished=applied" in text_b, f"recovery tras C3-E falló: {text_b!r}"
+            wait_for_exit(proc_b)
+        finally:
+            force_kill(proc_b)
+            wait_for_exit(proc_b)
+
+        # Invariante: NO hubo 2º efecto — dinero/posición/ledger exactos de A.
+        ev_fin = await fin_event_row(factory, execution_id=exec_id)
+        assert ev_fin is not None and ev_fin.status == "APPLIED", (
+            f"tras recovery C3-E la traza debe ser APPLIED: {ev_fin and ev_fin.status}"
+        )
+        cash_fin = await fin_account_total_cash(factory, account_id=account_id)
+        pos_fin = await fin_position_for_instrument(
+            factory, account_id=account_id, instrument_id=instrument_id
+        )
+        ledger_fin = await fin_count_ledger_effects(factory, account_id=account_id)
+        assert cash_fin == cash_a, "recovery C3-E NO debió mover cash (400-1250 exactos)"
+        assert pos_fin == pos_a == float("100.0"), (
+            "recovery C3-E NO debió duplicar la posición"
+        )
+        assert ledger_fin == ledger_a == 1, "recovery C3-E NO debió añadir efecto ledger"
+    finally:
+        await cleanup_financial(
+            factory,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            execution_id=exec_id,
+            order_id=order_id,
+        )
+
+
+# ---------------------------------------------------------------------------
+# V2.20 (P2-02) — reaper real-PG: orfanado APPLYING (lease muerto) → APPLIED
+# ---------------------------------------------------------------------------
+# Escenario que cierra P2-02 con la semántica safe-by-default elegida (sin
+# auto-sweep irrestricto en el worker): el MECANISMO de reap se valida aquí sobre
+# PG real con un dueño GARANTIZADO-muerto (oración de proceso caído, no worker
+# concurrente en marcha). ``reap_stale_applying`` (apply idempotente con
+# ExecuteTrade) lleva el orfanado APPLYING a APPLIED una sola vez, y NO roba un
+# APPLYING cuya lease sigue viva (single-owner).
+async def test_v220_stale_reaper_converges_orphaned_apply(factory, tmp_path: Path) -> None:
+    _ = tmp_path
+    from datetime import UTC, datetime, timedelta
+    from decimal import Decimal
+    from uuid import uuid4
+
+    from bolsa_application.accounts import ExecuteTrade
+    from bolsa_application.execution_event import (
+        LEASE_WINDOW_SECONDS,
+        ExecutionEvent,
+        PostgresExecutionEventStore,
+        reap_stale_applying,
+    )
+    from bolsa_application.live_order_store import PostgresLiveOrderStore
+    from bolsa_application.recovery_apply import recovery_idempotency_key
+    from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    # 1) Scope financiero real: cuenta + instrumento + 2 live_orders (UNKNOWN), uno
+    #    para el orfanado (reap) y otro con lease VIVA (no robar).
+    order_orph = unique_order_id("c3fang")
+    order_live = unique_order_id("c3flive")
+    instrument_id = f"inst-c3fang-{uuid4().hex[:8]}"
+    async with factory() as session:
+        account_id = await seed_financial_acct_instr(
+            session, name=f"C3FROPH-{order_orph}", instrument_id=instrument_id
+        )
+        vid_orph = await seed_financial_unknown(
+            session=session, order_id=order_orph, account_id=account_id,
+            instrument_id=instrument_id, quantity=100.0,
+        )
+        vid_live = await seed_financial_unknown(
+            session=session, order_id=order_live, account_id=account_id,
+            instrument_id=instrument_id, quantity=50.0,
+        )
+        await session.commit()
+    exec_orph = f"{vid_orph}#1"
+    exec_live = f"{vid_live}#1"
+
+    try:
+        # 2) Siembra del orfanado: traza durable directa en APPLYING con dueño muerto
+        #    y lease VECIDA (proceso caído). La VIVA queda con lease fresca (no se roba).
+        async with factory() as session:
+            now = datetime.now(UTC)
+            opid = "dead-worker-orph"
+            session.add(
+                ExecutionEventRow(
+                    execution_id=exec_orph,
+                    order_id=order_orph,
+                    venue="LIVE",
+                    account_id=account_id,
+                    venue_order_id=vid_orph,
+                    fill_seq=1,
+                    qty=Decimal("100.000000"),
+                    captured_at=now - timedelta(seconds=600),
+                    status="APPLYING",
+                    attempt_count=1,
+                    lease_owner=opid,
+                    updated_at=now - timedelta(seconds=LEASE_WINDOW_SECONDS + 60),
+                )
+            )
+            session.add(
+                ExecutionEventRow(
+                    execution_id=exec_live,
+                    order_id=order_live,
+                    venue="LIVE",
+                    account_id=account_id,
+                    venue_order_id=vid_live,
+                    fill_seq=1,
+                    qty=Decimal("50.000000"),
+                    captured_at=now,
+                    status="APPLYING",
+                    attempt_count=1,
+                    lease_owner="live-worker-b",
+                    updated_at=now,  # lease sin vencer.
+                )
+            )
+            await session.commit()
+
+        # 3) Reaper real-PG: misma maquinaria del recovery (ExecuteTrade idempotente).
+        async with factory() as session:
+            store = PostgresExecutionEventStore(session)
+            live_store = PostgresLiveOrderStore(session)
+            acct_repo = SqlAlchemyAccountRepository(session)
+            port_repo = SqlAlchemyPortfolioRepository(session)
+            led_repo = SqlAlchemyLedgerRepository(session)
+            trade = ExecuteTrade(acct_repo, port_repo, led_repo)
+
+            async def _applier(ev: ExecutionEvent) -> bool:
+                # Apply idempotente por execution_id (igual que el recovery/C3).
+                order = await live_store.get(ev.order_id)
+                price = _FIN_PRICE
+                try:
+                    await trade.execute(
+                        instrument_id=order.instrument_id,
+                        trade_type=order.side,
+                        quantity=float(ev.qty),
+                        price=price,
+                        account_id=ev.account_id,
+                        idempotency_key=recovery_idempotency_key(ev.execution_id),
+                    )
+                    return True
+                except Exception:  # noqa: BLE001
+                    return False
+
+            async def _resolver(ev: ExecutionEvent) -> ExecutionEvent | None:
+                # Re-derivar candidato re-materializable desde su propia traza (no
+                # fabrica: usa campos durDB/dominio estables del evento reclamado).
+                return ev
+
+            counts = await reap_stale_applying(
+                store,
+                owner="reaper-pg-1",
+                stale_before=datetime.now(UTC) - timedelta(seconds=LEASE_WINDOW_SECONDS),
+                limit=10,
+                resolve_candidate=_resolver,
+                apply_finance=_applier,
+            )
+
+        assert counts["reclaimed"] == 1, counts
+        assert counts["applied"] == 1, counts
+        assert counts["retry"] == 0 and counts["errors"] == 0, counts
+
+        # 4) Invariantes: el orfanado llegó a APPLIED; el VIVO no fue robado.
+        row = await fin_event_row(factory, execution_id=exec_orph)
+        assert row is not None and row.status == "APPLIED", (
+            f"reaper debió llevar el orfanado APPLYING→APPLIED: {row and row.status}"
+        )
+        assert row.applied_at is not None, "APPLIED debe llevar applied_at"
+        assert row.lease_owner is None, "terminal APPLIED libera la lease (no retenida)"
+        live = await fin_event_row(factory, execution_id=exec_live)
+        assert live is not None and live.status == "APPLYING", (
+            f"lease VIVA no debe robarse: {live and live.status}"
+        )
+        # Money exactamente una vez (posición única del orfanado de 100).
+        pos = await fin_position_for_instrument(
+            factory, account_id=account_id, instrument_id=instrument_id
+        )
+        assert pos == float("100.0"), f"reaper debe materializar la posición UNA vez: {pos}"
+        assert await fin_count_ledger_effects(factory, account_id=account_id) == 1, (
+            "reaper debe escribir UN solo efecto de ledger de fill"
+        )
+        cash = await fin_account_total_cash(factory, account_id=account_id)
+        # Cash == 100000 − 100×12.50 − comisión (UNA vez). Si el apply se duplicara
+        # (100+100) bajaría en > 2×notional → quedamos por encima de ese límite.
+        assert cash < 100_000.0 and cash > 100_000.0 - 2 * 100 * _FIN_PRICE, (
+            f"cash NO deducido exactamente una vez: {cash}"
+        )
+    finally:
+        await cleanup_financial(
+            factory,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            execution_id=exec_orph,
+            order_id=order_orph,
+        )
+        # Limpieza del segundo scope (live-no-robado) y su traza.
+        async with factory() as session:
+            from bolsa_application.live_order_store import PostgresLiveOrderStore
+            from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+            from sqlalchemy import delete
+
+            await session.execute(
+                delete(ExecutionEventRow).where(ExecutionEventRow.execution_id == exec_live)
+            )
+            await PostgresLiveOrderStore(session).delete(order_live)
+            await session.commit()
 

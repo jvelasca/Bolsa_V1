@@ -2,6 +2,64 @@
 
 All notable releases of Bolsa V1.
 
+## [1.49.0-beta] — V2.20-beta / A7 Iter-3 · hardening — 2026-09-09
+
+Elevación de **hardening (Iter-3 de LIVE Certification / A7)** que cierra la
+verificación **P1-01 — CAS no atómico** en `PostgresExecutionEventStore`
+(`start_apply` no era un Compare-And-Swap real) y los huecos de concurrency /
+recuperación que abría (dos-worker, C3-E, reaper de `APPLYING` stale,
+contrato de cantidad en parciales, identidad de release). Núcleo financiero
+congelado **intacto**: no añade features de trading.
+
+### ¿Qué cambia?
+
+- **P1-01 — CAS real atómico:** `PostgresExecutionEventStore.start_apply` /
+  `mark_*` / `reclaim_stale_apply` pasan a un ÚNICO `UPDATE ... WHERE
+execution_id AND status IN (orígenes-legales)` atómico con `rowcount`, sin la
+  secuencia `SELECT → check-in-memory → ORM-mutate → commit`. `start_apply`
+  incrementa `attempt_count` solo cuando gana y **NO acepta** el auto-origen
+  `APPLYING` (`_cas_sources_of`), de modo que dos workers sobre el MISMO
+  `CAPTURED` → exactamente uno `True` (`winner=1`) y otro `False` (`loser=0`).
+- **Diseño single-owner por lease (1b):** migrate `025_execution_events_lease`
+  añade `lease_owner` + `updated_at` a `execution_events` y un índice
+  `(status, updated_at)`; un `APPLYING` huérfano (dueño caído, lease vencida)
+  solo se retoma vía `reclaim_stale_apply` / `reclaim_stale_applying_batch`
+  (reaper).
+- **C3-E — crash tras commit financiero:** nueva escenario de la batería
+  `live_a7` (worker SIGKILLeado tras `ExecuteTrade COMMIT` pero antes de
+  `mark_applied`) → la traza queda `APPLYING` con dinero durable y la
+  recuperación lo retoma por lease **sin segundo efecto** (`APPLIED`, no doble
+  `ledger/position`).
+- **Two-worker real-PG test:** `test_v220_two_workers_cas_exactly_one_owner`
+  en `live_a7` demuestra sobre Postgres real que una sola de dos pasadas
+  simultáneas de `start_apply` gana (`winner=1, loser=0`).
+- **P2-02 — reaper de `APPLYING` stale (mecanismo + orquestador):**
+  `reclaim_stale_applying_batch` (barrido atómico por lease vencido / dueño
+  muerto) + orquestador `reap_stale_applying`: sobre un dueño garantizado-muerto
+  lleva `APPLYING → APPLIED` (apply idempotente, UNA materialización) o a
+  `RETRY` honesto cuando el candidato no es aún re-derivable, sin robar un
+  `APPLYING` de lease VIVA. **Decisión safe-by-default (V2.20):** el substrato de
+  lease + escenario real-PG se entregan verificados, pero **NO** se auto-enciende
+  un sweep de fondo en el worker — reclamar por mera edad a un apply en curso
+  (que no hace heartbeat entre `start_apply` y su `mark_applied`) podría robarle
+  el APPLYING a un dueño vivo (lost-/double-apply). Cerrar la gestión automática
+  plena requiere lease-renewal/heartbeat per-apply (Iter-4).
+- **P2-03 — contrato de cantidad en parciales:** `filled_quantity` documentado
+  y testeado como **delta por `fill_seq`** (no cumulativo): `40+30+30=100` son
+  3 trazas idempotentes y suman el total. Sin cambio de comportamiento en
+  espera del ruling del broker (puente XTB cumulativo-vs-delta sin confirmar).
+- **P2-04 — identidad de release:** package `1.48.0-beta → 1.49.0-beta`.
+
+### Verificación
+
+- **Live (Postgres real dedicado):** la batería `apps/api-python/tests/chaos/live_a7`
+  validada de nuevo con las semánticas de lease — **7 escenarios passed**:
+  C3-A/B/C/D/E + `test_v220_two_workers_cas_exactly_one_owner`
+  - `test_v220_stale_reaper_converges_orphaned_apply` (reaper real-PG).
+- Ruff `apps/api-python packages/py` → limpio en los ficheros tocados. Suita
+  unitaria de dominio (`test_execution_event.py` incl. los 2 nuevos de reaper,
+  `test_recovery_apply.py` con el contrato `40+30+30`) → sin regresiones.
+
 ## [1.48.0-beta] — V2.18 / A7 Iter-1 · C3 — 2026-09-09
 
 Elevación (completada: **Release-tag CI `#34341628713` GREEN** sobre `v2.18-beta` `conclusion: success`,

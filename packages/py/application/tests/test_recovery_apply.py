@@ -119,3 +119,45 @@ def test_idempotency_key_is_stable_within_bounds() -> None:
 
     assert re.search(r"\s", a) is None
     assert 16 <= len(a) <= 128
+
+
+# V2.20 (P2-03) — contrato de cantidad en fills PARCIALES: DELTA por fill_seq.
+def test_partial_fill_delta_contract_40_plus_30_plus_30_is_100() -> None:
+    """Three "fills" parciales de la MISMA orden comparten venue_order_id con
+    fill_seq distinto; cada ExecutionEvent lleva el DELTA de su fill_seq y son
+    idempotentemente distintos (3 execution_id). La suma == cantidad total llenada."""
+    from decimal import Decimal
+
+    even = (40, 30, 30)
+    total = Decimal("0")
+    ids: set[str] = set()
+    for i, delta in enumerate(even, start=1):
+        order = _order(venue_order_id="xtb-99")
+        r = _filled(
+            venue_order_id="xtb-99",
+            filled_quantity=str(delta),
+            remaining_quantity=str(100 - sum(even[:i])),
+            fill_seq=i,
+            fill_price="12.50",
+        )
+        ev = build_recovery_execution_candidate(order, r)
+        assert ev is not None, f"fill_seq {i} debe ser apply_candidate"
+        assert str(ev.qty) == Decimal(str(delta)).quantize(Decimal("0.000001")).to_eng_string()
+        ids.add(ev.execution_id)
+        total += ev.qty
+    assert ids == {"xtb-99#1", "xtb-99#2", "xtb-99#3"}, (  # 3 trazas idempotentes únicas.
+        f"cada fill_seq debe tener su propio execution_id: {ids}"
+    )
+    assert str(total) == "100.000000"  # 40 + 30 + 30 == 100 (nunca cumulativo)
+
+
+def test_fill_quantity_semantics_is_delta() -> None:
+    from decimal import Decimal
+
+    from bolsa_application.recovery_apply import recovery_fill_quantity_semantics
+
+    assert recovery_fill_quantity_semantics() == "delta_per_fill_seq"
+    # Los candidates de fills parciales suman el total: NO reinterpreta acumulados.
+    assert build_recovery_execution_candidate(
+        _order(venue_order_id="xtb-42"), _filled(fill_seq=2, filled_quantity="30")
+    ).qty == Decimal("30.000000")  # type: ignore[union-attr]

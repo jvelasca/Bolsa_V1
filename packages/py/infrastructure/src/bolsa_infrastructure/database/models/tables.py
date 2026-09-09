@@ -1387,6 +1387,17 @@ class ExecutionEventRow(Base):
         nullable=False,
     )
     last_error: Mapped[str | None] = mapped_column("last_error", Text, nullable=True)
+    # V2.20 (P2-01) — lease de ownership del apply (single-owner over APPLYING).
+    lease_owner: Mapped[str | None] = mapped_column(
+        "lease_owner",
+        String,
+        nullable=True,
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
 
 class OperationalIncidentRow(Base):
