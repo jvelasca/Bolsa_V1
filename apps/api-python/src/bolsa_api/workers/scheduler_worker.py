@@ -46,6 +46,7 @@ from bolsa_api.background.live_order_recovery_worker import (
 from bolsa_api.background.opportunity_daily_scan_worker import (
     start_opportunity_daily_scan_worker,
 )
+from bolsa_api.background.paper_auto_engine_worker import start_paper_auto_engine_worker
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 
@@ -69,6 +70,8 @@ def _event_loop_starters() -> list[Any]:
         start_live_order_recovery_worker,
         # V2.21/A8 (M2): reaper autónomo de APPLYING stale (solo tras fencing M1).
         start_execution_event_reaper_worker,
+        # V2.21/A8 (M4): AUTO Engine continuo SAFE/dry (nunca ejecuta por sí).
+        start_paper_auto_engine_worker,
     ]
 
 
