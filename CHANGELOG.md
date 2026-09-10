@@ -2,6 +2,33 @@
 
 All notable releases of Bolsa V1.
 
+## [1.53.0-beta] — V2.27 + V2.28 + V2.29 / A10 · Cierre del núcleo de decisión — 2026-09-10
+
+Cierra los P2 del A10 que tocaban el **núcleo de decisión**, acumulados desde V2.26:
+
+- **V2.27 — Wiring real**: el universo ESTUDIO y el LAB (`RunSmaGridOptimizeAndSave`) se
+  cablean en la composición real (`_default_orchestrator`), sin inyectar dependencias.
+- **V2.28 — Vigilancia real**: `sim_fill_finance_context` gana `strategy_version_id`
+  (Alembic `031_sim_fill_strategy_attr`) y la vigilancia calcula métricas observadas
+  (PnL, drawdown, win rate, profit factor) desde fills SIM atribuidos a la versión.
+- **V2.29 — COACH comparativo + SignalEvaluator real**: el COACH dictamina el TOP3 entero
+  (eligiendo el primer candidato sin veto, sin reordenar la evidencia); la versión
+  promocionada persiste los **parámetros del campeón** y su **definición ejecutable**; y
+  la estrategia ACTIVE puede evaluar **su propia señal** sobre barras reales
+  (`AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL`, default OFF ⇒ se conserva el spine).
+
+AUTO sigue **estrictamente SIMULATED**; **LIVE real intacto**. La vigilancia observada
+está separada de las métricas predictivas (`edge`/`wfe`/`dsr`) y usa una guarda de
+muestra mínima para no degradar por ruido.
+
+> Cierres: `docs/engineering/cierre-v2.27-a10-real-wiring-2026-09-10.md`,
+> `cierre-v2.28-vigilancia-real-2026-09-10.md`,
+> `cierre-v2.29-coach-comparativo-signal-real-2026-09-10.md`.
+
+> **Diferido a V2.30:** `StrategyDiscoveryEngine` (selector sobre los 30+ indicadores),
+> shadow automático (evidencia ejecutada en vez del flag `AUTO_ORCHESTRATOR_SHADOW_VALIDATED`)
+> y atribución de versión tras crash en posiciones readoptadas.
+
 ## [1.52.0-beta] — V2.25 + V2.26 / A10 · Strategy Lifecycle + Auto Orchestrator — 2026-09-10
 
 Construye el **ciclo de vida autónomo de estrategia (A10)** sobre la infraestructura

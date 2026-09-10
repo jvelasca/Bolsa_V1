@@ -42,12 +42,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from bolsa_api.background.paper_auto_engine_worker import (
-    DecisionProvider,
-    _effective_venue,
-    _kill_switch_env_on,
-    _watch_symbols,
-)
 from bolsa_application.auto_daily_journal import SimJournalRow
 from bolsa_application.auto_engine_state_store import (
     AutoEngineSnapshot,
@@ -70,6 +64,13 @@ from bolsa_application.sim_reconciliation import (
 from bolsa_application.simulated_settlement import (
     normalized_auto_venue,
     submit_simulated_order,
+)
+
+from bolsa_api.background.paper_auto_engine_worker import (
+    DecisionProvider,
+    _effective_venue,
+    _kill_switch_env_on,
+    _watch_symbols,
 )
 
 logger = logging.getLogger(__name__)
@@ -234,6 +235,26 @@ class FillObservation:
     qty: Decimal
 
 
+# V2.28 / A10 (P1-02 real): prefijo con que ``active_strategy_decider`` marca el
+# ``DecisionPackage.source``. Es el único vínculo entre una propuesta y la versión de
+# estrategia que la originó; aquí se extrae para atribuir el fill en el settlement.
+_ACTIVE_STRATEGY_SOURCE_PREFIX = "active-strategy:"
+
+
+def _strategy_version_from_source(source: Any) -> str | None:
+    """Extrae la versión de estrategia de ``DecisionPackage.source``.
+
+    Devuelve ``None`` cuando la propuesta no proviene de una estrategia ACTIVE (spine
+    determinista u otro origen): la ausencia de atribución es información, nunca se
+    inventa una versión.
+    """
+    text = str(source or "").strip()
+    if not text.startswith(_ACTIVE_STRATEGY_SOURCE_PREFIX):
+        return None
+    version_id = text[len(_ACTIVE_STRATEGY_SOURCE_PREFIX) :].strip()
+    return version_id or None
+
+
 @dataclass(frozen=True, slots=True)
 class _AppliedFill:
     """Fill aplicado, en la forma que la reconciliación entiende (P1-01/P2-02)."""
@@ -339,6 +360,11 @@ class AutoSimulationWorker:
         self._protection = _protection_config_from_env()
         self._entry_price: dict[str, Decimal] = {}
         self._high_price: dict[str, Decimal] = {}
+        # V2.28/A10 (P1-02 real): versión de estrategia que abrió la posición de cada
+        # símbolo. Permite atribuir también los fills de CIERRE (protección/venta) a la
+        # misma versión: sin esto la serie de la versión tendría compras sin ventas y
+        # el PnL observado no cuadraría.
+        self._position_version: dict[str, str] = {}
         # V2.24/A9.1 (P2-06): T1 parcial ya ejecutado por símbolo (no re-dispara T1).
         self._t1_done: set[str] = set()
         self._minute = 0
@@ -381,6 +407,10 @@ class AutoSimulationWorker:
             logger.exception("auto_sim readopt_positions failed")
             self._readopted = True
             return dict(self._open)
+        # Nota V2.28/A10 (P1-02 real): la proyección durable NO guarda la versión de
+        # estrategia que abrió la posición. Tras un crash, los fills de cierre de las
+        # posiciones readoptadas quedan sin atribución (``None``) en vez de inventar una
+        # versión. Aceptable: la ausencia de atribución es información, no un dato falso.
         authoritative = await self._reconcile_before_trusting(account_id, projection)
         # La posición abierta se adopta desde la proyección Y, si la reconciliación
         # determinó un canónico fiable, también desde él (un espejo vacío no debe
@@ -573,7 +603,13 @@ class AutoSimulationWorker:
         return self._time
 
     # ---- settlement vía dominio (M1/M2). Fail-closed sin exec_store. ----------
-    async def _settle(self, side: str, symbol: str, qty: Decimal) -> list[FillObservation]:
+    async def _settle(
+        self,
+        side: str,
+        symbol: str,
+        qty: Decimal,
+        strategy_version_id: str | None = None,
+    ) -> list[FillObservation]:
         if self._exec_store is None:
             return []
         venue = self._venue()
@@ -597,6 +633,9 @@ class AutoSimulationWorker:
                 owner="auto-sim-worker",
                 apply_finance=self._finance_applier,
                 context_store=self._context_store,
+                # V2.28/A10 (P1-02 real): atribuye el fill a la versión ACTIVE que lo
+                # originó (``None`` si la propuesta no viene de una estrategia).
+                strategy_version_id=strategy_version_id,
             )
         except Exception:  # noqa: BLE001 — un fallo de settlement no tumba el motor.
             # Fail-closed: un problema al persistir contexto/aplicar dinero NO debe
@@ -792,7 +831,18 @@ class AutoSimulationWorker:
             if action == "SELL" and exec_qty < qty:
                 _veto("sell_overshoot_clamped")
             report.proposals += 1
-            fills = await self._settle(action.lower(), symbol, exec_qty)
+            # V2.28/A10 (P1-02 real): atribuye el fill a la versión ACTIVE. La apertura
+            # aporta la versión desde el ``source`` de la propuesta; el CIERRE (venta de
+            # protección) hereda la versión que abrió la posición para no dejar la serie
+            # con compras sin ventas. ``None`` = sin atribución (spine determinista).
+            proposed_version = _strategy_version_from_source(getattr(pkg, "source", None))
+            effective_version = proposed_version or self._position_version.get(symbol)
+            fills = await self._settle(
+                action.lower(),
+                symbol,
+                exec_qty,
+                strategy_version_id=effective_version,
+            )
             if not fills:
                 continue  # fila no abierta: la cola SIM no confirmó fill (no LIVE).
             self._emit("order", venue, None, action.lower(), exec_qty)
@@ -806,6 +856,11 @@ class AutoSimulationWorker:
                 if held <= 0 and price > 0:
                     self._entry_price[symbol] = price
                     self._high_price[symbol] = price
+                # V2.28/A10 (P1-02 real): recuerda la versión que abrió la posición para
+                # atribuir después los fills de cierre. Solo al abrir desde plano (una
+                # ampliación sobre posición viva conserva la versión original).
+                if held <= 0 and effective_version:
+                    self._position_version[symbol] = effective_version
                 await self._persist_position(symbol, held + exec_qty)
                 report.opened += 1
             else:
@@ -825,6 +880,8 @@ class AutoSimulationWorker:
                     self._entry_price.pop(symbol, None)
                     self._high_price.pop(symbol, None)
                     self._t1_done.discard(symbol)
+                    # Posición cerrada: la atribución de versión deja de aplicar.
+                    self._position_version.pop(symbol, None)
                 self._open[symbol] = new_held
                 await self._persist_position(symbol, new_held)
             report.orders += 1
@@ -1070,6 +1127,34 @@ def active_strategy_enabled() -> bool:
     }
 
 
+def active_strategy_signal_enabled() -> bool:
+    """V2.29/A10: ¿la ACTIVE evalúa su PROPIA señal? (env, default OFF).
+
+    OFF: la ACTIVE solo aporta lote/watch sobre el spine (comportamiento V2.26-V2.28).
+    ON: la ACTIVE evalúa su definición ejecutable sobre barras reales (SignalEvaluator
+    real); si no hay datos o falla la evaluación, cae al spine (fail-open seguro).
+    """
+    return (os.getenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _signal_snapshot_limit() -> int:
+    """Nº de barras a precargar para la señal (env ``AUTO_ENGINE_SIM_SIGNAL_BARS``)."""
+    raw = (os.getenv("AUTO_ENGINE_SIM_SIGNAL_BARS") or "").strip()
+    if not raw:
+        return 120
+    try:
+        value = int(raw)
+    except ValueError:
+        return 120
+    return value if value > 0 else 120
+
+
+
 async def load_active_strategy_decider(
     session_factory: Any,
     *,
@@ -1077,14 +1162,21 @@ async def load_active_strategy_decider(
     fallback: DecisionProvider,
     watch: Sequence[str],
     lot_qty: float = 100.0,
+    ohlcv: Any = None,
+    signal_enabled: bool = False,
 ) -> DecisionProvider | None:
     """Carga la estrategia ACTIVE del store y la expone vía ``DecisionProvider``.
 
     V2.26/A10: éste es el ÚNICO punto por el que la estrategia promovida entra en el
-    hot path del AUTO. No ejecuta nada: envuelve el spine determinista con el lote y
-    el watch de la estrategia activa. Si no hay estrategia activa, o falla la lectura,
-    devuelve ``None`` y el worker sigue con el spine (fail-open seguro: el spine no
-    abre LIVE nunca; RiskGate/SimulationGate siguen vetando).
+    hot path del AUTO. Si no hay estrategia activa, o falla la lectura, devuelve
+    ``None`` y el worker sigue con el spine (fail-open seguro: el spine no abre LIVE
+    nunca; RiskGate/SimulationGate siguen vetando).
+
+    V2.29/A10: con ``signal_enabled=True`` la ACTIVE evalúa su PROPIA señal sobre las
+    últimas barras (SignalEvaluator real). El snapshot se carga aquí (async) sobre una
+    sesión viva y se cierra sobre el decisor síncrono; sin snapshot o ante error, se
+    delega en el spine. ``ohlcv`` permite inyectar el repo en tests; si es ``None`` se
+    compone por sesión.
     """
     if not active_strategy_enabled():
         return None
@@ -1095,8 +1187,23 @@ async def load_active_strategy_decider(
         async with session_factory() as session:
             store = PostgresStrategyLifecycleStore(session)
             record = await store.get_active(instrument_id=instrument_id)
-        if record is None:
-            return None
+            if record is None:
+                return None
+            if signal_enabled:
+                repo = ohlcv
+                if repo is None:
+                    from bolsa_api.api.dependencies import get_ohlcv_repository
+
+                    repo = get_ohlcv_repository(session)
+                return await _build_signal_decider(
+                    record=record,
+                    fallback=fallback,
+                    watch=watch,
+                    lot_qty=lot_qty,
+                    ohlcv=repo,
+                    instrument_id=instrument_id,
+                )
+
         return active_strategy_decider(
             active=record.active,
             fallback=fallback,
@@ -1106,6 +1213,41 @@ async def load_active_strategy_decider(
     except Exception:  # noqa: BLE001 — sin activa fiable se conserva el spine seguro.
         logger.exception("auto_sim active-strategy load failed (se usa el spine)")
         return None
+
+
+async def _build_signal_decider(
+    *,
+    record: Any,
+    fallback: DecisionProvider,
+    watch: Sequence[str],
+    lot_qty: float,
+    ohlcv: Any,
+    instrument_id: str,
+) -> DecisionProvider:
+    """Compone el ``DecisionProvider`` con SignalEvaluator real + snapshot de barras.
+
+    El snapshot se carga con la sesión viva del llamante (async) y se cierra sobre el
+    decisor síncrono. Cualquier fallo del snapshot se absorbe (símbolo sin datos ⇒ el
+    decisor cae al spine).
+    """
+    from bolsa_application.active_strategy_signal_evaluator import (
+        make_active_strategy_decider,
+        make_bar_snapshot_loader,
+    )
+
+    symbols = (
+        tuple(str(s) for s in (record.active.definition.get("watch") or watch))
+        or (instrument_id,)
+    )
+    refresh = make_bar_snapshot_loader(ohlcv, symbols, limit=_signal_snapshot_limit())
+    snapshot = await refresh()
+    return make_active_strategy_decider(
+        active=record.active,
+        fallback=fallback,
+        watch=watch,
+        bars_by_symbol=snapshot.get,
+        lot_qty=lot_qty,
+    )
 
 
 async def auto_sim_loop(
@@ -1348,6 +1490,7 @@ def start_auto_sim_worker(
                     instrument_id=effective_account,
                     fallback=base_decider,
                     watch=spine_watch,
+                    signal_enabled=active_strategy_signal_enabled(),
                 )
 
             decider_refresher = _refresh_active_decider

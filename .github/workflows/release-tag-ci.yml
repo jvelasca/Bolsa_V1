@@ -303,6 +303,19 @@ jobs:
           packages/py/application/tests/test_strategy_vigilance_phase.py
           packages/py/application/tests/test_auto_orchestrator.py
           packages/py/application/tests/test_sim_durable_unit_of_work.py
+          # V2.27/A10: universo ESTUDIO real + runner LAB real (herméticos).
+          packages/py/application/tests/test_orchestrator_universe.py
+          packages/py/application/tests/test_orchestrator_lab_runner.py
+          # V2.28/A10: vigilancia real desde fills SIM atribuidos a la versión.
+          packages/py/application/tests/test_strategy_observed_metrics.py
+          packages/py/application/tests/test_strategy_observed_metrics_provider.py
+          packages/py/application/tests/test_strategy_vigilance_observed.py
+          packages/py/application/tests/test_sim_strategy_attribution.py
+          # V2.29/A10: COACH comparativo + SignalEvaluator real (herméticos).
+          packages/py/application/tests/test_strategy_executable_definition.py
+          packages/py/application/tests/test_active_strategy_signal_evaluator.py
+          apps/api-python/tests/test_auto_sim_active_strategy_seam.py
+          apps/api-python/tests/test_auto_simulation_worker.py
           packages/py/infrastructure/tests/test_verify_financial_invariants.py
           apps/api-python/tests
           --ignore=apps/api-python/tests/integration
@@ -413,6 +426,9 @@ jobs:
           apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py
           # V2.25/A10: persistencia del Strategy Lifecycle (migración 030) sobre PG.
           apps/api-python/tests/test_strategy_lifecycle_pg.py
+          # V2.28/A10: vigilancia real (fills SIM atribuidos + migración 031) y
+          # V2.29/A10: campeón persistido + dictamen COACH comparativo sobre PG.
+          packages/py/application/tests/test_sim_strategy_attribution.py
           apps/api-python/tests/test_health.py
           -q
           --tb=short

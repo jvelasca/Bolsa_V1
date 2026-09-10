@@ -232,7 +232,16 @@ class ActiveStrategy:
 
 @dataclass(frozen=True, slots=True)
 class StrategyHealth:
-    """Salud de una estrategia ACTIVA en un instante (serie temporal fuera)."""
+    """Salud de una estrategia ACTIVA en un instante (serie temporal fuera).
+
+    V2.28 / A10: además de los indicadores *predictivos* de robustez (``edge``/``wfe``/
+    ``dsr``/``credibility``, derivados del LAB), puede llevar el bloque *observado* de la
+    ejecución SIM real (``observed_*``), que responde a otra pregunta: «¿qué está pasando
+    de verdad con el dinero?». Los umbrales observados viven en ``thresholds`` con prefijo
+    ``observed_``. El bloque observado solo degrada cuando hay evidencia suficiente
+    (``observed_trades >= min_observed_trades``): no se degrada una estrategia por ruido
+    de uno o dos trades.
+    """
 
     version_id: str
     as_of: str
@@ -241,10 +250,21 @@ class StrategyHealth:
     dsr: float | None = None
     credibility: float | None = None
     thresholds: dict[str, float] = field(default_factory=dict)
+    # --- Bloque observado (ejecución SIM real; V2.28 / A10) ---
+    observed_return_pct: float | None = None
+    observed_max_drawdown_pct: float | None = None
+    observed_win_rate: float | None = None
+    observed_profit_factor: float | None = None
+    observed_trades: int | None = None
 
     @property
     def degraded(self) -> bool:
-        """True si algún indicador conocido cae por debajo de su umbral."""
+        """True si algún indicador conocido cae por debajo de su umbral.
+
+        Los indicadores predictivos degradan siempre que estén presentes. El bloque
+        observado exige además evidencia mínima (``min_observed_trades``) para no
+        degradar por una muestra anecdótica.
+        """
         checks = (
             ("edge", self.edge),
             ("walk_forward_efficiency", self.walk_forward_efficiency),
@@ -255,6 +275,39 @@ class StrategyHealth:
             threshold = self.thresholds.get(key)
             if value is not None and threshold is not None and value < threshold:
                 return True
+        return self.observed_degraded
+
+    @property
+    def observed_degraded(self) -> bool:
+        """Degradación por métricas observadas, con guarda de muestra mínima.
+
+        Semántica de umbral por métrica: retorno/win-rate/profit-factor son MÍNIMOS (se
+        degrada por debajo); el drawdown es un TECHO (se degrada por encima), porque una
+        caída grande es lo malo. Público porque el dict de motivos lo consulta la capa de
+        aplicación para poblar ``breaches``.
+        """
+        if self.observed_trades is None:
+            return False
+        min_trades = self.thresholds.get("min_observed_trades")
+        if min_trades is not None and self.observed_trades < min_trades:
+            # Muestra insuficiente: el observado es informativo, no decisorio.
+            return False
+        minimums = (
+            ("observed_return_pct", self.observed_return_pct),
+            ("observed_win_rate", self.observed_win_rate),
+            ("observed_profit_factor", self.observed_profit_factor),
+        )
+        for key, value in minimums:
+            threshold = self.thresholds.get(key)
+            if value is not None and threshold is not None and value < threshold:
+                return True
+        max_dd = self.thresholds.get("observed_max_drawdown_pct")
+        if (
+            max_dd is not None
+            and self.observed_max_drawdown_pct is not None
+            and self.observed_max_drawdown_pct > max_dd
+        ):
+            return True
         return False
 
 

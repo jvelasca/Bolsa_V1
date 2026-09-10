@@ -19,6 +19,7 @@ import os
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -99,8 +100,6 @@ async def lifecycle_factory() -> async_sessionmaker[AsyncSession]:
 async def test_strategy_lifecycle_roundtrip_pg(
     lifecycle_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    from sqlalchemy import delete
-
     from bolsa_application.strategy_lifecycle_store import (
         ActiveStrategyRecord,
         PostgresStrategyLifecycleStore,
@@ -124,6 +123,7 @@ async def test_strategy_lifecycle_roundtrip_pg(
         StrategyPromotionRow,
         StrategyVersionRow,
     )
+    from sqlalchemy import delete
 
     suffix = uuid.uuid4().hex[:10]
     candidate_id = f"cand-{suffix}"
@@ -255,8 +255,6 @@ async def test_auto_orchestrator_full_cycle_pg(
     TOP3 → COACH → FINALISTA → PROMOCION (shadow) → ACTIVE; después vigilancia con
     métricas degradadas ⇒ re-LAB (sin swap directo).
     """
-    from sqlalchemy import delete
-
     from bolsa_application.auto_orchestrator import AutoOrchestrator, OrchestratorDeps
     from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
     from bolsa_infrastructure.database.models.tables import (
@@ -266,6 +264,7 @@ async def test_auto_orchestrator_full_cycle_pg(
         StrategyPromotionRow,
         StrategyVersionRow,
     )
+    from sqlalchemy import delete
 
     suffix = uuid.uuid4().hex[:10]
     instrument_id = f"inst-{suffix}"
@@ -338,3 +337,446 @@ async def test_auto_orchestrator_full_cycle_pg(
             assert still.active.version_id == active.active.version_id
     finally:
         await _cleanup()
+
+
+async def test_default_orchestrator_real_wiring_end_to_end_pg(
+    lifecycle_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V2.27/A10 — P1-01/P1-02: composición REAL, sin inyectar dependencias.
+
+    A diferencia de ``test_auto_orchestrator_full_cycle_pg`` (que inyecta
+    ``run_optimize`` y el candidato), este test usa ``_default_orchestrator`` tal cual
+    lo usa el scheduler: el universo ESTUDIO y el LAB real (``RunSmaGridOptimizeAndSave``)
+    se cablean solos. Se siembra instrumento + pertenencia a la lista ``estudio`` +
+    barras OHLCV, y se certifica que el ciclo deja ``sin_evidencia_top3`` y produce
+    evidencia real (evaluación persistida con ``optimization_run_id``).
+    """
+    from datetime import UTC, datetime, timedelta
+    from decimal import Decimal
+
+    from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+    from bolsa_infrastructure.database.models.tables import (
+        InstrumentRow,
+        OhlcvBarRow,
+        StrategyCandidateRow,
+        StrategyEvaluationRow,
+    )
+    from bolsa_infrastructure.database.repositories.list_repository import (
+        SqlAlchemyListRepository,
+    )
+    from bolsa_infrastructure.ids import new_id
+    from sqlalchemy import delete
+
+    from bolsa_api.background.auto_orchestrator_worker import _default_orchestrator
+
+    suffix = uuid.uuid4().hex[:10]
+    instrument_id = f"inst-v227-{suffix}"
+    symbol = f"V227{suffix[:5].upper()}"
+    # Miembros originales de ESTUDIO: se restauran en cleanup (no destructivo).
+    original_universe: list[str] = []
+
+    async def _cleanup() -> None:
+        async with lifecycle_factory() as session:
+            if original_universe:
+                repo = SqlAlchemyListRepository(session)
+                await repo.ensure_estudio_list()
+                await repo.update(
+                    SqlAlchemyListRepository.ESTUDIO_LIST_ID,
+                    instrument_ids=original_universe,
+                )
+            await session.execute(
+                delete(StrategyEvaluationRow).where(
+                    StrategyEvaluationRow.instrument_id == instrument_id
+                )
+            )
+            await session.execute(
+                delete(StrategyCandidateRow).where(
+                    StrategyCandidateRow.instrument_id == instrument_id
+                )
+            )
+            await session.execute(
+                delete(OhlcvBarRow).where(OhlcvBarRow.instrument_id == instrument_id)
+            )
+            await session.execute(
+                delete(InstrumentRow).where(InstrumentRow.id == instrument_id)
+            )
+            await session.commit()
+
+    await _cleanup()
+    try:
+        now = datetime.now(UTC)
+        async with lifecycle_factory() as session:
+            # Instrumento real (el LAB exige get_by_id).
+            session.add(
+                InstrumentRow(
+                    id=instrument_id,
+                    symbol=symbol,
+                    yahoo_symbol=f"{symbol}.MC",
+                    name=f"V227 Test {suffix}",
+                    exchange="MCE",
+                    country="ES",
+                    currency="EUR",
+                    type="stock",
+                    is_active=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            # Serie oscilante con tendencia alcista: SMA cross genera operaciones y un
+            # campeón con score > 0 (el gate `backtest` exige score positivo; una serie
+            # monótona produce 0 operaciones y no es evidencia válida del LAB).
+            base = Decimal("10.00")
+            for day in range(420):
+                wave = Decimal(str(1.5 * (1 if day % 40 < 20 else -1)))
+                drift = Decimal(day) * Decimal("0.03")
+                price = base + drift + wave
+                session.add(
+                    OhlcvBarRow(
+                        id=new_id(),
+                        instrument_id=instrument_id,
+                        timeframe="1d",
+                        timestamp=now - timedelta(days=419 - day),
+                        open=price,
+                        high=price + Decimal("0.10"),
+                        low=price - Decimal("0.10"),
+                        close=price,
+                        volume=1000,
+                        adj_close=price,
+                        source="yahoo",
+                        created_at=now,
+                    )
+                )
+            await session.commit()
+
+            # Universo canónico: se AÑADE el instrumento a ESTUDIO preservando el resto.
+            repo = SqlAlchemyListRepository(session)
+            existing = await repo.ensure_estudio_list()
+            original_universe = list(existing.instrument_ids)
+            if instrument_id not in original_universe:
+                await repo.update(
+                    SqlAlchemyListRepository.ESTUDIO_LIST_ID,
+                    instrument_ids=[*original_universe, instrument_id],
+                )
+            await session.commit()
+
+        # Composición REAL (store + ESTUDIO + LAB), sin inyectar nada.
+        orchestrator = _default_orchestrator(lifecycle_factory)
+
+        resolution = await orchestrator.resolve_universe()
+        assert resolution is not None
+        assert resolution.status == "ok"
+        assert instrument_id in resolution.instrument_ids
+
+        result = await orchestrator.run_cycle(
+            instrument_id=instrument_id,
+            shadow_validated=False,  # sin shadow: no promociona, pero SÍ evalúa.
+            run_id=f"v227-{suffix}",
+        )
+
+        # El LAB real se ejecutó: ya no caemos en candidata sintética sin evaluar.
+        assert result.evaluated >= 1, result
+
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            candidates = await store.list_candidates(instrument_id=instrument_id)
+            assert candidates, "el ESTUDIO real debe crear candidata"
+            evaluations = await store.list_evaluations(candidates[0].id)
+            assert evaluations, "el LAB real debe producir evaluación"
+            # Auditable: el ciclo persiste el optimization_run.
+            assert any(e.optimization_run_id for e in evaluations)
+            # Diagnóstico de gates (el LAB real no promete PASS con cualquier serie).
+            gates = {g.gate: g.status.value for g in evaluations[0].gates}
+            assert "backtest" in gates
+            assert result.status != "sin_evidencia_top3", (result, gates, evaluations[0].metrics)
+    finally:
+        await _cleanup()
+
+
+async def test_observed_vigilance_end_to_end_pg(
+    lifecycle_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V2.28/A10 (P1-02 real) — la vigilancia usa fills SIM atribuidos a la versión.
+
+    Certifica la cadena completa contra PG real:
+
+    1. se promociona una activa (versión conocida) para un instrumento sembrado;
+    2. se insertan fills SIM con ``strategy_version_id`` = esa versión;
+    3. la composición REAL construye el provider de métricas observadas;
+    4. ``watch_active`` persiste un snapshot de salud con el bloque observado poblado.
+
+    Es el cierre del P1-02: la vigilancia deja de invocarse con ``metrics={}``.
+    """
+    from datetime import UTC, datetime
+    from decimal import Decimal
+
+    from bolsa_application.sim_durable_store import SimFillFinanceContext
+    from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+    from bolsa_infrastructure.database.models.tables import (
+        SimFillFinanceContextRow,
+        StrategyHealthRow,
+    )
+    from sqlalchemy import delete
+
+    from bolsa_api.background.auto_orchestrator_worker import _default_orchestrator
+
+    suffix = uuid.uuid4().hex[:10]
+    instrument_id = f"inst-v228-{suffix}"
+    version_id = f"ver-v228-{suffix}"
+
+    async def _read_active(factory: Any, iid: str) -> Any:
+        async with factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            return await store.get_active(instrument_id=iid)
+
+    async def _cleanup() -> None:
+        async with lifecycle_factory() as session:
+            await session.execute(
+                delete(StrategyHealthRow).where(StrategyHealthRow.version_id == version_id)
+            )
+            await session.execute(
+                delete(SimFillFinanceContextRow).where(
+                    SimFillFinanceContextRow.instrument_id == instrument_id
+                )
+            )
+            await session.commit()
+
+    await _cleanup()
+    try:
+        # Activa real: se persiste la VERSIÓN (finalista) + PROMOCIÓN, que es lo que
+        # ``get_active`` lee de verdad (``strategy_promotions`` + ``strategy_versions``).
+        # Atajar con ``save_active`` no bastaría: no es la fuente del get_active.
+        from bolsa_application.strategy_lifecycle_store import (
+            StrategyPromotionRecord,
+        )
+        from bolsa_domain.entities.strategy_lifecycle import (
+            StrategyFinalist,
+            StrategyPromotion,
+        )
+
+        candidate_id = f"cand-v228-{suffix}"
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            await store.save_finalist(
+                StrategyFinalist(
+                    version_id=version_id,
+                    candidate_id=candidate_id,
+                    name="v228-observed",
+                    definition_hash=f"hash-{suffix}",
+                    definition={"instrument_id": instrument_id},
+                )
+            )
+            await store.save_promotion(
+                StrategyPromotionRecord(
+                    promotion=StrategyPromotion(
+                        finalist_id=version_id,
+                        promoted=True,
+                        reasons=(),
+                        shadow_validated=True,
+                    ),
+                    candidate_id=candidate_id,
+                    instrument_id=instrument_id,
+                    version_id=version_id,
+                    created_at=datetime.now(UTC).isoformat(),
+                )
+            )
+            await session.commit()
+
+        active_record = await _read_active(lifecycle_factory, instrument_id)
+        assert active_record is not None, "la promoción real debe dejar activa"
+        assert active_record.active.version_id == version_id
+
+        # Fills SIM atribuidos a la versión: 3 round-trips ganadores (guard ≥3).
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            # Se usa el store PG de contexto financiero real vía composición directa.
+            from bolsa_application.sim_durable_store import (
+                PostgresSimFillFinanceContextStore,
+            )
+
+            ctx_store = PostgresSimFillFinanceContextStore(session)
+            for i in range(3):
+                await ctx_store.save(
+                    SimFillFinanceContext(
+                        execution_id=f"{suffix}-b-{i}",
+                        instrument_id=instrument_id,
+                        side="buy",
+                        quantity=Decimal("10"),
+                        price=Decimal("100"),
+                        account_id=None,
+                        strategy_version_id=version_id,
+                    )
+                )
+                await ctx_store.save(
+                    SimFillFinanceContext(
+                        execution_id=f"{suffix}-s-{i}",
+                        instrument_id=instrument_id,
+                        side="sell",
+                        quantity=Decimal("10"),
+                        price=Decimal("110"),
+                        account_id=None,
+                        strategy_version_id=version_id,
+                    )
+                )
+            await session.commit()
+
+        # Guard de muestra mínima: 3 round-trips. Debe fijarse ANTES de componer el
+        # orquestador, porque el provider lee el env al construirse.
+        import os
+
+        os.environ["AUTO_ORCHESTRATOR_OBSERVED_MIN_TRADES"] = "3"
+        try:
+            orchestrator = _default_orchestrator(lifecycle_factory)
+            result = await orchestrator.watch_active(
+                instrument_id=instrument_id,
+                as_of="v228",
+            )
+        finally:
+            os.environ.pop("AUTO_ORCHESTRATOR_OBSERVED_MIN_TRADES", None)
+
+        assert result.active_version_id == version_id
+
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            health = await store.list_health(version_id)
+            assert health, "la vigilancia debe persistir un snapshot de salud"
+            snapshot = health[-1]
+            # El bloque observado viene de los fills SIM reales, no de metrics={}.
+            assert snapshot.observed_trades == 3
+            assert snapshot.observed_return_pct is not None
+            assert snapshot.observed_return_pct > 0
+    finally:
+        await _cleanup()
+
+
+async def test_promotion_persists_champion_and_coach_pg(
+    lifecycle_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V2.29/A10 — la promoción persiste el campeón y el dictamen COACH (PG real).
+
+    Cierra el hueco de atribución de señal: la versión promocionada debe llevar
+    ``champion_params`` + ``executable`` (para que la ACTIVE evalúe su propia señal) y
+    el dictamen COACH comparativo debe quedar persistido y ser legible.
+    """
+
+    from bolsa_application.auto_orchestrator import AutoOrchestrator, OrchestratorDeps
+    from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+    from bolsa_domain.entities.strategy_lifecycle import (
+        CoachAssessment,
+        GateResult,
+        StrategyEvaluation,
+    )
+
+    suffix = uuid.uuid4().hex[:10]
+    instrument_id = f"inst-v229-{suffix}"
+
+    async def _cleanup() -> None:
+        from bolsa_infrastructure.database.models.tables import (
+            StrategyCandidateRow,
+            StrategyEvaluationRow,
+        )
+        from sqlalchemy import delete
+
+        async with lifecycle_factory() as session:
+            await session.execute(
+                delete(StrategyEvaluationRow).where(
+                    StrategyEvaluationRow.candidate_id.like(f"cand-v229-{suffix}%")
+                )
+            )
+            await session.execute(
+                delete(StrategyCandidateRow).where(
+                    StrategyCandidateRow.instrument_id == instrument_id
+                )
+            )
+            await session.commit()
+
+    await _cleanup()
+
+    class _Trial:
+        def __init__(self, score: float, params: dict) -> None:
+            self.score = score
+            self.params = params
+            self.oos_metrics = {"score": 0.9}
+            self.max_drawdown_pct = 4.0
+
+    class _Result:
+        trials = [_Trial(2.0, {"fastPeriod": 10, "slowPeriod": 30})]
+        cpcv = {"pbo": 0.1}
+        pbo = {"pbo": 0.1}
+        walk_forward = {"walkForwardEfficiency": 0.8, "wfe": 0.8}
+        edge_report = {"dsr": 0.6}
+
+    class _Resolution:
+        status = "ok"
+        instrument_ids = [instrument_id]
+
+    async def _resolve() -> _Resolution:
+        return _Resolution()
+
+    async def _run_optimize(candidate: object) -> _Result:
+        return _Result()
+
+    try:
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            orchestrator = AutoOrchestrator(
+                OrchestratorDeps(
+                    store=store,
+                    resolve_universe=_resolve,
+                    run_optimize=_run_optimize,
+                    max_candidates=1,
+                )
+            )
+            result = await orchestrator.run_cycle(
+                instrument_id=instrument_id, shadow_validated=True
+            )
+
+        assert result.promoted, result.reasons
+
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            active = await store.get_active(instrument_id=instrument_id)
+            assert active is not None
+            definition = active.active.definition
+            assert definition["champion_params"] == {"fastPeriod": 10, "slowPeriod": 30}
+            assert definition["executable"]["presetKey"] == "sma_crossover"
+
+            # El dictamen COACH comparativo queda persistido y es legible.
+            candidates = await store.list_candidates(instrument_id=instrument_id)
+            assert candidates
+            assessments = await store.list_coach_assessments(candidates[0].id)
+            assert assessments
+            assert assessments[0].candidate_id == candidates[0].id
+
+        # Round-trip directo del store para el dictamen COACH (idempotente).
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            await store.save_coach_assessment(
+                CoachAssessment(candidate_id=f"cand-v229-{suffix}-x", approved=True)
+            )
+            await store.save_coach_assessment(
+                CoachAssessment(candidate_id=f"cand-v229-{suffix}-x", approved=True)
+            )
+            await session.commit()
+            rows = await store.list_coach_assessments(f"cand-v229-{suffix}-x")
+            assert len(rows) == 1  # idempotente por id determinista
+            assert rows[0].approved
+
+        # Round-trip del store de evaluación real (gates + champion) sin pérdida.
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            cid = f"cand-v229-{suffix}-rt"
+            await store.save_evaluation(
+                StrategyEvaluation(
+                    candidate_id=cid,
+                    score=1.0,
+                    gates=(GateResult.passed_gate("backtest"),),
+                    metrics={"instrument_id": instrument_id, "pbo": 0.1},
+                )
+            )
+            await session.commit()
+            stored = await store.list_evaluations(cid)
+            assert len(stored) == 1
+            assert stored[0].metrics["pbo"] == 0.1
+    finally:
+        await _cleanup()
+

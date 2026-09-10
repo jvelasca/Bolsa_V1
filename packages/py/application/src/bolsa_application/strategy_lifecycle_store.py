@@ -24,6 +24,7 @@ from typing import Any, Protocol
 
 from bolsa_domain.entities.strategy_lifecycle import (
     ActiveStrategy,
+    CoachAssessment,
     GateResult,
     GateStatus,
     StrategyCandidate,
@@ -90,6 +91,9 @@ class StrategyLifecycleStore(Protocol):
     async def list_active(self) -> list[ActiveStrategyRecord]: ...
     async def save_health(self, version_id: str, health: StrategyHealth) -> None: ...
     async def list_health(self, version_id: str) -> list[StrategyHealth]: ...
+    # V2.29 / A10: dictamen COACH comparativo del TOP3 (advisory, uno por candidato).
+    async def save_coach_assessment(self, assessment: CoachAssessment) -> None: ...
+    async def list_coach_assessments(self, candidate_id: str) -> list[CoachAssessment]: ...
 
 
 class InMemoryStrategyLifecycleStore:
@@ -102,6 +106,7 @@ class InMemoryStrategyLifecycleStore:
         self._promotions: list[StrategyPromotionRecord] = []
         self._active: dict[str, ActiveStrategyRecord] = {}
         self._health: dict[str, list[StrategyHealth]] = {}
+        self._coach: dict[str, list[CoachAssessment]] = {}
 
     async def save_candidate(self, candidate: StrategyCandidate) -> None:
         self._candidates[candidate.id] = candidate
@@ -149,6 +154,12 @@ class InMemoryStrategyLifecycleStore:
     async def list_health(self, version_id: str) -> list[StrategyHealth]:
         return list(self._health.get(version_id, []))
 
+    async def save_coach_assessment(self, assessment: CoachAssessment) -> None:
+        self._coach.setdefault(assessment.candidate_id, []).append(assessment)
+
+    async def list_coach_assessments(self, candidate_id: str) -> list[CoachAssessment]:
+        return list(self._coach.get(candidate_id, []))
+
 
 def _gates_to_json(gates: tuple[GateResult, ...]) -> dict[str, Any]:
     return {
@@ -184,6 +195,42 @@ def _gates_from_json(raw: Any) -> tuple[GateResult, ...]:
     return tuple(gates)
 
 
+# V2.29/A10: serialización del dictamen COACH (advisory) al JSON libre de la
+# evaluación. Se guarda como evidencia auditable, no como gate.
+def _coach_to_json(assessment: CoachAssessment) -> dict[str, Any]:
+    return {
+        "candidate_id": assessment.candidate_id,
+        "approved": assessment.approved,
+        "headline": assessment.headline,
+        "coherence": assessment.coherence.value,
+        "complementarity": assessment.complementarity.value,
+        "regime_fit": assessment.regime_fit.value,
+        "contradictions": list(assessment.contradictions),
+        "facts": list(assessment.facts),
+    }
+
+
+def _coach_from_json(payload: Any) -> CoachAssessment:
+    data = payload if isinstance(payload, dict) else {}
+
+    def _status_of(key: str) -> GateStatus:
+        try:
+            return GateStatus(str(data.get(key) or GateStatus.NOT_EVALUATED.value))
+        except ValueError:
+            return GateStatus.NOT_EVALUATED
+
+    return CoachAssessment(
+        candidate_id=str(data.get("candidate_id") or ""),
+        approved=bool(data.get("approved")),
+        headline=data.get("headline"),
+        coherence=_status_of("coherence"),
+        complementarity=_status_of("complementarity"),
+        regime_fit=_status_of("regime_fit"),
+        contradictions=tuple(str(c) for c in (data.get("contradictions") or [])),
+        facts=tuple(str(f) for f in (data.get("facts") or [])),
+    )
+
+
 class PostgresStrategyLifecycleStore:
     """Store durable del ciclo de vida (imports de modelo diferidos por método)."""
 
@@ -191,9 +238,8 @@ class PostgresStrategyLifecycleStore:
         self._session = session
 
     async def save_candidate(self, candidate: StrategyCandidate) -> None:
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
         from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         now = _now()
         await self._session.execute(
@@ -225,9 +271,8 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def get_candidate(self, candidate_id: str) -> StrategyCandidate | None:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
+        from sqlalchemy import select
 
         row = (
             await self._session.execute(
@@ -237,9 +282,8 @@ class PostgresStrategyLifecycleStore:
         return _candidate_from_row(row) if row is not None else None
 
     async def list_candidates(self, *, instrument_id: str | None = None) -> list[StrategyCandidate]:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
+        from sqlalchemy import select
 
         stmt = select(StrategyCandidateRow)
         if instrument_id is not None:
@@ -248,10 +292,9 @@ class PostgresStrategyLifecycleStore:
         return [_candidate_from_row(r) for r in rows]
 
     async def save_evaluation(self, evaluation: StrategyEvaluation) -> None:
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
         from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
         from bolsa_infrastructure.ids import new_id
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         await self._session.execute(
             pg_insert(StrategyEvaluationRow)
@@ -272,9 +315,8 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def list_evaluations(self, candidate_id: str) -> list[StrategyEvaluation]:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
+        from sqlalchemy import select
 
         rows = (
             await self._session.execute(
@@ -297,13 +339,12 @@ class PostgresStrategyLifecycleStore:
         ]
 
     async def save_finalist(self, finalist: StrategyFinalist) -> None:
-        from sqlalchemy import update
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
         from bolsa_infrastructure.database.models.tables import (
             StrategyCandidateRow,
             StrategyVersionRow,
         )
+        from sqlalchemy import update
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         instrument_id = finalist.definition.get("instrument_id") or ""
         if not instrument_id:
@@ -332,10 +373,9 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def save_promotion(self, record: StrategyPromotionRecord) -> None:
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
         from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
         from bolsa_infrastructure.ids import new_id
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         await self._session.execute(
             pg_insert(StrategyPromotionRow)
@@ -357,9 +397,8 @@ class PostgresStrategyLifecycleStore:
     async def list_promotions(
         self, *, promoted: bool | None = None
     ) -> list[StrategyPromotionRecord]:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
+        from sqlalchemy import select
 
         stmt = select(StrategyPromotionRow)
         if promoted is not None:
@@ -386,12 +425,11 @@ class PostgresStrategyLifecycleStore:
         # La activa se materializa como una promoción "activa" leída por get_active;
         # se persiste el marcador en la tabla de promociones (fuente única) para no
         # duplicar estado. No hay tabla ``active_strategies`` separada.
-        from sqlalchemy import select, update
-
         from bolsa_infrastructure.database.models.tables import (
             StrategyPromotionRow,
             StrategyVersionRow,
         )
+        from sqlalchemy import select, update
 
         await self._session.execute(
             update(StrategyVersionRow)
@@ -407,9 +445,8 @@ class PostgresStrategyLifecycleStore:
             )
         ).scalar_one_or_none()
         if exists is None:
-            from sqlalchemy.dialects.postgresql import insert as pg_insert
-
             from bolsa_infrastructure.ids import new_id
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
 
             await self._session.execute(
                 pg_insert(StrategyPromotionRow)
@@ -429,12 +466,11 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def get_active(self, *, instrument_id: str) -> ActiveStrategyRecord | None:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import (
             StrategyPromotionRow,
             StrategyVersionRow,
         )
+        from sqlalchemy import select
 
         row = (
             await self._session.execute(
@@ -469,9 +505,8 @@ class PostgresStrategyLifecycleStore:
         )
 
     async def list_active(self) -> list[ActiveStrategyRecord]:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
+        from sqlalchemy import select
 
         rows = (
             await self._session.execute(
@@ -486,10 +521,9 @@ class PostgresStrategyLifecycleStore:
         return out
 
     async def save_health(self, version_id: str, health: StrategyHealth) -> None:
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
         from bolsa_infrastructure.database.models.tables import StrategyHealthRow
         from bolsa_infrastructure.ids import new_id
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         await self._session.execute(
             pg_insert(StrategyHealthRow)
@@ -501,7 +535,11 @@ class PostgresStrategyLifecycleStore:
                 walk_forward_efficiency=health.walk_forward_efficiency,
                 dsr=health.dsr,
                 credibility=health.credibility,
-                thresholds=dict(health.thresholds),
+                # El JSON ``thresholds`` es el único campo libre de la tabla; en él se
+                # persisten TAMBIÉN los valores observados (V2.28/A10) bajo el prefijo
+                # ``value_`` para no colisionar con sus umbrales homónimos. Así el snapshot
+                # es auditable sin migrar la tabla.
+                thresholds=_health_payload(health),
                 degraded=health.degraded,
                 created_at=_now(),
             )
@@ -510,9 +548,8 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def list_health(self, version_id: str) -> list[StrategyHealth]:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import StrategyHealthRow
+        from sqlalchemy import select
 
         rows = (
             await self._session.execute(
@@ -529,10 +566,107 @@ class PostgresStrategyLifecycleStore:
                 walk_forward_efficiency=r.walk_forward_efficiency,
                 dsr=r.dsr,
                 credibility=r.credibility,
-                thresholds=dict(r.thresholds or {}),
+                **_health_from_payload(dict(r.thresholds or {})),
             )
             for r in rows
         ]
+
+    async def save_coach_assessment(self, assessment: CoachAssessment) -> None:
+        # V2.29/A10: el dictamen COACH se persiste como evidencia advisory en
+        # ``strategy_evaluations`` (tabla existente, sin migración): ``id`` determinista
+        # por candidato (idempotente) y el dictamen serializado en ``metrics["coach"]``.
+        # ``score`` no aplica a un dictamen ⇒ 0.0; los gates van vacíos (el COACH no
+        # sustituye a los gates cuantitativos).
+        from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        await self._session.execute(
+            pg_insert(StrategyEvaluationRow)
+            .values(
+                id=f"coach-{assessment.candidate_id}",
+                candidate_id=assessment.candidate_id,
+                instrument_id="",
+                score=0.0,
+                gates={},
+                metrics={"coach": _coach_to_json(assessment)},
+                trial_ids=[],
+                optimization_run_id=None,
+                edge_report_id=None,
+                created_at=_now(),
+            )
+            .on_conflict_do_nothing(index_elements=["id"])
+        )
+        await self._session.commit()
+
+    async def list_coach_assessments(self, candidate_id: str) -> list[CoachAssessment]:
+        from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
+        from sqlalchemy import select
+
+        rows = (
+            await self._session.execute(
+                select(StrategyEvaluationRow)
+                .where(StrategyEvaluationRow.id == f"coach-{candidate_id}")
+            )
+        ).scalars().all()
+        out: list[CoachAssessment] = []
+        for row in rows:
+            payload = dict(row.metrics or {}).get("coach")
+            if isinstance(payload, dict):
+                out.append(_coach_from_json(payload))
+        return out
+
+
+# V2.28 / A10: claves del payload de salud que NO son umbrales, sino VALORES observados.
+# Se guardan en el JSON ``thresholds`` (único campo libre) con prefijo ``value_`` para no
+# colisionar con los umbrales homónimos (``observed_return_pct``, etc.).
+_OBSERVED_VALUE_KEYS = (
+    "observed_return_pct",
+    "observed_max_drawdown_pct",
+    "observed_win_rate",
+    "observed_profit_factor",
+)
+_OBSERVED_TRADES_KEY = "value_observed_trades"
+
+
+def _health_payload(health: StrategyHealth) -> dict[str, Any]:
+    """Serializa umbrales + valores observados al JSON libre del snapshot.
+
+    Filtra valores no finitos (``inf``/``nan``): JSON no los admite y romperían el
+    ``INSERT`` en PG. Un valor no finito es, a efectos de salud, no disponible.
+    """
+    payload: dict[str, Any] = dict(health.thresholds)
+    for key in _OBSERVED_VALUE_KEYS:
+        value = getattr(health, key, None)
+        if value is not None and _is_finite(value):
+            payload[f"value_{key}"] = value
+    if health.observed_trades is not None:
+        payload[_OBSERVED_TRADES_KEY] = health.observed_trades
+    return payload
+
+
+def _is_finite(value: Any) -> bool:
+    import math
+
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _health_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Reconstruye los campos observados desde el JSON y deja solo umbrales en ``thresholds``."""
+    observed: dict[str, Any] = {}
+    for key in _OBSERVED_VALUE_KEYS:
+        value = payload.get(f"value_{key}")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            observed[key] = float(value)
+    trades = payload.get(_OBSERVED_TRADES_KEY)
+    if isinstance(trades, int) and not isinstance(trades, bool):
+        observed["observed_trades"] = trades
+    thresholds = {
+        key: value
+        for key, value in payload.items()
+        if not key.startswith("value_")
+    }
+    observed["thresholds"] = thresholds
+    return observed
 
 
 def _candidate_from_row(row: Any) -> StrategyCandidate:

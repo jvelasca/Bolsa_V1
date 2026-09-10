@@ -23,8 +23,24 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         w.AUTO_ORCHESTRATOR_INSTRUMENTS,
         w.AUTO_ORCHESTRATOR_INTERVAL_SECONDS,
         w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED,
+        w.AUTO_ORCHESTRATOR_STRATEGY_FAMILY,
+        w.AUTO_ORCHESTRATOR_LAB_PARAMS,
+        w.AUTO_ORCHESTRATOR_MAX_CANDIDATES,
     ):
         monkeypatch.delenv(key, raising=False)
+
+
+class _FakeSession:
+    async def __aenter__(self) -> _FakeSession:
+        return self
+
+    async def __aexit__(self, *_: Any) -> None:
+        return None
+
+
+def _session_factory() -> _FakeSession:
+    """Session factory mínima: la composición no abre sesión hasta ejecutar."""
+    return _FakeSession()
 
 
 # ── Gate de entorno ─────────────────────────────────────────────────────────────
@@ -91,9 +107,15 @@ class _FakeOrchestrator:
 
 
 @pytest.mark.asyncio
-async def test_loop_without_watch_returns_immediately() -> None:
+async def test_loop_without_instruments_keeps_running_safely() -> None:
+    # V2.27: sin universo ni allowlist el bucle NO muere ni orquesta nada; sigue
+    # reintentando (una caída transitoria de ESTUDIO no debe apagar el worker).
     orch = _FakeOrchestrator()
-    await asyncio.wait_for(w.auto_orchestrator_loop(orch, interval_seconds=0.01), timeout=1)
+    task = asyncio.create_task(w.auto_orchestrator_loop(orch, interval_seconds=0.01))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
     assert orch.cycles == []
 
 
@@ -121,3 +143,89 @@ async def test_loop_survives_per_instrument_failure(monkeypatch: pytest.MonkeyPa
         await task
     # El fallo de AAA no impide que BBB se orqueste.
     assert "BBB" in orch.cycles
+
+
+# ── V2.27: composición real (P1-01 + P1-02) ─────────────────────────────────────
+
+
+@dataclass
+class _OrchWithUniverse:
+    """Doble mínimo con ``resolve_universe`` público (como el orquestador real)."""
+
+    resolution: Any
+    cycles: list[str] = field(default_factory=list)
+
+    async def resolve_universe(self) -> Any:
+        return self.resolution
+
+    async def run_cycle(self, *, instrument_id: str, **_: Any) -> _Result:
+        self.cycles.append(instrument_id)
+        return _Result()
+
+    async def watch_active(self, *, instrument_id: str, **_: Any) -> _Result:
+        return _Result()
+
+
+@dataclass
+class _Resolution:
+    status: str = "ok"
+    instrument_ids: list[str] = field(default_factory=lambda: ["AAA", "BBB"])
+
+
+@pytest.mark.asyncio
+async def test_universe_is_canonical_instrument_source() -> None:
+    orch = _OrchWithUniverse(resolution=_Resolution())
+    watch = await w._instruments_for_cycle(orch, allowlist=())
+    assert watch == ("AAA", "BBB")
+
+
+@pytest.mark.asyncio
+async def test_allowlist_filters_the_universe() -> None:
+    orch = _OrchWithUniverse(resolution=_Resolution())
+    watch = await w._instruments_for_cycle(orch, allowlist=("BBB",))
+    assert watch == ("BBB",)
+
+
+@pytest.mark.asyncio
+async def test_unavailable_universe_falls_back_to_allowlist() -> None:
+    orch = _OrchWithUniverse(resolution=_Resolution(status="unavailable", instrument_ids=[]))
+    watch = await w._instruments_for_cycle(orch, allowlist=("AAA",))
+    assert watch == ("AAA",)
+
+
+@pytest.mark.asyncio
+async def test_loop_uses_estudio_universe_without_csv() -> None:
+    orch = _OrchWithUniverse(resolution=_Resolution())
+    task = asyncio.create_task(w.auto_orchestrator_loop(orch, interval_seconds=0.01))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    # Sin AUTO_ORCHESTRATOR_INSTRUMENTS, el universo ESTUDIO manda.
+    assert "AAA" in orch.cycles
+    assert "BBB" in orch.cycles
+
+
+def test_default_orchestrator_wires_real_dependencies() -> None:
+    # P1-01/P1-02: ya no se deja resolve_universe/run_optimize en None.
+    orch = w._default_orchestrator(_session_factory)
+    deps = orch.deps
+
+    assert deps.resolve_universe is not None
+    assert deps.run_optimize is not None
+    assert deps.candidate_id_factory is not None
+
+
+def test_default_orchestrator_is_sim_only() -> None:
+    # Regresión LIVE: la composición del orquestador no puede alcanzar ningún
+    # componente de ejecución real. Solo store + ESTUDIO + LAB.
+    src_module = w._default_orchestrator.__module__
+    assert src_module == "bolsa_api.background.auto_orchestrator_worker"
+
+    orch = w._default_orchestrator(_session_factory)
+    deps = orch.deps
+    # El store es el del lifecycle (SIM), no un router de ejecución.
+    assert type(deps.store).__name__ == "_SessionScopedStore"
+    # Las únicas dependencias cableadas son las del ciclo de investigación.
+    assert deps.resolve_universe is not None
+    assert deps.run_optimize is not None

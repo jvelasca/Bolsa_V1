@@ -70,6 +70,7 @@ def build_estudio_candidates(
     candidate_id_factory: Any | None = None,
     preset_key: str | None = None,
     max_candidates: int | None = None,
+    instrument_id: str | None = None,
 ) -> EstudioCandidatePlan:
     """Fase ESTUDIO: universo resuelto ⇒ candidatas reproducibles.
 
@@ -77,6 +78,11 @@ def build_estudio_candidates(
     ``instrument_ids``). ``EMPTY``/``UNAVAILABLE`` se propagan sin inventar trabajo;
     ``OK`` produce una candidata por instrumento, con ``data_snapshot_id`` común para
     que el LABORATORIO sea reproducible.
+
+    ``instrument_id`` filtra el universo a un solo instrumento. Es importante que el
+    filtro se aplique **antes** de ``max_candidates``: el orquestador procesa un
+    instrumento por ciclo, y recortar el universo antes del filtro dejaría
+    inalcanzables todos los instrumentos a partir de ``max_candidates``.
     """
     status = str(getattr(resolution, "status", "") or "")
     if status != "ok":
@@ -84,6 +90,8 @@ def build_estudio_candidates(
 
     raw_ids = getattr(resolution, "instrument_ids", None) or []
     instrument_ids = [str(i) for i in raw_ids if i]
+    if instrument_id is not None:
+        instrument_ids = [i for i in instrument_ids if i == instrument_id]
     if not instrument_ids:
         return EstudioCandidatePlan(status="empty")
     if max_candidates is not None and max_candidates > 0:

@@ -84,6 +84,9 @@ class SimFillFinanceContext:
     account_id: str | None = None
     venue: str = "simulated"
     idempotency_key: str | None = None
+    # V2.28 / A10 (P1-02 real): versión de estrategia que originó el fill. ``None``
+    # cuando no hay atribución (spine determinista sin ACTIVE) — no se inventa.
+    strategy_version_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.execution_id:
@@ -113,6 +116,13 @@ class SimPositionProjection:
 class SimFillFinanceContextStore(Protocol):
     async def save(self, context: SimFillFinanceContext) -> None: ...
     async def get(self, execution_id: str) -> SimFillFinanceContext | None: ...
+    async def list_for_strategy_version(
+        self,
+        strategy_version_id: str,
+        *,
+        account_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[SimFillFinanceContext]: ...
 
 
 class SimAutoPositionStore(Protocol):
@@ -148,6 +158,30 @@ class InMemorySimFillFinanceContextStore:
 
     async def get(self, execution_id: str) -> SimFillFinanceContext | None:
         return self._rows.get(execution_id)
+
+    async def list_for_strategy_version(
+        self,
+        strategy_version_id: str,
+        *,
+        account_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[SimFillFinanceContext]:
+        """Fills atribuidos a una versión (orden de inserción estable por ``execution_id``).
+
+        V2.28/A10: insumo de las métricas observadas de la vigilancia real. El doble
+        hermético no conoce ``created_at``; el orden por ``execution_id`` es determinista
+        y suficiente para el contrato (el store PG ordena por ``created_at`` real).
+        """
+        rows = [
+            row
+            for row in self._rows.values()
+            if row.strategy_version_id == strategy_version_id
+            and (account_id is None or row.account_id == account_id)
+        ]
+        rows.sort(key=lambda r: r.execution_id)
+        if limit is not None and limit > 0:
+            rows = rows[:limit]
+        return rows
 
     def size(self) -> int:
         return len(self._rows)
@@ -214,9 +248,8 @@ class PostgresSimFillFinanceContextStore:
         self._autocommit = autocommit
 
     async def save(self, context: SimFillFinanceContext) -> None:
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
         from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         await self._session.execute(
             pg_insert(SimFillFinanceContextRow)
@@ -228,6 +261,7 @@ class PostgresSimFillFinanceContextStore:
                 price=context.price,
                 account_id=context.account_id,
                 venue=context.venue,
+                strategy_version_id=context.strategy_version_id,
                 idempotency_key=context.idempotency_key,
                 created_at=_now(),
             )
@@ -239,9 +273,8 @@ class PostgresSimFillFinanceContextStore:
         await _commit_if(self._session, self._autocommit)
 
     async def get(self, execution_id: str) -> SimFillFinanceContext | None:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+        from sqlalchemy import select
 
         row = (
             await self._session.execute(
@@ -261,7 +294,52 @@ class PostgresSimFillFinanceContextStore:
             account_id=row.account_id,
             venue=row.venue,
             idempotency_key=row.idempotency_key,
+            strategy_version_id=row.strategy_version_id,
         )
+
+    async def list_for_strategy_version(
+        self,
+        strategy_version_id: str,
+        *,
+        account_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[SimFillFinanceContext]:
+        """Fills atribuidos a una versión, en orden temporal (V2.28/A10, vigilancia real).
+
+        Solo devuelve filas con atribución explícita; las de ``strategy_version_id``
+        NULL (spine determinista / anteriores a la migración 031) quedan fuera por
+        diseño: sin atribución no se puede afirmar que pertenezcan a la versión.
+        """
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+        from sqlalchemy import select
+
+        stmt = (
+            select(SimFillFinanceContextRow)
+            .where(SimFillFinanceContextRow.strategy_version_id == strategy_version_id)
+            .order_by(
+                SimFillFinanceContextRow.created_at.asc(),
+                SimFillFinanceContextRow.execution_id.asc(),
+            )
+        )
+        if account_id is not None:
+            stmt = stmt.where(SimFillFinanceContextRow.account_id == account_id)
+        if limit is not None and limit > 0:
+            stmt = stmt.limit(limit)
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [
+            SimFillFinanceContext(
+                execution_id=row.execution_id,
+                instrument_id=row.instrument_id,
+                side=row.side,
+                quantity=row.quantity,
+                price=row.price,
+                account_id=row.account_id,
+                venue=row.venue,
+                idempotency_key=row.idempotency_key,
+                strategy_version_id=row.strategy_version_id,
+            )
+            for row in rows
+        ]
 
 
 class PostgresSimAutoPositionStore:
@@ -287,9 +365,8 @@ class PostgresSimAutoPositionStore:
     async def read_projection(
         self, account_id: str, engine_id: str
     ) -> dict[str, SimPositionProjection]:
-        from sqlalchemy import select
-
         from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
+        from sqlalchemy import select
 
         rows = (
             await self._session.execute(
@@ -329,9 +406,8 @@ class PostgresSimAutoPositionStore:
         t1_state: str | None = None,
         trailing_state: str | None = None,
     ) -> None:
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
         from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         now = _now()
         await self._session.execute(
@@ -367,9 +443,8 @@ class PostgresSimAutoPositionStore:
         await _commit_if(self._session, self._autocommit)
 
     async def delete(self, account_id: str, engine_id: str, symbol: str) -> None:
-        from sqlalchemy import delete
-
         from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
+        from sqlalchemy import delete
 
         await self._session.execute(
             delete(SimAutoPositionRow).where(

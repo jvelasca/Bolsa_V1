@@ -2138,6 +2138,13 @@ class SimFillFinanceContextRow(Base):
         # V2.24 / A9.1 (P1-03, defensa redundante): scope de cuenta junto a la
         # identidad global del fill.
         Index("sim_fill_finance_context_account_exec_idx", "account_id", "execution_id"),
+        # V2.28 / A10 (P1-02 real): serie temporal de fills por versión de estrategia
+        # para la vigilancia real (métricas observadas de la ACTIVE).
+        Index(
+            "sim_fill_finance_context_strategy_created_idx",
+            "strategy_version_id",
+            "created_at",
+        ),
     )
 
     execution_id: Mapped[str] = mapped_column("execution_id", String, primary_key=True)
@@ -2147,6 +2154,11 @@ class SimFillFinanceContextRow(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
     venue: Mapped[str] = mapped_column("venue", String, nullable=False)
+    # V2.28 / A10 (P1-02 real): procedencia del fill. ``NULL`` = sin atribución
+    # (spine determinista / filas anteriores a la migración 031). Nunca se inventa.
+    strategy_version_id: Mapped[str | None] = mapped_column(
+        "strategy_version_id", String, nullable=True
+    )
     idempotency_key: Mapped[str | None] = mapped_column(
         "idempotency_key", String, nullable=True
     )

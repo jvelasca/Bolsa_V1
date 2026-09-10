@@ -26,6 +26,18 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from bolsa_domain.entities.strategy_lifecycle import (
+    PROMOTION_GATES,
+    ActiveStrategy,
+    GateResult,
+    StrategyCandidate,
+    StrategyEvaluation,
+)
+
+from bolsa_application.strategy_executable_definition import (
+    build_executable_definition,
+    champion_params_from_result,
+)
 from bolsa_application.strategy_lab_phase import (
     LabThresholds,
     build_estudio_candidates,
@@ -38,19 +50,13 @@ from bolsa_application.strategy_promotion_phase import (
 )
 from bolsa_application.strategy_top3_coach_phase import (
     CoachThresholds,
-    assess_with_coach,
+    Top3CoachVerdict,
+    assess_top3_with_coach,
     select_top3,
 )
 from bolsa_application.strategy_vigilance_phase import (
     HealthThresholds,
     evaluate_active_health,
-)
-from bolsa_domain.entities.strategy_lifecycle import (
-    PROMOTION_GATES,
-    ActiveStrategy,
-    GateResult,
-    StrategyCandidate,
-    StrategyEvaluation,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,12 +80,19 @@ class LifecycleStorePort(Protocol):
     async def save_active(self, record: Any) -> None: ...
     async def get_active(self, *, instrument_id: str) -> Any: ...
     async def save_health(self, version_id: str, health: Any) -> None: ...
+    # V2.29 / A10: dictamen COACH comparativo sobre el TOP3 (uno por candidato). El
+    # orquestador lo persiste como evidencia advisory; nunca sustituye a los gates.
+    async def save_coach_assessment(self, assessment: Any) -> None: ...
 
 
 # ``run_optimize(candidate) -> result`` (resultado de RunSmaGridOptimize o compatible).
 OptimizeRunner = Callable[[StrategyCandidate], Awaitable[Any]]
 # ``resolve_universe() -> resolution`` (objeto de resolve_estudio_universe).
 UniverseResolver = Callable[[], Awaitable[Any]]
+# ``observed_metrics(version_id) -> metrics`` (dict para evaluate_active_health).
+# V2.28 / A10: puerto opcional para la vigilancia real; sin él la vigilancia queda como
+# antes (métricas que le pase el llamante) y NO se inventa evidencia.
+ObservedMetricsProvider = Callable[[str], Awaitable[dict[str, Any]]]
 
 
 @dataclass(slots=True)
@@ -96,6 +109,10 @@ class OrchestratorDeps:
     strategy_family: str = "sma_crossover"
     params: dict[str, Any] = field(default_factory=dict)
     max_candidates: int = 3
+    # V2.28 / A10 (P1-02 real): métricas observadas de la versión activa (fills SIM
+    # atribuidos). Si es ``None``, ``watch_active`` usa exactamente las métricas que le
+    # pase el llamante (comportamiento previo, sin regresión).
+    observed_metrics: ObservedMetricsProvider | None = None
 
 
 @dataclass(slots=True)
@@ -120,6 +137,21 @@ class AutoOrchestrator:
 
     def __init__(self, deps: OrchestratorDeps) -> None:
         self._deps = deps
+
+    @property
+    def deps(self) -> OrchestratorDeps:
+        """Dependencias del orquestador (lectura; útil para composición/introspección)."""
+        return self._deps
+
+    async def resolve_universe(self) -> Any:
+        """Resuelve el universo (ESTUDIO) con el resolver cableado.
+
+        Devuelve ``None`` cuando no hay resolver inyectado (modo hermético/test): el
+        llamante debe entonces usar su allowlist configurada.
+        """
+        if self._deps.resolve_universe is None:
+            return None
+        return await self._deps.resolve_universe()
 
     async def run_cycle(
         self,
@@ -148,8 +180,9 @@ class AutoOrchestrator:
                 data_snapshot_id=data_snapshot_id,
                 candidate_id_factory=deps.candidate_id_factory,
                 max_candidates=deps.max_candidates,
+                instrument_id=instrument_id,
             )
-            candidates = [c for c in plan.candidates if c.instrument_id == instrument_id]
+            candidates = list(plan.candidates)
             if not candidates:
                 return OrchestratorResult(
                     instrument_id=instrument_id,
@@ -178,6 +211,9 @@ class AutoOrchestrator:
 
         # LABORATORIO: evaluar cada candidata con el runner real inyectado.
         evaluations: list[StrategyEvaluation] = []
+        # V2.29/A10: resultado crudo por candidata para extraer el campeón y persistir
+        # sus parámetros ganadores en la versión (habilita el SignalEvaluator real).
+        results_by_candidate: dict[str, Any] = {}
         if deps.run_optimize is not None:
             for candidate in candidates:
                 try:
@@ -192,6 +228,7 @@ class AutoOrchestrator:
                 )
                 await deps.store.save_evaluation(evaluation)
                 evaluations.append(evaluation)
+                results_by_candidate[candidate.id] = result
 
         # TOP3 (por evidencia) — solo si hay evaluaciones.
         selection = (
@@ -211,22 +248,42 @@ class AutoOrchestrator:
                 evaluated=len(evaluations),
             )
 
-        # COACH (advisory) sobre el mejor candidato del TOP3.
-        best_id = selection.top.candidate_ids[0]
-        best_eval = next(e for e in evaluations if e.candidate_id == best_id)
-        coach = assess_with_coach(evaluation=best_eval, thresholds=deps.coach_thresholds)
-        if coach.vetoes:
+        # COACH (advisory, V2.29 comparativo): dictamina los tres candidatos del TOP3
+        # en orden de ranking por evidencia y elige el primero sin veto. El ranking lo
+        # fija la evidencia (select_top3); el COACH nunca lo reordena ni aprueba por
+        # encima de un gate cuantitativo.
+        verdict: Top3CoachVerdict = assess_top3_with_coach(
+            selection=selection,
+            evaluations=evaluations,
+            thresholds=deps.coach_thresholds,
+        )
+        for assessment in verdict.assessments:
+            await deps.store.save_coach_assessment(assessment)
+        if verdict.all_vetoed:
             return OrchestratorResult(
                 instrument_id=instrument_id,
                 status="coach_veto",
                 candidates=len(candidates),
                 evaluated=len(evaluations),
-                reasons=coach.contradictions,
+                reasons=verdict.contradictions,
             )
 
-        # FINALISTA: versión inmutable.
+        best_id = verdict.selected_id
+        assert best_id is not None  # garantizado por all_vetoed
+        best_eval = next(e for e in evaluations if e.candidate_id == best_id)
+        coach = next(a for a in verdict.assessments if a.candidate_id == best_id)
+
+        # FINALISTA: versión inmutable (V2.29/A10: con los parámetros del CAMPEÓN y la
+        # definición ejecutable para que la ACTIVE pueda evaluar su propia señal).
         best_candidate = next(c for c in candidates if c.id == best_id)
-        finalist = build_strategy_version(candidate=best_candidate, name=best_candidate.id)
+        finalist = build_strategy_version(
+            candidate=best_candidate,
+            name=best_candidate.id,
+            definition=_champion_definition(
+                candidate=best_candidate,
+                result=results_by_candidate.get(best_id),
+            ),
+        )
         await deps.store.save_finalist(finalist)
 
         # VALIDACION + PROMOCION: gates cuantitativos (del LAB) + coach + shadow.
@@ -300,17 +357,40 @@ class AutoOrchestrator:
         self,
         *,
         instrument_id: str,
-        metrics: dict[str, Any],
+        metrics: dict[str, Any] | None = None,
         as_of: str,
     ) -> OrchestratorResult:
-        """Vigilancia: evalúa la activa y persiste el snapshot; degrada si procede."""
+        """Vigilancia: evalúa la activa y persiste el snapshot; degrada si procede.
+
+        V2.28 / A10 (P1-02 real): si hay ``observed_metrics`` cableado, se calculan las
+        métricas *observadas* de la versión activa desde sus fills SIM y se fusionan con
+        las que pase el llamante (las predictivas del LAB tienen prioridad si coinciden).
+        Sin provider, se comporta como antes: solo las métricas del llamante.
+
+        Fail-closed: un fallo del provider NO degrada ni aprueba por sí mismo — se degrada
+        a «sin métricas observadas» y se sigue evaluando con lo disponible.
+        """
         record = await self._deps.store.get_active(instrument_id=instrument_id)
         if record is None:
             return OrchestratorResult(instrument_id=instrument_id, status="sin_activa")
+        effective_metrics: dict[str, Any] = {}
+        if self._deps.observed_metrics is not None:
+            try:
+                effective_metrics = dict(
+                    await self._deps.observed_metrics(record.active.version_id) or {}
+                )
+            except Exception:  # noqa: BLE001 — sin evidencia observada no se inventa nada.
+                logger.exception(
+                    "auto_orchestrator observed metrics failed for %s",
+                    record.active.version_id,
+                )
+                effective_metrics = {}
+        if metrics:
+            effective_metrics.update(metrics)
         decision = evaluate_active_health(
             version_id=record.active.version_id,
             as_of=as_of,
-            metrics=metrics,
+            metrics=effective_metrics,
             thresholds=self._deps.health_thresholds,
         )
         if decision.health is not None:
@@ -323,6 +403,28 @@ class AutoOrchestrator:
             relab_triggered=decision.relab,
             reasons=decision.breaches,
         )
+
+
+def _champion_definition(
+    *,
+    candidate: StrategyCandidate,
+    result: Any,
+) -> dict[str, Any] | None:
+    """V2.29/A10 — ``definition`` extra para la versión promocionada.
+
+    Añade ``champion_params`` (parámetros ganadores del grid) y ``executable`` (esquema
+    declarativo listo para ``evaluate_strategy_last_bar``). Es aditivo: si no hay
+    resultado o campeón, devuelve ``None`` y la versión conserva su definición previa
+    (sin inventar señal ejecutable).
+    """
+    champion = champion_params_from_result(result) if result is not None else None
+    if champion is None:
+        return None
+    extra: dict[str, Any] = {"champion_params": champion}
+    executable = build_executable_definition(candidate.strategy_family, champion)
+    if executable is not None:
+        extra["executable"] = executable
+    return extra
 
 
 def _promotion_gates(evaluation: StrategyEvaluation, coach: Any) -> tuple[GateResult, ...]:

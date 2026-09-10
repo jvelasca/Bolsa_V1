@@ -139,3 +139,181 @@ async def test_set_decider_installs_provider() -> None:
     assert runtime._worker._decider is None
     runtime.set_decider(decider)
     assert runtime._worker._decider is decider
+
+
+# ── V2.29/A10: SignalEvaluator real (env-gated) ─────────────────────────────────
+
+
+def _active_with_executable() -> Any:
+    from bolsa_domain.entities.strategy_lifecycle import ActiveStrategy
+
+    def _spec(period: int) -> dict[str, Any]:
+        return {"definitionId": "sma", "parameters": {"period": period}}
+
+    return ActiveStrategy(
+        version_id="ver-sig",
+        candidate_id="cand-sig",
+        instrument_id="AAA",
+        name="SMA",
+        definition={
+            "lot_qty": 42.0,
+            "watch": ["AAA"],
+            "executable": {
+                "presetKey": "sma_crossover",
+                "indicatorSpecs": [_spec(2), _spec(4)],
+                "entries": {
+                    "operator": "all",
+                    "rules": [
+                        {
+                            "type": "indicator_cross",
+                            "leftSpec": _spec(2),
+                            "rightSpec": _spec(4),
+                            "direction": "bullish",
+                            "signalKind": "entry_long",
+                        }
+                    ],
+                },
+                "exits": {
+                    "operator": "all",
+                    "rules": [
+                        {
+                            "type": "indicator_cross",
+                            "leftSpec": _spec(2),
+                            "rightSpec": _spec(4),
+                            "direction": "bearish",
+                            "signalKind": "exit",
+                        }
+                    ],
+                },
+            },
+        },
+    )
+
+
+class _FakeOhlcv:
+    def __init__(self, closes: list[float]) -> None:
+        self._closes = closes
+
+    async def get_bars(self, instrument_id: str, *, timeframe: Any = None, limit: Any = None):
+        from bolsa_domain.entities.ohlcv_bar import OhlcvBar
+
+        return [
+            OhlcvBar(
+                timestamp=f"2026-01-{i + 1:02d}",
+                open=c,
+                high=c,
+                low=c,
+                close=c,
+                volume=1,
+            )
+            for i, c in enumerate(self._closes)
+        ]
+
+
+@pytest.mark.asyncio
+async def test_signal_disabled_uses_classic_decider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sin señal habilitada la ACTIVE solo aporta lote/watch (comportamiento V2.26)."""
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
+    monkeypatch.delenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", raising=False)
+    from bolsa_application.decision_contract import DecisionPackage
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        InMemoryStrategyLifecycleStore,
+    )
+
+    store = InMemoryStrategyLifecycleStore()
+    await store.save_active(
+        ActiveStrategyRecord(active=_active_with_executable(), promoted_at="2026-09-10")
+    )
+    factory, StoreCls, sls = _stub_session_factory(store)
+    monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
+
+    def fallback(symbol: str) -> DecisionPackage:
+        return DecisionPackage(action="BUY", instrument_id=symbol, quantity=7.0)
+
+    # El worker solo pasa ``signal_enabled`` cuando el flag de entorno está ON; aquí se
+    # omite (default False) ⇒ decider clásico: acción del spine, lote acotado.
+    decider = await w.load_active_strategy_decider(
+        factory,
+        instrument_id="AAA",
+        fallback=fallback,
+        watch=("AAA",),
+    )
+    assert decider is not None
+    assert decider("AAA").action == "BUY"
+    assert decider("AAA").quantity == 7.0
+
+
+@pytest.mark.asyncio
+async def test_signal_enabled_uses_own_signal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", "1")
+    from bolsa_application.decision_contract import DecisionPackage
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        InMemoryStrategyLifecycleStore,
+    )
+
+    store = InMemoryStrategyLifecycleStore()
+    await store.save_active(
+        ActiveStrategyRecord(active=_active_with_executable(), promoted_at="2026-09-10")
+    )
+    factory, StoreCls, sls = _stub_session_factory(store)
+    monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
+
+    def fallback(symbol: str) -> DecisionPackage:
+        return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
+
+    decider = await w.load_active_strategy_decider(
+        factory,
+        instrument_id="AAA",
+        fallback=fallback,
+        watch=("AAA",),
+        signal_enabled=True,
+        ohlcv=_FakeOhlcv([10.0] * 7 + [20.0]),
+    )
+    assert decider is not None
+    prop = decider("AAA")
+    assert prop.action == "BUY"  # señal propia (cruce en la última barra)
+    assert prop.quantity == 42.0  # lote de la ACTIVE
+    assert prop.source == "active-strategy:ver-sig"
+
+
+@pytest.mark.asyncio
+async def test_signal_enabled_without_bars_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", "1")
+    from bolsa_application.decision_contract import DecisionPackage
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        InMemoryStrategyLifecycleStore,
+    )
+
+    store = InMemoryStrategyLifecycleStore()
+    await store.save_active(
+        ActiveStrategyRecord(active=_active_with_executable(), promoted_at="2026-09-10")
+    )
+    factory, StoreCls, sls = _stub_session_factory(store)
+    monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
+
+    def fallback(symbol: str) -> DecisionPackage:
+        return DecisionPackage(action="BUY", instrument_id=symbol, quantity=5.0)
+
+    decider = await w.load_active_strategy_decider(
+        factory,
+        instrument_id="AAA",
+        fallback=fallback,
+        watch=("AAA",),
+        signal_enabled=True,
+        ohlcv=_FakeOhlcv([]),  # sin barras ⇒ spine
+    )
+    assert decider is not None
+    assert decider("AAA").action == "BUY"
+    assert decider("AAA").quantity == 5.0
+
+
+def test_signal_flag_defaults_off() -> None:
+    import os
+
+    os.environ.pop("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", None)
+    assert w.active_strategy_signal_enabled() is False

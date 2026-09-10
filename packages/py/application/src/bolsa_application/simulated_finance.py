@@ -88,6 +88,10 @@ class SimulatedFillFinance:
     price: Decimal
     account_id: str | None = None
     venue: str = "simulated"
+    # V2.28 / A10 (P1-02 real): atribución de la versión de estrategia que originó el
+    # fill. ``None`` = sin atribución. Se propaga desde el contexto durable para que un
+    # apply tras crash/relaunch no pierda la procedencia.
+    strategy_version_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.execution_id or not self.execution_id.strip():

@@ -6,16 +6,19 @@ que el COACH es advisory: solo veta/degrada, jamás aprueba por encima de los ga
 
 from __future__ import annotations
 
-from bolsa_application.strategy_top3_coach_phase import (
-    CoachThresholds,
-    assess_with_coach,
-    select_top3,
-)
 from bolsa_domain.entities.strategy_lifecycle import (
     CoachAssessment,
     GateResult,
     GateStatus,
     StrategyEvaluation,
+)
+
+from bolsa_application.strategy_top3_coach_phase import (
+    CoachThresholds,
+    Top3Selection,
+    assess_top3_with_coach,
+    assess_with_coach,
+    select_top3,
 )
 
 
@@ -175,3 +178,64 @@ def test_coach_never_upgrades_quantitative_fail() -> None:
         shadow_validated=True,
     )
     assert not promo.promoted  # los gates cuantitativos mandan
+
+
+# ── COACH comparativo sobre el TOP3 (V2.29) ─────────────────────────────────────
+
+
+def test_coach_comparativo_selects_first_unvetoed_in_rank_order() -> None:
+    """El COACH no reordena: elige el primer candidato del ranking sin veto."""
+    evaluations = [
+        _evaluation("c-best", score=3.0, pbo=0.9),  # mejor por score, pero PBO alto
+        _evaluation("c-ok", score=2.0),
+        _evaluation("c-mid", score=1.0),
+    ]
+    selection = select_top3(instrument_id="AAA", run_id="run-1", evaluations=evaluations)
+    verdict = assess_top3_with_coach(
+        selection=selection,
+        evaluations=evaluations,
+        thresholds=CoachThresholds(max_pbo=0.3),
+    )
+
+    # c-best va primero por score pero el COACH lo veta por PBO; promociona el siguiente.
+    assert selection.top.candidate_ids == ("c-best", "c-ok", "c-mid")
+    assert verdict.selected_id == "c-ok"
+    assert "c-best" in verdict.rejected_ids
+    assert len(verdict.assessments) == 3
+
+
+def test_coach_comparativo_all_vetoed_is_fail_closed() -> None:
+    evaluations = [
+        _evaluation("c1", score=2.0),
+        _evaluation("c2", score=1.0),
+    ]
+    selection = select_top3(instrument_id="AAA", run_id="run-1", evaluations=evaluations)
+    verdict = assess_top3_with_coach(
+        selection=selection,
+        evaluations=evaluations,
+        contradicts_active=True,
+    )
+
+    assert verdict.all_vetoed
+    assert verdict.selected_id is None
+    assert set(verdict.rejected_ids) == {"c1", "c2"}
+    assert "contradice_estrategia_activa" in verdict.contradictions
+
+
+def test_coach_comparativo_missing_evaluation_is_vetoed_not_invented() -> None:
+    """Un candidato del TOP3 sin evaluación asociada se veta; nunca se inventa."""
+    evaluations = [_evaluation("c1", score=2.0)]
+    selection = select_top3(instrument_id="AAA", run_id="run-1", evaluations=evaluations)
+    # Se simula un TOP que contiene un id sin evaluación en la lista.
+    verdict = assess_top3_with_coach(
+        selection=Top3Selection(
+            top=type(selection.top)(
+                instrument_id="AAA",
+                candidate_ids=("c1", "c-ghost"),
+                scores=(2.0, 1.0),
+            ),
+        ),
+        evaluations=evaluations,
+    )
+    assert verdict.selected_id == "c1"
+    assert "c-ghost" in verdict.rejected_ids

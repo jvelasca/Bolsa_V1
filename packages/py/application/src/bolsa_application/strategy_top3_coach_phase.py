@@ -30,6 +30,8 @@ from bolsa_domain.entities.strategy_lifecycle import (
 __all__ = [
     "CoachThresholds",
     "Top3Selection",
+    "Top3CoachVerdict",
+    "assess_top3_with_coach",
     "assess_with_coach",
     "select_top3",
 ]
@@ -112,6 +114,79 @@ def _evidence_level(evaluation: StrategyEvaluation) -> str:
     if "backtest" in passed and "oos" in passed:
         return "oos_validated"
     return "in_sample_only"
+
+
+@dataclass(frozen=True, slots=True)
+class Top3CoachVerdict:
+    """V2.29 — dictamen COACH comparativo sobre el TOP3 completo.
+
+    El ranking del TOP3 lo fija la evidencia (``select_top3``); este dictamen **no lo
+    reordena**: recorre el ranking en orden y elige el **primer candidato sin veto**
+    (``selected_id``). Si todos están vetados, ``approved_id`` es ``None`` y la
+    orquestación corta con ``coach_veto`` (fail-closed).
+    """
+
+    assessments: tuple[CoachAssessment, ...]
+    selected_id: str | None = None
+    rejected_ids: tuple[str, ...] = ()
+
+    @property
+    def all_vetoed(self) -> bool:
+        return self.selected_id is None
+
+    @property
+    def contradictions(self) -> tuple[str, ...]:
+        """Contradicciones agregadas de todos los dictámenes (para el motivo de veto)."""
+        out: list[str] = []
+        for assessment in self.assessments:
+            out.extend(assessment.contradictions)
+        return tuple(out)
+
+
+def assess_top3_with_coach(
+    *,
+    selection: Top3Selection,
+    evaluations: Sequence[StrategyEvaluation],
+    thresholds: CoachThresholds | None = None,
+    expected_regime: str | None = None,
+    recognized_regimes: Sequence[str] = (),
+    contradicts_active: bool = False,
+) -> Top3CoachVerdict:
+    """V2.29 — COACH comparativo: dictamina los tres candidatos del TOP3.
+
+    Recorre ``selection.top.candidate_ids`` **en el orden de ranking por evidencia** y
+    devuelve un ``CoachAssessment`` por candidato. No reordena ni "elige al mejor
+    número": el primero sin veto gana. Un candidato del TOP3 sin evaluación asociada
+    se registra como vetado (nunca se inventa evidencia).
+    """
+    by_id = {e.candidate_id: e for e in evaluations}
+    assessments: list[CoachAssessment] = []
+    selected_id: str | None = None
+    rejected: list[str] = []
+
+    for candidate_id in selection.top.candidate_ids:
+        evaluation = by_id.get(candidate_id)
+        if evaluation is None:
+            rejected.append(candidate_id)
+            continue
+        assessment = assess_with_coach(
+            evaluation=evaluation,
+            thresholds=thresholds,
+            expected_regime=expected_regime,
+            recognized_regimes=recognized_regimes,
+            contradicts_active=contradicts_active,
+        )
+        assessments.append(assessment)
+        if assessment.vetoes:
+            rejected.append(candidate_id)
+        elif selected_id is None:
+            selected_id = candidate_id
+
+    return Top3CoachVerdict(
+        assessments=tuple(assessments),
+        selected_id=selected_id,
+        rejected_ids=tuple(rejected),
+    )
 
 
 @dataclass(frozen=True, slots=True)

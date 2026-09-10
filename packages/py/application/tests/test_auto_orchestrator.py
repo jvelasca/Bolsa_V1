@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from bolsa_domain.entities.strategy_lifecycle import PROMOTION_GATES, ActiveStrategy
 
 from bolsa_application.auto_orchestrator import (
     AutoOrchestrator,
@@ -18,7 +19,7 @@ from bolsa_application.auto_orchestrator import (
     active_strategy_decider,
 )
 from bolsa_application.strategy_lifecycle_store import InMemoryStrategyLifecycleStore
-from bolsa_domain.entities.strategy_lifecycle import PROMOTION_GATES, ActiveStrategy
+from bolsa_application.strategy_top3_coach_phase import CoachThresholds
 
 # ── Dobles ──────────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ class _Trial:
     score: float
     oos_metrics: dict[str, Any] | None = None
     max_drawdown_pct: float | None = 5.0
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -41,7 +43,14 @@ class _OptimizeResult:
 
 def _good_result() -> _OptimizeResult:
     return _OptimizeResult(
-        trials=[_Trial(score=1.5, oos_metrics={"score": 0.9}, max_drawdown_pct=4.0)],
+        trials=[
+            _Trial(
+                score=1.5,
+                oos_metrics={"score": 0.9},
+                max_drawdown_pct=4.0,
+                params={"fastPeriod": 10, "slowPeriod": 30},
+            )
+        ],
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
@@ -201,3 +210,93 @@ def test_promotion_gate_names_are_the_six() -> None:
         "risk",
         "coach",
     }
+
+
+# ── Campeón persistido (V2.29) ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_promoted_version_carries_champion_params_and_executable() -> None:
+    """La versión promocionada incluye los params del campeón y la definición ejecutable."""
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    assert result.promoted
+
+    active = await store.get_active(instrument_id="AAA")
+    assert active is not None
+    definition = active.active.definition
+    assert definition["champion_params"] == {"fastPeriod": 10, "slowPeriod": 30}
+    executable = definition["executable"]
+    assert executable["presetKey"] == "sma_crossover"
+    assert executable["indicatorSpecs"] == [
+        {"definitionId": "sma", "parameters": {"period": 10}},
+        {"definitionId": "sma", "parameters": {"period": 30}},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_version_without_champion_keeps_plain_definition() -> None:
+    """Sin params de campeón no se inventa definición ejecutable (fail-closed)."""
+    no_params = _OptimizeResult(
+        trials=[_Trial(score=1.5, oos_metrics={"score": 0.9}, max_drawdown_pct=4.0)],
+        cpcv={"pbo": 0.1},
+        pbo={"pbo": 0.1},
+        walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
+        edge_report={"dsr": 0.5},
+    )
+    deps, store = _deps(runner=lambda c: no_params, resolution=_Resolution())
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    assert result.promoted
+
+    active = await store.get_active(instrument_id="AAA")
+    assert active is not None
+    assert "executable" not in active.active.definition
+    assert "champion_params" not in active.active.definition
+
+
+# ── COACH comparativo (V2.29) ───────────────────────────────────────────────────
+
+
+@dataclass
+class _MultiResolution:
+    """Universo con VARIAS candidatas para el mismo instrumento (COACH comparativo)."""
+
+    status: str = "ok"
+    instrument_ids: list[str] = field(
+        default_factory=lambda: ["AAA", "AAA", "AAA"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_coach_comparativo_persists_all_assessments() -> None:
+    """El COACH dictamina el TOP3 entero y persiste un assessment por candidato."""
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_MultiResolution())
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+
+    assert result.status == "active"
+    candidates = await store.list_candidates(instrument_id="AAA")
+    assert len(candidates) == 3
+    # Un dictamen por cada candidata evaluada.
+    total = 0
+    for candidate in candidates:
+        total += len(await store.list_coach_assessments(candidate.id))
+    assert total == 3
+
+
+@pytest.mark.asyncio
+async def test_coach_comparativo_veto_blocks_promotion_with_aggregated_reasons() -> None:
+    """Si TODOS los candidatos quedan vetados, no se promociona (fail-closed)."""
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_MultiResolution())
+    # PBO por encima del umbral del COACH ⇒ veta a todas las candidatas.
+    deps.coach_thresholds = CoachThresholds(max_pbo=-1.0)
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+
+    assert result.status == "coach_veto"
+    assert not result.promoted
+    assert "pbo_alto" in result.reasons
+    assert await store.get_active(instrument_id="AAA") is None
+

@@ -39,12 +39,16 @@ async def persist_fill_finance_context(
     side: str,
     account_id: str | None,
     venue: str,
+    strategy_version_id: str | None = None,
 ) -> int:
     """Persiste el contexto durable de cada fill del order. Devuelve nº de filas.
 
     Idempotente (PK ``execution_id``): un re-registro no duplica. Usa el mapper puro
     ``sim_fill_finances`` (mismo precio/cantidad deterministas que la liquidación) y
     por tanto reutiliza la MISMA identidad financiera del fill.
+
+    V2.28 / A10 (P1-02 real): ``strategy_version_id`` atribuye el fill a la versión de
+    estrategia ACTIVE que lo originó (``None`` = sin atribución; nunca se inventa).
     """
     finances: tuple[SimulatedFillFinance, ...] = sim_fill_finances(
         result,
@@ -65,6 +69,7 @@ async def persist_fill_finance_context(
                 account_id=fin.account_id,
                 venue=fin.venue,
                 idempotency_key=fin.idempotency_key,
+                strategy_version_id=strategy_version_id,
             )
         )
         saved += 1
@@ -96,6 +101,7 @@ def build_durable_finance_resolver(
                 price=Decimal(ctx.price),
                 account_id=ctx.account_id or getattr(execution, "account_id", None),
                 venue=ctx.venue or "simulated",
+                strategy_version_id=ctx.strategy_version_id,
             )
         except ValueError:
             # Contexto inválido (venue no sim-only, qty<=0…) ⇒ fail-closed.

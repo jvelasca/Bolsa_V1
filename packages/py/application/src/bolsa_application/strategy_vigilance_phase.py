@@ -38,21 +38,51 @@ DECISION_RELAB = "relab"
 
 @dataclass(frozen=True, slots=True)
 class HealthThresholds:
-    """Umbrales de degradación de la estrategia activa (fail-safe: conservadores)."""
+    """Umbrales de degradación de la estrategia activa (fail-safe: conservadores).
+
+    Los cuatro primeros son *predictivos* (del LAB). Los cuatro últimos son *observados*
+    (ejecución SIM real; V2.28 / A10): su semántica es distinta y **nunca** degradan por
+    debajo de ``min_observed_trades`` round-trips cerrados (guarda de muestra mínima).
+
+    Nota sobre el drawdown observado: se expresa en magnitud positiva (p. ej. ``20`` = 20%
+    de caída) y su umbral es un TECHO. La comparación con signo correcto la resuelve
+    ``StrategyHealth._observed_degraded``; aquí solo se declara el valor.
+    """
 
     min_edge: float = 0.0
     min_wfe: float = 0.0
     min_dsr: float = 0.0
     min_credibility: float = 0.0
+    # --- Umbrales observados (V2.28 / A10) ---
+    min_observed_trades: int = 10
+    min_observed_return_pct: float | None = None
+    max_observed_drawdown_pct: float | None = None
+    min_observed_win_rate: float | None = None
+    min_observed_profit_factor: float | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, float]:
-        return {
+        """Umbrales persistibles en el snapshot de salud.
+
+        Los ``None`` se omiten: un umbral no configurado no debe viajar como 0 (que
+        activaría una degradación por defecto no intencionada).
+        """
+        out: dict[str, float] = {
             "edge": self.min_edge,
             "walk_forward_efficiency": self.min_wfe,
             "dsr": self.min_dsr,
             "credibility": self.min_credibility,
+            "min_observed_trades": float(self.min_observed_trades),
         }
+        if self.min_observed_return_pct is not None:
+            out["observed_return_pct"] = self.min_observed_return_pct
+        if self.max_observed_drawdown_pct is not None:
+            out["observed_max_drawdown_pct"] = self.max_observed_drawdown_pct
+        if self.min_observed_win_rate is not None:
+            out["observed_win_rate"] = self.min_observed_win_rate
+        if self.min_observed_profit_factor is not None:
+            out["observed_profit_factor"] = self.min_observed_profit_factor
+        return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +123,7 @@ def evaluate_active_health(
     wfe = _num(metrics.get("walk_forward_efficiency") or metrics.get("wfe"))
     dsr = _num(metrics.get("dsr"))
     credibility = _num(metrics.get("credibility"))
+    observed_trades = _int(metrics.get("observed_trades"))
 
     health = StrategyHealth(
         version_id=version_id,
@@ -102,6 +133,12 @@ def evaluate_active_health(
         dsr=dsr,
         credibility=credibility,
         thresholds=th.as_dict(),
+        # V2.28 / A10: bloque observado (ejecución SIM real atribuida a la versión).
+        observed_return_pct=_num(metrics.get("observed_return_pct")),
+        observed_max_drawdown_pct=_num(metrics.get("observed_max_drawdown_pct")),
+        observed_win_rate=_num(metrics.get("observed_win_rate")),
+        observed_profit_factor=_num(metrics.get("observed_profit_factor")),
+        observed_trades=observed_trades,
     )
 
     breaches: list[str] = []
@@ -113,6 +150,11 @@ def evaluate_active_health(
         breaches.append("dsr")
     if credibility is not None and credibility < th.min_credibility:
         breaches.append("credibility")
+    # Degradación observada: se delega en la entidad, que aplica la guarda de muestra
+    # mínima y la semántica de techo del drawdown. Si degrada por observado, se registran
+    # los motivos concretos para que el snapshot sea auditable.
+    if health.observed_degraded:
+        breaches.extend(_observed_breaches(health, th))
 
     degraded = bool(breaches)
     return VigilanceDecision(
@@ -124,9 +166,49 @@ def evaluate_active_health(
     )
 
 
+def _observed_breaches(health: StrategyHealth, th: HealthThresholds) -> list[str]:
+    """Motivos concretos de la degradación observada (auditoría del snapshot)."""
+    out: list[str] = []
+    if (
+        th.min_observed_return_pct is not None
+        and health.observed_return_pct is not None
+        and health.observed_return_pct < th.min_observed_return_pct
+    ):
+        out.append("observed_return_pct")
+    if (
+        th.max_observed_drawdown_pct is not None
+        and health.observed_max_drawdown_pct is not None
+        and health.observed_max_drawdown_pct > th.max_observed_drawdown_pct
+    ):
+        out.append("observed_max_drawdown_pct")
+    if (
+        th.min_observed_win_rate is not None
+        and health.observed_win_rate is not None
+        and health.observed_win_rate < th.min_observed_win_rate
+    ):
+        out.append("observed_win_rate")
+    if (
+        th.min_observed_profit_factor is not None
+        and health.observed_profit_factor is not None
+        and health.observed_profit_factor < th.min_observed_profit_factor
+    ):
+        out.append("observed_profit_factor")
+    return out
+
+
 def _num(raw: Any) -> float | None:
     if isinstance(raw, bool) or raw is None:
         return None
     if isinstance(raw, (int, float)):
         return float(raw)
+    return None
+
+
+def _int(raw: Any) -> int | None:
+    if isinstance(raw, bool) or raw is None:
+        return None
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float) and raw.is_integer():
+        return int(raw)
     return None

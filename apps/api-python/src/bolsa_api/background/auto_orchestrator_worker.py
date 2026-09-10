@@ -1,13 +1,24 @@
-"""V2.26 / A10 — worker del Auto Orchestrator (env-gated, SIM-only).
+"""V2.27 / A10 — worker del Auto Orchestrator (env-gated, SIM-only).
 
 Reloj de fondo que invoca ``AutoOrchestrator.run_cycle`` y ``watch_active`` con el
 gate de entorno (default **OFF**), siguiendo el patrón de los workers A9:
 
 * ``AUTO_ORCHESTRATOR_ENABLED=1`` — activa el bucle (default OFF, fail-closed).
-* ``AUTO_ORCHESTRATOR_INSTRUMENTS`` — lista CSV de instrumentos a orquestar.
+* ``AUTO_ORCHESTRATOR_INSTRUMENTS`` — allowlist CSV **opcional**: el universo
+  canónico es ESTUDIO (lista ``estudio``); si se define, filtra ese universo.
 * ``AUTO_ORCHESTRATOR_INTERVAL_SECONDS`` — periodo del bucle (default 3600).
 * ``AUTO_ORCHESTRATOR_SHADOW_VALIDATED=1`` — permite promocionar (default OFF: sin
-  shadow no hay promoción, coherente con el Promotion Gate).
+  shadow no hay promoción, coherente con el Promotion Gate). P2 V2.28: este flag
+  certifica shadow sin ejecutarlo; debe endurecerse.
+* ``AUTO_ORCHESTRATOR_STRATEGY_FAMILY`` — familia por defecto del ESTUDIO.
+* ``AUTO_ORCHESTRATOR_LAB_PARAMS`` — override JSON del grid del LAB (opcional).
+* ``AUTO_ORCHESTRATOR_MAX_CANDIDATES`` — tope de candidatas por instrumento/ciclo
+  (default 3; el TOP3 de ``select_top3`` es aparte).
+
+V2.27 cablea el composition root real: ``resolve_universe`` (ESTUDIO) y
+``run_optimize`` (``RunSmaGridOptimizeAndSave``) dejan de ser ``None``, de modo que
+el ciclo ESTUDIO → LAB → TOP3 → COACH → PROMOTION → ACTIVE puede ejecutarse de
+verdad y con evidencia persistida.
 
 **SIM-only**: este worker no abre venues ni habilita LIVE. La ejecución sigue en el
 worker AUTO SIM, cuyo ``DecisionProvider`` puede leer la estrategia ACTIVE del store
@@ -21,12 +32,28 @@ import logging
 import os
 from typing import Any
 
+from bolsa_api.api.dependencies import (
+    get_cognitive_repository,
+    get_hypothesis_belief_repository,
+    get_instrument_repository,
+    get_list_repository,
+    get_ohlcv_repository,
+    get_optimization_run_repository,
+    get_research_evidence_repository,
+    get_research_trial_repository,
+)
+
 logger = logging.getLogger(__name__)
 
 AUTO_ORCHESTRATOR_ENABLED = "AUTO_ORCHESTRATOR_ENABLED"
 AUTO_ORCHESTRATOR_INSTRUMENTS = "AUTO_ORCHESTRATOR_INSTRUMENTS"
 AUTO_ORCHESTRATOR_INTERVAL_SECONDS = "AUTO_ORCHESTRATOR_INTERVAL_SECONDS"
 AUTO_ORCHESTRATOR_SHADOW_VALIDATED = "AUTO_ORCHESTRATOR_SHADOW_VALIDATED"
+# V2.27: familia por defecto del ESTUDIO, override JSON del grid del LAB, y tope de
+# candidatas por instrumento/ciclo (el universo ESTUDIO es la fuente canónica).
+AUTO_ORCHESTRATOR_STRATEGY_FAMILY = "AUTO_ORCHESTRATOR_STRATEGY_FAMILY"
+AUTO_ORCHESTRATOR_LAB_PARAMS = "AUTO_ORCHESTRATOR_LAB_PARAMS"
+AUTO_ORCHESTRATOR_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_MAX_CANDIDATES"
 
 
 def _truthy(raw: str | None) -> bool:
@@ -58,6 +85,52 @@ def shadow_validated() -> bool:
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_SHADOW_VALIDATED))
 
 
+async def _instruments_for_cycle(
+    orchestrator: Any,
+    *,
+    allowlist: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Instrumentos a orquestar: ESTUDIO canónico, con CSV como allowlist opcional.
+
+    V2.27: el universo ESTUDIO es la fuente principal. Si el orquestador no expone
+    ``resolve_universe`` (modo hermético/test) o el universo no está disponible, se
+    cae a la allowlist ``AUTO_ORCHESTRATOR_INSTRUMENTS`` (comportamiento previo). Un
+    universo ``empty``/``unavailable`` nunca inventa candidatas: fail-closed.
+    """
+    resolver = getattr(orchestrator, "resolve_universe", None)
+    if not callable(resolver):
+        return allowlist
+
+    try:
+        resolution = await resolver()
+    except Exception:  # noqa: BLE001 — resolver caído ⇒ allowlist, no se inventa nada.
+        logger.exception("auto_orchestrator: fallo resolviendo el universo ESTUDIO.")
+        return allowlist
+
+    if resolution is None:
+        # Sin resolver cableado (modo hermético/test): comportamiento previo.
+        return allowlist
+
+    status = str(getattr(resolution, "status", "") or "")
+    if status != "ok":
+        logger.info(
+            "auto_orchestrator: universo ESTUDIO status=%s — sin orquestación por "
+            "universo (allowlist=%s).",
+            status,
+            allowlist,
+        )
+        return allowlist
+
+    ids = tuple(str(i) for i in (getattr(resolution, "instrument_ids", None) or []) if i)
+    if not ids:
+        return allowlist
+    if allowlist:
+        # El CSV actúa como filtro/allowlist cuando está configurado.
+        filtered = tuple(i for i in ids if i in set(allowlist))
+        return filtered
+    return ids
+
+
 async def auto_orchestrator_loop(
     orchestrator: Any,
     *,
@@ -65,15 +138,16 @@ async def auto_orchestrator_loop(
 ) -> None:
     """Bucle del orquestador: corre el ciclo y vigila la activa por instrumento."""
     period = interval_seconds if interval_seconds is not None else _interval_seconds()
-    watch = instrument_watch()
-    if not watch:
-        logger.warning(
-            "auto_orchestrator activo pero sin %s — no se orquesta nada.",
-            AUTO_ORCHESTRATOR_INSTRUMENTS,
-        )
-        return
+    allowlist = instrument_watch()
     allow_promotion = shadow_validated()
     while True:
+        watch = await _instruments_for_cycle(orchestrator, allowlist=allowlist)
+        if not watch:
+            logger.warning(
+                "auto_orchestrator activo pero sin instrumentos (universo ESTUDIO no "
+                "disponible y %s vacío) — no se orquesta nada.",
+                AUTO_ORCHESTRATOR_INSTRUMENTS,
+            )
         for instrument_id in watch:
             try:
                 result = await orchestrator.run_cycle(
@@ -87,10 +161,13 @@ async def auto_orchestrator_loop(
                     result.status,
                     result.promoted,
                 )
-                # Vigilancia de la activa (si la hay) con las métricas disponibles.
+                # Vigilancia de la activa. V2.28/A10 (P1-02 real): las métricas
+                # observadas de la ejecución SIM las aporta el propio orquestador vía
+                # ``observed_metrics`` (fills atribuidos a la versión). Aquí ya no se
+                # pasa ``metrics={}``: sin evidencia observada suficiente, la vigilancia
+                # no degrada por ruido (guarda de muestra mínima en el dominio).
                 await orchestrator.watch_active(
                     instrument_id=instrument_id,
-                    metrics={},
                     as_of=result.status,
                 )
             except Exception:  # noqa: BLE001 — un fallo por instrumento no tumba el bucle.
@@ -129,14 +206,30 @@ def start_auto_orchestrator(
 
 
 def _default_orchestrator(session_factory: Any) -> Any:
-    """Compone el orquestador real (store Postgres por sesión, SIM-only).
+    """Compone el orquestador real: store + ESTUDIO + LAB reales (SIM-only).
 
-    El ``run_optimize`` real queda pendiente de cablear al LAB (``RunSmaGridOptimize``)
-    en el proceso API; hasta entonces el ciclo solo puede crear candidatas (sin
-    evidencia no promociona, que es el comportamiento fail-closed correcto).
+    V2.27: el ciclo deja de ser una maqueta. Se cablean los dos puertos que
+    ``AutoOrchestrator`` ya admitía pero que la composición real no proporcionaba:
+
+    * ``resolve_universe`` — universo canónico ESTUDIO (lista ``estudio``) vía
+      ``resolve_estudio_universe``; sustituye a ``AUTO_ORCHESTRATOR_INSTRUMENTS``
+      como fuente principal (el CSV queda como allowlist opcional en el bucle).
+    * ``run_optimize`` — LAB real ``RunSmaGridOptimizeAndSave`` mediante
+      ``LabOptimizeRunner``; persiste el ``optimization_run`` de cada ciclo para
+      que la evidencia sea auditable.
+
+    Cada uso abre su propia sesión (patrón "una sesión por operación"), de modo que
+    el orquestador no retiene una ``AsyncSession`` de larga vida.
+
+    **SIM-only**: no se compone ninguna dependencia de LIVE. El único consumidor de
+    la estrategia ACTIVE sigue siendo el worker AUTO SIM, detrás de sus gates.
     """
     from bolsa_application.auto_orchestrator import AutoOrchestrator, OrchestratorDeps
+    from bolsa_application.orchestrator_lab_runner import LabOptimizeRunner
     from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+    from bolsa_application.strategy_observed_metrics_provider import (
+        make_observed_metrics_provider,
+    )
 
     class _SessionScopedStore:
         """Store que abre una sesión por operación (imports diferidos)."""
@@ -149,4 +242,106 @@ def _default_orchestrator(session_factory: Any) -> Any:
 
             return _call
 
-    return AutoOrchestrator(OrchestratorDeps(store=_SessionScopedStore()))
+    def _build_lab_use_case(session: Any) -> Any:
+        """LAB real ``RunSmaGridOptimizeAndSave`` para una sesión dada (SIM-only)."""
+        from bolsa_application.optimization_runs import RunSmaGridOptimizeAndSave
+        from bolsa_application.optimize import RunSmaGridOptimize
+
+        return RunSmaGridOptimizeAndSave(
+            RunSmaGridOptimize(
+                get_instrument_repository(session),
+                get_ohlcv_repository(session),
+            ),
+            get_optimization_run_repository(session),
+            get_research_trial_repository(session),
+            get_cognitive_repository(session),
+            get_research_evidence_repository(session),
+            get_hypothesis_belief_repository(session),
+        )
+
+    return AutoOrchestrator(
+        OrchestratorDeps(
+            store=_SessionScopedStore(),
+            resolve_universe=_estudio_universe_resolver(session_factory),
+            run_optimize=LabOptimizeRunner(session_factory, _build_lab_use_case),
+            strategy_family=_default_family(),
+            params=_default_grid_params(),
+            max_candidates=_max_candidates(),
+            candidate_id_factory=_candidate_id_factory,
+            # V2.28 / A10 (P1-02 real): vigilancia con métricas OBSERVADAS de la ejecución
+            # SIM atribuida a la versión activa (fills con strategy_version_id).
+            observed_metrics=make_observed_metrics_provider(session_factory),
+        )
+    )
+
+
+class _SessionScopedEstudioList:
+    """``EstudioListPort`` real: abre una sesión por ``execute`` (lista ``estudio``).
+
+    ``resolve_estudio_universe`` solo necesita un objeto con ``execute(list_id)``;
+    este adaptador materializa el puerto con ``GetInstrumentList`` y una sesión
+    propia por llamada, sin retener sesiones de larga vida.
+    """
+
+    def __init__(self, session_factory: Any) -> None:
+        self._session_factory = session_factory
+
+    async def execute(self, list_id: str) -> Any:
+        from bolsa_application.lists import GetInstrumentList
+
+        async with self._session_factory() as session:
+            return await GetInstrumentList(get_list_repository(session)).execute(list_id)
+
+
+def _estudio_universe_resolver(session_factory: Any) -> Any:
+    """``resolve_universe`` real: universo canónico ESTUDIO (fail-closed)."""
+    from bolsa_application.orchestrator_universe import make_estudio_universe_resolver
+
+    return make_estudio_universe_resolver(_SessionScopedEstudioList(session_factory))
+
+
+def _candidate_id_factory(instrument_id: str, index: int) -> str:
+    """Id determinista y reproducible para una candidata del ESTUDIO."""
+    return f"auto-{instrument_id}-estudio-{index}"
+
+
+def _default_family() -> str:
+    """Familia por defecto del ESTUDIO (familias-first: SMA/RSI/MACD)."""
+    raw = (os.getenv(AUTO_ORCHESTRATOR_STRATEGY_FAMILY) or "").strip()
+    if raw:
+        return raw
+    from bolsa_application.optimize import STRATEGY_FAMILY_SMA
+
+    return STRATEGY_FAMILY_SMA
+
+
+def _default_grid_params() -> dict[str, Any]:
+    """Grid del LAB: defaults por familia en código, con override JSON por env."""
+    raw = (os.getenv(AUTO_ORCHESTRATOR_LAB_PARAMS) or "").strip()
+    if not raw:
+        return {}
+    import json
+
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        logger.warning("%s no es JSON válido — se ignoran overrides de grid.", AUTO_ORCHESTRATOR_LAB_PARAMS)
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _max_candidates() -> int:
+    """Tope de candidatas por instrumento y ciclo.
+
+    El orquestador filtra el universo por instrumento ANTES de aplicar este tope
+    (``build_estudio_candidates(instrument_id=...)``), así que ya no puede dejar
+    instrumentos inalcanzables. El TOP3 sigue fijo en 3 dentro de ``select_top3``.
+    """
+    raw = (os.getenv(AUTO_ORCHESTRATOR_MAX_CANDIDATES) or "").strip()
+    if not raw:
+        return 3
+    try:
+        value = int(raw)
+    except ValueError:
+        return 3
+    return value if value > 0 else 3

@@ -13,14 +13,14 @@ from decimal import Decimal
 from typing import Protocol
 
 import pytest
+from bolsa_application.auto_daily_journal import build_auto_daily_report
+from bolsa_application.decision_contract import DecisionPackage
+from bolsa_application.execution_event import InMemoryExecutionEventStore
 
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
     step_minute_clock,
 )
-from bolsa_application.auto_daily_journal import build_auto_daily_report
-from bolsa_application.decision_contract import DecisionPackage
-from bolsa_application.execution_event import InMemoryExecutionEventStore
 
 _SYMBOLS = ["AAA", "GBP"]
 
@@ -244,3 +244,127 @@ def _sell_decider(to_close: set[str]) -> _Prov:
         return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
 
     return _d
+
+
+# ── V2.28 / A10 (P1-02 real): atribución del fill a la versión de estrategia ────────
+
+
+def test_strategy_version_from_source_extracts_active_version() -> None:
+    from bolsa_api.background.auto_simulation_worker import _strategy_version_from_source
+
+    assert _strategy_version_from_source("active-strategy:ver-123") == "ver-123"
+
+
+def test_strategy_version_from_source_ignores_non_strategy_sources() -> None:
+    from bolsa_api.background.auto_simulation_worker import _strategy_version_from_source
+
+    assert _strategy_version_from_source("protection:protective_stop") is None
+    assert _strategy_version_from_source("") is None
+    assert _strategy_version_from_source(None) is None
+    assert _strategy_version_from_source("active-strategy:") is None
+
+
+@pytest.mark.asyncio
+async def test_open_fills_carry_active_strategy_version(auto_env: None) -> None:
+    """La apertura atribuye sus fills a la versión del ``DecisionPackage.source``."""
+    from bolsa_application.sim_durable_store import InMemorySimFillFinanceContextStore
+
+    store = InMemoryExecutionEventStore()
+    ctx_store = InMemorySimFillFinanceContextStore()
+    worker = AutoSimulationWorker(
+        clock=step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))[1],
+        exec_store=store,
+        context_store=ctx_store,
+    )
+
+    def _decider(symbol: str) -> DecisionPackage:
+        if symbol == "AAA" and worker._open.get("AAA", Decimal("0")) <= 0:
+            return DecisionPackage(
+                action="BUY",
+                instrument_id=symbol,
+                quantity=250.0,
+                source="active-strategy:ver-abc",
+            )
+        return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
+
+    worker._decider = _decider
+    await worker.auto_turn()
+    assert worker._open.get("AAA", Decimal("0")) > 0, "debe abrir posición"
+
+    rows = await ctx_store.list_for_strategy_version("ver-abc")
+    assert rows, "los fills de apertura deben quedar atribuidos a la versión"
+    assert all(r.side == "buy" for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_close_by_protection_inherits_position_version(
+    auto_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """El cierre por protección hereda la versión que abrió la posición.
+
+    Sin esta herencia, la serie de la versión tendría compras sin ventas y el PnL
+    observado no cuadraría.
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIM_PROTECTION", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_STOP_PCT", "0.02")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_T1_PCT", "0.0")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_TRAILING_PCT", "0.0")
+
+    from bolsa_application.sim_durable_store import InMemorySimFillFinanceContextStore
+
+    store = InMemoryExecutionEventStore()
+    ctx_store = InMemorySimFillFinanceContextStore()
+    prices = {"n": 0}
+
+    def script(_symbol: str, _minute: int) -> float:
+        prices["n"] += 1
+        return 100.0 if prices["n"] <= len(_SYMBOLS) else 90.0
+
+    worker = AutoSimulationWorker(
+        clock=step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))[1],
+        exec_store=store,
+        price_script=script,
+        context_store=ctx_store,
+    )
+
+    def _decider(symbol: str) -> DecisionPackage:
+        if symbol == "AAA" and worker._open.get("AAA", Decimal("0")) <= 0:
+            return DecisionPackage(
+                action="BUY",
+                instrument_id=symbol,
+                quantity=250.0,
+                source="active-strategy:ver-xyz",
+            )
+        return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
+
+    worker._decider = _decider
+    await worker.auto_turn()
+    assert worker._open.get("AAA", Decimal("0")) > 0
+
+    # El precio cae: la protección vende sin pasar por el decider (source=protection:*).
+    worker._decider = _hold_decider()
+    await worker.auto_turn()
+    assert worker._open.get("AAA", Decimal("0")) == 0, "SL debe cerrar"
+
+    rows = await ctx_store.list_for_strategy_version("ver-xyz")
+    sides = {r.side for r in rows}
+    assert "buy" in sides
+    assert "sell" in sides, "el cierre debe heredar la atribución de la apertura"
+
+
+@pytest.mark.asyncio
+async def test_deterministic_spine_fills_have_no_attribution(auto_env: None) -> None:
+    """Sin estrategia ACTIVA, los fills no se atribuyen a ninguna versión."""
+    from bolsa_application.sim_durable_store import InMemorySimFillFinanceContextStore
+
+    store = InMemoryExecutionEventStore()
+    ctx_store = InMemorySimFillFinanceContextStore()
+    worker = AutoSimulationWorker(
+        clock=step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))[1],
+        exec_store=store,
+        context_store=ctx_store,
+    )
+    await _open_all(worker, max_minutes=140)
+    assert ctx_store.size() > 0, "debe haber fills"
+    # Ninguno atribuido a una versión: el origen es el spine determinista.
+    assert await ctx_store.list_for_strategy_version("ver-abc") == []
