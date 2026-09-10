@@ -38,7 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-_HEAD = "030_strategy_lifecycle"
+_HEAD = "031_sim_fill_strategy_attr"
 
 
 def _load_env() -> None:
