@@ -224,6 +224,75 @@ def build_lifecycle_accounting(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class LedgerCashMovement:
+    """Movimiento de caja del ledger canónico (aportación mínima para reconstruir).
+
+    ``category`` clasifica la fila para no confundir flujo de caja con P&L:
+
+    * ``deposit``     — aportación externa/seed (+). NO es P&L; forma parte de
+      ``initial_equity``.
+    * ``withdrawal``  — retirada externa (−). NO es P&L.
+    * ``buy``         — compra de instrumento (−notional). NO es P&L por sí sola.
+    * ``sell``        — venta de instrumento (+notional). NO es P&L por sí sola.
+    * ``fee``         — comisión (−abs). SÍ es P&L (coste realizado).
+    """
+
+    category: str
+    amount: Decimal
+
+
+def reconstruct_accounting_from_state(
+    *,
+    movements: Sequence[LedgerCashMovement],
+    remaining: Decimal,
+    avg_cost: Decimal,
+    last_price: Decimal,
+    closed_pnl: Decimal = Decimal("0"),
+) -> LifecycleAccounting:
+    """V2.24.2 (P2-A) — reconstruye la contabilidad REAL del día AUTO.
+
+    A diferencia de una construcción con ``last_price=0``/``realized_pnl=0`` (la
+    invariante quedaría tautológica: ``market_value=0`` y ``unrealized=0``), esta
+    función deriva cada término de datos canónicos y produce una contabilidad
+    **NO degenerada** que ``assert_equity_invariant`` puede certificar de verdad:
+
+    * ``cash``            = Σ (deposits + withdrawals + buys + sells + fees)
+    * ``initial_equity``  = Σ deposits − Σ withdrawals  (capital aportado neto)
+    * ``realized_pnl``    = ``closed_pnl`` (P&L cerrado) − Σ |fees|
+    * ``unrealized_pnl``  = ``(last_price − avg_cost) × remaining`` (dentro del build)
+    * ``total_equity``    = ``cash + remaining × last_price`` (dentro del build)
+
+    La invariante del dominio exige entonces
+    ``cash + market_value == initial_equity + realized_pnl + unrealized_pnl``,
+    que solo se cumple si cash, coste medio, precio y P&L cerrado son coherentes.
+    """
+    cash = Decimal("0")
+    deposits = Decimal("0")
+    withdrawals = Decimal("0")
+    fees = Decimal("0")
+    for mv in movements:
+        amount = Decimal(str(mv.amount))
+        cash += amount
+        category = (mv.category or "").strip().lower()
+        if category == "deposit":
+            deposits += amount
+        elif category == "withdrawal":
+            withdrawals += abs(amount)
+        elif category == "fee":
+            fees += abs(amount)
+    initial_equity = deposits - withdrawals
+    realized_pnl = (Decimal(str(closed_pnl)) - fees).quantize(Decimal("0.000001"))
+    return build_lifecycle_accounting(
+        cash=cash.quantize(Decimal("0.000001")),
+        remaining=Decimal(str(remaining)),
+        avg_cost=Decimal(str(avg_cost)),
+        last_price=Decimal(str(last_price)),
+        realized_pnl=realized_pnl,
+        initial_equity=initial_equity.quantize(Decimal("0.000001")),
+    )
+
+
 def build_auto_daily_report(
     *,
     rows: Sequence[SimJournalRow],

@@ -2,6 +2,107 @@
 
 All notable releases of Bolsa V1.
 
+## [1.52.0-beta] — V2.25 + V2.26 / A10 · Strategy Lifecycle + Auto Orchestrator — 2026-09-10
+
+Construye el **ciclo de vida autónomo de estrategia (A10)** sobre la infraestructura
+LAB/optimización/OOS ya existente y lo cablea al AUTO **exclusivamente** por el seam
+`DecisionProvider`. Núcleo financiero LIVE congelado; **LIVE real sigue doblemente
+bloqueado** y AUTO es **estrictamente SIMULATED**.
+
+> **Nota de reciclaje de nombres:** los identificadores **V2.25** y **V2.26** se usaron
+> el 4-sep-2026 para _polish_ de UI (docs de `docs/engineering/`). Aquí se **reutilizan**
+> con el significado canónico del plan A10: **V2.25 = Strategy Lifecycle** y
+> **V2.26 = Auto Orchestrator**. Las referencias antiguas a V2.25/V2.26 de UI quedan
+> superadas por esta entrada.
+
+### V2.25 — Strategy Lifecycle (A10)
+
+- **Dominio** (`bolsa_domain/entities/strategy_lifecycle.py`): `StrategyCandidate`,
+  `StrategyEvaluation`, `StrategyFinalist`/`StrategyVersion` (inmutable, hash de
+  definición), `StrategyPromotion`, `ActiveStrategy`, `StrategyHealth` y la máquina de
+  estados `StrategyLifecycleState` con transiciones fail-closed (un gate previo debe
+  PASS; el COACH **solo veta/degrada**, nunca aprueba por encima de los gates).
+- **Persistencia** (Alembic **`030_strategy_lifecycle`**, head pasa de `029`): tablas
+  `strategy_candidates`, `strategy_versions`, `strategy_evaluations`,
+  `strategy_promotions`, `strategy_health_snapshots`. Reutiliza `strategy_definitions`,
+  `research_trials`, `research_evidence` y `edge_reports` como evidencia enlazada (no
+  duplica). Store: `InMemoryStrategyLifecycleStore` (hermético) y
+  `PostgresStrategyLifecycleStore` (PG).
+- **Fases** (módulos de aplicación, reutilizando el LAB existente):
+  - **ESTUDIO/LABORATORIO** (`strategy_lab_phase.py`): universo reproducible con
+    `data_snapshot_id` sellado; `evaluate_optimize_result` traduce
+    `RunSmaGridOptimize` (holdout/WF/CPCV/PBO) a `StrategyEvaluation` con gates.
+  - **TOP 3 / COACH** (`strategy_top3_coach_phase.py`): selección por evidencia (score +
+    gates + PBO) y `assess_with_coach` determinista y _advisory_ (veta, no promociona).
+  - **FINALISTA + Promotion Gate** (`strategy_promotion_phase.py`): `StrategyVersion`
+    inmutable y `decide_promotion` con los seis gates (`backtest`, `robustness`,
+    `walk_forward`, `oos`, `risk`, `coach`) + coach + **shadow validation**; reglas
+    anti-strategy-chasing (el LAB no sustituye la activa sin promoción).
+  - **Vigilancia** (`strategy_vigilance_phase.py`): `evaluate_active_health` compara
+    edge/WFE/DSR/credibilidad con umbrales; la degradación ⇒ **re-LAB** (nunca swap).
+- **API**: `GET /research/strategy/{version_id}/health` expone estado e histórico de
+  salud de la estrategia activa (DTOs en `schemas/research.py`).
+
+### V2.26 — Auto Orchestrator (A10)
+
+- **`auto_orchestrator.py`**: ciclo completo
+  ESTUDIO→LAB→TOP3→COACH→FINALISTA→VALIDACIÓN→PROMOCIÓN→ACTIVE→vigilancia, determinista
+  e inyectable. Sin shadow no promociona; sin evidencia, no hay TOP3; el COACH puede
+  vetar.
+- **Worker** (`background/auto_orchestrator_worker.py`, registrado en
+  `scheduler_worker.py`): bucle env-gated **default OFF** —
+  `AUTO_ORCHESTRATOR_ENABLED`, `AUTO_ORCHESTRATOR_INSTRUMENTS`,
+  `AUTO_ORCHESTRATOR_INTERVAL_SECONDS`, `AUTO_ORCHESTRATOR_SHADOW_VALIDATED`.
+- **Seam ACTIVE→AUTO**: `active_strategy_decider` traduce la estrategia activa a un
+  `DecisionProvider`. El worker AUTO lo instala vía `AutoSimRuntime.set_decider` cuando
+  `AUTO_ENGINE_SIM_ACTIVE_STRATEGY=1` (**default OFF**). No se toca RiskGate ni
+  SimulationGate y **no se abre LIVE**; sin activa fiable se conserva el spine
+  determinista.
+
+### Gates CI
+
+- `python-ci.yml` / `release-tag-ci.yml`: entran al pytest offline los tests herméticos
+  de las fases A10 + orquestador (`test_strategy_*_phase.py`, `test_auto_orchestrator.py`,
+  `test_sim_durable_unit_of_work.py`).
+- `release-tag-ci.yml > lifecycle-pg`: nuevo **`AUTO_ORCHESTRATOR_PG_REQUIRED=1`** y el
+  test `test_auto_orchestrator_full_cycle_pg` sobre el store Postgres real (promoción con
+  shadow y degradación→re-LAB). Un skip silencioso es fallo duro.
+
+## [1.51.1-beta] — V2.24.2 / A9.1-hardening — P2 residuales (equity real, UoW, recon global, restart) — 2026-09-10
+
+Endurecimiento de la certificación V2.24/A9.1 (run `34470214388`, GREEN) cerrando los
+**P2 residuales** señalados por la auditoría externa. Sin features de trading nuevas;
+núcleo financiero LIVE congelado y **LIVE real sigue doblemente bloqueado**.
+
+### Qué cambia
+
+- **P2-A — equity invariant REAL:** `reconstruct_accounting_from_state` reconstruye el
+  `LifecycleAccounting` desde las filas reales del ledger (depósitos/compras/ventas/fees),
+  coste medio y precio actual. El test de la Reina por proceso ya no pasa
+  `last_price=0`/`realized_pnl=0` (invariante tautológica): ahora `total_equity ==
+initial + realized + unrealized` es una afirmación financiera no degenerada.
+- **P2-B — unidad-de-trabajo proyección + finance:** `SimDurableUnitOfWork` y el flag
+  `autocommit=False` en `PostgresSimFillFinanceContextStore`/`PostgresSimAutoPositionStore`
+  permiten componer ambos espejos en UNA transacción. El commit autónomo sigue siendo
+  el default (durabilidad-e-idempotencia intacta); la proyección no cambia de naturaleza
+  (sigue siendo reconstruible, P1-01).
+- **P2-C — reconciliación GLOBAL de cuenta:** `reconcile_sim_account` agrega todos los
+  símbolos (unión eventos/canónico/proyección) y detecta posiciones fantasma solo en la
+  proyección; cualquier `DIVERGENT`/`UNKNOWN` bloquea aperturas en toda la cuenta
+  (fail-closed). El worker expone `reconciliation_status` y
+  `reconciliation_blocks_openings`.
+- **P2-D — restart con posición/protección abierta:** nuevo test PG-gated que arranca el
+  proceso real `scheduler_worker`, lo mata con la posición abierta y lo reinicia sobre la
+  misma BD: el proceso readopta la posición durable y **NO re-compra** (los BUY no se
+  doblan). Retén del spine parametrizable por `AUTO_ENGINE_SIM_EXIT_AFTER_TICKS` para
+  poder certificar el escenario.
+
+### Gates CI
+
+- `lifecycle-pg` añade `AUTO_SCHEDULER_RESTART_PG_REQUIRED=1`; el test de restart corre en
+  `apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py` (un skip sin PG sigue
+  siendo fallo duro con los gates activos).
+
 ## [1.51.0-beta] — V2.24-beta / A9.1 · Durable Autonomous Simulation Integrity — 2026-09-10
 
 Cierre de los **4 P1 de durabilidad/aislamiento** que la auditoría V2.23 detectó en

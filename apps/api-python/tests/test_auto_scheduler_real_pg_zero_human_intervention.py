@@ -149,7 +149,10 @@ async def _assert_real_equity_invariant(
 
     from sqlalchemy import select
 
-    from bolsa_application.auto_daily_journal import build_lifecycle_accounting
+    from bolsa_application.auto_daily_journal import (
+        LedgerCashMovement,
+        reconstruct_accounting_from_state,
+    )
     from bolsa_domain.lifecycle import assert_equity_invariant
     from bolsa_infrastructure.database.models.tables import (
         InvestmentPortfolioRow,
@@ -185,20 +188,36 @@ async def _assert_real_equity_invariant(
             session
         ).list_open_for_account(account_id)
         remaining = Decimal("0")
-        avg_cost = Decimal("0")
+        cost_basis = Decimal("0")
+        last_price = Decimal("0")
         for pos in open_positions:
-            qty = pos.position_state.get("remainingQuantity") or pos.position_state.get(
-                "quantity"
-            )
+            state = pos.position_state
+            qty = state.get("remainingQuantity") or state.get("quantity")
+            entry = state.get("actualEntry") or state.get("avgCost") or state.get("entryPrice")
+            price = state.get("lastPrice") or state.get("marketPrice") or entry
             if qty is not None:
                 remaining += Decimal(str(qty))
-        accounting = build_lifecycle_accounting(
-            cash=ledger_cash,
+            if entry is not None:
+                cost_basis += Decimal(str(qty or 0)) * Decimal(str(entry))
+            if price is not None:
+                last_price = Decimal(str(price))
+        avg_cost = (cost_basis / remaining) if remaining != 0 else Decimal("0")
+        if remaining != 0 and last_price == 0:
+            last_price = avg_cost
+        # V2.24.2 (P2-A): reconstrucción REAL desde filas del ledger (no tautológica).
+        entries = await ledger.list_for_account(account_id, limit=None)
+        movements = [
+            LedgerCashMovement(
+                category=(entry.type or "").strip().lower(),
+                amount=Decimal(str(entry.amount)),
+            )
+            for entry in entries
+        ]
+        accounting = reconstruct_accounting_from_state(
+            movements=movements,
             remaining=remaining,
             avg_cost=avg_cost,
-            last_price=Decimal("0"),
-            realized_pnl=Decimal("0"),
-            initial_equity=ledger_cash,
+            last_price=last_price,
         )
         assert_equity_invariant(accounting)  # lanza si el invariante no se cumple.
 

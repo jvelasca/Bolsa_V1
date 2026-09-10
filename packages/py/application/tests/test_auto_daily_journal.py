@@ -148,3 +148,91 @@ def test_report_not_checked_ledger_is_unhealthy() -> None:
     assert rep.healthy is False
     assert "ledger_balance_not_checked" in rep.errors
 
+
+# ── V2.24.2 (P2-A): reconstrucción contable REAL (invariante NO tautológica) ──────
+
+
+def test_reconstruct_accounting_is_not_tautological() -> None:
+    """La contabilidad reconstruida tiene market_value/unrealized NO nulos."""
+    from bolsa_application.auto_daily_journal import (
+        LedgerCashMovement,
+        reconstruct_accounting_from_state,
+    )
+    from bolsa_domain.lifecycle import assert_equity_invariant
+
+    # Depósito 10.000, compra 100 @ 100 (=-10.000 cash), fee 5, precio sube a 110.
+    movements = [
+        LedgerCashMovement(category="deposit", amount=Decimal("10000")),
+        LedgerCashMovement(category="buy", amount=Decimal("-10000")),
+        LedgerCashMovement(category="fee", amount=Decimal("-5")),
+    ]
+    acct = reconstruct_accounting_from_state(
+        movements=movements,
+        remaining=Decimal("100"),
+        avg_cost=Decimal("100"),
+        last_price=Decimal("110"),
+    )
+    # No degenerado: hay valor de mercado y P&L no realizado reales.
+    assert acct.market_value == Decimal("11000.000000")
+    assert acct.unrealized_pnl == Decimal("1000.000000")
+    assert acct.realized_pnl == Decimal("-5.000000")
+    assert acct.cash == Decimal("-5.000000")
+    assert acct.initial_equity == Decimal("10000.000000")
+    # 9995 equity total; 10000 - 5 + 1000 == 9995 ⇒ invariante se cumple de verdad.
+    assert_equity_invariant(acct)
+
+
+def test_reconstruct_accounting_detects_incoherent_cash() -> None:
+    """Si el cash no cuadra con initial+p&l, el invariante DEBE fallar."""
+    import pytest
+
+    from bolsa_application.auto_daily_journal import (
+        LedgerCashMovement,
+        reconstruct_accounting_from_state,
+    )
+    from bolsa_domain.lifecycle import assert_equity_invariant
+
+    movements = [
+        LedgerCashMovement(category="deposit", amount=Decimal("10000")),
+        LedgerCashMovement(category="buy", amount=Decimal("-9900")),  # cash incoherente
+    ]
+    acct = reconstruct_accounting_from_state(
+        movements=movements,
+        remaining=Decimal("100"),
+        avg_cost=Decimal("100"),
+        last_price=Decimal("110"),
+    )
+    with pytest.raises(AssertionError):
+        assert_equity_invariant(acct)
+
+
+def test_reconstruct_accounting_with_closed_pnl() -> None:
+    """P&L cerrado se incorpora al realizado y mantiene la invariante.
+
+    Round-trip coherente: depósito 10.000, compra 100 @ 50 (−5.000), venta 100 @ 55
+    (+5.500) ⇒ el P&L cerrado (500) YA está dentro del cash; la invariante cuadra.
+    """
+    from bolsa_application.auto_daily_journal import (
+        LedgerCashMovement,
+        reconstruct_accounting_from_state,
+    )
+    from bolsa_domain.lifecycle import assert_equity_invariant
+
+    movements = [
+        LedgerCashMovement(category="deposit", amount=Decimal("10000")),
+        LedgerCashMovement(category="buy", amount=Decimal("-5000")),
+        LedgerCashMovement(category="sell", amount=Decimal("5500")),
+    ]
+    acct = reconstruct_accounting_from_state(
+        movements=movements,
+        remaining=Decimal("0"),
+        avg_cost=Decimal("0"),
+        last_price=Decimal("0"),
+        closed_pnl=Decimal("500"),
+    )
+    # remaining=0 ⇒ market_value=0; pero realized_pnl=500 real (no 0).
+    assert acct.realized_pnl == Decimal("500.000000")
+    assert acct.market_value == Decimal("0.000000")
+    assert acct.cash == Decimal("10500.000000")
+    assert_equity_invariant(acct)
+

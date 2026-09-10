@@ -149,6 +149,38 @@ class LabHealthResponseDto(BaseModel):
     data: LabHealthDto
 
 
+class StrategyHealthSnapshotDto(BaseModel):
+    """V2.25/A10 — un snapshot de salud de una estrategia activa."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    version_id: str = Field(alias="versionId")
+    as_of: str = Field(alias="asOf")
+    edge: float | None = None
+    walk_forward_efficiency: float | None = Field(default=None, alias="walkForwardEfficiency")
+    dsr: float | None = None
+    credibility: float | None = None
+    degraded: bool = False
+
+
+class StrategyHealthDto(BaseModel):
+    """V2.25/A10 — estado de salud de la estrategia activa + decisión de vigilancia."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    version_id: str = Field(alias="versionId")
+    instrument_id: str | None = Field(default=None, alias="instrumentId")
+    decision: str  # "continue" | "relab"
+    degraded: bool
+    breaches: list[str] = Field(default_factory=list)
+    latest: StrategyHealthSnapshotDto | None = None
+    history: list[StrategyHealthSnapshotDto] = Field(default_factory=list)
+
+
+class StrategyHealthResponseDto(BaseModel):
+    data: StrategyHealthDto
+
+
 ResearchTrialSortParam = Literal[
     "created_at",
     "sharpe",

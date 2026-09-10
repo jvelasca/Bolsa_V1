@@ -139,8 +139,19 @@ async def _count_scoped_ledger(
 async def _assert_equity_invariant(
     factory: async_sessionmaker[AsyncSession], account_id: str
 ) -> None:
-    """V2.24/A9.1 (P2-05): certifica ``assert_equity_invariant`` sobre el ledger real."""
-    from bolsa_application.auto_daily_journal import build_lifecycle_accounting
+    """V2.24.2 (P2-A): «assert_equity_invariant» sobre el ledger REAL, no tautológico.
+
+    A diferencia de A9.1 (que pasaba ``last_price=0``/``avg_cost=0``/``realized_pnl=0``
+    y dejaba la invariante reducida a ``cash == cash``), aquí se reconstruye la
+    contabilidad desde las filas reales del ledger (depósitos, compras, ventas,
+    fees) y desde la posición abierta canónica (coste medio y precio actual), de
+    modo que ``total_equity == initial + realized + unrealized`` es una afirmación
+    financiera de verdad.
+    """
+    from bolsa_application.auto_daily_journal import (
+        LedgerCashMovement,
+        reconstruct_accounting_from_state,
+    )
     from bolsa_domain.lifecycle import assert_equity_invariant
     from bolsa_infrastructure.database.repositories.ledger_repository import (
         SqlAlchemyLedgerRepository,
@@ -150,24 +161,43 @@ async def _assert_equity_invariant(
     )
 
     async with factory() as session:
-        ledger_cash = Decimal(
-            str(await SqlAlchemyLedgerRepository(session).sum_cash_amounts(account_id))
+        entries = await SqlAlchemyLedgerRepository(session).list_for_account(
+            account_id, limit=None
         )
         open_positions = await SqlAlchemyPositionStateRepository(session).list_open_for_account(
             account_id
         )
         remaining = Decimal("0")
+        cost_basis = Decimal("0")
+        last_price = Decimal("0")
         for pos in open_positions:
-            qty = pos.position_state.get("remainingQuantity") or pos.position_state.get("quantity")
+            state = pos.position_state
+            qty = state.get("remainingQuantity") or state.get("quantity")
+            entry = state.get("actualEntry") or state.get("avgCost") or state.get("entryPrice")
+            price = state.get("lastPrice") or state.get("marketPrice") or entry
             if qty is not None:
                 remaining += Decimal(str(qty))
-        accounting = build_lifecycle_accounting(
-            cash=ledger_cash,
+            if entry is not None:
+                cost_basis += Decimal(str(qty or 0)) * Decimal(str(entry))
+            if price is not None:
+                # Precio plano determinista del día AUTO (price_script default).
+                last_price = Decimal(str(price))
+        avg_cost = (cost_basis / remaining) if remaining != 0 else Decimal("0")
+        if remaining != 0 and last_price == 0:
+            last_price = avg_cost
+        movements = [
+            LedgerCashMovement(
+                category=(entry.type or "").strip().lower(),
+                amount=Decimal(str(entry.amount)),
+            )
+            for entry in entries
+        ]
+        accounting = reconstruct_accounting_from_state(
+            movements=movements,
             remaining=remaining,
-            avg_cost=Decimal("0"),
-            last_price=Decimal("0"),
-            realized_pnl=Decimal("0"),
-            initial_equity=ledger_cash,
+            avg_cost=avg_cost,
+            last_price=last_price,
+            closed_pnl=Decimal("0"),
         )
         assert_equity_invariant(accounting)
 
@@ -317,6 +347,183 @@ async def test_a9_scheduler_process_full_day_pg_zero_human(
             await session.execute(
                 delete(CtxRow).where(CtxRow.account_id == account_id)
             )
+            try:
+                await SqlAlchemyAccountRepository(session).close_account(account_id)
+            except Exception:  # noqa: BLE001 — cleanup nunca tira el test
+                pass
+            await session.commit()
+
+
+# ── V2.24.2 (P2-D): restart REAL del proceso con posición + protección abierta ────
+
+
+async def _scoped_buy_fills(
+    factory: async_sessionmaker[AsyncSession], account_id: str
+) -> int:
+    """ExecutionEvents BUY de la cuenta (para probar que el restart no re-compró).
+
+    ``execution_events`` no tiene columna ``side``; el lado va embebido en
+    ``venue_order_id`` (``sim-{engine}-{acct}-{side}-...``, P1-03), así que se filtra
+    por ese patrón, scoped a la cuenta.
+    """
+    from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+
+    async with factory() as session:
+        return int(
+            (
+                await session.execute(
+                    select(func.count())
+                    .select_from(ExecutionEventRow)
+                    .where(
+                        ExecutionEventRow.account_id == account_id,
+                        ExecutionEventRow.venue_order_id.like("%-buy-%"),
+                    )
+                )
+            ).scalar()
+            or 0
+        )
+
+
+@pytest.mark.asyncio
+async def test_a9_scheduler_process_restart_with_open_protected_position_pg(
+    sched_process_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V2.24.2 (P2-D): el proceso scheduler se reinicia con posición ABIERTA.
+
+    A diferencia del restart de A9.1 (a mitad de jornada, sin garantizar protección
+    activa), aquí la posición queda abierta al matar el proceso con su estado de
+    protección ya persistido. Tras el reinicio del MISMO engine el proceso debe
+    readoptar la posición durable: NO vuelve a comprar (los BUY no se doblan) y la
+    fila de proyección sigue presente. Sin PostgreSQL real/credenciales hace skip;
+    con ``AUTO_SCHEDULER_PROCESS_PG_REQUIRED=1`` un skip es FALLO duro. NUNCA LIVE.
+    """
+    from bolsa_infrastructure.database.models.tables import SimAutoPositionRow as PosRow
+
+    instrument_id = f"inst-a9restart-{uuid.uuid4().hex[:10]}"
+    engine_id = f"auto-a9restart-{uuid.uuid4().hex[:8]}"
+    account_id: str | None = None
+    log_path = Path(tempfile.gettempdir()) / f"a9restart-{engine_id}.log"
+
+    async with sched_process_factory() as session:
+        from datetime import UTC, datetime
+
+        from bolsa_infrastructure.database.models.tables import InstrumentRow
+        from bolsa_infrastructure.database.repositories.account_repository import (
+            SqlAlchemyAccountRepository,
+        )
+
+        account_id = (
+            await SqlAlchemyAccountRepository(session).create_simulated_account(
+                name=f"AUTO-A9RESTART-{uuid.uuid4().hex[:8]}",
+                initial_deposit=100_000.0,
+            )
+        ).account.id
+        session.add(
+            InstrumentRow(
+                id=instrument_id,
+                symbol=f"R9{uuid.uuid4().hex[:6].upper()}",
+                yahoo_symbol=f"R9{uuid.uuid4().hex[:8]}",
+                isin=None,
+                name="A9-Restart",
+                exchange="BMAD",
+                country="ES",
+                currency="EUR",
+                type="stock",
+                is_active=True,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+        )
+        await session.commit()
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "AUTO_SIMULATION_WORKER_ENABLED": "1",
+            "AUTO_ENGINE_SIM_SPINE_AUTO": "1",
+            "AUTO_ENGINE_SIM_ACCOUNT_ID": account_id,
+            "AUTO_ENGINE_SIM_ENGINE_ID": engine_id,
+            "AUTO_ENGINE_SIMULATED_VENUE": "simulated",
+            "AUTO_ENGINE_SIMULATED_WATCH": instrument_id,
+            "AUTO_ENGINE_SIM_INTERVAL_SECONDS": "1.0",
+            "AUTO_ENGINE_SIM_LOT_QTY": "100",
+            # Retén largo: la posición debe seguir ABIERTA cuando matemos el proceso.
+            "AUTO_ENGINE_SIM_EXIT_AFTER_TICKS": "1000",
+            "PYTHONUNBUFFERED": "1",
+        }
+    )
+
+    def _spawn() -> subprocess.Popen[bytes]:
+        return subprocess.Popen(  # noqa: S603 — comando fijo del repo.
+            [sys.executable, "-m", "bolsa_api.workers.scheduler_worker"],
+            cwd=str(_REPO_ROOT),
+            env=env,
+            stdout=open(log_path, "a", encoding="utf-8"),  # noqa: SIM115 — cerrado abajo.
+            stderr=subprocess.STDOUT,
+        )
+
+    async def _stop(proc: subprocess.Popen[bytes]) -> None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=10)
+        try:
+            if proc.stdout is not None:
+                proc.stdout.close()
+        except OSError:
+            pass
+
+    proc = _spawn()
+    try:
+        # Espera a que el proceso abra una posición (BUY durable) antes de matarlo.
+        buys_before = 0
+        for _ in range(int(_TIMEOUT_S * 2)):
+            await asyncio.sleep(0.5)
+            buys_before = await _scoped_buy_fills(sched_process_factory, account_id)
+            if buys_before > 0:
+                break
+        assert buys_before > 0, _proc_failure(
+            "el proceso debe abrir (BUY durable) antes del restart", log_path
+        )
+
+        # Crash + restart del MISMO engine sobre la MISMA BD.
+        await _stop(proc)
+        proc = _spawn()
+
+        # El restart debe readoptar (NO re-comprar): los BUY no se doblan.
+        buys_after = buys_before
+        for _ in range(int(_TIMEOUT_S * 2)):
+            await asyncio.sleep(0.5)
+            buys_after = await _scoped_buy_fills(sched_process_factory, account_id)
+            if buys_after > buys_before:
+                break  # re-compra detectada: falla abajo con diagnóstico.
+        assert buys_after == buys_before, _proc_failure(
+            "el restart con posición abierta NO debe re-comprar (readopción durable)",
+            log_path,
+        )
+    finally:
+        await _stop(proc)
+
+    # Cleanup.
+    if account_id:
+        from sqlalchemy import delete
+
+        from bolsa_infrastructure.database.models.tables import (
+            InstrumentRow,
+        )
+        from bolsa_infrastructure.database.models.tables import (
+            SimFillFinanceContextRow as CtxRow,
+        )
+        from bolsa_infrastructure.database.repositories.account_repository import (
+            SqlAlchemyAccountRepository,
+        )
+
+        async with sched_process_factory() as session:
+            await session.execute(delete(InstrumentRow).where(InstrumentRow.id == instrument_id))
+            await session.execute(delete(PosRow).where(PosRow.account_id == account_id))
+            await session.execute(delete(CtxRow).where(CtxRow.account_id == account_id))
             try:
                 await SqlAlchemyAccountRepository(session).close_account(account_id)
             except Exception:  # noqa: BLE001 — cleanup nunca tira el test

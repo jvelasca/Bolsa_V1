@@ -31,6 +31,7 @@ from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_OK,
     POSITION_PROJECTION_REBUILT,
     POSITION_PROJECTION_UNKNOWN,
+    reconcile_sim_account,
     reconcile_sim_position,
 )
 from bolsa_application.simulated_settlement import auto_venue_order_id
@@ -165,6 +166,93 @@ async def test_protection_state_survives_restart(auto_env: None) -> None:
     assert w2._high_price.get("AAA") == Decimal("110")
 
 
+# ── V2.24.2 (P2-D): restart con posición y PROTECCIÓN abierta ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_restart_with_open_position_trailing_uses_persisted_watermark(
+    auto_env: None,
+) -> None:
+    """Tras reiniciar con posición abierta, el trailing usa el máximo PERSISTIDO.
+
+    No basta con que el lifecycle de ejecución se readopte (A9.1): aquí la posición
+    queda abierta y con protección activa, se reinicia el worker, y el nuevo worker
+    debe (1) NO re-comprar y (2) forzar un ``trailing_stop`` —no un falso ``t1_exit``—
+    con el ``high_watermark`` restaurado. Sin la protección durable el worker olvidaría
+    el máximo y el retroceso se etiquetaría mal.
+    """
+    store = InMemoryExecutionEventStore()
+    pos_store = InMemorySimAutoPositionStore()
+    account = "acc-restart-prot"
+    protection = ProtectionConfig(
+        stop_pct=0.05, t1_pct=0.02, trailing_pct=0.015, enabled=True, t1_fraction=1.0
+    )
+
+    # Worker 1: abre posición @100 y persiste el estado de protección (max 110).
+    _s1, clock1 = step_minute_clock(datetime(2026, 9, 10, 9, 0, tzinfo=UTC))
+    w1 = AutoSimulationWorker(
+        clock=clock1,
+        exec_store=store,
+        position_store=pos_store,
+        account_id=account,
+    )
+    w1._decider = _buy
+    await w1.auto_turn()
+    assert w1._open.get("AAA", Decimal("0")) > 0
+    await pos_store.upsert(
+        account,
+        "auto-sim",
+        "AAA",
+        w1._open["AAA"],
+        entry_price=Decimal("100"),
+        high_watermark=Decimal("110"),  # el máximo ya superó T1 (102)
+        stop_price=Decimal("95"),
+    )
+
+    # Worker 2 (reinicio): readopta posición Y protección desde el espejo durable.
+    _s2, clock2 = step_minute_clock(datetime(2026, 9, 10, 9, 30, tzinfo=UTC))
+    w2 = AutoSimulationWorker(
+        clock=clock2,
+        exec_store=store,
+        position_store=pos_store,
+        account_id=account,
+    )
+    w2._decider = _buy  # sigue proponiendo BUY: NO debe apilar
+    await w2.readopt_positions()
+    assert w2._open.get("AAA", Decimal("0")) > 0, "readopta posición"
+    assert w2._high_price.get("AAA") == Decimal("110"), "readopta el máximo (P2-01)"
+
+    # No doble BUY: un turno con el decider proponiendo BUY sobre posición readoptada
+    # no abre una segunda vez (G7) y NO duplica efecto financiero.
+    turn = await w2.auto_turn()
+    assert turn.opened == 0, "NO segundo BUY tras readopción con posición abierta"
+    assert w2._open.get("AAA", Decimal("0")) > 0
+
+    # Precio 108: retrocede desde 110 (trailing 1.5% ⇒ umbral 108.35) pero sigue
+    # por encima de T1 (102); el motivo correcto es trailing, no t1_exit.
+    reason = protection.exit_reason(
+        held=True,
+        entry=Decimal("100"),
+        high=w2._high_price["AAA"],
+        price=Decimal("108.2"),
+        minute=w2.minute,
+    )
+    assert reason == "trailing_stop", reason
+    # El umbral de trailing depende del high_watermark PERSISTIDO (110×0.985=108.35):
+    # un precio por encima de ese umbral (108.6) NO es trailing, aunque esté por
+    # debajo del máximo. Sin el máximo durable, este límite no existiría.
+    assert (
+        protection.exit_reason(
+            held=True,
+            entry=Decimal("100"),
+            high=w2._high_price["AAA"],
+            price=Decimal("108.6"),
+            minute=w2.minute,
+        )
+        in {None, "t1_exit"}  # 108.6 > 108.35 ⇒ no es trailing
+    )
+
+
 # ── P2-02: reconciliación ───────────────────────────────────────────────────────
 
 
@@ -218,6 +306,69 @@ def test_reconcile_unknown_without_canonical() -> None:
     )
     assert verdict.status == POSITION_PROJECTION_UNKNOWN
     assert not verdict.allows_new_openings
+
+
+# ── V2.24.2 (P2-C): reconciliación GLOBAL de la cuenta ──────────────────────────
+
+
+def test_account_reconciliation_ok_when_all_symbols_match() -> None:
+    report = reconcile_sim_account(
+        account_id="acc-1",
+        engine_id="eng-1",
+        symbols=("AAA", "BBB"),
+        execution_events=[_Ev("AAA", "buy", "100"), _Ev("BBB", "buy", "50")],
+        financial_positions={"AAA": Decimal("100"), "BBB": Decimal("50")},
+        sim_auto_positions={"AAA": Decimal("100"), "BBB": Decimal("50")},
+    )
+    assert report.status == POSITION_PROJECTION_OK
+    assert report.ok and not report.blocks_openings
+    assert set(report.symbols) == {"AAA", "BBB"}
+
+
+def test_account_reconciliation_blocks_on_any_divergent() -> None:
+    """Un solo símbolo divergente bloquea aperturas en TODA la cuenta (fail-closed)."""
+    report = reconcile_sim_account(
+        account_id="acc-1",
+        engine_id="eng-1",
+        symbols=("AAA", "BBB"),
+        execution_events=[_Ev("AAA", "buy", "100"), _Ev("BBB", "buy", "50")],
+        financial_positions={"AAA": Decimal("100"), "BBB": Decimal("999")},
+        sim_auto_positions={"AAA": Decimal("100"), "BBB": Decimal("50")},
+    )
+    assert report.status == POSITION_PROJECTION_DIVERGENT
+    assert report.blocks_openings
+    assert [v.symbol for v in report.divergent] == ["BBB"]
+
+
+def test_account_reconciliation_detects_phantom_projection() -> None:
+    """Una posición SOLO en la proyección (fantasma) no queda invisible."""
+    report = reconcile_sim_account(
+        account_id="acc-1",
+        engine_id="eng-1",
+        symbols=("AAA",),
+        execution_events=[_Ev("AAA", "buy", "100")],
+        financial_positions={"AAA": Decimal("100")},
+        sim_auto_positions={"AAA": Decimal("100"), "GHOST": Decimal("7")},
+    )
+    assert "GHOST" in report.symbols
+    # GHOST no está en el canónico ⇒ su veredicto es UNKNOWN (fail-closed).
+    ghost = next(v for v in report.verdicts if v.symbol == "GHOST")
+    assert ghost.status == POSITION_PROJECTION_UNKNOWN
+    assert report.blocks_openings
+
+
+def test_account_reconciliation_blocks_on_unknown_canonical() -> None:
+    """Sin canónico (None), ningún símbolo es OK: la cuenta queda bloqueada."""
+    report = reconcile_sim_account(
+        account_id="acc-1",
+        engine_id="eng-1",
+        symbols=("AAA",),
+        execution_events=[_Ev("AAA", "buy", "100")],
+        financial_positions=None,
+        sim_auto_positions={"AAA": Decimal("100")},
+    )
+    assert report.status == POSITION_PROJECTION_UNKNOWN
+    assert report.blocks_openings
 
 
 # ── P2-06: trailing vs T1, edad por símbolo, T1 parcial ─────────────────────────

@@ -36,7 +36,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -65,7 +65,7 @@ from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
     POSITION_PROJECTION_REBUILT,
     POSITION_PROJECTION_UNKNOWN,
-    reconcile_sim_position,
+    reconcile_sim_account,
 )
 from bolsa_application.simulated_settlement import (
     normalized_auto_venue,
@@ -443,14 +443,19 @@ class AutoSimulationWorker:
         canonical_map: dict[str, Decimal] = {
             str(s): Decimal(str(q)) for s, q in dict(canonical).items()
         }
-        symbols = set(canonical_map) | set(projection)
-        for symbol in symbols:
-            verdict = reconcile_sim_position(
-                symbol=symbol,
-                execution_events=events,
-                financial_positions=canonical_map,
-                sim_auto_positions={s: r.quantity for s, r in projection.items()},
-            )
+        # V2.24.2 (P2-C): reconciliación GLOBAL de la cuenta (no símbolo a símbolo),
+        # incluyendo símbolos fantasma presentes solo en la proyección.
+        projection_qty = {s: r.quantity for s, r in projection.items()}
+        report = reconcile_sim_account(
+            account_id=account_id,
+            engine_id=self._engine_id,
+            symbols=tuple(set(canonical_map) | set(projection_qty)),
+            execution_events=events,
+            financial_positions=canonical_map,
+            sim_auto_positions=projection_qty,
+        )
+        for verdict in report.verdicts:
+            symbol = verdict.symbol
             self._reconciliation[symbol] = verdict.status
             if verdict.status == POSITION_PROJECTION_REBUILT and self._position_store is not None:
                 # Reconstruye la proyección desde el canónico (conserva protección si la hay).
@@ -545,6 +550,19 @@ class AutoSimulationWorker:
     def journal_pairs(self) -> tuple[SimJournalRow, ...]:
         """Filas de journal completas del día simulado hasta ahora (M7)."""
         return tuple(self._journal)
+
+    @property
+    def reconciliation_status(self) -> dict[str, str]:
+        """V2.24.2 (P2-C) — estado de reconciliación por símbolo (observabilidad)."""
+        return dict(self._reconciliation)
+
+    @property
+    def reconciliation_blocks_openings(self) -> bool:
+        """True si ALGÚN símbolo reconciliado veta nuevas aperturas (fail-closed)."""
+        return any(
+            status in {POSITION_PROJECTION_DIVERGENT, POSITION_PROJECTION_UNKNOWN}
+            for status in self._reconciliation.values()
+        )
 
     def _venue(self) -> str:
         return normalized_auto_venue(_effective_venue()) or "paper"
@@ -1042,10 +1060,59 @@ def _compose_canonical_reader(session: Any) -> Any:
     return _read
 
 
+def active_strategy_enabled() -> bool:
+    """V2.26/A10: ¿el AUTO debe seguir la estrategia ACTIVE? (env, default OFF)."""
+    return (os.getenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+async def load_active_strategy_decider(
+    session_factory: Any,
+    *,
+    instrument_id: str,
+    fallback: DecisionProvider,
+    watch: Sequence[str],
+    lot_qty: float = 100.0,
+) -> DecisionProvider | None:
+    """Carga la estrategia ACTIVE del store y la expone vía ``DecisionProvider``.
+
+    V2.26/A10: éste es el ÚNICO punto por el que la estrategia promovida entra en el
+    hot path del AUTO. No ejecuta nada: envuelve el spine determinista con el lote y
+    el watch de la estrategia activa. Si no hay estrategia activa, o falla la lectura,
+    devuelve ``None`` y el worker sigue con el spine (fail-open seguro: el spine no
+    abre LIVE nunca; RiskGate/SimulationGate siguen vetando).
+    """
+    if not active_strategy_enabled():
+        return None
+    try:
+        from bolsa_application.auto_orchestrator import active_strategy_decider
+        from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+
+        async with session_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            record = await store.get_active(instrument_id=instrument_id)
+        if record is None:
+            return None
+        return active_strategy_decider(
+            active=record.active,
+            fallback=fallback,
+            watch=watch,
+            lot_qty=lot_qty,
+        )
+    except Exception:  # noqa: BLE001 — sin activa fiable se conserva el spine seguro.
+        logger.exception("auto_sim active-strategy load failed (se usa el spine)")
+        return None
+
+
 async def auto_sim_loop(
     runtime: AutoSimRuntime,
     *,
     interval_seconds: float = 60.0,
+    decider_refresher: Any = None,
 ) -> None:
     """Task periódica (SIM-ONLY) del scheduler; no avanza si el gate está OFF.
 
@@ -1054,12 +1121,23 @@ async def auto_sim_loop(
     conserva el ``AutoSimulationWorker`` entre turnos (estado ``_open`` del día en
     RAM; la materia durable de crash/restart es del Bloque 5). NUNCA arranca un
     ``AutoSimulationWorker()`` desnudo.
+
+    V2.26/A10: ``decider_refresher`` (opcional) es una corrutina que devuelve el
+    ``DecisionProvider`` vigente (p. ej. el que sigue la estrategia ACTIVE) y se
+    re-evalúa antes de cada tick; ``None`` ⇒ se mantiene el decider actual.
     """
     logger.info("AutoSimulationWorker (SIM-ONLY) loop iniciado (tick=%ss)", interval_seconds)
     while True:
         await asyncio.sleep(interval_seconds)
         if not sim_worker_enabled():
             continue
+        if decider_refresher is not None:
+            try:
+                refreshed = await decider_refresher()
+                if refreshed is not None:
+                    runtime.set_decider(refreshed)
+            except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
+                logger.exception("auto_sim decider refresh failed")
         try:
             await runtime.run_tick()
         except Exception:  # noqa: BLE001 — un turno no debe tumbar el loop.
@@ -1104,6 +1182,16 @@ class AutoSimRuntime:
     @property
     def worker(self) -> AutoSimulationWorker:
         return self._worker
+
+    def set_decider(self, decider: DecisionProvider | None) -> None:
+        """V2.26/A10: permite refrescar el ``DecisionProvider`` (estrategia ACTIVE).
+
+        El worker mantiene su estado ``_open``; solo cambia la fuente de propuestas.
+        ``None`` es no-op para no dejar el worker sin decider por un refresh vacío.
+        """
+        if decider is None:
+            return
+        self._worker._decider = decider  # noqa: SLF001 — seam interno documentado.
 
     async def run_tick(self) -> TurnReport | None:
         """Un turno real: abre sesión, compone stores PG + finanzas, y lo conduce.
@@ -1160,7 +1248,20 @@ def _default_spine_decider() -> DecisionProvider:
         "1", "true", "yes", "on",
     }
     lot = float(os.getenv("AUTO_ENGINE_SIM_LOT_QTY") or "100.0")
-    return deterministic_auto_decider(watch, lot_qty=lot, enabled=enabled)
+    # V2.24.2 (P2-D): retén configurable para poder certificar un restart con la
+    # posición ABIERTA (default 3 = comportamiento histórico).
+    try:
+        exit_after_ticks = int(os.getenv("AUTO_ENGINE_SIM_EXIT_AFTER_TICKS") or "3")
+    except ValueError:
+        exit_after_ticks = 3
+    if exit_after_ticks <= 0:
+        exit_after_ticks = 3
+    return deterministic_auto_decider(
+        watch,
+        lot_qty=lot,
+        exit_after_ticks=exit_after_ticks,
+        enabled=enabled,
+    )
 
 
 def _sim_engine_id(default: str = "auto-sim") -> str:
@@ -1198,6 +1299,9 @@ def start_auto_sim_worker(
             "AutoSimulationWorker (%s) desactivado — SIM-ONLY por defecto.", AUTO_SIM_WORKER_ENABLED
         )
         return None
+    runtime: Any
+    # V2.26/A10: refresco opcional del decider desde la estrategia ACTIVE (env-gated).
+    decider_refresher: Any = None
     if session_factory is None:
         # Sin composición PG no creamos un runtime "real"; degradamos al worker
         # inyectado (tests/hermético) o construimos uno SOLO si viene cableado.
@@ -1207,7 +1311,7 @@ def start_auto_sim_worker(
                 "ningún runtime (evita un AutoSimulationWorker() desnudo)."
             )
             return None
-        runtime: Any = _HermeticRuntime(worker)  # helper local definido abajo
+        runtime = _HermeticRuntime(worker)  # helper local definido abajo
     else:
         effective_account = account_id or SIM_ACCOUNT_ID
         # V2.24/A9.1 (P1-04): AUTO SIM exige cuenta inequívoca. Sin cuenta NO se
@@ -1228,8 +1332,31 @@ def start_auto_sim_worker(
             account_id=effective_account,
             finance_resolver=finance_resolver,
         )
+        # V2.26/A10: solo con runtime PG real y sin decider inyectado; el seam es el
+        # ``DecisionProvider`` (no se toca RiskGate/SimulationGate ni se abre LIVE).
+        if decider is None and active_strategy_enabled():
+            base_decider = _default_spine_decider()
+            spine_watch = tuple(
+                s.strip()
+                for s in (os.getenv("AUTO_ENGINE_SIM_WATCH") or "").split(",")
+                if s.strip()
+            )
+
+            async def _refresh_active_decider() -> DecisionProvider | None:
+                return await load_active_strategy_decider(
+                    session_factory,
+                    instrument_id=effective_account,
+                    fallback=base_decider,
+                    watch=spine_watch,
+                )
+
+            decider_refresher = _refresh_active_decider
     return asyncio.create_task(
-        auto_sim_loop(runtime, interval_seconds=_sim_interval_seconds(interval_seconds))
+        auto_sim_loop(
+            runtime,
+            interval_seconds=_sim_interval_seconds(interval_seconds),
+            decider_refresher=decider_refresher,
+        )
     )
 
 

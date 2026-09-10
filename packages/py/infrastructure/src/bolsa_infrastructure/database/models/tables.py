@@ -2203,3 +2203,113 @@ class SimAutoPositionRow(Base):
         DateTime(timezone=True),
         nullable=False,
     )
+
+
+# ── V2.25 / A10 — Strategy Lifecycle (candidate → version → promotion → health) ──
+# Migración 030_strategy_lifecycle. La evidencia (research_trials/research_evidence/
+# edge_reports) se REFERENCIA por id, no se duplica. ``strategy_definitions`` sigue
+# siendo la definición ejecutable; ``strategy_versions`` la fija inmutable.
+
+
+class StrategyCandidateRow(Base):
+    """Candidata de estrategia (semilla ESTUDIO→LAB), reproducible por snapshot."""
+
+    __tablename__ = "strategy_candidates"
+    __table_args__ = (
+        Index("strategy_candidates_instrument_family_idx", "instrument_id", "strategy_family"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    strategy_family: Mapped[str] = mapped_column("strategy_family", String, nullable=False)
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    origin: Mapped[str] = mapped_column(String, default="estudio")
+    data_snapshot_id: Mapped[str | None] = mapped_column(
+        "data_snapshot_id", String, nullable=True
+    )
+    preset_key: Mapped[str | None] = mapped_column("preset_key", String, nullable=True)
+    strategy_definition_id: Mapped[str | None] = mapped_column(
+        "strategy_definition_id", String, nullable=True
+    )
+    state: Mapped[str] = mapped_column(String, default="estudio")
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
+
+
+class StrategyVersionRow(Base):
+    """Versión INMUTABLE de una estrategia (finalista/promocionada)."""
+
+    __tablename__ = "strategy_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "candidate_id", "definition_hash", name="strategy_versions_candidate_hash_uq"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    candidate_id: Mapped[str] = mapped_column("candidate_id", String, nullable=False)
+    instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    definition_hash: Mapped[str] = mapped_column("definition_hash", String, nullable=False)
+    definition: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    is_finalist: Mapped[bool] = mapped_column("is_finalist", Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
+class StrategyEvaluationRow(Base):
+    """Evaluación de LABORATORIO de una candidata (gates + score + evidencia)."""
+
+    __tablename__ = "strategy_evaluations"
+    __table_args__ = (Index("strategy_evaluations_candidate_idx", "candidate_id"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    candidate_id: Mapped[str] = mapped_column("candidate_id", String, nullable=False)
+    instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+    gates: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    trial_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    optimization_run_id: Mapped[str | None] = mapped_column(
+        "optimization_run_id", String, nullable=True
+    )
+    edge_report_id: Mapped[str | None] = mapped_column("edge_report_id", String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
+class StrategyPromotionRow(Base):
+    """Promoción (o rechazo) de un finalista a ACTIVE, con motivos auditables."""
+
+    __tablename__ = "strategy_promotions"
+    __table_args__ = (Index("strategy_promotions_finalist_idx", "finalist_id"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    finalist_id: Mapped[str] = mapped_column("finalist_id", String, nullable=False)
+    candidate_id: Mapped[str] = mapped_column("candidate_id", String, nullable=False)
+    instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    promoted: Mapped[bool] = mapped_column(Boolean, default=False)
+    reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    shadow_validated: Mapped[bool] = mapped_column("shadow_validated", Boolean, default=False)
+    promoted_at: Mapped[datetime | None] = mapped_column(
+        "promoted_at", DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
+class StrategyHealthRow(Base):
+    """Snapshot de salud de una estrategia ACTIVA (serie temporal de vigilancia)."""
+
+    __tablename__ = "strategy_health_snapshots"
+    __table_args__ = (Index("strategy_health_version_asof_idx", "version_id", "as_of"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    version_id: Mapped[str] = mapped_column("version_id", String, nullable=False)
+    as_of: Mapped[datetime] = mapped_column("as_of", DateTime(timezone=True), nullable=False)
+    edge: Mapped[float | None] = mapped_column(Float, nullable=True)
+    walk_forward_efficiency: Mapped[float | None] = mapped_column(
+        "walk_forward_efficiency", Float, nullable=True
+    )
+    dsr: Mapped[float | None] = mapped_column(Float, nullable=True)
+    credibility: Mapped[float | None] = mapped_column(Float, nullable=True)
+    thresholds: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    degraded: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))

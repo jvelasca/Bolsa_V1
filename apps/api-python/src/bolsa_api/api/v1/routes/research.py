@@ -1,6 +1,6 @@
 """API: research Lab Health / trials / Observatory."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,6 +57,9 @@ from bolsa_api.schemas.research import (
     ResearchTrialDetailResponseDto,
     ResearchTrialsListResponseDto,
     ResearchTrialSortParam,
+    StrategyHealthDto,
+    StrategyHealthResponseDto,
+    StrategyHealthSnapshotDto,
     to_belief_history_entry_dto,
     to_hypothesis_belief_dto,
     to_hypothesis_dto,
@@ -687,5 +690,63 @@ async def get_lab_health(
             active_instruments=health["activeInstruments"],
             instruments_without_trials=health["instrumentsWithoutTrials"],
             caveat=health["caveat"],
+        )
+    )
+
+
+@router.get(
+    "/research/strategy/{version_id}/health",
+    response_model=StrategyHealthResponseDto,
+)
+async def get_strategy_health(
+    version_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> StrategyHealthResponseDto:
+    """V2.25/A10 — salud de una estrategia activa (serie de snapshots + decisión).
+
+    Lee los snapshots persistidos de ``strategy_health_snapshots``. La decisión
+    (``continue`` vs ``relab``) se deriva del último snapshot; si no hay snapshots,
+    se responde un estado neutro (``continue`` sin evidencia), nunca una degradación
+    inventada. La degradación real dispara re-LABORATORIO, **nunca** un swap directo.
+    """
+    from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+
+    store = PostgresStrategyLifecycleStore(session)
+    history = await store.list_health(version_id)
+    latest = history[-1] if history else None
+    degraded = bool(latest.degraded) if latest is not None else False
+    breaches: list[str] = []
+    if latest is not None and degraded:
+        thresholds = latest.thresholds or {}
+        for key, value in (
+            ("edge", latest.edge),
+            ("walk_forward_efficiency", latest.walk_forward_efficiency),
+            ("dsr", latest.dsr),
+            ("credibility", latest.credibility),
+        ):
+            threshold = thresholds.get(key)
+            if value is not None and threshold is not None and value < threshold:
+                breaches.append(key)
+
+    def _snapshot(snapshot: Any) -> StrategyHealthSnapshotDto:
+        return StrategyHealthSnapshotDto(
+            version_id=snapshot.version_id,
+            as_of=snapshot.as_of,
+            edge=snapshot.edge,
+            walk_forward_efficiency=snapshot.walk_forward_efficiency,
+            dsr=snapshot.dsr,
+            credibility=snapshot.credibility,
+            degraded=snapshot.degraded,
+        )
+
+    return StrategyHealthResponseDto(
+        data=StrategyHealthDto(
+            version_id=version_id,
+            instrument_id=None,
+            decision="relab" if degraded else "continue",
+            degraded=degraded,
+            breaches=breaches,
+            latest=_snapshot(latest) if latest is not None else None,
+            history=[_snapshot(s) for s in history],
         )
     )

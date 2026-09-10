@@ -29,12 +29,14 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 __all__ = [
+    "AccountReconciliationReport",
     "POSITION_PROJECTION_DIVERGENT",
     "POSITION_PROJECTION_OK",
     "POSITION_PROJECTION_REBUILT",
     "POSITION_PROJECTION_UNKNOWN",
     "ReconciliationVerdict",
     "expected_position_from_events",
+    "reconcile_sim_account",
     "reconcile_sim_position",
 ]
 
@@ -170,4 +172,93 @@ def reconcile_sim_position(
         expected=expected,
         actual=actual,
         projection=projection,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class AccountReconciliationReport:
+    """V2.24.2 (P2-C) — veredicto GLOBAL de reconciliación de una cuenta/engine.
+
+    ``reconcile_sim_position`` decide por símbolo; este reporte agrega TODOS los
+    símbolos relevantes (unión de eventos, canónico y proyección) para que la
+    vigilancia de la cuenta no dependa de mirar el watch uno a uno. ``blocks_openings``
+    es fail-closed: si CUALQUIER símbolo está ``DIVERGENT`` o ``UNKNOWN``, no se
+    autorizan nuevas aperturas en la cuenta.
+    """
+
+    account_id: str
+    engine_id: str
+    verdicts: tuple[ReconciliationVerdict, ...]
+
+    @property
+    def symbols(self) -> tuple[str, ...]:
+        return tuple(v.symbol for v in self.verdicts)
+
+    @property
+    def divergent(self) -> tuple[ReconciliationVerdict, ...]:
+        return tuple(v for v in self.verdicts if v.status == POSITION_PROJECTION_DIVERGENT)
+
+    @property
+    def unknown(self) -> tuple[ReconciliationVerdict, ...]:
+        return tuple(v for v in self.verdicts if v.status == POSITION_PROJECTION_UNKNOWN)
+
+    @property
+    def rebuilt(self) -> tuple[ReconciliationVerdict, ...]:
+        return tuple(v for v in self.verdicts if v.status == POSITION_PROJECTION_REBUILT)
+
+    @property
+    def ok(self) -> bool:
+        return not self.divergent and not self.unknown
+
+    @property
+    def blocks_openings(self) -> bool:
+        """Fail-closed: cualquier DIVERGENT/UNKNOWN bloquea nuevas aperturas."""
+        return not self.ok
+
+    @property
+    def status(self) -> str:
+        if self.divergent:
+            return POSITION_PROJECTION_DIVERGENT
+        if self.unknown:
+            return POSITION_PROJECTION_UNKNOWN
+        if self.rebuilt:
+            return POSITION_PROJECTION_REBUILT
+        return POSITION_PROJECTION_OK
+
+
+def reconcile_sim_account(
+    *,
+    account_id: str,
+    engine_id: str,
+    symbols: Sequence[str],
+    execution_events: Sequence[object] | None,
+    financial_positions: Mapping[str, object] | None,
+    sim_auto_positions: Mapping[str, object] | None,
+) -> AccountReconciliationReport:
+    """Reconcilia TODOS los símbolos de una cuenta/engine (P2-C).
+
+    Amplía el conjunto de símbolos con los que aparecen en el canónico o en la
+    proyección (no solo el watch), de modo que una posición fantasma —presente en la
+    proyección pero ausente del canónico— también se detecte como ``DIVERGENT`` en
+    vez de quedar invisible. Fail-closed: cualquier símbolo no-OK bloquea aperturas.
+    """
+    seen: list[str] = []
+    for source in (symbols, financial_positions or {}, sim_auto_positions or {}):
+        for raw in source:
+            symbol = str(raw)
+            if symbol and symbol not in seen:
+                seen.append(symbol)
+    verdicts = tuple(
+        reconcile_sim_position(
+            symbol=symbol,
+            execution_events=execution_events,
+            financial_positions=financial_positions,
+            sim_auto_positions=sim_auto_positions,
+        )
+        for symbol in seen
+    )
+    return AccountReconciliationReport(
+        account_id=account_id,
+        engine_id=engine_id,
+        verdicts=verdicts,
     )

@@ -37,6 +37,7 @@ __all__ = [
     "PostgresSimAutoPositionStore",
     "PostgresSimFillFinanceContextStore",
     "SimAutoPositionStore",
+    "SimDurableUnitOfWork",
     "SimFillFinanceContext",
     "SimFillFinanceContextStore",
     "SimPositionProjection",
@@ -54,6 +55,21 @@ def _to_decimal(raw: object) -> Decimal | None:
         return Decimal(str(raw))
     except (ArithmeticError, ValueError):
         return None
+
+
+async def _commit_if(session: Any, autocommit: bool) -> None:
+    """V2.24.2 (P2-B) — commit condicional.
+
+    Los stores Postgres de esta clase commitean por su cuenta por defecto
+    (``autocommit=True``): la fila debe ser durable y visible ANTES de mover dinero
+    (idempotencia/recuperación) y el store no debe depender de la transacción externa
+    del ``ExecutionEventStore``. Con ``autocommit=False`` el caller (unidad-de-trabajo)
+    controla el commit y puede componer la proyección y el contexto financiero en una
+    ÚNICA transacción, eliminando la ventana residual entre ambos espejos sin cambiar
+    la naturaleza reconstruible de la proyección (P1-01).
+    """
+    if autocommit:
+        await session.commit()
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,10 +202,16 @@ class InMemorySimAutoPositionStore:
 
 
 class PostgresSimFillFinanceContextStore:
-    """Store durable del contexto financiero por fill (tabla ``sim_fill_finance_context``)."""
+    """Store durable del contexto financiero por fill (tabla ``sim_fill_finance_context``).
 
-    def __init__(self, session: Any) -> None:
+    ``autocommit=True`` (default) conserva la durabilidad-e-idempotencia histórica
+    (commit propio). ``autocommit=False`` (V2.24.2 · P2-B) cede el commit al caller
+    para componer una unidad-de-trabajo con la proyección de posición.
+    """
+
+    def __init__(self, session: Any, *, autocommit: bool = True) -> None:
         self._session = session
+        self._autocommit = autocommit
 
     async def save(self, context: SimFillFinanceContext) -> None:
         from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -211,10 +233,10 @@ class PostgresSimFillFinanceContextStore:
             )
             .on_conflict_do_nothing(index_elements=["execution_id"])
         )
-        # Commit propio: la fila debe ser DURABLE y visible ANTES de mover dinero
-        # (idempotencia/recuperación). No interferimos con la transacción externa
-        # del ExecutionEventStore (que commitea por su cuenta).
-        await self._session.commit()
+        # Commit propio por defecto: la fila debe ser DURABLE y visible ANTES de mover
+        # dinero (idempotencia/recuperación). Con ``autocommit=False`` lo controla el
+        # caller (unidad-de-trabajo P2-B) para compartir transacción con la proyección.
+        await _commit_if(self._session, self._autocommit)
 
     async def get(self, execution_id: str) -> SimFillFinanceContext | None:
         from sqlalchemy import select
@@ -248,10 +270,15 @@ class PostgresSimAutoPositionStore:
     V2.24 / A9.1: aislada por ``account_id`` (P1-02) y con estado de protección
     (P2-01). La proyección es **reconstruible** desde el estado financiero canónico
     (P1-01) — ver ``rebuild_sim_position_projection``.
+
+    ``autocommit=True`` (default) conserva el commit propio. ``autocommit=False``
+    (V2.24.2 · P2-B) cede el commit al caller para una unidad-de-trabajo atómica
+    entre proyección y contexto financiero del mismo fill.
     """
 
-    def __init__(self, session: Any) -> None:
+    def __init__(self, session: Any, *, autocommit: bool = True) -> None:
         self._session = session
+        self._autocommit = autocommit
 
     async def read_open(self, account_id: str, engine_id: str) -> dict[str, Decimal]:
         projection = await self.read_projection(account_id, engine_id)
@@ -337,7 +364,7 @@ class PostgresSimAutoPositionStore:
                 },
             )
         )
-        await self._session.commit()
+        await _commit_if(self._session, self._autocommit)
 
     async def delete(self, account_id: str, engine_id: str, symbol: str) -> None:
         from sqlalchemy import delete
@@ -351,7 +378,7 @@ class PostgresSimAutoPositionStore:
                 SimAutoPositionRow.symbol == symbol,
             )
         )
-        await self._session.commit()
+        await _commit_if(self._session, self._autocommit)
 
 
 # ── P1-01: reconstrucción de la proyección desde el estado canónico ──────────────
@@ -397,3 +424,38 @@ async def rebuild_sim_position_projection(
     for symbol in set(current) - set(canonical):
         await position_store.delete(account_id, engine_id, symbol)
     return dict(canonical)
+
+
+# ── V2.24.2 (P2-B): unidad-de-trabajo proyección + finance ───────────────────────
+@dataclass(frozen=True, slots=True)
+class SimDurableUnitOfWork:
+    """Compone contexto financiero + proyección de posición en UNA transacción.
+
+    P2-B del audit V2.24: los dos espejos durables hacían ``commit()`` independiente,
+    dejando una ventana en la que un crash podía persistir uno y no el otro. Con
+    ``autocommit=False`` en ambos stores, esta unidad-de-trabajo hace los dos
+    ``execute`` y commitea UNA sola vez al final (o no commitea nada si algo falla),
+    de modo que proyección y contexto financiero del mismo fill son atómicos.
+
+    No altera la regla P1-01: la proyección sigue siendo reconstruible desde el
+    canónico; esto solo cierra la ventana transaccional entre ambos espejos.
+    """
+
+    session: Any
+    finance_store: PostgresSimFillFinanceContextStore
+    position_store: PostgresSimAutoPositionStore
+
+    @classmethod
+    def open(cls, session: Any) -> SimDurableUnitOfWork:
+        """Abre la unidad-de-trabajo sobre una sesión (el caller commitea/rollback)."""
+        return cls(
+            session=session,
+            finance_store=PostgresSimFillFinanceContextStore(session, autocommit=False),
+            position_store=PostgresSimAutoPositionStore(session, autocommit=False),
+        )
+
+    async def commit(self) -> None:
+        await self.session.commit()
+
+    async def rollback(self) -> None:
+        await self.session.rollback()

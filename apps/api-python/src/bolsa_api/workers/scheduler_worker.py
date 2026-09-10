@@ -26,6 +26,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from bolsa_api.background.auto_orchestrator_worker import start_auto_orchestrator
 from bolsa_api.background.auto_simulation_worker import start_auto_sim_worker
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
 from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
@@ -75,6 +76,9 @@ def _event_loop_starters() -> list[Any]:
         start_paper_auto_engine_worker,
         # V2.22/A9 (M5): AUTO bucle continuo SIM-ONLY (env-gated, default OFF).
         start_auto_sim_worker,
+        # V2.26/A10: orquestador del Strategy Lifecycle (env-gated, default OFF,
+        # SIM-only). Promociona solo por Promotion Gate + shadow.
+        start_auto_orchestrator,
     ]
 
 
