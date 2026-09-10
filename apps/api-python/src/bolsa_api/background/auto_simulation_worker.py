@@ -454,6 +454,7 @@ class AutoSimulationWorker:
                 price=price,
                 minute=self._minute,
             )
+            pkg: DecisionPackage | None
             if prot is not None:
                 pkg = DecisionPackage(
                     action="SELL",
@@ -796,7 +797,7 @@ class AutoSimRuntime:
             PostgresSimAutoPositionStore,
         )
 
-        async with self._session_factory() as session:  # type: ignore[attr-defined]
+        async with self._session_factory() as session:
             exec_store, auto_store, applier, context_store = _compose_real_stores(
                 session,
                 finance_resolver=self._finance_resolver,
