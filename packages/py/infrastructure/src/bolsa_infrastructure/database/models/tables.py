@@ -2133,7 +2133,12 @@ class SimFillFinanceContextRow(Base):
     """
 
     __tablename__ = "sim_fill_finance_context"
-    __table_args__ = (Index("sim_fill_finance_context_account_idx", "account_id"),)
+    __table_args__ = (
+        Index("sim_fill_finance_context_account_idx", "account_id"),
+        # V2.24 / A9.1 (P1-03, defensa redundante): scope de cuenta junto a la
+        # identidad global del fill.
+        Index("sim_fill_finance_context_account_exec_idx", "account_id", "execution_id"),
+    )
 
     execution_id: Mapped[str] = mapped_column("execution_id", String, primary_key=True)
     instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
@@ -2164,14 +2169,30 @@ class SimAutoPositionRow(Base):
 
     __tablename__ = "sim_auto_positions"
     __table_args__ = (
-        PrimaryKeyConstraint("engine_id", "symbol", name="sim_auto_positions_pk"),
-        Index("sim_auto_positions_engine_updated_idx", "engine_id", "updated_at"),
+        PrimaryKeyConstraint("account_id", "engine_id", "symbol", name="sim_auto_positions_pk"),
+        Index(
+            "sim_auto_positions_account_engine_updated_idx",
+            "account_id",
+            "engine_id",
+            "updated_at",
+        ),
     )
 
+    # V2.24 / A9.1 (P1-02): la cuenta forma parte de la IDENTIDAD de la posición.
+    # Antes solo ``(engine_id, symbol)``: dos cuentas con el mismo engine_id y símbolo
+    # colisionaban en la misma fila (una leía la posición de otra).
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
     engine_id: Mapped[str] = mapped_column("engine_id", String, nullable=False)
     symbol: Mapped[str] = mapped_column("symbol", String, nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     avg_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    # V2.24 / A9.1 (P2-01): estado de protección durable (crash/restart readopta SL/
+    # T1/trailing sin olvidar el máximo alcanzado).
+    entry_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    high_watermark: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    stop_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    t1_state: Mapped[str | None] = mapped_column("t1_state", String, nullable=True)
+    trailing_state: Mapped[str | None] = mapped_column("trailing_state", String, nullable=True)
     opened_at: Mapped[datetime] = mapped_column(
         "opened_at",
         DateTime(timezone=True),

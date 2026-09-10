@@ -276,6 +276,10 @@ class InMemoryExecutionEventStore:
     def __init__(self) -> None:
         self._rows: dict[str, ExecutionEvent] = {}
 
+    def __len__(self) -> int:
+        """Nº de trazas capturadas (conveniencia de test-double, V2.24/A9.1)."""
+        return len(self._rows)
+
     async def capture(self, execution: ExecutionEvent) -> CaptureStatus:
         if execution.execution_id in self._rows:
             return "duplicate"

@@ -2,6 +2,65 @@
 
 All notable releases of Bolsa V1.
 
+## [1.51.0-beta] — V2.24-beta / A9.1 · Durable Autonomous Simulation Integrity — 2026-09-10
+
+Cierre de los **4 P1 de durabilidad/aislamiento** que la auditoría V2.23 detectó en
+el AUTO SIM-ONLY, más el endurecimiento de los P2 de integridad y la primera
+**Reina real** (proceso scheduler, no `run_turn` manual). El núcleo financiero sigue
+congelado y **LIVE real continúa doblemente bloqueado** (`LIVE_EXECUTION_AUTHORIZED`
+
+- `LIVE_EXECUTION_UNLOCKED`, false por defecto e independientes).
+
+### ¿Qué cambia?
+
+- **P1-01 — proyección, no autoridad:** `sim_auto_positions` pasa a ser un espejo de
+  recuperación **reconstruible** desde el estado financiero canónico. Una proyección
+  no puede autorizar por sí sola una compra; ante divergencia se reconstruye y, si no
+  hay datos, se vetan aperturas (fail-closed).
+- **P1-02 — aislamiento por cuenta:** migración `029_sim_auto_positions_account_scope`
+  añade `account_id` a `sim_auto_positions` y rehace la PK a
+  `(account_id, engine_id, symbol)`. Dos cuentas con el mismo engine/símbolo ya no
+  colisionan en la misma fila.
+- **P1-03 — identidad de ejecución namespaceada:** `venue_order_id` incorpora
+  `engine_id` + `account_id` + `logical_order_id` único por intención
+  (`auto_venue_order_id`). Dos cuentas no pueden compartir `execution_id`. La
+  aleatoriedad del book deja de depender de la identidad del order (solo del contexto
+  de mercado).
+- **P1-04 — cuenta obligatoria:** sin `AUTO_ENGINE_SIM_ACCOUNT_ID` inequívoco el
+  motor AUTO **no arranca** (fail-closed) y `auto_turn` veta con
+  `account_id_required`; nunca una traza con `account_id=None`.
+- **P2-01 — estado de protección durable:** la proyección persiste
+  `entry_price`/`high_watermark`/`stop_price`/`t1_state`/`trailing_state`; tras un
+  crash el worker readoptado no olvida el máximo (trailing correcto).
+- **P2-02 — reconciliación SIM:** nuevo `sim_reconciliation.reconcile_sim_position`
+  exige `ExecutionEvents == posición canónica == proyección`
+  (`OK`/`REBUILT`/`DIVERGENT`/`UNKNOWN`).
+- **P2-03 — batería de crash:** escenarios C3-F/G/H/I sobre las nuevas ventanas
+  (finance/sim_position/journal/contexto/readopt).
+- **P2-04 — Reina real:** test que arranca `python -m bolsa_api.workers.scheduler_worker`
+  como proceso real con el spine determinista (sin `run_tick()` manual ni decider
+  scripteado) e intervalo parametrizable por `AUTO_ENGINE_SIM_INTERVAL_SECONDS`.
+- **P2-05 — invariante de equity:** el día AUTO se certifica con
+  `assert_equity_invariant` sobre el ledger real (nuevo gate CI
+  `AUTO_EQUITY_INVARIANT_PG_REQUIRED`).
+- **P2-06 — honestidad de etiquetas:** `ProtectionConfig.exit_reason` evalúa el
+  trailing antes que T1 cuando el máximo rebasó T1 (no etiqueta un trailing real como
+  toma en T1); T1 **parcial** (`AUTO_ENGINE_SIM_T1_FRACTION`); `AutoDecisionEngine`
+  lleva la edad **por símbolo** (no un contador compartido), de modo que
+  `exit_after_ticks` es comparable entre watches de distinto tamaño.
+
+### Estado
+
+AUTO SIM-ONLY end-to-end con durabilidad/aislamiento cerrados. La siguiente capa
+(ESTUDIO→LAB→COACH autónomo) es A10.
+
+## [1.50.0-beta] — V2.23-beta / A9 · AUTO SIM-ONLY end-to-end — 2026-09-09
+
+Composición real scheduler → `AutoSimRuntime` (stores PG + finanzas SIM por sesión),
+Decision Spine determinista, RiskGate/SimulationGate en el camino AUTO, kill switch
+fail-closed, posición durable básica (migración 028), protección SL/T1/trailing
+inicial, journal tri-estado (`NOT_CHECKED` ≠ PASS) y gates PG fail-if-skipped.
+
 ## [1.49.0-beta] — V2.20-beta / A7 Iter-3 · hardening — 2026-09-09
 
 Elevación de **hardening (Iter-3 de LIVE Certification / A7)** que cierra la

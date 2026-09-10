@@ -107,7 +107,13 @@ async def _seed_instrument(session: AsyncSession, instrument_id: str) -> None:
 
 
 def _finance_applier_for(
-    session: AsyncSession, *, account_id: str, instrument_id: str, side: str, seed: int
+    session: AsyncSession,
+    *,
+    account_id: str,
+    instrument_id: str,
+    side: str,
+    seed: int,
+    venue_order_id: str,
 ):
     """Applier ExecuteTrade real por fill; mapper puro resuelve price sobre el schedule.
 
@@ -139,7 +145,7 @@ def _finance_applier_for(
         instrument_id=instrument_id,
         side=side,
         quantity=Decimal("60"),
-        venue_order_id=f"sim-{side}-{instrument_id}-{seed}",
+        venue_order_id=venue_order_id,
         seed=seed,
         fill_chunks=3,
         base_mid=100.0,
@@ -181,18 +187,33 @@ async def _drive_buy_sell(
     from decimal import Decimal
 
     from bolsa_application.execution_event import PostgresExecutionEventStore
-    from bolsa_application.simulated_settlement import submit_simulated_order
+    from bolsa_application.simulated_settlement import (
+        auto_venue_order_id,
+        submit_simulated_order,
+    )
 
     fills: list[str] = []
     async with session_factory() as session:
         exec_store = PostgresExecutionEventStore(session)
         for side in ("buy", "sell"):
+            # V2.24/A9.1 (P1-03): identidad namespaceada única por intención. El
+            # applier y el settlement DEBEN compartir el mismo venue_order_id para
+            # que el resolver del schedule case por execution_id.
+            logical_order_id = f"fin-{side}-{uuid.uuid4().hex[:8]}"
+            venue_order_id = auto_venue_order_id(
+                engine_id="engine",
+                account_id=account_id,
+                instrument_id=instrument_id,
+                side=side,
+                logical_order_id=logical_order_id,
+            )
             applier = _finance_applier_for(
                 session,
                 account_id=account_id,
                 instrument_id=instrument_id,
                 side=side,
                 seed=seed,
+                venue_order_id=venue_order_id,
             )
             result, _out = await submit_simulated_order(
                 exec_store,
@@ -205,6 +226,8 @@ async def _drive_buy_sell(
                 fill_chunks=3,
                 base_mid=100.0,
                 order_id=f"auto-fin-{side}-{uuid.uuid4().hex[:8]}",
+                engine_id="engine",
+                logical_order_id=logical_order_id,
                 owner="fin-pg-gate",
                 apply_finance=applier,
             )
