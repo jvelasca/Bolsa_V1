@@ -338,6 +338,10 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           --ignore=apps/api-python/tests/test_financial_integrity_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
+          # V2.30: tests PG que ahora corre el job lifecycle-pg (necesitan PG; sin
+          # --ignore se recolectarían aquí sin BD y skipearían en silencio).
+          --ignore=apps/api-python/tests/test_e2_v2_14_incident_dedup_pg.py
+          --ignore=apps/api-python/tests/test_live_order_recovery_concurrency_pg.py
           -q
 
   lifecycle-pg:
@@ -388,6 +392,12 @@ jobs:
       AUTO_ORCHESTRATOR_PG_REQUIRED: '1'
       JWT_SIGNING_KEY: ci-lifecycle-pg-secret-key
       APP_AUTH_SECRET: ci-lifecycle-pg-secret-key
+      # V2.30 (higiene auditable): gates de los tests PG recién incorporados al job.
+      # Un skip silencioso aquí enmascararía de nuevo el drift (era el fallo real:
+      # test_f3b/test_ledger esperaban la head 004 sin que nadie lo notara).
+      LIVE_PG_REQUIRED: '1'
+      E2_PG_REQUIRED: '1'
+      EXECUTION_FENCE_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -430,6 +440,15 @@ jobs:
           # V2.29/A10: campeón persistido + dictamen COACH comparativo sobre PG.
           packages/py/application/tests/test_sim_strategy_attribution.py
           apps/api-python/tests/test_health.py
+          # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs
+          # (deuda: drift silencioso). Ahora se ejecutan con gate fail-if-skipped.
+          packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
+          packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py
+          packages/py/infrastructure/tests/test_execution_event_fence_pg.py
+          packages/py/application/tests/test_live_order_store_pg.py
+          packages/py/application/tests/test_submit_intent_store_pg.py
+          apps/api-python/tests/test_e2_v2_14_incident_dedup_pg.py
+          apps/api-python/tests/test_live_order_recovery_concurrency_pg.py
           -q
           --tb=short
 

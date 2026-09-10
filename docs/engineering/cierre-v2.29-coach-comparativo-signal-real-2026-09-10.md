@@ -143,6 +143,12 @@ añade, junto con los nuevos, y también lleva la atribución SIM al job `lifecy
 - **Atribución tras crash**: los cierres de posiciones readoptadas quedan sin versión
   (la proyección durable no la guarda) — límite documentado en V2.28.
 
+> **Actualización V2.30:** la **deuda de higiene** (guardias de head de Alembic
+> hardcodeadas, test de concurrencia PG no hermético, 7 tests PG fuera de todos los jobs
+> de CI y el marcador shadow en `save_active`) se cerró en V2.30. Los tres P2 de
+> **producto** de esta sección siguen diferidos — ahora a **V2.31**. Ver
+> `cierre-v2.30-higiene-auditable-2026-09-10.md`.
+
 ## 8. Barreras (sin cambios)
 
 - AUTO → SIMULATED únicamente. LIVE real intacto.

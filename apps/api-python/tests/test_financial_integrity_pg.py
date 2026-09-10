@@ -48,6 +48,7 @@ def _require_or_skip(exc: Exception) -> None:
 async def pg_engine() -> AsyncIterator[AsyncEngine]:
     _load_env()
     from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.migrations import alembic_head
     from bolsa_infrastructure.database.session import create_engine
 
     get_settings.cache_clear()
@@ -58,10 +59,10 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
             await conn.execute(select(1))
             version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "031_sim_fill_strategy_attr" not in versions:
+            head = alembic_head()
+            if head not in versions:
                 raise RuntimeError(
-                    f"alembic_version is {versions!r}; "
-                    "expected 031_sim_fill_strategy_attr (V2.28 head)"
+                    f"alembic_version is {versions!r}; expected {head} (head aplicada)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()

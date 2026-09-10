@@ -2,7 +2,8 @@
 
 Cubre:
 - ``ensure_migrated`` aplica migraciones Alembic hasta ``head`` de forma idempotente
-  (el ``head`` actual es ``004_ledger_reference_unique``).
+  (la ``head`` se deriva de la cadena de migraciones, no se hardcodea: ver
+  ``alembic_head``).
 - La columna ``data_epoch`` existe en ``backtest_runs`` y ``research_trials``.
 - La lógica de etiquetado old/next_open (``_mark_legacy``) del recalc script.
 Requiere PostgreSQL (mismas convenciones que los tests de infraestructura).
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import os
 import sys
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -26,7 +28,11 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_infrastructure.database.migrations import _alembic_config, ensure_migrated
+from bolsa_infrastructure.database.migrations import (
+    _alembic_config,
+    alembic_head,
+    ensure_migrated,
+)
 
 # psycopg async no soporta ProactorEventLoop en Windows (convención de infra)
 if sys.platform == "win32":
@@ -70,6 +76,8 @@ async def db_session() -> AsyncIterator[AsyncSession]:
             await conn.execute(select(1))
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
+        if os.environ.get("LIFECYCLE_PG_REQUIRED") == "1":
+            raise AssertionError(f"lifecycle-pg required but PostgreSQL unavailable: {exc}") from exc
         pytest.skip(f"PostgreSQL no disponible: {exc}")
     factory = create_session_factory(engine)
     async with factory() as session:
@@ -87,7 +95,7 @@ def test_alembic_instala_baseline_y_head_migracion() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     heads = script.get_heads()
     assert len(heads) == 1, heads
-    assert heads[0] == "004_ledger_reference_unique"
+    assert heads[0] == alembic_head()
 
 
 @pytest.mark.asyncio
@@ -116,7 +124,7 @@ async def test_ensure_migrated_idempotente_y_columna_data_epoch() -> None:
             version = (
                 await conn.execute(text("SELECT version_num FROM alembic_version"))
             ).scalars().one()
-            assert version == "004_ledger_reference_unique"
+            assert version == alembic_head()
     finally:
         await engine.dispose()
 

@@ -46,6 +46,26 @@ def _alembic_config() -> Config:
     return cfg
 
 
+def alembic_head() -> str:
+    """Revisión ``head`` de la cadena Alembic, derivada del filesystem de migraciones.
+
+    Autoridad única para tests y guardias: evita hardcodear la revisión concreta en
+    cada migración (deuda V2.30, antes los tests quedaban anclados a revisiones
+    antiguas — p.ej. ``004`` frente a la head real ``031`` — sin que el CI lo notara,
+    porque esos tests no se ejecutaban en ningún job).
+
+    No toca la BD: lee ``alembic/versions`` vía ``ScriptDirectory``. Exige una única
+    head lineal (invariante del repo); varias heads indican ramas divergentes y es un
+    fallo duro.
+    """
+    from alembic.script import ScriptDirectory
+
+    heads = ScriptDirectory.from_config(_alembic_config()).get_heads()
+    if len(heads) != 1:
+        raise RuntimeError(f"se esperaba una única head lineal, encontradas {len(heads)}: {heads}")
+    return heads[0]
+
+
 def _normalized_url(database_url: str) -> str:
     url = re.sub(r"^\s*postgresql(\+psycopg)?://", "postgresql+psycopg://", database_url)
     return url.split("?", 1)[0]

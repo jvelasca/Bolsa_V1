@@ -15,10 +15,10 @@ Entrega honesta de la batería C1 de E2-full pedida por el auditor: valida sobre
 * Los CHECK financieros de ``live_orders`` (021, hoy vigilados por la BD tras
   aplicar 022) rechazan una fila impossibile (filled > quantity).
 
-NO es un test corriente sin DB: exige ``DATABASE_URL`` apuntando a una BD en el
-head ``022_live_orders_exec`` (V2.14). Sin ella → skip; con ``E2_PG_REQUIRED=1``
+NO es un test corriente sin DB: exige ``DATABASE_URL`` apuntando a una BD migrada a
+la ``head`` (derivada con ``alembic_head``). Sin ella → skip; con ``E2_PG_REQUIRED=1``
 (CI/Release-tag) → fail hard. Escenario recomendado: base ``bolsa_c1_scratch``
-recién migrada (001→022), nunca la shared/histórica en 021.
+recién migrada (001→head), nunca la shared/histórica en una revisión antigua.
 """
 
 from __future__ import annotations
@@ -35,10 +35,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from bolsa_infrastructure.database.migrations import alembic_head
+
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-_HEAD = "031_sim_fill_strategy_attr"
+_HEAD = alembic_head()
 
 
 def _load_env() -> None:
@@ -78,7 +80,7 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
             versions = {row[0] for row in version}
             if _HEAD not in versions:
                 raise RuntimeError(
-                    f"alembic_version is {versions!r}; expected {_HEAD} (V2.14 head)"
+                    f"alembic_version is {versions!r}; expected {_HEAD} (head aplicada)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()

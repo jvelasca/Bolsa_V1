@@ -13,6 +13,7 @@ Los tests crean FKs de ``ledger_entries`` (account + portfolio) bajo nombres ún
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -25,7 +26,11 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_infrastructure.database.migrations import _alembic_config, ensure_migrated
+from bolsa_infrastructure.database.migrations import (
+    _alembic_config,
+    alembic_head,
+    ensure_migrated,
+)
 from bolsa_infrastructure.database.models import (
     InvestmentAccountRow,
     InvestmentPortfolioRow,
@@ -37,7 +42,6 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _INDEX_NAME = "uq_ledger_entries_account_reference"
-_HEAD = "004_ledger_reference_unique"
 
 
 def _load_env() -> None:
@@ -67,6 +71,8 @@ async def db_session() -> AsyncIterator[AsyncSession]:
             await conn.execute(select(1))
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
+        if os.environ.get("LIFECYCLE_PG_REQUIRED") == "1":
+            raise AssertionError(f"lifecycle-pg required but PostgreSQL unavailable: {exc}") from exc
         pytest.skip(f"PostgreSQL no disponible: {exc}")
     factory = create_session_factory(engine)
     async with factory() as session:
@@ -140,7 +146,7 @@ def test_alembic_head_es_el_nuevo() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     heads = script.get_heads()
     assert len(heads) == 1, heads
-    assert heads[0] == _HEAD
+    assert heads[0] == alembic_head()
 
 
 @pytest.mark.asyncio
@@ -157,7 +163,7 @@ async def test_ensure_migrated_carga_el_indice_unico(db_session: AsyncSession) -
             version = (
                 await conn.execute(text("SELECT version_num FROM alembic_version"))
             ).scalars().one()
-            assert version == _HEAD
+            assert version == alembic_head()
 
             idx = (
                 await conn.execute(

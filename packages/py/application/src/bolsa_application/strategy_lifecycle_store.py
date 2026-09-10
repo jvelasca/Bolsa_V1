@@ -467,6 +467,12 @@ class PostgresStrategyLifecycleStore:
                     instrument_id=record.active.instrument_id,
                     promoted=True,
                     reasons=[],
+                    # Marcador de materialización, NO evidencia de validación shadow:
+                    # esta fila existe solo como localizador de la versión ACTIVA
+                    # (get_active la busca por finalist_id + promoted). La evidencia
+                    # real de shadow vive en el Promotion Gate (ActiveStrategy no
+                    # expone shadow_validated, así que aquí no se puede propagar el
+                    # valor real; no interpretar este True como certificación).
                     shadow_validated=True,
                     promoted_at=_now(),
                     created_at=_now(),

@@ -18,6 +18,8 @@ import pytest_asyncio
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from bolsa_infrastructure.database.migrations import alembic_head
+
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -75,10 +77,10 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
                 raise RuntimeError("lifecycle_events.sequence_no missing — Alembic 016 required")
             version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "031_sim_fill_strategy_attr" not in versions:
+            head = alembic_head()
+            if head not in versions:
                 raise RuntimeError(
-                    f"alembic_version is {versions!r}; "
-                    "expected 031_sim_fill_strategy_attr (V2.28 head)"
+                    f"alembic_version is {versions!r}; expected {head} (head aplicada)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
@@ -122,7 +124,7 @@ async def test_alembic_head_has_sequence_and_aggregates(
     version = (
         await db_session.execute(text("SELECT version_num FROM alembic_version"))
     ).scalar_one()
-    assert str(version).startswith("03")  # head V2.28(031) chain
+    assert str(version) == alembic_head()
     seq = (
         await db_session.execute(
             text(

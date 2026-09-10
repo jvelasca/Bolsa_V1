@@ -58,6 +58,7 @@ def _require_or_skip(exc: Exception) -> None:
 async def pg_engine() -> AsyncIterator[AsyncEngine]:
     _load_env()
     from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.migrations import alembic_head
     from bolsa_infrastructure.database.session import create_engine
 
     get_settings.cache_clear()
@@ -68,10 +69,10 @@ async def pg_engine() -> AsyncIterator[AsyncEngine]:
             await conn.execute(select(1))
             version = await conn.execute(text("SELECT version_num FROM alembic_version"))
             versions = {row[0] for row in version}
-            if "031_sim_fill_strategy_attr" not in versions:
+            head = alembic_head()
+            if head not in versions:
                 raise RuntimeError(
-                    f"alembic_version is {versions!r}; "
-                    "expected 031_sim_fill_strategy_attr (V2.28 head)"
+                    f"alembic_version is {versions!r}; expected {head} (head aplicada)"
                 )
     except Exception as exc:  # noqa: BLE001
         await engine.dispose()
@@ -123,6 +124,27 @@ async def _seed_unknown(
     return ids
 
 
+async def _purge_account(
+    session_factory: async_sessionmaker[AsyncSession],
+    account_id: str,
+) -> None:
+    """Borra las filas sembradas por ``account_id`` (hermeticidad del test).
+
+    ``_seed_unknown`` hace ``commit`` y las filas UNKNOWN persisten en la BD
+    compartida del job. Sin esta purga, el test de concurrencia ve filas de
+    ejecuciones previas (``union != seeded``) y la suite se envenena a sí misma
+    entre pasadas. Se borra por cuenta (no ``TRUNCATE``) para respetar el
+    aislamiento multi-cuenta.
+    """
+    from sqlalchemy import delete
+
+    from bolsa_infrastructure.database.models.tables import LiveOrderRow
+
+    async with session_factory() as session:
+        await session.execute(delete(LiveOrderRow).where(LiveOrderRow.account_id == account_id))
+        await session.commit()
+
+
 async def _claim_ids(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -154,39 +176,41 @@ async def test_claim_skips_row_locked_by_other_session(
 
     account_id = f"acc-conc-lock-{uuid4().hex[:8]}"
     issue_id = await _seed_unknown(session_factory, count=1, account_id=account_id)
-
-    # A: reclama y mantiene la tx abierta (FOR UPDATE, sin commit) → lock vivo.
-    async with session_factory() as session_a:
-        store_a = PostgresLiveOrderStore(session_a)
-        rows_a = await store_a.claim_unknown_batch(
-            limit=10, worker_id="worker-a", stale_after_seconds=120
-        )
-        claimed_a = {r.order_id for r in rows_a}
-        assert issue_id[0] in claimed_a  # A tiene la fila
-        # NO commit: el lock FOR UPDATE persiste en la tx de A.
-
-        # B: en una tx independiente SKIP LOCKED no debe ver la fila de A.
-        async with session_factory() as session_b:
-            store_b = PostgresLiveOrderStore(session_b)
-            rows_b = await store_b.claim_unknown_batch(
-                limit=10, worker_id="worker-b", stale_after_seconds=120
+    try:
+        # A: reclama y mantiene la tx abierta (FOR UPDATE, sin commit) → lock vivo.
+        async with session_factory() as session_a:
+            store_a = PostgresLiveOrderStore(session_a)
+            rows_a = await store_a.claim_unknown_batch(
+                limit=10, worker_id="worker-a", stale_after_seconds=120
             )
-            claimed_b = {r.order_id for r in rows_b}
-            assert not (claimed_b & claimed_a)  # ninguna fila duplicada
+            claimed_a = {r.order_id for r in rows_a}
+            assert issue_id[0] in claimed_a  # A tiene la fila
+            # NO commit: el lock FOR UPDATE persiste en la tx de A.
 
-        # Cierra tx de A (rollback) → su claim se anula y B ya podría reapropiar.
-        await session_a.rollback()
+            # B: en una tx independiente SKIP LOCKED no debe ver la fila de A.
+            async with session_factory() as session_b:
+                store_b = PostgresLiveOrderStore(session_b)
+                rows_b = await store_b.claim_unknown_batch(
+                    limit=10, worker_id="worker-b", stale_after_seconds=120
+                )
+                claimed_b = {r.order_id for r in rows_b}
+                assert not (claimed_b & claimed_a)  # ninguna fila duplicada
 
-    # Tras rollback de A la fila vuelve a UNKNOWN y un nuevo claim la toma.
-    from bolsa_application.live_order_store import PostgresLiveOrderStore
+            # Cierra tx de A (rollback) → su claim se anula y B ya podría reapropiar.
+            await session_a.rollback()
 
-    async with session_factory() as session:
-        store = PostgresLiveOrderStore(session)
-        rows = await store.claim_unknown_batch(
-            limit=10, worker_id="worker-re", stale_after_seconds=120
-        )
-        assert issue_id[0] in {r.order_id for r in rows}
-        await session.rollback()
+        # Tras rollback de A la fila vuelve a UNKNOWN y un nuevo claim la toma.
+        from bolsa_application.live_order_store import PostgresLiveOrderStore
+
+        async with session_factory() as session:
+            store = PostgresLiveOrderStore(session)
+            rows = await store.claim_unknown_batch(
+                limit=10, worker_id="worker-re", stale_after_seconds=120
+            )
+            assert issue_id[0] in {r.order_id for r in rows}
+            await session.rollback()
+    finally:
+        await _purge_account(session_factory, account_id)
 
 
 @pytest.mark.asyncio
@@ -199,25 +223,27 @@ async def test_two_workers_claim_disjoint_unknown_batch(
     n = 4
     account_id = f"acc-conc-par-{uuid4().hex[:8]}"
     seeded = set(await _seed_unknown(session_factory, count=n, account_id=account_id))
+    try:
+        async def _run(worker_id: str) -> set[str]:
+            async with session_factory() as s:
+                store = PostgresLiveOrderStore(s)
+                rows = await store.claim_unknown_batch(
+                    limit=n, worker_id=worker_id, stale_after_seconds=120
+                )
+                got = {r.order_id for r in rows}
+                await s.rollback()  # no materializar lease (aislamiento de test)
+            return got
 
-    async def _run(worker_id: str) -> set[str]:
-        async with session_factory() as s:
-            store = PostgresLiveOrderStore(s)
-            rows = await store.claim_unknown_batch(
-                limit=n, worker_id=worker_id, stale_after_seconds=120
-            )
-            got = {r.order_id for r in rows}
-            await s.rollback()  # no materializar lease (aislamiento de test)
-        return got
+        # Lanzar dos claims en paralelo sobre el mismo conjunto n.
+        a_task = asyncio.create_task(_run("worker-x"))
+        b_task = asyncio.create_task(_run("worker-y"))
+        (claimed_a, claimed_b) = await asyncio.gather(a_task, b_task)
 
-    # Lanzar dos claims en paralelo sobre el mismo conjunto n.
-    a_task = asyncio.create_task(_run("worker-x"))
-    b_task = asyncio.create_task(_run("worker-y"))
-    (claimed_a, claimed_b) = await asyncio.gather(a_task, b_task)
-
-    union = claimed_a | claimed_b
-    overlap = claimed_a & claimed_b
-    # Ninguna fila asignada a dos workers al mismo tiempo.
-    assert not overlap, f"doble-claim en la misma ventana: {overlap}"
-    # Entre los dos cubren TODO el lote (no pierden filas bajo contención).
-    assert union == seeded, f"lote no cubierto: missing {seeded - union}, extra {union - seeded}"
+        union = claimed_a | claimed_b
+        overlap = claimed_a & claimed_b
+        # Ninguna fila asignada a dos workers al mismo tiempo.
+        assert not overlap, f"doble-claim en la misma ventana: {overlap}"
+        # Entre los dos cubren TODO el lote (no pierden filas bajo contención).
+        assert union == seeded, f"lote no cubierto: missing {seeded - union}, extra {union - seeded}"
+    finally:
+        await _purge_account(session_factory, account_id)

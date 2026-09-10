@@ -2,6 +2,34 @@
 
 All notable releases of Bolsa V1.
 
+## [1.54.0-beta] — V2.30 / A10 · Higiene auditable (CI que ejecuta lo que certifica) — 2026-09-10
+
+Cierra la **deuda de higiene** que impedía una auditoría limpia en GitHub. Sin cambios
+de comportamiento de producto: el núcleo de decisión A10 y el LIVE real quedan igual.
+
+- **Guardias de head de Alembic derivadas** (causa raíz): nuevo `alembic_head()` en
+  `bolsa_infrastructure.database.migrations`, que lee la head del filesystem de
+  migraciones (no se hardcodea). Sustituye las guardias que había que parchear a mano
+  en cada migración (`029→030`, `030→031`, ...).
+- **Drift de 27 migraciones corregido**: `test_f3b_alembic_data_epoch` y
+  `test_ledger_entries_reference_unique` seguían anclados a `004_ledger_reference_unique`
+  y **no se ejecutaban en ningún job** — el CI daba verde sobre tests que no corrían.
+- **Test de concurrencia PG hermético**: `test_live_order_recovery_concurrency_pg`
+  commiteaba filas y no limpiaba, envenenando la suite entre pasadas. Ahora purga por
+  `account_id` en `finally`.
+- **Hueco de CI cerrado**: 7 tests PG que estaban fuera de todos los jobs se incorporan
+  al job `lifecycle-pg` con gates fail-if-skipped (`LIVE_PG_REQUIRED`, `E2_PG_REQUIRED`,
+  `EXECUTION_FENCE_PG_REQUIRED`); el job `python` los ignora explícitamente.
+- **Marcador shadow documentado**: `shadow_validated=True` en `save_active` es un
+  localizador de la activa, no evidencia de validación (aclarado en código).
+
+> Cierre: `docs/engineering/cierre-v2.30-higiene-auditable-2026-09-10.md`.
+
+> **Diferido a V2.31 (deuda de producto):** `StrategyDiscoveryEngine` (selector sobre
+> los 30+ indicadores), shadow automático (evidencia ejecutada en vez del flag
+> `AUTO_ORCHESTRATOR_SHADOW_VALIDATED`) y atribución de versión tras crash en posiciones
+> readoptadas.
+
 ## [1.53.0-beta] — V2.27 + V2.28 + V2.29 / A10 · Cierre del núcleo de decisión — 2026-09-10
 
 Cierra los P2 del A10 que tocaban el **núcleo de decisión**, acumulados desde V2.26:
