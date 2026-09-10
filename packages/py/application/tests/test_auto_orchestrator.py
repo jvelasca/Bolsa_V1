@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.strategy_lifecycle import PROMOTION_GATES, ActiveStrategy
 
 from bolsa_application.auto_orchestrator import (
     AutoOrchestrator,
@@ -20,6 +19,7 @@ from bolsa_application.auto_orchestrator import (
 )
 from bolsa_application.strategy_lifecycle_store import InMemoryStrategyLifecycleStore
 from bolsa_application.strategy_top3_coach_phase import CoachThresholds
+from bolsa_domain.entities.strategy_lifecycle import PROMOTION_GATES, ActiveStrategy
 
 # ── Dobles ──────────────────────────────────────────────────────────────────────
 

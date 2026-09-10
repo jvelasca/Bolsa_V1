@@ -42,6 +42,12 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from bolsa_api.background.paper_auto_engine_worker import (
+    DecisionProvider,
+    _effective_venue,
+    _kill_switch_env_on,
+    _watch_symbols,
+)
 from bolsa_application.auto_daily_journal import SimJournalRow
 from bolsa_application.auto_engine_state_store import (
     AutoEngineSnapshot,
@@ -64,13 +70,6 @@ from bolsa_application.sim_reconciliation import (
 from bolsa_application.simulated_settlement import (
     normalized_auto_venue,
     submit_simulated_order,
-)
-
-from bolsa_api.background.paper_auto_engine_worker import (
-    DecisionProvider,
-    _effective_venue,
-    _kill_switch_env_on,
-    _watch_symbols,
 )
 
 logger = logging.getLogger(__name__)

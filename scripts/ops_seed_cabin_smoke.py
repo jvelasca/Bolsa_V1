@@ -455,13 +455,14 @@ async def _seed_flat_opening_fixture(
     from datetime import timedelta
     from decimal import Decimal
 
+    from sqlalchemy import delete
+
     from bolsa_domain.ohlcv_time import parse_bar_timestamp
     from bolsa_domain.value_objects.timeframe import TimeFrame
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.models import InstrumentRow, OhlcvBarRow
     from bolsa_infrastructure.database.session import create_engine, create_session_factory
     from bolsa_infrastructure.ids import new_id
-    from sqlalchemy import delete
 
     get_settings.cache_clear()
     settings = get_settings()

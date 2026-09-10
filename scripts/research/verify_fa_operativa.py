@@ -114,16 +114,16 @@ def _piotroski_modules() -> dict:
 
 def main() -> int:
     print("=== verify_fa_operativa (offline) ===")
-    from bolsa_market.instrument_fundamentals import (
-        FUNDAMENTALS_SOURCE_VERSION,
-        build_fundamentals_snapshot,
-    )
     from bolsa_analytics.knowledge.fundamental_card import build_fundamental_card
     from bolsa_analytics.signals.fundamental_gate import (
         build_fundamental_gate,
         passes_fundamental_gate,
     )
     from bolsa_analytics.signals.sector_bands import FUND_SECTOR_BANDS_VERSION
+    from bolsa_market.instrument_fundamentals import (
+        FUNDAMENTALS_SOURCE_VERSION,
+        build_fundamentals_snapshot,
+    )
 
     snap = build_fundamentals_snapshot(yahoo_modules=_piotroski_modules())
     assert snap["sourceVersion"] == FUNDAMENTALS_SOURCE_VERSION
@@ -224,8 +224,8 @@ def main() -> int:
     import os
     import tempfile
 
-    from bolsa_market.filing_store import list_filings, read_filing_text, save_filing
     from bolsa_analytics.knowledge.filing_summary import heuristic_filing_summary
+    from bolsa_market.filing_store import list_filings, read_filing_text, save_filing
 
     with tempfile.TemporaryDirectory() as tmp:
         os.environ["BOLSA_FILINGS_DIR"] = tmp
@@ -249,12 +249,12 @@ def main() -> int:
         assert len(summary["paragraphs"]) == 3
         print("OK F2b filing store + heuristic summary")
 
+        from bolsa_analytics.knowledge.filing_ask import heuristic_filing_answer
         from bolsa_market.filing_rag import (
             FILING_RAG_VERSION,
             ensure_chunk_index,
             retrieve_chunks,
         )
-        from bolsa_analytics.knowledge.filing_ask import heuristic_filing_answer
 
         idx = ensure_chunk_index("ops-test", meta["id"])
         assert idx and idx["indexVersion"] == FILING_RAG_VERSION

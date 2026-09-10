@@ -26,14 +26,6 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from bolsa_domain.entities.strategy_lifecycle import (
-    PROMOTION_GATES,
-    ActiveStrategy,
-    GateResult,
-    StrategyCandidate,
-    StrategyEvaluation,
-)
-
 from bolsa_application.strategy_executable_definition import (
     build_executable_definition,
     champion_params_from_result,
@@ -57,6 +49,13 @@ from bolsa_application.strategy_top3_coach_phase import (
 from bolsa_application.strategy_vigilance_phase import (
     HealthThresholds,
     evaluate_active_health,
+)
+from bolsa_domain.entities.strategy_lifecycle import (
+    PROMOTION_GATES,
+    ActiveStrategy,
+    GateResult,
+    StrategyCandidate,
+    StrategyEvaluation,
 )
 
 logger = logging.getLogger(__name__)

@@ -248,8 +248,9 @@ class PostgresSimFillFinanceContextStore:
         self._autocommit = autocommit
 
     async def save(self, context: SimFillFinanceContext) -> None:
-        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
         from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
 
         await self._session.execute(
             pg_insert(SimFillFinanceContextRow)
@@ -273,8 +274,9 @@ class PostgresSimFillFinanceContextStore:
         await _commit_if(self._session, self._autocommit)
 
     async def get(self, execution_id: str) -> SimFillFinanceContext | None:
-        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
 
         row = (
             await self._session.execute(
@@ -310,8 +312,9 @@ class PostgresSimFillFinanceContextStore:
         NULL (spine determinista / anteriores a la migración 031) quedan fuera por
         diseño: sin atribución no se puede afirmar que pertenezcan a la versión.
         """
-        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
 
         stmt = (
             select(SimFillFinanceContextRow)
@@ -365,8 +368,9 @@ class PostgresSimAutoPositionStore:
     async def read_projection(
         self, account_id: str, engine_id: str
     ) -> dict[str, SimPositionProjection]:
-        from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
 
         rows = (
             await self._session.execute(
@@ -406,8 +410,9 @@ class PostgresSimAutoPositionStore:
         t1_state: str | None = None,
         trailing_state: str | None = None,
     ) -> None:
-        from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
         from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
 
         now = _now()
         await self._session.execute(
@@ -443,8 +448,9 @@ class PostgresSimAutoPositionStore:
         await _commit_if(self._session, self._autocommit)
 
     async def delete(self, account_id: str, engine_id: str, symbol: str) -> None:
-        from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
         from sqlalchemy import delete
+
+        from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
 
         await self._session.execute(
             delete(SimAutoPositionRow).where(

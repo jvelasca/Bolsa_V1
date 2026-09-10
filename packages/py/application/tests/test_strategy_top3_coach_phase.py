@@ -6,19 +6,18 @@ que el COACH es advisory: solo veta/degrada, jamás aprueba por encima de los ga
 
 from __future__ import annotations
 
-from bolsa_domain.entities.strategy_lifecycle import (
-    CoachAssessment,
-    GateResult,
-    GateStatus,
-    StrategyEvaluation,
-)
-
 from bolsa_application.strategy_top3_coach_phase import (
     CoachThresholds,
     Top3Selection,
     assess_top3_with_coach,
     assess_with_coach,
     select_top3,
+)
+from bolsa_domain.entities.strategy_lifecycle import (
+    CoachAssessment,
+    GateResult,
+    GateStatus,
+    StrategyEvaluation,
 )
 
 

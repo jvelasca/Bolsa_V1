@@ -238,8 +238,9 @@ class PostgresStrategyLifecycleStore:
         self._session = session
 
     async def save_candidate(self, candidate: StrategyCandidate) -> None:
-        from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
         from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
 
         now = _now()
         await self._session.execute(
@@ -271,8 +272,9 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def get_candidate(self, candidate_id: str) -> StrategyCandidate | None:
-        from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
 
         row = (
             await self._session.execute(
@@ -282,8 +284,9 @@ class PostgresStrategyLifecycleStore:
         return _candidate_from_row(row) if row is not None else None
 
     async def list_candidates(self, *, instrument_id: str | None = None) -> list[StrategyCandidate]:
-        from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyCandidateRow
 
         stmt = select(StrategyCandidateRow)
         if instrument_id is not None:
@@ -292,9 +295,10 @@ class PostgresStrategyLifecycleStore:
         return [_candidate_from_row(r) for r in rows]
 
     async def save_evaluation(self, evaluation: StrategyEvaluation) -> None:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
         from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
         from bolsa_infrastructure.ids import new_id
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         await self._session.execute(
             pg_insert(StrategyEvaluationRow)
@@ -315,8 +319,9 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def list_evaluations(self, candidate_id: str) -> list[StrategyEvaluation]:
-        from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
 
         rows = (
             await self._session.execute(
@@ -339,12 +344,13 @@ class PostgresStrategyLifecycleStore:
         ]
 
     async def save_finalist(self, finalist: StrategyFinalist) -> None:
+        from sqlalchemy import update
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
         from bolsa_infrastructure.database.models.tables import (
             StrategyCandidateRow,
             StrategyVersionRow,
         )
-        from sqlalchemy import update
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         instrument_id = finalist.definition.get("instrument_id") or ""
         if not instrument_id:
@@ -373,9 +379,10 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def save_promotion(self, record: StrategyPromotionRecord) -> None:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
         from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
         from bolsa_infrastructure.ids import new_id
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         await self._session.execute(
             pg_insert(StrategyPromotionRow)
@@ -397,8 +404,9 @@ class PostgresStrategyLifecycleStore:
     async def list_promotions(
         self, *, promoted: bool | None = None
     ) -> list[StrategyPromotionRecord]:
-        from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
 
         stmt = select(StrategyPromotionRow)
         if promoted is not None:
@@ -425,11 +433,12 @@ class PostgresStrategyLifecycleStore:
         # La activa se materializa como una promoción "activa" leída por get_active;
         # se persiste el marcador en la tabla de promociones (fuente única) para no
         # duplicar estado. No hay tabla ``active_strategies`` separada.
+        from sqlalchemy import select, update
+
         from bolsa_infrastructure.database.models.tables import (
             StrategyPromotionRow,
             StrategyVersionRow,
         )
-        from sqlalchemy import select, update
 
         await self._session.execute(
             update(StrategyVersionRow)
@@ -445,8 +454,9 @@ class PostgresStrategyLifecycleStore:
             )
         ).scalar_one_or_none()
         if exists is None:
-            from bolsa_infrastructure.ids import new_id
             from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            from bolsa_infrastructure.ids import new_id
 
             await self._session.execute(
                 pg_insert(StrategyPromotionRow)
@@ -466,11 +476,12 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def get_active(self, *, instrument_id: str) -> ActiveStrategyRecord | None:
+        from sqlalchemy import select
+
         from bolsa_infrastructure.database.models.tables import (
             StrategyPromotionRow,
             StrategyVersionRow,
         )
-        from sqlalchemy import select
 
         row = (
             await self._session.execute(
@@ -505,8 +516,9 @@ class PostgresStrategyLifecycleStore:
         )
 
     async def list_active(self) -> list[ActiveStrategyRecord]:
-        from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
 
         rows = (
             await self._session.execute(
@@ -521,9 +533,10 @@ class PostgresStrategyLifecycleStore:
         return out
 
     async def save_health(self, version_id: str, health: StrategyHealth) -> None:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
         from bolsa_infrastructure.database.models.tables import StrategyHealthRow
         from bolsa_infrastructure.ids import new_id
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         await self._session.execute(
             pg_insert(StrategyHealthRow)
@@ -548,8 +561,9 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def list_health(self, version_id: str) -> list[StrategyHealth]:
-        from bolsa_infrastructure.database.models.tables import StrategyHealthRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyHealthRow
 
         rows = (
             await self._session.execute(
@@ -577,8 +591,9 @@ class PostgresStrategyLifecycleStore:
         # por candidato (idempotente) y el dictamen serializado en ``metrics["coach"]``.
         # ``score`` no aplica a un dictamen ⇒ 0.0; los gates van vacíos (el COACH no
         # sustituye a los gates cuantitativos).
-        from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
         from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
 
         await self._session.execute(
             pg_insert(StrategyEvaluationRow)
@@ -599,8 +614,9 @@ class PostgresStrategyLifecycleStore:
         await self._session.commit()
 
     async def list_coach_assessments(self, candidate_id: str) -> list[CoachAssessment]:
-        from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
         from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyEvaluationRow
 
         rows = (
             await self._session.execute(

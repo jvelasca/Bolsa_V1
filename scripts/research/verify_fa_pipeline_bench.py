@@ -129,9 +129,8 @@ def _ms(fn, n: int) -> float:
 
 def main() -> int:
     print("=== verify_fa_pipeline_bench (offline) ===")
-    from bolsa_market.instrument_fundamentals import build_fundamentals_snapshot
-    from bolsa_analytics.knowledge.fundamental_card import build_fundamental_card
     from bolsa_analytics.knowledge.composite_score import build_composite_card
+    from bolsa_analytics.knowledge.fundamental_card import build_fundamental_card
     from bolsa_analytics.signals.fundamental_gate import build_fundamental_gate
     from bolsa_analytics.signals.fundamental_screener import evaluate_fundamental_candidate
     from bolsa_application.fa_weekly_pipeline import (
@@ -140,6 +139,7 @@ def main() -> int:
     )
     from bolsa_application.paper_d_propose import PAPER_D_PROPOSE_VERSION, ProposePaperDPlan
     from bolsa_application.run_fundamental_screener import RunFundamentalScreener
+    from bolsa_market.instrument_fundamentals import build_fundamentals_snapshot
 
     modules = _rich_modules()
     for _ in range(N_WARM):

@@ -27,7 +27,6 @@ Cadena lineal: ``down_revision = "030_strategy_lifecycle"``.
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "031_sim_fill_strategy_attr"

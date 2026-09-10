@@ -100,6 +100,8 @@ async def lifecycle_factory() -> async_sessionmaker[AsyncSession]:
 async def test_strategy_lifecycle_roundtrip_pg(
     lifecycle_factory: async_sessionmaker[AsyncSession],
 ) -> None:
+    from sqlalchemy import delete
+
     from bolsa_application.strategy_lifecycle_store import (
         ActiveStrategyRecord,
         PostgresStrategyLifecycleStore,
@@ -123,7 +125,6 @@ async def test_strategy_lifecycle_roundtrip_pg(
         StrategyPromotionRow,
         StrategyVersionRow,
     )
-    from sqlalchemy import delete
 
     suffix = uuid.uuid4().hex[:10]
     candidate_id = f"cand-{suffix}"
@@ -255,6 +256,8 @@ async def test_auto_orchestrator_full_cycle_pg(
     TOP3 → COACH → FINALISTA → PROMOCION (shadow) → ACTIVE; después vigilancia con
     métricas degradadas ⇒ re-LAB (sin swap directo).
     """
+    from sqlalchemy import delete
+
     from bolsa_application.auto_orchestrator import AutoOrchestrator, OrchestratorDeps
     from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
     from bolsa_infrastructure.database.models.tables import (
@@ -264,7 +267,6 @@ async def test_auto_orchestrator_full_cycle_pg(
         StrategyPromotionRow,
         StrategyVersionRow,
     )
-    from sqlalchemy import delete
 
     suffix = uuid.uuid4().hex[:10]
     instrument_id = f"inst-{suffix}"
@@ -354,6 +356,9 @@ async def test_default_orchestrator_real_wiring_end_to_end_pg(
     from datetime import UTC, datetime, timedelta
     from decimal import Decimal
 
+    from sqlalchemy import delete
+
+    from bolsa_api.background.auto_orchestrator_worker import _default_orchestrator
     from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
     from bolsa_infrastructure.database.models.tables import (
         InstrumentRow,
@@ -365,9 +370,6 @@ async def test_default_orchestrator_real_wiring_end_to_end_pg(
         SqlAlchemyListRepository,
     )
     from bolsa_infrastructure.ids import new_id
-    from sqlalchemy import delete
-
-    from bolsa_api.background.auto_orchestrator_worker import _default_orchestrator
 
     suffix = uuid.uuid4().hex[:10]
     instrument_id = f"inst-v227-{suffix}"
@@ -509,15 +511,15 @@ async def test_observed_vigilance_end_to_end_pg(
     from datetime import UTC, datetime
     from decimal import Decimal
 
+    from sqlalchemy import delete
+
+    from bolsa_api.background.auto_orchestrator_worker import _default_orchestrator
     from bolsa_application.sim_durable_store import SimFillFinanceContext
     from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
     from bolsa_infrastructure.database.models.tables import (
         SimFillFinanceContextRow,
         StrategyHealthRow,
     )
-    from sqlalchemy import delete
-
-    from bolsa_api.background.auto_orchestrator_worker import _default_orchestrator
 
     suffix = uuid.uuid4().hex[:10]
     instrument_id = f"inst-v228-{suffix}"
@@ -670,11 +672,12 @@ async def test_promotion_persists_champion_and_coach_pg(
     instrument_id = f"inst-v229-{suffix}"
 
     async def _cleanup() -> None:
+        from sqlalchemy import delete
+
         from bolsa_infrastructure.database.models.tables import (
             StrategyCandidateRow,
             StrategyEvaluationRow,
         )
-        from sqlalchemy import delete
 
         async with lifecycle_factory() as session:
             await session.execute(

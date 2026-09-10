@@ -103,6 +103,8 @@ async def _run(args: argparse.Namespace) -> AuditReport:
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.models import (
         InstrumentRow as DbInstrument,
+    )
+    from bolsa_infrastructure.database.models import (
         OhlcvBarRow,
         ResearchTrialRow,
     )

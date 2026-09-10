@@ -9,13 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
-from bolsa_domain.entities.strategy_lifecycle import ActiveStrategy
 
 from bolsa_application.active_strategy_signal_evaluator import (
     make_active_strategy_decider,
     make_bar_snapshot_loader,
 )
 from bolsa_application.decision_contract import DecisionPackage
+from bolsa_domain.entities.strategy_lifecycle import ActiveStrategy
 
 
 @dataclass

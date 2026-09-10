@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.strategy_lifecycle import GateStatus, StrategyCandidate
 
 from bolsa_application.orchestrator_lab_runner import (
     AUTO_LAB_GRID_DEFAULTS,
@@ -25,6 +24,7 @@ from bolsa_application.orchestrator_lab_runner import (
     LabOptimizeRunner,
 )
 from bolsa_application.strategy_lab_phase import evaluate_optimize_result
+from bolsa_domain.entities.strategy_lifecycle import GateStatus, StrategyCandidate
 
 # ── Dobles ──────────────────────────────────────────────────────────────────────
 

@@ -32,23 +32,13 @@ Exit: 0 OK / skip · 1 fallo de contrato o API requerida caída.
 
 from __future__ import annotations
 
-
-
 import argparse
-
 import json
-
 import os
-
 import sys
-
 import urllib.error
-
 import urllib.request
-
 from typing import Any
-
-
 
 API = os.environ.get("BOLSA_API_URL", "http://127.0.0.1:8000").rstrip("/")
 
