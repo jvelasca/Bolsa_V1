@@ -469,6 +469,10 @@ class AutoSimulationWorker:
             if action not in {"BUY", "SELL"}:
                 _veto("hold_no_op")
                 continue
+            # Narrowing explícito para mypy: una acción BUY/SELL sólo puede venir de un
+            # ``pkg`` no nulo (``action`` se deriva de él). Sin esto, el tipo
+            # ``DecisionPackage | None`` no estrecha y el RiskGate/plan lo rechazan.
+            assert pkg is not None
             qty = Decimal(str(getattr(pkg, "quantity", None) or 0)).quantize(
                 Decimal("0.000001")
             )
