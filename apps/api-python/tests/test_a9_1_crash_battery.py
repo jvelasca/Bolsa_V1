@@ -33,7 +33,6 @@ from bolsa_application.execution_event import InMemoryExecutionEventStore
 from bolsa_application.sim_durable_store import (
     InMemorySimAutoPositionStore,
     InMemorySimFillFinanceContextStore,
-    SimPositionProjection,
 )
 from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,

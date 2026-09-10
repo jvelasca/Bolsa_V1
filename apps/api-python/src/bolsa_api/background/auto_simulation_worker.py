@@ -65,11 +65,9 @@ from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
     POSITION_PROJECTION_REBUILT,
     POSITION_PROJECTION_UNKNOWN,
-    expected_position_from_events,
     reconcile_sim_position,
 )
 from bolsa_application.simulated_settlement import (
-    auto_venue_order_id,
     normalized_auto_venue,
     submit_simulated_order,
 )

@@ -149,6 +149,7 @@ async def _assert_real_equity_invariant(
 
     from sqlalchemy import select
 
+    from bolsa_application.auto_daily_journal import build_lifecycle_accounting
     from bolsa_domain.lifecycle import assert_equity_invariant
     from bolsa_infrastructure.database.models.tables import (
         InvestmentPortfolioRow,
@@ -160,8 +161,6 @@ async def _assert_real_equity_invariant(
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
-
-    from bolsa_application.auto_daily_journal import build_lifecycle_accounting
 
     async with factory() as session:
         ledger = SqlAlchemyLedgerRepository(session)

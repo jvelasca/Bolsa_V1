@@ -140,6 +140,7 @@ async def _assert_equity_invariant(
     factory: async_sessionmaker[AsyncSession], account_id: str
 ) -> None:
     """V2.24/A9.1 (P2-05): certifica ``assert_equity_invariant`` sobre el ledger real."""
+    from bolsa_application.auto_daily_journal import build_lifecycle_accounting
     from bolsa_domain.lifecycle import assert_equity_invariant
     from bolsa_infrastructure.database.repositories.ledger_repository import (
         SqlAlchemyLedgerRepository,
@@ -147,8 +148,6 @@ async def _assert_equity_invariant(
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
-
-    from bolsa_application.auto_daily_journal import build_lifecycle_accounting
 
     async with factory() as session:
         ledger_cash = Decimal(
@@ -184,12 +183,6 @@ async def test_a9_scheduler_process_full_day_pg_zero_human(
     sin ``run_tick()`` manual, sin decider scripteado. Se comprueba que el scheduler,
     por sí solo, produce ticks/fills/ledger y deja el libro plano.
     """
-    from bolsa_infrastructure.database.models.tables import (
-        AutoEngineTickRow,
-        ExecutionEventRow,
-        LedgerEntryRow,
-        SimAutoPositionRow,
-    )
 
     instrument_id = f"inst-a9proc-{uuid.uuid4().hex[:10]}"
     engine_id = f"auto-a9proc-{uuid.uuid4().hex[:8]}"
@@ -307,7 +300,11 @@ async def test_a9_scheduler_process_full_day_pg_zero_human(
 
         from bolsa_infrastructure.database.models.tables import (
             InstrumentRow,
+        )
+        from bolsa_infrastructure.database.models.tables import (
             SimAutoPositionRow as PosRow,
+        )
+        from bolsa_infrastructure.database.models.tables import (
             SimFillFinanceContextRow as CtxRow,
         )
         from bolsa_infrastructure.database.repositories.account_repository import (

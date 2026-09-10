@@ -25,16 +25,13 @@ from bolsa_api.background.auto_simulation_worker import (
 )
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
+from bolsa_application.sim_durable_store import InMemorySimAutoPositionStore
 from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
     POSITION_PROJECTION_OK,
     POSITION_PROJECTION_REBUILT,
     POSITION_PROJECTION_UNKNOWN,
     reconcile_sim_position,
-)
-from bolsa_application.sim_durable_store import (
-    InMemorySimAutoPositionStore,
-    SimPositionProjection,
 )
 from bolsa_application.simulated_settlement import auto_venue_order_id
 
