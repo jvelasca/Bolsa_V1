@@ -17,6 +17,8 @@ from bolsa_application.auto_orchestrator import (
     OrchestratorDeps,
     active_strategy_decider,
 )
+from bolsa_application.discovery_catalog import DiscoveryBudget, family_by_name
+from bolsa_application.strategy_discovery_engine import discover_for_instrument
 from bolsa_application.strategy_lifecycle_store import InMemoryStrategyLifecycleStore
 from bolsa_application.strategy_top3_coach_phase import CoachThresholds
 from bolsa_domain.entities.strategy_lifecycle import PROMOTION_GATES, ActiveStrategy
@@ -299,4 +301,67 @@ async def test_coach_comparativo_veto_blocks_promotion_with_aggregated_reasons()
     assert not result.promoted
     assert "pbo_alto" in result.reasons
     assert await store.get_active(instrument_id="AAA") is None
+
+
+# ── Discovery Engine (V2.31/A11) ────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_discovery_replaces_single_candidate_and_promotes() -> None:
+    """Con el discovery cableado, el ciclo usa sus candidatas y puede promocionar."""
+    store = InMemoryStrategyLifecycleStore()
+    deps = OrchestratorDeps(
+        store=store,
+        run_optimize=(lambda candidate: _runner(_good_result())),
+        discovery=lambda instrument_id: discover_for_instrument(
+            instrument_id=instrument_id,
+            budget=DiscoveryBudget(max_trials_total=3, max_per_family=1, max_candidates=3),
+        ),
+    )
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    assert result.status == "active"
+    assert result.promoted
+    candidates = await store.list_candidates(instrument_id="AAA")
+    assert len(candidates) == 3
+    assert all(c.origin == "discovery" for c in candidates)
+
+
+@pytest.mark.asyncio
+async def test_discovery_without_candidates_does_not_invent_one() -> None:
+    """Discovery vacío ⇒ fail-closed: no se sintetiza la candidata única."""
+    store = InMemoryStrategyLifecycleStore()
+    deps = OrchestratorDeps(
+        store=store,
+        run_optimize=(lambda candidate: _runner(_good_result())),
+        discovery=lambda instrument_id: (),
+    )
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    assert result.status == "sin_candidatas_discovery"
+    assert result.candidates == 0
+    assert not result.promoted
+    assert await store.get_active(instrument_id="AAA") is None
+
+
+@pytest.mark.asyncio
+async def test_discovery_definition_is_carried_to_promoted_version() -> None:
+    """La versión promocionada conserva la definición ejecutable del discovery."""
+    store = InMemoryStrategyLifecycleStore()
+    deps = OrchestratorDeps(
+        store=store,
+        run_optimize=(lambda candidate: _runner(_good_result())),
+        discovery=lambda instrument_id: discover_for_instrument(
+            instrument_id=instrument_id,
+            families=(family_by_name("bb_reversion"),),
+            budget=DiscoveryBudget(max_trials_total=1, max_per_family=1, max_candidates=1),
+        ),
+    )
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    assert result.promoted
+    active = await store.get_active(instrument_id="AAA")
+    assert active is not None
+    executable = active.active.definition["executable"]
+    assert executable["presetKey"] == "bb_reversion"
 

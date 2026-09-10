@@ -1,7 +1,8 @@
-"""V2.29 / A10 — SignalEvaluator real de la ACTIVE (tests herméticos).
+"""V2.29 / A10 · V2.31/A11 — SignalEvaluator real de la ACTIVE (tests herméticos).
 
 Certifica que la ACTIVE evalúa su propia señal cuando hay snapshot de barras, y que
-ante ausencia de datos/definición ejecutable/error cae al spine (nunca rompe el motor).
+ante ausencia de datos/definición ejecutable/error queda en **HOLD (NO TRADE)**: el
+contrato V2.31/A11 es fail-closed y NUNCA hereda la acción de otra estrategia.
 """
 
 from __future__ import annotations
@@ -24,8 +25,8 @@ class _Bar:
     close: float
 
 
-def _fallback_buy(symbol: str) -> DecisionPackage:
-    return DecisionPackage(action="BUY", instrument_id=symbol, quantity=50)
+def _should_not_be_called(symbol: str) -> DecisionPackage:  # pragma: no cover
+    raise AssertionError("el fallback al spine ya no debe existir (V2.31/A11)")
 
 
 def _active_with_executable() -> ActiveStrategy:
@@ -76,18 +77,17 @@ def _closes(values: list[float]) -> list[_Bar]:
     return [_Bar(timestamp=f"2026-01-{i + 1:02d}", close=v) for i, v in enumerate(values)]
 
 
-def test_signal_evaluator_falls_back_when_no_signal_on_last_bar() -> None:
-    """Sin señal en la última barra (serie plana) delega en el spine, no inventa."""
+def test_no_signal_on_last_bar_holds_instead_of_falling_back() -> None:
+    """Sin señal en la última barra (serie plana) ⇒ HOLD, no se opera."""
     bars = _closes([10.0] * 10)
     decider = make_active_strategy_decider(
         active=_active_with_executable(),
-        fallback=_fallback_buy,
         watch=("AAA",),
         bars_by_symbol=lambda symbol: bars,
     )
     proposal = decider("AAA")
-    assert proposal.action == "BUY"
-    assert proposal.quantity == 50  # del spine, acotado al lote de la ACTIVE
+    assert proposal.action == "HOLD"
+    assert proposal.quantity == 0
     assert proposal.source == "active-strategy:ver-1"
 
 
@@ -97,7 +97,6 @@ def test_signal_evaluator_emits_entry_on_bullish_cross() -> None:
     bars = _closes([10.0] * 7 + [20.0])
     decider = make_active_strategy_decider(
         active=_active_with_executable(),
-        fallback=_fallback_buy,
         watch=("AAA",),
         bars_by_symbol=lambda symbol: bars,
     )
@@ -107,19 +106,16 @@ def test_signal_evaluator_emits_entry_on_bullish_cross() -> None:
     assert proposal.source == "active-strategy:ver-1"
 
 
-def test_signal_evaluator_falls_back_without_bars() -> None:
+def test_signal_evaluator_holds_without_bars() -> None:
     decider = make_active_strategy_decider(
         active=_active_with_executable(),
-        fallback=_fallback_buy,
         watch=("AAA",),
         bars_by_symbol=lambda symbol: [],
     )
-    proposal = decider("AAA")
-    assert proposal.action == "BUY"  # el spine decide
-    assert proposal.quantity == 50  # acotado al lote de la ACTIVE
+    assert decider("AAA").action == "HOLD"
 
 
-def test_signal_evaluator_falls_back_without_executable() -> None:
+def test_signal_evaluator_holds_without_executable() -> None:
     active = ActiveStrategy(
         version_id="ver-1",
         candidate_id="cand-1",
@@ -129,44 +125,40 @@ def test_signal_evaluator_falls_back_without_executable() -> None:
     )
     decider = make_active_strategy_decider(
         active=active,
-        fallback=_fallback_buy,
         watch=("AAA",),
         bars_by_symbol=lambda symbol: _closes([1.0, 2.0]),
     )
-    assert decider("AAA").action == "BUY"
+    assert decider("AAA").action == "HOLD"
 
 
 def test_signal_evaluator_holds_outside_watch() -> None:
     decider = make_active_strategy_decider(
         active=_active_with_executable(),
-        fallback=_fallback_buy,
         watch=("AAA",),
         bars_by_symbol=lambda symbol: _closes([1.0, 2.0]),
     )
     assert decider("BBB").action == "HOLD"
 
 
-def test_signal_evaluator_falls_back_on_evaluation_error() -> None:
-    """Una definición ejecutable corrupta no rompe el motor: cae al spine."""
+def test_signal_evaluator_holds_on_evaluation_error() -> None:
+    """Una definición ejecutable corrupta no rompe el motor: HOLD (nunca otra estrategia)."""
 
     def _boom(symbol: str) -> list[_Bar]:
         raise RuntimeError("snapshot roto")
 
     decider = make_active_strategy_decider(
         active=_active_with_executable(),
-        fallback=_fallback_buy,
         watch=("AAA",),
         bars_by_symbol=_boom,
     )
-    assert decider("AAA").action == "BUY"
+    assert decider("AAA").action == "HOLD"
 
 
-def test_signal_evaluator_holds_without_fallback() -> None:
+def test_signal_evaluator_holds_without_snapshot_loader() -> None:
     decider = make_active_strategy_decider(
         active=_active_with_executable(),
-        fallback=None,
         watch=("AAA",),
-        bars_by_symbol=lambda symbol: [],
+        bars_by_symbol=None,
     )
     assert decider("AAA").action == "HOLD"
 

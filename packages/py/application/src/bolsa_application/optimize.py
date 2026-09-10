@@ -51,6 +51,10 @@ from bolsa_analytics.optimize.rsi_grid import (
     estimate_rsi_grid_trial_total,
     run_rsi_mean_reversion_grid,
 )
+from bolsa_analytics.optimize.rules_grid import (
+    RulesGridTrial,
+    run_rules_grid_search,
+)
 from bolsa_analytics.optimize.sma_grid import (
     SmaGridTrial,
     _simulate_sma_crossover,
@@ -199,6 +203,87 @@ def _macd_to_grid(trial: MacdGridTrial) -> OptimizeGridTrial:
     )
 
 
+def _rules_grid_for(
+    definition: dict[str, Any],
+    family_name: str,
+) -> tuple[list[dict[str, Any]], Any]:
+    """V2.31/A11 — grid y plantilla para una familia declarativa del Discovery.
+
+    Si la familia existe en el catálogo, se devuelve su ``param_space`` completo (para
+    optimizar de verdad, no solo el punto que trajo la candidata) y su ``template``.
+    Si no (definición huérfana), se evalúa el único punto recibido con una plantilla
+    constante — fail-closed honesto: no se inventan puntos que no existen.
+    """
+    try:
+        from bolsa_application.discovery_catalog import family_by_name
+    except Exception:  # noqa: BLE001 — sin catálogo se evalúa el punto recibido.
+        family_by_name = None  # type: ignore[assignment]
+
+    family = family_by_name(family_name) if family_by_name is not None else None
+    if family is not None:
+        return family.param_points(), family.template
+
+    def _fixed(_point: Any) -> dict[str, Any]:
+        return definition
+
+    return [{}], _fixed
+
+
+def _rules_to_grid(
+    trial: RulesGridTrial,
+    *,
+    definition: dict[str, Any],
+) -> OptimizeGridTrial:
+    # El punto del grid (params) se conserva para el campeón; la definición ejecutable
+    # viaja con él para que ``_simulate_family_metrics`` pueda re-simular el campeón
+    # (necesario para el EdgeReport / OOS round-trips).
+    params = dict(trial.params or {})
+    params["definition"] = definition
+    return OptimizeGridTrial(
+        total_return_pct=trial.total_return_pct,
+        max_drawdown_pct=trial.max_drawdown_pct,
+        trade_count=trial.trade_count,
+        score=trial.score,
+        params=params,
+        is_metrics=dict(trial.is_metrics or {}),
+        oos_metrics=trial.oos_metrics,
+    )
+
+
+def _baseline_from_definition(
+    bars: list[BacktestBarInput],
+    definition: dict[str, Any],
+    initial_cash: float,
+) -> OptimizeGridTrial:
+    """Baseline honesto: si la plantilla rinde, se usa; si no, baseline neutro a 0.
+
+    El baseline de las familias H0 es un preset fijo. Para una plantilla declarativa
+    no existe ese preset, así que se evalúa la propia definición sobre las barras.
+    Si no genera operaciones, se devuelve un baseline plano (no se aborta el grid).
+    """
+    from bolsa_analytics.optimize.rules_grid import _simulate_rules_strategy
+
+    try:
+        metrics = _simulate_rules_strategy(bars, definition, initial_cash=initial_cash)
+    except ValueError:
+        return OptimizeGridTrial(
+            total_return_pct=0.0,
+            max_drawdown_pct=0.0,
+            trade_count=0,
+            score=trial_score(0.0, 0.0),
+            params={},
+            is_metrics={},
+        )
+    return OptimizeGridTrial(
+        total_return_pct=float(metrics["totalReturnPct"]),
+        max_drawdown_pct=float(metrics["maxDrawdownPct"]),
+        trade_count=int(metrics["tradeCount"]),
+        score=float(metrics["score"]),
+        params={},
+        is_metrics=dict(metrics),
+    )
+
+
 def _baseline_for_family(
     bars: list[BacktestBarInput],
     family: str,
@@ -237,6 +322,21 @@ def _simulate_family_metrics(
     attach_round_trips: bool = False,
     execution_model: Literal["next_open"] = "next_open",
 ) -> dict[str, Any]:
+    # V2.31/A11: trial de familia declarativa (Discovery) ⇒ se re-simula su definición
+    # ejecutable, que viaja en ``params['definition']``. Fail-closed: sin definición se
+    # cae al camino H0 (que fallará con KeyError y se absorbe en el llamante).
+    executable = trial.params.get("definition") if isinstance(trial.params, dict) else None
+    if isinstance(executable, dict):
+        from bolsa_analytics.optimize.rules_grid import _simulate_rules_strategy
+
+        return _simulate_rules_strategy(
+            bars,
+            executable,
+            initial_cash=initial_cash,
+            trade_from_index=trade_from_index,
+            attach_round_trips=attach_round_trips,
+            execution_model=execution_model,
+        )
     if family == STRATEGY_FAMILY_SMA:
         return _simulate_sma_crossover(
             bars,
@@ -298,7 +398,6 @@ def _champion_trade_returns(
         return []
     pnls = metrics.get("roundTripPnls") or []
     return trade_returns_from_pnls(pnls, initial_cash=initial_cash)
-
 
 def build_lab_pbo_summary(
     candidates: list[OptimizeGridTrial],
@@ -571,12 +670,26 @@ class RunSmaGridOptimize:
         cpcv_embargo_bars: int | None = None,
         on_progress: AsyncProgressCallback | None = None,
         execution_model: Literal["next_open"] = "next_open",
+        definition: dict[str, Any] | None = None,
     ) -> OptimizeSmaGridResult:
+        """Ejecuta el grid de optimización para una familia.
+
+        V2.31/A11: si ``definition`` es una ``StrategyDefinitionV1`` declarativa (la que
+        emite el Discovery Engine), se optimiza por **reglas declarativas** sobre las
+        familias del catálogo; el resto de familias mantiene los grids H0 clásicos.
+        """
         instrument = await self._instruments.get_by_id(instrument_id)
         if instrument is None:
             raise ValueError("Instrumento no encontrado")
 
-        family = normalize_strategy_family(strategy_family)
+        # V2.31/A11: una definición declarativa puede venir de una familia del catálogo
+        # de Discovery cuyo nombre NO es uno de los tres H0 (p. ej. ``bb_reversion``).
+        # En ese caso NO se normaliza (se preserva el nombre para la búsqueda de
+        # catálogo); solo las familias H0 pasan por ``normalize_strategy_family``.
+        if definition is not None:
+            family = str(strategy_family or "").strip().lower() or STRATEGY_FAMILY_SMA
+        else:
+            family = normalize_strategy_family(strategy_family)
         tf = TimeFrame(timeframe) if timeframe in {t.value for t in TimeFrame} else TimeFrame.D1
         bars = await self._ohlcv.get_bars(instrument_id, timeframe=tf, limit=bar_limit)
         if len(bars) < MIN_SCAN_BARS:
@@ -648,6 +761,21 @@ class RunSmaGridOptimize:
             except Exception:
                 holdout = None
         search_bars = holdout.is_bars if holdout is not None else inputs
+
+        # V2.31/A11 (Discovery): definición declarativa ⇒ grid de reglas genérico.
+        if definition is not None:
+            return await self._run_rules(
+                instrument_id=instrument_id,
+                bars=inputs,
+                search_bars=search_bars,
+                holdout=holdout,
+                definition=definition,
+                family_name=family,
+                initial_cash=initial_cash,
+                max_trials=max_trials,
+                on_progress=on_progress,
+                execution_model=execution_model,
+            )
 
         if family == STRATEGY_FAMILY_RSI:
             return await self._run_rsi(
@@ -1313,6 +1441,58 @@ class RunSmaGridOptimize:
             engine="macd_grid_h0",
             trials_total=trials_total,
             family=STRATEGY_FAMILY_MACD,
+            holdout=holdout,
+            initial_cash=initial_cash,
+        )
+
+    async def _run_rules(
+        self,
+        *,
+        instrument_id: str,
+        bars: list[BacktestBarInput],
+        search_bars: list[BacktestBarInput],
+        holdout: HoldoutSplit | None,
+        definition: dict[str, Any],
+        family_name: str,
+        initial_cash: float,
+        max_trials: int,
+        on_progress: AsyncProgressCallback | None,
+        execution_model: Literal["next_open"] = "next_open",
+    ) -> OptimizeSmaGridResult:
+        """V2.31/A11 — optimiza una familia declarativa del Discovery Engine.
+
+        La ``definition`` es la ``StrategyDefinitionV1`` de la plantilla; se recupera
+        su ``param_space`` del catálogo para re-evaluar el grid completo de esa familia
+        (no solo el punto que trajo la candidata). Si la familia no está en el catálogo
+        (definición huérfana), se evalúa el único punto recibido (fail-closed honesto).
+        """
+        param_points, template = _rules_grid_for(definition, family_name)
+        trials_total = max(1, min(len(param_points), max_trials))
+        if on_progress is not None:
+            await on_progress(0, trials_total, None)
+
+        baseline = _baseline_from_definition(search_bars, definition, initial_cash)
+
+        raw = await _run_in_thread_with_live_progress(
+            run_rules_grid_search,
+            search_bars,
+            trials_total=trials_total,
+            on_progress=on_progress,
+            param_points=param_points,
+            template=template,
+            initial_cash=initial_cash,
+            max_trials=min(max_trials, 80),
+            execution_model=execution_model,
+        )
+        trials = [_rules_to_grid(item, definition=definition) for item in raw]
+        return self._finalize(
+            instrument_id=instrument_id,
+            bars=bars,
+            baseline=baseline,
+            trials=trials,
+            engine="rules_grid_h0",
+            trials_total=trials_total,
+            family=family_name,
             holdout=holdout,
             initial_cash=initial_cash,
         )

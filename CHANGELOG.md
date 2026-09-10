@@ -2,6 +2,36 @@
 
 All notable releases of Bolsa V1.
 
+## [1.55.0-beta] — V2.31 / A11 · Intelligent Strategy Discovery — 2026-09-10
+
+Cierra los **dos P1** de la auditoría V2.30. Sin cambios en las barreras LIVE (siguen
+doblemente bloqueadas) ni en la ruta SIM-only.
+
+- **P1-01 — `StrategyDiscoveryEngine`**: nuevo search space **curado y acotado** sobre los
+  33 `definitionId` reales de `bolsa_analytics.indicators` (antes solo 3 familias fijas:
+  SMA/RSI/MACD). `discovery_catalog.py` declara 14 plantillas en tres ramas
+  (trend / momentum / volatility) con parámetros pequeños; `strategy_discovery_engine.py`
+  emite candidatas **deterministas** con presupuesto global (`DiscoveryBudget`).
+- **LAB declarativo**: `run_rules_grid_search` evalúa las plantillas con el motor real de
+  reglas (`evaluate_rules_signals`, gated, sin look-ahead); `RunSmaGridOptimize.execute`
+  acepta `definition=` y despacha a `rules_grid_h0` sin colapsar la familia a SMA/RSI/MACD.
+  `LabOptimizeRunner` propaga la definición.
+- **Orquestación**: `OrchestratorDeps.discovery` + flag `AUTO_ORCHESTRATOR_DISCOVERY`
+  (default OFF) con presupuesto por env. Discovery vacío ⇒
+  `status="sin_candidatas_discovery"` (fail-closed: no se inventa la candidata única).
+- **P1-02 — ACTIVE fail-closed (NO TRADE)**: se elimina el fallback al spine en
+  `active_strategy_signal_evaluator.py`. Sin señal evaluable (sin `executable`, sin barras,
+  fuera de `watch`, error) ⇒ `HOLD`; el único camino a BUY/SELL es la señal propia de la
+  estrategia promocionada. La procedencia real deja de ser invisible.
+- **Sin migraciones nuevas**: catálogo y motor son puros; el discovery reutiliza
+  `strategy_candidates`.
+
+> Cierre: `docs/engineering/cierre-v2.31-a11-discovery-engine-2026-09-10.md`.
+
+> **Diferido a V2.32 (deuda de producto):** shadow real (evidencia ejecutada en vez del
+> flag `AUTO_ORCHESTRATOR_SHADOW_VALIDATED`) y atribución de versión tras crash en
+> posiciones readoptadas.
+
 ## [1.54.0-beta] — V2.30 / A10 · Higiene auditable (CI que ejecuta lo que certifica) — 2026-09-10
 
 Cierra la **deuda de higiene** que impedía una auditoría limpia en GitHub. Sin cambios

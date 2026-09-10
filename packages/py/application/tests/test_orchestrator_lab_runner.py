@@ -180,6 +180,32 @@ async def test_runner_unknown_family_still_calls_lab() -> None:
     assert use_case.calls[0]["strategy_family"] == "my_custom_family"
 
 
+@pytest.mark.asyncio
+async def test_runner_forwards_discovery_definition() -> None:
+    """Una candidata del Discovery (familia del catálogo) pasa su definición al LAB."""
+    runner, use_case = _runner((_good_result(), _Run()))
+    definition = {"presetKey": "bb_reversion", "indicatorSpecs": [], "entries": {}, "exits": {}}
+    await runner(
+        _candidate(
+            strategy_family="bb_reversion",
+            params={"definition": definition, "discovery_family": "bb_reversion"},
+        )
+    )
+
+    call = use_case.calls[0]
+    assert call["strategy_family"] == "bb_reversion"
+    assert call["definition"] == definition
+    # La definición no se cuela como parámetro de grid del LAB.
+    assert "definition" not in call.get("periods", [])
+
+
+@pytest.mark.asyncio
+async def test_runner_without_definition_sends_none() -> None:
+    runner, use_case = _runner((_good_result(), _Run()))
+    await runner(_candidate())
+    assert use_case.calls[0]["definition"] is None
+
+
 # ── Compatibilidad con evaluate_optimize_result ─────────────────────────────────
 
 

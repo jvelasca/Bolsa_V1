@@ -1131,7 +1131,8 @@ def active_strategy_signal_enabled() -> bool:
 
     OFF: la ACTIVE solo aporta lote/watch sobre el spine (comportamiento V2.26-V2.28).
     ON: la ACTIVE evalúa su definición ejecutable sobre barras reales (SignalEvaluator
-    real); si no hay datos o falla la evaluación, cae al spine (fail-open seguro).
+    real) y es **fail-closed a NO TRADE** (V2.31/A11): si no puede evaluar su señal,
+    devuelve HOLD; nunca opera con la lógica de otra estrategia.
     """
     return (os.getenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL") or "").strip().lower() in {
         "1",
@@ -1158,7 +1159,6 @@ async def load_active_strategy_decider(
     session_factory: Any,
     *,
     instrument_id: str,
-    fallback: DecisionProvider,
     watch: Sequence[str],
     lot_qty: float = 100.0,
     ohlcv: Any = None,
@@ -1168,14 +1168,16 @@ async def load_active_strategy_decider(
 
     V2.26/A10: éste es el ÚNICO punto por el que la estrategia promovida entra en el
     hot path del AUTO. Si no hay estrategia activa, o falla la lectura, devuelve
-    ``None`` y el worker sigue con el spine (fail-open seguro: el spine no abre LIVE
-    nunca; RiskGate/SimulationGate siguen vetando).
+    ``None`` y el worker sigue con el spine determinista (comportamiento previo a
+    V2.31, válido cuando la señal de la ACTIVE está deshabilitada).
 
     V2.29/A10: con ``signal_enabled=True`` la ACTIVE evalúa su PROPIA señal sobre las
-    últimas barras (SignalEvaluator real). El snapshot se carga aquí (async) sobre una
-    sesión viva y se cierra sobre el decisor síncrono; sin snapshot o ante error, se
-    delega en el spine. ``ohlcv`` permite inyectar el repo en tests; si es ``None`` se
-    compone por sesión.
+    últimas barras (SignalEvaluator real).
+
+    V2.31/A11 (P1-02): con la señal habilitada, el decisor es **fail-closed a NO TRADE**.
+    Sin snapshot, sin definición ejecutable o ante error de evaluación, la ACTIVE
+    devuelve HOLD; NUNCA hereda la acción de otra estrategia. ``ohlcv`` permite inyectar
+    el repo en tests; si es ``None`` se compone por sesión.
     """
     if not active_strategy_enabled():
         return None
@@ -1196,7 +1198,6 @@ async def load_active_strategy_decider(
                     repo = get_ohlcv_repository(session)
                 return await _build_signal_decider(
                     record=record,
-                    fallback=fallback,
                     watch=watch,
                     lot_qty=lot_qty,
                     ohlcv=repo,
@@ -1205,7 +1206,7 @@ async def load_active_strategy_decider(
 
         return active_strategy_decider(
             active=record.active,
-            fallback=fallback,
+            fallback=None,
             watch=watch,
             lot_qty=lot_qty,
         )
@@ -1217,7 +1218,6 @@ async def load_active_strategy_decider(
 async def _build_signal_decider(
     *,
     record: Any,
-    fallback: DecisionProvider,
     watch: Sequence[str],
     lot_qty: float,
     ohlcv: Any,
@@ -1226,8 +1226,8 @@ async def _build_signal_decider(
     """Compone el ``DecisionProvider`` con SignalEvaluator real + snapshot de barras.
 
     El snapshot se carga con la sesión viva del llamante (async) y se cierra sobre el
-    decisor síncrono. Cualquier fallo del snapshot se absorbe (símbolo sin datos ⇒ el
-    decisor cae al spine).
+    decisor síncrono. Cualquier fallo del snapshot se absorbe: el símbolo sin datos
+    hará HOLD (fail-closed), nunca se delega en otra estrategia (V2.31/A11).
     """
     from bolsa_application.active_strategy_signal_evaluator import (
         make_active_strategy_decider,
@@ -1242,7 +1242,6 @@ async def _build_signal_decider(
     snapshot = await refresh()
     return make_active_strategy_decider(
         active=record.active,
-        fallback=fallback,
         watch=watch,
         bars_by_symbol=snapshot.get,
         lot_qty=lot_qty,
@@ -1476,7 +1475,6 @@ def start_auto_sim_worker(
         # V2.26/A10: solo con runtime PG real y sin decider inyectado; el seam es el
         # ``DecisionProvider`` (no se toca RiskGate/SimulationGate ni se abre LIVE).
         if decider is None and active_strategy_enabled():
-            base_decider = _default_spine_decider()
             spine_watch = tuple(
                 s.strip()
                 for s in (os.getenv("AUTO_ENGINE_SIM_WATCH") or "").split(",")
@@ -1487,7 +1485,6 @@ def start_auto_sim_worker(
                 return await load_active_strategy_decider(
                     session_factory,
                     instrument_id=effective_account,
-                    fallback=base_decider,
                     watch=spine_watch,
                     signal_enabled=active_strategy_signal_enabled(),
                 )

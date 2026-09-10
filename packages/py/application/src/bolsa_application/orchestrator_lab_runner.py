@@ -165,6 +165,14 @@ class LabOptimizeRunner:
     async def __call__(self, candidate: StrategyCandidate) -> LabOptimizeResult | None:
         family = _normalize_family(candidate.strategy_family)
         params = self._merge_params(family, candidate.params)
+        # V2.31/A11 (Discovery): la candidata puede traer una definición declarativa
+        # (familia del catálogo). En ese caso el LAB optimiza por reglas declarativas;
+        # la definición viaja en ``params['definition']`` (no es un parámetro de grid).
+        definition = params.pop("definition", None)
+        if definition is None and isinstance(candidate.params, dict):
+            raw_definition = candidate.params.get("definition")
+            if isinstance(raw_definition, dict):
+                definition = raw_definition
 
         try:
             async with self._session_factory() as session:
@@ -172,6 +180,7 @@ class LabOptimizeRunner:
                 outcome = await use_case.execute(
                     instrument_id=candidate.instrument_id,
                     strategy_family=family,
+                    definition=definition,
                     **params,
                 )
         except ValueError:
@@ -195,11 +204,25 @@ class LabOptimizeRunner:
 
     def _merge_params(self, family: str, candidate_params: dict[str, Any]) -> dict[str, Any]:
         """Grid por defecto de la familia + overrides libres del candidato."""
+        from bolsa_application.optimize import (
+            STRATEGY_FAMILY_MACD,
+            STRATEGY_FAMILY_RSI,
+            STRATEGY_FAMILY_SMA,
+        )
+
         merged: dict[str, Any] = dict(self._grid_defaults.get(family, {}))
         for key, value in dict(candidate_params or {}).items():
             if key in _LAB_RUN_KEYS or key in _GRID_KEYS:
                 merged[key] = value
-        return _prune_grid_to_window(family, merged)
+            elif key == "definition":
+                # V2.31/A11: la definición declarativa del Discovery no es un parámetro
+                # de grid; se propaga aparte (ver ``__call__``).
+                merged[key] = value
+        if family in {STRATEGY_FAMILY_SMA, STRATEGY_FAMILY_RSI, STRATEGY_FAMILY_MACD}:
+            return _prune_grid_to_window(family, merged)
+        # Familia declarativa del Discovery: el grid lo aporta el catálogo dentro del
+        # LAB (``RunSmaGridOptimize._run_rules``); no se recorta por warm-up de familia.
+        return merged
 
 
 def _prune_grid_to_window(family: str, params: dict[str, Any]) -> dict[str, Any]:

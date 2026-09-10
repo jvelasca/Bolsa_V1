@@ -2,8 +2,17 @@
 
 Hasta V2.28 el ``DecisionProvider`` de la estrategia ACTIVE delegaba la ACCIÓN en el
 spine determinista (``fallback``) y solo reescalaba el lote (P2 "SignalEvaluator real").
-Este módulo permite que la ACTIVE **evalúe su propia señal** sobre las últimas barras,
+V2.29 permitió que la ACTIVE **evalúe su propia señal** sobre las últimas barras,
 reutilizando el motor declarativo existente (``evaluate_strategy_last_bar``).
+
+V2.31/A11 (P1-02): el contrato pasa a **fail-closed a NO TRADE**. Antes, si la ACTIVE
+no podía evaluar su señal, el decisor heredaba la ACCIÓN del spine (otra estrategia),
+lo que hacía que el AUTO pudiera operar con una lógica distinta a la estrategia que él
+mismo había promocionado. Ahora:
+
+* La ACTIVE evalúa su definición ejecutable ⇒ BUY/SELL/HOLD según su propia señal.
+* Si no hay definición ejecutable, barras, snapshot, o la evaluación falla ⇒ **HOLD**
+  (no se opera). Nunca se delega en otra estrategia.
 
 Dos piezas:
 
@@ -11,9 +20,9 @@ Dos piezas:
   barras por símbolo. El decisor del worker es **síncrono**, así que el worker refresca
   este snapshot antes de cada turno y lo cierra sobre el ``DecisionProvider``.
 * ``make_active_strategy_decider(...)`` — traduce la señal (``entry_long``/``exit``) a
-  ``DecisionPackage``. **Fail-open al spine**: sin snapshot, sin ``executable`` o ante
-  cualquier error de evaluación, cae al ``fallback`` (una estrategia nunca rompe el
-  motor), nunca inventa una orden.
+  ``DecisionPackage``. **Fail-closed**: sin snapshot, sin ``executable`` o ante
+  cualquier error de evaluación, devuelve HOLD (nunca inventa una orden ni hereda la
+  de otra estrategia).
 """
 
 from __future__ import annotations
@@ -57,7 +66,7 @@ def make_bar_snapshot_loader(
 
     El worker lo invoca antes de cada turno (``auto_turn``) y guarda el resultado en un
     dict que cierra sobre el decisor síncrono. Un fallo por símbolo se ignora (ese
-    símbolo se queda sin snapshot y usará el ``fallback``), nunca aborta el refresco.
+    símbolo se queda sin snapshot y el decisor hará HOLD), nunca aborta el refresco.
     """
     from bolsa_domain.value_objects.timeframe import TimeFrame
 
@@ -70,7 +79,7 @@ def make_bar_snapshot_loader(
                 bars = await ohlcv.get_bars(
                     symbol, timeframe=effective_timeframe, limit=limit
                 )
-            except Exception:  # noqa: BLE001 — sin barras ⇒ fallback, no se rompe.
+            except Exception:  # noqa: BLE001 — sin barras ⇒ HOLD, no se rompe.
                 logger.debug("signal evaluator: no bars for %s", symbol, exc_info=True)
                 continue
             if bars:
@@ -102,7 +111,6 @@ def _to_decision(
 def make_active_strategy_decider(
     *,
     active: Any,
-    fallback: Callable[[str], DecisionPackage] | None,
     watch: Sequence[str],
     bars_by_symbol: Callable[[str], list[Any]] | None = None,
     lot_qty: float = 100.0,
@@ -111,7 +119,8 @@ def make_active_strategy_decider(
 
     ``bars_by_symbol`` devuelve las barras ya cargadas para el símbolo (snapshot
     síncrono). Si no hay barras, si la definición no trae ``executable`` o si la
-    evaluación falla, delega en ``fallback`` (o HOLD si no hay ``fallback``).
+    evaluación falla, devuelve **HOLD** (fail-closed): la ACTIVE nunca ejecuta la
+    lógica de otra estrategia (V2.31/A11, P1-02).
     """
     definition = dict(getattr(active, "definition", None) or {})
     executable = definition.get("executable")
@@ -120,48 +129,30 @@ def make_active_strategy_decider(
     effective_lot = float(definition.get("lot_qty", lot_qty) or lot_qty)
     effective_watch = tuple(str(s) for s in (definition.get("watch") or watch))
 
+    def _hold(symbol: str) -> DecisionPackage:
+        return DecisionPackage(
+            action="HOLD", instrument_id=symbol, quantity=0, source=source
+        )
+
     def _decide(symbol: str) -> DecisionPackage:
         if symbol not in effective_watch:
-            return DecisionPackage(
-                action="HOLD", instrument_id=symbol, quantity=0, source=source
-            )
+            return _hold(symbol)
         if not isinstance(executable, dict) or bars_by_symbol is None:
-            return _fallback(symbol)
+            # Sin estrategia ejecutable: no se opera (no se delega en el spine).
+            return _hold(symbol)
         try:
             bars = bars_by_symbol(symbol)
             if not bars:
-                return _fallback(symbol)
+                return _hold(symbol)
             signal_kind = _evaluate_last_signal(executable, bars, symbol)
         except Exception:  # noqa: BLE001 — una evaluación fallida no rompe el motor.
             logger.debug("signal evaluator failed for %s", symbol, exc_info=True)
-            return _fallback(symbol)
+            return _hold(symbol)
         if signal_kind is None:
-            return _fallback(symbol)
+            return _hold(symbol)
         effective = _bounded_lot(signal_kind, effective_lot)
         return _to_decision(
             symbol=symbol, signal_kind=signal_kind, lot_qty=effective, source=source
-        )
-
-    def _fallback(symbol: str) -> DecisionPackage:
-        if fallback is None:
-            return DecisionPackage(
-                action="HOLD", instrument_id=symbol, quantity=0, source=source
-            )
-        try:
-            proposal = fallback(symbol)
-        except Exception:  # noqa: BLE001
-            return DecisionPackage(
-                action="HOLD", instrument_id=symbol, quantity=0, source=source
-            )
-        if proposal.action in {"BUY", "SELL"}:
-            return DecisionPackage(
-                action=proposal.action,
-                instrument_id=symbol,
-                quantity=min(float(proposal.quantity or effective_lot), effective_lot),
-                source=source,
-            )
-        return DecisionPackage(
-            action=proposal.action, instrument_id=symbol, quantity=0, source=source
         )
 
     return _decide

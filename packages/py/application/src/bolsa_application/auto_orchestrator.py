@@ -21,6 +21,7 @@ lo invoca con el gate de entorno y las dependencias reales.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
@@ -92,6 +93,10 @@ UniverseResolver = Callable[[], Awaitable[Any]]
 # V2.28 / A10: puerto opcional para la vigilancia real; sin él la vigilancia queda como
 # antes (métricas que le pase el llamante) y NO se inventa evidencia.
 ObservedMetricsProvider = Callable[[str], Awaitable[dict[str, Any]]]
+# ``discover(instrument_id) -> candidatas`` (V2.31/A11). Sustituye la candidata única
+# por familia fija por el search space curado del Discovery Engine. Si es ``None``, se
+# conserva el comportamiento previo (una candidata con ``strategy_family``/``params``).
+DiscoveryRunner = Callable[[str], Awaitable[tuple[Any, ...]] | tuple[Any, ...]]
 
 
 @dataclass(slots=True)
@@ -112,6 +117,9 @@ class OrchestratorDeps:
     # atribuidos). Si es ``None``, ``watch_active`` usa exactamente las métricas que le
     # pase el llamante (comportamiento previo, sin regresión).
     observed_metrics: ObservedMetricsProvider | None = None
+    # V2.31 / A11 (P1-01): motor de descubrimiento. Si está cableado, ``run_cycle``
+    # genera las candidatas con él (search space curado) en vez de la candidata única.
+    discovery: DiscoveryRunner | None = None
 
 
 @dataclass(slots=True)
@@ -170,8 +178,22 @@ class AutoOrchestrator:
         if deps.resolve_universe is not None:
             resolution = await deps.resolve_universe()
 
+        # V2.31/A11 (P1-01): DISCOVERY ENGINE. Si está cableado, sustituye la candidata
+        # única por el search space curado (trend/momentum/volatility). El instrumento
+        # sigue viniendo del ciclo (el universo ESTUDIO ya filtró el allowlist).
+        if deps.discovery is not None:
+            discovered = deps.discovery(instrument_id)
+            if inspect.isawaitable(discovered):
+                discovered = await discovered
+            candidates = list(discovered or ())
+            if not candidates:
+                return OrchestratorResult(
+                    instrument_id=instrument_id,
+                    status="sin_candidatas_discovery",
+                    detail="discovery_sin_candidatas",
+                )
         # ESTUDIO: candidatas reproducibles (respetando el instrumento pedido).
-        if resolution is not None:
+        elif resolution is not None:
             plan = build_estudio_candidates(
                 resolution=resolution,
                 strategy_family=deps.strategy_family,
@@ -415,15 +437,31 @@ def _champion_definition(
     declarativo listo para ``evaluate_strategy_last_bar``). Es aditivo: si no hay
     resultado o campeón, devuelve ``None`` y la versión conserva su definición previa
     (sin inventar señal ejecutable).
+
+    V2.31/A11: para candidatas del Discovery, el campeón puede ser de una familia
+    declarativa que ``build_executable_definition`` no conoce (trend/momentum/volatility).
+    En ese caso se usa la definición ejecutable de la propia candidata (la plantilla del
+    catálogo), reescalada a los parámetros ganadores.
     """
     champion = champion_params_from_result(result) if result is not None else None
     if champion is None:
         return None
     extra: dict[str, Any] = {"champion_params": champion}
     executable = build_executable_definition(candidate.strategy_family, champion)
+    if executable is None:
+        executable = _discovery_executable(candidate)
     if executable is not None:
         extra["executable"] = executable
     return extra
+
+
+def _discovery_executable(candidate: StrategyCandidate) -> dict[str, Any] | None:
+    """Extrae la definición ejecutable de una candidata del Discovery (si la trae)."""
+    params = candidate.params if isinstance(candidate.params, dict) else {}
+    executable = params.get("definition")
+    if isinstance(executable, dict):
+        return executable
+    return None
 
 
 def _promotion_gates(evaluation: StrategyEvaluation, coach: Any) -> tuple[GateResult, ...]:

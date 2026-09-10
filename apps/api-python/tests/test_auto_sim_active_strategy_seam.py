@@ -48,7 +48,7 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.asyncio
 async def test_load_active_decider_disabled_by_default() -> None:
     decider = await w.load_active_strategy_decider(
-        object(), instrument_id="AAA", fallback=lambda s: None, watch=("AAA",)
+        object(), instrument_id="AAA", watch=("AAA",)
     )
     assert decider is None
 
@@ -64,7 +64,7 @@ async def test_load_active_decider_returns_none_without_active(
     factory, StoreCls, sls = _stub_session_factory(store)
     monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
     decider = await w.load_active_strategy_decider(
-        factory, instrument_id="AAA", fallback=lambda s: None, watch=("AAA",)
+        factory, instrument_id="AAA", watch=("AAA",)
     )
     assert decider is None
 
@@ -94,17 +94,15 @@ async def test_load_active_decider_wraps_active(monkeypatch: pytest.MonkeyPatch)
     factory, StoreCls, sls = _stub_session_factory(store)
     monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
 
-    def fallback(symbol: str) -> Any:
-        from bolsa_application.decision_contract import DecisionPackage
-
-        return DecisionPackage(action="BUY", instrument_id=symbol, quantity=5.0)
-
+    # V2.31/A11: el decider clásico ya no recibe fallback del worker ⇒ sin señal
+    # propia habilitada, la ACTIVE queda en HOLD (nunca hereda la acción del spine).
     decider = await w.load_active_strategy_decider(
-        factory, instrument_id="AAA", fallback=fallback, watch=("AAA",)
+        factory, instrument_id="AAA", watch=("AAA",)
     )
     assert decider is not None
     prop = decider("AAA")
     assert prop.source == "active-strategy:ver-1"
+    assert prop.action == "HOLD"
 
 
 @pytest.mark.asyncio
@@ -212,10 +210,9 @@ class _FakeOhlcv:
 
 @pytest.mark.asyncio
 async def test_signal_disabled_uses_classic_decider(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Sin señal habilitada la ACTIVE solo aporta lote/watch (comportamiento V2.26)."""
+    """Sin señal habilitada la ACTIVE no opera (HOLD): no hereda la acción del spine."""
     monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
     monkeypatch.delenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", raising=False)
-    from bolsa_application.decision_contract import DecisionPackage
     from bolsa_application.strategy_lifecycle_store import (
         ActiveStrategyRecord,
         InMemoryStrategyLifecycleStore,
@@ -228,27 +225,21 @@ async def test_signal_disabled_uses_classic_decider(monkeypatch: pytest.MonkeyPa
     factory, StoreCls, sls = _stub_session_factory(store)
     monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
 
-    def fallback(symbol: str) -> DecisionPackage:
-        return DecisionPackage(action="BUY", instrument_id=symbol, quantity=7.0)
-
     # El worker solo pasa ``signal_enabled`` cuando el flag de entorno está ON; aquí se
-    # omite (default False) ⇒ decider clásico: acción del spine, lote acotado.
+    # omite (default False) ⇒ decider clásico sin señal propia ⇒ HOLD.
     decider = await w.load_active_strategy_decider(
         factory,
         instrument_id="AAA",
-        fallback=fallback,
         watch=("AAA",),
     )
     assert decider is not None
-    assert decider("AAA").action == "BUY"
-    assert decider("AAA").quantity == 7.0
+    assert decider("AAA").action == "HOLD"
 
 
 @pytest.mark.asyncio
 async def test_signal_enabled_uses_own_signal(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
     monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", "1")
-    from bolsa_application.decision_contract import DecisionPackage
     from bolsa_application.strategy_lifecycle_store import (
         ActiveStrategyRecord,
         InMemoryStrategyLifecycleStore,
@@ -261,13 +252,9 @@ async def test_signal_enabled_uses_own_signal(monkeypatch: pytest.MonkeyPatch) -
     factory, StoreCls, sls = _stub_session_factory(store)
     monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
 
-    def fallback(symbol: str) -> DecisionPackage:
-        return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
-
     decider = await w.load_active_strategy_decider(
         factory,
         instrument_id="AAA",
-        fallback=fallback,
         watch=("AAA",),
         signal_enabled=True,
         ohlcv=_FakeOhlcv([10.0] * 7 + [20.0]),
@@ -280,10 +267,10 @@ async def test_signal_enabled_uses_own_signal(monkeypatch: pytest.MonkeyPatch) -
 
 
 @pytest.mark.asyncio
-async def test_signal_enabled_without_bars_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_signal_enabled_without_bars_holds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sin barras la ACTIVE queda en HOLD (fail-closed V2.31/A11), no en el spine."""
     monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
     monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", "1")
-    from bolsa_application.decision_contract import DecisionPackage
     from bolsa_application.strategy_lifecycle_store import (
         ActiveStrategyRecord,
         InMemoryStrategyLifecycleStore,
@@ -296,20 +283,15 @@ async def test_signal_enabled_without_bars_falls_back(monkeypatch: pytest.Monkey
     factory, StoreCls, sls = _stub_session_factory(store)
     monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
 
-    def fallback(symbol: str) -> DecisionPackage:
-        return DecisionPackage(action="BUY", instrument_id=symbol, quantity=5.0)
-
     decider = await w.load_active_strategy_decider(
         factory,
         instrument_id="AAA",
-        fallback=fallback,
         watch=("AAA",),
         signal_enabled=True,
-        ohlcv=_FakeOhlcv([]),  # sin barras ⇒ spine
+        ohlcv=_FakeOhlcv([]),  # sin barras ⇒ HOLD (no se opera)
     )
     assert decider is not None
-    assert decider("AAA").action == "BUY"
-    assert decider("AAA").quantity == 5.0
+    assert decider("AAA").action == "HOLD"
 
 
 def test_signal_flag_defaults_off() -> None:

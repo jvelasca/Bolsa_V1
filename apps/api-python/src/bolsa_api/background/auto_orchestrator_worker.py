@@ -54,6 +54,12 @@ AUTO_ORCHESTRATOR_SHADOW_VALIDATED = "AUTO_ORCHESTRATOR_SHADOW_VALIDATED"
 AUTO_ORCHESTRATOR_STRATEGY_FAMILY = "AUTO_ORCHESTRATOR_STRATEGY_FAMILY"
 AUTO_ORCHESTRATOR_LAB_PARAMS = "AUTO_ORCHESTRATOR_LAB_PARAMS"
 AUTO_ORCHESTRATOR_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_MAX_CANDIDATES"
+# V2.31/A11 (P1-01): motor de descubrimiento. OFF por defecto (rollout explícito y
+# reversible): con OFF se conserva la candidata única por familia fija (V2.29).
+AUTO_ORCHESTRATOR_DISCOVERY = "AUTO_ORCHESTRATOR_DISCOVERY"
+AUTO_ORCHESTRATOR_DISCOVERY_MAX_TRIALS = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_TRIALS"
+AUTO_ORCHESTRATOR_DISCOVERY_MAX_PER_FAMILY = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_PER_FAMILY"
+AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES"
 
 
 def _truthy(raw: str | None) -> bool:
@@ -83,6 +89,42 @@ def _interval_seconds(default: float = 3600.0) -> float:
 
 def shadow_validated() -> bool:
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_SHADOW_VALIDATED))
+
+
+def discovery_enabled() -> bool:
+    """V2.31/A11: ¿el AUTO descubre estrategias en el search space curado? (OFF)."""
+    return _truthy(os.getenv(AUTO_ORCHESTRATOR_DISCOVERY))
+
+
+def _discovery_budget() -> Any:
+    """Presupuesto del discovery (anti-explosión combinatoria), override por env."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    def _int_env(name: str, default: int) -> int:
+        raw = (os.getenv(name) or "").strip()
+        if not raw:
+            return default
+        try:
+            value = int(raw)
+        except ValueError:
+            return default
+        return value if value > 0 else default
+
+    return DiscoveryBudget(
+        max_trials_total=_int_env(AUTO_ORCHESTRATOR_DISCOVERY_MAX_TRIALS, 48),
+        max_per_family=_int_env(AUTO_ORCHESTRATOR_DISCOVERY_MAX_PER_FAMILY, 8),
+        max_candidates=_int_env(AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES, 24),
+    )
+
+
+def _make_discovery_runner(budget: Any) -> Any:
+    """``discovery(instrument_id)`` síncrono (función pura, sin DB/red)."""
+    from bolsa_application.strategy_discovery_engine import discover_for_instrument
+
+    def _discover(instrument_id: str) -> tuple[Any, ...]:
+        return discover_for_instrument(instrument_id=instrument_id, budget=budget)
+
+    return _discover
 
 
 async def _instruments_for_cycle(
@@ -271,6 +313,10 @@ def _default_orchestrator(session_factory: Any) -> Any:
             # V2.28 / A10 (P1-02 real): vigilancia con métricas OBSERVADAS de la ejecución
             # SIM atribuida a la versión activa (fills con strategy_version_id).
             observed_metrics=make_observed_metrics_provider(session_factory),
+            # V2.31/A11 (P1-01): discovery del search space curado (flag OFF por defecto).
+            discovery=(
+                _make_discovery_runner(_discovery_budget()) if discovery_enabled() else None
+            ),
         )
     )
 
