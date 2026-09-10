@@ -163,6 +163,7 @@ class PostgresAutoEngineStore:
 
     async def read(self, engine_id: str) -> AutoEngineSnapshot | None:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import AutoEngineRunRow
 
         row = (
@@ -191,6 +192,7 @@ class PostgresAutoEngineStore:
 
     async def _read_tick_count(self, engine_id: str) -> int:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import AutoEngineTickRow
 
         count = await self._session.scalar(
@@ -201,35 +203,46 @@ class PostgresAutoEngineStore:
         return int(count or 0)
 
     async def record_tick(self, tick: AutoEngineTickInput) -> None:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
         from bolsa_infrastructure.database.models.tables import (
             AutoEngineRunRow,
             AutoEngineTickRow,
         )
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         now = self._now()
         occurred = tick.occurred_at or now
         # 1) Matricular la fila de tick exactamente una vez (UNIQUE engine+seq).
-        inserted = await self._session.execute(
-            pg_insert(AutoEngineTickRow)
-            .values(
-                tick_id=f"tick-{tick.engine_id}-{tick.seq}",
-                engine_id=tick.engine_id,
-                seq=tick.seq,
-                state=tick.state,
-                proposals=int(tick.proposals),
-                vetoes=int(tick.vetoes),
-                pending_plans=int(tick.pending_plans),
-                reason=_reason_text(tick.last_reason),
-                tick_at=occurred,
-                created_at=now,
+        # V2.23/A9 (Bloque 5, P2): el "intento de matrícula" va en un SAVEPOINT para
+        # que un tick ya matriculado (crash/re-registro) NO arrastre con un rollback
+        # de sesión el trabajo previo pendiente del MISMO tick (p.ej. la captura de
+        # ``execution_events`` que el scheduler hizo sobre esta misma sesión). El
+        # savepoint aísla SOLO la inserción duplicada; el resto de la transacción
+        # queda intacto.
+        async with self._session.begin_nested() as _sp:
+            inserted = await self._session.execute(
+                pg_insert(AutoEngineTickRow)
+                .values(
+                    tick_id=f"tick-{tick.engine_id}-{tick.seq}",
+                    engine_id=tick.engine_id,
+                    seq=tick.seq,
+                    state=tick.state,
+                    proposals=int(tick.proposals),
+                    vetoes=int(tick.vetoes),
+                    pending_plans=int(tick.pending_plans),
+                    reason=_reason_text(tick.last_reason),
+                    tick_at=occurred,
+                    created_at=now,
+                )
+                .on_conflict_do_nothing(constraint="auto_engine_ticks_engine_seq_uidx")
             )
-            .on_conflict_do_nothing(constraint="auto_engine_ticks_engine_seq_uidx")
-        )
-        if inserted.rowcount == 0:
-            # Tick ya matriculado (crash/re-registro) → no avanzar la run (no dobla).
-            await self._session.rollback()
-            return
+            if inserted.rowcount == 0:
+                # Tick ya matriculado (crash/re-registro) → no avanzar la run (no
+                # dobla) y deshace SOLO el savepoint (la transacción externa y su
+                # trabajo previo —p.ej. la captura de execution_events del tick—
+                # quedan intactos).
+                await _sp.rollback()
+                return
         # 2) Sincronizar el acumulado durable de la run a los totales DE ESTE tick.
         await self._session.execute(
             pg_insert(AutoEngineRunRow)

@@ -38,7 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-_HEAD = "026_execution_events_fence"
+_HEAD = "028_sim_finance_position_durable"
 
 
 def _load_env() -> None:

@@ -12,6 +12,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    PrimaryKeyConstraint,
     String,
     Text,
     UniqueConstraint,
@@ -2116,6 +2117,68 @@ class AutoEngineTickRow(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
+class SimFillFinanceContextRow(Base):
+    """V2.23 / A9 (Bloque 5 · P1-05) — contexto financiero durable por fill SIM.
+
+    Espejo 1:1 de ``sim_fill_finance_context`` (migración 028). El
+    ``ExecutionEvent`` durable no lleva ``instrument_id``/``side``/``price``; aquí
+    se persiste por ``execution_id`` lo justo para que un resolver reconstruya la
+    finance de ESE fill sin depender de la memoria del ``SimulatedOrderResult``
+    (crash-recuperable). ``side`` en minúsculas (``buy``/``sell``; enum-igual).
+    """
+
+    __tablename__ = "sim_fill_finance_context"
+    __table_args__ = (Index("sim_fill_finance_context_account_idx", "account_id"),)
+
+    execution_id: Mapped[str] = mapped_column("execution_id", String, primary_key=True)
+    instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    side: Mapped[str] = mapped_column("side", String(8), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    venue: Mapped[str] = mapped_column("venue", String, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(
+        "idempotency_key", String, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
+class SimAutoPositionRow(Base):
+    """V2.23 / A9 (Bloque 5 · P1-06) — posición SIM durable del AUTO Engine.
+
+    Espejo 1:1 de ``sim_auto_positions`` (migración 028): cantidad abierta por
+    ``(engine_id, symbol)`` para que un worker reiniciado readopte la posición
+    (G7: BUY 100 → crash → restart → position=100 → NO segundo BUY). Sin FK a
+    ``instruments`` (mismo criterio que ``auto_engine_runs``): el motor AUTO opera
+    por símbolo de watch.
+    """
+
+    __tablename__ = "sim_auto_positions"
+    __table_args__ = (
+        PrimaryKeyConstraint("engine_id", "symbol", name="sim_auto_positions_pk"),
+        Index("sim_auto_positions_engine_updated_idx", "engine_id", "updated_at"),
+    )
+
+    engine_id: Mapped[str] = mapped_column("engine_id", String, nullable=False)
+    symbol: Mapped[str] = mapped_column("symbol", String, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    avg_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(
+        "opened_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
         DateTime(timezone=True),
         nullable=False,
     )

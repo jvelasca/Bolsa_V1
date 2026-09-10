@@ -214,6 +214,38 @@ async def _drive_buy_sell(
     return fills
 
 
+def _seed_with_fills(instrument_id: str, *, side: str = "buy") -> int:
+    """Elige un seed DETERMINISTA que garantice fills (no dependa de la lotería).
+
+    ``draw_queue_noise(seed, side, instrument_id)`` puede devolver una terminal
+    noisy (reject/closed/timeout) que deja ``fills=()``. El test asumía que el seed
+    aleatorio SIEMPRE llenaba → flaky ~13% de las corridas. Aquí se busca el primer
+    seed con fills para los DOS lados (buy/sell) del instrumento dado.
+    """
+    from decimal import Decimal
+
+    from bolsa_application.simulated_broker import simulated_fill_schedule
+
+    for seed in range(1, 100_000):
+        ok = True
+        for s in ("buy", "sell"):
+            r = simulated_fill_schedule(
+                instrument_id=instrument_id,
+                side=s,
+                quantity=Decimal("60"),
+                venue_order_id=f"sim-{s}-{instrument_id}-{seed}",
+                seed=seed,
+                fill_chunks=3,
+                base_mid=100.0,
+            )
+            if not r.fills:
+                ok = False
+                break
+        if ok:
+            return seed
+    raise AssertionError(f"no seed con fills para {instrument_id!r}")
+
+
 @pytest.mark.asyncio
 async def test_finance_auto_day_materializes_executetrade_exactly_once(
     fin_pg_factory: async_sessionmaker[AsyncSession],
@@ -225,8 +257,9 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
     (crash/relaunch) devuelve ``already_applied`` sin volver a tocar dinero (invariante
     C3/P2-01 idempotente por ``simulated_idempotency_key``).
     """
-    seed = uuid.uuid4().int % (2**31)
     instrument_id = f"inst-fin-{uuid.uuid4().hex[:10]}"
+    # V2.23/A9: seed determinista con fills garantizados (antes aleatorio ⇒ flaky ~13%).
+    seed = _seed_with_fills(instrument_id)
     account_id: str | None = None
     try:
         async with fin_pg_factory() as session:
@@ -281,11 +314,12 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
                 assert second == "already_applied", second
     finally:
         if account_id:
+            from sqlalchemy import delete  # noqa: PLC0415
+
             from bolsa_infrastructure.database.models.tables import InstrumentRow  # noqa: PLC0415
             from bolsa_infrastructure.database.repositories.account_repository import (  # noqa: PLC0415
                 SqlAlchemyAccountRepository,
             )
-            from sqlalchemy import delete  # noqa: PLC0415
 
             async with fin_pg_factory() as session:
                 await session.execute(

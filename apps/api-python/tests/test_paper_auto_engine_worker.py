@@ -10,12 +10,12 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+
+from bolsa_api.background import paper_auto_engine_worker as w
 from bolsa_application.risk_runtime import (
     clear_idempotency_memory_for_tests,
     set_runtime_kill_switch_memory,
 )
-
-from bolsa_api.background import paper_auto_engine_worker as w
 
 
 @pytest.fixture(autouse=True)

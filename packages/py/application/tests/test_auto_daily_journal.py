@@ -115,3 +115,36 @@ def test_ledger_balanced_numeric() -> None:
     assert ledger_balanced(net_cash_delta=Decimal("0"), ledger_remainder=Decimal("0"))
     assert ledger_balanced(net_cash_delta=Decimal("100.0"), ledger_remainder=Decimal("100.00"))
     assert not ledger_balanced(net_cash_delta=Decimal("100"), ledger_remainder=Decimal("99"))
+
+
+def test_ledger_not_checked_is_not_balanced() -> None:
+    """V2.23/A9 (Bloque 6): sin datos de balance ⇒ NOT_CHECKED, nunca PASS."""
+    from bolsa_application.auto_daily_journal import (
+        LEDGER_BALANCED,
+        LEDGER_NOT_CHECKED,
+        LEDGER_UNBALANCED,
+        ledger_balance_status,
+    )
+
+    assert ledger_balance_status() == LEDGER_NOT_CHECKED
+    assert not ledger_balanced()
+    assert (
+        ledger_balance_status(net_cash_delta=Decimal("0"), ledger_remainder=Decimal("0"))
+        == LEDGER_BALANCED
+    )
+    assert (
+        ledger_balance_status(
+            net_cash_delta=Decimal("100"), ledger_remainder=Decimal("99")
+        )
+        == LEDGER_UNBALANCED
+    )
+
+
+def test_report_not_checked_ledger_is_unhealthy() -> None:
+    """Un día con fills/posiciones pero sin balance comprobado NO es certificable."""
+    rep = build_auto_daily_report(rows=_healthy_rows())  # sin args de ledger
+    assert rep.ledger_balance_status == "NOT_CHECKED"
+    assert rep.ledger_balanced is False
+    assert rep.healthy is False
+    assert "ledger_balance_not_checked" in rep.errors
+

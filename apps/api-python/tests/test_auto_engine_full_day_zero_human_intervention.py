@@ -24,11 +24,11 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+
+from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
 from bolsa_application.auto_daily_journal import build_auto_daily_report
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
-
-from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
 
 _WATCH = ["AAA", "IBEX", "GBP"]
 _QTY = 120.0

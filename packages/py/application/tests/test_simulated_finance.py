@@ -26,7 +26,6 @@ import asyncio
 from decimal import Decimal
 
 import pytest
-from bolsa_domain.lifecycle import LIFECYCLE_CASH, LifecycleAccounting, assert_equity_invariant
 
 from bolsa_application.execution_event import (
     ExecutionEvent,
@@ -43,6 +42,7 @@ from bolsa_application.simulated_finance import (
     sim_roundtrip_accounting,
 )
 from bolsa_application.simulated_settlement import simulated_execution_candidates
+from bolsa_domain.lifecycle import LIFECYCLE_CASH, LifecycleAccounting, assert_equity_invariant
 
 _Q = Decimal("100.000000")
 

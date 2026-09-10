@@ -26,7 +26,6 @@ down_revision ``026_execution_events_fence`` (cadena lineal; sin branch_labels).
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "027_auto_engine_state"

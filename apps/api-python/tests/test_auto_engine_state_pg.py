@@ -30,6 +30,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 _DOTENV = Path(__file__).resolve().parents[3] / ".env"
 _ENV_FILE = "AUTO_M4_PG_REQUIRED"
 
+# V2.23/A9 (Bloque 1, CI GREEN): marker explícito. El job `lifecycle-pg` mezcla este
+# archivo con rutas fuera de `apps/api-python` (p.ej. `packages/py/infrastructure/...`),
+# con lo que el rootdir cae en la raíz y NO aplica `asyncio_mode=auto` del
+# `apps/api-python/pyproject.toml`. Sin este marker, pytest trata el test async como
+# función síncrona y falla ("async def functions are not natively supported").
+pytestmark = pytest.mark.asyncio
+
 
 def _require_or_skip(exc: Exception) -> None:
     if os.environ.get(_ENV_FILE) == "1":
@@ -69,13 +76,14 @@ async def test_crash_restart_readopts_running_without_doubling_tick(
 ) -> None:
     import uuid
 
+    from sqlalchemy import select, text
+
     from bolsa_application.auto_engine_state_store import (
         AutoEngineTickInput,
         PostgresAutoEngineStore,
         crash_restart_readopts,
     )
     from bolsa_infrastructure.database.models.tables import AutoEngineRunRow
-    from sqlalchemy import select, text
 
     factory, _db_name = auto_pg_factory
     engine_id = f"m4-pg-{uuid.uuid4().hex[:10]}"

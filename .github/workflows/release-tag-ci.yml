@@ -345,6 +345,14 @@ jobs:
       DB_PASSWORD: bolsa_dev
       DB_NAME: bolsa_v1
       LIFECYCLE_PG_REQUIRED: '1'
+      # V2.23/A9: gates PG nuevos fail-if-skipped. PostgreSQL está presente en este
+      # job, así que los tests PG de A9 (estado durable AUTO Engine y finance SIM
+      # real) DEBEN ejecutarse: un skip silencioso aquí es un fallo duro (no-green).
+      AUTO_M4_PG_REQUIRED: '1'
+      AUTO_M5_FIN_PG_REQUIRED: '1'
+      # V2.23/A9 (Bloque 6): certificación AUTO SIM-ONLY end-to-end por el camino real
+      # del scheduler. Un skip aquí (sin PG/credenciales) es un fallo duro.
+      AUTO_SCHEDULER_PG_REQUIRED: '1'
       JWT_SIGNING_KEY: ci-lifecycle-pg-secret-key
       APP_AUTH_SECRET: ci-lifecycle-pg-secret-key
     steps:
@@ -376,6 +384,10 @@ jobs:
           apps/api-python/tests/test_auto_engine_state_pg.py
           # V2.22/A9 (last gap): finance AUTO SIM-ONLY real-PG (ExecuteTrade por fill).
           apps/api-python/tests/test_simulated_finance_pg.py
+          # V2.23/A9 (Bloque 6): certificación AUTO SIM-ONLY end-to-end por el
+          # scheduler real (ticks/events/orders/fills/positions/ledger + no-LIVE +
+          # readopción crash sin doble BUY/efecto).
+          apps/api-python/tests/test_auto_scheduler_real_pg_zero_human_intervention.py
           apps/api-python/tests/test_health.py
           -q
           --tb=short

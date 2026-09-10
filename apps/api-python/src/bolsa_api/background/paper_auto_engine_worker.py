@@ -107,19 +107,27 @@ def _watch_symbols() -> list[str]:
 
 
 def _kill_switch_env_on() -> bool:
-    """Kill switch READ-only (sin Redis): Settings + runtime memory. Nunca escribe."""
+    """Kill switch READ-only (sin Redis): Settings + runtime memory. Nunca escribe.
+
+    Fail-CLOSED (V2.23/A9): si NO se puede leer el kill switch desde NINGUNA fuente
+    (config que lanza Y runtime memory que lanza/ausente), el AUTO se BLOQUEA
+    (``True`` = kill activo). Lo mismo que OR-6/operational_readiness: ante
+    incertidumbre de un interruptor de seguridad, paráte el motor; jamás dejes pasar
+    por no saber. Un mal lectura no abre una vía LIVE (SIM-ONLY), pero sí debe
+    impedir que siga planificando/liquidando en simulado cuando debería estar frenado.
+    """
     from bolsa_application.risk_runtime import get_runtime_kill_switch_memory
     from bolsa_infrastructure.config import get_settings
 
     try:
         if bool(get_settings().risk_kill_switch):
             return True
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 — primera fuente no disponible: probar la 2ª.
         pass
     try:
         return bool(get_runtime_kill_switch_memory())
-    except Exception:  # noqa: BLE001
-        return False
+    except Exception:  # noqa: BLE001 — ambas fuentes fallan ⇒ fail-closed.
+        return True
 
 
 def _effective_venue() -> str:

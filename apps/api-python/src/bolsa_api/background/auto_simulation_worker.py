@@ -36,28 +36,34 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from bolsa_api.background.paper_auto_engine_worker import (
+    DecisionProvider,
+    _effective_venue,
+    _kill_switch_env_on,
+    _watch_symbols,
+)
 from bolsa_application.auto_daily_journal import SimJournalRow
 from bolsa_application.auto_engine_state_store import (
     AutoEngineSnapshot,
     AutoEngineStore,
     AutoEngineTickInput,
 )
+from bolsa_application.decision_contract import (
+    DecisionPackage,
+    derive_execution_plan,
+    risk_gate_auto_paper_dry,
+    simulation_gate_allows,
+)
 from bolsa_application.execution_event import ExecutionEventStore
 from bolsa_application.simulated_settlement import (
     normalized_auto_venue,
     submit_simulated_order,
-)
-
-from bolsa_api.background.paper_auto_engine_worker import (
-    DecisionProvider,
-    _effective_venue,
-    _watch_symbols,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +108,83 @@ def step_minute_clock(
 def flat_price_script(_symbol: str, _minute: int) -> float:
     """Precio plano determinista por defecto (sin movimientos del mercado)."""
     return 100.0
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectionConfig:
+    """V2.23/A9 (Bloque 6 · G8/G9) — protección autónoma determinista de posición.
+
+    Es política pura (sin I/O): el worker la evalúa con el precio del ``price_script``
+    y la posición abierta para forzar un SELL de protección (mismo gate/spine).
+    """
+
+    stop_pct: float = 0.02  # SL: cae ≥2% desde la entrada ⇒ salir.
+    t1_pct: float = 0.02  # T1: sube ≥2% desde la entrada ⇒ tomar beneficio.
+    trailing_pct: float = 0.015  # Trailing: retrocede ≥1.5% desde el máximo ⇒ salir.
+    session_end_minute: int = 0  # >0 ⇒ cierre por fin de sesión (minuto simulado).
+    enabled: bool = False  # fail-closed: sin activar, ninguna salida automática.
+
+    def exit_reason(self, *, held: bool, entry: Decimal, high: Decimal, price: Decimal,
+                    minute: int) -> str | None:
+        """Razón de salida de protección (o None si no procede). Sólo con posición."""
+        if not self.enabled or not held:
+            return None
+        if entry <= 0 or price <= 0:
+            return None
+        if self.session_end_minute and minute >= self.session_end_minute:
+            return "session_close"
+        if self.stop_pct > 0 and price <= entry * (Decimal(1) - Decimal(str(self.stop_pct))):
+            return "protective_stop"
+        if self.t1_pct > 0 and price >= entry * (Decimal(1) + Decimal(str(self.t1_pct))):
+            return "t1_exit"
+        if (
+            self.trailing_pct > 0
+            and high > entry
+            and price <= high * (Decimal(1) - Decimal(str(self.trailing_pct)))
+        ):
+            return "trailing_stop"
+        return None
+
+
+def _protection_config_from_env() -> ProtectionConfig:
+    """Lee la política de protección de env (default OFF = fail-closed).
+
+    ``AUTO_ENGINE_SIM_PROTECTION=1`` activa. ``AUTO_ENGINE_SIM_STOP_PCT``/``_T1_PCT``/
+    ``_TRAILING_PCT`` (fracción, p.ej. 0.02) y ``AUTO_ENGINE_SIM_SESSION_END_MINUTE``
+    afinan los umbrales. Cualquier valor inválido se ignora (default seguro).
+    """
+
+    def _f(name: str, default: float) -> float:
+        raw = (os.getenv(name) or "").strip()
+        if not raw:
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            return default
+
+    def _i(name: str, default: int) -> int:
+        raw = (os.getenv(name) or "").strip()
+        if not raw:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            return default
+
+    enabled = (os.getenv("AUTO_ENGINE_SIM_PROTECTION") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    return ProtectionConfig(
+        stop_pct=_f("AUTO_ENGINE_SIM_STOP_PCT", 0.02),
+        t1_pct=_f("AUTO_ENGINE_SIM_T1_PCT", 0.02),
+        trailing_pct=_f("AUTO_ENGINE_SIM_TRAILING_PCT", 0.015),
+        session_end_minute=_i("AUTO_ENGINE_SIM_SESSION_END_MINUTE", 0),
+        enabled=enabled,
+    )
 
 
 # ── Modelo del día autónomo SIM ─────────────────────────────────────────────────
@@ -161,7 +244,11 @@ class AutoSimulationWorker:
         price_script: PriceScript = flat_price_script,
         clock: Clock | None = None,
         finance_applier: Callable[[Any], Awaitable[bool]] | None = None,
+        context_store: Any = None,
+        position_store: Any = None,
         engine_id: str = "auto-sim",
+        account_id: str | None = None,
+        kill_switch_source: Callable[[], bool] | None = None,
     ) -> None:
         self._decider = decider
         self._exec_store = exec_store
@@ -169,14 +256,83 @@ class AutoSimulationWorker:
         self._price_script = price_script
         self._clock = clock if clock is not None else default_clock
         self._engine_id = engine_id
+        self._account_id = account_id
+        # V2.23/A9 (Bloque 3, kill fail-closed): fuente del kill switch inyectable.
+        # Por defecto comparte el gate fail-closed de ``paper_auto_engine_worker``
+        # (si NO se puede leer desde ningún origen, bloquea el AUTO). Un test puede
+        # inyectar una fuente determinista.
+        self._kill_switch_source = kill_switch_source or _kill_switch_env_on
         # V2.22/a9 finance seam: un ``ApplyFinanceCallable`` opcional. Con None (default
         # hermético) los fills SIM quedan como hoy (``CAPTURED``, sin dinero). Con un
         # applier real, ``_settle`` lo reenvía como ``apply_finance`` de la liquidación.
         self._finance_applier = finance_applier
+        # V2.23/A9 (Bloque 5): durabilidad SIM.
+        #   ``context_store``  = contexto financiero por fill (P1-05).
+        #   ``position_store`` = espejo durable de posición abierta (P1-06 / G7).
+        self._context_store = context_store
+        self._position_store = position_store
+        self._readopted = False
+        # V2.23/A9 (Bloque 6): protección autónoma (SL/T1/trailing/cierre de sesión).
+        # Configurable por env, OFF por defecto. El precio de entrada/máximo se toma
+        # del ``price_script`` determinista al abrir (misma fuente que la liquidación).
+        self._protection = _protection_config_from_env()
+        self._entry_price: dict[str, Decimal] = {}
+        self._high_price: dict[str, Decimal] = {}
         self._minute = 0
         self._time = self._clock()
         self._open: dict[str, Decimal] = {}
         self._journal: list[SimJournalRow] = []
+        # V2.23/A9: última razón del gate determinista (para telemetría/durable).
+        self._last_gate_reason: tuple[str, ...] = ("idle",)
+
+    async def readopt_positions(self) -> Mapping[str, Decimal]:
+        """Readopta del espejo durable la posición abierta (Bloque 5 · P1-06 / G7).
+
+        Invariante: BUY 100 → crash → restart → readopt deja ``_open`` con 100 para
+        ese símbolo, de modo que un nuevo ``auto_turn`` con un BUY no apila un segundo
+        BUY (misma guarda ``action == "BUY" and held > 0``). Sin ``position_store``
+        (hermético) es un no-op. Idempotente: readoptar dos veces no altera el estado.
+        """
+        if self._position_store is None:
+            self._readopted = True
+            return dict(self._open)
+        try:
+            durable = await self._position_store.read_open(self._engine_id)
+        except Exception:  # noqa: BLE001 — un fallo de lectura no debe inventar posición.
+            logger.exception("auto_sim readopt_positions failed")
+            return dict(self._open)
+        for symbol, qty in durable.items():
+            if qty and qty > 0:
+                self._open[symbol] = qty
+        self._readopted = True
+        return dict(self._open)
+
+    async def _persist_position(self, symbol: str, qty: Decimal) -> None:
+        """Espeja la posición abierta en el store durable (Bloque 5 · P1-06).
+
+        qty<=0 ⇒ ``delete`` (posición cerrada); qty>0 ⇒ ``upsert``. Sin
+        ``position_store`` (hermético) o ante error del espejo, NO se rompe el turno:
+        la posición en RAM sigue siendo la autoridad del tick y el espejo se
+        reintentará al siguiente (el dinero ya está aplicado idempotente por fill).
+        """
+        if self._position_store is None:
+            return
+        try:
+            if qty is None or qty <= 0:
+                await self._position_store.delete(self._engine_id, symbol)
+                self._open.pop(symbol, None)
+            else:
+                await self._position_store.upsert(self._engine_id, symbol, qty)
+        except Exception:  # noqa: BLE001 — el espejo durable nunca tumba el turno SIM.
+            logger.exception("auto_sim persist_position failed symbol=%s", symbol)
+
+    # ---- gate fail-closed / de autoridad (Bloque 3) --------------------------
+    def _kill_active(self) -> bool:
+        """True si el kill switch está activo (o NO se puede leer; fail-closed)."""
+        try:
+            return bool(self._kill_switch_source())
+        except Exception:  # noqa: BLE001 — no saber ⇒ bloquear el motor AUTO.
+            return True
 
     # ---- consulta / estado -----------------------------------------------------
     @property
@@ -213,7 +369,8 @@ class AutoSimulationWorker:
             instrument_id=symbol,
             side=side,
             quantity=qty,
-            account_id=None,
+            # V2.23/A9 (P2-12): cuenta SIM inequívoca (nunca ``None`` en motor real).
+            account_id=self._account_id,
             venue=venue,
             seed=self._minute * 100_003 + sum(map(ord, symbol)) % 9999,
             base_mid=self._price_script(symbol, self._minute) or 100.0,
@@ -221,6 +378,7 @@ class AutoSimulationWorker:
             order_id=f"auto-{side}-{symbol}-{self._minute}",
             owner="auto-sim-worker",
             apply_finance=self._finance_applier,
+            context_store=self._context_store,
         )
         if not result.fills:
             return []
@@ -253,49 +411,140 @@ class AutoSimulationWorker:
 
     # ---- UN turno (decide + liquida SIM + actualiza el libro) ------------------
     async def auto_turn(self) -> TurnReport:
-        """Decide por símbolo y actúa (BUY abre / SELL reduce o cierra) SIM-ONLY."""
+        """Decide por símbolo y actúa con autoridad (Single Decision Spine).
+
+        V2.23/A9 (Bloque 3): cada ``DecisionPackage`` DEBE pasar por el RiskGate
+        determinista (``risk_gate_auto_paper_dry``) y la Simulation Gate antes de
+        tocar el settlement SIM. NO existe el atajo ``DecisionProvider -> _settle``:
+        el kill switch (fail-closed) y el venue AUTO-only (``simulation_gate_allows``)
+        vetan primero; solo una propuesta que el RiskGate admite y que
+        ``derive_execution_plan`` convierte en plan se liquida (BUY abre / SELL reduce).
+        Un ``SELL qty > held`` NUNCA sobreexcede: se clampa a la posición (o se veta).
+        """
         self._advance()
         venue = self._venue()
         report = TurnReport(decided=0, venue=venue)
+        kill = self._kill_active()
+        venue_ok = simulation_gate_allows(venue)
+        reasons: list[str] = []
+
+        def _veto(reason: str) -> None:
+            reasons.append(reason)
+            report.vetoes += 1
+
         for symbol in _watch_symbols():
             symbol = symbol.strip()
             if not symbol:
                 continue
             report.decided += 1
-            pkg = self._decider(symbol) if self._decider else None
-            action = str(getattr(pkg, "action", "HOLD")).upper()
-            qty = Decimal(str(getattr(pkg, "quantity", None) or 0)).quantize(Decimal("0.000001"))
-            if action not in {"BUY", "SELL"} or qty <= 0:
+            held = self._open.get(symbol, Decimal("0"))
+            # V2.23/A9 (Bloque 6 · G8/G9): la protección tiene prioridad sobre el
+            # decider cuando hay posición. Emite un SELL del total a través del MISMO
+            # spine (kill/sim-gate/RiskGate/posición), nunca un atajo.
+            price = Decimal(str(self._price_script(symbol, self._minute) or 0))
+            if held > 0 and price > 0:
+                # Mantiene el máximo desde la entrada para el trailing (G9).
+                prev_high = self._high_price.get(symbol, Decimal("0"))
+                if price > prev_high:
+                    self._high_price[symbol] = price
+            prot = self._protection.exit_reason(
+                held=held > 0,
+                entry=self._entry_price.get(symbol, Decimal("0")),
+                high=self._high_price.get(symbol, Decimal("0")),
+                price=price,
+                minute=self._minute,
+            )
+            if prot is not None:
+                pkg = DecisionPackage(
+                    action="SELL",
+                    instrument_id=symbol,
+                    quantity=float(held),
+                    source=f"protection:{prot}",
+                )
+                reasons.append(prot)
+            else:
+                pkg = self._decider(symbol) if self._decider else None
+            action = str(getattr(pkg, "action", "HOLD")).upper() if pkg else "HOLD"
+            if action not in {"BUY", "SELL"}:
+                _veto("hold_no_op")
+                continue
+            qty = Decimal(str(getattr(pkg, "quantity", None) or 0)).quantize(
+                Decimal("0.000001")
+            )
+            if qty <= 0:
+                _veto("non_positive_qty")
+                continue
+            # 1) Simulation Gate (kill fail-closed ANTES de nada AUTO).
+            if kill:
+                _veto("kill_switch_active")
+                continue
+            # 2) Simulation Gate: venue AUTO-only (paper/simulated).
+            if not venue_ok:
+                _veto("venue_not_auto_allowed")
+                continue
+            # 3) RiskGate determinista (nunca IA ejecuta por sí). Si no admite la
+            #    propuesta o no deriva plan, NO se liquida nada.
+            gate = risk_gate_auto_paper_dry(
+                pkg,
+                kill_switch_active=kill,
+                venue=venue,
+            )
+            if not gate.allow_proposal:
+                reasons.extend(r.value for r in gate.reasons)
                 report.vetoes += 1
                 continue
-            held = self._open.get(symbol, Decimal("0"))
+            plan = derive_execution_plan(pkg, venue=venue, kill_switch_active=kill)
+            if plan is None or plan.action not in {"BUY", "SELL"}:
+                _veto("no_execution_plan")
+                continue
+            # 4) Posición: BUY solo abre si no estoy expuesto; SELL solo contra una
+            #    posición. SELL > held se clampa (veto upstream de sobreventa, nunca
+            #    se manda 150 contra 100).
             if action == "BUY" and held > 0:
-                continue  # ya expuesto: sin apilar.
+                continue  # ya expuesto: sin apilar (HOLD implícito).
+            if action == "SELL" and held <= 0:
+                _veto("sell_without_position")
+                continue
+            exec_qty = min(qty, held) if action == "SELL" else qty
+            if exec_qty <= 0:
+                _veto("clamped_sell_to_zero")
+                continue
+            if action == "SELL" and exec_qty < qty:
+                _veto("sell_overshoot_clamped")
             report.proposals += 1
-            fills = await self._settle(action.lower(), symbol, qty)
+            fills = await self._settle(action.lower(), symbol, exec_qty)
             if not fills:
                 continue  # fila no abierta: la cola SIM no confirmó fill (no LIVE).
-            self._emit("order", venue, None, action.lower(), qty)
+            self._emit("order", venue, None, action.lower(), exec_qty)
             for o in fills:
                 self._emit("fill", o.venue, o.execution_id, o.side, o.qty)
             if action == "BUY":
-                self._emit("position_open", venue, fills[0].execution_id, "buy", qty)
-                self._open[symbol] = held + qty
+                self._emit("position_open", venue, fills[0].execution_id, "buy", exec_qty)
+                self._open[symbol] = held + exec_qty
+                # Referencia de protección: entrada = precio del tick de apertura.
+                if held <= 0 and price > 0:
+                    self._entry_price[symbol] = price
+                    self._high_price[symbol] = price
+                await self._persist_position(symbol, held + exec_qty)
                 report.opened += 1
             else:
-                new_held = (held - qty) if held >= qty else Decimal("0")
-                if new_held == 0:
+                new_held = held - exec_qty
+                if new_held <= 0:
                     self._emit(
                         "position_close",
                         venue,
                         fills[0].execution_id,
                         "sell",
-                        qty if held >= qty else held,
+                        exec_qty,
                     )
                     report.closed += 1
+                    self._entry_price.pop(symbol, None)
+                    self._high_price.pop(symbol, None)
                 self._open[symbol] = new_held
+                await self._persist_position(symbol, new_held)
             report.orders += 1
             report.fills += len(fills)
+        self._last_gate_reason = tuple(dict.fromkeys(reasons))
         return report
 
     async def run_until_flat(
@@ -336,36 +585,303 @@ class AutoSimulationWorker:
             )
         return report
 
+    # ---- V2.23/A9 (Bloque 2): turno REAL contra stores de una sesión por tick.
+    async def real_turn(
+        self,
+        *,
+        exec_store: ExecutionEventStore,
+        auto_store: AutoEngineStore | None,
+        finance_applier: Callable[[Any], Awaitable[bool]] | None,
+        account_id: str | None,
+        context_store: Any = None,
+        position_store: Any = None,
+    ) -> TurnReport:
+        """Un turno con autoridad (gates) persistiendo tick durable (opcional).
+
+        Se enlazan por-ciclo los stores/account (sesión por tick del scheduler) y se
+        delega en ``auto_turn`` (misma Single Decision Spine del Bloque 3). El estado
+        ``_open``/``_journal`` del worker se conserva entre turnos en el proceso; en
+        el PRIMER turno de un proceso se readopta la posición durable (Bloque 5 /
+        G7) para no re-comprar tras crash. Restaura los valores anteriores al
+        terminar para no dejar fugas entre ticks.
+        """
+        prev_exec, prev_auto, prev_fin, prev_acc, prev_ctx, prev_pos = (
+            self._exec_store,
+            self._auto_store,
+            self._finance_applier,
+            self._account_id,
+            self._context_store,
+            self._position_store,
+        )
+        try:
+            self._exec_store = exec_store
+            self._auto_store = auto_store
+            self._finance_applier = finance_applier
+            self._account_id = account_id
+            self._context_store = context_store if context_store is not None else prev_ctx
+            self._position_store = (
+                position_store if position_store is not None else prev_pos
+            )
+            if not self._readopted:
+                # Readopción una sola vez por proceso (crash/restart ⇒ adoptar posición).
+                await self.readopt_positions()
+            report = await self.auto_turn()
+            if auto_store is not None:
+                snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
+                seq = (snap.ticks + 1) if snap is not None else 1
+                await auto_store.record_tick(
+                    AutoEngineTickInput(
+                        engine_id=self._engine_id,
+                        venue=report.venue,
+                        state="RUNNING",
+                        seq=seq,
+                        proposals=report.proposals,
+                        vetoes=report.vetoes,
+                        pending_plans=len(self.open_symbols),
+                        last_reason=(self._last_gate_reason or ("idle",)),
+                        occurred_at=self._time,
+                    )
+                )
+            return report
+        finally:
+            self._exec_store = prev_exec
+            self._auto_store = prev_auto
+            self._finance_applier = prev_fin
+            self._account_id = prev_acc
+            self._context_store = prev_ctx
+            self._position_store = prev_pos
+
+
+
+
+# V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.
+SIM_ACCOUNT_ID = os.getenv("AUTO_ENGINE_SIM_ACCOUNT_ID") or None
+
+
+# V2.23/A9 (Bloque 2): composición REAL por sesión (scheduler → Worker).
+# Patrón ``execution_event_reaper_worker``: la sesión se abre por tick y aquí se
+# construyen los stores + finanzas reales sobre ESA sesión.
+def _compose_real_stores(
+    session: Any,
+    *,
+    finance_resolver: Any = None,
+) -> tuple[
+    ExecutionEventStore,
+    AutoEngineStore | None,
+    Callable[[Any], Awaitable[bool]] | None,
+    Any,
+]:
+    """Construye la composición durable por sesión (exec, auto, finance, contexto).
+
+    * ``exec_store`` = ``PostgresExecutionEventStore`` (captura idempotente por
+      ``execution_id`` sobre la sesión abierta del tick).
+    * ``auto_store``  = ``PostgresAutoEngineStore`` (Alembic 027, tick durable).
+    * ``finance_applier`` = applier SIM real (V2.23/A9, P1-05): reconstruye por
+      ``execution_id`` el contexto financiero durable del fill
+      (``sim_fill_finance_context``) sin depender de la memoria del worker.
+    * ``context_store`` = ``PostgresSimFillFinanceContextStore`` de la sesión, que
+      ``_settle`` usa para persistir el contexto de cada fill ANTES de mover dinero.
+
+    Si el caller inyecta un ``finance_resolver`` propio, se respeta; por defecto se
+    usa el resolver durable del contexto.
+    """
+    from bolsa_application.accounts import ExecuteTrade  # noqa: PLC0415
+    from bolsa_application.auto_engine_state_store import PostgresAutoEngineStore  # noqa: PLC0415
+    from bolsa_application.execution_event import PostgresExecutionEventStore  # noqa: PLC0415
+    from bolsa_application.sim_durable_store import (  # noqa: PLC0415
+        PostgresSimFillFinanceContextStore,
+    )
+    from bolsa_application.sim_finance_context import (  # noqa: PLC0415
+        build_durable_finance_resolver,
+    )
+    from bolsa_application.simulated_finance import (  # noqa: PLC0415
+        build_simulated_execute_trade_applier,
+    )
+    from bolsa_infrastructure.database.repositories.account_repository import (  # noqa: PLC0415
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.ledger_repository import (  # noqa: PLC0415
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (  # noqa: PLC0415
+        SqlAlchemyPortfolioRepository,
+    )
+
+    exec_store = PostgresExecutionEventStore(session)
+    auto_store = PostgresAutoEngineStore(session)
+    context_store = PostgresSimFillFinanceContextStore(session)
+    resolver = (
+        finance_resolver
+        if finance_resolver is not None
+        else build_durable_finance_resolver(context_store)
+    )
+    trade = ExecuteTrade(
+        SqlAlchemyAccountRepository(session),
+        SqlAlchemyPortfolioRepository(session),
+        SqlAlchemyLedgerRepository(session),
+    )
+    # ``build_..._applier(execute_trade, resolver)`` deduce la vía por duck-typing y
+    # acepta resolver síncrono o asíncrono (durable).
+    applier = build_simulated_execute_trade_applier(trade, resolver)
+    return exec_store, auto_store, applier, context_store
+
 
 async def auto_sim_loop(
-    worker: AutoSimulationWorker,
+    runtime: AutoSimRuntime,
     *,
     interval_seconds: float = 60.0,
 ) -> None:
-    """Task periódica (SIM-ONLY) del scheduler; no avanza si el gate está OFF."""
+    """Task periódica (SIM-ONLY) del scheduler; no avanza si el gate está OFF.
+
+    V2.23/A9 (Bloque 2): cada tick corre ``runtime.run_tick()``, que abre UNA sesión
+    de PostgreSQL y compone los stores + finanzas SIM reales sobre ella. El runtime
+    conserva el ``AutoSimulationWorker`` entre turnos (estado ``_open`` del día en
+    RAM; la materia durable de crash/restart es del Bloque 5). NUNCA arranca un
+    ``AutoSimulationWorker()`` desnudo.
+    """
     logger.info("AutoSimulationWorker (SIM-ONLY) loop iniciado (tick=%ss)", interval_seconds)
     while True:
         await asyncio.sleep(interval_seconds)
         if not sim_worker_enabled():
             continue
         try:
-            await worker.auto_turn()
+            await runtime.run_tick()
         except Exception:  # noqa: BLE001 — un turno no debe tumbar el loop.
             logger.exception("auto_sim tick failed")
 
 
+class AutoSimRuntime:
+    """Composición real (Bloque 2): scheduler → session_factory → Worker/AUTO.
+
+    Conduce el ``AutoSimulationWorker`` del día abriendo una sesión por tick y
+    entregando a ``worker.real_turn`` los stores/account de ESA sesión. El worker
+    conserva ``_open``/``_journal`` del día entre turnos en el proceso.
+    """
+
+    def __init__(
+        self,
+        session_factory: Any,
+        *,
+        worker: AutoSimulationWorker | None = None,
+        decider: DecisionProvider | None = None,
+        engine_id: str = "auto-sim",
+        account_id: str | None = None,
+        finance_resolver: Any = None,
+    ) -> None:
+        self._session_factory = session_factory
+        self._engine_id = engine_id
+        self._account_id = account_id
+        self._finance_resolver = finance_resolver
+        if worker is None:
+            worker = AutoSimulationWorker(
+                decider=decider,
+                engine_id=engine_id,
+                account_id=account_id,
+            )
+        self._worker = worker
+
+    @property
+    def worker(self) -> AutoSimulationWorker:
+        return self._worker
+
+    async def run_tick(self) -> TurnReport | None:
+        """Un turno real: abre sesión, compone stores PG + finanzas, y lo conduce.
+
+        Cada tick compone también el espejo durable de posición (``sim_auto_positions``,
+        Bloque 5/P1-06) sobre la MISMA sesión. En el primer tick del proceso,
+        ``real_turn`` readopta la posición durable (G7: no segundo BUY tras crash);
+        los ticks siguientes ya operan con ``_open`` en memoria + espejo por cambio.
+        """
+        from bolsa_application.sim_durable_store import (  # noqa: PLC0415
+            PostgresSimAutoPositionStore,
+        )
+
+        async with self._session_factory() as session:  # type: ignore[attr-defined]
+            exec_store, auto_store, applier, context_store = _compose_real_stores(
+                session,
+                finance_resolver=self._finance_resolver,
+            )
+            position_store = PostgresSimAutoPositionStore(session)
+            return await self._worker.real_turn(
+                exec_store=exec_store,
+                auto_store=auto_store,
+                finance_applier=applier,
+                account_id=self._account_id,
+                context_store=context_store,
+                position_store=position_store,
+            )
+
+
+class _HermeticRuntime:
+    """Adapter para un ``worker`` inyectado sin PG (uso en tests/hermético)."""
+
+    def __init__(self, worker: AutoSimulationWorker) -> None:
+        self._worker = worker
+
+    async def run_tick(self) -> None:
+        await self._worker.auto_turn()
+
+
+def _default_spine_decider() -> DecisionProvider:
+    """Spine determinista (Bloque 4) cuando ``AUTO_ENGINE_SIM_SPINE_AUTO=1``.
+
+    Default fail-closed: spins OFF ⇒ el spine devuelve HOLD para todo (no propone
+    nunca una ejecución SIM por defecto). Activarlo es una decisión explícita del
+    operador (solo SIM, SIM-ONLY); el RiskGate sigue teniendo la última autoridad.
+    """
+    from bolsa_application.auto_decision_engine import deterministic_auto_decider
+
+    watch = tuple(_watch_symbols())
+    enabled = (os.getenv("AUTO_ENGINE_SIM_SPINE_AUTO") or "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+    lot = float(os.getenv("AUTO_ENGINE_SIM_LOT_QTY") or "100.0")
+    return deterministic_auto_decider(watch, lot_qty=lot, enabled=enabled)
+
+
 def start_auto_sim_worker(
-    session_factory: Any = None,  # noqa: ARG001 — compatible con el scheduler.
+    session_factory: Any = None,
     *,
     worker: AutoSimulationWorker | None = None,
+    decider: DecisionProvider | None = None,
     interval_seconds: float = 60.0,
+    engine_id: str = "auto-sim",
+    account_id: str | None = None,
+    finance_resolver: Any = None,
 ) -> asyncio.Task[None] | None:
-    """start hook para ``_event_loop_starters()`` (env-gated; default OFF, SIM)."""
+    """start hook para ``_event_loop_starters()`` (env-gated; default OFF, SIM).
+
+    V2.22 bug (P1-01): arrancaba ``AutoSimulationWorker()`` desnudo (sin exec_store/
+    auto_store/decider/finance) y el camino autónomo real nunca liquidaba. V2.23
+    (Bloque 2): con ``session_factory`` compone un ``AutoSimRuntime`` real con
+    ``PostgresExecutionEventStore``/``AutoEngineStore``/finanzas SIM por sesión.
+    El decider por defecto es el Spine determinista (Bloque 4), seguro (HOLD a menos
+    que ``AUTO_ENGINE_SIM_SPINE_AUTO=1``). Sin ``session_factory`` (uso unit/hermético)
+    permite seguir con un ``worker`` inyectado (p.ej. con ``InMemoryExecutionEventStore``).
+    """
     if not sim_worker_enabled():
         logger.info(
             "AutoSimulationWorker (%s) desactivado — SIM-ONLY por defecto.", AUTO_SIM_WORKER_ENABLED
         )
         return None
-    if worker is None:
-        worker = AutoSimulationWorker()
-    return asyncio.create_task(auto_sim_loop(worker, interval_seconds=interval_seconds))
+    if session_factory is None:
+        # Sin composición PG no creamos un runtime "real"; degradamos al worker
+        # inyectado (tests/hermético) o construimos uno SOLO si viene cableado.
+        if worker is None:
+            logger.warning(
+                "auto_sim_worker sin session_factory y sin worker: no se arranca "
+                "ningún runtime (evita un AutoSimulationWorker() desnudo)."
+            )
+            return None
+        runtime: Any = _HermeticRuntime(worker)  # helper local definido abajo
+    else:
+        runtime = AutoSimRuntime(
+            session_factory,
+            worker=worker,
+            decider=decider if decider is not None else _default_spine_decider(),
+            engine_id=engine_id,
+            account_id=account_id or SIM_ACCOUNT_ID,
+            finance_resolver=finance_resolver,
+        )
+    return asyncio.create_task(auto_sim_loop(runtime, interval_seconds=interval_seconds))
+

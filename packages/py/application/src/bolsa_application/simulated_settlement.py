@@ -134,6 +134,8 @@ async def apply_simulated_order_once(
     instrument_id: str,
     account_id: str | None,
     venue: str,
+    side: str | None = None,
+    context_store: Any | None = None,
     apply_finance: Any | None = None,
     owner: str = "auto-sim",
     retryable_on_ineffective: bool = True,
@@ -145,6 +147,12 @@ async def apply_simulated_order_once(
     fencing). Sin ``apply_finance`` (default) la traza queda capturada pero NO se
     materializa dinero (fail-closed, = a un recovery sin go).
 
+    V2.23/A9 (Bloque 5, P1-05): con ``context_store`` (y ``side``) se persiste, ANTES
+    de mover dinero, el contexto financiero durable de cada fill
+    (``execution_id → instrument_id/side/qty/price/account/venue``). Así un resolver
+    posterior —incluido uno tras crash— reconstruye la finance sin memoria del
+    ``SimulatedOrderResult``.
+
     Devuelve un mapa ``{execution_id: DurableApplyOutcome}`` sobre las trazas.
     """
     events = simulated_execution_candidates(
@@ -153,6 +161,18 @@ async def apply_simulated_order_once(
         account_id=account_id,
         venue=venue,
     )
+    # Durable-first: contexto financiero por fill antes de cualquier materialización.
+    if context_store is not None and side is not None:
+        from bolsa_application.sim_finance_context import persist_fill_finance_context
+
+        await persist_fill_finance_context(
+            context_store,
+            result,
+            instrument_id=instrument_id,
+            side=side,
+            account_id=account_id,
+            venue=venue,
+        )
     outcomes: dict[str, str] = {}
     for ev in events:
         outcome = await apply_execution_financial_once(
@@ -179,6 +199,7 @@ async def submit_simulated_order(
     fill_chunks: int = 3,
     order_id: str | None = None,
     apply_finance: Any | None = None,
+    context_store: Any | None = None,
     owner: str = "auto-sim",
 ) -> tuple[SimulatedOrderResult, dict[str, str]]:
     """Submit determinista simulado (buy/sell) + liquidación idempotente.
@@ -225,6 +246,8 @@ async def submit_simulated_order(
         instrument_id=instrument_id,
         account_id=account_id,
         venue=venue_id,
+        side=raw_side,
+        context_store=context_store,
         apply_finance=apply_finance,
         owner=owner,
     )

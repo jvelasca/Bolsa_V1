@@ -41,6 +41,7 @@ Diseño (dos mitades, recosen costuras sin ciclos):
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
@@ -206,7 +207,10 @@ def resolve_execution_finance(
 
 
 # ── Mitad ligada a PG (lazy; opcional; nunca importa infra en el módulo) ──────────
-FinanceResolver = Callable[[ExecutionEvent], SimulatedFillFinance | None]
+FinanceResolver = Callable[[ExecutionEvent], Any]
+# El resolver puede ser síncrono (``SimulatedFillFinance | None``) o asíncrono
+# (``Awaitable[SimulatedFillFinance | None]``, p.ej. lectura durable por
+# ``execution_id``). ``build_simulated_execute_trade_applier`` normaliza ambos.
 
 
 def build_simulated_execute_trade_applier(
@@ -235,7 +239,11 @@ def build_simulated_execute_trade_applier(
         raise TypeError("execute_trade must expose an async .execute(**kwargs)")
 
     async def _apply(execution: ExecutionEvent) -> bool:
-        finance = resolver(execution)
+        resolved = resolver(execution)
+        # Resolver síncrono o asíncrono (durable): normaliza con inspect.isawaitable.
+        if inspect.isawaitable(resolved):
+            resolved = await resolved
+        finance = resolved
         if finance is None:
             # Sin contexto viable (no-match / venue no-AUTO / sin price) → nada que aplicar.
             return False

@@ -27,6 +27,13 @@ from typing import Any
 # Venues que un día AUTO SIM-ONLY puede tocar (nunca LIVE real).
 AUTO_SIM_VENUES: frozenset[str] = frozenset({"paper", "simulated"})
 
+# V2.23/A9 (Bloque 6): tri-estado del balance del ledger. ``NOT_CHECKED`` (sin datos
+# de balance) NUNCA es un PASS: un día AUTO no es certificable si no se comprobó el
+# ledger con datos reales.
+LEDGER_BALANCED = "BALANCED"
+LEDGER_UNBALANCED = "UNBALANCED"
+LEDGER_NOT_CHECKED = "NOT_CHECKED"
+
 # Razones de orden/fill que cuentan como orden enviada y fill confirmado.
 _ORDER_SIDES = ("buy", "sell")
 
@@ -55,6 +62,9 @@ class AutoDailyReport:
     all_venues_in_auto_sim: bool
     no_live_bridge_posts: bool
     errors: tuple[str, ...] = ()
+    # V2.23/A9 (Bloque 6): tri-estado del balance del ledger. ``NOT_CHECKED`` NUNCA
+    # cuenta como balance verdadero (el "no comprobado" deja de ser un PASS silencioso).
+    ledger_balance_status: str = LEDGER_NOT_CHECKED
 
     @property
     def healthy(self) -> bool:
@@ -65,6 +75,7 @@ class AutoDailyReport:
             and self.positions_created > 0
             and self.exits > 0
             and self.ledger_balanced
+            and self.ledger_balance_status == LEDGER_BALANCED
             and self.no_duplicate_execution_events
             and self.all_venues_in_auto_sim
             and self.no_live_bridge_posts
@@ -78,6 +89,7 @@ class AutoDailyReport:
             "positions_created": self.positions_created,
             "exits": self.exits,
             "ledger_balanced": self.ledger_balanced,
+            "ledger_balance_status": self.ledger_balance_status,
             "no_duplicate_execution_events": self.no_duplicate_execution_events,
             "all_venues_in_auto_sim": self.all_venues_in_auto_sim,
             "no_live_bridge_posts": self.no_live_bridge_posts,
@@ -114,18 +126,18 @@ def no_live_bridge_posts(venues: Sequence[str]) -> bool:
     return not any(_norm_venue(v) in bad for v in venues)
 
 
-def ledger_balanced(
+def ledger_balance_status(
     *,
     accounting: Any | None = None,
     net_cash_delta: Decimal | None = None,
     ledger_remainder: Decimal | None = None,
     tol: Decimal | None = None,
-) -> bool:
-    """Comprueba que el ledger queda balanceado tras el día AUTO.
+) -> str:
+    """Tri-estado del balance: ``BALANCED`` | ``UNBALANCED`` | ``NOT_CHECKED``.
 
-    delegación preferida: si se pasa un ``LifecycleAccounting`` del dominio se
-    llama a ``assert_equity_invariant`` (puede lanzar → False). Si no (test puro),
-    se exige ``net_cash_delta() == ledger_remainder()`` dentro de ``tol``.
+    V2.23/A9 (Bloque 6, §10): NO comprobar el ledger NO es un PASS. Antes, sin datos
+    de balance se devolvía ``True`` (not-checked == pass). Ahora ese caso es
+    ``NOT_CHECKED`` y el reporte/certificación lo trata como NO certificable.
     """
     from decimal import ROUND_HALF_UP
 
@@ -141,14 +153,40 @@ def ledger_balanced(
             from bolsa_domain.lifecycle import assert_equity_invariant
 
             assert_equity_invariant(accounting, tol=t)
-            return True
+            return LEDGER_BALANCED
         except Exception:  # noqa: BLE001 — cualquier invariante roto ⇒ balance NO ok
-            return False
+            return LEDGER_UNBALANCED
     if net_cash_delta is None or ledger_remainder is None:
-        return True  # sin datos de balance, no acusamos de roto (fail-mantener).
+        # Sin datos de balance ⇒ NO comprobado (jamás un PASS silencioso).
+        return LEDGER_NOT_CHECKED
     a = Decimal(str(net_cash_delta)).quantize(scale, rounding=ROUND_HALF_UP)
     b = Decimal(str(ledger_remainder)).quantize(scale, rounding=ROUND_HALF_UP)
-    return abs(a - b) <= t
+    return LEDGER_BALANCED if abs(a - b) <= t else LEDGER_UNBALANCED
+
+
+def ledger_balanced(
+    *,
+    accounting: Any | None = None,
+    net_cash_delta: Decimal | None = None,
+    ledger_remainder: Decimal | None = None,
+    tol: Decimal | None = None,
+) -> bool:
+    """Comprueba que el ledger queda balanceado tras el día AUTO.
+
+    delegación preferida: si se pasa un ``LifecycleAccounting`` del dominio se
+    llama a ``assert_equity_invariant`` (puede lanzar → False). Si no (test puro),
+    se exige ``net_cash_delta() == ledger_remainder()`` dentro de ``tol``.
+    V2.23/A9 (Bloque 6): ``NOT_CHECKED`` (sin datos) ⇒ ``False`` (no-pass).
+    """
+    return (
+        ledger_balance_status(
+            accounting=accounting,
+            net_cash_delta=net_cash_delta,
+            ledger_remainder=ledger_remainder,
+            tol=tol,
+        )
+        == LEDGER_BALANCED
+    )
 
 
 def build_auto_daily_report(
@@ -188,17 +226,23 @@ def build_auto_daily_report(
     unique_events = execution_events_are_unique(exec_ids)
     auto_venues = venues_are_auto_sim(venues)
     no_live = no_live_bridge_posts(venues)
-    balanced = ledger_balanced(
+    balance_status = ledger_balance_status(
         accounting=accounting,
         net_cash_delta=net_cash_delta,
         ledger_remainder=ledger_remainder,
     )
+    balanced = balance_status == LEDGER_BALANCED
+    if balance_status == LEDGER_NOT_CHECKED:
+        errors.append("ledger_balance_not_checked")
+    elif balance_status == LEDGER_UNBALANCED:
+        errors.append("ledger_unbalanced")
     return AutoDailyReport(
         orders=orders,
         fills=fills,
         positions_created=positions_created,
         exits=exits,
         ledger_balanced=balanced,
+        ledger_balance_status=balance_status,
         no_duplicate_execution_events=unique_events,
         all_venues_in_auto_sim=auto_venues,
         no_live_bridge_posts=no_live,
