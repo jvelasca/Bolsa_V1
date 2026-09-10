@@ -2,9 +2,10 @@
 
 **Fecha:** 2026-09-10
 **Versión:** `1.51.0-beta` (`package.json`)
-**Tag:** `v2.24-beta`
+**Tag:** `v2.24-beta` (apunta al merge commit `b2ee67ed`, PR #61)
 **Alcance:** AUTO SIM-ONLY (simulación). **LIVE real intacto y doblemente bloqueado.**
-**PR:** [#60](https://github.com/jvelasca/Bolsa_V1/pull/60)
+**PRs:** [#60](https://github.com/jvelasca/Bolsa_V1/pull/60) (A9.1) · [#61](https://github.com/jvelasca/Bolsa_V1/pull/61) (head-guard)
+**Certificación:** run [`34470214388`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34470214388) — **GREEN**
 
 ---
 
@@ -158,9 +159,34 @@ uv run pytest apps/api-python/tests/test_a9_1_durability_integrity.py \
    `test_queue_poll_worker::test_run_con_arq_es_noop` fallan **solo** en el entorno local
    (resolución de venue/`arq`); el CI de `main` está verde y se confirmó que
    `test_non_auto_venue_requires_attention` también falla en `v2.23-beta`. No bloquean.
+   Del mismo modo, los tests PG de concurrencia (`test_live_order_recovery_concurrency_pg`,
+   `test_platform_events_isolation`, etc.) pueden fallar en la **BD de desarrollo compartida**
+   por filas huérfanas de ejecuciones previas; en CI la BD arranca fresca y pasan.
 4. **Fases 2 y 3 fuera de alcance.** El `Strategy Lifecycle` (V2.25) y el `auto_orchestrator`
    (V2.26) son el siguiente incremento; el orquestador ESTUDIO→LAB→COACH autónomo aún no
    existe en esta entrega (semilla A10).
+
+---
+
+## 7-bis. Incidencia detectada y cerrada durante el cierre (head-guard Alembic)
+
+La **primera** certificación de `v2.24-beta` (run `34468966144`) falló en el job `lifecycle-pg`:
+cinco tests PG tenían el head Alembic V2.23 **hardcodeado** (`028_sim_finance_position_durable`)
+y, con `LIFECYCLE_PG_REQUIRED=1`, fallan en duro ante el nuevo head
+`029_sim_auto_pos_account_scope` (introducido por P1-02 en el propio A9.1):
+
+```
+AssertionError: lifecycle-pg required but PostgreSQL/Alembic unavailable:
+alembic_version is {'029_sim_auto_pos_account_scope'};
+expected 028_sim_finance_position_durable (V2.23 head)
+```
+
+**Cierre:** PR [#61](https://github.com/jvelasca/Bolsa_V1/pull/61) actualiza el head esperado a
+`029` en los 5 ficheros (sin cambios de lógica de producto). Mergeado a `main` (`b2ee67ed`) y el
+tag `v2.24-beta` se movió a ese commit para re-disparar la certificación, que quedó **verde**
+(run `34470214388`), con `lifecycle-pg` incluyendo
+`test_a9_scheduler_process_pg_zero_human.py` bajo `AUTO_SCHEDULER_PROCESS_PG_REQUIRED=1` y
+`AUTO_EQUITY_INVARIANT_PG_REQUIRED=1`.
 
 ---
 
@@ -185,11 +211,14 @@ uv run pytest apps/api-python/tests/test_a9_1_durability_integrity.py \
 
 ## 9. Cómo auditar esta entrega
 
-1. **Diff del PR:** https://github.com/jvelasca/Bolsa_V1/pull/60 (19 + 5 ficheros, sección
-   Commits).
-2. **CI del PR:** checks `quality` (ruff/import-linter/mypy/pytest), `battery`,
-   `fase2-battery`, `scan`, frontend.
-3. **Certificación por release:** tag `v2.24-beta` → run de `release-tag-ci.yml` con los
-   5 gates PG (`lifecycle-pg`).
+1. **Diff del PR:** [#60](https://github.com/jvelasca/Bolsa_V1/pull/60) (A9.1) y
+   [#61](https://github.com/jvelasca/Bolsa_V1/pull/61) (head-guard).
+2. **CI de los PR:** checks `quality` (ruff/import-linter/mypy/pytest), `battery`,
+   `fase2-battery`, `scan`, frontend — todos en verde.
+3. **Certificación por release:** tag `v2.24-beta` →
+   run [`34470214388`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34470214388)
+   (`conclusion: success`), job `lifecycle-pg` con los 5 gates PG.
 4. **Migración:** `029_sim_auto_pos_account_scope` (up + down reversibles; el down descarta
    filas homónimas de otras cuentas, pérdida documentada e inevitable).
+
+**Estado final:** `main` en `b2ee67ed` · tag `v2.24-beta` → `b2ee67ed` · certificación GREEN.
