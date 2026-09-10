@@ -353,6 +353,11 @@ jobs:
       # V2.23/A9 (Bloque 6): certificación AUTO SIM-ONLY end-to-end por el camino real
       # del scheduler. Un skip aquí (sin PG/credenciales) es un fallo duro.
       AUTO_SCHEDULER_PG_REQUIRED: '1'
+      # V2.24/A9.1 (P2-04/P2-05): el proceso REAL del scheduler debe arrancar sobre
+      # PG y el día AUTO certificarse con el invariante de equity sobre el ledger
+      # real. Cualquier skip silencioso aquí es un fallo duro.
+      AUTO_SCHEDULER_PROCESS_PG_REQUIRED: '1'
+      AUTO_EQUITY_INVARIANT_PG_REQUIRED: '1'
       JWT_SIGNING_KEY: ci-lifecycle-pg-secret-key
       APP_AUTH_SECRET: ci-lifecycle-pg-secret-key
     steps:
@@ -388,6 +393,9 @@ jobs:
           # scheduler real (ticks/events/orders/fills/positions/ledger + no-LIVE +
           # readopción crash sin doble BUY/efecto).
           apps/api-python/tests/test_auto_scheduler_real_pg_zero_human_intervention.py
+          # V2.24/A9.1 (P2-04/P2-05): Reina REAL por proceso scheduler (sin run_tick
+          # manual ni decider scripteado) + invariante de equity sobre el ledger real.
+          apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py
           apps/api-python/tests/test_health.py
           -q
           --tb=short

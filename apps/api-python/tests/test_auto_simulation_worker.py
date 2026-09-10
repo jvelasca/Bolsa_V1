@@ -110,22 +110,27 @@ async def test_readopt_prevents_second_buy_after_crash(auto_env: None) -> None:
 
     store = InMemoryExecutionEventStore()
     pos_store = InMemorySimAutoPositionStore()
+    account_id = "acc-readopt"
 
     # Día 1: abre AAA (queda espejado en el store durable).
     _s1, clock1 = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
-    w1 = AutoSimulationWorker(clock=clock1, exec_store=store, position_store=pos_store)
+    w1 = AutoSimulationWorker(
+        clock=clock1, exec_store=store, position_store=pos_store, account_id=account_id
+    )
     w1._decider = _buy_decider(set(), {"AAA"})
     await w1.auto_turn()
     assert w1._open.get("AAA", Decimal("0")) > 0
 
     # Crash y restart: nuevo worker sobre el MISMO espejo durable (G7).
     _s2, clock2 = step_minute_clock(datetime(2026, 9, 9, 9, 1, tzinfo=UTC))
-    w2 = AutoSimulationWorker(clock=clock2, exec_store=store, position_store=pos_store)
+    w2 = AutoSimulationWorker(
+        clock=clock2, exec_store=store, position_store=pos_store, account_id=account_id
+    )
     await w2.real_turn(
         exec_store=store,
         auto_store=None,
         finance_applier=None,
-        account_id=None,
+        account_id=account_id,
         position_store=pos_store,
     )
     assert w2._open.get("AAA", Decimal("0")) > 0, "debe readoptar la posición durable"

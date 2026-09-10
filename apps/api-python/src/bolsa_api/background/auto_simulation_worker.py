@@ -61,6 +61,12 @@ from bolsa_application.decision_contract import (
     simulation_gate_allows,
 )
 from bolsa_application.execution_event import ExecutionEventStore
+from bolsa_application.sim_reconciliation import (
+    POSITION_PROJECTION_DIVERGENT,
+    POSITION_PROJECTION_REBUILT,
+    POSITION_PROJECTION_UNKNOWN,
+    reconcile_sim_position,
+)
 from bolsa_application.simulated_settlement import (
     normalized_auto_venue,
     submit_simulated_order,
@@ -122,11 +128,23 @@ class ProtectionConfig:
     t1_pct: float = 0.02  # T1: sube ≥2% desde la entrada ⇒ tomar beneficio.
     trailing_pct: float = 0.015  # Trailing: retrocede ≥1.5% desde el máximo ⇒ salir.
     session_end_minute: int = 0  # >0 ⇒ cierre por fin de sesión (minuto simulado).
+    # V2.24 / A9.1 (P2-06): T1 PARCIAL. Fracción de la posición que se toma en T1
+    # (0.3 = vender 30%, dejar 70% con trailing). 1.0 = comportamiento antiguo (cierre
+    # total). El resto se gestiona con trailing/stop.
+    t1_fraction: float = 1.0
     enabled: bool = False  # fail-closed: sin activar, ninguna salida automática.
 
     def exit_reason(self, *, held: bool, entry: Decimal, high: Decimal, price: Decimal,
                     minute: int) -> str | None:
-        """Razón de salida de protección (o None si no procede). Sólo con posición."""
+        """Razón de salida de protección (o None si no procede). Sólo con posición.
+
+        V2.24 / A9.1 (P2-06): el ORDEN importa. Si el máximo ya superó el umbral T1
+        (``high > entry*(1+t1_pct)``) el precio actual puede seguir por encima de T1 y
+        haber retrocedido desde el máximo: eso es un ``trailing_stop`` real, no un
+        ``t1_exit``. Antes se comprobaba T1 primero y se etiquetaba mal el motivo
+        (misma acción, distinta historia en el journal). Ahora se evalúa el trailing
+        antes que T1 cuando el máximo rebasó T1.
+        """
         if not self.enabled or not held:
             return None
         if entry <= 0 or price <= 0:
@@ -135,15 +153,29 @@ class ProtectionConfig:
             return "session_close"
         if self.stop_pct > 0 and price <= entry * (Decimal(1) - Decimal(str(self.stop_pct))):
             return "protective_stop"
-        if self.t1_pct > 0 and price >= entry * (Decimal(1) + Decimal(str(self.t1_pct))):
-            return "t1_exit"
-        if (
+        high_above_t1 = (
+            self.t1_pct > 0 and high > entry * (Decimal(1) + Decimal(str(self.t1_pct)))
+        )
+        trailing_hit = (
             self.trailing_pct > 0
             and high > entry
             and price <= high * (Decimal(1) - Decimal(str(self.trailing_pct)))
-        ):
+        )
+        # Trailing tiene prioridad sobre T1 cuando el máximo ya rebasó T1 (un
+        # retroceso desde un máximo alto es un trailing real, no una toma en T1).
+        if trailing_hit and high_above_t1:
+            return "trailing_stop"
+        if self.t1_pct > 0 and price >= entry * (Decimal(1) + Decimal(str(self.t1_pct))):
+            return "t1_exit"
+        if trailing_hit:
             return "trailing_stop"
         return None
+
+    def exit_fraction(self, reason: str | None) -> float:
+        """Fracción de la posición a vender para una razón T1 (parcial) / resto 1.0."""
+        if reason == "t1_exit" and 0 < self.t1_fraction < 1:
+            return self.t1_fraction
+        return 1.0
 
 
 def _protection_config_from_env() -> ProtectionConfig:
@@ -183,6 +215,7 @@ def _protection_config_from_env() -> ProtectionConfig:
         t1_pct=_f("AUTO_ENGINE_SIM_T1_PCT", 0.02),
         trailing_pct=_f("AUTO_ENGINE_SIM_TRAILING_PCT", 0.015),
         session_end_minute=_i("AUTO_ENGINE_SIM_SESSION_END_MINUTE", 0),
+        t1_fraction=_f("AUTO_ENGINE_SIM_T1_FRACTION", 1.0),
         enabled=enabled,
     )
 
@@ -199,6 +232,22 @@ class FillObservation:
     execution_id: str
     order_id: str
     qty: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class _AppliedFill:
+    """Fill aplicado, en la forma que la reconciliación entiende (P1-01/P2-02)."""
+
+    symbol: str
+    side: str
+    qty: Decimal
+    price: Decimal
+    execution_id: str
+    venue: str
+
+    @property
+    def instrument_id(self) -> str:
+        return self.symbol
 
 
 @dataclass
@@ -249,6 +298,8 @@ class AutoSimulationWorker:
         engine_id: str = "auto-sim",
         account_id: str | None = None,
         kill_switch_source: Callable[[], bool] | None = None,
+        canonical_positions_reader: Any = None,
+        require_account_id: bool = False,
     ) -> None:
         self._decider = decider
         self._exec_store = exec_store
@@ -271,6 +322,16 @@ class AutoSimulationWorker:
         #   ``position_store`` = espejo durable de posición abierta (P1-06 / G7).
         self._context_store = context_store
         self._position_store = position_store
+        # V2.24/A9.1 (P1-01): proyección reconstruible. ``canonical_positions_reader``
+        # lee el estado financiero CANÓNICO (posiciones abiertas del ledger) para
+        # reconstruir/comprobar la proyección. Sin él, la proyección no puede autorizar
+        # aperturas por sí sola (fail-closed ante divergencia).
+        self._canonical_positions_reader = canonical_positions_reader
+        # V2.24/A9.1 (P1-04): en el camino durable REAL la cuenta es obligatoria
+        # (fail-closed). Los tests herméticos que ejercitan la mecánica SIM sin PG
+        # pueden relajarlo explícitamente con ``require_account_id=False``.
+        self._require_account_id = require_account_id
+        self._reconciliation: dict[str, str] = {}
         self._readopted = False
         # V2.23/A9 (Bloque 6): protección autónoma (SL/T1/trailing/cierre de sesión).
         # Configurable por env, OFF por defecto. El precio de entrada/máximo se toma
@@ -278,9 +339,15 @@ class AutoSimulationWorker:
         self._protection = _protection_config_from_env()
         self._entry_price: dict[str, Decimal] = {}
         self._high_price: dict[str, Decimal] = {}
+        # V2.24/A9.1 (P2-06): T1 parcial ya ejecutado por símbolo (no re-dispara T1).
+        self._t1_done: set[str] = set()
         self._minute = 0
         self._time = self._clock()
         self._open: dict[str, Decimal] = {}
+        # V2.24/A9.1 (P1-03): identidades de orden lógicas únicas por intención, para
+        # namespacear el ``execution_id`` (no colisión entre cuentas/engines).
+        self._order_seq: int = 0
+        self._active_orders: dict[str, str] = {}
         self._journal: list[SimJournalRow] = []
         # V2.23/A9: última razón del gate determinista (para telemetría/durable).
         self._last_gate_reason: tuple[str, ...] = ("idle",)
@@ -292,39 +359,167 @@ class AutoSimulationWorker:
         ese símbolo, de modo que un nuevo ``auto_turn`` con un BUY no apila un segundo
         BUY (misma guarda ``action == "BUY" and held > 0``). Sin ``position_store``
         (hermético) es un no-op. Idempotente: readoptar dos veces no altera el estado.
+
+        V2.24/A9.1:
+        * P1-02 — la lectura va scoped por ``(account_id, engine_id)``.
+        * P2-01 — restaura también ``entry_price``/``high_watermark`` (el trailing no
+          puede olvidar el máximo tras un reinicio).
+        * P1-01/P2-02 — si hay lector canónico, RECONCILIA la proyección contra el
+          estado financiero real antes de fiarse de ella.
         """
         if self._position_store is None:
             self._readopted = True
             return dict(self._open)
+        account_id = self._account_id
+        if not account_id:
+            # P1-04: sin cuenta inequívoca no se readopta nada (fail-closed).
+            self._readopted = True
+            return dict(self._open)
         try:
-            durable = await self._position_store.read_open(self._engine_id)
+            projection = await self._read_projection(account_id)
         except Exception:  # noqa: BLE001 — un fallo de lectura no debe inventar posición.
             logger.exception("auto_sim readopt_positions failed")
+            self._readopted = True
             return dict(self._open)
-        for symbol, qty in durable.items():
+        authoritative = await self._reconcile_before_trusting(account_id, projection)
+        # La posición abierta se adopta desde la proyección Y, si la reconciliación
+        # determinó un canónico fiable, también desde él (un espejo vacío no debe
+        # hacer perder una posición real: P1-01).
+        for symbol, qty in (authoritative or {}).items():
             if qty and qty > 0:
                 self._open[symbol] = qty
+        for symbol, row in projection.items():
+            qty = row.quantity
+            if qty and qty > 0:
+                self._open.setdefault(symbol, qty)
+                if row.entry_price is not None:
+                    self._entry_price[symbol] = Decimal(str(row.entry_price))
+                if row.high_watermark is not None:
+                    self._high_price[symbol] = Decimal(str(row.high_watermark))
         self._readopted = True
         return dict(self._open)
 
-    async def _persist_position(self, symbol: str, qty: Decimal) -> None:
-        """Espeja la posición abierta en el store durable (Bloque 5 · P1-06).
+    async def _read_projection(self, account_id: str) -> dict[str, Any]:
+        """Lee la proyección rica (P2-01) con fallback al read_open clásico."""
+        reader = getattr(self._position_store, "read_projection", None)
+        if reader is not None:
+            return dict(await reader(account_id, self._engine_id))
+        # Fallback hermético/legado: solo cantidades.
+        from bolsa_application.sim_durable_store import SimPositionProjection
 
-        qty<=0 ⇒ ``delete`` (posición cerrada); qty>0 ⇒ ``upsert``. Sin
-        ``position_store`` (hermético) o ante error del espejo, NO se rompe el turno:
-        la posición en RAM sigue siendo la autoridad del tick y el espejo se
-        reintentará al siguiente (el dinero ya está aplicado idempotente por fill).
+        qty_map = await self._position_store.read_open(account_id, self._engine_id)
+        return {
+            symbol: SimPositionProjection(symbol=symbol, quantity=Decimal(str(qty)))
+            for symbol, qty in qty_map.items()
+            if Decimal(str(qty)) > 0
+        }
+
+    async def _reconcile_before_trusting(
+        self, account_id: str, projection: Mapping[str, Any]
+    ) -> dict[str, Decimal]:
+        """P1-01 / P2-02: la proyección es un espejo, no una autoridad.
+
+        Con lector canónico disponible, reconcilia ``ExecutionEvents`` ↔ posición
+        canónica ↔ proyección. Si divergen, reconstruye la proyección desde el estado
+        canónico; si no hay datos, marca ``UNKNOWN`` y NO se autorizan aperturas.
+        Devuelve el mapa canónico fiable (``{}`` si no se pudo determinar).
+        """
+        reader = self._canonical_positions_reader
+        events = getattr(self, "_applied_execution_events", None)
+        if reader is None:
+            self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
+            return {}
+        try:
+            canonical = await reader(account_id)
+        except Exception:  # noqa: BLE001 — sin canónico no se puede confiar en el espejo.
+            logger.exception("auto_sim canonical positions read failed")
+            self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
+            return {}
+        if canonical is None:
+            # El lector no pudo determinar el canónico (distinto de "sin posiciones"):
+            # no se reconstruye nada y NO se autorizan aperturas.
+            self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
+            return {}
+        canonical_map: dict[str, Decimal] = {
+            str(s): Decimal(str(q)) for s, q in dict(canonical).items()
+        }
+        symbols = set(canonical_map) | set(projection)
+        for symbol in symbols:
+            verdict = reconcile_sim_position(
+                symbol=symbol,
+                execution_events=events,
+                financial_positions=canonical_map,
+                sim_auto_positions={s: r.quantity for s, r in projection.items()},
+            )
+            self._reconciliation[symbol] = verdict.status
+            if verdict.status == POSITION_PROJECTION_REBUILT and self._position_store is not None:
+                # Reconstruye la proyección desde el canónico (conserva protección si la hay).
+                canonical_qty = canonical_map.get(symbol, Decimal("0"))
+                prior = projection.get(symbol)
+                if canonical_qty <= 0:
+                    # El canónico dice "sin posición": la proyección estaba obsoleta.
+                    await self._position_store.delete(account_id, self._engine_id, symbol)
+                else:
+                    await self._position_store.upsert(
+                        account_id,
+                        self._engine_id,
+                        symbol,
+                        canonical_qty,
+                        entry_price=getattr(prior, "entry_price", None),
+                        high_watermark=getattr(prior, "high_watermark", None),
+                        stop_price=getattr(prior, "stop_price", None),
+                        t1_state=getattr(prior, "t1_state", None),
+                        trailing_state=getattr(prior, "trailing_state", None),
+                    )
+            if verdict.status in {POSITION_PROJECTION_DIVERGENT, POSITION_PROJECTION_UNKNOWN}:
+                logger.warning(
+                    "auto_sim position reconciliation=%s symbol=%s (aperturas vetadas)",
+                    verdict.status,
+                    symbol,
+                )
+        return canonical_map
+
+    def _openings_vetoed(self, symbol: str) -> bool:
+        """True si la reconciliación de ese símbolo impide nuevas aperturas."""
+        return self._reconciliation.get(symbol) in {
+            POSITION_PROJECTION_DIVERGENT,
+            POSITION_PROJECTION_UNKNOWN,
+        }
+
+    async def _persist_position(self, symbol: str, qty: Decimal) -> None:
+        """Espeja la posición abierta + su estado de protección (P1-06 / P2-01).
+
+        qty<=0 ⇒ ``delete`` (posición cerrada); qty>0 ⇒ ``upsert`` con
+        ``entry_price``/``high_watermark`` durables. Sin ``position_store``
+        (hermético) o ante error del espejo, NO se rompe el turno: la posición en RAM
+        sigue siendo la autoridad del tick y el espejo se reintentará al siguiente
+        (el dinero ya está aplicado idempotente por fill).
         """
         if self._position_store is None:
             return
+        account_id = self._account_id
+        if not account_id:
+            return
         try:
             if qty is None or qty <= 0:
-                await self._position_store.delete(self._engine_id, symbol)
+                await self._position_store.delete(account_id, self._engine_id, symbol)
                 self._open.pop(symbol, None)
             else:
-                await self._position_store.upsert(self._engine_id, symbol, qty)
+                await self._position_store.upsert(
+                    account_id,
+                    self._engine_id,
+                    symbol,
+                    qty,
+                    entry_price=self._entry_price.get(symbol),
+                    high_watermark=self._high_price.get(symbol),
+                )
         except Exception:  # noqa: BLE001 — el espejo durable nunca tumba el turno SIM.
             logger.exception("auto_sim persist_position failed symbol=%s", symbol)
+
+    def _next_logical_order_id(self, symbol: str, side: str) -> str:
+        """P1-03: identidad lógica única por INTENCIÓN (namespace del execution_id)."""
+        self._order_seq += 1
+        return f"{self._engine_id}-{self._minute}-{side}-{symbol}-{self._order_seq}"
 
     # ---- gate fail-closed / de autoridad (Bloque 3) --------------------------
     def _kill_active(self) -> bool:
@@ -364,22 +559,33 @@ class AutoSimulationWorker:
         if self._exec_store is None:
             return []
         venue = self._venue()
-        result, _out = await submit_simulated_order(
-            self._exec_store,
-            instrument_id=symbol,
-            side=side,
-            quantity=qty,
-            # V2.23/A9 (P2-12): cuenta SIM inequívoca (nunca ``None`` en motor real).
-            account_id=self._account_id,
-            venue=venue,
-            seed=self._minute * 100_003 + sum(map(ord, symbol)) % 9999,
-            base_mid=self._price_script(symbol, self._minute) or 100.0,
-            fill_chunks=_FILL_CHUNKS,
-            order_id=f"auto-{side}-{symbol}-{self._minute}",
-            owner="auto-sim-worker",
-            apply_finance=self._finance_applier,
-            context_store=self._context_store,
-        )
+        logical_order_id = self._next_logical_order_id(symbol, side)
+        try:
+            result, _out = await submit_simulated_order(
+                self._exec_store,
+                instrument_id=symbol,
+                side=side,
+                quantity=qty,
+                # V2.23/A9 (P2-12): cuenta SIM inequívoca (nunca ``None`` en motor real).
+                account_id=self._account_id,
+                venue=venue,
+                seed=self._minute * 100_003 + sum(map(ord, symbol)) % 9999,
+                base_mid=self._price_script(symbol, self._minute) or 100.0,
+                fill_chunks=_FILL_CHUNKS,
+                order_id=f"auto-{side}-{symbol}-{self._minute}",
+                # V2.24/A9.1 (P1-03): namespace de identidad (no colisión entre cuentas).
+                engine_id=self._engine_id,
+                logical_order_id=logical_order_id,
+                owner="auto-sim-worker",
+                apply_finance=self._finance_applier,
+                context_store=self._context_store,
+            )
+        except Exception:  # noqa: BLE001 — un fallo de settlement no tumba el motor.
+            # Fail-closed: un problema al persistir contexto/aplicar dinero NO debe
+            # romper el turno AUTOnomo (se degrada a "sin fill este tick"). El motor
+            # reintentará; jamás se fabrica una posición sin settlement confirmado.
+            logger.exception("auto_sim settle failed symbol=%s side=%s", symbol, side)
+            return []
         if not result.fills:
             return []
         vid = str(result.venue_order_id or "").strip() or f"sim-{side}-{symbol}"
@@ -396,6 +602,30 @@ class AutoSimulationWorker:
         ]
 
     # ---- journal de fila: mantiene el día y ofrece el turno --------------------
+    def _record_applied_event(
+        self, symbol: str, fill: FillObservation, price: Decimal
+    ) -> None:
+        """P1-01/P2-02: registra el fill aplicado para poder reconciliar la posición.
+
+        La reconciliación compara los ``ExecutionEvents`` esperados (BUY − SELL) con
+        la posición canónica y la proyección. Se guarda la identidad + lado + qty del
+        fill confirmado por el settlement (misma fuente que el journal).
+        """
+        events = getattr(self, "_applied_execution_events", None)
+        if events is None:
+            events = []
+            self._applied_execution_events = events
+        events.append(
+            _AppliedFill(
+                symbol=symbol,
+                side=fill.side,
+                qty=Decimal(str(fill.qty)),
+                price=price,
+                execution_id=fill.execution_id,
+                venue=fill.venue,
+            )
+        )
+
     def _emit(
         self, kind: str, venue: str, exec_id: str | None, side: str, qty: Decimal
     ) -> SimJournalRow:
@@ -427,6 +657,13 @@ class AutoSimulationWorker:
         kill = self._kill_active()
         venue_ok = simulation_gate_allows(venue)
         reasons: list[str] = []
+        # V2.24/A9.1 (P1-04): AUTO SIM exige cuenta inequívoca. En el camino durable
+        # real (``require_account_id``) sin account_id NO se opera: fail-closed, jamás
+        # una traza ``account_id=None``. La composición real ya bloquea el arranque;
+        # esto es defensa en profundidad (el spine no puede saltarlo).
+        account_required = self._require_account_id and not self._account_id
+        if account_required:
+            reasons.append("account_id_required")
 
         def _veto(reason: str) -> None:
             reasons.append(reason)
@@ -437,6 +674,9 @@ class AutoSimulationWorker:
             if not symbol:
                 continue
             report.decided += 1
+            if account_required:
+                _veto("account_id_required")
+                continue
             held = self._open.get(symbol, Decimal("0"))
             # V2.23/A9 (Bloque 6 · G8/G9): la protección tiene prioridad sobre el
             # decider cuando hay posición. Emite un SELL del total a través del MISMO
@@ -454,12 +694,24 @@ class AutoSimulationWorker:
                 price=price,
                 minute=self._minute,
             )
+            # T1 parcial ya tomado ⇒ no volver a disparar T1 (el resto lo gestiona
+            # trailing/stop/sesión). Evita vender 30% en cada tick por encima de T1.
+            if prot == "t1_exit" and symbol in self._t1_done:
+                prot = None
             pkg: DecisionPackage | None
             if prot is not None:
+                # V2.24/A9.1 (P2-06): T1 PARCIAL. La protección puede vender solo una
+                # fracción (p. ej. 30%) y dejar el resto gestionado por trailing/stop.
+                fraction = self._protection.exit_fraction(prot)
+                sell_qty = (
+                    held * Decimal(str(fraction))
+                    if 0 < fraction < 1
+                    else held
+                )
                 pkg = DecisionPackage(
                     action="SELL",
                     instrument_id=symbol,
-                    quantity=float(held),
+                    quantity=float(sell_qty),
                     source=f"protection:{prot}",
                 )
                 reasons.append(prot)
@@ -507,6 +759,11 @@ class AutoSimulationWorker:
             #    se manda 150 contra 100).
             if action == "BUY" and held > 0:
                 continue  # ya expuesto: sin apilar (HOLD implícito).
+            # V2.24/A9.1 (P1-01): una proyección divergente/no verificada NO autoriza
+            # abrir. (SELL sí se permite: reducir/cerrar nunca empeora el riesgo.)
+            if action == "BUY" and self._openings_vetoed(symbol):
+                _veto("position_reconciliation_not_ok")
+                continue
             if action == "SELL" and held <= 0:
                 _veto("sell_without_position")
                 continue
@@ -523,6 +780,7 @@ class AutoSimulationWorker:
             self._emit("order", venue, None, action.lower(), exec_qty)
             for o in fills:
                 self._emit("fill", o.venue, o.execution_id, o.side, o.qty)
+                self._record_applied_event(symbol, o, price)
             if action == "BUY":
                 self._emit("position_open", venue, fills[0].execution_id, "buy", exec_qty)
                 self._open[symbol] = held + exec_qty
@@ -534,6 +792,9 @@ class AutoSimulationWorker:
                 report.opened += 1
             else:
                 new_held = held - exec_qty
+                if prot == "t1_exit" and new_held > 0:
+                    # T1 parcial ejecutado: marca para no repetirlo.
+                    self._t1_done.add(symbol)
                 if new_held <= 0:
                     self._emit(
                         "position_close",
@@ -545,6 +806,7 @@ class AutoSimulationWorker:
                     report.closed += 1
                     self._entry_price.pop(symbol, None)
                     self._high_price.pop(symbol, None)
+                    self._t1_done.discard(symbol)
                 self._open[symbol] = new_held
                 await self._persist_position(symbol, new_held)
             report.orders += 1
@@ -600,6 +862,7 @@ class AutoSimulationWorker:
         account_id: str | None,
         context_store: Any = None,
         position_store: Any = None,
+        canonical_positions_reader: Any = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -610,13 +873,14 @@ class AutoSimulationWorker:
         G7) para no re-comprar tras crash. Restaura los valores anteriores al
         terminar para no dejar fugas entre ticks.
         """
-        prev_exec, prev_auto, prev_fin, prev_acc, prev_ctx, prev_pos = (
+        prev_exec, prev_auto, prev_fin, prev_acc, prev_ctx, prev_pos, prev_canon = (
             self._exec_store,
             self._auto_store,
             self._finance_applier,
             self._account_id,
             self._context_store,
             self._position_store,
+            self._canonical_positions_reader,
         )
         try:
             self._exec_store = exec_store
@@ -627,7 +891,14 @@ class AutoSimulationWorker:
             self._position_store = (
                 position_store if position_store is not None else prev_pos
             )
-            if not self._readopted:
+            self._canonical_positions_reader = (
+                canonical_positions_reader
+                if canonical_positions_reader is not None
+                else prev_canon
+            )
+            # V2.24/A9.1 (P1-04): sin cuenta inequívoca NO se readopta ni opera el
+            # camino durable; auto_turn veta igualmente (defensa en profundidad).
+            if not self._readopted and self._account_id:
                 # Readopción una sola vez por proceso (crash/restart ⇒ adoptar posición).
                 await self.readopt_positions()
             report = await self.auto_turn()
@@ -655,6 +926,7 @@ class AutoSimulationWorker:
             self._account_id = prev_acc
             self._context_store = prev_ctx
             self._position_store = prev_pos
+            self._canonical_positions_reader = prev_canon
 
 
 
@@ -731,6 +1003,45 @@ def _compose_real_stores(
     return exec_store, auto_store, applier, context_store
 
 
+def _compose_canonical_reader(session: Any) -> Any:
+    """V2.24/A9.1 (P1-01): lector del estado financiero CANÓNICO de la cuenta.
+
+    Devuelve ``account_id -> {symbol: qty}`` desde las posiciones canónicas
+    (``position_state`` abiertas del portfolio). Es la autoridad contra la que se
+    reconcilia/reconstruye la proyección ``sim_auto_positions``. Fail-safe: si el
+    repositorio no está disponible, devuelve ``{}`` (el reconciliador marcará
+    ``UNKNOWN`` y vetará aperturas, sin inventar posición).
+    """
+    from bolsa_infrastructure.database.repositories.position_state_repository import (  # noqa: PLC0415
+        SqlAlchemyPositionStateRepository,
+    )
+
+    async def _read(account_id: str) -> dict[str, Decimal] | None:
+        try:
+            rows = await SqlAlchemyPositionStateRepository(session).list_open_for_account(
+                account_id
+            )
+        except Exception:  # noqa: BLE001 — sin canónico no se inventa posición.
+            logger.exception("auto_sim canonical positions read failed")
+            return None
+        out: dict[str, Decimal] = {}
+        for row in rows:
+            qty = row.position_state.get("remainingQuantity")
+            if qty is None:
+                qty = row.position_state.get("quantity")
+            if qty is None:
+                continue
+            try:
+                value = Decimal(str(qty))
+            except (ArithmeticError, ValueError):
+                continue
+            if value > 0:
+                out[str(row.instrument_id)] = out.get(str(row.instrument_id), Decimal("0")) + value
+        return out
+
+    return _read
+
+
 async def auto_sim_loop(
     runtime: AutoSimRuntime,
     *,
@@ -772,16 +1083,21 @@ class AutoSimRuntime:
         engine_id: str = "auto-sim",
         account_id: str | None = None,
         finance_resolver: Any = None,
+        canonical_positions_reader: Any = None,
     ) -> None:
         self._session_factory = session_factory
         self._engine_id = engine_id
         self._account_id = account_id
         self._finance_resolver = finance_resolver
+        # V2.24/A9.1 (P1-01): lector canónico inyectable (por defecto se compone por
+        # sesión desde ``position_state``). Sin él, la reconciliación es UNKNOWN.
+        self._canonical_reader = canonical_positions_reader
         if worker is None:
             worker = AutoSimulationWorker(
                 decider=decider,
                 engine_id=engine_id,
                 account_id=account_id,
+                require_account_id=True,
             )
         self._worker = worker
 
@@ -814,6 +1130,9 @@ class AutoSimRuntime:
                 account_id=self._account_id,
                 context_store=context_store,
                 position_store=position_store,
+                canonical_positions_reader=self._canonical_reader or _compose_canonical_reader(
+                    session
+                ),
             )
 
 
@@ -844,13 +1163,23 @@ def _default_spine_decider() -> DecisionProvider:
     return deterministic_auto_decider(watch, lot_qty=lot, enabled=enabled)
 
 
+def _sim_engine_id(default: str = "auto-sim") -> str:
+    """V2.24/A9.1 (P2-04): engine_id configurable por env (aislamiento/telemetría).
+
+    Permite que un despliegue y una prueba Reina aíslen su ledger de ticks
+    (``auto_engine_ticks``) sin compartir el engine por defecto.
+    """
+    raw = (os.getenv("AUTO_ENGINE_SIM_ENGINE_ID") or "").strip()
+    return raw or default
+
+
 def start_auto_sim_worker(
     session_factory: Any = None,
     *,
     worker: AutoSimulationWorker | None = None,
     decider: DecisionProvider | None = None,
     interval_seconds: float = 60.0,
-    engine_id: str = "auto-sim",
+    engine_id: str | None = None,
     account_id: str | None = None,
     finance_resolver: Any = None,
 ) -> asyncio.Task[None] | None:
@@ -880,13 +1209,42 @@ def start_auto_sim_worker(
             return None
         runtime: Any = _HermeticRuntime(worker)  # helper local definido abajo
     else:
+        effective_account = account_id or SIM_ACCOUNT_ID
+        # V2.24/A9.1 (P1-04): AUTO SIM exige cuenta inequívoca. Sin cuenta NO se
+        # arranca el motor durable (fail-closed): jamás una traza con account_id=None.
+        if not effective_account:
+            logger.error(
+                "auto_sim_worker habilitado pero SIN cuenta SIM inequívoca "
+                "(%s / AUTO_ENGINE_SIM_ACCOUNT_ID): NO se arranca el motor AUTO "
+                "(fail-closed).",
+                "account_id",
+            )
+            return None
         runtime = AutoSimRuntime(
             session_factory,
             worker=worker,
             decider=decider if decider is not None else _default_spine_decider(),
-            engine_id=engine_id,
-            account_id=account_id or SIM_ACCOUNT_ID,
+            engine_id=engine_id or _sim_engine_id(),
+            account_id=effective_account,
             finance_resolver=finance_resolver,
         )
-    return asyncio.create_task(auto_sim_loop(runtime, interval_seconds=interval_seconds))
+    return asyncio.create_task(
+        auto_sim_loop(runtime, interval_seconds=_sim_interval_seconds(interval_seconds))
+    )
+
+
+def _sim_interval_seconds(default: float = 60.0) -> float:
+    """Intervalo del loop AUTO (env ``AUTO_ENGINE_SIM_INTERVAL_SECONDS``; default 60s).
+
+    V2.24/A9.1 (P2-04): parametrizable para que la prueba Reina pueda arrancar el
+    scheduler real sin esperar minutos. Valor inválido ⇒ default seguro.
+    """
+    raw = (os.getenv("AUTO_ENGINE_SIM_INTERVAL_SECONDS") or "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
 

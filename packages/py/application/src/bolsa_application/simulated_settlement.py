@@ -43,6 +43,45 @@ from bolsa_application.simulated_broker import (
 AUTO_SETTLE_VENUES: frozenset[str] = frozenset({"paper", "simulated"})
 
 
+def _identity_token(value: object, *, fallback: str = "na") -> str:
+    """Token estable y seguro para la identidad de orden (sin separadores/espacios)."""
+    raw = str(value or "").strip()
+    if not raw:
+        return fallback
+    token = re.sub(r"[^A-Za-z0-9]", "", raw)
+    return token[:64] or fallback
+
+
+def auto_venue_order_id(
+    *,
+    engine_id: object,
+    account_id: object,
+    instrument_id: str,
+    side: str,
+    logical_order_id: object,
+) -> str:
+    """V2.24 / A9.1 (P1-03) — identidad de orden AUTO con namespace global único.
+
+    Antes: ``sim-{side}-{instrument}-{seed}`` con ``seed`` derivado solo de minuto y
+    símbolo ⇒ dos cuentas (o dos engines) podían producir el MISMO ``venue_order_id``
+    y, por tanto, el mismo ``execution_id`` (``venue_order_id#fill_seq``). Como la
+    idempotencia financiera y la PK de contexto son globales por ``execution_id``,
+    una cuenta podía "absorber" la ejecución de otra.
+
+    Ahora la identidad incluye ``engine_id`` + ``account_id`` + un
+    ``logical_order_id`` único por INTENCIÓN: una colisión entre cuentas es
+    imposible por construcción.
+    """
+    raw_side = str(side or "").strip().lower()
+    return (
+        f"sim-{_identity_token(engine_id, fallback='engine')}"
+        f"-{_identity_token(account_id, fallback='acct')}"
+        f"-{raw_side}"
+        f"-{_identity_token(instrument_id, fallback='inst')}"
+        f"-{_identity_token(logical_order_id, fallback='ord')}"
+    )
+
+
 def normalized_auto_venue(venue: str) -> str | None:
     """Normaliza un venue de liquidación AUTO.
 
@@ -198,6 +237,9 @@ async def submit_simulated_order(
     base_mid: float = 100.0,
     fill_chunks: int = 3,
     order_id: str | None = None,
+    engine_id: str | None = None,
+    logical_order_id: str | None = None,
+    venue_order_id: str | None = None,
     apply_finance: Any | None = None,
     context_store: Any | None = None,
     owner: str = "auto-sim",
@@ -210,18 +252,35 @@ async def submit_simulated_order(
     1. ``simulated_fill_schedule`` produce el schedule determinista (seed+ctx).
     2. ``apply_simulated_order_once`` captura/materializa por ``execution_id``.
 
+    V2.24 / A9.1 (P1-03): la identidad de orden se namespacea por
+    ``engine_id`` + ``account_id`` + ``logical_order_id`` (``auto_venue_order_id``)
+    salvo que el caller aporte un ``venue_order_id`` explícito. Así dos cuentas no
+    pueden colisionar en el mismo ``execution_id``.
+
     Raise ``ValueError`` si ``side`` no es buy/sell.
     """
     raw_side = str(side or "").strip().lower()
     if raw_side not in {"buy", "sell"}:
         raise ValueError(f"side must be 'buy' or 'sell', got {side!r}")
 
+    vid = (
+        str(venue_order_id).strip()
+        if venue_order_id is not None and str(venue_order_id).strip()
+        else auto_venue_order_id(
+            engine_id=engine_id or "engine",
+            account_id=account_id,
+            instrument_id=instrument_id,
+            side=raw_side,
+            logical_order_id=logical_order_id or f"{seed}-{order_id or ''}",
+        )
+    )
+
     venue_id = normalized_auto_venue(venue)
     if venue_id is None:
         # Bloqueo durísimo: venue AUTO no permitido; devolvemos order sin fills ni
         # trazas por si el caller quiere observar. No se fabrica nada.
         blocked = SimulatedOrderResult(
-            venue_order_id=f"sim-{raw_side}-{instrument_id}-{seed}",
+            venue_order_id=vid,
             status="rejected",
             reason="venue_not_auto_allowed",
             scheduled_gap_seconds=0.0,
@@ -235,7 +294,7 @@ async def submit_simulated_order(
         instrument_id=instrument_id,
         side=raw_side,
         quantity=quantity,
-        venue_order_id=f"sim-{raw_side}-{instrument_id}-{seed}",
+        venue_order_id=vid,
         seed=seed,
         fill_chunks=fill_chunks,
         base_mid=base_mid,

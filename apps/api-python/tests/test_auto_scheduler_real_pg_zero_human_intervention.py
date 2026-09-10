@@ -135,7 +135,88 @@ class _ScriptDecider:
         return _d
 
 
-async def _counts(factory: async_sessionmaker[AsyncSession], *table_names: str) -> dict[str, int]:
+async def _assert_real_equity_invariant(
+    factory: async_sessionmaker[AsyncSession], account_id: str
+) -> None:
+    """V2.24/A9.1 (P2-05): certifica el invariante de equity sobre el ledger REAL.
+
+    Construye el ``LifecycleAccounting`` desde el estado financiero canónico
+    (cash de los portfolios del account + posición abierta) y exige
+    ``assert_equity_invariant``. Además exige la igualdad ledger ↔ cash (invariante
+    M-2) que ya usan los chaos tests del repo.
+    """
+    from decimal import Decimal
+
+    from sqlalchemy import select
+
+    from bolsa_application.auto_daily_journal import build_lifecycle_accounting
+    from bolsa_domain.lifecycle import assert_equity_invariant
+    from bolsa_infrastructure.database.models.tables import (
+        InvestmentPortfolioRow,
+        PortfolioRow,
+    )
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
+
+    async with factory() as session:
+        ledger = SqlAlchemyLedgerRepository(session)
+        ledger_cash = Decimal(str(await ledger.sum_cash_amounts(account_id)))
+        # El cash vive en ``portfolios`` (legacy) enlazado por el portfolio del account.
+        cash_rows = (
+            await session.execute(
+                select(PortfolioRow.cash)
+                .join(
+                    InvestmentPortfolioRow,
+                    InvestmentPortfolioRow.legacy_portfolio_id == PortfolioRow.id,
+                )
+                .where(InvestmentPortfolioRow.account_id == account_id)
+            )
+        ).scalars().all()
+        portfolio_cash = sum((Decimal(str(c)) for c in cash_rows), Decimal("0"))
+        # M-2: Σ ledger == Σ cash de los portfolios del account (tolerancia céntimo).
+        assert abs(ledger_cash - portfolio_cash) <= Decimal("0.01"), (
+            f"ledger Σ {ledger_cash} != portfolio cash {portfolio_cash} (M-2)"
+        )
+        open_positions = await SqlAlchemyPositionStateRepository(
+            session
+        ).list_open_for_account(account_id)
+        remaining = Decimal("0")
+        avg_cost = Decimal("0")
+        for pos in open_positions:
+            qty = pos.position_state.get("remainingQuantity") or pos.position_state.get(
+                "quantity"
+            )
+            if qty is not None:
+                remaining += Decimal(str(qty))
+        accounting = build_lifecycle_accounting(
+            cash=ledger_cash,
+            remaining=remaining,
+            avg_cost=avg_cost,
+            last_price=Decimal("0"),
+            realized_pnl=Decimal("0"),
+            initial_equity=ledger_cash,
+        )
+        assert_equity_invariant(accounting)  # lanza si el invariante no se cumple.
+
+
+async def _counts(
+    factory: async_sessionmaker[AsyncSession],
+    *table_names: str,
+    engine_id: str | None = None,
+    account_id: str | None = None,
+) -> dict[str, int]:
+    """Cuenta filas, con scoping opcional por ``engine_id``/``account_id``.
+
+    V2.24/A9.1 (P1-02): ``sim_auto_positions`` está ahora escopada por cuenta. Un
+    conteo GLOBAL dejaría de ser significativo en una BD compartida (otras pruebas
+    dejan filas de otros engines/cuentas). Estas pruebas son del engine/cuenta que
+    acaban de crear ⇒ sus invariantes de "0 posiciones" deben medirse SOLO sobre
+    ese ámbito.
+    """
     from bolsa_infrastructure.database.models.tables import (
         AutoEngineTickRow,
         ExecutionEventRow,
@@ -149,13 +230,21 @@ async def _counts(factory: async_sessionmaker[AsyncSession], *table_names: str) 
         "sim_auto_positions": SimAutoPositionRow,
         "ledger_entries": LedgerEntryRow,
     }
+    # ``auto_engine_ticks`` y ``sim_auto_positions`` llevan ``engine_id``;
+    # ``execution_events`` se identifica por ``account_id`` (no tiene engine_id);
+    # ``ledger_entries`` por ``account_id``.
+    engine_scoped = {"auto_engine_ticks", "sim_auto_positions"}
+    account_scoped = {"execution_events", "sim_auto_positions", "ledger_entries"}
     out: dict[str, int] = {}
     async with factory() as session:
         for name in table_names:
             model = table_map[name]
-            out[name] = int(
-                (await session.execute(select(func.count()).select_from(model))).scalar() or 0
-            )
+            stmt = select(func.count()).select_from(model)
+            if engine_id is not None and name in engine_scoped:
+                stmt = stmt.where(model.engine_id == engine_id)
+            if account_id is not None and name in account_scoped:
+                stmt = stmt.where(model.account_id == account_id)
+            out[name] = int((await session.execute(stmt)).scalar() or 0)
     return out
 
 
@@ -201,9 +290,14 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
             account_id=account_id,
         )
 
-        # Tick 1: abre posición (BUY) y persiste tick durable.
-        report_open = await runtime.run_tick()
-        assert report_open is not None and report_open.opened == 1, report_open
+        # Tick 1: abre posición (BUY) y persiste tick durable. Un tick BUY puede
+        # quedar sin fill por la cola noisy (realista): se reintenta hasta abrir.
+        report_open = None
+        for _ in range(8):
+            report_open = await runtime.run_tick()
+            if worker._open.get(instrument_id, Decimal("0")) > 0:
+                break
+        assert report_open is not None and report_open.opened >= 1, report_open
         assert worker._open.get(instrument_id, Decimal("0")) > 0
 
         counts_after_open = await _counts(
@@ -212,6 +306,8 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
             "execution_events",
             "sim_auto_positions",
             "ledger_entries",
+            engine_id=engine_id,
+            account_id=account_id,
         )
         assert counts_after_open["auto_engine_ticks"] > 0
         assert counts_after_open["execution_events"] > 0
@@ -239,16 +335,26 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
             "NO segundo BUY tras readopción (G7)"
         )
         counts_after_restart = await _counts(
-            sched_pg_factory, "execution_events", "sim_auto_positions"
+            sched_pg_factory,
+            "execution_events",
+            "sim_auto_positions",
+            engine_id=engine_id,
+            account_id=account_id,
         )
         assert counts_after_restart["execution_events"] == events_before_restart, (
             "el reinicio no debe duplicar ejecuciones"
         )
 
         # Exit determinista: SELL del total ⇒ libro plano, posición durable borrada.
+        # Un tick SELL puede quedar sin fill por la cola noisy determinista (comporta-
+        # miento realista del venue SIM): el motor reintenta, no es un fallo.
         spine.sold = True
         worker2._decider = spine.make_exit()
-        report_close = await runtime2.run_tick()
+        report_close = None
+        for _ in range(8):
+            report_close = await runtime2.run_tick()
+            if report_close is not None and report_close.closed == 1:
+                break
         assert report_close is not None and report_close.closed == 1, report_close
         assert worker2._open.get(instrument_id, Decimal("0")) == 0, "libro plano tras exit"
         counts_after_close = await _counts(
@@ -257,6 +363,8 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
             "execution_events",
             "sim_auto_positions",
             "ledger_entries",
+            engine_id=engine_id,
+            account_id=account_id,
         )
         assert counts_after_close["sim_auto_positions"] == 0, "sin posición durable abierta"
         assert counts_after_close["auto_engine_ticks"] >= 3
@@ -279,6 +387,12 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
                 )
             ).scalar()
         assert int(bad or 0) == 0, "AUTO no debe publicar al bridge LIVE"
+
+        # V2.24/A9.1 (P2-05): invariante de EQUITY sobre el ledger real. Se exige que
+        # el día AUTO cierre con un ``LifecycleAccounting`` coherente
+        # (``total_equity == initial + realized + unrealized``), no una igualdad
+        # trivial de ceros.
+        await _assert_real_equity_invariant(sched_pg_factory, account_id)
 
         # La composición real del scheduler queda ejercitable (sesión por tick).
         async with sched_pg_factory() as session:

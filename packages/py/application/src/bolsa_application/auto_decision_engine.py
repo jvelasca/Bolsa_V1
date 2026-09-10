@@ -62,7 +62,11 @@ class AutoDecisionEngine:
     # estado en proceso (la posición durable/readopción es Bloque 5).
     _state: dict[str, str] = field(default_factory=dict)  # BUY | COOLDOWN
     _enter_ticks: dict[str, int] = field(default_factory=dict)
-    _age: int = 0
+    # V2.24/A9.1 (P2-06): edad POR SÍMBOLO. Antes ``_age`` era un contador compartido
+    # incrementado por cada llamada ``_decide`` (una por símbolo del watch), de modo
+    # que con N símbolos el retén ``exit_after_ticks`` se cumplía N veces más rápido y
+    # los resultados no eran comparables entre watches de distinto tamaño.
+    _age: dict[str, int] = field(default_factory=dict)
 
     def __call__(self, symbol: str) -> DecisionPackage:
         try:
@@ -79,7 +83,8 @@ class AutoDecisionEngine:
                 action="HOLD", instrument_id=symbol, quantity=0,
                 source="auto-spine:deterministic",
             )
-        self._age += 1
+        age = self._age.get(symbol, 0) + 1
+        self._age[symbol] = age
         if self._state.get(symbol) == "COOLDOWN":
             return DecisionPackage(
                 action="HOLD", instrument_id=symbol, quantity=0,
@@ -89,14 +94,14 @@ class AutoDecisionEngine:
             # Primera exposición: apertura acotada (el RiskGate+position-limits vetan
             # si procede; un segundo BUY sobre posición ya abierta la bloquea el worker).
             self._state[symbol] = "BUY"
-            self._enter_ticks[symbol] = self._age
+            self._enter_ticks[symbol] = age
             return DecisionPackage(
                 action="BUY", instrument_id=symbol,
                 quantity=min(self.lot_qty, self.max_qty),
                 source="auto-spine:deterministic",
             )
         # Retención determinista y cierre.
-        if self._age - self._enter_ticks.get(symbol, self._age) >= self.exit_after_ticks:
+        if age - self._enter_ticks.get(symbol, age) >= self.exit_after_ticks:
             self._state[symbol] = "COOLDOWN"
             return DecisionPackage(
                 action="SELL", instrument_id=symbol,

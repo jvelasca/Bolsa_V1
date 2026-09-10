@@ -212,7 +212,10 @@ def simulated_fill_schedule(
         # Mercado noisy a mitad: una parcial se queda corta (no consumimos el resto)
         # solo si aún no es el chunk final. (Caso de libro: partial-mided.)
         if not is_last:
-            mid_cut = sim_rand(seed, instrument_id, venue_order_id, "partialcut", i)
+            # V2.24/A9.1 (P1-03): la aleatoriedad del book depende SOLO del contexto
+            # de mercado (seed/side/instrument), nunca de la identidad del order
+            # (``venue_order_id``). Así namespacear la identidad no altera el fill.
+            mid_cut = sim_rand(seed, side, instrument_id, "partialcut", i)
             if mid_cut < 0.07:
                 break  # la cola no mete el resto → esta orden queda en parcial.
         frac = Decimal(str(weights[i]))
@@ -227,14 +230,14 @@ def simulated_fill_schedule(
     cum = Decimal("0")
     elapsed = 0.0
     for i, d in enumerate(deltas, start=1):
-        slip = adverse_slippage_bps * i - (sim_rand(seed, venue_order_id, "slip", i) * 2 - 1) * 2
+        slip = adverse_slippage_bps * i - (sim_rand(seed, side, instrument_id, "slip", i) * 2 - 1) * 2
         spr = spread_bps / 2.0
         bps_total = Decimal(str(slip + spr)) / Decimal("10000")
         delta_price = base_mid_dec * bps_total
         # buy: compra al ask (= mid + slippageAdverso). sell: al bid (simétrico).
         sign = Decimal("-1") if str(side).strip().lower() in {"sell", "short"} else Decimal("1")
         px = base_mid_dec + sign * abs(delta_price)
-        delay_extra = 0.08 * (1 + sim_rand(seed, venue_order_id, "delay", i))
+        delay_extra = 0.08 * (1 + sim_rand(seed, side, instrument_id, "delay", i))
         elapsed += gap + delay_extra
         cum += d
         fills.append(

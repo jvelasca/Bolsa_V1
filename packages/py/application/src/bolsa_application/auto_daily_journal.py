@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from bolsa_domain.lifecycle import LifecycleAccounting
+
 # Venues que un día AUTO SIM-ONLY puede tocar (nunca LIVE real).
 AUTO_SIM_VENUES: frozenset[str] = frozenset({"paper", "simulated"})
 
@@ -186,6 +188,39 @@ def ledger_balanced(
             tol=tol,
         )
         == LEDGER_BALANCED
+    )
+
+
+def build_lifecycle_accounting(
+    *,
+    cash: Decimal,
+    remaining: Decimal,
+    avg_cost: Decimal,
+    last_price: Decimal,
+    realized_pnl: Decimal,
+    initial_equity: Decimal,
+) -> LifecycleAccounting:
+    """V2.24/A9.1 (P2-05) — construye el ``LifecycleAccounting`` del dominio.
+
+    Permite que el día AUTO se certifique con el INVARIANTE DE EQUITY real
+    (``assert_equity_invariant``) calculado desde el estado financiero canónico
+    (cash/posición del ledger), y no con una igualdad trivial de ceros.
+    """
+    market_value = (remaining * last_price).quantize(Decimal("0.000001"))
+    unrealized = ((last_price - avg_cost) * remaining).quantize(Decimal("0.000001"))
+    total_pnl = (realized_pnl + unrealized).quantize(Decimal("0.000001"))
+    total_equity = (cash + market_value).quantize(Decimal("0.000001"))
+    return LifecycleAccounting(
+        cash=cash,
+        remaining=remaining,
+        realized_pnl=realized_pnl,
+        unrealized_pnl=unrealized,
+        total_pnl=total_pnl,
+        last_price=last_price,
+        market_value=market_value,
+        total_equity=total_equity,
+        avg_cost=avg_cost,
+        initial_equity=initial_equity,
     )
 
 
