@@ -788,3 +788,83 @@ async def test_promotion_persists_champion_and_coach_pg(
     finally:
         await _cleanup()
 
+
+async def test_paper_forward_result_persistence_pg(
+    lifecycle_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """V2.33/A13: la evidencia forward se persiste y se relee sin pérdida.
+
+    Certifica el fingerprint reproducible (barras, rango, motor) y la semántica de
+    muestra (round-trips/fills ≠ piernas), que es lo que hace auditable el forward.
+    """
+    from sqlalchemy import delete
+
+    from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+    from bolsa_domain.entities.strategy_lifecycle import (
+        PaperForwardPolicy,
+        PaperForwardResult,
+    )
+    from bolsa_infrastructure.database.models.tables import PaperForwardResultRow
+
+    suffix = uuid.uuid4().hex[:10]
+    version_id = f"ver-forward-{suffix}"
+
+    async def _cleanup() -> None:
+        async with lifecycle_factory() as session:
+            await session.execute(
+                delete(PaperForwardResultRow).where(
+                    PaperForwardResultRow.version_id == version_id
+                )
+            )
+            await session.commit()
+
+    result = PaperForwardPolicy(
+        min_closed_round_trips=1, min_bars=5, min_return_pct=-100.0
+    ).evaluate(
+        version_id=version_id,
+        trades=8,
+        round_trips=4,
+        return_pct=3.25,
+        max_drawdown_pct=2.5,
+        win_rate=0.55,
+        bars_used=120,
+        as_of="2026-10-15",
+        data_snapshot_id="snap-forward",
+        forward_start="2026-09-12T00:00:00",
+        forward_end="2026-10-15T00:00:00",
+        bars_hash="deadbeef",
+        strategy_definition_hash="def-hash",
+        engine_version="paper-forward/2.33.0",
+        config_hash="cfg",
+        promoted_at="2026-09-11T00:00:00",
+        fills=4,
+        vetoes=("risk_gate:concentracion",),
+    )
+
+    try:
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            await store.save_forward_result(result)
+
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            rows = await store.list_forward_results(version_id)
+
+        assert len(rows) == 1
+        stored = rows[0]
+        assert stored.version_id == version_id
+        assert stored.trades == 8
+        assert stored.round_trips == 4
+        assert stored.passed is True
+        assert stored.reasons == ()
+        assert stored.forward_start == "2026-09-12T00:00:00"
+        assert stored.forward_end == "2026-10-15T00:00:00"
+        assert stored.bars_hash == "deadbeef"
+        assert stored.engine_version == "paper-forward/2.33.0"
+        assert stored.promoted_at == "2026-09-11T00:00:00"
+        assert stored.vetoes == ("risk_gate:concentracion",)
+        assert isinstance(stored, PaperForwardResult)
+    finally:
+        await _cleanup()
+
+

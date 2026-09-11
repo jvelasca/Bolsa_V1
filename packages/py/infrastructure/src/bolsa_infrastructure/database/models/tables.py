@@ -2360,6 +2360,52 @@ class StrategyShadowValidationRow(Base):
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
+class PaperForwardResultRow(Base):
+    """Evidencia *forward* de una estrategia ACTIVE (V2.33/A13).
+
+    A diferencia de ``StrategyShadowValidationRow`` (validación histórica), esta tabla
+    mide el comportamiento de la ACTIVE con **mercado nuevo posterior a la promoción**
+    (señales → fills paper/SIM → P&L forward). La barrera temporal es ``promoted_at``:
+    solo cuentan barras con timestamp posterior.
+    """
+
+    __tablename__ = "paper_forward_results"
+    __table_args__ = (
+        Index("paper_forward_results_version_idx", "version_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    version_id: Mapped[str] = mapped_column("version_id", String, nullable=False)
+    instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
+    trades: Mapped[int] = mapped_column(Integer, default=0)
+    round_trips: Mapped[int] = mapped_column("round_trips", Integer, default=0)
+    fills: Mapped[int] = mapped_column(Integer, default=0)
+    return_pct: Mapped[float | None] = mapped_column("return_pct", Float, nullable=True)
+    max_drawdown_pct: Mapped[float | None] = mapped_column(
+        "max_drawdown_pct", Float, nullable=True
+    )
+    win_rate: Mapped[float | None] = mapped_column("win_rate", Float, nullable=True)
+    bars_used: Mapped[int] = mapped_column("bars_used", Integer, default=0)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    vetoes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    as_of: Mapped[str | None] = mapped_column("as_of", String, nullable=True)
+    # Identidad reproducible del dataset forward (mismo patrón que el shadow).
+    data_snapshot_id: Mapped[str | None] = mapped_column(
+        "data_snapshot_id", String, nullable=True
+    )
+    forward_start: Mapped[str | None] = mapped_column("forward_start", String, nullable=True)
+    forward_end: Mapped[str | None] = mapped_column("forward_end", String, nullable=True)
+    bars_hash: Mapped[str | None] = mapped_column("bars_hash", String, nullable=True)
+    strategy_definition_hash: Mapped[str | None] = mapped_column(
+        "strategy_definition_hash", String, nullable=True
+    )
+    engine_version: Mapped[str | None] = mapped_column("engine_version", String, nullable=True)
+    config_hash: Mapped[str | None] = mapped_column("config_hash", String, nullable=True)
+    promoted_at: Mapped[str | None] = mapped_column("promoted_at", String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
 class StrategyHealthRow(Base):
     """Snapshot de salud de una estrategia ACTIVA (serie temporal de vigilancia)."""
 

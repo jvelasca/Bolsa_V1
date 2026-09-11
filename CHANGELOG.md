@@ -2,6 +2,38 @@
 
 All notable releases of Bolsa V1.
 
+## [1.58.0-beta] — V2.33 / A13 · Paper Forward (ACTIVE → forward P&L → vigilancia) — 2026-09-11
+
+Cierra el salto que V2.32/A12 deja abierto: la evidencia de una estrategia deja de ser
+solo **histórica** (shadow sobre un hold-out del LAB) y pasa a incluir **forward** real
+sobre mercado nuevo posterior a la promoción. Sin dinero real, sin cambios en las
+barreras LIVE (siguen doblemente bloqueadas) y sin tocar la ruta SIM-only.
+
+- **Forward paper determinista**: nuevo `paper_forward_phase.run_paper_forward` que
+  reutiliza el **mismo** motor declarativo de reglas que el LAB/shadow (causalidad
+  `index-1 → open(index)`, sin look-ahead) pero sobre barras con timestamp
+  **estrictamente posterior** a la promoción de la ACTIVE. No hay un segundo motor de
+  trading: la definición ejecutable de la ACTIVE es la única fuente de señal.
+- **Frontera temporal fail-closed**: sin barras nuevas post-promoción no hay evidencia
+  (`forward_sin_barras`, `passed=False`); nunca se inventa un P&L forward.
+- **Fingerprint reproducible**: dominio `PaperForwardResult` + `PaperForwardPolicy`
+  (guarda de muestra en `min_closed_round_trips`, DD fail-closed) con
+  `forward_start`/`forward_end`/`bars_hash`/`strategy_definition_hash`/`engine_version`/
+  `config_hash`/`data_snapshot_id`/`promoted_at`.
+- **Persistencia**: migración **035** (`paper_forward_results`, aditiva y nullable, sin
+  backfill) + `save_forward_result`/`list_forward_results` en el store (InMemory y
+  Postgres). La evidencia queda atribuida a la `version_id` de la ACTIVE.
+- **Wiring AUTO (default OFF)**: `AUTO_ORCHESTRATOR_FORWARD=1` activa el forward tras
+  cada ciclo y antes de la vigilancia (`AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS`, default
+  400). Con OFF el comportamiento es idéntico a V2.32.1 (rollout reversible).
+- **Certificación PG por commit**: nuevo job `paper-forward-pg` en `python-ci.yml` que
+  aplica `alembic upgrade head` (hasta 035) y ejecuta el E2E A13 con
+  `PAPER_FORWARD_PG_REQUIRED=1` (un skip es fallo duro). El E2E certifica
+  ACTIVE → barras nuevas → señal → fills/round-trips → P&L → evidencia persistida →
+  vigilancia, y el caso negativo sin barras nuevas.
+
+> Cierre: `docs/engineering/cierre-v2.33-a13-paper-forward-2026-09-11.md`.
+
 ## [1.57.0-beta] — V2.32.1 / A12.1 · Audit Remediation (P1 + promotion-hardening P2) — 2026-09-11
 
 Remedia los hallazgos verificados de la auditoría V2.32 contra HEAD `854dc86`, sin

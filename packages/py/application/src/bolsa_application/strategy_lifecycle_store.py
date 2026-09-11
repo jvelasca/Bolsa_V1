@@ -27,6 +27,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     CoachAssessment,
     GateResult,
     GateStatus,
+    PaperForwardResult,
     ShadowValidationResult,
     StrategyCandidate,
     StrategyEvaluation,
@@ -98,6 +99,9 @@ class StrategyLifecycleStore(Protocol):
     # V2.32 / A12: evidencia shadow ejecutada (autoridad del Promotion Gate).
     async def save_shadow_result(self, result: ShadowValidationResult) -> None: ...
     async def list_shadow_results(self, version_id: str) -> list[ShadowValidationResult]: ...
+    # V2.33 / A13: evidencia *forward* de la ACTIVE (mercado nuevo post-promoción).
+    async def save_forward_result(self, result: PaperForwardResult) -> None: ...
+    async def list_forward_results(self, version_id: str) -> list[PaperForwardResult]: ...
 
 
 class InMemoryStrategyLifecycleStore:
@@ -112,6 +116,7 @@ class InMemoryStrategyLifecycleStore:
         self._health: dict[str, list[StrategyHealth]] = {}
         self._coach: dict[str, list[CoachAssessment]] = {}
         self._shadow: dict[str, list[ShadowValidationResult]] = {}
+        self._forward: dict[str, list[PaperForwardResult]] = {}
 
     async def save_candidate(self, candidate: StrategyCandidate) -> None:
         self._candidates[candidate.id] = candidate
@@ -170,6 +175,12 @@ class InMemoryStrategyLifecycleStore:
 
     async def list_shadow_results(self, version_id: str) -> list[ShadowValidationResult]:
         return list(self._shadow.get(version_id, []))
+
+    async def save_forward_result(self, result: PaperForwardResult) -> None:
+        self._forward.setdefault(result.version_id, []).append(result)
+
+    async def list_forward_results(self, version_id: str) -> list[PaperForwardResult]:
+        return list(self._forward.get(version_id, []))
 
 
 def _gates_to_json(gates: tuple[GateResult, ...]) -> dict[str, Any]:
@@ -513,6 +524,83 @@ class PostgresStrategyLifecycleStore:
                 engine_version=r.engine_version,
                 config_hash=r.config_hash,
                 lab_end=r.lab_end,
+            )
+            for r in rows
+        ]
+
+    async def save_forward_result(self, result: PaperForwardResult) -> None:
+        """V2.33 / A13: persiste la evidencia forward de la ACTIVE (mercado nuevo)."""
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import PaperForwardResultRow
+        from bolsa_infrastructure.ids import new_id
+
+        await self._session.execute(
+            pg_insert(PaperForwardResultRow)
+            .values(
+                id=new_id(),
+                version_id=result.version_id,
+                instrument_id=result.instrument_id,
+                trades=int(result.trades),
+                round_trips=int(result.round_trips),
+                fills=int(result.fills),
+                return_pct=result.return_pct,
+                max_drawdown_pct=result.max_drawdown_pct,
+                win_rate=result.win_rate,
+                bars_used=int(result.bars_used),
+                passed=bool(result.passed),
+                reasons=list(result.reasons),
+                vetoes=list(result.vetoes),
+                as_of=result.as_of,
+                data_snapshot_id=result.data_snapshot_id,
+                forward_start=result.forward_start,
+                forward_end=result.forward_end,
+                bars_hash=result.bars_hash,
+                strategy_definition_hash=result.strategy_definition_hash,
+                engine_version=result.engine_version,
+                config_hash=result.config_hash,
+                promoted_at=result.promoted_at,
+                created_at=_now(),
+            )
+            .on_conflict_do_nothing(index_elements=["id"])
+        )
+        await self._session.commit()
+
+    async def list_forward_results(self, version_id: str) -> list[PaperForwardResult]:
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import PaperForwardResultRow
+
+        rows = (
+            await self._session.execute(
+                select(PaperForwardResultRow)
+                .where(PaperForwardResultRow.version_id == version_id)
+                .order_by(PaperForwardResultRow.created_at.asc())
+            )
+        ).scalars().all()
+        return [
+            PaperForwardResult(
+                version_id=r.version_id,
+                trades=int(r.trades or 0),
+                passed=bool(r.passed),
+                reasons=tuple(str(x) for x in (r.reasons or [])),
+                instrument_id=r.instrument_id,
+                return_pct=r.return_pct,
+                max_drawdown_pct=r.max_drawdown_pct,
+                win_rate=r.win_rate,
+                bars_used=int(r.bars_used or 0),
+                as_of=r.as_of,
+                round_trips=int(r.round_trips or 0),
+                data_snapshot_id=r.data_snapshot_id,
+                forward_start=r.forward_start,
+                forward_end=r.forward_end,
+                bars_hash=r.bars_hash,
+                strategy_definition_hash=r.strategy_definition_hash,
+                engine_version=r.engine_version,
+                config_hash=r.config_hash,
+                promoted_at=r.promoted_at,
+                fills=int(r.fills or 0),
+                vetoes=tuple(str(x) for x in (r.vetoes or [])),
             )
             for r in rows
         ]

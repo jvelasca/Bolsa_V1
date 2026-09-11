@@ -12,6 +12,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     CoachAssessment,
     GateResult,
     GateStatus,
+    PaperForwardPolicy,
     ShadowPolicy,
     StrategyCandidate,
     StrategyEvaluation,
@@ -328,3 +329,112 @@ def test_promotion_with_passing_evidence_links_validation_id() -> None:
     assert promo.promoted
     assert promo.shadow_validated is True
     assert promo.shadow_validation_id == "ver-1"
+
+
+# ── V2.33/A13: validación FORWARD (paper, mercado nuevo post-promoción) ──────────
+
+
+def test_paper_forward_policy_passes_with_evidence() -> None:
+    policy = PaperForwardPolicy(min_closed_round_trips=3, min_bars=10, min_return_pct=0.0)
+    result = policy.evaluate(
+        version_id="ver-1",
+        trades=8,
+        round_trips=4,
+        return_pct=2.5,
+        max_drawdown_pct=4.0,
+        bars_used=60,
+        fills=4,
+    )
+    assert result.passed
+    assert result.reasons == ()
+    assert result.round_trips == 4
+    assert result.fills == 4
+
+
+def test_paper_forward_fails_closed_without_bars() -> None:
+    """Sin ventana forward suficiente no hay evidencia interpretable."""
+    policy = PaperForwardPolicy(min_closed_round_trips=1, min_bars=20, min_return_pct=-100.0)
+    result = policy.evaluate(
+        version_id="ver-1",
+        trades=5,
+        round_trips=3,
+        return_pct=9.0,
+        max_drawdown_pct=1.0,
+        bars_used=5,
+    )
+    assert not result.passed
+    assert "forward_barras_insuficientes" in result.reasons
+
+
+def test_paper_forward_fails_closed_without_sample() -> None:
+    policy = PaperForwardPolicy(min_closed_round_trips=10, min_bars=5, min_return_pct=-100.0)
+    result = policy.evaluate(
+        version_id="ver-1",
+        trades=4,
+        round_trips=2,
+        return_pct=5.0,
+        max_drawdown_pct=1.0,
+        bars_used=40,
+    )
+    assert not result.passed
+    assert "forward_muestra_insuficiente" in result.reasons
+
+
+def test_paper_forward_fails_closed_when_drawdown_missing() -> None:
+    """Con techo de DD configurado, métrica ausente NO es 'sin riesgo'."""
+    policy = PaperForwardPolicy(
+        min_closed_round_trips=1, min_bars=5, min_return_pct=-100.0, max_drawdown_pct=15.0
+    )
+    result = policy.evaluate(
+        version_id="ver-1",
+        trades=4,
+        round_trips=2,
+        return_pct=5.0,
+        max_drawdown_pct=None,
+        bars_used=40,
+    )
+    assert not result.passed
+    assert "forward_drawdown_ausente" in result.reasons
+
+
+def test_paper_forward_result_carries_reproducible_fingerprint() -> None:
+    """La evidencia forward debe poder reproducirse: barras, hash y versión de motor."""
+    policy = PaperForwardPolicy(min_closed_round_trips=1, min_bars=1, min_return_pct=-100.0)
+    result = policy.evaluate(
+        version_id="ver-1",
+        trades=4,
+        round_trips=2,
+        return_pct=3.0,
+        max_drawdown_pct=2.0,
+        bars_used=30,
+        forward_start="2026-09-12T00:00:00",
+        forward_end="2026-09-30T00:00:00",
+        bars_hash="abc123",
+        strategy_definition_hash="hash-1",
+        engine_version="paper-forward/2.33.0",
+        config_hash="cfg-1",
+        data_snapshot_id="snap-1",
+        promoted_at="2026-09-11T00:00:00",
+    )
+    assert result.passed
+    assert result.forward_start == "2026-09-12T00:00:00"
+    assert result.forward_end == "2026-09-30T00:00:00"
+    assert result.bars_hash == "abc123"
+    assert result.engine_version == "paper-forward/2.33.0"
+    assert result.promoted_at == "2026-09-11T00:00:00"
+
+
+def test_paper_forward_result_records_vetoes() -> None:
+    """Un veto del gate no es un fallo de la política, pero queda auditado."""
+    policy = PaperForwardPolicy(min_closed_round_trips=0, min_bars=1, min_return_pct=None)
+    result = policy.evaluate(
+        version_id="ver-1",
+        trades=0,
+        round_trips=0,
+        return_pct=None,
+        max_drawdown_pct=None,
+        bars_used=5,
+        vetoes=("risk_gate:concentracion",),
+    )
+    assert result.passed
+    assert result.vetoes == ("risk_gate:concentracion",)

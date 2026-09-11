@@ -26,6 +26,8 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         w.AUTO_ORCHESTRATOR_STRATEGY_FAMILY,
         w.AUTO_ORCHESTRATOR_LAB_PARAMS,
         w.AUTO_ORCHESTRATOR_MAX_CANDIDATES,
+        w.AUTO_ORCHESTRATOR_FORWARD,
+        w.AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS,
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -258,6 +260,70 @@ def test_health_thresholds_are_calibrated() -> None:
     th = w._health_thresholds()
     assert th.min_credibility is not None
     assert th.min_edge is not None
+
+
+# ── V2.33/A13: forward paper (default OFF, reversible) ───────────────────────────
+
+
+def test_forward_defaults_off() -> None:
+    """El forward es OFF por defecto: sin env no se ejecuta ni persiste."""
+    assert w.forward_enabled() is False
+
+
+def test_forward_enabled_truthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_FORWARD, "1")
+    assert w.forward_enabled() is True
+
+
+def test_forward_window_bars_default_and_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert w._forward_window_bars() == w._FORWARD_WINDOW_BARS_DEFAULT
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS, "120")
+    assert w._forward_window_bars() == 120
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS, "basura")
+    assert w._forward_window_bars() == w._FORWARD_WINDOW_BARS_DEFAULT
+
+
+@pytest.mark.asyncio
+async def test_loop_runs_forward_between_cycle_and_watch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con ``forward_runner`` cableado, el bucle lo invoca tras el ciclo."""
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
+    calls: list[str] = []
+
+    class _Recorder:
+        async def run_cycle(self, *, instrument_id: str, **_: Any) -> _Result:
+            calls.append(f"cycle:{instrument_id}")
+            return _Result()
+
+        async def watch_active(self, *, instrument_id: str, **_: Any) -> _Result:
+            calls.append(f"watch:{instrument_id}")
+            return _Result()
+
+    async def _forward(instrument_id: str) -> None:
+        calls.append(f"forward:{instrument_id}")
+        return None
+
+    task = asyncio.create_task(
+        w.auto_orchestrator_loop(
+            _Recorder(), interval_seconds=0.01, forward_runner=_forward
+        )
+    )
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert "forward:AAA" in calls, calls
+    assert calls.index("forward:AAA") > calls.index("cycle:AAA"), calls
+    assert calls.index("watch:AAA") > calls.index("forward:AAA"), calls
+
+
+def test_start_does_not_wire_forward_when_disabled() -> None:
+    """Sin el gate ON, el arranque no construye un forward runner (idempotente)."""
+    import os
+
+    assert w.forward_enabled() is False
+    assert os.getenv(w.AUTO_ORCHESTRATOR_FORWARD) is None
 
 
 def test_default_orchestrator_wires_real_dependencies() -> None:

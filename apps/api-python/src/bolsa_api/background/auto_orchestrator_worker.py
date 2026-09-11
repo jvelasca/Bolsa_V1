@@ -10,6 +10,10 @@ gate de entorno (default **OFF**), siguiendo el patrón de los workers A9:
 * ``AUTO_ORCHESTRATOR_SHADOW_VALIDATED=1`` — **override manual del operador**. Ya NO
   se cablea en el bucle AUTO (V2.32.1, auditoría P2-02): AUTO promociona solo con
   evidencia shadow ejecutada. El flag queda reservado a herramientas admin/manuales.
+* ``AUTO_ORCHESTRATOR_FORWARD=1`` — **forward paper de la ACTIVE** (V2.33/A13, default
+  OFF). Con ON, tras cada ciclo se ejecuta y persiste la evidencia forward de la ACTIVE
+  sobre mercado nuevo posterior a la promoción (``AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS``,
+  default 400).
 * ``AUTO_ORCHESTRATOR_STRATEGY_FAMILY`` — familia por defecto del ESTUDIO.
 * ``AUTO_ORCHESTRATOR_LAB_PARAMS`` — override JSON del grid del LAB (opcional).
 * ``AUTO_ORCHESTRATOR_MAX_CANDIDATES`` — tope de candidatas por instrumento/ciclo
@@ -65,6 +69,11 @@ AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_CA
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
 _SHADOW_WINDOW_BARS_DEFAULT = 250
+# V2.33/A13: forward paper de la ACTIVE sobre mercado nuevo post-promoción. OFF por
+# defecto (rollout explícito y reversible): sin ON no se ejecuta ni persiste forward.
+AUTO_ORCHESTRATOR_FORWARD = "AUTO_ORCHESTRATOR_FORWARD"
+AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS = "AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS"
+_FORWARD_WINDOW_BARS_DEFAULT = 400
 # V2.32.1 (auditoría P1-01): ventana de barras del LAB (grid default). El provider
 # shadow lee ``LAB_BAR_LIMIT_DEFAULT + shadow_window`` para que el hold-out exista de
 # verdad (el orquestador reserva las últimas ``shadow_window`` barras al shadow).
@@ -149,6 +158,27 @@ def _shadow_window_bars() -> int:
     return value if value > 0 else _SHADOW_WINDOW_BARS_DEFAULT
 
 
+def forward_enabled() -> bool:
+    """V2.33/A13: ¿el AUTO ejecuta el forward paper de la ACTIVE? (default OFF).
+
+    OFF por defecto: rollout explícito y reversible. Con OFF no se lee ni se persiste
+    evidencia forward; el comportamiento es idéntico al de V2.32.1.
+    """
+    return _truthy(os.getenv(AUTO_ORCHESTRATOR_FORWARD))
+
+
+def _forward_window_bars() -> int:
+    """Ventana (en barras) del forward paper; override por env, default 400."""
+    raw = (os.getenv(AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS) or "").strip()
+    if not raw:
+        return _FORWARD_WINDOW_BARS_DEFAULT
+    try:
+        value = int(raw)
+    except ValueError:
+        return _FORWARD_WINDOW_BARS_DEFAULT
+    return value if value > 0 else _FORWARD_WINDOW_BARS_DEFAULT
+
+
 def _new_cycle_id() -> str:
     """Identidad única por ciclo AUTO (UTC timestamp + sufijo aleatorio corto).
 
@@ -229,6 +259,72 @@ def _make_shadow_bars_provider(session_factory: Any) -> Any:
     return _shadow_bars
 
 
+def _make_forward_runner(session_factory: Any) -> Any:
+    """``run_forward(instrument_id)`` async: ejecuta y persiste el forward de la ACTIVE.
+
+    V2.33/A13. Para el instrumento dado:
+
+    1. Lee la ACTIVE (y su ``promoted_at``) del lifecycle store.
+    2. Lee barras OHLCV de PG (ventana amplia).
+    3. Ejecuta el forward **solo** sobre barras posteriores a la promoción y persiste la
+       evidencia. Sin barras nuevas ⇒ evidencia fail-closed (``forward_sin_barras``), que
+       también se persiste para que la ausencia quede auditada.
+
+    Fail-closed: sin ACTIVE o sin definición ejecutable no hay forward; un fallo de
+    lectura no se convierte en aprobación (se loguea y se continúa).
+    """
+
+    async def _run_forward(instrument_id: str) -> Any:
+        from bolsa_application.paper_forward_phase import (
+            PaperForwardConfig,
+            run_paper_forward,
+        )
+        from bolsa_application.strategy_lifecycle_store import (
+            PostgresStrategyLifecycleStore,
+        )
+        from bolsa_domain.entities.strategy_lifecycle import PaperForwardPolicy
+
+        try:
+            async with session_factory() as session:
+                store = PostgresStrategyLifecycleStore(session)
+                record = await store.get_active(instrument_id=instrument_id)
+                if record is None:
+                    return None
+                active = record.active
+                from bolsa_api.api.dependencies import get_ohlcv_repository
+
+                repo = get_ohlcv_repository(session)
+                bars = tuple(
+                    await repo.get_bars(
+                        instrument_id, limit=LAB_BAR_LIMIT_DEFAULT + _forward_window_bars()
+                    )
+                    or ()
+                )
+        except Exception:  # noqa: BLE001 — sin datos no hay evidencia; no se inventa.
+            logger.exception("auto_orchestrator forward read failed for %s", instrument_id)
+            return None
+
+        result = run_paper_forward(
+            active=active,
+            bars=bars,
+            policy=PaperForwardPolicy(),
+            config=PaperForwardConfig(
+                promoted_at=active.promoted_at,
+                window_bars=_forward_window_bars(),
+            ),
+            as_of=f"forward:{instrument_id}",
+        )
+        try:
+            async with session_factory() as session:
+                store = PostgresStrategyLifecycleStore(session)
+                await store.save_forward_result(result)
+        except Exception:  # noqa: BLE001 — persistir no debe tumbar el ciclo.
+            logger.exception("auto_orchestrator forward persist failed for %s", instrument_id)
+        return result
+
+    return _run_forward
+
+
 async def _instruments_for_cycle(
     orchestrator: Any,
     *,
@@ -279,8 +375,9 @@ async def auto_orchestrator_loop(
     orchestrator: Any,
     *,
     interval_seconds: float | None = None,
+    forward_runner: Any = None,
 ) -> None:
-    """Bucle del orquestador: corre el ciclo y vigila la activa por instrumento."""
+    """Bucle del orquestador: corre el ciclo, mide el forward y vigila la activa."""
     period = interval_seconds if interval_seconds is not None else _interval_seconds()
     allowlist = instrument_watch()
     # V2.32.1 (auditoría P2-02): AUTO promociona SOLO por evidencia. El override del
@@ -310,6 +407,25 @@ async def auto_orchestrator_loop(
                     result.status,
                     result.promoted,
                 )
+                # V2.33/A13: forward paper de la ACTIVE sobre mercado nuevo posterior a
+                # la promoción. Solo con la fase habilitada (default OFF) y sin ACTIVE
+                # no hace nada; un fallo del forward no tumba el ciclo (fail-closed).
+                if forward_runner is not None:
+                    try:
+                        forward = await forward_runner(instrument_id)
+                        if forward is not None:
+                            logger.info(
+                                "auto_orchestrator forward instrument=%s passed=%s "
+                                "round_trips=%s bars=%s",
+                                instrument_id,
+                                forward.passed,
+                                forward.round_trips,
+                                forward.bars_used,
+                            )
+                    except Exception:  # noqa: BLE001 — el forward no rompe la vigilancia.
+                        logger.exception(
+                            "auto_orchestrator forward failed for %s", instrument_id
+                        )
                 # Vigilancia de la activa. V2.28/A10 (P1-02 real): las métricas
                 # observadas de la ejecución SIM las aporta el propio orquestador vía
                 # ``observed_metrics`` (fills atribuidos a la versión). Aquí ya no se
@@ -349,8 +465,19 @@ def start_auto_orchestrator(
             )
             return None
         orchestrator = _default_orchestrator(session_factory)
+    # V2.33/A13: forward paper de la ACTIVE (default OFF). Con OFF no se ejecuta ni
+    # persiste evidencia forward; el comportamiento es idéntico a V2.32.1.
+    forward_runner = (
+        _make_forward_runner(session_factory)
+        if session_factory is not None and forward_enabled()
+        else None
+    )
     return asyncio.create_task(
-        auto_orchestrator_loop(orchestrator, interval_seconds=interval_seconds)
+        auto_orchestrator_loop(
+            orchestrator,
+            interval_seconds=interval_seconds,
+            forward_runner=forward_runner,
+        )
     )
 
 

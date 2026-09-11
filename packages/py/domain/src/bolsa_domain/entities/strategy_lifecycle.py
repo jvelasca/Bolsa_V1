@@ -336,6 +336,138 @@ class ShadowPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class PaperForwardResult:
+    """Evidencia **forward** de una estrategia ACTIVE (V2.33 / A13).
+
+    A diferencia de ``ShadowValidationResult`` (validación *histórica* sobre un hold-out
+    del LAB), este resultado mide lo que ocurre con **mercado nuevo posterior a la
+    promoción**: la propia definición de la ACTIVE produce señales sobre barras nuevas,
+    esas señales pasan por los gates deterministas y, si procede, se ejecutan como
+    órdenes/fills **paper** (SIM). El P&L resultante es forward de verdad, no replay
+    histórico.
+
+    Fail-closed: ``passed`` solo es True si hay operaciones **cerradas** suficientes
+    (``round_trips >= min_closed_round_trips``) y las métricas respetan la política. Sin
+    barras nuevas posteriores a la promoción ⇒ ``sin_barras_forward`` y ``passed=False``
+    (nunca se inventa P&L).
+
+    El fingerprint (``forward_start``/``forward_end``/``bars_hash``/
+    ``strategy_definition_hash``/``engine_version``/``config_hash``/``data_snapshot_id``)
+    hace la evidencia reproducible: dentro de meses se puede demostrar exactamente con
+    qué barras nuevas se comportó la estrategia.
+    """
+
+    version_id: str
+    trades: int
+    passed: bool
+    reasons: tuple[str, ...] = ()
+    instrument_id: str | None = None
+    return_pct: float | None = None
+    max_drawdown_pct: float | None = None
+    win_rate: float | None = None
+    bars_used: int = 0
+    as_of: str | None = None
+    # --- V2.33: semántica de muestra y fingerprint del dataset forward ---
+    round_trips: int = 0
+    data_snapshot_id: str | None = None
+    forward_start: str | None = None
+    forward_end: str | None = None
+    bars_hash: str | None = None
+    strategy_definition_hash: str | None = None
+    engine_version: str | None = None
+    config_hash: str | None = None
+    # Barrera temporal: solo cuentan barras posteriores a la promoción de la ACTIVE.
+    promoted_at: str | None = None
+    # ``dry_run``/``blocked`` distinguen "no se ejecutó paper" de "se ejecutó y perdió".
+    fills: int = 0
+    vetoes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PaperForwardPolicy:
+    """Umbrales de la validación forward (deterministas, sin IA).
+
+    ``min_closed_round_trips`` es la guarda de muestra (misma semántica que el shadow):
+    no se valida una estrategia forward con evidencia anecdótica. ``min_bars`` exige una
+    ventana forward mínima para que el resultado sea interpretable.
+
+    ``min_return_pct`` es MÍNIMO y ``max_drawdown_pct`` es TECHO. Fail-closed: si el
+    umbral está configurado y la métrica falta, se rechaza (no se asume que "no medido"
+    es "sin riesgo"). Un umbral ``None`` desactiva ese check.
+    """
+
+    min_closed_round_trips: int = 10
+    min_bars: int = 20
+    min_return_pct: float | None = 0.0
+    max_drawdown_pct: float | None = None
+
+    def evaluate(
+        self,
+        *,
+        version_id: str,
+        trades: int,
+        return_pct: float | None,
+        max_drawdown_pct: float | None,
+        win_rate: float | None = None,
+        instrument_id: str | None = None,
+        bars_used: int = 0,
+        as_of: str | None = None,
+        round_trips: int | None = None,
+        data_snapshot_id: str | None = None,
+        forward_start: str | None = None,
+        forward_end: str | None = None,
+        bars_hash: str | None = None,
+        strategy_definition_hash: str | None = None,
+        engine_version: str | None = None,
+        config_hash: str | None = None,
+        promoted_at: str | None = None,
+        fills: int = 0,
+        vetoes: tuple[str, ...] = (),
+    ) -> PaperForwardResult:
+        """Aplica la política a las métricas del forward paper (fail-closed)."""
+        reasons: list[str] = []
+        closed = trades if round_trips is None else int(round_trips)
+        if bars_used < self.min_bars:
+            reasons.append("forward_barras_insuficientes")
+        if closed < self.min_closed_round_trips:
+            reasons.append("forward_muestra_insuficiente")
+        if self.min_return_pct is not None and (
+            return_pct is None or return_pct < self.min_return_pct
+        ):
+            reasons.append("forward_retorno_insuficiente")
+        # Fail-closed: si el drawdown es un gate configurado y la métrica falta, se
+        # rechaza. "No medido" NO es "sin riesgo".
+        if self.max_drawdown_pct is not None:
+            if max_drawdown_pct is None:
+                reasons.append("forward_drawdown_ausente")
+            elif max_drawdown_pct > self.max_drawdown_pct:
+                reasons.append("forward_drawdown_excesivo")
+        return PaperForwardResult(
+            version_id=version_id,
+            trades=trades,
+            passed=not reasons,
+            reasons=tuple(reasons),
+            instrument_id=instrument_id,
+            return_pct=return_pct,
+            max_drawdown_pct=max_drawdown_pct,
+            win_rate=win_rate,
+            bars_used=bars_used,
+            as_of=as_of,
+            round_trips=closed,
+            data_snapshot_id=data_snapshot_id,
+            forward_start=forward_start,
+            forward_end=forward_end,
+            bars_hash=bars_hash,
+            strategy_definition_hash=strategy_definition_hash,
+            engine_version=engine_version,
+            config_hash=config_hash,
+            promoted_at=promoted_at,
+            fills=fills,
+            vetoes=vetoes,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class StrategyPromotion:
     """Promoción (o rechazo) de un finalista a ACTIVE, con su porqué auditable."""
 
@@ -599,6 +731,8 @@ __all__ = [
     "CoachAssessment",
     "GateResult",
     "GateStatus",
+    "PaperForwardPolicy",
+    "PaperForwardResult",
     "ShadowPolicy",
     "ShadowValidationResult",
     "StrategyCandidate",
