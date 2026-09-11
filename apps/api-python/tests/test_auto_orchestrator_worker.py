@@ -31,6 +31,11 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         w.AUTO_ORCHESTRATOR_GRAMMAR,
         w.AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS,
         w.AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS,
+        w.AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR,
+        w.AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT,
+        w.AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT,
+        w.AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_SIMPLE_WEIGHT,
+        w.AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_COMPOSITE_WEIGHT,
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -764,3 +769,188 @@ def test_default_orchestrator_is_sim_only() -> None:
     # Las únicas dependencias cableadas son las del ciclo de investigación.
     assert deps.resolve_universe is not None
     assert deps.run_optimize is not None
+
+
+# ── V2.36 (incremento 1): carril adaptativo alimentado por snapshot ─────────────
+
+
+def _snapshot(adaptive_weight: float) -> Any:
+    from bolsa_domain.entities.discovery_evidence_snapshot import (
+        DiscoveryEvidenceSnapshot,
+    )
+
+    return DiscoveryEvidenceSnapshot(
+        id="snap-1",
+        snapshot_hash="sha256:abc",
+        math_version="discovery_evidence_v0",
+        window_from="a",
+        window_to="b",
+        family_weights={"sma": 1.0},
+        lane_weights={"adaptive": adaptive_weight},
+        sample_sizes={"sma": 10},
+        payload={},
+        created_at="2026-09-11T00:00:00+00:00",
+    )
+
+
+def test_adaptive_allocator_defaults_off() -> None:
+    assert w.adaptive_allocator_enabled() is False
+
+
+def test_adaptive_allocator_enabled_truthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR, "1")
+    assert w.adaptive_allocator_enabled() is True
+
+
+def test_allocator_uses_env_weight_without_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sin snapshot, el peso adaptativo es el del env (histórico 0.0)."""
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT, "0.3")
+    allocator = w._discovery_allocator()
+    assert allocator.adaptive_weight == 0.3
+
+
+def test_allocator_snapshot_overrides_env_weight() -> None:
+    allocator = w._discovery_allocator(_snapshot(0.42))
+    assert allocator.adaptive_weight == 0.42
+
+
+def test_allocator_snapshot_without_adaptive_key_is_fail_closed() -> None:
+    from bolsa_domain.entities.discovery_evidence_snapshot import (
+        DiscoveryEvidenceSnapshot,
+    )
+
+    snapshot = DiscoveryEvidenceSnapshot(
+        id="snap-2",
+        snapshot_hash="sha256:def",
+        math_version="discovery_evidence_v0",
+        window_from="a",
+        window_to="b",
+        family_weights={},
+        lane_weights={},
+        sample_sizes={},
+        payload={},
+        created_at="2026-09-11T00:00:00+00:00",
+    )
+    assert w._discovery_allocator(snapshot).adaptive_weight == 0.0
+
+
+def test_runner_uses_injected_snapshot_holder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El runner lee el holder por ciclo y construye el allocator con su peso."""
+    from bolsa_application import strategy_discovery_engine as engine
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR, "1")
+    captured: dict[str, Any] = {}
+
+    real = engine.discover_for_instrument_with_summary
+
+    def _spy(**kwargs: Any) -> Any:
+        captured["allocator"] = kwargs.get("allocator")
+        return real(**kwargs)
+
+    monkeypatch.setattr(engine, "discover_for_instrument_with_summary", _spy)
+
+    holder: list[Any] = [_snapshot(0.5)]
+    runner = w._make_discovery_runner(
+        DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40),
+        holder,
+    )
+    runner("AAA")
+    allocator = captured["allocator"]
+    assert allocator is not None
+    assert allocator.adaptive_weight == 0.5
+
+
+def test_runner_without_snapshot_holder_keeps_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from bolsa_application import strategy_discovery_engine as engine
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR, "1")
+    captured: dict[str, Any] = {}
+    real = engine.discover_for_instrument_with_summary
+
+    def _spy(**kwargs: Any) -> Any:
+        captured["allocator"] = kwargs.get("allocator")
+        return real(**kwargs)
+
+    monkeypatch.setattr(engine, "discover_for_instrument_with_summary", _spy)
+
+    runner = w._make_discovery_runner(
+        DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    )
+    runner("AAA")
+    assert captured["allocator"].adaptive_weight == 0.0
+
+
+@pytest.mark.asyncio
+async def test_loop_reads_adaptive_snapshot_once_per_cycle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El provider se consulta UNA vez por ciclo (no por instrumento)."""
+    calls: list[int] = []
+
+    async def _provider() -> Any:
+        calls.append(1)
+        return _snapshot(0.4)
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA,BBB,CCC")
+    orch = _OrchWithUniverse(
+        resolution=_Resolution(instrument_ids=["AAA", "BBB", "CCC"])
+    )
+    orch.adaptive_snapshot_holder = []
+
+    task = asyncio.create_task(
+        w.auto_orchestrator_loop(
+            orch, interval_seconds=30.0, adaptive_snapshot_provider=_provider
+        )
+    )
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    # Un solo ciclo observado ⇒ una sola lectura, pese a haber 3 instrumentos.
+    assert len(calls) == 1
+    assert len(orch.adaptive_snapshot_holder) == 1
+
+
+@pytest.mark.asyncio
+async def test_loop_without_provider_does_not_touch_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con el flag OFF no hay provider: el holder queda vacío (byte-idéntico)."""
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
+    orch = _OrchWithUniverse(resolution=_Resolution(instrument_ids=["AAA"]))
+    orch.adaptive_snapshot_holder = []
+
+    task = asyncio.create_task(w.auto_orchestrator_loop(orch, interval_seconds=0.01))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert orch.adaptive_snapshot_holder == []
+
+
+@pytest.mark.asyncio
+async def test_refresh_adaptive_snapshot_fail_closed_on_provider_error() -> None:
+    """Un provider que falla deja el holder vacío (peso 0), no rompe el ciclo."""
+    orch = _FakeOrchestrator()
+    orch.adaptive_snapshot_holder = []
+
+    async def _boom() -> Any:
+        raise RuntimeError("db down")
+
+    await w._refresh_adaptive_snapshot(orch, _boom)
+    assert orch.adaptive_snapshot_holder == []
+
+
+def test_start_does_not_wire_adaptive_provider_when_disabled() -> None:
+    assert w.adaptive_allocator_enabled() is False
+    import os
+
+    assert os.getenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR) is None

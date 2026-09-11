@@ -75,8 +75,7 @@ AUTO_ORCHESTRATOR_GRAMMAR = "AUTO_ORCHESTRATOR_GRAMMAR"
 AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS = "AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS"
 AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS = "AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS"
 # V2.36/A16 (P2-03): pesos del allocator explícito por carril (catálogo / gramática
-# simple / gramática compuesta / adaptive). Override por env; defaults seguros. El
-# carril ``adaptive`` es un placeholder (peso 0): no implementa aprendizaje.
+# simple / gramática compuesta / adaptive). Override por env; defaults seguros.
 AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT = "AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT"
 AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_SIMPLE_WEIGHT = (
     "AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_SIMPLE_WEIGHT"
@@ -85,6 +84,11 @@ AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_COMPOSITE_WEIGHT = (
     "AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_COMPOSITE_WEIGHT"
 )
 AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT = "AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT"
+# V2.36 (incremento 1): carril ``adaptive`` alimentado por el snapshot de evidencia
+# persistido. OFF por defecto: con OFF el allocator conserva el peso adaptativo del env
+# (histórico 0.0) y el ciclo es byte-idéntico a v2.35.1. Con ON, el worker lee UNA vez
+# por ciclo el snapshot vigente (fail-closed: sin snapshot ⇒ 0.0) y lo inyecta.
+AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR = "AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR"
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
 _SHADOW_WINDOW_BARS_DEFAULT = 250
@@ -153,6 +157,17 @@ def grammar_enabled() -> bool:
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_GRAMMAR))
 
 
+def adaptive_allocator_enabled() -> bool:
+    """V2.36 (incremento 1): ¿el carril ``adaptive`` se alimenta del snapshot? (OFF).
+
+    OFF por defecto (rollout explícito y reversible): con OFF el allocator conserva el
+    peso adaptativo del env (histórico ``0.0``) y **no se lee** la BD para snapshots; el
+    ciclo es byte-idéntico a v2.35.1. Con ON se lee UNA vez por ciclo el snapshot
+    vigente y su peso adaptativo se inyecta (fail-closed: sin snapshot ⇒ ``0.0``).
+    """
+    return _truthy(os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR))
+
+
 def _int_env(name: str, default: int) -> int:
     raw = (os.getenv(name) or "").strip()
     if not raw:
@@ -186,22 +201,29 @@ def _grammar_budget(discovery_budget: Any) -> Any:
     )
 
 
-def _discovery_allocator() -> Any:
-    """V2.36/A16 (P2-03): allocator explícito de cupos por carril (override por env).
+def _discovery_allocator(adaptive_snapshot: Any = None) -> Any:
+    """V2.36/A16 (P2-03) + V2.36 (incremento 1): allocator explícito por carril.
 
     Los pesos del reparto catálogo/gramática pueden ajustarse por env, pero los
-    defaults son conservadores y deterministas. ``adaptive_weight`` queda a 0 (carril
-    placeholder de la futura búsqueda adaptativa; NO implementa aprendizaje).
+    defaults son conservadores y deterministas. El peso del carril ``adaptive``:
+
+    * por defecto (flag ``AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR`` OFF o envío ausente)
+      se toma del env ``AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT`` (histórico 0.0);
+    * con el flag ON y un snapshot vigente, se toma del snapshot (fail-closed: el
+      snapshot sin evidencia, o ausente, vale 0.0 — nunca un peso inventado).
     """
     from bolsa_application.discovery_catalog import DiscoveryBudgetAllocator
 
+    adaptive_weight = _float_env(AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT, 0.0)
+    if adaptive_snapshot is not None:
+        adaptive_weight = float(adaptive_snapshot.adaptive_weight())
     return DiscoveryBudgetAllocator(
         catalog_weight=_float_env(AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT, 2.0),
         grammar_simple_weight=_float_env(AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_SIMPLE_WEIGHT, 1.0),
         grammar_composite_weight=_float_env(
             AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_COMPOSITE_WEIGHT, 1.0
         ),
-        adaptive_weight=_float_env(AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT, 0.0),
+        adaptive_weight=adaptive_weight,
     )
 
 
@@ -379,7 +401,7 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
-def _make_discovery_runner(budget: Any) -> Any:
+def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
     """``discovery(instrument_id)`` síncrono (función pura, sin DB/red).
 
     V2.34/A14: si ``AUTO_ORCHESTRATOR_GRAMMAR`` está ON, se pasa un ``GrammarBudget``
@@ -395,6 +417,11 @@ def _make_discovery_runner(budget: Any) -> Any:
     explícito (pesos por carril, override por env) para que el reparto catálogo /
     gramática no dependa del orden de consumo. Con gramática OFF el allocator no se
     consulta y la salida sigue siendo la histórica.
+
+    V2.36 (incremento 1): ``adaptive_snapshot`` es un *holder* mutable (``list`` de un
+    elemento) que el bucle refresca UNA vez por ciclo; el runner lo lee al construir el
+    allocator en cada instrumento, de modo que todos los instrumentos de un ciclo usan
+    el MISMO snapshot. Sin holder o con holder vacío ⇒ peso adaptativo histórico.
     """
     from bolsa_application.strategy_discovery_engine import (
         discover_for_instrument_with_summary,
@@ -403,10 +430,17 @@ def _make_discovery_runner(budget: Any) -> Any:
     grammar_budget = _grammar_budget(budget) if grammar_enabled() else None
     # V2.36/A16: con gramática OFF no se consulta el allocator (salida histórica
     # intacta); con ON se inyecta el reparto explícito por carriles (P2-03).
-    allocator = _discovery_allocator() if grammar_budget is not None else None
     enabled = grammar_budget is not None
 
+    def _current_snapshot() -> Any:
+        if not isinstance(adaptive_snapshot, list) or not adaptive_snapshot:
+            return None
+        return adaptive_snapshot[0]
+
     def _discover(instrument_id: str) -> tuple[Any, ...]:
+        allocator = None
+        if enabled:
+            allocator = _discovery_allocator(_current_snapshot())
         candidates, summary = discover_for_instrument_with_summary(
             instrument_id=instrument_id,
             budget=budget,
@@ -417,7 +451,7 @@ def _make_discovery_runner(budget: Any) -> Any:
         logger.info(
             "auto_orchestrator discovery instrument=%s grammar_enabled=%s "
             "catalog=%s grammar=%s total=%s trials=%s catalog_cap=%s grammar_cap=%s "
-            "bar_count_ok=%s",
+            "adaptive_cap=%s bar_count_ok=%s",
             instrument_id,
             summary.grammar_enabled,
             summary.catalog_candidates,
@@ -426,6 +460,7 @@ def _make_discovery_runner(budget: Any) -> Any:
             summary.trials_used,
             summary.catalog_cap,
             summary.grammar_cap,
+            summary.adaptive_cap,
             summary.bar_count_ok,
         )
         return candidates
@@ -447,6 +482,66 @@ def _bar_source(bars: tuple[Any, ...]) -> str | None:
         if value:
             return str(value)
     return None
+
+
+def _make_adaptive_snapshot_provider(session_factory: Any) -> Any:
+    """``read_snapshot()`` async: snapshot de evidencia vigente (V2.36, incremento 1).
+
+    Abre una sesión por llamada (patrón "una sesión por operación" del worker) y lee
+    la fila más reciente de ``discovery_evidence_snapshots``. Fail-closed: cualquier
+    fallo de lectura (BD caída, tabla ausente) devuelve ``None``, que el allocator
+    traduce a peso adaptativo ``0.0`` — nunca a un peso inventado. El bucle llama a
+    este provider **una vez por ciclo**, no por instrumento.
+    """
+
+    async def _read_snapshot() -> Any:
+        from bolsa_infrastructure.database.repositories.discovery_evidence_snapshot_repository import (  # noqa: E501
+            SqlAlchemyDiscoveryEvidenceSnapshotRepository,
+        )
+
+        try:
+            async with session_factory() as session:
+                repo = SqlAlchemyDiscoveryEvidenceSnapshotRepository(session)
+                return await repo.get_latest()
+        except Exception:  # noqa: BLE001 — sin snapshot no hay señal; peso 0.
+            logger.exception("auto_orchestrator adaptive snapshot read failed")
+            return None
+
+    return _read_snapshot
+
+
+async def _refresh_adaptive_snapshot(
+    orchestrator: Any, snapshot_provider: Any
+) -> None:
+    """Refresca el holder del snapshot adaptativo UNA vez por ciclo (V2.36).
+
+    Se llama al inicio de cada iteración del bucle, antes de orquestar instrumentos,
+    de modo que **todos** los instrumentos del ciclo consuman el mismo snapshot
+    (reproducibilidad dentro del ciclo). Sin provider (flag OFF) no hace nada y no
+    toca la BD: el holder queda vacío y el peso adaptativo es el histórico.
+    """
+    if snapshot_provider is None:
+        return
+    holder = getattr(orchestrator, "adaptive_snapshot_holder", None)
+    if not isinstance(holder, list):
+        return
+    holder.clear()
+    try:
+        snapshot = await snapshot_provider()
+    except Exception:  # noqa: BLE001 — sin snapshot no hay señal; peso 0.
+        logger.exception("auto_orchestrator adaptive snapshot refresh failed")
+        return
+    if snapshot is not None:
+        holder.append(snapshot)
+        logger.info(
+            "auto_orchestrator adaptive_snapshot hash=%s adaptive_weight=%s",
+            snapshot.snapshot_hash,
+            snapshot.adaptive_weight(),
+        )
+    else:
+        logger.info(
+            "auto_orchestrator adaptive_snapshot ausente — adaptive_weight=0.0"
+        )
 
 
 def _make_shadow_bars_provider(session_factory: Any) -> Any:
@@ -613,8 +708,14 @@ async def auto_orchestrator_loop(
     *,
     interval_seconds: float | None = None,
     forward_runner: Any = None,
+    adaptive_snapshot_provider: Any = None,
 ) -> None:
-    """Bucle del orquestador: corre el ciclo, mide el forward y vigila la activa."""
+    """Bucle del orquestador: corre el ciclo, mide el forward y vigila la activa.
+
+    V2.36 (incremento 1): ``adaptive_snapshot_provider`` (opcional) se consulta **una
+    vez por ciclo** para refrescar el snapshot del carril ``adaptive``. Sin provider
+    (flag OFF) no se toca la BD y el comportamiento es byte-idéntico a v2.35.1.
+    """
     period = interval_seconds if interval_seconds is not None else _interval_seconds()
     allowlist = instrument_watch()
     # V2.32.1 (auditoría P2-02): AUTO promociona SOLO por evidencia. El override del
@@ -634,6 +735,10 @@ async def auto_orchestrator_loop(
         # iteración (antes de orquestar instrumentos) para que ``cycle_summary`` reporte
         # SOLO este ciclo. Los acumulados de proceso siguen intactos y monótonos.
         _reset_cycle_counters()
+        # V2.36 (incremento 1): snapshot del carril adaptativo, UNA lectura por ciclo
+        # (antes de orquestar instrumentos) para que todo el ciclo use el mismo prior.
+        # Sin provider o con flag OFF no toca la BD; fail-closed: sin snapshot ⇒ peso 0.
+        await _refresh_adaptive_snapshot(orchestrator, adaptive_snapshot_provider)
         for instrument_id in watch:
             try:
                 # V2.32.1 (auditoría P2-05): run_id por ciclo (no constante) para que
@@ -751,11 +856,19 @@ def start_auto_orchestrator(
         if session_factory is not None and forward_enabled()
         else None
     )
+    # V2.36 (incremento 1): snapshot del carril adaptativo (default OFF). Con OFF el
+    # bucle no lee la BD y el peso adaptativo es el histórico 0.0 (byte-idéntico).
+    adaptive_snapshot_provider = (
+        _make_adaptive_snapshot_provider(session_factory)
+        if session_factory is not None and adaptive_allocator_enabled()
+        else None
+    )
     return asyncio.create_task(
         auto_orchestrator_loop(
             orchestrator,
             interval_seconds=interval_seconds,
             forward_runner=forward_runner,
+            adaptive_snapshot_provider=adaptive_snapshot_provider,
         )
     )
 
@@ -815,7 +928,17 @@ def _default_orchestrator(session_factory: Any) -> Any:
             get_hypothesis_belief_repository(session),
         )
 
-    return AutoOrchestrator(
+    # V2.36 (incremento 1): holder mutable compartido entre el bucle y el runner. El
+    # bucle lo refresca UNA vez por ciclo con el snapshot vigente; el runner lo lee al
+    # construir el allocator de cada instrumento. Con el flag OFF el holder nunca se
+    # rellena (peso adaptativo histórico 0.0 ⇒ byte-idéntico a v2.35.1).
+    adaptive_snapshot_holder: list[Any] = []
+
+    def _build_discovery_runner() -> Any:
+        runner = _make_discovery_runner(_discovery_budget(), adaptive_snapshot_holder)
+        return runner
+
+    orchestrator = AutoOrchestrator(
         OrchestratorDeps(
             store=_SessionScopedStore(),
             resolve_universe=_estudio_universe_resolver(session_factory),
@@ -828,9 +951,7 @@ def _default_orchestrator(session_factory: Any) -> Any:
             # SIM atribuida a la versión activa (fills con strategy_version_id).
             observed_metrics=make_observed_metrics_provider(session_factory),
             # V2.31/A11 (P1-01): discovery del search space curado (flag OFF por defecto).
-            discovery=(
-                _make_discovery_runner(_discovery_budget()) if discovery_enabled() else None
-            ),
+            discovery=(_build_discovery_runner() if discovery_enabled() else None),
             # V2.32.1 (auditoría 2b): vigilancia con umbrales predictivos CALIBRADOS. Sin
             # esto, ``HealthThresholds()`` no degrada por edge/wfe/dsr/credibilidad
             # (``None`` = sin configurar), honesto pero ciego. El AUTO fija valores
@@ -847,6 +968,10 @@ def _default_orchestrator(session_factory: Any) -> Any:
             shadow_config=ShadowReplayConfig(timeframe="1d"),
         )
     )
+    # V2.36 (incremento 1): el bucle refresca este holder UNA vez por ciclo (misma
+    # referencia que el runner lee). Con el flag OFF nunca se rellena.
+    orchestrator.adaptive_snapshot_holder = adaptive_snapshot_holder  # type: ignore[attr-defined]
+    return orchestrator
 
 
 class _SessionScopedEstudioList:

@@ -64,6 +64,8 @@ class ResearchTrialRepository(Protocol):
 
     async def sum_k_by_instrument(self, instrument_id: str) -> int: ...
 
+    async def latest_trial_at(self) -> str | None: ...
+
     async def list_by_instrument(
         self,
         instrument_id: str,
@@ -76,3 +78,10 @@ class ResearchTrialRepository(Protocol):
     async def laboratory_summary(self) -> dict[str, Any]: ...
 
     async def lab_health(self) -> dict[str, Any]: ...
+
+    async def family_evidence_summary(
+        self,
+        *,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[dict[str, Any]]: ...

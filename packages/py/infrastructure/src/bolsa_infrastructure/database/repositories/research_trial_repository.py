@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from sqlalchemy import Float, and_, asc, cast, desc, func, nulls_last, select
+from sqlalchemy import Float, and_, asc, case, cast, desc, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.expression import ColumnElement
 
@@ -197,6 +197,18 @@ class SqlAlchemyResearchTrialRepository:
         result = await self._session.execute(stmt)
         return int(result.scalar_one())
 
+    async def latest_trial_at(self) -> str | None:
+        """V2.36 (incremento 1): ``created_at`` del trial más reciente (o ``None``).
+
+        Es el corte temporal *dato-dependiente* del snapshot de evidencia: usar el
+        reloj haría que cada ejecución del job produjese un hash distinto sobre los
+        mismos datos, rompiendo la idempotencia. Con el último trial como corte, dos
+        ejecuciones sobre la misma evidencia comparten ``snapshot_hash``.
+        """
+        stmt = select(func.max(ResearchTrialRow.created_at))
+        value = (await self._session.execute(stmt)).scalar()
+        return None if value is None else value.isoformat()
+
     async def list_by_instrument(
         self,
         instrument_id: str,
@@ -348,6 +360,78 @@ class SqlAlchemyResearchTrialRepository:
             "byPreset": by_preset,
             "byOrigin": by_origin,
         }
+
+    async def family_evidence_summary(
+        self,
+        *,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """V2.36 (incremento 1): agrega la evidencia de laboratorio **por familia H0**.
+
+        Devuelve, por ``preset_key`` (familia normalizada), un resumen determinista con
+        el número de trials, el score medio/máximo, el Sharpe medio y el número de
+        trials sin operaciones o fallidos. Es la materia prima del snapshot que alimenta
+        el carril ``adaptive`` del allocator (ver
+        ``bolsa_application.discovery_evidence``).
+
+        Orden canónico por ``preset_key`` ascendente para que el resultado sea
+        reproducible con independencia del plan de ejecución de la BD. Solo lectura.
+        """
+        sharpe = self._metric_float("sharpeRatio")
+        trade_count = cast(ResearchTrialRow.is_metrics["tradeCount"].as_string(), Float)
+
+        filters = []
+        if date_from:
+            filters.append(ResearchTrialRow.created_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            filters.append(ResearchTrialRow.created_at <= datetime.fromisoformat(date_to))
+
+        stmt = (
+            select(
+                ResearchTrialRow.preset_key.label("preset"),
+                func.count().label("trials"),
+                func.coalesce(func.sum(ResearchTrialRow.k_contribution), 0).label("k"),
+                func.avg(ResearchTrialRow.is_score).label("avg_score"),
+                func.max(ResearchTrialRow.is_score).label("best_score"),
+                func.avg(sharpe).label("avg_sharpe"),
+                func.sum(
+                    case((and_(trade_count.isnot(None), trade_count == 0.0), 1), else_=0)
+                ).label("zero_trade"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                ResearchTrialRow.fail_code.isnot(None),
+                                ResearchTrialRow.fail_code != "",
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("failures"),
+            )
+            .where(ResearchTrialRow.preset_key.isnot(None))
+            .group_by(ResearchTrialRow.preset_key)
+            .order_by(asc(ResearchTrialRow.preset_key))
+        )
+        if filters:
+            stmt = stmt.where(*filters)
+
+        rows = (await self._session.execute(stmt)).all()
+        return [
+            {
+                "presetKey": str(row.preset),
+                "trials": int(row.trials or 0),
+                "kConsumed": int(row.k or 0),
+                "avgScore": None if row.avg_score is None else float(row.avg_score),
+                "bestScore": None if row.best_score is None else float(row.best_score),
+                "avgSharpe": None if row.avg_sharpe is None else float(row.avg_sharpe),
+                "zeroTrade": int(row.zero_trade or 0),
+                "failures": int(row.failures or 0),
+            }
+            for row in rows
+        ]
 
     def _metric_present(self, key: str) -> ColumnElement[bool]:
         raw = ResearchTrialRow.is_metrics[key].as_string()

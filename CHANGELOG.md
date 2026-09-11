@@ -2,6 +2,68 @@
 
 All notable releases of Bolsa V1.
 
+## [1.61.0-beta] — V2.36 · Strategy Intelligence adaptativa (incremento 1: carril `adaptive`) — 2026-09-11
+
+Primer incremento de la **V2.36 Strategy Intelligence adaptativa**: cerrar el bucle
+`evidence → aprender → ajustar búsqueda` activando el carril `adaptive` del
+`DiscoveryBudgetAllocator` (hoy peso `0.0`, un hueco semántico) con pesos derivados de
+**evidencia real ya persistida del LAB**. El aprendizaje NO ocurre dentro del motor: se
+materializa en un **snapshot determinista, versionado y persistido**, calculado fuera del
+hot path por un job batch/CLI, e **inyectado** como dependencia. El discovery sigue siendo
+una **función pura dada la tupla `(instrument_id, snapshot)`**.
+
+- **Dominio** — entidad `DiscoveryEvidenceSnapshot` (dominio puro, `frozen`/`slots`) con
+  `snapshot_hash`, `math_version`, ventana temporal, `family_weights` (familia H0 →
+  peso), `lane_weights` (catálogo/gramática/adaptive), `sample_sizes` y `payload`; más el
+  contrato `DiscoveryEvidenceSnapshotRepository` (`save`/`get_latest`/`get_by_hash`/
+  `list_recent`). Método de lectura agregada nuevo `family_evidence_summary` (por
+  `preset_key`, orden canónico) en el protocolo de trials.
+- **Aplicación** — `bolsa_application.discovery_evidence` (nuevo): builder determinista
+  `build_discovery_evidence_snapshot` + `compute_family_weights`/`compute_lane_weights` +
+  `snapshot_hash`. Aritmética con redondeo fijo, orden canónico por familia y hash estable
+  (`sort_keys`+separadores compactos, patrón `definition_hash`). `math_version`
+  `discovery_evidence_v0` audita la fórmula. **Fail-closed**: sin muestra mínima por
+  familia (`min_samples`) ni total (`min_total_samples`) el peso adaptativo es `0.0`
+  explícito — nunca un peso inventado. Peso acotado a `[0, max_adaptive_weight]` (0.5 por
+  defecto) contra overfitting a familias con suerte (multiple testing documentado).
+- **Persistencia** — migración aditiva **`036_discovery_evidence_snapshots`**
+  (`down_revision=035_paper_forward_evidence`), tabla nueva con `snapshot_hash` único,
+  `math_version`, ventana y `payload` JSONB; sin backfill, `downgrade()` completo.
+  Repositorio `SqlAlchemyDiscoveryEvidenceSnapshotRepository` inmutable por hash
+  (`save` idempotente).
+- **Job batch/CLI** — `apps/api-python/scripts/build_discovery_evidence_snapshot.py`:
+  lee evidencia → construye snapshot → persiste. **Idempotente de verdad** por
+  `snapshot_hash`: el corte `window_to` por defecto es el `created_at` del trial más
+  reciente (dato-dependiente, no reloj), de modo que dos ejecuciones sobre la misma
+  evidencia dan el mismo hash y la segunda no reescribe. `--dry-run` para auditar la
+  fórmula sin tocar la BD. No se ejecuta desde el worker ni el request path.
+- **Worker (inyección, sin tocar el hot path)** — flag nuevo
+  `AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR` **OFF por defecto**: con OFF no se lee la BD y
+  todo es **byte-idéntico a v2.35.1**. Con ON, el bucle lee el snapshot vigente **una vez
+  por ciclo** (`_refresh_adaptive_snapshot` + `_make_adaptive_snapshot_provider`, una
+  sesión por operación) y lo inyecta en el allocator de todos los instrumentos del ciclo.
+  `_discovery_allocator(snapshot)` toma el peso del snapshot (fail-closed: sin snapshot o
+  sin evidencia ⇒ `0.0`, nunca el env por accidente).
+- **Alcance del incremento 1 (explícito)** — se asigna **cupo real y observable** al
+  carril `adaptive`; NO se añade espacio de búsqueda nuevo ni emisión adaptativa (eso es el
+  incremento 2). No confundir "peso asignado" con "capacidad de búsqueda": debe quedar
+  escrito. Catálogo, gramática simple y gramática compuesta quedan intactos.
+- **Invariantes intactas**: `AUTO ⇒ SIMULATED`; LIVE bloqueado; sin LLM en hot path;
+  fail-closed; long-only; H1 (`require_holdout=True` inviolable) y H2 (identidad de
+  dataset) intactos; gates CPCV/PBO/DSR/WFE/OOS + coach sin relajar. Test anti-explosión
+  `len(plans) == 1784` intacto.
+- **Tests**: `test_discovery_evidence.py` (determinismo, orden-insensibilidad del hash,
+  fail-closed, cotas, reproducibilidad por hash, cupo adaptativo sin romper el global);
+  worker (flag OFF por defecto, peso del snapshot vs env, fail-closed),
+  lectura única por ciclo, no-op sin provider); PG (tabla/índices a head, `save`
+  idempotente por hash, `get_latest`/`get_by_hash`, agregación por familia, roundtrip
+  `up/down` de la migración `036`).
+- **Verificación (tres bloques, local)**: `ruff` + `lint-imports` (4/4) + `mypy` (474
+  ficheros) verdes; offline `1518 passed` (domain + application + worker); PG con gates
+  `A14_GRAMMAR_PG_REQUIRED`/`LIFECYCLE_PG_REQUIRED`/`AUTO_ORCHESTRATOR_PG_REQUIRED`
+  `10 passed` + snapshot PG `6 passed` + lifecycle `57 passed` (incluye anti-explosión).
+- **Alembic head**: `036_discovery_evidence_snapshots`.
+
 ## [1.60.1-beta] — V2.35.1 · ESTUDIO hard gate (P1-01) — 2026-09-11
 
 Cierra el único hallazgo P1 de la auditoría externa de v2.35-beta: el AUTO podía

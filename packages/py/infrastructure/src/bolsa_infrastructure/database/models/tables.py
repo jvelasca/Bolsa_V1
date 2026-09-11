@@ -2406,6 +2406,30 @@ class PaperForwardResultRow(Base):
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
+class DiscoveryEvidenceSnapshotRow(Base):
+    """Snapshot versionado de evidencia para el carril ``adaptive`` (V2.36).
+
+    Persiste el prior determinista de reparto de presupuesto calculado FUERA del hot
+    path por el job batch/CLI (``compute_discovery_evidence_snapshot``). Inmutable por
+    ``snapshot_hash`` (índice único): el job es idempotente por hash. El worker solo
+    lee la fila más reciente (``get_latest``) y la inyecta en el allocator.
+    """
+
+    __tablename__ = "discovery_evidence_snapshots"
+    __table_args__ = (
+        Index("discovery_evidence_snapshots_hash_idx", "snapshot_hash", unique=True),
+        Index("discovery_evidence_snapshots_created_idx", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    snapshot_hash: Mapped[str] = mapped_column("snapshot_hash", String, nullable=False)
+    math_version: Mapped[str] = mapped_column("math_version", String, nullable=False)
+    window_from: Mapped[str | None] = mapped_column("window_from", String, nullable=True)
+    window_to: Mapped[str | None] = mapped_column("window_to", String, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
 class StrategyHealthRow(Base):
     """Snapshot de salud de una estrategia ACTIVA (serie temporal de vigilancia)."""
 
