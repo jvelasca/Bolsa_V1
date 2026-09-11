@@ -2,6 +2,65 @@
 
 All notable releases of Bolsa V1.
 
+## [1.62.0-beta] — V2.37 · Hardening de V2.36 (P2-01/02/03) + Adaptive Discovery Generation — 2026-09-11
+
+Segundo incremento de **Strategy Intelligence**: cierra los tres P2 de la auditoría externa de
+`v2.36-beta` y pasa de "cuánto presupuesto recibe una familia" a **"qué hipótesis merece
+explorarse"**, sin relajar ningún gate y manteniendo el aprendizaje **fuera del hot path**.
+
+- **P2-01 — Evidencia estadística rica (LAB + posterior).** La v0 saturaba el score en 1.0
+  (`clamp(avgScore,0,1) × success_ratio`) y perdía toda la información por encima de 1. Aplicación:
+  nueva señal compuesta `discovery_evidence_v1` con componentes monótonos (`1 - exp(-x)` para el
+  `is_score`, `tanh` para el Sharpe, `1 - exp(-(pf-1))` para el profit factor, `exp(-dd/50)` para el
+  drawdown y la evidencia posterior ponderada por nivel ADR-012), combinados por media ponderada con
+  **_shrinkage_ por cobertura** hacia un ancla neutral 0.5: una métrica ausente **no** puntúa como 0
+  (ni premia la ausencia). `family_evidence_summary` agrega ahora Sharpe/PF/drawdown medios con
+  `metricCoverage` explícita y nunca inventa ceros; nuevo `posterior_evidence_summary` agrega
+  shadow/paper forward por familia vía `research_evidence` (join por `trial_id`). La **v0 se conserva
+  reproducible** (`--math-version discovery_evidence_v0`).
+- **P2-02 — Política formal exploración/explotación.** `DiscoveryBudgetAllocator` gana
+  `exploration_floor_ratio` (default 0.5): fracción mínima del presupuesto de candidatas reservada a
+  los carriles exploratorios (catálogo + gramática) que el carril `adaptive` **nunca** puede absorber.
+  Materializa el invariante "champion cannot teach itself" en el reparto. Con ratio 0 el reparto es
+  el histórico de v2.36 (test de regresión).
+- **P2-03 — Freshness y fingerprint del snapshot.** `DiscoveryEvidenceSnapshot` gana
+  `evidence_fingerprint` (huella del research dataset agregado, determinista y sin reloj) y
+  `is_fresh(now, max_staleness_days)`; la entidad documenta las **tres identidades** (`snapshot_hash`
+  = conocimiento, `id` = instancia, `created_at` = persistencia — "más nuevo" ≠ "más reciente en
+  conocimiento"). Migración aditiva **`037_discovery_evidence_freshness`** (columna nullable, sin
+  backfill, `downgrade()` completo). El worker descarta por **fail-closed** un snapshot `stale`
+  (`AUTO_ORCHESTRATOR_ADAPTIVE_MAX_STALENESS_DAYS`, default 30 días): el reparto vuelve al histórico
+  en vez de gobernar con aprendizaje viejo. `0` desactiva la validación (compatibilidad v2.36).
+- **V2.37 incremento 2 — Adaptive Discovery Generation.** Nuevo módulo de aplicación
+  `discovery_search_policy` (`SearchPolicy` determinista y versionado `discovery_search_policy_v0`):
+  convierte el prior por familia en **cuotas de emisión por familia**, repartidas en dos tramos
+  (explotación top-k por peso + exploración uniforme garantizada, `exploration_ratio` default 0.25).
+  El carril `adaptive` con cupo **emite candidatas reales** en `strategy_discovery_engine`
+  (prefijo `ADAPTIVE_FAMILY_PREFIX`), reutilizando el catálogo curado — sin añadir espacio de búsqueda
+  nuevo. Determinismo: mismo `(instrument_id, snapshot, budget)` ⇒ mismas candidatas en mismo orden;
+  el motor sigue sin consultar BD ni reloj. Fail-closed: sin política o sin snapshot ⇒ carril no emite
+  (byte-idéntico a v2.36).
+- **Rollout** — Flag nuevo `AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION` **OFF por defecto**: con OFF el
+  carril solo recibe cupo observable (v2.36). El provider de snapshot se cablea si **cualquiera** de
+  los dos flags está ON. Observabilidad aditiva: `DiscoveryEmissionSummary` gana
+  `adaptive_candidates`/`adaptive_policy_hash`/`adaptive_exploration_quota`/`adaptive_families` y los
+  contadores de ciclo/proceso suman `adaptive_candidates`/`adaptive_discoveries`.
+- **Granularidad progresiva (P2-03 del audit)** — El payload del snapshot publica un desglose
+  aditivo `familyGranularity` (régimen / región de parámetros / clase de instrumento) cuando el repo
+  los aporte, sin romper el esquema ni participar en el hash.
+- **Invariantes intactas**: `AUTO ⇒ SIMULATED`; LIVE bloqueado; sin LLM en hot path; fail-closed;
+  long-only; H1 y H2 intactos; gates CPCV/PBO/DSR/WFE/OOS + coach sin relajar; test anti-explosión
+  `len(plans) == 1784` intacto; con los flags OFF, salida **byte-idéntica a v2.36**.
+- **Tests**: `test_discovery_evidence.py` (v1 sin saturación, cobertura neutral, drawdown/PF/posterior,
+  fingerprint, suelo de exploración, cota adaptive), `test_discovery_search_policy.py` (determinismo,
+  fail-closed, exploración garantizada, emisión adaptativa dentro del presupuesto global y
+  determinista), worker (freshness fail-closed, staleness 0, flag de generación), PG (métrica rica +
+  cobertura, posterior por familia, fingerprint persistida, roundtrip `037`).
+- **Alembic head**: `037_discovery_evidence_freshness`.
+- **Verificación (local)**: `ruff` OK · `lint-imports` 4/4 · `mypy` **475 files** Success · offline
+  **1547 passed** · PG discovery/snapshot **12 passed** + snapshot detallado **10 passed** +
+  lifecycle **6 passed**.
+
 ## [1.61.0-beta] — V2.36 · Strategy Intelligence adaptativa (incremento 1: carril `adaptive`) — 2026-09-11
 
 Primer incremento de la **V2.36 Strategy Intelligence adaptativa**: cerrar el bucle
