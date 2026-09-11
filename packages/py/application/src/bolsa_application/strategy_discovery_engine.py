@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from bolsa_application.discovery_catalog import (
     DISCOVERY_FAMILIES,
@@ -48,6 +49,7 @@ from bolsa_application.discovery_grammar import (
 from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
 
 __all__ = [
+    "ADAPTIVE_FAMILY_PREFIX",
     "GRAMMAR_FAMILY_PREFIX",
     "DiscoveryBudgetAllocator",
     "DiscoveryEmissionSummary",
@@ -63,6 +65,11 @@ CandidateIdFactory = Callable[[str, int], str]
 # Prefijo de familia de las candidatas gramaticales (A14). El ``presetKey`` del plan
 # viaja como ``strategy_family`` para que ``_rules_grid_for`` pueda localizarlo.
 GRAMMAR_FAMILY_PREFIX = "grammar:"
+
+# V2.37 (incremento 2): prefijo de las candidatas emitidas por el carril adaptativo.
+# Distingue la procedencia (catálogo / gramática / adaptive) en la observabilidad y en
+# el resumen de emisión, sin colisionar con el prefijo gramatical.
+ADAPTIVE_FAMILY_PREFIX = "adaptive:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +102,13 @@ class DiscoveryEmissionSummary:
     # Cupo de trials por carril (mismo reparto explícito, solo lectura).
     catalog_trials_cap: int | None = None
     grammar_trials_cap: int | None = None
+    # V2.37 (incremento 2): emisión adaptativa real (observabilidad aditiva).
+    # ``adaptive_candidates`` cuenta las emitidas por el carril adaptativo; el resto de
+    # campos documentan la política aplicada (0/None si el carril no emitió).
+    adaptive_candidates: int = 0
+    adaptive_policy_hash: str | None = None
+    adaptive_exploration_quota: int | None = None
+    adaptive_families: int = 0
 
 
 def _default_candidate_id(instrument_id: str, family_name: str, index: int) -> str:
@@ -112,6 +126,7 @@ def discover_for_instrument_with_summary(
     bar_count: int | None = None,
     grammar_budget: GrammarBudget | None = None,
     allocator: DiscoveryBudgetAllocator | None = None,
+    search_policy: Any = None,
 ) -> tuple[tuple[StrategyCandidate, ...], DiscoveryEmissionSummary]:
     """V2.35/A15 — como ``discover_for_instrument`` pero devuelve también el resumen.
 
@@ -124,6 +139,13 @@ def discover_for_instrument_with_summary(
     secuencial dependiente del orden, sino el reparto explícito por carriles del
     ``allocator`` (``DiscoveryBudgetAllocator``). Con ``grammar_budget=None`` el
     allocator no interviene: la salida sigue siendo la histórica (A13).
+
+    V2.37 (incremento 2): ``search_policy`` (``SearchPolicy``) habilita la **emisión
+    adaptativa real** en el carril ``adaptive``: reparte su cupo entre familias del
+    catálogo según el prior de evidencia. Es una dependencia inyectada (el motor sigue
+    puro): sin política o con política vacía el carril no emite nada y la salida es la
+    de V2.36. Las candidatas adaptativas reutilizan el catálogo curado y llevan el
+    prefijo ``ADAPTIVE_FAMILY_PREFIX`` para no confundirse con catálogo ni gramática.
     """
     effective_budget = (budget or DiscoveryBudget()).normalized()
     catalog = tuple(
@@ -237,10 +259,92 @@ def discover_for_instrument_with_summary(
     else:
         bar_count_ok = True
 
+    # V2.37 (incremento 2) — emisión adaptativa real. El carril ``adaptive`` tenía cupo
+    # observable pero no emitía nada (V2.36). Con una ``SearchPolicy`` inyectada, su cupo
+    # se reparte entre familias del catálogo ponderadas por el prior de evidencia. Es
+    # determinista y fail-closed: sin política o con cupo 0 no se emite nada y la salida
+    # es la de V2.36. Las candidatas reutilizan el catálogo curado (no se añade espacio
+    # de búsqueda nuevo).
+    adaptive_candidates_count = 0
+    adaptive_policy_hash: str | None = None
+    adaptive_exploration_quota: int | None = None
+    adaptive_families_count = 0
+    if (
+        adaptive_cap
+        and int(adaptive_cap) > 0
+        and search_policy is not None
+        and not bool(getattr(search_policy, "is_empty", lambda: True)())
+    ):
+        adaptive_families_count = len(getattr(search_policy, "quotas", ()) or ())
+        adaptive_policy_hash = getattr(search_policy, "policy_hash", None)
+        adaptive_exploration_quota = int(getattr(search_policy, "exploration_quota", 0) or 0)
+        eligible = tuple(catalog)
+        by_name = {family.name: family for family in eligible}
+        quota_map = {
+            str(q.family): int(q.quota)
+            for q in getattr(search_policy, "quotas", ()) or ()
+            if int(getattr(q, "quota", 0)) > 0
+        }
+        # Orden canónico por nombre de familia: la política ya viene ordenada, pero se
+        # reordena aquí para no depender del orden de su tupla (determinismo explícito).
+        for family_name in sorted(quota_map):
+            budget_left = int(adaptive_cap) - adaptive_candidates_count
+            if budget_left <= 0:
+                break
+            adaptive_family = by_name.get(family_name)
+            if adaptive_family is None:
+                continue
+            if bar_count is not None and bar_count < int(adaptive_family.min_bars_hint):
+                continue
+            family_budget = min(quota_map[family_name], budget_left)
+            emitted_for_family = 0
+            for point in adaptive_family.param_points():
+                if emitted_for_family >= family_budget:
+                    break
+                if adaptive_candidates_count >= int(adaptive_cap):
+                    break
+                if trials_used >= effective_budget.max_trials_total:
+                    break
+                executable = adaptive_family.template(point)
+                if executable is None:
+                    continue
+                index = len(candidates)
+                cid = (
+                    candidate_id_factory(instrument_id, index)
+                    if candidate_id_factory is not None
+                    else _default_candidate_id(instrument_id, adaptive_family.name, index)
+                )
+                candidates.append(
+                    StrategyCandidate(
+                        id=str(cid),
+                        instrument_id=instrument_id,
+                        strategy_family=f"{ADAPTIVE_FAMILY_PREFIX}{adaptive_family.name}",
+                        params={
+                            "definition": executable,
+                            "discovery_family": adaptive_family.name,
+                            "discovery_parent": adaptive_family.parent,
+                            "discovery_params": dict(point),
+                            "discovery_lane": "adaptive",
+                            "search_policy_hash": adaptive_policy_hash or "",
+                        },
+                        origin="discovery",
+                        data_snapshot_id=data_snapshot_id,
+                        preset_key=str(executable.get("presetKey") or adaptive_family.name),
+                    )
+                )
+                emitted_for_family += 1
+                adaptive_candidates_count += 1
+                trials_used += 1
+
     catalog_candidates = sum(
-        1 for c in candidates if not str(c.strategy_family).startswith(GRAMMAR_FAMILY_PREFIX)
+        1
+        for c in candidates
+        if not str(c.strategy_family).startswith(GRAMMAR_FAMILY_PREFIX)
+        and not str(c.strategy_family).startswith(ADAPTIVE_FAMILY_PREFIX)
     )
-    grammar_candidates = len(candidates) - catalog_candidates
+    grammar_candidates = sum(
+        1 for c in candidates if str(c.strategy_family).startswith(GRAMMAR_FAMILY_PREFIX)
+    )
     summary = DiscoveryEmissionSummary(
         catalog_candidates=catalog_candidates,
         grammar_candidates=grammar_candidates,
@@ -255,6 +359,10 @@ def discover_for_instrument_with_summary(
         adaptive_cap=adaptive_cap,
         catalog_trials_cap=catalog_trials_cap,
         grammar_trials_cap=grammar_trials_cap,
+        adaptive_candidates=adaptive_candidates_count,
+        adaptive_policy_hash=adaptive_policy_hash,
+        adaptive_exploration_quota=adaptive_exploration_quota,
+        adaptive_families=adaptive_families_count,
     )
     return tuple(candidates), summary
 
@@ -270,6 +378,7 @@ def discover_for_instrument(
     bar_count: int | None = None,
     grammar_budget: GrammarBudget | None = None,
     allocator: DiscoveryBudgetAllocator | None = None,
+    search_policy: Any = None,
 ) -> tuple[StrategyCandidate, ...]:
     """Genera las candidatas de descubrimiento para un instrumento.
 
@@ -306,6 +415,7 @@ def discover_for_instrument(
         bar_count=bar_count,
         grammar_budget=grammar_budget,
         allocator=allocator,
+        search_policy=search_policy,
     )
     return candidates
 
@@ -400,6 +510,7 @@ def discover_candidates(
     bar_count: int | None = None,
     grammar_budget: GrammarBudget | None = None,
     allocator: DiscoveryBudgetAllocator | None = None,
+    search_policy: Any = None,
 ) -> tuple[StrategyCandidate, ...]:
     """Alias público estable de ``discover_for_instrument`` (nombre del motor)."""
     return discover_for_instrument(
@@ -412,6 +523,7 @@ def discover_candidates(
         bar_count=bar_count,
         grammar_budget=grammar_budget,
         allocator=allocator,
+        search_policy=search_policy,
     )
 
 
@@ -424,6 +536,7 @@ def discover_from_universe(
     bar_counts: dict[str, int] | None = None,
     grammar_budget: GrammarBudget | None = None,
     allocator: DiscoveryBudgetAllocator | None = None,
+    search_policy: Any = None,
 ) -> dict[str, tuple[StrategyCandidate, ...]]:
     """Descubre candidatas para todo un universo (útil fuera del orquestador).
 
@@ -444,5 +557,6 @@ def discover_from_universe(
             bar_count=counts.get(symbol),
             grammar_budget=grammar_budget,
             allocator=allocator,
+            search_policy=search_policy,
         )
     return out

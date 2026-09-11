@@ -89,6 +89,16 @@ AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT = "AUTO_ORCHESTRATOR_ALLOCATOR_ADAPT
 # (histórico 0.0) y el ciclo es byte-idéntico a v2.35.1. Con ON, el worker lee UNA vez
 # por ciclo el snapshot vigente (fail-closed: sin snapshot ⇒ 0.0) y lo inyecta.
 AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR = "AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR"
+# V2.37/P2-03: vigencia máxima (días) del corte ``window_to`` del snapshot. Un snapshot
+# más antiguo es *stale* y se descarta (fail-closed ⇒ peso adaptativo 0), en vez de
+# gobernar el reparto indefinidamente con aprendizaje viejo. 0 = desactiva la validación
+# (compatibilidad estricta con v2.36), pero el default es conservador.
+AUTO_ORCHESTRATOR_ADAPTIVE_MAX_STALENESS_DAYS = "AUTO_ORCHESTRATOR_ADAPTIVE_MAX_STALENESS_DAYS"
+_ADAPTIVE_MAX_STALENESS_DAYS_DEFAULT = 30
+# V2.37 (incremento 2): emisión adaptativa real gobernada por la search policy. OFF por
+# defecto: con OFF el carril adaptive solo recibe cupo observable (v2.36), sin emitir
+# candidatas nuevas.
+AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION = "AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION"
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
 _SHADOW_WINDOW_BARS_DEFAULT = 250
@@ -168,6 +178,31 @@ def adaptive_allocator_enabled() -> bool:
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR))
 
 
+def adaptive_generation_enabled() -> bool:
+    """V2.37 (incremento 2): ¿el carril ``adaptive`` EMITE candidatas? (OFF).
+
+    OFF por defecto: con OFF el incremento 2 no cambia nada (el carril sigue recibiendo
+    cupo observable pero sin emitir; comportamiento v2.36). Con ON, el cupo adaptativo se
+    reparte entre familias según la ``SearchPolicy`` derivada del snapshot vigente.
+    """
+    return _truthy(os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION))
+
+
+def adaptive_max_staleness_days() -> int:
+    """V2.37/P2-03: días máximos de antigüedad del corte ``window_to`` (default 30).
+
+    ``0`` o negativo desactiva la validación de freshness (compatibilidad v2.36).
+    """
+    raw = (os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_MAX_STALENESS_DAYS) or "").strip()
+    if not raw:
+        return _ADAPTIVE_MAX_STALENESS_DAYS_DEFAULT
+    try:
+        value = int(raw)
+    except ValueError:
+        return _ADAPTIVE_MAX_STALENESS_DAYS_DEFAULT
+    return max(0, value)
+
+
 def _int_env(name: str, default: int) -> int:
     raw = (os.getenv(name) or "").strip()
     if not raw:
@@ -199,6 +234,17 @@ def _grammar_budget(discovery_budget: Any) -> Any:
         max_components=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS, 3),
         max_per_component_variant=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS, 4),
     )
+
+
+def _catalog_families() -> tuple[Any, ...]:
+    """Familias del catálogo curado (V2.37): universo elegible de la search policy.
+
+    La emisión adaptativa reutiliza el catálogo existente (no añade espacio de búsqueda
+    nuevo); se excluyen las familias que la gramática ya cubre para no duplicar hipótesis.
+    """
+    from bolsa_application.discovery_catalog import DISCOVERY_FAMILIES
+
+    return tuple(DISCOVERY_FAMILIES)
 
 
 def _discovery_allocator(adaptive_snapshot: Any = None) -> Any:
@@ -248,6 +294,9 @@ class GrammarObservabilityCounters:
     total_candidates: int = 0
     trials_used: int = 0
     warmup_skipped: int = 0
+    # V2.37 (incremento 2): emisión adaptativa real (observabilidad, solo lectura).
+    adaptive_candidates: int = 0
+    adaptive_discoveries: int = 0
 
 
 @dataclass(slots=True)
@@ -267,6 +316,9 @@ class CycleGrammarCounters:
     total_candidates: int = 0
     trials_used: int = 0
     warmup_skipped: int = 0
+    # V2.37 (incremento 2): emisión adaptativa real (observabilidad, solo lectura).
+    adaptive_candidates: int = 0
+    adaptive_discoveries: int = 0
 
 
 _PROCESS_COUNTERS = GrammarObservabilityCounters()
@@ -315,6 +367,11 @@ def _accumulate(counters: CycleGrammarCounters | GrammarObservabilityCounters, s
     counters.trials_used += int(getattr(summary, "trials_used", 0))
     if not bool(getattr(summary, "bar_count_ok", True)):
         counters.warmup_skipped += 1
+    # V2.37 (incremento 2): emisión adaptativa real (observabilidad aditiva).
+    adaptive_emitted = int(getattr(summary, "adaptive_candidates", 0))
+    counters.adaptive_candidates += adaptive_emitted
+    if adaptive_emitted > 0:
+        counters.adaptive_discoveries += 1
 
 
 def _record_discovery_summary(summary: Any) -> None:
@@ -437,6 +494,28 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
             return None
         return adaptive_snapshot[0]
 
+    def _current_search_policy() -> Any:
+        # V2.37 (incremento 2): con la generación adaptativa OFF la política es None y el
+        # carril no emite nada (comportamiento v2.36). Con ON se deriva del mismo snapshot
+        # del ciclo, usando el cupo que el allocator concede al carril adaptativo.
+        if not adaptive_generation_enabled():
+            return None
+        snapshot = _current_snapshot()
+        if snapshot is None or not enabled:
+            return None
+        try:
+            from bolsa_application.discovery_search_policy import build_search_policy
+
+            adaptive_cap = _discovery_allocator(snapshot).allocate(budget)["adaptive"].candidates
+            return build_search_policy(
+                snapshot,
+                adaptive_cap=adaptive_cap,
+                available_families=[family.name for family in _catalog_families()],
+            )
+        except Exception:  # noqa: BLE001 — sin política no se emite; nunca se inventa.
+            logger.exception("auto_orchestrator search policy build failed")
+            return None
+
     def _discover(instrument_id: str) -> tuple[Any, ...]:
         allocator = None
         if enabled:
@@ -446,21 +525,24 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
             budget=budget,
             grammar_budget=grammar_budget,
             allocator=allocator,
+            search_policy=_current_search_policy(),
         )
         _record_discovery_summary(summary)
         logger.info(
             "auto_orchestrator discovery instrument=%s grammar_enabled=%s "
-            "catalog=%s grammar=%s total=%s trials=%s catalog_cap=%s grammar_cap=%s "
-            "adaptive_cap=%s bar_count_ok=%s",
+            "catalog=%s grammar=%s adaptive=%s total=%s trials=%s catalog_cap=%s "
+            "grammar_cap=%s adaptive_cap=%s policy_hash=%s bar_count_ok=%s",
             instrument_id,
             summary.grammar_enabled,
             summary.catalog_candidates,
             summary.grammar_candidates,
+            summary.adaptive_candidates,
             summary.total_candidates,
             summary.trials_used,
             summary.catalog_cap,
             summary.grammar_cap,
             summary.adaptive_cap,
+            summary.adaptive_policy_hash,
             summary.bar_count_ok,
         )
         return candidates
@@ -531,17 +613,34 @@ async def _refresh_adaptive_snapshot(
     except Exception:  # noqa: BLE001 — sin snapshot no hay señal; peso 0.
         logger.exception("auto_orchestrator adaptive snapshot refresh failed")
         return
-    if snapshot is not None:
-        holder.append(snapshot)
-        logger.info(
-            "auto_orchestrator adaptive_snapshot hash=%s adaptive_weight=%s",
-            snapshot.snapshot_hash,
-            snapshot.adaptive_weight(),
-        )
-    else:
+    if snapshot is None:
         logger.info(
             "auto_orchestrator adaptive_snapshot ausente — adaptive_weight=0.0"
         )
+        return
+    # V2.37/P2-03: freshness fail-closed. Un snapshot con el corte ``window_to`` más
+    # antiguo que la ventana configurada se descarta: el reparto vuelve al histórico
+    # (catálogo + gramática) en lugar de gobernar con aprendizaje stale.
+    max_staleness = adaptive_max_staleness_days()
+    if max_staleness > 0 and not snapshot.is_fresh(
+        now=datetime.now(UTC).isoformat(), max_staleness_days=max_staleness
+    ):
+        logger.warning(
+            "auto_orchestrator adaptive_snapshot STALE hash=%s window_to=%s "
+            "max_staleness_days=%s — adaptive_weight=0.0",
+            snapshot.snapshot_hash,
+            snapshot.window_to,
+            max_staleness,
+        )
+        return
+    holder.append(snapshot)
+    logger.info(
+        "auto_orchestrator adaptive_snapshot hash=%s fingerprint=%s "
+        "adaptive_weight=%s",
+        snapshot.snapshot_hash,
+        snapshot.evidence_fingerprint,
+        snapshot.adaptive_weight(),
+    )
 
 
 def _make_shadow_bars_provider(session_factory: Any) -> Any:
@@ -800,24 +899,30 @@ async def auto_orchestrator_loop(
         logger.info(
             "auto_orchestrator cycle_summary cycle_id=%s instruments=%s "
             "grammar_discoveries=%s catalog_candidates=%s grammar_candidates=%s "
+            "adaptive_candidates=%s adaptive_discoveries=%s "
             "total_candidates=%s warmup_skipped=%s",
             cycle_id,
             len(watch),
             cycle.grammar_discovery_calls,
             cycle.catalog_candidates,
             cycle.grammar_candidates,
+            cycle.adaptive_candidates,
+            cycle.adaptive_discoveries,
             cycle.total_candidates,
             cycle.warmup_skipped,
         )
         logger.info(
             "auto_orchestrator process_summary cycle_id=%s "
             "discovery_calls=%s grammar_discoveries=%s catalog_candidates=%s "
-            "grammar_candidates=%s total_candidates=%s warmup_skipped=%s",
+            "grammar_candidates=%s adaptive_candidates=%s adaptive_discoveries=%s "
+            "total_candidates=%s warmup_skipped=%s",
             cycle_id,
             process.discovery_calls,
             process.grammar_discovery_calls,
             process.catalog_candidates,
             process.grammar_candidates,
+            process.adaptive_candidates,
+            process.adaptive_discoveries,
             process.total_candidates,
             process.warmup_skipped,
         )
@@ -860,7 +965,8 @@ def start_auto_orchestrator(
     # bucle no lee la BD y el peso adaptativo es el histórico 0.0 (byte-idéntico).
     adaptive_snapshot_provider = (
         _make_adaptive_snapshot_provider(session_factory)
-        if session_factory is not None and adaptive_allocator_enabled()
+        if session_factory is not None
+        and (adaptive_allocator_enabled() or adaptive_generation_enabled())
         else None
     )
     return asyncio.create_task(

@@ -24,7 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_domain.entities.discovery_evidence_snapshot import (
-    MATH_VERSION_DISCOVERY_EVIDENCE_V0,
+    MATH_VERSION_DISCOVERY_EVIDENCE_V1,
     DiscoveryEvidenceSnapshot,
 )
 from bolsa_infrastructure.database.repositories.discovery_evidence_snapshot_repository import (
@@ -83,19 +83,21 @@ def _snapshot(snapshot_hash: str, *, adaptive_weight: float = 0.4) -> DiscoveryE
     return DiscoveryEvidenceSnapshot(
         id="",
         snapshot_hash=snapshot_hash,
-        math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V0,
+        math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V1,
         window_from="2026-01-01T00:00:00+00:00",
         window_to="2026-09-11T00:00:00+00:00",
         family_weights={"sma": 1.0},
         lane_weights={"adaptive": adaptive_weight, "catalog": 2.0},
         sample_sizes={"sma": 10},
         payload={
-            "mathVersion": MATH_VERSION_DISCOVERY_EVIDENCE_V0,
+            "mathVersion": MATH_VERSION_DISCOVERY_EVIDENCE_V1,
             "familyWeights": {"sma": 1.0},
             "laneWeights": {"adaptive": adaptive_weight, "catalog": 2.0},
             "sampleSizes": {"sma": 10},
+            "evidenceFingerprint": "sha256:fp-test",
         },
         created_at="2026-09-11T00:00:00+00:00",
+        evidence_fingerprint="sha256:fp-test",
     )
 
 
@@ -220,9 +222,149 @@ async def test_family_evidence_summary_aggregates_by_preset(pg_session: AsyncSes
     assert len(match) == 1
     assert match[0]["trials"] == 2
     assert match[0]["zeroTrade"] == 1
+    # V2.37/P2-01: cobertura de métricas explícita (nunca se inventa 0).
+    assert "metricCoverage" in match[0]
+    assert match[0]["metricCoverage"]["sharpeRatio"] == 0
+    assert match[0]["avgSharpe"] is None
     # Orden canónico por presetKey (reproducibilidad del snapshot).
     keys = [r["presetKey"] for r in rows]
     assert keys == sorted(keys)
+
+
+@pytest.mark.asyncio
+async def test_family_evidence_summary_aggregates_rich_metrics(pg_session: AsyncSession) -> None:
+    """V2.37/P2-01: Sharpe, profit factor y drawdown medios por familia (cobertura)."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
+    instrument_id = f"inst_v237_{uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    pg_session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"V237{uuid4().hex[:5].upper()}",
+            yahoo_symbol=f"V237{uuid4().hex[:5]}",
+            name="V237 test",
+            exchange="MCE",
+            currency="EUR",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    preset = f"v237_family_{uuid4().hex[:8]}"
+    pg_session.add_all(
+        [
+            ResearchTrialRow(
+                id=f"trial_{uuid4().hex[:12]}",
+                instrument_id=instrument_id,
+                preset_key=preset,
+                params={},
+                is_metrics={
+                    "tradeCount": 10,
+                    "sharpeRatio": 2.0,
+                    "profitFactor": 2.0,
+                    "maxDrawdownPct": 10.0,
+                },
+                proposed_by="test",
+                created_at=now,
+            ),
+            ResearchTrialRow(
+                id=f"trial_{uuid4().hex[:12]}",
+                instrument_id=instrument_id,
+                preset_key=preset,
+                params={},
+                is_metrics={"tradeCount": 8},
+                proposed_by="test",
+                created_at=now,
+            ),
+        ]
+    )
+    await pg_session.flush()
+
+    repo = SqlAlchemyResearchTrialRepository(pg_session)
+    rows = await repo.family_evidence_summary()
+    match = [r for r in rows if r["presetKey"] == preset]
+    assert len(match) == 1
+    assert match[0]["avgSharpe"] == 2.0
+    assert match[0]["avgProfitFactor"] == 2.0
+    assert match[0]["avgMaxDrawdownPct"] == 10.0
+    # Cobertura: solo uno de los dos trials traía las métricas.
+    assert match[0]["metricCoverage"]["sharpeRatio"] == 1
+    assert match[0]["metricCoverage"]["profitFactor"] == 1
+
+
+@pytest.mark.asyncio
+async def test_posterior_evidence_summary_by_family(pg_session: AsyncSession) -> None:
+    """V2.37/P2-01: evidencia posterior (shadow/paper) agregada por familia y nivel."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models import (
+        InstrumentRow,
+        ResearchEvidenceRow,
+        ResearchTrialRow,
+    )
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
+    instrument_id = f"inst_v237p_{uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    pg_session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"V237P{uuid4().hex[:4].upper()}",
+            yahoo_symbol=f"V237P{uuid4().hex[:4]}",
+            name="V237 posterior test",
+            exchange="MCE",
+            currency="EUR",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    preset = f"v237_post_{uuid4().hex[:8]}"
+    trial_id = f"trial_{uuid4().hex[:12]}"
+    pg_session.add(
+        ResearchTrialRow(
+            id=trial_id,
+            instrument_id=instrument_id,
+            preset_key=preset,
+            params={},
+            is_metrics={"tradeCount": 5},
+            proposed_by="test",
+            created_at=now,
+        )
+    )
+    await pg_session.flush()
+    pg_session.add(
+        ResearchEvidenceRow(
+            id=f"ev_{uuid4().hex[:12]}",
+            instrument_id=instrument_id,
+            trial_id=trial_id,
+            level="A",
+            source="holdout",
+            evidence_weight=1.0,
+            summary={},
+            created_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    repo = SqlAlchemyResearchTrialRepository(pg_session)
+    posterior = await repo.posterior_evidence_summary()
+    assert preset in posterior
+    assert posterior[preset]["posteriorCount"] == 1.0
+    # Nivel A ⇒ peso 1.0 × evidence_weight 1.0.
+    assert posterior[preset]["posteriorWeighted"] == 1.0
 
 
 @pytest.mark.asyncio
@@ -275,6 +417,74 @@ async def test_batch_job_is_idempotent_by_hash(pg_session: AsyncSession) -> None
 
 
 @pytest.mark.asyncio
+async def test_fingerprint_persists_and_roundtrips(pg_session: AsyncSession) -> None:
+    """V2.37/P2-03: la huella del dataset se persiste y vuelve a leerse."""
+    repo = SqlAlchemyDiscoveryEvidenceSnapshotRepository(pg_session)
+    await repo.save(_snapshot("sha256:itest-fp"))
+    await pg_session.flush()
+    loaded = await repo.get_by_hash("sha256:itest-fp")
+    assert loaded is not None
+    assert loaded.evidence_fingerprint == "sha256:fp-test"
+    column = (
+        await pg_session.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema='public' AND table_name='discovery_evidence_snapshots' "
+                "AND column_name='evidence_fingerprint'"
+            )
+        )
+    ).scalar_one_or_none()
+    assert column is not None
+
+
+@pytest.mark.asyncio
+async def test_migration_037_roundtrip(pg_session: AsyncSession) -> None:
+    """``downgrade``/``upgrade`` de la 037 dejan la columna como estaba."""
+    pytest.importorskip("alembic")
+    from alembic import command
+    from sqlalchemy import create_engine
+
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.migrations import _alembic_config, alembic_head
+
+    settings = get_settings()
+    url = settings.database_url
+    assert url is not None
+    url = url.replace("postgresql://", "postgresql+psycopg://", 1).split("?", 1)[0]
+    engine = create_engine(url)
+    cfg = _alembic_config()
+
+    def _column_present(connection: object) -> bool:
+        row = connection.execute(  # type: ignore[attr-defined]
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema='public' "
+                "AND table_name='discovery_evidence_snapshots' "
+                "AND column_name='evidence_fingerprint'"
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+    try:
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.downgrade(cfg, "036_discovery_evidence_snapshots")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _column_present(connection) is False
+
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.upgrade(cfg, "head")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _column_present(connection) is True
+        assert alembic_head() == "037_discovery_evidence_freshness"
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_migration_036_roundtrip(pg_session: AsyncSession) -> None:
     """``downgrade``/``upgrade`` de la 036 dejan el esquema como estaba.
 
@@ -319,6 +529,6 @@ async def test_migration_036_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _table_present(connection) is True
-        assert alembic_head() == "036_discovery_evidence_snapshots"
+        assert alembic_head() == "037_discovery_evidence_freshness"
     finally:
         engine.dispose()

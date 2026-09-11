@@ -29,6 +29,7 @@ obligatorios, ``template`` devuelve ``None`` y el punto no se convierte en candi
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -785,6 +786,20 @@ class DiscoveryBudgetAllocator:
     grammar_simple_min: int = 1
     grammar_composite_min: int = 0
     adaptive_min: int = 0
+    # V2.37/P2-02 — suelo de EXPLORACIÓN (anti auto-refuerzo del champion).
+    #
+    # Política formal exploración/explotación: el carril adaptativo (explotación) NUNCA
+    # puede absorber el presupuesto de exploración. ``exploration_floor_ratio`` es la
+    # fracción MÍNIMA del presupuesto global de candidatas que se reserva a los carriles
+    # exploratorios (catálogo + gramática) antes de que el adaptive pueda tomar su parte.
+    #
+    # Esto convierte la cota de peso existente (``max_adaptive_weight``) en una política
+    # explícita: aunque el prior adaptativo sea muy alto, siempre queda espacio de
+    # exploración. Sin él, una familia con suerte recibiría más presupuesto, generaría más
+    # evidencia sobre sí misma y se auto-reforzaría ("champion cannot teach itself").
+    #
+    # ``0.0`` = política desactivada (comportamiento histórico v2.36).
+    exploration_floor_ratio: float = 0.5
 
     def normalized(self) -> DiscoveryBudgetAllocator:
         """Clamp defensivo: pesos/pisos no negativos (sin NaN/negativos)."""
@@ -805,6 +820,15 @@ class DiscoveryBudgetAllocator:
                 return 0
             return max(0, number)
 
+        def _r(value: float) -> float:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return 0.0
+            if number != number or number < 0:  # NaN o negativo ⇒ 0 (fail-safe)
+                return 0.0
+            return min(1.0, number)
+
         return DiscoveryBudgetAllocator(
             catalog_weight=_w(self.catalog_weight),
             grammar_simple_weight=_w(self.grammar_simple_weight),
@@ -814,6 +838,7 @@ class DiscoveryBudgetAllocator:
             grammar_simple_min=_m(self.grammar_simple_min),
             grammar_composite_min=_m(self.grammar_composite_min),
             adaptive_min=_m(self.adaptive_min),
+            exploration_floor_ratio=_r(self.exploration_floor_ratio),
         )
 
     # Orden canónico de desempate (no alfabético): catálogo, gramática simple,
@@ -935,10 +960,52 @@ class DiscoveryBudgetAllocator:
             candidates[donor] -= 1
             candidates[lane] = 1
 
+        # V2.37/P2-02 — suelo de EXPLORACIÓN (política formal anti auto-refuerzo).
+        # El carril adaptativo (explotación) no puede comerse la exploración: se reserva
+        # ``exploration_floor_ratio`` del presupuesto global de candidatas a los carriles
+        # exploratorios (catálogo + gramática). Si el adaptive quedó por encima de su techo
+        # permitido, la diferencia se devuelve a exploración (determinista, por orden de
+        # carril). Con ``exploration_floor_ratio == 0`` la política está desactivada y el
+        # reparto es el histórico.
+        floor_ratio = float(self_norm.exploration_floor_ratio)
+        if floor_ratio > 0 and total_candidates > 0:
+            exploration_lanes = (
+                CatalogLane.NAME,
+                GrammarLane.SIMPLE,
+                GrammarLane.COMPOSITE,
+            )
+            floor = int(math.ceil(total_candidates * floor_ratio))
+            exploration_total = sum(candidates[lane] for lane in exploration_lanes)
+            shortfall = max(0, floor - exploration_total)
+            adaptive_excess = max(0, candidates["adaptive"] - (total_candidates - floor))
+            for _ in range(min(shortfall, adaptive_excess)):
+                if candidates["adaptive"] <= 0:
+                    break
+                candidates["adaptive"] -= 1
+                # Devuelve la candidata al carril exploratorio con más peso (y, en
+                # empate, al primero del orden canónico): determinista.
+                donor = max(
+                    exploration_lanes,
+                    key=lambda lane: (weights[lane], -self._TIE_ORDER.index(lane)),
+                )
+                candidates[donor] += 1
+
         return {
             lane: LaneAllocation(candidates=int(candidates[lane]), trials=int(trials[lane]))
             for lane in lanes
         }
+
+    def exploration_floor_candidates(self, budget: DiscoveryBudget) -> int:
+        """Candidatas mínimas reservadas a exploración (catálogo + gramática).
+
+        Política formal V2.37/P2-02: ``ceil(max_candidates * exploration_floor_ratio)``.
+        Con la política desactivada (ratio 0) devuelve 0. Determinista.
+        """
+        effective = budget.normalized()
+        ratio = self.normalized().exploration_floor_ratio
+        if ratio <= 0:
+            return 0
+        return int(math.ceil(int(effective.max_candidates) * ratio))
 
     def normalized_weights(self) -> dict[str, float]:
         """Pesos normalizados (suman 1.0) para observabilidad/auditoría; no reparte.

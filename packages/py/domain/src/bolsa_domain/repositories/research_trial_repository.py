@@ -85,3 +85,11 @@ class ResearchTrialRepository(Protocol):
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> list[dict[str, Any]]: ...
+
+    async def posterior_evidence_summary(
+        self,
+        *,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        levels: tuple[str, ...] = ("A", "B", "C", "D"),
+    ) -> dict[str, dict[str, float]]: ...

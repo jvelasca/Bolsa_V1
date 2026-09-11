@@ -774,22 +774,26 @@ def test_default_orchestrator_is_sim_only() -> None:
 # ── V2.36 (incremento 1): carril adaptativo alimentado por snapshot ─────────────
 
 
-def _snapshot(adaptive_weight: float) -> Any:
+def _snapshot(adaptive_weight: float, *, window_to: str | None = None) -> Any:
+    from datetime import UTC, datetime
+
     from bolsa_domain.entities.discovery_evidence_snapshot import (
         DiscoveryEvidenceSnapshot,
     )
 
+    fresh_to = window_to or datetime.now(UTC).isoformat()
     return DiscoveryEvidenceSnapshot(
         id="snap-1",
         snapshot_hash="sha256:abc",
-        math_version="discovery_evidence_v0",
+        math_version="discovery_evidence_v1",
         window_from="a",
-        window_to="b",
+        window_to=fresh_to,
         family_weights={"sma": 1.0},
         lane_weights={"adaptive": adaptive_weight},
         sample_sizes={"sma": 10},
         payload={},
         created_at="2026-09-11T00:00:00+00:00",
+        evidence_fingerprint="sha256:fp",
     )
 
 
@@ -947,6 +951,78 @@ async def test_refresh_adaptive_snapshot_fail_closed_on_provider_error() -> None
 
     await w._refresh_adaptive_snapshot(orch, _boom)
     assert orch.adaptive_snapshot_holder == []
+
+
+# ── V2.37/P2-03 — freshness fail-closed ─────────────────────────────────────────
+
+
+def test_adaptive_max_staleness_defaults_to_30_days(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_MAX_STALENESS_DAYS, raising=False)
+    assert w.adaptive_max_staleness_days() == 30
+
+
+def test_adaptive_max_staleness_zero_disables_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_MAX_STALENESS_DAYS, "0")
+    assert w.adaptive_max_staleness_days() == 0
+
+
+@pytest.mark.asyncio
+async def test_stale_snapshot_is_discarded_fail_closed() -> None:
+    """Un snapshot con corte antiguo NO gobierna el reparto (peso 0)."""
+    orch = _FakeOrchestrator()
+    orch.adaptive_snapshot_holder = []
+    stale = _snapshot(0.4, window_to="2020-01-01T00:00:00+00:00")
+
+    async def _provider() -> Any:
+        return stale
+
+    await w._refresh_adaptive_snapshot(orch, _provider)
+    assert orch.adaptive_snapshot_holder == []
+
+
+@pytest.mark.asyncio
+async def test_staleness_check_disabled_accepts_old_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con la validación desactivada (0) el snapshot antiguo sí se inyecta (compat)."""
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_MAX_STALENESS_DAYS, "0")
+    orch = _FakeOrchestrator()
+    orch.adaptive_snapshot_holder = []
+    stale = _snapshot(0.4, window_to="2020-01-01T00:00:00+00:00")
+
+    async def _provider() -> Any:
+        return stale
+
+    await w._refresh_adaptive_snapshot(orch, _provider)
+    assert len(orch.adaptive_snapshot_holder) == 1
+
+
+# ── V2.37 (incremento 2) — flag de generación adaptativa ─────────────────────────
+
+
+def test_adaptive_generation_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION, raising=False)
+    assert w.adaptive_generation_enabled() is False
+
+
+def test_adaptive_generation_truthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION, "1")
+    assert w.adaptive_generation_enabled() is True
+
+
+def test_discovery_runner_emits_no_adaptive_without_generation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con la generación OFF, el runner no construye política (carril sin emitir)."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION, raising=False)
+    holder: list[Any] = [_snapshot(0.5)]
+    runner = w._make_discovery_runner(
+        DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40),
+        holder,
+    )
+    assert callable(runner)
 
 
 def test_start_does_not_wire_adaptive_provider_when_disabled() -> None:

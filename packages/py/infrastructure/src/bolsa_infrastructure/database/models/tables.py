@@ -2426,6 +2426,10 @@ class DiscoveryEvidenceSnapshotRow(Base):
     math_version: Mapped[str] = mapped_column("math_version", String, nullable=False)
     window_from: Mapped[str | None] = mapped_column("window_from", String, nullable=True)
     window_to: Mapped[str | None] = mapped_column("window_to", String, nullable=True)
+    # V2.37/P2-03: huella del dataset de evidencia agregada (nullable: snapshots v0).
+    evidence_fingerprint: Mapped[str | None] = mapped_column(
+        "evidence_fingerprint", String, nullable=True
+    )
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 

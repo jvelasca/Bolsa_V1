@@ -28,6 +28,10 @@ import asyncio
 import json
 import sys
 
+from bolsa_domain.entities.discovery_evidence_snapshot import (
+    MATH_VERSION_DISCOVERY_EVIDENCE_V1,
+)
+
 # psycopg async no soporta ProactorEventLoop en Windows: se selecciona el bucle
 # Selector igual que hacen los tests de infraestructura, para que el job pueda usar
 # el engine async de SQLAlchemy en Windows.
@@ -37,6 +41,7 @@ if sys.platform == "win32":
 DEFAULT_MAX_ADAPTIVE_WEIGHT = 0.5
 DEFAULT_MIN_SAMPLES = 3
 DEFAULT_MIN_TOTAL_SAMPLES = 12
+DEFAULT_MATH_VERSION = MATH_VERSION_DISCOVERY_EVIDENCE_V1
 
 
 async def build_and_persist(
@@ -47,6 +52,7 @@ async def build_and_persist(
     min_samples: int = DEFAULT_MIN_SAMPLES,
     min_total_samples: int = DEFAULT_MIN_TOTAL_SAMPLES,
     max_adaptive_weight: float = DEFAULT_MAX_ADAPTIVE_WEIGHT,
+    math_version: str = MATH_VERSION_DISCOVERY_EVIDENCE_V1,
 ) -> dict[str, object]:
     """Lee evidencia, construye el snapshot y (si no es dry-run) lo persiste.
 
@@ -82,6 +88,15 @@ async def build_and_persist(
             aggregates = await trials.family_evidence_summary(
                 date_from=window_from, date_to=window_to
             )
+            # V2.37/P2-01: evidencia posterior (shadow / paper forward) por familia.
+            posterior = await trials.posterior_evidence_summary(
+                date_from=window_from, date_to=window_to
+            )
+            merged: list[dict[str, object]] = []
+            for row in aggregates:
+                family = str(row.get("presetKey") or "")
+                extra = posterior.get(family, {})
+                merged.append({**row, **extra})
             resolved_to = window_to or await trials.latest_trial_at()
             now = datetime.now(UTC).isoformat()
             snapshot = build_discovery_evidence_snapshot(
@@ -89,10 +104,12 @@ async def build_and_persist(
                 created_at=now,
                 window_from=window_from or "",
                 window_to=resolved_to or "",
-                aggregates=aggregates,
+                aggregates=merged,
                 min_samples=min_samples,
                 min_total_samples=min_total_samples,
                 max_adaptive_weight=max_adaptive_weight,
+                math_version=math_version,
+                posterior_cut=resolved_to or "",
             )
             persisted = False
             if not dry_run:
@@ -105,6 +122,7 @@ async def build_and_persist(
             return {
                 "snapshotHash": snapshot.snapshot_hash,
                 "mathVersion": snapshot.math_version,
+                "evidenceFingerprint": snapshot.evidence_fingerprint,
                 "windowFrom": snapshot.window_from,
                 "windowTo": snapshot.window_to,
                 "laneWeights": snapshot.lane_weights,
@@ -134,6 +152,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--min-samples", type=int, default=DEFAULT_MIN_SAMPLES)
     parser.add_argument("--min-total-samples", type=int, default=DEFAULT_MIN_TOTAL_SAMPLES)
     parser.add_argument("--max-adaptive-weight", type=float, default=DEFAULT_MAX_ADAPTIVE_WEIGHT)
+    parser.add_argument(
+        "--math-version",
+        default=DEFAULT_MATH_VERSION,
+        help="Versión de la fórmula (default: la v1 compuesta; usa discovery_evidence_v0 para audit histórico).",
+    )
     return parser.parse_args(argv)
 
 
@@ -147,6 +170,7 @@ def main(argv: list[str] | None = None) -> int:
             min_samples=args.min_samples,
             min_total_samples=args.min_total_samples,
             max_adaptive_weight=args.max_adaptive_weight,
+            math_version=args.math_version,
         )
     )
     # ASCII-only: evita UnicodeEncodeError (cp1252) al capturar stdout por pipe.

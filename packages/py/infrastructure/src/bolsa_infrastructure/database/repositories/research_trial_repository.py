@@ -7,7 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.expression import ColumnElement
 
 from bolsa_domain.entities.research_trial import ResearchTrial
-from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
+from bolsa_infrastructure.database.models import (
+    InstrumentRow,
+    ResearchEvidenceRow,
+    ResearchTrialRow,
+)
 from bolsa_infrastructure.ids import new_id
 
 ResearchTrialSort = Literal[
@@ -367,18 +371,21 @@ class SqlAlchemyResearchTrialRepository:
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> list[dict[str, Any]]:
-        """V2.36 (incremento 1): agrega la evidencia de laboratorio **por familia H0**.
+        """V2.36 (incremento 1) + V2.37/P2-01: agrega la evidencia del LAB por familia H0.
 
         Devuelve, por ``preset_key`` (familia normalizada), un resumen determinista con
-        el número de trials, el score medio/máximo, el Sharpe medio y el número de
-        trials sin operaciones o fallidos. Es la materia prima del snapshot que alimenta
-        el carril ``adaptive`` del allocator (ver
-        ``bolsa_application.discovery_evidence``).
+        el número de trials, el score medio/máximo, y —desde V2.37— la **cobertura
+        completa** de métricas ya persistidas en ``is_metrics`` que la señal compuesta
+        del snapshot necesita: Sharpe, profit factor y drawdown máximos medios. Las
+        métricas ausentes se devuelven como ``None`` (nunca 0: un dato ausente no es un
+        mal dato) y su cobertura se reporta en ``metricCoverage``.
 
         Orden canónico por ``preset_key`` ascendente para que el resultado sea
         reproducible con independencia del plan de ejecución de la BD. Solo lectura.
         """
         sharpe = self._metric_float("sharpeRatio")
+        profit_factor = self._metric_float("profitFactor")
+        max_dd = self._metric_float("maxDrawdownPct")
         trade_count = cast(ResearchTrialRow.is_metrics["tradeCount"].as_string(), Float)
 
         filters = []
@@ -395,6 +402,11 @@ class SqlAlchemyResearchTrialRepository:
                 func.avg(ResearchTrialRow.is_score).label("avg_score"),
                 func.max(ResearchTrialRow.is_score).label("best_score"),
                 func.avg(sharpe).label("avg_sharpe"),
+                func.avg(profit_factor).label("avg_profit_factor"),
+                func.avg(max_dd).label("avg_max_dd"),
+                func.count(sharpe).label("sharpe_n"),
+                func.count(profit_factor).label("profit_factor_n"),
+                func.count(max_dd).label("max_dd_n"),
                 func.sum(
                     case((and_(trade_count.isnot(None), trade_count == 0.0), 1), else_=0)
                 ).label("zero_trade"),
@@ -427,11 +439,82 @@ class SqlAlchemyResearchTrialRepository:
                 "avgScore": None if row.avg_score is None else float(row.avg_score),
                 "bestScore": None if row.best_score is None else float(row.best_score),
                 "avgSharpe": None if row.avg_sharpe is None else float(row.avg_sharpe),
+                "avgProfitFactor": None
+                if row.avg_profit_factor is None
+                else float(row.avg_profit_factor),
+                "avgMaxDrawdownPct": None if row.avg_max_dd is None else float(row.avg_max_dd),
+                "metricCoverage": {
+                    "sharpeRatio": int(row.sharpe_n or 0),
+                    "profitFactor": int(row.profit_factor_n or 0),
+                    "maxDrawdownPct": int(row.max_dd_n or 0),
+                },
                 "zeroTrade": int(row.zero_trade or 0),
                 "failures": int(row.failures or 0),
             }
             for row in rows
         ]
+
+    async def posterior_evidence_summary(
+        self,
+        *,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        levels: tuple[str, ...] = ("A", "B", "C", "D"),
+    ) -> dict[str, dict[str, float]]:
+        """V2.37/P2-01: evidencia **posterior** por familia (shadow / paper forward).
+
+        Agrega ``research_evidence`` por la familia H0 del trial asociado y por nivel
+        ADR-012, devolviendo por familia la suma ponderada por nivel
+        (``posteriorWeighted``), el número de evidencias (``posteriorCount``) y el
+        desglose por nivel. El join con ``research_trials`` es el único modo de atar la
+        evidencia posterior a una familia (``research_evidence`` no guarda ``preset_key``).
+
+        Solo lectura y determinista (orden canónico). Fail-closed: familias sin evidencia
+        posterior simplemente no aparecen (la señal compuesta las trata como cobertura
+        ausente, no como 0).
+        """
+        level_weight = {"A": 1.0, "B": 0.75, "C": 0.5, "D": 0.25}
+        filters = []
+        if date_from:
+            filters.append(ResearchEvidenceRow.created_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            filters.append(ResearchEvidenceRow.created_at <= datetime.fromisoformat(date_to))
+        if levels:
+            filters.append(ResearchEvidenceRow.level.in_(tuple(levels)))
+
+        weighted = func.sum(
+            ResearchEvidenceRow.evidence_weight
+            * case(
+                {level: weight for level, weight in level_weight.items()},
+                value=ResearchEvidenceRow.level,
+                else_=0.0,
+            )
+        ).label("weighted")
+        stmt = (
+            select(
+                ResearchTrialRow.preset_key.label("preset"),
+                func.count().label("n"),
+                weighted,
+            )
+            .join(ResearchTrialRow, ResearchTrialRow.id == ResearchEvidenceRow.trial_id)
+            .where(ResearchTrialRow.preset_key.isnot(None))
+            .group_by(ResearchTrialRow.preset_key)
+            .order_by(asc(ResearchTrialRow.preset_key))
+        )
+        if filters:
+            stmt = stmt.where(*filters)
+
+        rows = (await self._session.execute(stmt)).all()
+        out: dict[str, dict[str, float]] = {}
+        for row in rows:
+            family = str(row.preset or "").strip()
+            if not family:
+                continue
+            out[family] = {
+                "posteriorWeighted": float(row.weighted or 0.0),
+                "posteriorCount": float(row.n or 0),
+            }
+        return out
 
     def _metric_present(self, key: str) -> ColumnElement[bool]:
         raw = ResearchTrialRow.is_metrics[key].as_string()

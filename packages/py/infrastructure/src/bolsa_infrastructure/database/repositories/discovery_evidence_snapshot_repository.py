@@ -41,6 +41,9 @@ class SqlAlchemyDiscoveryEvidenceSnapshotRepository:
             sample_sizes=sample_sizes,
             payload=payload,
             created_at=row.created_at.isoformat(),
+            evidence_fingerprint=str(
+                payload.get("evidenceFingerprint") or row.evidence_fingerprint or ""
+            ),
         )
 
     async def save(
@@ -56,6 +59,7 @@ class SqlAlchemyDiscoveryEvidenceSnapshotRepository:
             math_version=snapshot.math_version,
             window_from=snapshot.window_from or None,
             window_to=snapshot.window_to or None,
+            evidence_fingerprint=snapshot.evidence_fingerprint or None,
             payload=snapshot.payload,
             created_at=datetime.now(UTC),
         )

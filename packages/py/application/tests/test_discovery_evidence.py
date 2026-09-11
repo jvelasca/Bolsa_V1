@@ -11,6 +11,7 @@ Certifica el builder determinista del snapshot que alimenta el carril ``adaptive
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from bolsa_application.discovery_catalog import (
@@ -22,10 +23,12 @@ from bolsa_application.discovery_evidence import (
     build_discovery_evidence_snapshot,
     compute_family_weights,
     compute_lane_weights,
+    evidence_fingerprint,
     snapshot_hash,
 )
 from bolsa_domain.entities.discovery_evidence_snapshot import (
     MATH_VERSION_DISCOVERY_EVIDENCE_V0,
+    MATH_VERSION_DISCOVERY_EVIDENCE_V1,
 )
 
 
@@ -86,8 +89,16 @@ def test_compute_family_weights_orders_canonically() -> None:
 
 def test_math_version_is_persisted() -> None:
     snapshot = _build([_agg("sma", 10)])
+    assert snapshot.math_version == MATH_VERSION_DISCOVERY_EVIDENCE_V1
+    assert snapshot.payload["mathVersion"] == MATH_VERSION_DISCOVERY_EVIDENCE_V1
+
+
+def test_v0_math_version_is_still_reproducible() -> None:
+    """La fórmula v0 se conserva para reproducir snapshots históricos."""
+    snapshot = _build([_agg("sma", 100, avg_score=1.0)], math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V0)
     assert snapshot.math_version == MATH_VERSION_DISCOVERY_EVIDENCE_V0
-    assert snapshot.payload["mathVersion"] == MATH_VERSION_DISCOVERY_EVIDENCE_V0
+    # La v0 saturaba el score en 1.0 * success_ratio(1.0) = 1.0.
+    assert snapshot.family_weights == {"sma": 1.0}
 
 
 # ── Fail-closed ─────────────────────────────────────────────────────────────────
@@ -115,7 +126,8 @@ def test_unknown_family_key_is_ignored() -> None:
     weights, samples = compute_family_weights([_agg("", 10), _agg("sma", 10)])
     assert "" not in weights
     assert "" not in samples
-    assert weights == {"sma": 1.0}
+    # v1: sin métricas opcionales, la señal es 1 - exp(-avgScore) * success_ratio.
+    assert 0.0 < weights["sma"] < 1.0
 
 
 # ── Cota ────────────────────────────────────────────────────────────────────────
@@ -203,3 +215,113 @@ def test_compute_lane_weights_fail_closed_when_total_below_threshold() -> None:
         {"sma": 1.0}, {"sma": 2}, min_total_samples=12
     )
     assert lane_weights["adaptive"] == 0.0
+
+
+# ── V2.37/P2-01 — señal v1 (sin saturación, cobertura explícita) ────────────────
+
+
+def test_v1_does_not_saturate_above_one() -> None:
+    """La v1 conserva información por encima de is_score 1.0 (la v0 la perdía)."""
+    base = _agg("sma", 100, avg_score=1.0)
+    higher = _agg("sma", 100, avg_score=1.5)
+    v1_base, _ = compute_family_weights([base], math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V1)
+    v1_higher, _ = compute_family_weights([higher], math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V1)
+    assert v1_higher["sma"] > v1_base["sma"]
+
+    v0_base, _ = compute_family_weights([base], math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V0)
+    v0_higher, _ = compute_family_weights([higher], math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V0)
+    assert v0_higher["sma"] == v0_base["sma"]  # v0 saturaba
+
+
+def test_v1_absent_metric_is_neutral_not_penalized() -> None:
+    """Una métrica ausente arrastra al ancla neutral; no puntúa como 0 ni premia."""
+    without_sharpe = _agg("sma", 100, avg_score=1.0)
+    with_good_sharpe = {**without_sharpe, "presetKey": "good", "avgSharpe": 3.0}
+    with_bad_sharpe = {**without_sharpe, "presetKey": "bad", "avgSharpe": -3.0}
+    strengths, _ = compute_family_weights(
+        [without_sharpe, with_good_sharpe, with_bad_sharpe],
+        math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V1,
+    )
+    # El dato observado manda: bueno > ausente > malo.
+    assert strengths["good"] > strengths["sma"] > strengths["bad"]
+
+
+def test_v1_drawdown_and_profit_factor_move_the_signal() -> None:
+    good = _agg("sma", 100, avg_score=1.0)
+    good.update({"avgProfitFactor": 2.0, "avgMaxDrawdownPct": 10.0})
+    bad = _agg("sma", 100, avg_score=1.0)
+    bad.update({"avgProfitFactor": 0.8, "avgMaxDrawdownPct": 80.0})
+    weights, _ = compute_family_weights(
+        [{**good, "presetKey": "good"}, {**bad, "presetKey": "bad"}],
+        math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V1,
+    )
+    assert weights["good"] > weights["bad"]
+
+
+def test_v1_posterior_evidence_raises_strength() -> None:
+    plain = _agg("sma", 100, avg_score=1.0)
+    posterior = {**plain, "presetKey": "with_posterior", "posteriorWeighted": 4.0, "posteriorCount": 4.0}
+    weights, _ = compute_family_weights(
+        [plain, posterior], math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V1
+    )
+    assert weights["with_posterior"] > weights["sma"]
+
+
+def test_v1_strength_is_bounded() -> None:
+    extreme = _agg("sma", 100, avg_score=99.0)
+    extreme.update({"avgSharpe": 99.0, "avgProfitFactor": 99.0, "avgMaxDrawdownPct": 0.0})
+    weights, _ = compute_family_weights([extreme], math_version=MATH_VERSION_DISCOVERY_EVIDENCE_V1)
+    assert 0.0 <= weights["sma"] <= 1.0
+
+
+# ── V2.37/P2-03 — fingerprint del dataset de evidencia ──────────────────────────
+
+
+def test_evidence_fingerprint_is_deterministic_and_sensitive() -> None:
+    a = [_agg("sma", 10)]
+    assert evidence_fingerprint(aggregates=a) == evidence_fingerprint(aggregates=list(a))
+    assert evidence_fingerprint(aggregates=a) != evidence_fingerprint(aggregates=[_agg("sma", 11)])
+
+
+def test_snapshot_carries_fingerprint() -> None:
+    snapshot = _build([_agg("sma", 10)])
+    assert snapshot.evidence_fingerprint.startswith("sha256:")
+    assert snapshot.payload["evidenceFingerprint"] == snapshot.evidence_fingerprint
+
+
+# ── V2.37/P2-02 — política formal exploración/explotación ───────────────────────
+
+
+def test_exploration_floor_guarantees_exploration_under_extreme_adaptive() -> None:
+    """Con el adaptive al máximo, la exploración conserva su suelo reservado."""
+    allocator = DiscoveryBudgetAllocator(
+        adaptive_weight=100.0, adaptive_min=5, exploration_floor_ratio=0.5
+    )
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    allocation = allocator.allocate(budget)
+    exploration = (
+        allocation["catalog"].candidates
+        + allocation["grammar_simple"].candidates
+        + allocation["grammar_composite"].candidates
+    )
+    assert exploration >= allocator.exploration_floor_candidates(budget)
+    assert sum(a.candidates for a in allocation.values()) <= budget.max_candidates
+
+
+def test_exploration_floor_zero_keeps_history() -> None:
+    """Con la política desactivada el reparto es el histórico (adaptive sin cota extra)."""
+    allocator = DiscoveryBudgetAllocator(adaptive_weight=100.0, exploration_floor_ratio=0.0)
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    raised = allocator.allocate(budget)
+    capped = allocator.normalized().allocate(budget)
+    assert raised["adaptive"].candidates == capped["adaptive"].candidates
+
+
+def test_adaptive_never_absorbs_all_exploration() -> None:
+    """Invariante 'champion cannot teach itself': el adaptive no toma el 100 %."""
+    allocator = DiscoveryBudgetAllocator(adaptive_weight=1000.0, exploration_floor_ratio=0.9)
+    budget = DiscoveryBudget(max_trials_total=100, max_per_family=8, max_candidates=50)
+    allocation = allocator.allocate(budget)
+    assert allocation["adaptive"].candidates <= budget.max_candidates - int(
+        math.ceil(budget.max_candidates * 0.9)
+    )
