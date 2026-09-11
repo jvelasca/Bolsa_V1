@@ -2,6 +2,36 @@
 
 All notable releases of Bolsa V1.
 
+## [1.60.1-beta] — V2.35.1 · ESTUDIO hard gate (P1-01) — 2026-09-11
+
+Cierra el único hallazgo P1 de la auditoría externa de v2.35-beta: el AUTO podía
+**abandonar ESTUDIO** y operar la allowlist CSV como universo cuando ESTUDIO fallaba
+o estaba vacío. El contrato pasa a ser literal: **ESTUDIO es obligatorio para AUTO;
+la allowlist solo intersecta; nunca lo sustituye.**
+
+- **Hard gate en `_instruments_for_cycle`**: los cinco caminos que antes devolvían la
+  allowlist (`resolver` ausente, excepción del resolver, `resolution is None`,
+  `status != "ok"` —cubre `unavailable`/`empty`/desconocido— e `instrument_ids` vacío)
+  ahora devuelven `()` ⇒ **no se opera**. El worker no muere: reintenta el ciclo
+  siguiente (fail-closed, no fail-stop).
+- **Allowlist como intersección pura**: con ESTUDIO `ok` y CSV configurado, el cálculo
+  sigue siendo `ESTUDIO ∩ allowlist`; nunca `ESTUDIO falla → CSV se convierte en
+universo`.
+- **Sin vía de escape hermética**: el gate es estricto también cuando el orquestador no
+  expone `resolve_universe` (antes los tests/dobles caían a la allowlist). Los dobles de
+  test migran a un universo ESTUDIO real.
+- **Documentación coherente**: se corrige la contradicción entre el docstring del worker
+  ("`empty`/`unavailable` nunca inventa candidatas") y su comportamiento previo, y el
+  comentario de `orchestrator_universe.py` deja de llamar a la allowlist "fallback".
+- **Tests**: nuevos `test_unavailable_estudio_never_falls_back_to_allowlist`,
+  `test_estudio_empty_never_falls_back_to_allowlist`,
+  `test_estudio_error_never_falls_back_to_allowlist` y
+  `test_loop_does_not_operate_when_estudio_unavailable_with_allowlist` (no se ejecuta
+  ningún ciclo); se retiran los que certificaban el fallback.
+- **Invariantes intactas**: `AUTO ⇒ SIMULATED`, LIVE bloqueado, sin LLM en hot path,
+  fail-closed, long-only y gates CPCV/PBO/DSR/WFE/OOS + coach sin cambios. Sin
+  migración (head Alembic sigue en `035_paper_forward_evidence`).
+
 ## [1.60.0-beta] — V2.35 / A15 · Observabilidad y gobernanza de la gramática de Discovery — 2026-09-11
 
 Hace **gobernable el rollout** de la gramática controlada de A14 (`AUTO_ORCHESTRATOR_GRAMMAR`,

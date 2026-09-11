@@ -5,7 +5,8 @@ gate de entorno (default **OFF**), siguiendo el patrón de los workers A9:
 
 * ``AUTO_ORCHESTRATOR_ENABLED=1`` — activa el bucle (default OFF, fail-closed).
 * ``AUTO_ORCHESTRATOR_INSTRUMENTS`` — allowlist CSV **opcional**: el universo
-  canónico es ESTUDIO (lista ``estudio``); si se define, filtra ese universo.
+  canónico es ESTUDIO (lista ``estudio``); si se define, **intersecta** ese universo.
+  V2.35.1 (auditoría P1-01): nunca lo sustituye — sin ESTUDIO ``ok`` no se opera.
 * ``AUTO_ORCHESTRATOR_INTERVAL_SECONDS`` — periodo del bucle (default 3600).
 * ``AUTO_ORCHESTRATOR_SHADOW_VALIDATED=1`` — **override manual del operador**. Ya NO
   se cablea en el bucle AUTO (V2.32.1, auditoría P2-02): AUTO promociona solo con
@@ -461,38 +462,47 @@ async def _instruments_for_cycle(
 ) -> tuple[str, ...]:
     """Instrumentos a orquestar: ESTUDIO canónico, con CSV como allowlist opcional.
 
-    V2.27: el universo ESTUDIO es la fuente principal. Si el orquestador no expone
-    ``resolve_universe`` (modo hermético/test) o el universo no está disponible, se
-    cae a la allowlist ``AUTO_ORCHESTRATOR_INSTRUMENTS`` (comportamiento previo). Un
-    universo ``empty``/``unavailable`` nunca inventa candidatas: fail-closed.
+    V2.35.1 (auditoría P1-01): ESTUDIO es **obligatorio** para el AUTO. Sin universo
+    canónico ``ok`` y no vacío **no se opera** (``()``): ni ``unavailable``, ni
+    ``empty``, ni error, ni ausencia de resolver convierten la allowlist en universo.
+    La allowlist ``AUTO_ORCHESTRATOR_INSTRUMENTS`` **solo intersecta** ESTUDIO; nunca
+    lo sustituye. Fail-closed: el bucle no muere, simplemente no orquesta ese ciclo.
     """
     resolver = getattr(orchestrator, "resolve_universe", None)
     if not callable(resolver):
-        return allowlist
+        logger.warning(
+            "auto_orchestrator: orquestador sin resolve_universe (universo ESTUDIO "
+            "obligatorio) — no se orquesta nada."
+        )
+        return ()
 
     try:
         resolution = await resolver()
-    except Exception:  # noqa: BLE001 — resolver caído ⇒ allowlist, no se inventa nada.
-        logger.exception("auto_orchestrator: fallo resolviendo el universo ESTUDIO.")
-        return allowlist
+    except Exception:  # noqa: BLE001 — resolver caído ⇒ no se opera (fail-closed).
+        logger.exception(
+            "auto_orchestrator: fallo resolviendo el universo ESTUDIO — no se opera."
+        )
+        return ()
 
     if resolution is None:
-        # Sin resolver cableado (modo hermético/test): comportamiento previo.
-        return allowlist
+        logger.warning(
+            "auto_orchestrator: universo ESTUDIO no resuelto (None) — no se opera."
+        )
+        return ()
 
     status = str(getattr(resolution, "status", "") or "")
     if status != "ok":
         logger.info(
-            "auto_orchestrator: universo ESTUDIO status=%s — sin orquestación por "
-            "universo (allowlist=%s).",
+            "auto_orchestrator: universo ESTUDIO status=%s — no se opera "
+            "(la allowlist no sustituye al universo; allowlist=%s).",
             status,
             allowlist,
         )
-        return allowlist
+        return ()
 
     ids = tuple(str(i) for i in (getattr(resolution, "instrument_ids", None) or []) if i)
     if not ids:
-        return allowlist
+        return ()
     if allowlist:
         # El CSV actúa como filtro/allowlist cuando está configurado.
         filtered = tuple(i for i in ids if i in set(allowlist))
@@ -517,8 +527,8 @@ async def auto_orchestrator_loop(
         watch = await _instruments_for_cycle(orchestrator, allowlist=allowlist)
         if not watch:
             logger.warning(
-                "auto_orchestrator activo pero sin instrumentos (universo ESTUDIO no "
-                "disponible y %s vacío) — no se orquesta nada.",
+                "auto_orchestrator activo pero sin instrumentos — el universo ESTUDIO "
+                "es obligatorio (%s no lo sustituye); no se orquesta nada.",
                 AUTO_ORCHESTRATOR_INSTRUMENTS,
             )
         cycle_id = _new_cycle_id()

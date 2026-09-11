@@ -139,21 +139,25 @@ async def test_loop_without_instruments_keeps_running_safely() -> None:
 
 @pytest.mark.asyncio
 async def test_loop_runs_cycle_and_watch(monkeypatch: pytest.MonkeyPatch) -> None:
+    # V2.35.1 (P1-01): el universo lo aporta ESTUDIO; la allowlist solo intersecta.
     monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
-    orch = _FakeOrchestrator()
+    orch = _OrchWithUniverse(resolution=_Resolution(instrument_ids=["AAA", "BBB"]))
     task = asyncio.create_task(w.auto_orchestrator_loop(orch, interval_seconds=0.01))
     await asyncio.sleep(0.05)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
     assert "AAA" in orch.cycles
-    assert "AAA" in orch.watches
+    # La allowlist filtra BBB del universo ESTUDIO.
+    assert "BBB" not in orch.cycles
 
 
 @pytest.mark.asyncio
 async def test_loop_survives_per_instrument_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA,BBB")
-    orch = _FakeOrchestrator(fail_on="AAA")
+    orch = _OrchWithUniverse(
+        resolution=_Resolution(instrument_ids=["AAA", "BBB"]), fail_on="AAA"
+    )
     task = asyncio.create_task(w.auto_orchestrator_loop(orch, interval_seconds=0.01))
     await asyncio.sleep(0.05)
     task.cancel()
@@ -172,15 +176,20 @@ class _OrchWithUniverse:
 
     resolution: Any
     cycles: list[str] = field(default_factory=list)
+    watches: list[str] = field(default_factory=list)
+    fail_on: str | None = None
 
     async def resolve_universe(self) -> Any:
         return self.resolution
 
     async def run_cycle(self, *, instrument_id: str, **_: Any) -> _Result:
         self.cycles.append(instrument_id)
+        if self.fail_on == instrument_id:
+            raise RuntimeError("boom")
         return _Result()
 
     async def watch_active(self, *, instrument_id: str, **_: Any) -> _Result:
+        self.watches.append(instrument_id)
         return _Result()
 
 
@@ -205,10 +214,45 @@ async def test_allowlist_filters_the_universe() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unavailable_universe_falls_back_to_allowlist() -> None:
+async def test_unavailable_estudio_never_falls_back_to_allowlist() -> None:
+    # V2.35.1 (P1-01): ESTUDIO unavailable NO convierte la allowlist en universo.
     orch = _OrchWithUniverse(resolution=_Resolution(status="unavailable", instrument_ids=[]))
     watch = await w._instruments_for_cycle(orch, allowlist=("AAA",))
-    assert watch == ("AAA",)
+    assert watch == ()
+
+
+@pytest.mark.asyncio
+async def test_estudio_empty_never_falls_back_to_allowlist() -> None:
+    # V2.35.1 (P1-01): ESTUDIO vacío ⇒ no operar (fail-closed), sin CSV de rescate.
+    orch = _OrchWithUniverse(resolution=_Resolution(status="ok", instrument_ids=[]))
+    watch = await w._instruments_for_cycle(orch, allowlist=("AAA",))
+    assert watch == ()
+
+
+@pytest.mark.asyncio
+async def test_estudio_error_never_falls_back_to_allowlist() -> None:
+    # V2.35.1 (P1-01): un fallo del resolver ⇒ no operar, nunca allowlist.
+    class _Boom:
+        async def resolve_universe(self) -> Any:
+            raise RuntimeError("estudio down")
+
+    watch = await w._instruments_for_cycle(_Boom(), allowlist=("AAA",))
+    assert watch == ()
+
+
+@pytest.mark.asyncio
+async def test_loop_does_not_operate_when_estudio_unavailable_with_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # V2.35.1 (P1-01): con ESTUDIO unavailable y CSV configurado NO se ejecuta ciclo.
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
+    orch = _OrchWithUniverse(resolution=_Resolution(status="unavailable", instrument_ids=[]))
+    task = asyncio.create_task(w.auto_orchestrator_loop(orch, interval_seconds=0.01))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert orch.cycles == []
 
 
 @pytest.mark.asyncio
@@ -238,6 +282,9 @@ async def test_loop_does_not_pass_shadow_override(
     seen: list[dict[str, Any]] = []
 
     class _Recorder:
+        async def resolve_universe(self) -> Any:
+            return _Resolution(instrument_ids=["AAA"])
+
         async def run_cycle(self, *, instrument_id: str, **kwargs: Any) -> _Result:
             seen.append({"instrument_id": instrument_id, **kwargs})
             return _Result()
@@ -419,7 +466,7 @@ async def test_loop_logs_cycle_summary(
     import logging
 
     monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
-    orch = _FakeOrchestrator()
+    orch = _OrchWithUniverse(resolution=_Resolution(instrument_ids=["AAA"]))
 
     task = asyncio.create_task(w.auto_orchestrator_loop(orch, interval_seconds=0.01))
     with caplog.at_level(logging.INFO):
@@ -440,6 +487,9 @@ async def test_loop_runs_forward_between_cycle_and_watch(
     calls: list[str] = []
 
     class _Recorder:
+        async def resolve_universe(self) -> Any:
+            return _Resolution(instrument_ids=["AAA"])
+
         async def run_cycle(self, *, instrument_id: str, **_: Any) -> _Result:
             calls.append(f"cycle:{instrument_id}")
             return _Result()

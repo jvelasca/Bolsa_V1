@@ -6,8 +6,9 @@ y espera un objeto con ``status`` (``ok``/``empty``/``unavailable``) e
 Desk), pero nunca se había cableado al proceso AUTO.
 
 Este módulo es **solo composición**: reutiliza el resolver existente en lugar de
-duplicar la lógica de ESTUDIO. El universo canónico del AUTO pasa a ser la lista
-Estudio; ``AUTO_ORCHESTRATOR_INSTRUMENTS`` queda como allowlist/fallback opcional.
+duplicar la lógica de ESTUDIO. El universo canónico del AUTO es la lista Estudio;
+``AUTO_ORCHESTRATOR_INSTRUMENTS`` queda como allowlist opcional que **intersecta**
+ese universo (V2.35.1: nunca lo sustituye; sin ESTUDIO no se opera).
 """
 
 from __future__ import annotations
