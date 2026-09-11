@@ -361,7 +361,15 @@ async def test_a14_grammar_candidate_is_discovered_and_promotes_or_fails_honestl
             data_snapshot_id="a14-e2e",
             run_id="a14-e2e-no-shadow",
         )
-        assert no_shadow.status in {"no_promocionada", "sin_candidatas_discovery"}, no_shadow
+        assert no_shadow.status in {
+            "no_promocionada",
+            "sin_candidatas_discovery",
+            # V2.35.1 (P2-03): con el allocator explícito la gramática recibe cupo real
+            # y llega al LAB; si ninguna candidata produce evidencia suficiente para el
+            # TOP3, el ciclo corta fail-closed ANTES del gate shadow -> ``sin_evidencia_top3``.
+            # Igualmente no hay promoción (más estricto aún).
+            "sin_evidencia_top3",
+        }, no_shadow
         if no_shadow.status == "no_promocionada":
             assert "shadow_validation_requerida" in no_shadow.reasons
 
@@ -374,7 +382,14 @@ async def test_a14_grammar_candidate_is_discovered_and_promotes_or_fails_honestl
             data_snapshot_id="a14-e2e",
             run_id="a14-e2e",
         )
-        assert result_cycle.status in {"active", "no_promocionada", "sin_candidatas_discovery"}
+        assert result_cycle.status in {
+            "active",
+            "no_promocionada",
+            "sin_candidatas_discovery",
+            # V2.35.1 (P2-03): ciclo sin evidencia suficiente para TOP3 (corte
+            # fail-closed previo al gate shadow). No hay promoción.
+            "sin_evidencia_top3",
+        }
 
         if result_cycle.status == "active":
             from bolsa_application.strategy_lifecycle_store import (
@@ -424,7 +439,13 @@ async def test_a14_promotion_requires_shadow_evidence_pg(
             data_snapshot_id="a14-e2e",
             run_id="a14-e2e-negative",
         )
-        assert result.status in {"no_promocionada", "sin_candidatas_discovery"}
+        assert result.status in {
+            "no_promocionada",
+            "sin_candidatas_discovery",
+            # V2.35.1 (P2-03): corte fail-closed por falta de evidencia TOP3 (previo al
+            # gate shadow). Sin promoción, invariante H1 intacto.
+            "sin_evidencia_top3",
+        }
         if result.status == "no_promocionada":
             assert "shadow_validation_requerida" in result.reasons
     finally:

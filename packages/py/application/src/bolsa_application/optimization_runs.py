@@ -466,6 +466,7 @@ class RunSmaGridOptimizeAndSave:
         cpcv_purge_bars: int | None = None,
         cpcv_embargo_bars: int | None = None,
         definition: dict[str, Any] | None = None,
+        grammar_variants: list[dict[str, Any]] | None = None,
         date_to: str | None = None,
     ) -> tuple[OptimizeSmaGridResult, OptimizationRunRecord]:
         result = await self._run_optimize.execute(
@@ -488,6 +489,7 @@ class RunSmaGridOptimizeAndSave:
             cpcv_purge_bars=cpcv_purge_bars,
             cpcv_embargo_bars=cpcv_embargo_bars,
             definition=definition,
+            grammar_variants=grammar_variants,
             date_to=date_to,
         )
         payload = {

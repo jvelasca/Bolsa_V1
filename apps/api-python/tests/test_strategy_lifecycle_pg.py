@@ -54,6 +54,10 @@ def _optimize_result() -> object:
         score: float
         oos_metrics: dict[str, object] | None = None
         max_drawdown_pct: float | None = 5.0
+        # V2.35.1 (P2-01): parámetros del campeón. Sin ellos no hay definición
+        # ejecutable y el shadow no puede producir evidencia (la promoción dejó de
+        # aceptar el override humano). El stub debe aportar un campeón real.
+        params: dict[str, object] | None = None
 
     @dataclass
     class _Result:
@@ -64,7 +68,17 @@ def _optimize_result() -> object:
         edge_report: dict[str, object] | None = None
 
     return _Result(
-        trials=[_Trial(score=1.5, oos_metrics={"score": 0.9}, max_drawdown_pct=4.0)],
+        trials=[
+            _Trial(
+                score=1.5,
+                oos_metrics={"score": 0.9},
+                max_drawdown_pct=4.0,
+                # V2.35.1 (P2-01): campeón con parámetros reales para que
+                # ``_champion_definition`` construya un ``executable`` replicable por
+                # el shadow (sin override humano la evidencia es la única vía).
+                params={"fast": 10, "slow": 30},
+            )
+        ],
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
@@ -362,6 +376,10 @@ async def test_auto_orchestrator_full_cycle_pg(
                 data_snapshot_id="snap-pg",
                 run_id="pg-cycle",
             )
+            # V2.35.1 (P2-01): sin override humano, la promoción exige evidencia shadow
+            # EJECUTADA. El stub del LAB aporta un campeón con parámetros reales para que
+            # el shadow pueda replicar la definición; el promotion gate decide por
+            # evidencia, no por un booleano.
             assert promoted.status == "active", promoted.reasons
             assert promoted.active_version_id is not None
 
