@@ -101,14 +101,25 @@ uv run pytest apps/api-python/tests/test_auto_orchestrator_worker.py -q
 
 ---
 
-## 5. Deuda P2 (NO bloquea esta versión)
+## 5. Deuda P2 (RESUELTA en la misma v2.35.1)
 
-- **P2-01** — separar `PromotionGate` de `ManualAdminPromotionGate` (hoy `shadow_override`
-  vive en el API genérico de `OrchestratorDeps`; el AUTO real no lo cablea).
-- **P2-02** — separar `CycleGrammarCounters` de `ProcessGrammarCounters` (hoy `cycle_summary`
-  escribe acumulados de proceso).
-- **P2-03** — budget allocator explícito del Discovery (hoy la reserva catálogo→gramática hace
-  que el orden del espacio de búsqueda influya en qué recibe presupuesto).
+Los tres hallazgos P2 de la auditoría v2.35-beta se cerraron en la misma versión, cada uno
+en su rama aislada y luego integrados (commits `7eba50a8` P2-02, `884430c3` P2-03,
+`4299a650` P2-01, `645c9215` integración):
+
+- **P2-01** — Promotion Gate automática (`decide_promotion`/`evaluate_promotion`, sin
+  override) separada de la admin/manual (`decide_admin_promotion`/`evaluate_admin_promotion`,
+  única con `shadow_validated`). Eliminado `OrchestratorDeps.shadow_override` y el parámetro
+  `shadow_validated` de `run_cycle`. H1 intacto.
+- **P2-02** — `CycleGrammarCounters` (por ciclo, reiniciado cada iteración) separado de
+  `GrammarObservabilityCounters` (proceso). `cycle_summary` reporta el ciclo; nuevo
+  `process_summary` conserva los acumulados.
+- **P2-03** — `DiscoveryBudgetAllocator` explícito por carriles (catálogo / gramática simple /
+  compuesta / adaptive placeholder) con reparto determinista por resto mayor, sustituye el
+  sesgo de orden de `_grammar_reserve`. Gramática OFF byte-idéntica a A13.
+- **Integración (hallazgo nuevo)**: al dar cupo real a la gramática se destapó que
+  `RunSmaGridOptimizeAndSave.execute` no reenviaba `grammar_variants` (gap de A14); corregido
+  en `optimization_runs.py`. Tests A14 PG admiten `sin_evidencia_top3` como corte honesto.
 
 ---
 

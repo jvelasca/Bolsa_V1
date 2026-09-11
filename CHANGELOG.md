@@ -32,6 +32,35 @@ universo`.
   fail-closed, long-only y gates CPCV/PBO/DSR/WFE/OOS + coach sin cambios. Sin
   migración (head Alembic sigue en `035_paper_forward_evidence`).
 
+### Deuda P2 de la auditoría v2.35-beta, resuelta en la misma versión
+
+- **P2-01 — Promotion Gate automática separada de la admin/manual.** El override humano
+  `shadow_validated` sale del API genérico: `decide_promotion`/`evaluate_promotion` son la
+  vía **automática** (solo evidencia shadow ejecutada, sin parámetro de override) y
+  `decide_admin_promotion`/`evaluate_admin_promotion` la **única** vía admin con override.
+  Se elimina `OrchestratorDeps.shadow_override` y el parámetro `shadow_validated` de
+  `run_cycle`. H1 intacto (`require_holdout=True` inviolable, sin escape hatch; sin
+  `lab_end` no hay replay). El AUTO productivo nunca podía usar el override; ahora la
+  frontera es explícita también en el tipo. Sin migración.
+- **P2-02 — Contadores de ciclo separados de los de proceso.** Nuevo
+  `CycleGrammarCounters` efímero (reiniciado al inicio de cada iteración) para que
+  `cycle_summary` reporte **solo** el ciclo vigente; se añade `process_summary` con los
+  acumulados desde el arranque del worker. `grammar_counters()` sigue devolviendo el
+  acumulador de proceso (compatibilidad). Observabilidad pura: no altera ninguna decisión.
+- **P2-03 — Allocator explícito de presupuesto del Discovery.** Nuevo
+  `DiscoveryBudgetAllocator` (pesos por carril: catálogo / gramática simple / gramática
+  compuesta / adaptive-placeholder) con reparto determinista por **resto mayor** y suelos
+  por carril, que sustituye la reserva secuencial `_grammar_reserve` y elimina el sesgo de
+  orden catálogo→gramática (el catálogo ya no puede dejar sin presupuesto a la gramática, ni
+  al revés). Con gramática OFF la salida sigue siendo byte-idéntica a A13 (test de
+  regresión). `adaptive` queda a peso 0 (placeholder; **no** implementa aprendizaje). Pesos
+  configurables por env `AUTO_ORCHESTRATOR_ALLOCATOR_*`. Sin migración.
+- **Integración**: el bump de P2-03 da cupo real a la gramática y destapó que
+  `RunSmaGridOptimizeAndSave.execute` no reenviaba `grammar_variants` (A14 lo añadió al
+  optimizador y a `_GRID_KEYS`, pero no al wrapper de persistencia) ⇒ corregido. Los tests
+  A14 PG admiten además el corte honesto `sin_evidencia_top3` (fail-closed previo al gate
+  shadow) ahora que la gramática ya no queda muerta.
+
 ## [1.60.0-beta] — V2.35 / A15 · Observabilidad y gobernanza de la gramática de Discovery — 2026-09-11
 
 Hace **gobernable el rollout** de la gramática controlada de A14 (`AUTO_ORCHESTRATOR_GRAMMAR`,
