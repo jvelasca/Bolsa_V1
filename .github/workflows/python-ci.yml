@@ -83,6 +83,9 @@ jobs:
           packages/py/application/tests/test_lab_discovery_dispatch.py
           # V2.34/A14: gramática controlada de Discovery (composición + presupuesto).
           packages/py/application/tests/test_discovery_grammar.py
+          # V2.36/V2.37: evidencia adaptativa (prior determinista) + search policy.
+          packages/py/application/tests/test_discovery_evidence.py
+          packages/py/application/tests/test_discovery_search_policy.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
           # V2.32/A12: evidencia shadow ejecutada (replay determinista, sin DB).
           packages/py/application/tests/test_strategy_shadow_phase.py
@@ -270,5 +273,6 @@ jobs:
         run: >
           uv run pytest
           apps/api-python/tests/test_a14_grammar_discovery_pg.py
+          apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
           -q
           --tb=short
