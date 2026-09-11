@@ -22,6 +22,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     StrategyTop3,
     StrategyValidation,
     can_transition,
+    evaluate_admin_promotion,
     evaluate_promotion,
     next_state,
 )
@@ -108,7 +109,7 @@ def test_coach_cannot_bypass_missing_quantitative_gates() -> None:
         finalist_id="ver-1",
         gates=(GateResult.passed_gate("backtest"),),  # faltan 5
     )
-    promo = evaluate_promotion(
+    promo = evaluate_admin_promotion(
         finalist=_finalist(),
         validation=validation,
         coach=_coach_approves(),
@@ -127,7 +128,7 @@ def test_promotion_requires_shadow_validation() -> None:
         finalist=_finalist(),
         validation=validation,
         coach=_coach_approves(),
-        shadow_validated=False,
+        shadow=None,
     )
     assert not promo.promoted
     assert "shadow_validation_requerida" in promo.reasons
@@ -135,7 +136,7 @@ def test_promotion_requires_shadow_validation() -> None:
 
 def test_promotion_blocked_by_coach_veto() -> None:
     validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
-    promo = evaluate_promotion(
+    promo = evaluate_admin_promotion(
         finalist=_finalist(),
         validation=validation,
         coach=CoachAssessment(
@@ -149,7 +150,7 @@ def test_promotion_blocked_by_coach_veto() -> None:
 
 def test_promotion_happy_path_needs_all_conditions() -> None:
     validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
-    promo = evaluate_promotion(
+    promo = evaluate_admin_promotion(
         finalist=_finalist(),
         validation=validation,
         coach=_coach_approves(),
@@ -167,6 +168,71 @@ def test_validation_missing_gates_are_reported() -> None:
     )
     assert not validation.passed
     assert set(validation.missing_gates) == set(PROMOTION_GATES) - {"backtest", "risk"}
+
+
+# ── V2.35.1 / P2-01: separación compuerta AUTOMÁTICA vs ADMIN ────────────────────
+
+
+def test_automatic_gate_has_no_override_parameter() -> None:
+    """La compuerta AUTOMÁTICA no conoce ningún override humano."""
+    import inspect
+
+    params = inspect.signature(evaluate_promotion).parameters
+    assert "shadow_validated" not in params
+    assert "shadow_override" not in params
+
+
+def test_admin_gate_is_the_only_one_with_override() -> None:
+    import inspect
+
+    assert "shadow_validated" in inspect.signature(evaluate_admin_promotion).parameters
+
+
+def test_automatic_gate_cannot_promote_without_executed_evidence() -> None:
+    """Fail-closed: sin evidencia ejecutada, la compuerta automática NO promociona."""
+    validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
+    promo = evaluate_promotion(
+        finalist=_finalist(),
+        validation=validation,
+        coach=_coach_approves(),
+        shadow=None,
+    )
+    assert not promo.promoted
+    assert "shadow_validation_requerida" in promo.reasons
+
+
+def test_admin_gate_promotes_via_explicit_override() -> None:
+    validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
+    promo = evaluate_admin_promotion(
+        finalist=_finalist(),
+        validation=validation,
+        coach=_coach_approves(),
+        shadow_validated=True,
+    )
+    assert promo.promoted
+    assert promo.shadow_validated is True
+    assert promo.shadow_validation_id == "ver-1"
+
+
+def test_admin_gate_denied_override_fails_closed() -> None:
+    validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
+    promo = evaluate_admin_promotion(
+        finalist=_finalist(),
+        validation=validation,
+        coach=_coach_approves(),
+        shadow_validated=False,
+    )
+    assert not promo.promoted
+    assert "shadow_validation_requerida" in promo.reasons
+
+
+def test_can_transition_has_no_override_parameter() -> None:
+    """La máquina de estados (ruta automática) tampoco acepta override humano."""
+    import inspect
+
+    params = inspect.signature(can_transition).parameters
+    assert "shadow_validated" not in params
+    assert "shadow_require_holdout" not in params
 
 
 # ── Vigilancia: degradación vuelve al LAB, nunca swap directo ────────────────────
@@ -287,14 +353,13 @@ def test_shadow_policy_round_trips_is_the_sample_guard() -> None:
 
 
 def test_promotion_requires_shadow_evidence_not_flag() -> None:
-    """Sin evidencia shadow (``shadow=None``, flag None) NO promociona."""
+    """Sin evidencia shadow (``shadow=None``) NO promociona; no hay flag que certifique."""
     validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
     promo = evaluate_promotion(
         finalist=_finalist(),
         validation=validation,
         coach=_coach_approves(),
         shadow=None,
-        shadow_validated=None,
     )
     assert not promo.promoted
     assert "shadow_validation_requerida" in promo.reasons

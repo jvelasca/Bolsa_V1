@@ -28,6 +28,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     StrategyFinalist,
     StrategyPromotion,
     StrategyValidation,
+    evaluate_admin_promotion,
     evaluate_promotion,
 )
 
@@ -35,6 +36,7 @@ __all__ = [
     "ActiveStrategyRef",
     "PromotionDecision",
     "build_strategy_version",
+    "decide_admin_promotion",
     "decide_promotion",
     "definition_hash",
 ]
@@ -103,30 +105,85 @@ def decide_promotion(
     finalist: StrategyFinalist,
     gates: Sequence[GateResult],
     coach: CoachAssessment,
-    shadow_validated: bool | None = None,
     shadow: ShadowValidationResult | None = None,
     active: ActiveStrategyRef | None = None,
     require_gate_for_active: bool = True,
 ) -> PromotionDecision:
-    """Promotion Gate: seis gates + COACH + shadow, nunca swap directo de la activa.
+    """Promotion Gate AUTOMÁTICO: seis gates + COACH + evidencia shadow.
 
-    V2.32 / A12: la autoridad shadow es la **evidencia ejecutada** (``shadow``). El
-    booleano ``shadow_validated`` (``None`` por defecto) se acepta solo como override
-    explícito del operador; sin evidencia ni override, no hay promoción.
+    V2.32 / A12: la autoridad shadow es la **evidencia ejecutada** (``shadow``). Esta
+    es la compuerta de la ruta autónoma y NO acepta override humano (V2.35.1, auditoría
+    P2-01): sin evidencia que pase, no hay promoción. El override administrativo vive
+    exclusivamente en :func:`decide_admin_promotion`.
 
     Si ya hay una estrategia ``active`` y ``require_gate_for_active`` (default), el
     reemplazo exige que TODOS los gates estén PASS, que el COACH no vete y que haya
     shadow/paper validado. Además, si el candidato es el MISMO que la activa, no hay
     nada que promover (no se re-promociona a sí mismo).
     """
-    validation = StrategyValidation(finalist_id=finalist.version_id, gates=tuple(gates))
-    promotion = evaluate_promotion(
+    return _decide_promotion(
         finalist=finalist,
-        validation=validation,
+        gates=gates,
         coach=coach,
-        shadow=shadow,
-        shadow_validated=shadow_validated,
+        promotion=evaluate_promotion(
+            finalist=finalist,
+            validation=StrategyValidation(finalist_id=finalist.version_id, gates=tuple(gates)),
+            coach=coach,
+            shadow=shadow,
+        ),
+        active=active,
+        require_gate_for_active=require_gate_for_active,
     )
+
+
+def decide_admin_promotion(
+    *,
+    finalist: StrategyFinalist,
+    gates: Sequence[GateResult],
+    coach: CoachAssessment,
+    shadow_validated: bool,
+    active: ActiveStrategyRef | None = None,
+    require_gate_for_active: bool = True,
+) -> PromotionDecision:
+    """Promotion Gate ADMIN/MANUAL: única vía que acepta el override ``shadow_validated``.
+
+    V2.35.1 (auditoría P2-01): separada de la compuerta automática para que la frontera
+    de seguridad sea explícita. Pensada para herramientas administrativas puntuales
+    (rollout/operación), nunca para el hot path AUTO. Comparte el núcleo de decisión con
+    :func:`decide_promotion`; solo cambia la resolución de la evidencia shadow.
+
+    Fail-closed: el override es un ``bool`` explícito; ``False`` no promociona y ``True``
+    queda auditado como ``shadow_override_operador``.
+    """
+    return _decide_promotion(
+        finalist=finalist,
+        gates=gates,
+        coach=coach,
+        promotion=evaluate_admin_promotion(
+            finalist=finalist,
+            validation=StrategyValidation(finalist_id=finalist.version_id, gates=tuple(gates)),
+            coach=coach,
+            shadow_validated=shadow_validated,
+        ),
+        active=active,
+        require_gate_for_active=require_gate_for_active,
+    )
+
+
+def _decide_promotion(
+    *,
+    finalist: StrategyFinalist,
+    gates: Sequence[GateResult],
+    coach: CoachAssessment,
+    promotion: StrategyPromotion,
+    active: ActiveStrategyRef | None,
+    require_gate_for_active: bool,
+) -> PromotionDecision:
+    """Núcleo compartido: aplica la promoción ya evaluada a la política de reemplazo.
+
+    Único punto donde se decide si se sustituye la activa (anti strategy-chasing), para
+    que la compuerta automática y la administrativa no dupliquen esta lógica.
+    """
     reasons = list(promotion.reasons)
 
     replaces: ActiveStrategyRef | None = None

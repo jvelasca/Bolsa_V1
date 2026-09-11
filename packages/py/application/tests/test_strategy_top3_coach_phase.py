@@ -147,7 +147,7 @@ def test_coach_never_upgrades_quantitative_fail() -> None:
         PROMOTION_GATES,
         StrategyFinalist,
         StrategyValidation,
-        evaluate_promotion,
+        evaluate_admin_promotion,
     )
 
     evaluation = _evaluation("c1", score=1.0, gates=("backtest",))
@@ -164,7 +164,7 @@ def test_coach_never_upgrades_quantitative_fail() -> None:
             ),
         ),
     )
-    promo = evaluate_promotion(
+    promo = evaluate_admin_promotion(
         finalist=StrategyFinalist(
             candidate_id="c1",
             version_id="ver-1",

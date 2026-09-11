@@ -21,8 +21,9 @@ from bolsa_application.auto_orchestrator import (
 from bolsa_application.discovery_catalog import DiscoveryBudget, family_by_name
 from bolsa_application.strategy_discovery_engine import discover_for_instrument
 from bolsa_application.strategy_lifecycle_store import InMemoryStrategyLifecycleStore
+from bolsa_application.strategy_shadow_phase import ShadowReplayConfig
 from bolsa_application.strategy_top3_coach_phase import CoachThresholds
-from bolsa_domain.entities.strategy_lifecycle import PROMOTION_GATES, ActiveStrategy
+from bolsa_domain.entities.strategy_lifecycle import PROMOTION_GATES, ActiveStrategy, ShadowPolicy
 
 # ── Dobles ──────────────────────────────────────────────────────────────────────
 
@@ -88,17 +89,29 @@ async def _runner(value: Any) -> Any:
     return value
 
 
+def _with_shadow_evidence(deps: OrchestratorDeps) -> OrchestratorDeps:
+    """Cablea evidencia shadow REAL (barras + política) para promocionar sin override.
+
+    V2.35.1 (P2-01): la ruta AUTO ya no acepta un booleano humano; los tests que
+    esperan promoción deben aportar evidencia ejecutada de verdad.
+    """
+    deps.shadow_bars = lambda instrument_id: _shadow_bars(400)
+    deps.shadow_policy = ShadowPolicy(min_closed_round_trips=1, min_return_pct=-100.0)
+    deps.shadow_config = ShadowReplayConfig(window_bars=99, min_bars=10)
+    return deps
+
+
 # ── Ciclo feliz ─────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_full_cycle_promotes_with_shadow() -> None:
+async def test_full_cycle_promotes_with_shadow_evidence() -> None:
+    """V2.35.1 (P2-01): la ruta AUTO promociona con evidencia shadow REAL, sin override."""
     deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(
-        instrument_id="AAA", data_snapshot_id="snap-1", shadow_validated=True
-    )
-    assert result.status == "active"
+    result = await orchestrator.run_cycle(instrument_id="AAA", data_snapshot_id="snap-1")
+    assert result.status == "active", result.reasons
     assert result.promoted
     assert result.active_version_id is not None
     active = await store.get_active(instrument_id="AAA")
@@ -108,10 +121,11 @@ async def test_full_cycle_promotes_with_shadow() -> None:
 
 @pytest.mark.asyncio
 async def test_cycle_without_shadow_does_not_promote() -> None:
+    """Fail-closed: sin provider de evidencia shadow, el ciclo NO promociona."""
     deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
     orchestrator = AutoOrchestrator(deps)
     result = await orchestrator.run_cycle(
-        instrument_id="AAA", data_snapshot_id="snap-1", shadow_validated=False
+        instrument_id="AAA", data_snapshot_id="snap-1"
     )
     assert result.status == "no_promocionada"
     assert not result.promoted
@@ -123,16 +137,46 @@ async def test_cycle_without_shadow_does_not_promote() -> None:
 async def test_cycle_without_evidence_does_not_promote() -> None:
     deps, _store = _deps(runner=lambda c: None, resolution=_Resolution())
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
     assert result.status == "sin_evidencia_top3"
     assert not result.promoted
+
+
+def test_auto_run_cycle_has_no_override_parameter() -> None:
+    """V2.35.1 (P2-01): la ruta AUTO no acepta ningún override humano en el ciclo."""
+    import inspect
+
+    params = inspect.signature(AutoOrchestrator.run_cycle).parameters
+    assert "shadow_validated" not in params
+    assert "shadow_override" not in params
+
+
+def test_orchestrator_deps_has_no_shadow_override_field() -> None:
+    """V2.35.1 (P2-01): el override se eliminó de deps; solo vive en el gate admin."""
+    from dataclasses import fields
+
+    assert "shadow_override" not in {f.name for f in fields(OrchestratorDeps)}
+
+
+@pytest.mark.asyncio
+async def test_cycle_never_promotes_without_shadow_evidence_even_with_provider() -> None:
+    """Fail-closed: provider presente pero serie insuficiente ⇒ no hay evidencia ⇒ no promoción."""
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    deps.shadow_bars = lambda instrument_id: _shadow_bars(5)  # demasiado corta: sin hold-out.
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
+    assert result.status == "no_promocionada"
+    assert not result.promoted
+    assert "shadow_validation_requerida" in result.reasons
+    assert result.shadow_started == 0
+    assert await store.get_active(instrument_id="AAA") is None
 
 
 @pytest.mark.asyncio
 async def test_universe_unavailable_produces_no_candidates() -> None:
     deps, _store = _deps(runner=lambda c: _good_result(), resolution=_Resolution(status="unavailable"))
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
     assert result.status == "unavailable"
     assert result.candidates == 0
 
@@ -151,8 +195,9 @@ async def test_vigilance_degrades_to_relab() -> None:
         resolution=_Resolution(),
         health_thresholds=HealthThresholds(min_edge=0.0, min_wfe=0.5),
     )
+    _with_shadow_evidence(deps)
     orchestrator = AutoOrchestrator(deps)
-    await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    await orchestrator.run_cycle(instrument_id="AAA")
     watched = await orchestrator.watch_active(
         instrument_id="AAA",
         metrics={"edge": -0.5, "wfe": 0.1},
@@ -232,8 +277,9 @@ def test_promotion_gate_names_are_the_six() -> None:
 async def test_promoted_version_carries_champion_params_and_executable() -> None:
     """La versión promocionada incluye los params del campeón y la definición ejecutable."""
     deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
     assert result.promoted
 
     active = await store.get_active(instrument_id="AAA")
@@ -250,7 +296,11 @@ async def test_promoted_version_carries_champion_params_and_executable() -> None
 
 @pytest.mark.asyncio
 async def test_version_without_champion_keeps_plain_definition() -> None:
-    """Sin params de campeón no se inventa definición ejecutable (fail-closed)."""
+    """Sin params de campeón no se inventa definición ejecutable (fail-closed).
+
+    V2.35.1 (P2-01): sin ``executable`` el shadow no puede ejecutar evidencia, así que
+    la ruta AUTO no promociona (no hay override que lo supla).
+    """
     no_params = _OptimizeResult(
         trials=[_Trial(score=1.5, oos_metrics={"score": 0.9}, max_drawdown_pct=4.0)],
         cpcv={"pbo": 0.1},
@@ -259,14 +309,12 @@ async def test_version_without_champion_keeps_plain_definition() -> None:
         edge_report={"dsr": 0.5},
     )
     deps, store = _deps(runner=lambda c: no_params, resolution=_Resolution())
+    _with_shadow_evidence(deps)
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
-    assert result.promoted
-
-    active = await store.get_active(instrument_id="AAA")
-    assert active is not None
-    assert "executable" not in active.active.definition
-    assert "champion_params" not in active.active.definition
+    result = await orchestrator.run_cycle(instrument_id="AAA")
+    assert not result.promoted
+    assert "shadow_validation_requerida" in result.reasons
+    assert await store.get_active(instrument_id="AAA") is None
 
 
 # ── COACH comparativo (V2.29) ───────────────────────────────────────────────────
@@ -286,8 +334,9 @@ class _MultiResolution:
 async def test_coach_comparativo_persists_all_assessments() -> None:
     """El COACH dictamina el TOP3 entero y persiste un assessment por candidato."""
     deps, store = _deps(runner=lambda c: _good_result(), resolution=_MultiResolution())
+    _with_shadow_evidence(deps)
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
 
     assert result.status == "active"
     candidates = await store.list_candidates(instrument_id="AAA")
@@ -306,7 +355,7 @@ async def test_coach_comparativo_veto_blocks_promotion_with_aggregated_reasons()
     # PBO por encima del umbral del COACH ⇒ veta a todas las candidatas.
     deps.coach_thresholds = CoachThresholds(max_pbo=-1.0)
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
 
     assert result.status == "coach_veto"
     assert not result.promoted
@@ -329,8 +378,9 @@ async def test_discovery_replaces_single_candidate_and_promotes() -> None:
             budget=DiscoveryBudget(max_trials_total=3, max_per_family=1, max_candidates=3),
         ),
     )
+    _with_shadow_evidence(deps)
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
     assert result.status == "active"
     assert result.promoted
     candidates = await store.list_candidates(instrument_id="AAA")
@@ -348,7 +398,7 @@ async def test_discovery_without_candidates_does_not_invent_one() -> None:
         discovery=lambda instrument_id: (),
     )
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
     assert result.status == "sin_candidatas_discovery"
     assert result.candidates == 0
     assert not result.promoted
@@ -368,8 +418,9 @@ async def test_discovery_definition_is_carried_to_promoted_version() -> None:
             budget=DiscoveryBudget(max_trials_total=1, max_per_family=1, max_candidates=1),
         ),
     )
+    _with_shadow_evidence(deps)
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
     assert result.promoted
     active = await store.get_active(instrument_id="AAA")
     assert active is not None
@@ -393,12 +444,12 @@ async def test_orchestrator_reports_catalog_provenance_when_grammar_disabled() -
         ),
     )
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
     assert result.catalog_candidates == 3
     assert result.grammar_candidates == 0
     assert result.lab_grammar_evaluated == 0
     # Sin provider de barras el replay shadow no se ejecuta (fail-closed honesto):
-    # el override del operador puede promocionar, pero no se inventa evidencia.
+    # no hay evidencia y la ruta AUTO no tiene override con el que saltársela.
     assert result.shadow_started == 0
     assert result.shadow_grammar_started == 0
 
@@ -420,7 +471,7 @@ async def test_orchestrator_reports_grammar_provenance_and_lab_shadow() -> None:
         ),
     )
     orchestrator = AutoOrchestrator(deps)
-    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
 
     assert result.grammar_candidates > 0
     assert result.catalog_candidates > 0

@@ -281,10 +281,11 @@ async def test_loop_uses_estudio_universe_without_csv() -> None:
 async def test_loop_does_not_pass_shadow_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """V2.32.1 (P2-02): el bucle AUTO NO cablea el override del operador.
+    """V2.35.1 (P2-01): el bucle AUTO NO envía ningún override al ciclo.
 
     Con ``AUTO_ORCHESTRATOR_SHADOW_VALIDATED=1`` el ciclo debe seguir sin recibir
-    ``shadow_validated``: AUTO promociona solo por evidencia ejecutada.
+    ``shadow_validated`` (la firma ya no lo acepta): AUTO promociona solo por evidencia
+    ejecutada.
     """
     monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
     monkeypatch.setenv(w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED, "1")
@@ -310,9 +311,15 @@ async def test_loop_does_not_pass_shadow_override(
     assert all("shadow_validated" not in call for call in seen)
 
 
-def test_default_orchestrator_does_not_wire_shadow_override() -> None:
-    """V2.32.1 (P2-02): la composición AUTO deja ``shadow_override=None`` (sin bypass)."""
+def test_default_orchestrator_has_no_shadow_override_field() -> None:
+    """V2.35.1 (P2-01): la composición AUTO no expone ningún override humano.
+
+    ``shadow_override`` se eliminó de ``OrchestratorDeps``: la ruta AUTO promociona
+    solo con evidencia ejecutada. El override administrativo vive exclusivamente en
+    ``decide_admin_promotion`` (fuera del orquestador autónomo).
+    """
     import os
+    from dataclasses import fields
 
     previous = os.environ.get(w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED)
     os.environ[w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED] = "1"
@@ -323,7 +330,7 @@ def test_default_orchestrator_does_not_wire_shadow_override() -> None:
             os.environ.pop(w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED, None)
         else:
             os.environ[w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED] = previous
-    assert orch.deps.shadow_override is None
+    assert "shadow_override" not in {f.name for f in fields(orch.deps)}
     # H1: el hold-out estricto es invariante de la ruta; no hay flag de escape en deps.
     assert not hasattr(orch.deps, "shadow_require_holdout")
 

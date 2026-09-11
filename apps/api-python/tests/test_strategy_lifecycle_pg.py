@@ -72,6 +72,39 @@ def _optimize_result() -> object:
     )
 
 
+def _make_shadow_bars_provider(instrument_id: str) -> Any:
+    """V2.35.1 (P2-01): barras deterministas para ejecutar evidencia shadow real.
+
+    La ruta AUTO ya no acepta override humano, así que los tests que esperan promoción
+    deben aportar barras con hold-out separable. El ``instrument_id`` se acepta por
+    firma (el provider real filtra por instrumento), pero la serie es sintética.
+    """
+    import math
+    from datetime import date, timedelta
+
+    from bolsa_analytics.backtest import BacktestBarInput
+
+    base = date(2026, 1, 1)
+    bars = []
+    for index in range(400):
+        price = 100.0 + 12.0 * math.sin(index / 6.0) + index * 0.05
+        bars.append(
+            BacktestBarInput(
+                timestamp=(base + timedelta(days=index)).isoformat(),
+                close=price,
+                open=price,
+                high=price * 1.01,
+                low=price * 0.99,
+                volume=1000.0,
+            )
+        )
+
+    def _provider(_instrument_id: str) -> tuple[Any, ...]:
+        return tuple(bars)
+
+    return _provider
+
+
 
 @pytest_asyncio.fixture
 async def lifecycle_factory() -> async_sessionmaker[AsyncSession]:
@@ -116,7 +149,7 @@ async def test_strategy_lifecycle_roundtrip_pg(
         StrategyFinalist,
         StrategyHealth,
         StrategyValidation,
-        evaluate_promotion,
+        evaluate_admin_promotion,
     )
     from bolsa_infrastructure.database.models.tables import (
         StrategyCandidateRow,
@@ -190,7 +223,7 @@ async def test_strategy_lifecycle_roundtrip_pg(
 
             # 4) Promotion Gate + persistencia de la decisión.
             validation = StrategyValidation(finalist_id=version_id, gates=evaluation.gates)
-            promo = evaluate_promotion(
+            promo = evaluate_admin_promotion(
                 finalist=finalist,
                 validation=validation,
                 coach=CoachAssessment(candidate_id=candidate_id, approved=True),
@@ -312,16 +345,21 @@ async def test_auto_orchestrator_full_cycle_pg(
             orchestrator = AutoOrchestrator(deps)
 
             # Primera pasada sin shadow ⇒ NO promociona (fail-closed).
-            dry = await orchestrator.run_cycle(
-                instrument_id=instrument_id, shadow_validated=False
-            )
+            dry = await orchestrator.run_cycle(instrument_id=instrument_id)
             assert not dry.promoted
             assert await store.get_active(instrument_id=instrument_id) is None
+
+            # V2.35.1 (P2-01): la promoción exige EVIDENCIA shadow real (sin override).
+            from bolsa_application.strategy_shadow_phase import ShadowReplayConfig
+            from bolsa_domain.entities.strategy_lifecycle import ShadowPolicy
+
+            deps.shadow_bars = _make_shadow_bars_provider(instrument_id)
+            deps.shadow_policy = ShadowPolicy(min_closed_round_trips=1, min_return_pct=-100.0)
+            deps.shadow_config = ShadowReplayConfig(window_bars=99, min_bars=10)
 
             promoted = await orchestrator.run_cycle(
                 instrument_id=instrument_id,
                 data_snapshot_id="snap-pg",
-                shadow_validated=True,
                 run_id="pg-cycle",
             )
             assert promoted.status == "active", promoted.reasons
@@ -476,7 +514,6 @@ async def test_default_orchestrator_real_wiring_end_to_end_pg(
 
         result = await orchestrator.run_cycle(
             instrument_id=instrument_id,
-            shadow_validated=False,  # sin shadow: no promociona, pero SÍ evalúa.
             run_id=f"v227-{suffix}",
         )
 
@@ -667,9 +704,11 @@ async def test_promotion_persists_champion_and_coach_pg(
 
     from bolsa_application.auto_orchestrator import AutoOrchestrator, OrchestratorDeps
     from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+    from bolsa_application.strategy_shadow_phase import ShadowReplayConfig
     from bolsa_domain.entities.strategy_lifecycle import (
         CoachAssessment,
         GateResult,
+        ShadowPolicy,
         StrategyEvaluation,
     )
 
@@ -732,11 +771,12 @@ async def test_promotion_persists_champion_and_coach_pg(
                     resolve_universe=_resolve,
                     run_optimize=_run_optimize,
                     max_candidates=1,
+                    shadow_bars=_make_shadow_bars_provider(instrument_id),
+                    shadow_policy=ShadowPolicy(min_closed_round_trips=1, min_return_pct=-100.0),
+                    shadow_config=ShadowReplayConfig(window_bars=99, min_bars=10),
                 )
             )
-            result = await orchestrator.run_cycle(
-                instrument_id=instrument_id, shadow_validated=True
-            )
+            result = await orchestrator.run_cycle(instrument_id=instrument_id)
 
         assert result.promoted, result.reasons
 

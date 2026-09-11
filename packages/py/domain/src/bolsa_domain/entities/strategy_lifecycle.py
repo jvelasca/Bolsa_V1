@@ -591,21 +591,67 @@ def evaluate_promotion(
     validation: StrategyValidation,
     coach: CoachAssessment,
     shadow: ShadowValidationResult | None = None,
-    shadow_validated: bool | None = None,
 ) -> StrategyPromotion:
-    """Promotion Gate (V2.25 · Fase 6): decide si un finalista puede ser ACTIVE.
+    """Promotion Gate AUTOMÁTICO (V2.25 · Fase 6): decide si un finalista puede ser ACTIVE.
 
-    Exige, en este orden:
+    Es la compuerta de la ruta autónoma (AUTO/worker): NO acepta override humano.
+    Decide estrictamente sobre evidencia ejecutada, en este orden:
 
     1. Los SEIS gates cuantitativos en PASS (``validation.passed``).
     2. El COACH sin veto (un veto del COACH bloquea aunque los gates pasen).
     3. Evidencia shadow/paper *ejecutada* (anti strategy-chasing): V2.32 / A12.
+       Sin ``shadow`` que pase ⇒ ``shadow_validation_requerida`` (fail-closed).
 
-    V2.32: la autoridad es ``shadow`` (``ShadowValidationResult``). El booleano
-    ``shadow_validated`` se conserva SOLO como override explícito del operador
-    (rollout/compatibilidad de herméticos): si se pasa, sustituye a la evidencia.
-    Por defecto (``shadow_validated=None``) el flag no puede certificar sin
-    evidencia: sin ``shadow`` que pase ⇒ ``shadow_validation_requerida``.
+    V2.35.1 (auditoría P2-01): el override humano se separó a
+    :func:`evaluate_admin_promotion`. Esta función no lo conoce, así que la ausencia
+    de evidencia nunca se puede confundir con una aprobación.
+    """
+    return _evaluate_promotion(
+        finalist=finalist,
+        validation=validation,
+        coach=coach,
+        shadow=shadow,
+    )
+
+
+def evaluate_admin_promotion(
+    *,
+    finalist: StrategyFinalist,
+    validation: StrategyValidation,
+    coach: CoachAssessment,
+    shadow_validated: bool,
+) -> StrategyPromotion:
+    """Promotion Gate ADMIN/MANUAL (V2.35.1 · auditoría P2-01): única vía con override.
+
+    Reservada a herramientas administrativas explícitas (rollout/operación puntual).
+    Comparte la evaluación con :func:`evaluate_promotion` (no duplica la decisión) y
+    añade el override ``shadow_validated`` como sustituto de la evidencia ejecutada.
+
+    Fail-closed por diseño: el override es un ``bool`` explícito, no un ``bool | None``.
+    Un override ``False`` produce evidencia sintética fallida
+    (``shadow_override_operador_denegado``); un ``True`` queda auditado como
+    ``shadow_override_operador``. La ruta AUTOMÁTICA nunca pasa por aquí.
+    """
+    return _evaluate_promotion(
+        finalist=finalist,
+        validation=validation,
+        coach=coach,
+        shadow=_shadow_override(shadow_validated, finalist),
+    )
+
+
+def _evaluate_promotion(
+    *,
+    finalist: StrategyFinalist,
+    validation: StrategyValidation,
+    coach: CoachAssessment,
+    shadow: ShadowValidationResult | None,
+) -> StrategyPromotion:
+    """Evaluación compartida del Promotion Gate (gates + COACH + evidencia).
+
+    Núcleo único para que las compuertas AUTOMÁTICA y ADMIN no dupliquen la decisión:
+    recibe ya resuelta la ``shadow`` efectiva (evidencia real, o sintética si un
+    override administrativo la sustituye). Sin evidencia que pase ⇒ fail-closed.
     """
     reasons: list[str] = []
     missing = validation.missing_gates
@@ -613,31 +659,28 @@ def evaluate_promotion(
         reasons.append(f"gates_no_superados:{','.join(missing)}")
     if coach.vetoes:
         reasons.append("coach_veto")
-    effective = shadow if shadow is not None else _shadow_override(shadow_validated, finalist)
-    if effective is None or not effective.passed:
+    if shadow is None or not shadow.passed:
         reasons.append("shadow_validation_requerida")
     promoted = not reasons
     return StrategyPromotion(
         finalist_id=finalist.version_id,
         promoted=promoted,
         reasons=tuple(reasons),
-        shadow_validated=bool(effective.passed) if effective is not None else False,
-        shadow_validation_id=effective.version_id if effective is not None else None,
+        shadow_validated=bool(shadow.passed) if shadow is not None else False,
+        shadow_validation_id=shadow.version_id if shadow is not None else None,
     )
 
 
 def _shadow_override(
-    shadow_validated: bool | None,
+    shadow_validated: bool,
     finalist: StrategyFinalist | None,
-) -> ShadowValidationResult | None:
-    """Adapta el override booleano (legado) a un resultado shadow sintético.
+) -> ShadowValidationResult:
+    """Materializa el override administrativo como resultado shadow sintético.
 
-    ``None`` ⇒ no hay override (sin evidencia ⇒ no promoción). Un booleano explícito
-    se materializa como resultado con motivo ``shadow_override_operador`` para que la
-    auditoría distinga "aprobado por evidencia" de "aprobado por override humano".
+    Un booleano explícito se convierte en evidencia con motivo distinto según el
+    valor, para que la auditoría distinga "aprobado por evidencia" de "aprobado por
+    override humano". Solo lo usa :func:`evaluate_admin_promotion`.
     """
-    if shadow_validated is None:
-        return None
     version_id = finalist.version_id if finalist is not None else "override"
     if not shadow_validated:
         return ShadowValidationResult(
@@ -660,7 +703,6 @@ def can_transition(
     gates: tuple[GateResult, ...] = (),
     coach: CoachAssessment | None = None,
     validation: StrategyValidation | None = None,
-    shadow_validated: bool | None = None,
     shadow: ShadowValidationResult | None = None,
 ) -> TransitionResult:
     """Máquina de estados: ¿puede avanzar desde ``state`` y con qué motivos?
@@ -668,9 +710,11 @@ def can_transition(
     Fail-closed y explícita: cada paso exige su condición y devuelve los motivos de
     bloqueo. No ejecuta efectos; solo decide.
 
-    V2.32 / A12: en ``VALIDACION`` la autoridad es la evidencia ``shadow``; el
-    booleano ``shadow_validated`` (``None`` por defecto) se acepta como override
-    explícito para compatibilidad de herméticos.
+    V2.32 / A12: en ``VALIDACION`` la autoridad es la evidencia ``shadow``.
+
+    V2.35.1 (auditoría P2-01): la máquina de estados es ruta AUTOMÁTICA, así que ya no
+    acepta el override booleano ``shadow_validated``. El override administrativo vive
+    exclusivamente en :func:`evaluate_admin_promotion`.
     """
     target = next_state(state)
     if state in {StrategyLifecycleState.REJECTED, StrategyLifecycleState.ACTIVE}:
@@ -710,7 +754,7 @@ def can_transition(
                 False,
                 (f"gates_no_superados:{','.join(validation.missing_gates)}",),
             )
-        effective = shadow if shadow is not None else _shadow_override(shadow_validated, None)
+        effective = shadow
         if effective is None or not effective.passed:
             return TransitionResult(state, target, False, ("shadow_validation_requerida",))
         return TransitionResult(state, target, True)
@@ -745,6 +789,7 @@ __all__ = [
     "StrategyValidation",
     "TransitionResult",
     "can_transition",
+    "evaluate_admin_promotion",
     "evaluate_promotion",
     "next_state",
 ]

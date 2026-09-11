@@ -141,9 +141,9 @@ class OrchestratorDeps:
     # hold-out estricto respecto al LAB (``shadow_start > lab_end``); sin separación
     # demostrable no hay evidencia (fail-closed). Es un **invariante**, no una opción:
     # no existe flag de deps para desactivarlo (lo fuerza ``_run_shadow``).
-    # V2.32 / A12: override explícito del operador (rollout/compatibilidad). ``None``
-    # (default) ⇒ la autoridad es exclusivamente la evidencia ejecutada.
-    shadow_override: bool | None = None
+    # V2.35.1 (auditoría P2-01): se ELIMINÓ ``shadow_override``. La ruta AUTO promociona
+    # solo con evidencia ejecutada; el override administrativo vive exclusivamente en
+    # ``decide_admin_promotion`` (herramientas admin), fuera del orquestador autónomo.
 
 
 @dataclass(slots=True)
@@ -198,18 +198,16 @@ class AutoOrchestrator:
         *,
         instrument_id: str,
         data_snapshot_id: str | None = None,
-        shadow_validated: bool | None = None,
         run_id: str = "auto-orchestrator",
     ) -> OrchestratorResult:
         """Ejecuta una pasada completa del ciclo para ``instrument_id``.
 
         V2.32/A12: la validación shadow es **evidencia ejecutada** (se corre el replay
-        del finalista sobre una ventana separada). ``shadow_validated`` es el override
-        explícito del operador (``None`` por defecto ⇒ la evidencia manda). El
-        orquestador nunca inventa una aprobación shadow.
+        del finalista sobre una ventana separada). V2.35.1 (auditoría P2-01): la ruta
+        AUTO ya no acepta override humano; promociona solo con evidencia real. El
+        override administrativo vive en ``decide_admin_promotion``.
         """
         deps = self._deps
-        shadow_override = shadow_validated if shadow_validated is not None else deps.shadow_override
         resolution = None
         if deps.resolve_universe is not None:
             resolution = await deps.resolve_universe()
@@ -375,9 +373,9 @@ class AutoOrchestrator:
 
         # VALIDACION (shadow): V2.32/A12. Se EJECUTA la definición del finalista sobre
         # una ventana separada del LAB para producir evidencia contable. Sin provider de
-        # barras no hay evidencia y el Promotion Gate no promociona (fail-closed). El
-        # override explícito del operador (``shadow_override``) solo aplica si se fija.
+        # barras no hay evidencia y el Promotion Gate no promociona (fail-closed).
         # V2.32.1 (auditoría P1-01): la ventana shadow es un hold-out ESTRICTO del LAB.
+        # V2.35.1 (auditoría P2-01): sin override humano, la evidencia es la única vía.
         shadow_result = await self._run_shadow(
             finalist=finalist,
             instrument_id=instrument_id,
@@ -416,7 +414,6 @@ class AutoOrchestrator:
             gates=gates,
             coach=coach,
             shadow=shadow_result,
-            shadow_validated=shadow_override,
             active=active_ref,
         )
         await deps.store.save_promotion(
