@@ -325,3 +325,80 @@ def test_adaptive_never_absorbs_all_exploration() -> None:
     assert allocation["adaptive"].candidates <= budget.max_candidates - int(
         math.ceil(budget.max_candidates * 0.9)
     )
+
+
+# ── V2.38 (incremento 3) — granularidad por región de parámetros ────────────────
+
+
+def _agg_region(
+    preset: str, region: str, trials: int, *, avg_score: float = 1.0
+) -> dict[str, Any]:
+    return {
+        "presetKey": preset,
+        "paramRegion": region,
+        "trials": trials,
+        "avgScore": avg_score,
+        "zeroTrade": 0,
+        "failures": 0,
+    }
+
+
+def test_without_region_keys_remain_plain_families() -> None:
+    """Compatibilidad byte a byte: sin region, la clave es la familia (como V2.37)."""
+    snapshot = _build([_agg("sma", 10), _agg("rsi", 8)])
+    assert set(snapshot.sample_sizes) == {"sma", "rsi"}
+    assert set(snapshot.family_weights) == {"sma", "rsi"}
+
+
+def test_composite_key_isolates_regions() -> None:
+    """Dos regiones de la misma familia se agregan por separado."""
+    snapshot = _build(
+        [
+            _agg_region("sma", "r00:aaa", 6, avg_score=1.4),
+            _agg_region("sma", "r01:bbb", 6, avg_score=0.6),
+        ]
+    )
+    keys = set(snapshot.sample_sizes)
+    assert keys == {"sma|r00:aaa", "sma|r01:bbb"}
+    assert snapshot.family_weights["sma|r00:aaa"] > snapshot.family_weights["sma|r01:bbb"]
+
+
+def test_composite_key_hash_is_stable_and_sensitive_to_region() -> None:
+    first = _build([_agg_region("sma", "r00:aaa", 6)])
+    again = _build([_agg_region("sma", "r00:aaa", 6)])
+    other = _build([_agg_region("sma", "r01:bbb", 6)])
+    assert first.snapshot_hash == again.snapshot_hash
+    assert first.snapshot_hash != other.snapshot_hash
+
+
+def test_family_granularity_payload_is_populated_when_region_present() -> None:
+    """``familyGranularity`` deja de estar vacío y documenta la región real."""
+    snapshot = _build([_agg_region("sma", "r00:aaa", 6)])
+    granularity = snapshot.payload["familyGranularity"]
+    assert granularity == {"sma|r00:aaa": {"family": "sma", "paramRegion": "r00:aaa"}}
+
+
+def test_family_granularity_is_empty_without_region() -> None:
+    snapshot = _build([_agg("sma", 10)])
+    assert snapshot.payload["familyGranularity"] == {}
+
+
+def test_granularity_does_not_change_snapshot_hash_vs_plain_family() -> None:
+    """``familyGranularity`` es aditivo: NO participa en el ``snapshot_hash``."""
+    plain = _build([_agg("sma", 6)])
+    granular = _build([_agg_region("sma", "r00:aaa", 6)])
+    # Distinta evidencia (una sin region, otra con region) ⇒ hashes distintos...
+    assert plain.snapshot_hash != granular.snapshot_hash
+    # ...y el fingerprint sí refleja la region (identidad del dataset).
+    assert plain.evidence_fingerprint != granular.evidence_fingerprint
+
+
+def test_mixed_region_and_plain_family_coexist() -> None:
+    """Evidencia histórica (sin region) y nueva (con region) pueden coexistir."""
+    snapshot = _build(
+        [
+            _agg("sma", 4),
+            _agg_region("sma", "r00:aaa", 6),
+        ]
+    )
+    assert set(snapshot.sample_sizes) == {"sma", "sma|r00:aaa"}

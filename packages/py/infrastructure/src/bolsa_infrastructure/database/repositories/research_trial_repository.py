@@ -6,6 +6,7 @@ from sqlalchemy import Float, and_, asc, case, cast, desc, func, nulls_last, sel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.expression import ColumnElement
 
+from bolsa_application.discovery_param_region import compose_granularity_key
 from bolsa_domain.entities.research_trial import ResearchTrial
 from bolsa_infrastructure.database.models import (
     InstrumentRow,
@@ -21,6 +22,17 @@ ResearchTrialSort = Literal[
     "commission",
     "k_contribution",
 ]
+
+
+def _normalized_region(value: Any) -> str | None:
+    """V2.38 (incremento 3): normaliza la region de un trial agregado.
+
+    ``None``/vacío ⇒ ``None`` (sin region: la clave compuesta colapsa a la familia).
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 class SqlAlchemyResearchTrialRepository:
@@ -43,6 +55,7 @@ class SqlAlchemyResearchTrialRepository:
             strategy_definition_id=row.strategy_definition_id,
             preset_key=row.preset_key,
             strategy_name=row.strategy_name,
+            param_region=row.param_region,
             blocks=row.blocks if isinstance(row.blocks, dict) else None,
             is_score=None if row.is_score is None else float(row.is_score),
             parent_trial_id=row.parent_trial_id,
@@ -65,6 +78,7 @@ class SqlAlchemyResearchTrialRepository:
         strategy_definition_id: str | None = None,
         preset_key: str | None = None,
         strategy_name: str | None = None,
+        param_region: str | None = None,
         blocks: dict[str, Any] | None = None,
         is_score: float | None = None,
         parent_trial_id: str | None = None,
@@ -83,6 +97,7 @@ class SqlAlchemyResearchTrialRepository:
             strategy_definition_id=strategy_definition_id,
             preset_key=preset_key,
             strategy_name=strategy_name,
+            param_region=param_region,
             params=params,
             blocks=blocks,
             is_metrics=is_metrics,
@@ -397,6 +412,7 @@ class SqlAlchemyResearchTrialRepository:
         stmt = (
             select(
                 ResearchTrialRow.preset_key.label("preset"),
+                ResearchTrialRow.param_region.label("region"),
                 func.count().label("trials"),
                 func.coalesce(func.sum(ResearchTrialRow.k_contribution), 0).label("k"),
                 func.avg(ResearchTrialRow.is_score).label("avg_score"),
@@ -424,8 +440,8 @@ class SqlAlchemyResearchTrialRepository:
                 ).label("failures"),
             )
             .where(ResearchTrialRow.preset_key.isnot(None))
-            .group_by(ResearchTrialRow.preset_key)
-            .order_by(asc(ResearchTrialRow.preset_key))
+            .group_by(ResearchTrialRow.preset_key, ResearchTrialRow.param_region)
+            .order_by(asc(ResearchTrialRow.preset_key), asc(ResearchTrialRow.param_region))
         )
         if filters:
             stmt = stmt.where(*filters)
@@ -434,6 +450,10 @@ class SqlAlchemyResearchTrialRepository:
         return [
             {
                 "presetKey": str(row.preset),
+                # V2.38 (incremento 3): granularidad por region. ``None``/``""`` cuando
+                # no hay region (flag OFF o trials historicos): la clave compuesta que
+                # deriva el snapshot es entonces la propia familia (compatibilidad).
+                "paramRegion": _normalized_region(row.region),
                 "trials": int(row.trials or 0),
                 "kConsumed": int(row.k or 0),
                 "avgScore": None if row.avg_score is None else float(row.avg_score),
@@ -493,13 +513,14 @@ class SqlAlchemyResearchTrialRepository:
         stmt = (
             select(
                 ResearchTrialRow.preset_key.label("preset"),
+                ResearchTrialRow.param_region.label("region"),
                 func.count().label("n"),
                 weighted,
             )
             .join(ResearchTrialRow, ResearchTrialRow.id == ResearchEvidenceRow.trial_id)
             .where(ResearchTrialRow.preset_key.isnot(None))
-            .group_by(ResearchTrialRow.preset_key)
-            .order_by(asc(ResearchTrialRow.preset_key))
+            .group_by(ResearchTrialRow.preset_key, ResearchTrialRow.param_region)
+            .order_by(asc(ResearchTrialRow.preset_key), asc(ResearchTrialRow.param_region))
         )
         if filters:
             stmt = stmt.where(*filters)
@@ -510,7 +531,9 @@ class SqlAlchemyResearchTrialRepository:
             family = str(row.preset or "").strip()
             if not family:
                 continue
-            out[family] = {
+            # V2.38 (incremento 3): clave compuesta canónica (familia o familia|region).
+            key = compose_granularity_key(family, _normalized_region(row.region) or "")
+            out[key] = {
                 "posteriorWeighted": float(row.weighted or 0.0),
                 "posteriorCount": float(row.n or 0),
             }

@@ -301,6 +301,135 @@ async def test_family_evidence_summary_aggregates_rich_metrics(pg_session: Async
 
 
 @pytest.mark.asyncio
+async def test_family_evidence_summary_groups_by_composite_key(pg_session: AsyncSession) -> None:
+    """V2.38 (incremento 3): la agregación distingue regiones dentro de la misma familia."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
+    instrument_id = f"inst_v238agg_{uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    pg_session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"V238A{uuid4().hex[:4].upper()}",
+            yahoo_symbol=f"V238A{uuid4().hex[:4]}",
+            name="V238 aggregation test",
+            exchange="MCE",
+            currency="EUR",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    preset = f"v238_family_{uuid4().hex[:8]}"
+    # Región A: dos trials; región B: uno; más un trial histórico sin región.
+    rows = [
+        ("r00:aaa", 2, 1.5),
+        ("r00:aaa", 2, 1.5),
+        ("r01:bbb", 1, 0.5),
+        (None, 1, 1.0),
+    ]
+    for region, trades, score in rows:
+        pg_session.add(
+            ResearchTrialRow(
+                id=f"trial_{uuid4().hex[:12]}",
+                instrument_id=instrument_id,
+                preset_key=preset,
+                param_region=region,
+                params={},
+                is_metrics={"tradeCount": trades},
+                is_score=score,
+                proposed_by="test",
+                created_at=now,
+            )
+        )
+    await pg_session.flush()
+
+    repo = SqlAlchemyResearchTrialRepository(pg_session)
+    summary = await repo.family_evidence_summary()
+    match = [r for r in summary if r["presetKey"] == preset]
+    by_region = {r["paramRegion"]: r for r in match}
+    # Tres claves distintas: dos regiones + la histórica sin region (None).
+    assert set(by_region) == {"r00:aaa", "r01:bbb", None}
+    assert by_region["r00:aaa"]["trials"] == 2
+    assert by_region["r01:bbb"]["trials"] == 1
+    assert by_region[None]["trials"] == 1
+
+
+@pytest.mark.asyncio
+async def test_posterior_evidence_summary_keyed_by_composite(pg_session: AsyncSession) -> None:
+    """V2.38: la evidencia posterior se agrega por clave compuesta (familia|region)."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models import (
+        InstrumentRow,
+        ResearchEvidenceRow,
+        ResearchTrialRow,
+    )
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
+    instrument_id = f"inst_v238post_{uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    pg_session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"V238P{uuid4().hex[:4].upper()}",
+            yahoo_symbol=f"V238P{uuid4().hex[:4]}",
+            name="V238 posterior test",
+            exchange="MCE",
+            currency="EUR",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    preset = f"v238_post_{uuid4().hex[:8]}"
+    region = "r00:aaa"
+    trial_id = f"trial_{uuid4().hex[:12]}"
+    pg_session.add(
+        ResearchTrialRow(
+            id=trial_id,
+            instrument_id=instrument_id,
+            preset_key=preset,
+            param_region=region,
+            params={},
+            is_metrics={"tradeCount": 5},
+            proposed_by="test",
+            created_at=now,
+        )
+    )
+    await pg_session.flush()
+    pg_session.add(
+        ResearchEvidenceRow(
+            id=f"ev_{uuid4().hex[:12]}",
+            instrument_id=instrument_id,
+            trial_id=trial_id,
+            level="A",
+            source="holdout",
+            evidence_weight=0.8,
+            summary={},
+            created_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    repo = SqlAlchemyResearchTrialRepository(pg_session)
+    posterior = await repo.posterior_evidence_summary()
+    assert f"{preset}|{region}" in posterior
+    assert posterior[f"{preset}|{region}"]["posteriorCount"] == 1.0
+
+
+@pytest.mark.asyncio
 async def test_posterior_evidence_summary_by_family(pg_session: AsyncSession) -> None:
     """V2.37/P2-01: evidencia posterior (shadow/paper) agregada por familia y nivel."""
     from datetime import UTC, datetime
@@ -479,7 +608,7 @@ async def test_migration_037_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _column_present(connection) is True
-        assert alembic_head() == "037_discovery_evidence_freshness"
+        assert alembic_head() == "038_research_trials_param_region"
     finally:
         engine.dispose()
 
@@ -529,6 +658,108 @@ async def test_migration_036_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _table_present(connection) is True
-        assert alembic_head() == "037_discovery_evidence_freshness"
+        assert alembic_head() == "038_research_trials_param_region"
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_param_region_roundtrips(pg_session: AsyncSession) -> None:
+    """V2.38: un trial con region se lee de vuelta; sin region queda ``None``."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models import InstrumentRow
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
+    instrument_id = f"inst_v238_{uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    pg_session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"V238{uuid4().hex[:5].upper()}",
+            yahoo_symbol=f"V238{uuid4().hex[:5]}",
+            name="V238 test",
+            exchange="MCE",
+            currency="EUR",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    repo = SqlAlchemyResearchTrialRepository(pg_session)
+    region = "r03:abc123def456"
+    saved = await repo.insert_trial(
+        instrument_id=instrument_id,
+        preset_key="v238_family",
+        params={"discovery_param_region": region},
+        is_metrics={"tradeCount": 3},
+        proposed_by="test",
+        param_region=region,
+    )
+    assert saved.param_region == region
+    fetched = await repo.get_by_id(saved.id)
+    assert fetched is not None
+    assert fetched.param_region == region
+
+    without = await repo.insert_trial(
+        instrument_id=instrument_id,
+        preset_key="v238_family",
+        params={},
+        is_metrics={"tradeCount": 0},
+        proposed_by="test",
+    )
+    assert without.param_region is None
+
+
+@pytest.mark.asyncio
+async def test_migration_038_roundtrip(pg_session: AsyncSession) -> None:
+    """``downgrade``/``upgrade`` de la 038 dejan ``research_trials.param_region`` igual."""
+    pytest.importorskip("alembic")
+    from alembic import command
+    from sqlalchemy import create_engine
+
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.migrations import _alembic_config, alembic_head
+
+    settings = get_settings()
+    url = settings.database_url
+    assert url is not None
+    url = url.replace("postgresql://", "postgresql+psycopg://", 1).split("?", 1)[0]
+    engine = create_engine(url)
+    cfg = _alembic_config()
+
+    def _region_column_present(connection: object) -> bool:
+        row = connection.execute(  # type: ignore[attr-defined]
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema='public' "
+                "AND table_name='research_trials' "
+                "AND column_name='param_region'"
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+    try:
+        with engine.connect() as connection:
+            assert _region_column_present(connection) is True
+
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.downgrade(cfg, "037_discovery_evidence_freshness")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _region_column_present(connection) is False
+
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.upgrade(cfg, "head")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _region_column_present(connection) is True
+        assert alembic_head() == "038_research_trials_param_region"
     finally:
         engine.dispose()

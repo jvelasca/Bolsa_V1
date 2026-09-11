@@ -49,6 +49,7 @@ import math
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from bolsa_application.discovery_param_region import compose_granularity_key
 from bolsa_domain.entities.discovery_evidence_snapshot import (
     MATH_VERSION_DISCOVERY_EVIDENCE_V0,
     MATH_VERSION_DISCOVERY_EVIDENCE_V1,
@@ -261,22 +262,38 @@ def compute_family_weights(
     min_samples: int = DEFAULT_MIN_SAMPLES,
     math_version: str = MATH_VERSION_DISCOVERY_EVIDENCE_V1,
 ) -> tuple[dict[str, float], dict[str, int]]:
-    """Pesos por familia H0 y tamaños de muestra, a partir de los agregados del repo.
+    """Pesos por familia H0 (o clave compuesta familia|region) y tamaños de muestra.
 
-    Orden canónico por ``presetKey``. Las familias por debajo de ``min_samples`` se
-    excluyen del mapa de pesos (no aportan señal) pero conservan su tamaño de muestra
-    para auditoría.
+    V2.38 (incremento 3): los agregados pueden venir ya granularizados por **region de
+    parametros**. La clave canónica se compone con ``compose_granularity_key``: sin región
+    es exactamente la familia (compatibilidad byte a byte con V2.36/V2.37); con región es
+    ``familia|region``. Orden canónico por clave compuesta. Las claves por debajo de
+    ``min_samples`` se excluyen del mapa de pesos (no aportan señal) pero conservan su
+    tamaño de muestra para auditoría.
     """
+    from bolsa_application.discovery_param_region import compose_granularity_key
+
+
+
     family_weights: dict[str, float] = {}
     sample_sizes: dict[str, int] = {}
-    for row in sorted(aggregates, key=lambda r: str(r.get("presetKey") or "")):
+    ordered = sorted(
+        aggregates,
+        key=lambda r: (
+            str(r.get("presetKey") or ""),
+            str(r.get("paramRegion") or ""),
+        ),
+    )
+    for row in ordered:
         family = str(row.get("presetKey") or "").strip()
         if not family:
             continue
+        region = str(row.get("paramRegion") or "").strip()
+        key = compose_granularity_key(family, region)
         trials = int(row.get("trials") or 0)
-        sample_sizes[family] = trials
+        sample_sizes[key] = trials
         if trials >= int(min_samples):
-            family_weights[family] = _family_strength(row, math_version=math_version)
+            family_weights[key] = _family_strength(row, math_version=math_version)
     return family_weights, sample_sizes
 
 
@@ -323,6 +340,7 @@ def evidence_fingerprint(
             "families": [
                 {
                     "presetKey": str(row.get("presetKey") or ""),
+                    "paramRegion": str(row.get("paramRegion") or ""),
                     "trials": int(row.get("trials") or 0),
                     "zeroTrade": int(row.get("zeroTrade") or 0),
                     "failures": int(row.get("failures") or 0),
@@ -410,24 +428,22 @@ def build_discovery_evidence_snapshot(
         sample_sizes=sample_sizes,
     )
     fingerprint = evidence_fingerprint(aggregates=aggregate_list, posterior_cut=posterior_cut)
-    # V2.37/P2-03 (granularidad progresiva): desglose opcional por régimen / región de
-    # parámetros / clase de instrumento. Aditivo y NO obligatorio: hoy los agregados son
-    # por familia H0 (``preset_key``); cuando el repo los aporte (clave compuesta), el
-    # payload ya tiene un hueco canónico para publicarlos sin romper el esquema. No
-    # participa en el hash: es observabilidad para la siguiente evolución.
+    # V2.37/P2-03 + V2.38 (incremento 3): desglose de granularidad. La dimension ACTIVA
+    # hoy es la region de parametros (bucket determinista v0); regimen y clase de
+    # instrumento quedan documentados como pendientes porque NO existen como dato
+    # persistido. Aditivo y NO obligatorio: se publica por clave compuesta sin romper el
+    # esquema. No participa en el ``snapshot_hash`` (observabilidad para la siguiente
+    # evolucion); si participa en ``evidence_fingerprint`` (identidad del dataset).
     granularity: dict[str, Any] = {}
     for row in aggregate_list:
         family = str(row.get("presetKey") or "").strip()
         if not family:
             continue
-        regime = str(row.get("regime") or "").strip()
         region = str(row.get("paramRegion") or "").strip()
-        instrument_class = str(row.get("instrumentClass") or "").strip()
-        if regime or region or instrument_class:
-            granularity[family] = {
-                "regime": regime,
+        if region:
+            granularity[compose_granularity_key(family, region)] = {
+                "family": family,
                 "paramRegion": region,
-                "instrumentClass": instrument_class,
             }
     payload: dict[str, Any] = {
         "mathVersion": math_version,

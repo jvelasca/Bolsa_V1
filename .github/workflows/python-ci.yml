@@ -86,6 +86,8 @@ jobs:
           # V2.36/V2.37: evidencia adaptativa (prior determinista) + search policy.
           packages/py/application/tests/test_discovery_evidence.py
           packages/py/application/tests/test_discovery_search_policy.py
+          # V2.38: granularidad por región de parámetros (bucket determinista puro).
+          packages/py/application/tests/test_discovery_param_region.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
           # V2.32/A12: evidencia shadow ejecutada (replay determinista, sin DB).
           packages/py/application/tests/test_strategy_shadow_phase.py

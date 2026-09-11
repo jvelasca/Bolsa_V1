@@ -28,6 +28,7 @@ class ResearchTrialRepository(Protocol):
         strategy_definition_id: str | None = None,
         preset_key: str | None = None,
         strategy_name: str | None = None,
+        param_region: str | None = None,
         blocks: dict[str, Any] | None = None,
         is_score: float | None = None,
         parent_trial_id: str | None = None,

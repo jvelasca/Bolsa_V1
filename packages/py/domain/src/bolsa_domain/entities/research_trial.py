@@ -19,6 +19,10 @@ class ResearchTrial:
     strategy_definition_id: str | None = None
     preset_key: str | None = None
     strategy_name: str | None = None
+    # V2.38 (incremento 3): region de parametros determinista (bucket v0) del trial, o
+    # ``None`` si no aplica (sin grid / flag OFF / trial historico). Ver
+    # ``bolsa_application.discovery_param_region``.
+    param_region: str | None = None
     blocks: dict[str, Any] | None = None
     is_score: float | None = None
     parent_trial_id: str | None = None

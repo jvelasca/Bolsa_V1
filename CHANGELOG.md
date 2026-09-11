@@ -2,6 +2,63 @@
 
 All notable releases of Bolsa V1.
 
+## [1.63.0-beta] — V2.38 · Granularidad por región de parámetros (incremento 3) — 2026-09-11
+
+Tercer incremento de **Strategy Intelligence**: la evidencia adaptativa deja de agregarse solo por
+familia H0 (`preset_key`) y pasa a granularidad por **región de parámetros**, con bucket determinista
+y versionado, columna nueva nullable en `research_trials` (migración aditiva) y consumo en la search
+policy. Régimen e **instrument class quedan explícitamente fuera**: no existen hoy como dato
+persistido (ver más abajo).
+
+- **Núcleo determinista y puro.** Nuevo módulo `bolsa_application.discovery_param_region`
+  (`math_version=discovery_param_region_v0`): `param_region_for_point` deriva una clave estable del
+  punto dentro del grid de su familia (ordinal en el producto cartesiano determinista + hash corto de
+  los valores), `compose_granularity_key`/`split_granularity_key` definen la clave compuesta canónica
+  `familia` o `familia|region`. **Fail-closed**: un punto fuera del grid no recibe región (`""`), no se
+  aproxima. Sin LLM, sin red, sin BD.
+- **Persistencia por trial.** Migración aditiva **`038_research_trials_param_region`** (columna
+  `param_region String NULL`, sin backfill, `downgrade()` completo): los trials históricos quedan
+  `NULL` (no se inventa su región). Write-path completo: el motor etiqueta la candidata
+  (`discovery_param_region`), el runner la propaga (`_REGION_KEYS`, antes se descartaba) y
+  `optimization_runs` la persiste (`ResearchTrial.param_region`, entidad + Protocol + repo SQL).
+- **Agregación por clave compuesta.** `family_evidence_summary` y `posterior_evidence_summary` agrupan
+  por `preset_key + param_region` y devuelven `paramRegion`; el job batch mergea por clave compuesta.
+  **Retrocompatible**: si todas las regiones son `NULL`, la clave colapsa a la familia y el
+  `snapshot_hash` es **idéntico** al de V2.37.
+- **Snapshot y fingerprint.** `compute_family_weights` mintea la clave compuesta; `familyGranularity`
+  deja de estar vacío y publica `{family, paramRegion}` reales (aditivo, **fuera del `snapshot_hash`**,
+  dentro de `evidence_fingerprint`).
+- **Search policy y motor.** `SearchPolicy` sube a `discovery_search_policy_v1` e incluye
+  `granularityKeyVersion` en su hash (la fórmula de reparto no cambia: ya era agnóstica a la clave).
+  El motor resuelve la clave compuesta y **filtra `param_points()` a la región** indicada; clave
+  desconocida o región inexistente ⇒ no emite (fail-closed).
+- **Rollout** — Flag nuevo `AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION` **OFF por defecto**: con OFF la
+  evidencia se colapsa a familia (`_collapse_regions`) y el sistema es **byte-idéntico a V2.37**.
+  Observabilidad aditiva: `DiscoveryEmissionSummary` gana `adaptive_region_emissions`/
+  `adaptive_region_count`; los contadores de ciclo/proceso suman `adaptive_region_emissions` y los
+  logs reportan `adaptive_regions=N/M`.
+- **Por qué NO régimen ni clase de instrumento.** Régimen solo existe como clasificación en memoria en
+  la capa cognitiva (`bolsa_analytics.cognitive.market_state`) y jamás se persiste; `instruments.type`
+  es un enum con un único valor (`stock`) y `sector` es texto libre sin poblar. Incorporarlos exige
+  primero persistirlos como fuente de verdad; la clave compuesta está diseñada para admitir nuevos
+  componentes sin romper el contrato.
+- **Invariantes intactas**: `AUTO ⇒ SIMULATED`; LIVE bloqueado; sin LLM en hot path; fail-closed;
+  long-only; H1 y H2 intactos; gates CPCV/PBO/DSR/WFE/OOS + coach sin relajar; test anti-explosión
+  `len(plans) == 1784` intacto (solo se etiqueta, no se añade espacio de búsqueda); con el flag OFF,
+  salida **byte-idéntica a V2.37**.
+- **Tests**: `test_discovery_param_region.py` (determinismo, estabilidad ante reordenación,
+  fail-closed, ida y vuelta de la clave compuesta, anti-explosión intacta),
+  `test_discovery_evidence.py` (claves compuestas aíslan regiones, hash estable y sensible a región,
+  `familyGranularity` poblado/vacío, coexistencia histórica+regionada),
+  `test_discovery_search_policy.py` (claves compuestas + `granularityKeyVersion`, filtrado por región,
+  región desconocida fail-closed), worker (flag de región OFF/ON, `_collapse_regions`),
+  PG (columna `param_region` + roundtrip, agregación por región, posterior por clave compuesta,
+  roundtrip `038`).
+- **Alembic head**: `038_research_trials_param_region`.
+- **Verificación (local)**: `ruff` OK (ficheros tocados) · `mypy` Success en los módulos tocados ·
+  offline **1703 passed** · PG con gates `A14_GRAMMAR_PG_REQUIRED=1` **14 passed** · anti-explosión
+  `1784` intacto · `--dry-run` OK · sin región, `snapshot_hash` idéntico a V2.37.
+
 ## [1.62.0-beta] — V2.37 · Hardening de V2.36 (P2-01/02/03) + Adaptive Discovery Generation — 2026-09-11
 
 Segundo incremento de **Strategy Intelligence**: cierra los tres P2 de la auditoría externa de

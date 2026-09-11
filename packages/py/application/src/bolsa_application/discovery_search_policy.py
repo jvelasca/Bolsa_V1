@@ -37,7 +37,15 @@ from bolsa_domain.entities.discovery_evidence_snapshot import (
 
 # Versión de la matemática de la política (separada del snapshot que la alimenta): una
 # política guardada/emitida se puede auditar y reproducir con su fórmula.
-MATH_VERSION_SEARCH_POLICY_V0 = "discovery_search_policy_v0"
+# V2.38 (incremento 3): v1 — la clave de reparto es la **clave compuesta** de
+# granularidad (familia o familia|region), no solo la familia. La fórmula de reparto no
+# cambia (ya era agnóstica a la clave); el bump marca que las claves pueden llevar región.
+MATH_VERSION_SEARCH_POLICY_V0 = "discovery_search_policy_v1"
+
+# Versión del esquema de clave de granularidad que alimenta la política. Se incluye en el
+# ``policy_hash`` para que una política derivada de claves compuestas sea distinguible de
+# una derivada solo por familia (reproducibilidad de extremo a extremo).
+GRANULARITY_KEY_VERSION_V0 = "discovery_granularity_key_v0"
 
 # Fracción mínima del cupo adaptativo reservada a exploración uniforme entre familias
 # con evidencia. Garantiza que la explotación (familias con mejor prior) nunca absorbe
@@ -237,6 +245,7 @@ def build_search_policy(
     payload = {
         "mathVersion": MATH_VERSION_SEARCH_POLICY_V0,
         "snapshotHash": snapshot.snapshot_hash,
+        "granularityKeyVersion": GRANULARITY_KEY_VERSION_V0,
         "adaptiveCap": cap,
         "explorationRatio": _round(ratio),
         "quotas": {q.family: q.quota for q in quotas},
@@ -249,6 +258,7 @@ def build_search_policy(
         policy_hash=_policy_hash(payload),
         metadata={
             "snapshotHash": snapshot.snapshot_hash,
+            "granularityKeyVersion": GRANULARITY_KEY_VERSION_V0,
             "saturationAware": snapshot.math_version != MATH_VERSION_DISCOVERY_EVIDENCE_V0,
         },
     )

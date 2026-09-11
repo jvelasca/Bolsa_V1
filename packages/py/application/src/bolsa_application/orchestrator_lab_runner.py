@@ -123,6 +123,11 @@ _GRID_KEYS = frozenset(
     }
 )
 
+# V2.38 (incremento 3): claves de etiquetado del Discovery que NO son parametros de
+# grid ni de corrida, pero deben propagarse hasta el trial persistido para poder agregar
+# la evidencia por region de parametros. Hoy solo la region (bucket determinista v0).
+_REGION_KEYS = frozenset({"discovery_param_region"})
+
 
 @dataclass(frozen=True, slots=True)
 class LabOptimizeResult:
@@ -250,6 +255,11 @@ class LabOptimizeRunner:
         merged.update(self._grid_defaults.get(family, {}))
         for key, value in dict(candidate_params or {}).items():
             if key in _LAB_RUN_KEYS or key in _GRID_KEYS:
+                merged[key] = value
+            elif key in _REGION_KEYS:
+                # V2.38 (incremento 3): la region de parametros no es un parametro de
+                # corrida; se propaga para que el trial persistido quede etiquetado y la
+                # evidencia pueda agregarse por region (ver ``optimization_runs``).
                 merged[key] = value
             elif key == "definition":
                 # V2.31/A11: la definición declarativa del Discovery no es un parámetro

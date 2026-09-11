@@ -1061,6 +1061,9 @@ class ResearchTrialRow(Base):
     )
     preset_key: Mapped[str | None] = mapped_column("preset_key", String, nullable=True)
     strategy_name: Mapped[str | None] = mapped_column("strategy_name", String, nullable=True)
+    # V2.38 (incremento 3): region de parametros determinista (bucket v0) del trial.
+    # ``NULL`` = sin region (trials historicos o flag OFF): agrega por familia, como antes.
+    param_region: Mapped[str | None] = mapped_column("param_region", String, nullable=True)
     params: Mapped[dict[str, Any]] = mapped_column(JSONB)
     blocks: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_metrics: Mapped[dict[str, Any]] = mapped_column("is_metrics", JSONB)

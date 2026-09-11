@@ -99,6 +99,10 @@ _ADAPTIVE_MAX_STALENESS_DAYS_DEFAULT = 30
 # defecto: con OFF el carril adaptive solo recibe cupo observable (v2.36), sin emitir
 # candidatas nuevas.
 AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION = "AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION"
+# V2.38 (incremento 3): granularidad de la evidencia adaptativa por REGION de parametros.
+# OFF por defecto: con OFF la clave es la familia y el sistema es byte-idéntico a V2.37.
+# Con ON, la evidencia ``familia|region`` filtra la emisión adaptativa al punto concreto.
+AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION = "AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION"
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
 _SHADOW_WINDOW_BARS_DEFAULT = 250
@@ -186,6 +190,18 @@ def adaptive_generation_enabled() -> bool:
     reparte entre familias según la ``SearchPolicy`` derivada del snapshot vigente.
     """
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION))
+
+
+def adaptive_param_region_enabled() -> bool:
+    """V2.38 (incremento 3): ¿la emisión adaptativa se filtra por REGION de parametros? (OFF).
+
+    OFF por defecto: con OFF la clave de la evidencia es la familia (como V2.37) y la
+    emisión adaptativa recorre el grid completo de cada familia, de modo que el
+    comportamiento es **byte-idéntico** a V2.37. Con ON, la evidencia ya granularizada por
+    region (``familia|region``) se respeta y la emisión adaptativa se **filtra al punto/
+    region** indicado por el prior, en lugar de barrer la familia entera.
+    """
+    return _truthy(os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION))
 
 
 def adaptive_max_staleness_days() -> int:
@@ -297,6 +313,8 @@ class GrammarObservabilityCounters:
     # V2.37 (incremento 2): emisión adaptativa real (observabilidad, solo lectura).
     adaptive_candidates: int = 0
     adaptive_discoveries: int = 0
+    # V2.38 (incremento 3): emisión adaptativa granularizada por region de parametros.
+    adaptive_region_emissions: int = 0
 
 
 @dataclass(slots=True)
@@ -316,9 +334,12 @@ class CycleGrammarCounters:
     total_candidates: int = 0
     trials_used: int = 0
     warmup_skipped: int = 0
+
     # V2.37 (incremento 2): emisión adaptativa real (observabilidad, solo lectura).
     adaptive_candidates: int = 0
     adaptive_discoveries: int = 0
+    # V2.38 (incremento 3): emisión adaptativa granularizada por region de parametros.
+    adaptive_region_emissions: int = 0
 
 
 _PROCESS_COUNTERS = GrammarObservabilityCounters()
@@ -372,6 +393,10 @@ def _accumulate(counters: CycleGrammarCounters | GrammarObservabilityCounters, s
     counters.adaptive_candidates += adaptive_emitted
     if adaptive_emitted > 0:
         counters.adaptive_discoveries += 1
+    # V2.38 (incremento 3): emisión adaptativa de regiones concretas (observabilidad).
+    counters.adaptive_region_emissions += int(
+        getattr(summary, "adaptive_region_emissions", 0)
+    )
 
 
 def _record_discovery_summary(summary: Any) -> None:
@@ -458,6 +483,44 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
+def _collapse_regions(snapshot: Any) -> Any:
+    """V2.38 (incremento 3): colapsa las claves ``familia|region`` a solo familia.
+
+    Se usa cuando ``AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION`` está OFF: la evidencia
+    granularizada se reduce a la familia (compatibilidad byte-idéntica con V2.37), de modo
+    que la emisión adaptativa vuelve a recorrer el grid completo. Determinista:
+    ``sample_sizes`` se suma y ``family_weights`` toma el **máximo** por familia (criterio
+    conservador: la familia hereda la mejor región, sin inventar señal).
+
+    Fail-closed: si ningún peso lleva región, devuelve el snapshot tal cual (no se toca).
+    """
+    from dataclasses import replace as _dc_replace
+
+    from bolsa_application.discovery_param_region import split_granularity_key
+
+    weights = dict(getattr(snapshot, "family_weights", {}) or {})
+    samples = dict(getattr(snapshot, "sample_sizes", {}) or {})
+    if not any(split_granularity_key(key)[1] for key in weights):
+        return snapshot
+    collapsed_weights: dict[str, float] = {}
+    for key, value in weights.items():
+        family, _ = split_granularity_key(key)
+        collapsed_weights[family] = max(collapsed_weights.get(family, 0.0), float(value))
+    collapsed_samples: dict[str, int] = {}
+    for key, value in samples.items():
+        family, _ = split_granularity_key(key)
+        collapsed_samples[family] = collapsed_samples.get(family, 0) + int(value)
+    try:
+        return _dc_replace(
+            snapshot,
+            family_weights=collapsed_weights,
+            sample_sizes=collapsed_samples,
+        )
+    except Exception:  # noqa: BLE001 — snapshot no reemplazable: se ignora el colapso.
+        logger.exception("auto_orchestrator region collapse failed")
+        return snapshot
+
+
 def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
     """``discovery(instrument_id)`` síncrono (función pura, sin DB/red).
 
@@ -503,6 +566,12 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
         snapshot = _current_snapshot()
         if snapshot is None or not enabled:
             return None
+        # V2.38 (incremento 3): con la granularidad por región OFF, la evidencia se
+        # colapsa a familia (claves ``familia|region`` -> ``familia``) para que la
+        # emisión adaptativa recorra el grid completo y la salida sea byte-idéntica a
+        # V2.37. Con ON se respeta la región y el motor filtra a ese punto.
+        if not adaptive_param_region_enabled():
+            snapshot = _collapse_regions(snapshot)
         try:
             from bolsa_application.discovery_search_policy import build_search_policy
 
@@ -530,13 +599,14 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
         _record_discovery_summary(summary)
         logger.info(
             "auto_orchestrator discovery instrument=%s grammar_enabled=%s "
-            "catalog=%s grammar=%s adaptive=%s total=%s trials=%s catalog_cap=%s "
-            "grammar_cap=%s adaptive_cap=%s policy_hash=%s bar_count_ok=%s",
+            "catalog=%s grammar=%s adaptive=%s adaptive_regions=%s total=%s trials=%s "
+            "catalog_cap=%s grammar_cap=%s adaptive_cap=%s policy_hash=%s bar_count_ok=%s",
             instrument_id,
             summary.grammar_enabled,
             summary.catalog_candidates,
             summary.grammar_candidates,
             summary.adaptive_candidates,
+            f"{summary.adaptive_region_emissions}/{summary.adaptive_region_count}",
             summary.total_candidates,
             summary.trials_used,
             summary.catalog_cap,
@@ -899,7 +969,7 @@ async def auto_orchestrator_loop(
         logger.info(
             "auto_orchestrator cycle_summary cycle_id=%s instruments=%s "
             "grammar_discoveries=%s catalog_candidates=%s grammar_candidates=%s "
-            "adaptive_candidates=%s adaptive_discoveries=%s "
+            "adaptive_candidates=%s adaptive_discoveries=%s adaptive_regions=%s "
             "total_candidates=%s warmup_skipped=%s",
             cycle_id,
             len(watch),
@@ -908,6 +978,7 @@ async def auto_orchestrator_loop(
             cycle.grammar_candidates,
             cycle.adaptive_candidates,
             cycle.adaptive_discoveries,
+            cycle.adaptive_region_emissions,
             cycle.total_candidates,
             cycle.warmup_skipped,
         )
@@ -915,7 +986,7 @@ async def auto_orchestrator_loop(
             "auto_orchestrator process_summary cycle_id=%s "
             "discovery_calls=%s grammar_discoveries=%s catalog_candidates=%s "
             "grammar_candidates=%s adaptive_candidates=%s adaptive_discoveries=%s "
-            "total_candidates=%s warmup_skipped=%s",
+            "adaptive_regions=%s total_candidates=%s warmup_skipped=%s",
             cycle_id,
             process.discovery_calls,
             process.grammar_discovery_calls,
@@ -923,6 +994,7 @@ async def auto_orchestrator_loop(
             process.grammar_candidates,
             process.adaptive_candidates,
             process.adaptive_discoveries,
+            process.adaptive_region_emissions,
             process.total_candidates,
             process.warmup_skipped,
         )

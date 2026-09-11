@@ -1030,3 +1030,47 @@ def test_start_does_not_wire_adaptive_provider_when_disabled() -> None:
     import os
 
     assert os.getenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR) is None
+
+
+# ── V2.38 (incremento 3) — flag de granularidad por región de parámetros ─────────
+
+
+def test_adaptive_param_region_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION, raising=False)
+    assert w.adaptive_param_region_enabled() is False
+
+
+def test_adaptive_param_region_truthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION, "1")
+    assert w.adaptive_param_region_enabled() is True
+
+
+def test_collapse_regions_merges_composite_keys() -> None:
+    """Con la región OFF, ``familia|region`` colapsa a familia (compatibilidad V2.37)."""
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class _Snap:
+        family_weights: dict[str, float]
+        sample_sizes: dict[str, int]
+
+    collapsed = w._collapse_regions(
+        _Snap(
+            family_weights={"sma|r00:aaa": 0.4, "sma|r01:bbb": 0.7, "rsi": 0.2},
+            sample_sizes={"sma|r00:aaa": 3, "sma|r01:bbb": 4, "rsi": 5},
+        )
+    )
+    assert collapsed.family_weights == {"sma": 0.7, "rsi": 0.2}
+    assert collapsed.sample_sizes == {"sma": 7, "rsi": 5}
+
+
+def test_collapse_regions_noop_without_regions() -> None:
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class _Snap:
+        family_weights: dict[str, float]
+        sample_sizes: dict[str, int]
+
+    snap = _Snap(family_weights={"sma": 0.4}, sample_sizes={"sma": 3})
+    assert w._collapse_regions(snap) is snap

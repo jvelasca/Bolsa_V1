@@ -46,6 +46,10 @@ from bolsa_application.discovery_grammar import (
     enumerate_grammar_plans,
     grammar_variants_for_plan,
 )
+from bolsa_application.discovery_param_region import (
+    param_region_for_point,
+    split_granularity_key,
+)
 from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
 
 __all__ = [
@@ -109,10 +113,33 @@ class DiscoveryEmissionSummary:
     adaptive_policy_hash: str | None = None
     adaptive_exploration_quota: int | None = None
     adaptive_families: int = 0
+    # V2.38 (incremento 3): emisión adaptativa granularizada por region de parametros.
+    # ``adaptive_region_emissions`` cuenta las candidatas adaptativas cuya cuota provenía
+    # de una clave compuesta ``familia|region``; ``adaptive_region_count`` el nº de
+    # regiones distintas cubiertas. Aditivo: con el flag OFF ambos quedan a 0.
+    adaptive_region_emissions: int = 0
+    adaptive_region_count: int = 0
 
 
 def _default_candidate_id(instrument_id: str, family_name: str, index: int) -> str:
     return f"disc-{instrument_id}-{family_name}-{index}"
+
+
+def _points_for_region(family: DiscoveryFamily, param_region: str) -> list[dict[str, Any]]:
+    """V2.38 (incremento 3): puntos del grid de ``family`` que caen en ``param_region``.
+
+    Fail-closed: región vacía ⇒ grid completo; región desconocida ⇒ lista vacía (no se
+    emite nada, no se aproxima a la familia entera). El orden del grid es el determinista
+    de ``param_points()``, así que el filtrado conserva la reproducibilidad.
+    """
+    region = str(param_region or "").strip()
+    if not region:
+        return list(family.param_points())
+    return [
+        point
+        for point in family.param_points()
+        if param_region_for_point(family.param_space, point) == region
+    ]
 
 
 def discover_for_instrument_with_summary(
@@ -212,6 +239,12 @@ def discover_for_instrument_with_summary(
                         "discovery_family": family.name,
                         "discovery_parent": family.parent,
                         "discovery_params": dict(point),
+                        # V2.38 (incremento 3): region determinista del punto en el grid
+                        # de la familia. Se propaga hasta el trial persistido para poder
+                        # agregar la evidencia por region (flag de rollout en el worker).
+                        "discovery_param_region": param_region_for_point(
+                            family.param_space, point
+                        ),
                     },
                     origin="discovery",
                     data_snapshot_id=data_snapshot_id,
@@ -269,6 +302,9 @@ def discover_for_instrument_with_summary(
     adaptive_policy_hash: str | None = None
     adaptive_exploration_quota: int | None = None
     adaptive_families_count = 0
+    # V2.38 (incremento 3): cobertura de regiones en la emisión adaptativa.
+    adaptive_region_emissions_count = 0
+    adaptive_regions_seen: set[str] = set()
     if (
         adaptive_cap
         and int(adaptive_cap) > 0
@@ -280,25 +316,44 @@ def discover_for_instrument_with_summary(
         adaptive_exploration_quota = int(getattr(search_policy, "exploration_quota", 0) or 0)
         eligible = tuple(catalog)
         by_name = {family.name: family for family in eligible}
-        quota_map = {
-            str(q.family): int(q.quota)
-            for q in getattr(search_policy, "quotas", ()) or ()
-            if int(getattr(q, "quota", 0)) > 0
-        }
-        # Orden canónico por nombre de familia: la política ya viene ordenada, pero se
-        # reordena aquí para no depender del orden de su tupla (determinismo explícito).
-        for family_name in sorted(quota_map):
+        # V2.38 (incremento 3): la clave de la cuota puede ser la **clave compuesta**
+        # (``familia`` o ``familia|region``). Se resuelve a familia + region; la region
+        # filtra el grid a ese punto concreto (no se añade espacio de búsqueda).
+        regions_by_family: dict[str, dict[str, str]] = {}
+        quota_map: dict[str, int] = {}
+        for quota in getattr(search_policy, "quotas", ()) or ():
+            quota_value = int(getattr(quota, "quota", 0))
+            if quota_value <= 0:
+                continue
+            granularity_key = str(getattr(quota, "family", ""))
+            family_name, param_region = split_granularity_key(granularity_key)
+            if not family_name:
+                continue
+            quota_map[granularity_key] = quota_value
+            if param_region:
+                regions_by_family.setdefault(family_name, {})[granularity_key] = param_region
+        # Orden canónico por clave: la política ya viene ordenada, pero se reordena aquí
+        # para no depender del orden de su tupla (determinismo explícito).
+        for granularity_key in sorted(quota_map):
             budget_left = int(adaptive_cap) - adaptive_candidates_count
             if budget_left <= 0:
                 break
+            family_name, param_region = split_granularity_key(granularity_key)
             adaptive_family = by_name.get(family_name)
             if adaptive_family is None:
                 continue
             if bar_count is not None and bar_count < int(adaptive_family.min_bars_hint):
                 continue
-            family_budget = min(quota_map[family_name], budget_left)
+            points = adaptive_family.param_points()
+            if param_region:
+                # Fail-closed: región indicada por la evidencia pero no materializable en
+                # el grid actual ⇒ no se emite (no se aproxima a la familia entera).
+                points = _points_for_region(adaptive_family, param_region)
+                if not points:
+                    continue
+            family_budget = min(quota_map[granularity_key], budget_left)
             emitted_for_family = 0
-            for point in adaptive_family.param_points():
+            for point in points:
                 if emitted_for_family >= family_budget:
                     break
                 if adaptive_candidates_count >= int(adaptive_cap):
@@ -324,6 +379,9 @@ def discover_for_instrument_with_summary(
                             "discovery_family": adaptive_family.name,
                             "discovery_parent": adaptive_family.parent,
                             "discovery_params": dict(point),
+                            "discovery_param_region": param_region_for_point(
+                                adaptive_family.param_space, point
+                            ),
                             "discovery_lane": "adaptive",
                             "search_policy_hash": adaptive_policy_hash or "",
                         },
@@ -334,6 +392,9 @@ def discover_for_instrument_with_summary(
                 )
                 emitted_for_family += 1
                 adaptive_candidates_count += 1
+                if param_region:
+                    adaptive_region_emissions_count += 1
+                    adaptive_regions_seen.add(param_region)
                 trials_used += 1
 
     catalog_candidates = sum(
@@ -363,6 +424,8 @@ def discover_for_instrument_with_summary(
         adaptive_policy_hash=adaptive_policy_hash,
         adaptive_exploration_quota=adaptive_exploration_quota,
         adaptive_families=adaptive_families_count,
+        adaptive_region_emissions=adaptive_region_emissions_count,
+        adaptive_region_count=len(adaptive_regions_seen),
     )
     return tuple(candidates), summary
 

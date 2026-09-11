@@ -28,6 +28,7 @@ import asyncio
 import json
 import sys
 
+from bolsa_application.discovery_param_region import compose_granularity_key
 from bolsa_domain.entities.discovery_evidence_snapshot import (
     MATH_VERSION_DISCOVERY_EVIDENCE_V1,
 )
@@ -88,14 +89,17 @@ async def build_and_persist(
             aggregates = await trials.family_evidence_summary(
                 date_from=window_from, date_to=window_to
             )
-            # V2.37/P2-01: evidencia posterior (shadow / paper forward) por familia.
+            # V2.37/P2-01 + V2.38 (incremento 3): evidencia posterior (shadow / paper
+            # forward) por **clave compuesta** (familia o familia|region).
             posterior = await trials.posterior_evidence_summary(
                 date_from=window_from, date_to=window_to
             )
             merged: list[dict[str, object]] = []
             for row in aggregates:
-                family = str(row.get("presetKey") or "")
-                extra = posterior.get(family, {})
+                key = compose_granularity_key(
+                    str(row.get("presetKey") or ""), str(row.get("paramRegion") or "")
+                )
+                extra = posterior.get(key, {})
                 merged.append({**row, **extra})
             resolved_to = window_to or await trials.latest_trial_at()
             now = datetime.now(UTC).isoformat()

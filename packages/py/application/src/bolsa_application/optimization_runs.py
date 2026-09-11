@@ -1,5 +1,6 @@
 """Use-cases de optimization runs (cola + process)."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -160,6 +161,33 @@ def _payload_to_execute_kwargs(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _param_region_for_trial(
+    params: Mapping[str, Any], blocks: Mapping[str, Any] | None
+) -> str | None:
+    """V2.38 (incremento 3): region de parametros a persistir en el trial.
+
+    Preferencia fail-closed:
+
+    1. ``params['discovery_param_region']`` — etiqueta ya calculada por el motor al
+       emitir la candidata (bucket determinista v0).
+    2. ``blocks['discovery']['paramRegion']`` — transporte alternativo del runner.
+    3. ``None`` — sin region: el trial agrega por familia, exactamente como en V2.37.
+
+    Nunca se deriva aqui la region a partir del grid: el motor es la unica fuente de
+    verdad del bucket y este modulo no debe duplicar esa matematica.
+    """
+    direct = params.get("discovery_param_region")
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+    if isinstance(blocks, Mapping):
+        discovery = blocks.get("discovery")
+        if isinstance(discovery, Mapping):
+            nested = discovery.get("paramRegion")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+    return None
+
+
 async def _persist_optimize_research_trials(
     trials_repo: ResearchTrialRepository,
     *,
@@ -266,6 +294,7 @@ async def _persist_optimize_research_trials(
             optimization_run_id=optimization_run_id,
             preset_key=family,
             strategy_name=family,
+            param_region=_param_region_for_trial(trial.params, blocks),
             params=params,
             is_metrics=dict(trial.is_metrics),
             is_score=trial.score,
