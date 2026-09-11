@@ -73,3 +73,46 @@ def test_health_snapshot_carries_thresholds() -> None:
     assert decision.health is not None
     assert decision.health.thresholds["edge"] == 0.2
     assert not decision.health.degraded
+
+
+# ── V2.32.1 (auditoría 2b): umbrales predictivos no inventan un 0.0 ───────────────
+
+
+def test_predictive_thresholds_default_to_none() -> None:
+    """Sin configurar, un umbral predictivo es ``None`` (no un 0.0 que finge decisión)."""
+    th = HealthThresholds()
+    assert th.min_edge is None
+    assert th.min_wfe is None
+    assert th.min_dsr is None
+    assert th.min_credibility is None
+    # ``as_dict`` omite los no configurados (misma filosofía que los observados).
+    assert "edge" not in th.as_dict()
+    assert "credibility" not in th.as_dict()
+
+
+def test_unconfigured_thresholds_do_not_degrade() -> None:
+    """Con defaults, una credibilidad débil (0.02) NO se marca degradada por un 0.0 falso.
+
+    No es que 0.02 sea "sana": es que nadie configuró umbral, así que no se finge una
+    decisión. La vigilancia calibrada es responsabilidad del llamante (AUTO la fija).
+    """
+    decision = evaluate_active_health(
+        version_id="ver-1",
+        as_of="2026-09-10",
+        metrics={"credibility": 0.02, "edge": 0.01, "dsr": 0.01},
+    )
+    assert not decision.degraded
+    assert decision.health is not None
+    # El snapshot no viaja con umbrales "0.0" fabricados.
+    assert "edge" not in decision.health.thresholds
+
+
+def test_calibrated_credibility_threshold_degrades() -> None:
+    decision = evaluate_active_health(
+        version_id="ver-1",
+        as_of="2026-09-10",
+        metrics={"credibility": 0.02},
+        thresholds=HealthThresholds(min_credibility=0.1),
+    )
+    assert decision.degraded
+    assert "credibility" in decision.breaches

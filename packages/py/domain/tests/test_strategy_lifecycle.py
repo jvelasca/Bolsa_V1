@@ -137,7 +137,9 @@ def test_promotion_blocked_by_coach_veto() -> None:
     promo = evaluate_promotion(
         finalist=_finalist(),
         validation=validation,
-        coach=CoachAssessment(candidate_id="cand-1", approved=True, contradictions=("contradice T1",)),
+        coach=CoachAssessment(
+            candidate_id="cand-1", approved=True, contradictions=("contradice T1",)
+        ),
         shadow_validated=True,
     )
     assert not promo.promoted
@@ -198,6 +200,33 @@ def test_active_is_terminal_in_the_funnel() -> None:
     assert result.to_state is None
 
 
+def test_transition_without_gates_is_fail_closed() -> None:
+    """V2.32.1 (auditoría): ``gates=()`` (el default de la firma) NO autoriza el salto.
+
+    El mismo tipo de bug que OR-6: un default permisivo. Cero gates evaluados es un
+    caso más extremo que NOT_EVALUATED y debe bloquear, no aprobar.
+    """
+    for state in (
+        StrategyLifecycleState.ESTUDIO,
+        StrategyLifecycleState.LABORATORIO,
+        StrategyLifecycleState.TOP3,
+        StrategyLifecycleState.COACH,
+        StrategyLifecycleState.FINALISTA,
+    ):
+        result = can_transition(state=state)
+        assert not result.allowed, f"{state} no debe avanzar sin gates"
+        assert "gates_no_evaluados" in result.reasons
+
+
+def test_transition_with_not_evaluated_gate_is_fail_closed() -> None:
+    result = can_transition(
+        state=StrategyLifecycleState.LABORATORIO,
+        gates=(GateResult(gate="backtest", status=GateStatus.NOT_EVALUATED),),
+    )
+    assert not result.allowed
+    assert "backtest" in result.reasons[0]
+
+
 def test_candidate_carries_data_snapshot_for_reproducibility() -> None:
     cand = StrategyCandidate(
         id="cand-1",
@@ -210,6 +239,7 @@ def test_candidate_carries_data_snapshot_for_reproducibility() -> None:
 
 
 # ── V2.32/A12: Promotion Gate por EVIDENCIA shadow (no por flag) ─────────────────
+
 
 def test_shadow_policy_passes_with_evidence() -> None:
     policy = ShadowPolicy(min_trades=5, min_return_pct=0.0, max_drawdown_pct=20.0)
@@ -231,6 +261,28 @@ def test_shadow_policy_fails_closed_without_sample() -> None:
     result = policy.evaluate(version_id="ver-1", trades=2, return_pct=5.0, max_drawdown_pct=1.0)
     assert not result.passed
     assert "shadow_muestra_insuficiente" in result.reasons
+
+
+def test_shadow_policy_fails_closed_when_drawdown_missing() -> None:
+    """V2.32.1 (P2-01): con techo configurado, métrica ausente NO es "sin riesgo"."""
+    policy = ShadowPolicy(min_closed_round_trips=1, max_drawdown_pct=15.0)
+    result = policy.evaluate(
+        version_id="ver-1", trades=4, round_trips=2, return_pct=5.0, max_drawdown_pct=None
+    )
+    assert not result.passed
+    assert "shadow_drawdown_ausente" in result.reasons
+
+
+def test_shadow_policy_round_trips_is_the_sample_guard() -> None:
+    """V2.32.1 (P2-04): la guarda de muestra cuenta round-trips cerrados, no piernas."""
+    policy = ShadowPolicy(min_closed_round_trips=3, min_return_pct=-100.0)
+    # 8 piernas ejecutadas pero solo 2 operaciones cerradas ⇒ muestra insuficiente.
+    result = policy.evaluate(
+        version_id="ver-1", trades=8, round_trips=2, return_pct=1.0, max_drawdown_pct=1.0
+    )
+    assert not result.passed
+    assert "shadow_muestra_insuficiente" in result.reasons
+    assert result.round_trips == 2
 
 
 def test_promotion_requires_shadow_evidence_not_flag() -> None:
@@ -276,4 +328,3 @@ def test_promotion_with_passing_evidence_links_validation_id() -> None:
     assert promo.promoted
     assert promo.shadow_validated is True
     assert promo.shadow_validation_id == "ver-1"
-

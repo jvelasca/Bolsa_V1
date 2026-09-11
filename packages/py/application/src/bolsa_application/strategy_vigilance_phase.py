@@ -44,15 +44,20 @@ class HealthThresholds:
     (ejecución SIM real; V2.28 / A10): su semántica es distinta y **nunca** degradan por
     debajo de ``min_observed_trades`` round-trips cerrados (guarda de muestra mínima).
 
+    V2.32.1 (auditoría): los umbrales *predictivos* usan ``None`` = "sin configurar",
+    igual que los observados. Un ``0.0`` real fingiría una decisión que nadie tomó
+    (una estrategia con ``credibility=0.02`` no debería pasar como sana por defecto);
+    con ``None`` ese indicador no degrada por su ausencia, pero tampoco inventa un cero.
+
     Nota sobre el drawdown observado: se expresa en magnitud positiva (p. ej. ``20`` = 20%
     de caída) y su umbral es un TECHO. La comparación con signo correcto la resuelve
     ``StrategyHealth._observed_degraded``; aquí solo se declara el valor.
     """
 
-    min_edge: float = 0.0
-    min_wfe: float = 0.0
-    min_dsr: float = 0.0
-    min_credibility: float = 0.0
+    min_edge: float | None = None
+    min_wfe: float | None = None
+    min_dsr: float | None = None
+    min_credibility: float | None = None
     # --- Umbrales observados (V2.28 / A10) ---
     min_observed_trades: int = 10
     min_observed_return_pct: float | None = None
@@ -65,15 +70,20 @@ class HealthThresholds:
         """Umbrales persistibles en el snapshot de salud.
 
         Los ``None`` se omiten: un umbral no configurado no debe viajar como 0 (que
-        activaría una degradación por defecto no intencionada).
+        activaría una degradación por defecto no intencionada). Aplica a predictivos y
+        observados por igual (V2.32.1: misma filosofía en ambos bloques).
         """
         out: dict[str, float] = {
-            "edge": self.min_edge,
-            "walk_forward_efficiency": self.min_wfe,
-            "dsr": self.min_dsr,
-            "credibility": self.min_credibility,
             "min_observed_trades": float(self.min_observed_trades),
         }
+        if self.min_edge is not None:
+            out["edge"] = self.min_edge
+        if self.min_wfe is not None:
+            out["walk_forward_efficiency"] = self.min_wfe
+        if self.min_dsr is not None:
+            out["dsr"] = self.min_dsr
+        if self.min_credibility is not None:
+            out["credibility"] = self.min_credibility
         if self.min_observed_return_pct is not None:
             out["observed_return_pct"] = self.min_observed_return_pct
         if self.max_observed_drawdown_pct is not None:
@@ -142,13 +152,17 @@ def evaluate_active_health(
     )
 
     breaches: list[str] = []
-    if edge is not None and edge < th.min_edge:
+    if th.min_edge is not None and edge is not None and edge < th.min_edge:
         breaches.append("edge")
-    if wfe is not None and wfe < th.min_wfe:
+    if th.min_wfe is not None and wfe is not None and wfe < th.min_wfe:
         breaches.append("walk_forward_efficiency")
-    if dsr is not None and dsr < th.min_dsr:
+    if th.min_dsr is not None and dsr is not None and dsr < th.min_dsr:
         breaches.append("dsr")
-    if credibility is not None and credibility < th.min_credibility:
+    if (
+        th.min_credibility is not None
+        and credibility is not None
+        and credibility < th.min_credibility
+    ):
         breaches.append("credibility")
     # Degradación observada: se delega en la entidad, que aplica la guarda de muestra
     # mínima y la semántica de techo del drawdown. Si degrada por observado, se registran

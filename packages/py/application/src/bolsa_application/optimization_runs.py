@@ -466,6 +466,7 @@ class RunSmaGridOptimizeAndSave:
         cpcv_purge_bars: int | None = None,
         cpcv_embargo_bars: int | None = None,
         definition: dict[str, Any] | None = None,
+        date_to: str | None = None,
     ) -> tuple[OptimizeSmaGridResult, OptimizationRunRecord]:
         result = await self._run_optimize.execute(
             instrument_id=instrument_id,
@@ -487,6 +488,7 @@ class RunSmaGridOptimizeAndSave:
             cpcv_purge_bars=cpcv_purge_bars,
             cpcv_embargo_bars=cpcv_embargo_bars,
             definition=definition,
+            date_to=date_to,
         )
         payload = {
             "instrumentId": instrument_id,
@@ -509,6 +511,8 @@ class RunSmaGridOptimizeAndSave:
             "cpcvGroups": cpcv_groups,
             "cpcvPurgeBars": cpcv_purge_bars,
             "cpcvEmbargoBars": cpcv_embargo_bars,
+            # V2.32.1 (P1-01): recorte temporal del LAB (excluye el hold-out shadow).
+            "labDateTo": date_to,
             "trialsTotal": result.trials_total,
         }
         from dataclasses import replace

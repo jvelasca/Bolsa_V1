@@ -7,9 +7,9 @@ gate de entorno (default **OFF**), siguiendo el patrón de los workers A9:
 * ``AUTO_ORCHESTRATOR_INSTRUMENTS`` — allowlist CSV **opcional**: el universo
   canónico es ESTUDIO (lista ``estudio``); si se define, filtra ese universo.
 * ``AUTO_ORCHESTRATOR_INTERVAL_SECONDS`` — periodo del bucle (default 3600).
-* ``AUTO_ORCHESTRATOR_SHADOW_VALIDATED=1`` — permite promocionar (default OFF: sin
-  shadow no hay promoción, coherente con el Promotion Gate). P2 V2.28: este flag
-  certifica shadow sin ejecutarlo; debe endurecerse.
+* ``AUTO_ORCHESTRATOR_SHADOW_VALIDATED=1`` — **override manual del operador**. Ya NO
+  se cablea en el bucle AUTO (V2.32.1, auditoría P2-02): AUTO promociona solo con
+  evidencia shadow ejecutada. El flag queda reservado a herramientas admin/manuales.
 * ``AUTO_ORCHESTRATOR_STRATEGY_FAMILY`` — familia por defecto del ESTUDIO.
 * ``AUTO_ORCHESTRATOR_LAB_PARAMS`` — override JSON del grid del LAB (opcional).
 * ``AUTO_ORCHESTRATOR_MAX_CANDIDATES`` — tope de candidatas por instrumento/ciclo
@@ -30,6 +30,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_api.api.dependencies import (
@@ -63,6 +65,15 @@ AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_CA
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
 _SHADOW_WINDOW_BARS_DEFAULT = 250
+# V2.32.1 (auditoría P1-01): ventana de barras del LAB (grid default). El provider
+# shadow lee ``LAB_BAR_LIMIT_DEFAULT + shadow_window`` para que el hold-out exista de
+# verdad (el orquestador reserva las últimas ``shadow_window`` barras al shadow).
+LAB_BAR_LIMIT_DEFAULT = 400
+# V2.32.1 (auditoría 2b): umbrales predictivos calibrados de la vigilancia AUTO.
+AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE = "AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE"
+AUTO_ORCHESTRATOR_HEALTH_MIN_WFE = "AUTO_ORCHESTRATOR_HEALTH_MIN_WFE"
+AUTO_ORCHESTRATOR_HEALTH_MIN_DSR = "AUTO_ORCHESTRATOR_HEALTH_MIN_DSR"
+AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY = "AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY"
 
 
 def _truthy(raw: str | None) -> bool:
@@ -91,11 +102,11 @@ def _interval_seconds(default: float = 3600.0) -> float:
 
 
 def shadow_validated() -> bool:
-    """V2.32/A12: override explícito del operador del Promotion Gate (default OFF).
+    """V2.32.1: override manual del operador del Promotion Gate (default OFF).
 
-    Ya NO es la autoridad: la autoridad es la evidencia ejecutada por el replay
-    shadow del orquestador. ON se usa solo para rollout/emergencia y queda auditado
-    como ``shadow_override_operador``.
+    Ya NO es la autoridad ni se cablea en el bucle AUTO: la autoridad es la evidencia
+    ejecutada por el replay shadow. Se conserva para herramientas admin/manuales y
+    para que la auditoría distinga "aprobado por evidencia" de "aprobado por override".
     """
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_SHADOW_VALIDATED))
 
@@ -138,6 +149,45 @@ def _shadow_window_bars() -> int:
     return value if value > 0 else _SHADOW_WINDOW_BARS_DEFAULT
 
 
+def _new_cycle_id() -> str:
+    """Identidad única por ciclo AUTO (UTC timestamp + sufijo aleatorio corto).
+
+    V2.32.1 (auditoría P2-05): permite distinguir ciclos, reintentos, re-LAB y shadow
+    en la trazabilidad (antes todos compartían ``orchestrator:{instrument}``).
+    """
+    now = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return f"{now}-{uuid.uuid4().hex[:8]}"
+
+
+def _health_thresholds() -> Any:
+    """Umbrales de vigilancia del AUTO (V2.32.1, auditoría 2b).
+
+    Los predictivos (edge/wfe/dsr/credibilidad) usan ``None`` por defecto en el
+    dataclass (honesto: "sin configurar"), así que el AUTO fija aquí valores
+    conservadores explícitos para que la vigilancia no sea ciega. Ajustables por env
+    ``AUTO_ORCHESTRATOR_HEALTH_*``; ``AUTO_ORCHESTRATOR_HEALTH_*`` no fijado conserva
+    el default calibrado.
+    """
+    from bolsa_application.strategy_vigilance_phase import HealthThresholds
+
+    return HealthThresholds(
+        min_edge=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE, 0.0),
+        min_wfe=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_WFE, 0.0),
+        min_dsr=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_DSR, 0.0),
+        min_credibility=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY, 0.1),
+    )
+
+
+def _float_env(name: str, default: float) -> float:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 def _make_discovery_runner(budget: Any) -> Any:
     """``discovery(instrument_id)`` síncrono (función pura, sin DB/red)."""
     from bolsa_application.strategy_discovery_engine import discover_for_instrument
@@ -154,7 +204,13 @@ def _make_shadow_bars_provider(session_factory: Any) -> Any:
     V2.32/A12: abre una sesión por llamada (mismo patrón que el resto del worker) y
     lee la ventana diaria del instrumento. Un fallo de lectura devuelve vacío: sin
     barras no hay evidencia y el Promotion Gate queda fail-closed (no se inventa).
+
+    V2.32.1 (auditoría P1-01): se lee una ventana **más amplia** que la del LAB
+    (``LAB_BAR_LIMIT_DEFAULT + shadow_window``) para que exista un hold-out estricto
+    real: el orquestador reserva las últimas ``shadow_window`` barras para el shadow y
+    deja el resto para el LAB, sin solape temporal.
     """
+
     async def _shadow_bars(instrument_id: str) -> tuple[Any, ...]:
         from bolsa_api.api.dependencies import get_ohlcv_repository
 
@@ -162,7 +218,8 @@ def _make_shadow_bars_provider(session_factory: Any) -> Any:
             async with session_factory() as session:
                 repo = get_ohlcv_repository(session)
                 bars = await repo.get_bars(
-                    instrument_id, limit=_shadow_window_bars()
+                    instrument_id,
+                    limit=LAB_BAR_LIMIT_DEFAULT + _shadow_window_bars(),
                 )
                 return tuple(bars or ())
         except Exception:  # noqa: BLE001 — sin evidencia no se aprueba nada.
@@ -226,10 +283,10 @@ async def auto_orchestrator_loop(
     """Bucle del orquestador: corre el ciclo y vigila la activa por instrumento."""
     period = interval_seconds if interval_seconds is not None else _interval_seconds()
     allowlist = instrument_watch()
-    # V2.32/A12: el flag pasa a ser un OVERRIDE explícito del operador. Por defecto
-    # (OFF) la autoridad del Promotion Gate es la evidencia shadow ejecutada; el flag
-    # ON solo se usa para rollout/emergencia y queda auditado como override.
-    allow_override = shadow_validated() or None
+    # V2.32.1 (auditoría P2-02): AUTO promociona SOLO por evidencia. El override del
+    # operador (`AUTO_ORCHESTRATOR_SHADOW_VALIDATED`) deja de cablearse en el camino
+    # autónomo: no existe ruta NO EVIDENCE → OVERRIDE → PROMOTION. El override queda
+    # reservado a herramientas manuales/admin (fuera del bucle AUTO).
     while True:
         watch = await _instruments_for_cycle(orchestrator, allowlist=allowlist)
         if not watch:
@@ -238,12 +295,14 @@ async def auto_orchestrator_loop(
                 "disponible y %s vacío) — no se orquesta nada.",
                 AUTO_ORCHESTRATOR_INSTRUMENTS,
             )
+        cycle_id = _new_cycle_id()
         for instrument_id in watch:
             try:
+                # V2.32.1 (auditoría P2-05): run_id por ciclo (no constante) para que
+                # reintentos/re-LAB/shadow sean distinguibles en la trazabilidad.
                 result = await orchestrator.run_cycle(
                     instrument_id=instrument_id,
-                    shadow_validated=allow_override,
-                    run_id=f"orchestrator:{instrument_id}",
+                    run_id=f"orchestrator:{instrument_id}:{cycle_id}",
                 )
                 logger.info(
                     "auto_orchestrator cycle instrument=%s status=%s promoted=%s",
@@ -365,11 +424,16 @@ def _default_orchestrator(session_factory: Any) -> Any:
             discovery=(
                 _make_discovery_runner(_discovery_budget()) if discovery_enabled() else None
             ),
-            # V2.32/A12: evidencia shadow ejecutada (barras OHLCV del instrumento) y
-            # override explícito del operador. Con ``shadow_override=None`` la única
-            # autoridad del Promotion Gate es la evidencia.
+            # V2.32.1 (auditoría 2b): vigilancia con umbrales predictivos CALIBRADOS. Sin
+            # esto, ``HealthThresholds()`` no degrada por edge/wfe/dsr/credibilidad
+            # (``None`` = sin configurar), honesto pero ciego. El AUTO fija valores
+            # conservadores por defecto, ajustables por env.
+            health_thresholds=_health_thresholds(),
+            # V2.32/A12: evidencia shadow ejecutada (barras OHLCV del instrumento) sobre
+            # un hold-out ESTRICTO del LAB (V2.32.1, auditoría P1-01). Sin override:
+            # AUTO promociona solo con evidencia (P2-02).
             shadow_bars=_make_shadow_bars_provider(session_factory),
-            shadow_override=(True if shadow_validated() else None),
+            shadow_require_holdout=True,
         )
     )
 
@@ -424,7 +488,9 @@ def _default_grid_params() -> dict[str, Any]:
     try:
         parsed = json.loads(raw)
     except ValueError:
-        logger.warning("%s no es JSON válido — se ignoran overrides de grid.", AUTO_ORCHESTRATOR_LAB_PARAMS)
+        logger.warning(
+            "%s no es JSON válido — se ignoran overrides de grid.", AUTO_ORCHESTRATOR_LAB_PARAMS
+        )
         return {}
     return parsed if isinstance(parsed, dict) else {}
 

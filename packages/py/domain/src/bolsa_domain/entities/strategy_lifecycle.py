@@ -215,8 +215,16 @@ class ShadowValidationResult:
     Promotion Gate: la promoción exige un resultado con evidencia contable (trades
     ejecutados en una ventana separada del LAB), no un booleano humano.
 
-    Fail-closed: ``passed`` solo es True si hay muestra suficiente (``trades >=
-    min_trades``) y las métricas respetan la política. Sin evidencia ⇒ ``False``.
+    Fail-closed: ``passed`` solo es True si hay muestra suficiente (``round_trips >=
+    min_closed_round_trips``) y las métricas respetan la política. Sin evidencia ⇒
+    ``False``.
+
+    V2.32.1 (auditoría): ``trades`` cuenta *piernas* ejecutadas (entradas + salidas);
+    ``round_trips`` cuenta operaciones *cerradas* (la guarda de muestra real). El
+    fingerprint del dataset (``shadow_start``/``shadow_end``/``bars_hash``/
+    ``strategy_definition_hash``/``engine_version``/``config_hash``/
+    ``data_snapshot_id``) hace la evidencia reproducible: dentro de meses se puede
+    demostrar exactamente con qué barras se autorizó la promoción.
     """
 
     version_id: str
@@ -229,20 +237,37 @@ class ShadowValidationResult:
     win_rate: float | None = None
     bars_used: int = 0
     as_of: str | None = None
+    # --- V2.32.1: semántica de muestra y fingerprint del dataset ---
+    round_trips: int = 0
+    data_snapshot_id: str | None = None
+    shadow_start: str | None = None
+    shadow_end: str | None = None
+    bars_hash: str | None = None
+    strategy_definition_hash: str | None = None
+    engine_version: str | None = None
+    config_hash: str | None = None
+    lab_end: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ShadowPolicy:
     """Umbrales de la validación shadow (deterministas, sin IA).
 
-    ``min_trades`` es la guarda de muestra (no se aprueba con evidencia anecdótica).
+    ``min_closed_round_trips`` es la guarda de muestra: no se aprueba con evidencia
+    anecdótica, y cuenta operaciones **cerradas** (no piernas ejecutadas). Se conserva
+    ``min_trades`` como alias de compatibilidad; si ambos se pasan, manda
+    ``min_closed_round_trips``.
+
     ``min_return_pct`` es MÍNIMO (se rechaza por debajo) y ``max_drawdown_pct`` es
-    TECHO (se rechaza por encima). Un techo negativo o None desactiva el check.
+    TECHO (se rechaza por encima). Fail-closed: si el umbral está configurado y la
+    métrica del replay falta, se rechaza (no se asume que "no medido" es "sin riesgo").
+    Un umbral ``None`` desactiva ese check.
     """
 
-    min_trades: int = 10
+    min_closed_round_trips: int = 10
     min_return_pct: float | None = 0.0
     max_drawdown_pct: float | None = None
+    min_trades: int | None = None  # alias de compatibilidad (legado)
 
     def evaluate(
         self,
@@ -255,19 +280,38 @@ class ShadowPolicy:
         instrument_id: str | None = None,
         bars_used: int = 0,
         as_of: str | None = None,
+        round_trips: int | None = None,
+        data_snapshot_id: str | None = None,
+        shadow_start: str | None = None,
+        shadow_end: str | None = None,
+        bars_hash: str | None = None,
+        strategy_definition_hash: str | None = None,
+        engine_version: str | None = None,
+        config_hash: str | None = None,
+        lab_end: str | None = None,
     ) -> ShadowValidationResult:
-        """Aplica la política a las métricas del replay shadow (fail-closed)."""
+        """Aplica la política a las métricas del replay shadow (fail-closed).
+
+        La guarda de muestra se evalúa sobre ``round_trips`` (operaciones cerradas) si
+        se aporta; si no, se asume que ``trades`` ya es el número de round-trips (modo
+        legado/compatibilidad con llamantes antiguos).
+        """
         reasons: list[str] = []
-        if trades < self.min_trades:
+        min_trips = self.min_closed_round_trips if self.min_trades is None else self.min_trades
+        closed = trades if round_trips is None else int(round_trips)
+        if closed < min_trips:
             reasons.append("shadow_muestra_insuficiente")
         if self.min_return_pct is not None and (
             return_pct is None or return_pct < self.min_return_pct
         ):
             reasons.append("shadow_retorno_insuficiente")
-        if self.max_drawdown_pct is not None and max_drawdown_pct is not None and (
-            max_drawdown_pct > self.max_drawdown_pct
-        ):
-            reasons.append("shadow_drawdown_excesivo")
+        # Fail-closed: si el drawdown es un gate configurado y la métrica falta, se
+        # rechaza. "No medido" NO es "sin riesgo" (antes se saltaba el check).
+        if self.max_drawdown_pct is not None:
+            if max_drawdown_pct is None:
+                reasons.append("shadow_drawdown_ausente")
+            elif max_drawdown_pct > self.max_drawdown_pct:
+                reasons.append("shadow_drawdown_excesivo")
         return ShadowValidationResult(
             version_id=version_id,
             trades=trades,
@@ -279,6 +323,15 @@ class ShadowPolicy:
             win_rate=win_rate,
             bars_used=bars_used,
             as_of=as_of,
+            round_trips=closed,
+            data_snapshot_id=data_snapshot_id,
+            shadow_start=shadow_start,
+            shadow_end=shadow_end,
+            bars_hash=bars_hash,
+            strategy_definition_hash=strategy_definition_hash,
+            engine_version=engine_version,
+            config_hash=config_hash,
+            lab_end=lab_end,
         )
 
 
@@ -505,8 +558,12 @@ def can_transition(
         StrategyLifecycleState.FINALISTA,
     }:
         failed = tuple(g.gate for g in gates if not g.passed)
-        if gates and failed:
+        if failed:
             return TransitionResult(state, target, False, (f"gates_fallidos:{','.join(failed)}",))
+        # Fail-closed: avanzar sin haber evaluado NINGÚN gate no es PASS. ``gates=()``
+        # (el propio default de la firma) NO puede autorizar el salto de estado.
+        if not gates:
+            return TransitionResult(state, target, False, ("gates_no_evaluados",))
         if state == StrategyLifecycleState.COACH and coach is not None and coach.vetoes:
             return TransitionResult(state, target, False, ("coach_veto",))
         return TransitionResult(state, target, True)

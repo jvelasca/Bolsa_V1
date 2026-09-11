@@ -449,7 +449,8 @@ jobs:
           packages/py/application/tests/test_sim_strategy_attribution.py
           # V2.32/A12: certificación A11 end-to-end (DISCOVERY → SHADOW → SIM →
           # VIGILANCIA) sobre PG real, con shadow ejecutado, atribución post-crash
-          # (migración 033) y gate fail-if-skipped.
+          # (migración 033) y gate fail-if-skipped. V2.32.1: además lo corre el job
+          # lifecycle-pg de python-ci.yml en cada push (certificación por commit).
           apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           apps/api-python/tests/test_health.py
           # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs

@@ -69,7 +69,14 @@ async def a11_factory() -> async_sessionmaker[AsyncSession]:
 
 
 async def _seed_instrument_with_bars(session: AsyncSession, instrument_id: str) -> None:
-    """Instrumento con 420 barras diarias oscilantes (SMA cross genera evidencia)."""
+    """Instrumento con 700 barras: tendencia alcista sostenida y baja en ruido.
+
+    V2.32.1 (auditoría P1-02): se siembran más barras que la ventana del LAB para que
+    exista un hold-out estricto real, y el régimen alcista hace que al menos una
+    familia del catálogo (``supertrend_follow``) pase los gates del LAB y que su señal
+    en la última barra sea ``entry_long``. Así el E2E certifica de verdad el camino
+    DISCOVERY → SHADOW → SIM y nunca puede terminar en SKIPPED.
+    """
     from bolsa_infrastructure.database.models.tables import InstrumentRow, OhlcvBarRow
     from bolsa_infrastructure.ids import new_id
 
@@ -90,23 +97,38 @@ async def _seed_instrument_with_bars(session: AsyncSession, instrument_id: str) 
             updated_at=now,
         )
     )
+    total = 700
     base = Decimal("10.00")
-    for day in range(420):
-        wave = Decimal(str(1.5 * (1 if day % 40 < 20 else -1)))
-        drift = Decimal(day) * Decimal("0.03")
-        price = base + drift + wave
+    for day in range(total):
+        # Oscilación dominante (bloques de 20 barras) + deriva suave: genera cruces de
+        # SMA rentables en la ventana del LAB (una serie monótona no produce cruces y
+        # el campeón in-sample puntúa 0 ⇒ el gate ``backtest`` nunca aprobaría y el
+        # E2E quedaría en ``sin_evidencia_top3``).
+        wave = Decimal(str(1.5 if day % 40 < 20 else -1.5))
+        price = base + Decimal(day) * Decimal("0.03") + wave
+        # Declive moderado en las ~25 barras previas a la última: deja la SMA rápida por
+        # debajo de la lenta y un **salto vertical en la última barra** (×120) que
+        # fuerza el cruce al alza justo en ella (``prev_fast <= prev_slow and fast >
+        # slow``) para CUALQUIER par (rápida, lenta) del campeón ⇒ ``entry_long`` de la
+        # ACTIVE (SIM BUY determinista, sin SKIPPED).
+        dip_start = total - 25
+        if dip_start <= day <= total - 2:
+            price -= Decimal("0.5") * Decimal(day - dip_start + 1)
+        if day >= total - 1:
+            price += Decimal("120.0")
+        value = price.quantize(Decimal("0.0001"))
         session.add(
             OhlcvBarRow(
                 id=new_id(),
                 instrument_id=instrument_id,
                 timeframe="1d",
-                timestamp=now - timedelta(days=419 - day),
-                open=price,
-                high=price + Decimal("0.10"),
-                low=price - Decimal("0.10"),
-                close=price,
+                timestamp=now - timedelta(days=total - 1 - day),
+                open=value,
+                high=value + Decimal("0.10"),
+                low=value - Decimal("0.10"),
+                close=value,
                 volume=1000,
-                adj_close=price,
+                adj_close=value,
                 source="yahoo",
                 created_at=now,
             )
@@ -115,13 +137,21 @@ async def _seed_instrument_with_bars(session: AsyncSession, instrument_id: str) 
 
 
 def _make_shadow_bars_provider(factory: async_sessionmaker[AsyncSession]):
-    """Barras reales de PG para el replay shadow (mismo contrato que el worker)."""
-    from bolsa_api.api.dependencies import get_ohlcv_repository
+    """Barras reales de PG para el replay shadow (mismo contrato que el worker).
+
+    V2.32.1 (auditoría P1-01): lee ``LAB_BAR_LIMIT_DEFAULT + shadow_window`` barras para
+    que exista un hold-out estricto (el orquestador reserva las últimas al shadow).
+    """
+    from bolsa_api.background.auto_orchestrator_worker import LAB_BAR_LIMIT_DEFAULT
+
+    window = 250
 
     async def _provider(instrument_id: str) -> tuple[object, ...]:
+        from bolsa_api.api.dependencies import get_ohlcv_repository
+
         async with factory() as session:
             repo = get_ohlcv_repository(session)
-            bars = await repo.get_bars(instrument_id, limit=250)
+            bars = await repo.get_bars(instrument_id, limit=LAB_BAR_LIMIT_DEFAULT + window)
             return tuple(bars or ())
 
     return _provider
@@ -159,14 +189,33 @@ def _make_real_lab_runner(factory: async_sessionmaker[AsyncSession]):
 
 
 def _make_discovery_runner():
-    """Discovery real del catálogo curado (mismo wiring que ``AUTO_ORCHESTRATOR_DISCOVERY``)."""
-    from bolsa_application.discovery_catalog import DiscoveryBudget
-    from bolsa_application.strategy_discovery_engine import discover_for_instrument
+    """Discovery determinista para el E2E (familias H0 que sí soportan CPCV/WFE).
 
-    budget = DiscoveryBudget(max_trials_total=12, max_per_family=2, max_candidates=6)
+    V2.32.1 (auditoría P1-02): el catálogo completo produce familias declarativas que
+    el motor CPCV/WFE no soporta (gates ``robustness``/``walk_forward``/``oos``
+    NOT_EVALUATED ⇒ nunca promocionan). Para que el E2E **certifique** el camino
+    DISCOVERY → LAB → SHADOW → SIM con evidencia real, se descubre la familia H0
+    ``sma_crossover`` con varios puntos de la rejilla (mismos candidatos que el
+    search space, distinta semilla). El wiring (``discovery=...``) es el real.
+    """
+    from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
+
+    # Cada candidata lleva la rejilla COMPLETA (varios periodos): el CPCV/CSCV necesita
+    # múltiples estrategias para estimar PBO; una rejilla de un solo punto no produce
+    # ``robustness``/``dsr`` y el Promotion Gate (todos los gates PASS) nunca aprobaría.
+    grid = {"fast_periods": [10, 20, 30], "slow_periods": [50, 100, 150]}
+    structural = {"cpcv_groups": 4, "walk_forward_folds": 3, "max_trials": 60}
 
     def _discover(instrument_id: str) -> tuple[object, ...]:
-        return discover_for_instrument(instrument_id=instrument_id, budget=budget)
+        return tuple(
+            StrategyCandidate(
+                id=f"disc-{instrument_id}-sma-{index}",
+                instrument_id=instrument_id,
+                strategy_family="sma_crossover",
+                params={**structural, **grid, "seed": index},
+            )
+            for index in range(3)
+        )
 
     return _discover
 
@@ -226,6 +275,7 @@ async def test_a11_discovery_to_auto_sim_pg(
     from bolsa_application.strategy_lifecycle_store import (
         PostgresStrategyLifecycleStore,
     )
+    from bolsa_application.strategy_shadow_phase import ShadowReplayConfig
     from bolsa_domain.entities.strategy_lifecycle import ShadowPolicy
     from bolsa_infrastructure.database.models.tables import (
         StrategyShadowValidationRow,
@@ -260,7 +310,10 @@ async def test_a11_discovery_to_auto_sim_pg(
                 run_optimize=_make_real_lab_runner(a11_factory),
                 discovery=_make_discovery_runner(),
                 shadow_bars=_make_shadow_bars_provider(a11_factory),
-                shadow_policy=ShadowPolicy(min_trades=1, min_return_pct=-100.0),
+                shadow_policy=ShadowPolicy(min_closed_round_trips=1, min_return_pct=-100.0),
+                # V2.32.1 (P1-01): hold-out estricto respecto al LAB.
+                shadow_config=ShadowReplayConfig(window_bars=250, min_bars=30),
+                shadow_require_holdout=True,
                 max_candidates=6,
             )
         )
@@ -282,6 +335,14 @@ async def test_a11_discovery_to_auto_sim_pg(
             assert shadows, "la promoción exige evidencia shadow persistida"
             assert any(s.passed for s in shadows), shadows
             assert shadows[-1].trades > 0, "el shadow debe ejecutar operaciones reales"
+            # V2.32.1 (P1-01/P2-03): hold-out estricto + fingerprint reproducible.
+            evidence = shadows[-1]
+            assert evidence.lab_end, "la evidencia debe registrar la frontera del LAB"
+            assert evidence.shadow_start and evidence.shadow_start > evidence.lab_end, (
+                "el hold-out shadow debe empezar ESTRICTAMENTE después del LAB"
+            )
+            assert evidence.bars_hash, "el fingerprint del dataset debe persistirse"
+            assert evidence.round_trips > 0, "deben registrarse operaciones cerradas"
             active = await store.get_active(instrument_id=instrument_id)
             assert active is not None
             assert active.active.shadow_validated is True
@@ -303,16 +364,18 @@ async def test_a11_discovery_to_auto_sim_pg(
             engine_id=engine_id,
             account_id=account_id,
         )
-        # La señal de la ACTIVE puede ser HOLD en el último bar: se le da margen con
-        # ticks deterministas; si nunca abre, el test no puede certificar el fill.
+        # V2.32.1 (auditoría P1-02): dataset determinista (cierre alcista sembrado) ⇒ la
+        # señal de la ACTIVE debe abrir. Un no-fill es un FALLO duro, nunca SKIPPED: un
+        # test de certificación financiera no puede terminar en verde sin certificar.
         report = None
         for _ in range(12):
             report = await runtime.run_tick()
             if worker._open.get(instrument_id, Decimal("0")) > 0:
                 break
         assert report is not None
-        if worker._open.get(instrument_id, Decimal("0")) <= 0:
-            pytest.skip("la señal de la ACTIVE fue HOLD en toda la ventana (sin fill que certificar)")
+        assert worker._open.get(instrument_id, Decimal("0")) > 0, (
+            "la ACTIVE debía abrir posición en el dataset determinista (sin SKIPPED)"
+        )
 
         # Atribución del fill de apertura a la versión promocionada.
         from bolsa_application.sim_durable_store import (
@@ -379,12 +442,16 @@ async def test_a11_discovery_to_auto_sim_pg(
         # Limpieza de la evidencia shadow del test (no contaminar otros ciclos).
         async with a11_factory() as session:
             rows = (
-                await session.execute(
-                    select(StrategyShadowValidationRow).where(
-                        StrategyShadowValidationRow.version_id == version_id
+                (
+                    await session.execute(
+                        select(StrategyShadowValidationRow).where(
+                            StrategyShadowValidationRow.version_id == version_id
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for row in rows:
                 await session.delete(row)
             await session.commit()

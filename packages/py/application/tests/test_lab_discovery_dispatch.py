@@ -55,8 +55,21 @@ class _Ohlcv:
                 )
             )
 
-    async def get_bars(self, instrument_id: str, *, timeframe: Any = None, limit: int = 0) -> Any:
-        return self._bars[:limit] if limit else self._bars
+    async def get_bars(
+        self,
+        instrument_id: str,
+        *,
+        timeframe: Any = None,
+        limit: int = 0,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> Any:
+        bars = list(self._bars)
+        if date_to is not None:
+            bars = [b for b in bars if b.timestamp <= date_to]
+        if date_from is not None:
+            bars = [b for b in bars if b.timestamp >= date_from]
+        return bars[:limit] if limit else bars
 
 
 def _bb_reversion_definition() -> dict[str, Any]:

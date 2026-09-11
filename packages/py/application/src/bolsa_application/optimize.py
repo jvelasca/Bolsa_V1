@@ -671,12 +671,18 @@ class RunSmaGridOptimize:
         on_progress: AsyncProgressCallback | None = None,
         execution_model: Literal["next_open"] = "next_open",
         definition: dict[str, Any] | None = None,
+        date_to: str | None = None,
     ) -> OptimizeSmaGridResult:
         """Ejecuta el grid de optimización para una familia.
 
         V2.31/A11: si ``definition`` es una ``StrategyDefinitionV1`` declarativa (la que
         emite el Discovery Engine), se optimiza por **reglas declarativas** sobre las
         familias del catálogo; el resto de familias mantiene los grids H0 clásicos.
+
+        V2.32.1 (auditoría P1-01): ``date_to`` acota las barras del LAB a un rango que
+        termina ANTES del hold-out shadow, de modo que la separación LAB/shadow sea real
+        (no un re-etiquetado de la misma ventana). ``None`` = sin recorte (comportamiento
+        previo).
         """
         instrument = await self._instruments.get_by_id(instrument_id)
         if instrument is None:
@@ -691,7 +697,9 @@ class RunSmaGridOptimize:
         else:
             family = normalize_strategy_family(strategy_family)
         tf = TimeFrame(timeframe) if timeframe in {t.value for t in TimeFrame} else TimeFrame.D1
-        bars = await self._ohlcv.get_bars(instrument_id, timeframe=tf, limit=bar_limit)
+        bars = await self._ohlcv.get_bars(
+            instrument_id, timeframe=tf, limit=bar_limit, date_to=date_to
+        )
         if len(bars) < MIN_SCAN_BARS:
             raise ValueError(f"Se necesitan al menos {MIN_SCAN_BARS} barras")
 

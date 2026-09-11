@@ -247,8 +247,24 @@ def evaluate_optimize_result(
     if isinstance(walk_forward, dict):
         wfe = walk_forward.get("walkForwardEfficiency") or walk_forward.get("wfe")
     edge_report = getattr(result, "edge_report", None)
+    # V2.32.1 (auditoría P1-02): el edge_report lite anida la suite en
+    # ``edge_report["suite"]`` (ahí viven ``walkForwardEfficiency`` y ``dsr``); leer solo
+    # el nivel superior hacía que los gates ``walk_forward``/``dsr`` quedaran
+    # NOT_EVALUATED aunque el LAB SÍ hubiera medido esos valores — imposible promocionar.
+    edge_suite = (
+        edge_report.get("suite") if isinstance(edge_report, dict) else None
+    )
+    if not isinstance(edge_suite, dict):
+        edge_suite = {}
     if wfe is None and isinstance(edge_report, dict):
-        wfe = edge_report.get("labWalkForwardEfficiency") or edge_report.get("wfe")
+        wfe = (
+            edge_report.get("labWalkForwardEfficiency")
+            or edge_report.get("wfe")
+            or edge_suite.get("walkForwardEfficiency")
+            or edge_suite.get("wfe")
+        )
+    if wfe is None and isinstance(result.cpcv, dict):
+        wfe = result.cpcv.get("walkForwardEfficiency")
     if wfe is None:
         gates.append(_gate("walk_forward", None, detail="wfe_ausente"))
     else:
@@ -285,7 +301,12 @@ def evaluate_optimize_result(
 
     dsr = None
     if isinstance(edge_report, dict):
-        dsr = edge_report.get("dsr") or edge_report.get("deflatedSharpe")
+        dsr = (
+            edge_report.get("dsr")
+            or edge_report.get("deflatedSharpe")
+            or edge_suite.get("dsr")
+            or edge_suite.get("deflatedSharpe")
+        )
     gates.append(
         _gate("dsr", None if dsr is None else float(dsr) >= th.min_dsr, metrics={"dsr": dsr})
     )

@@ -24,7 +24,7 @@ from __future__ import annotations
 import inspect
 import logging
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from bolsa_application.strategy_executable_definition import (
@@ -136,6 +136,10 @@ class OrchestratorDeps:
     shadow_bars: ShadowBarsProvider | None = None
     shadow_policy: ShadowPolicy = field(default_factory=ShadowPolicy)
     shadow_config: ShadowReplayConfig = field(default_factory=ShadowReplayConfig)
+    # V2.32.1 (auditoría P1-01): exige hold-out estricto respecto al LAB. Si es True,
+    # la ventana shadow debe empezar después del último dato del LAB (``shadow_start >
+    # lab_end``); sin separación demostrable no hay evidencia (fail-closed).
+    shadow_require_holdout: bool = True
     # V2.32 / A12: override explícito del operador (rollout/compatibilidad). ``None``
     # (default) ⇒ la autoridad es exclusivamente la evidencia ejecutada.
     shadow_override: bool | None = None
@@ -252,6 +256,14 @@ class AutoOrchestrator:
         for candidate in candidates:
             await deps.store.save_candidate(candidate)
 
+        # V2.32.1 (auditoría P1-01): HOLDOUT ESTRICTO. Se lee UNA vez la serie amplia de
+        # barras y se fija la frontera LAB/shadow ANTES de correr el LAB: el LAB recibe
+        # ``date_to = lab_end`` (no ve el hold-out) y el shadow recibe exactamente el
+        # complemento. Así la separación es real, no un re-etiquetado de la misma ventana.
+        shadow_bars_series, lab_end = await self._resolve_holdout(instrument_id)
+        if lab_end is not None:
+            candidates = [self._candidate_with_lab_cutoff(c, lab_end) for c in candidates]
+
         # LABORATORIO: evaluar cada candidata con el runner real inyectado.
         evaluations: list[StrategyEvaluation] = []
         # V2.29/A10: resultado crudo por candidata para extraer el campeón y persistir
@@ -333,10 +345,14 @@ class AutoOrchestrator:
         # una ventana separada del LAB para producir evidencia contable. Sin provider de
         # barras no hay evidencia y el Promotion Gate no promociona (fail-closed). El
         # override explícito del operador (``shadow_override``) solo aplica si se fija.
+        # V2.32.1 (auditoría P1-01): la ventana shadow es un hold-out ESTRICTO del LAB.
         shadow_result = await self._run_shadow(
             finalist=finalist,
             instrument_id=instrument_id,
             run_id=run_id,
+            data_snapshot_id=data_snapshot_id,
+            bars=shadow_bars_series,
+            lab_end=lab_end,
         )
         if shadow_result is not None:
             await deps.store.save_shadow_result(shadow_result)
@@ -463,35 +479,105 @@ class AutoOrchestrator:
             reasons=decision.breaches,
         )
 
-    async def _run_shadow(
-        self,
-        *,
-        finalist: Any,
-        instrument_id: str,
-        run_id: str,
-    ) -> Any:
-        """V2.32 / A12: ejecuta la validación shadow del finalista (fail-closed).
+    async def _resolve_holdout(
+        self, instrument_id: str
+    ) -> tuple[tuple[Any, ...], str | None]:
+        """Lee la serie amplia de barras y fija la frontera LAB/shadow (``lab_end``).
 
-        Sin provider de barras no hay evidencia: devuelve ``None`` y el Promotion Gate
-        no promociona. Un fallo del provider tampoco se convierte en aprobación.
+        Devuelve ``(bars, lab_end)``. ``lab_end`` es el timestamp de la barra tras la
+        cual empieza el hold-out (las últimas ``shadow_window`` barras de la serie). Con
+        ``shadow_require_holdout`` y sin separación demostrable, ``lab_end`` es ``None``
+        y el shadow resolverá fail-closed (no se inventa evidencia).
         """
         provider = self._deps.shadow_bars
         if provider is None:
-            return None
+            return (), None
         try:
             bars = provider(instrument_id)
             if inspect.isawaitable(bars):
                 bars = await bars
         except Exception:  # noqa: BLE001 — sin barras no se inventa evidencia.
             logger.exception("auto_orchestrator shadow bars failed for %s", instrument_id)
-            return None
+            return (), None
+        bar_tuple = tuple(bars or ())
+        if not self._deps.shadow_require_holdout:
+            return bar_tuple, None
+        return bar_tuple, _lab_end_timestamp(bar_tuple, self._deps.shadow_config.window_bars)
+
+    @staticmethod
+    def _candidate_with_lab_cutoff(candidate: Any, lab_end: str) -> Any:
+        """Inyecta ``date_to=lab_end`` en la candidata para que el LAB no vea el hold-out."""
+        params = dict(getattr(candidate, "params", None) or {})
+        params["date_to"] = lab_end
+        return replace(candidate, params=params)
+
+    async def _run_shadow(
+        self,
+        *,
+        finalist: Any,
+        instrument_id: str,
+        run_id: str,
+        data_snapshot_id: str | None = None,
+        bars: tuple[Any, ...] | None = None,
+        lab_end: str | None = None,
+    ) -> Any:
+        """V2.32 / A12: ejecuta la validación shadow del finalista (fail-closed).
+
+        Sin provider de barras no hay evidencia: devuelve ``None`` y el Promotion Gate
+        no promociona. Un fallo del provider tampoco se convierte en aprobación.
+
+        V2.32.1 (auditoría P1-01): la ventana shadow es un **hold-out estricto** del
+        LAB (``lab_end`` fijado por ``_resolve_holdout`` antes de correr el LAB).
+        """
+        if bars is None or lab_end is None:
+            # Sin serie/hold-out resuelto: no se inventa evidencia.
+            if self._deps.shadow_bars is None:
+                return None
+            bars, resolved_lab_end = await self._resolve_holdout(instrument_id)
+            lab_end = lab_end if lab_end is not None else resolved_lab_end
+
+        config = replace(
+            self._deps.shadow_config,
+            lab_end=lab_end,
+            require_holdout=self._deps.shadow_require_holdout,
+        )
         return run_shadow_replay(
             finalist=finalist,
-            bars=tuple(bars or ()),
+            bars=bars,
             policy=self._deps.shadow_policy,
-            config=self._deps.shadow_config,
+            config=config,
             as_of=run_id,
+            data_snapshot_id=data_snapshot_id,
         )
+
+
+def _lab_end_timestamp(bars: tuple[Any, ...], shadow_window_bars: Any) -> str | None:
+    """Último timestamp reservado para el LAB (frontera del hold-out shadow).
+
+    El provider devuelve la serie completa disponible. La ventana shadow es un
+    hold-out **estricto** de las últimas ``shadow_window_bars`` barras; por tanto el
+    LAB queda restringido a todo lo anterior y su última barra es
+    ``bars[-(shadow_window_bars + 1)]``. Así ``shadow_start > lab_end`` por construcción.
+
+    ``None`` si no se puede determinar (serie demasiado corta o ventana inválida): el
+    shadow resolverá fail-closed (no se inventa una separación).
+    """
+    if not isinstance(shadow_window_bars, int) or shadow_window_bars <= 0:
+        return None
+    # Se necesita al menos una barra de LAB además del hold-out.
+    if len(bars) <= shadow_window_bars:
+        return None
+    bar = bars[-(shadow_window_bars + 1)]
+    return _bar_timestamp(bar)
+
+
+def _bar_timestamp(bar: Any) -> str | None:
+    ts = getattr(bar, "timestamp", None)
+    if ts is None and isinstance(bar, dict):
+        ts = bar.get("timestamp")
+    if ts is None:
+        return None
+    return ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
 
 
 def _champion_definition(

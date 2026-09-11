@@ -206,6 +206,60 @@ async def test_loop_uses_estudio_universe_without_csv() -> None:
     assert "BBB" in orch.cycles
 
 
+@pytest.mark.asyncio
+async def test_loop_does_not_pass_shadow_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """V2.32.1 (P2-02): el bucle AUTO NO cablea el override del operador.
+
+    Con ``AUTO_ORCHESTRATOR_SHADOW_VALIDATED=1`` el ciclo debe seguir sin recibir
+    ``shadow_validated``: AUTO promociona solo por evidencia ejecutada.
+    """
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED, "1")
+    seen: list[dict[str, Any]] = []
+
+    class _Recorder:
+        async def run_cycle(self, *, instrument_id: str, **kwargs: Any) -> _Result:
+            seen.append({"instrument_id": instrument_id, **kwargs})
+            return _Result()
+
+        async def watch_active(self, *, instrument_id: str, **_: Any) -> _Result:
+            return _Result()
+
+    task = asyncio.create_task(w.auto_orchestrator_loop(_Recorder(), interval_seconds=0.01))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert seen, "el bucle debe haber ejecutado ciclos"
+    assert all("shadow_validated" not in call for call in seen)
+
+
+def test_default_orchestrator_does_not_wire_shadow_override() -> None:
+    """V2.32.1 (P2-02): la composición AUTO deja ``shadow_override=None`` (sin bypass)."""
+    import os
+
+    previous = os.environ.get(w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED)
+    os.environ[w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED] = "1"
+    try:
+        orch = w._default_orchestrator(_session_factory)
+    finally:
+        if previous is None:
+            os.environ.pop(w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED, None)
+        else:
+            os.environ[w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED] = previous
+    assert orch.deps.shadow_override is None
+    assert orch.deps.shadow_require_holdout is True
+
+
+def test_health_thresholds_are_calibrated() -> None:
+    """V2.32.1 (auditoría 2b): el AUTO fija umbrales predictivos reales (no ``None``)."""
+    th = w._health_thresholds()
+    assert th.min_credibility is not None
+    assert th.min_edge is not None
+
+
 def test_default_orchestrator_wires_real_dependencies() -> None:
     # P1-01/P1-02: ya no se deja resolve_universe/run_optimize en None.
     orch = w._default_orchestrator(_session_factory)

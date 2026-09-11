@@ -2,6 +2,48 @@
 
 All notable releases of Bolsa V1.
 
+## [1.57.0-beta] — V2.32.1 / A12.1 · Audit Remediation (P1 + promotion-hardening P2) — 2026-09-11
+
+Remedia los hallazgos verificados de la auditoría V2.32 contra HEAD `854dc86`, sin
+cambios de arquitectura ni en las barreras LIVE (siguen doblemente bloqueadas) y sin
+tocar la ruta SIM-only. Endurece la honestidad estadística y la certificación continua.
+
+- **P1-01 — Hold-out estricto LAB/shadow**: la ventana del shadow ya no se solapa con la
+  del LAB. El orquestador resuelve el corte (`lab_end`), lo inyecta en las candidatas
+  (`date_to`) y el replay parte las barras en LAB vs hold-out estricto
+  (`split_holdout`), con _fail-closed_ (`shadow_solape_lab` /
+  `shadow_barras_holdout_insuficientes`). El worker lee `bar_limit + shadow_window`
+  barras para que exista un hold-out real posterior.
+- **P1-02 — E2E PG por commit**: nuevo job `lifecycle-pg` en `python-ci.yml` que arranca
+  `postgres:16`, aplica `alembic upgrade head` (032/033/034) y ejecuta la suite A12
+  crítica con gates `*_PG_REQUIRED=1` (un skip es fallo duro). El E2E
+  `test_a11_discovery_to_auto_sim_pg.py` deja de estar `--ignore`d en la certificación.
+- **P1-02 — E2E determinista (sin SKIPPED)**: dataset sembrado que produce un cruce SMA
+  real en la última barra ⇒ `ACTIVE → SIGNAL → SIM BUY → FILL` certificado como
+  aserción dura. Se corrige además un fallo preexistente de lectura de gates
+  (`walkForwardEfficiency`/`dsr` anidados en `edge_report["suite"]`) que dejaba
+  `robustness`/`walk_forward`/`dsr` en `NOT_EVALUATED` e impedía promocionar.
+- **P2-01 — Drawdown fail-closed**: `ShadowPolicy.evaluate` falla cerrado si
+  `max_drawdown_pct` está configurado y la métrica es `None` (`shadow_drawdown_ausente`).
+- **P2-02 — Sin override en AUTO**: se elimina `shadow_validated`/`shadow_override` de la
+  ruta AUTO real; la promoción en AUTO es solo por evidencia. El parámetro se mantiene
+  para llamadas manuales/admin/test.
+- **P2-03 — Fingerprint del dataset shadow**: migración **034**
+  (`round_trips`, `data_snapshot_id`, `shadow_start`, `shadow_end`, `bars_hash`,
+  `strategy_definition_hash`, `engine_version`, `config_hash`, `lab_end`), todas
+  nullable y sin backfill (la ausencia de evidencia no se inventa).
+- **P2-04 — Semántica de round-trips**: la guarda de muestra es `min_closed_round_trips`
+  (operaciones cerradas), no piernas ejecutadas.
+- **P2-05 — Identidad por ciclo**: `run_id` por ciclo (`orchestrator:{instrument}:{ts}-{rnd}`)
+  en vez de constante, para distinguir retries/re-LAB/shadow.
+- **Auditoría 2a — `can_transition` fail-closed**: transicionar sin gates evaluados se
+  bloquea (`gates_no_evaluados`) en vez de permitirse.
+- **Auditoría 2b — `HealthThresholds` predictivos**: `min_edge`/`min_wfe`/`min_dsr`/
+  `min_credibility` pasan a `None` por defecto (sin fabricar un `0.0`); la vigilancia
+  solo degrada con umbrales calibrados.
+
+> Cierre: `docs/engineering/PROJECT_STATE.md`.
+
 ## [1.56.0-beta] — V2.32 / A12 · Shadow Validation & Autonomous Attribution — 2026-09-11
 
 Cierra los **dos P2 diferidos a V2.32** por la auditoría V2.31. Sin cambios en las

@@ -70,6 +70,7 @@ def _deps(
     *,
     runner: Any = None,
     resolution: Any = None,
+    health_thresholds: Any = None,
 ) -> tuple[OrchestratorDeps, InMemoryStrategyLifecycleStore]:
     store = InMemoryStrategyLifecycleStore()
     deps = OrchestratorDeps(
@@ -77,6 +78,7 @@ def _deps(
         resolve_universe=(lambda: _runner(resolution)) if resolution is not None else None,
         run_optimize=(lambda candidate: _runner(runner(candidate))),
         max_candidates=3,
+        **( {"health_thresholds": health_thresholds} if health_thresholds is not None else {} ),
     )
     return deps, store
 
@@ -139,7 +141,15 @@ async def test_universe_unavailable_produces_no_candidates() -> None:
 
 @pytest.mark.asyncio
 async def test_vigilance_degrades_to_relab() -> None:
-    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    # V2.32.1 (auditoría 2b): los umbrales predictivos ya no se inventan con 0.0; el
+    # llamante debe configurarlos explícitamente para que la vigilancia los aplique.
+    from bolsa_application.strategy_vigilance_phase import HealthThresholds
+
+    deps, store = _deps(
+        runner=lambda c: _good_result(),
+        resolution=_Resolution(),
+        health_thresholds=HealthThresholds(min_edge=0.0, min_wfe=0.5),
+    )
     orchestrator = AutoOrchestrator(deps)
     await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
     watched = await orchestrator.watch_active(

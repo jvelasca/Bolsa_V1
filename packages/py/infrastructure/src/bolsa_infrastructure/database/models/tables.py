@@ -2342,6 +2342,21 @@ class StrategyShadowValidationRow(Base):
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     as_of: Mapped[str | None] = mapped_column("as_of", String, nullable=True)
+    # V2.32.1 (auditoría P2-03): identidad reproducible del dataset shadow. Permite
+    # demostrar dentro de meses EXACTAMENTE con qué barras se autorizó la promoción.
+    round_trips: Mapped[int] = mapped_column("round_trips", Integer, default=0)
+    data_snapshot_id: Mapped[str | None] = mapped_column(
+        "data_snapshot_id", String, nullable=True
+    )
+    shadow_start: Mapped[str | None] = mapped_column("shadow_start", String, nullable=True)
+    shadow_end: Mapped[str | None] = mapped_column("shadow_end", String, nullable=True)
+    bars_hash: Mapped[str | None] = mapped_column("bars_hash", String, nullable=True)
+    strategy_definition_hash: Mapped[str | None] = mapped_column(
+        "strategy_definition_hash", String, nullable=True
+    )
+    engine_version: Mapped[str | None] = mapped_column("engine_version", String, nullable=True)
+    config_hash: Mapped[str | None] = mapped_column("config_hash", String, nullable=True)
+    lab_end: Mapped[str | None] = mapped_column("lab_end", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 

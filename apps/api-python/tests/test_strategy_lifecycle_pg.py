@@ -298,11 +298,16 @@ async def test_auto_orchestrator_full_cycle_pg(
             async def _run_optimize(_candidate: object) -> object:
                 return _optimize_result()
 
+            from bolsa_application.strategy_vigilance_phase import HealthThresholds
+
             deps = OrchestratorDeps(
                 store=store,
                 run_optimize=_run_optimize,
                 candidate_id_factory=lambda _inst, _i: candidate_id,
                 strategy_family="sma_crossover",
+                # V2.32.1 (auditoría 2b): los umbrales predictivos ya no se inventan con
+                # 0.0; el test configura explícitamente los que quiere ejercitar.
+                health_thresholds=HealthThresholds(min_edge=0.0, min_wfe=0.5),
             )
             orchestrator = AutoOrchestrator(deps)
 

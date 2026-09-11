@@ -84,8 +84,18 @@ _LAB_RUN_KEYS = frozenset(
         "cpcv_groups",
         "cpcv_purge_bars",
         "cpcv_embargo_bars",
+        # V2.32.1 (P1-01): recorte temporal del LAB para el hold-out shadow.
+        "date_to",
     }
 )
+
+# V2.32.1 (auditoría P1-02): defaults estructurales de ventana aplicables a TODAS las
+# familias. ``cpcv_groups``/``walk_forward_folds`` NO se incluyen aquí: el motor solo
+# los soporta para familias H0 (``_run_cpcv``/``_run_walk_forward`` operan sobre grids
+# H0); aplicarlos a las familias declarativas del Discovery las dejaría sin trials.
+_STRUCTURAL_LAB_DEFAULTS: dict[str, Any] = {
+    "bar_limit": 400,
+}
 
 _GRID_KEYS = frozenset(
     {
@@ -108,11 +118,16 @@ class LabOptimizeResult:
     tiene ``optimization_run_id``/``edge_report_id``. Se exponen los campos que
     ``evaluate_optimize_result`` lee (``trials``, ``cpcv``, ``pbo``, ``walk_forward``,
     ``edge_report``) más la identidad para auditoría.
+
+    V2.32.1 (auditoría P1-01): ``lab_bars_used`` es la ventana de barras que usó el
+    LAB. El orquestador la emplea para calcular el ``lab_end`` del hold-out estricto
+    del shadow (la ventana shadow debe empezar *después* de la última barra del LAB).
     """
 
     result: Any
     optimization_run_id: str | None = None
     edge_report_id: str | None = None
+    lab_bars_used: int | None = None
 
     @property
     def trials(self) -> Any:
@@ -200,6 +215,7 @@ class LabOptimizeRunner:
             result=result,
             optimization_run_id=getattr(run, "id", None),
             edge_report_id=_edge_report_id(result),
+            lab_bars_used=_lab_bars_used(params, result),
         )
 
     def _merge_params(self, family: str, candidate_params: dict[str, Any]) -> dict[str, Any]:
@@ -210,7 +226,14 @@ class LabOptimizeRunner:
             STRATEGY_FAMILY_SMA,
         )
 
-        merged: dict[str, Any] = dict(self._grid_defaults.get(family, {}))
+        # V2.32.1 (P1-02): el default estructural de ventana (``bar_limit``) se aplica a
+        # TODAS las familias, incluidas las declarativas del Discovery, para que el corte
+        # LAB/hold-out sea coherente. ``cpcv_groups``/``walk_forward_folds`` NO se fuerzan
+        # aquí: solo las familias H0 los soportan (las declarativas los reciben del
+        # catálogo o del candidato, y con ellos los gates robustness/walk_forward/oos
+        # dejan de quedar NOT_EVALUATED).
+        merged: dict[str, Any] = dict(_STRUCTURAL_LAB_DEFAULTS)
+        merged.update(self._grid_defaults.get(family, {}))
         for key, value in dict(candidate_params or {}).items():
             if key in _LAB_RUN_KEYS or key in _GRID_KEYS:
                 merged[key] = value
@@ -297,4 +320,21 @@ def _edge_report_id(result: Any) -> str | None:
         raw = edge_report.get("persistedEdgeReportId") or edge_report.get("id")
         if isinstance(raw, str) and raw:
             return raw
+    return None
+
+
+def _lab_bars_used(params: dict[str, Any], result: Any) -> int | None:
+    """Ventana real de barras del LAB (para el ``lab_end`` del hold-out shadow).
+
+    Prioriza el ``bar_count`` que el propio resultado del LAB reporta (las barras que
+    de verdad cargó); si no está, cae al ``bar_limit`` solicitado. ``None`` si no se
+    puede determinar (el shadow resolverá fail-closed: sin ``lab_end`` no hay
+    separación demostrable).
+    """
+    bar_count = getattr(result, "bar_count", None)
+    if isinstance(bar_count, int) and bar_count > 0:
+        return bar_count
+    bar_limit = params.get("bar_limit")
+    if isinstance(bar_limit, int) and bar_limit > 0:
+        return bar_limit
     return None

@@ -111,3 +111,100 @@ def test_shadow_replay_insufficient_sample_fails() -> None:
     result = run_shadow_replay(finalist=finalist, bars=_bars(), policy=policy)
     assert result.passed is False
     assert "shadow_muestra_insuficiente" in result.reasons
+
+
+# ── V2.32.1 (auditoría P1-01): hold-out ESTRICTO del LAB ─────────────────────────
+
+
+def _dated_bars(count: int = 400, start_day: int = 0) -> list[Any]:
+    """Barras con timestamps reales y crecientes (2026-01-01 + N días)."""
+    from datetime import date, timedelta
+
+    from bolsa_analytics.backtest import BacktestBarInput
+
+    base = date(2026, 1, 1)
+    out = []
+    for index in range(count):
+        price = 100.0 + 12.0 * math.sin(index / 6.0) + index * 0.05
+        ts = base + timedelta(days=start_day + index)
+        out.append(
+            BacktestBarInput(
+                timestamp=ts.isoformat(),
+                close=price,
+                open=price,
+                high=price * 1.01,
+                low=price * 0.99,
+                volume=1000.0,
+            )
+        )
+    return out
+
+
+def test_shadow_replay_requires_holdout_when_requested() -> None:
+    finalist = _finalist({"executable": _executable_definition()})
+    result = run_shadow_replay(
+        finalist=finalist,
+        bars=_dated_bars(),
+        config=ShadowReplayConfig(require_holdout=True),
+    )
+    assert result.passed is False
+    assert "shadow_lab_end_ausente" in result.reasons
+
+
+def test_shadow_replay_splits_holdout_after_lab_end() -> None:
+    finalist = _finalist({"executable": _executable_definition()})
+    bars = _dated_bars(400)
+    lab_end = bars[300].timestamp
+    policy = ShadowPolicy(min_closed_round_trips=1, min_return_pct=-1000.0)
+    result = run_shadow_replay(
+        finalist=finalist,
+        bars=bars,
+        policy=policy,
+        config=ShadowReplayConfig(lab_end=lab_end, window_bars=99, min_bars=10),
+    )
+    # El hold-out son las 99 barras estrictamente posteriores al lab_end.
+    assert result.bars_used == 99
+    assert result.shadow_start is not None and result.shadow_start > lab_end
+    assert result.lab_end == lab_end
+    assert result.bars_hash is not None
+
+
+def test_shadow_replay_fails_closed_without_separation() -> None:
+    finalist = _finalist({"executable": _executable_definition()})
+    bars = _dated_bars(400)
+    # lab_end == última barra ⇒ no queda hold-out posterior.
+    lab_end = bars[-1].timestamp
+    result = run_shadow_replay(
+        finalist=finalist,
+        bars=bars,
+        config=ShadowReplayConfig(lab_end=lab_end),
+    )
+    assert result.passed is False
+    assert "shadow_solape_lab" in result.reasons
+
+
+def test_shadow_replay_fingerprint_is_reproducible() -> None:
+    finalist = _finalist({"executable": _executable_definition()})
+    bars = _dated_bars(400)
+    lab_end = bars[300].timestamp
+    config = ShadowReplayConfig(lab_end=lab_end, window_bars=99, min_bars=10)
+    policy = ShadowPolicy(min_closed_round_trips=1, min_return_pct=-1000.0)
+    first = run_shadow_replay(
+        finalist=finalist,
+        bars=bars,
+        policy=policy,
+        config=config,
+        data_snapshot_id="snap-1",
+    )
+    second = run_shadow_replay(
+        finalist=finalist,
+        bars=bars,
+        policy=policy,
+        config=config,
+        data_snapshot_id="snap-1",
+    )
+    assert first == second
+    assert first.bars_hash == second.bars_hash
+    assert first.data_snapshot_id == "snap-1"
+    assert first.engine_version is not None
+    assert first.strategy_definition_hash == "h"

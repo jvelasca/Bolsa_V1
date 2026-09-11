@@ -465,6 +465,16 @@ class PostgresStrategyLifecycleStore:
                 passed=bool(result.passed),
                 reasons=list(result.reasons),
                 as_of=result.as_of,
+                # V2.32.1: identidad reproducible del dataset (P2-03).
+                round_trips=int(result.round_trips),
+                data_snapshot_id=result.data_snapshot_id,
+                shadow_start=result.shadow_start,
+                shadow_end=result.shadow_end,
+                bars_hash=result.bars_hash,
+                strategy_definition_hash=result.strategy_definition_hash,
+                engine_version=result.engine_version,
+                config_hash=result.config_hash,
+                lab_end=result.lab_end,
                 created_at=_now(),
             )
             .on_conflict_do_nothing(index_elements=["id"])
@@ -494,6 +504,15 @@ class PostgresStrategyLifecycleStore:
                 win_rate=r.win_rate,
                 bars_used=int(r.bars_used or 0),
                 as_of=r.as_of,
+                round_trips=int(getattr(r, "round_trips", 0) or 0),
+                data_snapshot_id=r.data_snapshot_id,
+                shadow_start=r.shadow_start,
+                shadow_end=r.shadow_end,
+                bars_hash=r.bars_hash,
+                strategy_definition_hash=r.strategy_definition_hash,
+                engine_version=r.engine_version,
+                config_hash=r.config_hash,
+                lab_end=r.lab_end,
             )
             for r in rows
         ]
