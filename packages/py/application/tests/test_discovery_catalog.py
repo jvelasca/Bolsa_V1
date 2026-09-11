@@ -12,7 +12,10 @@ from bolsa_application.discovery_catalog import (
     PARENT_MOMENTUM,
     PARENT_TREND,
     PARENT_VOLATILITY,
+    CatalogLane,
     DiscoveryBudget,
+    DiscoveryBudgetAllocator,
+    GrammarLane,
     families_by_parent,
     family_by_name,
     iter_param_points,
@@ -93,3 +96,129 @@ def test_budget_normalizes_to_positive() -> None:
     assert normalized.max_per_family >= 1
     assert normalized.max_candidates >= 1
     assert normalized.min_bars >= 1
+
+
+# ── V2.36/A16 (P2-03): allocator explícito de presupuesto por carril ────────────
+
+
+def test_allocator_declares_the_four_lanes() -> None:
+    """El allocator reparte entre catálogo, gramática simple/compuesta y adaptive."""
+    allocation = DiscoveryBudgetAllocator().allocate(DiscoveryBudget())
+    assert set(allocation) == {
+        CatalogLane.NAME,
+        GrammarLane.SIMPLE,
+        GrammarLane.COMPOSITE,
+        "adaptive",
+    }
+
+
+def test_allocator_is_deterministic_and_idempotent() -> None:
+    """Mismo allocator + mismo presupuesto ⇒ mismo reparto, repetible."""
+    allocator = DiscoveryBudgetAllocator()
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    first = allocator.allocate(budget)
+    second = allocator.allocate(budget)
+    assert first == second
+    assert allocator.allocate(budget) == first
+
+
+def test_allocator_never_exceeds_global_budget() -> None:
+    """La suma de cupos por carril nunca supera ``max_candidates``/``max_trials_total``."""
+    allocator = DiscoveryBudgetAllocator()
+    for budget in (
+        DiscoveryBudget(),
+        DiscoveryBudget(max_trials_total=3, max_per_family=1, max_candidates=1),
+        DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24),
+        DiscoveryBudget(max_trials_total=100, max_per_family=4, max_candidates=7),
+    ):
+        allocation = allocator.allocate(budget)
+        assert sum(a.candidates for a in allocation.values()) <= budget.max_candidates
+        assert sum(a.trials for a in allocation.values()) <= budget.max_trials_total
+
+
+def test_allocator_guarantees_non_zero_share_to_grammar() -> None:
+    """La gramática recibe cupo > 0 con los pesos por defecto (bug A14 no reaparece)."""
+    allocation = DiscoveryBudgetAllocator().allocate(DiscoveryBudget())
+    assert allocation[GrammarLane.SIMPLE].candidates > 0
+    assert allocation[CatalogLane.NAME].candidates > 0
+
+
+def test_allocator_guarantees_catalog_share_so_grammar_cannot_starve_it() -> None:
+    """Aunque la gramática tenga mucho peso, el catálogo conserva su cupo."""
+    allocator = DiscoveryBudgetAllocator(
+        catalog_weight=0.1,
+        grammar_simple_weight=10.0,
+        grammar_composite_weight=10.0,
+    )
+    allocation = allocator.allocate(DiscoveryBudget())
+    assert allocation[CatalogLane.NAME].candidates > 0
+
+
+def test_allocator_order_independence_of_lane_weights() -> None:
+    """Intercambiar el peso de dos carriles intercambia sus cupos (no los anula).
+
+    La asignación depende SOLO de los pesos, no de quién consome primero: permutar
+    dos pesos simétricos produce la permutación simétrica de los cupos.
+    """
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    base = DiscoveryBudgetAllocator(
+        catalog_weight=2.0, grammar_simple_weight=1.0, grammar_composite_weight=1.0
+    ).allocate(budget)
+    swapped = DiscoveryBudgetAllocator(
+        catalog_weight=1.0, grammar_simple_weight=2.0, grammar_composite_weight=1.0
+    ).allocate(budget)
+    assert swapped[GrammarLane.SIMPLE].candidates > base[GrammarLane.SIMPLE].candidates
+    assert swapped[CatalogLane.NAME].candidates < base[CatalogLane.NAME].candidates
+    # Ambos carriles conservan cupo (nadie queda a 0 por el orden).
+    assert swapped[CatalogLane.NAME].candidates > 0
+    assert swapped[GrammarLane.SIMPLE].candidates > 0
+
+
+def test_allocator_adaptive_lane_is_a_zero_placeholder() -> None:
+    """``adaptive`` no aprende ni emite: peso 0 ⇒ cupo 0 con los defaults."""
+    allocation = DiscoveryBudgetAllocator().allocate(DiscoveryBudget())
+    assert allocation["adaptive"].candidates == 0
+    assert allocation["adaptive"].trials == 0
+
+
+def test_allocator_all_zero_weights_falls_back_to_catalog() -> None:
+    """Sin pesos ni pisos el reparto degenerado da todo al catálogo (compatibilidad)."""
+    allocator = DiscoveryBudgetAllocator(
+        catalog_weight=0.0,
+        grammar_simple_weight=0.0,
+        grammar_composite_weight=0.0,
+        adaptive_weight=0.0,
+        catalog_min=0,
+        grammar_simple_min=0,
+        grammar_composite_min=0,
+        adaptive_min=0,
+    )
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    allocation = allocator.allocate(budget)
+    assert allocation[CatalogLane.NAME].candidates == 24
+    assert sum(a.candidates for a in allocation.values()) == 24
+
+
+def test_allocator_normalizes_negative_and_nan_weights() -> None:
+    """Pesos negativos/NaN se sanean a 0 (fail-safe, sin reparto negativo)."""
+    allocator = DiscoveryBudgetAllocator(
+        catalog_weight=-5.0, grammar_simple_weight=float("nan")
+    ).normalized()
+    assert allocator.catalog_weight == 0.0
+    assert allocator.grammar_simple_weight == 0.0
+
+
+def test_allocator_normalized_weights_sum_to_one() -> None:
+    """Los pesos normalizados son una distribución (suman 1.0) y son deterministas."""
+    weights = DiscoveryBudgetAllocator().normalized_weights()
+    assert abs(sum(weights.values()) - 1.0) < 1e-9
+    assert weights[CatalogLane.NAME] == 0.5
+    assert weights[GrammarLane.SIMPLE] == 0.25
+    assert weights["adaptive"] == 0.0
+
+
+def test_allocator_lane_for_grammar_maps_simple_and_composite() -> None:
+    """El carril de gramática distingue plan simple (1 bloque opcional) de compuesto."""
+    allocator = DiscoveryBudgetAllocator()
+    assert allocator.lane_for_grammar(composite=False) == GrammarLane.SIMPLE
+    assert allocator.lane_for_grammar(composite=True) == GrammarLane.COMPOSITE

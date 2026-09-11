@@ -35,8 +35,12 @@ from typing import Any
 
 __all__ = [
     "DISCOVERY_FAMILIES",
+    "CatalogLane",
     "DiscoveryBudget",
+    "DiscoveryBudgetAllocator",
     "DiscoveryFamily",
+    "GrammarLane",
+    "LaneAllocation",
     "PARENT_MOMENTUM",
     "PARENT_TREND",
     "PARENT_VOLATILITY",
@@ -688,6 +692,293 @@ class DiscoveryBudget:
             max_candidates=max(1, int(self.max_candidates)),
             min_bars=max(1, int(self.min_bars)),
         )
+
+
+# ── V2.36/A16 (auditoría P2-03): allocator explícito de presupuesto ────────────
+#
+# ANTES (A14): el presupuesto global se repartía por RESERVA SECUENCIAL — primero el
+# catálogo consumía hasta agotar ``max_candidates`` y solo después se descontaba una
+# reserva para la gramática. El ORDEN del search space decidía quién recibía cupo.
+#
+# AHORA: un allocator explícito con CUOTAS POR CARRIL. Cada carril declara un peso
+# (``weight``) y un mínimo garantizado (``min_floor``); ``allocate()`` normaliza los
+# pesos de forma determinista y reparte el presupuesto global por partes, sin que
+# ningún carril pueda comerse a otro. La suma de techos nunca excede el presupuesto.
+#
+# ``adaptive`` queda declarado como carril de peso 0 (placeholder de la futura
+# búsqueda adaptativa): NO implementa aprendizaje, solo reserva el hueco semántico.
+
+
+class GrammarLane:
+    """Carriles de la gramática a los que el allocator asigna cupo (namespace estable).
+
+    Se usa ``str`` para el tipo de los campos del allocator; la clase solo centraliza
+    los nombres para evitar literales dispersos (mismo patrón que los ``str`` ya
+    existentes en el resto del catálogo).
+    """
+
+    SIMPLE = "grammar_simple"
+    COMPOSITE = "grammar_composite"
+
+
+class CatalogLane:
+    """Carril del catálogo curado de familias técnicas."""
+
+    NAME = "catalog"
+
+
+@dataclass(frozen=True, slots=True)
+class LaneAllocation:
+    """Cupo asignado a un carril: techo de candidatas + techo de trials.
+
+    Es un dato derivado (inmutable) del allocator + presupuesto. ``candidates`` es el
+    máximo de candidatas que el carril puede emitir en el ciclo; ``trials`` el máximo
+    de evaluaciones (puntos materializados) que puede consumir. Ambos se calculan a
+    partir de pesos explícitos, nunca del consumo previo de otro carril.
+    """
+
+    candidates: int = 0
+    trials: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class DiscoveryBudgetAllocator:
+    """Reparto explícito y determinista del presupuesto global por carril (P2-03).
+
+    Decisiones de diseño:
+
+    * **Cuotas explícitas, no consumo secuencial.** Los pesos (``catalog_weight``,
+      ``grammar_simple_weight``, ``grammar_composite_weight``, ``adaptive_weight``) y
+      los mínimos (``*_min``) son la única fuente de verdad. ``allocate(budget)``
+      normaliza los pesos y reparte ``max_candidates``/``max_trials_total`` por partes.
+    * **Total y exhaustivo.** ``allocate`` no modifica estado ni depende del orden de
+      llamadas: mismo ``(allocator, budget)`` ⇒ mismo reparto. Puede llamarse varias
+      veces con el MISMO resultado (idempotente de facto).
+    * **Nunca se sobrepasa el global.** La suma de ``candidates`` de TODOS los carriles
+      es ``<= budget.max_candidates`` y la suma de ``trials`` ``<= max_trials_total``
+      (garantizado por el método de reparto por quedas mayores).
+    * **Ningún carril hambriento si se le concede suelo.** Un carril con
+      ``weight > 0`` o ``min_floor > 0`` recibe al menos 1 candidata cuando el
+      presupuesto lo permite (queda mayor con prioridad a los pisos), de modo que el
+      bug A14 (el catálogo se comía todo y la gramática nunca corría) no puede repetirse.
+    * **``adaptive``** se declara con peso 0 por defecto: es un placeholder para la
+      futura búsqueda adaptativa; NO hay aprendizaje ni realimentación en el motor.
+
+    Reparto (determinista):
+      1. ``effective`` = budget.normalized().
+      2. Si todos los pesos + pisos son 0 ⇒ todo al catálogo (compatibilidad).
+      3. Cuota por peso mayorista (``floor(global * w / W)``) para candidatas y trials.
+      4. Las quedas se reparten de mayor a menor (desempate por clase: catálogo primero,
+         luego gramática simple, compuesta y adaptive; y enfin por orden alfabético).
+      5. Se aplican los pisos: cada carril con derecho recibe al menos su piso y, si el
+         presupuesto lo permite, al menos 1 candidata (suelo natural para pesos > 0).
+      6. Se repara el total hacia abajo si la suma excediera el global.
+    """
+
+    catalog_weight: float = 2.0
+    grammar_simple_weight: float = 1.0
+    grammar_composite_weight: float = 1.0
+    # Placeholder de la búsqueda adaptativa futura: peso 0 (no aprende, no emite).
+    adaptive_weight: float = 0.0
+    # Pisos garantizados por carril (siempre que el presupuesto global lo permita).
+    catalog_min: int = 1
+    grammar_simple_min: int = 1
+    grammar_composite_min: int = 0
+    adaptive_min: int = 0
+
+    def normalized(self) -> DiscoveryBudgetAllocator:
+        """Clamp defensivo: pesos/pisos no negativos (sin NaN/negativos)."""
+
+        def _w(value: float) -> float:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return 0.0
+            if number != number or number < 0:  # NaN o negativo ⇒ 0 (fail-safe)
+                return 0.0
+            return number
+
+        def _m(value: int) -> int:
+            try:
+                number = int(value)
+            except (TypeError, ValueError):
+                return 0
+            return max(0, number)
+
+        return DiscoveryBudgetAllocator(
+            catalog_weight=_w(self.catalog_weight),
+            grammar_simple_weight=_w(self.grammar_simple_weight),
+            grammar_composite_weight=_w(self.grammar_composite_weight),
+            adaptive_weight=_w(self.adaptive_weight),
+            catalog_min=_m(self.catalog_min),
+            grammar_simple_min=_m(self.grammar_simple_min),
+            grammar_composite_min=_m(self.grammar_composite_min),
+            adaptive_min=_m(self.adaptive_min),
+        )
+
+    # Orden canónico de desempate (no alfabético): catálogo, gramática simple,
+    # gramática compuesta, adaptive. Determinista y ajeno a la iteración de dicts.
+    _TIE_ORDER: tuple[str, ...] = (
+        CatalogLane.NAME,
+        GrammarLane.SIMPLE,
+        GrammarLane.COMPOSITE,
+        "adaptive",
+    )
+
+    def allocate(self, budget: DiscoveryBudget) -> dict[str, LaneAllocation]:
+        """Reparte ``budget`` entre los carriles de forma determinista y total.
+
+        Devuelve un mapping carril → ``LaneAllocation``. El mapping contiene SIEMPRE
+        los cuatro carriles declarados (aunque su cupo sea 0), de modo que el llamante
+        no dependa de la presencia/ausencia de claves.
+        """
+        effective = budget.normalized()
+        self_norm = self.normalized()
+
+        weights: dict[str, float] = {
+            CatalogLane.NAME: self_norm.catalog_weight,
+            GrammarLane.SIMPLE: self_norm.grammar_simple_weight,
+            GrammarLane.COMPOSITE: self_norm.grammar_composite_weight,
+            "adaptive": self_norm.adaptive_weight,
+        }
+        floors: dict[str, int] = {
+            CatalogLane.NAME: self_norm.catalog_min,
+            GrammarLane.SIMPLE: self_norm.grammar_simple_min,
+            GrammarLane.COMPOSITE: self_norm.grammar_composite_min,
+            "adaptive": self_norm.adaptive_min,
+        }
+        lanes = self._TIE_ORDER
+
+        total_candidates = int(effective.max_candidates)
+        total_trials = int(effective.max_trials_total)
+
+        # Caso degenerado: sin pesos ni pisos ⇒ todo al catálogo (compatibilidad con
+        # el reparto histórico, que también daba todo al catálogo cuando no había
+        # gramática). No se reparte nada a un carril sin derecho.
+        if all(weights[lane] <= 0 and floors[lane] <= 0 for lane in lanes):
+            return {
+                lane: LaneAllocation(
+                    candidates=total_candidates if lane == CatalogLane.NAME else 0,
+                    trials=total_trials if lane == CatalogLane.NAME else 0,
+                )
+                for lane in lanes
+            }
+
+        weight_sum = sum(weights[lane] for lane in lanes)
+
+        def _apportion(total: int, minimums: dict[str, int], tie: tuple[str, ...]) -> dict[str, int]:
+            """Reparto mayorista con pisos y desempate determinista (largest remainder)."""
+            if total <= 0:
+                return {lane: 0 for lane in lanes}
+            # 1) Cuota proporcional al peso.
+            quotas: dict[str, float] = {
+                lane: (total * weights[lane] / weight_sum) if weight_sum > 0 else 0.0
+                for lane in lanes
+            }
+            base: dict[str, int] = {lane: int(quotas[lane]) for lane in lanes}
+            assigned = sum(base.values())
+            # 2) Orden de prioridad de las quedas: quedas mayores primero; empate por
+            #    orden canónico de carril. Estable y ajeno al orden de iteración.
+            order = sorted(
+                lanes,
+                key=lambda lane: (
+                    -round(quotas[lane] - base[lane], 12),
+                    tie.index(lane),
+                ),
+            )
+            idx = 0
+            while assigned < total and order:
+                lane = order[idx % len(order)]
+                base[lane] += 1
+                assigned += 1
+                idx += 1
+            # 3) Pisos: un carril con derecho recibe al menos su piso (si cabe).
+            for lane in lanes:
+                if assigned >= total:
+                    break
+                floor = minimums[lane]
+                if floor > base[lane]:
+                    delta = min(floor - base[lane], total - assigned)
+                    base[lane] += delta
+                    assigned += delta
+            return base
+
+        candidates = _apportion(total_candidates, floors, lanes)
+        trials = _apportion(total_trials, floors, lanes)
+
+        # Suelo natural: un carril con peso > 0 o piso recibe al menos 1 candidata si
+        # el presupuesto global lo permite. Esto es lo que garantiza que ni la
+        # gramática ni el catálogo queden a 0 por culpa del otro — el bug A14. Si el
+        # presupuesto ya está repartido, se toma una candidata del carril más dotado
+        # (que conserve al menos 1) para donarla al carril hambriento.
+        for lane in lanes:
+            if candidates[lane] > 0:
+                continue
+            if weights[lane] <= 0 and floors[lane] <= 0:
+                continue
+            if total_candidates < 1:
+                break
+            if sum(candidates.values()) < total_candidates:
+                candidates[lane] = 1
+                continue
+            donor_candidates = [
+                other
+                for other in lanes
+                if other != lane and candidates[other] > 1
+            ]
+            if not donor_candidates:
+                continue
+            donor = max(
+                donor_candidates,
+                key=lambda other: (candidates[other], -self._TIE_ORDER.index(other)),
+            )
+            candidates[donor] -= 1
+            candidates[lane] = 1
+
+        return {
+            lane: LaneAllocation(candidates=int(candidates[lane]), trials=int(trials[lane]))
+            for lane in lanes
+        }
+
+    def normalized_weights(self) -> dict[str, float]:
+        """Pesos normalizados (suman 1.0) para observabilidad/auditoría; no reparte.
+
+        Determinista. Si todos los pesos son 0 devuelve el reparto degenerado (todo al
+        catálogo) como pesos, coherente con ``allocate``.
+        """
+        self_norm = self.normalized()
+        weights: dict[str, float] = {
+            CatalogLane.NAME: self_norm.catalog_weight,
+            GrammarLane.SIMPLE: self_norm.grammar_simple_weight,
+            GrammarLane.COMPOSITE: self_norm.grammar_composite_weight,
+            "adaptive": self_norm.adaptive_weight,
+        }
+        total = sum(weights.values())
+        if total <= 0:
+            return {
+                lane: (1.0 if lane == CatalogLane.NAME else 0.0) for lane in self._TIE_ORDER
+            }
+        return {lane: weights[lane] / total for lane in self._TIE_ORDER}
+
+    def lane_for_grammar(self, *, composite: bool = False) -> str:
+        """Carril de gramática al que pertenece un plan (simple vs compuesto).
+
+        ``composite`` = True cuando el plan combina más de un bloque opcional; en otro
+        caso es ``grammar_simple``. La distinción es semántica (observabilidad y
+        reparto), no un segundo motor.
+        """
+        return GrammarLane.COMPOSITE if composite else GrammarLane.SIMPLE
+
+    @property
+    def grammar_candidates(self) -> int:
+        """Peso de gramática simple + compuesta (para el cupo agregado de la gramática)."""
+        self_norm = self.normalized()
+        return int(
+            round(self_norm.grammar_simple_weight + self_norm.grammar_composite_weight)
+        )
+
+
+DEFAULT_DISCOVERY_ALLOCATOR = DiscoveryBudgetAllocator()
 
 
 def family_by_name(name: str) -> DiscoveryFamily | None:

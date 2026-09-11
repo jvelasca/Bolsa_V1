@@ -14,7 +14,12 @@ Certifica las propiedades duras de la gramática:
 
 from __future__ import annotations
 
-from bolsa_application.discovery_catalog import DiscoveryBudget
+from bolsa_application.discovery_catalog import (
+    CatalogLane,
+    DiscoveryBudget,
+    DiscoveryBudgetAllocator,
+    GrammarLane,
+)
 from bolsa_application.discovery_grammar import (
     COMPONENT_EXIT,
     COMPONENT_MOMENTUM,
@@ -235,7 +240,12 @@ def test_engine_output_is_unchanged_when_grammar_is_disabled() -> None:
 
 
 def test_engine_appends_grammar_candidates_after_catalog() -> None:
-    """Con gramática habilitada, el catálogo va primero y la gramática ocupa el remanente."""
+    """Con gramática ON, el catálogo va primero y la gramática ocupa su cupo explícito.
+
+    V2.36/A16 (P2-03): el reparto ya NO es el remanente del catálogo, sino cuotas
+    explícitas del ``DiscoveryBudgetAllocator``. El catálogo conserva su prefijo (se
+    corta a su cupo) y la gramática se añade después con el suyo.
+    """
     budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
     baseline = discover_for_instrument(instrument_id="AAA", budget=budget)
     with_grammar = discover_for_instrument(
@@ -243,10 +253,22 @@ def test_engine_appends_grammar_candidates_after_catalog() -> None:
         budget=budget,
         grammar_budget=GrammarBudget(base=budget),
     )
-    # El catálogo conserva el prefijo de su salida (la reserva solo recorta la cola).
-    assert [c.strategy_family for c in with_grammar[: len(baseline)]] == [
-        c.strategy_family for c in baseline
+    # El catálogo conserva el prefijo de su salida, recortado a su cupo por el allocator.
+    catalog_part = [
+        c for c in with_grammar if not c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
     ]
+    assert [c.strategy_family for c in catalog_part] == [
+        c.strategy_family for c in baseline[: len(catalog_part)]
+    ]
+    # Catálogo primero, gramática después.
+    first_grammar = next(
+        i
+        for i, c in enumerate(with_grammar)
+        if c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
+    )
+    assert all(
+        c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX) for c in with_grammar[first_grammar:]
+    )
     grammar_candidates = [
         c for c in with_grammar if c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
     ]
@@ -388,4 +410,158 @@ def test_summary_is_deterministic() -> None:
         instrument_id="AAA", budget=budget, grammar_budget=grammar_budget
     )
     assert first == second
+
+
+# ── V2.36/A16 (P2-03): allocator explícito (cuotas por carril) ──────────────────
+
+
+def test_allocator_lane_caps_come_from_weights_not_consumption_order() -> None:
+    """El cupo del catálogo procede del allocator (pesos), no del orden de consumo."""
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    allocator = DiscoveryBudgetAllocator(
+        catalog_weight=1.0, grammar_simple_weight=1.0, grammar_composite_weight=0.0
+    )
+    _, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=GrammarBudget(base=budget),
+        allocator=allocator,
+    )
+    allocation = allocator.allocate(budget)
+    assert summary.catalog_cap == allocation[CatalogLane.NAME].candidates
+    assert summary.grammar_simple_cap == allocation[GrammarLane.SIMPLE].candidates
+    assert summary.grammar_composite_cap == allocation[GrammarLane.COMPOSITE].candidates
+    assert summary.adaptive_cap == allocation["adaptive"].candidates
+
+
+def test_allocator_catalog_never_exceeds_its_cap() -> None:
+    """El catálogo no puede emitir más candidatas que su cupo del allocator."""
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    allocator = DiscoveryBudgetAllocator(
+        catalog_weight=1.0, grammar_simple_weight=1.0, grammar_composite_weight=0.0
+    )
+    candidates, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=GrammarBudget(base=budget),
+        allocator=allocator,
+    )
+    assert summary.catalog_cap is not None
+    assert summary.catalog_candidates <= summary.catalog_cap
+    assert summary.total_candidates <= budget.max_candidates
+
+
+def test_allocator_grammar_lane_is_guaranteed_a_share() -> None:
+    """El cupo de la gramática es > 0 aunque el catálogo tenga familias de sobra (A14)."""
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    candidates, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=GrammarBudget(base=budget),
+    )
+    assert summary.grammar_cap is not None and summary.grammar_cap > 0
+    assert summary.grammar_candidates > 0
+    assert any(c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX) for c in candidates)
+
+
+def test_allocator_total_stays_within_global_budget() -> None:
+    """Suma de carriles ≤ presupuesto global y total emitido dentro del presupuesto."""
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    allocator = DiscoveryBudgetAllocator()
+    allocation = allocator.allocate(budget)
+    assert sum(a.candidates for a in allocation.values()) <= budget.max_candidates
+    assert sum(a.trials for a in allocation.values()) <= budget.max_trials_total
+    candidates, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=GrammarBudget(base=budget),
+        allocator=allocator,
+    )
+    assert summary.total_candidates <= budget.max_candidates
+    assert summary.trials_used <= budget.max_trials_total
+
+
+def test_allocator_is_order_independent_no_lane_starves() -> None:
+    """Permutar los pesos intercambia cupos sin dejar ningún carril a 0."""
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    base = DiscoveryBudgetAllocator(
+        catalog_weight=2.0, grammar_simple_weight=1.0, grammar_composite_weight=1.0
+    )
+    swapped = DiscoveryBudgetAllocator(
+        catalog_weight=1.0, grammar_simple_weight=2.0, grammar_composite_weight=1.0
+    )
+    base_alloc = base.allocate(budget)
+    swapped_alloc = swapped.allocate(budget)
+    assert swapped_alloc[CatalogLane.NAME].candidates > 0
+    assert swapped_alloc[GrammarLane.SIMPLE].candidates > 0
+    assert (
+        swapped_alloc[GrammarLane.SIMPLE].candidates
+        > base_alloc[GrammarLane.SIMPLE].candidates
+    )
+    # Y el engine refleja el cupo del catálogo del allocator inyectado, no del orden.
+    _, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=GrammarBudget(base=budget),
+        allocator=swapped,
+    )
+    assert summary.catalog_cap == swapped_alloc[CatalogLane.NAME].candidates
+
+
+def test_allocator_engine_is_deterministic_across_repeated_runs() -> None:
+    """Mismo allocator + presupuesto ⇒ mismas candidatas y mismo resumen, repetible."""
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    allocator = DiscoveryBudgetAllocator()
+    grammar_budget = GrammarBudget(base=budget)
+    results = [
+        discover_for_instrument_with_summary(
+            instrument_id="AAA",
+            budget=budget,
+            grammar_budget=grammar_budget,
+            allocator=allocator,
+        )
+        for _ in range(3)
+    ]
+    first_candidates, first_summary = results[0]
+    for candidates, summary in results[1:]:
+        assert [c.id for c in candidates] == [c.id for c in first_candidates]
+        assert summary == first_summary
+
+
+def test_allocator_grammar_disabled_output_is_unchanged() -> None:
+    """Regresión A13: con gramática OFF el allocator no interviene (salida idéntica)."""
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    baseline = discover_for_instrument(instrument_id="AAA", budget=budget)
+    # Un allocator que daría TODO el cupo a la gramática no debe alterar nada con OFF.
+    hostile = DiscoveryBudgetAllocator(
+        catalog_weight=0.0,
+        grammar_simple_weight=100.0,
+        grammar_composite_weight=100.0,
+    )
+    off_with_allocator, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=None,
+        allocator=hostile,
+    )
+    assert [c.id for c in off_with_allocator] == [c.id for c in baseline]
+    assert [c.strategy_family for c in off_with_allocator] == [
+        c.strategy_family for c in baseline
+    ]
+    assert summary.grammar_enabled is False
+    assert summary.catalog_cap is None
+    assert summary.grammar_cap is None
+    assert summary.adaptive_cap is None
+
+
+def test_allocator_small_budget_keeps_catalog_alive() -> None:
+    """Con presupuesto mínimo, el catálogo conserva al menos una candidata."""
+    budget = DiscoveryBudget(max_trials_total=10, max_per_family=10, max_candidates=2)
+    candidates, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=GrammarBudget(base=budget),
+    )
+    assert len(candidates) <= budget.max_candidates
+    assert summary.catalog_candidates >= 1
 

@@ -74,6 +74,17 @@ AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_CA
 AUTO_ORCHESTRATOR_GRAMMAR = "AUTO_ORCHESTRATOR_GRAMMAR"
 AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS = "AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS"
 AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS = "AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS"
+# V2.36/A16 (P2-03): pesos del allocator explícito por carril (catálogo / gramática
+# simple / gramática compuesta / adaptive). Override por env; defaults seguros. El
+# carril ``adaptive`` es un placeholder (peso 0): no implementa aprendizaje.
+AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT = "AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT"
+AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_SIMPLE_WEIGHT = (
+    "AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_SIMPLE_WEIGHT"
+)
+AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_COMPOSITE_WEIGHT = (
+    "AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_COMPOSITE_WEIGHT"
+)
+AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT = "AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT"
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
 _SHADOW_WINDOW_BARS_DEFAULT = 250
@@ -172,6 +183,25 @@ def _grammar_budget(discovery_budget: Any) -> Any:
         base=discovery_budget,
         max_components=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS, 3),
         max_per_component_variant=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS, 4),
+    )
+
+
+def _discovery_allocator() -> Any:
+    """V2.36/A16 (P2-03): allocator explícito de cupos por carril (override por env).
+
+    Los pesos del reparto catálogo/gramática pueden ajustarse por env, pero los
+    defaults son conservadores y deterministas. ``adaptive_weight`` queda a 0 (carril
+    placeholder de la futura búsqueda adaptativa; NO implementa aprendizaje).
+    """
+    from bolsa_application.discovery_catalog import DiscoveryBudgetAllocator
+
+    return DiscoveryBudgetAllocator(
+        catalog_weight=_float_env(AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT, 2.0),
+        grammar_simple_weight=_float_env(AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_SIMPLE_WEIGHT, 1.0),
+        grammar_composite_weight=_float_env(
+            AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_COMPOSITE_WEIGHT, 1.0
+        ),
+        adaptive_weight=_float_env(AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT, 0.0),
     )
 
 
@@ -360,12 +390,20 @@ def _make_discovery_runner(budget: Any) -> Any:
     de observabilidad por instrumento (catálogo vs gramática, presupuesto y cupos) y
     acumular contadores de proceso y de ciclo (``grammar_counters`` /
     ``cycle_grammar_counters``). Solo lectura: no altera el discovery ni sus decisiones.
+
+    V2.36/A16 (P2-03): con gramática ON se inyecta un ``DiscoveryBudgetAllocator``
+    explícito (pesos por carril, override por env) para que el reparto catálogo /
+    gramática no dependa del orden de consumo. Con gramática OFF el allocator no se
+    consulta y la salida sigue siendo la histórica.
     """
     from bolsa_application.strategy_discovery_engine import (
         discover_for_instrument_with_summary,
     )
 
     grammar_budget = _grammar_budget(budget) if grammar_enabled() else None
+    # V2.36/A16: con gramática OFF no se consulta el allocator (salida histórica
+    # intacta); con ON se inyecta el reparto explícito por carriles (P2-03).
+    allocator = _discovery_allocator() if grammar_budget is not None else None
     enabled = grammar_budget is not None
 
     def _discover(instrument_id: str) -> tuple[Any, ...]:
@@ -373,6 +411,7 @@ def _make_discovery_runner(budget: Any) -> Any:
             instrument_id=instrument_id,
             budget=budget,
             grammar_budget=grammar_budget,
+            allocator=allocator,
         )
         _record_discovery_summary(summary)
         logger.info(

@@ -33,8 +33,11 @@ from dataclasses import dataclass
 
 from bolsa_application.discovery_catalog import (
     DISCOVERY_FAMILIES,
+    CatalogLane,
     DiscoveryBudget,
+    DiscoveryBudgetAllocator,
     DiscoveryFamily,
+    GrammarLane,
     families_by_parent,
 )
 from bolsa_application.discovery_grammar import (
@@ -46,6 +49,7 @@ from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
 
 __all__ = [
     "GRAMMAR_FAMILY_PREFIX",
+    "DiscoveryBudgetAllocator",
     "DiscoveryEmissionSummary",
     "discover_candidates",
     "discover_for_instrument",
@@ -83,6 +87,14 @@ class DiscoveryEmissionSummary:
     grammar_enabled: bool = False
     # Warm-up: False si ``bar_count`` no alcanzó ``GrammarBudget.min_bars``.
     bar_count_ok: bool = True
+    # V2.36/A16 (P2-03): cupo explícito por carril del allocator (observabilidad
+    # aditiva; nunca reemplaza los campos previos). ``None`` con gramática OFF.
+    grammar_simple_cap: int | None = None
+    grammar_composite_cap: int | None = None
+    adaptive_cap: int | None = None
+    # Cupo de trials por carril (mismo reparto explícito, solo lectura).
+    catalog_trials_cap: int | None = None
+    grammar_trials_cap: int | None = None
 
 
 def _default_candidate_id(instrument_id: str, family_name: str, index: int) -> str:
@@ -99,6 +111,7 @@ def discover_for_instrument_with_summary(
     candidate_id_factory: CandidateIdFactory | None = None,
     bar_count: int | None = None,
     grammar_budget: GrammarBudget | None = None,
+    allocator: DiscoveryBudgetAllocator | None = None,
 ) -> tuple[tuple[StrategyCandidate, ...], DiscoveryEmissionSummary]:
     """V2.35/A15 — como ``discover_for_instrument`` pero devuelve también el resumen.
 
@@ -106,6 +119,11 @@ def discover_for_instrument_with_summary(
     (contando el prefijo ``GRAMMAR_FAMILY_PREFIX``) y sobre el presupuesto efectivo,
     sin alterar el reparto ni la semántica fail-closed. Con ``grammar_budget=None``
     los contadores gramaticales quedan a 0 y la tupla es byte-idéntica a la de A13.
+
+    V2.36/A16 (P2-03): el reparto entre catálogo y gramática ya NO es una reserva
+    secuencial dependiente del orden, sino el reparto explícito por carriles del
+    ``allocator`` (``DiscoveryBudgetAllocator``). Con ``grammar_budget=None`` el
+    allocator no interviene: la salida sigue siendo la histórica (A13).
     """
     effective_budget = (budget or DiscoveryBudget()).normalized()
     catalog = tuple(
@@ -114,24 +132,43 @@ def discover_for_instrument_with_summary(
         else (families_by_parent(parent) if parent is not None else DISCOVERY_FAMILIES)
     )
 
+    # V2.36/A16: el cupo del catálogo procede del allocator explícito (no del orden).
+    # Con gramática OFF (``grammar_budget is None``) el allocator no se consulta y el
+    # catálogo puede consumir todo el presupuesto: comportamiento histórico intacto.
+    # Con gramática ON y sin allocator inyectado se usa el reparto por defecto, que
+    # garantiza cupo a ambos carriles.
+    catalog_cap: int | None = None
+    if grammar_budget is not None:
+        effective_allocator = (allocator or DiscoveryBudgetAllocator()).normalized()
+        allocation = effective_allocator.allocate(effective_budget)
+        catalog_cap = allocation[CatalogLane.NAME].candidates
+    catalog_candidate_budget = effective_budget
+    if catalog_cap is not None:
+        catalog_candidate_budget = DiscoveryBudget(
+            max_trials_total=effective_budget.max_trials_total,
+            max_per_family=effective_budget.max_per_family,
+            max_candidates=max(0, min(catalog_cap, effective_budget.max_candidates)),
+            min_bars=effective_budget.min_bars,
+        )
+
     candidates: list[StrategyCandidate] = []
     trials_used = 0
 
     for family in catalog:
-        if len(candidates) >= effective_budget.max_candidates:
+        if len(candidates) >= catalog_candidate_budget.max_candidates:
             break
-        if trials_used >= effective_budget.max_trials_total:
+        if trials_used >= catalog_candidate_budget.max_trials_total:
             break
         # Warm-up: si sabemos el nº de barras y no caben los params típicos, se salta.
         if bar_count is not None and bar_count < int(family.min_bars_hint):
             continue
         emitted_for_family = 0
         for point in family.param_points():
-            if emitted_for_family >= effective_budget.max_per_family:
+            if emitted_for_family >= catalog_candidate_budget.max_per_family:
                 break
-            if trials_used >= effective_budget.max_trials_total:
+            if trials_used >= catalog_candidate_budget.max_trials_total:
                 break
-            if len(candidates) >= effective_budget.max_candidates:
+            if len(candidates) >= catalog_candidate_budget.max_candidates:
                 break
             executable = family.template(point)
             if executable is None:
@@ -163,39 +200,38 @@ def discover_for_instrument_with_summary(
             trials_used += 1
 
     # V2.35/A15: cupo reservado al catálogo (observabilidad), solo si hay gramática.
-    catalog_cap: int | None = None
     grammar_cap: int | None = None
     grammar_enabled = grammar_budget is not None
     effective_grammar = grammar_budget.normalized() if grammar_budget is not None else None
+    grammar_simple_cap: int | None = None
+    grammar_composite_cap: int | None = None
+    adaptive_cap: int | None = None
+    catalog_trials_cap: int | None = None
+    grammar_trials_cap: int | None = None
 
-    # V2.34/A14 — gramática controlada, opt-in, con el MISMO presupuesto global.
-    # Se reserva una porción del presupuesto para la gramática (si está habilitada), de
-    # modo que el catálogo no la deje sin espacio: sin esta reserva, un catálogo grande
-    # (24 candidatas) agotaría ``max_candidates`` y la gramática jamás emitiría.
+    # V2.34/A14 / V2.36/A16 — gramática controlada, opt-in, con el MISMO presupuesto
+    # global. El reparto catálogo/gramática lo fija el allocator explícito: el catálogo
+    # ya se cortó a ``catalog_cap`` (pesos), así que la gramática siempre dispone de su
+    # cupo aunque el catálogo tenga familias de sobra (bug A14 arreglado por diseño).
     if effective_grammar is not None:
-        catalog_cap = effective_budget.max_candidates
-        reserve = _grammar_reserve(effective_budget, effective_grammar)
-        if reserve > 0:
-            catalog_cap = max(0, effective_budget.max_candidates - reserve)
-        # Recorta las candidatas del catálogo ya emitidas si excedieran el cupo reservado.
-        if len(candidates) > catalog_cap:
-            overflow = len(candidates) - catalog_cap
-            candidates = candidates[:catalog_cap]
-            trials_used = max(0, trials_used - overflow)
+        grammar_simple_cap = allocation[GrammarLane.SIMPLE].candidates
+        grammar_composite_cap = allocation[GrammarLane.COMPOSITE].candidates
+        adaptive_cap = allocation["adaptive"].candidates
+        catalog_trials_cap = allocation[CatalogLane.NAME].trials
+        grammar_trials_cap = (
+            allocation[GrammarLane.SIMPLE].trials + allocation[GrammarLane.COMPOSITE].trials
+        )
+        grammar_cap = grammar_simple_cap + grammar_composite_cap
         candidates, trials_used = _extend_with_grammar(
             candidates=candidates,
             trials_used=trials_used,
             instrument_id=instrument_id,
             effective_budget=effective_budget,
             grammar_budget=effective_grammar,
+            grammar_cap=grammar_cap,
             data_snapshot_id=data_snapshot_id,
             candidate_id_factory=candidate_id_factory,
             bar_count=bar_count,
-        )
-        # Techo real de emisión gramatical: mismo cálculo que ``_extend_with_grammar``.
-        grammar_cap = min(
-            int(effective_grammar.max_per_component_variant),
-            int(effective_budget.max_per_family),
         )
         bar_count_ok = bar_count is None or bar_count >= int(effective_grammar.min_bars)
     else:
@@ -214,6 +250,11 @@ def discover_for_instrument_with_summary(
         grammar_cap=grammar_cap,
         grammar_enabled=grammar_enabled,
         bar_count_ok=bar_count_ok,
+        grammar_simple_cap=grammar_simple_cap,
+        grammar_composite_cap=grammar_composite_cap,
+        adaptive_cap=adaptive_cap,
+        catalog_trials_cap=catalog_trials_cap,
+        grammar_trials_cap=grammar_trials_cap,
     )
     return tuple(candidates), summary
 
@@ -228,6 +269,7 @@ def discover_for_instrument(
     candidate_id_factory: CandidateIdFactory | None = None,
     bar_count: int | None = None,
     grammar_budget: GrammarBudget | None = None,
+    allocator: DiscoveryBudgetAllocator | None = None,
 ) -> tuple[StrategyCandidate, ...]:
     """Genera las candidatas de descubrimiento para un instrumento.
 
@@ -248,6 +290,11 @@ def discover_for_instrument(
 
     V2.35/A15: delega en ``discover_for_instrument_with_summary`` y descarta el
     resumen de observabilidad (API estable previa, sin cambios de firma).
+
+    V2.36/A16 (P2-03): ``allocator`` permite fijar cuotas explícitas por carril
+    (catálogo / gramática simple / gramática compuesta / adaptive). Si es ``None`` se
+    usa el reparto por defecto de ``DiscoveryBudgetAllocator``. El allocator solo se
+    consulta con gramática habilitada; con ``grammar_budget=None`` no interviene.
     """
     candidates, _ = discover_for_instrument_with_summary(
         instrument_id=instrument_id,
@@ -258,26 +305,9 @@ def discover_for_instrument(
         candidate_id_factory=candidate_id_factory,
         bar_count=bar_count,
         grammar_budget=grammar_budget,
+        allocator=allocator,
     )
     return candidates
-
-
-def _grammar_reserve(
-    effective_budget: DiscoveryBudget, grammar_budget: GrammarBudget
-) -> int:
-    """Nº de candidatas reservadas a la gramática dentro de ``max_candidates``.
-
-    La reserva es acotada: nunca más de la mitad del presupuesto de candidatas ni más
-    que las variantes por bloque permitidas, y siempre deja al menos una candidata al
-    catálogo (si el presupuesto lo permite).
-    """
-    effective_grammar = grammar_budget.normalized()
-    half = effective_budget.max_candidates // 2
-    reserve = min(effective_grammar.max_per_component_variant, half)
-    if reserve < 1:
-        reserve = 1
-    # Deja sitio al catálogo: si el presupuesto es 1, la reserva no puede comérselo todo.
-    return max(0, min(reserve, effective_budget.max_candidates - 1))
 
 
 def _extend_with_grammar(
@@ -287,27 +317,31 @@ def _extend_with_grammar(
     instrument_id: str,
     effective_budget: DiscoveryBudget,
     grammar_budget: GrammarBudget,
+    grammar_cap: int,
     data_snapshot_id: str | None,
     candidate_id_factory: CandidateIdFactory | None,
     bar_count: int | None,
 ) -> tuple[list[StrategyCandidate], int]:
-    """Emite candidatas gramaticales consumiendo el remanente del presupuesto global.
+    """Emite candidatas gramaticales consumiendo el cupo que fija el allocator.
 
     Determinista: ``enumerate_grammar_plans`` ya devuelve un orden total estable; aquí
-    solo se corta por presupuesto y warm-up. Fail-closed: un plan que no materializa
-    no emite candidata.
+    solo se corta por el ``grammar_cap`` (del allocator explícito, P2-03), por el
+    presupuesto global y por warm-up. Fail-closed: un plan que no materializa no emite
+    candidata.
     """
     effective_grammar = grammar_budget.normalized()
     if bar_count is not None and bar_count < int(effective_grammar.min_bars):
         return candidates, trials_used
 
-    # El tope de emisión de la gramática es su propio ``max_per_component_variant``
-    # (acota cuántos planes aporta, no cuántos puntos por familia del catálogo), pero
-    # nunca puede exceder ``max_per_family`` del presupuesto global: el presupuesto
-    # sigue siendo único y compartido.
-    grammar_emission_cap = min(
-        int(effective_grammar.max_per_component_variant),
-        int(effective_budget.max_per_family),
+    # El cupo gramatical viene del allocator (suma de carriles simple+compuesto). Se
+    # mantiene además el techo histórico ``max_per_component_variant`` como cota de
+    # seguridad: la gramática nunca aporta más planes que variantes declaradas.
+    grammar_emission_cap = max(
+        0,
+        min(
+            int(grammar_cap),
+            int(effective_grammar.max_per_component_variant),
+        ),
     )
 
     emitted_for_grammar = 0
@@ -365,6 +399,7 @@ def discover_candidates(
     candidate_id_factory: CandidateIdFactory | None = None,
     bar_count: int | None = None,
     grammar_budget: GrammarBudget | None = None,
+    allocator: DiscoveryBudgetAllocator | None = None,
 ) -> tuple[StrategyCandidate, ...]:
     """Alias público estable de ``discover_for_instrument`` (nombre del motor)."""
     return discover_for_instrument(
@@ -376,6 +411,7 @@ def discover_candidates(
         candidate_id_factory=candidate_id_factory,
         bar_count=bar_count,
         grammar_budget=grammar_budget,
+        allocator=allocator,
     )
 
 
@@ -387,6 +423,7 @@ def discover_from_universe(
     candidate_id_factory: CandidateIdFactory | None = None,
     bar_counts: dict[str, int] | None = None,
     grammar_budget: GrammarBudget | None = None,
+    allocator: DiscoveryBudgetAllocator | None = None,
 ) -> dict[str, tuple[StrategyCandidate, ...]]:
     """Descubre candidatas para todo un universo (útil fuera del orquestador).
 
@@ -406,5 +443,6 @@ def discover_from_universe(
             candidate_id_factory=candidate_id_factory,
             bar_count=counts.get(symbol),
             grammar_budget=grammar_budget,
+            allocator=allocator,
         )
     return out
