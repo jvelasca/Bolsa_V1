@@ -311,9 +311,9 @@ async def test_a11_discovery_to_auto_sim_pg(
                 discovery=_make_discovery_runner(),
                 shadow_bars=_make_shadow_bars_provider(a11_factory),
                 shadow_policy=ShadowPolicy(min_closed_round_trips=1, min_return_pct=-100.0),
-                # V2.32.1 (P1-01): hold-out estricto respecto al LAB.
+                # V2.32.1 (P1-01) + H1: hold-out estricto respecto al LAB (invariante:
+                # la ruta de promoción lo fuerza siempre).
                 shadow_config=ShadowReplayConfig(window_bars=250, min_bars=30),
-                shadow_require_holdout=True,
                 max_candidates=6,
             )
         )

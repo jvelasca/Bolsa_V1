@@ -213,11 +213,35 @@ async def _assert_real_equity_invariant(
             )
             for entry in entries
         ]
+        # V2.33 hardening (auditoría): el P&L **cerrado** debe aportarse desde una
+        # fuente independiente del ``cash``. Derivarlo del libro de fills
+        # (``sim_fill_finance_context``: lado/cantidad/precio) evita el descuadre que
+        # provoca asumir ``closed_pnl=0`` cuando el día dejó operaciones en pérdida
+        # (``cash`` ya incorpora ese resultado; ``realized_pnl`` debe reflejarlo).
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+
+        fills = (
+            await session.execute(
+                select(
+                    SimFillFinanceContextRow.side,
+                    SimFillFinanceContextRow.quantity,
+                    SimFillFinanceContextRow.price,
+                ).where(SimFillFinanceContextRow.account_id == account_id)
+            )
+        ).all()
+        closed_pnl = Decimal("0")
+        for side, quantity, price in fills:
+            notional = Decimal(str(quantity)) * Decimal(str(price))
+            if (side or "").strip().lower() == "sell":
+                closed_pnl += notional
+            else:
+                closed_pnl -= notional
         accounting = reconstruct_accounting_from_state(
             movements=movements,
             remaining=remaining,
             avg_cost=avg_cost,
             last_price=last_price,
+            closed_pnl=closed_pnl,
         )
         assert_equity_invariant(accounting)  # lanza si el invariante no se cumple.
 

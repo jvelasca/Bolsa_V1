@@ -243,7 +243,6 @@ async def _promote_active(
             shadow_bars=_make_shadow_bars_provider(factory),
             shadow_policy=ShadowPolicy(min_closed_round_trips=1, min_return_pct=-100.0),
             shadow_config=ShadowReplayConfig(window_bars=250, min_bars=30),
-            shadow_require_holdout=True,
             max_candidates=6,
         )
     )

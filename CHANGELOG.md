@@ -2,6 +2,55 @@
 
 All notable releases of Bolsa V1.
 
+## [1.58.1-beta] — V2.32.1 · Hardening H1+H2 (hold-out inviolable + identidad de dataset) — 2026-09-11
+
+Cierra los dos contratos que la auditoría V2.32.1 dejó pendientes y que se acordó **no**
+mezclar con A13. Cambio de contrato, **sin migración** y sin tocar las barreras LIVE
+(siguen doblemente bloqueadas).
+
+- **H1 — `require_holdout=True` inviolable en la ruta de promoción**: el orquestador
+  fuerza el hold-out estricto al construir el `ShadowReplayConfig` del shadow. El flag
+  `OrchestratorDeps.shadow_require_holdout` **se elimina** (ya no existe vía de escape).
+  Sin `lab_end` demostrable no se construye el replay (fail-closed en el orquestador,
+  antes de invocar la fase). Ya no existe ninguna ruta de promoción que replique sin
+  hold-out estricto ni sin frontera LAB.
+- **H2 — identidad de dataset en el `bars_hash`**: `ShadowReplayConfig` y
+  `PaperForwardConfig` ganan `instrument_id`/`timeframe`/`source`/`adjusted`, que se
+  incorporan a la cabecera del hash en shadow y forward. Dos series con el mismo OHLCV
+  pero distinto instrumento o marco temporal ya **no** comparten identidad de evidencia.
+  Si el config no fija `instrument_id`, se cae al del finalista/ACTIVE (compatibilidad).
+  Se mantiene la semántica «mismo dataset ⇒ mismo hash».
+- **Wiring AUTO**: el worker puebla `instrument_id`/`timeframe`/`source` en la evidencia
+  shadow y forward desde la lectura diaria del instrumento; `adjusted` no se inventa.
+- **Tests**: orquestador (fuerza del hold-out, fail-closed sin `lab_end`) y fases shadow/
+  forward (mismo OHLCV con distinta identidad ⇒ hash distinto; identidad estable).
+- **Correcciones de arranque del CI (deuda preexistente saldada en esta release)**:
+  - `alembic/env.py`: `fileConfig(..., disable_existing_loggers=False)`. Al correr Alembic
+    **en proceso** (`ensure_migrated` en el bootstrap de workers y en tests PG), el default
+    de `fileConfig` deshabilitaba los loggers de la app ya creados — silenciando el logging
+    del proceso y rompiendo por orden `test_queue_poll_worker::test_run_con_arq_es_noop`.
+  - `test_scheduler_worker`: el set esperado no incluía `start_auto_orchestrator` (A10).
+  - `test_auto_scheduler_real_pg_zero_human_intervention`: la reconstrucción de equity
+    llamaba a `reconstruct_accounting_from_state` sin `closed_pnl`, provocando un descuadre
+    cuando el día cerraba con pérdida realizada (`cash` ya la incorporaba). Ahora deriva el
+    P&L cerrado del libro de fills (`sim_fill_finance_context`) — fuente independiente del
+    `cash`, invariante no tautológica.
+
+> Verificación: `ruff`, `lint-imports`, `mypy` verdes; job `quality` offline
+> (`apps/api-python` 201/201, `packages/py` 2276/2278) y E2E PG de certificación
+> (`paper-forward-pg` / `lifecycle-pg`) en verde.
+>
+> **Deuda preexistente que NO se toca aquí** (ajena al hardening; falla igual en el baseline
+> `5fcd0224`): `packages/py/infrastructure/tests/chaos/test_load_concurrency_flow.py` (2
+> tests de carga 500+500; el invariante de orden por `(executed_at, id)` se rompe por empates
+> de timestamp a alta concurrencia — el invariante contable Σ ledger == cash sí es correcto).
+>
+> **Compatibilidad de evidencia**: el `bars_hash` cambia de semántica (incluye identidad). La
+> evidencia _shadow/forward_ persistida **antes** de este commit conserva su hash almacenado,
+> pero no coincide con un recálculo bajo la nueva cabecera. No hay migración ni backfill (la
+> evidencia histórica no se reescribe); el cambio afecta a la reproducibilidad de aquí en
+> adelante.
+
 ## [1.58.0-beta] — V2.33 / A13 · Paper Forward (ACTIVE → forward P&L → vigilancia) — 2026-09-11
 
 Cierra el salto que V2.32/A12 deja abierto: la evidencia de una estrategia deja de ser

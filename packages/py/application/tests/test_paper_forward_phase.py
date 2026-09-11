@@ -8,6 +8,7 @@ ante falta de definición, falta de barras nuevas o muestra insuficiente.
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from typing import Any
 
 from bolsa_application.discovery_catalog import DISCOVERY_FAMILIES
@@ -213,6 +214,57 @@ def test_paper_forward_fingerprint_is_reproducible() -> None:
     assert first.data_snapshot_id == "snap-1"
     assert first.strategy_definition_hash is not None
     assert first.engine_version is not None
+
+
+def test_paper_forward_bars_hash_includes_dataset_identity() -> None:
+    """H2: mismo OHLCV con distinto instrument_id/timeframe ⇒ identidad distinta."""
+    active = _active({"executable": _executable_definition()})
+    bars = _dated_bars(400)
+    promoted_at = bars[299].timestamp
+    policy = PaperForwardPolicy(min_closed_round_trips=1, min_bars=10, min_return_pct=-1e9)
+    base = PaperForwardConfig(promoted_at=promoted_at, window_bars=99, min_bars=10)
+
+    daily = run_paper_forward(
+        active=active,
+        bars=bars,
+        policy=policy,
+        config=replace(base, instrument_id="AAA", timeframe="D1"),
+    )
+    hourly = run_paper_forward(
+        active=active,
+        bars=bars,
+        policy=policy,
+        config=replace(base, instrument_id="AAA", timeframe="H1"),
+    )
+    other_instrument = run_paper_forward(
+        active=active,
+        bars=bars,
+        policy=policy,
+        config=replace(base, instrument_id="BBB", timeframe="D1"),
+    )
+
+    assert daily.bars_hash is not None
+    assert daily.bars_hash != hourly.bars_hash
+    assert daily.bars_hash != other_instrument.bars_hash
+
+
+def test_paper_forward_identity_falls_back_to_active_instrument() -> None:
+    """H2: sin instrument_id en config, la identidad usa el de la ACTIVE."""
+    active = _active({"executable": _executable_definition()})
+    bars = _dated_bars(400)
+    promoted_at = bars[299].timestamp
+    policy = PaperForwardPolicy(min_closed_round_trips=1, min_bars=10, min_return_pct=-1e9)
+    base = PaperForwardConfig(promoted_at=promoted_at, window_bars=99, min_bars=10)
+
+    from_active = run_paper_forward(active=active, bars=bars, policy=policy, config=base)
+    explicit = run_paper_forward(
+        active=active,
+        bars=bars,
+        policy=policy,
+        config=replace(base, instrument_id="AAA"),
+    )
+
+    assert from_active.bars_hash == explicit.bars_hash
 
 
 def test_paper_forward_records_vetoes() -> None:

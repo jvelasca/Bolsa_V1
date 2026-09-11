@@ -7,6 +7,9 @@ loops periódicos y que **nunca** embeba scan/optimize (autoridad de colas:
 
 from __future__ import annotations
 
+from bolsa_api.background.auto_orchestrator_worker import (  # type: ignore[import-untyped]
+    start_auto_orchestrator,
+)
 from bolsa_api.background.auto_simulation_worker import (  # type: ignore[import-untyped]
     start_auto_sim_worker,
 )
@@ -82,6 +85,9 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_paper_auto_engine_worker,
         # V2.22/A9 (M5): AUTO bucle continuo SIM-ONLY (env-gated, default OFF).
         start_auto_sim_worker,
+        # V2.26/A10: orquestador del Strategy Lifecycle (env-gated, default OFF,
+        # SIM-only). Promociona solo por Promotion Gate + hold-out estricto.
+        start_auto_orchestrator,
     }
     assert set(starters) == expected
 

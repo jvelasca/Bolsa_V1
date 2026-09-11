@@ -55,6 +55,12 @@ class ShadowReplayConfig:
     calcula el hold-out estricto (solo barras con timestamp ``> lab_end``) y falla
     cerrado si no hay separación. Si es ``None``, se asume que ``bars`` ya contiene
     únicamente el hold-out (compatibilidad con llamantes que ya recortan).
+
+    V2.32.1 hardening (H2): la **identidad del dataset** forma parte del fingerprint.
+    ``instrument_id``/``timeframe``/``source``/``adjusted`` se incorporan al
+    ``bars_hash`` para que dos series con el mismo OHLCV pero distinto instrumento o
+    marco temporal no puedan compartir identidad de evidencia. Si ``instrument_id`` es
+    ``None``, el replay usa el del finalista.
     """
 
     initial_cash: float = 10000.0
@@ -63,6 +69,24 @@ class ShadowReplayConfig:
     lab_end: str | None = None
     require_holdout: bool = False
     config_hash: str | None = None
+    instrument_id: str | None = None
+    timeframe: str | None = None
+    source: str | None = None
+    adjusted: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _BarsIdentity:
+    """Identidad del dataset que entra en el ``bars_hash`` (H2, auditoría V2.32.1)."""
+
+    instrument_id: str | None = None
+    timeframe: str | None = None
+    source: str | None = None
+    adjusted: bool | None = None
+
+
+# Identidad vacía (H2): singleton para el default de ``_denied`` (evita B008).
+_NO_IDENTITY = _BarsIdentity()
 
 
 def extract_executable(finalist: StrategyFinalist) -> dict[str, Any] | None:
@@ -130,6 +154,7 @@ def run_shadow_replay(
     effective_config = config or ShadowReplayConfig()
     executable = extract_executable(finalist)
     definition_hash = finalist.definition_hash
+    identity = _bars_identity(effective_config, finalist=finalist)
     fingerprint = _fingerprint_kwargs(
         finalist=finalist,
         definition_hash=definition_hash,
@@ -139,7 +164,13 @@ def run_shadow_replay(
     )
 
     if executable is None:
-        return _denied(finalist, "shadow_sin_definicion_ejecutable", as_of=as_of, **fingerprint)
+        return _denied(
+            finalist,
+            "shadow_sin_definicion_ejecutable",
+            as_of=as_of,
+            identity=identity,
+            **fingerprint,
+        )
 
     lab_end = effective_config.lab_end
     if effective_config.require_holdout and not lab_end:
@@ -149,6 +180,7 @@ def run_shadow_replay(
             "shadow_lab_end_ausente",
             bars_used=len(bars),
             as_of=as_of,
+            identity=identity,
             **fingerprint,
         )
 
@@ -162,6 +194,7 @@ def run_shadow_replay(
                 bars_used=len(source_bars),
                 as_of=as_of,
                 lab_end=lab_end,
+                identity=identity,
                 **fingerprint,
             )
         _lab, source_bars = split
@@ -173,6 +206,7 @@ def run_shadow_replay(
             bars_used=len(source_bars),
             as_of=as_of,
             lab_end=lab_end,
+            identity=identity,
             **fingerprint,
         )
 
@@ -195,6 +229,7 @@ def run_shadow_replay(
             as_of=as_of,
             lab_end=lab_end,
             window=window,
+            identity=identity,
             **fingerprint,
         )
 
@@ -212,7 +247,7 @@ def run_shadow_replay(
         as_of=as_of,
         shadow_start=_bar_timestamp(window[0]) if window else None,
         shadow_end=_bar_timestamp(window[-1]) if window else None,
-        bars_hash=_bars_hash(window),
+        bars_hash=_bars_hash(window, identity),
         lab_end=lab_end,
         **fingerprint,
     )
@@ -226,6 +261,7 @@ def _denied(
     as_of: str | None = None,
     lab_end: str | None = None,
     window: Sequence[Any] | None = None,
+    identity: _BarsIdentity = _NO_IDENTITY,
     **fingerprint: Any,
 ) -> ShadowValidationResult:
     return ShadowValidationResult(
@@ -239,7 +275,7 @@ def _denied(
         lab_end=lab_end,
         shadow_start=_bar_timestamp(window[0]) if window else None,
         shadow_end=_bar_timestamp(window[-1]) if window else None,
-        bars_hash=_bars_hash(window) if window else None,
+        bars_hash=_bars_hash(window, identity) if window else None,
         **fingerprint,
     )
 
@@ -276,11 +312,18 @@ def _round_trip_count(metrics: Mapping[str, Any], trades: int) -> int:
     return trades // 2
 
 
-def _bars_hash(window: Sequence[Any]) -> str | None:
-    """Hash determinista del hold-out exacto (timestamps + OHLCV)."""
+def _bars_hash(window: Sequence[Any], identity: _BarsIdentity) -> str | None:
+    """Hash determinista del hold-out exacto (identidad + timestamps + OHLCV).
+
+    H2: la cabecera de identidad (``instrument_id|timeframe|source|adjusted``) entra en
+    el digest, de modo que el mismo OHLCV con distinto instrumento o marco temporal
+    produce hashes distintos. Un campo ausente se serializa como cadena vacía.
+    """
     if not window:
         return None
     digest = hashlib.sha256()
+    digest.update(_identity_header(identity).encode("utf-8"))
+    digest.update(b"\n")
     for bar in window:
         ts = _bar_timestamp(bar)
         if ts is None:
@@ -296,6 +339,18 @@ def _bars_hash(window: Sequence[Any]) -> str | None:
         digest.update("|".join(parts).encode("utf-8"))
         digest.update(b"\n")
     return digest.hexdigest()
+
+
+def _identity_header(identity: _BarsIdentity) -> str:
+    """Serializa la identidad del dataset (H2) de forma estable y determinista."""
+    return "|".join(
+        (
+            identity.instrument_id or "",
+            identity.timeframe or "",
+            identity.source or "",
+            "" if identity.adjusted is None else ("1" if identity.adjusted else "0"),
+        )
+    )
 
 
 def _fmt(value: Any) -> str:
@@ -326,6 +381,25 @@ def _finalist_instrument(finalist: StrategyFinalist) -> str | None:
     definition = finalist.definition if isinstance(finalist.definition, Mapping) else {}
     instrument = definition.get("instrument_id")
     return str(instrument) if instrument else None
+
+
+def _bars_identity(
+    config: ShadowReplayConfig,
+    *,
+    finalist: StrategyFinalist,
+) -> _BarsIdentity:
+    """Resuelve la identidad del dataset del replay (H2).
+
+    El config manda; si no fija ``instrument_id``, se cae al del finalista (la
+    definición ya lo lleva). ``timeframe``/``source``/``adjusted`` no se pueden inferir
+    del finalista: si no se aportan, quedan ausentes (se serializan vacíos).
+    """
+    return _BarsIdentity(
+        instrument_id=config.instrument_id or _finalist_instrument(finalist),
+        timeframe=config.timeframe,
+        source=config.source,
+        adjusted=config.adjusted,
+    )
 
 
 def _as_float(value: Any) -> float | None:

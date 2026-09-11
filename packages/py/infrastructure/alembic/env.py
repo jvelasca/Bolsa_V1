@@ -29,7 +29,12 @@ from bolsa_infrastructure.database.models import Base
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # ``disable_existing_loggers=False``: cuando Alembic corre EN PROCESO (p.ej.
+    # ``ensure_migrated`` durante el bootstrap de un worker o en tests PG), el default
+    # de ``fileConfig`` (True) deshabilitaría los loggers de la app ya creados —
+    # silenciando el logging del proceso. No queremos eso: las migraciones no deben
+    # mutar el estado de logging de la aplicación.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

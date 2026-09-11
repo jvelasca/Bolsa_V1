@@ -8,6 +8,7 @@ barras/definición/operaciones.
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from typing import Any
 
 from bolsa_application.discovery_catalog import DISCOVERY_FAMILIES
@@ -207,4 +208,52 @@ def test_shadow_replay_fingerprint_is_reproducible() -> None:
     assert first.bars_hash == second.bars_hash
     assert first.data_snapshot_id == "snap-1"
     assert first.engine_version is not None
+
+
+def test_shadow_replay_bars_hash_includes_dataset_identity() -> None:
+    """H2: mismo OHLCV con distinto instrument_id/timeframe ⇒ identidad distinta."""
+    finalist = _finalist({"executable": _executable_definition()})
+    bars = _dated_bars(400)
+    lab_end = bars[300].timestamp
+    policy = ShadowPolicy(min_closed_round_trips=1, min_return_pct=-1000.0)
+    base = ShadowReplayConfig(lab_end=lab_end, window_bars=99, min_bars=10)
+
+    daily = run_shadow_replay(
+        finalist=finalist,
+        bars=bars,
+        policy=policy,
+        config=replace(base, instrument_id="AAA", timeframe="D1"),
+    )
+    hourly = run_shadow_replay(
+        finalist=finalist,
+        bars=bars,
+        policy=policy,
+        config=replace(base, instrument_id="AAA", timeframe="H1"),
+    )
+    other_instrument = run_shadow_replay(
+        finalist=finalist,
+        bars=bars,
+        policy=policy,
+        config=replace(base, instrument_id="BBB", timeframe="D1"),
+    )
+
+    assert daily.bars_hash is not None
+    assert daily.bars_hash != hourly.bars_hash
+    assert daily.bars_hash != other_instrument.bars_hash
+
+
+def test_shadow_replay_bars_hash_is_stable_for_same_identity() -> None:
+    """H2: mismo dataset e identidad ⇒ mismo hash (no se rompe la reproducibilidad)."""
+    finalist = _finalist({"executable": _executable_definition()})
+    bars = _dated_bars(400)
+    lab_end = bars[300].timestamp
+    policy = ShadowPolicy(min_closed_round_trips=1, min_return_pct=-1000.0)
+    config = ShadowReplayConfig(
+        lab_end=lab_end, window_bars=99, min_bars=10, instrument_id="AAA", timeframe="D1"
+    )
+
+    first = run_shadow_replay(finalist=finalist, bars=bars, policy=policy, config=config)
+    second = run_shadow_replay(finalist=finalist, bars=bars, policy=policy, config=config)
+
+    assert first.bars_hash == second.bars_hash
     assert first.strategy_definition_hash == "h"

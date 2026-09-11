@@ -37,8 +37,22 @@ def test_queue_loop_starters_con_arq_estan_vacios(monkeypatch: Any) -> None:
     assert queue_poll_worker._queue_loop_starters() == []
 
 
-def test_run_con_arq_es_noop(monkeypatch: Any, caplog: Any) -> None:
+def test_run_con_arq_es_noop(monkeypatch: Any) -> None:
+    """Con ARQ, ``run()`` es no-op y lo registra (captura local, sin estado global)."""
+    import logging
+
     _patch_backend(monkeypatch, "arq")
-    with caplog.at_level("INFO"):
+    records: list[logging.LogRecord] = []
+    handler = logging.Handler()
+    handler.setLevel(logging.INFO)
+    handler.emit = lambda record: records.append(record)  # type: ignore[method-assign]
+    logger = logging.getLogger("bolsa_api.workers.queue_poll_worker")
+    previous_level = logger.level
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    try:
         queue_poll_worker.run()
-    assert any("no-op" in r.message for r in caplog.records)
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(previous_level)
+    assert any("no-op" in record.getMessage() for record in records)

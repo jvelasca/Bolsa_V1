@@ -136,10 +136,10 @@ class OrchestratorDeps:
     shadow_bars: ShadowBarsProvider | None = None
     shadow_policy: ShadowPolicy = field(default_factory=ShadowPolicy)
     shadow_config: ShadowReplayConfig = field(default_factory=ShadowReplayConfig)
-    # V2.32.1 (auditoría P1-01): exige hold-out estricto respecto al LAB. Si es True,
-    # la ventana shadow debe empezar después del último dato del LAB (``shadow_start >
-    # lab_end``); sin separación demostrable no hay evidencia (fail-closed).
-    shadow_require_holdout: bool = True
+    # V2.32.1 (auditoría P1-01 + hardening H1): la ruta de promoción exige SIEMPRE un
+    # hold-out estricto respecto al LAB (``shadow_start > lab_end``); sin separación
+    # demostrable no hay evidencia (fail-closed). Es un **invariante**, no una opción:
+    # no existe flag de deps para desactivarlo (lo fuerza ``_run_shadow``).
     # V2.32 / A12: override explícito del operador (rollout/compatibilidad). ``None``
     # (default) ⇒ la autoridad es exclusivamente la evidencia ejecutada.
     shadow_override: bool | None = None
@@ -485,9 +485,12 @@ class AutoOrchestrator:
         """Lee la serie amplia de barras y fija la frontera LAB/shadow (``lab_end``).
 
         Devuelve ``(bars, lab_end)``. ``lab_end`` es el timestamp de la barra tras la
-        cual empieza el hold-out (las últimas ``shadow_window`` barras de la serie). Con
-        ``shadow_require_holdout`` y sin separación demostrable, ``lab_end`` es ``None``
-        y el shadow resolverá fail-closed (no se inventa evidencia).
+        cual empieza el hold-out (las últimas ``shadow_window`` barras de la serie).
+
+        V2.32.1 hardening (H1): la ruta de promoción **siempre** exige un hold-out
+        estricto (el hold-out es un invariante, no una opción). Sin separación
+        demostrable, ``lab_end`` es ``None`` y ``_run_shadow`` resuelve fail-closed
+        (no se inventa evidencia).
         """
         provider = self._deps.shadow_bars
         if provider is None:
@@ -500,8 +503,6 @@ class AutoOrchestrator:
             logger.exception("auto_orchestrator shadow bars failed for %s", instrument_id)
             return (), None
         bar_tuple = tuple(bars or ())
-        if not self._deps.shadow_require_holdout:
-            return bar_tuple, None
         return bar_tuple, _lab_end_timestamp(bar_tuple, self._deps.shadow_config.window_bars)
 
     @staticmethod
@@ -528,6 +529,10 @@ class AutoOrchestrator:
 
         V2.32.1 (auditoría P1-01): la ventana shadow es un **hold-out estricto** del
         LAB (``lab_end`` fijado por ``_resolve_holdout`` antes de correr el LAB).
+
+        V2.32.1 hardening (H1): ``require_holdout`` es **inviolable** en esta ruta —
+        se fuerza a ``True`` con independencia de la config del llamante, y sin
+        ``lab_end`` demostrable no se construye el replay (fail-closed).
         """
         if bars is None or lab_end is None:
             # Sin serie/hold-out resuelto: no se inventa evidencia.
@@ -536,10 +541,15 @@ class AutoOrchestrator:
             bars, resolved_lab_end = await self._resolve_holdout(instrument_id)
             lab_end = lab_end if lab_end is not None else resolved_lab_end
 
+        # H1: la ruta de promoción nunca confía en que el llamante ya recortó. Sin
+        # frontera LAB demostrable no hay hold-out estricto ⇒ no hay replay.
+        if lab_end is None:
+            return None
+
         config = replace(
             self._deps.shadow_config,
             lab_end=lab_end,
-            require_holdout=self._deps.shadow_require_holdout,
+            require_holdout=True,
         )
         return run_shadow_replay(
             finalist=finalist,

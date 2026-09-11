@@ -7,6 +7,7 @@ degradación dispara re-LAB (nunca swap directo).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -374,4 +375,119 @@ async def test_discovery_definition_is_carried_to_promoted_version() -> None:
     assert active is not None
     executable = active.active.definition["executable"]
     assert executable["presetKey"] == "bb_reversion"
+
+
+# ── Hardening H1 (audit V2.32.1): hold-out inviolable en la ruta de promoción ───
+
+
+def _shadow_bars(count: int = 400) -> list[Any]:
+    """Barras OHLCV con timestamps crecientes (serie amplia LAB + hold-out)."""
+    from datetime import date, timedelta
+
+    from bolsa_analytics.backtest import BacktestBarInput
+
+    base = date(2026, 1, 1)
+    out = []
+    for index in range(count):
+        price = 100.0 + 12.0 * math.sin(index / 6.0) + index * 0.05
+        out.append(
+            BacktestBarInput(
+                timestamp=(base + timedelta(days=index)).isoformat(),
+                close=price,
+                open=price,
+                high=price * 1.01,
+                low=price * 0.99,
+                volume=1000.0,
+            )
+        )
+    return out
+
+
+def _finalist_stub() -> Any:
+    from bolsa_application.discovery_catalog import family_by_name
+    from bolsa_domain.entities.strategy_lifecycle import StrategyFinalist
+
+    family = family_by_name("ema_crossover")
+    definition = family.template({"fastPeriod": 5, "slowPeriod": 20})
+    assert definition is not None
+    return StrategyFinalist(
+        candidate_id="cand-h1",
+        version_id="ver-h1",
+        name="h1",
+        definition_hash="h1",
+        definition={"executable": definition, "instrument_id": "AAA"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_shadow_forces_require_holdout_unconditionally(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """H1: la ruta de promoción fuerza ``require_holdout=True`` sin opción de escape."""
+    import bolsa_application.auto_orchestrator as orchestrator_module
+    from bolsa_application.strategy_shadow_phase import ShadowReplayConfig
+
+    captured: dict[str, Any] = {}
+
+    def _spy(**kwargs: Any) -> Any:
+        captured["config"] = kwargs["config"]
+        return None
+
+    monkeypatch.setattr(orchestrator_module, "run_shadow_replay", _spy)
+
+    bars = tuple(_shadow_bars(400))
+    deps, _store = _deps()
+    # No existe flag para desactivar el hold-out: la ruta lo fuerza siempre.
+    deps.shadow_config = ShadowReplayConfig(window_bars=99, min_bars=10)
+    deps.shadow_bars = lambda instrument_id: bars
+    orchestrator = AutoOrchestrator(deps)
+
+    await orchestrator._run_shadow(
+        finalist=_finalist_stub(),
+        instrument_id="AAA",
+        run_id="run-h1",
+        data_snapshot_id="snap-h1",
+    )
+
+    config = captured["config"]
+    assert config.require_holdout is True
+    assert config.lab_end is not None
+
+
+def test_orchestrator_deps_has_no_holdout_escape_hatch() -> None:
+    """H1: no hay campo en deps para desactivar el hold-out (contrato eliminado)."""
+    from dataclasses import fields
+
+    assert "shadow_require_holdout" not in {f.name for f in fields(OrchestratorDeps)}
+
+
+@pytest.mark.asyncio
+async def test_run_shadow_without_demonstrable_lab_end_does_not_replay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """H1: sin frontera LAB demostrable no se construye el replay (fail-closed)."""
+    import bolsa_application.auto_orchestrator as orchestrator_module
+
+    called = False
+
+    def _spy(**kwargs: Any) -> Any:
+        nonlocal called
+        called = True
+        return None
+
+    monkeypatch.setattr(orchestrator_module, "run_shadow_replay", _spy)
+
+    deps, _store = _deps()
+    deps.shadow_bars = lambda instrument_id: ()  # Serie vacía ⇒ lab_end irresoluble.
+    orchestrator = AutoOrchestrator(deps)
+
+    result = await orchestrator._run_shadow(
+        finalist=_finalist_stub(),
+        instrument_id="AAA",
+        run_id="run-h1-empty",
+    )
+
+    assert result is None
+    assert called is False
+
 

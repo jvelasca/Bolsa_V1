@@ -56,6 +56,12 @@ class PaperForwardConfig:
     solo cuenta barras con ``timestamp > promoted_at`` (mercado nuevo); si es ``None``,
     se asume que ``bars`` ya contiene únicamente barras posteriores (compatibilidad con
     llamantes que ya recortan) y se emite ``forward_sin_barras`` si no hay ninguna.
+
+    V2.33 hardening (H2): la **identidad del dataset** forma parte del fingerprint.
+    ``instrument_id``/``timeframe``/``source``/``adjusted`` se incorporan al
+    ``bars_hash`` para que dos series con el mismo OHLCV pero distinto instrumento o
+    marco temporal no puedan compartir identidad de evidencia. Si ``instrument_id`` es
+    ``None``, el forward usa el de la ACTIVE.
     """
 
     initial_cash: float = 10000.0
@@ -63,6 +69,24 @@ class PaperForwardConfig:
     min_bars: int = 20
     promoted_at: str | None = None
     config_hash: str | None = None
+    instrument_id: str | None = None
+    timeframe: str | None = None
+    source: str | None = None
+    adjusted: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _BarsIdentity:
+    """Identidad del dataset que entra en el ``bars_hash`` (H2, auditoría V2.32.1)."""
+
+    instrument_id: str | None = None
+    timeframe: str | None = None
+    source: str | None = None
+    adjusted: bool | None = None
+
+
+# Identidad vacía (H2): singleton para el default de ``_denied`` (evita B008).
+_NO_IDENTITY = _BarsIdentity()
 
 
 def extract_active_executable(active: ActiveStrategy) -> dict[str, Any] | None:
@@ -122,6 +146,7 @@ def run_paper_forward(
     effective_policy = policy or PaperForwardPolicy()
     effective_config = config or PaperForwardConfig()
     executable = extract_active_executable(active)
+    identity = _bars_identity(effective_config, active=active)
     fingerprint = _fingerprint_kwargs(
         active=active,
         engine_version=ENGINE_VERSION,
@@ -135,6 +160,7 @@ def run_paper_forward(
             "forward_sin_definicion_ejecutable",
             as_of=as_of,
             promoted_at=effective_config.promoted_at,
+            identity=identity,
             **fingerprint,
         )
 
@@ -146,6 +172,7 @@ def run_paper_forward(
             bars_used=0,
             as_of=as_of,
             promoted_at=effective_config.promoted_at,
+            identity=identity,
             **fingerprint,
         )
 
@@ -168,6 +195,7 @@ def run_paper_forward(
             as_of=as_of,
             promoted_at=effective_config.promoted_at,
             window=window,
+            identity=identity,
             **fingerprint,
         )
 
@@ -185,7 +213,7 @@ def run_paper_forward(
         as_of=as_of,
         forward_start=_bar_timestamp(window[0]) if window else None,
         forward_end=_bar_timestamp(window[-1]) if window else None,
-        bars_hash=_bars_hash(window),
+        bars_hash=_bars_hash(window, identity),
         promoted_at=effective_config.promoted_at,
         fills=round_trips,
         vetoes=tuple(vetoes),
@@ -201,6 +229,7 @@ def _denied(
     as_of: str | None = None,
     promoted_at: str | None = None,
     window: Sequence[Any] | None = None,
+    identity: _BarsIdentity = _NO_IDENTITY,
     **fingerprint: Any,
 ) -> PaperForwardResult:
     return PaperForwardResult(
@@ -214,7 +243,7 @@ def _denied(
         promoted_at=promoted_at,
         forward_start=_bar_timestamp(window[0]) if window else None,
         forward_end=_bar_timestamp(window[-1]) if window else None,
-        bars_hash=_bars_hash(window) if window else None,
+        bars_hash=_bars_hash(window, identity) if window else None,
         **fingerprint,
     )
 
@@ -259,11 +288,18 @@ def _round_trip_count(metrics: Mapping[str, Any], trades: int) -> int:
     return trades // 2
 
 
-def _bars_hash(window: Sequence[Any]) -> str | None:
-    """Hash determinista de la ventana forward exacta (timestamps + OHLCV)."""
+def _bars_hash(window: Sequence[Any], identity: _BarsIdentity) -> str | None:
+    """Hash determinista de la ventana forward exacta (identidad + timestamps + OHLCV).
+
+    H2: la cabecera de identidad (``instrument_id|timeframe|source|adjusted``) entra en
+    el digest, de modo que el mismo OHLCV con distinto instrumento o marco temporal
+    produce hashes distintos. Un campo ausente se serializa como cadena vacía.
+    """
     if not window:
         return None
     digest = hashlib.sha256()
+    digest.update(_identity_header(identity).encode("utf-8"))
+    digest.update(b"\n")
     for bar in window:
         ts = _bar_timestamp(bar)
         if ts is None:
@@ -279,6 +315,37 @@ def _bars_hash(window: Sequence[Any]) -> str | None:
         digest.update("|".join(parts).encode("utf-8"))
         digest.update(b"\n")
     return digest.hexdigest()
+
+
+def _identity_header(identity: _BarsIdentity) -> str:
+    """Serializa la identidad del dataset (H2) de forma estable y determinista."""
+    return "|".join(
+        (
+            identity.instrument_id or "",
+            identity.timeframe or "",
+            identity.source or "",
+            "" if identity.adjusted is None else ("1" if identity.adjusted else "0"),
+        )
+    )
+
+
+def _bars_identity(
+    config: PaperForwardConfig,
+    *,
+    active: ActiveStrategy,
+) -> _BarsIdentity:
+    """Resuelve la identidad del dataset del forward (H2).
+
+    El config manda; si no fija ``instrument_id``, se cae al de la ACTIVE.
+    ``timeframe``/``source``/``adjusted`` no se pueden inferir de la ACTIVE: si no se
+    aportan, quedan ausentes (se serializan vacíos).
+    """
+    return _BarsIdentity(
+        instrument_id=config.instrument_id or active.instrument_id,
+        timeframe=config.timeframe,
+        source=config.source,
+        adjusted=config.adjusted,
+    )
 
 
 def _fmt(value: Any) -> str:

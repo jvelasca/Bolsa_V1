@@ -252,7 +252,8 @@ def test_default_orchestrator_does_not_wire_shadow_override() -> None:
         else:
             os.environ[w.AUTO_ORCHESTRATOR_SHADOW_VALIDATED] = previous
     assert orch.deps.shadow_override is None
-    assert orch.deps.shadow_require_holdout is True
+    # H1: el hold-out estricto es invariante de la ruta; no hay flag de escape en deps.
+    assert not hasattr(orch.deps, "shadow_require_holdout")
 
 
 def test_health_thresholds_are_calibrated() -> None:

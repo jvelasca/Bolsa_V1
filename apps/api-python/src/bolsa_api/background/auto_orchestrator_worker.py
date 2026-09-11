@@ -228,6 +228,19 @@ def _make_discovery_runner(budget: Any) -> Any:
     return _discover
 
 
+def _bar_source(bars: tuple[Any, ...]) -> str | None:
+    """``source`` del dataset de barras (H2): el de la primera barra que lo exponga.
+
+    Todas las barras de una misma lectura comparten fuente; si ninguna lo expone, se
+    devuelve ``None`` (no se inventa identidad).
+    """
+    for bar in bars:
+        value = bar.get("source") if isinstance(bar, dict) else getattr(bar, "source", None)
+        if value:
+            return str(value)
+    return None
+
+
 def _make_shadow_bars_provider(session_factory: Any) -> Any:
     """``shadow_bars(instrument_id)`` async: barras OHLCV para el replay shadow.
 
@@ -311,6 +324,13 @@ def _make_forward_runner(session_factory: Any) -> Any:
             config=PaperForwardConfig(
                 promoted_at=active.promoted_at,
                 window_bars=_forward_window_bars(),
+                # H2 (auditoría V2.32.1): identidad del dataset en el fingerprint. El
+                # repositorio lee la ventana diaria del instrumento; la fuente se toma
+                # de las barras (todas comparten `source`). `adjusted` no es derivable
+                # de forma fiable aquí ⇒ se deja ausente (no se inventa identidad).
+                instrument_id=instrument_id,
+                timeframe="1d",
+                source=_bar_source(bars),
             ),
             as_of=f"forward:{instrument_id}",
         )
@@ -506,6 +526,7 @@ def _default_orchestrator(session_factory: Any) -> Any:
     from bolsa_application.strategy_observed_metrics_provider import (
         make_observed_metrics_provider,
     )
+    from bolsa_application.strategy_shadow_phase import ShadowReplayConfig
 
     class _SessionScopedStore:
         """Store que abre una sesión por operación (imports diferidos)."""
@@ -560,7 +581,11 @@ def _default_orchestrator(session_factory: Any) -> Any:
             # un hold-out ESTRICTO del LAB (V2.32.1, auditoría P1-01). Sin override:
             # AUTO promociona solo con evidencia (P2-02).
             shadow_bars=_make_shadow_bars_provider(session_factory),
-            shadow_require_holdout=True,
+            # H2 (auditoría V2.32.1): identidad de dataset en el fingerprint del shadow.
+            # El provider lee la ventana diaria (TimeFrame.D1); el instrument_id se
+            # resuelve por fallback desde el finalista. `source`/`adjusted` no son
+            # derivables aquí de forma fiable ⇒ se dejan ausentes (no se inventa).
+            shadow_config=ShadowReplayConfig(timeframe="1d"),
         )
     )
 
