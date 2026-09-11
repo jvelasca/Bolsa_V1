@@ -8,9 +8,10 @@
 
 | Elemento                      | Referencia                                                                                                               |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Tag certificado               | **`v2.32.1-beta`** → commit `f39a6c10`                                                                                   |
+| Tag certificado               | **`v2.32.1-beta`** → commit `0d4c39c2`                                                                                   |
 | Commit de la remediación      | **`aefbf7eb`** (`fix(v2.32.1/A12.1): remediacion auditoria V2.32 ...`)                                                   |
 | Commit del cierre/documento   | `f39a6c10` (`docs(v2.32.1/A12.1): cierre de la remediacion ...`)                                                         |
+| Commit del audit pack (este)  | `0d4c39c2` (`docs(v2.32.1): audit pack ...`)                                                                             |
 | Base auditada (HEAD anterior) | **`854dc86b`** (`feat(v2.32/A12): shadow validation with executed evidence ...`)                                         |
 | Doc de cierre (detalle)       | [`cierre-v2.32.1-a12.1-remediacion-auditoria-2026-09-11.md`](./cierre-v2.32.1-a12.1-remediacion-auditoria-2026-09-11.md) |
 
@@ -19,6 +20,7 @@ El **diff a revisar** es exactamente:
 ```
 git diff 854dc86b..aefbf7eb        # la remediación de código (23 ficheros)
 git show f39a6c10                  # el documento de cierre + CHANGELOG
+git show 0d4c39c2                  # este audit pack
 ```
 
 ## 1. Cómo reproducir la verificación (sin entorno del autor)
