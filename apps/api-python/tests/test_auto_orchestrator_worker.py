@@ -35,10 +35,8 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(key, raising=False)
 
 
-@pytest.fixture(autouse=True)
-def _reset_grammar_counters() -> None:
-    """V2.35/A15: los contadores son de proceso; se resetean por test."""
-    counters = w.grammar_counters()
+def _zero_counters(counters: Any) -> None:
+    """Pone a cero un acumulador de gramática (mismos campos en proceso y ciclo)."""
     counters.discovery_calls = 0
     counters.grammar_discovery_calls = 0
     counters.catalog_candidates = 0
@@ -46,6 +44,17 @@ def _reset_grammar_counters() -> None:
     counters.total_candidates = 0
     counters.trials_used = 0
     counters.warmup_skipped = 0
+
+
+@pytest.fixture(autouse=True)
+def _reset_grammar_counters() -> None:
+    """V2.35/A15: los contadores son de proceso; se resetean por test.
+
+    V2.35.1 (P2-02): también se resetea el acumulador de ciclo para que cada test
+    arranque de un estado limpio y determinista.
+    """
+    _zero_counters(w.grammar_counters())
+    _zero_counters(w._reset_cycle_counters())
 
 
 class _FakeSession:
@@ -476,6 +485,207 @@ async def test_loop_logs_cycle_summary(
             await task
 
     assert any("cycle_summary" in record.message for record in caplog.records)
+
+
+# ── V2.35.1 (P2-02): contadores de ciclo separados de los de proceso ────────────
+
+
+@dataclass
+class _Summary:
+    """Resumen de discovery mínimo (contrato de ``_record_discovery_summary``)."""
+
+    grammar_enabled: bool = False
+    catalog_candidates: int = 0
+    grammar_candidates: int = 0
+    total_candidates: int = 0
+    trials_used: int = 0
+    bar_count_ok: bool = True
+
+
+def _counters_snapshot(counters: Any) -> tuple[int, ...]:
+    """Tupla determinista con los siete campos del acumulador (para comparar)."""
+    return (
+        counters.discovery_calls,
+        counters.grammar_discovery_calls,
+        counters.catalog_candidates,
+        counters.grammar_candidates,
+        counters.total_candidates,
+        counters.trials_used,
+        counters.warmup_skipped,
+    )
+
+
+def test_process_and_cycle_counters_have_same_fields() -> None:
+    """``CycleGrammarCounters`` es el gemelo de ciclo del acumulador de proceso."""
+    process = w.GrammarObservabilityCounters()
+    cycle = w.CycleGrammarCounters()
+    assert _counters_snapshot(process) == _counters_snapshot(cycle) == (0, 0, 0, 0, 0, 0, 0)
+
+
+def test_record_discovery_summary_accumulates_in_both() -> None:
+    """Un resumen suma a la vez en proceso y en ciclo (mismos números)."""
+    summary = _Summary(total_candidates=3, catalog_candidates=2, grammar_candidates=1)
+    w._record_discovery_summary(summary)
+
+    assert _counters_snapshot(w.process_grammar_counters()) == (1, 0, 2, 1, 3, 0, 0)
+    assert _counters_snapshot(w.cycle_grammar_counters()) == (1, 0, 2, 1, 3, 0, 0)
+
+
+def test_grammar_counters_returns_process_accumulator() -> None:
+    """``grammar_counters()`` sigue devolviendo el acumulador de proceso (compat)."""
+    assert w.grammar_counters() is w.process_grammar_counters()
+
+
+def test_cycle_reset_leaves_process_monotonic() -> None:
+    """Reiniciar el ciclo no toca el proceso: sigue acumulando (monótono)."""
+    w._record_discovery_summary(_Summary(total_candidates=2, catalog_candidates=2))
+    w._record_discovery_summary(_Summary(total_candidates=3, catalog_candidates=3))
+    assert w.process_grammar_counters().discovery_calls == 2
+
+    w._reset_cycle_counters()
+    # El ciclo vuelve a cero; el proceso conserva sus totales.
+    assert _counters_snapshot(w.cycle_grammar_counters()) == (0, 0, 0, 0, 0, 0, 0)
+    assert w.process_grammar_counters().discovery_calls == 2
+
+    w._record_discovery_summary(_Summary(total_candidates=5, catalog_candidates=5))
+    assert w.process_grammar_counters().discovery_calls == 3
+    assert w.cycle_grammar_counters().discovery_calls == 1
+    assert w.cycle_grammar_counters().total_candidates == 5
+
+
+def test_grammar_off_keeps_cycle_and_process_grammar_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con la gramática OFF, ni ciclo ni proceso cuentan gramática."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_GRAMMAR, raising=False)
+    runner = w._make_discovery_runner(DiscoveryBudget())
+    candidates = runner("AAA")
+
+    for counters in (w.cycle_grammar_counters(), w.process_grammar_counters()):
+        assert counters.grammar_discovery_calls == 0
+        assert counters.grammar_candidates == 0
+        assert counters.catalog_candidates == len(candidates)
+
+
+def test_runner_counter_reset_is_deterministic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Misma entrada ⇒ mismos contadores (determinismo ciclo a ciclo)."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_GRAMMAR, raising=False)
+    runner = w._make_discovery_runner(DiscoveryBudget())
+
+    runner("AAA")
+    first_cycle = _counters_snapshot(w._reset_cycle_counters())
+    runner("AAA")
+    second_cycle = _counters_snapshot(w._reset_cycle_counters())
+    assert first_cycle == second_cycle
+
+
+@pytest.mark.asyncio
+async def test_loop_cycle_summary_reports_only_current_cycle(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """El ``cycle_summary`` reporta el ciclo vigente y ``process_summary`` el proceso.
+
+    V2.35.1 (P2-02): con un discovery de gramática OFF inyectado, cada ciclo cuenta
+    solo su propio discovery; el proceso, sin embargo, acumula entre ciclos.
+    """
+    import logging
+
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
+    runner = w._make_discovery_runner(DiscoveryBudget())
+
+    class _DiscoveryOrch:
+        """Doble que invoca el discovery real una vez por instrumento/ciclo."""
+
+        def __init__(self) -> None:
+            self.cycles = 0
+
+        async def resolve_universe(self) -> Any:
+            return _Resolution(instrument_ids=["AAA"])
+
+        async def run_cycle(self, *, instrument_id: str, **_: Any) -> _Result:
+            self.cycles += 1
+            runner(instrument_id)
+            return _Result()
+
+        async def watch_active(self, *, instrument_id: str, **_: Any) -> _Result:
+            return _Result()
+
+    task = asyncio.create_task(w.auto_orchestrator_loop(_DiscoveryOrch(), interval_seconds=0.01))
+    with caplog.at_level(logging.INFO):
+        await asyncio.sleep(0.08)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    cycle_lines = [r.getMessage() for r in caplog.records if "cycle_summary" in r.getMessage()]
+    process_lines = [
+        r.getMessage() for r in caplog.records if "process_summary" in r.getMessage()
+    ]
+    assert cycle_lines, "debe haber al menos un cycle_summary"
+    assert process_lines, "debe haber al menos un process_summary"
+
+    # El resumen de ciclo cuenta un solo discovery (un instrumento por ciclo).
+    assert all("grammar_discoveries=0" in line for line in cycle_lines)
+    assert w.process_grammar_counters().discovery_calls == len(process_lines)
+    # El de proceso acumula: el último refleja todos los ciclos ejecutados.
+    assert f"discovery_calls={len(process_lines)}" in process_lines[-1]
+
+
+@pytest.mark.asyncio
+async def test_consecutive_cycles_report_independent_cycle_numbers(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Dos ciclos consecutivos con distinto nº de discoveries reportan números propios."""
+    import logging
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA,BBB")
+    seen: list[int] = []
+
+    class _TwoCycleOrch:
+        """Doble que ejecuta un discovery por instrumento (2 en el primer ciclo)."""
+
+        def __init__(self) -> None:
+            self.resolution_calls = 0
+
+        async def resolve_universe(self) -> Any:
+            self.resolution_calls += 1
+            if self.resolution_calls > 1:
+                raise asyncio.CancelledError
+            return _Resolution(instrument_ids=["AAA", "BBB"])
+
+        async def run_cycle(self, *, instrument_id: str, **_: Any) -> _Result:
+            w._record_discovery_summary(_Summary(total_candidates=1, catalog_candidates=1))
+            return _Result()
+
+        async def watch_active(self, *, instrument_id: str, **_: Any) -> _Result:
+            return _Result()
+
+    class _CycleCapture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            message = record.getMessage()
+            if "cycle_summary" in message:
+                seen.append(int(message.split("catalog_candidates=")[1].split()[0]))
+
+    handler = _CycleCapture()
+    root = logging.getLogger("bolsa_api.background.auto_orchestrator_worker")
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+    try:
+        with pytest.raises(asyncio.CancelledError):
+            await w.auto_orchestrator_loop(_TwoCycleOrch(), interval_seconds=0.01)
+    finally:
+        root.removeHandler(handler)
+
+    # El primer ciclo ve 2 discoveries (AAA, BBB); el segundo se cancela al resolver.
+    assert seen[0] == 2
 
 
 @pytest.mark.asyncio

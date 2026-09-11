@@ -183,6 +183,10 @@ class GrammarObservabilityCounters:
     resúmenes que devuelve ``discover_for_instrument_with_summary`` y permiten gobernar
     el rollout de ``AUTO_ORCHESTRATOR_GRAMMAR`` (cuánto aporta la gramática frente al
     catálogo) sin necesidad de persistir nada en DB (sin migración).
+
+    V2.35.1 (auditoría P2-02): este tipo es el acumulador **de proceso** (desde el
+    arranque del worker). El resumen por ciclo se emite con ``CycleGrammarCounters``,
+    que se reinicia al principio de cada iteración del bucle.
     """
 
     discovery_calls: int = 0
@@ -194,28 +198,83 @@ class GrammarObservabilityCounters:
     warmup_skipped: int = 0
 
 
-_GRAMMAR_COUNTERS = GrammarObservabilityCounters()
+@dataclass(slots=True)
+class CycleGrammarCounters:
+    """V2.35.1 (auditoría P2-02) — contadores de gramática de **un solo ciclo**.
+
+    Mismos campos que ``GrammarObservabilityCounters`` pero efímeros: el bucle crea una
+    instancia nueva al inicio de cada iteración y ``cycle_summary`` reporta solo lo
+    ocurrido en ese ciclo (antes se imprimían totales de proceso bajo un nombre de
+    ciclo). Solo lectura/observabilidad: no participa en ninguna decisión.
+    """
+
+    discovery_calls: int = 0
+    grammar_discovery_calls: int = 0
+    catalog_candidates: int = 0
+    grammar_candidates: int = 0
+    total_candidates: int = 0
+    trials_used: int = 0
+    warmup_skipped: int = 0
+
+
+_PROCESS_COUNTERS = GrammarObservabilityCounters()
+_CYCLE_COUNTERS = CycleGrammarCounters()
 
 
 def grammar_counters() -> GrammarObservabilityCounters:
     """Contadores observados de la gramática (acumulados desde el arranque del proceso).
 
-    El llamante no debe mutarlos: es un resumen de solo lectura para tests/inspección.
+    Se mantiene por compatibilidad: sigue devolviendo el acumulador de proceso. El
+    llamante no debe mutarlos: es un resumen de solo lectura para tests/inspección.
     """
-    return _GRAMMAR_COUNTERS
+    return _PROCESS_COUNTERS
+
+
+def process_grammar_counters() -> GrammarObservabilityCounters:
+    """V2.35.1 (P2-02): alias explícito del acumulador de proceso (mismo objeto)."""
+    return _PROCESS_COUNTERS
+
+
+def cycle_grammar_counters() -> CycleGrammarCounters:
+    """V2.35.1 (P2-02): contadores del ciclo en curso (se reinician por iteración)."""
+    return _CYCLE_COUNTERS
+
+
+def _reset_cycle_counters() -> CycleGrammarCounters:
+    """V2.35.1 (P2-02): reinicia los contadores de ciclo (una vez por iteración).
+
+    Devuelve la instancia nueva para que el bucle pueda loguearla; el módulo guarda la
+    misma referencia en ``_CYCLE_COUNTERS`` (así ``_record_discovery_summary`` siempre
+    acumula en el ciclo vigente).
+    """
+    global _CYCLE_COUNTERS
+    _CYCLE_COUNTERS = CycleGrammarCounters()
+    return _CYCLE_COUNTERS
+
+
+def _accumulate(counters: CycleGrammarCounters | GrammarObservabilityCounters, summary: Any) -> None:
+    """Suma un resumen de discovery en ``counters`` (proceso o ciclo, observabilidad)."""
+    counters.discovery_calls += 1
+    if bool(getattr(summary, "grammar_enabled", False)):
+        counters.grammar_discovery_calls += 1
+    counters.catalog_candidates += int(getattr(summary, "catalog_candidates", 0))
+    counters.grammar_candidates += int(getattr(summary, "grammar_candidates", 0))
+    counters.total_candidates += int(getattr(summary, "total_candidates", 0))
+    counters.trials_used += int(getattr(summary, "trials_used", 0))
+    if not bool(getattr(summary, "bar_count_ok", True)):
+        counters.warmup_skipped += 1
 
 
 def _record_discovery_summary(summary: Any) -> None:
-    """Acumula el resumen de un discovery en ``_GRAMMAR_COUNTERS`` (observabilidad)."""
-    _GRAMMAR_COUNTERS.discovery_calls += 1
-    if bool(getattr(summary, "grammar_enabled", False)):
-        _GRAMMAR_COUNTERS.grammar_discovery_calls += 1
-    _GRAMMAR_COUNTERS.catalog_candidates += int(getattr(summary, "catalog_candidates", 0))
-    _GRAMMAR_COUNTERS.grammar_candidates += int(getattr(summary, "grammar_candidates", 0))
-    _GRAMMAR_COUNTERS.total_candidates += int(getattr(summary, "total_candidates", 0))
-    _GRAMMAR_COUNTERS.trials_used += int(getattr(summary, "trials_used", 0))
-    if not bool(getattr(summary, "bar_count_ok", True)):
-        _GRAMMAR_COUNTERS.warmup_skipped += 1
+    """Acumula el resumen de un discovery en proceso **y** en el ciclo vigente.
+
+    V2.35.1 (P2-02): mismo resumen, dos vistas. El acumulador de proceso
+    (``_PROCESS_COUNTERS``) es monótono desde el arranque; el de ciclo
+    (``_CYCLE_COUNTERS``) se reinicia al inicio de cada iteración del bucle. Solo
+    observabilidad: no altera el discovery ni sus decisiones.
+    """
+    _accumulate(_PROCESS_COUNTERS, summary)
+    _accumulate(_CYCLE_COUNTERS, summary)
 
 
 def _shadow_window_bars() -> int:
@@ -299,8 +358,8 @@ def _make_discovery_runner(budget: Any) -> Any:
 
     V2.35/A15: se usa ``discover_for_instrument_with_summary`` para emitir una línea
     de observabilidad por instrumento (catálogo vs gramática, presupuesto y cupos) y
-    acumular contadores de proceso (``grammar_counters``). Solo lectura: no altera el
-    discovery ni sus decisiones.
+    acumular contadores de proceso y de ciclo (``grammar_counters`` /
+    ``cycle_grammar_counters``). Solo lectura: no altera el discovery ni sus decisiones.
     """
     from bolsa_application.strategy_discovery_engine import (
         discover_for_instrument_with_summary,
@@ -532,6 +591,10 @@ async def auto_orchestrator_loop(
                 AUTO_ORCHESTRATOR_INSTRUMENTS,
             )
         cycle_id = _new_cycle_id()
+        # V2.35.1 (P2-02): se reinician los contadores de ciclo al principio de cada
+        # iteración (antes de orquestar instrumentos) para que ``cycle_summary`` reporte
+        # SOLO este ciclo. Los acumulados de proceso siguen intactos y monótonos.
+        _reset_cycle_counters()
         for instrument_id in watch:
             try:
                 # V2.32.1 (auditoría P2-05): run_id por ciclo (no constante) para que
@@ -583,20 +646,36 @@ async def auto_orchestrator_loop(
             except Exception:  # noqa: BLE001 — un fallo por instrumento no tumba el bucle.
                 logger.exception("auto_orchestrator cycle failed for %s", instrument_id)
         # V2.35/A15 — resumen agregado por ciclo (observabilidad de la gramática).
-        # Con la gramática OFF, ``grammar_candidates`` del acumulado no crece; la línea
-        # deja traza explícita del rollout sin alterar ninguna decisión.
-        counters = grammar_counters()
+        # V2.35.1 (P2-02): ``cycle_summary`` reporta SOLO el ciclo vigente (contadores
+        # reiniciados al inicio de la iteración); ``process_summary`` conserva los
+        # acumulados desde el arranque del worker. Con la gramática OFF, los campos de
+        # gramática no crecen; ambas líneas son traza explícita del rollout sin alterar
+        # ninguna decisión.
+        cycle = cycle_grammar_counters()
+        process = process_grammar_counters()
         logger.info(
             "auto_orchestrator cycle_summary cycle_id=%s instruments=%s "
             "grammar_discoveries=%s catalog_candidates=%s grammar_candidates=%s "
             "total_candidates=%s warmup_skipped=%s",
             cycle_id,
             len(watch),
-            counters.grammar_discovery_calls,
-            counters.catalog_candidates,
-            counters.grammar_candidates,
-            counters.total_candidates,
-            counters.warmup_skipped,
+            cycle.grammar_discovery_calls,
+            cycle.catalog_candidates,
+            cycle.grammar_candidates,
+            cycle.total_candidates,
+            cycle.warmup_skipped,
+        )
+        logger.info(
+            "auto_orchestrator process_summary cycle_id=%s "
+            "discovery_calls=%s grammar_discoveries=%s catalog_candidates=%s "
+            "grammar_candidates=%s total_candidates=%s warmup_skipped=%s",
+            cycle_id,
+            process.discovery_calls,
+            process.grammar_discovery_calls,
+            process.catalog_candidates,
+            process.grammar_candidates,
+            process.total_candidates,
+            process.warmup_skipped,
         )
         await asyncio.sleep(period)
 
