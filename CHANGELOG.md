@@ -63,6 +63,11 @@ una **función pura dada la tupla `(instrument_id, snapshot)`**.
   `A14_GRAMMAR_PG_REQUIRED`/`LIFECYCLE_PG_REQUIRED`/`AUTO_ORCHESTRATOR_PG_REQUIRED`
   `10 passed` + snapshot PG `6 passed` + lifecycle `57 passed` (incluye anti-explosión).
 - **Alembic head**: `036_discovery_evidence_snapshots`.
+- **Elevación**: `main == cb147d89` == tag **`v2.36-beta`**. Release-tag CI **GREEN
+  verificado** (run [`34604803938`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34604803938),
+  conclusión `success`, 2026-09-11): `python`, `lifecycle-pg`, `dr-verify`, `a7-gate`,
+  `security`, `decision-spine`, `shared`, `frontend`, `playwright (mock E2E)` y `certify`
+  en verde; `playwright (integrated E2E, opt-in)` correctamente skipped.
 
 ## [1.60.1-beta] — V2.35.1 · ESTUDIO hard gate (P1-01) — 2026-09-11
 

@@ -5,15 +5,16 @@
 > con un snapshot de evidencia determinista, versionado y persistido, calculado fuera del hot
 > path e inyectado en el worker.
 >
-> **Estado auditado:** `main` (base `5348bee0` == tag `v2.35.1-beta`).
+> **Estado auditado:** `main == cb147d89` == tag **`v2.36-beta`** (base `5348bee0` == tag `v2.35.1-beta`).
 > **Alembic head:** `036_discovery_evidence_snapshots`.
 > **Bump:** `1.60.1-beta` → `1.61.0-beta`.
 > **Flag de rollout:** `AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR` **OFF por defecto** (con OFF, el
 > sistema es byte-idéntico a `v2.35.1-beta`).
 >
-> **Nota honesta:** veredicto de Release-tag CI de un eventual tag `v2.36-beta` **aún no
-> existe** en el momento de redactar este pack. No se afirma "CI GREEN" de este tag hasta
-> verificarlo; este documento solo certifica la **verificación local de los tres bloques**.
+> **Veredicto de CI:** Release-tag CI **GREEN VERIFICADO** para `v2.36-beta` (run
+> [`34604803938`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34604803938), conclusión
+> `success`, 2026-09-11). Adicionalmente, verificación **local** de los tres bloques (estático,
+> offline y PG con gates).
 
 ---
 

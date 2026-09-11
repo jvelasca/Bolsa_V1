@@ -6,10 +6,12 @@
 >
 > **AsOf:** 2026-09-11 · **Base:** `main` · padre `5348bee0` (sello `v2.35.1-beta`).
 > **Alembic head:** `036_discovery_evidence_snapshots` (migración aditiva nueva).
-> **Veredicto:** incremento 1 **IMPLEMENTADO y verificado en local** (tres bloques verdes).
-> Pendiente: commit + elevación (tag `v2.36-beta`) y **Release-tag CI GREEN verificado** antes
-> de afirmar nada en docs. El flag `AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR` queda **OFF por
-> defecto**: con OFF el sistema es byte-idéntico a `v2.35.1-beta`.
+> **Veredicto:** incremento 1 **IMPLEMENTADO, ELEVADO y verificado**. `main == cb147d89` ==
+> tag **`v2.36-beta`**; **Release-tag CI GREEN VERIFICADO** (run `34604803938`, conclusión
+> `success`, 2026-09-11): `python`, `lifecycle-pg`, `dr-verify`, `a7-gate`, `security`,
+> `decision-spine`, `shared`, `frontend`, `playwright (mock E2E)` y `certify` en verde.
+> El flag `AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR` queda **OFF por defecto**: con OFF el
+> sistema es byte-idéntico a `v2.35.1-beta`.
 > **Bump:** `1.60.1-beta` → `1.61.0-beta`.
 
 ---
@@ -178,9 +180,9 @@ uv run --project apps/api-python python \
 
 ## 9. Pendiente / siguiente paso
 
-1. Commit de la fase y elevación a `main`; tag `v2.36-beta` y **Release-tag CI GREEN real**
-   antes de afirmar verde en ninguna parte.
+1. **Elevación (HECHA)**: commit `cb147d89` en `main`, tag `v2.36-beta` publicado y
+   **Release-tag CI GREEN verificado** (run `34604803938`, `success`).
 2. Incremento 2 (fuera de alcance hoy): **emisión adaptativa real** en el carril con cupo, ya
    preparada por este diseño.
-3. Actualizar el audit-pack consolidado con la matriz de esta fase (afirmación → código → test)
-   cuando se eleve el tag.
+3. Actualizar el audit-pack consolidado A13+A14+A15 con la matriz de esta fase si se quiere un
+   punto de entrada único acumulado (hoy la matriz de v2.36 vive en su propio audit-pack).
