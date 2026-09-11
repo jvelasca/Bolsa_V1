@@ -377,6 +377,91 @@ async def test_discovery_definition_is_carried_to_promoted_version() -> None:
     assert executable["presetKey"] == "bb_reversion"
 
 
+# ── V2.35/A15: observabilidad de procedencia (catálogo vs gramática) ────────────
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_reports_catalog_provenance_when_grammar_disabled() -> None:
+    """Sin gramática, todas las candidatas son del catálogo y la gramática va a cero."""
+    store = InMemoryStrategyLifecycleStore()
+    deps = OrchestratorDeps(
+        store=store,
+        run_optimize=(lambda candidate: _runner(_good_result())),
+        discovery=lambda instrument_id: discover_for_instrument(
+            instrument_id=instrument_id,
+            budget=DiscoveryBudget(max_trials_total=3, max_per_family=1, max_candidates=3),
+        ),
+    )
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+    assert result.catalog_candidates == 3
+    assert result.grammar_candidates == 0
+    assert result.lab_grammar_evaluated == 0
+    # Sin provider de barras el replay shadow no se ejecuta (fail-closed honesto):
+    # el override del operador puede promocionar, pero no se inventa evidencia.
+    assert result.shadow_started == 0
+    assert result.shadow_grammar_started == 0
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_reports_grammar_provenance_and_lab_shadow() -> None:
+    """Con gramática, el orquestador distingue catálogo/gramática en LAB y shadow."""
+    from bolsa_application.discovery_grammar import GrammarBudget
+
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    store = InMemoryStrategyLifecycleStore()
+    deps = OrchestratorDeps(
+        store=store,
+        run_optimize=(lambda candidate: _runner(_good_result())),
+        discovery=lambda instrument_id: discover_for_instrument(
+            instrument_id=instrument_id,
+            budget=budget,
+            grammar_budget=GrammarBudget(base=budget),
+        ),
+    )
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA", shadow_validated=True)
+
+    assert result.grammar_candidates > 0
+    assert result.catalog_candidates > 0
+    assert result.catalog_candidates + result.grammar_candidates == result.candidates
+    # El LAB evalúa todas las candidatas (el runner responde a todas).
+    assert result.lab_grammar_evaluated == result.grammar_candidates
+    # Sin provider de barras no hay replay shadow: no se inventa evidencia.
+    assert result.shadow_started == 0
+    assert result.shadow_grammar_started == 0
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_counts_shadow_started_with_provider() -> None:
+    """Con provider de barras, el shadow se ejecuta y el contador lo refleja."""
+    from bolsa_application.discovery_grammar import GrammarBudget
+    from bolsa_application.strategy_shadow_phase import ShadowReplayConfig
+
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    store = InMemoryStrategyLifecycleStore()
+    bars = tuple(_shadow_bars(400))
+    deps = OrchestratorDeps(
+        store=store,
+        run_optimize=(lambda candidate: _runner(_good_result())),
+        discovery=lambda instrument_id: discover_for_instrument(
+            instrument_id=instrument_id,
+            budget=budget,
+            grammar_budget=GrammarBudget(base=budget),
+        ),
+        shadow_bars=lambda instrument_id: bars,
+        shadow_config=ShadowReplayConfig(window_bars=100, min_bars=10),
+    )
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
+
+    assert result.shadow_started == 1
+    # El finalista es una candidata concreta: gramatical o de catálogo, nunca ambas.
+    assert result.shadow_grammar_started in (0, 1)
+    assert result.shadow_grammar_started <= result.shadow_started
+
+
+
 # ── Hardening H1 (audit V2.32.1): hold-out inviolable en la ruta de promoción ───
 
 

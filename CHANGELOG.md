@@ -2,6 +2,50 @@
 
 All notable releases of Bolsa V1.
 
+## [1.60.0-beta] — V2.35 / A15 · Observabilidad y gobernanza de la gramática de Discovery — 2026-09-11
+
+Hace **gobernable el rollout** de la gramática controlada de A14 (`AUTO_ORCHESTRATOR_GRAMMAR`,
+OFF por defecto) sin cambiar ninguna semántica de decisión: ahora se mide cuánto aporta la
+gramática frente al catálogo curado y cuántos planes llegan de verdad al LAB y al shadow.
+Todo es **observabilidad de solo lectura** — no altera presupuestos, gates ni el reparto
+catálogo↔gramática, y **no hay migración** (head Alembic sigue en
+`035_paper_forward_evidence`).
+
+- **Resumen determinista de emisión (`DiscoveryEmissionSummary`)**: nueva API aditiva
+  `discover_for_instrument_with_summary(...)` en `strategy_discovery_engine.py` que devuelve
+  `(candidatas, resumen)`. El resumen cuenta `catalog_candidates`, `grammar_candidates`,
+  `total_candidates`, `trials_used`, los cupos reservados (`catalog_cap`/`grammar_cap`), el
+  flag `grammar_enabled` y el warm-up (`bar_count_ok`). Se calcula sobre lo ya emitido (el
+  prefijo `grammar:` es la fuente de verdad); **no añade estado al motor**.
+- **API estable intacta**: `discover_for_instrument(...)` delega en la nueva función y
+  descarta el resumen, de modo que con `grammar_budget=None` la salida es **byte-idéntica**
+  a la de A13 (test de regresión explícito).
+- **Procedencia en el orquestador**: `OrchestratorResult` gana campos aditivos de conteo
+  (`catalog_candidates`, `grammar_candidates`, `lab_grammar_evaluated`, `shadow_started`,
+  `shadow_grammar_started`) derivados de la evidencia real del ciclo (evaluaciones del LAB y
+  replay shadow ejecutado). Sin provider de barras, `shadow_started` es 0 (fail-closed
+  honesto: no se inventa evidencia).
+- **Logs estructurados en el worker AUTO**: una línea de observabilidad por instrumento
+  (procedencia, presupuesto y cupos) y un `cycle_summary` agregado por ciclo, más
+  `GrammarObservabilityCounters` acumulados por proceso (`grammar_counters()` para
+  inspección/tests). Solo `logging`: sin persistencia en DB.
+- **Invariantes intactas**: `AUTO ⇒ SIMULATED`, LIVE bloqueado, sin LLM en hot path,
+  fail-closed (ausencia de evidencia ≠ aprobación), long-only y gates CPCV/PBO/DSR/WFE/OOS
+  - coach sin cambios.
+- **Tests**: herméticos de resumen OFF/ON, cuadre catálogo+gramática=total, determinismo,
+  warm-up y regresión A13 (`test_discovery_grammar.py`); contadores y `cycle_summary` del
+  worker (`test_auto_orchestrator_worker.py`); procedencia LAB/shadow del orquestador
+  (`test_auto_orchestrator.py`).
+
+> Verificación: `ruff`, `lint-imports` (4/0), `mypy` (470 ficheros) verdes; job `quality`
+> offline (1243 passed) y E2E PG de certificación (`grammar-discovery-pg`,
+> `paper-forward-pg`, `lifecycle-pg`) sin skips.
+>
+> **Deuda preexistente que NO se toca aquí**: `packages/py/infrastructure/tests/chaos/
+test_load_concurrency_flow.py` (fallos de carga preexistentes) y el flake ambiental de
+> `test_a9_scheduler_process_pg_zero_human` sobre BD local sucia (documentado en el audit-pack
+> de V2.32.1).
+
 ## [1.59.0-beta] — V2.34 / A14 · Strategy Intelligence (gramática controlada de Discovery) — 2026-09-11
 
 Discovery deja de ser un catálogo de familias técnicas fijas y pasa a ser una **gramática

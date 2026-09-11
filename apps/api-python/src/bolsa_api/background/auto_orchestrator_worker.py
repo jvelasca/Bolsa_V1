@@ -35,6 +35,7 @@ import asyncio
 import logging
 import os
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -173,6 +174,49 @@ def _grammar_budget(discovery_budget: Any) -> Any:
     )
 
 
+@dataclass(slots=True)
+class GrammarObservabilityCounters:
+    """V2.35/A15 — contadores acumulados de la gramática en este proceso del worker.
+
+    Solo lectura/observabilidad: no participa en ninguna decisión. Se alimentan de los
+    resúmenes que devuelve ``discover_for_instrument_with_summary`` y permiten gobernar
+    el rollout de ``AUTO_ORCHESTRATOR_GRAMMAR`` (cuánto aporta la gramática frente al
+    catálogo) sin necesidad de persistir nada en DB (sin migración).
+    """
+
+    discovery_calls: int = 0
+    grammar_discovery_calls: int = 0
+    catalog_candidates: int = 0
+    grammar_candidates: int = 0
+    total_candidates: int = 0
+    trials_used: int = 0
+    warmup_skipped: int = 0
+
+
+_GRAMMAR_COUNTERS = GrammarObservabilityCounters()
+
+
+def grammar_counters() -> GrammarObservabilityCounters:
+    """Contadores observados de la gramática (acumulados desde el arranque del proceso).
+
+    El llamante no debe mutarlos: es un resumen de solo lectura para tests/inspección.
+    """
+    return _GRAMMAR_COUNTERS
+
+
+def _record_discovery_summary(summary: Any) -> None:
+    """Acumula el resumen de un discovery en ``_GRAMMAR_COUNTERS`` (observabilidad)."""
+    _GRAMMAR_COUNTERS.discovery_calls += 1
+    if bool(getattr(summary, "grammar_enabled", False)):
+        _GRAMMAR_COUNTERS.grammar_discovery_calls += 1
+    _GRAMMAR_COUNTERS.catalog_candidates += int(getattr(summary, "catalog_candidates", 0))
+    _GRAMMAR_COUNTERS.grammar_candidates += int(getattr(summary, "grammar_candidates", 0))
+    _GRAMMAR_COUNTERS.total_candidates += int(getattr(summary, "total_candidates", 0))
+    _GRAMMAR_COUNTERS.trials_used += int(getattr(summary, "trials_used", 0))
+    if not bool(getattr(summary, "bar_count_ok", True)):
+        _GRAMMAR_COUNTERS.warmup_skipped += 1
+
+
 def _shadow_window_bars() -> int:
     """Ventana (en barras) del replay shadow; override por env, default 250."""
     raw = (os.getenv(AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS) or "").strip()
@@ -251,18 +295,45 @@ def _make_discovery_runner(budget: Any) -> Any:
     V2.34/A14: si ``AUTO_ORCHESTRATOR_GRAMMAR`` está ON, se pasa un ``GrammarBudget``
     que amplía el catálogo con la gramática controlada, consumiendo el MISMO
     presupuesto global. Con OFF el runner es idéntico al de A13.
+
+    V2.35/A15: se usa ``discover_for_instrument_with_summary`` para emitir una línea
+    de observabilidad por instrumento (catálogo vs gramática, presupuesto y cupos) y
+    acumular contadores de proceso (``grammar_counters``). Solo lectura: no altera el
+    discovery ni sus decisiones.
     """
-    from bolsa_application.strategy_discovery_engine import discover_for_instrument
+    from bolsa_application.strategy_discovery_engine import (
+        discover_for_instrument_with_summary,
+    )
 
     grammar_budget = _grammar_budget(budget) if grammar_enabled() else None
+    enabled = grammar_budget is not None
 
     def _discover(instrument_id: str) -> tuple[Any, ...]:
-        return discover_for_instrument(
+        candidates, summary = discover_for_instrument_with_summary(
             instrument_id=instrument_id,
             budget=budget,
             grammar_budget=grammar_budget,
         )
+        _record_discovery_summary(summary)
+        logger.info(
+            "auto_orchestrator discovery instrument=%s grammar_enabled=%s "
+            "catalog=%s grammar=%s total=%s trials=%s catalog_cap=%s grammar_cap=%s "
+            "bar_count_ok=%s",
+            instrument_id,
+            summary.grammar_enabled,
+            summary.catalog_candidates,
+            summary.grammar_candidates,
+            summary.total_candidates,
+            summary.trials_used,
+            summary.catalog_cap,
+            summary.grammar_cap,
+            summary.bar_count_ok,
+        )
+        return candidates
 
+    # V2.35/A15: se guarda el flag efectivo en el closure para que el bucle pueda
+    # distinguir OFF/ON sin releer el entorno (el gate se evaluó al componer).
+    _discover.grammar_enabled = enabled  # type: ignore[attr-defined]
     return _discover
 
 
@@ -460,10 +531,16 @@ async def auto_orchestrator_loop(
                     run_id=f"orchestrator:{instrument_id}:{cycle_id}",
                 )
                 logger.info(
-                    "auto_orchestrator cycle instrument=%s status=%s promoted=%s",
+                    "auto_orchestrator cycle instrument=%s status=%s promoted=%s "
+                    "catalog=%s grammar=%s lab_grammar=%s shadow=%s shadow_grammar=%s",
                     instrument_id,
                     result.status,
                     result.promoted,
+                    getattr(result, "catalog_candidates", 0),
+                    getattr(result, "grammar_candidates", 0),
+                    getattr(result, "lab_grammar_evaluated", 0),
+                    getattr(result, "shadow_started", 0),
+                    getattr(result, "shadow_grammar_started", 0),
                 )
                 # V2.33/A13: forward paper de la ACTIVE sobre mercado nuevo posterior a
                 # la promoción. Solo con la fase habilitada (default OFF) y sin ACTIVE
@@ -495,6 +572,22 @@ async def auto_orchestrator_loop(
                 )
             except Exception:  # noqa: BLE001 — un fallo por instrumento no tumba el bucle.
                 logger.exception("auto_orchestrator cycle failed for %s", instrument_id)
+        # V2.35/A15 — resumen agregado por ciclo (observabilidad de la gramática).
+        # Con la gramática OFF, ``grammar_candidates`` del acumulado no crece; la línea
+        # deja traza explícita del rollout sin alterar ninguna decisión.
+        counters = grammar_counters()
+        logger.info(
+            "auto_orchestrator cycle_summary cycle_id=%s instruments=%s "
+            "grammar_discoveries=%s catalog_candidates=%s grammar_candidates=%s "
+            "total_candidates=%s warmup_skipped=%s",
+            cycle_id,
+            len(watch),
+            counters.grammar_discovery_calls,
+            counters.catalog_candidates,
+            counters.grammar_candidates,
+            counters.total_candidates,
+            counters.warmup_skipped,
+        )
         await asyncio.sleep(period)
 
 

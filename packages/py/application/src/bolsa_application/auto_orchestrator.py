@@ -27,6 +27,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
+from bolsa_application.strategy_discovery_engine import GRAMMAR_FAMILY_PREFIX
 from bolsa_application.strategy_executable_definition import (
     build_executable_definition,
     champion_params_from_result,
@@ -160,6 +161,15 @@ class OrchestratorResult:
     relab_triggered: bool = False
     reasons: tuple[str, ...] = ()
     detail: str | None = None
+    # V2.35/A15 — observabilidad de la gramática (solo lectura, no altera decisiones).
+    # ``catalog_candidates`` / ``grammar_candidates``: procedencia de las candidatas
+    # emitidas por el discovery. ``lab_*``: cuántas llegaron a evaluarse en el LAB.
+    # ``shadow_*``: si el finalista que entró al shadow era gramatical o de catálogo.
+    catalog_candidates: int = 0
+    grammar_candidates: int = 0
+    lab_grammar_evaluated: int = 0
+    shadow_started: int = 0
+    shadow_grammar_started: int = 0
 
 
 class AutoOrchestrator:
@@ -256,6 +266,11 @@ class AutoOrchestrator:
         for candidate in candidates:
             await deps.store.save_candidate(candidate)
 
+        # V2.35/A15 — observabilidad de procedencia (solo lectura): cuántas candidatas
+        # vienen del catálogo curado y cuántas de la gramática controlada (A14). El
+        # prefijo ``grammar:`` del ``strategy_family`` es la fuente de verdad.
+        catalog_candidates, grammar_candidates = _candidate_provenance(candidates)
+
         # V2.32.1 (auditoría P1-01): HOLDOUT ESTRICTO. Se lee UNA vez la serie amplia de
         # barras y se fija la frontera LAB/shadow ANTES de correr el LAB: el LAB recibe
         # ``date_to = lab_end`` (no ve el hold-out) y el shadow recibe exactamente el
@@ -285,6 +300,17 @@ class AutoOrchestrator:
                 evaluations.append(evaluation)
                 results_by_candidate[candidate.id] = result
 
+        # V2.35/A15 — observabilidad LAB: cuántas candidatas gramaticales llegaron a
+        # evaluarse de verdad (no solo a emitirse). Se apoya en las evaluaciones, que
+        # solo existen para candidatas que el LAB procesó con resultado.
+        evaluated_ids = {e.candidate_id for e in evaluations}
+        lab_grammar_evaluated = sum(
+            1
+            for c in candidates
+            if c.id in evaluated_ids
+            and str(c.strategy_family).startswith(GRAMMAR_FAMILY_PREFIX)
+        )
+
         # TOP3 (por evidencia) — solo si hay evaluaciones.
         selection = (
             select_top3(
@@ -301,6 +327,9 @@ class AutoOrchestrator:
                 status="sin_evidencia_top3",
                 candidates=len(candidates),
                 evaluated=len(evaluations),
+                catalog_candidates=catalog_candidates,
+                grammar_candidates=grammar_candidates,
+                lab_grammar_evaluated=lab_grammar_evaluated,
             )
 
         # COACH (advisory, V2.29 comparativo): dictamina los tres candidatos del TOP3
@@ -321,6 +350,9 @@ class AutoOrchestrator:
                 candidates=len(candidates),
                 evaluated=len(evaluations),
                 reasons=verdict.contradictions,
+                catalog_candidates=catalog_candidates,
+                grammar_candidates=grammar_candidates,
+                lab_grammar_evaluated=lab_grammar_evaluated,
             )
 
         best_id = verdict.selected_id
@@ -357,6 +389,16 @@ class AutoOrchestrator:
         if shadow_result is not None:
             await deps.store.save_shadow_result(shadow_result)
 
+        # V2.35/A15 — observabilidad SHADOW: el finalista (una candidata por ciclo) que
+        # entró al replay shadow. ``shadow_started=1`` si se ejecutó algún shadow.
+        shadow_started = 1 if shadow_result is not None else 0
+        shadow_grammar_started = (
+            1
+            if shadow_result is not None
+            and str(best_candidate.strategy_family).startswith(GRAMMAR_FAMILY_PREFIX)
+            else 0
+        )
+
         # PROMOCION: gates cuantitativos (del LAB) + coach + evidencia shadow.
         active_record = await deps.store.get_active(instrument_id=instrument_id)
         active_ref = (
@@ -387,6 +429,11 @@ class AutoOrchestrator:
                 candidates=len(candidates),
                 evaluated=len(evaluations),
                 reasons=decision.reasons,
+                catalog_candidates=catalog_candidates,
+                grammar_candidates=grammar_candidates,
+                lab_grammar_evaluated=lab_grammar_evaluated,
+                shadow_started=shadow_started,
+                shadow_grammar_started=shadow_grammar_started,
             )
 
         # ACTIVE (+ vigilancia inicial).
@@ -426,6 +473,11 @@ class AutoOrchestrator:
             replaces_version_id=decision.replaces.version_id if decision.replaces else None,
             degraded=vigilance.degraded,
             relab_triggered=vigilance.relab,
+            catalog_candidates=catalog_candidates,
+            grammar_candidates=grammar_candidates,
+            lab_grammar_evaluated=lab_grammar_evaluated,
+            shadow_started=shadow_started,
+            shadow_grammar_started=shadow_grammar_started,
         )
 
     async def watch_active(
@@ -636,6 +688,21 @@ def _discovery_executable(candidate: StrategyCandidate) -> dict[str, Any] | None
     if isinstance(executable, dict):
         return executable
     return None
+
+
+def _candidate_provenance(
+    candidates: Sequence[StrategyCandidate],
+) -> tuple[int, int]:
+    """V2.35/A15 — cuenta ``(catálogo, gramática)`` por prefijo de ``strategy_family``.
+
+    Función pura de solo lectura: el prefijo ``grammar:`` (``GRAMMAR_FAMILY_PREFIX``)
+    marca las candidatas emitidas por la gramática controlada de A14; el resto son del
+    catálogo curado. No altera ninguna decisión ni presupuesto.
+    """
+    grammar = sum(
+        1 for c in candidates if str(c.strategy_family).startswith(GRAMMAR_FAMILY_PREFIX)
+    )
+    return len(candidates) - grammar, grammar
 
 
 def _promotion_gates(evaluation: StrategyEvaluation, coach: Any) -> tuple[GateResult, ...]:

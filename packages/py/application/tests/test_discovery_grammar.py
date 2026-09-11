@@ -31,7 +31,9 @@ from bolsa_application.discovery_grammar import (
 )
 from bolsa_application.strategy_discovery_engine import (
     GRAMMAR_FAMILY_PREFIX,
+    DiscoveryEmissionSummary,
     discover_for_instrument,
+    discover_for_instrument_with_summary,
 )
 
 _VALID_SIGNAL_KINDS = {"entry_long", "entry_short", "exit"}
@@ -321,3 +323,69 @@ def test_engine_grammar_respects_warmup_filter() -> None:
     assert not [
         c for c in candidates if c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
     ]
+
+
+# ── V2.35/A15: observabilidad (resumen de emisión) ──────────────────────────────
+
+
+def test_summary_grammar_disabled_reports_zero_grammar_candidates() -> None:
+    """Con gramática OFF: contadores gramaticales a 0 y total == catálogo (sin cambio)."""
+    candidates, summary = discover_for_instrument_with_summary(instrument_id="AAA")
+    assert isinstance(summary, DiscoveryEmissionSummary)
+    assert summary.grammar_enabled is False
+    assert summary.grammar_candidates == 0
+    assert summary.catalog_cap is None
+    assert summary.grammar_cap is None
+    assert summary.catalog_candidates == summary.total_candidates == len(candidates)
+
+
+def test_summary_grammar_disabled_is_byte_identical_to_wrapper() -> None:
+    """Regresión A13: ``discover_for_instrument`` == el resumen con gramática OFF."""
+    candidates, _ = discover_for_instrument_with_summary(instrument_id="AAA")
+    assert candidates == discover_for_instrument(instrument_id="AAA")
+
+
+def test_summary_counts_catalog_and_grammar_and_sums_to_total() -> None:
+    """Con gramática ON: la procedencia se cuenta y cuadra con el total emitido."""
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    candidates, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=GrammarBudget(base=budget),
+    )
+    grammar = [
+        c for c in candidates if c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
+    ]
+    assert summary.grammar_enabled is True
+    assert summary.grammar_candidates == len(grammar) > 0
+    assert summary.total_candidates == len(candidates)
+    assert summary.catalog_candidates + summary.grammar_candidates == len(candidates)
+    assert summary.catalog_cap is not None
+    assert summary.grammar_cap is not None
+
+
+def test_summary_grammar_warmup_flag_is_false_when_bar_count_is_low() -> None:
+    """El resumen refleja el warm-up sin inventar candidatas gramaticales."""
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    _, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        bar_count=10,
+        grammar_budget=GrammarBudget(base=budget, min_bars=120),
+    )
+    assert summary.bar_count_ok is False
+    assert summary.grammar_candidates == 0
+
+
+def test_summary_is_deterministic() -> None:
+    """Mismo presupuesto ⇒ mismo resumen (observabilidad reproducible)."""
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    grammar_budget = GrammarBudget(base=budget)
+    _, first = discover_for_instrument_with_summary(
+        instrument_id="AAA", budget=budget, grammar_budget=grammar_budget
+    )
+    _, second = discover_for_instrument_with_summary(
+        instrument_id="AAA", budget=budget, grammar_budget=grammar_budget
+    )
+    assert first == second
+

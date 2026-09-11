@@ -28,8 +28,24 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         w.AUTO_ORCHESTRATOR_MAX_CANDIDATES,
         w.AUTO_ORCHESTRATOR_FORWARD,
         w.AUTO_ORCHESTRATOR_FORWARD_WINDOW_BARS,
+        w.AUTO_ORCHESTRATOR_GRAMMAR,
+        w.AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS,
+        w.AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS,
     ):
         monkeypatch.delenv(key, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _reset_grammar_counters() -> None:
+    """V2.35/A15: los contadores son de proceso; se resetean por test."""
+    counters = w.grammar_counters()
+    counters.discovery_calls = 0
+    counters.grammar_discovery_calls = 0
+    counters.catalog_candidates = 0
+    counters.grammar_candidates = 0
+    counters.total_candidates = 0
+    counters.trials_used = 0
+    counters.warmup_skipped = 0
 
 
 class _FakeSession:
@@ -339,6 +355,80 @@ def test_discovery_runner_includes_grammar_only_when_enabled(
         c for c in off_candidates if str(c.strategy_family).startswith("grammar:")
     ]
     assert [c for c in on_candidates if str(c.strategy_family).startswith("grammar:")]
+
+
+# ── V2.35/A15: observabilidad de la gramática (contadores y flag) ───────────────
+
+
+def test_grammar_runner_records_disabled_counters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con la gramática OFF, el runner cuenta el catálogo pero cero gramática."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_GRAMMAR, raising=False)
+    runner = w._make_discovery_runner(DiscoveryBudget())
+    assert runner.grammar_enabled is False
+
+    candidates = runner("AAA")
+    counters = w.grammar_counters()
+    assert counters.discovery_calls == 1
+    assert counters.grammar_discovery_calls == 0
+    assert counters.grammar_candidates == 0
+    assert counters.catalog_candidates == len(candidates) == counters.total_candidates
+
+
+def test_grammar_runner_records_enabled_counters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con la gramática ON, el runner cuenta la procedencia y cuadra el total."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR, "1")
+    base = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    runner = w._make_discovery_runner(base)
+    assert runner.grammar_enabled is True
+
+    candidates = runner("AAA")
+    counters = w.grammar_counters()
+    assert counters.discovery_calls == 1
+    assert counters.grammar_discovery_calls == 1
+    assert counters.grammar_candidates > 0
+    assert counters.total_candidates == len(candidates)
+    assert counters.catalog_candidates + counters.grammar_candidates == len(candidates)
+
+
+def test_grammar_counters_are_monotonic_across_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Los contadores acumulan entre llamadas (observabilidad del proceso)."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_GRAMMAR, raising=False)
+    runner = w._make_discovery_runner(DiscoveryBudget())
+    runner("AAA")
+    runner("BBB")
+    assert w.grammar_counters().discovery_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_loop_logs_cycle_summary(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """El bucle emite un resumen por ciclo sin alterar ninguna decisión."""
+    import logging
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_INSTRUMENTS, "AAA")
+    orch = _FakeOrchestrator()
+
+    task = asyncio.create_task(w.auto_orchestrator_loop(orch, interval_seconds=0.01))
+    with caplog.at_level(logging.INFO):
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    assert any("cycle_summary" in record.message for record in caplog.records)
 
 
 @pytest.mark.asyncio

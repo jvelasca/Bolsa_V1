@@ -29,6 +29,7 @@ La candidata lleva en ``params`` dos claves que consume el runner genérico del 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 
 from bolsa_application.discovery_catalog import (
     DISCOVERY_FAMILIES,
@@ -45,8 +46,10 @@ from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
 
 __all__ = [
     "GRAMMAR_FAMILY_PREFIX",
+    "DiscoveryEmissionSummary",
     "discover_candidates",
     "discover_for_instrument",
+    "discover_for_instrument_with_summary",
     "discover_from_universe",
 ]
 
@@ -58,11 +61,35 @@ CandidateIdFactory = Callable[[str, int], str]
 GRAMMAR_FAMILY_PREFIX = "grammar:"
 
 
+@dataclass(frozen=True, slots=True)
+class DiscoveryEmissionSummary:
+    """V2.35/A15 — resumen determinista de lo EMITIDO por el discovery (solo lectura).
+
+    Observabilidad para gobernar el rollout de la gramática: cuántas candidatas
+    aporta el catálogo curado, cuántas la gramática controlada, qué presupuesto se
+    consumió y qué cupo se reservó a cada vía. **No** altera ninguna decisión ni
+    presupuesto: se calcula a partir de lo ya emitido (el prefijo
+    ``GRAMMAR_FAMILY_PREFIX`` distingue la procedencia). Sin IA, sin red, sin DB.
+    """
+
+    catalog_candidates: int = 0
+    grammar_candidates: int = 0
+    total_candidates: int = 0
+    trials_used: int = 0
+    # Cupo máximo de candidatas del catálogo cuando la gramática está habilitada.
+    catalog_cap: int | None = None
+    # Techo de emisión de planes gramaticales en este ciclo (sino None).
+    grammar_cap: int | None = None
+    grammar_enabled: bool = False
+    # Warm-up: False si ``bar_count`` no alcanzó ``GrammarBudget.min_bars``.
+    bar_count_ok: bool = True
+
+
 def _default_candidate_id(instrument_id: str, family_name: str, index: int) -> str:
     return f"disc-{instrument_id}-{family_name}-{index}"
 
 
-def discover_for_instrument(
+def discover_for_instrument_with_summary(
     *,
     instrument_id: str,
     families: Sequence[DiscoveryFamily] | None = None,
@@ -72,23 +99,13 @@ def discover_for_instrument(
     candidate_id_factory: CandidateIdFactory | None = None,
     bar_count: int | None = None,
     grammar_budget: GrammarBudget | None = None,
-) -> tuple[StrategyCandidate, ...]:
-    """Genera las candidatas de descubrimiento para un instrumento.
+) -> tuple[tuple[StrategyCandidate, ...], DiscoveryEmissionSummary]:
+    """V2.35/A15 — como ``discover_for_instrument`` pero devuelve también el resumen.
 
-    ``families`` permite inyectar un catálogo alternativo (tests); por defecto usa
-    ``DISCOVERY_FAMILIES``. ``parent`` filtra por rama (trend/momentum/volatility).
-    ``bar_count`` (opcional) descarta familias cuyo ``min_bars_hint`` no quepa en la
-    ventana disponible — evita candidatas condenadas a "sin trials" por warm-up.
-
-    El reparto del presupuesto es determinista: se recorre el catálogo en orden y
-    cada familia aporta como máximo ``max_per_family`` puntos hasta agotar
-    ``max_trials_total`` y ``max_candidates``.
-
-    V2.34/A14: si se pasa ``grammar_budget``, tras las familias del catálogo se
-    emiten candidatas de la **gramática controlada** (REGIME + TREND + MOMENTUM +
-    TRIGGER + EXIT) consumiendo el MISMO presupuesto global (``budget``). Con
-    ``grammar_budget=None`` (default) el comportamiento es byte-idéntico al previo a
-    A14 — la gramática es opt-in, nunca rompe el catálogo existente.
+    El resumen es de **solo lectura**: se calcula sobre las candidatas ya emitidas
+    (contando el prefijo ``GRAMMAR_FAMILY_PREFIX``) y sobre el presupuesto efectivo,
+    sin alterar el reparto ni la semántica fail-closed. Con ``grammar_budget=None``
+    los contadores gramaticales quedan a 0 y la tupla es byte-idéntica a la de A13.
     """
     effective_budget = (budget or DiscoveryBudget()).normalized()
     catalog = tuple(
@@ -145,13 +162,19 @@ def discover_for_instrument(
             emitted_for_family += 1
             trials_used += 1
 
+    # V2.35/A15: cupo reservado al catálogo (observabilidad), solo si hay gramática.
+    catalog_cap: int | None = None
+    grammar_cap: int | None = None
+    grammar_enabled = grammar_budget is not None
+    effective_grammar = grammar_budget.normalized() if grammar_budget is not None else None
+
     # V2.34/A14 — gramática controlada, opt-in, con el MISMO presupuesto global.
     # Se reserva una porción del presupuesto para la gramática (si está habilitada), de
     # modo que el catálogo no la deje sin espacio: sin esta reserva, un catálogo grande
     # (24 candidatas) agotaría ``max_candidates`` y la gramática jamás emitiría.
-    if grammar_budget is not None:
+    if effective_grammar is not None:
         catalog_cap = effective_budget.max_candidates
-        reserve = _grammar_reserve(effective_budget, grammar_budget)
+        reserve = _grammar_reserve(effective_budget, effective_grammar)
         if reserve > 0:
             catalog_cap = max(0, effective_budget.max_candidates - reserve)
         # Recorta las candidatas del catálogo ya emitidas si excedieran el cupo reservado.
@@ -164,13 +187,79 @@ def discover_for_instrument(
             trials_used=trials_used,
             instrument_id=instrument_id,
             effective_budget=effective_budget,
-            grammar_budget=grammar_budget,
+            grammar_budget=effective_grammar,
             data_snapshot_id=data_snapshot_id,
             candidate_id_factory=candidate_id_factory,
             bar_count=bar_count,
         )
+        # Techo real de emisión gramatical: mismo cálculo que ``_extend_with_grammar``.
+        grammar_cap = min(
+            int(effective_grammar.max_per_component_variant),
+            int(effective_budget.max_per_family),
+        )
+        bar_count_ok = bar_count is None or bar_count >= int(effective_grammar.min_bars)
+    else:
+        bar_count_ok = True
 
-    return tuple(candidates)
+    catalog_candidates = sum(
+        1 for c in candidates if not str(c.strategy_family).startswith(GRAMMAR_FAMILY_PREFIX)
+    )
+    grammar_candidates = len(candidates) - catalog_candidates
+    summary = DiscoveryEmissionSummary(
+        catalog_candidates=catalog_candidates,
+        grammar_candidates=grammar_candidates,
+        total_candidates=len(candidates),
+        trials_used=trials_used,
+        catalog_cap=catalog_cap,
+        grammar_cap=grammar_cap,
+        grammar_enabled=grammar_enabled,
+        bar_count_ok=bar_count_ok,
+    )
+    return tuple(candidates), summary
+
+
+def discover_for_instrument(
+    *,
+    instrument_id: str,
+    families: Sequence[DiscoveryFamily] | None = None,
+    parent: str | None = None,
+    budget: DiscoveryBudget | None = None,
+    data_snapshot_id: str | None = None,
+    candidate_id_factory: CandidateIdFactory | None = None,
+    bar_count: int | None = None,
+    grammar_budget: GrammarBudget | None = None,
+) -> tuple[StrategyCandidate, ...]:
+    """Genera las candidatas de descubrimiento para un instrumento.
+
+    ``families`` permite inyectar un catálogo alternativo (tests); por defecto usa
+    ``DISCOVERY_FAMILIES``. ``parent`` filtra por rama (trend/momentum/volatility).
+    ``bar_count`` (opcional) descarta familias cuyo ``min_bars_hint`` no quepa en la
+    ventana disponible — evita candidatas condenadas a "sin trials" por warm-up.
+
+    El reparto del presupuesto es determinista: se recorre el catálogo en orden y
+    cada familia aporta como máximo ``max_per_family`` puntos hasta agotar
+    ``max_trials_total`` y ``max_candidates``.
+
+    V2.34/A14: si se pasa ``grammar_budget``, tras las familias del catálogo se
+    emiten candidatas de la **gramática controlada** (REGIME + TREND + MOMENTUM +
+    TRIGGER + EXIT) consumiendo el MISMO presupuesto global (``budget``). Con
+    ``grammar_budget=None`` (default) el comportamiento es byte-idéntico al previo a
+    A14 — la gramática es opt-in, nunca rompe el catálogo existente.
+
+    V2.35/A15: delega en ``discover_for_instrument_with_summary`` y descarta el
+    resumen de observabilidad (API estable previa, sin cambios de firma).
+    """
+    candidates, _ = discover_for_instrument_with_summary(
+        instrument_id=instrument_id,
+        families=families,
+        parent=parent,
+        budget=budget,
+        data_snapshot_id=data_snapshot_id,
+        candidate_id_factory=candidate_id_factory,
+        bar_count=bar_count,
+        grammar_budget=grammar_budget,
+    )
+    return candidates
 
 
 def _grammar_reserve(
