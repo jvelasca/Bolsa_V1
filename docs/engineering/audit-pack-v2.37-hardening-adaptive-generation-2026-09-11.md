@@ -8,9 +8,17 @@
 > **Base auditada:** `v2.36-beta` (`main == cb147d89`).
 > **Alembic head:** `037_discovery_evidence_freshness`.
 > **Bump:** `1.61.0-beta` → `1.62.0-beta`.
+> **Elevación:** `main == 13020eeb` == tag **`v2.37-beta`**, Release-tag CI **GREEN verificado**
+> (run [`34619419865`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34619419865), `success`).
 > **Flags de rollout:** `AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR` y
 > `AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION` **OFF por defecto**; con ambos OFF el sistema es
 > **byte-idéntico a `v2.36-beta`**. `AUTO_ORCHESTRATOR_ADAPTIVE_MAX_STALENESS_DAYS` default 30.
+
+> **Nota de CI (fix de deuda):** los tests `test_discovery_evidence.py`,
+> `test_discovery_search_policy.py` y `test_discovery_evidence_snapshot_pg.py` existían desde
+> v2.36 pero **no estaban cableados en ningún job** (los workflows enumeran ficheros, no globs).
+> Se han incorporado al job `python-offline` y al `grammar-discovery-pg`/`lifecycle-pg` en el
+> commit `13020eeb`, de modo que el tag los certifica.
 
 ---
 
