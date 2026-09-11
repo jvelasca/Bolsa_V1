@@ -7,8 +7,10 @@
 > **AsOf:** 2026-09-11 · **Base:** `main` · HEAD local **`114327c3`** (relevo A14) sobre `61e613b1`
 > (hardening H1+H2), ancestro `5fcd0224` (cierre A13).
 > **Alembic head:** `035_paper_forward_evidence` (SIN migración nueva en A14).
-> **Veredicto:** A14 **CERRADA en código y verificada** (working tree **sin commitear**). Pendiente:
-> (a) commit, (b) push + tag por parte del owner.
+> **Veredicto:** A14 **CERRADA, ELEVADA y CERTIFICADA**. Commit de fase `e6fbab83` + cierre
+> documental `129f3baa` == `main` == `origin/main` == tag **`v2.34-beta`** (anotado `9c7e91e2`),
+> con **Release tag CI GREEN real** (run `34586050941`, `certify` success). Verificación local de
+> los tres bloques también pasada en esta sesión (ruff/imports/mypy, 1232 offline, 17 PG sin skips).
 
 ---
 
@@ -91,7 +93,7 @@ attach_round_trips, execution_model="next_open")`, y `run_rules_grid_search` (re
 
 ---
 
-## 2. Qué se acaba de hacer (V2.34/A14) — working tree sin commitear
+## 2. Qué se acaba de hacer (V2.34/A14) — commit de fase `e6fbab83` (ya en `main`)
 
 **Ficheros modificados (10):** `.github/workflows/python-ci.yml`, `CHANGELOG.md`,
 `apps/api-python/src/bolsa_api/background/auto_orchestrator_worker.py`,
@@ -256,15 +258,19 @@ Fallos **preexistentes** del baseline, ruido de entorno de alta concurrencia:
 
 ## 4. TRABAJO PENDIENTE — en orden
 
-### Tarea 0 (owner, no agente): commit + push + tag de A14
+### Tarea 0 — HECHA (2026-09-11): commit + push + tag de A14
 
-- Commitear el working tree de A14 (recomendado: **un** commit de fase, con CHANGELOG + tests +
-  CI, sin migración).
-- Push de `main` y tag de la release. `main` va **3 commits por delante** de `origin/main`
-  (`5fcd0224`, `61e613b1`, `114327c3`), sin push.
-- Verificar CI del tag: como mínimo `quality`, `lifecycle-pg`, `paper-forward-pg`,
-  `grammar-discovery-pg` (skip = fallo).
-- **No** hacer esto el agente salvo que el owner lo pida explícitamente.
+- Commit de fase `e6fbab83` (CHANGELOG + tests + CI, sin migración) y cierre documental
+  `129f3baa` (`PROJECT_STATE` + entrada 103 del `engineering-index`).
+- `main` pusheado a `origin` y tag anotado **`v2.34-beta`** (`9c7e91e2` → `129f3baa`);
+  `main` == `origin/main` == tag.
+- **Release tag CI GREEN** run [34586050941](https://github.com/jvelasca/Bolsa_V1/actions/runs/34586050941)
+  `conclusion=success` con todos los jobs en `success` (incluidos `python`, `lifecycle-pg`,
+  `dr-verify`, `a7-gate` y `certify`); `paper-forward-pg` y `grammar-discovery-pg` verdes en el
+  `Python CI` del push a `main` (run `34586030405`). Solo queda skipped el `playwright
+(integrated E2E, opt-in)`, que es opt-in por diseño.
+- Verificación local de los tres bloques: ruff + import-linter (4/0) + mypy (470 ficheros) verdes ·
+  offline **1232 passed** · PG **17 passed** sin skips.
 
 ### Tarea 1 — Observabilidad de la gramática (opcional, pequeño)
 
@@ -327,13 +333,15 @@ Reglas de honestidad del repo:
 
 ## 7. Checklist de arranque (haz esto primero)
 
-- [ ] `git log --oneline -3` → `114327c3` (relevo A14) debe ser HEAD.
-- [ ] `git status --short` → el working tree de A14 (10 M + 4 nuevos) o ya commiteado, según avance.
-      Hay caches/`__pycache__`/logs que **no** son tuyos; no los metas en commits.
+- [x] `git log --oneline -3` → `129f3baa` (cierre documental) es `main` == `origin/main` == tag
+      `v2.34-beta`; el commit de fase A14 es `e6fbab83`.
+- [ ] `git status --short` → en el momento de elevar A14 quedó limpio (el commit de fase agrupó
+      10 M + 4 nuevos). Hay caches/`__pycache__`/logs que **no** son tuyos; no los metas en commits.
 - [ ] Leer `docs/engineering/PROJECT_STATE.md` (columna viva).
 - [ ] `cd packages/py/infrastructure && uv run alembic heads` → debe salir
       `035_paper_forward_evidence (head)`.
-- [ ] Preguntar al owner: ¿commit/push de A14 ahora? ¿Tarea 1 (observabilidad) o Tarea 2 (nueva fase)?
+- [ ] Preguntar al owner: ¿**Tarea 1** (observabilidad/gobernanza de la gramática) o **Tarea 2**
+      (nueva fase de Strategy Intelligence, empezando por plan)?
 
 ---
 
@@ -343,7 +351,10 @@ Reglas de honestidad del repo:
 `PAPER_D_EXECUTE` off · sin LLM en hot path · fail-closed (ausencia de evidencia ≠ aprobación) ·
 migraciones aditivas sin backfill · long-only · Alembic head `035_paper_forward_evidence` ·
 gramática A14 tras `AUTO_ORCHESTRATOR_GRAMMAR` (OFF por defecto) ·
-A14 en `114327c3` (local, **working tree sin commitear**).
+A14 **ELEVADA**: `main` == tag **`v2.34-beta`** (anotado `9c7e91e2`) == `129f3baa`
+(commit de fase `e6fbab83` + cierre documental) · **Release tag CI GREEN real**
+run [34586050941](https://github.com/jvelasca/Bolsa_V1/actions/runs/34586050941)
+`conclusion=success`, job `certify` success.
 
 **No hacer:** tocar las barreras LIVE · añadir un segundo motor de trading/FSM · certificar sin
 correr los tres bloques de verificación · mezclar A13/hardening/A14 en un commit · editar el fichero
