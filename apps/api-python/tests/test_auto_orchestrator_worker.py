@@ -1116,3 +1116,58 @@ def test_runner_passes_emit_param_region_true_when_flag_on(
     runner = w._make_discovery_runner(DiscoveryBudget())
     runner("AAA")
     assert captured["emit_param_region"] is True
+
+
+# ── V2.39 (incremento 4) — régimen de mercado por trial ─────────────────────────
+
+
+def test_adaptive_regime_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail-closed: sin variable de entorno, el régimen está OFF (equivalencia V2.38.1)."""
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_REGIME, raising=False)
+    assert w.adaptive_regime_enabled() is False
+
+
+def test_adaptive_regime_truthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_REGIME, "true")
+    assert w.adaptive_regime_enabled() is True
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_REGIME, "OFF")
+    assert w.adaptive_regime_enabled() is False
+
+
+def test_lab_runner_emit_regime_defaults_true() -> None:
+    """El runner aislado conserva el default histórico (True): el rollout lo fija el worker."""
+    from bolsa_application.orchestrator_lab_runner import LabOptimizeRunner
+
+    runner = LabOptimizeRunner(lambda: None, lambda session: None)
+    merged = runner._merge_params("sma_crossover", {})
+    assert merged["emit_regime"] is True
+
+
+def test_lab_runner_emit_regime_false_propagates() -> None:
+    """V2.39: con el flag OFF del worker, el LAB no calcula régimen (equivalencia)."""
+    from bolsa_application.orchestrator_lab_runner import LabOptimizeRunner
+
+    runner = LabOptimizeRunner(lambda: None, lambda session: None, emit_regime=False)
+    merged = runner._merge_params("sma_crossover", {})
+    assert merged["emit_regime"] is False
+
+
+def test_lab_runner_candidate_cannot_enable_regime() -> None:
+    """La política de rollout es del operador: una candidata no puede encender el régimen."""
+    from bolsa_application.orchestrator_lab_runner import LabOptimizeRunner
+
+    runner = LabOptimizeRunner(lambda: None, lambda session: None, emit_regime=False)
+    merged = runner._merge_params("sma_crossover", {"emit_regime": True})
+    # ``emit_regime`` no está en ``_LAB_RUN_KEYS``/``_GRID_KEYS``, así que el override de la
+    # candidata se ignora y prevalece el valor del operador.
+    assert merged["emit_regime"] is False
+
+
+def test_log_regime_rollout_state_is_pure_observability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El log aditivo no lanza ni depende del flag (solo observabilidad)."""
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_REGIME, raising=False)
+    w.log_regime_rollout_state()
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_REGIME, "1")
+    w.log_regime_rollout_state()

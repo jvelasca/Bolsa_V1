@@ -160,3 +160,77 @@ def test_optimize_result_to_dict() -> None:
     assert payload["trials"][0]["score"] == 7.5
     assert payload["strategyFamily"] == "sma_crossover"
     assert payload["isBarCount"] == 80
+
+
+# ── V2.39 (incremento 4) — régimen por trial en el write-path ───────────────────
+
+
+def test_regime_for_trial_prefers_result_regime() -> None:
+    from bolsa_application.optimization_runs import _regime_for_trial
+
+    assert _regime_for_trial("trend_up", {}, None) == "trend_up"
+
+
+def test_regime_for_trial_falls_back_to_params_then_blocks() -> None:
+    from bolsa_application.optimization_runs import _regime_for_trial
+
+    assert _regime_for_trial(None, {"discovery_regime": "range"}, None) == "range"
+    assert (
+        _regime_for_trial(None, {}, {"discovery": {"regime": "high_vol"}}) == "high_vol"
+    )
+
+
+def test_regime_for_trial_is_fail_closed_when_absent() -> None:
+    from bolsa_application.optimization_runs import _regime_for_trial
+
+    assert _regime_for_trial(None, {}, None) is None
+    assert _regime_for_trial("", {}, None) is None
+
+
+def test_regime_for_trial_ignores_whitespace_and_blank() -> None:
+    from bolsa_application.optimization_runs import _regime_for_trial
+
+    assert _regime_for_trial(None, {"discovery_regime": "   "}, None) is None
+    assert _regime_for_trial("  ", {}, None) is None
+
+
+@pytest.mark.asyncio
+async def test_emit_regime_false_persists_no_regime() -> None:
+    """V2.39: con ``emit_regime=False`` el trial se persiste SIN régimen (equivalencia)."""
+    from bolsa_application.optimization_runs import _persist_optimize_research_trials
+
+    result = _sample_result()
+    # Aunque el resultado traiga régimen, el flag OFF lo descarta al persistir.
+    from dataclasses import replace
+
+    result = replace(result, regime="trend_up")
+    trials = MagicMock()
+    trials.insert_trial = AsyncMock()
+    await _persist_optimize_research_trials(
+        trials,
+        result=result,
+        optimization_run_id="run-1",
+        proposed_by="grid",
+        emit_regime=False,
+    )
+    assert trials.insert_trial.await_args.kwargs["regime"] is None
+
+
+@pytest.mark.asyncio
+async def test_emit_regime_true_persists_result_regime() -> None:
+    """V2.39: con ``emit_regime=True`` el régimen del resultado llega al trial."""
+    from dataclasses import replace
+
+    from bolsa_application.optimization_runs import _persist_optimize_research_trials
+
+    result = replace(_sample_result(), regime="trend_down")
+    trials = MagicMock()
+    trials.insert_trial = AsyncMock()
+    await _persist_optimize_research_trials(
+        trials,
+        result=result,
+        optimization_run_id="run-1",
+        proposed_by="grid",
+        emit_regime=True,
+    )
+    assert trials.insert_trial.await_args.kwargs["regime"] == "trend_down"

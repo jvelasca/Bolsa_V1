@@ -86,6 +86,10 @@ _LAB_RUN_KEYS = frozenset(
         "cpcv_embargo_bars",
         # V2.32.1 (P1-01): recorte temporal del LAB para el hold-out shadow.
         "date_to",
+        # V2.39 (incremento 4): si el LAB debe calcular y persistir el regimen de mercado
+        # del trial (derivado de sus barras). Estructural, no de grid: lo inyecta el worker
+        # segun ``AUTO_ORCHESTRATOR_ADAPTIVE_REGIME``. Con OFF no se calcula regimen.
+        "emit_regime",
     }
 )
 
@@ -191,10 +195,16 @@ class LabOptimizeRunner:
         build_use_case: Callable[[Any], Any],
         *,
         grid_defaults: dict[str, dict[str, Any]] | None = None,
+        emit_regime: bool = True,
     ) -> None:
         self._session_factory = session_factory
         self._build_use_case = build_use_case
         self._grid_defaults = dict(grid_defaults or AUTO_LAB_GRID_DEFAULTS)
+        # V2.39 (incremento 4): si el LAB debe calcular y persistir el regimen de mercado
+        # del trial. El composition root lo fija segun ``AUTO_ORCHESTRATOR_ADAPTIVE_REGIME``
+        # (OFF por defecto). Con OFF, el trial se persiste sin regimen ⇒ equivalencia real
+        # con V2.38.1 (ninguna dimension nueva en la evidencia).
+        self._emit_regime = bool(emit_regime)
 
     async def __call__(self, candidate: StrategyCandidate) -> LabOptimizeResult | None:
         family = _normalize_family(candidate.strategy_family)
@@ -265,6 +275,10 @@ class LabOptimizeRunner:
                 # V2.31/A11: la definición declarativa del Discovery no es un parámetro
                 # de grid; se propaga aparte (ver ``__call__``).
                 merged[key] = value
+        # V2.39 (incremento 4): el flag de regimen lo fija SIEMPRE el composition root,
+        # no la candidata (la politica de rollout es del operador y debe ser fail-closed).
+        # Se reafirma despues de los overrides para que una candidata no pueda encenderlo.
+        merged["emit_regime"] = self._emit_regime
         if family in {STRATEGY_FAMILY_SMA, STRATEGY_FAMILY_RSI, STRATEGY_FAMILY_MACD}:
             return _prune_grid_to_window(family, merged)
         # V2.34/A14: familia declarativa (catálogo de Discovery o gramática). El motor

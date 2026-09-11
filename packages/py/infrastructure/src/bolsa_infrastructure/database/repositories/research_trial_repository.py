@@ -35,6 +35,18 @@ def _normalized_region(value: Any) -> str | None:
     return text or None
 
 
+def _normalized_regime(value: Any) -> str | None:
+    """V2.39 (incremento 4): normaliza el regimen de un trial agregado.
+
+    ``None``/vacío ⇒ ``None`` (sin regimen: fail-closed o flag OFF). El regimen es una
+    dimensión paralela y NUNCA altera la clave de granularidad ``familia|region``.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 class SqlAlchemyResearchTrialRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -56,6 +68,7 @@ class SqlAlchemyResearchTrialRepository:
             preset_key=row.preset_key,
             strategy_name=row.strategy_name,
             param_region=row.param_region,
+            regime=row.regime,
             blocks=row.blocks if isinstance(row.blocks, dict) else None,
             is_score=None if row.is_score is None else float(row.is_score),
             parent_trial_id=row.parent_trial_id,
@@ -79,6 +92,7 @@ class SqlAlchemyResearchTrialRepository:
         preset_key: str | None = None,
         strategy_name: str | None = None,
         param_region: str | None = None,
+        regime: str | None = None,
         blocks: dict[str, Any] | None = None,
         is_score: float | None = None,
         parent_trial_id: str | None = None,
@@ -98,6 +112,7 @@ class SqlAlchemyResearchTrialRepository:
             preset_key=preset_key,
             strategy_name=strategy_name,
             param_region=param_region,
+            regime=regime,
             params=params,
             blocks=blocks,
             is_metrics=is_metrics,
@@ -413,6 +428,7 @@ class SqlAlchemyResearchTrialRepository:
             select(
                 ResearchTrialRow.preset_key.label("preset"),
                 ResearchTrialRow.param_region.label("region"),
+                ResearchTrialRow.regime.label("regime"),
                 func.count().label("trials"),
                 func.coalesce(func.sum(ResearchTrialRow.k_contribution), 0).label("k"),
                 func.avg(ResearchTrialRow.is_score).label("avg_score"),
@@ -440,8 +456,16 @@ class SqlAlchemyResearchTrialRepository:
                 ).label("failures"),
             )
             .where(ResearchTrialRow.preset_key.isnot(None))
-            .group_by(ResearchTrialRow.preset_key, ResearchTrialRow.param_region)
-            .order_by(asc(ResearchTrialRow.preset_key), asc(ResearchTrialRow.param_region))
+            .group_by(
+                ResearchTrialRow.preset_key,
+                ResearchTrialRow.param_region,
+                ResearchTrialRow.regime,
+            )
+            .order_by(
+                asc(ResearchTrialRow.preset_key),
+                asc(ResearchTrialRow.param_region),
+                asc(ResearchTrialRow.regime),
+            )
         )
         if filters:
             stmt = stmt.where(*filters)
@@ -454,6 +478,9 @@ class SqlAlchemyResearchTrialRepository:
                 # no hay region (flag OFF o trials historicos): la clave compuesta que
                 # deriva el snapshot es entonces la propia familia (compatibilidad).
                 "paramRegion": _normalized_region(row.region),
+                # V2.39 (incremento 4): granularidad por regimen. ``None``/``""`` cuando
+                # no hay regimen (flag OFF, barras insuficientes o trials historicos).
+                "regime": _normalized_regime(row.regime),
                 "trials": int(row.trials or 0),
                 "kConsumed": int(row.k or 0),
                 "avgScore": None if row.avg_score is None else float(row.avg_score),
@@ -514,29 +541,49 @@ class SqlAlchemyResearchTrialRepository:
             select(
                 ResearchTrialRow.preset_key.label("preset"),
                 ResearchTrialRow.param_region.label("region"),
+                ResearchTrialRow.regime.label("regime"),
                 func.count().label("n"),
                 weighted,
             )
             .join(ResearchTrialRow, ResearchTrialRow.id == ResearchEvidenceRow.trial_id)
             .where(ResearchTrialRow.preset_key.isnot(None))
-            .group_by(ResearchTrialRow.preset_key, ResearchTrialRow.param_region)
-            .order_by(asc(ResearchTrialRow.preset_key), asc(ResearchTrialRow.param_region))
+            .group_by(
+                ResearchTrialRow.preset_key,
+                ResearchTrialRow.param_region,
+                ResearchTrialRow.regime,
+            )
+            .order_by(
+                asc(ResearchTrialRow.preset_key),
+                asc(ResearchTrialRow.param_region),
+                asc(ResearchTrialRow.regime),
+            )
         )
         if filters:
             stmt = stmt.where(*filters)
 
         rows = (await self._session.execute(stmt)).all()
-        out: dict[str, dict[str, float]] = {}
+        out: dict[str, dict[str, Any]] = {}
         for row in rows:
             family = str(row.preset or "").strip()
             if not family:
                 continue
             # V2.38 (incremento 3): clave compuesta canónica (familia o familia|region).
+            # V2.39 (incremento 4): la clave de granularidad NO cambia (el regimen es una
+            # dimension paralela); se publica aparte para no romper `_collapse_regions`.
             key = compose_granularity_key(family, _normalized_region(row.region) or "")
-            out[key] = {
-                "posteriorWeighted": float(row.weighted or 0.0),
-                "posteriorCount": float(row.n or 0),
-            }
+            entry = out.setdefault(
+                key,
+                {
+                    "posteriorWeighted": 0.0,
+                    "posteriorCount": 0.0,
+                    "regimeCounts": {},
+                },
+            )
+            entry["posteriorWeighted"] += float(row.weighted or 0.0)
+            entry["posteriorCount"] += float(row.n or 0)
+            regime = _normalized_regime(row.regime)
+            counts: dict[str, float] = entry["regimeCounts"]
+            counts[regime or ""] = counts.get(regime or "", 0.0) + float(row.n or 0)
         return out
 
     def _metric_present(self, key: str) -> ColumnElement[bool]:

@@ -2,6 +2,49 @@
 
 All notable releases of Bolsa V1.
 
+## [1.64.0-beta] — V2.39 · Régimen de mercado por trial (incremento 4) — 2026-09-11
+
+Cuarto incremento de **Strategy Intelligence**: la evidencia gana la segunda dimensión de
+granularidad que V2.38 dejó apuntada, el **régimen de mercado** bajo el que se evaluó cada trial.
+Se deriva de las **propias barras del trial** (as-of, determinista y versionado), se persiste en una
+columna nueva nullable `research_trials.regime` (migración aditiva) y se publica como dimensión
+observable y agregable. **No** entra en el reparto de cupos ni en la clave `familia|region`.
+
+- **Por qué un régimen derivado de barras y no el macro cognitivo.** `bolsa_analytics.cognitive.market_state`
+  se alimenta de `fetch_macro_snapshot_dict`, que usa valores _live_ de Yahoo (`date.today()`,
+  `closes[-1]`) y **no persiste serie histórica**: no es calculable as-of. Etiquetar un trial pasado
+  con el régimen de hoy sería inventar dato — exactamente lo que V2.38 evitó. El régimen de barras, en
+  cambio, es derivable en el punto del LAB que ya tiene las barras del trial.
+- **Núcleo determinista y puro.** Nuevo módulo `bolsa_application.discovery_market_regime`
+  (`math_version=discovery_market_regime_v0`): un solo eje con etiquetas `trend_up` / `trend_down` /
+  `range` / `high_vol`. Tendencia por pendiente normalizada por volatilidad; volatilidad por rango
+  relativo medio (high-low-close). `high_vol` tiene prioridad (en mercado revuelto la dirección es
+  poco fiable). **Fail-closed**: menos de `MIN_REGIME_BARS`, NaN/inf, high-low ausentes o ventana
+  degenerada ⇒ sin régimen (`""`); nunca se aproxima. Sin LLM, sin red, sin BD.
+- **Persistencia por trial.** Migración aditiva **`039_research_trials_regime`** (columna
+  `regime String NULL`, sin backfill, `downgrade()` completo): los trials históricos quedan `NULL`.
+  Write-path completo: `OptimizeSmaGridResult.regime` se calcula en los 4 constructores del dataclass
+  (con la ventana real de cada camino) y `optimization_runs` lo persiste (entidad + Protocol + repo
+  SQL + `_regime_for_trial` fail-closed con fallback a `params`/`blocks`).
+- **Agregación y evidencia.** `family_evidence_summary` y `posterior_evidence_summary` amplían su
+  `GROUP BY` con `regime`; el snapshot publica el desglose aditivo **`regimeGranularity`** (fuera del
+  `snapshot_hash`, dentro del `evidence_fingerprint`) y la evidencia posterior añade `regimeCounts`.
+  **La clave de granularidad `familia|region` NO cambia**: el régimen es una **dimensión paralela**;
+  meterlo en la clave habría roto `_collapse_regions` y la compatibilidad V2.37/V2.38.
+- **Rollout reversible.** Nuevo flag **`AUTO_ORCHESTRATOR_ADAPTIVE_REGIME`** (OFF por defecto). Con
+  OFF el LAB **no calcula ni persiste régimen** (`emit_regime=False`, fijado por el composition root,
+  no por la candidata): los trials quedan a `NULL` y la evidencia es **idéntica** a la de V2.38.1.
+  La lección del P2-01 de V2.38.1 se aplica aquí de raíz: la equivalencia se garantiza por la vía del
+  write-path, no por un colapso posterior.
+- **Invariantes intactas**: `AUTO ⇒ SIMULATED`; LIVE bloqueado; sin LLM en hot path; fail-closed;
+  H1/H2; long-only; gates CPCV/PBO/DSR/WFE/OOS sin relajar; anti-explosión `1784` intacto; la clave
+  compuesta `familia|region` y `_collapse_regions` **sin modificar**; con el flag OFF, comportamiento
+  idéntico a V2.38.1. Alembic head pasa a **`039_research_trials_regime`**.
+- **Verificación (local)**: `ruff` con invocación CI exacta (`--config pyproject.toml`) **All checks
+  passed** · `mypy` Success en los módulos tocados · suites V2.39 offline **212 passed** · PG
+  `test_discovery_evidence_snapshot_pg.py` **18 passed** (migración 039 upgradable/downgradable +
+  agregación por régimen + roundtrip).
+
 ## [1.63.1-beta] — V2.38.1 · Hotfix de los 2 P2 de la auditoría de V2.38 — 2026-09-11
 
 Hotfix de la **auditoría externa de `v2.38-beta`** (commit `41b96a41`, CI GREEN). Cierra dos P2

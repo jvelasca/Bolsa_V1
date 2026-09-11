@@ -337,6 +337,10 @@ def evidence_fingerprint(
                 {
                     "presetKey": str(row.get("presetKey") or ""),
                     "paramRegion": str(row.get("paramRegion") or ""),
+                    # V2.39 (incremento 4): regimen como dimension de identidad del
+                    # dataset. Es paralelo a la clave de granularidad: no altera
+                    # `compute_family_weights` ni el reparto de cupos.
+                    "regime": str(row.get("regime") or ""),
                     "trials": int(row.get("trials") or 0),
                     "zeroTrade": int(row.get("zeroTrade") or 0),
                     "failures": int(row.get("failures") or 0),
@@ -354,11 +358,13 @@ def evidence_fingerprint(
                 # identico al de ``compute_family_weights``. Ordenar solo por ``presetKey``
                 # dejaba el orden entre regiones de una misma familia a merced del orden de
                 # entrada (fragilidad latente en un valor que es identidad del dataset).
+                # V2.39: se anade el regimen como tercer criterio, por la misma razon.
                 for row in sorted(
                     aggregates,
                     key=lambda r: (
                         str(r.get("presetKey") or ""),
                         str(r.get("paramRegion") or ""),
+                        str(r.get("regime") or ""),
                     ),
                 )
             ],
@@ -441,6 +447,11 @@ def build_discovery_evidence_snapshot(
     # esquema. No participa en el ``snapshot_hash`` (observabilidad para la siguiente
     # evolucion); si participa en ``evidence_fingerprint`` (identidad del dataset).
     granularity: dict[str, Any] = {}
+    # V2.39 (incremento 4): regimen de mercado (clasificador determinista v0), derivado de
+    # las barras del trial. Dimension PARALELA a la clave de granularidad: se publica
+    # aparte, no entra en ``compute_family_weights`` ni en la clave ``familia|region``, y
+    # tampoco en el ``snapshot_hash``. Aditivo: sin regimen queda vacio.
+    regime_granularity: dict[str, Any] = {}
     for row in aggregate_list:
         family = str(row.get("presetKey") or "").strip()
         if not family:
@@ -451,6 +462,11 @@ def build_discovery_evidence_snapshot(
                 "family": family,
                 "paramRegion": region,
             }
+        regime = str(row.get("regime") or "").strip()
+        if regime:
+            composite = compose_granularity_key(family, region)
+            regimes = regime_granularity.setdefault(composite, {})
+            regimes[regime] = int(row.get("trials") or 0)
     payload: dict[str, Any] = {
         "mathVersion": math_version,
         "windowFrom": window_from,
@@ -463,6 +479,7 @@ def build_discovery_evidence_snapshot(
         "evidenceFingerprint": fingerprint,
         "posteriorCut": str(posterior_cut or ""),
         "familyGranularity": granularity,
+        "regimeGranularity": regime_granularity,
     }
     return DiscoveryEvidenceSnapshot(
         id=snapshot_id,

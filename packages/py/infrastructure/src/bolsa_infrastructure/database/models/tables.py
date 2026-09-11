@@ -1064,6 +1064,11 @@ class ResearchTrialRow(Base):
     # V2.38 (incremento 3): region de parametros determinista (bucket v0) del trial.
     # ``NULL`` = sin region (trials historicos o flag OFF): agrega por familia, como antes.
     param_region: Mapped[str | None] = mapped_column("param_region", String, nullable=True)
+    # V2.39 (incremento 4): regimen de mercado determinista (clasificador v0) del trial,
+    # derivado de las barras del propio trial (as-of). ``NULL`` = sin regimen (trials
+    # historicos o flag OFF): la agregacion no cambia. Ver
+    # ``bolsa_application.discovery_market_regime``.
+    regime: Mapped[str | None] = mapped_column("regime", String, nullable=True)
     params: Mapped[dict[str, Any]] = mapped_column(JSONB)
     blocks: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_metrics: Mapped[dict[str, Any]] = mapped_column("is_metrics", JSONB)

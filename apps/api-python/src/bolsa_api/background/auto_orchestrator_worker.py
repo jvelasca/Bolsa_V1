@@ -104,6 +104,12 @@ AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION = "AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION"
 # de V2.37 (sin grano) y el ciclo es equivalente a V2.37. Con ON, la evidencia
 # ``familia|region`` filtra la emision adaptativa al punto concreto.
 AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION = "AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION"
+# V2.39 (incremento 4): granularidad de la evidencia por REGIMEN de mercado del trial.
+# OFF por defecto: con OFF el write-path NO calcula ni persiste regimen (los trials quedan
+# a NULL), la evidencia no gana ninguna dimension y el ciclo es equivalente a V2.38.1. Con
+# ON, cada trial se etiqueta con el regimen derivado de sus barras (clasificador
+# determinista v0) y la evidencia publica el desglose ``regimeGranularity`` (aditivo).
+AUTO_ORCHESTRATOR_ADAPTIVE_REGIME = "AUTO_ORCHESTRATOR_ADAPTIVE_REGIME"
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
 _SHADOW_WINDOW_BARS_DEFAULT = 250
@@ -209,6 +215,21 @@ def adaptive_param_region_enabled() -> bool:
     numéricamente del peso que V2.37 habría calculado.
     """
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION))
+
+
+def adaptive_regime_enabled() -> bool:
+    """V2.39 (incremento 4): ¿la evidencia se granulariza por REGIMEN de mercado? (OFF).
+
+    OFF por defecto. Con OFF, el write-path NO calcula ni persiste el régimen
+    (``emit_regime=False``), de modo que los trials quedan a ``NULL`` y la evidencia es
+    **idéntica** a la de V2.38.1 (sin dimensión de régimen): la clave ``familia|region``,
+    los pesos por familia y el ``snapshot_hash`` no cambian. Con ON, cada trial se
+    etiqueta con el régimen derivado de sus propias barras (clasificador determinista
+    ``discovery_market_regime_v0``, as-of y fail-closed) y el snapshot publica el
+    desglose aditivo ``regimeGranularity`` (fuera del ``snapshot_hash`` y fuera del
+    reparto de cupos: es dimensión observable, no de asignación).
+    """
+    return _truthy(os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_REGIME))
 
 
 def adaptive_max_staleness_days() -> int:
@@ -640,6 +661,20 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
     # distinguir OFF/ON sin releer el entorno (el gate se evaluó al componer).
     _discover.grammar_enabled = enabled  # type: ignore[attr-defined]
     return _discover
+
+
+def log_regime_rollout_state() -> None:
+    """V2.39 (incremento 4): log aditivo del rollout del regimen de mercado.
+
+    Solo observabilidad: con OFF no se calcula ni persiste regimen (equivalencia con
+    V2.38.1); con ON cada trial se etiqueta con el regimen derivado de sus barras. No
+    altera ninguna decision del bucle.
+    """
+    logger.info(
+        "auto_orchestrator regime rollout regime_enabled=%s param_region_enabled=%s",
+        adaptive_regime_enabled(),
+        adaptive_param_region_enabled(),
+    )
 
 
 def _bar_source(bars: tuple[Any, ...]) -> str | None:
@@ -1139,7 +1174,11 @@ def _default_orchestrator(session_factory: Any) -> Any:
         OrchestratorDeps(
             store=_SessionScopedStore(),
             resolve_universe=_estudio_universe_resolver(session_factory),
-            run_optimize=LabOptimizeRunner(session_factory, _build_lab_use_case),
+            run_optimize=LabOptimizeRunner(
+                session_factory,
+                _build_lab_use_case,
+                emit_regime=adaptive_regime_enabled(),
+            ),
             strategy_family=_default_family(),
             params=_default_grid_params(),
             max_candidates=_max_candidates(),
@@ -1168,6 +1207,8 @@ def _default_orchestrator(session_factory: Any) -> Any:
     # V2.36 (incremento 1): el bucle refresca este holder UNA vez por ciclo (misma
     # referencia que el runner lee). Con el flag OFF nunca se rellena.
     orchestrator.adaptive_snapshot_holder = adaptive_snapshot_holder  # type: ignore[attr-defined]
+    # V2.39 (incremento 4): log aditivo del rollout del regimen (observabilidad).
+    log_regime_rollout_state()
     return orchestrator
 
 

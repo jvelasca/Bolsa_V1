@@ -23,6 +23,11 @@ class ResearchTrial:
     # ``None`` si no aplica (sin grid / flag OFF / trial historico). Ver
     # ``bolsa_application.discovery_param_region``.
     param_region: str | None = None
+    # V2.39 (incremento 4): regimen de mercado determinista (clasificador v0) del trial,
+    # derivado de las barras del propio trial (as-of), o ``None`` si no aplica (barras
+    # insuficientes / flag OFF / trial historico). Ver
+    # ``bolsa_application.discovery_market_regime``.
+    regime: str | None = None
     blocks: dict[str, Any] | None = None
     is_score: float | None = None
     parent_trial_id: str | None = None

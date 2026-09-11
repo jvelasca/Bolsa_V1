@@ -453,3 +453,117 @@ def test_mixed_region_and_plain_family_coexist() -> None:
         ]
     )
     assert set(snapshot.sample_sizes) == {"sma", "sma|r00:aaa"}
+
+
+# ── V2.39 (incremento 4) — régimen de mercado como dimensión paralela ───────────
+
+
+def _agg_regime(
+    preset: str,
+    regime: str,
+    trials: int,
+    *,
+    region: str = "",
+    avg_score: float = 1.0,
+) -> dict[str, Any]:
+    return {
+        "presetKey": preset,
+        "paramRegion": region,
+        "regime": regime,
+        "trials": trials,
+        "avgScore": avg_score,
+        "zeroTrade": 0,
+        "failures": 0,
+    }
+
+
+def test_regime_does_not_enter_the_granularity_key() -> None:
+    """V2.39: el régimen es paralelo; la clave sigue siendo `familia|region`."""
+    snapshot = _build(
+        [
+            _agg_regime("sma", "trend_up", 6),
+            _agg_regime("sma", "range", 6),
+        ]
+    )
+    # Ambas filas colapsan en la MISMA clave de granularidad (no hay region).
+    assert set(snapshot.sample_sizes) == {"sma"}
+    assert set(snapshot.family_weights) == {"sma"}
+
+
+def test_regime_granularity_payload_is_populated_when_regime_present() -> None:
+    """``regimeGranularity`` publica el desglose por régimen, aditivo y aparte."""
+    snapshot = _build(
+        [
+            _agg_regime("sma", "trend_up", 6, region="r00:aaa"),
+            _agg_regime("sma", "range", 4, region="r00:aaa"),
+        ]
+    )
+    assert snapshot.payload["regimeGranularity"] == {
+        "sma|r00:aaa": {"trend_up": 6, "range": 4}
+    }
+
+
+def test_regime_granularity_is_empty_without_regime() -> None:
+    snapshot = _build([_agg("sma", 10)])
+    assert snapshot.payload["regimeGranularity"] == {}
+
+
+def test_regime_does_not_change_snapshot_hash_vs_no_regime() -> None:
+    """El régimen NO participa en el ``snapshot_hash`` (dimension observable).
+
+    Igual que ``familyGranularity``: el hash se calcula solo sobre
+    ``mathVersion/windowFrom/windowTo/familyWeights/laneWeights/sampleSizes``. Se
+    certifica reconstruyendo el hash a mano desde esos componentes y comprobando que
+    coincide con el del snapshot que sí lleva régimen en el payload.
+    """
+    with_regime = _build([_agg_regime("sma", "trend_up", 6)])
+    assert with_regime.payload["regimeGranularity"] == {"sma": {"trend_up": 6}}
+    assert (
+        snapshot_hash(
+            math_version=with_regime.math_version,
+            window_from=with_regime.window_from,
+            window_to=with_regime.window_to,
+            family_weights=with_regime.family_weights,
+            lane_weights=with_regime.lane_weights,
+            sample_sizes=with_regime.sample_sizes,
+        )
+        == with_regime.snapshot_hash
+    )
+
+
+def test_regime_changes_evidence_fingerprint() -> None:
+    """El régimen SÍ entra en el fingerprint (identidad del dataset de research)."""
+    from bolsa_application.discovery_evidence import evidence_fingerprint
+
+    up = [_agg_regime("sma", "trend_up", 6)]
+    down = [_agg_regime("sma", "trend_down", 6)]
+    assert evidence_fingerprint(aggregates=up) != evidence_fingerprint(aggregates=down)
+
+
+def test_fingerprint_is_order_insensitive_across_regimes() -> None:
+    """V2.39: el fingerprint no depende del orden de las filas de régimen."""
+    from bolsa_application.discovery_evidence import evidence_fingerprint
+
+    rows = [
+        _agg_regime("sma", "trend_up", 6),
+        _agg_regime("sma", "range", 6),
+        _agg_regime("sma", "high_vol", 3),
+    ]
+    assert evidence_fingerprint(aggregates=rows) == evidence_fingerprint(
+        aggregates=list(reversed(rows))
+    )
+
+
+def test_regime_and_region_coexist_without_key_collision() -> None:
+    """Región y régimen conviven: la clave compuesta no incorpora el régimen."""
+    snapshot = _build(
+        [
+            _agg_regime("sma", "trend_up", 6, region="r00:aaa"),
+            _agg_regime("sma", "range", 4, region="r01:bbb"),
+        ]
+    )
+    assert set(snapshot.sample_sizes) == {"sma|r00:aaa", "sma|r01:bbb"}
+    assert snapshot.payload["regimeGranularity"] == {
+        "sma|r00:aaa": {"trend_up": 6},
+        "sma|r01:bbb": {"range": 4},
+    }

@@ -88,6 +88,8 @@ jobs:
           packages/py/application/tests/test_discovery_search_policy.py
           # V2.38: granularidad por región de parámetros (bucket determinista puro).
           packages/py/application/tests/test_discovery_param_region.py
+          # V2.39: régimen de mercado por trial (clasificador determinista puro, as-of).
+          packages/py/application/tests/test_discovery_market_regime.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
           # V2.32/A12: evidencia shadow ejecutada (replay determinista, sin DB).
           packages/py/application/tests/test_strategy_shadow_phase.py

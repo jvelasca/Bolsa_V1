@@ -67,6 +67,7 @@ from bolsa_analytics.optimize.walk_forward import (
     normalize_walk_forward_folds,
     split_walk_forward_bars,
 )
+from bolsa_application.discovery_market_regime import classify_market_regime
 from bolsa_domain.platform_kernel import MIN_SCAN_BARS
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
@@ -104,6 +105,7 @@ class OptimizeGridTrial:
 @dataclass(frozen=True, slots=True)
 class OptimizeSmaGridResult:
     """Resultado de Optimize Sma Grid."""
+
     instrument_id: str
     bar_count: int
     baseline: OptimizeGridTrial
@@ -123,6 +125,10 @@ class OptimizeSmaGridResult:
     edge_report: dict[str, Any] | None = None
     # CSCV PBO lab lite (usually nested under cpcv too).
     pbo: dict[str, Any] | None = None
+    # V2.39 (incremento 4): regimen de mercado determinista (clasificador v0) derivado de
+    # las barras del propio trial (as-of), o ``None`` si no aplica (barras insuficientes /
+    # flag OFF). Ver ``bolsa_application.discovery_market_regime``.
+    regime: str | None = None
 
 
 def normalize_strategy_family(raw: str | None) -> str:
@@ -352,9 +358,7 @@ def _baseline_for_family(
         return _sma_to_grid(run_baseline_preset_backtest(bars, initial_cash))
     result = run_backtest(bars, family, initial_cash)
     metrics = {**result.is_metrics}
-    score = trial_score(
-        float(metrics["totalReturnPct"]), float(metrics["maxDrawdownPct"])
-    )
+    score = trial_score(float(metrics["totalReturnPct"]), float(metrics["maxDrawdownPct"]))
     metrics["score"] = score
     if family == STRATEGY_FAMILY_RSI:
         params: dict[str, Any] = {"period": 14, "oversold": 30.0, "overbought": 70.0}
@@ -456,6 +460,7 @@ def _champion_trade_returns(
         return []
     pnls = metrics.get("roundTripPnls") or []
     return trade_returns_from_pnls(pnls, initial_cash=initial_cash)
+
 
 def build_lab_pbo_summary(
     candidates: list[OptimizeGridTrial],
@@ -646,7 +651,9 @@ def rank_trials_for_result(trials: list[OptimizeGridTrial]) -> list[OptimizeGrid
     """Prefer OOS score when every trial has oosMetrics; otherwise IS score."""
     if not trials:
         return trials
-    if all(isinstance(t.oos_metrics, dict) and t.oos_metrics.get("score") is not None for t in trials):
+    if all(
+        isinstance(t.oos_metrics, dict) and t.oos_metrics.get("score") is not None for t in trials
+    ):
         return sorted(trials, key=_oos_rank_key, reverse=True)
     return sorted(trials, key=lambda trial: trial.score, reverse=True)
 
@@ -697,6 +704,7 @@ async def _run_in_thread_with_live_progress[T](
 
 class RunSmaGridOptimize:
     """Ejecuta Sma Grid Optimize."""
+
     def __init__(
         self,
         instrument_repository: InstrumentRepository,
@@ -776,6 +784,11 @@ class RunSmaGridOptimize:
             )
             for bar in bars
         ]
+
+        # V2.39 (incremento 4): el regimen de mercado se deriva de las barras del trial en
+        # cada constructor de `OptimizeSmaGridResult` (mediante `classify_market_regime`),
+        # usando la ventana real que cada camino evaluo. Fail-closed: si las barras son
+        # insuficientes, el clasificador devuelve "" (sin regimen).
 
         cpcv_n = normalize_cpcv_groups(cpcv_groups)
         if cpcv_n is not None:
@@ -1009,6 +1022,7 @@ class RunSmaGridOptimize:
             split_timestamp=None,
             walk_forward=None,
             cpcv=None,
+            regime=classify_market_regime(train_bars) or None,
         )
 
     async def _run_cpcv(
@@ -1044,9 +1058,7 @@ class RunSmaGridOptimize:
         declarative_params: dict[str, Any] = {}
         if grammar_variants:
             declarative_params["grammar_variants"] = list(grammar_variants)
-        purge = normalize_cpcv_gap(
-            purge_bars, default=CPCV_PURGE_DEFAULT, upper=CPCV_PURGE_MAX
-        )
+        purge = normalize_cpcv_gap(purge_bars, default=CPCV_PURGE_DEFAULT, upper=CPCV_PURGE_MAX)
         embargo = normalize_cpcv_gap(
             embargo_bars, default=CPCV_EMBARGO_DEFAULT, upper=CPCV_EMBARGO_MAX
         )
@@ -1215,6 +1227,7 @@ class RunSmaGridOptimize:
             walk_forward=None,
             cpcv=cpcv,
             pbo=pbo_summary,
+            regime=classify_market_regime(bars) or None,
         )
         return attach_lab_edge_report(
             result,
@@ -1401,6 +1414,7 @@ class RunSmaGridOptimize:
             split_timestamp=holdout.split_timestamp,
             walk_forward=walk_forward,
             cpcv=None,
+            regime=classify_market_regime(bars) or None,
         )
         return attach_lab_edge_report(
             result,
@@ -1508,9 +1522,7 @@ class RunSmaGridOptimize:
                     if best_score is None or score > best_score:
                         best_score = score
                     if on_progress is not None and (
-                        len(trials) == 1
-                        or len(trials) % 2 == 0
-                        or len(trials) >= trials_total
+                        len(trials) == 1 or len(trials) % 2 == 0 or len(trials) >= trials_total
                     ):
                         await on_progress(len(trials), trials_total, best_score)
                         await asyncio.sleep(0)
@@ -1726,6 +1738,7 @@ class RunSmaGridOptimize:
             split_timestamp=split_timestamp,
             walk_forward=None,
             cpcv=None,
+            regime=classify_market_regime(bars) or None,
         )
         is_bars = holdout.is_bars if holdout is not None else bars
         oos_bars = holdout.oos_bars if holdout is not None else None

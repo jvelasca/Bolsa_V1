@@ -188,6 +188,38 @@ def _param_region_for_trial(
     return None
 
 
+def _regime_for_trial(
+    regime: str | None,
+    params: Mapping[str, Any],
+    blocks: Mapping[str, Any] | None,
+) -> str | None:
+    """V2.39 (incremento 4): regimen de mercado a persistir en el trial.
+
+    Preferencia fail-closed:
+
+    1. ``result.regime`` — clasificado por el LAB a partir de las barras reales del trial
+       (fuente de verdad, as-of).
+    2. ``params['discovery_regime']`` / ``blocks['discovery']['regime']`` — transporte
+       alternativo si algun runner decide propagarlo por parametros.
+    3. ``None`` — sin regimen: el trial agrega sin regimen, exactamente como en V2.38.1.
+
+    Nunca se reclasifica aqui a partir de otras senales: el LAB es la unica fuente de
+    verdad del regimen y este modulo no debe duplicar esa matematica.
+    """
+    if isinstance(regime, str) and regime.strip():
+        return regime.strip()
+    direct = params.get("discovery_regime")
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+    if isinstance(blocks, Mapping):
+        discovery = blocks.get("discovery")
+        if isinstance(discovery, Mapping):
+            nested = discovery.get("regime")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+    return None
+
+
 async def _persist_optimize_research_trials(
     trials_repo: ResearchTrialRepository,
     *,
@@ -196,6 +228,7 @@ async def _persist_optimize_research_trials(
     proposed_by: str,
     evidence_repo: Any | None = None,
     belief_repo: Any | None = None,
+    emit_regime: bool = True,
 ) -> None:
     """Append one research_trials row per grid trial (ledger K) + Evidence/Belief."""
     family = result.strategy_family or STRATEGY_FAMILY_SMA
@@ -295,6 +328,9 @@ async def _persist_optimize_research_trials(
             preset_key=family,
             strategy_name=family,
             param_region=_param_region_for_trial(trial.params, blocks),
+            regime=_regime_for_trial(
+                result.regime if emit_regime else None, trial.params, blocks
+            ),
             params=params,
             is_metrics=dict(trial.is_metrics),
             is_score=trial.score,
@@ -497,6 +533,7 @@ class RunSmaGridOptimizeAndSave:
         definition: dict[str, Any] | None = None,
         grammar_variants: list[dict[str, Any]] | None = None,
         date_to: str | None = None,
+        emit_regime: bool = True,
     ) -> tuple[OptimizeSmaGridResult, OptimizationRunRecord]:
         result = await self._run_optimize.execute(
             instrument_id=instrument_id,
@@ -573,5 +610,6 @@ class RunSmaGridOptimizeAndSave:
             proposed_by=proposed_by,
             evidence_repo=self._evidence,
             belief_repo=self._beliefs,
+            emit_regime=emit_regime,
         )
         return result, run

@@ -608,7 +608,7 @@ async def test_migration_037_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _column_present(connection) is True
-        assert alembic_head() == "038_research_trials_param_region"
+        assert alembic_head() == "039_research_trials_regime"
     finally:
         engine.dispose()
 
@@ -658,7 +658,7 @@ async def test_migration_036_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _table_present(connection) is True
-        assert alembic_head() == "038_research_trials_param_region"
+        assert alembic_head() == "039_research_trials_regime"
     finally:
         engine.dispose()
 
@@ -760,6 +760,247 @@ async def test_migration_038_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _region_column_present(connection) is True
-        assert alembic_head() == "038_research_trials_param_region"
+        assert alembic_head() == "039_research_trials_regime"
+    finally:
+        engine.dispose()
+
+
+# ── V2.39 (incremento 4) — régimen de mercado por trial ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_regime_roundtrips(pg_session: AsyncSession) -> None:
+    """V2.39: un trial con régimen se lee de vuelta; sin régimen queda ``None``."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models import InstrumentRow
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
+    instrument_id = f"inst_v239_{uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    pg_session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"V239{uuid4().hex[:5].upper()}",
+            yahoo_symbol=f"V239{uuid4().hex[:5]}",
+            name="V239 test",
+            exchange="MCE",
+            currency="EUR",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    repo = SqlAlchemyResearchTrialRepository(pg_session)
+    saved = await repo.insert_trial(
+        instrument_id=instrument_id,
+        preset_key="v239_family",
+        params={"discovery_regime": "trend_up"},
+        is_metrics={"tradeCount": 3},
+        proposed_by="test",
+        regime="trend_up",
+    )
+    assert saved.regime == "trend_up"
+    fetched = await repo.get_by_id(saved.id)
+    assert fetched is not None
+    assert fetched.regime == "trend_up"
+
+    without = await repo.insert_trial(
+        instrument_id=instrument_id,
+        preset_key="v239_family",
+        params={},
+        is_metrics={"tradeCount": 0},
+        proposed_by="test",
+    )
+    assert without.regime is None
+
+
+@pytest.mark.asyncio
+async def test_family_evidence_summary_groups_by_regime(pg_session: AsyncSession) -> None:
+    """V2.39: la agregación distingue regímenes dentro de la misma clave familia|region."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
+    instrument_id = f"inst_v239agg_{uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    pg_session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"V239A{uuid4().hex[:4].upper()}",
+            yahoo_symbol=f"V239A{uuid4().hex[:4]}",
+            name="V239 aggregation test",
+            exchange="MCE",
+            currency="EUR",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    preset = f"v239_family_{uuid4().hex[:8]}"
+    # Misma región, dos regímenes distintos; más un trial sin régimen (fail-closed).
+    rows = [("trend_up", 2), ("trend_up", 2), ("range", 1), (None, 1)]
+    for regime, trades in rows:
+        pg_session.add(
+            ResearchTrialRow(
+                id=f"trial_{uuid4().hex[:12]}",
+                instrument_id=instrument_id,
+                preset_key=preset,
+                param_region="r00:aaa",
+                regime=regime,
+                params={},
+                is_metrics={"tradeCount": trades},
+                is_score=1.0,
+                proposed_by="test",
+                created_at=now,
+            )
+        )
+    await pg_session.flush()
+
+    repo = SqlAlchemyResearchTrialRepository(pg_session)
+    summary = await repo.family_evidence_summary()
+    match = [r for r in summary if r["presetKey"] == preset]
+    by_regime = {r["regime"]: r for r in match}
+    assert set(by_regime) == {"trend_up", "range", None}
+    assert by_regime["trend_up"]["trials"] == 2
+    assert by_regime["range"]["trials"] == 1
+    assert by_regime[None]["trials"] == 1
+    # La granularidad por región sigue intacta: el régimen es dimensión paralela.
+    assert all(r["paramRegion"] == "r00:aaa" for r in match)
+
+
+@pytest.mark.asyncio
+async def test_posterior_evidence_summary_publishes_regime_counts(
+    pg_session: AsyncSession,
+) -> None:
+    """V2.39: la evidencia posterior desglosa por régimen sin cambiar la clave compuesta."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from bolsa_infrastructure.database.models import (
+        InstrumentRow,
+        ResearchEvidenceRow,
+        ResearchTrialRow,
+    )
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
+    instrument_id = f"inst_v239post_{uuid4().hex[:12]}"
+    now = datetime.now(UTC)
+    pg_session.add(
+        InstrumentRow(
+            id=instrument_id,
+            symbol=f"V239P{uuid4().hex[:4].upper()}",
+            yahoo_symbol=f"V239P{uuid4().hex[:4]}",
+            name="V239 posterior test",
+            exchange="MCE",
+            currency="EUR",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await pg_session.flush()
+
+    preset = f"v239_post_{uuid4().hex[:8]}"
+    trial_ids: list[str] = []
+    for regime in ("trend_up", "range"):
+        trial_id = f"trial_{uuid4().hex[:12]}"
+        trial_ids.append(trial_id)
+        pg_session.add(
+            ResearchTrialRow(
+                id=trial_id,
+                instrument_id=instrument_id,
+                preset_key=preset,
+                param_region="r00:aaa",
+                regime=regime,
+                params={},
+                is_metrics={"tradeCount": 1},
+                is_score=1.0,
+                proposed_by="test",
+                created_at=now,
+            )
+        )
+    # Los trials deben existir antes de la evidencia (FK): flush intermedio obligatorio.
+    await pg_session.flush()
+    for trial_id in trial_ids:
+        pg_session.add(
+            ResearchEvidenceRow(
+                id=f"ev_{uuid4().hex[:12]}",
+                trial_id=trial_id,
+                instrument_id=instrument_id,
+                level="A",
+                source="holdout",
+                evidence_weight=1.0,
+                summary={},
+                created_at=now,
+            )
+        )
+    await pg_session.flush()
+
+    repo = SqlAlchemyResearchTrialRepository(pg_session)
+    posterior = await repo.posterior_evidence_summary()
+    entry = posterior.get(f"{preset}|r00:aaa")
+    assert entry is not None
+    assert entry["posteriorCount"] == 2.0
+    # El régimen se publica aparte; NUNCA altera la clave compuesta familia|region.
+    assert entry["regimeCounts"] == {"trend_up": 1.0, "range": 1.0}
+
+
+@pytest.mark.asyncio
+async def test_migration_039_roundtrip(pg_session: AsyncSession) -> None:
+    """``downgrade``/``upgrade`` de la 039 dejan ``research_trials.regime`` igual."""
+    pytest.importorskip("alembic")
+    from alembic import command
+    from sqlalchemy import create_engine
+
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.migrations import _alembic_config, alembic_head
+
+    settings = get_settings()
+    url = settings.database_url
+    assert url is not None
+    url = url.replace("postgresql://", "postgresql+psycopg://", 1).split("?", 1)[0]
+    engine = create_engine(url)
+    cfg = _alembic_config()
+
+    def _regime_column_present(connection: object) -> bool:
+        row = connection.execute(  # type: ignore[attr-defined]
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema='public' "
+                "AND table_name='research_trials' "
+                "AND column_name='regime'"
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+    try:
+        with engine.connect() as connection:
+            assert _regime_column_present(connection) is True
+
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.downgrade(cfg, "038_research_trials_param_region")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _regime_column_present(connection) is False
+
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.upgrade(cfg, "head")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _regime_column_present(connection) is True
+        assert alembic_head() == "039_research_trials_regime"
     finally:
         engine.dispose()
