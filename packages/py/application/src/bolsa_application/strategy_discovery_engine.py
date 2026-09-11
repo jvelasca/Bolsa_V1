@@ -154,6 +154,7 @@ def discover_for_instrument_with_summary(
     grammar_budget: GrammarBudget | None = None,
     allocator: DiscoveryBudgetAllocator | None = None,
     search_policy: Any = None,
+    emit_param_region: bool = True,
 ) -> tuple[tuple[StrategyCandidate, ...], DiscoveryEmissionSummary]:
     """V2.35/A15 — como ``discover_for_instrument`` pero devuelve también el resumen.
 
@@ -173,6 +174,12 @@ def discover_for_instrument_with_summary(
     puro): sin política o con política vacía el carril no emite nada y la salida es la
     de V2.36. Las candidatas adaptativas reutilizan el catálogo curado y llevan el
     prefijo ``ADAPTIVE_FAMILY_PREFIX`` para no confundirse con catálogo ni gramática.
+
+    V2.38.1/P2-01: ``emit_param_region`` inyecta la decisión de rollout del worker sin
+    romper la pureza del motor. Con ``False`` las candidatas **no** llevan
+    ``discovery_param_region``; la evidencia persistida queda idéntica a la de V2.37
+    (sin región) y el colapso del worker es un no-op, garantizando equivalencia real.
+    Con ``True`` (default, comportamiento V2.38) la región se etiqueta siempre.
     """
     effective_budget = (budget or DiscoveryBudget()).normalized()
     catalog = tuple(
@@ -229,23 +236,27 @@ def discover_for_instrument_with_summary(
                 if candidate_id_factory is not None
                 else _default_candidate_id(instrument_id, family.name, index)
             )
+            # V2.38.1/P2-01: la region solo se etiqueta si el rollout lo pide (inyectado).
+            # Con ``emit_param_region=False`` el dict de params es byte-identico al de
+            # V2.37 (sin la clave), de modo que la evidencia persistida no lleva region.
+            catalog_params: dict[str, Any] = {
+                "definition": executable,
+                "discovery_family": family.name,
+                "discovery_parent": family.parent,
+                "discovery_params": dict(point),
+            }
+            if emit_param_region:
+                # V2.38 (incremento 3): region determinista del punto en el grid de la
+                # familia; se propaga hasta el trial persistido para agregar por region.
+                catalog_params["discovery_param_region"] = param_region_for_point(
+                    family.param_space, point
+                )
             candidates.append(
                 StrategyCandidate(
                     id=str(cid),
                     instrument_id=instrument_id,
                     strategy_family=family.name,
-                    params={
-                        "definition": executable,
-                        "discovery_family": family.name,
-                        "discovery_parent": family.parent,
-                        "discovery_params": dict(point),
-                        # V2.38 (incremento 3): region determinista del punto en el grid
-                        # de la familia. Se propaga hasta el trial persistido para poder
-                        # agregar la evidencia por region (flag de rollout en el worker).
-                        "discovery_param_region": param_region_for_point(
-                            family.param_space, point
-                        ),
-                    },
+                    params=catalog_params,
                     origin="discovery",
                     data_snapshot_id=data_snapshot_id,
                     preset_key=str(executable.get("presetKey") or family.name),
@@ -379,8 +390,16 @@ def discover_for_instrument_with_summary(
                             "discovery_family": adaptive_family.name,
                             "discovery_parent": adaptive_family.parent,
                             "discovery_params": dict(point),
-                            "discovery_param_region": param_region_for_point(
-                                adaptive_family.param_space, point
+                            # V2.38.1/P2-01: la clave se etiqueta solo si el rollout lo
+                            # pide; con OFF el dict es byte-identico al de V2.37.
+                            **(
+                                {
+                                    "discovery_param_region": param_region_for_point(
+                                        adaptive_family.param_space, point
+                                    )
+                                }
+                                if emit_param_region
+                                else {}
                             ),
                             "discovery_lane": "adaptive",
                             "search_policy_hash": adaptive_policy_hash or "",
@@ -392,7 +411,7 @@ def discover_for_instrument_with_summary(
                 )
                 emitted_for_family += 1
                 adaptive_candidates_count += 1
-                if param_region:
+                if param_region and emit_param_region:
                     adaptive_region_emissions_count += 1
                     adaptive_regions_seen.add(param_region)
                 trials_used += 1

@@ -21,7 +21,9 @@ from bolsa_application.discovery_catalog import (
 )
 from bolsa_application.discovery_evidence import build_discovery_evidence_snapshot
 from bolsa_application.discovery_search_policy import (
+    MATH_VERSION_SEARCH_POLICY,
     MATH_VERSION_SEARCH_POLICY_V0,
+    MATH_VERSION_SEARCH_POLICY_V1,
     build_search_policy,
 )
 from bolsa_application.strategy_discovery_engine import (
@@ -60,7 +62,7 @@ def test_same_snapshot_yields_same_policy_and_hash() -> None:
     second = build_search_policy(snapshot, adaptive_cap=10)
     assert first.policy_hash == second.policy_hash
     assert first.quotas == second.quotas
-    assert first.math_version == MATH_VERSION_SEARCH_POLICY_V0
+    assert first.math_version == MATH_VERSION_SEARCH_POLICY
 
 
 def test_policy_quotas_never_exceed_cap() -> None:
@@ -282,7 +284,7 @@ def test_unknown_region_is_fail_closed() -> None:
         quotas=(FamilyQuota(family=f"{family}|r99:inexistente", quota=5, weight=1.0),),
         total_quota=5,
         exploration_quota=0,
-        math_version=MATH_VERSION_SEARCH_POLICY_V0,
+        math_version=MATH_VERSION_SEARCH_POLICY,
         policy_hash="test",
     )
     budget = _budget()
@@ -295,3 +297,26 @@ def test_unknown_region_is_fail_closed() -> None:
     )
     assert summary.adaptive_candidates == 0
     assert not any(c.strategy_family.startswith(ADAPTIVE_FAMILY_PREFIX) for c in candidates)
+
+
+def test_math_versions_are_distinct_and_reproducible() -> None:
+    """V2.38.1/P3: v0 y v1 coexisten con valores distintos (auditoría reproducible).
+
+    Antes se reescribía el valor de ``_V0`` in-place, de modo que una política histórica
+    guardada como ``discovery_search_policy_v1`` no se distinguía de la actual.
+    """
+    assert MATH_VERSION_SEARCH_POLICY_V0 == "discovery_search_policy_v0"
+    assert MATH_VERSION_SEARCH_POLICY_V1 == "discovery_search_policy_v1"
+    assert MATH_VERSION_SEARCH_POLICY_V0 != MATH_VERSION_SEARCH_POLICY_V1
+    assert MATH_VERSION_SEARCH_POLICY == MATH_VERSION_SEARCH_POLICY_V1
+
+
+def test_region_policy_uses_v1_math_version() -> None:
+    """La política derivada de evidencia granularizada declara la math_version v1."""
+    snapshot, family, _, _ = _snapshot_with_regions()
+    policy = build_search_policy(
+        snapshot,
+        adaptive_cap=10,
+        available_families=[family],
+    )
+    assert policy.math_version == MATH_VERSION_SEARCH_POLICY_V1

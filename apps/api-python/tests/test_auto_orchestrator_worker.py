@@ -1074,3 +1074,45 @@ def test_collapse_regions_noop_without_regions() -> None:
 
     snap = _Snap(family_weights={"sma": 0.4}, sample_sizes={"sma": 3})
     assert w._collapse_regions(snap) is snap
+
+
+def test_runner_passes_emit_param_region_false_when_flag_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """V2.38.1/P2-01: con el flag OFF el runner NO etiqueta región (equivalencia real)."""
+    from bolsa_application import strategy_discovery_engine as engine
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION, raising=False)
+    captured: dict[str, Any] = {}
+    real = engine.discover_for_instrument_with_summary
+
+    def _spy(**kwargs: Any) -> Any:
+        captured["emit_param_region"] = kwargs.get("emit_param_region")
+        return real(**kwargs)
+
+    monkeypatch.setattr(engine, "discover_for_instrument_with_summary", _spy)
+    runner = w._make_discovery_runner(DiscoveryBudget())
+    runner("AAA")
+    assert captured["emit_param_region"] is False
+
+
+def test_runner_passes_emit_param_region_true_when_flag_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """V2.38.1/P2-01: con el flag ON el runner etiqueta región (grano activo)."""
+    from bolsa_application import strategy_discovery_engine as engine
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION, "1")
+    captured: dict[str, Any] = {}
+    real = engine.discover_for_instrument_with_summary
+
+    def _spy(**kwargs: Any) -> Any:
+        captured["emit_param_region"] = kwargs.get("emit_param_region")
+        return real(**kwargs)
+
+    monkeypatch.setattr(engine, "discover_for_instrument_with_summary", _spy)
+    runner = w._make_discovery_runner(DiscoveryBudget())
+    runner("AAA")
+    assert captured["emit_param_region"] is True

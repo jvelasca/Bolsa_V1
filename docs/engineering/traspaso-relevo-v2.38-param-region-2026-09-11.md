@@ -6,9 +6,33 @@
 >
 > **AsOf:** 2026-09-11 · **Base:** `v2.37-beta` (`main == 13020eeb`).
 > **Alembic head:** `038_research_trials_param_region` (migración aditiva nueva).
-> **Bump:** `1.62.0-beta` → `1.63.0-beta`.
+> **Bump:** `1.62.0-beta` → `1.63.0-beta` → `1.63.1-beta` (hotfix de auditoría).
 > **Flag:** `AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION` **OFF por defecto**; con OFF el
-> sistema es byte-idéntico a `v2.37-beta`.
+> ciclo es **equivalente** a `v2.37-beta` (ver §0bis).
+>
+> ⚠️ **ADDENDUM V2.38.1 (hotfix de la auditoría de V2.38).** El claim original
+> "byte-idéntico a V2.37 con OFF" era inexacto y ya está corregido. Ver §0bis antes de
+> dar por bueno cualquier razonamiento de esta versión.
+
+---
+
+## 0bis. Hotfix V2.38.1 — correcciones de la auditoría (leer SIEMPRE)
+
+La auditoría externa de `v2.38-beta` (`41b96a41`, CI GREEN) dio **8,9/10** con **P2 = 2**.
+Ambos están cerrados en `1.63.1-beta`:
+
+1. **P2-01 — equivalencia con V2.37.** El write-path etiquetaba la región **siempre**, así
+   que con OFF el snapshot contenía regiones y `_collapse_regions` colapsaba con `max(peso)`
+   (≈ 7,4 % de divergencia: `0.747` vs `0.803`). **Fix**: el motor recibe
+   `emit_param_region` (dependencia inyectada) y el worker lo pone a
+   `adaptive_param_region_enabled()`. Con OFF **no se genera región** ⇒ evidencia idéntica a
+   V2.37 y colapso no-op. `_collapse_regions` sigue existiendo para evidencia histórica.
+2. **P2-02 — determinismo del `evidence_fingerprint`.** Ordenaba solo por `presetKey`;
+   ahora por clave compuesta `(presetKey, paramRegion)`.
+
+**Consecuencia para el agente entrante:** si tocas el write-path o el colapso, respeta que
+la equivalencia con V2.37 se garantiza por la **ausencia de grano** cuando el flag está OFF,
+**nunca** por el colapso. Audit-pack: `audit-pack-v2.38.1-hotfix-audit-2026-09-11.md`.
 
 ---
 

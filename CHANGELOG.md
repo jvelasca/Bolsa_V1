@@ -2,6 +2,40 @@
 
 All notable releases of Bolsa V1.
 
+## [1.63.1-beta] — V2.38.1 · Hotfix de los 2 P2 de la auditoría de V2.38 — 2026-09-11
+
+Hotfix de la **auditoría externa de `v2.38-beta`** (commit `41b96a41`, CI GREEN). Cierra dos P2
+conceptuales sin cambiar la semántica funcional del incremento 3.
+
+- **P2-01 — La equivalencia "byte-idéntica a V2.37 con el flag OFF" no se cumplía.** El write-path
+  etiquetaba `discovery_param_region` **siempre, sin consultar el flag**; con OFF el snapshot contenía
+  regiones y `_collapse_regions` colapsaba con `max(peso)` en vez de re-derivar la fuerza sobre el
+  agregado familiar (el snapshot solo persiste `family_weights`/`sample_sizes`, así que el colapso no
+  puede recomputarla). Divergencia medida: `0.747` (V2.37) vs `0.803` (colapsado) ≈ **7,4 %**.
+  **Fix**: el motor recibe la decisión como dependencia inyectada
+  (`discover_for_instrument_with_summary(..., emit_param_region: bool = True)`) y el worker pasa
+  `adaptive_param_region_enabled()`. Con OFF **no se genera región**, la evidencia es idéntica a la de
+  V2.37 y el colapso es un no-op: **equivalencia real, no aproximada**. `_collapse_regions` se
+  conserva, pero reencuadrado como puente para **evidencia histórica** ya persistida con región
+  (transición ON→OFF), con su docstring corregido para no prometer equivalencia numérica.
+- **P2-02 — `evidence_fingerprint` no ordenaba por clave compuesta.** `compute_family_weights` ordenaba
+  por `(presetKey, paramRegion)` pero el fingerprint solo por `presetKey`; con varias regiones de una
+  misma familia el orden quedaba a merced del orden de entrada (`sorted` estable ⇒ fragilidad latente
+  en un valor que es identidad del dataset). **Fix**: orden canónico por clave compuesta + tests de
+  orden adverso (familias y regiones barajadas producen el mismo fingerprint).
+- **P3 — Versionado de la search policy.** `MATH_VERSION_SEARCH_POLICY_V0` tenía el valor
+  `"discovery_search_policy_v1"` (reescrito in-place), de modo que una política histórica no se
+  distinguía de la nueva. **Fix**: coexisten `_V0` = `"discovery_search_policy_v0"` y `_V1` =
+  `"discovery_search_policy_v1"`, con alias `MATH_VERSION_SEARCH_POLICY` para la vigente.
+- **P3 — Test mal nombrado.** `test_granularity_does_not_change_snapshot_hash_vs_plain_family` era
+  tautológico; se documenta y se añade la comprobación real (recalcular `snapshot_hash` sobre los
+  componentes declarados reproduce el hash almacenado ⇒ el payload/granularidad no participa).
+- **Invariantes intactas**: `AUTO ⇒ SIMULATED`; LIVE bloqueado; sin LLM en hot path; fail-closed;
+  H1/H2; gates sin relajar; anti-explosión `1784` intacto; Alembic head sigue en
+  `038_research_trials_param_region` (el hotfix no añade migración).
+- **Verificación (local)**: `ruff` con invocación CI exacta (`--config pyproject.toml`) **All checks
+  passed** · `mypy` Success en los módulos tocados · offline **1497 passed** (suites relevantes).
+
 ## [1.63.0-beta] — V2.38 · Granularidad por región de parámetros (incremento 3) — 2026-09-11
 
 Tercer incremento de **Strategy Intelligence**: la evidencia adaptativa deja de agregarse solo por
@@ -32,8 +66,9 @@ persistido (ver más abajo).
   `granularityKeyVersion` en su hash (la fórmula de reparto no cambia: ya era agnóstica a la clave).
   El motor resuelve la clave compuesta y **filtra `param_points()` a la región** indicada; clave
   desconocida o región inexistente ⇒ no emite (fail-closed).
-- **Rollout** — Flag nuevo `AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION` **OFF por defecto**: con OFF la
-  evidencia se colapsa a familia (`_collapse_regions`) y el sistema es **byte-idéntico a V2.37**.
+- **Rollout** — Flag nuevo `AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION` **OFF por defecto**: con OFF
+  el write-path no genera región y el sistema es **equivalente a V2.37** (ver V2.38.1/P2-01: el
+  colapso `_collapse_regions` solo normaliza evidencia histórica y no es equivalencia numérica).
   Observabilidad aditiva: `DiscoveryEmissionSummary` gana `adaptive_region_emissions`/
   `adaptive_region_count`; los contadores de ciclo/proceso suman `adaptive_region_emissions` y los
   logs reportan `adaptive_regions=N/M`.
@@ -45,7 +80,7 @@ persistido (ver más abajo).
 - **Invariantes intactas**: `AUTO ⇒ SIMULATED`; LIVE bloqueado; sin LLM en hot path; fail-closed;
   long-only; H1 y H2 intactos; gates CPCV/PBO/DSR/WFE/OOS + coach sin relajar; test anti-explosión
   `len(plans) == 1784` intacto (solo se etiqueta, no se añade espacio de búsqueda); con el flag OFF,
-  salida **byte-idéntica a V2.37**.
+  salida equivalente a V2.37 (ver V2.38.1 para la corrección del claim de byte-identidad).
 - **Tests**: `test_discovery_param_region.py` (determinismo, estabilidad ante reordenación,
   fail-closed, ida y vuelta de la clave compuesta, anti-explosión intacta),
   `test_discovery_evidence.py` (claves compuestas aíslan regiones, hash estable y sensible a región,

@@ -271,10 +271,6 @@ def compute_family_weights(
     ``min_samples`` se excluyen del mapa de pesos (no aportan señal) pero conservan su
     tamaño de muestra para auditoría.
     """
-    from bolsa_application.discovery_param_region import compose_granularity_key
-
-
-
     family_weights: dict[str, float] = {}
     sample_sizes: dict[str, int] = {}
     ordered = sorted(
@@ -354,7 +350,17 @@ def evidence_fingerprint(
                         )
                     },
                 }
-                for row in sorted(aggregates, key=lambda r: str(r.get("presetKey") or ""))
+                # V2.38.1/P2-02: orden canonico por clave COMPUESTA (familia, region),
+                # identico al de ``compute_family_weights``. Ordenar solo por ``presetKey``
+                # dejaba el orden entre regiones de una misma familia a merced del orden de
+                # entrada (fragilidad latente en un valor que es identidad del dataset).
+                for row in sorted(
+                    aggregates,
+                    key=lambda r: (
+                        str(r.get("presetKey") or ""),
+                        str(r.get("paramRegion") or ""),
+                    ),
+                )
             ],
             "posteriorCut": str(posterior_cut or ""),
         },

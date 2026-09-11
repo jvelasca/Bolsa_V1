@@ -100,8 +100,9 @@ _ADAPTIVE_MAX_STALENESS_DAYS_DEFAULT = 30
 # candidatas nuevas.
 AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION = "AUTO_ORCHESTRATOR_ADAPTIVE_GENERATION"
 # V2.38 (incremento 3): granularidad de la evidencia adaptativa por REGION de parametros.
-# OFF por defecto: con OFF la clave es la familia y el sistema es byte-idéntico a V2.37.
-# Con ON, la evidencia ``familia|region`` filtra la emisión adaptativa al punto concreto.
+# OFF por defecto: con OFF el write-path NO etiqueta region, la evidencia es identica a la
+# de V2.37 (sin grano) y el ciclo es equivalente a V2.37. Con ON, la evidencia
+# ``familia|region`` filtra la emision adaptativa al punto concreto.
 AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION = "AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION"
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
@@ -193,13 +194,19 @@ def adaptive_generation_enabled() -> bool:
 
 
 def adaptive_param_region_enabled() -> bool:
-    """V2.38 (incremento 3): ¿la emisión adaptativa se filtra por REGION de parametros? (OFF).
+    """V2.38 (incremento 3): ¿la evidencia adaptativa se granulariza por REGION? (OFF).
 
-    OFF por defecto: con OFF la clave de la evidencia es la familia (como V2.37) y la
-    emisión adaptativa recorre el grid completo de cada familia, de modo que el
-    comportamiento es **byte-idéntico** a V2.37. Con ON, la evidencia ya granularizada por
-    region (``familia|region``) se respeta y la emisión adaptativa se **filtra al punto/
-    region** indicado por el prior, en lugar de barrer la familia entera.
+    OFF por defecto. Con OFF, el write-path NO etiqueta la región
+    (``emit_param_region=False``), de modo que la evidencia nueva es **idéntica** a la de
+    V2.37 (sin región): la emisión adaptativa recorre el grid completo de cada familia y
+    el ciclo es equivalente a V2.37. Con ON, la evidencia se granulariza por
+    ``familia|region`` y la emisión adaptativa se **filtra al punto/región** indicado por
+    el prior, en lugar de barrer la familia entera.
+
+    Nota (auditoría v2.38/P2-01): la equivalencia con V2.37 se garantiza por esta vía
+    (no se genera región cuando está OFF), NO por el colapso ``_collapse_regions``, que
+    solo normaliza **evidencia histórica** ya persistida con región y puede diferir
+    numéricamente del peso que V2.37 habría calculado.
     """
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION))
 
@@ -484,13 +491,20 @@ def _float_env(name: str, default: float) -> float:
 
 
 def _collapse_regions(snapshot: Any) -> Any:
-    """V2.38 (incremento 3): colapsa las claves ``familia|region`` a solo familia.
+    """V2.38 (incremento 3) / V2.38.1 (P2-01): colapsa ``familia|region`` a solo familia.
 
-    Se usa cuando ``AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION`` está OFF: la evidencia
-    granularizada se reduce a la familia (compatibilidad byte-idéntica con V2.37), de modo
-    que la emisión adaptativa vuelve a recorrer el grid completo. Determinista:
-    ``sample_sizes`` se suma y ``family_weights`` toma el **máximo** por familia (criterio
-    conservador: la familia hereda la mejor región, sin inventar señal).
+    Se usa cuando ``AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION`` está OFF. Con el write-path
+    de V2.38.1, con OFF la evidencia nueva NO lleva región (``emit_param_region=False``),
+    así que este colapso solo actúa sobre **evidencia histórica** ya persistida con región
+    (transiciones ON→OFF). Determinista: ``sample_sizes`` se suma y ``family_weights`` toma
+    el **máximo** por familia (criterio conservador: la familia hereda la mejor región).
+
+    IMPORTANTE (precisión del invariante, auditoría v2.38/P2-01): esto NO es una
+    equivalencia numérica con V2.37. V2.37 calcularía el peso de la familia sobre el
+    agregado de TODOS sus trials; aquí no se dispone de ese agregado (el snapshot solo
+    persiste ``family_weights``/``sample_sizes``), por lo que el ``max`` puede diferir.
+    La equivalencia byte-idéntica con V2.37 se garantiza por la vía del write-path
+    (sin región ⇒ sin grano), no por este colapso.
 
     Fail-closed: si ningún peso lleva región, devuelve el snapshot tal cual (no se toca).
     """
@@ -566,10 +580,11 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
         snapshot = _current_snapshot()
         if snapshot is None or not enabled:
             return None
-        # V2.38 (incremento 3): con la granularidad por región OFF, la evidencia se
-        # colapsa a familia (claves ``familia|region`` -> ``familia``) para que la
-        # emisión adaptativa recorra el grid completo y la salida sea byte-idéntica a
-        # V2.37. Con ON se respeta la región y el motor filtra a ese punto.
+        # V2.38 (incremento 3) / V2.38.1 (P2-01): con la granularidad OFF, el write-path
+        # ya no genera región, de modo que la evidencia nueva es idéntica a V2.37 y la
+        # emisión recorre el grid completo. Este colapso solo normaliza evidencia
+        # HISTÓRICA ya persistida con región (transición ON→OFF); no es una equivalencia
+        # numérica con V2.37 (ver docstring de ``_collapse_regions``).
         if not adaptive_param_region_enabled():
             snapshot = _collapse_regions(snapshot)
         try:
@@ -595,6 +610,10 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
             grammar_budget=grammar_budget,
             allocator=allocator,
             search_policy=_current_search_policy(),
+            # V2.38.1/P2-01: la region solo se etiqueta si el rollout lo pide. Con OFF
+            # la evidencia persistida es identica a V2.37 (sin region) y el colapso del
+            # snapshot es un no-op: equivalencia real, no aproximada.
+            emit_param_region=adaptive_param_region_enabled(),
         )
         _record_discovery_summary(summary)
         logger.info(

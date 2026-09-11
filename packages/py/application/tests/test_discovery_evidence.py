@@ -384,13 +384,64 @@ def test_family_granularity_is_empty_without_region() -> None:
 
 
 def test_granularity_does_not_change_snapshot_hash_vs_plain_family() -> None:
-    """``familyGranularity`` es aditivo: NO participa en el ``snapshot_hash``."""
+    """``familyGranularity`` es aditivo: NO participa en el ``snapshot_hash``.
+
+    Nota (V2.38.1/P3): comparar evidencia *distinta* (con y sin region) y ver hashes
+    distintos es tautologico — ``familyWeights``/``sampleSizes`` ya difieren. Lo que de
+    verdad certifica la exclusion de ``familyGranularity`` del hash es que el hash se
+    calcula solo sobre ``mathVersion/windowFrom/windowTo/familyWeights/laneWeights/
+    sampleSizes`` (ver ``snapshot_hash``): el payload (que incluye granularidad y
+    fingerprint) NO entra.
+    """
     plain = _build([_agg("sma", 6)])
     granular = _build([_agg_region("sma", "r00:aaa", 6)])
-    # Distinta evidencia (una sin region, otra con region) ⇒ hashes distintos...
+    # Distinta evidencia ⇒ hashes distintos (por los pesos/muestras, no por la granularidad).
     assert plain.snapshot_hash != granular.snapshot_hash
-    # ...y el fingerprint sí refleja la region (identidad del dataset).
+    # El fingerprint sí refleja la region (identidad del dataset).
     assert plain.evidence_fingerprint != granular.evidence_fingerprint
+    # La granularidad viaja en el payload, pero fuera de la clave de identidad del snapshot.
+    assert "familyGranularity" in granular.payload
+    assert snapshot_hash(
+        math_version=granular.math_version,
+        window_from=granular.window_from,
+        window_to=granular.window_to,
+        family_weights=granular.family_weights,
+        lane_weights=granular.lane_weights,
+        sample_sizes=granular.sample_sizes,
+    ) == granular.snapshot_hash
+
+
+def test_fingerprint_is_order_insensitive_across_regions() -> None:
+    """V2.38.1/P2-02: el fingerprint es determinista ante orden adverso de regiones.
+
+    Antes solo se ordenaba por ``presetKey``: con dos regiones de la MISMA familia, el
+    orden relativo dependia del orden de entrada (``sorted`` es estable), lo que hacia
+    fragil un valor que es identidad del dataset. El orden canonico es la clave compuesta.
+    """
+    from bolsa_application.discovery_evidence import evidence_fingerprint
+
+    rows = [
+        _agg_region("sma", "r00:aaa", 6, avg_score=1.4),
+        _agg_region("sma", "r01:bbb", 6, avg_score=0.6),
+    ]
+    reversed_rows = list(reversed(rows))
+    assert evidence_fingerprint(aggregates=rows) == evidence_fingerprint(
+        aggregates=reversed_rows
+    )
+
+
+def test_fingerprint_is_order_insensitive_across_families_and_regions() -> None:
+    """V2.38.1/P2-02: el orden no importa ni entre familias ni entre regiones."""
+    from bolsa_application.discovery_evidence import evidence_fingerprint
+
+    rows = [
+        _agg("rsi", 8),
+        _agg_region("sma", "r01:bbb", 6, avg_score=0.6),
+        _agg_region("sma", "r00:aaa", 6, avg_score=1.4),
+        _agg("macd", 5),
+    ]
+    shuffled = [rows[2], rows[0], rows[3], rows[1]]
+    assert evidence_fingerprint(aggregates=rows) == evidence_fingerprint(aggregates=shuffled)
 
 
 def test_mixed_region_and_plain_family_coexist() -> None:

@@ -11,7 +11,13 @@
 > **Alembic head:** `038_research_trials_param_region`.
 > **Bump:** `1.62.0-beta` → `1.63.0-beta`.
 > **Flag de rollout:** `AUTO_ORCHESTRATOR_ADAPTIVE_PARAM_REGION` **OFF por defecto**; con
-> OFF el sistema es **byte-idéntico a `v2.37-beta`**.
+> OFF el write-path no genera región y el ciclo es **equivalente a `v2.37-beta`**.
+>
+> ⚠️ **Corregido por V2.38.1 (hotfix de auditoría).** La afirmación original "byte-idéntico
+> a V2.37 con OFF" era inexacta: el write-path etiquetaba la región siempre y
+> `_collapse_regions` colapsaba con `max(peso)`, que no equivale a la fuerza sobre el
+> agregado familiar (divergencia medida ≈ 7,4 %). Ver
+> `audit-pack-v2.38.1-hotfix-audit-2026-09-11.md`.
 
 ---
 

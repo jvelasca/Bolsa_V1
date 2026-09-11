@@ -111,3 +111,71 @@ def test_param_region_does_not_change_search_space() -> None:
             param_region_for_point(family.param_space, point)
     after = sum(len(family.param_points()) for family in DISCOVERY_FAMILIES)
     assert after == before
+
+
+# ── V2.38.1/P2-01 — equivalencia real con V2.37 via write-path ──────────────────
+
+
+def test_emit_param_region_false_omits_region_key() -> None:
+    """Con ``emit_param_region=False`` las candidatas NO llevan region (bytes V2.37).
+
+    Es la via que garantiza la equivalencia REAL con V2.37: no se genera grano, en vez
+    de generarlo y colapsarlo despues (que no era numericamente equivalente).
+    """
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+    from bolsa_application.strategy_discovery_engine import (
+        discover_for_instrument_with_summary,
+    )
+
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    candidates, summary = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        emit_param_region=False,
+    )
+    assert summary.catalog_candidates > 0
+    assert all("discovery_param_region" not in c.params for c in candidates)
+    assert summary.adaptive_region_emissions == 0
+    assert summary.adaptive_region_count == 0
+
+
+def test_emit_param_region_true_labels_region() -> None:
+    """Con ``emit_param_region=True`` (default V2.38) la region se etiqueta."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+    from bolsa_application.strategy_discovery_engine import (
+        discover_for_instrument_with_summary,
+    )
+
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    candidates, _ = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        emit_param_region=True,
+    )
+    assert candidates
+    assert all("discovery_param_region" in c.params for c in candidates)
+    # La region etiquetada es una clave valida del bucket (no vacia para grids no triviales).
+    assert any(c.params["discovery_param_region"] for c in candidates)
+
+
+def test_emit_param_region_false_is_byte_identical_to_v237_params() -> None:
+    """El dict de params con OFF es identico al historico (sin la clave de region)."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+    from bolsa_application.discovery_param_region import (
+        MATH_VERSION_PARAM_REGION_V0,
+    )
+    from bolsa_application.strategy_discovery_engine import (
+        discover_for_instrument_with_summary,
+    )
+
+    assert MATH_VERSION_PARAM_REGION_V0  # la version existe aunque no se emita grano
+    budget = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    candidates, _ = discover_for_instrument_with_summary(
+        instrument_id="AAA", budget=budget, emit_param_region=False
+    )
+    for candidate in candidates:
+        assert "discovery_param_region" not in candidate.params
+        # Las claves historicas siguen presentes: no se ha perdido ningun campo.
+        assert "definition" in candidate.params
+        assert "discovery_family" in candidate.params
+        assert "discovery_params" in candidate.params

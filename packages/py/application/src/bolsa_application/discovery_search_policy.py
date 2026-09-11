@@ -40,7 +40,13 @@ from bolsa_domain.entities.discovery_evidence_snapshot import (
 # V2.38 (incremento 3): v1 — la clave de reparto es la **clave compuesta** de
 # granularidad (familia o familia|region), no solo la familia. La fórmula de reparto no
 # cambia (ya era agnóstica a la clave); el bump marca que las claves pueden llevar región.
-MATH_VERSION_SEARCH_POLICY_V0 = "discovery_search_policy_v1"
+# V2.38.1/P3: la v0 se conserva como constante para poder **distinguir** una política
+# histórica (pre-región) de una derivada con claves compuestas; antes se reescribía el
+# valor de ``_V0`` in-place, lo que hacía irreproducible la auditoría de políticas viejas.
+MATH_VERSION_SEARCH_POLICY_V0 = "discovery_search_policy_v0"
+MATH_VERSION_SEARCH_POLICY_V1 = "discovery_search_policy_v1"
+# Alias de compatibilidad: el valor por defecto de la política vigente.
+MATH_VERSION_SEARCH_POLICY = MATH_VERSION_SEARCH_POLICY_V1
 
 # Versión del esquema de clave de granularidad que alimenta la política. Se incluye en el
 # ``policy_hash`` para que una política derivada de claves compuestas sea distinguible de
@@ -85,7 +91,7 @@ class SearchPolicy:
     quotas: tuple[FamilyQuota, ...]
     total_quota: int
     exploration_quota: int
-    math_version: str = MATH_VERSION_SEARCH_POLICY_V0
+    math_version: str = MATH_VERSION_SEARCH_POLICY
     policy_hash: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -243,7 +249,7 @@ def build_search_policy(
         for family in sorted(combined, key=lambda f: (-combined[f], f))
     )
     payload = {
-        "mathVersion": MATH_VERSION_SEARCH_POLICY_V0,
+        "mathVersion": MATH_VERSION_SEARCH_POLICY,
         "snapshotHash": snapshot.snapshot_hash,
         "granularityKeyVersion": GRANULARITY_KEY_VERSION_V0,
         "adaptiveCap": cap,
@@ -254,7 +260,7 @@ def build_search_policy(
         quotas=quotas,
         total_quota=total,
         exploration_quota=int(sum(explore_quotas.values())),
-        math_version=MATH_VERSION_SEARCH_POLICY_V0,
+        math_version=MATH_VERSION_SEARCH_POLICY,
         policy_hash=_policy_hash(payload),
         metadata={
             "snapshotHash": snapshot.snapshot_hash,
