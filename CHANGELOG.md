@@ -42,7 +42,7 @@ tocar la ruta SIM-only. Endurece la honestidad estadística y la certificación 
   `min_credibility` pasan a `None` por defecto (sin fabricar un `0.0`); la vigilancia
   solo degrada con umbrales calibrados.
 
-> Cierre: `docs/engineering/PROJECT_STATE.md`.
+> Cierre: `docs/engineering/cierre-v2.32.1-a12.1-remediacion-auditoria-2026-09-11.md`.
 
 ## [1.56.0-beta] — V2.32 / A12 · Shadow Validation & Autonomous Attribution — 2026-09-11
 
