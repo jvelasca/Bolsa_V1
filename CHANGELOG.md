@@ -2,6 +2,33 @@
 
 All notable releases of Bolsa V1.
 
+## [1.56.0-beta] — V2.32 / A12 · Shadow Validation & Autonomous Attribution — 2026-09-11
+
+Cierra los **dos P2 diferidos a V2.32** por la auditoría V2.31. Sin cambios en las
+barreras LIVE (siguen doblemente bloqueadas) ni en la ruta SIM-only.
+
+- **Shadow real (evidencia ejecutada, no flag)**: nuevo `strategy_shadow_phase.py`
+  (`run_shadow_replay`) que ejecuta la definición del finalista con el motor real de
+  reglas sobre una ventana separada del LAB. Dominio: `ShadowValidationResult` +
+  `ShadowPolicy`; `evaluate_promotion` pasa a exigir evidencia (`shadow=...`) y la
+  ACTIVE queda enlazada a `shadow_validation_id`. `AUTO_ORCHESTRATOR_SHADOW_VALIDATED`
+  deja de ser autoridad y pasa a **override explícito** del operador.
+- **Persistencia**: migración **032** `strategy_shadow_validations` +
+  `strategy_promotions.shadow_validation_id`; `save_shadow_result`/`list_shadow_results`.
+  El marcador engañoso de `save_active` (escribía `shadow_validated=True` sin evidencia)
+  queda corregido.
+- **Atribución post-crash**: migración **033** (`sim_auto_positions.strategy_version_id` +
+  `ledger_entries.strategy_version_id`). `readopt_positions` restaura la versión ⇒ los
+  cierres readoptados vuelven a atribuirse; el ledger recibe la versión por
+  `ExecuteTrade.execute(..., strategy_version_id=...)` (aditivo, sin tocar importes).
+- **E2E A11 en PG**: nuevo `test_a11_discovery_to_auto_sim_pg.py`
+  (DISCOVERY → SHADOW → PROMOTION → ACTIVE → SIM → LEDGER → VIGILANCIA + caso negativo
+  sin evidencia + readopt con atribución), en el job `lifecycle-pg`.
+- **CI simétrico**: discovery + shadow añadidos también a `python-ci.yml` (el job diario
+  no los listaba).
+
+> Cierre: `docs/engineering/cierre-v2.32-a12-shadow-attribution-2026-09-11.md`.
+
 ## [1.55.0-beta] — V2.31 / A11 · Intelligent Strategy Discovery — 2026-09-10
 
 Cierra los **dos P1** de la auditoría V2.30. Sin cambios en las barreras LIVE (siguen

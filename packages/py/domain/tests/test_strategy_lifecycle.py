@@ -12,6 +12,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     CoachAssessment,
     GateResult,
     GateStatus,
+    ShadowPolicy,
     StrategyCandidate,
     StrategyEvaluation,
     StrategyFinalist,
@@ -206,3 +207,73 @@ def test_candidate_carries_data_snapshot_for_reproducibility() -> None:
         data_snapshot_id="snap-2026-09-10",
     )
     assert cand.data_snapshot_id == "snap-2026-09-10"
+
+
+# ── V2.32/A12: Promotion Gate por EVIDENCIA shadow (no por flag) ─────────────────
+
+def test_shadow_policy_passes_with_evidence() -> None:
+    policy = ShadowPolicy(min_trades=5, min_return_pct=0.0, max_drawdown_pct=20.0)
+    result = policy.evaluate(
+        version_id="ver-1",
+        trades=8,
+        return_pct=3.5,
+        max_drawdown_pct=7.0,
+        win_rate=0.6,
+        bars_used=200,
+    )
+    assert result.passed
+    assert result.reasons == ()
+    assert result.bars_used == 200
+
+
+def test_shadow_policy_fails_closed_without_sample() -> None:
+    policy = ShadowPolicy(min_trades=10)
+    result = policy.evaluate(version_id="ver-1", trades=2, return_pct=5.0, max_drawdown_pct=1.0)
+    assert not result.passed
+    assert "shadow_muestra_insuficiente" in result.reasons
+
+
+def test_promotion_requires_shadow_evidence_not_flag() -> None:
+    """Sin evidencia shadow (``shadow=None``, flag None) NO promociona."""
+    validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
+    promo = evaluate_promotion(
+        finalist=_finalist(),
+        validation=validation,
+        coach=_coach_approves(),
+        shadow=None,
+        shadow_validated=None,
+    )
+    assert not promo.promoted
+    assert "shadow_validation_requerida" in promo.reasons
+
+
+def test_promotion_with_failed_evidence_does_not_promote() -> None:
+    validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
+    failed = ShadowPolicy(min_trades=10).evaluate(
+        version_id="ver-1", trades=1, return_pct=-2.0, max_drawdown_pct=9.0
+    )
+    promo = evaluate_promotion(
+        finalist=_finalist(),
+        validation=validation,
+        coach=_coach_approves(),
+        shadow=failed,
+    )
+    assert not promo.promoted
+    assert "shadow_validation_requerida" in promo.reasons
+
+
+def test_promotion_with_passing_evidence_links_validation_id() -> None:
+    validation = StrategyValidation(finalist_id="ver-1", gates=_all_gates_pass())
+    evidence = ShadowPolicy(min_trades=1, min_return_pct=-100.0).evaluate(
+        version_id="ver-1", trades=6, return_pct=4.0, max_drawdown_pct=3.0
+    )
+    promo = evaluate_promotion(
+        finalist=_finalist(),
+        validation=validation,
+        coach=_coach_approves(),
+        shadow=evidence,
+    )
+    assert promo.promoted
+    assert promo.shadow_validated is True
+    assert promo.shadow_validation_id == "ver-1"
+

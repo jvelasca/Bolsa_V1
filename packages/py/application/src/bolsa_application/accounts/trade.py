@@ -56,12 +56,17 @@ class ExecuteTrade:
         account_id: str | None = None,
         portfolio_id: str | None = None,
         idempotency_key: str,
+        strategy_version_id: str | None = None,
     ) -> TradeResult:
         """Ejecuta un trade sobre la cuenta/cartera resuelta por el scope.
 
         R-11 C2/C3: ``idempotency_key`` obligatoria (str 16-128, sin whitespace) y
         precisión `Decimal` íntegra hasta el borde del wire; el float solo aparece al
         invocar repo/ledger.
+
+        V2.32/A12: ``strategy_version_id`` (opcional) se estampa en los asientos del
+        ledger para que la atribución de la serie contable no dependa en exclusiva del
+        contexto financiero SIM. NO afecta a importes, balances ni idempotencia.
         """
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
         # M4: doble POST con la misma idempotency_key → una sola transacción.
@@ -153,6 +158,7 @@ class ExecuteTrade:
             quantity=quantity,
             price=price,
             reference_id=result.transaction.id,
+            strategy_version_id=strategy_version_id,
         )
         if fees.total > 0:
             fee_parts = []
@@ -171,6 +177,7 @@ class ExecuteTrade:
                 balance_after=float(fee_balance),
                 reference_id=result.transaction.id,
                 description=description,
+                strategy_version_id=strategy_version_id,
             )
         await self._account_repo.touch_activity(scope.account.id)
         return result

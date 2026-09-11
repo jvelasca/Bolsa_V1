@@ -27,6 +27,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     CoachAssessment,
     GateResult,
     GateStatus,
+    ShadowValidationResult,
     StrategyCandidate,
     StrategyEvaluation,
     StrategyFinalist,
@@ -94,6 +95,9 @@ class StrategyLifecycleStore(Protocol):
     # V2.29 / A10: dictamen COACH comparativo del TOP3 (advisory, uno por candidato).
     async def save_coach_assessment(self, assessment: CoachAssessment) -> None: ...
     async def list_coach_assessments(self, candidate_id: str) -> list[CoachAssessment]: ...
+    # V2.32 / A12: evidencia shadow ejecutada (autoridad del Promotion Gate).
+    async def save_shadow_result(self, result: ShadowValidationResult) -> None: ...
+    async def list_shadow_results(self, version_id: str) -> list[ShadowValidationResult]: ...
 
 
 class InMemoryStrategyLifecycleStore:
@@ -107,6 +111,7 @@ class InMemoryStrategyLifecycleStore:
         self._active: dict[str, ActiveStrategyRecord] = {}
         self._health: dict[str, list[StrategyHealth]] = {}
         self._coach: dict[str, list[CoachAssessment]] = {}
+        self._shadow: dict[str, list[ShadowValidationResult]] = {}
 
     async def save_candidate(self, candidate: StrategyCandidate) -> None:
         self._candidates[candidate.id] = candidate
@@ -159,6 +164,12 @@ class InMemoryStrategyLifecycleStore:
 
     async def list_coach_assessments(self, candidate_id: str) -> list[CoachAssessment]:
         return list(self._coach.get(candidate_id, []))
+
+    async def save_shadow_result(self, result: ShadowValidationResult) -> None:
+        self._shadow.setdefault(result.version_id, []).append(result)
+
+    async def list_shadow_results(self, version_id: str) -> list[ShadowValidationResult]:
+        return list(self._shadow.get(version_id, []))
 
 
 def _gates_to_json(gates: tuple[GateResult, ...]) -> dict[str, Any]:
@@ -394,6 +405,7 @@ class PostgresStrategyLifecycleStore:
                 promoted=record.promotion.promoted,
                 reasons=list(record.promotion.reasons),
                 shadow_validated=record.promotion.shadow_validated,
+                shadow_validation_id=record.promotion.shadow_validation_id,
                 promoted_at=_now() if record.promotion.promoted else None,
                 created_at=_now(),
             )
@@ -419,12 +431,69 @@ class PostgresStrategyLifecycleStore:
                     promoted=bool(r.promoted),
                     reasons=tuple(str(x) for x in (r.reasons or [])),
                     shadow_validated=bool(r.shadow_validated),
+                    shadow_validation_id=(
+                        str(r.shadow_validation_id) if r.shadow_validation_id else None
+                    ),
                     promoted_at=r.promoted_at.isoformat() if r.promoted_at else None,
                 ),
                 candidate_id=r.candidate_id,
                 instrument_id=r.instrument_id,
                 version_id=r.finalist_id,
                 created_at=r.created_at.isoformat(),
+            )
+            for r in rows
+        ]
+
+    async def save_shadow_result(self, result: ShadowValidationResult) -> None:
+        """V2.32 / A12: persiste la evidencia shadow ejecutada (autoridad del gate)."""
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import StrategyShadowValidationRow
+        from bolsa_infrastructure.ids import new_id
+
+        await self._session.execute(
+            pg_insert(StrategyShadowValidationRow)
+            .values(
+                id=new_id(),
+                version_id=result.version_id,
+                instrument_id=result.instrument_id,
+                trades=int(result.trades),
+                return_pct=result.return_pct,
+                max_drawdown_pct=result.max_drawdown_pct,
+                win_rate=result.win_rate,
+                bars_used=int(result.bars_used),
+                passed=bool(result.passed),
+                reasons=list(result.reasons),
+                as_of=result.as_of,
+                created_at=_now(),
+            )
+            .on_conflict_do_nothing(index_elements=["id"])
+        )
+        await self._session.commit()
+
+    async def list_shadow_results(self, version_id: str) -> list[ShadowValidationResult]:
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyShadowValidationRow
+
+        rows = (
+            await self._session.execute(
+                select(StrategyShadowValidationRow)
+                .where(StrategyShadowValidationRow.version_id == version_id)
+                .order_by(StrategyShadowValidationRow.created_at.asc())
+            )
+        ).scalars().all()
+        return [
+            ShadowValidationResult(
+                version_id=r.version_id,
+                trades=int(r.trades or 0),
+                passed=bool(r.passed),
+                reasons=tuple(str(x) for x in (r.reasons or [])),
+                return_pct=r.return_pct,
+                max_drawdown_pct=r.max_drawdown_pct,
+                win_rate=r.win_rate,
+                bars_used=int(r.bars_used or 0),
+                as_of=r.as_of,
             )
             for r in rows
         ]
@@ -458,6 +527,10 @@ class PostgresStrategyLifecycleStore:
 
             from bolsa_infrastructure.ids import new_id
 
+            # V2.32/A12: la fila de localización NO certifica shadow. Solo se propaga
+            # la evidencia real (``active.shadow_validation_id``/``shadow_validated``)
+            # si el Promotion Gate la aportó; en otro caso queda en False/None y
+            # ``get_active`` localiza la activa por ``promoted`` (no por el flag).
             await self._session.execute(
                 pg_insert(StrategyPromotionRow)
                 .values(
@@ -467,13 +540,8 @@ class PostgresStrategyLifecycleStore:
                     instrument_id=record.active.instrument_id,
                     promoted=True,
                     reasons=[],
-                    # Marcador de materialización, NO evidencia de validación shadow:
-                    # esta fila existe solo como localizador de la versión ACTIVA
-                    # (get_active la busca por finalist_id + promoted). La evidencia
-                    # real de shadow vive en el Promotion Gate (ActiveStrategy no
-                    # expone shadow_validated, así que aquí no se puede propagar el
-                    # valor real; no interpretar este True como certificación).
-                    shadow_validated=True,
+                    shadow_validated=bool(record.active.shadow_validated),
+                    shadow_validation_id=record.active.shadow_validation_id,
                     promoted_at=_now(),
                     created_at=_now(),
                 )
@@ -514,6 +582,10 @@ class PostgresStrategyLifecycleStore:
             instrument_id=version.instrument_id,
             name=version.name,
             definition=dict(version.definition or {}),
+            shadow_validated=bool(row.shadow_validated),
+            shadow_validation_id=(
+                str(row.shadow_validation_id) if row.shadow_validation_id else None
+            ),
             promoted_at=row.promoted_at.isoformat() if row.promoted_at else None,
         )
         return ActiveStrategyRecord(

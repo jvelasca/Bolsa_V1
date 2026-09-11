@@ -406,10 +406,10 @@ class AutoSimulationWorker:
             logger.exception("auto_sim readopt_positions failed")
             self._readopted = True
             return dict(self._open)
-        # Nota V2.28/A10 (P1-02 real): la proyección durable NO guarda la versión de
-        # estrategia que abrió la posición. Tras un crash, los fills de cierre de las
-        # posiciones readoptadas quedan sin atribución (``None``) en vez de inventar una
-        # versión. Aceptable: la ausencia de atribución es información, no un dato falso.
+        # V2.32/A12: la proyección durable YA guarda la versión de estrategia que abrió
+        # la posición (migración 033). Al readoptarla se restaura ``_position_version``,
+        # de modo que los fills de cierre posteriores al crash vuelven a atribuirse a la
+        # misma versión (antes quedaban en NULL y truncaban la serie observada).
         authoritative = await self._reconcile_before_trusting(account_id, projection)
         # La posición abierta se adopta desde la proyección Y, si la reconciliación
         # determinó un canónico fiable, también desde él (un espejo vacío no debe
@@ -425,6 +425,8 @@ class AutoSimulationWorker:
                     self._entry_price[symbol] = Decimal(str(row.entry_price))
                 if row.high_watermark is not None:
                     self._high_price[symbol] = Decimal(str(row.high_watermark))
+                if row.strategy_version_id:
+                    self._position_version[symbol] = str(row.strategy_version_id)
         self._readopted = True
         return dict(self._open)
 
@@ -546,6 +548,9 @@ class AutoSimulationWorker:
                     qty,
                     entry_price=self._entry_price.get(symbol),
                     high_watermark=self._high_price.get(symbol),
+                    # V2.32/A12: la versión que abrió la posición viaja al espejo
+                    # durable para sobrevivir al crash y restaurarse en readopt.
+                    strategy_version_id=self._position_version.get(symbol),
                 )
         except Exception:  # noqa: BLE001 — el espejo durable nunca tumba el turno SIM.
             logger.exception("auto_sim persist_position failed symbol=%s", symbol)

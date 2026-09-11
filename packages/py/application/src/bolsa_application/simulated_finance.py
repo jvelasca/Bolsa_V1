@@ -261,6 +261,8 @@ def build_simulated_execute_trade_applier(
                 price=float(finance.price),
                 account_id=finance.account_id,
                 idempotency_key=finance.idempotency_key,
+                # V2.32/A12: la versión viaja al ledger (atribución aditiva).
+                strategy_version_id=finance.strategy_version_id,
             )
             return True
         except Exception:  # noqa: BLE001 — no applied; no marcar APPLIED por excepción.

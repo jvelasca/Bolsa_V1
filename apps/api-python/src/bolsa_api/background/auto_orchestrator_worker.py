@@ -60,6 +60,9 @@ AUTO_ORCHESTRATOR_DISCOVERY = "AUTO_ORCHESTRATOR_DISCOVERY"
 AUTO_ORCHESTRATOR_DISCOVERY_MAX_TRIALS = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_TRIALS"
 AUTO_ORCHESTRATOR_DISCOVERY_MAX_PER_FAMILY = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_PER_FAMILY"
 AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES"
+# V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
+AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
+_SHADOW_WINDOW_BARS_DEFAULT = 250
 
 
 def _truthy(raw: str | None) -> bool:
@@ -88,6 +91,12 @@ def _interval_seconds(default: float = 3600.0) -> float:
 
 
 def shadow_validated() -> bool:
+    """V2.32/A12: override explícito del operador del Promotion Gate (default OFF).
+
+    Ya NO es la autoridad: la autoridad es la evidencia ejecutada por el replay
+    shadow del orquestador. ON se usa solo para rollout/emergencia y queda auditado
+    como ``shadow_override_operador``.
+    """
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_SHADOW_VALIDATED))
 
 
@@ -117,6 +126,18 @@ def _discovery_budget() -> Any:
     )
 
 
+def _shadow_window_bars() -> int:
+    """Ventana (en barras) del replay shadow; override por env, default 250."""
+    raw = (os.getenv(AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS) or "").strip()
+    if not raw:
+        return _SHADOW_WINDOW_BARS_DEFAULT
+    try:
+        value = int(raw)
+    except ValueError:
+        return _SHADOW_WINDOW_BARS_DEFAULT
+    return value if value > 0 else _SHADOW_WINDOW_BARS_DEFAULT
+
+
 def _make_discovery_runner(budget: Any) -> Any:
     """``discovery(instrument_id)`` síncrono (función pura, sin DB/red)."""
     from bolsa_application.strategy_discovery_engine import discover_for_instrument
@@ -125,6 +146,30 @@ def _make_discovery_runner(budget: Any) -> Any:
         return discover_for_instrument(instrument_id=instrument_id, budget=budget)
 
     return _discover
+
+
+def _make_shadow_bars_provider(session_factory: Any) -> Any:
+    """``shadow_bars(instrument_id)`` async: barras OHLCV para el replay shadow.
+
+    V2.32/A12: abre una sesión por llamada (mismo patrón que el resto del worker) y
+    lee la ventana diaria del instrumento. Un fallo de lectura devuelve vacío: sin
+    barras no hay evidencia y el Promotion Gate queda fail-closed (no se inventa).
+    """
+    async def _shadow_bars(instrument_id: str) -> tuple[Any, ...]:
+        from bolsa_api.api.dependencies import get_ohlcv_repository
+
+        try:
+            async with session_factory() as session:
+                repo = get_ohlcv_repository(session)
+                bars = await repo.get_bars(
+                    instrument_id, limit=_shadow_window_bars()
+                )
+                return tuple(bars or ())
+        except Exception:  # noqa: BLE001 — sin evidencia no se aprueba nada.
+            logger.exception("auto_orchestrator shadow bars read failed for %s", instrument_id)
+            return ()
+
+    return _shadow_bars
 
 
 async def _instruments_for_cycle(
@@ -181,7 +226,10 @@ async def auto_orchestrator_loop(
     """Bucle del orquestador: corre el ciclo y vigila la activa por instrumento."""
     period = interval_seconds if interval_seconds is not None else _interval_seconds()
     allowlist = instrument_watch()
-    allow_promotion = shadow_validated()
+    # V2.32/A12: el flag pasa a ser un OVERRIDE explícito del operador. Por defecto
+    # (OFF) la autoridad del Promotion Gate es la evidencia shadow ejecutada; el flag
+    # ON solo se usa para rollout/emergencia y queda auditado como override.
+    allow_override = shadow_validated() or None
     while True:
         watch = await _instruments_for_cycle(orchestrator, allowlist=allowlist)
         if not watch:
@@ -194,7 +242,7 @@ async def auto_orchestrator_loop(
             try:
                 result = await orchestrator.run_cycle(
                     instrument_id=instrument_id,
-                    shadow_validated=allow_promotion,
+                    shadow_validated=allow_override,
                     run_id=f"orchestrator:{instrument_id}",
                 )
                 logger.info(
@@ -317,6 +365,11 @@ def _default_orchestrator(session_factory: Any) -> Any:
             discovery=(
                 _make_discovery_runner(_discovery_budget()) if discovery_enabled() else None
             ),
+            # V2.32/A12: evidencia shadow ejecutada (barras OHLCV del instrumento) y
+            # override explícito del operador. Con ``shadow_override=None`` la única
+            # autoridad del Promotion Gate es la evidencia.
+            shadow_bars=_make_shadow_bars_provider(session_factory),
+            shadow_override=(True if shadow_validated() else None),
         )
     )
 

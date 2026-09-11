@@ -41,6 +41,10 @@ from bolsa_application.strategy_promotion_phase import (
     build_strategy_version,
     decide_promotion,
 )
+from bolsa_application.strategy_shadow_phase import (
+    ShadowReplayConfig,
+    run_shadow_replay,
+)
 from bolsa_application.strategy_top3_coach_phase import (
     CoachThresholds,
     Top3CoachVerdict,
@@ -55,6 +59,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     PROMOTION_GATES,
     ActiveStrategy,
     GateResult,
+    ShadowPolicy,
     StrategyCandidate,
     StrategyEvaluation,
 )
@@ -83,6 +88,8 @@ class LifecycleStorePort(Protocol):
     # V2.29 / A10: dictamen COACH comparativo sobre el TOP3 (uno por candidato). El
     # orquestador lo persiste como evidencia advisory; nunca sustituye a los gates.
     async def save_coach_assessment(self, assessment: Any) -> None: ...
+    # V2.32 / A12: evidencia shadow ejecutada (autoridad del Promotion Gate).
+    async def save_shadow_result(self, result: Any) -> None: ...
 
 
 # ``run_optimize(candidate) -> result`` (resultado de RunSmaGridOptimize o compatible).
@@ -97,6 +104,10 @@ ObservedMetricsProvider = Callable[[str], Awaitable[dict[str, Any]]]
 # por familia fija por el search space curado del Discovery Engine. Si es ``None``, se
 # conserva el comportamiento previo (una candidata con ``strategy_family``/``params``).
 DiscoveryRunner = Callable[[str], Awaitable[tuple[Any, ...]] | tuple[Any, ...]]
+# ``shadow_bars(instrument_id) -> barras`` (V2.32/A12). Fuente de la ventana shadow
+# para ejecutar la validación del finalista. Sin ella, el orquestador no puede
+# producir evidencia y el Promotion Gate queda fail-closed (no promociona).
+ShadowBarsProvider = Callable[[str], Awaitable[Sequence[Any]] | Sequence[Any]]
 
 
 @dataclass(slots=True)
@@ -120,6 +131,14 @@ class OrchestratorDeps:
     # V2.31 / A11 (P1-01): motor de descubrimiento. Si está cableado, ``run_cycle``
     # genera las candidatas con él (search space curado) en vez de la candidata única.
     discovery: DiscoveryRunner | None = None
+    # V2.32 / A12: barras de la ventana shadow. Si no está cableado, no hay evidencia
+    # shadow y el Promotion Gate no promociona (fail-closed).
+    shadow_bars: ShadowBarsProvider | None = None
+    shadow_policy: ShadowPolicy = field(default_factory=ShadowPolicy)
+    shadow_config: ShadowReplayConfig = field(default_factory=ShadowReplayConfig)
+    # V2.32 / A12: override explícito del operador (rollout/compatibilidad). ``None``
+    # (default) ⇒ la autoridad es exclusivamente la evidencia ejecutada.
+    shadow_override: bool | None = None
 
 
 @dataclass(slots=True)
@@ -165,15 +184,18 @@ class AutoOrchestrator:
         *,
         instrument_id: str,
         data_snapshot_id: str | None = None,
-        shadow_validated: bool = False,
+        shadow_validated: bool | None = None,
         run_id: str = "auto-orchestrator",
     ) -> OrchestratorResult:
         """Ejecuta una pasada completa del ciclo para ``instrument_id``.
 
-        ``shadow_validated`` es la validación shadow/paper exigida por el Promotion
-        Gate; el orquestador NO la inventa (default False ⇒ no promociona).
+        V2.32/A12: la validación shadow es **evidencia ejecutada** (se corre el replay
+        del finalista sobre una ventana separada). ``shadow_validated`` es el override
+        explícito del operador (``None`` por defecto ⇒ la evidencia manda). El
+        orquestador nunca inventa una aprobación shadow.
         """
         deps = self._deps
+        shadow_override = shadow_validated if shadow_validated is not None else deps.shadow_override
         resolution = None
         if deps.resolve_universe is not None:
             resolution = await deps.resolve_universe()
@@ -307,7 +329,19 @@ class AutoOrchestrator:
         )
         await deps.store.save_finalist(finalist)
 
-        # VALIDACION + PROMOCION: gates cuantitativos (del LAB) + coach + shadow.
+        # VALIDACION (shadow): V2.32/A12. Se EJECUTA la definición del finalista sobre
+        # una ventana separada del LAB para producir evidencia contable. Sin provider de
+        # barras no hay evidencia y el Promotion Gate no promociona (fail-closed). El
+        # override explícito del operador (``shadow_override``) solo aplica si se fija.
+        shadow_result = await self._run_shadow(
+            finalist=finalist,
+            instrument_id=instrument_id,
+            run_id=run_id,
+        )
+        if shadow_result is not None:
+            await deps.store.save_shadow_result(shadow_result)
+
+        # PROMOCION: gates cuantitativos (del LAB) + coach + evidencia shadow.
         active_record = await deps.store.get_active(instrument_id=instrument_id)
         active_ref = (
             ActiveStrategyRef(
@@ -323,7 +357,8 @@ class AutoOrchestrator:
             finalist=finalist,
             gates=gates,
             coach=coach,
-            shadow_validated=shadow_validated,
+            shadow=shadow_result,
+            shadow_validated=shadow_override,
             active=active_ref,
         )
         await deps.store.save_promotion(
@@ -349,6 +384,9 @@ class AutoOrchestrator:
                     instrument_id=instrument_id,
                     name=finalist.name,
                     definition=finalist.definition,
+                    # V2.32/A12: la evidencia real que autorizó la promoción.
+                    shadow_validated=decision.promotion.shadow_validated,
+                    shadow_validation_id=decision.promotion.shadow_validation_id,
                 ),
                 promoted_at=finalist.definition.get("promoted_at") or "",
             )
@@ -423,6 +461,36 @@ class AutoOrchestrator:
             degraded=decision.degraded,
             relab_triggered=decision.relab,
             reasons=decision.breaches,
+        )
+
+    async def _run_shadow(
+        self,
+        *,
+        finalist: Any,
+        instrument_id: str,
+        run_id: str,
+    ) -> Any:
+        """V2.32 / A12: ejecuta la validación shadow del finalista (fail-closed).
+
+        Sin provider de barras no hay evidencia: devuelve ``None`` y el Promotion Gate
+        no promociona. Un fallo del provider tampoco se convierte en aprobación.
+        """
+        provider = self._deps.shadow_bars
+        if provider is None:
+            return None
+        try:
+            bars = provider(instrument_id)
+            if inspect.isawaitable(bars):
+                bars = await bars
+        except Exception:  # noqa: BLE001 — sin barras no se inventa evidencia.
+            logger.exception("auto_orchestrator shadow bars failed for %s", instrument_id)
+            return None
+        return run_shadow_replay(
+            finalist=finalist,
+            bars=tuple(bars or ()),
+            policy=self._deps.shadow_policy,
+            config=self._deps.shadow_config,
+            as_of=run_id,
         )
 
 

@@ -23,6 +23,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     PROMOTION_GATES,
     CoachAssessment,
     GateResult,
+    ShadowValidationResult,
     StrategyCandidate,
     StrategyFinalist,
     StrategyPromotion,
@@ -102,11 +103,16 @@ def decide_promotion(
     finalist: StrategyFinalist,
     gates: Sequence[GateResult],
     coach: CoachAssessment,
-    shadow_validated: bool,
+    shadow_validated: bool | None = None,
+    shadow: ShadowValidationResult | None = None,
     active: ActiveStrategyRef | None = None,
     require_gate_for_active: bool = True,
 ) -> PromotionDecision:
     """Promotion Gate: seis gates + COACH + shadow, nunca swap directo de la activa.
+
+    V2.32 / A12: la autoridad shadow es la **evidencia ejecutada** (``shadow``). El
+    booleano ``shadow_validated`` (``None`` por defecto) se acepta solo como override
+    explícito del operador; sin evidencia ni override, no hay promoción.
 
     Si ya hay una estrategia ``active`` y ``require_gate_for_active`` (default), el
     reemplazo exige que TODOS los gates estén PASS, que el COACH no vete y que haya
@@ -118,6 +124,7 @@ def decide_promotion(
         finalist=finalist,
         validation=validation,
         coach=coach,
+        shadow=shadow,
         shadow_validated=shadow_validated,
     )
     reasons = list(promotion.reasons)
@@ -137,7 +144,8 @@ def decide_promotion(
             finalist_id=promotion.finalist_id,
             promoted=promoted,
             reasons=tuple(reasons),
-            shadow_validated=shadow_validated,
+            shadow_validated=promotion.shadow_validated,
+            shadow_validation_id=promotion.shadow_validation_id,
         ),
         finalist=finalist,
         replaces=replaces if promoted else None,

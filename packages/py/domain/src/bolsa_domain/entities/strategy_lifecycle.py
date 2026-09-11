@@ -208,6 +208,81 @@ class StrategyValidation:
 
 
 @dataclass(frozen=True, slots=True)
+class ShadowValidationResult:
+    """Evidencia shadow/paper *ejecutada* de un finalista (V2.32 / A12).
+
+    Sustituye al flag ``AUTO_ORCHESTRATOR_SHADOW_VALIDATED`` como autoridad del
+    Promotion Gate: la promoción exige un resultado con evidencia contable (trades
+    ejecutados en una ventana separada del LAB), no un booleano humano.
+
+    Fail-closed: ``passed`` solo es True si hay muestra suficiente (``trades >=
+    min_trades``) y las métricas respetan la política. Sin evidencia ⇒ ``False``.
+    """
+
+    version_id: str
+    trades: int
+    passed: bool
+    reasons: tuple[str, ...] = ()
+    instrument_id: str | None = None
+    return_pct: float | None = None
+    max_drawdown_pct: float | None = None
+    win_rate: float | None = None
+    bars_used: int = 0
+    as_of: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowPolicy:
+    """Umbrales de la validación shadow (deterministas, sin IA).
+
+    ``min_trades`` es la guarda de muestra (no se aprueba con evidencia anecdótica).
+    ``min_return_pct`` es MÍNIMO (se rechaza por debajo) y ``max_drawdown_pct`` es
+    TECHO (se rechaza por encima). Un techo negativo o None desactiva el check.
+    """
+
+    min_trades: int = 10
+    min_return_pct: float | None = 0.0
+    max_drawdown_pct: float | None = None
+
+    def evaluate(
+        self,
+        *,
+        version_id: str,
+        trades: int,
+        return_pct: float | None,
+        max_drawdown_pct: float | None,
+        win_rate: float | None = None,
+        instrument_id: str | None = None,
+        bars_used: int = 0,
+        as_of: str | None = None,
+    ) -> ShadowValidationResult:
+        """Aplica la política a las métricas del replay shadow (fail-closed)."""
+        reasons: list[str] = []
+        if trades < self.min_trades:
+            reasons.append("shadow_muestra_insuficiente")
+        if self.min_return_pct is not None and (
+            return_pct is None or return_pct < self.min_return_pct
+        ):
+            reasons.append("shadow_retorno_insuficiente")
+        if self.max_drawdown_pct is not None and max_drawdown_pct is not None and (
+            max_drawdown_pct > self.max_drawdown_pct
+        ):
+            reasons.append("shadow_drawdown_excesivo")
+        return ShadowValidationResult(
+            version_id=version_id,
+            trades=trades,
+            passed=not reasons,
+            reasons=tuple(reasons),
+            instrument_id=instrument_id,
+            return_pct=return_pct,
+            max_drawdown_pct=max_drawdown_pct,
+            win_rate=win_rate,
+            bars_used=bars_used,
+            as_of=as_of,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class StrategyPromotion:
     """Promoción (o rechazo) de un finalista a ACTIVE, con su porqué auditable."""
 
@@ -215,6 +290,7 @@ class StrategyPromotion:
     promoted: bool
     reasons: tuple[str, ...] = ()
     shadow_validated: bool = False
+    shadow_validation_id: str | None = None
     promoted_at: str | None = None
 
 
@@ -227,6 +303,9 @@ class ActiveStrategy:
     instrument_id: str
     name: str
     definition: dict[str, Any]
+    # V2.32/A12: evidencia shadow que autorizó la promoción (None si no hay).
+    shadow_validated: bool = False
+    shadow_validation_id: str | None = None
     promoted_at: str | None = None
 
 
@@ -326,7 +405,8 @@ def evaluate_promotion(
     finalist: StrategyFinalist,
     validation: StrategyValidation,
     coach: CoachAssessment,
-    shadow_validated: bool,
+    shadow: ShadowValidationResult | None = None,
+    shadow_validated: bool | None = None,
 ) -> StrategyPromotion:
     """Promotion Gate (V2.25 · Fase 6): decide si un finalista puede ser ACTIVE.
 
@@ -334,7 +414,13 @@ def evaluate_promotion(
 
     1. Los SEIS gates cuantitativos en PASS (``validation.passed``).
     2. El COACH sin veto (un veto del COACH bloquea aunque los gates pasen).
-    3. Validación en shadow/paper (anti strategy-chasing): sin ella, no promoción.
+    3. Evidencia shadow/paper *ejecutada* (anti strategy-chasing): V2.32 / A12.
+
+    V2.32: la autoridad es ``shadow`` (``ShadowValidationResult``). El booleano
+    ``shadow_validated`` se conserva SOLO como override explícito del operador
+    (rollout/compatibilidad de herméticos): si se pasa, sustituye a la evidencia.
+    Por defecto (``shadow_validated=None``) el flag no puede certificar sin
+    evidencia: sin ``shadow`` que pase ⇒ ``shadow_validation_requerida``.
     """
     reasons: list[str] = []
     missing = validation.missing_gates
@@ -342,14 +428,44 @@ def evaluate_promotion(
         reasons.append(f"gates_no_superados:{','.join(missing)}")
     if coach.vetoes:
         reasons.append("coach_veto")
-    if not shadow_validated:
+    effective = shadow if shadow is not None else _shadow_override(shadow_validated, finalist)
+    if effective is None or not effective.passed:
         reasons.append("shadow_validation_requerida")
     promoted = not reasons
     return StrategyPromotion(
         finalist_id=finalist.version_id,
         promoted=promoted,
         reasons=tuple(reasons),
-        shadow_validated=shadow_validated,
+        shadow_validated=bool(effective.passed) if effective is not None else False,
+        shadow_validation_id=effective.version_id if effective is not None else None,
+    )
+
+
+def _shadow_override(
+    shadow_validated: bool | None,
+    finalist: StrategyFinalist | None,
+) -> ShadowValidationResult | None:
+    """Adapta el override booleano (legado) a un resultado shadow sintético.
+
+    ``None`` ⇒ no hay override (sin evidencia ⇒ no promoción). Un booleano explícito
+    se materializa como resultado con motivo ``shadow_override_operador`` para que la
+    auditoría distinga "aprobado por evidencia" de "aprobado por override humano".
+    """
+    if shadow_validated is None:
+        return None
+    version_id = finalist.version_id if finalist is not None else "override"
+    if not shadow_validated:
+        return ShadowValidationResult(
+            version_id=version_id,
+            trades=0,
+            passed=False,
+            reasons=("shadow_override_operador_denegado",),
+        )
+    return ShadowValidationResult(
+        version_id=version_id,
+        trades=0,
+        passed=True,
+        reasons=("shadow_override_operador",),
     )
 
 
@@ -359,12 +475,17 @@ def can_transition(
     gates: tuple[GateResult, ...] = (),
     coach: CoachAssessment | None = None,
     validation: StrategyValidation | None = None,
-    shadow_validated: bool = False,
+    shadow_validated: bool | None = None,
+    shadow: ShadowValidationResult | None = None,
 ) -> TransitionResult:
     """Máquina de estados: ¿puede avanzar desde ``state`` y con qué motivos?
 
     Fail-closed y explícita: cada paso exige su condición y devuelve los motivos de
     bloqueo. No ejecuta efectos; solo decide.
+
+    V2.32 / A12: en ``VALIDACION`` la autoridad es la evidencia ``shadow``; el
+    booleano ``shadow_validated`` (``None`` por defecto) se acepta como override
+    explícito para compatibilidad de herméticos.
     """
     target = next_state(state)
     if state in {StrategyLifecycleState.REJECTED, StrategyLifecycleState.ACTIVE}:
@@ -400,7 +521,8 @@ def can_transition(
                 False,
                 (f"gates_no_superados:{','.join(validation.missing_gates)}",),
             )
-        if not shadow_validated:
+        effective = shadow if shadow is not None else _shadow_override(shadow_validated, None)
+        if effective is None or not effective.passed:
             return TransitionResult(state, target, False, ("shadow_validation_requerida",))
         return TransitionResult(state, target, True)
 
@@ -420,6 +542,8 @@ __all__ = [
     "CoachAssessment",
     "GateResult",
     "GateStatus",
+    "ShadowPolicy",
+    "ShadowValidationResult",
     "StrategyCandidate",
     "StrategyEvaluation",
     "StrategyFinalist",

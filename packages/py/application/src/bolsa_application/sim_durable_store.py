@@ -111,6 +111,9 @@ class SimPositionProjection:
     stop_price: Decimal | None = None
     t1_state: str | None = None
     trailing_state: str | None = None
+    # V2.32 / A12: versión de estrategia que abrió la posición. Se restaura en
+    # ``readopt_positions`` para que los cierres post-crash sigan atribuyéndose.
+    strategy_version_id: str | None = None
 
 
 class SimFillFinanceContextStore(Protocol):
@@ -143,6 +146,7 @@ class SimAutoPositionStore(Protocol):
         stop_price: Decimal | None = None,
         t1_state: str | None = None,
         trailing_state: str | None = None,
+        strategy_version_id: str | None = None,
     ) -> None: ...
     async def delete(self, account_id: str, engine_id: str, symbol: str) -> None: ...
 
@@ -219,6 +223,7 @@ class InMemorySimAutoPositionStore:
         stop_price: Decimal | None = None,
         t1_state: str | None = None,
         trailing_state: str | None = None,
+        strategy_version_id: str | None = None,
     ) -> None:
         self._rows.setdefault((account_id, engine_id), {})[symbol] = SimPositionProjection(
             symbol=symbol,
@@ -229,6 +234,7 @@ class InMemorySimAutoPositionStore:
             stop_price=stop_price,
             t1_state=t1_state,
             trailing_state=trailing_state,
+            strategy_version_id=strategy_version_id,
         )
 
     async def delete(self, account_id: str, engine_id: str, symbol: str) -> None:
@@ -393,6 +399,7 @@ class PostgresSimAutoPositionStore:
                 stop_price=row.stop_price,
                 t1_state=row.t1_state,
                 trailing_state=row.trailing_state,
+                strategy_version_id=row.strategy_version_id,
             )
         return out
 
@@ -409,6 +416,7 @@ class PostgresSimAutoPositionStore:
         stop_price: Decimal | None = None,
         t1_state: str | None = None,
         trailing_state: str | None = None,
+        strategy_version_id: str | None = None,
     ) -> None:
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -428,6 +436,7 @@ class PostgresSimAutoPositionStore:
                 stop_price=stop_price,
                 t1_state=t1_state,
                 trailing_state=trailing_state,
+                strategy_version_id=strategy_version_id,
                 opened_at=now,
                 updated_at=now,
             )
@@ -441,6 +450,7 @@ class PostgresSimAutoPositionStore:
                     "stop_price": stop_price,
                     "t1_state": t1_state,
                     "trailing_state": trailing_state,
+                    "strategy_version_id": strategy_version_id,
                     "updated_at": now,
                 },
             )
@@ -501,6 +511,7 @@ async def rebuild_sim_position_projection(
             stop_price=prior.stop_price if prior else None,
             t1_state=prior.t1_state if prior else None,
             trailing_state=prior.trailing_state if prior else None,
+            strategy_version_id=prior.strategy_version_id if prior else None,
         )
     for symbol in set(current) - set(canonical):
         await position_store.delete(account_id, engine_id, symbol)

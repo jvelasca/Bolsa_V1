@@ -56,6 +56,7 @@ class SqlAlchemyLedgerRepository:
         price: float,
         reference_id: str,
         executed_at: datetime | None = None,
+        strategy_version_id: str | None = None,
     ) -> LedgerEntry:
         now = datetime.now(UTC)
         executed = executed_at or now
@@ -72,6 +73,7 @@ class SqlAlchemyLedgerRepository:
             price=Decimal(str(price)),
             reference_type="transaction",
             reference_id=reference_id,
+            strategy_version_id=strategy_version_id,
             description=None,
             executed_at=executed,
             created_at=now,
@@ -91,6 +93,7 @@ class SqlAlchemyLedgerRepository:
         reference_id: str,
         description: str | None = None,
         executed_at: datetime | None = None,
+        strategy_version_id: str | None = None,
     ) -> LedgerEntry:
         now = datetime.now(UTC)
         executed = executed_at or now
@@ -107,6 +110,7 @@ class SqlAlchemyLedgerRepository:
             price=None,
             reference_type="transaction",
             reference_id=reference_id,
+            strategy_version_id=strategy_version_id,
             description=description or "Comisiones e impuestos de operación",
             executed_at=executed,
             created_at=now,
@@ -151,6 +155,37 @@ class SqlAlchemyLedgerRepository:
             LedgerEntryRow.reference_id == reference_id,
         )
         return (await self._session.execute(stmt)).scalar_one_or_none() is not None
+
+    async def attribute_strategy(
+        self,
+        *,
+        account_id: str,
+        reference_ids: list[str],
+        strategy_version_id: str,
+    ) -> int:
+        """V2.32 / A12: estampa la versión de estrategia en los asientos de un fill.
+
+        Atribución aditiva y no destructiva: solo rellena filas cuyo
+        ``strategy_version_id`` es NULL (nunca sobreescribe una atribución previa) y
+        se limita a los ``reference_ids`` del fill. No toca importes ni balances.
+        Devuelve el número de filas estampadas.
+        """
+        from sqlalchemy import update
+
+        if not reference_ids:
+            return 0
+        result = await self._session.execute(
+            update(LedgerEntryRow)
+            .where(
+                LedgerEntryRow.account_id == account_id,
+                LedgerEntryRow.reference_id.in_(list(reference_ids)),
+                LedgerEntryRow.strategy_version_id.is_(None),
+            )
+            .values(strategy_version_id=strategy_version_id)
+        )
+        await self._session.flush()
+        rowcount = getattr(result, "rowcount", 0)
+        return int(rowcount or 0)
 
     async def list_reference_ids(
         self, account_id: str, *, reference_type: str = "transaction"

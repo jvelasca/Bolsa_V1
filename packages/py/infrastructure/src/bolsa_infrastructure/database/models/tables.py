@@ -1803,6 +1803,11 @@ class LedgerEntryRow(Base):
     price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     reference_type: Mapped[str | None] = mapped_column("reference_type", String, nullable=True)
     reference_id: Mapped[str | None] = mapped_column("reference_id", String, nullable=True)
+    # V2.32 / A12: atribución del asiento a la versión de estrategia (promoción de la
+    # serie de vigilancia al ledger, no solo a sim_fill_finance_context). Nullable.
+    strategy_version_id: Mapped[str | None] = mapped_column(
+        "strategy_version_id", String, nullable=True
+    )
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     executed_at: Mapped[datetime] = mapped_column("executed_at", DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
@@ -2205,6 +2210,12 @@ class SimAutoPositionRow(Base):
     stop_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     t1_state: Mapped[str | None] = mapped_column("t1_state", String, nullable=True)
     trailing_state: Mapped[str | None] = mapped_column("trailing_state", String, nullable=True)
+    # V2.32 / A12: atribución de la posición a la versión de estrategia que la abrió.
+    # Sin esto, tras crash/readopt los fills de cierre quedaban con atribución NULL y
+    # la vigilancia observada perdía la serie completa. Nullable: ausencia = información.
+    strategy_version_id: Mapped[str | None] = mapped_column(
+        "strategy_version_id", String, nullable=True
+    )
     opened_at: Mapped[datetime] = mapped_column(
         "opened_at",
         DateTime(timezone=True),
@@ -2301,9 +2312,36 @@ class StrategyPromotionRow(Base):
     promoted: Mapped[bool] = mapped_column(Boolean, default=False)
     reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     shadow_validated: Mapped[bool] = mapped_column("shadow_validated", Boolean, default=False)
+    shadow_validation_id: Mapped[str | None] = mapped_column(
+        "shadow_validation_id", String, nullable=True
+    )
     promoted_at: Mapped[datetime | None] = mapped_column(
         "promoted_at", DateTime(timezone=True), nullable=True
     )
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
+class StrategyShadowValidationRow(Base):
+    """Evidencia shadow ejecutada de un finalista (V2.32/A12, autoridad del gate)."""
+
+    __tablename__ = "strategy_shadow_validations"
+    __table_args__ = (
+        Index("strategy_shadow_validations_version_idx", "version_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    version_id: Mapped[str] = mapped_column("version_id", String, nullable=False)
+    instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
+    trades: Mapped[int] = mapped_column(Integer, default=0)
+    return_pct: Mapped[float | None] = mapped_column("return_pct", Float, nullable=True)
+    max_drawdown_pct: Mapped[float | None] = mapped_column(
+        "max_drawdown_pct", Float, nullable=True
+    )
+    win_rate: Mapped[float | None] = mapped_column("win_rate", Float, nullable=True)
+    bars_used: Mapped[int] = mapped_column("bars_used", Integer, default=0)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    as_of: Mapped[str | None] = mapped_column("as_of", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
