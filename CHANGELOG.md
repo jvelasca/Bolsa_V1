@@ -31,6 +31,11 @@ universo`.
 - **Invariantes intactas**: `AUTO ⇒ SIMULATED`, LIVE bloqueado, sin LLM en hot path,
   fail-closed, long-only y gates CPCV/PBO/DSR/WFE/OOS + coach sin cambios. Sin
   migración (head Alembic sigue en `035_paper_forward_evidence`).
+- **Elevación**: `main == 5348bee0` == tag **`v2.35.1-beta`**. Release-tag CI **GREEN
+  verificado** (run [`34599471123`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34599471123),
+  conclusión `success`, 2026-09-11): `python` (ruff/imports/mypy/pytest offline),
+  `lifecycle-pg`, `dr-verify`, `a7-gate`, `security`, `decision-spine`, `shared`,
+  `frontend` y `playwright (mock E2E)` en verde.
 
 ### Deuda P2 de la auditoría v2.35-beta, resuelta en la misma versión
 

@@ -7,8 +7,11 @@
 > **AsOf:** 2026-09-11 · **Base:** `main` · padre `f47e0ceb` (sello A15) → `4fdf108d` (sello A14)
 > → `e6fbab83` (fase A14) → `61e613b1` (hardening H1+H2) → `5fcd0224` (cierre A13).
 > **Alembic head:** `035_paper_forward_evidence` (SIN migración nueva en v2.35.1).
-> **Veredicto:** P1-01 **CERRADO** (hard gate ESTUDIO + tests obligatorios). Pendiente de
-> commit de fase, bump `1.60.1-beta`, y —si el owner lo decide— tag `v2.35.1-beta`.
+> **Veredicto:** P1-01 **CERRADO** y **los tres P2 de la auditoría RESUELTOS** en la misma
+> versión. **ELEVADO**: `main == 5348bee0` == tag **`v2.35.1-beta`** (bump `1.60.1-beta`).
+> **Release-tag CI GREEN VERIFICADO** (run `34599471123`, conclusión `success`, 2026-09-11):
+> `python`, `lifecycle-pg`, `dr-verify`, `a7-gate`, `security`, `decision-spine`, `shared`,
+> `frontend` y `playwright (mock E2E)` en verde; E2E integrado opt-in correctamente skipped.
 
 ---
 
