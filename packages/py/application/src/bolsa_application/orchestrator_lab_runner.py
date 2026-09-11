@@ -90,11 +90,22 @@ _LAB_RUN_KEYS = frozenset(
 )
 
 # V2.32.1 (auditoría P1-02): defaults estructurales de ventana aplicables a TODAS las
-# familias. ``cpcv_groups``/``walk_forward_folds`` NO se incluyen aquí: el motor solo
-# los soporta para familias H0 (``_run_cpcv``/``_run_walk_forward`` operan sobre grids
-# H0); aplicarlos a las familias declarativas del Discovery las dejaría sin trials.
+# familias. ``cpcv_groups``/``walk_forward_folds`` NO se incluyen aquí; desde V2.34/A14
+# las familias declarativas los reciben vía ``_DECLARATIVE_LAB_DEFAULTS`` porque el
+# motor ya soporta CPCV/WF sobre definiciones declarativas.
 _STRUCTURAL_LAB_DEFAULTS: dict[str, Any] = {
     "bar_limit": 400,
+}
+
+# V2.34/A14: defaults estructurales para familias DECLARATIVAS (catálogo de Discovery o
+# gramática). A diferencia de las H0, estas familias sí soportan CPCV/WF desde A14
+# (``RunSmaGridOptimize._run_cpcv/_run_walk_forward`` con ``definition`` declaran una
+# rama declarativa), así que se les habilita el CPCV/WF por defecto para que los gates
+# ``robustness``/``walk_forward`` dejen de quedar NOT_EVALUATED. Valores conservadores:
+# ``cpcv_groups=4`` (> CPCV_MIN_GROUPS) y 3 folds WF. El candidato puede sobreescribirlos.
+_DECLARATIVE_LAB_DEFAULTS: dict[str, Any] = {
+    "cpcv_groups": 4,
+    "walk_forward_folds": 3,
 }
 
 _GRID_KEYS = frozenset(
@@ -106,6 +117,9 @@ _GRID_KEYS = frozenset(
         "overbought_levels",
         "macd_triples",
         "max_trials",
+        # V2.34/A14: grid gramatical de la candidata (hermanos del plan). No es un
+        # parámetro de grid H0 pero viaja igual hasta el optimizador declarativo.
+        "grammar_variants",
     }
 )
 
@@ -243,8 +257,15 @@ class LabOptimizeRunner:
                 merged[key] = value
         if family in {STRATEGY_FAMILY_SMA, STRATEGY_FAMILY_RSI, STRATEGY_FAMILY_MACD}:
             return _prune_grid_to_window(family, merged)
-        # Familia declarativa del Discovery: el grid lo aporta el catálogo dentro del
-        # LAB (``RunSmaGridOptimize._run_rules``); no se recorta por warm-up de familia.
+        # V2.34/A14: familia declarativa (catálogo de Discovery o gramática). El motor
+        # YA soporta CPCV/WF sobre definiciones declarativas
+        # (``_run_declarative_partial_on_bars``), así que se aplican los defaults
+        # estructurales para que ``robustness``/``walk_forward`` se midan de verdad.
+        # El candidato puede sobreescribirlos (vienen de ``candidate_params``).
+        for key, value in _DECLARATIVE_LAB_DEFAULTS.items():
+            merged.setdefault(key, value)
+        # El grid lo aporta el catálogo/gramática dentro del LAB; no se recorta por
+        # warm-up de familia H0.
         return merged
 
 

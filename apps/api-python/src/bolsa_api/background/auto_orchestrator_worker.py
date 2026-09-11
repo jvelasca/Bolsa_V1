@@ -66,6 +66,12 @@ AUTO_ORCHESTRATOR_DISCOVERY = "AUTO_ORCHESTRATOR_DISCOVERY"
 AUTO_ORCHESTRATOR_DISCOVERY_MAX_TRIALS = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_TRIALS"
 AUTO_ORCHESTRATOR_DISCOVERY_MAX_PER_FAMILY = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_PER_FAMILY"
 AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES"
+# V2.34/A14: gramática controlada de Discovery (compone REGIME/TREND/MOMENTUM/TRIGGER/
+# EXIT sobre el mismo presupuesto global). OFF por defecto: con OFF el discovery es
+# byte-idéntico al de A13 (solo familias del catálogo).
+AUTO_ORCHESTRATOR_GRAMMAR = "AUTO_ORCHESTRATOR_GRAMMAR"
+AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS = "AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS"
+AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS = "AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS"
 # V2.32/A12: ventana de barras del replay shadow (evidencia del Promotion Gate).
 AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS = "AUTO_ORCHESTRATOR_SHADOW_WINDOW_BARS"
 _SHADOW_WINDOW_BARS_DEFAULT = 250
@@ -125,24 +131,45 @@ def discovery_enabled() -> bool:
     return _truthy(os.getenv(AUTO_ORCHESTRATOR_DISCOVERY))
 
 
+def grammar_enabled() -> bool:
+    """V2.34/A14: ¿el discovery amplía el catálogo con la gramática controlada? (OFF).
+
+    OFF por defecto: con OFF ``discover_for_instrument`` recibe ``grammar_budget=None``
+    y su salida es byte-idéntica a la de A13.
+    """
+    return _truthy(os.getenv(AUTO_ORCHESTRATOR_GRAMMAR))
+
+
+def _int_env(name: str, default: int) -> int:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
 def _discovery_budget() -> Any:
     """Presupuesto del discovery (anti-explosión combinatoria), override por env."""
     from bolsa_application.discovery_catalog import DiscoveryBudget
-
-    def _int_env(name: str, default: int) -> int:
-        raw = (os.getenv(name) or "").strip()
-        if not raw:
-            return default
-        try:
-            value = int(raw)
-        except ValueError:
-            return default
-        return value if value > 0 else default
 
     return DiscoveryBudget(
         max_trials_total=_int_env(AUTO_ORCHESTRATOR_DISCOVERY_MAX_TRIALS, 48),
         max_per_family=_int_env(AUTO_ORCHESTRATOR_DISCOVERY_MAX_PER_FAMILY, 8),
         max_candidates=_int_env(AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES, 24),
+    )
+
+
+def _grammar_budget(discovery_budget: Any) -> Any:
+    """Presupuesto de la gramática (A14), envolviendo el presupuesto global del discovery."""
+    from bolsa_application.discovery_grammar import GrammarBudget
+
+    return GrammarBudget(
+        base=discovery_budget,
+        max_components=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS, 3),
+        max_per_component_variant=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS, 4),
     )
 
 
@@ -219,11 +246,22 @@ def _float_env(name: str, default: float) -> float:
 
 
 def _make_discovery_runner(budget: Any) -> Any:
-    """``discovery(instrument_id)`` síncrono (función pura, sin DB/red)."""
+    """``discovery(instrument_id)`` síncrono (función pura, sin DB/red).
+
+    V2.34/A14: si ``AUTO_ORCHESTRATOR_GRAMMAR`` está ON, se pasa un ``GrammarBudget``
+    que amplía el catálogo con la gramática controlada, consumiendo el MISMO
+    presupuesto global. Con OFF el runner es idéntico al de A13.
+    """
     from bolsa_application.strategy_discovery_engine import discover_for_instrument
 
+    grammar_budget = _grammar_budget(budget) if grammar_enabled() else None
+
     def _discover(instrument_id: str) -> tuple[Any, ...]:
-        return discover_for_instrument(instrument_id=instrument_id, budget=budget)
+        return discover_for_instrument(
+            instrument_id=instrument_id,
+            budget=budget,
+            grammar_budget=grammar_budget,
+        )
 
     return _discover
 

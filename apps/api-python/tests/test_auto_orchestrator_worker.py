@@ -284,6 +284,63 @@ def test_forward_window_bars_default_and_override(monkeypatch: pytest.MonkeyPatc
     assert w._forward_window_bars() == w._FORWARD_WINDOW_BARS_DEFAULT
 
 
+# ── V2.34/A14: gramática de Discovery (default OFF, reversible) ─────────────────
+
+
+def test_grammar_defaults_off() -> None:
+    """La gramática es OFF por defecto: el discovery queda idéntico a A13."""
+    assert w.grammar_enabled() is False
+
+
+def test_grammar_enabled_truthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR, "1")
+    assert w.grammar_enabled() is True
+
+
+def test_grammar_budget_wraps_discovery_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El ``GrammarBudget`` envuelve el presupuesto global y respeta el techo de bloques."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    base = DiscoveryBudget(max_trials_total=48, max_per_family=8, max_candidates=24)
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS, "2")
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS, "3")
+
+    budget = w._grammar_budget(base)
+    assert budget.base is base
+    assert budget.max_components == 2
+    assert budget.max_per_component_variant == 3
+
+
+def test_grammar_budget_caps_excessive_components() -> None:
+    """Un valor de env disparatado se acota al techo duro (3) vía ``normalized``."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    budget = w._grammar_budget(DiscoveryBudget())
+    assert budget.normalized().max_components <= 3
+
+
+def test_discovery_runner_includes_grammar_only_when_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con la gramática ON el runner emite candidatas gramaticales; con OFF no."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    base = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_GRAMMAR, raising=False)
+    off_runner = w._make_discovery_runner(base)
+    off_candidates = off_runner("AAA")
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR, "1")
+    on_runner = w._make_discovery_runner(base)
+    on_candidates = on_runner("AAA")
+
+    assert not [
+        c for c in off_candidates if str(c.strategy_family).startswith("grammar:")
+    ]
+    assert [c for c in on_candidates if str(c.strategy_family).startswith("grammar:")]
+
+
 @pytest.mark.asyncio
 async def test_loop_runs_forward_between_cycle_and_watch(
     monkeypatch: pytest.MonkeyPatch,

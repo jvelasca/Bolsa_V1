@@ -8,20 +8,31 @@ from bolsa_analytics.indicators.compute import (
     IndicatorSpecInput,
     OhlcvBar,
     compute_adx,
+    compute_aroon,
     compute_atr,
+    compute_bears_power,
     compute_bollinger,
+    compute_bulls_power,
     compute_cci,
     compute_donchian,
     compute_ema,
     compute_ichimoku,
     compute_macd_line,
     compute_macd_signal_line,
+    compute_mfi,
+    compute_momentum,
+    compute_obv,
+    compute_psar,
+    compute_roc,
     compute_rsi,
     compute_sma,
+    compute_std_dev,
     compute_stoch_k,
+    compute_stoch_rsi,
     compute_supertrend,
     compute_vwap,
     compute_williams_r,
+    compute_wma,
     instance_spec_key,
 )
 from bolsa_analytics.signals.evaluate import SignalEvent, SignalKind
@@ -152,6 +163,42 @@ def _series_for_spec(
         if line == "chikou":
             return chikou
         return tenkan
+    if definition_id == "wma":
+        return compute_wma(closes, period)
+    if definition_id == "mom":
+        return compute_momentum(closes, period)
+    if definition_id == "sd":
+        return compute_std_dev(closes, period)
+    if definition_id == "roc":
+        return compute_roc(closes, period)
+    if definition_id == "obv":
+        return compute_obv(bars)
+    if definition_id == "mfi":
+        return compute_mfi(bars, period)
+    if definition_id == "bears":
+        return compute_bears_power(bars, period)
+    if definition_id == "bulls":
+        return compute_bulls_power(bars, period)
+    if definition_id == "aroon":
+        up, down = compute_aroon(bars, period)
+        if line == "down":
+            return down
+        return up
+    if definition_id == "sar":
+        step = float(parameters.get("step", 0.02))
+        # ``compute_spec`` llama al parámetro ``maxAf``; la plantilla de Discovery usaba
+        # históricamente ``maxStep``. Se aceptan ambos (fail-closed al default 0.2).
+        max_af_raw = parameters.get("maxAf", parameters.get("maxStep", 0.2))
+        return compute_psar(bars, step, float(max_af_raw))
+    if definition_id == "srsi":
+        rsi_period = int(parameters.get("rsiPeriod", period))
+        stoch_period = int(parameters.get("stochPeriod", 14))
+        k_period = int(parameters.get("kPeriod", 3))
+        d_period = int(parameters.get("dPeriod", 3))
+        k_line, d_line = compute_stoch_rsi(closes, rsi_period, stoch_period, k_period, d_period)
+        if line == "signal":
+            return d_line
+        return k_line
     return None
 
 

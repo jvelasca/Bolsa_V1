@@ -81,6 +81,9 @@ jobs:
           packages/py/application/tests/test_discovery_catalog.py
           packages/py/application/tests/test_strategy_discovery_engine.py
           packages/py/application/tests/test_lab_discovery_dispatch.py
+          # V2.34/A14: gramática controlada de Discovery (composición + presupuesto).
+          packages/py/application/tests/test_discovery_grammar.py
+          packages/py/analytics/tests/test_rules_engine_series_wiring.py
           # V2.32/A12: evidencia shadow ejecutada (replay determinista, sin DB).
           packages/py/application/tests/test_strategy_shadow_phase.py
           # V2.33/A13: forward paper determinista (sin DB, sin red).
@@ -110,6 +113,9 @@ jobs:
           --ignore=apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           # V2.33/A13: el E2E del Paper Forward necesita PG real (job paper-forward-pg).
           --ignore=apps/api-python/tests/test_a13_paper_forward_pg.py
+          # V2.34/A14: el E2E de la gramática de Discovery necesita PG real
+          # (job grammar-discovery-pg).
+          --ignore=apps/api-python/tests/test_a14_grammar_discovery_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
 
@@ -213,5 +219,56 @@ jobs:
         run: >
           uv run pytest
           apps/api-python/tests/test_a13_paper_forward_pg.py
+          -q
+          --tb=short
+
+  grammar-discovery-pg:
+    # V2.34 (A14): certificación PostgreSQL OBLIGATORIA por commit de la gramática
+    # controlada de Discovery. Valida que una candidata gramatical recorre el lifecycle
+    # con evidencia real (CPCV/PBO/WFE declarativos), que los gates robustness/
+    # walk_forward dejan de quedar NOT_EVALUATED, el fail-closed sin shadow y la
+    # invariante LIVE=0, con gates fail-if-skipped: un skip silencioso es un fallo duro.
+    name: grammar-discovery-pg (Alembic + A14 E2E, per-commit)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bolsa
+          POSTGRES_PASSWORD: bolsa_dev
+          POSTGRES_DB: bolsa_v1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolsa -d bolsa_v1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: bolsa
+      DB_PASSWORD: bolsa_dev
+      DB_NAME: bolsa_v1
+      A14_GRAMMAR_PG_REQUIRED: '1'
+      AUTO_ORCHESTRATOR_PG_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Alembic upgrade head
+        run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      - name: Pytest A14 PG (fail if skipped)
+        run: >
+          uv run pytest
+          apps/api-python/tests/test_a14_grammar_discovery_pg.py
           -q
           --tb=short

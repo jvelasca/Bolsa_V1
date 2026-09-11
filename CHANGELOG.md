@@ -2,6 +2,58 @@
 
 All notable releases of Bolsa V1.
 
+## [1.59.0-beta] — V2.34 / A14 · Strategy Intelligence (gramática controlada de Discovery) — 2026-09-11
+
+Discovery deja de ser un catálogo de familias técnicas fijas y pasa a ser una **gramática
+controlada**: una estrategia se compone de bloques funcionales (`REGIME` + `TREND FILTER`
+
+- `MOMENTUM` + `ENTRY TRIGGER` + `EXIT`, con `TRIGGER`/`EXIT` obligatorios y máx. 2–3
+  opcionales), acotada por un presupuesto determinista. **Sin segundo motor de trading ni
+  segundo FSM**, **sin migración** (head Alembic sigue en `035_paper_forward_evidence`) y sin
+  tocar las barreras LIVE.
+
+* **Gramática controlada (`discovery_grammar.py`)**: vocabulario de bloques, variantes
+  declaradas, vetos de redundancia y materialización a `StrategyDefinitionV1` con los
+  helpers existentes. La composición es la **conjunción plana** de reglas
+  (`operator="all"`), exactamente lo que el motor declarativo ya evalúa; no se añade
+  sintaxis ni nesting al motor.
+* **`GrammarBudget`**: envuelve `DiscoveryBudget` (un único presupuesto global por
+  instrumento), acota `max_components ∈ [1, 3]` y `max_per_component_variant`, con
+  enumeración determinista (cero azar, cero IA). El techo exacto queda fijado por test
+  anti-explosión (1784 planes con el presupuesto por defecto).
+* **Cierre del gap bloqueante de promoción**: la vía declarativa del LAB
+  (`_run_cpcv`/`_run_walk_forward`) gana una rama que reutiliza `split_cpcv_paths` y
+  `_simulate_rules_strategy`, produciendo **CPCV/PBO/DSR/WFE reales**. Antes de A14,
+  `robustness`/`walk_forward` quedaban `NOT_EVALUATED` para toda familia declarativa y
+  **ninguna candidata de Discovery podía promocionar**.
+* **Grid gramatical**: cada candidata gramatical lleva variantes hermanas
+  (`grammar_variants`) para que el LAB re-optimice de verdad y el PBO CSCV tenga columnas
+  que rankear; la reserva de presupuesto garantiza que el catálogo no deja a la gramática
+  sin candidatas.
+* **Sanación de familias inertes**: se cablean en `_series_for_spec` los ids causales que
+  faltaban (`roc`, `srsi`, `mom`, `wma`, `sd`, `obv`, `mfi`, `aroon`, `bears`, `bulls`,
+  `sar` vía `compute_psar` con `maxAf`). Las plantillas `roc_momentum`,
+  `stoch_rsi_reversion` y `sar_flip` del catálogo, que referenciaban ids no cableados
+  (reglas silenciosamente inertes), ahora producen señales reales.
+* **Propagación del campeón**: el `executable` promocionado se **re-materializa con los
+  parámetros ganadores** del campeón (no con el punto plantilla de la candidata), evitando
+  que shadow/forward repliquen parámetros obsoletos.
+* **Rollout reversible**: la gramática está tras `AUTO_ORCHESTRATOR_GRAMMAR` (OFF por
+  defecto); con OFF el Discovery es idéntico al de A13 (test de regresión).
+* **Invariantes intactas**: H1 (`require_holdout=True` inviolable; fail-closed sin
+  `lab_end`), H2 (identidad `instrument_id/timeframe/source/adjusted` en `bars_hash`) y las
+  barreras LIVE (`AUTO ⇒ SIMULATED`; cero publicaciones al bridge real).
+* **Tests**: herméticos de gramática/determinismo/techo/vetos/wiring/gates declarativos
+  (entran en el job `quality`) y E2E PG `grammar-discovery-pg` (gate
+  `A14_GRAMMAR_PG_REQUIRED=1`, fail-if-skipped; negativo fail-closed e invariante LIVE=0).
+
+> Verificación: `ruff`, `lint-imports`, `mypy` verdes; job `quality` offline
+> (`apps/api-python` 201/201, `packages/py` 2276/2278) y E2E PG de certificación
+> (`grammar-discovery-pg`, `paper-forward-pg`, `lifecycle-pg`) sin skips.
+>
+> **Deuda preexistente que NO se toca aquí**: `packages/py/infrastructure/tests/chaos/
+test_load_concurrency_flow.py` (2 fallos de carga preexistentes).
+
 ## [1.58.1-beta] — V2.32.1 · Hardening H1+H2 (hold-out inviolable + identidad de dataset) — 2026-09-11
 
 Cierra los dos contratos que la auditoría V2.32.1 dejó pendientes y que se acordó **no**

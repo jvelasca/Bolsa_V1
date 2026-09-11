@@ -604,14 +604,24 @@ def _champion_definition(
 
     V2.31/A11: para candidatas del Discovery, el campeón puede ser de una familia
     declarativa que ``build_executable_definition`` no conoce (trend/momentum/volatility).
-    En ese caso se usa la definición ejecutable de la propia candidata (la plantilla del
-    catálogo), reescalada a los parámetros ganadores.
+    En ese caso se usa la definición ejecutable de la candidata.
+
+    V2.34/A14: se prefiere la definición RE-MATERIALIZADA del campeón
+    (``champion_trial.params["definition"]``, escrita por ``_rules_to_grid`` con los
+    parámetros ganadores) sobre la definición original de la candidata. Sin esto, el
+    ``executable`` promocionado sería el punto plantilla que trajo la candidata, no el
+    campeón optimizado, y el shadow/forward replicarían parámetros obsoletos.
     """
     champion = champion_params_from_result(result) if result is not None else None
     if champion is None:
         return None
-    extra: dict[str, Any] = {"champion_params": champion}
-    executable = build_executable_definition(candidate.strategy_family, champion)
+    champion_trial_definition = champion.get("definition")
+    # ``champion_params`` no debe anidar la definición (es un dict de grid params).
+    champion_grid = {k: v for k, v in champion.items() if k != "definition"}
+    extra: dict[str, Any] = {"champion_params": champion_grid}
+    executable = build_executable_definition(candidate.strategy_family, champion_grid)
+    if executable is None and isinstance(champion_trial_definition, dict):
+        executable = champion_trial_definition
     if executable is None:
         executable = _discovery_executable(candidate)
     if executable is not None:

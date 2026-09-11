@@ -36,9 +36,15 @@ from bolsa_application.discovery_catalog import (
     DiscoveryFamily,
     families_by_parent,
 )
+from bolsa_application.discovery_grammar import (
+    GrammarBudget,
+    enumerate_grammar_plans,
+    grammar_variants_for_plan,
+)
 from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
 
 __all__ = [
+    "GRAMMAR_FAMILY_PREFIX",
     "discover_candidates",
     "discover_for_instrument",
     "discover_from_universe",
@@ -46,6 +52,10 @@ __all__ = [
 
 # Firma del generador de ids: ``(instrument_id, index) -> str`` (reproducible).
 CandidateIdFactory = Callable[[str, int], str]
+
+# Prefijo de familia de las candidatas gramaticales (A14). El ``presetKey`` del plan
+# viaja como ``strategy_family`` para que ``_rules_grid_for`` pueda localizarlo.
+GRAMMAR_FAMILY_PREFIX = "grammar:"
 
 
 def _default_candidate_id(instrument_id: str, family_name: str, index: int) -> str:
@@ -61,6 +71,7 @@ def discover_for_instrument(
     data_snapshot_id: str | None = None,
     candidate_id_factory: CandidateIdFactory | None = None,
     bar_count: int | None = None,
+    grammar_budget: GrammarBudget | None = None,
 ) -> tuple[StrategyCandidate, ...]:
     """Genera las candidatas de descubrimiento para un instrumento.
 
@@ -72,6 +83,12 @@ def discover_for_instrument(
     El reparto del presupuesto es determinista: se recorre el catálogo en orden y
     cada familia aporta como máximo ``max_per_family`` puntos hasta agotar
     ``max_trials_total`` y ``max_candidates``.
+
+    V2.34/A14: si se pasa ``grammar_budget``, tras las familias del catálogo se
+    emiten candidatas de la **gramática controlada** (REGIME + TREND + MOMENTUM +
+    TRIGGER + EXIT) consumiendo el MISMO presupuesto global (``budget``). Con
+    ``grammar_budget=None`` (default) el comportamiento es byte-idéntico al previo a
+    A14 — la gramática es opt-in, nunca rompe el catálogo existente.
     """
     effective_budget = (budget or DiscoveryBudget()).normalized()
     catalog = tuple(
@@ -79,11 +96,10 @@ def discover_for_instrument(
         if families is not None
         else (families_by_parent(parent) if parent is not None else DISCOVERY_FAMILIES)
     )
-    if not catalog:
-        return ()
 
     candidates: list[StrategyCandidate] = []
     trials_used = 0
+
     for family in catalog:
         if len(candidates) >= effective_budget.max_candidates:
             break
@@ -129,7 +145,125 @@ def discover_for_instrument(
             emitted_for_family += 1
             trials_used += 1
 
+    # V2.34/A14 — gramática controlada, opt-in, con el MISMO presupuesto global.
+    # Se reserva una porción del presupuesto para la gramática (si está habilitada), de
+    # modo que el catálogo no la deje sin espacio: sin esta reserva, un catálogo grande
+    # (24 candidatas) agotaría ``max_candidates`` y la gramática jamás emitiría.
+    if grammar_budget is not None:
+        catalog_cap = effective_budget.max_candidates
+        reserve = _grammar_reserve(effective_budget, grammar_budget)
+        if reserve > 0:
+            catalog_cap = max(0, effective_budget.max_candidates - reserve)
+        # Recorta las candidatas del catálogo ya emitidas si excedieran el cupo reservado.
+        if len(candidates) > catalog_cap:
+            overflow = len(candidates) - catalog_cap
+            candidates = candidates[:catalog_cap]
+            trials_used = max(0, trials_used - overflow)
+        candidates, trials_used = _extend_with_grammar(
+            candidates=candidates,
+            trials_used=trials_used,
+            instrument_id=instrument_id,
+            effective_budget=effective_budget,
+            grammar_budget=grammar_budget,
+            data_snapshot_id=data_snapshot_id,
+            candidate_id_factory=candidate_id_factory,
+            bar_count=bar_count,
+        )
+
     return tuple(candidates)
+
+
+def _grammar_reserve(
+    effective_budget: DiscoveryBudget, grammar_budget: GrammarBudget
+) -> int:
+    """Nº de candidatas reservadas a la gramática dentro de ``max_candidates``.
+
+    La reserva es acotada: nunca más de la mitad del presupuesto de candidatas ni más
+    que las variantes por bloque permitidas, y siempre deja al menos una candidata al
+    catálogo (si el presupuesto lo permite).
+    """
+    effective_grammar = grammar_budget.normalized()
+    half = effective_budget.max_candidates // 2
+    reserve = min(effective_grammar.max_per_component_variant, half)
+    if reserve < 1:
+        reserve = 1
+    # Deja sitio al catálogo: si el presupuesto es 1, la reserva no puede comérselo todo.
+    return max(0, min(reserve, effective_budget.max_candidates - 1))
+
+
+def _extend_with_grammar(
+    *,
+    candidates: list[StrategyCandidate],
+    trials_used: int,
+    instrument_id: str,
+    effective_budget: DiscoveryBudget,
+    grammar_budget: GrammarBudget,
+    data_snapshot_id: str | None,
+    candidate_id_factory: CandidateIdFactory | None,
+    bar_count: int | None,
+) -> tuple[list[StrategyCandidate], int]:
+    """Emite candidatas gramaticales consumiendo el remanente del presupuesto global.
+
+    Determinista: ``enumerate_grammar_plans`` ya devuelve un orden total estable; aquí
+    solo se corta por presupuesto y warm-up. Fail-closed: un plan que no materializa
+    no emite candidata.
+    """
+    effective_grammar = grammar_budget.normalized()
+    if bar_count is not None and bar_count < int(effective_grammar.min_bars):
+        return candidates, trials_used
+
+    # El tope de emisión de la gramática es su propio ``max_per_component_variant``
+    # (acota cuántos planes aporta, no cuántos puntos por familia del catálogo), pero
+    # nunca puede exceder ``max_per_family`` del presupuesto global: el presupuesto
+    # sigue siendo único y compartido.
+    grammar_emission_cap = min(
+        int(effective_grammar.max_per_component_variant),
+        int(effective_budget.max_per_family),
+    )
+
+    emitted_for_grammar = 0
+    for plan in enumerate_grammar_plans(effective_grammar):
+        if len(candidates) >= effective_budget.max_candidates:
+            break
+        if trials_used >= effective_budget.max_trials_total:
+            break
+        if emitted_for_grammar >= grammar_emission_cap:
+            break
+        executable = plan.materialize()
+        if executable is None:
+            continue
+        index = len(candidates)
+        cid = (
+            candidate_id_factory(instrument_id, index)
+            if candidate_id_factory is not None
+            else _default_candidate_id(instrument_id, plan.preset_key, index)
+        )
+        # Grid de variantes hermanas: permite que el LAB re-optimice el plan y que el
+        # PBO CSCV tenga columnas que rankear (un plan suelto no produce PBO).
+        grammar_variants = grammar_variants_for_plan(
+            plan, max_variants=max(2, int(effective_grammar.max_per_component_variant))
+        )
+        candidates.append(
+            StrategyCandidate(
+                id=str(cid),
+                instrument_id=instrument_id,
+                strategy_family=f"{GRAMMAR_FAMILY_PREFIX}{plan.preset_key}",
+                params={
+                    "definition": executable,
+                    "discovery_family": plan.preset_key,
+                    "discovery_parent": "grammar",
+                    "discovery_params": {"grammar_plan": plan.name},
+                    "grammar_variants": grammar_variants,
+                },
+                origin="discovery",
+                data_snapshot_id=data_snapshot_id,
+                preset_key=plan.preset_key,
+            )
+        )
+        emitted_for_grammar += 1
+        trials_used += 1
+
+    return candidates, trials_used
 
 
 def discover_candidates(
@@ -141,6 +275,7 @@ def discover_candidates(
     data_snapshot_id: str | None = None,
     candidate_id_factory: CandidateIdFactory | None = None,
     bar_count: int | None = None,
+    grammar_budget: GrammarBudget | None = None,
 ) -> tuple[StrategyCandidate, ...]:
     """Alias público estable de ``discover_for_instrument`` (nombre del motor)."""
     return discover_for_instrument(
@@ -151,6 +286,7 @@ def discover_candidates(
         data_snapshot_id=data_snapshot_id,
         candidate_id_factory=candidate_id_factory,
         bar_count=bar_count,
+        grammar_budget=grammar_budget,
     )
 
 
@@ -161,6 +297,7 @@ def discover_from_universe(
     data_snapshot_id: str | None = None,
     candidate_id_factory: CandidateIdFactory | None = None,
     bar_counts: dict[str, int] | None = None,
+    grammar_budget: GrammarBudget | None = None,
 ) -> dict[str, tuple[StrategyCandidate, ...]]:
     """Descubre candidatas para todo un universo (útil fuera del orquestador).
 
@@ -179,5 +316,6 @@ def discover_from_universe(
             data_snapshot_id=data_snapshot_id,
             candidate_id_factory=candidate_id_factory,
             bar_count=counts.get(symbol),
+            grammar_budget=grammar_budget,
         )
     return out

@@ -206,14 +206,33 @@ def _macd_to_grid(trial: MacdGridTrial) -> OptimizeGridTrial:
 def _rules_grid_for(
     definition: dict[str, Any],
     family_name: str,
+    candidate_params: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], Any]:
     """V2.31/A11 — grid y plantilla para una familia declarativa del Discovery.
 
     Si la familia existe en el catálogo, se devuelve su ``param_space`` completo (para
     optimizar de verdad, no solo el punto que trajo la candidata) y su ``template``.
+    Si la candidata trae un grid gramatical (A14: ``grammar_variants``, hermanos del
+    mismo plan variando una variante de bloque), se usa ese grid para que el LAB
+    re-optimice de verdad y el PBO CSCV tenga múltiples columnas que rankear.
     Si no (definición huérfana), se evalúa el único punto recibido con una plantilla
     constante — fail-closed honesto: no se inventan puntos que no existen.
     """
+    variants = _grammar_variants_from_params(candidate_params)
+    if variants:
+        points = [{"grammarVariant": label} for label, _ in variants]
+        by_label = {label: spec for label, spec in variants}
+
+        def _from_variant(point: Any) -> dict[str, Any] | None:
+            if not isinstance(point, dict):
+                return None
+            label = point.get("grammarVariant")
+            if not isinstance(label, str):
+                return None
+            return by_label.get(label)
+
+        return points, _from_variant
+
     try:
         from bolsa_application.discovery_catalog import family_by_name
     except Exception:  # noqa: BLE001 — sin catálogo se evalúa el punto recibido.
@@ -229,16 +248,55 @@ def _rules_grid_for(
     return [{}], _fixed
 
 
+def _grammar_variants_from_params(
+    candidate_params: dict[str, Any] | None,
+) -> list[tuple[str, dict[str, Any]]]:
+    """Extrae el grid gramatical de ``candidate_params`` (A14), si lo trae.
+
+    Formato: ``grammar_variants`` = lista de ``{"label": str, "definition": dict}``.
+    Se devuelve como lista de ``(label, definition)`` en el orden declarado (estable).
+    """
+    if not isinstance(candidate_params, dict):
+        return []
+    raw = candidate_params.get("grammar_variants")
+    if not isinstance(raw, list):
+        return []
+    out: list[tuple[str, dict[str, Any]]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("label")
+        spec = item.get("definition")
+        if isinstance(label, str) and isinstance(spec, dict):
+            out.append((label, spec))
+    return out
+
+
 def _rules_to_grid(
     trial: RulesGridTrial,
     *,
     definition: dict[str, Any],
+    template: Any = None,
 ) -> OptimizeGridTrial:
     # El punto del grid (params) se conserva para el campeón; la definición ejecutable
     # viaja con él para que ``_simulate_family_metrics`` pueda re-simular el campeón
     # (necesario para el EdgeReport / OOS round-trips).
+    #
+    # V2.34/A14: si hay plantilla, se RE-MATERIALIZA la definición con los parámetros
+    # ganadores de ESTE trial (no se reutiliza la definición de la candidata). Sin esto,
+    # el ``executable`` promocionado sería el punto plantilla original y el shadow/forward
+    # replicarían parámetros que no son los del campeón. Fail-closed: si la plantilla no
+    # materializa el punto, se cae a la definición recibida (no se inventa señal).
     params = dict(trial.params or {})
-    params["definition"] = definition
+    champion_definition = definition
+    if template is not None:
+        try:
+            materialized = template(params)
+        except Exception:  # noqa: BLE001 — plantilla defensiva: fallback a la original.
+            materialized = None
+        if isinstance(materialized, dict):
+            champion_definition = materialized
+    params["definition"] = champion_definition
     return OptimizeGridTrial(
         total_return_pct=trial.total_return_pct,
         max_drawdown_pct=trial.max_drawdown_pct,
@@ -672,6 +730,7 @@ class RunSmaGridOptimize:
         execution_model: Literal["next_open"] = "next_open",
         definition: dict[str, Any] | None = None,
         date_to: str | None = None,
+        grammar_variants: list[dict[str, Any]] | None = None,
     ) -> OptimizeSmaGridResult:
         """Ejecuta el grid de optimización para una familia.
 
@@ -738,6 +797,8 @@ class RunSmaGridOptimize:
                 timeframe=timeframe,
                 on_progress=on_progress,
                 execution_model=execution_model,
+                definition=definition,
+                grammar_variants=grammar_variants,
             )
 
         wf_n = normalize_walk_forward_folds(walk_forward_folds)
@@ -758,6 +819,8 @@ class RunSmaGridOptimize:
                 timeframe=timeframe,
                 on_progress=on_progress,
                 execution_model=execution_model,
+                definition=definition,
+                grammar_variants=grammar_variants,
             )
 
         # Hold-out is best-effort: never abort the whole optimize if the split
@@ -772,6 +835,9 @@ class RunSmaGridOptimize:
 
         # V2.31/A11 (Discovery): definición declarativa ⇒ grid de reglas genérico.
         if definition is not None:
+            candidate_params: dict[str, Any] = {}
+            if grammar_variants:
+                candidate_params["grammar_variants"] = list(grammar_variants)
             return await self._run_rules(
                 instrument_id=instrument_id,
                 bars=inputs,
@@ -779,6 +845,7 @@ class RunSmaGridOptimize:
                 holdout=holdout,
                 definition=definition,
                 family_name=family,
+                candidate_params=candidate_params,
                 initial_cash=initial_cash,
                 max_trials=max_trials,
                 on_progress=on_progress,
@@ -885,6 +952,65 @@ class RunSmaGridOptimize:
             execution_model=execution_model,
         )
 
+    async def _run_declarative_partial_on_bars(
+        self,
+        *,
+        instrument_id: str,
+        train_bars: list[BacktestBarInput],
+        definition: dict[str, Any],
+        family_name: str,
+        fold_max: int,
+        initial_cash: float,
+        on_progress: AsyncProgressCallback | None,
+        execution_model: Literal["next_open"] = "next_open",
+        candidate_params: dict[str, Any] | None = None,
+    ) -> OptimizeSmaGridResult:
+        """V2.34/A14 — re-optimiza una definición declarativa sobre una sub-ventana.
+
+        Análogo a ``_run_h0_partial_on_bars`` pero para la vía declarativa (gramática y
+        familias del catálogo de Discovery). Reutiliza ``run_rules_grid_search`` y por
+        tanto **el único motor** ``_simulate_rules_strategy``; no hay un segundo motor.
+
+        Se evalúa el grid real de la familia (o el grid gramatical de la candidata, o el
+        único punto si es huérfana), igual que ``_run_rules``, pero sin hold-out (la
+        sub-ventana ya es el bloque de entrenamiento de este path/fold) y con el tope
+        ``fold_max``.
+        """
+        param_points, template = _rules_grid_for(definition, family_name, candidate_params)
+        trials_total = max(1, min(len(param_points), fold_max))
+        if on_progress is not None:
+            await on_progress(0, trials_total, None)
+
+        baseline = _baseline_from_definition(train_bars, definition, initial_cash)
+        raw = await _run_in_thread_with_live_progress(
+            run_rules_grid_search,
+            train_bars,
+            trials_total=trials_total,
+            on_progress=on_progress,
+            param_points=param_points,
+            template=template,
+            initial_cash=initial_cash,
+            max_trials=fold_max,
+            execution_model=execution_model,
+        )
+        trials = [_rules_to_grid(item, definition=definition, template=template) for item in raw]
+        trials = rank_trials_for_result(trials)
+        return OptimizeSmaGridResult(
+            instrument_id=instrument_id,
+            bar_count=len(train_bars),
+            baseline=baseline,
+            trials=trials,
+            engine="rules_grid_h0",
+            trials_total=trials_total,
+            strategy_family=family_name,
+            oos_pct=None,
+            is_bar_count=None,
+            oos_bar_count=None,
+            split_timestamp=None,
+            walk_forward=None,
+            cpcv=None,
+        )
+
     async def _run_cpcv(
         self,
         *,
@@ -905,8 +1031,19 @@ class RunSmaGridOptimize:
         timeframe: str,
         on_progress: AsyncProgressCallback | None,
         execution_model: Literal["next_open"] = "next_open",
+        definition: dict[str, Any] | None = None,
+        grammar_variants: list[dict[str, Any]] | None = None,
     ) -> OptimizeSmaGridResult:
-        """CPCV ligero: H0 per combinatorial path; OOS = selected best."""
+        """CPCV ligero: H0 per combinatorial path; OOS = selected best.
+
+        V2.34/A14: si ``definition`` no es ``None`` la optimización por path es
+        declarativa (``_run_declarative_partial_on_bars``) en lugar de H0, de modo que
+        las familias del catálogo de Discovery y la gramática obtienen CPCV/PBO/WFE
+        reales. El resto del pipeline (PBO CSCV, agregación, edge report) es idéntico.
+        """
+        declarative_params: dict[str, Any] = {}
+        if grammar_variants:
+            declarative_params["grammar_variants"] = list(grammar_variants)
         purge = normalize_cpcv_gap(
             purge_bars, default=CPCV_PURGE_DEFAULT, upper=CPCV_PURGE_MAX
         )
@@ -944,22 +1081,35 @@ class RunSmaGridOptimize:
                 if on_progress is not None:
                     await on_progress(min(progress_total, _base + done), progress_total, best)
 
-            partial = await self._run_h0_partial_on_bars(
-                instrument_id=instrument_id,
-                train_bars=path.train_bars,
-                family=family,
-                fold_max=path_max,
-                fast_periods=fast_periods,
-                slow_periods=slow_periods,
-                periods=periods,
-                oversold_levels=oversold_levels,
-                overbought_levels=overbought_levels,
-                macd_triples=macd_triples,
-                initial_cash=initial_cash,
-                timeframe=timeframe,
-                on_progress=_path_progress,
-                execution_model=execution_model,
-            )
+            if definition is not None:
+                partial = await self._run_declarative_partial_on_bars(
+                    instrument_id=instrument_id,
+                    train_bars=path.train_bars,
+                    definition=definition,
+                    family_name=family,
+                    fold_max=path_max,
+                    initial_cash=initial_cash,
+                    on_progress=_path_progress,
+                    execution_model=execution_model,
+                    candidate_params=declarative_params,
+                )
+            else:
+                partial = await self._run_h0_partial_on_bars(
+                    instrument_id=instrument_id,
+                    train_bars=path.train_bars,
+                    family=family,
+                    fold_max=path_max,
+                    fast_periods=fast_periods,
+                    slow_periods=slow_periods,
+                    periods=periods,
+                    oversold_levels=oversold_levels,
+                    overbought_levels=overbought_levels,
+                    macd_triples=macd_triples,
+                    initial_cash=initial_cash,
+                    timeframe=timeframe,
+                    on_progress=_path_progress,
+                    execution_model=execution_model,
+                )
             best = partial.trials[0] if partial.trials else partial.baseline
             best_oos = _eval_oos_for_grid(
                 best,
@@ -1092,8 +1242,18 @@ class RunSmaGridOptimize:
         timeframe: str,
         on_progress: AsyncProgressCallback | None,
         execution_model: Literal["next_open"] = "next_open",
+        definition: dict[str, Any] | None = None,
+        grammar_variants: list[dict[str, Any]] | None = None,
     ) -> OptimizeSmaGridResult:
-        """Anchored expanding WF: re-optimize H0 per fold; OOS = selected best."""
+        """Anchored expanding WF: re-optimize H0 per fold; OOS = selected best.
+
+        V2.34/A14: si ``definition`` no es ``None`` la re-optimización por fold es
+        declarativa (``_run_declarative_partial_on_bars``), habilitando WFE real para
+        las familias de Discovery y la gramática.
+        """
+        declarative_params: dict[str, Any] = {}
+        if grammar_variants:
+            declarative_params["grammar_variants"] = list(grammar_variants)
         folds = split_walk_forward_bars(bars, n_folds)
         # Cap per-fold search — WF multiplies cost by n_folds.
         fold_max = min(max_trials, 80) if family == STRATEGY_FAMILY_SMA else min(max_trials, 60)
@@ -1120,22 +1280,35 @@ class RunSmaGridOptimize:
                 if on_progress is not None:
                     await on_progress(min(progress_total, _base + done), progress_total, best)
 
-            partial = await self._run_h0_partial_on_bars(
-                instrument_id=instrument_id,
-                train_bars=fold.train_bars,
-                family=family,
-                fold_max=fold_max,
-                fast_periods=fast_periods,
-                slow_periods=slow_periods,
-                periods=periods,
-                oversold_levels=oversold_levels,
-                overbought_levels=overbought_levels,
-                macd_triples=macd_triples,
-                initial_cash=initial_cash,
-                timeframe=timeframe,
-                on_progress=_fold_progress,
-                execution_model=execution_model,
-            )
+            if definition is not None:
+                partial = await self._run_declarative_partial_on_bars(
+                    instrument_id=instrument_id,
+                    train_bars=fold.train_bars,
+                    definition=definition,
+                    family_name=family,
+                    fold_max=fold_max,
+                    initial_cash=initial_cash,
+                    on_progress=_fold_progress,
+                    execution_model=execution_model,
+                    candidate_params=declarative_params,
+                )
+            else:
+                partial = await self._run_h0_partial_on_bars(
+                    instrument_id=instrument_id,
+                    train_bars=fold.train_bars,
+                    family=family,
+                    fold_max=fold_max,
+                    fast_periods=fast_periods,
+                    slow_periods=slow_periods,
+                    periods=periods,
+                    oversold_levels=oversold_levels,
+                    overbought_levels=overbought_levels,
+                    macd_triples=macd_triples,
+                    initial_cash=initial_cash,
+                    timeframe=timeframe,
+                    on_progress=_fold_progress,
+                    execution_model=execution_model,
+                )
 
             best = partial.trials[0] if partial.trials else partial.baseline
             best_oos = _eval_oos_for_grid(
@@ -1466,15 +1639,17 @@ class RunSmaGridOptimize:
         max_trials: int,
         on_progress: AsyncProgressCallback | None,
         execution_model: Literal["next_open"] = "next_open",
+        candidate_params: dict[str, Any] | None = None,
     ) -> OptimizeSmaGridResult:
         """V2.31/A11 — optimiza una familia declarativa del Discovery Engine.
 
         La ``definition`` es la ``StrategyDefinitionV1`` de la plantilla; se recupera
-        su ``param_space`` del catálogo para re-evaluar el grid completo de esa familia
-        (no solo el punto que trajo la candidata). Si la familia no está en el catálogo
-        (definición huérfana), se evalúa el único punto recibido (fail-closed honesto).
+        su ``param_space`` del catálogo (o el grid gramatical de la candidata, A14) para
+        re-evaluar el grid completo de esa familia (no solo el punto que trajo la
+        candidata). Si no hay catálogo ni grid gramatical (definición huérfana), se
+        evalúa el único punto recibido (fail-closed honesto).
         """
-        param_points, template = _rules_grid_for(definition, family_name)
+        param_points, template = _rules_grid_for(definition, family_name, candidate_params)
         trials_total = max(1, min(len(param_points), max_trials))
         if on_progress is not None:
             await on_progress(0, trials_total, None)
@@ -1492,7 +1667,7 @@ class RunSmaGridOptimize:
             max_trials=min(max_trials, 80),
             execution_model=execution_model,
         )
-        trials = [_rules_to_grid(item, definition=definition) for item in raw]
+        trials = [_rules_to_grid(item, definition=definition, template=template) for item in raw]
         return self._finalize(
             instrument_id=instrument_id,
             bars=bars,
