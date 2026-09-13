@@ -18,6 +18,11 @@ from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, TradeRe
 class _FakeExecuteTrade:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.existing: TradeResult | None = None
+
+    async def find_existing_by_idempotency(self, **kwargs: Any) -> TradeResult | None:
+        """Peek de replay: por defecto no hay trade previo con esa key."""
+        return self.existing
 
     async def execute(self, **kwargs: Any) -> TradeResult:
         self.calls.append(kwargs)
@@ -110,6 +115,97 @@ async def test_gated_http_sell_skips_opening_gate() -> None:
     assert result.transaction.id == "tx-http"
     assert len(trade.calls) == 1
     assert trade.calls[0]["trade_type"] == "sell"
+
+
+@pytest.mark.asyncio
+async def test_replay_idempotente_no_reevalua_el_gate_de_apertura() -> None:
+    """Regresión P2: un replay (misma key + mismo payload) NO debe pasar por el gate.
+
+    Antes, el gate se evaluaba antes de la idempotencia: en un reintento legítimo (mismo
+    payload tras un timeout) la posición ya estaba abierta por el primer intento, el gate
+    la vetaba y devolvía 403 en lugar de rejugar el resultado (200).
+    """
+    trade = _FakeExecuteTrade()
+    # El trade ya existe (replay) y coincide exactamente con el payload entrante.
+    trade.existing = TradeResult(
+        transaction=Transaction(
+            id="tx-original",
+            type="buy",
+            instrument_id="inst-1",
+            symbol="SYM",
+            quantity=2.0,
+            price=10.0,
+            total=20.0,
+            executed_at="2026-08-25T00:00:00Z",
+        ),
+        summary=PortfolioSummary(
+            portfolio=Portfolio(id="pf", name="p", currency="EUR", cash=0.0),
+            positions=[],
+            total_market_value=0.0,
+            total_cost=0.0,
+            total_unrealized_pnl=0.0,
+            total_equity=0.0,
+        ),
+    )
+    # Un summary que VETA: si el gate se evaluara, esto lanzaría OpeningVetoedError.
+    uc = _uc(summary=_VetoSummary(), trade=trade)
+
+    result = await uc.execute(
+        instrument_id="inst-1",
+        trade_type="buy",
+        quantity=2.0,
+        price=10.0,
+        account_id="acc-1",
+        idempotency_key="k" * 16,
+    )
+
+    assert result.transaction.id == "tx-original"
+    # No se ejecutó un trade nuevo: es un replay, no una nueva apertura.
+    assert trade.calls == []
+
+
+@pytest.mark.asyncio
+async def test_key_reutilizada_con_payload_distinto_da_409_antes_del_gate() -> None:
+    """El 409 por key reutilizada tiene prioridad sobre el 403 del gate.
+
+    Si la key existe pero el payload cambió, es un error determinista del cliente: debe
+    reportarse como ``IdempotencyKeyReused`` (409), no enmascararse como veto de apertura.
+    """
+    from bolsa_domain.errors import IdempotencyKeyReused
+
+    trade = _FakeExecuteTrade()
+    trade.existing = TradeResult(
+        transaction=Transaction(
+            id="tx-original",
+            type="buy",
+            instrument_id="inst-1",
+            symbol="SYM",
+            quantity=2.0,
+            price=10.0,
+            total=20.0,
+            executed_at="2026-08-25T00:00:00Z",
+        ),
+        summary=PortfolioSummary(
+            portfolio=Portfolio(id="pf", name="p", currency="EUR", cash=0.0),
+            positions=[],
+            total_market_value=0.0,
+            total_cost=0.0,
+            total_unrealized_pnl=0.0,
+            total_equity=0.0,
+        ),
+    )
+    uc = _uc(summary=_VetoSummary(), trade=trade)
+
+    with pytest.raises(IdempotencyKeyReused):
+        await uc.execute(
+            instrument_id="inst-1",
+            trade_type="buy",
+            quantity=2.0,
+            price=999.0,  # payload divergente
+            account_id="acc-1",
+            idempotency_key="k" * 16,
+        )
+    assert trade.calls == []
 
 
 @pytest.mark.asyncio

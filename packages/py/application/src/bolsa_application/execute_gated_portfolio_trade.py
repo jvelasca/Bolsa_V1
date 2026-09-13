@@ -12,6 +12,7 @@ from typing import Any
 
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
+from bolsa_application.accounts.idempotency import _trade_payload_matches
 from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.opening_permission import (
     AccountScopeLookup,
@@ -29,6 +30,7 @@ from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
 )
+from bolsa_domain.errors import IdempotencyKeyReused
 
 
 class OpeningVetoedError(Exception):
@@ -86,6 +88,33 @@ class ExecuteGatedPortfolioTrade:
         idempotency_key: str,
     ) -> Any:
         side = str(trade_type).lower()
+
+        # Replay idempotente ANTES del gate (P2): si ya existe un trade con esta
+        # ``idempotency_key``, la petición NO es una nueva apertura y no debe reevaluarse
+        # ``allow_opening_fill``. Sin esto, un reintento legítimo (mismo payload tras un
+        # timeout) veía la posición ya abierta por el primer intento y el gate la vetaba
+        # → 403 en vez de rejugar el 200.
+        #
+        # Y si la key existe pero el payload CAMBIÓ, el conflicto (409) también tiene
+        # prioridad sobre el 403 del gate: la reutilización de la key es un error
+        # determinista del cliente que debe reportarse como tal, no enmascararse como un
+        # veto de apertura. Si se dejara pasar al gate, la posición ya abierta lo vetaría
+        # y devolveríamos 403 en lugar del 409 esperado.
+        existing = await self._execute_trade.find_existing_by_idempotency(
+            account_id=account_id,
+            idempotency_key=idempotency_key,
+        )
+        if existing is not None:
+            if not _trade_payload_matches(
+                existing.transaction,
+                instrument_id=instrument_id,
+                trade_type=side,
+                quantity=float(quantity),
+                price=float(price),
+            ):
+                raise IdempotencyKeyReused(idempotency_key)
+            return existing
+
         if side == "buy":
             symbol = await self._resolve_symbol(instrument_id)
             venue = await self._resolve_broker_venue(account_id or "")

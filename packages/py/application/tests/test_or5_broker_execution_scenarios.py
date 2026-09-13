@@ -150,6 +150,11 @@ class _FakeProtect:
 class _HttpExecuteTrade:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.existing: TradeResult | None = None
+
+    async def find_existing_by_idempotency(self, **kwargs: Any) -> TradeResult | None:
+        """Peek de replay: por defecto no hay trade previo con esa key."""
+        return self.existing
 
     async def execute(self, **kwargs: Any) -> TradeResult:
         self.calls.append(kwargs)
