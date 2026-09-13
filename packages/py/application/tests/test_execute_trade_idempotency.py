@@ -183,6 +183,8 @@ class _FakeLedgerRepo:
         self.fee_balance: float | None = None
         self.trade_amount: float | None = None
         self.fee_amount: float | None = None
+        self.trade_executed_at: object | None = None
+        self.fee_executed_at: object | None = None
 
     async def append_trade(
         self,
@@ -191,6 +193,7 @@ class _FakeLedgerRepo:
         reference_id: str,
         amount: float | None = None,
         balance_after: float | None = None,
+        executed_at: object | None = None,
         **_: object,
     ) -> None:
         self.rows.append((entry_type, reference_id))
@@ -198,6 +201,7 @@ class _FakeLedgerRepo:
             self.trade_amount = amount
         if balance_after is not None:
             self.trade_balance = balance_after
+        self.trade_executed_at = executed_at
 
     async def append_fee(
         self,
@@ -205,12 +209,14 @@ class _FakeLedgerRepo:
         amount: float,
         reference_id: str,
         balance_after: float | None = None,
+        executed_at: object | None = None,
         **_: object,
     ) -> None:
         self.rows.append(("fee", reference_id))
         self.fee_amount = amount
         if balance_after is not None:
             self.fee_balance = balance_after
+        self.fee_executed_at = executed_at
 
 
 def _build() -> tuple[ExecuteTrade, _FakePortfolioRepo, _FakeLedgerRepo]:
@@ -1787,4 +1793,67 @@ def test_or1_stable_id_helpers_deterministic() -> None:
     assert stable_intent_id_from_decision("DEC-1") == "INT-DEC-1"
     assert stable_order_id_from_decision("DEC-1") == "ORD-DEC-1"
     assert stable_intent_id_from_decision("DEC-1") == stable_intent_id_from_decision("DEC-1")
+
+
+# ---------------------------------------------------------------------------
+# Orden del ledger bajo concurrencia (P2): trade y fee deben encadenar siempre.
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_ledger_trade_y_fee_comparten_el_executed_at_del_trade() -> None:
+    """Regresión P2: trade y fee NO deben llevar timestamps propios.
+
+    Antes cada ``append_*`` tomaba su propio ``datetime.now(UTC)``. Bajo concurrencia ambos
+    caían en el mismo microsegundo y el consumidor que ordena por ``(executed_at, id)``
+    desempataba por un ``id`` aleatorio, intercalando la fee ANTES del trade y rompiendo la
+    cadena ``balance_after[n] == balance_after[n-1] + amount[n]``. El cash era correcto,
+    pero el ledger dejaba de ser reproducible/auditable.
+
+    Ahora ambos derivan del ``executed_at`` de la transacción, con el trade 1 µs antes.
+    """
+    use_case, _portfolio, ledger = _build()
+
+    await use_case.execute(
+        instrument_id="inst-1",
+        trade_type="buy",
+        quantity=10.0,
+        price=100.0,
+        account_id="acc-1",
+        idempotency_key="inst-1|2026-08-20|pol-1|entry_long",
+    )
+
+    # Ambos asientos comparten el MISMO instante base: el ``executed_at`` que devuelve el
+    # repo de cartera (la transacción), no un now() distinto por llamada.
+    assert ledger.trade_executed_at is not None, "el trade debe fijar su executed_at"
+    assert ledger.fee_executed_at is not None, "la fee debe fijar su executed_at"
+    assert ledger.trade_executed_at == ledger.fee_executed_at - timedelta(microseconds=1)
+    assert ledger.trade_executed_at < ledger.fee_executed_at
+
+
+def test_ledger_ordering_helper_es_determinista() -> None:
+    """El helper de orden fija trade antes que fee, y los iguala cuando no hay fee."""
+    from bolsa_application.accounts.trade import _ledger_ordering
+
+    base = datetime(2026, 9, 1, 12, 0, 0, 500000, tzinfo=UTC)
+
+    trade_at, fee_at = _ledger_ordering(base, has_fee=True)
+    assert trade_at < fee_at
+    assert (fee_at - trade_at) == timedelta(microseconds=1)
+    assert fee_at == base
+
+    trade_at, fee_at = _ledger_ordering(base, has_fee=False)
+    assert trade_at == fee_at == base
+
+
+def test_parse_executed_at_tolera_formatos_inesperados() -> None:
+    """Un ``executed_at`` vacío/naive/no parseable no debe romper el ledger."""
+    from bolsa_application.accounts.trade import _parse_executed_at
+
+    assert _parse_executed_at(None) is not None
+    assert _parse_executed_at("") is not None
+    assert _parse_executed_at("no-es-una-fecha") is not None
+    naive = _parse_executed_at("2026-09-01T12:00:00")
+    assert naive.tzinfo is not None, "debe quedar tz-aware"
+    aware = _parse_executed_at("2026-09-01T12:00:00+00:00")
+    assert aware == datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
+
 

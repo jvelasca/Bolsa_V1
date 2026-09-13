@@ -1,5 +1,7 @@
 """Use-case de ejecución de trades."""
 
+from datetime import UTC, datetime, timedelta
+
 from bolsa_domain.account_settings import calculate_trade_fees, settings_from_dict
 from bolsa_domain.entities.portfolio import TradeResult
 from bolsa_domain.errors import IdempotencyKeyExists
@@ -12,6 +14,39 @@ from bolsa_infrastructure.database.repositories.portfolio_repository import (
 )
 
 from .idempotency import _assert_trade_payload_matches
+
+# Separación mínima entre el asiento de trade y el de fee del MISMO trade. PostgreSQL
+# ``timestamptz`` tiene resolución de microsegundos, así que 1 µs basta para fijar un orden
+# determinista sin depender del desempate aleatorio por ``id``.
+_FEE_ORDER_GAP = timedelta(microseconds=1)
+
+
+def _parse_executed_at(raw: str | None) -> datetime:
+    """``executed_at`` de dominio (ISO str) → datetime con tz (el del trade).
+
+    Si viene vacío o no parseable se cae a ``now(UTC)``: el ledger siempre necesita un
+    timestamp, y perder el orden por un formato inesperado sería peor que un fallback.
+    """
+    if not raw:
+        return datetime.now(UTC)
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return datetime.now(UTC)
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _ledger_ordering(executed_at: datetime, *, has_fee: bool) -> tuple[datetime, datetime]:
+    """Instantes de los asientos trade y fee, garantizando trade ANTES que fee.
+
+    Comparten el mismo instante base (el del trade, tomado bajo ``with_for_update``) para
+    que no se intercalen con los de operaciones concurrentes; si hay fee, el asiento de
+    trade se adelanta 1 µs para que el orden ``(executed_at, id)`` sea el de aplicación real
+    (trade: balance intermedio → fee: balance final). Sin fee ambos coinciden.
+    """
+    if not has_fee:
+        return executed_at, executed_at
+    return executed_at - _FEE_ORDER_GAP, executed_at
 
 
 class ExecuteTrade:
@@ -147,6 +182,20 @@ class ExecuteTrade:
         # Semántica invariante: balance_after[n] == balance_after[n-1] + amount[n].
         fee_balance = Decimal(str(result.summary.portfolio.cash))
         trade_balance = fee_balance + Decimal(str(abs(fees.total)))
+        # Orden del ledger (P2 concurrencia): las filas trade+fee de UN MISMO trade deben
+        # compartir el MISMO ``executed_at`` (el de la transacción, fijado dentro del
+        # ``with_for_update``). Antes cada append tomaba su propio ``datetime.now(UTC)``:
+        # bajo concurrencia ambos caían en el mismo microsegundo (granularidad del reloj en
+        # Windows) y el consumidor que ordena por ``(executed_at, id)`` desempataba por un
+        # ``id`` aleatorio, intercalando fee antes de trade y rompiendo la cadena
+        # ``balance_after[n] == balance_after[n-1] + amount[n]``. El ledger quedaba no
+        # reproducible/auditable pese a que el cash era correcto.
+        #
+        # Además se separa el asiento de trade 1 µs ANTES del de fee: al compartir
+        # ``executed_at`` el desempate por ``id`` seguía siendo aleatorio, y la cadena exige
+        # que el trade (balance intermedio) preceda SIEMPRE a la fee (balance final).
+        executed_at = _parse_executed_at(result.transaction.executed_at)
+        (trade_at, fee_at) = _ledger_ordering(executed_at, has_fee=fees.total > 0)
         await self._ledger_repo.append_trade(
             account_id=scope.account.id,
             portfolio_id=scope.portfolio.id,
@@ -158,6 +207,7 @@ class ExecuteTrade:
             quantity=quantity,
             price=price,
             reference_id=result.transaction.id,
+            executed_at=trade_at,
             strategy_version_id=strategy_version_id,
         )
         if fees.total > 0:
@@ -177,6 +227,7 @@ class ExecuteTrade:
                 balance_after=float(fee_balance),
                 reference_id=result.transaction.id,
                 description=description,
+                executed_at=fee_at,
                 strategy_version_id=strategy_version_id,
             )
         await self._account_repo.touch_activity(scope.account.id)
