@@ -132,6 +132,7 @@ async def list_account_summaries(
 
 @router.post("/accounts", response_model=AccountResponseDto, status_code=201)
 async def create_account(
+    request: Request,
     body: CreateInvestmentAccountDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountResponseDto:
@@ -175,6 +176,9 @@ async def create_account(
             account_name=account.name,
             declared=declared,
             active_profile_id=body.active_profile_id,
+            # Owner de la cuenta: imprescindible para que el perfil recién creado sea
+            # visible para su dueño (la lectura es owner-scoped; NULL => 404).
+            user_id=get_request_principal(request),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

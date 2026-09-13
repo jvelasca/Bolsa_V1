@@ -106,7 +106,13 @@ class EnsureDefaultInvestorProfile:
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
-    async def execute(self, account_id: str, account_name: str) -> InvestorProfileRecord:
+    async def execute(
+        self,
+        account_id: str,
+        account_name: str,
+        *,
+        user_id: str | None = None,
+    ) -> InvestorProfileRecord:
         existing = await self._store.get_for_account(account_id)
         if existing is not None:
             return existing
@@ -119,6 +125,7 @@ class EnsureDefaultInvestorProfile:
             suggested_policy_template_id="moderate",
             selected_policy_template_id="moderate",
             notes="Creado automáticamente al abrir la cuenta",
+            user_id=user_id,
         )
         await self._store.assign_to_account(account_id, profile.id)
         return profile
@@ -152,7 +159,15 @@ class EnsureAccountInvestorProfile:
         account_name: str,
         declared: DeclaredProfileInput | None = None,
         active_profile_id: str | None = None,
+        user_id: str | None = None,
     ) -> InvestorProfileRecord:
+        """Crea/asigna el perfil de inversor de una cuenta recién abierta.
+
+        ``user_id`` es el PROPIETARIO de la cuenta y debe propagarse SIEMPRE: la lectura de
+        perfiles es owner-scoped (``account_visible_to_principal``), y un perfil con
+        ``user_id=NULL`` es invisible para su propio dueño (el GET devolvía 404 con el perfil
+        recién creado). Antes este parámetro no existía y las tres ramas creaban sin dueño.
+        """
         if declared is not None:
             suggested = (
                 declared.suggested_policy_template_id
@@ -174,6 +189,7 @@ class EnsureAccountInvestorProfile:
                 notes=declared.notes or "Creado con la cuenta (asistente Nueva demo)",
                 suggested_policy_template_id=suggested,
                 selected_policy_template_id=selected,
+                user_id=user_id,
             )
         elif active_profile_id:
             existing = await self._store.get(active_profile_id)
@@ -182,7 +198,7 @@ class EnsureAccountInvestorProfile:
             profile = existing
         else:
             profile = await EnsureDefaultInvestorProfile(self._store).execute(
-                account_id, account_name
+                account_id, account_name, user_id=user_id
             )
         await self._store.assign_to_account(account_id, profile.id)
         return profile

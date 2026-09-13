@@ -10,7 +10,11 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_infrastructure.database.models import MandateTenureRow, MandateTradeLinkRow
+from bolsa_infrastructure.database.models import (
+    InstrumentRow,
+    MandateTenureRow,
+    MandateTradeLinkRow,
+)
 
 
 @dataclass(slots=True)
@@ -114,25 +118,68 @@ class SqlAlchemyMandateRepository:
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_map_link(r) for r in rows]
 
+    async def _known_instrument_ids(self, candidates: list[str]) -> set[str]:
+        """Subconjunto de ``candidates`` que existe realmente en ``instruments``.
+
+        Se consulta en bloque (un único SELECT) para no hacer N comprobaciones. Devuelve solo
+        los ids presentes, de modo que el llamante descarte los huérfanos. Si no hay candidatos
+        válidos no toca la BD (evita un round-trip inútil en payloads vacíos).
+        """
+        wanted = {cid for cid in candidates if cid}
+        if not wanted:
+            return set()
+        rows = await self._session.execute(
+            select(InstrumentRow.id).where(InstrumentRow.id.in_(wanted))
+        )
+        return set(rows.scalars().all())
+
     async def sync_account(
         self,
         account_id: str,
         tenures: list[dict[str, Any]],
         links: list[dict[str, Any]],
     ) -> tuple[list[MandateTenureRecord], list[MandateTradeLinkRecord]]:
-        """Upsert tenures/links for account; drop local rows not present in payload."""
+        """Upsert tenures/links for account; drop local rows not present in payload.
+
+        Fail-soft ante instrumentos huérfanos: el payload lo construye el cliente desde su
+        cache (``localStorage``) y puede referenciar instrumentos de un catálogo anterior ya
+        inexistentes en ``instruments``. Antes bastaba ``if not instrument_id`` para descartar,
+        así que un id NO vacío pero inexistente llegaba a la FK y reventaba el PUT con
+        ``ForeignKeyViolation`` → 500. Ahora se valida EXISTENCIA y se descartan las filas
+        huérfanas, conservando las válidas (mismo espíritu tolerante que la comprobación previa).
+        """
         now = datetime.now(UTC)
         incoming_tenure_ids = set()
 
+        # Ids de instrumento realmente presentes en el catálogo. Se consulta una sola vez y
+        # solo si hay candidatos, evitando un SELECT por fila. Los links se filtran contra
+        # ``kept_tenure_ids`` (su FK apunta a ``mandate_tenures``) y contra este mismo set.
+        known_instrument_ids = await self._known_instrument_ids(
+            [
+                str(raw.get("instrumentId") or raw.get("instrument_id") or "")
+                for raw in [*tenures, *links]
+            ]
+        )
+        kept_tenure_ids: set[str] = set()
+
         for raw in tenures:
             tid = str(raw.get("id") or f"mt_{uuid4().hex}")
+            instrument_id = str(
+                raw.get("instrumentId") or raw.get("instrument_id") or ""
+            )
+            # Descartar huérfanas: sin instrumento o con instrumento inexistente. No se añade
+            # a ``incoming_tenure_ids`` ⇒ además se borra de BD si existía (sin dejar restos
+            # que apunten a un instrumento ya ausente).
+            if not instrument_id or instrument_id not in known_instrument_ids:
+                continue
             incoming_tenure_ids.add(tid)
+            kept_tenure_ids.add(tid)
             existing = await self._session.get(MandateTenureRow, tid)
             eff_from = _parse_dt(raw.get("effectiveFrom") or raw.get("effective_from")) or now
             eff_to = _parse_dt(raw.get("effectiveTo") or raw.get("effective_to"))
             fields = {
                 "account_id": account_id,
-                "instrument_id": str(raw.get("instrumentId") or raw.get("instrument_id") or ""),
+                "instrument_id": instrument_id,
                 "timeframe": raw.get("timeframe"),
                 "strategy_definition_id": raw.get("strategyDefinitionId")
                 or raw.get("strategy_definition_id"),
@@ -147,8 +194,6 @@ class SqlAlchemyMandateRepository:
                 "evidence_level": raw.get("evidenceLevel") or raw.get("evidence_level"),
                 "updated_at": now,
             }
-            if not fields["instrument_id"]:
-                continue
             if existing is None:
                 self._session.add(
                     MandateTenureRow(id=tid, created_at=now, **fields),
@@ -172,19 +217,28 @@ class SqlAlchemyMandateRepository:
         for raw in links:
             tx_id = str(raw.get("transactionId") or raw.get("transaction_id") or "")
             tenure_id = str(raw.get("mandateTenureId") or raw.get("mandate_tenure_id") or "")
-            if not tx_id or not tenure_id:
+            instrument_id = str(
+                raw.get("instrumentId") or raw.get("instrument_id") or ""
+            )
+            # Coherencia referencial del payload (todo dentro de la MISMA transacción):
+            # el link solo es insertable si su instrumento existe Y su tenure sobrevivió al
+            # filtro de huérfanos. Si no, la FK ``mandate_trade_links.mandate_tenure_id``
+            # (o la de instrumento) reventaría el PUT completo. Se descarta el link, no el lote.
+            if not tx_id or not tenure_id or not instrument_id:
+                continue
+            if instrument_id not in known_instrument_ids:
+                continue
+            if tenure_id not in kept_tenure_ids:
                 continue
             incoming_tx.add(tx_id)
             linked_at = _parse_dt(raw.get("linkedAt") or raw.get("linked_at")) or now
             fields = {
                 "mandate_tenure_id": tenure_id,
-                "instrument_id": str(raw.get("instrumentId") or raw.get("instrument_id") or ""),
+                "instrument_id": instrument_id,
                 "account_id": account_id,
                 "linked_at": linked_at,
                 "engine": str(raw.get("engine") or "mandate-trade-links-v1"),
             }
-            if not fields["instrument_id"]:
-                continue
             existing_link = await self._session.get(MandateTradeLinkRow, tx_id)
             if existing_link is None:
                 self._session.add(MandateTradeLinkRow(transaction_id=tx_id, **fields))
