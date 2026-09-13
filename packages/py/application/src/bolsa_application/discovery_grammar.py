@@ -632,12 +632,14 @@ def enumerate_grammar_plans(
                 list(pool[kind]) for kind in combo
             ]
             for chosen in _cartesian(optionals):
-                # Orden de anidamiento: trigger varía más rápido que exit, y ambos más
+                # Orden de anidamiento: ``exit`` es el bucle EXTERNO y ``trigger`` el
+                # INTERNO, de modo que el trigger varía más rápido que el exit y ambos más
                 # rápido que la combinación de opcionales. Así un corte por cupo (el
-                # allocator concede pocas candidatas) cubre varios triggers/exits en
-                # lugar de agotar el exit más interno con un solo trigger (P2-01).
-                for trigger in triggers:
-                    for exit_component in exits:
+                # allocator concede pocas candidatas) cubre varios triggers en lugar de
+                # agotar todas las variantes de exit bajo un solo trigger (P2-01). Medido:
+                # con cap=4 antes salía 1 trigger × 4 exits; ahora 4 triggers × 1 exit.
+                for exit_component in exits:
+                    for trigger in triggers:
                         components = (
                             *chosen,
                             trigger,

@@ -347,6 +347,24 @@ def test_engine_grammar_emission_is_not_single_shape() -> None:
     assert component_counts == {3}, "premisa: trigger+exit+opcional (2 obligatorios + 1)"
 
 
+def test_grammar_enumeration_varies_trigger_faster_than_exit() -> None:
+    """P2-01 (regresión): con un cupo PEQUEÑO debe haber varios triggers, no uno.
+
+    El cupo real del allocator puede ser tan bajo como 4. Si ``exit`` fuera el bucle
+    interno, ese corte agotaría todas las variantes de exit bajo un único trigger
+    (medido: 1 trigger × 4 exits), reintroduciendo el colapso que P2-01 arregla. El
+    contraste con ``cap=12`` no lo detecta porque ahí el cupo ya alcanza 3 triggers.
+    """
+    plans = enumerate_grammar_plans(GrammarBudget())
+    assert len(plans) >= 4, "premisa: hay planes suficientes para el corte"
+    first_four = plans[:4]
+    triggers = {plan.components[-2].name for plan in first_four}
+    assert len(triggers) == 4, (
+        "con cupo 4 debe haber 4 triggers distintos (el trigger varía más rápido "
+        f"que el exit); encontrados: {sorted(triggers)}"
+    )
+
+
 def test_grammar_variants_rotate_axis_for_multi_optional_plans() -> None:
     """P2-01: ``axis_index`` rota el bloque permutado (más de una dimensión en el LAB).
 
