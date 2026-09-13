@@ -147,8 +147,9 @@ OFF, comportamiento idéntico a V2.38.1.
 
 ## 7. Próximos pasos
 
-1. **Sellado:** commit de fase + commit documental, tag `v2.39-beta`, push, verificar
-   **Release-tag CI GREEN** (`certify`) y referenciar el run.
+1. **Sellado:** ✅ HECHO — commit de fase `e94f2632` en `main`, tag `v2.39-beta` pusheado y
+   **Release-tag CI GREEN verificado** (run `34727468861`, `success`, 10/10 jobs requeridos +
+   `certify` aggregate).
 2. **Auditoría externa** sobre el tag sellado, usando
    `audit-pack-v2.39-regimen-por-trial-2026-09-11.md` como punto de entrada.
 3. **Valorar** (no en V2.39): consumo del régimen en el reparto de cupos (requiere masa

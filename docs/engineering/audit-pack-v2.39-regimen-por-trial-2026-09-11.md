@@ -180,6 +180,7 @@ pytest V2.39 (offline, herméticos)          → 212 passed
 pytest PG (test_discovery_evidence_snapshot_pg.py) → 18 passed
 ```
 
-> Nota de honestidad (patrón del repo): este documento **no afirma CI de un tag aún no
-> creado**. El sellado (`v2.39-beta` + Release-tag CI) y la auditoría externa se ejecutan
-> después; el run se referenciará al elevarlo.
+> Nota de honestidad (patrón del repo): este documento **no afirmaba CI de un tag aún no
+> creado**. El sellado se ejecutó después: `v2.39-beta` == `main == e94f2632`, Release-tag CI
+> **GREEN verificado** (run `34727468861`, `success`, 10/10 jobs requeridos verdes + `certify`
+> aggregate). Queda pendiente la auditoría externa sobre el tag sellado.
