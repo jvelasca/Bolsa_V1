@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.auth.jwt import encode_access_token
@@ -20,6 +21,25 @@ from bolsa_infrastructure.database.models import InvestmentAccountRow, UserRow
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _load_env() -> None:
+    """Carga el ``.env`` de la raíz (convención del resto de tests PG de ``api-python``).
+
+    ``test_lifecycle_auth`` ejercita el lifespan real de la API, que abre conexión a
+    PostgreSQL; sin esto dependía de que las variables ya estuvieran exportadas en el
+    shell y fallaba con ``fe_sendauth: no password supplied`` en ejecución aislada.
+    """
+    from pathlib import Path
+
+    env_path = Path(__file__).resolve().parents[3] / ".env"
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+    except ImportError:  # pragma: no cover — dep opcional
+        return
+    load_dotenv(env_path, override=False)
 
 
 async def _insert_user(
@@ -82,8 +102,75 @@ async def _jwt(
         )
 
 
+async def _cleanup_tenant(
+    factory: async_sessionmaker[AsyncSession], *, user_ids: list[str]
+) -> None:
+    """Borra las cuentas y usuarios creados por el test (no deja residuo en la BD).
+
+    Sin esto, cada ejecución dejaba cuentas ``is_default=True`` con ``user_id`` ajeno al
+    owner de la app. Eso rompía el arranque de la API (``_load_default_scope`` lanzaba
+    ``MultipleResultsFound``), y el residuo se volvía indistinguible de datos reales.
+    El borrado respeta el orden de claves foráneas y nunca toca la cuenta demo.
+    """
+    async with factory() as session:
+        for user_id in user_ids:
+            account_ids = (
+                await session.execute(
+                    text(
+                        "SELECT id FROM investment_accounts "
+                        "WHERE user_id = :uid AND id <> 'default-account-seed'"
+                    ),
+                    {"uid": user_id},
+                )
+            ).scalars().all()
+            for account_id in account_ids:
+                portfolio_ids = (
+                    await session.execute(
+                        text(
+                            "SELECT id FROM investment_portfolios "
+                            "WHERE account_id = :aid"
+                        ),
+                        {"aid": account_id},
+                    )
+                ).scalars().all()
+                for table in (
+                    "core_r_account_state",
+                    "supervised_f3_account_state",
+                    "custody_obligation",
+                    "custody_obligations",
+                    "execution_policies",
+                    "position_policies",
+                    "pending_orders",
+                    "mandate_tenures",
+                    "position_states",
+                    "ledger_entries",
+                ):
+                    await session.execute(
+                        text(f"DELETE FROM {table} WHERE account_id = :aid"),
+                        {"aid": account_id},
+                    )
+                for portfolio_id in portfolio_ids:
+                    await session.execute(
+                        text("DELETE FROM ledger_entries WHERE portfolio_id = :pid"),
+                        {"pid": portfolio_id},
+                    )
+                await session.execute(
+                    text("DELETE FROM investment_portfolios WHERE account_id = :aid"),
+                    {"aid": account_id},
+                )
+                await session.execute(
+                    text("DELETE FROM investment_accounts WHERE id = :aid"),
+                    {"aid": account_id},
+                )
+            await session.execute(
+                text("DELETE FROM users WHERE id = :uid"), {"uid": user_id}
+            )
+        await session.commit()
+
+
 @pytest.fixture
 def auth_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    _load_env()
     monkeypatch.setenv("APP_AUTH_SECRET", "lifecycle-auth-test-secret-key-32b")
     monkeypatch.setenv("JWT_SIGNING_KEY", "lifecycle-auth-test-secret-key-32b")
     get_settings.cache_clear()
@@ -141,6 +228,7 @@ async def test_lifecycle_unknown_field_is_422(auth_secret: None) -> None:
                 },
             )
             assert response.status_code == 422
+        await _cleanup_tenant(factory, user_ids=["user-a"])
 
 
 @pytest.mark.asyncio
@@ -184,3 +272,4 @@ async def test_lifecycle_owner_ok_foreign_403(auth_secret: None) -> None:
                 },
             )
             assert foreign_post.status_code == 403
+        await _cleanup_tenant(factory, user_ids=["user-a", "user-b"])

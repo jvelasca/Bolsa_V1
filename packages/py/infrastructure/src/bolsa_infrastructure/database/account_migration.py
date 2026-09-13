@@ -80,13 +80,18 @@ async def _ensure_default_account(session: AsyncSession) -> None:
 
     account = await session.get(InvestmentAccountRow, DEFAULT_ACCOUNT_SEED_ID)
     if account is None:
-        any_default_stmt = select(InvestmentAccountRow.id).where(
+        owner_id = get_settings().owner_principal()
+        # "Ya hay un default" debe evaluarse POR TENANT: si otro usuario tiene su cuenta
+        # por defecto, no debe impedir que el owner de la app reciba la suya (antes se
+        # miraba cualquier default de la BD y la cuenta del owner quedaba sin marcar).
+        owner_default_stmt = select(InvestmentAccountRow.id).where(
             InvestmentAccountRow.is_default.is_(True),
+            InvestmentAccountRow.user_id == owner_id,
         )
-        has_default = (await session.execute(any_default_stmt)).scalar_one_or_none()
+        has_default = (await session.execute(owner_default_stmt)).scalar_one_or_none()
         account = InvestmentAccountRow(
             id=DEFAULT_ACCOUNT_SEED_ID,
-            user_id=get_settings().owner_principal(),
+            user_id=owner_id,
             name="Cuenta demo EUR",
             type="simulated",
             status="active",
@@ -160,7 +165,17 @@ async def _ensure_default_account(session: AsyncSession) -> None:
 
 
 async def _load_default_scope(session: AsyncSession) -> _PendingScope:
-    stmt = select(InvestmentAccountRow).where(InvestmentAccountRow.is_default.is_(True))
+    # El bootstrap opera sobre el tenant PROPIETARIO de la app (``owner_principal``), no
+    # sobre "la cuenta por defecto de toda la BD". El modelo es multi-tenant: cada usuario
+    # puede tener su propia cuenta ``is_default``, así que filtrar solo por ``is_default``
+    # y usar ``scalar_one_or_none()`` reventaba con ``MultipleResultsFound`` en cuanto
+    # existía otra cuenta por defecto (usuarios reales o residuos de tests de integración),
+    # abortando el arranque de la API.
+    owner_id = get_settings().owner_principal()
+    stmt = select(InvestmentAccountRow).where(
+        InvestmentAccountRow.is_default.is_(True),
+        InvestmentAccountRow.user_id == owner_id,
+    )
     account_row = (await session.execute(stmt)).scalar_one_or_none()
     if account_row is None:
         raise ValueError("No hay cuenta por defecto")

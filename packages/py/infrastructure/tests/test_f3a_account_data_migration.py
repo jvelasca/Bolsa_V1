@@ -13,10 +13,12 @@ from __future__ import annotations
 import asyncio
 import sys
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_infrastructure.database.account_migration import run_account_data_migration
@@ -129,3 +131,58 @@ def test_repositorio_no_expone_ensure_migrated() -> None:
     """P1.2: la migración ya no es un método por-request del repositorio."""
     assert not hasattr(SqlAlchemyAccountRepository, "ensure_migrated")
     assert not hasattr(SqlAlchemyAccountRepository, "_migration_done")
+
+
+@pytest.mark.asyncio
+async def test_migration_survives_foreign_tenant_default_account(
+    db_session: AsyncSession,
+) -> None:
+    """Regresión: una cuenta ``is_default`` de OTRO tenant no rompe el arranque.
+
+    El modelo es multi-tenant y cada usuario puede tener su propia cuenta por defecto.
+    ``_load_default_scope`` filtraba solo por ``is_default`` con ``scalar_one_or_none()``
+    y lanzaba ``MultipleResultsFound`` en cuanto existía otra cuenta por defecto (usuarios
+    reales o residuos de tests de integración), abortando el arranque de la API.
+    """
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.account_migration import _load_default_scope
+
+    await db_session.commit()
+
+    owner_id = get_settings().owner_principal()
+    foreign_id = "regression-foreign-tenant-account"
+    await db_session.execute(
+        text("DELETE FROM investment_accounts WHERE id = :id"),
+        {"id": foreign_id},
+    )
+    db_session.add(
+        InvestmentAccountRow(
+            id=foreign_id,
+            user_id="foreign-tenant-user",
+            name="Cuenta de otro tenant",
+            type="simulated",
+            status="active",
+            currency="EUR",
+            base_currency="EUR",
+            initial_deposit=Decimal("1000"),
+            leverage=Decimal("1"),
+            is_default=True,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+    )
+    await db_session.commit()
+
+    # Antes del fix esto lanzaba MultipleResultsFound.
+    scope = await _load_default_scope(db_session)
+    account = await db_session.get(InvestmentAccountRow, scope.account_id)
+    assert account is not None
+    assert account.user_id == owner_id, "el scope debe ser el del owner, no el ajeno"
+
+    # Idempotencia y limpieza: la migración completa no falla con el default ajeno.
+    await run_account_data_migration(db_session)
+    await db_session.execute(
+        text("DELETE FROM investment_accounts WHERE id = :id"),
+        {"id": foreign_id},
+    )
+    await db_session.commit()
