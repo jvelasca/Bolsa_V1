@@ -1,5 +1,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from tests.conftest import purge_accounts
 from tests.opening_gate_seed import seed_http_opening_allow
 
 from bolsa_api.main import create_app, lifespan
@@ -47,32 +49,37 @@ async def test_create_account_with_investor_profile_payload() -> None:
     async with lifespan(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            create = await client.post(
-                "/api/accounts",
-                json={
-                    "name": "Perfil custom account",
-                    "currency": "EUR",
-                    "initialDeposit": 25_000,
-                    "investorProfile": {
-                        "name": "Conservador test",
-                        "horizon": "long_term",
-                        "riskTolerance": "low",
-                        "experience": "novice",
-                        "objectives": ["preservation"],
+            try:
+                create = await client.post(
+                    "/api/accounts",
+                    json={
+                        "name": "Perfil custom account",
+                        "currency": "EUR",
+                        "initialDeposit": 25_000,
+                        "investorProfile": {
+                            "name": "Conservador test",
+                            "horizon": "long_term",
+                            "riskTolerance": "low",
+                            "experience": "novice",
+                            "objectives": ["preservation"],
+                        },
                     },
-                },
-            )
-            assert create.status_code == 201
-            account = create.json()["data"]
-            profile_id = account["activeProfileId"]
-            assert profile_id
+                )
+                assert create.status_code == 201
+                account = create.json()["data"]
+                profile_id = account["activeProfileId"]
+                assert profile_id
 
-            profile = await client.get(f"/api/investor-profiles/{profile_id}")
-            assert profile.status_code == 200
-            data = profile.json()["data"]
-            assert data["name"] == "Conservador test"
-            assert data["declared"]["riskTolerance"] == "low"
-            assert data["selectedPolicyTemplateId"] == "conservative"
+                profile = await client.get(f"/api/investor-profiles/{profile_id}")
+                assert profile.status_code == 200
+                data = profile.json()["data"]
+                assert data["name"] == "Conservador test"
+                assert data["declared"]["riskTolerance"] == "low"
+                assert data["selectedPolicyTemplateId"] == "conservative"
+            finally:
+                # Teardown aunque el test falle: sin esto cada ejecución dejaba cuentas
+                # residuales que se mezclan con datos reales y rompen el worker de custodia.
+                await purge_accounts(app.state.session_factory, [account["id"]])
 
 
 @pytest.mark.asyncio
@@ -94,36 +101,39 @@ async def test_create_account_with_settings_and_trade_fees() -> None:
             assert create.status_code == 201
             account = create.json()["data"]
             account_id = account["id"]
-            assert account["settings"]["commission"]["presetId"] == "standard_es"
-            assert account.get("activeProfileId")  # perfil moderate por defecto
+            try:
+                assert account["settings"]["commission"]["presetId"] == "standard_es"
+                assert account.get("activeProfileId")  # perfil moderate por defecto
 
-            patch = await client.patch(
-                f"/api/accounts/{account_id}/settings",
-                json={"settings": STANDARD_ES_SETTINGS},
-            )
-            assert patch.status_code == 200
+                patch = await client.patch(
+                    f"/api/accounts/{account_id}/settings",
+                    json={"settings": STANDARD_ES_SETTINGS},
+                )
+                assert patch.status_code == 200
 
-            instrument_id = await _first_instrument_id(client)
-            await seed_http_opening_allow(app, client, account_id, instrument_id)
-            trade = await client.post(
-                "/api/portfolio/trade",
-                headers={"X-Account-Id": account_id},
-                json={
-                    "instrumentId": instrument_id,
-                    "type": "buy",
-                    "quantity": 10,
-                    "price": 100,
-                    "idempotencyKey": "trade-fees-1-abcdefghij",
-                },
-            )
-            assert trade.status_code == 200
+                instrument_id = await _first_instrument_id(client)
+                await seed_http_opening_allow(app, client, account_id, instrument_id)
+                trade = await client.post(
+                    "/api/portfolio/trade",
+                    headers={"X-Account-Id": account_id},
+                    json={
+                        "instrumentId": instrument_id,
+                        "type": "buy",
+                        "quantity": 10,
+                        "price": 100,
+                        "idempotencyKey": "trade-fees-1-abcdefghij",
+                    },
+                )
+                assert trade.status_code == 200
 
-            ledger = await client.get(f"/api/accounts/{account_id}/ledger")
-            assert ledger.status_code == 200
-            entries = ledger.json()["data"]
-            types = {entry["type"] for entry in entries}
-            assert "buy" in types
-            assert "fee" in types
+                ledger = await client.get(f"/api/accounts/{account_id}/ledger")
+                assert ledger.status_code == 200
+                entries = ledger.json()["data"]
+                types = {entry["type"] for entry in entries}
+                assert "buy" in types
+                assert "fee" in types
+            finally:
+                await purge_accounts(app.state.session_factory, [account_id])
 
 
 @pytest.mark.asyncio
@@ -144,46 +154,51 @@ async def test_account_cash_deposits_and_lifecycle() -> None:
             assert create.status_code == 201
             account_id = create.json()["data"]["id"]
 
-            before = await client.get(f"/api/accounts/{account_id}/summary")
-            cash_before = before.json()["data"]["cash"]
+            try:
+                before = await client.get(f"/api/accounts/{account_id}/summary")
+                cash_before = before.json()["data"]["cash"]
 
-            deposit = await client.post(
-                f"/api/accounts/{account_id}/deposits",
-                json={"amount": 1000, "note": "Aportación", "idempotencyKey": "dep-lifecycle-abcdefgh"},
-            )
-            assert deposit.status_code == 201
-            assert deposit.json()["data"]["kind"] == "external_deposit"
+                deposit = await client.post(
+                    f"/api/accounts/{account_id}/deposits",
+                    json={"amount": 1000, "note": "Aportación", "idempotencyKey": "dep-lifecycle-abcdefgh"},
+                )
+                assert deposit.status_code == 201
+                assert deposit.json()["data"]["kind"] == "external_deposit"
 
-            summary = await client.get(f"/api/accounts/{account_id}/summary")
-            assert summary.json()["data"]["cash"] == cash_before + 1000
+                summary = await client.get(f"/api/accounts/{account_id}/summary")
+                assert summary.json()["data"]["cash"] == cash_before + 1000
 
-            patch = await client.patch(
-                f"/api/accounts/{account_id}",
-                json={"name": "Lifecycle renombrada", "description": "Demo"},
-            )
-            assert patch.status_code == 200
-            assert patch.json()["data"]["name"] == "Lifecycle renombrada"
+                patch = await client.patch(
+                    f"/api/accounts/{account_id}",
+                    json={"name": "Lifecycle renombrada", "description": "Demo"},
+                )
+                assert patch.status_code == 200
+                assert patch.json()["data"]["name"] == "Lifecycle renombrada"
 
-            close = await client.post(f"/api/accounts/{account_id}/close")
-            assert close.status_code == 200
-            assert close.json()["data"]["status"] == "closed"
+                close = await client.post(f"/api/accounts/{account_id}/close")
+                assert close.status_code == 200
+                assert close.json()["data"]["status"] == "closed"
 
-            # Soft-close: sigue listable en BD hasta purga
-            closed_list = await client.get("/api/database/closed-accounts")
-            assert closed_list.status_code == 200
-            closed_ids = {a["id"] for a in closed_list.json()["data"]["accounts"]}
-            assert account_id in closed_ids
+                # Soft-close: sigue listable en BD hasta purga
+                closed_list = await client.get("/api/database/closed-accounts")
+                assert closed_list.status_code == 200
+                closed_ids = {a["id"] for a in closed_list.json()["data"]["accounts"]}
+                assert account_id in closed_ids
 
-            delete = await client.delete(f"/api/accounts/{account_id}")
-            assert delete.status_code == 204
+                delete = await client.delete(f"/api/accounts/{account_id}")
+                assert delete.status_code == 204
 
-            gone = await client.get(f"/api/accounts/{account_id}")
-            assert gone.status_code == 404
+                gone = await client.get(f"/api/accounts/{account_id}")
+                assert gone.status_code == 404
 
-            closed_after = await client.get("/api/database/closed-accounts")
-            assert account_id not in {
-                a["id"] for a in closed_after.json()["data"]["accounts"]
-            }
+                closed_after = await client.get("/api/database/closed-accounts")
+                assert account_id not in {
+                    a["id"] for a in closed_after.json()["data"]["accounts"]
+                }
+            finally:
+                # Red de seguridad: el test ya borra la cuenta, pero si falla a mitad
+                # (p. ej. antes del DELETE) no debe quedar residuo en la BD.
+                await purge_accounts(app.state.session_factory, [account_id])
 
 
 @pytest.mark.asyncio
@@ -204,19 +219,22 @@ async def test_purge_closed_simulated_accounts_batch() -> None:
             assert create.status_code == 201
             account_id = create.json()["data"]["id"]
 
-            close = await client.post(f"/api/accounts/{account_id}/close")
-            assert close.status_code == 200
+            try:
+                close = await client.post(f"/api/accounts/{account_id}/close")
+                assert close.status_code == 200
 
-            purge = await client.post(
-                "/api/database/closed-accounts/purge",
-                json={"limit": 50},
-            )
-            assert purge.status_code == 200
-            body = purge.json()["data"]
-            assert account_id in body["purgedIds"]
+                purge = await client.post(
+                    "/api/database/closed-accounts/purge",
+                    json={"limit": 50},
+                )
+                assert purge.status_code == 200
+                body = purge.json()["data"]
+                assert account_id in body["purgedIds"]
 
-            gone = await client.get(f"/api/accounts/{account_id}")
-            assert gone.status_code == 404
+                gone = await client.get(f"/api/accounts/{account_id}")
+                assert gone.status_code == 404
+            finally:
+                await purge_accounts(app.state.session_factory, [account_id])
 
 
 @pytest.mark.asyncio
@@ -232,11 +250,26 @@ async def test_set_default_account() -> None:
             assert create.status_code == 201
             account_id = create.json()["data"]["id"]
 
-            make_default = await client.post(f"/api/accounts/{account_id}/make-default")
-            assert make_default.status_code == 200
-            assert make_default.json()["data"]["isDefault"] is True
+            try:
+                make_default = await client.post(f"/api/accounts/{account_id}/make-default")
+                assert make_default.status_code == 200
+                assert make_default.json()["data"]["isDefault"] is True
 
-            listed = await client.get("/api/accounts")
-            defaults = [a for a in listed.json()["data"] if a["isDefault"]]
-            assert len(defaults) == 1
-            assert defaults[0]["id"] == account_id
+                listed = await client.get("/api/accounts")
+                defaults = [a for a in listed.json()["data"] if a["isDefault"]]
+                assert len(defaults) == 1
+                assert defaults[0]["id"] == account_id
+            finally:
+                # Crítico: este test deja su cuenta como DEFAULT, desplazando a la demo.
+                # Si no se limpia, cada ejecución añade una "Para principal" que además
+                # rompe `_load_default_scope` (multiple default accounts).
+                await purge_accounts(app.state.session_factory, [account_id])
+                # Restaurar la demo como única default, como estaba antes del test.
+                async with app.state.session_factory() as session:
+                    await session.execute(
+                        text(
+                            "UPDATE investment_accounts SET is_default = "
+                            "(id = 'default-account-seed')"
+                        )
+                    )
+                    await session.commit()

@@ -282,3 +282,57 @@ def test_job_idempotente_doble_invocacion() -> None:
     ]
     assert len(applied_upserts) == 1
     assert applied_upserts[0]["outstanding"] == pytest.approx(0.0)
+
+
+class _FakeAccountRepoWithBrokenAccount(_FakeAccountRepo):
+    """Como el fake base, pero ``resolve_scope`` falla en la cuenta indicada.
+
+    Reproduce el caso real: una cuenta sin cartera legacy lanza ``ValueError`` en
+    ``_load_scope`` (``account_repository.py``), y ese fallo NO debe arrastrar al job.
+    """
+
+    def __init__(self, accounts: list, broken_id: str) -> None:
+        super().__init__(accounts)
+        self._broken_id = broken_id
+
+    async def resolve_scope(self, account_id: str, portfolio_id=None):
+        if account_id == self._broken_id:
+            raise ValueError("La cuenta no tiene cartera legacy vinculada")
+        return await super().resolve_scope(account_id, portfolio_id)
+
+
+def test_job_cuenta_rota_no_aborta_el_resto() -> None:
+    """Regresión: una cuenta inválida no debe impedir cobrar a las cuentas VÁLIDAS.
+
+    Antes, ``resolve_scope`` lanzaba y el bucle entero se abortaba: las cuentas buenas
+    se quedaban sin cobrar en TODOS los ciclos del worker (el error se repetía en bucle).
+    Ahora la cuenta rota se marca ``skipped`` con motivo y el job sigue.
+    """
+    broken = _account("acc-broken", status="active", pct=0.2)
+    good = _account("acc-good", status="active", pct=0.2)
+
+    portfolio_repo = _FakePortfolioRepo(cash=100.0, equity=10_000.0)
+    ledger = _FakeLedger()
+    obligation = _FakeObligationRepo()
+    job = RunCustodyJob(
+        _FakeAccountRepoWithBrokenAccount([broken, good], broken_id="acc-broken"),  # type: ignore[arg-type]
+        portfolio_repo,  # type: ignore[arg-type]
+        ledger,  # type: ignore[arg-type]
+        obligation,  # type: ignore[arg-type]
+    )
+
+    result = asyncio_run(job.execute())
+
+    # La cuenta buena SÍ se cobra pese a la rota.
+    assert result["scanned"] == 2
+    assert result["applied_complete"] == 1, "la cuenta válida debe cobrarse"
+    assert result["skipped"] == 1, "la cuenta rota se cuenta como skipped"
+    assert ledger.appended.get("acc-good") is not None
+    assert ledger.appended.get("acc-broken") is None
+
+    broken_outcomes = [
+        r for r in result["results"] if r["accountId"] == "acc-broken"
+    ]
+    assert broken_outcomes and broken_outcomes[0]["outcome"] == "skipped"
+    assert "cartera legacy" in broken_outcomes[0]["reason"]
+    assert result["skipped_reasons"], "el motivo debe agregarse para observabilidad"

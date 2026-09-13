@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI
 from httpx import AsyncClient
+from sqlalchemy import delete
 
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
 from bolsa_domain.ohlcv_time import parse_bar_timestamp
@@ -77,6 +78,13 @@ async def seed_http_opening_allow(
     factory = app.state.session_factory
     created_at = datetime.now(UTC)
     async with factory() as session:
+        # Idempotencia: el test puede reejecutarse con el mismo instrumento (p. ej. ACS del
+        # seed) y la inserción directa de barras chocaba con
+        # ``ohlcv_bars_instrument_timeframe_ts_uidx`` (UniqueViolation) a partir de la 2ª
+        # ejecución. Se limpian las barras del instrumento antes de re-sembrar.
+        await session.execute(
+            delete(OhlcvBarRow).where(OhlcvBarRow.instrument_id == instrument_id)
+        )
         for bar in _flat_daily_bars():
             session.add(
                 OhlcvBarRow(

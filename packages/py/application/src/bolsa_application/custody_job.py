@@ -15,6 +15,7 @@ cuenta; si queda alguna → ``pending``, si no → ``applied_complete``.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from bolsa_application.accounts import ApplyCustodyFees
@@ -28,6 +29,8 @@ from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RunCustodyJob:
@@ -45,21 +48,57 @@ class RunCustodyJob:
         self._ledger_repo = ledger_repo
         self._obligation_repo = custody_obligation_repo
 
+    async def _rollback_quietly(self) -> None:
+        """Limpia la sesión tras el fallo de una cuenta para poder seguir con las demás.
+
+        Una excepción a mitad de transacción deja la sesión en estado abortado: sin este
+        ``rollback`` la siguiente cuenta fallaría por arrastre y el aislamiento no serviría.
+        """
+        session = getattr(self._account_repo, "_session", None)
+        if session is not None:
+            try:
+                await session.rollback()
+            except Exception:  # noqa: BLE001 — el rollback best-effort no debe propagar
+                logger.debug("Custodia: rollback best-effort falló", exc_info=True)
+
     async def execute(self) -> dict[str, Any]:
         accounts = await self._account_repo.list_active_accounts(for_custody_job=True)
         applied_complete = 0
         pending = 0
         skipped = 0
+        skipped_reasons: dict[str, int] = {}
         results: list[dict[str, Any]] = []
 
         for account in accounts:
-            scope = await self._account_repo.resolve_scope(account.id, None)
-            applied = await ApplyCustodyFees(
-                self._account_repo,
-                self._portfolio_repo,
-                self._ledger_repo,
-                custody_obligation_repo=self._obligation_repo,
-            ).execute(scope)
+            # Aislamiento por cuenta: un fallo en UNA cuenta no debe abortar el job entero.
+            # Antes, una cuenta sin cartera legacy (``_load_scope`` lanza ValueError) reventaba
+            # el bucle completo y las cuentas VÁLIDAS se quedaban sin cobrar, en cada ciclo.
+            # Ahora se marca como skipped (con motivo) y se sigue con la siguiente.
+            try:
+                scope = await self._account_repo.resolve_scope(account.id, None)
+                applied = await ApplyCustodyFees(
+                    self._account_repo,
+                    self._portfolio_repo,
+                    self._ledger_repo,
+                    custody_obligation_repo=self._obligation_repo,
+                ).execute(scope)
+            except Exception as exc:  # noqa: BLE001 — una cuenta no puede tumbar el job
+                await self._rollback_quietly()
+                reason = f"{type(exc).__name__}: {exc}"[:200]
+                skipped += 1
+                skipped_reasons[reason] = skipped_reasons.get(reason, 0) + 1
+                results.append(
+                    {
+                        "accountId": account.id,
+                        "outcome": "skipped",
+                        "reason": reason,
+                    }
+                )
+                logger.warning(
+                    "Custodia: cuenta %s omitida (%s)", account.id, reason
+                )
+                continue
+
             if not applied:
                 # Idempotente: no aplica / ya cobrado / perdedor de carrera UNIQUE/mutex.
                 skipped += 1
@@ -82,5 +121,6 @@ class RunCustodyJob:
             "applied_complete": applied_complete,
             "pending": pending,
             "skipped": skipped,
+            "skipped_reasons": skipped_reasons,
             "results": results,
         }

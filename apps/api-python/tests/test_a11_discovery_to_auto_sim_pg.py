@@ -455,8 +455,30 @@ async def test_a11_discovery_to_auto_sim_pg(
             for row in rows:
                 await session.delete(row)
             await session.commit()
-    except Exception:
-        raise
+    finally:
+        # Teardown del instrumento sintético y sus barras. Sin esto la BD acumulaba
+        # decenas de `inst-a11-*` con 700 barras cada uno, y `_seed_instrument_with_bars`
+        # reventaba con UniqueViolation al re-sembrar (rompiendo suites sin relación).
+        await _purge_synthetic_instrument(a11_factory, instrument_id)
+
+
+async def _purge_synthetic_instrument(
+    factory: async_sessionmaker[AsyncSession], instrument_id: str
+) -> None:
+    """Borra el instrumento sintético del test y todo su grafo (barras incluidas)."""
+    from sqlalchemy import text
+
+    if not instrument_id:
+        return
+    async with factory() as session:
+        # Barras primero (FK a instruments).
+        await session.execute(
+            text("DELETE FROM ohlcv_bars WHERE instrument_id = :iid"), {"iid": instrument_id}
+        )
+        await session.execute(
+            text("DELETE FROM instruments WHERE id = :iid"), {"iid": instrument_id}
+        )
+        await session.commit()
 
 
 async def test_a11_promotion_requires_shadow_evidence_pg(
