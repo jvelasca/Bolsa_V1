@@ -15,6 +15,7 @@ Certifica las propiedades duras de la gramática:
 from __future__ import annotations
 
 from bolsa_application.discovery_catalog import (
+    DEFAULT_DISCOVERY_ALLOCATOR,
     CatalogLane,
     DiscoveryBudget,
     DiscoveryBudgetAllocator,
@@ -33,6 +34,7 @@ from bolsa_application.discovery_grammar import (
     GrammarComponent,
     GrammarPlan,
     enumerate_grammar_plans,
+    grammar_variants_for_plan,
 )
 from bolsa_application.strategy_discovery_engine import (
     GRAMMAR_FAMILY_PREFIX,
@@ -294,6 +296,80 @@ def test_engine_reserves_budget_for_grammar_so_it_is_not_starved() -> None:
         c for c in candidates if c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
     ]
     assert grammar_candidates, "la gramática quedó sin presupuesto"
+
+
+def test_engine_grammar_consumes_its_full_allocator_cap() -> None:
+    """P2-01: la gramática emite su cupo del allocator, no ``max_per_component_variant``.
+
+    Con el presupuesto por defecto el allocator concede 12 cupos a la gramática
+    (simple 6 + compuesta 6). Antes se cortaba a ``min(12, max_per_component_variant=4)``
+    = 4, colapsando la emisión y dejando fuera las combinaciones de 2-3 bloques.
+    """
+    budget = DiscoveryBudget()
+    grammar_budget = GrammarBudget(base=budget)
+    candidates = discover_for_instrument(
+        instrument_id="AAA", budget=budget, grammar_budget=grammar_budget
+    )
+    grammar_candidates = [
+        c for c in candidates if c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
+    ]
+    cap = DEFAULT_DISCOVERY_ALLOCATOR.allocate(budget)[GrammarLane.SIMPLE].candidates + (
+        DEFAULT_DISCOVERY_ALLOCATOR.allocate(budget)[GrammarLane.COMPOSITE].candidates
+    )
+    assert cap > grammar_budget.max_per_component_variant, "premisa del test"
+    assert len(grammar_candidates) == cap
+
+
+def test_engine_grammar_emission_is_not_single_shape() -> None:
+    """P2-01: la emisión gramatical no se limita a una sola forma de plan.
+
+    Con el techo antiguo (=4) los 4 planes emitidos eran siempre
+    ``trigger_fijo + exit_fijo + regime``. Con el techo del allocator entran también
+    planes con 2 bloques opcionales y con otros triggers/exits.
+    """
+    budget = DiscoveryBudget()
+    candidates = discover_for_instrument(
+        instrument_id="AAA", budget=budget, grammar_budget=GrammarBudget(base=budget)
+    )
+    grammar_candidates = [
+        c for c in candidates if c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
+    ]
+    blocks = [
+        c.strategy_family[len(GRAMMAR_FAMILY_PREFIX):].split("__")
+        for c in grammar_candidates
+    ]
+    # No todos los planes comparten trigger+exit: hay variedad real de bloques.
+    triggers = {parts[0] for parts in blocks}
+    exits = {parts[1] for parts in blocks}
+    component_counts = {len(parts) for parts in blocks}
+    assert len(triggers) > 1, "todos los planes emitidos comparten el mismo trigger"
+    assert len(exits) > 1, "todos los planes emitidos comparten el mismo exit"
+    assert component_counts == {3}, "premisa: trigger+exit+opcional (2 obligatorios + 1)"
+
+
+def test_grammar_variants_rotate_axis_for_multi_optional_plans() -> None:
+    """P2-01: ``axis_index`` rota el bloque permutado (más de una dimensión en el LAB).
+
+    Sin rotación, todos los planes variaban el mismo bloque (el último opcional), de
+    modo que el PBO CSCV rankeaba columnas de una sola dimensión.
+    """
+    plans = enumerate_grammar_plans(GrammarBudget(max_per_component_variant=2))
+    if not plans:
+        return
+    base_plan = plans[0]
+    axes = set()
+    for axis_index in range(3):
+        variants = grammar_variants_for_plan(base_plan, max_variants=3, axis_index=axis_index)
+        assert variants[0]["label"] == base_plan.name, "el propio plan debe ir primero"
+        swapped = {
+            part
+            for v in variants[1:]
+            for part in v["label"].split("__")
+            if part not in set(base_plan.name.split("__"))
+        }
+        if swapped:
+            axes.add(frozenset(swapped))
+    assert len(axes) > 1, "la rotación de eje no cambia el bloque permutado"
 
 
 def test_engine_grammar_reserve_never_consumes_the_whole_budget() -> None:

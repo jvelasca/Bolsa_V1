@@ -7,7 +7,7 @@ funcionales
     REGIME + TREND FILTER + MOMENTUM + ENTRY TRIGGER + EXIT
 
 donde ``ENTRY_TRIGGER`` y ``EXIT`` son obligatorios y los otros tres son opcionales,
-con un techo duro de **2–3 componentes** opcionales. La combinatoria nunca «explota»:
+con un techo duro de **hasta 3 componentes** opcionales. La combinatoria nunca «explota»:
 se acota con ``GrammarBudget`` (que envuelve ``DiscoveryBudget``) y con un orden de
 enumeración total y determinista.
 
@@ -351,7 +351,14 @@ def _trigger_variants() -> tuple[GrammarComponent, ...]:
 
 
 def _exit_variants() -> tuple[GrammarComponent, ...]:
-    """EXIT — salida obligatoria (1 por plan)."""
+    """EXIT — salida obligatoria (1 por plan).
+
+    Nota (P2-02, no-bug): ``exit_ema10_cross_ema50`` / ``exit_ema20_cross_ema100``
+    comparten operandos con los triggers ``trigger_ema{10,20}_cross_ema{50,100}``, pero
+    son reglas DISTINTAS (dirección bajista vs alcista y ``signalKind="exit"`` vs
+    ``"entry_long"``). El veto ``_trend_regime_conflicts`` las acepta correctamente:
+    reutilizar specs es legítimo y se deduplica al materializar.
+    """
 
     def _ema_cross_down(fast: int, slow: int) -> GrammarComponent:
         fast_spec = _spec("ema", period=fast)
@@ -620,13 +627,17 @@ def enumerate_grammar_plans(
 
     for count in range(1, effective.max_components + 1):
         for combo in combinations(optional_kinds, count):
-            for trigger in triggers:
-                for exit_component in exits:
-                    # Producto cartesiano estable de las variantes de los opcionales.
-                    optionals: list[list[GrammarComponent]] = [
-                        list(pool[kind]) for kind in combo
-                    ]
-                    for chosen in _cartesian(optionals):
+            # Producto cartesiano estable de las variantes de los opcionales.
+            optionals: list[list[GrammarComponent]] = [
+                list(pool[kind]) for kind in combo
+            ]
+            for chosen in _cartesian(optionals):
+                # Orden de anidamiento: trigger varía más rápido que exit, y ambos más
+                # rápido que la combinación de opcionales. Así un corte por cupo (el
+                # allocator concede pocas candidatas) cubre varios triggers/exits en
+                # lugar de agotar el exit más interno con un solo trigger (P2-01).
+                for trigger in triggers:
+                    for exit_component in exits:
                         components = (
                             *chosen,
                             trigger,
@@ -671,15 +682,26 @@ def grammar_variants_for_plan(
     plan: GrammarPlan,
     *,
     max_variants: int = 4,
+    axis_index: int = 0,
 ) -> list[dict[str, Any]]:
     """Grid de variantes hermanas del plan para el LAB (A14).
 
     Un plan gramatical es UNA definición concreta, sin grid propio. Para que el LAB
     re-optimice de verdad y el PBO CSCV tenga múltiples columnas que rankear, se
     devuelven variantes hermanas: el mismo plan del que se permuta UNA variante de UN
-    bloque (el último bloque opcional presente; si no hay opcionales, el trigger),
+    bloque (uno de los bloques presentes: opcionales si los hay, si no el trigger),
     manteniendo el resto fijo. El primer elemento es SIEMPRE el propio plan (la
     candidata que trajo el Discovery), de modo que el campeón pueda ser la original.
+
+    ``axis_index`` selecciona de forma DETERMINISTA qué bloque se permuta, rotando
+    sobre TODOS los bloques permutables del plan — opcionales presentes, y también el
+    trigger y el exit (``axis_index % len(permutables)``). Rotar solo sobre el último
+    opcional dejaba sin dimensión a los planes con un único opcional (p. ej. los
+    ``regime``-only), para los que el grid degeneraba en el mismo eje (P2-01). Así dos
+    planes vecinos no comparten siempre el mismo eje y el LAB rankea columnas que
+    varían más de un bloque. El llamante pasa un índice estable (p. ej. el orden de
+    emisión); el valor por defecto 0 conserva el comportamiento histórico de un único
+    eje (el último opcional; si no hay, el trigger).
 
     Determinista y acotado a ``max_variants``. Fail-closed: las variantes que no
     materializan se descartan (no se inventan puntos).
@@ -690,10 +712,17 @@ def grammar_variants_for_plan(
         return []
     variants.append({"label": plan.name, "definition": own})
 
-    # Bloque a permutar: el último opcional presente; si no, el trigger.
-    optional_present = [c.kind for c in plan.components if c.kind in GRAMMAR_COMPONENT_ORDER]
-    swap_kind = optional_present[-1] if optional_present else COMPONENT_TRIGGER
+    # Bloques permutables presentes, en orden canónico. Se incluyen los obligatorios
+    # (trigger, exit) para que incluso los planes de un solo opcional tengan más de un
+    # eje de variación. El orden es el canónico y el eje rota con ``axis_index``.
     current = {c.kind: c for c in plan.components}
+    permutable_kinds = sorted(
+        (kind for kind in current if kind in GRAMMAR_VARIANTS),
+        key=lambda kind: (*_REQUIRED_COMPONENTS, *GRAMMAR_COMPONENT_ORDER).index(kind),
+    )
+    if not permutable_kinds:
+        return variants
+    swap_kind = permutable_kinds[int(axis_index) % len(permutable_kinds)]
     pool = GRAMMAR_VARIANTS.get(swap_kind, ())
 
     for alternative in pool:

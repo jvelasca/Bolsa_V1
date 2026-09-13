@@ -32,6 +32,8 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
+
 from bolsa_application.discovery_catalog import (
     DISCOVERY_FAMILIES,
     CatalogLane,
@@ -50,7 +52,6 @@ from bolsa_application.discovery_param_region import (
     param_region_for_point,
     split_granularity_key,
 )
-from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
 
 __all__ = [
     "ADAPTIVE_FAMILY_PREFIX",
@@ -525,16 +526,13 @@ def _extend_with_grammar(
     if bar_count is not None and bar_count < int(effective_grammar.min_bars):
         return candidates, trials_used
 
-    # El cupo gramatical viene del allocator (suma de carriles simple+compuesto). Se
-    # mantiene además el techo histórico ``max_per_component_variant`` como cota de
-    # seguridad: la gramática nunca aporta más planes que variantes declaradas.
-    grammar_emission_cap = max(
-        0,
-        min(
-            int(grammar_cap),
-            int(effective_grammar.max_per_component_variant),
-        ),
-    )
+    # El cupo gramatical viene del allocator (suma de carriles simple+compuesto) y es
+    # el ÚNICO techo de emisión. ``max_per_component_variant`` NO se usa aquí: acota
+    # cuántas variantes de cada bloque entran en la ENUMERACIÓN (``enumerate_grammar_plans``),
+    # no cuántos planes se emiten. Usarlo como techo global colapsaba la emisión a ese
+    # valor (4 por defecto) e impedía que la gramática consumiera su cupo real (12),
+    # dejando fuera las combinaciones de 2-3 bloques opcionales (P2-01).
+    grammar_emission_cap = max(0, int(grammar_cap))
 
     emitted_for_grammar = 0
     for plan in enumerate_grammar_plans(effective_grammar):
@@ -554,9 +552,13 @@ def _extend_with_grammar(
             else _default_candidate_id(instrument_id, plan.preset_key, index)
         )
         # Grid de variantes hermanas: permite que el LAB re-optimice el plan y que el
-        # PBO CSCV tenga columnas que rankear (un plan suelto no produce PBO).
+        # PBO CSCV tenga columnas que rankear (un plan suelto no produce PBO). El eje a
+        # permutar rota con el índice de emisión (determinista) para que planes vecinos
+        # no compartan el mismo grid y el LAB cubra más de una dimensión (P2-01).
         grammar_variants = grammar_variants_for_plan(
-            plan, max_variants=max(2, int(effective_grammar.max_per_component_variant))
+            plan,
+            max_variants=max(2, int(effective_grammar.max_per_component_variant)),
+            axis_index=emitted_for_grammar,
         )
         candidates.append(
             StrategyCandidate(
