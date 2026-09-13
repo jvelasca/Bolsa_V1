@@ -32,8 +32,6 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
-
 from bolsa_application.discovery_catalog import (
     DISCOVERY_FAMILIES,
     CatalogLane,
@@ -52,6 +50,7 @@ from bolsa_application.discovery_param_region import (
     param_region_for_point,
     split_granularity_key,
 )
+from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
 
 __all__ = [
     "ADAPTIVE_FAMILY_PREFIX",

@@ -14,11 +14,6 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from bolsa_domain.entities.discovery_evidence_snapshot import (
-    MATH_VERSION_DISCOVERY_EVIDENCE_V0,
-    MATH_VERSION_DISCOVERY_EVIDENCE_V1,
-)
-
 from bolsa_application.discovery_catalog import (
     DiscoveryBudget,
     DiscoveryBudgetAllocator,
@@ -30,6 +25,10 @@ from bolsa_application.discovery_evidence import (
     compute_lane_weights,
     evidence_fingerprint,
     snapshot_hash,
+)
+from bolsa_domain.entities.discovery_evidence_snapshot import (
+    MATH_VERSION_DISCOVERY_EVIDENCE_V0,
+    MATH_VERSION_DISCOVERY_EVIDENCE_V1,
 )
 
 

@@ -174,7 +174,7 @@ async def test_link_to_dropped_tenure_is_dropped_too(
     # No debe lanzar aunque el tenure referenciado no sobreviva al filtro.
     _, out_links = await repo.sync_account(ACCOUNT_ID, tenures, links)
 
-    assert all(l.transaction_id != "regression-link-orphan" for l in out_links)
+    assert all(link.transaction_id != "regression-link-orphan" for link in out_links)
 
 
 async def _delete_tenures(session: AsyncSession, ids: list[str]) -> None:

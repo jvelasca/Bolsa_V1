@@ -145,6 +145,30 @@ async def _purge_account(
         await session.commit()
 
 
+async def _purge_all_unknown(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Borra TODA fila UNKNOWN de la tabla (hermeticidad ante el claim global).
+
+    ``claim_unknown_batch`` NO acepta ``account_id``: es una barrida global de
+    ``status='UNKNOWN'`` (semántica correcta en producción — un worker de recuperación
+    atiende cualquier cuenta). Por eso un test que siembra n filas y afirma
+    ``union == seeded`` NO es hermético aunque purgue su propia cuenta: si otra pasada
+    (o otro test) dejó filas UNKNOWN vivas, el claim también las reclamará y la unión
+    excederá el lote sembrado.
+
+    Se limpia por ``status`` (no ``TRUNCATE`` ni ``DELETE`` total) para no tocar filas
+    que otros estados del ciclo de vida sí pueden necesitar.
+    """
+    from sqlalchemy import delete
+
+    from bolsa_infrastructure.database.models.tables import LiveOrderRow
+
+    async with session_factory() as session:
+        await session.execute(delete(LiveOrderRow).where(LiveOrderRow.status == "UNKNOWN"))
+        await session.commit()
+
+
 async def _claim_ids(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -175,6 +199,9 @@ async def test_claim_skips_row_locked_by_other_session(
     from bolsa_application.live_order_store import PostgresLiveOrderStore
 
     account_id = f"acc-conc-lock-{uuid4().hex[:8]}"
+    # El claim es global: sin purgar las UNKNOWN previas, A/B podrían reclamar filas
+    # ajenas y las aserciones ``issue_id[0] in claimed_*`` seguirían pasando por azar.
+    await _purge_all_unknown(session_factory)
     issue_id = await _seed_unknown(session_factory, count=1, account_id=account_id)
     try:
         # A: reclama y mantiene la tx abierta (FOR UPDATE, sin commit) → lock vivo.
@@ -222,6 +249,10 @@ async def test_two_workers_claim_disjoint_unknown_batch(
 
     n = 4
     account_id = f"acc-conc-par-{uuid4().hex[:8]}"
+    # Hermeticidad obligatoria: ``claim_unknown_batch`` barre la tabla entera, así que
+    # cualquier UNKNOWN residual de otra pasada/tests haría que ``union`` excediera
+    # ``seeded``. Se limpia ANTES de sembrar (el try/finally solo purga lo propio).
+    await _purge_all_unknown(session_factory)
     seeded = set(await _seed_unknown(session_factory, count=n, account_id=account_id))
     try:
         async def _run(worker_id: str) -> set[str]:

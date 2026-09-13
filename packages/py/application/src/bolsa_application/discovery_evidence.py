@@ -49,13 +49,12 @@ import math
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from bolsa_application.discovery_param_region import compose_granularity_key
 from bolsa_domain.entities.discovery_evidence_snapshot import (
     MATH_VERSION_DISCOVERY_EVIDENCE_V0,
     MATH_VERSION_DISCOVERY_EVIDENCE_V1,
     DiscoveryEvidenceSnapshot,
 )
-
-from bolsa_application.discovery_param_region import compose_granularity_key
 
 # --- Parámetros por defecto del prior (deterministas y conservadores) ---------------
 
