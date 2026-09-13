@@ -298,6 +298,10 @@ async def test_family_evidence_summary_aggregates_rich_metrics(pg_session: Async
     # Cobertura: solo uno de los dos trials traía las métricas.
     assert match[0]["metricCoverage"]["sharpeRatio"] == 1
     assert match[0]["metricCoverage"]["profitFactor"] == 1
+    # Cobertura de ``is_score``: contador expuesto para poder ponderar ``avgScore`` por
+    # su muestra real en la fusión multi-régimen (N2).
+    assert "score" in match[0]["metricCoverage"]
+    assert match[0]["metricCoverage"]["score"] >= 0
 
 
 @pytest.mark.asyncio

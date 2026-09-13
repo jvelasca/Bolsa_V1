@@ -49,12 +49,13 @@ import math
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from bolsa_application.discovery_param_region import compose_granularity_key
 from bolsa_domain.entities.discovery_evidence_snapshot import (
     MATH_VERSION_DISCOVERY_EVIDENCE_V0,
     MATH_VERSION_DISCOVERY_EVIDENCE_V1,
     DiscoveryEvidenceSnapshot,
 )
+
+from bolsa_application.discovery_param_region import compose_granularity_key
 
 # --- Parámetros por defecto del prior (deterministas y conservadores) ---------------
 
@@ -256,6 +257,152 @@ def _family_strength(row: Mapping[str, Any], *, math_version: str) -> float:
     return _family_strength_v1(row)
 
 
+def _merge_aggregates_by_key(
+    aggregates: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Fusiona filas con la MISMA clave compuesta ``familia|region`` (P2 nuevo).
+
+    El productor SQL agrupa por ``(preset_key, param_region, regime)``: cuando una misma
+    familia|región aparece en varios regímenes llegan VARIAS filas con la misma clave
+    compuesta. Agregar con asignación (``sample_sizes[key] = trials``) descartaba todas
+    menos la última, perdiendo evidencia real (medido: 60 trials reportados como 30, y una
+    familia con 12 trials quedaba por debajo de ``min_total_samples``).
+
+    Reglas de fusión (deterministas):
+
+    * **Contadores** (``trials``, ``zeroTrade``, ``failures``): SUMA.
+    * **Ratios** (``avgScore``, ``avgSharpe``, ``avgProfitFactor``, ``avgMaxDrawdownPct``):
+      media ponderada por la **cobertura real** de cada métrica, no por ``trials``. El SQL
+      calcula cada ratio con ``func.avg`` sobre las filas donde la métrica NO es nula, de
+      modo que el denominador correcto es ``metricCoverage[<métrica>]`` (ya expuesto en la
+      fila para las cuatro métricas). Ponderar por ``trials`` mezclaría denominadores
+      distintos: medido, un sesgo de hasta ~23 % en el Sharpe fusionado y mucho mayor en
+      ``avgScore``. Si una fila no trae cobertura (API pura, no el productor SQL) se usa
+      ``trials`` como fallback documentado.
+    * **Posterior** (``posteriorWeighted``, ``posteriorCount``): SUMA (ya son conteos).
+    * **Presupuesto / cobertura**: ``kConsumed`` (``sum(k_contribution)`` en SQL) y
+      ``metricCoverage`` (``count(<métrica>)``) SUMAN. ``bestScore``
+      (``max(is_score)``) toma el MÁXIMO. Preservar estos campos evita el descarte
+      silencioso que sufría la fusión (P3 del revisor).
+    * ``regime`` se descarta en el resultado fusionado: NO entra en la clave de
+      granularidad (es dimensión paralela, V2.39). El desglose por régimen se publica
+      aparte en ``regimeGranularity`` del payload, no aquí.
+
+    Orden canónico por clave compuesta ⇒ salida reproducible. Una entrada con una sola
+    fila por clave devuelve exactamente las mismas métricas (compatibilidad byte a byte).
+    """
+    # Métrica de ratio -> clave de ``metricCoverage`` que da su tamaño de muestra real.
+    ratio_coverage: dict[str, str] = {
+        "avgScore": "score",
+        "avgSharpe": "sharpeRatio",
+        "avgProfitFactor": "profitFactor",
+        "avgMaxDrawdownPct": "maxDrawdownPct",
+    }
+    ratio_keys = tuple(ratio_coverage)
+    # Orden de entrada canónico ANTES de acumular: la suma flotante es sensible al orden
+    # en el último bit; ordenar aquí garantiza que dos ejecuciones con distinto orden de
+    # BD produzcan bit a bit el mismo acumulador (robustez de determinismo).
+    ordered_rows = sorted(
+        aggregates,
+        key=lambda r: (
+            str(r.get("presetKey") or ""),
+            str(r.get("paramRegion") or ""),
+            str(r.get("regime") or ""),
+        ),
+    )
+    merged: dict[str, dict[str, Any]] = {}
+    for row in ordered_rows:
+        family = str(row.get("presetKey") or "").strip()
+        if not family:
+            continue
+        region = str(row.get("paramRegion") or "").strip()
+        key = compose_granularity_key(family, region)
+        entry = merged.get(key)
+        if entry is None:
+            entry = {
+                "presetKey": family,
+                "paramRegion": region,
+                "trials": 0,
+                "zeroTrade": 0,
+                "failures": 0,
+                "posteriorWeighted": 0.0,
+                "posteriorCount": 0.0,
+                # Presupuesto consumido: ``sum(k_contribution)`` en SQL -> SUMA.
+                "kConsumed": 0,
+                # Mejor score observado: ``max(is_score)`` en SQL -> MAXIMO.
+                "bestScore": None,
+                # Cobertura real por metrica: ``count(<metrica>)`` -> SUMA por contador.
+                "_coverage": {
+                    "score": 0,
+                    "sharpeRatio": 0,
+                    "profitFactor": 0,
+                    "maxDrawdownPct": 0,
+                },
+                # Acumulador interno: suma ponderada por métrica. No se publica.
+                "_weighted_sum": {name: 0.0 for name in ratio_keys},
+                "_weighted_n": {name: 0 for name in ratio_keys},
+            }
+            merged[key] = entry
+        trials = int(row.get("trials") or 0)
+        entry["trials"] += trials
+        entry["zeroTrade"] += int(row.get("zeroTrade") or 0)
+        entry["failures"] += int(row.get("failures") or 0)
+        entry["kConsumed"] += int(row.get("kConsumed") or 0)
+        best = _as_float(row.get("bestScore"))
+        if best is not None:
+            current_best = entry["bestScore"]
+            entry["bestScore"] = best if current_best is None else max(current_best, best)
+        entry["posteriorWeighted"] += float(_as_float(row.get("posteriorWeighted")) or 0.0)
+        entry["posteriorCount"] += float(_as_float(row.get("posteriorCount")) or 0.0)
+        coverage = row.get("metricCoverage")
+        coverage = coverage if isinstance(coverage, Mapping) else {}
+        for cov_key in entry["_coverage"]:
+            entry["_coverage"][cov_key] += int(coverage.get(cov_key) or 0)
+        for name, coverage_key in ratio_coverage.items():
+            value = _as_float(row.get(name))
+            if value is None:
+                continue
+            # Peso = tamaño de muestra real de la métrica (su cobertura). Si la fila no la
+            # declara (API pura) se cae a ``trials`` como cota superior documentada.
+            weight = int(coverage.get(coverage_key) or 0)
+            if weight <= 0:
+                weight = trials
+            if weight <= 0:
+                continue
+            entry["_weighted_sum"][name] += value * weight
+            entry["_weighted_n"][name] += weight
+
+    result: list[dict[str, Any]] = []
+    for key in sorted(merged):
+        entry = merged[key]
+        out: dict[str, Any] = {
+            "presetKey": entry["presetKey"],
+            "paramRegion": entry["paramRegion"],
+            "trials": entry["trials"],
+            "zeroTrade": entry["zeroTrade"],
+            "failures": entry["failures"],
+            "kConsumed": entry["kConsumed"],
+        }
+        # ``bestScore`` solo si alguna fila lo trajo (ausente != 0).
+        if entry["bestScore"] is not None:
+            out["bestScore"] = entry["bestScore"]
+        # Cobertura real por metrica, acumulada por contador (no mezclar con ratios).
+        out["metricCoverage"] = {
+            cov_key: int(value) for cov_key, value in entry["_coverage"].items()
+        }
+        # Posterior solo si hubo evidencia (coherente con ``_posterior_component``).
+        if entry["posteriorCount"] > 0:
+            out["posteriorWeighted"] = entry["posteriorWeighted"]
+            out["posteriorCount"] = entry["posteriorCount"]
+        for name in ratio_keys:
+            n = entry["_weighted_n"][name]
+            if n > 0:
+                out[name] = _round(entry["_weighted_sum"][name] / n)
+            # Si n == 0 la métrica queda ausente (no se emite la clave).
+        result.append(out)
+    return result
+
+
 def compute_family_weights(
     aggregates: Iterable[Mapping[str, Any]],
     *,
@@ -270,20 +417,16 @@ def compute_family_weights(
     ``familia|region``. Orden canónico por clave compuesta. Las claves por debajo de
     ``min_samples`` se excluyen del mapa de pesos (no aportan señal) pero conservan su
     tamaño de muestra para auditoría.
+
+    P2 nuevo: la entrada se FUSIONA primero por clave compuesta
+    (``_merge_aggregates_by_key``). El productor SQL rompe por régimen, de modo que una
+    misma familia|región puede llegar en varias filas; sin la fusión, la última fila
+    sobrescribía el resto y se descartaba evidencia real.
     """
     family_weights: dict[str, float] = {}
     sample_sizes: dict[str, int] = {}
-    ordered = sorted(
-        aggregates,
-        key=lambda r: (
-            str(r.get("presetKey") or ""),
-            str(r.get("paramRegion") or ""),
-        ),
-    )
-    for row in ordered:
+    for row in _merge_aggregates_by_key(aggregates):
         family = str(row.get("presetKey") or "").strip()
-        if not family:
-            continue
         region = str(row.get("paramRegion") or "").strip()
         key = compose_granularity_key(family, region)
         trials = int(row.get("trials") or 0)
@@ -330,6 +473,15 @@ def evidence_fingerprint(
     snapshot" (qué conjunto exacto de filas se agregó). Incluye por familia la muestra y
     la cobertura de métricas, más el corte de evidencia posterior. No incluye
     ``created_at`` ni el reloj: es determinista sobre los datos.
+
+    ALCANCE DEL CONTRATO (importante): esta huella se calcula sobre las filas CRUDAS, con
+    el régimen como dimensión (V2.39), mientras que ``compute_family_weights`` opera sobre
+    las filas FUSIONADAS por ``familia|region`` (el régimen colapsa, P2). Son dos
+    granularidades deliberadamente distintas: el fingerprint es **trazabilidad del input
+    crudo** (identidad del dataset), NO una clave de equivalencia de pesos. Dos datasets
+    que difieren solo en el reparto por régimen comparten ``snapshot_hash`` (el reparto de
+    cupos es el mismo) pero tienen fingerprints distintos. No usar el fingerprint para
+    deduplicar snapshots ni para inferir que los pesos coinciden.
     """
     canonical = json.dumps(
         {
@@ -466,7 +618,10 @@ def build_discovery_evidence_snapshot(
         if regime:
             composite = compose_granularity_key(family, region)
             regimes = regime_granularity.setdefault(composite, {})
-            regimes[regime] = int(row.get("trials") or 0)
+            # ACUMULA, no sobrescribe: por API pura pueden llegar dos filas con el mismo
+            # ``(familia, region, regime)``; asignar perdía trials y dejaba el payload
+            # incoherente con ``sampleSizes`` (que sí suma).
+            regimes[regime] = regimes.get(regime, 0) + int(row.get("trials") or 0)
     payload: dict[str, Any] = {
         "mathVersion": math_version,
         "windowFrom": window_from,

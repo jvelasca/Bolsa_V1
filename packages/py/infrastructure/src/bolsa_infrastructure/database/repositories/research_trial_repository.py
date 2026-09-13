@@ -439,6 +439,10 @@ class SqlAlchemyResearchTrialRepository:
                 func.count(sharpe).label("sharpe_n"),
                 func.count(profit_factor).label("profit_factor_n"),
                 func.count(max_dd).label("max_dd_n"),
+                # Cobertura real de ``is_score`` (``func.avg`` ignora NULLs); sin este
+                # contador la fusión multi-régimen no puede ponderar ``avgScore`` por su
+                # muestra real y cae a ``trials``, que sobrepondera las filas dispersas.
+                func.count(ResearchTrialRow.is_score).label("is_score_n"),
                 func.sum(
                     case((and_(trade_count.isnot(None), trade_count == 0.0), 1), else_=0)
                 ).label("zero_trade"),
@@ -494,6 +498,7 @@ class SqlAlchemyResearchTrialRepository:
                     "sharpeRatio": int(row.sharpe_n or 0),
                     "profitFactor": int(row.profit_factor_n or 0),
                     "maxDrawdownPct": int(row.max_dd_n or 0),
+                    "score": int(row.is_score_n or 0),
                 },
                 "zeroTrade": int(row.zero_trade or 0),
                 "failures": int(row.failures or 0),

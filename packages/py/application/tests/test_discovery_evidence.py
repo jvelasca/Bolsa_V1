@@ -14,6 +14,11 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from bolsa_domain.entities.discovery_evidence_snapshot import (
+    MATH_VERSION_DISCOVERY_EVIDENCE_V0,
+    MATH_VERSION_DISCOVERY_EVIDENCE_V1,
+)
+
 from bolsa_application.discovery_catalog import (
     DiscoveryBudget,
     DiscoveryBudgetAllocator,
@@ -25,10 +30,6 @@ from bolsa_application.discovery_evidence import (
     compute_lane_weights,
     evidence_fingerprint,
     snapshot_hash,
-)
-from bolsa_domain.entities.discovery_evidence_snapshot import (
-    MATH_VERSION_DISCOVERY_EVIDENCE_V0,
-    MATH_VERSION_DISCOVERY_EVIDENCE_V1,
 )
 
 
@@ -567,3 +568,255 @@ def test_regime_and_region_coexist_without_key_collision() -> None:
         "sma|r00:aaa": {"trend_up": 6},
         "sma|r01:bbb": {"range": 4},
     }
+
+
+# ── P2 (auditoría): fusión de filas con la MISMA clave compuesta por régimen ────
+
+
+def test_repeated_composite_key_sums_sample_sizes() -> None:
+    """El SQL rompe por régimen: varias filas de la misma clave deben SUMARSE.
+
+    Antes se sobrescribían (``sample_sizes[key] = trials``): 10 + 2 reales se
+    reportaban como 2, descartando evidencia real.
+    """
+    weights, samples = compute_family_weights(
+        [
+            _agg_regime("sma", "trend_up", 10, region="r00:aaa"),
+            _agg_regime("sma", "range", 2, region="r00:aaa"),
+        ],
+        min_samples=3,
+    )
+    assert samples == {"sma|r00:aaa": 12}
+    assert set(weights) == {"sma|r00:aaa"}
+
+
+def test_repeated_key_without_region_sums_too() -> None:
+    """Sin región, dos regímenes de la misma familia también suman (no sobrescriben)."""
+    weights, samples = compute_family_weights(
+        [
+            _agg_regime("sma", "trend_up", 10),
+            _agg_regime("sma", "range", 5),
+        ],
+        min_samples=3,
+    )
+    assert samples == {"sma": 15}
+    assert set(weights) == {"sma"}
+
+
+def test_enough_evidence_enables_adaptive_lane_after_merge() -> None:
+    """P2: con 12 trials reales repartidos en dos regímenes, el carril debe habilitarse.
+
+    Antes el total reportado era 2 (< ``min_total_samples=12``) y el carril quedaba
+    apagado teniendo evidencia de sobra.
+    """
+    snapshot = _build(
+        [
+            _agg_regime("sma", "trend_up", 10, region="r00:aaa"),
+            _agg_regime("sma", "range", 2, region="r00:aaa"),
+        ],
+        min_samples=3,
+        min_total_samples=12,
+    )
+    assert sum(snapshot.sample_sizes.values()) == 12
+    assert snapshot.adaptive_weight() > 0.0
+
+
+def test_merged_metrics_are_trials_weighted() -> None:
+    """Los ratios se recombinan como media ponderada por su muestra real.
+
+    Sin ``metricCoverage`` en las filas, el peso disponible es ``trials`` (fallback
+    documentado), así que la media es la ponderada por trials.
+    """
+    from bolsa_application.discovery_evidence import _merge_aggregates_by_key
+
+    merged = _merge_aggregates_by_key(
+        [
+            _agg_regime("sma", "trend_up", 6, region="r00:aaa", avg_score=1.0),
+            _agg_regime("sma", "range", 2, region="r00:aaa", avg_score=0.0),
+        ]
+    )
+    assert len(merged) == 1
+    row = merged[0]
+    assert row["trials"] == 8
+    # (1.0*6 + 0.0*2) / 8 = 0.75
+    assert row["avgScore"] == 0.75
+
+
+def test_metric_coverage_is_used_as_weight_for_ratios() -> None:
+    """El peso de cada ratio es su cobertura real, no ``trials`` (P2 del revisor).
+
+    ``func.avg`` en SQL promedia solo las filas con la métrica no nula, así que el
+    denominador correcto es ``metricCoverage[<métrica>]``. Ponderar por ``trials``
+    mezclaba denominadores (sesgo medido de hasta ~23 %).
+    """
+    from bolsa_application.discovery_evidence import _merge_aggregates_by_key
+
+    merged = _merge_aggregates_by_key(
+        [
+            {
+                "presetKey": "sma",
+                "paramRegion": "r00:aaa",
+                "regime": "trend_up",
+                "trials": 6,
+                "avgSharpe": 2.0,
+                "metricCoverage": {"sharpeRatio": 3},
+            },
+            {
+                "presetKey": "sma",
+                "paramRegion": "r00:aaa",
+                "regime": "range",
+                "trials": 4,
+                "avgSharpe": 0.5,
+                "metricCoverage": {"sharpeRatio": 4},
+            },
+        ]
+    )
+    # (2.0*3 + 0.5*4) / 7 = 1.142857 (la verdad); ponderar por trials daría 1.4.
+    assert merged[0]["avgSharpe"] == round((2.0 * 3 + 0.5 * 4) / 7, 6)
+    assert merged[0]["trials"] == 10
+
+
+def test_missing_metric_coverage_falls_back_to_trials() -> None:
+    """Sin ``metricCoverage`` el peso cae a ``trials`` (no se descarta la fila)."""
+    from bolsa_application.discovery_evidence import _merge_aggregates_by_key
+
+    merged = _merge_aggregates_by_key(
+        [
+            {"presetKey": "sma", "trials": 6, "avgSharpe": 2.0},
+            {"presetKey": "sma", "trials": 4, "avgSharpe": 0.5},
+        ]
+    )
+    assert merged[0]["avgSharpe"] == 1.4
+
+
+def test_avg_score_uses_its_own_coverage_not_trials() -> None:
+    """``avgScore`` se pondera por ``metricCoverage['score']``, no por ``trials`` (N2).
+
+    ``is_score`` es nullable, así que ``func.avg`` promedia sobre un subconjunto; el
+    contador ``count(is_score)`` (expuesto por el productor SQL) es el denominador real.
+    """
+    from bolsa_application.discovery_evidence import _merge_aggregates_by_key
+
+    # Coberturas 5 y 1: (1.0*5 + 10.0*1) / 6 = 2.5.
+    # Ponderar por ``trials`` (100 y 100) daría 5.5, un sesgo del 120 %.
+    merged = _merge_aggregates_by_key(
+        [
+            {
+                "presetKey": "sma",
+                "regime": "trend_up",
+                "trials": 100,
+                "avgScore": 1.0,
+                "metricCoverage": {"score": 5},
+            },
+            {
+                "presetKey": "sma",
+                "regime": "range",
+                "trials": 100,
+                "avgScore": 10.0,
+                "metricCoverage": {"score": 1},
+            },
+        ]
+    )
+    assert merged[0]["avgScore"] == 2.5
+
+
+def test_repeated_regime_counts_are_summed_not_overwritten() -> None:
+    """``regimeGranularity`` acumula trials si se repite ``(familia, region, regime)``.
+
+    Por API pura pueden llegar dos filas idénticas en la terna; asignar perdía trials y
+    dejaba el payload incoherente con ``sampleSizes`` (que sí suma).
+    """
+    snapshot = _build(
+        [
+            _agg_regime("sma", "trend_up", 6, region="r00:aaa"),
+            _agg_regime("sma", "trend_up", 4, region="r00:aaa"),
+        ]
+    )
+    assert snapshot.payload["regimeGranularity"] == {"sma|r00:aaa": {"trend_up": 10}}
+    assert snapshot.sample_sizes == {"sma|r00:aaa": 10}
+
+
+def test_merge_preserves_budget_best_and_coverage_fields() -> None:
+    """La fusión NO descarta ``kConsumed``/``bestScore``/``metricCoverage`` (P3).
+
+    Semántica verificada en el productor SQL: ``kConsumed`` es ``sum(k_contribution)``,
+    ``bestScore`` es ``max(is_score)`` y ``metricCoverage`` son ``count(<métrica>)``.
+    """
+    from bolsa_application.discovery_evidence import _merge_aggregates_by_key
+
+    merged = _merge_aggregates_by_key(
+        [
+            {
+                "presetKey": "sma",
+                "regime": "trend_up",
+                "trials": 4,
+                "kConsumed": 10,
+                "bestScore": 3.0,
+                "metricCoverage": {
+                    "score": 4,
+                    "sharpeRatio": 2,
+                    "profitFactor": 1,
+                    "maxDrawdownPct": 4,
+                },
+            },
+            {
+                "presetKey": "sma",
+                "regime": "range",
+                "trials": 3,
+                "kConsumed": 5,
+                "bestScore": 7.0,
+                "metricCoverage": {
+                    "score": 2,
+                    "sharpeRatio": 3,
+                    "profitFactor": 2,
+                    "maxDrawdownPct": 3,
+                },
+            },
+        ]
+    )
+    row = merged[0]
+    assert row["kConsumed"] == 15  # suma
+    assert row["bestScore"] == 7.0  # máximo, no suma ni última
+    assert row["metricCoverage"] == {
+        "score": 6,
+        "sharpeRatio": 5,
+        "profitFactor": 3,
+        "maxDrawdownPct": 7,
+    }  # suma por contador
+
+
+def test_zero_trial_rows_do_not_inflate_samples_or_break_mean() -> None:
+    """Una fila con ``trials=0`` no pondera la media ni aporta muestra."""
+    from bolsa_application.discovery_evidence import _merge_aggregates_by_key
+
+    merged = _merge_aggregates_by_key(
+        [
+            _agg_regime("sma", "trend_up", 4, region="r00:aaa", avg_score=1.0),
+            _agg_regime("sma", "range", 0, region="r00:aaa", avg_score=9.9),
+        ]
+    )
+    assert merged[0]["trials"] == 4
+    # La métrica de la fila sin muestra se ignora: la media es la de la fila con trials.
+    assert merged[0]["avgScore"] == 1.0
+
+
+def test_merge_is_order_insensitive() -> None:
+    """El resultado fusionado no depende del orden de las filas de entrada."""
+    rows = [
+        _agg_regime("sma", "trend_up", 6, region="r00:aaa", avg_score=1.4),
+        _agg_regime("sma", "range", 4, region="r00:aaa", avg_score=0.2),
+        _agg_regime("rsi", "trend_up", 5, avg_score=0.9),
+    ]
+    a = _build(rows)
+    b = _build(list(reversed(rows)))
+    assert a.family_weights == b.family_weights
+    assert a.sample_sizes == b.sample_sizes
+    assert a.snapshot_hash == b.snapshot_hash
+
+
+def test_single_row_per_key_is_unchanged_by_merge() -> None:
+    """Compatibilidad: una fila por clave produce exactamente la misma salida."""
+    plain = compute_family_weights([_agg("sma", 10), _agg("rsi", 8, avg_score=0.5)])
+    via_snapshot = _build([_agg("sma", 10), _agg("rsi", 8, avg_score=0.5)])
+    assert plain[0] == via_snapshot.family_weights
+    assert plain[1] == via_snapshot.sample_sizes
