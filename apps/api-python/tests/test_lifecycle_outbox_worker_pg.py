@@ -82,6 +82,28 @@ async def session_factory(
     return create_session_factory(pg_engine)
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _isolated_outbox_table(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[None]:
+    """Aísla la tabla ``lifecycle_outbox`` antes y después de cada test del fichero.
+
+    ``claim_batch`` barre la tabla GLOBALMENTE (FIFO por posición, sin filtrar por
+    posición), así que las filas ``pending``/``processing`` de otras suites pueden
+    consumir el hook inyectado del test antes de que su propia fila avance. Ver
+    ``_purge_residual_outbox``. La purga no debe tumbar un test ya juzgado.
+    """
+    try:
+        await _purge_residual_outbox(session_factory)
+    except Exception:  # noqa: BLE001 — si la BD no está, el test ya skipea arriba.
+        pass
+    yield
+    try:
+        await _purge_residual_outbox(session_factory)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _direct(
     *,
     kind: str,
@@ -171,6 +193,28 @@ async def _cleanup(factory: async_sessionmaker[AsyncSession], *, position_id: st
         await session.execute(
             text("DELETE FROM lifecycle_aggregates WHERE position_id = :p"),
             {"p": position_id},
+        )
+        await session.commit()
+
+
+async def _purge_residual_outbox(factory: async_sessionmaker[AsyncSession]) -> None:
+    """Deja la tabla ``lifecycle_outbox`` sin filas vivas de otras suites.
+
+    ``claim_batch`` es una barrida GLOBAL con sanitizado de huérfanas: reclama filas
+    ``pending`` (o ``processing`` caducadas) FIFO por posición, pero sin filtrar por
+    posición. En una ejecución aislada solo ve las filas que crea este fichero; en la
+    batería completa ve además cabezas FIFO ``pending``/``dead`` de otras suites, que
+    pueden consumir el hook inyectado (``on_before_apply_commit``) antes de que la fila
+    propia pase a ``processing``. Eso hacía que ``_wait_status(..., "processing")``
+    observara ``applied`` y el test fallara de forma intermitente según el orden.
+
+    Se purgan solo las filas ``pending``/``processing`` (residuo transitorio anómalo) y
+    se dejan intactas las ``applied``/``dead``, que son historia legítima de otras
+    suites y no interfieren (una fila ``dead`` es terminal y no vuelve a reclamarse).
+    """
+    async with factory() as session:
+        await session.execute(
+            text("DELETE FROM lifecycle_outbox WHERE status IN ('pending', 'processing')")
         )
         await session.commit()
 

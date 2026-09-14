@@ -194,18 +194,19 @@ async def test_dead_head_vs_dead_non_head(
         )
         await session.commit()
 
-    async with session_factory() as session:
-        row = (
-            await session.execute(
-                select(LifecycleOutboxRow).where(
-                    LifecycleOutboxRow.account_id == account_id,
-                    LifecycleOutboxRow.position_id == position_id,
+    try:
+        async with session_factory() as session:
+            row = (
+                await session.execute(
+                    select(LifecycleOutboxRow).where(
+                        LifecycleOutboxRow.account_id == account_id,
+                        LifecycleOutboxRow.position_id == position_id,
+                    )
                 )
-            )
-        ).scalar_one()
-        row.status = "dead"
-        row.created_at = t0
-        await session.commit()
+            ).scalar_one()
+            row.status = "dead"
+            row.created_at = t0
+            await session.commit()
 
         snaps = [
             OutboxSnap(
@@ -232,6 +233,16 @@ async def test_dead_head_vs_dead_non_head(
         )
         assert report.status == "blocked"
         assert any(i.code == "dead_head" for i in report.issues)
+    finally:
+        # Hermeticidad: esta fila nace ``dead`` y se quedaría para siempre. Al ser la
+        # cabeza FIFO de su posición no bloquea a nadie, pero el sanitizado global de
+        # ``claim_batch`` la ve y otros tests del outbox fallan al reclamar filas ajenas.
+        async with session_factory() as session:
+            await session.execute(
+                text("DELETE FROM lifecycle_outbox WHERE position_id = :p"),
+                {"p": position_id},
+            )
+            await session.commit()
 
     # Non-head dead: pending head + later dead
     pos2 = f"fi-pos2-{uuid4().hex[:10]}"

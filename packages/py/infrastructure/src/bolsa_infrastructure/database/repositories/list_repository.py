@@ -375,6 +375,15 @@ class SqlAlchemyListRepository:
 
             return False
 
+        # La FK ``instrument_list_items.list_id`` NO es ON DELETE CASCADE, así que hay
+        # que vaciar los items ANTES de borrar la lista. Sin esto, cualquier lista con
+        # instrumentos es imborrable: el DELETE viola la FK y la API devuelve 500 en vez
+        # de 204. Ambos borrados viajan en la misma transacción (sesión), así que o se
+        # vacían los items y se borra la lista, o no se cambia nada.
+        await self._session.execute(
+            delete(InstrumentListItemRow).where(InstrumentListItemRow.list_id == list_id)
+        )
+
         stmt = delete(InstrumentListRow).where(InstrumentListRow.id == list_id)
 
         result = await self._session.execute(stmt)

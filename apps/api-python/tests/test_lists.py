@@ -40,3 +40,49 @@ async def test_lists_crud_flow() -> None:
 
             delete_response = await client.delete(f"/api/lists/{created_id}")
             assert delete_response.status_code == 204
+
+            # La lista borrada no debe reaparecer en el catálogo.
+            after_response = await client.get("/api/lists")
+            assert after_response.status_code == 200
+            ids_after = {item["id"] for item in after_response.json()["data"]}
+            assert created_id not in ids_after
+
+
+@pytest.mark.asyncio
+async def test_delete_list_with_items_does_not_violate_fk() -> None:
+    """Regresión: borrar una lista CON instrumentos debe funcionar (204), no 500.
+
+    ``instrument_list_items.list_id`` no es ``ON DELETE CASCADE``. El repositorio
+    borraba la fila de ``instrument_lists`` directamente, así que cualquier lista con
+    items violaba la FK y la API devolvía 500. Este test fija el contrato: se crea una
+    lista con un instrumento real, se verifica que tiene items y se borra.
+    """
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            lists_body = (await client.get("/api/lists")).json()["data"]
+            assert lists_body, "premisa: hay listas sembradas"
+            list_id = lists_body[0]["id"]
+            quotes = (await client.get(f"/api/lists/{list_id}/quotes")).json()["data"]
+            assert quotes, "premisa: la lista tiene instrumentos"
+
+            created = await client.post(
+                "/api/lists",
+                json={
+                    "name": f"Lista con items {list_id}",
+                    "instrumentIds": [quotes[0]["id"]],
+                },
+            )
+            assert created.status_code == 201
+            created_id = created.json()["data"]["id"]
+
+            detail = await client.get(f"/api/lists/{created_id}/quotes")
+            assert detail.status_code == 200
+            assert len(detail.json()["data"]) >= 1, "la lista debe tener items que la referencien"
+
+            deleted = await client.delete(f"/api/lists/{created_id}")
+            assert deleted.status_code == 204, (
+                f"borrar una lista con items debe dar 204, no {deleted.status_code}"
+            )
+            assert (await client.get(f"/api/lists/{created_id}/quotes")).status_code == 404
