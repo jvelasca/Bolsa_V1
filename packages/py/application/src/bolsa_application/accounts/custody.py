@@ -113,14 +113,27 @@ class ApplyCustodyFees:
                         continue
                     to_charge = min(pending.outstanding, cash)
                     new_outstanding = pending.outstanding - to_charge
-                    balance_after = cash - to_charge
                     description = (
                         f"Custodia {pending.period} (pendiente) {pct:.2f} % · "
                         f"patrimonio {total_equity:.2f} €"
                     )
                     async with _idempotent_savepoint(session):
-                        await self._portfolio_repo.deduct_cash(
+                        # EXEC-B-CONC (misma regla que ExecuteTrade): ``balance_after``
+                        # se deriva del cash POST-lock que devuelve ``deduct_cash``,
+                        # NUNCA de un ``get_summary`` PRE-lock. Leer cash antes del
+                        # ``with_for_update`` producía un ``balance_after`` calculado
+                        # sobre un estado que otro trade (concurrente, ya commiteado)
+                        # había modificado, rompiendo la cadena
+                        # ``balance_after[n] == balance_after[n-1] + amount[n]``.
+                        balance_after = await self._portfolio_repo.deduct_cash(
                             charge_legacy_id, to_charge, allow_partial=True
+                        )
+                        # El instante sale del secuenciador del ledger (monótono con el
+                        # orden de aplicación), no del reloj de pared: bajo concurrencia
+                        # el reloj puede invertirse respecto al commit y desordenar la
+                        # cadena. Invocado ya con el lock de la cartera tomado.
+                        executed_at = await self._ledger_repo.next_executed_at(
+                            scope.account.id
                         )
                         await self._ledger_repo.append_custody_fee(
                             account_id=scope.account.id,
@@ -130,6 +143,7 @@ class ApplyCustodyFees:
                             balance_after=balance_after,
                             reference_id=f"custody-{pending.period}",
                             description=description,
+                            executed_at=executed_at,
                         )
                         await self._account_repo.touch_activity(scope.account.id)
                         settled = new_outstanding <= 0
@@ -148,14 +162,19 @@ class ApplyCustodyFees:
             description = f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f} €"
             if cash_before >= fee_amount:
                 # Cobro completo, no parcial: solo con saldo suficiente se descuenta
-                # cash y se escribe el ledger. balance_after (F3) ya viene descontado;
-                # invariante Σ ledger == cash se mantiene (no cargo parcial).
-                balance_after = cash_before - fee_amount
+                # cash y se escribe el ledger. ``balance_after`` (F3) se toma del cash
+                # POST-lock devuelto por ``deduct_cash`` (misma regla EXEC-B-CONC que
+                # ExecuteTrade): derivarlo del ``cash_before`` PRE-lock rompía la
+                # cadena si otro trade commiteó entre la lectura y el lock.
+                # Invariante Σ ledger == cash se mantiene (no cargo parcial).
                 async with _idempotent_savepoint(session):
-                    await self._portfolio_repo.deduct_cash(
+                    balance_after = await self._portfolio_repo.deduct_cash(
                         charge_legacy_id,
                         fee_amount,
                         allow_partial=False,
+                    )
+                    executed_at = await self._ledger_repo.next_executed_at(
+                        scope.account.id
                     )
                     await self._ledger_repo.append_custody_fee(
                         account_id=scope.account.id,
@@ -165,6 +184,7 @@ class ApplyCustodyFees:
                         balance_after=balance_after,
                         reference_id=f"custody-{period}",
                         description=description,
+                        executed_at=executed_at,
                     )
                     await self._account_repo.touch_activity(scope.account.id)
                     if self._obligation_repo is not None:

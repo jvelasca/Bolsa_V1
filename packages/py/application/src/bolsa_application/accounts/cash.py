@@ -67,6 +67,11 @@ class DepositCashToAccount:
                     scope.legacy_portfolio_id, amount
                 )
                 description = note or "Depósito externo (simulado)"
+                # El instante sale del secuenciador del ledger, ya con el lock de la
+                # cartera tomado por ``add_cash`` (EXEC-B-CONC): el reloj de pared
+                # puede invertirse bajo concurrencia y romper la cadena
+                # ``balance_after[n] == balance_after[n-1] + amount[n]``.
+                executed_at = await self._ledger_repo.next_executed_at(scope.account.id)
                 entry = await self._ledger_repo.append_cash_movement(
                     account_id=account_id,
                     portfolio_id=scope.portfolio.id,
@@ -77,6 +82,7 @@ class DepositCashToAccount:
                     reference_id=movement_id,
                     reference_type="external",
                     description=description,
+                    executed_at=executed_at,
                 )
                 await self._account_repo.touch_activity(account_id)
         except IdempotencyKeyExists:
@@ -168,6 +174,7 @@ class WithdrawCashFromAccount:
                     scope.legacy_portfolio_id, amount
                 )
                 description = note or "Retirada externa (simulada)"
+                executed_at = await self._ledger_repo.next_executed_at(scope.account.id)
                 entry = await self._ledger_repo.append_cash_movement(
                     account_id=account_id,
                     portfolio_id=scope.portfolio.id,
@@ -178,6 +185,7 @@ class WithdrawCashFromAccount:
                     reference_id=movement_id,
                     reference_type="external",
                     description=description,
+                    executed_at=executed_at,
                 )
                 await self._account_repo.touch_activity(account_id)
         except IdempotencyKeyExists:

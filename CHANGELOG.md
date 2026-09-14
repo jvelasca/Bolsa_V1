@@ -45,6 +45,145 @@ observable y agregable. **No** entra en el reparto de cupos ni en la clave `fami
   `test_discovery_evidence_snapshot_pg.py` **18 passed** (migración 039 upgradable/downgradable +
   agregación por régimen + roundtrip).
 
+## [1.64.1-beta] — V2.39.1 · Hotfix de la auditoría interna de V2.39 — 2026-09-13
+
+Hotfix sobre `1.64.0-beta` (auditoría interna previa a la externa). Cierra dos **P2** de Discovery, un
+**P1** de arranque, un **P1** de integridad del ledger y la deuda de hermetismo de los tests PG que
+hacía el CI no determinista. **Sin cambios de semántica funcional** ni de migraciones (Alembic head
+sigue en **`039_research_trials_regime`**).
+
+- **P2-01 — La gramática no consumía su cupo completo (A14).** El orquestador repartía el presupuesto
+  entre planes, pero `grammar_variants_for_plan` se invocaba siempre con el mismo eje, así que un plan
+  con varios bloques opcionales **no rotaba la variante** y el cupo del allocator quedaba
+  subconsumido. **Fix**: `grammar_emission_cap` se calcula sobre el cupo real y la llamada pasa
+  `axis_index=emitted_for_grammar`, de modo que cada emisión avanza de eje. Se reordena además la
+  enumeración para que el **trigger varíe antes que el exit** (antes el exit agotaba el presupuesto de
+  variación y el trigger quedaba con una sola forma).
+- **P2 — La evidencia fusionada por clave compuesta perdía y sesgaba datos.** `compute_family_weights`
+  agregaba las filas por `familia|region` con un `GROUP BY` que **descartaba en silencio** las filas
+  con la misma clave procedentes de regímenes distintos, y ponderaba `avgScore` por número de filas en
+  vez de por muestra. **Fix**: nuevo `_merge_aggregates_by_key` que fusiona por clave compuesta con
+  semántica explícita — contadores por suma, ratios por **media ponderada por cobertura**,
+  `bestScore` por máximo y `kConsumed` por suma. El productor (`family_evidence_summary`) expone
+  `is_score_n` para poder ponderar `avgScore` por muestra real. `evidence_fingerprint` sigue
+  detectando reescrituras retrospectivas.
+- **P1 — El arranque de la API moría con `MultipleResultsFound`.** `_load_default_scope` /
+  `_ensure_default_account` filtraban solo por `is_default` con `scalar_one_or_none()`: en cuanto
+  existía **otra** cuenta por defecto (otro tenant, o residuo de tests de integración) el bootstrap
+  reventaba. **Fix**: ambas consultas filtran por `owner_principal()` (el tenant propietario), que es
+  la semántica correcta en un modelo multi-tenant. Regresión:
+  `test_migration_survives_foreign_tenant_default_account`.
+- **P1 — Perfiles de inversor invisibles (404) al abrir cuenta.** `EnsureDefaultInvestorProfile` /
+  `EnsureAccountInvestorProfile` creaban el perfil **sin `user_id`**, así que el control de acceso
+  owner-scoped no lo encontraba y la ruta devolvía 404 sobre un recurso propio. **Fix**: se propaga
+  `user_id` (el principal de la request) por las tres ramas de creación.
+- **P1 — Mandatos con instrumentos huérfanos tumbaban el `PUT`.** Un `instrument_id` inexistente en el
+  payload provocaba `ForeignKeyViolation`. **Fix**: `sync_account` valida los `instrument_id` contra el
+  catálogo y **descarta** las tenures y links huérfanos en vez de estampar la transacción.
+  Regresión: `test_mandate_sync_orphan_instrument.py`.
+- **P1 — El worker de custodia abortaba el job entero por una sola cuenta rota.** `RunCustodyJob`
+  procesaba las cuentas en serie sin aislar fallos: una cuenta sin cartera legacy (`ValueError`)
+  mataba el lote completo. **Fix**: cada cuenta se procesa en su propio `try/except`, con rollback
+  best-effort, marcado como `skipped` con motivo en el resumen y continuación del job. Regresión:
+  `test_job_cuenta_rota_no_aborta_el_resto`.
+- **P2 — El replay idempotente de trade pasaba por el gate de apertura (403 → 200).** `ExecuteTrade`
+  evaluaba el gate **antes** de comprobar la `idempotencyKey`: un reenvío legítimo quedaba vetado con
+  403 en vez de devolver el 200 original, y un payload divergente daba 403 en vez de 409. **Fix**: la
+  comprobación de idempotencia ocurre primero — replay con payload idéntico ⇒ 200; payload divergente
+  ⇒ `IdempotencyKeyReused` (409). Regresiones en `test_execute_gated_portfolio_trade.py`.
+- **P2 — El ledger perdía el orden real bajo concurrencia.** `append_trade` y `append_fee` tomaban
+  cada uno su propio `datetime.now(UTC)`: bajo concurrencia caían en el mismo microsegundo y el
+  consumidor que ordena por `(executed_at, id)` desempataba por un **`id` aleatorio**, intercalando la
+  fee antes del trade y rompiendo `balance_after[n] == balance_after[n-1] + amount[n]`. El cash era
+  correcto, pero el ledger dejaba de ser **reproducible y auditable**. **Fix**: ambos asientos derivan
+  del `executed_at` de la transacción (fijado bajo `with_for_update`), con el trade 1 µs antes de la
+  fee para que el orden sea el de aplicación real. Verificado por mutación.
+- **Hermetismo de tests PG (sin esto el CI era no determinista).** Varias suites dejaban residuos en
+  la BD compartida y otras no eran inmunes a ellos: cuentas `AUTO-*`/`lc-*`, barras OHLCV sintéticas y
+  filas `live_orders` `UNKNOWN`. Como `claim_unknown_batch` es una barrida **global** (por diseño: un
+  worker de recuperación atiende cualquier cuenta), un residuo de una pasada hacía fallar el test de
+  concurrencia de otra. **Fix**: fixture `autouse` de limpieza por sesión en `conftest.py`, purga
+  explícita en las suites que commitean filas, purga de las `UNKNOWN` de prueba antes de sembrar, y
+  limpieza de las suites que crean cuentas. Además se corrigieron 4 hallazgos de `ruff` (orden de
+  imports y un `l` ambiguo) que habrían dejado el job `quality` en rojo.
+- **Estabilidad de la certificación por proceso del scheduler (A9).** Los dos tests que levantan el
+  **proceso real** `scheduler_worker` esperaban actividad con un plazo fijo de 90 s _sin comprobar si
+  el subproceso seguía vivo_: bajo un job completo (miles de tests, máquina cargada) el arranque
+  —import de la app + `database_bootstrap` con advisory lock + primer tick— podía excederlo, y el
+  fallo se reportaba como «0 eventos» sin diagnóstico. **Fix**: la espera es por **progreso real** con
+  un margen de arranque explícito (`_STARTUP_GRACE_S`) y **falla al instante con el log del
+  subproceso** si el proceso muere, en vez de agotar el plazo a ciegas. Se documenta el hallazgo de que
+  `_reconcile_before_trusting` marca `UNKNOWN` (y por tanto **veta aperturas**) cuando el lector
+  canónico falla o devuelve `None`, que es la vía por la que el día AUTO podía quedar sin fills.
+- **Verificación (local)**: `ruff --config pyproject.toml` **All checks passed** · `import-linter`
+  (4 contratos) OK · `mypy` full-tree **Success, 0 errores en 477 ficheros** · job `quality` del CI
+  reproducido **2589 passed** · flaky de concurrencia de `live_orders` **10/10** en verde ·
+  `test_a9_scheduler_process_pg_zero_human` **6/6** aislado y **3/3** junto al resto de PG.
+
+## [1.64.2-beta] — V2.39.2 · Cierre de flaky: el ledger se secuencia por estado, no por reloj — 2026-09-13
+
+Segunda pasada de la auditoría interna, centrada en los **flaky** que quedaban antes de la auditoría
+externa. Tres causas distintas, una de ellas un **bug real de producción** que la primera pasada no
+alcanzó a cerrar. Alembic head sigue en **`039_research_trials_regime`** (sin migraciones nuevas).
+
+- **P1 — El `executed_at` del ledger se derivaba del reloj de pared.** La primera pasada (V2.39.1)
+  hizo que trade y fee compartieran el instante de la **transacción**, pero ese instante se sigue
+  tomando con `datetime.now(UTC)`. Bajo concurrencia eso **no ordena**: dos transacciones serializadas
+  por el `with_for_update` de la cartera pueden leer el reloj en orden **invertido** respecto al de
+  commit, y el consumidor que ordena por `(executed_at, id)` reconstruye una secuencia falsa (el
+  desempate por `id` es un UUID v4 **aleatorio**, no rescata el orden real) → la cadena
+  `balance_after[n] == balance_after[n-1] + amount[n]` se rompe de forma intermitente. Capturado con
+  instrumentación forense: el salto real entre dos asientos consecutivos **no coincidía con su
+  `amount`**, prueba de que el asiento se había aplicado en otra posición del orden.
+  **Fix — secuenciador por cuenta:** nuevo `SqlAlchemyLedgerRepository.next_executed_at(account_id)`,
+  que devuelve `max(now, último_executed_at_de_la_cuenta + 1 µs)`, leído en la **misma transacción**
+  que el llamador (que ya retiene el lock de la cartera). El instante se deriva del **estado
+  persistido**, no del reloj, así que es **estrictamente creciente con el orden de aplicación**. Se
+  conecta en las cuatro rutas que escriben asientos: trade (`ExecuteTrade`), custodia
+  (`ApplyCustodyFees`, que además arrastraba el bug simétrico de calcular `balance_after` desde un
+  `get_summary` **pre-lock**) y depósito/retiro (`cash.py`). El paso de 1 µs convierte el desempate
+  por `id` en irrelevante: dos asientos nunca comparten instante y el orden es determinista.
+- **P1 — `ApplyCustodyFees` calculaba `balance_after` con el cash PRE-lock.** Mismo patrón que
+  `ExecuteTrade` ya había corregido (EXEC-B-CONC), pero la custodia nunca lo recibió: leía
+  `get_summary().portfolio.cash` **antes** de `deduct_cash` (que es quien toma el `with_for_update`) y
+  escribía ese balance desfasado. **Fix**: el `balance_after` se toma del cash **POST-lock** que ya
+  devolvía `deduct_cash`, en las dos ramas (liquidación de PENDING y periodo actual).
+- **Flaky de entorno — `pool_size=64` agotaba las conexiones del PostgreSQL local.** El escenario de
+  estrés abría un pool de 64 conexiones por test; con `max_connections=100` y la convivencia con otros
+  engines (otras suites, workers, API) el servidor respondía `FATAL: sorry, too many clients already`
+  y los tests fallaban **en ráfaga** con un error de entorno que **enmascaraba el veredicto real**.
+  **Fix**: `pool_size=24`. El escenario serializa igual sobre la fila de cartera, así que el pool
+  grande no aceleraba nada y sí monopolizaba el servidor. Resultado: **0/10 fallos y ~38 s** por
+  pasada (antes ~45 s con fallos intermitentes).
+- **Honestidad del test `test_two_workers_claim_disjoint_unknown_batch`.** Hacía `asyncio.gather` de
+  dos `claim_unknown_batch` con **rollback inmediato** de cada uno y exigía que fueran disjuntos: eso
+  **no certificaba** la exclusión mutua, la refutaba — en PostgreSQL real el segundo `SELECT ... FOR
+UPDATE SKIP LOCKED` puede correr **después** del rollback del primero y ver las filas liberadas (el
+  resultado dependía del entrelazado del event loop). La propiedad real y determinista que garantiza
+  el lease es «**mientras el lease está vivo y no expirado, otro worker no reclama la misma fila**».
+  El test ahora retiene las dos transacciones abiertas, afirma que el segundo worker obtiene **vacío**
+  y, tras liberar el primero, comprueba el **relevo** cubriendo el lote completo.
+- **Certificación por proceso del scheduler (A9): el bucle de vigilancia antirrecompra agotaba el
+  presupuesto siempre.** Tras el crash+restart, el test esperaba «a que ocurra una re-compra» para
+  fallar; pero el camino **correcto** es que nunca ocurra, así que el bucle agotaba el plazo completo
+  en cada pasada (de ahí los ~518 s y, con el margen recortado, fallos intermitentes de «no abrió
+  posición»). **Fix**: ese sondeo usa un plazo **corto y acotado** (`_RESTART_WATCH_S = 20 s`) —una
+  re-compra aparecería en los primeros ticks, no al final— y los tres bucles comprueban `proc.poll()`
+  para **fallar al instante con el log del subproceso** si el worker muere, en vez de esperar a
+  ciegas. Pasada: **~28 s** (desde ~518 s) y **8/8 en verde**.
+- **Verificación (local)**: `ruff --config pyproject.toml` **All checks passed** · `mypy` sobre las
+  fuentes tocadas **Success (272 ficheros)** · `import-linter` **4 contratos OK** · suite de aplicación
+  **1468 passed** · infraestructura **137 passed, 1 xfailed** · recovery + idempotencia **8 passed** ·
+  chaos de ledger/concurrencia **10/10 pasadas en verde (0 fallos)** · A9 **8/8 (~28 s)** · regresión
+  del secuenciador verificada **por mutación** (revertir el fix hace fallar el test nuevo) ·
+  `test_two_workers_claim_disjoint_unknown_batch` **5/5** estable.
+- **Nota de entorno (no del código).** Los flaky restantes se reprodujeron **solo** bajo ejecuciones
+  back-to-back masivas: el PostgreSQL local agotaba conexiones (`FATAL: sorry, too many clients
+already`) y los tests que dependen del arranque de un subproceso agotaban su plazo. Con el pool de
+  los chaos acotado a 24 y la BD en reposo, **20/20 pasadas del chaos y 8/8 del A9 fueron verdes**. El
+  CI (máquina limpia, un job) no reproduce esa saturación, pero se deja anotado para no confundirla
+  con una regresión de código.
+
 ## [1.63.1-beta] — V2.38.1 · Hotfix de los 2 P2 de la auditoría de V2.38 — 2026-09-11
 
 Hotfix de la **auditoría externa de `v2.38-beta`** (commit `41b96a41`, CI GREEN). Cierra dos P2

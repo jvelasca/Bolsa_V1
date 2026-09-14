@@ -244,7 +244,26 @@ async def test_claim_skips_row_locked_by_other_session(
 async def test_two_workers_claim_disjoint_unknown_batch(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Dos workers dividen el lote UNKNOWN sin duplicar (unión == seed exacta)."""
+    """Dos workers con leases VIVOS y solapados se reparten el lote sin duplicar.
+
+    Nota de honestidad (bug real de este test, no flakiness): antes se hacía
+    ``asyncio.gather`` de dos ``claim_unknown_batch`` y **cada uno hacía rollback
+    inmediato**. Eso NO certifica la exclusión mutua de producción, la refuta: en
+    PostgreSQL real el ``SELECT ... FOR UPDATE SKIP LOCKED`` de Y puede ejecutarse
+    *después* de que X haya hecho rollback, viendo las filas ya liberadas y
+    reclamándolas otra vez. El resultado dependía del entrelazado del event loop
+    (a veces solapaban, a veces no) → verde/rojo aleatorio con la semilla del
+    scheduler.
+
+    La propiedad REAL que ``claim_unknown_batch`` garantiza (y que sí es
+    determinista) es: **mientras el lease de un worker está vivo y no expirado,
+    otro worker no puede reclamar la misma fila** (FOR UPDATE + lease + SKIP
+    LOCKED). Eso es lo que se certifica aquí, con las dos sesiones/leases ABIERTOS
+    a la vez: X reclama n y se retiene su tx; Y reclama n concurrentemente y debe
+    obtener vacío (todas lockeadas); al liberar X, Y sí puede reclamarlas. La
+    cobertura total (unión == seed) se comprueba sobre el resultado de Y tras la
+    liberación, que es la secuencia real de un relevo de worker.
+    """
     from bolsa_application.live_order_store import PostgresLiveOrderStore
 
     n = 4
@@ -255,26 +274,44 @@ async def test_two_workers_claim_disjoint_unknown_batch(
     await _purge_all_unknown(session_factory)
     seeded = set(await _seed_unknown(session_factory, count=n, account_id=account_id))
     try:
-        async def _run(worker_id: str) -> set[str]:
-            async with session_factory() as s:
-                store = PostgresLiveOrderStore(s)
-                rows = await store.claim_unknown_batch(
-                    limit=n, worker_id=worker_id, stale_after_seconds=120
+        async with session_factory() as session_x:
+            store_x = PostgresLiveOrderStore(session_x)
+            rows_x = await store_x.claim_unknown_batch(
+                limit=n, worker_id="worker-x", stale_after_seconds=120
+            )
+            claimed_x = {r.order_id for r in rows_x}
+            assert claimed_x == seeded, f"X debe reclamar todo el lote: {claimed_x}"
+
+            # Y reclama en una tx INDEPENDIENTE mientras X mantiene su lease vivo.
+            # SKIP LOCKED: todas las filas de X están lockeadas → Y no ve ninguna.
+            async with session_factory() as session_y:
+                store_y = PostgresLiveOrderStore(session_y)
+                rows_y = await store_y.claim_unknown_batch(
+                    limit=n, worker_id="worker-y", stale_after_seconds=120
                 )
-                got = {r.order_id for r in rows}
-                await s.rollback()  # no materializar lease (aislamiento de test)
-            return got
+                claimed_y_live = {r.order_id for r in rows_y}
+                overlap = claimed_x & claimed_y_live
+                assert not overlap, f"doble-claim con leases vivos: {overlap}"
+                assert claimed_y_live == set(), (
+                    f"Y no debe reclamar nada mientras X retiene el lease: {claimed_y_live}"
+                )
+                await session_y.rollback()
 
-        # Lanzar dos claims en paralelo sobre el mismo conjunto n.
-        a_task = asyncio.create_task(_run("worker-x"))
-        b_task = asyncio.create_task(_run("worker-y"))
-        (claimed_a, claimed_b) = await asyncio.gather(a_task, b_task)
+            # X suelta el lease (rollback del claim: el lock se libera).
+            await session_x.rollback()
 
-        union = claimed_a | claimed_b
-        overlap = claimed_a & claimed_b
-        # Ninguna fila asignada a dos workers al mismo tiempo.
-        assert not overlap, f"doble-claim en la misma ventana: {overlap}"
-        # Entre los dos cubren TODO el lote (no pierden filas bajo contención).
-        assert union == seeded, f"lote no cubierto: missing {seeded - union}, extra {union - seeded}"
+        # Relevo real: Y vuelve a reclamar ahora que las filas están libres y cubre
+        # el lote completo (no se pierden filas con el relevo).
+        async with session_factory() as session_y2:
+            store_y2 = PostgresLiveOrderStore(session_y2)
+            rows_y2 = await store_y2.claim_unknown_batch(
+                limit=n, worker_id="worker-y", stale_after_seconds=120
+            )
+            claimed_y_after = {r.order_id for r in rows_y2}
+            await session_y2.rollback()
+        assert claimed_y_after == seeded, (
+            f"lote no cubierto tras el relevo: missing {seeded - claimed_y_after}, "
+            f"extra {claimed_y_after - seeded}"
+        )
     finally:
         await _purge_account(session_factory, account_id)

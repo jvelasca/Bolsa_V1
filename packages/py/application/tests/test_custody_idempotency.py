@@ -42,6 +42,14 @@ class _FakeLedger:
         self._last = last_charge_at
         self._raise_append = raise_append
         self.appended: list[dict] = []
+        self._seq = 0
+
+    async def next_executed_at(self, account_id: str):  # noqa: ARG001
+        """Secuenciador del ledger (fake): instante monótono por llamada."""
+        from datetime import UTC, datetime, timedelta
+
+        self._seq += 1
+        return datetime(2026, 1, 1, tzinfo=UTC) + timedelta(microseconds=self._seq)
 
     async def last_custody_charge_at(self, account_id: str):  # noqa: ARG001
         return self._last

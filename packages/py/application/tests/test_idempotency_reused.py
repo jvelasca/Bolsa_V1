@@ -89,6 +89,13 @@ class _FakeLedgerRepo:
         self.entries: list[LedgerEntry] = []
         self._seq = 0
 
+    async def next_executed_at(self, account_id: str) -> object:
+        """Secuenciador del ledger (fake): instante monótono por llamada."""
+        from datetime import UTC, datetime, timedelta
+
+        self._seq += 1
+        return datetime(2026, 1, 1, tzinfo=UTC) + timedelta(microseconds=self._seq)
+
     async def find_cash_movement_by_reference(
         self,
         reference_type: str,
@@ -119,6 +126,7 @@ class _FakeLedgerRepo:
         reference_id: str,
         reference_type: str = "transfer",
         description: str | None = None,
+        **_: object,
     ) -> LedgerEntry:
         self._seq += 1
         entry = LedgerEntry(
@@ -192,6 +200,14 @@ class _FakePortfolioTradeRepo:
 class _FakeLedgerTradeRepo:
     def __init__(self) -> None:
         self.rows: list[tuple[str, str]] = []
+        self._seq = 0
+
+    async def next_executed_at(self, account_id: str) -> object:
+        """Secuenciador del ledger (fake): instante monótono por llamada."""
+        from datetime import UTC, datetime, timedelta
+
+        self._seq += 1
+        return datetime(2026, 1, 1, tzinfo=UTC) + timedelta(microseconds=self._seq)
 
     async def append_trade(self, *, entry_type: str, reference_id: str, **_: object) -> None:
         self.rows.append((entry_type, reference_id))

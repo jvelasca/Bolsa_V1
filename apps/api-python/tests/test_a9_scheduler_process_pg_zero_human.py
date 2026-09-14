@@ -19,6 +19,7 @@ import os
 import subprocess  # noqa: S404 — proceso real del scheduler (objeto del test).
 import sys
 import tempfile
+import time
 import uuid
 from decimal import Decimal
 from pathlib import Path
@@ -32,6 +33,16 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DOTENV = _REPO_ROOT / ".env"
 _REQUIRED_ENV = "AUTO_SCHEDULER_PROCESS_PG_REQUIRED"
 _TIMEOUT_S = 90.0
+# Presupuesto de espera para que el subproceso produzca sus ticks. El arranque paga
+# import de la app + bootstrap de BD antes del primer tick, así que se da holgura sobre
+# ``_TIMEOUT_S`` — pero SIN disparar la duración del job: un test de certificación debe
+# fallar de forma informativa, no quedarse 8 minutos esperando. Complementariamente se
+# falla al instante si el proceso muere (ver ``proc.poll()`` en los bucles).
+_STARTUP_GRACE_S = 120.0
+# Vigilancia acotada tras un restart: el caso CORRECTO es que NO ocurra nada (no se
+# re-compra), así que este sondeo es corto a propósito — no debe agotar el presupuesto
+# de arranque en el camino feliz.
+_RESTART_WATCH_S = 20.0
 
 
 def _require_or_skip(exc: Exception) -> None:
@@ -278,9 +289,25 @@ async def test_a9_scheduler_process_full_day_pg_zero_human(
         # Deja correr el proceso el tiempo suficiente para varios ticks (BUY→…→SELL).
         # Todo se cuenta SCOPED a este engine_id/cuenta (nunca global): un día AUTO
         # solo es válido si ESTE proceso produjo SUS ticks/fills/ledger.
+        #
+        # Robustez ante carga: el subproceso paga import de la app + bootstrap de BD
+        # antes de emitir su primer tick, y bajo un job completo (miles de tests) ese
+        # arranque puede alargarse. Se espera por PROGRESO real con holgura de arranque
+        # (``_STARTUP_GRACE_S``) y se falla AL INSTANTE con el log del subproceso si el
+        # proceso muere, en vez de agotar el plazo a ciegas y reportar «0 eventos».
         ticks = events = ledger = 0
-        for _ in range(int(_TIMEOUT_S * 2)):
+        deadline = time.monotonic() + _STARTUP_GRACE_S
+        while time.monotonic() < deadline:
             await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                # Murió (crash o kill externo): no tiene sentido seguir esperando.
+                raise AssertionError(
+                    _proc_failure(
+                        f"el proceso scheduler terminó (exit={proc.returncode}) sin "
+                        "producir ticks",
+                        log_path,
+                    )
+                )
             ticks = await _count_scoped_ticks(sched_process_factory, engine_id)
             events = await _count_scoped_events(sched_process_factory, account_id)
             ledger = await _count_scoped_ledger(sched_process_factory, account_id)
@@ -478,9 +505,20 @@ async def test_a9_scheduler_process_restart_with_open_protected_position_pg(
     proc = _spawn()
     try:
         # Espera a que el proceso abra una posición (BUY durable) antes de matarlo.
+        # Igual que en el escenario de día completo: se espera por progreso real con
+        # holgura de arranque y se falla al instante si el subproceso muere.
         buys_before = 0
-        for _ in range(int(_TIMEOUT_S * 2)):
+        deadline = time.monotonic() + _STARTUP_GRACE_S
+        while time.monotonic() < deadline:
             await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                raise AssertionError(
+                    _proc_failure(
+                        f"el proceso scheduler terminó (exit={proc.returncode}) antes de "
+                        "abrir posición",
+                        log_path,
+                    )
+                )
             buys_before = await _scoped_buy_fills(sched_process_factory, account_id)
             if buys_before > 0:
                 break
@@ -493,9 +531,25 @@ async def test_a9_scheduler_process_restart_with_open_protected_position_pg(
         proc = _spawn()
 
         # El restart debe readoptar (NO re-comprar): los BUY no se doblan.
+        #
+        # OJO: aquí NO se espera «a que pase algo». El camino CORRECTO es que nunca
+        # ocurra una segunda compra, así que un bucle «hasta que buys_after crezca o
+        # venza el plazo» agotaría SIEMPRE el presupuesto entero de arranque (el bug
+        # de los 180s×2). Se sondea un plazo corto y acotado: si el restart fuese a
+        # re-comprar lo haría en sus primeros ticks, no al final. Un margen corto
+        # detecta igual la re-compra y no convierte el caso feliz en una espera larga.
         buys_after = buys_before
-        for _ in range(int(_TIMEOUT_S * 2)):
+        deadline = time.monotonic() + _RESTART_WATCH_S
+        while time.monotonic() < deadline:
             await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                raise AssertionError(
+                    _proc_failure(
+                        f"el proceso scheduler terminó (exit={proc.returncode}) tras el "
+                        "restart",
+                        log_path,
+                    )
+                )
             buys_after = await _scoped_buy_fills(sched_process_factory, account_id)
             if buys_after > buys_before:
                 break  # re-compra detectada: falla abajo con diagnóstico.

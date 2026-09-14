@@ -182,19 +182,23 @@ class ExecuteTrade:
         # Semántica invariante: balance_after[n] == balance_after[n-1] + amount[n].
         fee_balance = Decimal(str(result.summary.portfolio.cash))
         trade_balance = fee_balance + Decimal(str(abs(fees.total)))
-        # Orden del ledger (P2 concurrencia): las filas trade+fee de UN MISMO trade deben
-        # compartir el MISMO ``executed_at`` (el de la transacción, fijado dentro del
-        # ``with_for_update``). Antes cada append tomaba su propio ``datetime.now(UTC)``:
-        # bajo concurrencia ambos caían en el mismo microsegundo (granularidad del reloj en
-        # Windows) y el consumidor que ordena por ``(executed_at, id)`` desempataba por un
-        # ``id`` aleatorio, intercalando fee antes de trade y rompiendo la cadena
-        # ``balance_after[n] == balance_after[n-1] + amount[n]``. El ledger quedaba no
-        # reproducible/auditable pese a que el cash era correcto.
+        # Orden del ledger (EXEC-B-CONC, bug real de concurrencia): el ``executed_at``
+        # se toma del SECUENCIADOR del ledger (``next_executed_at``), no del reloj de
+        # pared ni del timestamp de dominio. Con ``datetime.now(UTC)`` el instante
+        # reflejaba cuándo se leyó el reloj, no cuándo se aplicó el efecto: dos
+        # transacciones serializadas por el ``with_for_update`` de la cartera podían
+        # quedar con el reloj invertido respecto al commit, y el consumidor que ordena
+        # por ``(executed_at, id)`` reconstruía una secuencia falsa (el desempate por
+        # ``id`` es un UUID v4 aleatorio, no rescata el orden real) → cadena
+        # ``balance_after`` rota de forma intermitente.
         #
-        # Además se separa el asiento de trade 1 µs ANTES del de fee: al compartir
-        # ``executed_at`` el desempate por ``id`` seguía siendo aleatorio, y la cadena exige
-        # que el trade (balance intermedio) preceda SIEMPRE a la fee (balance final).
-        executed_at = _parse_executed_at(result.transaction.executed_at)
+        # El secuenciador se invoca aquí, con el lock de la cartera YA tomado por
+        # ``execute_trade`` y la sesión aún sin commit, así que su lectura del último
+        # ``executed_at`` + la escritura son atómicas frente al resto de escritores.
+        # Ambas filas (trade y fee) comparten el mismo instante secuenciado: el trade
+        # (balance intermedio) se escribe 1 µs antes que la fee (balance final) para que
+        # el orden sea el de aplicación real y no dependa del ``id``.
+        executed_at = await self._ledger_repo.next_executed_at(scope.account.id)
         (trade_at, fee_at) = _ledger_ordering(executed_at, has_fee=fees.total > 0)
         await self._ledger_repo.append_trade(
             account_id=scope.account.id,

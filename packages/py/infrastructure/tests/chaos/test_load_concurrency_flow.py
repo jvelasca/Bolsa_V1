@@ -111,8 +111,16 @@ async def _factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     producción (default 5+10): las ráfagas de -- cientos-filas-``asyncio.gather`` de este
     test (p.ej. 500 BUY + 500 SELL) abren cientos de sesiones a la vez y con el default
     agotarían el pool (``QueuePool limit reached``). Un pool amplio es la configuración
-    razonable para un test de estrés; el número de conexiones a PostgreSQL sigue siendo
-    finito y acotado por ``pool_size``.
+    razonable para un test de estrés.
+
+    ``pool_size`` deliberadamente ACOTADO (no 64): las operaciones del escenario se
+    serializan igualmente sobre la fila de cartera (``with_for_update``), así que un pool
+    enorme no acelera el test y sí monopoliza el servidor. Con ``max_connections=100`` en
+    el PostgreSQL local, un ``pool_size=64`` por test dejaba al servidor al borde: al
+    convivir con otros engines (``pg_engine`` de otras suites, workers, API) el resultado
+    era ``FATAL: sorry, too many clients already`` — fallos de entorno que enmascaraban
+    el veredicto real del test. 24 conexiones sostienen la concurrencia del escenario y
+    dejan margen al resto de procesos.
     """
     _load_env()
     from bolsa_infrastructure.config import get_settings
@@ -124,7 +132,7 @@ async def _factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         settings.database_url or "",
         pool_pre_ping=True,
         poolclass=AsyncAdaptedQueuePool,
-        pool_size=64,
+        pool_size=24,
         max_overflow=0,
     )
     try:

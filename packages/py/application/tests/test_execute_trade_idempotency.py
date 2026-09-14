@@ -185,6 +185,17 @@ class _FakeLedgerRepo:
         self.fee_amount: float | None = None
         self.trade_executed_at: object | None = None
         self.fee_executed_at: object | None = None
+        self.sequence_calls = 0
+        # Valor de dominio (reloj de pared) que el use-case ya NO debe usar para el
+        # ledger: sirve para afirmar que el asiento sale del secuenciador.
+        self.transaction_executed_at = "2026-08-20T08:00:00+00:00"
+
+    async def next_executed_at(self, account_id: str) -> object:
+        """Secuenciador del ledger: instante monótono por llamada (fake determinista)."""
+        from datetime import UTC, datetime, timedelta
+
+        self.sequence_calls += 1
+        return datetime(2026, 1, 1, tzinfo=UTC) + timedelta(microseconds=self.sequence_calls)
 
     async def append_trade(
         self,
@@ -1855,5 +1866,46 @@ def test_parse_executed_at_tolera_formatos_inesperados() -> None:
     assert naive.tzinfo is not None, "debe quedar tz-aware"
     aware = _parse_executed_at("2026-09-01T12:00:00+00:00")
     assert aware == datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_trade_usa_el_secuenciador_del_ledger_no_el_reloj() -> None:
+    """EXEC-B-CONC: el ``executed_at`` sale del secuenciador, no de ``datetime.now``.
+
+    Con reloj de pared dos transacciones serializadas por el ``with_for_update`` de la
+    cartera podían quedar con el instante INVERTIDO respecto al orden de aplicación (la
+    lectura del reloj y el commit no están ordenados). El consumidor que ordena por
+    ``(executed_at, id)`` reconstruía entonces una secuencia falsa y la cadena
+    ``balance_after`` se rompía de forma intermitente. El secuenciador deriva el instante
+    del propio ledger (``último + 1µs``), así que es monótono con el orden de aplicación.
+    """
+    use_case, _portfolio, ledger = _build()
+
+    await use_case.execute(
+        instrument_id="inst-1",
+        trade_type="buy",
+        quantity=10.0,
+        price=100.0,
+        account_id="acc-1",
+        idempotency_key="inst-1|2026-08-20|pol-1|entry_long",
+    )
+
+    assert ledger.sequence_calls == 1, "el trade debe pedir UN instante al secuenciador"
+    assert ledger.trade_executed_at is not None
+    # El instante usado NO es el de la transacción de dominio (reloj), sino el secuenciado.
+    assert ledger.trade_executed_at != ledger.transaction_executed_at, (
+        "el ledger no debe reutilizar el timestamp de dominio (reloj de pared)"
+    )
+
+
+@pytest.mark.asyncio
+async def test_secuenciador_es_estrictamente_creciente() -> None:
+    """Dos asientos consecutivos de la cuenta nunca comparten instante (monotonía)."""
+    _use_case, _portfolio, ledger = _build()
+
+    first = await ledger.next_executed_at("acc-1")
+    second = await ledger.next_executed_at("acc-1")
+
+    assert first < second, "el secuenciador debe ser estrictamente creciente"
 
 

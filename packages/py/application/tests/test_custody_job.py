@@ -12,7 +12,7 @@ activas/cerradas:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -90,6 +90,12 @@ class _FakeLedger:
     def __init__(self) -> None:
         self._last: dict[str, datetime] = {}
         self.appended: dict[str, list] = {}
+        self._seq = 0
+
+    async def next_executed_at(self, account_id: str) -> datetime:
+        """Secuenciador del ledger (fake): instante monótono por llamada."""
+        self._seq += 1
+        return datetime(2026, 1, 1, tzinfo=UTC) + timedelta(microseconds=self._seq)
 
     async def last_custody_charge_at(self, account_id: str) -> datetime | None:
         return self._last.get(account_id)

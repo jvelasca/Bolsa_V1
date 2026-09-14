@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -11,6 +11,10 @@ from bolsa_domain.errors import IdempotencyKeyExists
 from bolsa_infrastructure.database.db_errors import is_unique_violation
 from bolsa_infrastructure.database.models import LedgerEntryRow
 from bolsa_infrastructure.ids import new_id
+
+# Paso del secuenciador de ``executed_at`` (ver ``next_executed_at``): 1 µs, la
+# resolución de ``timestamptz`` en PostgreSQL. Garantiza monotonía estricta por cuenta.
+_SEQUENCE_STEP = timedelta(microseconds=1)
 
 
 def _entry_from_row(row: LedgerEntryRow, symbol: str | None = None) -> LedgerEntry:
@@ -41,6 +45,46 @@ class SqlAlchemyLedgerRepository:
     def session(self) -> AsyncSession:
         """Sesión activa — R-8A (savepoint de idempotencia en use-cases)."""
         return self._session
+
+    async def next_executed_at(self, account_id: str) -> datetime:
+        """Instante monótono para un asiento nuevo de la cuenta (secuenciador).
+
+        PROBLEMA (bug real de concurrencia, EXEC-B-CONC extendido): con
+        ``datetime.now(UTC)`` el ``executed_at`` de un asiento refleja *cuándo se
+        tomó el reloj*, no *cuándo se aplicó* el efecto sobre el cash. Bajo
+        concurrencia (READ COMMITTED) dos transacciones serializadas por el
+        ``with_for_update`` de la cartera pueden quedarse el reloj en orden
+        invertido respecto al orden de commit: T1 lee el reloj DESPUÉS que T2 pero
+        aplica ANTES. El consumidor que ordena por ``(executed_at, id)`` reconstruye
+        entonces una secuencia falsa y la cadena
+        ``balance_after[n] == balance_after[n-1] + amount[n]`` se rompe (el desempate
+        por ``id`` es un UUID v4 aleatorio, así que no rescata el orden verdadero).
+
+        SOLUCIÓN: derivar el instante del propio ledger, no del reloj de pared.
+        Devuelve ``max(ahora, último_executed_at + 1µs)`` para la cuenta, leído en la
+        MISMA transacción que el llamador (que ya retiene el lock de la cartera). Al
+        ser estrictamente creciente con el orden de aplicación, el orden por
+        ``(executed_at, id)`` coincide con el order real de los asientos.
+
+        Debe invocarse SIEMPRE dentro del lock de la cartera, justo antes de escribir
+        el asiento, para que la lectura del último ``executed_at`` y la escritura sean
+        atómicas respecto al resto de escritores.
+        """
+        stmt = (
+            select(LedgerEntryRow.executed_at)
+            .where(LedgerEntryRow.account_id == account_id)
+            .order_by(LedgerEntryRow.executed_at.desc())
+            .limit(1)
+        )
+        last = (await self._session.execute(stmt)).scalar_one_or_none()
+        now = datetime.now(UTC)
+        if last is None:
+            return now
+        last_dt = last if last.tzinfo is not None else last.replace(tzinfo=UTC)
+        # +1µs garantiza monotonía ESTRICTA (el desempate por ``id`` deja de importar
+        # y dos asientos nunca comparten instante → el orden es determinista).
+        bumped = last_dt + _SEQUENCE_STEP
+        return bumped if bumped > now else now
 
     async def append_trade(
         self,
@@ -259,8 +303,13 @@ class SqlAlchemyLedgerRepository:
         balance_after: float,
         reference_id: str,
         description: str,
+        executed_at: datetime | None = None,
     ) -> LedgerEntry:
+        # ``executed_at`` explícito (secuenciador del ledger) cuando se cobra bajo
+        # concurrencia con trades: el reloj de pared puede invertirse respecto al
+        # orden de aplicación y desordenar la cadena ``balance_after`` (EXEC-B-CONC).
         now = datetime.now(UTC)
+        executed = executed_at or now
         row = LedgerEntryRow(
             id=new_id(),
             account_id=account_id,
@@ -275,7 +324,7 @@ class SqlAlchemyLedgerRepository:
             reference_type="custody",
             reference_id=reference_id,
             description=description,
-            executed_at=now,
+            executed_at=executed,
             created_at=now,
         )
         self._session.add(row)
@@ -344,8 +393,12 @@ class SqlAlchemyLedgerRepository:
         reference_id: str,
         reference_type: str = "transfer",
         description: str | None = None,
+        executed_at: datetime | None = None,
     ) -> LedgerEntry:
+        # ``executed_at`` explícito (secuenciador del ledger) para que depósitos/retiros
+        # concurrentes no inviertan el orden por reloj de pared (EXEC-B-CONC).
         now = datetime.now(UTC)
+        executed = executed_at or now
         row = LedgerEntryRow(
             id=new_id(),
             account_id=account_id,
@@ -360,7 +413,7 @@ class SqlAlchemyLedgerRepository:
             reference_type=reference_type,
             reference_id=reference_id,
             description=description,
-            executed_at=now,
+            executed_at=executed,
             created_at=now,
         )
         try:
