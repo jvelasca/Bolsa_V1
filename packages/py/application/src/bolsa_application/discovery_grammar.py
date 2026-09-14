@@ -184,13 +184,17 @@ def _trend_variants() -> tuple[GrammarComponent, ...]:
         )
 
     def _donchian_upper(period: int) -> GrammarComponent:
-        upper = _spec("dc", period=period, line="upper")
+        # Mismo defecto y misma corrección que en ``_donchian_break`` del trigger: la
+        # banda superior incluye la barra actual, así que ``close > upper`` es imposible
+        # y el filtro de tendencia nunca deja pasar ninguna entrada. Se usa la banda
+        # MEDIA (``close`` sobre el punto medio del canal = fondo alcista).
+        mid = _spec("dc", period=period, line="mid")
 
         def _specs() -> list[dict[str, Any]]:
-            return [upper]
+            return [mid]
 
         def _rules() -> list[dict[str, Any]]:
-            return [_price_vs(upper, operator="gt", signal_kind="entry_long")]
+            return [_price_vs(mid, operator="gt", signal_kind="entry_long")]
 
         return GrammarComponent(
             name=f"trend_dc{period}_breakout",
@@ -308,13 +312,19 @@ def _trigger_variants() -> tuple[GrammarComponent, ...]:
         )
 
     def _donchian_break(period: int) -> GrammarComponent:
-        upper = _spec("dc", period=period, line="upper")
+        # La banda ``upper`` del Donchian incluye la barra actual (``max(high)`` de la
+        # ventana), así que ``close > upper`` es matemáticamente imposible: el máximo de
+        # la ventana es siempre ≥ ``high[i]`` ≥ ``close[i]``. Un trigger así nunca
+        # dispara (0 operaciones, 0 trials, sin evidencia posible). Se usa la banda
+        # MEDIA como disparador de ruptura, igual que el preset ``donchian_breakout``
+        # de producción: ``close`` por encima del punto medio del canal = tendencia.
+        mid = _spec("dc", period=period, line="mid")
 
         def _specs() -> list[dict[str, Any]]:
-            return [upper]
+            return [mid]
 
         def _rules() -> list[dict[str, Any]]:
-            return [_price_vs(upper, operator="gt", signal_kind="entry_long")]
+            return [_price_vs(mid, operator="gt", signal_kind="entry_long")]
 
         return GrammarComponent(
             name=f"trigger_dc{period}_break",
@@ -437,6 +447,24 @@ GRAMMAR_VARIANTS: dict[str, tuple[GrammarComponent, ...]] = {
 """Variantes declaradas por bloque. Orden de tupla = orden de enumeración."""
 
 
+# Pares axiales acoplados: permutar el TRIGGER de un plan cuyo EXIT es el homónimo
+# bajista deja el exit mirando las MISMAS series que el trigger recién cambiado. Un
+# cruce alcista y otro bajista de las mismas EMAs no pueden dispararse el mismo día, así
+# que el trigger queda inalcanzable, la simulación no genera operaciones y el punto se
+# descarta como trial. El resultado es un grid degenerado (menos de 2 columnas) y el PBO
+# CSCV no puede calcularse: el LAB se queda sin evidencia real sobre candidatas
+# gramaticales. Para evitar eso, cuando se permuta el trigger se arrastra el exit
+# homónimo al par correspondiente (10/50 ↔ 10/50, 20/100 ↔ 20/100).
+_AXIAL_TRIGGER_EXIT_PAIRS: tuple[tuple[str, str], ...] = (
+    ("trigger_ema10_cross_ema50", "exit_ema10_cross_ema50"),
+    ("trigger_ema20_cross_ema100", "exit_ema20_cross_ema100"),
+)
+"""Pares trigger↔exit homónimos que deben permutarse juntos (orden de tupla estable)."""
+
+_TRIGGER_AXIS_KINDS: frozenset[str] = frozenset({COMPONENT_TRIGGER, COMPONENT_EXIT})
+"""Bloques axiales: son la columna vertebral del plan (entrada/salida obligatorias)."""
+
+
 # ── Vetos de compatibilidad (deterministas, sin IA) ───────────────────────────
 
 
@@ -483,9 +511,113 @@ def _trend_regime_conflicts(components: Sequence[GrammarComponent]) -> bool:
     return False
 
 
+def _mutually_unreachable_trigger_exit(components: Sequence[GrammarComponent]) -> bool:
+    """Veto de inanición: trigger y exit que no pueden dispararse nunca.
+
+    Un trigger de rango roto ``price_vs(dc:upper, gt)`` con un exit de canal
+    ``price_vs(dc:lower, lt)`` es una estrategia vacía: para entrar el precio debe estar
+    por encima de la banda superior y para salir por debajo de la inferior, así que el
+    exit no puede cumplirse mientras la posición está abierta. No es un error de datos:
+    la combinación es estructuralmente inoperable y el LAB solo puede registrar 0 trials.
+    Se descarta el plan para no emitir candidatas que jamás producirán evidencia.
+
+    El caso "comparten series" (p. ej. trigger EMA alcista vs exit EMA bajista del mismo
+    par) NO entra aquí: es legítimo a nivel de reglas y no siempre es inoperable; el
+    acoplamiento de ``_AXIAL_TRIGGER_EXIT_PAIRS`` ya lo resuelve al permutar.
+    """
+    by_kind = {component.kind: component for component in components}
+    trigger = by_kind.get(COMPONENT_TRIGGER)
+    exit_component = by_kind.get(COMPONENT_EXIT)
+    if trigger is None or exit_component is None:
+        return False
+
+    trigger_rules = trigger.build_rules()
+    exit_rules = exit_component.build_rules()
+    if len(trigger_rules) != 1 or len(exit_rules) != 1:
+        return False
+
+    trigger_rule = trigger_rules[0]
+    exit_rule = exit_rules[0]
+    if trigger_rule.get("type") != "price_vs_indicator":
+        return False
+    if exit_rule.get("type") != "price_vs_indicator":
+        return False
+    if trigger_rule.get("operator") != "gt" or exit_rule.get("operator") != "lt":
+        return False
+
+    trigger_spec = trigger_rule.get("indicatorSpec") or {}
+    exit_spec = exit_rule.get("indicatorSpec") or {}
+    trigger_params = dict(trigger_spec.get("parameters") or {})
+    exit_params = dict(exit_spec.get("parameters") or {})
+    # Mismo indicador y mismo periodo, pero bandas opuestas (upper/lower): rango que
+    # nunca se cumple de entrada a salida.
+    return (
+        trigger_spec.get("definitionId") == exit_spec.get("definitionId")
+        and trigger_params.get("period") == exit_params.get("period")
+        and trigger_params.get("line") == "upper"
+        and exit_params.get("line") == "lower"
+    )
+
+
+def _conjunctive_ema_starvation(components: Sequence[GrammarComponent]) -> bool:
+    """Veto de inanición: trigger EMA y filtro de tendencia EMA que se excluyen.
+
+    El trigger ``trigger_ema10_cross_ema50`` sólo puede dispararse en un cruce al alza de
+    EMA10 sobre EMA50, y los gates conjuntivos del plan (régimen de tendencia y filtro
+    ``trend_ema20_gt_ema50``) deben cumplirse SIMULTÁNEAMENTE. Pero un cruce de EMA10
+    sobre EMA50 ocurre necesariamente antes de que EMA20 confirme por encima de EMA50,
+    así que ``EMA10 > EMA50`` y ``EMA20 > EMA50`` no son ciertos en ningún cruce. Medido
+    sobre una serie de ciclos: 210 barras cumplen ambas condiciones, 0 cruces.
+
+    El resultado es un plan estructuralmente inoperable (0 trials, sin evidencia). Se
+    veta para no emitir candidatas que jamás podrán promocionar. Un filtro de tendencia
+    más lento (EMA10 sobre EMA50) sí es compatible con el trigger y se acepta.
+    """
+    by_kind = {component.kind: component for component in components}
+    trigger = by_kind.get(COMPONENT_TRIGGER)
+    trend = by_kind.get(COMPONENT_TREND_FILTER)
+    if trigger is None or trend is None:
+        return False
+
+    trigger_rules = trigger.build_rules()
+    if len(trigger_rules) != 1 or trigger_rules[0].get("type") != "indicator_cross":
+        return False
+    if trigger_rules[0].get("direction") != "bullish":
+        return False
+
+    left = trigger_rules[0].get("leftSpec") or {}
+    right = trigger_rules[0].get("rightSpec") or {}
+    if left.get("definitionId") != "ema" or right.get("definitionId") != "ema":
+        return False
+    trigger_fast = (left.get("parameters") or {}).get("period")
+    trigger_slow = (right.get("parameters") or {}).get("period")
+
+    # El filtro de tendencia debe ser un EMA-stack con el MISMO par lento/corto que el
+    # trigger pero confirmando desde la pata lenta (p. ej. trigger 10/50 + trend 20/50).
+    trend_rules = trend.build_rules()
+    if len(trend_rules) != 1 or trend_rules[0].get("type") != "indicator_vs_indicator":
+        return False
+    t_left = trend_rules[0].get("leftSpec") or {}
+    t_right = trend_rules[0].get("rightSpec") or {}
+    if t_left.get("definitionId") != "ema" or t_right.get("definitionId") != "ema":
+        return False
+    trend_fast = (t_left.get("parameters") or {}).get("period")
+    trend_slow = (t_right.get("parameters") or {}).get("period")
+
+    # Misma pata lenta y pata rápida MÁS LENTA que la del trigger ⇒ el filtro confirma
+    # después de que el trigger haya cruzado ⇒ el trigger es inalcanzable.
+    return trend_slow == trigger_slow and isinstance(trend_fast, int) and isinstance(
+        trigger_fast, int
+    ) and trend_fast > trigger_fast
+
+
 def _plan_is_coherent(components: Sequence[GrammarComponent]) -> bool:
     """True si la combinación de bloques es admisible (pasa todos los vetos)."""
-    return not _trend_regime_conflicts(components)
+    return (
+        not _trend_regime_conflicts(components)
+        and not _mutually_unreachable_trigger_exit(components)
+        and not _conjunctive_ema_starvation(components)
+    )
 
 
 # ── Plan gramatical ───────────────────────────────────────────────────────────
@@ -691,19 +823,25 @@ def grammar_variants_for_plan(
     Un plan gramatical es UNA definición concreta, sin grid propio. Para que el LAB
     re-optimice de verdad y el PBO CSCV tenga múltiples columnas que rankear, se
     devuelven variantes hermanas: el mismo plan del que se permuta UNA variante de UN
-    bloque (uno de los bloques presentes: opcionales si los hay, si no el trigger),
-    manteniendo el resto fijo. El primer elemento es SIEMPRE el propio plan (la
-    candidata que trajo el Discovery), de modo que el campeón pueda ser la original.
+    bloque (uno de los bloques presentes: los OPCIONALES si los hay, y solo si no hay
+    ninguno, el trigger), manteniendo el resto fijo. El primer elemento es SIEMPRE el
+    propio plan (la candidata que trajo el Discovery), de modo que el campeón pueda ser
+    la original.
 
     ``axis_index`` selecciona de forma DETERMINISTA qué bloque se permuta, rotando
-    sobre TODOS los bloques permutables del plan — opcionales presentes, y también el
-    trigger y el exit (``axis_index % len(permutables)``). Rotar solo sobre el último
-    opcional dejaba sin dimensión a los planes con un único opcional (p. ej. los
-    ``regime``-only), para los que el grid degeneraba en el mismo eje (P2-01). Así dos
-    planes vecinos no comparten siempre el mismo eje y el LAB rankea columnas que
-    varían más de un bloque. El llamante pasa un índice estable (p. ej. el orden de
-    emisión); el valor por defecto 0 conserva el comportamiento histórico de un único
-    eje (el último opcional; si no hay, el trigger).
+    sobre los bloques permutables del plan (``axis_index % len(permutables)``). El eje
+    son preferentemente los OPCIONALES presentes (regime/trend/momentum) y nunca el
+    último opcional a secas: rotar sobre el conjunto completo evita que dos planes
+    vecinos compartan siempre el mismo eje, de modo que el LAB rankea columnas que
+    varían de verdad (P2-01). Los bloques axiales (trigger/exit) solo entran como eje
+    cuando el plan no tiene ningún opcional. El llamante pasa un índice estable (p. ej.
+    el orden de emisión); el valor por defecto 0 conserva el comportamiento histórico de
+    un único eje.
+
+    Cuando el eje cae sobre el trigger, el exit homónimo se permuta CON ÉL por par
+    (``_AXIAL_TRIGGER_EXIT_PAIRS``). Sin ese arrastre, el exit seguiría mirando las
+    series del trigger anterior y la señal de entrada quedaría inalcanzable, dejando el
+    plan con <2 trials y sin PBO (grid degenerado).
 
     Determinista y acotado a ``max_variants``. Fail-closed: las variantes que no
     materializan se descartan (no se inventan puntos).
@@ -714,26 +852,71 @@ def grammar_variants_for_plan(
         return []
     variants.append({"label": plan.name, "definition": own})
 
-    # Bloques permutables presentes, en orden canónico. Se incluyen los obligatorios
-    # (trigger, exit) para que incluso los planes de un solo opcional tengan más de un
-    # eje de variación. El orden es el canónico y el eje rota con ``axis_index``.
     current = {c.kind: c for c in plan.components}
-    permutable_kinds = sorted(
-        (kind for kind in current if kind in GRAMMAR_VARIANTS),
-        key=lambda kind: (*_REQUIRED_COMPONENTS, *GRAMMAR_COMPONENT_ORDER).index(kind),
-    )
+    optional_kinds = [
+        kind for kind in GRAMMAR_COMPONENT_ORDER if kind in current and kind in GRAMMAR_VARIANTS
+    ]
+
+    # Preferencia de eje (V2.39.2): los bloques OPCIONALES primero, y los axiales
+    # (trigger/exit) solo como último recurso. Motivo: permutar un bloque axial sin tocar
+    # el resto puede inutilizar el trigger (ver ``_AXIAL_TRIGGER_EXIT_PAIRS``), y en el
+    # mejor caso el grid degenera a 1 columna. Rotar sobre los opcionales mantiene el
+    # grid con ≥2 columnas operables en la inmensa mayoría de los planes.
+    permutable_kinds = [
+        *optional_kinds,
+        *(kind for kind in current if kind in _TRIGGER_AXIS_KINDS and kind in GRAMMAR_VARIANTS),
+    ]
     if not permutable_kinds:
         return variants
     swap_kind = permutable_kinds[int(axis_index) % len(permutable_kinds)]
     pool = GRAMMAR_VARIANTS.get(swap_kind, ())
+
+    # Si el eje es el trigger y su exit homónimo está presente, se permutan AMBOS: el
+    # exit acompaña al trigger por PAR (no por nombre), de modo que la señal de salida
+    # sigue siendo alcanzable sobre las nuevas series. Sin esto, las variantes del eje
+    # trigger nunca operan y el plan se queda sin PBO.
+    paired_exit_kind: str | None = None
+    if swap_kind == COMPONENT_TRIGGER and COMPONENT_EXIT in current:
+        current_trigger_name = current[COMPONENT_TRIGGER].name
+        current_exit_name = current[COMPONENT_EXIT].name
+        for trigger_name, exit_name in _AXIAL_TRIGGER_EXIT_PAIRS:
+            if current_trigger_name == trigger_name and current_exit_name == exit_name:
+                paired_exit_kind = COMPONENT_EXIT
+                break
 
     for alternative in pool:
         if len(variants) >= max_variants:
             break
         if alternative.name == current.get(swap_kind, alternative).name:
             continue
+        replacements = {swap_kind: alternative}
+        if paired_exit_kind is not None:
+            # El índice del par se deriva de la posición del trigger en la tabla, no del
+            # nombre del exit (fail-closed: si no se encuentra el par, no se arrastra).
+            pair_index = next(
+                (
+                    index
+                    for index, (trigger_name, _) in enumerate(_AXIAL_TRIGGER_EXIT_PAIRS)
+                    if trigger_name == current[COMPONENT_TRIGGER].name
+                ),
+                None,
+            )
+            if pair_index is None:
+                continue
+            pool_exits = GRAMMAR_VARIANTS.get(COMPONENT_EXIT, ())
+            exit_index = next(
+                (
+                    index
+                    for index, component in enumerate(pool_exits)
+                    if component.name == _AXIAL_TRIGGER_EXIT_PAIRS[pair_index][1]
+                ),
+                None,
+            )
+            if exit_index is None:
+                continue
+            replacements[COMPONENT_EXIT] = pool_exits[exit_index]
         swapped = tuple(
-            alternative if c.kind == swap_kind else c for c in plan.components
+            replacements.get(c.kind, c) for c in plan.components
         )
         if not _plan_is_coherent(swapped):
             continue

@@ -98,16 +98,31 @@ async def _seed_instrument(session: AsyncSession, instrument_id: str) -> None:
 
 
 async def _seed_bars(session: AsyncSession, instrument_id: str, *, total: int) -> list[str]:
-    """Siembra ``total`` barras oscilantes (cruces de EMA ⇒ señales y fills reales)."""
+    """Siembra ``total`` barras con ciclos que disparan los triggers reales de la gramática.
+
+    Los planes gramaticales usan disparadores de continuación (``close > sma200``, cruces
+    de EMA, ``close > punto medio del canal Donchian``). Para que el LAB pueda medir
+    evidencia real (≥2 columnas para el PBO CSCV) la serie debe cumplir:
+
+    * tramos alcistas MÁS LARGOS que el período del canal (60 > 40), de modo que el
+      cierre marque nuevos máximos y ``close`` supere el punto medio del canal;
+    * retrocesos periódicos que crucen las EMAs a la baja (salidas alcanzables).
+
+    Determinista: misma ``total`` ⇒ misma serie salvo el ancla temporal.
+    """
     from bolsa_infrastructure.database.models.tables import OhlcvBarRow
     from bolsa_infrastructure.ids import new_id
 
     now = datetime.now(UTC)
     timestamps: list[str] = []
-    base = Decimal("10.00")
+    close = Decimal("10.00")
     for day in range(total):
-        wave = Decimal(str(1.5 if day % 40 < 20 else -1.5))
-        price = (base + Decimal(day) * Decimal("0.03") + wave).quantize(Decimal("0.0001"))
+        cycle = day % 90
+        # 60 barras subiendo y 30 bajando: cubre canales de 20 y 40 y cruza EMAs.
+        close += Decimal("0.05") if cycle < 60 else Decimal("-0.07")
+        close = max(close, Decimal("1.00"))
+        price = close.quantize(Decimal("0.0001"))
+        half = Decimal("0.05")
         ts = now - timedelta(days=(total - 1 - day))
         timestamps.append(ts.isoformat())
         session.add(
@@ -117,8 +132,8 @@ async def _seed_bars(session: AsyncSession, instrument_id: str, *, total: int) -
                 timeframe="1d",
                 timestamp=ts,
                 open=price,
-                high=price + Decimal("0.10"),
-                low=price - Decimal("0.10"),
+                high=(price + half).quantize(Decimal("0.0001")),
+                low=(price - half).quantize(Decimal("0.0001")),
                 close=price,
                 volume=1000,
                 adj_close=price,

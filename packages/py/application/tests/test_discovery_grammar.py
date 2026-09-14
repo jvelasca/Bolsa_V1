@@ -147,7 +147,10 @@ def test_default_budget_yields_a_bounded_exact_plan_count() -> None:
     multiple testing de forma consciente.
     """
     plans = enumerate_grammar_plans()
-    assert len(plans) == 1784
+    # V2.39.2: 1684 = 1784 (base) + 312 (trigger dc40 con banda media, antes inerte)
+    # - 112 (pares trigger/exit Donchian mutuamente inalcanzables, vetados)
+    # - 300 (doble filtro EMA incompatible con el cruce del trigger, vetado).
+    assert len(plans) == 1684
     # Muy por debajo de la explosión del producto completo con los 5 bloques a la vez.
     full_product = 4 * 4 * 4 * 5 * 4
     assert len(plans) < full_product * 100
@@ -158,9 +161,9 @@ def test_budget_ceiling_is_enforced() -> None:
     one_variant = enumerate_grammar_plans(GrammarBudget(max_per_component_variant=1))
     two_variants = enumerate_grammar_plans(GrammarBudget(max_per_component_variant=2))
     assert len(one_variant) <= len(two_variants)
-    # 1 variante por bloque × 3 combinaciones de bloques opcionales (1, 2 y 3 bloques),
-    # más las variantes de exit extra que no colisionan con el trigger por defecto.
-    assert len(one_variant) == 7
+    # V2.39.2: los vetos de inanición (Donchian inalcanzable y doble filtro EMA) recortan
+    # las combinaciones degeneradas que antes engordaban el conteo con planes inoperables.
+    assert len(one_variant) == 3
 
 
 def test_max_components_is_capped_at_three() -> None:
@@ -658,4 +661,132 @@ def test_allocator_small_budget_keeps_catalog_alive() -> None:
     )
     assert len(candidates) <= budget.max_candidates
     assert summary.catalog_candidates >= 1
+
+
+def test_grammar_variants_produce_at_least_two_operable_columns() -> None:
+    """V2.39.2: el grid de variantes debe tener ≥2 columnas OPERABLES, no solo emitidas.
+
+    El PBO CSCV exige ``len(candidates) >= 2``; si las variantes hermanas no generan
+    operaciones, ``_simulate_rules_strategy`` lanza ``ValueError``, ``rules_grid``
+    descarta el punto y el LAB se queda con 1 trial ⇒ ``pbo = None`` ⇒ gates
+    ``robustness``/``walk_forward`` sin evidencia sobre candidatas gramaticales. La
+    regresión era real: el 100% de los planes emitía <2 columnas operables porque el
+    trigger Donchian (``close > max(high, n)``) es matemáticamente imposible y el eje de
+    permutación rompía el par trigger/exit homónimo.
+
+    Se comprueba sobre TODOS los planes y con la serie de ciclos que usa el test de
+    integración A14 (tramo alcista más largo que el canal), sin tocar la base de datos.
+    """
+    from datetime import UTC, datetime, timedelta
+    from decimal import Decimal
+
+    from bolsa_analytics.backtest import BacktestBarInput
+    from bolsa_analytics.optimize.rules_grid import _simulate_rules_strategy
+
+    total = 400
+    now = datetime.now(UTC)
+    bars: list[BacktestBarInput] = []
+    close = Decimal("10.00")
+    for day in range(total):
+        cycle = day % 90
+        close += Decimal("0.05") if cycle < 60 else Decimal("-0.07")
+        close = max(close, Decimal("1.00"))
+        price = close.quantize(Decimal("0.0001"))
+        half = Decimal("0.05")
+        bars.append(
+            BacktestBarInput(
+                timestamp=(now - timedelta(days=(total - 1 - day))).isoformat(),
+                open=price,
+                high=(price + half).quantize(Decimal("0.0001")),
+                low=(price - half).quantize(Decimal("0.0001")),
+                close=price,
+                volume=Decimal("1000"),
+            )
+        )
+
+    plans = enumerate_grammar_plans()
+    assert plans, "premisa: la gramática enumera planes"
+
+    def _operable(plan) -> int:
+        served: set[str] = set()
+        operable = 0
+        for variant in grammar_variants_for_plan(plan, max_variants=4):
+            definition = variant["definition"]
+            if not isinstance(definition, dict):
+                continue
+            key = repr(definition)
+            if key in served:
+                continue
+            served.add(key)
+            try:
+                _simulate_rules_strategy(bars, definition, initial_cash=10000.0)
+            except ValueError:
+                continue
+            operable += 1
+        return operable
+
+    broken: list[tuple[str, int]] = []
+    for plan in plans:
+        operable = _operable(plan)
+        if operable < 2:
+            broken.append((plan.name, operable))
+    assert not broken, (
+        "planes con <2 columnas operables (el PBO CSCV no puede medirse): "
+        f"{len(broken)}/{len(plans)}; ejemplos: {broken[:5]}"
+    )
+
+
+def test_grammar_donchian_trigger_is_reachable() -> None:
+    """V2.39.2: ``close > max(high, n)`` nunca dispara; el trigger usa la banda media.
+
+    Regresión de producción: el canal ``upper`` incluye la barra actual, así que el
+    cierre jamás puede superarlo (0 barras incluso en una serie estrictamente creciente).
+    El trigger gramatical Donchian debe ser alcanzable sobre una serie monótona.
+    """
+    from datetime import UTC, datetime, timedelta
+    from decimal import Decimal
+
+    from bolsa_analytics.backtest import BacktestBarInput
+    from bolsa_analytics.optimize.rules_grid import _simulate_rules_strategy
+
+    components = {
+        component.name: component
+        for plan in enumerate_grammar_plans()
+        for component in plan.components
+        if component.kind == COMPONENT_TRIGGER
+    }
+    assert "trigger_dc20_break" in components, "premisa: existe el trigger Donchian"
+
+    trigger = components["trigger_dc20_break"]
+    rules = trigger.build_rules()
+    assert len(rules) == 1
+    spec = rules[0]["indicatorSpec"]
+    assert spec["parameters"].get("line") == "mid", (
+        "el trigger Donchian debe usar la banda media: la superior es inalcanzable"
+    )
+
+    # Serie monótona creciente: un canal por debajo del precio debe disparar entrada.
+    now = datetime.now(UTC)
+    bars: list[BacktestBarInput] = []
+    for day in range(400):
+        price = Decimal(str(10 + day * 0.1))
+        half = Decimal("0.5")
+        bars.append(
+            BacktestBarInput(
+                timestamp=(now - timedelta(days=(400 - 1 - day))).isoformat(),
+                open=price,
+                high=price + half,
+                low=price - half,
+                close=price,
+                volume=Decimal("1000"),
+            )
+        )
+    definition = {
+        "presetKey": "grammar_probe",
+        "indicatorSpecs": trigger.build_specs(),
+        "entries": {"operator": "all", "rules": rules},
+        "exits": {"operator": "all", "rules": [{"type": "price_compare", "operator": "lt", "value": 0.0, "signalKind": "exit"}]},
+    }
+    metrics = _simulate_rules_strategy(bars, definition, initial_cash=10000.0)
+    assert metrics["tradeCount"] >= 1, "el trigger Donchian debe poder abrir posición"
 
