@@ -124,7 +124,9 @@ def _make_shadow_bars_provider(instrument_id: str) -> Any:
 async def lifecycle_factory() -> async_sessionmaker[AsyncSession]:
     from dotenv import load_dotenv
 
-    load_dotenv(_DOTENV, override=False)
+    # Solo como conveniencia local: en CI las variables vienen del entorno del job.
+    if _DOTENV.exists():
+        load_dotenv(_DOTENV, override=False)
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.migrations import ensure_migrated
     from bolsa_infrastructure.database.session import create_engine, create_session_factory

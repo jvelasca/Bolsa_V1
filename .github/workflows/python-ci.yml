@@ -280,3 +280,19 @@ jobs:
           apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
           -q
           --tb=short
+          # V2.39.2: el job declara A14_GRAMMAR_PG_REQUIRED=1 para exigir PG real, pero el
+          # test no lo leía y podía quedar skipped sin que el job se pusiera rojo (skip
+          # silencioso = certificación fantasma). ``-rs`` imprime el motivo y el paso
+          # siguiente convierte cualquier skip del job en un fallo duro.
+          -rs | tee /tmp/a14-pg.log
+
+      - name: Fail on skipped A14 PG (no skip silencioso)
+        # Un skip invalida la certificación: si algún test quedó fuera del veredicto, el
+        # job falla con el motivo a la vista aunque el paso anterior saliera en verde.
+        run: |
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/a14-pg.log; then
+            echo "::error::A14 PG dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/a14-pg.log || true
+            exit 1
+          fi
+        if: always()
