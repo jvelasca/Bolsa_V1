@@ -184,6 +184,67 @@ already`) y los tests que dependen del arranque de un subproceso agotaban su pla
   CI (máquina limpia, un job) no reproduce esa saturación, pero se deja anotado para no confundirla
   con una regresión de código.
 
+### Tercera pasada — la gramática de Discovery emitía planes inoperables
+
+Al correr la batería exacta del CI apareció un fallo que **no** era flaky: la certificación A14
+(`test_a14_grammar_discovery_pg`) fallaba con _«ningún plan gramatical produjo evidencia CPCV/PBO
+real»_. La investigación cerró una cadena de **tres** causas, todas medidas, y una de ellas convertía
+el `P2-01` anterior en un colapso silencioso del grid.
+
+- **P1 — El 100 % de los planes gramaticales producía menos de 2 columnas operables.** El PBO CSCV
+  exige `len(candidates) >= 2`; con **1 solo trial** (o 0) `build_lab_pbo_summary` devuelve `None` y
+  los gates `robustness`/`walk_forward` quedan **sin evidencia** sobre candidatas gramaticales, en
+  silencio. Medido sobre los 1784 planes: **1184 con 1 columna y 600 con 0** — ninguno alcanzaba 2.
+  El LAB registraba «0 trials» y el orquestador real pasa exactamente la misma ruta, así que el
+  defecto era **de producción**, no del test.
+- **Causa 1 — el trigger y el filtro de tendencia Donchian eran matemáticamente inalcanzables.** El
+  canal `dc:upper` es `max(high)` de la ventana **incluyendo la barra actual**, así que
+  `close > upper` es imposible: el máximo de la ventana es siempre `≥ high[i] ≥ close[i]`. Medido:
+  **0 disparos incluso en una serie estrictamente creciente**. **Fix**: trigger y trend filter usan la
+  banda **media** (`dc:mid`), igual que el preset `donchian_breakout` de producción (que sí opera:
+  381/400 barras con `close > mid`). La banda `upper` de la gramática quedaba inerte.
+- **Causa 2 — el eje de permutación podía romper el par trigger/exit homónimo.** Al rotar el eje sobre
+  el trigger (lo introdujo `P2-01`), el `exit_ema10_cross_ema50` (bajista) seguía mirando las **mismas
+  EMAs** que el trigger nuevo: un cruce alcista y otro bajista de las mismas series **no coinciden
+  nunca**, así que el trigger quedaba inalcanzable. **Fix**: el exit homónimo se permuta **con** el
+  trigger, por par (`_AXIAL_TRIGGER_EXIT_PAIRS`), y el eje rota **preferentemente** sobre los bloques
+  opcionales (regime/trend/momentum), cayendo en los axiales solo si el plan no tiene ninguno. Se
+  conserva la rotación de ejes que arreglaba el `P2-01`.
+- **Causa 3 — incompatibilidad estructural entre bloques, no vetada.** `trigger_ema10_cross_ema50` +
+  `trend_ema20_gt_ema50`: el cruce de EMA10 sobre EMA50 es **necesariamente anterior** a que EMA20
+  confirme por encima de EMA50, y los gates del plan se exigen **simultáneamente**. Medido: 210 barras
+  cumplen ambas condiciones, **0 cruces**. **Fix**: dos vetos de inanición deterministas y fail-closed
+  (`_mutually_unreachable_trigger_exit`, `_conjunctive_ema_starvation`) sacan esas combinaciones de la
+  enumeración en vez de emitirlas sin evidencia posible. 1684 planes, **0 degenerados**.
+- **El test de integración A14 sembraba una serie donde sus propios disparadores no existían.** La
+  rampa descendente dejaba `close > sma200` y `close > max(high, n)` en **0 barras**. **Fix**: la serie
+  ahora son ciclos con tramo alcista **más largo que el período del canal** (60 > 40) y retrocesos que
+  cruzan las EMAs. El test pasa de **fallar a los 146 s** a pasar en **5,8 s**.
+- **Regresión**: dos tests nuevos en `test_discovery_grammar.py` exigen **≥2 columnas operables por
+  plan** sobre la serie de integración y que el trigger Donchian sea alcanzable.
+
+### Tercera pasada — dos fallos que solo aparecían en la batería completa
+
+- **P1 (producto) — una lista con instrumentos no se podía borrar.** `SqlAlchemyListRepository.delete`
+  borraba la fila de `instrument_lists` **sin vaciar antes** `instrument_list_items`; la FK `list_id`
+  no es `ON DELETE CASCADE`, así que cualquier lista **con** instrumentos violaba la integridad
+  referencial y `DELETE /api/lists/{id}` devolvía **500 en vez de 204**. **Fix**: los items se borran
+  en la misma transacción justo antes que la lista. Regresión:
+  `test_delete_list_with_items_does_not_violate_fk`.
+- **P2 (hermeticidad) — la tabla `lifecycle_outbox` envenenaba suites entre sí.** `claim_batch` es una
+  barrida **global** (FIFO por posición, sin filtrar por posición) con sanitizado de huérfanas;
+  `test_financial_integrity_pg` dejaba una cabeza FIFO `dead` sin limpieza y otras suites filas
+  `pending`/`processing`, de modo que el worker de `test_lifecycle_outbox_worker_pg` reclamaba filas
+  **ajenas** y el hook inyectado (`on_before_apply_commit`) consumía su **único** disparo antes de que
+  la fila propia pasara a `processing` → _«status=applied expected=processing»_. **Fix**: el test de
+  integridad limpia su fila en `finally` y el fichero del worker aísla la tabla (purga
+  `pending`/`processing` antes y después de cada test). **Verificado**: `apps/api-python/tests` +
+  `packages/py/infrastructure/tests` pasan **521 en dos pasadas consecutivas** (antes 2 failed en cada
+  intento de la batería completa).
+- **Verificación (local) de la tercera pasada**: `ruff` **All checks passed** · `mypy` **Success (477
+  ficheros)** · batería completa del job _quality_ **1306 passed, 0 failed** · gramática + A14
+  **40 passed**.
+
 ## [1.63.1-beta] — V2.38.1 · Hotfix de los 2 P2 de la auditoría de V2.38 — 2026-09-11
 
 Hotfix de la **auditoría externa de `v2.38-beta`** (commit `41b96a41`, CI GREEN). Cierra dos P2
