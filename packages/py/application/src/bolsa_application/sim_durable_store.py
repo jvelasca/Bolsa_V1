@@ -33,10 +33,14 @@ from typing import Any, Protocol
 
 __all__ = [
     "InMemorySimAutoPositionStore",
+    "InMemorySimConsumedSignalStore",
     "InMemorySimFillFinanceContextStore",
     "PostgresSimAutoPositionStore",
+    "PostgresSimConsumedSignalStore",
     "PostgresSimFillFinanceContextStore",
     "SimAutoPositionStore",
+    "SimConsumedSignal",
+    "SimConsumedSignalStore",
     "SimDurableUnitOfWork",
     "SimFillFinanceContext",
     "SimFillFinanceContextStore",
@@ -114,6 +118,21 @@ class SimPositionProjection:
     # V2.32 / A12: versión de estrategia que abrió la posición. Se restaura en
     # ``readopt_positions`` para que los cierres post-crash sigan atribuyéndose.
     strategy_version_id: str | None = None
+    # AUTO 2.0 · P4 (migración 040): plan operativo V2 completo (``PositionState.to_dict``).
+    # Con él el reinicio REHIDRATA la posición (stop/T1/T2/parciales reales) en vez de
+    # reconstruir la geometría por ATR. ``None`` = fila anterior a P4 ⇒ el worker cae a
+    # la adopción reconstruida (auditada con ``adopted``).
+    position_state: Mapping[str, Any] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SimConsumedSignal:
+    """AUTO 2.0 · P4 — señal consumida (entrada ya ejecutada) sobre una barra concreta."""
+
+    signal_id: str
+    instrument_id: str
+    bar_timestamp: str
+    consumed_at: datetime
 
 
 class SimFillFinanceContextStore(Protocol):
@@ -147,8 +166,32 @@ class SimAutoPositionStore(Protocol):
         t1_state: str | None = None,
         trailing_state: str | None = None,
         strategy_version_id: str | None = None,
+        position_state: Mapping[str, Any] | None = None,
     ) -> None: ...
     async def delete(self, account_id: str, engine_id: str, symbol: str) -> None: ...
+
+
+class SimConsumedSignalStore(Protocol):
+    """AUTO 2.0 · P4 — señales ya consumidas (idempotente por identidad canónica).
+
+    La semántica es de BARRA: solo se leen/marcan las señales de la barra corriente y
+    las anteriores se podan (``prune_before``), de modo que el espejo no crece sin
+    límite. ``mark`` es idempotente (repetir la marca de la misma señal no duplica ni
+    falla: el crash/retry es el caso normal).
+    """
+
+    async def mark(
+        self,
+        account_id: str,
+        engine_id: str,
+        signal_id: str,
+        *,
+        instrument_id: str,
+        bar_timestamp: str,
+        consumed_at: datetime | None = None,
+    ) -> None: ...
+    async def list_bar(self, account_id: str, engine_id: str, bar_timestamp: str) -> list[str]: ...
+    async def prune_before(self, account_id: str, engine_id: str, bar_timestamp: str) -> int: ...
 
 
 class InMemorySimFillFinanceContextStore:
@@ -205,9 +248,7 @@ class InMemorySimAutoPositionStore:
         self, account_id: str, engine_id: str
     ) -> Mapping[str, SimPositionProjection]:
         return {
-            s: r
-            for s, r in self._rows.get((account_id, engine_id), {}).items()
-            if r.quantity > 0
+            s: r for s, r in self._rows.get((account_id, engine_id), {}).items() if r.quantity > 0
         }
 
     async def upsert(
@@ -224,6 +265,7 @@ class InMemorySimAutoPositionStore:
         t1_state: str | None = None,
         trailing_state: str | None = None,
         strategy_version_id: str | None = None,
+        position_state: Mapping[str, Any] | None = None,
     ) -> None:
         self._rows.setdefault((account_id, engine_id), {})[symbol] = SimPositionProjection(
             symbol=symbol,
@@ -235,10 +277,52 @@ class InMemorySimAutoPositionStore:
             t1_state=t1_state,
             trailing_state=trailing_state,
             strategy_version_id=strategy_version_id,
+            position_state=dict(position_state) if position_state is not None else None,
         )
 
     async def delete(self, account_id: str, engine_id: str, symbol: str) -> None:
         self._rows.get((account_id, engine_id), {}).pop(symbol, None)
+
+
+class InMemorySimConsumedSignalStore:
+    """Doble hermético de las señales consumidas (por cuenta+engine, idempotente)."""
+
+    def __init__(self) -> None:
+        self._rows: dict[tuple[str, str], dict[str, SimConsumedSignal]] = {}
+
+    async def mark(
+        self,
+        account_id: str,
+        engine_id: str,
+        signal_id: str,
+        *,
+        instrument_id: str,
+        bar_timestamp: str,
+        consumed_at: datetime | None = None,
+    ) -> None:
+        row = SimConsumedSignal(
+            signal_id=signal_id,
+            instrument_id=instrument_id,
+            bar_timestamp=bar_timestamp,
+            consumed_at=consumed_at or _now(),
+        )
+        self._rows.setdefault((account_id, engine_id), {}).setdefault(signal_id, row)
+
+    async def list_bar(self, account_id: str, engine_id: str, bar_timestamp: str) -> list[str]:
+        rows = self._rows.get((account_id, engine_id), {})
+        return sorted(sid for sid, row in rows.items() if row.bar_timestamp == bar_timestamp)
+
+    async def prune_before(self, account_id: str, engine_id: str, bar_timestamp: str) -> int:
+        rows = self._rows.get((account_id, engine_id))
+        if not rows:
+            return 0
+        stale = [sid for sid, row in rows.items() if row.bar_timestamp < bar_timestamp]
+        for sid in stale:
+            rows.pop(sid, None)
+        return len(stale)
+
+    def size(self) -> int:
+        return sum(len(rows) for rows in self._rows.values())
 
 
 class PostgresSimFillFinanceContextStore:
@@ -400,6 +484,7 @@ class PostgresSimAutoPositionStore:
                 t1_state=row.t1_state,
                 trailing_state=row.trailing_state,
                 strategy_version_id=row.strategy_version_id,
+                position_state=dict(row.position_state) if row.position_state else None,
             )
         return out
 
@@ -417,6 +502,7 @@ class PostgresSimAutoPositionStore:
         t1_state: str | None = None,
         trailing_state: str | None = None,
         strategy_version_id: str | None = None,
+        position_state: Mapping[str, Any] | None = None,
     ) -> None:
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -437,6 +523,7 @@ class PostgresSimAutoPositionStore:
                 t1_state=t1_state,
                 trailing_state=trailing_state,
                 strategy_version_id=strategy_version_id,
+                position_state=dict(position_state) if position_state is not None else None,
                 opened_at=now,
                 updated_at=now,
             )
@@ -451,6 +538,9 @@ class PostgresSimAutoPositionStore:
                     "t1_state": t1_state,
                     "trailing_state": trailing_state,
                     "strategy_version_id": strategy_version_id,
+                    "position_state": (
+                        dict(position_state) if position_state is not None else None
+                    ),
                     "updated_at": now,
                 },
             )
@@ -470,6 +560,79 @@ class PostgresSimAutoPositionStore:
             )
         )
         await _commit_if(self._session, self._autocommit)
+
+
+class PostgresSimConsumedSignalStore:
+    """Store durable de señales consumidas (tabla ``sim_consumed_signals``).
+
+    ``autocommit=True`` (default) commitea por su cuenta: la marca debe ser durable
+    ANTES de que el proceso pueda morir, porque de ella depende no re-emitir la misma
+    oportunidad sobre la misma barra tras el reinicio.
+    """
+
+    def __init__(self, session: Any, *, autocommit: bool = True) -> None:
+        self._session = session
+        self._autocommit = autocommit
+
+    async def mark(
+        self,
+        account_id: str,
+        engine_id: str,
+        signal_id: str,
+        *,
+        instrument_id: str,
+        bar_timestamp: str,
+        consumed_at: datetime | None = None,
+    ) -> None:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import SimConsumedSignalRow
+
+        await self._session.execute(
+            pg_insert(SimConsumedSignalRow)
+            .values(
+                account_id=account_id,
+                engine_id=engine_id,
+                signal_id=signal_id,
+                instrument_id=instrument_id,
+                bar_timestamp=bar_timestamp,
+                consumed_at=consumed_at or _now(),
+            )
+            .on_conflict_do_nothing(index_elements=["account_id", "engine_id", "signal_id"])
+        )
+        await _commit_if(self._session, self._autocommit)
+
+    async def list_bar(self, account_id: str, engine_id: str, bar_timestamp: str) -> list[str]:
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import SimConsumedSignalRow
+
+        rows = (
+            await self._session.execute(
+                select(SimConsumedSignalRow.signal_id).where(
+                    SimConsumedSignalRow.account_id == account_id,
+                    SimConsumedSignalRow.engine_id == engine_id,
+                    SimConsumedSignalRow.bar_timestamp == bar_timestamp,
+                )
+            )
+        ).scalars()
+        return sorted(rows)
+
+    async def prune_before(self, account_id: str, engine_id: str, bar_timestamp: str) -> int:
+        """Borra las señales de barras ANTERIORES (la tabla queda acotada a la actual)."""
+        from sqlalchemy import delete
+
+        from bolsa_infrastructure.database.models.tables import SimConsumedSignalRow
+
+        result = await self._session.execute(
+            delete(SimConsumedSignalRow).where(
+                SimConsumedSignalRow.account_id == account_id,
+                SimConsumedSignalRow.engine_id == engine_id,
+                SimConsumedSignalRow.bar_timestamp < bar_timestamp,
+            )
+        )
+        await _commit_if(self._session, self._autocommit)
+        return int(result.rowcount or 0)
 
 
 # ── P1-01: reconstrucción de la proyección desde el estado canónico ──────────────
@@ -493,7 +656,8 @@ async def rebuild_sim_position_projection(
     Devuelve ``{symbol: qty}`` reconstruido y deja el espejo alineado (upsert de lo
     que existe en el canónico, delete de lo que ya no). ``protection`` permite
     conservar el estado de protección si el símbolo sigue abierto (no se pierde el
-    ``high_watermark`` al reconstruir).
+    ``high_watermark`` al reconstruir) — incluido el plan V2 (``position_state``): la
+    reconstrucción ajusta la CANTIDAD, jamás el plan operativo de la posición.
     """
     canonical = await canonical_reader(account_id)
     canonical = {str(s): Decimal(str(q)) for s, q in canonical.items() if Decimal(str(q)) > 0}
@@ -512,6 +676,7 @@ async def rebuild_sim_position_projection(
             t1_state=prior.t1_state if prior else None,
             trailing_state=prior.trailing_state if prior else None,
             strategy_version_id=prior.strategy_version_id if prior else None,
+            position_state=prior.position_state if prior else None,
         )
     for symbol in set(current) - set(canonical):
         await position_store.delete(account_id, engine_id, symbol)
@@ -536,6 +701,7 @@ class SimDurableUnitOfWork:
     session: Any
     finance_store: PostgresSimFillFinanceContextStore
     position_store: PostgresSimAutoPositionStore
+    consumed_signal_store: PostgresSimConsumedSignalStore
 
     @classmethod
     def open(cls, session: Any) -> SimDurableUnitOfWork:
@@ -544,6 +710,10 @@ class SimDurableUnitOfWork:
             session=session,
             finance_store=PostgresSimFillFinanceContextStore(session, autocommit=False),
             position_store=PostgresSimAutoPositionStore(session, autocommit=False),
+            # P4: la marca de "señal consumida" pertenece a la MISMA transacción que el
+            # espejo del fill que la consume — o el fill y su dedupe quedan juntos, o
+            # no queda ninguno de los dos.
+            consumed_signal_store=PostgresSimConsumedSignalStore(session, autocommit=False),
         )
 
     async def commit(self) -> None:

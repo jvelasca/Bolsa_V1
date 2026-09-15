@@ -85,3 +85,25 @@ async def test_unit_of_work_rollback_leaves_nothing_committed() -> None:
     await uow.rollback()
     assert session.commits == 0
     assert session.rollbacks == 1
+
+
+@pytest.mark.asyncio
+async def test_unit_of_work_includes_consumed_signal_mark() -> None:
+    """AUTO 2.0 · P4: la marca de señal consumida va en la MISMA transacción del fill.
+
+    O el espejo del fill y su dedupe quedan persistidos juntos, o no queda ninguno:
+    nunca un fill sin marca (que reabriría la misma oportunidad tras el crash).
+    """
+    session = _FakeSession()
+    uow = SimDurableUnitOfWork.open(session)
+    await uow.consumed_signal_store.mark(
+        "acc-1",
+        "eng-1",
+        "sig-1",
+        instrument_id="AAPL",
+        bar_timestamp="2026-09-15T09:00:00+00:00",
+    )
+    assert session.commits == 0, "la marca no commitea por su cuenta dentro de la UoW"
+    assert session.executes == 1
+    await uow.commit()
+    assert session.commits == 1, "un único commit para espejo + dedupe"

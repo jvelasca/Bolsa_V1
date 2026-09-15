@@ -2172,9 +2172,7 @@ class SimFillFinanceContextRow(Base):
     strategy_version_id: Mapped[str | None] = mapped_column(
         "strategy_version_id", String, nullable=True
     )
-    idempotency_key: Mapped[str | None] = mapped_column(
-        "idempotency_key", String, nullable=True
-    )
+    idempotency_key: Mapped[str | None] = mapped_column("idempotency_key", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         DateTime(timezone=True),
@@ -2224,6 +2222,11 @@ class SimAutoPositionRow(Base):
     strategy_version_id: Mapped[str | None] = mapped_column(
         "strategy_version_id", String, nullable=True
     )
+    # AUTO 2.0 · P4 (migración 040): plan operativo V2 completo (``PositionState.to_dict``)
+    # para que el reinicio REHIDRATE la posición en vez de reconstruir su geometría por
+    # ATR. Las columnas planas de arriba (``stop_price``/``t1_state``/``trailing_state``)
+    # siguen siendo la vista consultable; esta es la fuente fiel del plan.
+    position_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     opened_at: Mapped[datetime] = mapped_column(
         "opened_at",
         DateTime(timezone=True),
@@ -2231,6 +2234,42 @@ class SimAutoPositionRow(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
+class SimConsumedSignalRow(Base):
+    """AUTO 2.0 · P4 (migración 040) — señal consumida por barra (anti-repetición durable).
+
+    Espejo 1:1 de ``sim_consumed_signals``. La identidad canónica de señal
+    (``SignalIdentity.signal_id`` = instrumento|versión|timeframe|barra|hash) se marca
+    al EJECUTAR la entrada, de modo que un crash/restart no autoriza a re-emitir la
+    MISMA señal sobre la MISMA barra (el ``churn`` de re-entrada inmediata tras un
+    stop-out). Solo interesa la barra corriente: ``prune_before`` elimina las
+    anteriores y la tabla queda acotada.
+    """
+
+    __tablename__ = "sim_consumed_signals"
+    __table_args__ = (
+        PrimaryKeyConstraint(
+            "account_id", "engine_id", "signal_id", name="sim_consumed_signals_pk"
+        ),
+        Index(
+            "sim_consumed_signals_bar_idx",
+            "account_id",
+            "engine_id",
+            "bar_timestamp",
+        ),
+    )
+
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    engine_id: Mapped[str] = mapped_column("engine_id", String, nullable=False)
+    signal_id: Mapped[str] = mapped_column("signal_id", String, nullable=False)
+    instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    bar_timestamp: Mapped[str] = mapped_column("bar_timestamp", String, nullable=False)
+    consumed_at: Mapped[datetime] = mapped_column(
+        "consumed_at",
         DateTime(timezone=True),
         nullable=False,
     )
@@ -2255,9 +2294,7 @@ class StrategyCandidateRow(Base):
     strategy_family: Mapped[str] = mapped_column("strategy_family", String, nullable=False)
     params: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     origin: Mapped[str] = mapped_column(String, default="estudio")
-    data_snapshot_id: Mapped[str | None] = mapped_column(
-        "data_snapshot_id", String, nullable=True
-    )
+    data_snapshot_id: Mapped[str | None] = mapped_column("data_snapshot_id", String, nullable=True)
     preset_key: Mapped[str | None] = mapped_column("preset_key", String, nullable=True)
     strategy_definition_id: Mapped[str | None] = mapped_column(
         "strategy_definition_id", String, nullable=True
@@ -2333,18 +2370,14 @@ class StrategyShadowValidationRow(Base):
     """Evidencia shadow ejecutada de un finalista (V2.32/A12, autoridad del gate)."""
 
     __tablename__ = "strategy_shadow_validations"
-    __table_args__ = (
-        Index("strategy_shadow_validations_version_idx", "version_id", "created_at"),
-    )
+    __table_args__ = (Index("strategy_shadow_validations_version_idx", "version_id", "created_at"),)
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     version_id: Mapped[str] = mapped_column("version_id", String, nullable=False)
     instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
     trades: Mapped[int] = mapped_column(Integer, default=0)
     return_pct: Mapped[float | None] = mapped_column("return_pct", Float, nullable=True)
-    max_drawdown_pct: Mapped[float | None] = mapped_column(
-        "max_drawdown_pct", Float, nullable=True
-    )
+    max_drawdown_pct: Mapped[float | None] = mapped_column("max_drawdown_pct", Float, nullable=True)
     win_rate: Mapped[float | None] = mapped_column("win_rate", Float, nullable=True)
     bars_used: Mapped[int] = mapped_column("bars_used", Integer, default=0)
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -2353,9 +2386,7 @@ class StrategyShadowValidationRow(Base):
     # V2.32.1 (auditoría P2-03): identidad reproducible del dataset shadow. Permite
     # demostrar dentro de meses EXACTAMENTE con qué barras se autorizó la promoción.
     round_trips: Mapped[int] = mapped_column("round_trips", Integer, default=0)
-    data_snapshot_id: Mapped[str | None] = mapped_column(
-        "data_snapshot_id", String, nullable=True
-    )
+    data_snapshot_id: Mapped[str | None] = mapped_column("data_snapshot_id", String, nullable=True)
     shadow_start: Mapped[str | None] = mapped_column("shadow_start", String, nullable=True)
     shadow_end: Mapped[str | None] = mapped_column("shadow_end", String, nullable=True)
     bars_hash: Mapped[str | None] = mapped_column("bars_hash", String, nullable=True)
@@ -2378,9 +2409,7 @@ class PaperForwardResultRow(Base):
     """
 
     __tablename__ = "paper_forward_results"
-    __table_args__ = (
-        Index("paper_forward_results_version_idx", "version_id", "created_at"),
-    )
+    __table_args__ = (Index("paper_forward_results_version_idx", "version_id", "created_at"),)
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     version_id: Mapped[str] = mapped_column("version_id", String, nullable=False)
@@ -2389,9 +2418,7 @@ class PaperForwardResultRow(Base):
     round_trips: Mapped[int] = mapped_column("round_trips", Integer, default=0)
     fills: Mapped[int] = mapped_column(Integer, default=0)
     return_pct: Mapped[float | None] = mapped_column("return_pct", Float, nullable=True)
-    max_drawdown_pct: Mapped[float | None] = mapped_column(
-        "max_drawdown_pct", Float, nullable=True
-    )
+    max_drawdown_pct: Mapped[float | None] = mapped_column("max_drawdown_pct", Float, nullable=True)
     win_rate: Mapped[float | None] = mapped_column("win_rate", Float, nullable=True)
     bars_used: Mapped[int] = mapped_column("bars_used", Integer, default=0)
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -2399,9 +2426,7 @@ class PaperForwardResultRow(Base):
     vetoes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     as_of: Mapped[str | None] = mapped_column("as_of", String, nullable=True)
     # Identidad reproducible del dataset forward (mismo patrón que el shadow).
-    data_snapshot_id: Mapped[str | None] = mapped_column(
-        "data_snapshot_id", String, nullable=True
-    )
+    data_snapshot_id: Mapped[str | None] = mapped_column("data_snapshot_id", String, nullable=True)
     forward_start: Mapped[str | None] = mapped_column("forward_start", String, nullable=True)
     forward_end: Mapped[str | None] = mapped_column("forward_end", String, nullable=True)
     bars_hash: Mapped[str | None] = mapped_column("bars_hash", String, nullable=True)
