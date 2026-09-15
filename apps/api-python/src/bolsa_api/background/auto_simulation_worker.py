@@ -37,11 +37,18 @@ import asyncio
 import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from bolsa_analytics.cognitive.position_state import (
+    PositionState,
+    apply_position_reduce,
+    build_position_state_from_fill,
+    position_state_from_dict,
+)
+from bolsa_analytics.cognitive.signal_identity import bar_window
 from bolsa_api.background.paper_auto_engine_worker import (
     DecisionProvider,
     _effective_venue,
@@ -54,6 +61,21 @@ from bolsa_application.auto_engine_state_store import (
     AutoEngineStore,
     AutoEngineTickInput,
 )
+from bolsa_application.auto_v2_entry import (
+    V2Signal,
+    V2Tunables,
+    build_worker_snapshot,
+    plan_v2_position_decision,
+    plan_v2_tick,
+    position_manager_package,
+    sector_from_package,
+    signal_identity_for_bar,
+    tunables_from_env,
+    v2_engine_enabled,
+)
+from bolsa_application.auto_v2_entry import (
+    edge_from_package as _edge_from_package,
+)
 from bolsa_application.decision_contract import (
     DecisionPackage,
     derive_execution_plan,
@@ -63,6 +85,7 @@ from bolsa_application.decision_contract import (
 from bolsa_application.execution_event import ExecutionEventStore
 from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
+    POSITION_PROJECTION_OK,
     POSITION_PROJECTION_REBUILT,
     POSITION_PROJECTION_UNKNOWN,
     reconcile_sim_account,
@@ -134,8 +157,9 @@ class ProtectionConfig:
     t1_fraction: float = 1.0
     enabled: bool = False  # fail-closed: sin activar, ninguna salida automática.
 
-    def exit_reason(self, *, held: bool, entry: Decimal, high: Decimal, price: Decimal,
-                    minute: int) -> str | None:
+    def exit_reason(
+        self, *, held: bool, entry: Decimal, high: Decimal, price: Decimal, minute: int
+    ) -> str | None:
         """Razón de salida de protección (o None si no procede). Sólo con posición.
 
         V2.24 / A9.1 (P2-06): el ORDEN importa. Si el máximo ya superó el umbral T1
@@ -153,9 +177,7 @@ class ProtectionConfig:
             return "session_close"
         if self.stop_pct > 0 and price <= entry * (Decimal(1) - Decimal(str(self.stop_pct))):
             return "protective_stop"
-        high_above_t1 = (
-            self.t1_pct > 0 and high > entry * (Decimal(1) + Decimal(str(self.t1_pct)))
-        )
+        high_above_t1 = self.t1_pct > 0 and high > entry * (Decimal(1) + Decimal(str(self.t1_pct)))
         trailing_hit = (
             self.trailing_pct > 0
             and high > entry
@@ -254,6 +276,17 @@ def _strategy_version_from_source(source: Any) -> str | None:
     return version_id or None
 
 
+def _dec_or_none(value: Any) -> Decimal | None:
+    """float|str|None → ``Decimal`` (o ``None``). Sin inventar ceros ni NaN."""
+    if value is None:
+        return None
+    try:
+        dec = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    return dec if dec.is_finite() else None
+
+
 @dataclass(frozen=True, slots=True)
 class _AppliedFill:
     """Fill aplicado, en la forma que la reconciliación entiende (P1-01/P2-02)."""
@@ -320,6 +353,9 @@ class AutoSimulationWorker:
         kill_switch_source: Callable[[], bool] | None = None,
         canonical_positions_reader: Any = None,
         require_account_id: bool = False,
+        regime_source: Callable[[], str | None] | None = None,
+        sector_source: Callable[[str], str | None] | None = None,
+        consumed_signal_store: Any = None,
     ) -> None:
         self._decider = decider
         self._exec_store = exec_store
@@ -366,6 +402,44 @@ class AutoSimulationWorker:
         self._position_version: dict[str, str] = {}
         # V2.24/A9.1 (P2-06): T1 parcial ya ejecutado por símbolo (no re-dispara T1).
         self._t1_done: set[str] = set()
+        # AUTO 2.0 (V2) — pipeline de decisión (env-gated, default OFF). Con ON, las
+        # entradas pasan por OpportunityRanker + PortfolioDecisionEngine + TradePlan y
+        # la gestión de posición por PositionState + ExitPlan + PositionDecision, en
+        # lugar del decider directo y de la política global ``ProtectionConfig``.
+        # El settlement/ledger/reconciliación NO cambian: esto solo decide QUÉ emitir.
+        self._v2_enabled = v2_engine_enabled()
+        self._v2_tunables: V2Tunables = tunables_from_env()
+        self._v2_positions: dict[str, Any] = {}
+        self._v2_plan: Any = None
+        self._v2_journal: list[Any] = []
+        self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
+        # AUTO 2.0 (V2): fuente del régimen operativo (inyectable). Sin fuente y sin
+        # override de env, el régimen es UNKNOWN ⇒ exit-only (fail-closed: sin régimen
+        # no se abren entradas nuevas).
+        self._v2_regime_source = regime_source
+        # AUTO 2.0 (V2): fuente del sector por símbolo (inyectable). Sin ella, el sector
+        # solo existe si la propuesta lo declara en su ``memo``; si no, es desconocido y
+        # el gate de concentración sectorial no puede evaluarlo (nunca se asume exento).
+        self._v2_sector_source = sector_source
+        # AUTO 2.0 · P4: espejo durable de las señales consumidas (inyectable). Con él,
+        # un reinicio NO autoriza a re-emitir la misma señal sobre la misma barra; sin
+        # él (hermético) el dedupe vive solo en RAM, como hasta ahora.
+        self._consumed_signal_store = consumed_signal_store
+        # AUTO 2.0 (V2): identidades de señal YA consumidas (oportunidades emitidas
+        # sobre su barra). Evita que el mismo BUY sobre la misma barra vuelva a
+        # re-emitirse en el turno siguiente (worker 60s sobre señal D1) — el ``churn``
+        # clásico: stop-out y re-entrada inmediata con la señal que ya se usó.
+        self._v2_consumed_signals: set[str] = set()
+        # Barra (inicio ISO) a la que pertenece ``_v2_consumed_signals``: al cambiar de
+        # barra la memoria se reinicia (solo la barra corriente deduplica).
+        self._v2_consumed_bar: str = ""
+        # AUTO 2.0 · P4: planes V2 rehidratados del espejo durable al readoptar
+        # (``symbol → PositionState.to_dict()``), pendientes de primer uso. Se usa una
+        # sola vez: una vez rehidratado, el ``PositionState`` vivo manda.
+        self._v2_durable_plans: dict[str, dict[str, Any]] = {}
+        # Identidad de la señal de cada símbolo en el tick corriente (para marcarla como
+        # consumida SOLO cuando la entrada se ejecuta de verdad).
+        self._v2_tick_signals: dict[str, str] = {}
         self._minute = 0
         self._time = self._clock()
         self._open: dict[str, Decimal] = {}
@@ -427,6 +501,12 @@ class AutoSimulationWorker:
                     self._high_price[symbol] = Decimal(str(row.high_watermark))
                 if row.strategy_version_id:
                     self._position_version[symbol] = str(row.strategy_version_id)
+                # AUTO 2.0 · P4: el plan operativo durable se guarda para rehidratarlo
+                # EXACTO en el primer uso (``_v2_adopt_position``). Reconstruirlo por
+                # ATR sería inventar un stop/objetivos distintos de los que el motor
+                # estaba siguiendo antes del crash.
+                if row.position_state:
+                    self._v2_durable_plans[symbol] = dict(row.position_state)
         self._readopted = True
         return dict(self._open)
 
@@ -506,6 +586,11 @@ class AutoSimulationWorker:
                         stop_price=getattr(prior, "stop_price", None),
                         t1_state=getattr(prior, "t1_state", None),
                         trailing_state=getattr(prior, "trailing_state", None),
+                        # Una reconstrucción ajusta la CANTIDAD contra el canónico;
+                        # jamás el plan operativo ni la atribución de estrategia (si
+                        # siguen siendo válidos, sobreviven tal cual).
+                        strategy_version_id=getattr(prior, "strategy_version_id", None),
+                        position_state=getattr(prior, "position_state", None),
                     )
             if verdict.status in {POSITION_PROJECTION_DIVERGENT, POSITION_PROJECTION_UNKNOWN}:
                 logger.warning(
@@ -551,9 +636,39 @@ class AutoSimulationWorker:
                     # V2.32/A12: la versión que abrió la posición viaja al espejo
                     # durable para sobrevivir al crash y restaurarse en readopt.
                     strategy_version_id=self._position_version.get(symbol),
+                    # AUTO 2.0 · P4: el plan operativo V2 (stop vigente, objetivos,
+                    # parciales, trailing) se persiste en cada cambio de cantidad. Si
+                    # no hay plan vivo, ``**{}`` deja las columnas V2 intactas.
+                    **self._v2_durable_state(symbol),
                 )
         except Exception:  # noqa: BLE001 — el espejo durable nunca tumba el turno SIM.
             logger.exception("auto_sim persist_position failed symbol=%s", symbol)
+
+    def _v2_durable_state(self, symbol: str) -> dict[str, Any]:
+        """AUTO 2.0 · P4: plan operativo vivo serializado para el espejo durable.
+
+        Devuelve ``{}`` cuando no hay plan V2 vivo (V2 off, o sin ``PositionState`` para
+        el símbolo): el espejo queda entonces SIN plan (NULL), que es la verdad — no se
+        inventa un plan operativo que el motor no está siguiendo.
+        El plan viaja como ``PositionState.to_dict()`` (rehidratable exacto con
+        ``position_state_from_dict``): es el estado que DEBE sobrevivir al crash.
+        """
+        if not self._v2_enabled:
+            return {}
+        position = self._v2_positions.get(symbol)
+        if position is None:
+            return {}
+        target1 = getattr(position, "target1_leg", None)
+        trailing = position.trailing if isinstance(position.trailing, dict) else None
+        return {
+            "position_state": position.to_dict(),
+            "avg_price": _dec_or_none(position.actual_entry),
+            "stop_price": _dec_or_none(position.current_stop),
+            "t1_state": getattr(target1, "status", None) if target1 else None,
+            "trailing_state": (
+                str(trailing.get("status")) if trailing and trailing.get("status") else None
+            ),
+        }
 
     def _next_logical_order_id(self, symbol: str, side: str) -> str:
         """P1-03: identidad lógica única por INTENCIÓN (namespace del execution_id)."""
@@ -663,9 +778,7 @@ class AutoSimulationWorker:
         ]
 
     # ---- journal de fila: mantiene el día y ofrece el turno --------------------
-    def _record_applied_event(
-        self, symbol: str, fill: FillObservation, price: Decimal
-    ) -> None:
+    def _record_applied_event(self, symbol: str, fill: FillObservation, price: Decimal) -> None:
         """P1-01/P2-02: registra el fill aplicado para poder reconciliar la posición.
 
         La reconciliación compara los ``ExecutionEvents`` esperados (BUY − SELL) con
@@ -700,6 +813,457 @@ class AutoSimulationWorker:
         self._journal.append(row)
         return row
 
+    # ---- AUTO 2.0 (V2): decisión de entradas y de posición (env-gated) --------
+    def v2_enabled(self) -> bool:
+        """True si el pipeline AUTO 2.0 gestiona la decisión (env-gated, default OFF)."""
+        return self._v2_enabled
+
+    def _v2_regime(self) -> str | None:
+        """Régimen operativo del tick (override de env > fuente inyectada > None).
+
+        Sin régimen el pipeline V2 queda en UNKNOWN ⇒ exit-only (fail-closed): no se
+        abren entradas nuevas si no se puede determinar el régimen.
+        """
+        override = self._v2_tunables.regime_override
+        if override:
+            return override
+        if self._v2_regime_source is None:
+            return None
+        try:
+            return self._v2_regime_source()
+        except Exception:  # noqa: BLE001 — sin régimen no se inventan entradas.
+            logger.exception("auto_sim v2 regime_source failed")
+            return None
+
+    def _v2_equity(self) -> float:
+        """Equity de referencia del tick (env ``AUTO_ENGINE_SIM_V2_EQUITY`` o 100k)."""
+        raw = (os.getenv("AUTO_ENGINE_SIM_V2_EQUITY") or "").strip()
+        if raw:
+            try:
+                value = float(raw)
+            except ValueError:
+                value = 0.0
+            if value > 0:
+                return value
+        return 100_000.0
+
+    def _v2_snapshot(self, regime: str | None) -> Any:
+        """Construye la foto canónica del tick desde el libro del worker."""
+        equity = self._v2_equity()
+        invested = Decimal("0")
+        marks: dict[str, float] = {}
+        for symbol, qty in self._open.items():
+            if qty <= 0:
+                continue
+            price = Decimal(str(self._price_script(symbol, self._minute) or 0))
+            if price > 0:
+                marks[symbol] = float(price)
+                invested += qty * price
+        cash = max(Decimal("0"), Decimal(str(equity)) - invested)
+        return build_worker_snapshot(
+            account_id=self._account_id or "auto-sim",
+            equity=equity,
+            cash=float(cash),
+            open_positions={s: float(q) for s, q in self._open.items() if q > 0},
+            entry_prices={s: float(p) for s, p in self._entry_price.items()},
+            marks=marks,
+            stops=self._v2_stop_map(),
+            strategies=tuple(sorted(set(self._position_version.values()))),
+            regime=regime,
+            risk_budget_pct=self._v2_tunables.risk_budget_pct,
+            reconciliation_ok=not self.reconciliation_blocks_openings,
+        )
+
+    def _v2_stop_map(self) -> dict[str, float]:
+        """Stop vivo por símbolo (del PositionState V2 si existe; si no, el implícito)."""
+        stops: dict[str, float] = {}
+        for symbol, position in self._v2_positions.items():
+            stop = position.current_stop or position.initial_stop
+            if stop is not None and stop > 0:
+                stops[symbol] = float(stop)
+        # Sin estado V2 (posición readoptada) el stop aún no está adoptado: se estima
+        # con la misma geometría del pipeline para que el riesgo consumido no sea 0.
+        for symbol in self._open:
+            if symbol in stops:
+                continue
+            entry = self._entry_price.get(symbol)
+            if entry is None or entry <= 0:
+                continue
+            atr = entry * Decimal(str(self._v2_tunables.atr_pct_fallback))
+            stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * atr
+            if 0 < stop < entry:
+                stops[symbol] = float(stop)
+        return stops
+
+    def _v2_signals(self) -> list[V2Signal]:
+        """Recoge las señales crudas del decider para el tick (una por símbolo)."""
+        signals: list[V2Signal] = []
+        self._v2_tick_signals = {}
+        for symbol in _watch_symbols():
+            symbol = symbol.strip()
+            if not symbol:
+                continue
+            pkg = self._decider(symbol) if self._decider else None
+            if pkg is None:
+                continue
+            price = Decimal(str(self._price_script(symbol, self._minute) or 0))
+            action = str(getattr(pkg, "action", "HOLD")).upper()
+            version = _strategy_version_from_source(getattr(pkg, "source", None))
+            identity = signal_identity_for_bar(
+                instrument_id=symbol,
+                action=action,
+                # Sin versión declarada se deduplica por el centinela explícito
+                # ``unversioned`` (una estrategia que no se identifica sigue sin poder
+                # repetir la MISMA señal sobre la MISMA barra).
+                strategy_version=version or "unversioned",
+                timeframe=self._v2_tunables.signal_timeframe,
+                moment=self._time,
+            )
+            signal_id = identity.signal_id if identity is not None else ""
+            if signal_id:
+                self._v2_tick_signals[symbol] = signal_id
+            signals.append(
+                V2Signal(
+                    instrument_id=symbol,
+                    action=action,
+                    price=float(price),
+                    atr=(float(price) * self._v2_tunables.atr_pct_fallback if price > 0 else None),
+                    edge=_edge_from_package(pkg, default=self._v2_tunables.default_edge),
+                    sector=self._v2_sector(symbol, pkg),
+                    strategy_version=version,
+                    signal_id=signal_id,
+                    bar_timestamp=identity.bar_timestamp if identity is not None else "",
+                    valid_until=identity.valid_until if identity is not None else "",
+                )
+            )
+        return signals
+
+    def _v2_sector(self, symbol: str, pkg: Any) -> str | None:
+        """Sector del candidato para el gate de concentración sectorial.
+
+        Prioridad: lo que declare la propia propuesta (``memo``, canal explícito de la
+        estrategia) > la fuente inyectada > ``None`` (sector desconocido: el motor lo
+        trata como caja opaca, nunca como "sin exposición sectorial").
+        """
+        declared = sector_from_package(pkg)
+        if declared:
+            return declared
+        if self._v2_sector_source is None:
+            return None
+        try:
+            return self._v2_sector_source(symbol)
+        except Exception:  # noqa: BLE001 — sin sector no se inventa uno.
+            logger.exception("auto_sim v2 sector_source failed symbol=%s", symbol)
+            return None
+
+    async def _v2_refresh_regime(self) -> None:
+        """Refresca el régimen si la fuente lo soporta (fuente async + lectura sync).
+
+        La lectura del régimen en el tick es SÍNCRONA; el I/O (barras) se concentra aquí,
+        una vez por tick, para que decidir no dependa de la red y para que
+        ``_v2_position_package`` lea siempre un valor coherente del mismo tick.
+        """
+        refresher = getattr(self._v2_regime_source, "refresh", None)
+        if refresher is None or not callable(refresher):
+            return
+        try:
+            await refresher()
+        except Exception:  # noqa: BLE001 — sin refresco el régimen queda como estaba.
+            logger.exception("auto_sim v2 regime refresh failed")
+
+    def _v2_current_bar_start(self) -> str:
+        """Inicio ISO-UTC de la barra corriente (``""`` si el timeframe no se entiende).
+
+        Es la clave con la que se acotan las señales consumidas: lo consumido fuera de
+        esta barra NO puede bloquear una oportunidad nueva (y no se guarda para siempre).
+        """
+        window = bar_window(self._time, self._v2_tunables.signal_timeframe)
+        return window[0] if window is not None else ""
+
+    def _v2_roll_consumed_bar(self) -> None:
+        """Al cambiar de barra, la memoria de consumo se reinicia.
+
+        Solo la barra corriente deduplica (la identidad de señal incluye la barra), así
+        que el histórico no protege de nada y no debe crecer sin límite en un worker
+        de larga vida. El espejo durable se poda en paralelo por la misma razón.
+        """
+        bar_start = self._v2_current_bar_start()
+        if bar_start and bar_start != self._v2_consumed_bar:
+            self._v2_consumed_bar = bar_start
+            self._v2_consumed_signals.clear()
+
+    async def _v2_load_consumed_signals(self) -> None:
+        """Carga del espejo durable las señales consumidas de la barra corriente.
+
+        Es lo que hace que el dedupe sobreviva al crash: sin esto, un reinicio
+        volvería a autorizar la MISMA señal sobre la MISMA barra (el churn clásico:
+        stop-out y re-entrada inmediata en la misma vela). Sin store (hermético) la
+        RAM sigue siendo la única memoria. La lectura es fail-safe: si falla, se
+        opera con lo que ya hubiera en RAM (no se bloquea el turno por telemetría).
+        """
+        if self._consumed_signal_store is None or not self._account_id:
+            return
+        bar_start = self._v2_current_bar_start()
+        if not bar_start:
+            return
+        try:
+            stored = await self._consumed_signal_store.list_bar(
+                self._account_id, self._engine_id, bar_start
+            )
+        except Exception:  # noqa: BLE001 — sin lectura se conserva la memoria de RAM.
+            logger.exception("auto_sim v2 consumed signals read failed")
+            return
+        self._v2_consumed_signals.update(str(s) for s in stored)
+
+    async def _v2_prune_consumed_signals(self) -> None:
+        """Descarta las señales consumidas de barras anteriores (tabla acotada).
+
+        Solo la barra corriente puede deduplicar; conservar el histórico haría crecer
+        la tabla sin límite y no aportaría ninguna protección extra.
+        """
+        if self._consumed_signal_store is None or not self._account_id:
+            return
+        bar_start = self._v2_current_bar_start()
+        if not bar_start:
+            return
+        try:
+            await self._consumed_signal_store.prune_before(
+                self._account_id, self._engine_id, bar_start
+            )
+        except Exception:  # noqa: BLE001 — la poda es mantenimiento, no decide nada.
+            logger.exception("auto_sim v2 consumed signals prune failed")
+
+    async def _v2_mark_signal_consumed(self, symbol: str) -> None:
+        """Marca la señal del símbolo (barra corriente) como ya consumida.
+
+        Se llama SOLO cuando la entrada se ha ejecutado (fill confirmado): una propuesta
+        vetada por el spine (kill/sim-gate/RiskGate/sin plan) no quema la señal, así que
+        el turno siguiente puede volver a intentarla dentro de la misma barra. Lo que no
+        puede repetirse es la MISMA oportunidad ya tomada.
+
+        La marca se persiste ANTES de seguir: si el proceso muere justo después del
+        fill, el reinicio debe seguir viendo la señal como consumida.
+        """
+        signal_id = self._v2_tick_signals.get(symbol)
+        if not signal_id:
+            return
+        self._v2_consumed_signals.add(signal_id)
+        if self._consumed_signal_store is None or not self._account_id:
+            return
+        bar_start = self._v2_current_bar_start()
+        if not bar_start:
+            return
+        try:
+            await self._consumed_signal_store.mark(
+                self._account_id,
+                self._engine_id,
+                signal_id,
+                instrument_id=symbol,
+                bar_timestamp=bar_start,
+            )
+        except Exception:  # noqa: BLE001 — el fill ya ocurrió; la marca durable se
+            # reintenta (la RAM ya la tiene y el tick siguiente la re-marcará).
+            logger.exception("auto_sim v2 consumed signal persist failed symbol=%s", symbol)
+
+    async def _v2_plan_tick(self) -> Any:
+        """Planifica el tick completo (entradas) por el pipeline AUTO 2.0."""
+        await self._v2_refresh_regime()
+        self._v2_roll_consumed_bar()
+        await self._v2_load_consumed_signals()
+        regime = self._v2_regime()
+        snapshot = self._v2_snapshot(regime)
+        plan = plan_v2_tick(
+            snapshot=snapshot,
+            signals=self._v2_signals(),
+            regime=regime,
+            tunables=self._v2_tunables,
+            as_of=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            consumed_signal_ids=self._v2_consumed_signals,
+        )
+        self._v2_journal.extend(plan.journal_entries)
+        await self._v2_prune_consumed_signals()
+        return plan
+
+    def _v2_recon_status(self, symbol: str) -> str | None:
+        """Estado de reconciliación que ve el PositionManager para ese símbolo.
+
+        Solo un ``DIVERGENT`` *conocido* se reporta como ``drift`` (⇒ CRITICAL ⇒
+        REVIEW). ``UNKNOWN`` (no se pudo verificar) NO debe degradar la protección:
+        la reconciliación veta APERTURAS (``_openings_vetoed``), nunca cierres —
+        reducir/cerrar no empeora el riesgo. Reportarlo como ``drift`` dejaría una
+        posición con el stop rebasado sin vender, que es el peor fallo posible.
+        Devuelve ``None`` cuando no hay veredicto (el spine lo trata como ATTENTION).
+        """
+        status = self._reconciliation.get(symbol)
+        if status == POSITION_PROJECTION_DIVERGENT:
+            return "drift"
+        if status in {POSITION_PROJECTION_OK, POSITION_PROJECTION_REBUILT}:
+            return "clean"
+        return None
+
+    def _v2_adopt_position(self, symbol: str, price: Decimal) -> PositionState | None:
+        """Recupera el ``PositionState`` de una posición abierta sin estado V2 vivo.
+
+        Dos caminos, en este orden:
+        1. **Plan durable** (P4): si el espejo traía ``position_state``, se REHIDRATA
+           exacto (``position_state_from_dict``) — mismo stop, mismos objetivos, mismas
+           parciales y trailing que el motor seguía antes del crash. La cantidad se
+           re-sincroniza con la posición real; el plan NO se reinterpreta.
+        2. **Geometría reconstruida** (fallback): sin plan durable se adopta con la
+           MISMA geometría que usa el pipeline (stop = entrada − atr_mult × ATR,
+           objetivos en múltiplos de R) para que el stop siga vivo. El plan
+           reconstruido se marca como ``adopted`` (auditoría explícita: no sobrevivió
+           un plan real al reinicio) — gestionar sin estado es peor que un plan
+           aproximado, pero nunca se disfraza de plan original.
+        """
+        held = self._open.get(symbol, Decimal("0"))
+        entry = self._entry_price.get(symbol)
+        if held <= 0 or entry is None or entry <= 0 or price <= 0:
+            return None
+        restored = self._v2_restore_durable_position(symbol, held)
+        if restored is not None:
+            return restored
+        atr = entry * Decimal(str(self._v2_tunables.atr_pct_fallback))
+        stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * atr
+        if stop <= 0 or stop >= entry:
+            return None
+        r_multiple = entry - stop
+        plan: dict[str, object] = {
+            "decisionId": f"adopted-{symbol}",
+            "instrumentId": symbol,
+            "direction": "long",
+            "status": "TRIGGERED",
+            "entry": float(entry),
+            "structuralStop": float(stop),
+            "target1": float(entry + Decimal(str(self._v2_tunables.target1_r)) * r_multiple),
+            "target2": float(entry + Decimal(str(self._v2_tunables.target2_r)) * r_multiple),
+            "adopted": True,
+        }
+        position = build_position_state_from_fill(
+            plan,
+            fill_price=float(entry),
+            fill_quantity=float(held),
+            filled_at=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        if position is not None:
+            logger.warning(
+                "auto_sim v2 adopted position without surviving plan symbol=%s stop=%s",
+                symbol,
+                stop,
+            )
+        return position
+
+    def _v2_restore_durable_position(self, symbol: str, held: Decimal) -> PositionState | None:
+        """Rehidrata el plan V2 persistido (una sola vez) para ``symbol``.
+
+        Fail-closed: un blob que no rehidrata (o cuyo ``instrumentId`` no coincide) NO
+        se usa; se descarta y el símbolo cae al camino de geometría reconstruida. La
+        cantidad se ajusta a la posición REAL (el plan manda en el CÓMO salir, no en el
+        CUÁNTO queda: eso es del ledger).
+        """
+        blob = self._v2_durable_plans.pop(symbol, None)
+        if not blob:
+            return None
+        try:
+            position = position_state_from_dict(blob)
+        except Exception:  # noqa: BLE001 — un plan ilegible no puede tumbar el turno.
+            logger.exception("auto_sim v2 durable plan unreadable symbol=%s", symbol)
+            return None
+        if position is None or position.instrument_id != symbol:
+            logger.warning(
+                "auto_sim v2 durable plan discarded symbol=%s instrument=%s",
+                symbol,
+                getattr(position, "instrument_id", None),
+            )
+            return None
+        remaining = float(held)
+        if remaining != position.remaining_quantity:
+            # El ledger es la autoridad de cantidad: el plan se re-ancla a lo real
+            # (el plan manda en el CÓMO salir; el CUÁNTO lo dicta el ledger).
+            position = replace(
+                position,
+                remaining_quantity=remaining,
+                quantity=max(float(position.quantity), remaining),
+            )
+        logger.info(
+            "auto_sim v2 position restored from durable plan symbol=%s stop=%s status=%s",
+            symbol,
+            position.current_stop,
+            position.status,
+        )
+        return position
+
+    def _v2_position_package(self, symbol: str, price: Decimal) -> DecisionPackage | None:
+        """Intención de gestión de la posición abierta (PositionManager) o ``None``.
+
+        Requiere un ``PositionState`` V2 vivo para el símbolo. Si no lo hay (posición
+        readoptada tras un reinicio) se ADOPTA con geometría reconstruida para no dejar
+        la posición sin stop; solo si la adopción no es posible se devuelve ``None`` y
+        la gestión cae a la política clásica (fail-safe).
+        """
+        position: PositionState | None = self._v2_positions.get(symbol)
+        if position is None:
+            position = self._v2_adopt_position(symbol, price)
+            if position is None:
+                return None
+            self._v2_positions[symbol] = position
+        result = plan_v2_position_decision(
+            position,
+            mark_price=float(price),
+            regime=self._v2_regime(),
+            portfolio_recon_status=self._v2_recon_status(symbol),
+            exit_template=self._v2_tunables.exit_template,
+            at=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        self._v2_last_exit_reasons[symbol] = result.exit_reasons if result is not None else ()
+        return position_manager_package(result)
+
+    def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
+        """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó)."""
+        plan = getattr(self._v2_plan, "decisions", ()) if self._v2_plan else ()
+        trade_plan_dict: dict[str, object] | None = None
+        for decision in plan:
+            if decision.instrument_id != symbol or decision.trade_plan is None:
+                continue
+            trade_plan_dict = dict(decision.trade_plan.to_dict())
+            break
+        if trade_plan_dict is None:
+            return
+        position = build_position_state_from_fill(
+            trade_plan_dict,
+            fill_price=float(price),
+            fill_quantity=float(qty),
+            filled_at=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        if position is not None:
+            self._v2_positions[symbol] = position
+
+    def _v2_track_reduce(
+        self,
+        symbol: str,
+        qty: Decimal,
+        price: Decimal,
+        exit_reasons: tuple[str, ...],
+    ) -> None:
+        """Actualiza el ``PositionState`` V2 tras un fill de venta (parcial o total)."""
+        position: PositionState | None = self._v2_positions.get(symbol)
+        if position is None:
+            return
+        reduced = apply_position_reduce(
+            position,
+            float(qty),
+            exit_price=float(price),
+            reason=",".join(exit_reasons) or None,
+            mark_target1_achieved="target_1" in exit_reasons,
+            mark_target2_achieved="target_2" in exit_reasons,
+        )
+        if reduced is None:
+            return
+        if reduced.status == "CLOSED":
+            self._v2_positions.pop(symbol, None)
+        else:
+            self._v2_positions[symbol] = reduced
+
     # ---- UN turno (decide + liquida SIM + actualiza el libro) ------------------
     async def auto_turn(self) -> TurnReport:
         """Decide por símbolo y actúa con autoridad (Single Decision Spine).
@@ -730,6 +1294,17 @@ class AutoSimulationWorker:
             reasons.append(reason)
             report.vetoes += 1
 
+        # AUTO 2.0 (V2): planifica las entradas del tick UNA vez (rankeo + decisión +
+        # TradePlan) antes del bucle. El resultado lo consume el bucle por símbolo, y
+        # sigue pasando por el MISMO spine (kill/sim-gate/RiskGate/settlement).
+        self._v2_last_exit_reasons = {}
+        if self._v2_enabled and not kill and venue_ok and not account_required:
+            try:
+                self._v2_plan = await self._v2_plan_tick()
+            except Exception:  # noqa: BLE001 — sin plan V2 se degrada a no operar.
+                logger.exception("auto_sim v2 plan failed (tick sin entradas)")
+                self._v2_plan = None
+
         for symbol in _watch_symbols():
             symbol = symbol.strip()
             if not symbol:
@@ -748,27 +1323,34 @@ class AutoSimulationWorker:
                 prev_high = self._high_price.get(symbol, Decimal("0"))
                 if price > prev_high:
                     self._high_price[symbol] = price
-            prot = self._protection.exit_reason(
-                held=held > 0,
-                entry=self._entry_price.get(symbol, Decimal("0")),
-                high=self._high_price.get(symbol, Decimal("0")),
-                price=price,
-                minute=self._minute,
-            )
-            # T1 parcial ya tomado ⇒ no volver a disparar T1 (el resto lo gestiona
-            # trailing/stop/sesión). Evita vender 30% en cada tick por encima de T1.
-            if prot == "t1_exit" and symbol in self._t1_done:
-                prot = None
+            prot: str | None = None
+            v2_pkg: DecisionPackage | None = None
+            if self._v2_enabled and held > 0 and price > 0:
+                # AUTO 2.0 (V2): gestión por PositionManager (PositionState + ExitPlan
+                # + PositionDecision) en lugar de la política global ProtectionConfig.
+                v2_pkg = self._v2_position_package(symbol, price)
+                reasons.extend(self._v2_last_exit_reasons.get(symbol, ()))
+            else:
+                prot = self._protection.exit_reason(
+                    held=held > 0,
+                    entry=self._entry_price.get(symbol, Decimal("0")),
+                    high=self._high_price.get(symbol, Decimal("0")),
+                    price=price,
+                    minute=self._minute,
+                )
+                # T1 parcial ya tomado ⇒ no volver a disparar T1 (el resto lo gestiona
+                # trailing/stop/sesión). Evita vender 30% en cada tick por encima de T1.
+                if prot == "t1_exit" and symbol in self._t1_done:
+                    prot = None
             pkg: DecisionPackage | None
-            if prot is not None:
+            if v2_pkg is not None:
+                # Intención V2 (reduce/sell) con su geometría por operación.
+                pkg = v2_pkg
+            elif prot is not None:
                 # V2.24/A9.1 (P2-06): T1 PARCIAL. La protección puede vender solo una
                 # fracción (p. ej. 30%) y dejar el resto gestionado por trailing/stop.
                 fraction = self._protection.exit_fraction(prot)
-                sell_qty = (
-                    held * Decimal(str(fraction))
-                    if 0 < fraction < 1
-                    else held
-                )
+                sell_qty = held * Decimal(str(fraction)) if 0 < fraction < 1 else held
                 pkg = DecisionPackage(
                     action="SELL",
                     instrument_id=symbol,
@@ -776,6 +1358,11 @@ class AutoSimulationWorker:
                     source=f"protection:{prot}",
                 )
                 reasons.append(prot)
+            elif self._v2_enabled:
+                # AUTO 2.0 (V2): la propuesta viene del plan del tick (TradePlan →
+                # DecisionPackage), no del decider directo.
+                plan = self._v2_plan
+                pkg = plan.entry_packages.get(symbol) if plan is not None else None
             else:
                 pkg = self._decider(symbol) if self._decider else None
             action = str(getattr(pkg, "action", "HOLD")).upper() if pkg else "HOLD"
@@ -786,9 +1373,7 @@ class AutoSimulationWorker:
             # ``pkg`` no nulo (``action`` se deriva de él). Sin esto, el tipo
             # ``DecisionPackage | None`` no estrecha y el RiskGate/plan lo rechazan.
             assert pkg is not None
-            qty = Decimal(str(getattr(pkg, "quantity", None) or 0)).quantize(
-                Decimal("0.000001")
-            )
+            qty = Decimal(str(getattr(pkg, "quantity", None) or 0)).quantize(Decimal("0.000001"))
             if qty <= 0:
                 _veto("non_positive_qty")
                 continue
@@ -856,6 +1441,12 @@ class AutoSimulationWorker:
             if action == "BUY":
                 self._emit("position_open", venue, fills[0].execution_id, "buy", exec_qty)
                 self._open[symbol] = held + exec_qty
+                # AUTO 2.0 (V2): la señal de esta barra queda CONSUMIDA al ejecutarse la
+                # entrada. Si la posición muere después dentro de la misma barra (stop,
+                # exit-only), esa misma señal no puede re-abrir: es la MISMA oportunidad
+                # ya tomada, no una nueva.
+                if self._v2_enabled:
+                    await self._v2_mark_signal_consumed(symbol)
                 # Referencia de protección: entrada = precio del tick de apertura.
                 if held <= 0 and price > 0:
                     self._entry_price[symbol] = price
@@ -865,10 +1456,23 @@ class AutoSimulationWorker:
                 # ampliación sobre posición viva conserva la versión original).
                 if held <= 0 and effective_version:
                     self._position_version[symbol] = effective_version
+                # AUTO 2.0 (V2): crea el PositionState de la operación desde el
+                # TradePlan que la originó (gestiona T1/T2/stop/trailing por estado).
+                if self._v2_enabled and held <= 0:
+                    self._v2_track_entry(symbol, price, exec_qty)
                 await self._persist_position(symbol, held + exec_qty)
                 report.opened += 1
             else:
                 new_held = held - exec_qty
+                # AUTO 2.0 (V2): actualiza el PositionState tras la venta (parcial o
+                # total) para que T1/T2 no se re-disparen en ticks sucesivos.
+                if self._v2_enabled:
+                    self._v2_track_reduce(
+                        symbol,
+                        exec_qty,
+                        price,
+                        self._v2_last_exit_reasons.get(symbol, ()),
+                    )
                 if prot == "t1_exit" and new_held > 0:
                     # T1 parcial ejecutado: marca para no repetirlo.
                     self._t1_done.add(symbol)
@@ -942,6 +1546,7 @@ class AutoSimulationWorker:
         context_store: Any = None,
         position_store: Any = None,
         canonical_positions_reader: Any = None,
+        consumed_signal_store: Any = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -961,19 +1566,21 @@ class AutoSimulationWorker:
             self._position_store,
             self._canonical_positions_reader,
         )
+        prev_signals = self._consumed_signal_store
         try:
             self._exec_store = exec_store
             self._auto_store = auto_store
             self._finance_applier = finance_applier
             self._account_id = account_id
             self._context_store = context_store if context_store is not None else prev_ctx
-            self._position_store = (
-                position_store if position_store is not None else prev_pos
-            )
+            self._position_store = position_store if position_store is not None else prev_pos
             self._canonical_positions_reader = (
-                canonical_positions_reader
-                if canonical_positions_reader is not None
-                else prev_canon
+                canonical_positions_reader if canonical_positions_reader is not None else prev_canon
+            )
+            # AUTO 2.0 · P4: el espejo de señales consumidas se enlaza igual (una
+            # sesión por tick); sin él se conserva el que hubiera (hermético).
+            self._consumed_signal_store = (
+                consumed_signal_store if consumed_signal_store is not None else prev_signals
             )
             # V2.24/A9.1 (P1-04): sin cuenta inequívoca NO se readopta ni opera el
             # camino durable; auto_turn veta igualmente (defensa en profundidad).
@@ -1006,8 +1613,7 @@ class AutoSimulationWorker:
             self._context_store = prev_ctx
             self._position_store = prev_pos
             self._canonical_positions_reader = prev_canon
-
-
+            self._consumed_signal_store = prev_signals
 
 
 # V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.
@@ -1159,7 +1765,6 @@ def _signal_snapshot_limit() -> int:
     return value if value > 0 else 120
 
 
-
 async def load_active_strategy_decider(
     session_factory: Any,
     *,
@@ -1239,9 +1844,8 @@ async def _build_signal_decider(
         make_bar_snapshot_loader,
     )
 
-    symbols = (
-        tuple(str(s) for s in (record.active.definition.get("watch") or watch))
-        or (instrument_id,)
+    symbols = tuple(str(s) for s in (record.active.definition.get("watch") or watch)) or (
+        instrument_id,
     )
     refresh = make_bar_snapshot_loader(ohlcv, symbols, limit=_signal_snapshot_limit())
     snapshot = await refresh()
@@ -1348,6 +1952,7 @@ class AutoSimRuntime:
         """
         from bolsa_application.sim_durable_store import (  # noqa: PLC0415
             PostgresSimAutoPositionStore,
+            PostgresSimConsumedSignalStore,
         )
 
         async with self._session_factory() as session:
@@ -1356,6 +1961,10 @@ class AutoSimRuntime:
                 finance_resolver=self._finance_resolver,
             )
             position_store = PostgresSimAutoPositionStore(session)
+            # AUTO 2.0 · P4: las señales consumidas también sobreviven al reinicio
+            # (misma sesión, commit propio): un crash no reabre la MISMA oportunidad
+            # sobre la MISMA barra.
+            consumed_signal_store = PostgresSimConsumedSignalStore(session)
             return await self._worker.real_turn(
                 exec_store=exec_store,
                 auto_store=auto_store,
@@ -1363,9 +1972,9 @@ class AutoSimRuntime:
                 account_id=self._account_id,
                 context_store=context_store,
                 position_store=position_store,
-                canonical_positions_reader=self._canonical_reader or _compose_canonical_reader(
-                    session
-                ),
+                consumed_signal_store=consumed_signal_store,
+                canonical_positions_reader=self._canonical_reader
+                or _compose_canonical_reader(session),
             )
 
 
@@ -1390,7 +1999,10 @@ def _default_spine_decider() -> DecisionProvider:
 
     watch = tuple(_watch_symbols())
     enabled = (os.getenv("AUTO_ENGINE_SIM_SPINE_AUTO") or "").strip().lower() in {
-        "1", "true", "yes", "on",
+        "1",
+        "true",
+        "yes",
+        "on",
     }
     lot = float(os.getenv("AUTO_ENGINE_SIM_LOT_QTY") or "100.0")
     # V2.24.2 (P2-D): retén configurable para poder certificar un restart con la
@@ -1518,4 +2130,3 @@ def _sim_interval_seconds(default: float = 60.0) -> float:
     except ValueError:
         return default
     return value if value > 0 else default
-
