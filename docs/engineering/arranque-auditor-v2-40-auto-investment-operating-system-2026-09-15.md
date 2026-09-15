@@ -15,6 +15,11 @@ entorno local.
 - **Alembic head:** `040_auto_v2_durable_state` — esta fase **sí añade migración** (ver Foco 5).
 - **Flags:** `AUTO_ENGINE_SIM_V2` **OFF por defecto**. Con el flag sin definir, AUTO debe comportarse
   como en `v2.39.3-beta`. Los umbrales V2 se leen de env con default seguro.
+- **Sello CI:** `release-tag-ci` **GREEN** — run
+  [`34972246205`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34972246205) (10/10 jobs
+  requeridos + `certify`; único skip: `playwright` integrado, opt-in) · `python-ci` **GREEN** — run
+  [`34972246101`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34972246101), con el job nuevo
+  `auto-v2-durable-pg` en `success`.
 
 **Regla:** NINGÚN estado ambiguo → NO COMPRAR. No inventes PASS. Compara **línea por línea**
 `v2.39.3-beta` → `v2.40-beta` y registra P0/P1/P2/P3 con evidencia `archivo:línea`.

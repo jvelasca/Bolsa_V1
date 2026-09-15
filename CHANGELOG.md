@@ -58,6 +58,9 @@ defecto**: sin el flag, AUTO se comporta exactamente como en `v2.39.3-beta`.
   `test_signal_and_regime.py`, `test_auto_v2_worker_integration.py`, `test_auto_v2_durable_pg.py`.
   Los herméticos entran en la batería offline de CI y el de PG real en el job nuevo
   `auto-v2-durable-pg` con **gate fail-if-skipped**.
+- **CI (verificado antes del tag):** `release-tag-ci` **GREEN** — run `34972246205` (10/10 jobs
+  requeridos verdes + `certify` aggregate `success`; único skip: `playwright` integrado, opt-in) ·
+  `python-ci` **GREEN** — run `34972246101` con el job nuevo `auto-v2-durable-pg` en `success`.
 
 ## [1.64.3-beta] — V2.39.3 · Cierre P1/N1 (lock de cuenta) + P2/N2 (secuenciador forzado) + fix `totalSamples` — 2026-09-15
 

@@ -6,16 +6,26 @@
 > cuándo, cuánto, cómo gestionar y cuándo salir).
 >
 > **Base auditada:** `v2.39.3-beta` (`b6c70595`).
-> **Commit de código:** _pendiente de sellado_ (package **`1.65.0-beta`**).
+> **Commits de código/test:** `c342330a` (espina cognitiva) · `c31de353` (decisión de cartera y
+> gestión por posición) · `2e65e764` (estado V2 durable, migración 040) · `44ebafd8` (cableado en el
+> worker) · `301a77a9` (reinicio real PG + head 040 en los roundtrips). Bump y certificación CI:
+> `85438af0` (`1.64.3-beta` → **`1.65.0-beta`**). Documentación de auditoría: `97f004e7` y el commit
+> de sellado.
 > **Tag:** `v2.40-beta` (anotado) — el auditor lo resuelve con `git rev-list -n 1 v2.40-beta`.
 > **Alembic head:** `040_auto_v2_durable_state` (**una migración nueva**, ver §5).
 > **Flags:** `AUTO_ENGINE_SIM_V2` (**OFF por defecto**). Con el flag sin activar, AUTO se comporta
 > exactamente como `v2.39.3-beta` (el camino clásico queda intacto). El resto de umbrales V2 se
 > leen de env con **default seguro ante valor inválido** (§7).
 >
-> **Sello CI:** _pendiente_ — se sella al obtener el `release-tag-ci` **GREEN** del tag (patrón de
-> las fases anteriores: el pack se actualiza con el run id y el tag se re-apunta al commit de
-> sellado; el auditor resuelve siempre con `git rev-list -n 1 v2.40-beta`).
+> **Sello CI:** `release-tag-ci` **GREEN** — run [`34972246205`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34972246205)
+> (`status=completed`, `conclusion=success`, commit `97f004e7`; 10/10 jobs requeridos verdes +
+> `certify` aggregate `success`; único skip: `playwright` integrado, opt-in). `python-ci` (por
+> commit) **GREEN** — run [`34972246101`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34972246101),
+> con el job **nuevo** `auto-v2-durable-pg` en `success` (PostgreSQL real + `AUTO_V2_DURABLE_PG_REQUIRED=1`
+>
+> - paso _fail-if-skipped_). Siguiendo el patrón de las fases anteriores, el tag se re-apunta al
+>   commit de sellado (solo documentación) por encima de `97f004e7`; el auditor resuelve siempre con
+>   `git rev-list -n 1 v2.40-beta`.
 
 ---
 
@@ -226,7 +236,7 @@ en el resto del sistema: no re-emitir es una optimización, no un invariante de 
   (`integration/test_tax_report` → `403` de auth; `test_workspaces_crud` → pasa aislado). Se anotan
   como deuda, **no** se tocan en esta fase.
 
-**En CI (esta fase añade certificación explícita de AUTO 2.0):**
+**En CI (esta fase añade certificación explícita de AUTO 2.0) — todo verificado GREEN antes del tag:**
 
 - `python-ci.yml` (por commit): los herméticos nuevos entran en la batería offline
   (`test_auto_v2_entry`, `test_auto_investment_system`, `test_portfolio_decision_engine`,
@@ -235,9 +245,12 @@ en el resto del sistema: no re-emitir es una optimización, no un invariante de 
   mudo.
 - `python-ci.yml`: job **nuevo** `auto-v2-durable-pg` (PostgreSQL service + `alembic upgrade head` +
   `AUTO_V2_DURABLE_PG_REQUIRED=1`) con paso _"Fail on skipped"_ — un skip invalida la certificación.
+  Evidencia: run [`34972246101`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34972246101),
+  job en `success` (ejecutado, no skipeado).
 - `release-tag-ci.yml`: `test_auto_v2_durable_pg.py` se ejecuta en `lifecycle-pg` con
   `AUTO_V2_DURABLE_PG_REQUIRED=1` (ya dentro del agregado `certify`, así que un rojo no-GREENea el
-  tag).
+  tag). Evidencia: run [`34972246205`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34972246205),
+  `lifecycle-pg` y `certify` en `success`.
 - Migración 040: roundtrip **downgrade/upgrade** verificado sobre PG real
   (`test_migration_040_roundtrip`). Las cabezas esperadas de las pruebas de roundtrip 036–039 se
   unifican en una constante `_ALEMBIC_HEAD` (antes duplicadas, fuente de drift al añadir migración).
