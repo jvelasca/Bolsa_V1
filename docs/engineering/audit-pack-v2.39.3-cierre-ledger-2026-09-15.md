@@ -10,9 +10,7 @@
 > **Alembic head:** `039_research_trials_regime` (esta fase **no** añade migración).
 > **Flags:** sin cambios.
 >
-> **Nota de honestidad.** La verificación local está en verde (§6); el sello CI del tag
-> (`release-tag-ci`) queda por ejecutarse en GitHub tras el push. Este documento no afirma
-> un `GREEN` de CI hasta que `certify` lo confirme.
+> **Sello CI:** `release-tag-ci` **GREEN** en `v2.39.3-beta` — run [`34939411719`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34939411719) (`status=completed`, `conclusion=success`; `certify` aggregate `success`). Jobs requeridos verdes: `security`, `shared`, `decision-spine`, `frontend`, `python`, `playwright-mock`, `lifecycle-pg`, `dr-verify`, `a7-gate`. Único skip: `playwright` integrado (opt-in).
 
 ---
 
