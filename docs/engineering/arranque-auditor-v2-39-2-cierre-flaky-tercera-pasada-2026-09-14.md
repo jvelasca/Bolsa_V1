@@ -7,9 +7,11 @@ Copia en chat nuevo (auditor):
 Eres auditor externo de Bolsa V1 **candidato V2.39.2**. Auditas **desde GitHub**, sin acceso al
 entorno local.
 
-- **Delta:** `v2.39-beta` (`7c499cfc`) → tag **`v2.39.2-beta`** (anotado) → peeled a
-  **`0f59bab9`**.
-- **`main` en la fecha del tag:** `9444b364` (posterior al peel por un commit de test/CI).
+- **Delta:** `v2.39-beta` (`e94f2632`) → tag **`v2.39.2-beta`** (anotado) → peeled al
+  commit de sellado de `main`; el **código** auditado es `9444b364` (certificado GREEN).
+- **`main`:** incluye, por encima del código, el commit de documentación de auditoría; el
+  tag re-sellado apunta a ese commit final (el auditor lo resuelve con
+  `git rev-list -n 1 v2.39.2-beta`).
 - **Package:** `1.64.2-beta` · **CHANGELOG:** `[1.64.2-beta]`.
 - **Alembic head:** `039_research_trials_regime` — esta fase **no añade migración**.
 - **Flags:** sin cambios. `AUTO_ORCHESTRATOR_ADAPTIVE_REGIME` sigue **OFF** por defecto.

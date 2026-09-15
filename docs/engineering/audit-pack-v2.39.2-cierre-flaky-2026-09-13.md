@@ -5,8 +5,9 @@
 > previa a la externa** sobre `v2.39.1`.
 >
 > **Base auditada:** `v2.39-beta` (`e94f2632`).
-> **Commit de esta fase:** `9444b364` (tag `v2.39.2-beta` → `0f59bab9`, package
-> **`1.64.2-beta`**).
+> **Commit de código:** `9444b364` (certificado GREEN por Release-tag CI).
+> **Tag:** `v2.39.2-beta` — sella `main` incluyendo la documentación de auditoría
+> (código idéntico a `9444b364`). Package **`1.64.2-beta`**.
 > **Alembic head:** `039_research_trials_regime` (esta fase **no** añade migración).
 > **Bump:** `1.64.1-beta` → `1.64.2-beta`.
 > **Flags:** sin cambios (`AUTO_ORCHESTRATOR_ADAPTIVE_REGIME` sigue **OFF** por defecto).
