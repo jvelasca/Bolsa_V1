@@ -90,6 +90,16 @@ jobs:
           packages/py/application/tests/test_discovery_param_region.py
           # V2.39: régimen de mercado por trial (clasificador determinista puro, as-of).
           packages/py/application/tests/test_discovery_market_regime.py
+          # V2.40/AUTO 2.0: Investment Operating System — pipeline de decisión
+          # (snapshot/ranker/decider/allocator/position manager) + identidad de señal.
+          # Herméticos: sin PG, sin red, sin LIVE. La durabilidad V2 con PG real va en
+          # el job auto-v2-durable-pg (gate fail-if-skipped).
+          packages/py/application/tests/test_auto_v2_entry.py
+          packages/py/application/tests/test_auto_investment_system.py
+          packages/py/application/tests/test_portfolio_decision_engine.py
+          packages/py/application/tests/test_position_manager.py
+          packages/py/application/tests/test_active_strategy_runtime_state.py
+          packages/py/application/tests/test_sim_durable_v2_state.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
           # V2.32/A12: evidencia shadow ejecutada (replay determinista, sin DB).
           packages/py/application/tests/test_strategy_shadow_phase.py
@@ -123,6 +133,9 @@ jobs:
           # V2.34/A14: el E2E de la gramática de Discovery necesita PG real
           # (job grammar-discovery-pg).
           --ignore=apps/api-python/tests/test_a14_grammar_discovery_pg.py
+          # V2.40/AUTO 2.0: la durabilidad real del estado V2 (plan de posición +
+          # señales consumidas, migración 040) necesita PG real (job auto-v2-durable-pg).
+          --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
 
@@ -293,6 +306,72 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/a14-pg.log; then
             echo "::error::A14 PG dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/a14-pg.log || true
+            exit 1
+          fi
+        if: always()
+
+  auto-v2-durable-pg:
+    # V2.40 (AUTO 2.0 · P4): certificación PostgreSQL OBLIGATORIA por commit de la
+    # durabilidad del estado V2 (migración 040): el plan operativo de la posición
+    # (``sim_auto_positions.position_state``) y las señales consumidas por barra
+    # (``sim_consumed_signals``) deben SOBREVIVIR a un reinicio real de proceso —
+    # el worker nuevo rehidrata el mismo PositionState (no lo reconstruye por ATR) y
+    # sigue vetando el re-emitir la misma señal. Gate fail-if-skipped: sin PG real un
+    # skip silencioso sería una certificación fantasma.
+    name: auto-v2-durable-pg (Alembic 040 + reinicio real, per-commit)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bolsa
+          POSTGRES_PASSWORD: bolsa_dev
+          POSTGRES_DB: bolsa_v1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolsa -d bolsa_v1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: bolsa
+      DB_PASSWORD: bolsa_dev
+      DB_NAME: bolsa_v1
+      AUTO_V2_DURABLE_PG_REQUIRED: '1'
+      # El reinicio real usa el mismo camino durable del scheduler AUTO.
+      AUTO_SCHEDULER_PG_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Alembic upgrade head (hasta 040 incluida)
+        run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      - name: Pytest AUTO 2.0 durable PG (fail if skipped)
+        run: >
+          uv run pytest
+          apps/api-python/tests/test_auto_v2_durable_pg.py
+          apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
+          -q
+          --tb=short
+          -rs | tee /tmp/auto-v2-durable-pg.log
+
+      - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)
+        # Un skip invalida la certificación: el reinicio real exige PG.
+        run: |
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-v2-durable-pg.log; then
+            echo "::error::AUTO 2.0 durable PG dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-v2-durable-pg.log || true
             exit 1
           fi
         if: always()
