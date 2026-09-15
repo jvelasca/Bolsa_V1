@@ -33,6 +33,13 @@ Diseño del dedupe (conservador y explícito):
 Guards idempotentes offline-safe (patrón 028–040): si la BD vino de Prisma, los
 nombres de índice son los mismos y se detectan como existentes. Cadena lineal:
 ``down_revision = "040_auto_v2_durable_state"``.
+
+Ojo con el doble origen de cada nombre, que es lo que hace delicado el ``downgrade``:
+en una BD recién migrada el baseline ``003`` crea estos nombres como **constraint**
+(copia los ``UniqueConstraint`` de ``tables.py``) y ``upgrade`` los omite; en una BD
+antigua (anterior a declarar el modelo) el nombre no existe y lo crea 041 como **índice
+plano**. ``downgrade`` retira solo los planos —los que creó 041— porque ``DROP INDEX``
+sobre el índice de una constraint aborta con ``DependentObjectsStillExist``.
 """
 
 from __future__ import annotations
@@ -110,6 +117,23 @@ def _index_exists(bind: sa.engine.Connection, index_name: str) -> bool:
     return bind.scalar(sa.text(sql), {"n": index_name}) is not None
 
 
+def _backing_constraint(bind: sa.engine.Connection, table_name: str, index_name: str) -> str | None:
+    """Nombre de la constraint que respalda ese índice, o ``None`` si es índice plano.
+
+    Importa porque PostgreSQL **no** deja ``DROP INDEX`` sobre el índice que implementa
+    una constraint (``DependentObjectsStillExist``): hay que soltar la constraint.
+    """
+    sql = (
+        "SELECT c.conname "
+        "FROM pg_class idx "
+        "JOIN pg_index ix ON ix.indexrelid = idx.oid "
+        "JOIN pg_class tbl ON tbl.oid = ix.indrelid "
+        "JOIN pg_constraint c ON c.conindid = idx.oid "
+        "WHERE idx.relname = :idx AND tbl.relname = :tbl"
+    )
+    return bind.scalar(sa.text(sql), {"idx": index_name, "tbl": table_name})
+
+
 def _duplicate_sample(
     bind: sa.engine.Connection, table_name: str, columns: tuple[str, ...]
 ) -> list[tuple[object, ...]]:
@@ -170,7 +194,23 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Deshace **solo** los índices que creó esta migración (los planos).
+
+    Un nombre respaldado por una constraint no lo creó 041: ``upgrade`` lo detecta como
+    existente (``pg_indexes`` lista también los índices de constraint) y lo omite. Por
+    eso el baseline ``003`` —que construye las tablas desde ``Base.metadata`` y copia los
+    ``UniqueConstraint`` de ``tables.py``— ya deja estos 8 nombres como constraint en una
+    BD recién migrada, mientras que una BD antigua (previa al fix del modelo) los tiene
+    como índice plano creado por 041.
+
+    Intentar ``DROP INDEX`` sobre el índice de una constraint aborta con
+    ``DependentObjectsStillExist`` y tumbaba los roundtrips de migración 036→040 en CI
+    (job ``grammar-discovery-pg``, run 35009780076).
+    """
     bind = op.get_bind()
     for table_name, _columns, index_name in _TARGETS:
-        if _index_exists(bind, index_name):
-            op.drop_index(index_name, table_name=table_name)
+        if not _index_exists(bind, index_name):
+            continue
+        if _backing_constraint(bind, table_name, index_name) is not None:
+            continue
+        op.drop_index(index_name, table_name=table_name)
