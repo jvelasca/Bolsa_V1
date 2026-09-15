@@ -1,6 +1,13 @@
 """RFC-008 Cognitive Decision Architecture — D1…D7."""
 
 from bolsa_analytics.cognitive.auto_live import AutoLiveCheck, check_auto_live
+from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
+    AutoPortfolioSnapshot,
+    ExposureBreakdown,
+    PortfolioPosition,
+    aggregate_exposure,
+    build_auto_portfolio_snapshot,
+)
 from bolsa_analytics.cognitive.bracket_plan import (
     BRACKET_PLAN_KEY,
     build_bracket_plan_dict,
@@ -130,6 +137,16 @@ from bolsa_analytics.cognitive.live_ledger_reconciliation import (
 )
 from bolsa_analytics.cognitive.macro_facts import build_macro_fact_set
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
+from bolsa_analytics.cognitive.market_regime_gate import (
+    map_macro_regime,
+    map_trial_regime,
+    regime_allows_entry_for,
+    regime_allows_new_entry,
+    regime_blocks_new_long,
+    regime_blocks_new_short,
+    regime_is_exit_only,
+    resolve_operational_regime,
+)
 from bolsa_analytics.cognitive.market_state import (
     ContextValidationResult,
     MarketState,
@@ -161,6 +178,13 @@ from bolsa_analytics.cognitive.operational_incident import (
     resolve_incident,
 )
 from bolsa_analytics.cognitive.operational_levels import validate_operational_levels
+from bolsa_analytics.cognitive.opportunity_ranker import (
+    OPPORTUNITY_WEIGHTS,
+    OpportunityScore,
+    rank_opportunities,
+    score_opportunity,
+    select_top_opportunities,
+)
 from bolsa_analytics.cognitive.order_intent import (
     OrderIntent,
     intent_from_recommendation,
@@ -232,11 +256,26 @@ from bolsa_analytics.cognitive.recommendation import (
     Recommendation,
     recommendation_from_decision_package,
 )
+from bolsa_analytics.cognitive.risk_allocator import (
+    AllocationResult,
+    RiskAllocatorConfig,
+    compute_allocation,
+    compute_atr_stop,
+    compute_stop_distance,
+    compute_take_profit,
+)
 from bolsa_analytics.cognitive.risk_signature import (
     apply_signed_levels_to_trade_plan,
     evaluate_risk_signature,
 )
 from bolsa_analytics.cognitive.score_macro import ScoreMacroResult, score_macro_from_facts
+from bolsa_analytics.cognitive.signal_identity import (
+    SignalIdentity,
+    bar_window,
+    build_signal_identity,
+    compute_signal_hash,
+    timeframe_seconds,
+)
 from bolsa_analytics.cognitive.stats_suite import (
     monte_carlo_permutation_p_value,
     walk_forward_efficiency,
@@ -519,4 +558,34 @@ __all__ = [
     "validate_context",
     "walk_forward_efficiency",
     "weight_rules_for_horizon",
+    # AUTO 2.0 — Investment Operating System (P0/P1)
+    "AllocationResult",
+    "AutoPortfolioSnapshot",
+    "ExposureBreakdown",
+    "OPPORTUNITY_WEIGHTS",
+    "OpportunityScore",
+    "PortfolioPosition",
+    "RiskAllocatorConfig",
+    "SignalIdentity",
+    "aggregate_exposure",
+    "bar_window",
+    "build_auto_portfolio_snapshot",
+    "build_signal_identity",
+    "compute_allocation",
+    "compute_atr_stop",
+    "compute_signal_hash",
+    "compute_stop_distance",
+    "compute_take_profit",
+    "map_macro_regime",
+    "map_trial_regime",
+    "rank_opportunities",
+    "regime_allows_entry_for",
+    "regime_allows_new_entry",
+    "regime_blocks_new_long",
+    "regime_blocks_new_short",
+    "regime_is_exit_only",
+    "resolve_operational_regime",
+    "score_opportunity",
+    "select_top_opportunities",
+    "timeframe_seconds",
 ]
