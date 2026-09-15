@@ -40,6 +40,12 @@ en una BD recién migrada el baseline ``003`` crea estos nombres como **constrai
 antigua (anterior a declarar el modelo) el nombre no existe y lo crea 041 como **índice
 plano**. ``downgrade`` retira solo los planos —los que creó 041— porque ``DROP INDEX``
 sobre el índice de una constraint aborta con ``DependentObjectsStillExist``.
+
+Consecuencia explícita de ese contrato, para que nadie la lea como un fallo: en la BD
+nueva bajar a 040 deja las 8 claves **en pie** (son del baseline, no de la 041); en la
+antigua desaparecen. Se comprobó además que ninguna FK referencia estas claves (23 FKs
+apuntan a las 8 tablas, 0 a la clave natural), así que retirar la constraint no arrastraría
+dependencias: no se hace porque el linaje no es de esta migración.
 """
 
 from __future__ import annotations

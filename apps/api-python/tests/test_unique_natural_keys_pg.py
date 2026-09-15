@@ -428,9 +428,16 @@ async def test_the_unique_index_rejects_a_raw_duplicate_row(
 async def test_migration_041_dedupes_existing_duplicates_and_recreates_indexes() -> None:
     """Roundtrip 041 con duplicados preexistentes: dedupe conservador + índice único.
 
-    Se baja a 040 (sin los índices), se insertan dos filas de la MISMA clave natural con
-    ``updated_at`` distinto, y al volver a head debe quedar solo la más reciente y el
+    Se baja a 040, se deja la tabla SIN backstop (el escenario real del incidente: la BD en
+    la que la 041 todavía no había corrido), se insertan dos filas de la MISMA clave natural
+    con ``updated_at`` distinto, y al volver a head debe quedar solo la más reciente y el
     índice debe existir. Es la reproducción exacta de las 24 filas del 2026-09-14.
+
+    El test es consciente del **linaje** del nombre (ver docstring de la migración): en una
+    BD nueva el baseline ``003`` lo crea como *constraint* al construir las tablas desde el
+    modelo, y en una BD antigua lo crea la 041 como *índice plano*. El ``downgrade`` de la
+    041 solo retira los planos —los suyos—, así que aquí se comprueba el contrato para cada
+    linaje y se retira el backstop a mano cuando el linaje lo deja en pie.
     """
     pytest.importorskip("alembic")
     from dotenv import load_dotenv
@@ -461,18 +468,62 @@ async def test_migration_041_dedupes_existing_duplicates_and_recreates_indexes()
         ).scalar_one_or_none()
         return found is not None
 
+    def _backing_constraint(connection: object) -> str | None:
+        return connection.execute(  # type: ignore[attr-defined]
+            text(
+                "SELECT c.conname FROM pg_class idx "
+                "JOIN pg_index ix ON ix.indexrelid = idx.oid "
+                "JOIN pg_constraint c ON c.conindid = idx.oid "
+                "WHERE idx.relname = :n"
+            ),
+            {"n": index_name},
+        ).scalar_one_or_none()
+
+    def _backstop(connection: object) -> str:
+        """``"constraint"``, ``"indice"`` o ``"ausente"``: quién sostiene la clave natural.
+
+        El mismo nombre tiene dos linajes posibles (docstring de la 041): el baseline ``003``
+        lo crea como *constraint* al construir las tablas desde el modelo (BD nueva) y la 041
+        como *índice plano* en una BD antigua.
+        """
+        if not _index_present(connection):
+            return "ausente"
+        return "constraint" if _backing_constraint(connection) is not None else "indice"
+
+    def _drop_backstop(connection: object) -> None:
+        """Deja la tabla SIN unicidad en la clave natural: el escenario real del incidente.
+
+        El roundtrip no puede depender del linaje: ``downgrade`` a 040 retira lo que creó la
+        041 (índice plano), pero **no** la constraint del baseline (no es suya, y ``DROP
+        INDEX`` sobre ella aborta con ``DependentObjectsStillExist``). Se retira aquí,
+        explícitamente, para poder sembrar las dos filas duplicadas que la 041 debe
+        deduplicar al volver a head.
+        """
+        conname = _backing_constraint(connection)
+        if conname is not None:
+            connection.execute(  # type: ignore[attr-defined]
+                text(f'ALTER TABLE instrument_strategy_tops DROP CONSTRAINT IF EXISTS "{conname}"')
+            )
+        connection.execute(text(f"DROP INDEX IF EXISTS {index_name}"))  # type: ignore[attr-defined]
+
     engine = create_engine(url)
     cfg = _alembic_config()
     try:
         with engine.connect() as connection:
-            assert _index_present(connection) is True
+            lineage = _backstop(connection)
+            assert lineage != "ausente", "la 041 (o el baseline) debe sostener la clave natural"
 
         with engine.connect() as connection:
             cfg.attributes["connection"] = connection
             command.downgrade(cfg, _PREVIOUS_REVISION)
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
-            assert _index_present(connection) is False, "el downgrade retira el índice único"
+            # Contrato del ``downgrade``: retira solo lo que creó la 041. Un nombre que
+            # respalda una constraint del baseline 003 sobrevive (no es de la 041).
+            expected = "ausente" if lineage == "indice" else "constraint"
+            actual = _backstop(connection)
+            assert actual == expected, f"downgrade de la 041 deja el backstop en '{actual}'"
+            _drop_backstop(connection)
             connection.execute(
                 text(
                     "INSERT INTO instruments (id, symbol, yahoo_symbol, name, exchange, country,"

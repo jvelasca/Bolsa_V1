@@ -116,7 +116,11 @@ la única clave que no converge al nombre de Prisma.
 - concurrencia de narrativas y de dictamen diario ⇒ una fila por clave;
 - **roundtrip de la 041 con duplicados preexistentes**: `downgrade` a `040`, se insertan a mano dos
   filas de la misma clave con distinto `updated_at`, `upgrade` a `head` ⇒ queda **la más reciente**
-  y el índice vuelve a existir (reproducción exacta de las 24 filas del incidente).
+  y el índice vuelve a existir (reproducción exacta de las 24 filas del incidente). El test es
+  consciente del **linaje** del nombre —_constraint_ del baseline `003` en una BD nueva, _índice
+  plano_ de la 041 en una BD antigua—: comprueba el contrato del `downgrade` en cada caso y retira
+  el backstop explícitamente para poder sembrar los duplicados (que es el escenario real: la BD en
+  la que la 041 aún no había corrido).
 
 Se actualizó `_ALEMBIC_HEAD` en `test_discovery_evidence_snapshot_pg.py` (`040` → `041`): los tests
 de roundtrip existentes ya lo usan como única fuente.
@@ -158,6 +162,24 @@ De regalo, el job offline de release gana los `--ignore` de `test_instrument_tra
 `test_unique_natural_keys_pg.py` que ya tenía el job equivalente de `python-ci.yml` (los certifica el
 job con PG; sin `--ignore` se recolectarían sin BD y skipearían en silencio).
 
+**Lo que destapó el arreglo (y no estaba verde):** con el `pipefail` real, el job
+`auto-v2-durable-pg` dejó de mentir y apareció `1 failed, 27 passed` — el roundtrip de la 041
+(`assert _index_present(connection) is False` tras bajar a 040). La causa es de linaje, no de
+lógica del dedupe: en CI la BD se migra desde cero, así que el baseline `003` (construido desde
+`tables.py`) crea las 8 claves como **constraint** y el `downgrade` de la 041 —correctamente— no
+las toca (no son suyas; `DROP INDEX` sobre ellas aborta), mientras que en la BD de desarrollo son
+**índices planos** de la 041 y sí desaparecen. El test asumía un solo linaje. Ahora comprueba el
+contrato en los dos (constraint ⇒ sobrevive; índice plano ⇒ desaparece) y retira el backstop
+explícitamente para poder sembrar los duplicados.
+
+Reproducido en local **por el camino de la app** (`ensure_migrated`, no el CLI: el CLI de alembic
+construye el engine desde `alembic.ini` e ignora `DATABASE_URL` — en CI coinciden por casualidad),
+con una BD vacía migrada a head: las 8 claves quedan como constraint, y el job
+(`test_auto_v2_durable_pg` + `test_instrument_trade_context_pg` + `test_unique_natural_keys_pg` +
+`test_discovery_evidence_snapshot_pg`) pasa **28 passed** en el linaje de CI y **7 passed** el
+roundtrip en el linaje antiguo. También se comprobó que ninguna FK referencia las 8 claves (23 FKs
+hacia esas tablas, 0 hacia la clave natural).
+
 ### Verificación
 
 - `ruff check packages/py apps/api-python --config pyproject.toml` → **0**
@@ -169,6 +191,9 @@ job con PG; sin `--ignore` se recolectarían sin BD y skipearían en silencio).
 - Job `auto-v2-durable-pg` (4 ficheros, PG real) → **28 passed, 0 skipped**
 - Migración aplicada en la BD de desarrollo: head `041`, las 8 claves presentes y
   `instrument_strategy_tops` **46 → 34 filas / 0 grupos duplicados**
+- Run Python CI `35018635017` (tras el sellado): `quality` **en verde con la batería completa**
+  (2m29s), `lifecycle-pg`, `paper-forward-pg` y `grammar-discovery-pg` en verde; `auto-v2-durable-pg`
+  destapó el fallo de linaje del roundtrip (arriba), que el job ocultaba con el `tee` sin `pipefail`
 
 ## [1.65.1-beta] — V2.40.1 · AUTO Safety Hardening (fail-closed real + fuentes reales) — 2026-09-15
 
