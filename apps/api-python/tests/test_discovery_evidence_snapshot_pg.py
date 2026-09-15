@@ -37,6 +37,11 @@ if sys.platform == "win32":
 
 _REQUIRED = "A14_GRAMMAR_PG_REQUIRED"
 
+# Revisión de cabeza del árbol de migraciones. Las pruebas de roundtrip hacen
+# ``upgrade head`` y comprueban que la cabeza es la esperada: al añadir una migración
+# nueva hay que actualizar SOLO esta constante (antes vivía duplicada en cada test).
+_ALEMBIC_HEAD = "040_auto_v2_durable_state"
+
 
 def _load_env() -> None:
     from pathlib import Path
@@ -118,9 +123,7 @@ async def test_table_and_indexes_exist_at_head(pg_session: AsyncSession) -> None
     ):
         found = (
             await pg_session.execute(
-                text(
-                    "SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=:n"
-                ),
+                text("SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=:n"),
                 {"n": index},
             )
         ).scalar_one_or_none()
@@ -612,7 +615,7 @@ async def test_migration_037_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _column_present(connection) is True
-        assert alembic_head() == "039_research_trials_regime"
+        assert alembic_head() == _ALEMBIC_HEAD
     finally:
         engine.dispose()
 
@@ -662,7 +665,7 @@ async def test_migration_036_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _table_present(connection) is True
-        assert alembic_head() == "039_research_trials_regime"
+        assert alembic_head() == _ALEMBIC_HEAD
     finally:
         engine.dispose()
 
@@ -764,7 +767,7 @@ async def test_migration_038_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _region_column_present(connection) is True
-        assert alembic_head() == "039_research_trials_regime"
+        assert alembic_head() == _ALEMBIC_HEAD
     finally:
         engine.dispose()
 
@@ -1005,6 +1008,74 @@ async def test_migration_039_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _regime_column_present(connection) is True
-        assert alembic_head() == "039_research_trials_regime"
+        assert alembic_head() == _ALEMBIC_HEAD
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_migration_040_roundtrip(pg_session: AsyncSession) -> None:
+    """AUTO 2.0 · P4: ``downgrade``/``upgrade`` de la 040 son reversibles y limpios.
+
+    La 040 añade ``sim_auto_positions.position_state`` (JSONB, nullable: la ausencia de
+    plan es un estado válido) y crea ``sim_consumed_signals`` (dedupe durable por
+    barra). El roundtrip debe dejar el esquema EXACTAMENTE como estaba: si el downgrade
+    dejara residuos, un segundo upgrade fallaría (columna/tabla ya existente).
+    """
+    pytest.importorskip("alembic")
+    from alembic import command
+    from sqlalchemy import create_engine
+
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.migrations import _alembic_config, alembic_head
+
+    settings = get_settings()
+    url = settings.database_url
+    assert url is not None
+    url = url.replace("postgresql://", "postgresql+psycopg://", 1).split("?", 1)[0]
+    engine = create_engine(url)
+    cfg = _alembic_config()
+
+    def _position_state_column(connection: object) -> bool:
+        row = connection.execute(  # type: ignore[attr-defined]
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema='public' "
+                "AND table_name='sim_auto_positions' "
+                "AND column_name='position_state'"
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+    def _consumed_signals_table(connection: object) -> bool:
+        row = connection.execute(  # type: ignore[attr-defined]
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_name='sim_consumed_signals'"
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+    try:
+        with engine.connect() as connection:
+            assert _position_state_column(connection) is True
+            assert _consumed_signals_table(connection) is True
+
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.downgrade(cfg, "039_research_trials_regime")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _position_state_column(connection) is False, "la columna se revierte"
+            assert _consumed_signals_table(connection) is False, "la tabla se revierte"
+
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.upgrade(cfg, "head")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _position_state_column(connection) is True
+            assert _consumed_signals_table(connection) is True
+        assert alembic_head() == _ALEMBIC_HEAD
     finally:
         engine.dispose()
