@@ -287,6 +287,37 @@ jobs:
           --follow-imports=silent
 
       - name: Pytest offline
+        # Sin servicio Postgres en este job: unitarios + API tests offline. La
+        # integración ASGI/DB y todo lo PG-gated va en los jobs con servicio (abajo).
+        #
+        # V2.40.2: estos comentarios van FUERA del bloque plegado. En un ``run: >`` cada
+        # línea es texto del comando, así que un ``#`` intercalado convertía el resto de
+        # la lista en comentario de shell: el step ejecutaba solo los tests anteriores al
+        # primer bloque marcado y el job quedaba verde con la mayor parte de la batería
+        # sin correr (mismo hazard que en python-ci.yml, ver audit-pack v2.40.2).
+        #
+        # Procedencia de cada bloque de la lista (mismo orden que el comando):
+        # V2.25/A10: fases del Strategy Lifecycle + orquestador V2.26 (herméticos).
+        # V2.27/A10: universo ESTUDIO real + runner LAB real (herméticos).
+        # V2.28/A10: vigilancia real desde fills SIM atribuidos a la versión.
+        # V2.29/A10: COACH comparativo + SignalEvaluator real (herméticos).
+        # V2.31/A11: Discovery Engine (catálogo + motor + dispatch declarativo del LAB).
+        # V2.36/V2.37: evidencia adaptativa (prior determinista) + search policy.
+        # V2.38: granularidad por región de parámetros (bucket determinista puro).
+        # V2.39: régimen de mercado por trial (clasificador determinista puro, as-of).
+        # V2.40/AUTO 2.0: Investment Operating System — pipeline de decisión
+        # (snapshot/ranker/decider/allocator/position manager) + identidad de señal.
+        # Herméticos: sin PG, sin red, sin LIVE. La durabilidad V2 con PG real va en el
+        # job lifecycle-pg (gate fail-if-skipped).
+        # V2.32/A12: evidencia shadow ejecutada (dominio + replay determinista).
+        # V2.30: tests PG que ahora corre el job lifecycle-pg (necesitan PG; sin --ignore
+        # se recolectarían aquí sin BD y skipearían en silencio).
+        # V2.32/A12: el E2E A11 necesita PG real (lo corre lifecycle-pg).
+        # V2.40/AUTO 2.0: la durabilidad real del estado V2 (plan de posición + señales
+        # consumidas, migración 040) necesita PG real → job lifecycle-pg con gate
+        # fail-if-skipped. Sin --ignore se recolectaría aquí y skipearía en mudo.
+        # V2.40.1/AUTO 2.0 y V2.40.2: contexto de cartera (sector + ADV + frescura) y
+        # claves naturales únicas → mismo criterio, los certifica el job con PG.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -296,48 +327,35 @@ jobs:
           packages/py/application/tests/test_reconcile_lifecycle_integrity_v193.py
           packages/py/application/tests/test_reconcile_financial_integrity_v194.py
           packages/py/application/tests/test_reconciliation_opening_gate.py
-          # V2.25/A10: fases del Strategy Lifecycle + orquestador V2.26 (herméticos).
           packages/py/application/tests/test_strategy_lab_phase.py
           packages/py/application/tests/test_strategy_top3_coach_phase.py
           packages/py/application/tests/test_strategy_promotion_phase.py
           packages/py/application/tests/test_strategy_vigilance_phase.py
           packages/py/application/tests/test_auto_orchestrator.py
           packages/py/application/tests/test_sim_durable_unit_of_work.py
-          # V2.27/A10: universo ESTUDIO real + runner LAB real (herméticos).
           packages/py/application/tests/test_orchestrator_universe.py
           packages/py/application/tests/test_orchestrator_lab_runner.py
-          # V2.28/A10: vigilancia real desde fills SIM atribuidos a la versión.
           packages/py/application/tests/test_strategy_observed_metrics.py
           packages/py/application/tests/test_strategy_observed_metrics_provider.py
           packages/py/application/tests/test_strategy_vigilance_observed.py
           packages/py/application/tests/test_sim_strategy_attribution.py
-          # V2.29/A10: COACH comparativo + SignalEvaluator real (herméticos).
           packages/py/application/tests/test_strategy_executable_definition.py
           packages/py/application/tests/test_active_strategy_signal_evaluator.py
           apps/api-python/tests/test_auto_sim_active_strategy_seam.py
           apps/api-python/tests/test_auto_simulation_worker.py
-          # V2.31/A11: Discovery Engine (catálogo + motor + dispatch declarativo del LAB).
           packages/py/application/tests/test_discovery_catalog.py
           packages/py/application/tests/test_strategy_discovery_engine.py
           packages/py/application/tests/test_lab_discovery_dispatch.py
-          # V2.36/V2.37: evidencia adaptativa (prior determinista) + search policy.
           packages/py/application/tests/test_discovery_evidence.py
           packages/py/application/tests/test_discovery_search_policy.py
-          # V2.38: granularidad por región de parámetros (bucket determinista puro).
           packages/py/application/tests/test_discovery_param_region.py
-          # V2.39: régimen de mercado por trial (clasificador determinista puro, as-of).
           packages/py/application/tests/test_discovery_market_regime.py
-          # V2.40/AUTO 2.0: Investment Operating System — pipeline de decisión
-          # (snapshot/ranker/decider/allocator/position manager) + identidad de señal.
-          # Herméticos: sin PG, sin red, sin LIVE. La durabilidad V2 con PG real va en
-          # el job lifecycle-pg (gate fail-if-skipped).
           packages/py/application/tests/test_auto_v2_entry.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
           packages/py/application/tests/test_position_manager.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py
-          # V2.32/A12: evidencia shadow ejecutada (dominio + replay determinista).
           packages/py/application/tests/test_strategy_shadow_phase.py
           packages/py/infrastructure/tests/test_verify_financial_invariants.py
           apps/api-python/tests
@@ -361,16 +379,12 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           --ignore=apps/api-python/tests/test_financial_integrity_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
-          # V2.30: tests PG que ahora corre el job lifecycle-pg (necesitan PG; sin
-          # --ignore se recolectarían aquí sin BD y skipearían en silencio).
           --ignore=apps/api-python/tests/test_e2_v2_14_incident_dedup_pg.py
           --ignore=apps/api-python/tests/test_live_order_recovery_concurrency_pg.py
-          # V2.32/A12: el E2E A11 necesita PG real (lo corre lifecycle-pg).
           --ignore=apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
-          # V2.40/AUTO 2.0: la durabilidad real del estado V2 (plan de posición +
-          # señales consumidas, migración 040) necesita PG real → job lifecycle-pg con
-          # gate fail-if-skipped. Sin --ignore se recolectaría aquí y skipearía en mudo.
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
+          --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
+          --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           -q
 
   lifecycle-pg:
@@ -453,6 +467,38 @@ jobs:
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
       - name: Pytest lifecycle PG + auth + golden V1.88–V1.91/V1.95/V1.96 + worker V1.92/V1.93/V1.97 + integrity V1.94 + health schema-aware V2.15 (fail if skipped)
+        # V2.40.2: los comentarios de procedencia van FUERA del bloque plegado. En un
+        # ``run: >`` cada línea es texto del comando, así que un ``#`` intercalado
+        # convertía el resto de la lista en comentario de shell: este step ejecutaba sólo
+        # los 10 primeros tests y el job quedaba verde con el resto de la certificación
+        # PG sin correr (audit-pack v2.40.2; mismo hazard en python-ci.yml).
+        #
+        # V2.22/A9 (M4): estado durable AUTO Engine (Alembic 027) readopción crash.
+        # V2.22/A9 (last gap): finance AUTO SIM-ONLY real-PG (ExecuteTrade por fill).
+        # V2.23/A9 (Bloque 6): certificación AUTO SIM-ONLY end-to-end por el scheduler
+        # real (ticks/events/orders/fills/positions/ledger + no-LIVE + readopción crash
+        # sin doble BUY/efecto).
+        # V2.24/A9.1 (P2-04/P2-05): Reina REAL por proceso scheduler (sin run_tick manual
+        # ni decider scripteado) + invariante de equity sobre el ledger real.
+        # V2.25/A10: persistencia del Strategy Lifecycle (migración 030) sobre PG.
+        # V2.28/A10: vigilancia real (fills SIM atribuidos + migración 031).
+        # V2.29/A10: campeón persistido + dictamen COACH comparativo sobre PG.
+        # V2.32/A12: certificación A11 end-to-end (DISCOVERY → SHADOW → SIM →
+        # VIGILANCIA) sobre PG real, con shadow ejecutado, atribución post-crash
+        # (migración 033). V2.32.1: además lo corre el job lifecycle-pg de python-ci.yml
+        # en cada push (certificación por commit).
+        # V2.36/V2.37: snapshot de evidencia (fingerprint + migración 037).
+        # V2.40/AUTO 2.0 (P4): durabilidad REAL del estado V2 — reinicio de proceso sobre
+        # la misma BD con el plan operativo y las señales consumidas intactos (migración
+        # 040). Gate fail-if-skipped: AUTO_V2_DURABLE_PG_REQUIRED=1.
+        # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV + frescura) —
+        # la fuente REAL de los gates fail-closed del tick.
+        # Gate fail-if-skipped: INSTRUMENT_TRADE_CONTEXT_PG_REQUIRED=1.
+        # V2.40.2: claves naturales únicas — el "sin backstop + check-then-insert" que
+        # dejó la ruta de opiniones diarias en MultipleResultsFound permanente.
+        # Gate fail-if-skipped: UNIQUE_NATURAL_KEYS_PG_REQUIRED=1.
+        # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs (deuda:
+        # drift silencioso). Ahora se ejecutan aquí con gate fail-if-skipped.
         run: >
           uv run pytest
           packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
@@ -464,44 +510,18 @@ jobs:
           apps/api-python/tests/test_lifecycle_golden_v196.py
           apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           apps/api-python/tests/test_financial_integrity_pg.py
-          # V2.22/A9 (M4): estado durable AUTO Engine (Alembic 027) readopción crash.
           apps/api-python/tests/test_auto_engine_state_pg.py
-          # V2.22/A9 (last gap): finance AUTO SIM-ONLY real-PG (ExecuteTrade por fill).
           apps/api-python/tests/test_simulated_finance_pg.py
-          # V2.23/A9 (Bloque 6): certificación AUTO SIM-ONLY end-to-end por el
-          # scheduler real (ticks/events/orders/fills/positions/ledger + no-LIVE +
-          # readopción crash sin doble BUY/efecto).
           apps/api-python/tests/test_auto_scheduler_real_pg_zero_human_intervention.py
-          # V2.24/A9.1 (P2-04/P2-05): Reina REAL por proceso scheduler (sin run_tick
-          # manual ni decider scripteado) + invariante de equity sobre el ledger real.
           apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py
-          # V2.25/A10: persistencia del Strategy Lifecycle (migración 030) sobre PG.
           apps/api-python/tests/test_strategy_lifecycle_pg.py
-          # V2.28/A10: vigilancia real (fills SIM atribuidos + migración 031) y
-          # V2.29/A10: campeón persistido + dictamen COACH comparativo sobre PG.
           packages/py/application/tests/test_sim_strategy_attribution.py
-          # V2.32/A12: certificación A11 end-to-end (DISCOVERY → SHADOW → SIM →
-          # VIGILANCIA) sobre PG real, con shadow ejecutado, atribución post-crash
-          # (migración 033) y gate fail-if-skipped. V2.32.1: además lo corre el job
-          # lifecycle-pg de python-ci.yml en cada push (certificación por commit).
           apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
-          # V2.36/V2.37: persistencia del snapshot de evidencia (fingerprint + migración 037).
           apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
-          # V2.40/AUTO 2.0 (P4): durabilidad REAL del estado V2 — reinicio de proceso
-          # sobre la misma BD con el plan operativo y las señales consumidas intactos
-          # (migración 040). Gate fail-if-skipped: AUTO_V2_DURABLE_PG_REQUIRED=1.
           apps/api-python/tests/test_auto_v2_durable_pg.py
-          # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV +
-          # frescura) — la fuente REAL de los gates fail-closed del tick.
-          # Gate fail-if-skipped: INSTRUMENT_TRADE_CONTEXT_PG_REQUIRED=1.
           apps/api-python/tests/test_instrument_trade_context_pg.py
-          # V2.40.2: claves naturales únicas — el "sin backstop + check-then-insert"
-          # que dejó la ruta de opiniones diarias en MultipleResultsFound permanente.
-          # Gate fail-if-skipped: UNIQUE_NATURAL_KEYS_PG_REQUIRED=1.
           apps/api-python/tests/test_unique_natural_keys_pg.py
           apps/api-python/tests/test_health.py
-          # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs
-          # (deuda: drift silencioso). Ahora se ejecutan con gate fail-if-skipped.
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py
           packages/py/infrastructure/tests/test_execution_event_fence_pg.py

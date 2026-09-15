@@ -61,6 +61,37 @@ jobs:
         # entran al lifespan→ensure_migrated→DB: se excluyen aquí (no hay Postgres en CI),
         # mismo criterio que las DB-gated existentes (P2.5/CI).
         # R-12 A3: invariantes C/D/E son unitarios in-memory (sin PG).
+        #
+        # V2.40.2: los comentarios de esta lista van FUERA del bloque plegado (aquí dentro
+        # sí valen, porque YAML los mira como comentarios; el problema es meterlos en el
+        # ``run: >``). En un ``run: >`` cada línea es texto del comando, así que un ``#``
+        # intercalado convertía el resto de la lista en comentario de shell y el step solo
+        # ejecutaba hasta ahí; ``quality`` corría 936 tests y **nunca** llegaba a
+        # ``apps/api-python/tests``, con los ficheros nuevos de
+        # ``packages/py/application/tests`` listados pero sin ejecutar. Mismo hazard que
+        # tumbó el job A14 (ver más abajo).
+        #
+        # V2.25/A10: fases del Strategy Lifecycle + orquestador V2.26 (herméticos).
+        # V2.31/A11: Discovery Engine (catálogo + motor + dispatch declarativo del LAB).
+        # V2.34/A14: gramática controlada de Discovery (composición + presupuesto).
+        # V2.36/V2.37: evidencia adaptativa (prior determinista) + search policy.
+        # V2.38: granularidad por región de parámetros (bucket determinista puro).
+        # V2.39: régimen de mercado por trial (clasificador determinista puro, as-of).
+        # V2.40/AUTO 2.0: Investment Operating System — pipeline de decisión
+        # (snapshot/ranker/decider/allocator/position manager) + identidad de señal.
+        # Herméticos: sin PG, sin red, sin LIVE. La durabilidad V2 con PG real va en
+        # el job auto-v2-durable-pg (gate fail-if-skipped).
+        # V2.32/A12: evidencia shadow ejecutada (replay determinista, sin DB).
+        # V2.33/A13: forward paper determinista (sin DB, sin red).
+        # V2.32/A12: el E2E A11 necesita PG real (lo corre el job lifecycle-pg abajo).
+        # V2.33/A13: el E2E del Paper Forward necesita PG real (job paper-forward-pg).
+        # V2.34/A14: el E2E de la gramática de Discovery necesita PG real
+        # (job grammar-discovery-pg).
+        # V2.40/AUTO 2.0: la durabilidad real del estado V2 (plan de posición +
+        # señales consumidas, migración 040) necesita PG real (job auto-v2-durable-pg).
+        # V2.40.1/AUTO 2.0: el contexto de cartera del catálogo (sector + ADV +
+        # frescura) se certifica con PG real en el mismo job auto-v2-durable-pg.
+        # V2.40.2: las claves naturales únicas (índices + upsert atómico) exigen PG.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -70,30 +101,20 @@ jobs:
           packages/py/application/tests/test_reconcile_lifecycle_integrity_v193.py
           packages/py/application/tests/test_reconcile_financial_integrity_v194.py
           packages/py/application/tests/test_reconciliation_opening_gate.py
-          # V2.25/A10: fases del Strategy Lifecycle + orquestador V2.26 (herméticos).
           packages/py/application/tests/test_strategy_lab_phase.py
           packages/py/application/tests/test_strategy_top3_coach_phase.py
           packages/py/application/tests/test_strategy_promotion_phase.py
           packages/py/application/tests/test_strategy_vigilance_phase.py
           packages/py/application/tests/test_auto_orchestrator.py
           packages/py/application/tests/test_sim_durable_unit_of_work.py
-          # V2.31/A11: Discovery Engine (catálogo + motor + dispatch declarativo del LAB).
           packages/py/application/tests/test_discovery_catalog.py
           packages/py/application/tests/test_strategy_discovery_engine.py
           packages/py/application/tests/test_lab_discovery_dispatch.py
-          # V2.34/A14: gramática controlada de Discovery (composición + presupuesto).
           packages/py/application/tests/test_discovery_grammar.py
-          # V2.36/V2.37: evidencia adaptativa (prior determinista) + search policy.
           packages/py/application/tests/test_discovery_evidence.py
           packages/py/application/tests/test_discovery_search_policy.py
-          # V2.38: granularidad por región de parámetros (bucket determinista puro).
           packages/py/application/tests/test_discovery_param_region.py
-          # V2.39: régimen de mercado por trial (clasificador determinista puro, as-of).
           packages/py/application/tests/test_discovery_market_regime.py
-          # V2.40/AUTO 2.0: Investment Operating System — pipeline de decisión
-          # (snapshot/ranker/decider/allocator/position manager) + identidad de señal.
-          # Herméticos: sin PG, sin red, sin LIVE. La durabilidad V2 con PG real va en
-          # el job auto-v2-durable-pg (gate fail-if-skipped).
           packages/py/application/tests/test_auto_v2_entry.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
@@ -101,9 +122,7 @@ jobs:
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
-          # V2.32/A12: evidencia shadow ejecutada (replay determinista, sin DB).
           packages/py/application/tests/test_strategy_shadow_phase.py
-          # V2.33/A13: forward paper determinista (sin DB, sin red).
           packages/py/application/tests/test_paper_forward_phase.py
           packages/py/infrastructure/tests/test_verify_financial_invariants.py
           apps/api-python/tests
@@ -126,20 +145,11 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_golden_v196.py
           --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           --ignore=apps/api-python/tests/test_financial_integrity_pg.py
-          # V2.32/A12: el E2E A11 necesita PG real (lo corre el job lifecycle-pg abajo).
           --ignore=apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
-          # V2.33/A13: el E2E del Paper Forward necesita PG real (job paper-forward-pg).
           --ignore=apps/api-python/tests/test_a13_paper_forward_pg.py
-          # V2.34/A14: el E2E de la gramática de Discovery necesita PG real
-          # (job grammar-discovery-pg).
           --ignore=apps/api-python/tests/test_a14_grammar_discovery_pg.py
-          # V2.40/AUTO 2.0: la durabilidad real del estado V2 (plan de posición +
-          # señales consumidas, migración 040) necesita PG real (job auto-v2-durable-pg).
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
-          # V2.40.1/AUTO 2.0: el contexto de cartera del catálogo (sector + ADV +
-          # frescura) se certifica con PG real en el mismo job auto-v2-durable-pg.
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
-          # V2.40.2: las claves naturales únicas (índices + upsert atómico) exigen PG.
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
@@ -291,23 +301,30 @@ jobs:
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
+      # V2.39.2: el job declara A14_GRAMMAR_PG_REQUIRED=1 para exigir PG real, pero el
+      # test no lo leía y podía quedar skipped sin que el job se pusiera rojo (skip
+      # silencioso = certificación fantasma). ``-rs`` imprime el motivo y el paso
+      # siguiente convierte cualquier skip del job en un fallo duro.
+      # V2.40.2: los comentarios van FUERA del ``run`` (dentro de un bloque plegado ``>``
+      # son texto del comando, no comentarios YAML: cortaban la línea y se perdían el
+      # ``-rs`` y el ``tee``) y el pipe declara ``pipefail``: sin él un pytest rojo devolvía
+      # el exit code de ``tee`` (0) y el job quedaba en falso verde (run 35009780076).
       - name: Pytest A14 PG (fail if skipped)
-        run: >
-          uv run pytest
-          apps/api-python/tests/test_a14_grammar_discovery_pg.py
-          apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
-          -q
-          --tb=short
-          # V2.39.2: el job declara A14_GRAMMAR_PG_REQUIRED=1 para exigir PG real, pero el
-          # test no lo leía y podía quedar skipped sin que el job se pusiera rojo (skip
-          # silencioso = certificación fantasma). ``-rs`` imprime el motivo y el paso
-          # siguiente convierte cualquier skip del job en un fallo duro.
-          -rs | tee /tmp/a14-pg.log
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_a14_grammar_discovery_pg.py \
+            apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
+            -q --tb=short -rs | tee /tmp/a14-pg.log
 
       - name: Fail on skipped A14 PG (no skip silencioso)
         # Un skip invalida la certificación: si algún test quedó fuera del veredicto, el
         # job falla con el motivo a la vista aunque el paso anterior saliera en verde.
         run: |
+          if [ ! -s /tmp/a14-pg.log ]; then
+            echo "::error::A14 PG no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/a14-pg.log; then
             echo "::error::A14 PG dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/a14-pg.log || true
@@ -370,20 +387,27 @@ jobs:
       - name: Alembic upgrade head (hasta 041 incluida)
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
+      # V2.40.2: ``pipefail`` es obligatorio. Con ``... | tee log`` el step devuelve el
+      # exit code de ``tee`` (0), así que la certificación PG quedó en falso verde con
+      # ``6 failed, 22 passed`` en el run 35009780076. Y el guard de skips exige el log:
+      # sin fichero, ``grep`` falla en mudo y el guard no guardaba nada.
       - name: Pytest AUTO 2.0 durable PG (fail if skipped)
-        run: >
-          uv run pytest
-          apps/api-python/tests/test_auto_v2_durable_pg.py
-          apps/api-python/tests/test_instrument_trade_context_pg.py
-          apps/api-python/tests/test_unique_natural_keys_pg.py
-          apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
-          -q
-          --tb=short
-          -rs | tee /tmp/auto-v2-durable-pg.log
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_v2_durable_pg.py \
+            apps/api-python/tests/test_instrument_trade_context_pg.py \
+            apps/api-python/tests/test_unique_natural_keys_pg.py \
+            apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)
         # Un skip invalida la certificación: el reinicio real exige PG.
         run: |
+          if [ ! -s /tmp/auto-v2-durable-pg.log ]; then
+            echo "::error::AUTO 2.0 durable PG no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-v2-durable-pg.log; then
             echo "::error::AUTO 2.0 durable PG dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/auto-v2-durable-pg.log || true

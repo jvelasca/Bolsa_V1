@@ -121,6 +121,43 @@ la única clave que no converge al nombre de Prisma.
 Se actualizó `_ALEMBIC_HEAD` en `test_discovery_evidence_snapshot_pg.py` (`040` → `041`): los tests
 de roundtrip existentes ya lo usan como única fuente.
 
+### CI: los comandos plegados ejecutaban menos de lo que declaraban (sellado 2026-09-15)
+
+Tres cosas que la certificación daba por verdes sin serlo, encontradas al revisar por qué el job
+`grammar-discovery-pg` se puso rojo tras el push:
+
+1. **`run: >` con comentarios intercalados (comentario de shell = truncación).** En un bloque
+   plegado YAML cada línea es _texto del comando_, no un comentario de YAML. Un `#` intercalado en
+   medio de la lista de pytest convertía **todo lo que venía después en comentario de shell**:
+   - `quality` (`python-ci.yml`) ejecutaba **936 tests** y nunca llegaba a `apps/api-python/tests`;
+     los ficheros nuevos de `packages/py/application/tests` (`test_auto_v2_entry.py`,
+     `test_auto_investment_system.py`, `test_portfolio_decision_engine.py`,
+     `test_position_manager.py`, `test_discovery_evidence.py`, …) estaban **listados pero no
+     corrían** en CI. Verde falso.
+   - `python` / `Pytest offline` y `lifecycle-pg` de `release-tag-ci.yml` (la certificación de
+     release) tenían el mismo corte: el job de release ejecutaba 11 y 10 ficheros respectivamente de
+     los ~40 declarados.
+2. **`... | tee log` sin `pipefail`.** El step devolvía el exit code de `tee` (**0**): el run
+   `35009780076` publicó `6 failed, 22 passed` en el job `auto-v2-durable-pg` **con el job en verde**.
+   Ahora los dos steps con `tee` hacen `set -o pipefail` y el guard anti-skip exige que el log exista
+   y no esté vacío (antes un log ausente hacía fallar el `grep` en mudo y el guard no guardaba nada).
+3. **`downgrade` de la 041 contra índices que respaldan una constraint.** En una BD recién migrada
+   el baseline `003` crea los 8 nombres como _constraint_ (copia los `UniqueConstraint` de
+   `tables.py`) y `upgrade` los detecta como existentes y los omite; en una BD antigua son _índices
+   planos_ creados por la 041. El `downgrade` hacía `DROP INDEX` siempre y PostgreSQL aborta con
+   `DependentObjectsStillExist` cuando el índice implementa una constraint: tumbaba los roundtrips
+   036→041 en CI. Ahora `downgrade` consulta `pg_constraint.conindid` y solo retira los planos.
+
+Los comentarios de procedencia de las listas de pytest se movieron **encima** del step (donde sí son
+YAML) en los tres sitios: `quality` de `python-ci.yml`, y `python`/`lifecycle-pg` de
+`release-tag-ci.yml`. Verificado con un parser YAML de verdad (jobs, tokens del comando resultante,
+cero tokens `#`) y comprobando que la lista de tests actual es subsecuencia exacta de la anterior
+—no se perdió ni se duplicó ningún fichero.
+
+De regalo, el job offline de release gana los `--ignore` de `test_instrument_trade_context_pg.py` y
+`test_unique_natural_keys_pg.py` que ya tenía el job equivalente de `python-ci.yml` (los certifica el
+job con PG; sin `--ignore` se recolectarían sin BD y skipearían en silencio).
+
 ### Verificación
 
 - `ruff check packages/py apps/api-python --config pyproject.toml` → **0**
