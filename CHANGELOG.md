@@ -2,6 +2,46 @@
 
 All notable releases of Bolsa V1.
 
+## [1.64.3-beta] — V2.39.3 · Cierre P1/N1 (lock de cuenta) + P2/N2 (secuenciador forzado) + fix `totalSamples` — 2026-09-15
+
+Tercera pasada de la auditoría interna, esta vez sobre `v2.39.2-beta`. Cierra los dos hallazgos
+del **secuenciador del ledger** (AUDITORIA 1), el bug de `totalSamples` en `discovery_evidence.py`
+(AUDITORIA 2) y confirma un detalle del script de limpieza que **no** es fallo. Alembic head sigue
+en **`039_research_trials_regime`** (sin migraciones nuevas).
+
+- **P1/N1 — `next_executed_at` es por cuenta pero el lock que lo protegía era de cartera.**
+  `next_executed_at(account_id)` lee `MAX(executed_at)` **por cuenta**, pero el lock era
+  `with_for_update` sobre `PortfolioRow` (por `legacy_portfolio_id`). Dos carteras de la **misma
+  cuenta** no comparten `legacy_portfolio_id`, así que sus escritores **no se excluyen entre sí** y
+  pueden leer el mismo `MAX(executed_at)` antes del commit del otro, emitiendo asientos con
+  **idéntico instante** (el desempate por `id`, UUID v4 aleatorio, no rescata el orden real).
+  **Fix**: nuevo `SqlAlchemyAccountRepository.lock_account(account_id)` (`SELECT ... FOR UPDATE`
+  sobre `investment_accounts`), cableado como lock externo antes del lock de cartera en `trade.py`,
+  `cash.py` (deposit + withdraw) y `custody.py` (orden determinista **cuenta → cartera**). El
+  docstring de `next_executed_at` pasa a exigir el lock de **cuenta**.
+- **P2/N2 — `append_*` aceptaba `executed_at` externo.** `append_trade`, `append_fee`,
+  `append_custody_fee` y `append_cash_movement` aceptaban `executed_at: datetime | None = None` con
+  fallback `executed_at or now`, permitiendo saltarse el secuenciador. **Fix**: se elimina el
+  parámetro y cada método obtiene internamente `await self.next_executed_at(account_id)`; la
+  secuencia es ahora obligatoria por infraestructura, no por disciplina del caller. En `trade.py` se
+  eliminan `_ledger_ordering`/`_FEE_ORDER_GAP` y la llamada manual al secuenciador (trade → X,
+  fee → X+1 µs natural).
+- **Auditoría 2 — `totalSamples` inflado.** `compute_lane_weights()` y el payload `"totalSamples"`
+  sumaban `sample_sizes.values()` sin filtrar, contando familias descartadas por `min_samples`.
+  **Fix**: nuevo `_effective_total_samples(family_weights, sample_sizes)` que suma solo las familias
+  con peso, usado en ambos sitios para unificar la puerta de decisión con lo publicado al operador.
+- **Test de concurrencia multi-portfolio (N3).** Nuevo
+  `packages/py/infrastructure/tests/chaos/test_multi_portfolio_ledger_sequence.py`: dos carteras de
+  la misma cuenta, ráfagas concurrentes, `executed_at` estrictamente creciente y cadena
+  `balance_after` encadenada. Se valida localmente contra `bolsa_v1_chaos` (los chaos no entran en
+  CI, deuda anotada).
+- **Detalle del script de limpieza (no es fallo).** `custody_obligation` (005) y
+  `custody_obligations` (006) **coexisten** legítimamente: la 006 no borra la 005. La lista
+  `ACCOUNT_CHILD_TABLES` es correcta tal cual.
+- **Verificación (local)**: `ruff --config pyproject.toml` **All checks passed** · `mypy` full-tree
+  **Success (477 ficheros)** · `import-linter` **4 contratos OK** · batería offline del job
+  `quality` **en verde** · chaos `test_multi_portfolio_ledger_sequence` **passed** contra PG real.
+
 ## [1.64.0-beta] — V2.39 · Régimen de mercado por trial (incremento 4) — 2026-09-11
 
 Cuarto incremento de **Strategy Intelligence**: la evidencia gana la segunda dimensión de

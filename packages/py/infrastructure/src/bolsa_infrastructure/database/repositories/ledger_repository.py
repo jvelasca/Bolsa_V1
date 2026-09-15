@@ -66,9 +66,12 @@ class SqlAlchemyLedgerRepository:
         ser estrictamente creciente con el orden de aplicación, el orden por
         ``(executed_at, id)`` coincide con el order real de los asientos.
 
-        Debe invocarse SIEMPRE dentro del lock de la cartera, justo antes de escribir
-        el asiento, para que la lectura del último ``executed_at`` y la escritura sean
-        atómicas respecto al resto de escritores.
+        P1/N1 (v2.39.3): debe invocarse SIEMPRE dentro del lock de la CUENTA
+        (``SqlAlchemyAccountRepository.lock_account``), no de la cartera. La unidad de
+        secuenciación es ``account_id``, así que la exclusión que la protege debe ser
+        por cuenta: dos carteras de la misma cuenta no comparten ``legacy_portfolio_id``
+        y no se excluirían entre sí con un lock de cartera. Hoy los ``append_*`` invocan
+        este método internamente (el caller ya no puede saltarse el secuenciador).
         """
         stmt = (
             select(LedgerEntryRow.executed_at)
@@ -99,11 +102,13 @@ class SqlAlchemyLedgerRepository:
         quantity: float,
         price: float,
         reference_id: str,
-        executed_at: datetime | None = None,
         strategy_version_id: str | None = None,
     ) -> LedgerEntry:
+        # P2/N2 (v2.39.3): el instante sale SIEMPRE del secuenciador, no del caller. Se
+        # elimina ``executed_at`` del contrato para que ningún caller pueda saltarse la
+        # secuencia con ``datetime.now()`` y romper el orden determinista del ledger.
+        executed = await self.next_executed_at(account_id)
         now = datetime.now(UTC)
-        executed = executed_at or now
         row = LedgerEntryRow(
             id=new_id(),
             account_id=account_id,
@@ -136,11 +141,11 @@ class SqlAlchemyLedgerRepository:
         balance_after: float,
         reference_id: str,
         description: str | None = None,
-        executed_at: datetime | None = None,
         strategy_version_id: str | None = None,
     ) -> LedgerEntry:
+        # P2/N2 (v2.39.3): instante SIEMPRE secuenciado (ver ``append_trade``).
+        executed = await self.next_executed_at(account_id)
         now = datetime.now(UTC)
-        executed = executed_at or now
         row = LedgerEntryRow(
             id=new_id(),
             account_id=account_id,
@@ -303,13 +308,13 @@ class SqlAlchemyLedgerRepository:
         balance_after: float,
         reference_id: str,
         description: str,
-        executed_at: datetime | None = None,
     ) -> LedgerEntry:
-        # ``executed_at`` explícito (secuenciador del ledger) cuando se cobra bajo
-        # concurrencia con trades: el reloj de pared puede invertirse respecto al
-        # orden de aplicación y desordenar la cadena ``balance_after`` (EXEC-B-CONC).
+        # P2/N2 (v2.39.3): instante SIEMPRE secuenciado. Antes el caller pasaba un
+        # ``executed_at`` explícito tomado del secuenciador; ahora el secuenciador se
+        # invoca internamente para que ningún caller pueda saltárselo (reloj de pared
+        # invertido bajo concurrencia → cadena ``balance_after`` rota, EXEC-B-CONC).
+        executed = await self.next_executed_at(account_id)
         now = datetime.now(UTC)
-        executed = executed_at or now
         row = LedgerEntryRow(
             id=new_id(),
             account_id=account_id,
@@ -393,12 +398,11 @@ class SqlAlchemyLedgerRepository:
         reference_id: str,
         reference_type: str = "transfer",
         description: str | None = None,
-        executed_at: datetime | None = None,
     ) -> LedgerEntry:
-        # ``executed_at`` explícito (secuenciador del ledger) para que depósitos/retiros
-        # concurrentes no inviertan el orden por reloj de pared (EXEC-B-CONC).
+        # P2/N2 (v2.39.3): instante SIEMPRE secuenciado (ver ``append_trade``), para
+        # que depósitos/retiros concurrentes no inviertan el orden por reloj de pared.
+        executed = await self.next_executed_at(account_id)
         now = datetime.now(UTC)
-        executed = executed_at or now
         row = LedgerEntryRow(
             id=new_id(),
             account_id=account_id,

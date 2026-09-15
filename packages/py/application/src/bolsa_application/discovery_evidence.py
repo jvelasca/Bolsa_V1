@@ -435,6 +435,22 @@ def compute_family_weights(
     return family_weights, sample_sizes
 
 
+def _effective_total_samples(
+    family_weights: Mapping[str, float],
+    sample_sizes: Mapping[str, int],
+) -> int:
+    """Suma SOLO el tamaño de muestra de las familias que sí aportan peso.
+
+    P2 (v2.39.3): ``sample_sizes`` guarda el tamaño de TODAS las familias (incluso las
+    que no superaron ``min_samples`` y nunca aportaron peso a ``family_weights``), para
+    auditoría. ``min_total_samples`` debe medir cuánta evidencia ÚTIL hay detrás del
+    carril adaptativo, no cualquier evidencia: sin este filtro, un puñado de familias
+    descartadas por tener pocos trials podía inflar el contador global y dejar que una
+    única familia con el mínimo (``min_samples``) activase el carril.
+    """
+    return sum(int(n) for key, n in sample_sizes.items() if key in family_weights)
+
+
 def compute_lane_weights(
     family_weights: Mapping[str, float],
     sample_sizes: Mapping[str, int],
@@ -450,7 +466,7 @@ def compute_lane_weights(
     acotado por ``max_adaptive_weight``.
     """
     lane_weights = dict(_DEFAULT_LANE_WEIGHTS)
-    total_samples = sum(int(n) for n in sample_sizes.values())
+    total_samples = _effective_total_samples(family_weights, sample_sizes)
     if total_samples < int(min_total_samples) or not family_weights:
         lane_weights["adaptive"] = DEFAULT_ADAPTIVE_WEIGHT
         return lane_weights
@@ -629,7 +645,7 @@ def build_discovery_evidence_snapshot(
         "laneWeights": lane_weights,
         "sampleSizes": sample_sizes,
         "familyCount": len(family_weights),
-        "totalSamples": sum(sample_sizes.values()),
+        "totalSamples": _effective_total_samples(family_weights, sample_sizes),
         "evidenceFingerprint": fingerprint,
         "posteriorCut": str(posterior_cut or ""),
         "familyGranularity": granularity,

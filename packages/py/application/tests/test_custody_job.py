@@ -54,6 +54,9 @@ class _FakeAccountRepo:
         )
         return SimpleNamespace(account=account, portfolio=portfolio)
 
+    async def lock_account(self, account_id):  # noqa: ARG001
+        """P1/N1 (v2.39.3): mutex financiero por cuenta (no-op en el fake)."""
+
     async def list_portfolios(self, account_id: str):  # noqa: ARG001
         account = next(a for a in self._accounts if a.id == account_id)
         return [

@@ -108,6 +108,9 @@ class _FakeAccountRepo:
         )
         return SimpleNamespace(account=account, portfolio=portfolio)
 
+    async def lock_account(self, account_id):  # noqa: ARG001
+        """P1/N1 (v2.39.3): mutex financiero por cuenta (no-op en el fake)."""
+
 
 class _FakePortfolioRepo:
     def __init__(self, cash: float, equity: float) -> None:

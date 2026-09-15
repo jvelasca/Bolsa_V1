@@ -58,6 +58,9 @@ class _FakeAccountRepo:
     async def resolve_scope(self, account_id: str, portfolio_id: str | None = None) -> _FakeScope:
         return self.scope
 
+    async def lock_account(self, account_id: str) -> None:
+        """P1/N1 (v2.39.3): mutex financiero por cuenta (no-op en el fake)."""
+
     async def touch_activity(self, account_id: str) -> None:
         self.touched += 1
 

@@ -69,6 +69,9 @@ class _FakeAccountRepo:
     async def list_portfolios(self, account_id):  # noqa: ARG001
         return self._portfolios
 
+    async def lock_account(self, account_id):  # noqa: ARG001
+        """P1/N1 (v2.39.3): mutex financiero por cuenta (no-op en el fake)."""
+
     async def touch_activity(self, account_id):  # noqa: ARG001
         self.activities += 1
 

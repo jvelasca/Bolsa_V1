@@ -1,6 +1,6 @@
 """Use-case de ejecución de trades."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from bolsa_domain.account_settings import calculate_trade_fees, settings_from_dict
 from bolsa_domain.entities.portfolio import TradeResult
@@ -14,11 +14,6 @@ from bolsa_infrastructure.database.repositories.portfolio_repository import (
 )
 
 from .idempotency import _assert_trade_payload_matches
-
-# Separación mínima entre el asiento de trade y el de fee del MISMO trade. PostgreSQL
-# ``timestamptz`` tiene resolución de microsegundos, así que 1 µs basta para fijar un orden
-# determinista sin depender del desempate aleatorio por ``id``.
-_FEE_ORDER_GAP = timedelta(microseconds=1)
 
 
 def _parse_executed_at(raw: str | None) -> datetime:
@@ -34,19 +29,6 @@ def _parse_executed_at(raw: str | None) -> datetime:
     except ValueError:
         return datetime.now(UTC)
     return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
-
-
-def _ledger_ordering(executed_at: datetime, *, has_fee: bool) -> tuple[datetime, datetime]:
-    """Instantes de los asientos trade y fee, garantizando trade ANTES que fee.
-
-    Comparten el mismo instante base (el del trade, tomado bajo ``with_for_update``) para
-    que no se intercalen con los de operaciones concurrentes; si hay fee, el asiento de
-    trade se adelanta 1 µs para que el orden ``(executed_at, id)`` sea el de aplicación real
-    (trade: balance intermedio → fee: balance final). Sin fee ambos coinciden.
-    """
-    if not has_fee:
-        return executed_at, executed_at
-    return executed_at - _FEE_ORDER_GAP, executed_at
 
 
 class ExecuteTrade:
@@ -104,6 +86,11 @@ class ExecuteTrade:
         contexto financiero SIM. NO afecta a importes, balances ni idempotencia.
         """
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
+        # P1/N1 (v2.39.3): mutex financiero por CUENTA. El secuenciador del ledger es por
+        # ``account_id``, así que su exclusión debe ser por cuenta (no por cartera). Se
+        # toma ANTES del lock de cartera de ``execute_trade`` para serializar en orden
+        # determinista cuenta → cartera todos los escritores del ledger de la cuenta.
+        await self._account_repo.lock_account(scope.account.id)
         # M4: doble POST con la misma idempotency_key → una sola transacción.
         # Devuelve la transacción original (misma shape) con un summary fresco, sin duplicar.
         if idempotency_key:
@@ -183,23 +170,17 @@ class ExecuteTrade:
         fee_balance = Decimal(str(result.summary.portfolio.cash))
         trade_balance = fee_balance + Decimal(str(abs(fees.total)))
         # Orden del ledger (EXEC-B-CONC, bug real de concurrencia): el ``executed_at``
-        # se toma del SECUENCIADOR del ledger (``next_executed_at``), no del reloj de
-        # pared ni del timestamp de dominio. Con ``datetime.now(UTC)`` el instante
-        # reflejaba cuándo se leyó el reloj, no cuándo se aplicó el efecto: dos
-        # transacciones serializadas por el ``with_for_update`` de la cartera podían
-        # quedar con el reloj invertido respecto al commit, y el consumidor que ordena
-        # por ``(executed_at, id)`` reconstruía una secuencia falsa (el desempate por
-        # ``id`` es un UUID v4 aleatorio, no rescata el orden real) → cadena
-        # ``balance_after`` rota de forma intermitente.
+        # sale SIEMPRE del secuenciador del ledger, ahora INVOCADO INTERNAMENTE por
+        # ``append_trade``/``append_fee`` (P2/N2, v2.39.3). El caller ya no puede pasar
+        # un ``executed_at`` propio ni usar ``datetime.now(UTC)``: dos transacciones
+        # serializadas por el lock de cuenta podían quedar con el reloj invertido
+        # respecto al commit y el consumidor que ordena por ``(executed_at, id)``
+        # reconstruía una secuencia falsa → cadena ``balance_after`` rota.
         #
-        # El secuenciador se invoca aquí, con el lock de la cartera YA tomado por
-        # ``execute_trade`` y la sesión aún sin commit, así que su lectura del último
-        # ``executed_at`` + la escritura son atómicas frente al resto de escritores.
-        # Ambas filas (trade y fee) comparten el mismo instante secuenciado: el trade
-        # (balance intermedio) se escribe 1 µs antes que la fee (balance final) para que
-        # el orden sea el de aplicación real y no dependa del ``id``.
-        executed_at = await self._ledger_repo.next_executed_at(scope.account.id)
-        (trade_at, fee_at) = _ledger_ordering(executed_at, has_fee=fees.total > 0)
+        # Ambas filas comparten el secuenciador: el trade (balance intermedio) se
+        # escribe primero y la fee (balance final) justo después, así que el orden
+        # trade→fee queda garantizado por la monotonía estricta (+1µs) sin depender
+        # del ``id``.
         await self._ledger_repo.append_trade(
             account_id=scope.account.id,
             portfolio_id=scope.portfolio.id,
@@ -211,7 +192,6 @@ class ExecuteTrade:
             quantity=quantity,
             price=price,
             reference_id=result.transaction.id,
-            executed_at=trade_at,
             strategy_version_id=strategy_version_id,
         )
         if fees.total > 0:
@@ -231,7 +211,6 @@ class ExecuteTrade:
                 balance_after=float(fee_balance),
                 reference_id=result.transaction.id,
                 description=description,
-                executed_at=fee_at,
                 strategy_version_id=strategy_version_id,
             )
         await self._account_repo.touch_activity(scope.account.id)

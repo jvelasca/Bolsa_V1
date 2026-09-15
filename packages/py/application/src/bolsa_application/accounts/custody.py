@@ -71,6 +71,13 @@ class ApplyCustodyFees:
         if not claimed:
             return False
 
+        # P1/N1 (v2.39.3): mutex financiero por CUENTA, antes de cualquier lock de
+        # cartera (``deduct_cash``). El secuenciador del ledger es por ``account_id``;
+        # este lock alinea la exclusión con la unidad de secuenciación (cuenta) para
+        # que la custodia de una cartera no colisione con un trade de otra cartera de
+        # la misma cuenta.
+        await self._account_repo.lock_account(scope.account.id)
+
         try:
             portfolios = await self._account_repo.list_portfolios(scope.account.id)
             total_equity = 0.0
@@ -128,13 +135,9 @@ class ApplyCustodyFees:
                         balance_after = await self._portfolio_repo.deduct_cash(
                             charge_legacy_id, to_charge, allow_partial=True
                         )
-                        # El instante sale del secuenciador del ledger (monótono con el
-                        # orden de aplicación), no del reloj de pared: bajo concurrencia
-                        # el reloj puede invertirse respecto al commit y desordenar la
-                        # cadena. Invocado ya con el lock de la cartera tomado.
-                        executed_at = await self._ledger_repo.next_executed_at(
-                            scope.account.id
-                        )
+                        # El instante sale del secuenciador del ledger, invocado
+                        # internamente por ``append_custody_fee`` (P2/N2, v2.39.3), ya
+                        # con el lock de la cuenta tomado (P1/N1).
                         await self._ledger_repo.append_custody_fee(
                             account_id=scope.account.id,
                             portfolio_id=charge_portfolio_id,
@@ -143,7 +146,6 @@ class ApplyCustodyFees:
                             balance_after=balance_after,
                             reference_id=f"custody-{pending.period}",
                             description=description,
-                            executed_at=executed_at,
                         )
                         await self._account_repo.touch_activity(scope.account.id)
                         settled = new_outstanding <= 0
@@ -173,9 +175,6 @@ class ApplyCustodyFees:
                         fee_amount,
                         allow_partial=False,
                     )
-                    executed_at = await self._ledger_repo.next_executed_at(
-                        scope.account.id
-                    )
                     await self._ledger_repo.append_custody_fee(
                         account_id=scope.account.id,
                         portfolio_id=charge_portfolio_id,
@@ -184,7 +183,6 @@ class ApplyCustodyFees:
                         balance_after=balance_after,
                         reference_id=f"custody-{period}",
                         description=description,
-                        executed_at=executed_at,
                     )
                     await self._account_repo.touch_activity(scope.account.id)
                     if self._obligation_repo is not None:

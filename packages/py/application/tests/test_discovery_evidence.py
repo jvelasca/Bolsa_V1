@@ -217,6 +217,40 @@ def test_compute_lane_weights_fail_closed_when_total_below_threshold() -> None:
     assert lane_weights["adaptive"] == 0.0
 
 
+def test_compute_lane_weights_filters_discarded_families_from_total() -> None:
+    """P2 (v2.39.3): ``min_total_samples`` no cuenta familias descartadas por ``min_samples``.
+
+    Ejemplo de la auditoría: 5 familias de 2 trials (descartadas por ``min_samples=3``) +
+    1 familia válida de 3. El total bruto era 5·2 + 3 = 13 ≥ 12 → el carril se activaba
+    con un único dato real. El total efectivo (3) debe dejar el carril en fail-closed.
+    """
+    family_weights = {"sma": 1.0}
+    sample_sizes = {"f1": 2, "f2": 2, "f3": 2, "f4": 2, "f5": 2, "sma": 3}
+    lane_weights = compute_lane_weights(family_weights, sample_sizes, min_total_samples=12)
+    assert lane_weights["adaptive"] == 0.0
+
+
+def test_total_samples_matches_filtered_sum_of_family_weights() -> None:
+    """Invariante P2 (v2.39.3): ``payload["totalSamples"]`` == Σ samples de familias CON peso.
+
+    ``sampleSizes`` publica TODAS las familias (incluidas las descartadas por
+    ``min_samples``) para auditoría; ``totalSamples`` debe publicar solo la evidencia ÚTIL
+    (claves presentes en ``familyWeights``), no el bruto. Sin filtro, las familias
+    descartadas inflaban el contador y la puerta de decisión divergía de lo publicado.
+    """
+    snapshot = _build(
+        [_agg("sma", 3), _agg("rsi", 2), _agg("macd", 2), _agg("bb", 1), _agg("stoch", 1)],
+        min_samples=3,
+        min_total_samples=12,
+    )
+    family_weights = snapshot.payload["familyWeights"]
+    sample_sizes = snapshot.payload["sampleSizes"]
+    assert list(family_weights) == ["sma"], "solo 'sma' (3 trials) supera min_samples=3"
+    filtered = sum(int(sample_sizes[k]) for k in sample_sizes if k in family_weights)
+    # El bruto (sin filtro) sería 3+2+2+1+1 = 9; el filtrado coincide con lo publicado.
+    assert snapshot.payload["totalSamples"] == filtered == 3
+
+
 # ── V2.37/P2-01 — señal v1 (sin saturación, cobertura explícita) ────────────────
 
 

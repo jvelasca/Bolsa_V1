@@ -40,6 +40,9 @@ class DepositCashToAccount:
         if amount <= 0:
             raise ValueError("El importe debe ser mayor que cero")
         scope = await self._account_repo.resolve_scope(account_id)
+        # P1/N1 (v2.39.3): mutex financiero por CUENTA antes del lock de cartera de
+        # ``add_cash`` (orden determinista cuenta → cartera).
+        await self._account_repo.lock_account(scope.account.id)
         # A-2: idempotencia — un retry con la misma idempotency_key no re-mueve
         # efectivo; rejuega el movimiento original desde el ledger. Aislado por
         # cuenta y por type (deposit) para coincidir con el UNIQUE por-cuenta+type.
@@ -67,11 +70,9 @@ class DepositCashToAccount:
                     scope.legacy_portfolio_id, amount
                 )
                 description = note or "Depósito externo (simulado)"
-                # El instante sale del secuenciador del ledger, ya con el lock de la
-                # cartera tomado por ``add_cash`` (EXEC-B-CONC): el reloj de pared
-                # puede invertirse bajo concurrencia y romper la cadena
-                # ``balance_after[n] == balance_after[n-1] + amount[n]``.
-                executed_at = await self._ledger_repo.next_executed_at(scope.account.id)
+                # El instante sale del secuenciador del ledger, invocado internamente
+                # por ``append_cash_movement`` (P2/N2, v2.39.3) ya con el lock de la
+                # cuenta tomado (P1/N1).
                 entry = await self._ledger_repo.append_cash_movement(
                     account_id=account_id,
                     portfolio_id=scope.portfolio.id,
@@ -82,7 +83,6 @@ class DepositCashToAccount:
                     reference_id=movement_id,
                     reference_type="external",
                     description=description,
-                    executed_at=executed_at,
                 )
                 await self._account_repo.touch_activity(account_id)
         except IdempotencyKeyExists:
@@ -141,6 +141,9 @@ class WithdrawCashFromAccount:
         if amount <= 0:
             raise ValueError("El importe debe ser mayor que cero")
         scope = await self._account_repo.resolve_scope(account_id)
+        # P1/N1 (v2.39.3): mutex financiero por CUENTA antes del lock de cartera de
+        # ``deduct_cash`` (orden determinista cuenta → cartera).
+        await self._account_repo.lock_account(scope.account.id)
         # A-2: idempotencia — un retry con la misma idempotency_key no re-mueve
         # efectivo; rejuega el movimiento original desde el ledger (antes de validar
         # saldo actual, que ya se consumió en la ejecución original). Aislado por
@@ -174,7 +177,8 @@ class WithdrawCashFromAccount:
                     scope.legacy_portfolio_id, amount
                 )
                 description = note or "Retirada externa (simulada)"
-                executed_at = await self._ledger_repo.next_executed_at(scope.account.id)
+                # El instante sale del secuenciador del ledger, invocado internamente
+                # por ``append_cash_movement`` (P2/N2, v2.39.3).
                 entry = await self._ledger_repo.append_cash_movement(
                     account_id=account_id,
                     portfolio_id=scope.portfolio.id,
@@ -185,7 +189,6 @@ class WithdrawCashFromAccount:
                     reference_id=movement_id,
                     reference_type="external",
                     description=description,
-                    executed_at=executed_at,
                 )
                 await self._account_repo.touch_activity(account_id)
         except IdempotencyKeyExists:

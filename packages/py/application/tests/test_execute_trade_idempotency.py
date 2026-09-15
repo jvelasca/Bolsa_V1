@@ -122,6 +122,9 @@ class _FakeAccountRepo:
     async def resolve_scope(self, account_id: str, portfolio_id: str | None = None) -> _FakeScope:
         return self.scope
 
+    async def lock_account(self, account_id: str) -> None:
+        """P1/N1 (v2.39.3): mutex financiero por cuenta (no-op en el fake)."""
+
     async def touch_activity(self, account_id: str) -> None:
         self.touched += 1
 
@@ -204,7 +207,6 @@ class _FakeLedgerRepo:
         reference_id: str,
         amount: float | None = None,
         balance_after: float | None = None,
-        executed_at: object | None = None,
         **_: object,
     ) -> None:
         self.rows.append((entry_type, reference_id))
@@ -212,7 +214,9 @@ class _FakeLedgerRepo:
             self.trade_amount = amount
         if balance_after is not None:
             self.trade_balance = balance_after
-        self.trade_executed_at = executed_at
+        # P2/N2 (v2.39.3): el instante sale del secuenciador, invocado internamente por
+        # el repo real; el fake replica ese comportamiento.
+        self.trade_executed_at = await self.next_executed_at("")
 
     async def append_fee(
         self,
@@ -220,14 +224,13 @@ class _FakeLedgerRepo:
         amount: float,
         reference_id: str,
         balance_after: float | None = None,
-        executed_at: object | None = None,
         **_: object,
     ) -> None:
         self.rows.append(("fee", reference_id))
         self.fee_amount = amount
         if balance_after is not None:
             self.fee_balance = balance_after
-        self.fee_executed_at = executed_at
+        self.fee_executed_at = await self.next_executed_at("")
 
 
 def _build() -> tuple[ExecuteTrade, _FakePortfolioRepo, _FakeLedgerRepo]:
@@ -1819,7 +1822,8 @@ async def test_ledger_trade_y_fee_comparten_el_executed_at_del_trade() -> None:
     cadena ``balance_after[n] == balance_after[n-1] + amount[n]``. El cash era correcto,
     pero el ledger dejaba de ser reproducible/auditable.
 
-    Ahora ambos derivan del ``executed_at`` de la transacción, con el trade 1 µs antes.
+    Ahora ambos derivan del secuenciador del ledger (invocado internamente por los
+    ``append_*``), con el trade 1 µs antes que la fee.
     """
     use_case, _portfolio, ledger = _build()
 
@@ -1832,27 +1836,12 @@ async def test_ledger_trade_y_fee_comparten_el_executed_at_del_trade() -> None:
         idempotency_key="inst-1|2026-08-20|pol-1|entry_long",
     )
 
-    # Ambos asientos comparten el MISMO instante base: el ``executed_at`` que devuelve el
-    # repo de cartera (la transacción), no un now() distinto por llamada.
+    # El secuenciador se invoca UNA vez por asiento (trade y fee), de forma que la fee
+    # queda exactamente 1 µs después del trade (monotonía estricta, no reloj de pared).
     assert ledger.trade_executed_at is not None, "el trade debe fijar su executed_at"
     assert ledger.fee_executed_at is not None, "la fee debe fijar su executed_at"
     assert ledger.trade_executed_at == ledger.fee_executed_at - timedelta(microseconds=1)
     assert ledger.trade_executed_at < ledger.fee_executed_at
-
-
-def test_ledger_ordering_helper_es_determinista() -> None:
-    """El helper de orden fija trade antes que fee, y los iguala cuando no hay fee."""
-    from bolsa_application.accounts.trade import _ledger_ordering
-
-    base = datetime(2026, 9, 1, 12, 0, 0, 500000, tzinfo=UTC)
-
-    trade_at, fee_at = _ledger_ordering(base, has_fee=True)
-    assert trade_at < fee_at
-    assert (fee_at - trade_at) == timedelta(microseconds=1)
-    assert fee_at == base
-
-    trade_at, fee_at = _ledger_ordering(base, has_fee=False)
-    assert trade_at == fee_at == base
 
 
 def test_parse_executed_at_tolera_formatos_inesperados() -> None:
@@ -1890,7 +1879,9 @@ async def test_trade_usa_el_secuenciador_del_ledger_no_el_reloj() -> None:
         idempotency_key="inst-1|2026-08-20|pol-1|entry_long",
     )
 
-    assert ledger.sequence_calls == 1, "el trade debe pedir UN instante al secuenciador"
+    assert ledger.sequence_calls == 2, (
+        "trade y fee deben pedir un instante al secuenciador (uno por asiento)"
+    )
     assert ledger.trade_executed_at is not None
     # El instante usado NO es el de la transacción de dominio (reloj), sino el secuenciado.
     assert ledger.trade_executed_at != ledger.transaction_executed_at, (

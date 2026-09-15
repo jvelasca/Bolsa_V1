@@ -148,6 +148,28 @@ class SqlAlchemyAccountRepository:
     ) -> AccountScope:
         return await self._load_scope(account_id, portfolio_id)
 
+    async def lock_account(self, account_id: str) -> None:
+        """Mutex financiero por cuenta — ``SELECT ... FOR UPDATE`` (P1/N1, v2.39.3).
+
+        El secuenciador del ledger (``next_executed_at``) es por ``account_id``, de modo
+        que su exclusión debe ser por CUENTA, no por cartera: dos carteras de la misma
+        cuenta que no comparten ``legacy_portfolio_id`` no se excluirían entre sí y podrían
+        leer el mismo ``MAX(executed_at)``, produciendo dos asientos con idéntico instante.
+        Este lock alinea la unidad de locking con la unidad de secuenciación (cuenta).
+
+        Debe invocarse ANTES de cualquier lock de cartera (``with_for_update`` sobre
+        ``PortfolioRow``) y mantenerse hasta el commit, de modo que todos los escritores
+        financieros de una cuenta serializan en orden determinista cuenta → cartera.
+        """
+        stmt = (
+            select(InvestmentAccountRow.id)
+            .where(InvestmentAccountRow.id == account_id)
+            .with_for_update()
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+
     async def resolve_default_account_for_owner(
         self,
         *,
