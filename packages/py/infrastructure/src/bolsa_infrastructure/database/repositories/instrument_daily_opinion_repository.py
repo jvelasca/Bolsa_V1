@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_infrastructure.database.models import InstrumentDailyOpinionRow
@@ -163,55 +164,61 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
         instrument_id = str(payload["instrument_id"])
         as_of: date = payload["as_of_bar_date"]
         source = str(payload.get("source") or "on_demand")
-        key = str(payload.get("idempotency_key") or make_idempotency_key(instrument_id, as_of, source))
+        key = str(
+            payload.get("idempotency_key") or make_idempotency_key(instrument_id, as_of, source)
+        )
         now = datetime.now(UTC)
-        existing = await self.get(instrument_id, as_of, source)
-        if existing is None:
-            row = InstrumentDailyOpinionRow(
-                id=f"ido_{uuid4().hex}",
-                instrument_id=instrument_id,
-                account_id=payload.get("account_id"),
-                as_of_bar_date=as_of,
-                stance=str(payload["stance"]),
-                dictamen_stars=int(payload["dictamen_stars"]),
-                strategy_stars=payload.get("strategy_stars"),
-                io_score=payload.get("io_score"),
-                fa_score=payload.get("fa_score"),
-                ta_score=payload.get("ta_score"),
-                distress=bool(payload.get("distress") or False),
-                reasons=list(payload.get("reasons") or []),
-                gate_status=payload.get("gate_status"),
-                top_id=payload.get("top_id"),
-                top_version=payload.get("top_version"),
-                source=source,
-                engine_version=str(payload.get("engine_version") or "opinion_v1"),
-                idempotency_key=key,
-                computed_at=payload.get("computed_at") or now,
-                created_at=now,
-                updated_at=now,
-            )
-            self._session.add(row)
-            await self._session.commit()
-            await self._session.refresh(row)
-            return _map(row)
-
-        stmt = select(InstrumentDailyOpinionRow).where(InstrumentDailyOpinionRow.id == existing.id)
+        insert_stmt = pg_insert(InstrumentDailyOpinionRow).values(
+            id=f"ido_{uuid4().hex}",
+            instrument_id=instrument_id,
+            account_id=payload.get("account_id"),
+            as_of_bar_date=as_of,
+            stance=str(payload["stance"]),
+            dictamen_stars=int(payload["dictamen_stars"]),
+            strategy_stars=payload.get("strategy_stars"),
+            io_score=payload.get("io_score"),
+            fa_score=payload.get("fa_score"),
+            ta_score=payload.get("ta_score"),
+            distress=bool(payload.get("distress") or False),
+            reasons=list(payload.get("reasons") or []),
+            gate_status=payload.get("gate_status"),
+            top_id=payload.get("top_id"),
+            top_version=payload.get("top_version"),
+            source=source,
+            engine_version=str(payload.get("engine_version") or "opinion_v1"),
+            idempotency_key=key,
+            computed_at=payload.get("computed_at") or now,
+            created_at=now,
+            updated_at=now,
+        )
+        # Upsert atómico por (instrument_id, as_of_bar_date, source): antes era
+        # check-then-insert y dos peticiones concurrentes del mismo día duplicaban
+        # el dictamen (índice único: migración 041). `idempotency_key` no se
+        # reescribe en conflicto (semántica previa: la clave se fija al crear).
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[
+                InstrumentDailyOpinionRow.instrument_id,
+                InstrumentDailyOpinionRow.as_of_bar_date,
+                InstrumentDailyOpinionRow.source,
+            ],
+            set_={
+                "account_id": insert_stmt.excluded.account_id,
+                "stance": insert_stmt.excluded.stance,
+                "dictamen_stars": insert_stmt.excluded.dictamen_stars,
+                "strategy_stars": insert_stmt.excluded.strategy_stars,
+                "io_score": insert_stmt.excluded.io_score,
+                "fa_score": insert_stmt.excluded.fa_score,
+                "ta_score": insert_stmt.excluded.ta_score,
+                "distress": insert_stmt.excluded.distress,
+                "reasons": insert_stmt.excluded.reasons,
+                "gate_status": insert_stmt.excluded.gate_status,
+                "top_id": insert_stmt.excluded.top_id,
+                "top_version": insert_stmt.excluded.top_version,
+                "engine_version": insert_stmt.excluded.engine_version,
+                "computed_at": insert_stmt.excluded.computed_at,
+                "updated_at": insert_stmt.excluded.updated_at,
+            },
+        ).returning(InstrumentDailyOpinionRow)
         row = (await self._session.execute(stmt)).scalar_one()
-        row.account_id = payload.get("account_id")
-        row.stance = str(payload["stance"])
-        row.dictamen_stars = int(payload["dictamen_stars"])
-        row.strategy_stars = payload.get("strategy_stars")
-        row.io_score = payload.get("io_score")
-        row.fa_score = payload.get("fa_score")
-        row.ta_score = payload.get("ta_score")
-        row.distress = bool(payload.get("distress") or False)
-        row.reasons = list(payload.get("reasons") or [])
-        row.gate_status = payload.get("gate_status")
-        row.top_id = payload.get("top_id")
-        row.top_version = payload.get("top_version")
-        row.engine_version = str(payload.get("engine_version") or "opinion_v1")
-        row.computed_at = payload.get("computed_at") or now
-        row.updated_at = now
         await self._session.commit()
-        await self._session.refresh(row)
         return _map(row)

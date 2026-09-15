@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_infrastructure.database.models import InstrumentNarrativeRow
@@ -78,31 +79,29 @@ class SqlAlchemyInstrumentNarrativeRepository:
             raise ValueError(f"source inválido: {source}")
         validate_narrative_body(body)
         now = datetime.now(UTC)
-        existing = await self.get(instrument_id, scope)
-        if existing is None:
-            row = InstrumentNarrativeRow(
-                id=f"inar_{uuid4().hex}",
-                instrument_id=instrument_id,
-                scope=scope,
-                body=body,
-                source=source,
-                version=1,
-                created_at=now,
-                updated_at=now,
-            )
-            self._session.add(row)
-            await self._session.commit()
-            await self._session.refresh(row)
-            return _map(row)
-
-        stmt = select(InstrumentNarrativeRow).where(InstrumentNarrativeRow.id == existing.id)
+        insert_stmt = pg_insert(InstrumentNarrativeRow).values(
+            id=f"inar_{uuid4().hex}",
+            instrument_id=instrument_id,
+            scope=scope,
+            body=body,
+            source=source,
+            version=1,
+            created_at=now,
+            updated_at=now,
+        )
+        # Upsert atómico por (instrument_id, scope): antes era check-then-insert y
+        # dos escritores concurrentes duplicaban la fila (índice único: migración 041).
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[InstrumentNarrativeRow.instrument_id, InstrumentNarrativeRow.scope],
+            set_={
+                "body": insert_stmt.excluded.body,
+                "source": insert_stmt.excluded.source,
+                "version": InstrumentNarrativeRow.version + 1,
+                "updated_at": insert_stmt.excluded.updated_at,
+            },
+        ).returning(InstrumentNarrativeRow)
         row = (await self._session.execute(stmt)).scalar_one()
-        row.body = body
-        row.source = source
-        row.version = int(row.version or 1) + 1
-        row.updated_at = now
         await self._session.commit()
-        await self._session.refresh(row)
         return _map(row)
 
     async def delete(self, instrument_id: str, scope: str = "estudio") -> bool:

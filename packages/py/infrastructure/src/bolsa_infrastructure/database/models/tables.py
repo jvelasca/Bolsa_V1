@@ -75,6 +75,11 @@ class Base(DeclarativeBase):
 
 class InstrumentRow(Base):
     __tablename__ = "instruments"
+    __table_args__ = (
+        # Clave natural del catálogo. Reconciliado con Prisma en la migración 041
+        # (inventario de drift: Prisma la declaraba, el baseline Alembic no la creó).
+        UniqueConstraint("symbol", "exchange", name="instruments_symbol_exchange_key"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     symbol: Mapped[str] = mapped_column(String)
@@ -183,6 +188,13 @@ class PortfolioRow(Base):
 
 class PositionRow(Base):
     __tablename__ = "positions"
+    __table_args__ = (
+        # Una posición por cartera×instrumento. Reconciliado en la migración 041;
+        # el trade path ya la protege con lock de cartera + savepoint (R-8A).
+        UniqueConstraint(
+            "portfolio_id", "instrument_id", name="positions_portfolio_id_instrument_id_key"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     portfolio_id: Mapped[str] = mapped_column("portfolio_id", ForeignKey("portfolios.id"))
@@ -354,6 +366,15 @@ class IndexSubscribeJobRow(Base):
 
 class InstrumentListItemRow(Base):
     __tablename__ = "instrument_list_items"
+    __table_args__ = (
+        # Un instrumento no puede repetirse dentro de la misma lista. Reconciliado
+        # en la migración 041; el writer ya deduplica en memoria antes de insertar.
+        UniqueConstraint(
+            "list_id",
+            "instrument_id",
+            name="instrument_list_items_list_id_instrument_id_key",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     list_id: Mapped[str] = mapped_column("list_id", ForeignKey("instrument_lists.id"))
@@ -472,6 +493,16 @@ class ScanJobRow(Base):
 
 class DataSnapshotRow(Base):
     __tablename__ = "data_snapshots"
+    __table_args__ = (
+        # Un snapshot por instrumento×timeframe×versión de datos. Reconciliado en la
+        # migración 041; el upsert actual solo resuelve conflicto por id (backstop).
+        UniqueConstraint(
+            "instrument_id",
+            "timeframe",
+            "data_version",
+            name="data_snapshots_instrument_timeframe_version_idx",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     instrument_id: Mapped[str] = mapped_column(
@@ -563,6 +594,13 @@ class ExecutionPolicyRow(Base):
 
 class PositionPolicyRow(Base):
     __tablename__ = "position_policies"
+    __table_args__ = (
+        # Una política por cuenta×instrumento (el caso de uso ya rechaza el duplicado
+        # con ValueError). Reconciliado en la migración 041.
+        UniqueConstraint(
+            "account_id", "instrument_id", name="position_policies_account_instrument_idx"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     account_id: Mapped[str] = mapped_column(
@@ -1829,6 +1867,15 @@ class InstrumentStrategyTopRow(Base):
     """TOP-3 estrategias AT por instrumento (semifinal del embudo coach)."""
 
     __tablename__ = "instrument_strategy_tops"
+    __table_args__ = (
+        # Contrato del upsert (instrument_strategy_top_repository.upsert con
+        # ON CONFLICT (instrument_id, timeframe)). Reconciliado en la migración 041:
+        # su ausencia en el baseline Alembic permitió el duplicado del 2026-09-14 que
+        # dejó el endpoint de opiniones diarias en MultipleResultsFound permanente.
+        UniqueConstraint(
+            "instrument_id", "timeframe", name="instrument_strategy_tops_instrument_timeframe_uq"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     instrument_id: Mapped[str] = mapped_column(
@@ -1852,6 +1899,19 @@ class InstrumentDailyOpinionRow(Base):
     """Dictamen diario Estudio (O3-C / ADR-022)."""
 
     __tablename__ = "instrument_daily_opinions"
+    __table_args__ = (
+        # Contrato del upsert (instrument_daily_opinion_repository.upsert con
+        # ON CONFLICT (instrument_id, as_of_bar_date, source)). Reconciliado en la 041.
+        # NOTA: el nombre que declaró Prisma para esta clave tenía 65 caracteres y
+        # PostgreSQL lo habría truncado en silencio (límite 63), así que aquí se usa un
+        # nombre explícito que cabe entero.
+        UniqueConstraint(
+            "instrument_id",
+            "as_of_bar_date",
+            "source",
+            name="instrument_daily_opinions_instrument_id_asof_source_key",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     instrument_id: Mapped[str] = mapped_column(
@@ -1883,6 +1943,13 @@ class InstrumentNarrativeRow(Base):
     """Resumen corto de evolución por instrumento (scope estudio/global/trading)."""
 
     __tablename__ = "instrument_narratives"
+    __table_args__ = (
+        # Contrato del upsert (instrument_narrative_repository.upsert con
+        # ON CONFLICT (instrument_id, scope)). Reconciliado en la migración 041.
+        UniqueConstraint(
+            "instrument_id", "scope", name="instrument_narratives_instrument_id_scope_key"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     instrument_id: Mapped[str] = mapped_column(
