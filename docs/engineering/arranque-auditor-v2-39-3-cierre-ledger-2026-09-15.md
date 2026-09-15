@@ -8,7 +8,8 @@ Eres auditor externo de Bolsa V1 **candidato V2.39.3**. Auditas **desde GitHub**
 entorno local.
 
 - **Delta:** `v2.39.2-beta` (`9444b364`) → tag **`v2.39.3-beta`** (anotado) → peeled al commit de
-  sellado de `main` `b77a36aa`. El **código** auditado es el commit del tag.
+  sellado de `main` (el auditor lo resuelve con `git rev-list -n 1 v2.39.3-beta`); el **código**
+  auditado está en `b77a36aa`.
 - **`main`:** incluye, por encima del código, el commit de documentación de auditoría; el tag
   re-sellado apunta a ese commit final (el auditor lo resuelve con
   `git rev-list -n 1 v2.39.3-beta`).

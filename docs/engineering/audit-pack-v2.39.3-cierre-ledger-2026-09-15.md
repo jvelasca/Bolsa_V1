@@ -5,7 +5,8 @@
 > (AUDITORIA 1 y AUDITORIA 2) y el bug de `totalSamples` en `discovery_evidence.py`.
 >
 > **Base auditada:** `v2.39.2-beta` (`9444b364`).
-> **Delta:** tag **`v2.39.3-beta`** → commit de sellado `b77a36aa` (peel: `git rev-list -n 1 v2.39.3-beta`).
+> **Commit de código:** `b77a36aa` (package **`1.64.3-beta`**).
+> **Tag:** `v2.39.3-beta` (anotado) — el auditor lo resuelve con `git rev-list -n 1 v2.39.3-beta`.
 > **Alembic head:** `039_research_trials_regime` (esta fase **no** añade migración).
 > **Flags:** sin cambios.
 >
