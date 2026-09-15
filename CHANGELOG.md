@@ -194,6 +194,18 @@ hacia esas tablas, 0 hacia la clave natural).
 - Run Python CI `35018635017` (tras el sellado): `quality` **en verde con la batería completa**
   (2m29s), `lifecycle-pg`, `paper-forward-pg` y `grammar-discovery-pg` en verde; `auto-v2-durable-pg`
   destapó el fallo de linaje del roundtrip (arriba), que el job ocultaba con el `tee` sin `pipefail`
+- Run Python CI `35019474204` (tras el fix del linaje): **5/5 jobs en verde** (`quality`, `lifecycle-pg`,
+  `paper-forward-pg`, `grammar-discovery-pg`, `auto-v2-durable-pg`). `quality` ejecuta ahora
+  **1579 passed, 37 skipped** donde el step truncado corría 936 tests y nunca llegaba a
+  `apps/api-python/tests`
+- Lista de `release-tag-ci.yml` (la que el `#` truncaba) ejecutada en local con el comando exacto del
+  workflow: job `python` / `Pytest offline` → **1624 passed**; job `lifecycle-pg` → **131 passed,
+  1 failed**, y el fallo es el flaky **conocido y preexistente**
+  `test_a9_scheduler_process_restart_with_open_protected_position_pg` ("el proceso debe abrir (BUY
+  durable) antes del restart", con `reconciliation=UNKNOWN`/aperturas vetadas): hasta ahora **no se
+  ejecutaba en ningún job de release** porque el `#` cortaba la lista ~30 ficheros antes. Queda
+  declarado como deuda (no se toca en este sellado): al etiquetar `v2.40.2-beta` ese test entra por
+  primera vez en la certificación de release
 
 ## [1.65.1-beta] — V2.40.1 · AUTO Safety Hardening (fail-closed real + fuentes reales) — 2026-09-15
 
