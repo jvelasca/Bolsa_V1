@@ -2,6 +2,231 @@
 
 All notable releases of Bolsa V1.
 
+## [1.65.2-beta] — V2.40.2 · Claves naturales únicas (reconciliación Prisma→Alembic + upsert atómico) — 2026-09-15
+
+Migración nueva **`041_unique_natural_keys`** (head `040` → **`041`**): las **8 claves naturales
+que Prisma declaraba y el baseline Alembic nunca creó** pasan a existir como índice único, y los
+**tres `upsert` que escriben sobre ellas** resuelven el conflicto dentro de PostgreSQL. El ledger,
+el settlement, el `RiskGate`, la reconciliación y el AUTO **no cambian** (cambio aditivo de DDL +
+tres escrituras que pasan de `SELECT`+`INSERT` a `INSERT … ON CONFLICT`).
+
+### El incidente que lo motiva (visible en la consola del dev server)
+
+`GET /api/instrument-daily-opinions` quedó en **`MultipleResultsFound` permanente**:
+
+```
+instrument_strategy_top_repository.py:60  row = (await self._session.execute(stmt)).scalar_one_or_none()
+sqlalchemy.exc.MultipleResultsFound: Multiple rows were found when one or none was required
+```
+
+La causa raíz es **doble**, y ninguna de las dos mitades basta sola:
+
+1. **Sin backstop en la BD.** La migración Prisma `20260727160000_instrument_strategy_tops`
+   declaró `UNIQUE (instrument_id, timeframe)`, pero el baseline Alembic (003) solo copia columnas
+   y constraints de FK/`UniqueConstraint` de `tables.py`: al **no estar declarada en el modelo**,
+   el índice nunca se creó. Verificado contra la BD viva: solo existían `_pkey` y la FK.
+2. **Escritura no atómica.** `instrument_strategy_top_repository.upsert` era un
+   _check-then-insert_ (`get()` → `INSERT`): dos escritores concurrentes ven `None` e insertan
+   ambos. Resultado medido: **12 grupos duplicados / 24 filas**, con pares a 7-8 ms de distancia
+   (`created_at` 19:32:20.065952 vs 19:32:20.071963), del barrido del **2026-09-14**.
+
+Lo que lo hacía **irrecuperable** (no un 500 transitorio): `get()` usa `scalar_one_or_none()` y el
+propio `upsert` empieza llamando a `get()`, así que el instrumento duplicado quedaba envenenado
+para siempre.
+
+### Inventario medido antes de tocar nada (BD de desarrollo, 2026-09-15)
+
+De las 10 claves naturales de `schema.prisma`, **8 faltaban** en la BD. Duplicados reales:
+
+| tabla                                                              |  filas | grupos dup | filas implicadas |
+| ------------------------------------------------------------------ | -----: | ---------: | ---------------: |
+| **`instrument_strategy_tops(instrument_id, timeframe)`**           |     46 |     **12** |           **24** |
+| `instruments(symbol, exchange)`                                    |    243 |          0 |                0 |
+| `ohlcv_bars(instrument_id, timeframe, timestamp)`                  | 95 224 |          0 |                0 |
+| `instrument_daily_opinions(instrument_id, as_of_bar_date, source)` |    160 |          0 |                0 |
+| `instrument_list_items(list_id, instrument_id)`                    |    112 |          0 |                0 |
+| `positions(portfolio_id, instrument_id)`                           |      0 |          0 |                0 |
+| `transactions(portfolio_id, idempotency_key)`                      |      0 |          0 |                0 |
+| `data_snapshots(instrument_id, timeframe, data_version)`           |      0 |          0 |                0 |
+| `position_policies(account_id, instrument_id)`                     |      0 |          0 |                0 |
+| `instrument_narratives(instrument_id, scope)`                      |      0 |          0 |                0 |
+
+Solo `instrument_strategy_tops` tenía duplicados ⇒ las otras 7 claves se pudieron crear **sin
+borrar un solo dato**.
+
+### Dedupe conservador (fail-closed: nunca borrar datos financieros en automático)
+
+- **`instrument_strategy_tops`**: se deduplica conservando la fila más reciente
+  (`updated_at`, `created_at`, `id`). Es una caché derivada del embudo coach: la más nueva es la
+  vigente por construcción. **46 → 34 filas** en la BD de desarrollo.
+- **Las otras 7: no se borra nada.** Si alguna tuviera duplicados al aplicar, la migración
+  **aborta nombrando tabla, columnas y filas de muestra**. Borrar un `instruments`/`positions`
+  duplicado cascadea a datos financieros, y `position_policies`/`instrument_narratives` son
+  contenido de usuario: esa decisión no es de una migración. Mejor un bloqueo visible que una
+  pérdida silenciosa.
+
+### Escrituras atómicas (las tres que podían duplicar)
+
+| repositorio                                  | clave                                     | antes                   | ahora                            |
+| -------------------------------------------- | ----------------------------------------- | ----------------------- | -------------------------------- |
+| `instrument_strategy_top_repository.upsert`  | `(instrument_id, timeframe)`              | `get()` → INSERT/UPDATE | `INSERT … ON CONFLICT DO UPDATE` |
+| `instrument_narrative_repository.upsert`     | `(instrument_id, scope)`                  | `get()` → INSERT/UPDATE | `INSERT … ON CONFLICT DO UPDATE` |
+| `instrument_daily_opinion_repository.upsert` | `(instrument_id, as_of_bar_date, source)` | `get()` → INSERT/UPDATE | `INSERT … ON CONFLICT DO UPDATE` |
+
+Semántica de datos **preservada**: `version` sigue incrementándose en conflicto, el `symbol` de
+tops se conserva si el llamante no aporta uno (`coalesce`), y el `idempotency_key` del dictamen no
+se reescribe. `instrument_daily_opinion_repository.upsert` mantiene además su `idempotency_key`
+único como segunda red.
+
+Las otras 5 tablas **no cambian de writer**: tienen guarda propia y el índice les queda de
+backstop (`positions` → lock de cartera + savepoint R-8A; `position_policies` → `ValueError` del
+caso de uso; `instruments` → `yahoo_symbol` único + import de usuario; `instrument_list_items` →
+dedupe en memoria + delete/insert en una transacción; `data_snapshots` → upsert por `id`).
+
+### Detalle que atrapó PostgreSQL (no el test)
+
+El nombre de índice que declaró Prisma para el dictamen diario
+(`instrument_daily_opinions_instrument_id_as_of_bar_date_source_key`) tiene **65 caracteres** y
+PostgreSQL **lo habría truncado en silencio** (límite 63): el `CREATE INDEX` falló con
+`IdentifierError` en el primer intento de `alembic upgrade head`. Se usa
+`instrument_daily_opinions_instrument_id_asof_source_key` (55), explícito y sin truncamiento. Es
+la única clave que no converge al nombre de Prisma.
+
+### Cambio de comportamiento observable (a tener en cuenta)
+
+- **Un `INSERT` crudo duplicado sobre cualquiera de las 8 claves ahora falla** con
+  `IntegrityError` en vez de crear una fila corrupta. Es el objetivo (fail-closed), y es
+  precisamente por eso que las tres escrituras atómicas **tenían que entrar en el mismo cambio**:
+  el índice solo, sin arreglar el `upsert`, habría convertido el duplicado silencioso en un 500.
+- **Bases con duplicados en las 7 tablas no deduplicadas bloquean el `upgrade`** con un error
+  explícito. La BD de desarrollo está limpia (0 grupos en todas); la migración se aplicó sin
+  incidencias.
+
+### Tests (job `auto-v2-durable-pg`, gate fail-if-skipped `UNIQUE_NATURAL_KEYS_PG_REQUIRED=1`)
+
+`apps/api-python/tests/test_unique_natural_keys_pg.py` (**7 tests nuevos**):
+
+- guardia **anti-deriva**: las 8 claves existen como índice único en `pg_indexes` (sin ella, la
+  reconciliación se vuelve a perder en la siguiente tabla que alguien añada "solo en Prisma");
+- **regresión del incidente**: dos `upsert` concurrentes del mismo `(instrument_id, timeframe)`
+  ⇒ UNA fila, sin excepción;
+- **backstop real**: un `INSERT` crudo duplicado lanza `IntegrityError` (certifica la propiedad
+  fail-closed sin pasar por el repositorio);
+- semántica de `version`/`symbol` conservada en el upsert de tops;
+- concurrencia de narrativas y de dictamen diario ⇒ una fila por clave;
+- **roundtrip de la 041 con duplicados preexistentes**: `downgrade` a `040`, se insertan a mano dos
+  filas de la misma clave con distinto `updated_at`, `upgrade` a `head` ⇒ queda **la más reciente**
+  y el índice vuelve a existir (reproducción exacta de las 24 filas del incidente).
+
+Se actualizó `_ALEMBIC_HEAD` en `test_discovery_evidence_snapshot_pg.py` (`040` → `041`): los tests
+de roundtrip existentes ya lo usan como única fuente.
+
+### Verificación
+
+- `ruff check packages/py apps/api-python --config pyproject.toml` → **0**
+- `ruff format` sobre los ficheros tocados → aplicado
+- `mypy domain/market/infrastructure/application/apps-api-python` → **0 errores** (482 ficheros)
+- `lint-imports` → **4/4 contratos**
+- Batería offline `quality` → **2793 passed**
+- `packages/py/infrastructure/tests` → **138 passed, 1 xfailed**
+- Job `auto-v2-durable-pg` (4 ficheros, PG real) → **28 passed, 0 skipped**
+- Migración aplicada en la BD de desarrollo: head `041`, las 8 claves presentes y
+  `instrument_strategy_tops` **46 → 34 filas / 0 grupos duplicados**
+
+## [1.65.1-beta] — V2.40.1 · AUTO Safety Hardening (fail-closed real + fuentes reales) — 2026-09-15
+
+Endurecimiento de **AUTO 2.0** sobre `v2.40-beta`: los siete P0 de la auditoría de esa versión
+quedan **cerrados** en el pipeline de decisión, y las fuentes que lo alimentan (sector, liquidez,
+edge, régimen) dejan de ser inyecciones de test y pasan a estar **cableadas en producción**. La
+regla que gobierna todo el incremento es una sola: **la ausencia de dato no puede aprobar nada**.
+
+Sin migración nueva (Alembic head se queda en **`040_auto_v2_durable_state`**). El ledger, el
+settlement, el `RiskGate` y la reconciliación **no cambian**: toda intención sigue pasando por el
+mismo _Single Decision Spine_. El flag sigue siendo `AUTO_ENGINE_SIM_V2` (**OFF por defecto**; con
+OFF el comportamiento es el de `v2.39.3-beta`).
+
+### Matriz de gates fail-closed (solo el estado explícito permite entrar)
+
+Nuevo módulo puro `bolsa_analytics.cognitive.trade_context` con tri-estados deterministas
+(`SectorResolutionStatus`, `LiquidityStatus`, `CorrelationStatus`) y `TradeContext`, que resuelve
+sector declarado vs. catálogo, ADV notional y frescura de fundamentales:
+
+| Estado                 | Cuándo                                                      | Efecto en el motor                                                             |
+| ---------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `KNOWN` / `CALCULATED` | Dato presente, coherente y fresco (≤ `sector_max_age_days`) | Único estado que permite **ENTRY**                                             |
+| `UNKNOWN`              | No hay dato                                                 | Veto `sector_unknown` / `liquidity_unknown`                                    |
+| `CONFLICTING`          | El `memo sector=` y `instruments.sector` difieren           | Veto `sector_conflicting`                                                      |
+| `STALE`                | `fetchedAt` de fundamentales supera la edad máxima          | Veto `sector_stale`                                                            |
+| `UNAVAILABLE`          | Correlación no calculable con el gate activo                | Veto `correlation_unknown`                                                     |
+| Posición abierta opaca | Cualquier posición abierta con sector no-`KNOWN`            | Veto `sector_exposure_unverifiable` (no se sube exposición sobre estado opaco) |
+
+- **P0-1 · Correlación fail-open.** `_correlation_conflict()` devolvía `False` con
+  `correlation is None` ⇒ "el dato no existe" se aprobaba como "sin conflicto". Ahora, con el gate
+  de correlación activo, solo `CALCULATED` pasa; el resto veta con `correlation_unknown`.
+- **P0-2 · Concentración sectorial sobre cajas opacas.** `build_worker_snapshot()` **no
+  transmitía el `sector`** de las posiciones abiertas, así que todas caían al sentinel `<unknown>`
+  de `portfolio_fit.py` y el sector del candidato se medía **solo contra sí mismo**. Ahora el
+  snapshot lleva los sectores **conocidos** y una posición de sector no fiable se publica
+  **deliberadamente opaca**: el motor lo detecta y veta `sector_exposure_unverifiable` en vez de
+  asumir que la cartera está limpia.
+- **P0-3 · Sobre-gasto de riesgo intra-tick.** `_committed_position()` no propagaba
+  `risk_amount`, así que `risk_used` no subía dentro del tick y todas las candidatas del mismo tick
+  se evaluaban contra la **misma** foto inicial. Ahora cada aprobación reconstruye una **foto de
+  trabajo** (`_working_snapshot`) que acumula riesgo y exposición comprometidos: A → reserva → B →
+  reserva → C. Invariante: 6 candidatas de riesgo 1 % con presupuesto 6 % ⇒ exactamente 6
+  aprobadas, `risk_remaining == 0` y la 7ª veta por `risk_budget_exceeded`.
+- **P0-4 · Edge y liquidez inventados.** `V2Tunables.default_edge = 0.9` convertía "la estrategia
+  no declara edge" en "oportunidad excelente", y `_score_from_signal()` puntuaba
+  `liquidity = 1.0` cuando el notional era `None`. **Breaking (en beta):** se elimina el env
+  `AUTO_ENGINE_SIM_V2_DEFAULT_EDGE` y el campo `default_edge`; el edge ausente vale **0** (por
+  debajo de `min_edge` ⇒ NO ENTRY) y la liquidez ausente veta. El edge **real** pasa a ser un dato
+  persistido y auditable: `EdgeReportRow.edge_score` de la versión de estrategia vía
+  `latest_edge_report()` (prioridad `memo edge=` > EdgeReport > nada).
+- **P0-5 · Identidad de señal opcional y dedupe dependiente del orden.** `_signal_rejection()` no
+  descartaba sin `signal_id` y el dedupe usaba `deduped.setdefault(...)`, de modo que el conjunto
+  aprobado dependía del **orden de entrada**. Ahora `signal_id` vacío ⇒
+  `SIGNAL_IDENTITY_MISSING` ⇒ NO ENTRY, y la selección usa una clave canónica
+  (`canonical_candidate_key`: edge desc → versión → barra → `signal_id` → instrumento) con
+  `min(...)` por instrumento: el mismo conjunto de señales produce el mismo veredicto en cualquier
+  orden.
+- **P0-6 · `EXIT_ONLY` no era absoluto.** `manage_position()` solo forzaba la venta total por
+  régimen si `order_action == "hold"`, así que `REDUCE`/`TAKE_PROFIT`/trailing ganaban al
+  exit-only. Ahora `EXIT_ONLY` tiene **precedencia absoluta**: liquida el remanente e ignora el
+  resto de vías de decisión.
+- **P0-7 · AUTO V2 ciego en producción.** `AutoSimRuntime` construía el worker **sin**
+  `regime_source` ni `sector_source` (solo los tests los inyectaban) y no existía
+  `liquidity_source` ⇒ en producción el régimen era `UNKNOWN` ⇒ exit-only ⇒ **nunca abría nada**.
+  Ahora el runtime compone los lectores sobre la sesión viva del tick: régimen con
+  `DiscoveryRegimeSource` + `bars_provider` sobre `SqlAlchemyOhlcvRepository`, contexto de cartera
+  con `CatalogTradeContextSource` (nueva lectura en una query
+  `list_trade_context_by_ids` → `sector`, `advUsd` y `fetchedAt` del catálogo) y edge con
+  `EdgeReportSource` sobre `SqlAlchemyCognitiveRepository`. El override
+  `AUTO_ENGINE_SIM_V2_REGIME` sigue teniendo prioridad.
+
+**Consecuencia operativa (documentada, no un bug):** AUTO solo entrará si hay **sector + ADV
+frescos** (≤ `sector_max_age_days`, 30 días por defecto) y un `EdgeReport` vigente de la versión
+ACTIVE. Si los fundamentales están caducados, AUTO queda en **NO ENTRY** (no en "asumir válido").
+
+- **Verificación.** `ruff check` **limpio** (el comando que gatea CI: `E/F/I/UP/B` sobre
+  `packages/py` + `apps/api-python`) · `mypy` **0 errores** en 482
+  ficheros · _import-linter_ **4/4 contratos KEPT** · batería exacta del job `quality`
+  **1616 passed** · `packages/py` (application + analytics + domain) **2347 passed** · job
+  `auto-v2-durable-pg` (PG real, `fail-if-skipped`) **21 passed**, incluido el test nuevo
+  `test_instrument_trade_context_pg.py` (contrato del contexto de cartera: clave por `id` y por
+  `symbol`, dato ausente ⇒ `None` explícito, nunca un default). Tests nuevos de los gates:
+  `test_plan_v2_tick_unknown_sector_is_rejected`, `_unknown_liquidity_is_rejected`,
+  `_sector_conflict_with_catalog_is_rejected`, `_stale_observation_is_rejected`,
+  `_unknown_correlation_blocks_when_gate_on`,
+  `_open_position_without_sector_blocks_new_entries`, `_dedupe_is_order_independent`,
+  `edge_from_package_has_no_default`, `test_plan_v2_tick_without_identity_is_rejected` y la
+  precedencia `EXIT_ONLY` sobre `REDUCE`/`TAKE_PROFIT`; en integración,
+  `test_v2_without_trade_sources_is_fail_closed` (sin liquidez/edge/sector el worker real no abre
+  nada: cascada `liquidity_unknown` → `edge_below_threshold` → `sector_unknown`).
+- **CI:** el test nuevo de PG entra en el job `auto-v2-durable-pg` de `python-ci.yml` (con
+  `INSTRUMENT_TRADE_CONTEXT_PG_REQUIRED=1` y el paso _fail-if-skipped_ ya existente) y en el job
+  de certificación de `release-tag-ci.yml`; en el job `quality` (sin PostgreSQL) queda
+  explícitamente ignorado, como el resto de las suites PG-gated.
+
 ## [1.65.0-beta] — V2.40 · AUTO 2.0 — Investment Operating System — 2026-09-15
 
 AUTO deja de ser un _orquestador de investigación + promoción de estrategias_ conectado a un

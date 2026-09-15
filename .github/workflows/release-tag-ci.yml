@@ -418,6 +418,14 @@ jobs:
       # posición + señales consumidas por barra, migración 040). Sin PG este test
       # skipearía en mudo, así que un skip aquí es un fallo duro.
       AUTO_V2_DURABLE_PG_REQUIRED: '1'
+      # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV + frescura)
+      # que alimenta los gates fail-closed del tick. Mismo gobierno: sin PG el test
+      # skipearía en mudo, así que un skip aquí es un fallo duro.
+      INSTRUMENT_TRADE_CONTEXT_PG_REQUIRED: '1'
+      # V2.40.2: claves naturales únicas (reconciliación Prisma→Alembic, migración 041).
+      # El dedupe con duplicados preexistentes y la atomicidad de los upsert de tops/
+      # narrativas/opiniones solo se certifican contra PostgreSQL real.
+      UNIQUE_NATURAL_KEYS_PG_REQUIRED: '1'
       # V2.25/A10: persistencia del Strategy Lifecycle (migración 030) en PG real.
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
       # V2.26/A10: ciclo completo del Auto Orchestrator sobre PG real (promoción solo
@@ -483,6 +491,14 @@ jobs:
           # sobre la misma BD con el plan operativo y las señales consumidas intactos
           # (migración 040). Gate fail-if-skipped: AUTO_V2_DURABLE_PG_REQUIRED=1.
           apps/api-python/tests/test_auto_v2_durable_pg.py
+          # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV +
+          # frescura) — la fuente REAL de los gates fail-closed del tick.
+          # Gate fail-if-skipped: INSTRUMENT_TRADE_CONTEXT_PG_REQUIRED=1.
+          apps/api-python/tests/test_instrument_trade_context_pg.py
+          # V2.40.2: claves naturales únicas — el "sin backstop + check-then-insert"
+          # que dejó la ruta de opiniones diarias en MultipleResultsFound permanente.
+          # Gate fail-if-skipped: UNIQUE_NATURAL_KEYS_PG_REQUIRED=1.
+          apps/api-python/tests/test_unique_natural_keys_pg.py
           apps/api-python/tests/test_health.py
           # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs
           # (deuda: drift silencioso). Ahora se ejecutan con gate fail-if-skipped.

@@ -136,6 +136,11 @@ jobs:
           # V2.40/AUTO 2.0: la durabilidad real del estado V2 (plan de posición +
           # señales consumidas, migración 040) necesita PG real (job auto-v2-durable-pg).
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
+          # V2.40.1/AUTO 2.0: el contexto de cartera del catálogo (sector + ADV +
+          # frescura) se certifica con PG real en el mismo job auto-v2-durable-pg.
+          --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
+          # V2.40.2: las claves naturales únicas (índices + upsert atómico) exigen PG.
+          --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
 
@@ -318,7 +323,7 @@ jobs:
     # el worker nuevo rehidrata el mismo PositionState (no lo reconstruye por ATR) y
     # sigue vetando el re-emitir la misma señal. Gate fail-if-skipped: sin PG real un
     # skip silencioso sería una certificación fantasma.
-    name: auto-v2-durable-pg (Alembic 040 + reinicio real, per-commit)
+    name: auto-v2-durable-pg (Alembic 040-041 + reinicio real, per-commit)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -342,6 +347,14 @@ jobs:
       DB_PASSWORD: bolsa_dev
       DB_NAME: bolsa_v1
       AUTO_V2_DURABLE_PG_REQUIRED: '1'
+      # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV + frescura) —
+      # la fuente REAL que alimenta los gates fail-closed del tick. Un skip silencioso
+      # invalidaría la certificación del cableado de producción.
+      INSTRUMENT_TRADE_CONTEXT_PG_REQUIRED: '1'
+      # V2.40.2: claves naturales únicas (reconciliación Prisma→Alembic, migración 041).
+      # El dedupe con duplicados preexistentes y la atomicidad de los upsert solo se
+      # certifican contra PostgreSQL real (job auto-v2-durable-pg).
+      UNIQUE_NATURAL_KEYS_PG_REQUIRED: '1'
       # El reinicio real usa el mismo camino durable del scheduler AUTO.
       AUTO_SCHEDULER_PG_REQUIRED: '1'
     steps:
@@ -354,13 +367,15 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Alembic upgrade head (hasta 040 incluida)
+      - name: Alembic upgrade head (hasta 041 incluida)
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
       - name: Pytest AUTO 2.0 durable PG (fail if skipped)
         run: >
           uv run pytest
           apps/api-python/tests/test_auto_v2_durable_pg.py
+          apps/api-python/tests/test_instrument_trade_context_pg.py
+          apps/api-python/tests/test_unique_natural_keys_pg.py
           apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
           -q
           --tb=short
