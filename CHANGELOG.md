@@ -2,6 +2,63 @@
 
 All notable releases of Bolsa V1.
 
+## [1.65.0-beta] — V2.40 · AUTO 2.0 — Investment Operating System — 2026-09-15
+
+AUTO deja de ser un _orquestador de investigación + promoción de estrategias_ conectado a un
+simulador y pasa a ser un **sistema operativo de inversión**: decide **qué** comprar, **cuándo**,
+**cuánto**, **cómo gestionar la posición** y **cuándo salir**. El settlement, el ledger y la
+reconciliación **no cambian**: AUTO 2.0 solo decide qué intención emitir, y todo sigue pasando por
+el mismo _Single Decision Spine_ (kill switch → Simulation Gate → RiskGate → settlement SIM).
+
+Toda la capa nueva vive detrás de un **flag de entorno**, `AUTO_ENGINE_SIM_V2=1`, **OFF por
+defecto**: sin el flag, AUTO se comporta exactamente como en `v2.39.3-beta`.
+
+- **P0 — Espina cognitiva (paquete `bolsa_analytics.cognitive`).**
+  `AutoPortfolioSnapshot` (foto canónica e inmutable del libro: posiciones, stops, exposición
+  bruta/neta, efectivo, régimen, `as_of`), `OpportunityRanker` (score determinista de cada
+  oportunidad: edge, R:R, liquidez y penalización por concentración), `RiskAllocator` (sizing por
+  presupuesto de riesgo y SL/TP derivados de ATR) y `SignalIdentity` (identidad estable de señal +
+  frescura). Todos **deterministas, puros y sin red** (contrato
+  `analytics-market-independence` intacto).
+- **P1 — Motor de decisión de cartera.** `PortfolioDecisionEngine`: decide **ENTRY/NO-ENTRY** a nivel
+  de cartera, con vetos **fail-closed** y motivo registrado (sin régimen operable, `position_exists`,
+  presupuesto de riesgo agotado, correlación, stop inválido, `min_edge`/`min_risk_reward`…). Publica
+  un `TradePlan` (el contrato del camino caliente) con stop estructural, objetivos y dirección, y
+  propaga el **sector** de la decisión.
+- **P2 — Gestión de posición por estado.** `PositionState` + `ExitPlan` + `PositionDecision` vía
+  `PositionManager`: stop estructural, T1/T2 (parciales), trailing, exit-only por régimen y cierre
+  de sesión — la gestión deja de depender de una `ProtectionConfig` global y pasa a ser **por
+  operación**.
+- **P3 — Regime gate direccional.** `MarketRegimeGate` veta entradas por régimen y **dirección**
+  (un `BULL_TREND` no autoriza cortos). `DiscoveryRegimeSource` conecta el régimen operativo real al
+  clasificador determinista de barras (`discovery_market_regime_v0`), con `fail-closed` (régimen
+  desconocido ⇒ `UNKNOWN` ⇒ **exit-only**, nunca entradas a ciegas).
+- **P4 — Durabilidad del estado V2 (migración nueva, head `040_auto_v2_durable_state`).** Un crash ya
+  no degrada la operativa:
+  - `sim_auto_positions.position_state` (JSONB): el **plan operativo** de cada posición se persiste
+    en cada cambio de cantidad y se **rehidrata exacto** al readoptar (`position_state_from_dict`) —
+    mismo stop, mismos objetivos, mismas parciales — en vez de reconstruirlo por ATR. Sin plan
+    durable (espejo legado) el fallback reconstruido se marca `adopted` (auditoría explícita).
+  - `sim_consumed_signals`: las **señales consumidas por barra** son durables, de modo que tras un
+    reinicio el motor no re-emite la MISMA oportunidad sobre la MISMA barra (anti-_churn_: stop-out
+    y re-entrada inmediata en la misma vela). La tabla se poda a la barra corriente.
+  - `SimDurableUnitOfWork` incorpora el store de señales: el espejo del fill y su dedupe o quedan
+    juntos, o no queda ninguno.
+- **Cableado en el worker.** `AutoSimulationWorker` incorpora el pipeline (`auto_v2_entry.py`):
+  snapshot → ranker → decisión → `TradePlan` → adaptador `trade_plan_to_decision_package` → spine.
+  El readopt durable, la marca de señal consumida (solo tras fill confirmado) y la poda de barras
+  viejas viven aquí.
+- **Verificación.** `ruff` / `ruff format` limpios · `mypy` sin incidencias · `packages/py/application/tests`
+  **1546 passed** · `packages/py/analytics` + `infrastructure` **816 passed, 1 xfailed** · suites
+  V2/worker/AUTO/PG/migraciones **82 passed** (incluye el roundtrip de la 040 y el reinicio real
+  sobre PostgreSQL). Tests nuevos: `test_auto_v2_entry.py`, `test_auto_investment_system.py`,
+  `test_portfolio_decision_engine.py`, `test_position_manager.py`,
+  `test_active_strategy_runtime_state.py`, `test_sim_durable_v2_state.py`,
+  `test_auto_portfolio_snapshot.py`, `test_opportunity_ranker.py`, `test_risk_allocator.py`,
+  `test_signal_and_regime.py`, `test_auto_v2_worker_integration.py`, `test_auto_v2_durable_pg.py`.
+  Los herméticos entran en la batería offline de CI y el de PG real en el job nuevo
+  `auto-v2-durable-pg` con **gate fail-if-skipped**.
+
 ## [1.64.3-beta] — V2.39.3 · Cierre P1/N1 (lock de cuenta) + P2/N2 (secuenciador forzado) + fix `totalSamples` — 2026-09-15
 
 Tercera pasada de la auditoría interna, esta vez sobre `v2.39.2-beta`. Cierra los dos hallazgos
