@@ -5,12 +5,13 @@
 > (AUDITORIA 1 y AUDITORIA 2) y el bug de `totalSamples` en `discovery_evidence.py`.
 >
 > **Base auditada:** `v2.39.2-beta` (`9444b364`).
+> **Delta:** tag **`v2.39.3-beta`** → commit de sellado `b77a36aa` (peel: `git rev-list -n 1 v2.39.3-beta`).
 > **Alembic head:** `039_research_trials_regime` (esta fase **no** añade migración).
 > **Flags:** sin cambios.
 >
-> **Nota de honestidad.** Este documento describe el **cierre de código** y sus pruebas. No
-> afirma un tag ni un sello CI de un commit aún no creado: la batería de verificación se
-> lista en §6 y queda por ejecutar en CI/local antes de sellar el tag.
+> **Nota de honestidad.** La verificación local está en verde (§6); el sello CI del tag
+> (`release-tag-ci`) queda por ejecutarse en GitHub tras el push. Este documento no afirma
+> un `GREEN` de CI hasta que `certify` lo confirme.
 
 ---
 
