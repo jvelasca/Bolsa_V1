@@ -58,6 +58,13 @@ def test_tunables_invalid_env_falls_back(monkeypatch: pytest.MonkeyPatch) -> Non
     assert cfg.min_edge == 0.30
 
 
+def test_tunables_have_no_default_edge(monkeypatch: pytest.MonkeyPatch) -> None:
+    """V2.40.1: el env del edge de reserva es historia; no existe canal de relleno."""
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_DEFAULT_EDGE", "0.9")
+    cfg = tunables_from_env()
+    assert not hasattr(cfg, "default_edge")
+
+
 # ── Snapshot desde el libro del worker ────────────────────────────────────────
 
 
@@ -102,7 +109,7 @@ def test_build_worker_snapshot_derives_risk_used_and_budget() -> None:
 # ── Pipeline de entradas ──────────────────────────────────────────────────────
 
 
-def _snapshot():
+def _snapshot(*, risk_budget_pct: float | None = 6.0):
     return build_worker_snapshot(
         account_id="acc-1",
         equity=100_000.0,
@@ -110,6 +117,46 @@ def _snapshot():
         open_positions={},
         entry_prices={},
         regime="BULL_TREND",
+        risk_budget_pct=risk_budget_pct,
+    )
+
+
+def _signal(
+    symbol: str,
+    *,
+    edge: float | None = 0.9,
+    price: float = 100.0,
+    atr: float | None = 2.0,
+    sector: str | None = "tech",
+    liquidity: float | None = 1_000_000.0,
+    action: str = "BUY",
+    moment: datetime | None = None,
+    signal_id: str | None = None,
+    bar_timestamp: str | None = None,
+    valid_until: str | None = None,
+    **extra,
+) -> V2Signal:
+    """Señal COMPLETA del tick.
+
+    V2.40.1: identidad, sector y liquidez son obligatorios y explícitos; una señal a la
+    que le falte cualquiera de los tres ya no entra (fail-closed), así que los tests que
+    quieren certificar el camino FELIZ deben aportarlos. ``signal_id``/``bar_timestamp``/
+    ``valid_until`` se pueden sobreescribir para casos de dedupe/frescura.
+    """
+    identity = _signal_identity(symbol, action=action, moment=moment)
+    return V2Signal(
+        symbol,
+        action,
+        price=price,
+        atr=atr,
+        edge=edge,
+        sector=sector,
+        liquidity_notional=liquidity,
+        strategy_version="v42",
+        signal_id=signal_id if signal_id is not None else identity.signal_id,
+        bar_timestamp=bar_timestamp if bar_timestamp is not None else identity.bar_timestamp,
+        valid_until=valid_until if valid_until is not None else identity.valid_until,
+        **extra,
     )
 
 
@@ -117,8 +164,8 @@ def test_plan_v2_tick_approves_best() -> None:
     plan = plan_v2_tick(
         snapshot=_snapshot(),
         signals=[
-            V2Signal("AAA", "BUY", price=100.0, atr=2.0, edge=0.9),
-            V2Signal("BBB", "BUY", price=200.0, atr=4.0, edge=0.8),
+            _signal("AAA", edge=0.9),
+            _signal("BBB", price=200.0, atr=4.0, edge=0.8),
         ],
         regime="BULL_TREND",
         as_of="2026-09-15T09:00:00Z",
@@ -135,8 +182,7 @@ def test_plan_v2_tick_approves_best() -> None:
 
 def test_plan_v2_tick_top_n_limits_entries() -> None:
     signals = [
-        V2Signal(f"S{i}", "BUY", price=100.0, atr=2.0, edge=0.9 - i * 0.05)
-        for i in range(5)
+        _signal(f"S{i}", edge=0.9 - i * 0.05, sector=f"sector-{i}") for i in range(5)
     ]
     plan = plan_v2_tick(
         snapshot=_snapshot(),
@@ -151,7 +197,7 @@ def test_plan_v2_tick_top_n_limits_entries() -> None:
 def test_plan_v2_tick_regime_unknown_blocks_all() -> None:
     plan = plan_v2_tick(
         snapshot=_snapshot(),
-        signals=[V2Signal("AAA", "BUY", price=100.0, atr=2.0, edge=0.9)],
+        signals=[_signal("AAA")],
         regime="",  # UNKNOWN ⇒ exit-only
     )
     assert plan.regime == "UNKNOWN"
@@ -162,7 +208,7 @@ def test_plan_v2_tick_regime_unknown_blocks_all() -> None:
 def test_plan_v2_tick_low_edge_blocks() -> None:
     plan = plan_v2_tick(
         snapshot=_snapshot(),
-        signals=[V2Signal("AAA", "BUY", price=100.0, atr=2.0, edge=0.1)],
+        signals=[_signal("AAA", edge=0.1)],
         regime="BULL_TREND",
     )
     assert plan.approved_symbols == ()
@@ -174,7 +220,7 @@ def test_plan_v2_tick_ignores_sell_signals_for_entry() -> None:
         snapshot=_snapshot(),
         signals=[
             V2Signal("AAA", "SELL", price=100.0, atr=2.0, edge=0.9),
-            V2Signal("BBB", "BUY", price=100.0, atr=2.0, edge=0.9),
+            _signal("BBB"),
         ],
         regime="BULL_TREND",
     )
@@ -190,10 +236,11 @@ def test_plan_v2_tick_existing_position_holds() -> None:
         entry_prices={"AAA": 100.0},
         marks={"AAA": 100.0},
         regime="BULL_TREND",
+        sectors={"AAA": "tech"},
     )
     plan = plan_v2_tick(
         snapshot=snap,
-        signals=[V2Signal("AAA", "BUY", price=100.0, atr=2.0, edge=0.9)],
+        signals=[_signal("AAA")],
         regime="BULL_TREND",
     )
     assert plan.approved_symbols == ()
@@ -203,7 +250,7 @@ def test_plan_v2_tick_existing_position_holds() -> None:
 def test_plan_v2_tick_atr_fallback_when_absent() -> None:
     plan = plan_v2_tick(
         snapshot=_snapshot(),
-        signals=[V2Signal("AAA", "BUY", price=100.0, atr=None, edge=0.9)],
+        signals=[_signal("AAA", atr=None)],
         regime="BULL_TREND",
     )
     # atr = 100 * 0.02 = 2 ⇒ stop = 100 - 1.5*2 = 97.
@@ -211,6 +258,219 @@ def test_plan_v2_tick_atr_fallback_when_absent() -> None:
     trade_plan = plan.decisions[0].trade_plan
     assert trade_plan is not None
     assert trade_plan.structural_stop == 97.0
+
+
+# ── V2.40.1 (P0): gates fail-closed de la cartera ──────────────────────────────
+
+
+def test_plan_v2_tick_unknown_sector_is_rejected() -> None:
+    """Sin sector NO se entra: antes caía al cajón ``<unknown>`` y pasaba."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", sector=None)],
+        regime="BULL_TREND",
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("sector_unknown",)
+
+
+def test_plan_v2_tick_unknown_liquidity_is_rejected() -> None:
+    """Liquidez desconocida NO es "liquidez perfecta": veta con motivo auditable."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", liquidity=None)],
+        regime="BULL_TREND",
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("liquidity_unknown",)
+
+
+def test_plan_v2_tick_sector_conflict_with_catalog_is_rejected() -> None:
+    """``memo sector=`` en conflicto con el catálogo ⇒ CONFLICTING ⇒ no se entra."""
+    from bolsa_analytics.cognitive.trade_context import TradeContext
+
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[
+            _signal(
+                "AAA",
+                trade_context=TradeContext.from_observation(
+                    sector_declared="tech",
+                    sector_catalog="energy",
+                    adv_usd=1_000_000.0,
+                ),
+            )
+        ],
+        regime="BULL_TREND",
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("sector_conflicting",)
+
+
+def test_plan_v2_tick_stale_observation_is_rejected() -> None:
+    """Una observación caducada (``fetchedAt`` viejo) NO es ``KNOWN`` ⇒ veta.
+
+    El mismo bloque de fundamentales alimenta el sector Y el ADV, así que un dato viejo
+    deja ambos en ``STALE``; el gate de liquidez se evalúa antes y es el que reporta el
+    motivo. El mapeo de cada estado a su propio código se certifica por separado en
+    ``test_portfolio_decision_engine.py``.
+    """
+    from bolsa_analytics.cognitive.trade_context import TradeContext
+
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[
+            _signal(
+                "AAA",
+                trade_context=TradeContext.from_observation(
+                    sector_catalog="tech",
+                    adv_usd=1_000_000.0,
+                    observed_at="2026-06-01T00:00:00Z",
+                    as_of="2026-09-15T09:00:00Z",
+                ),
+            )
+        ],
+        regime="BULL_TREND",
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("liquidity_unknown",)
+
+
+def test_plan_v2_tick_unknown_correlation_blocks_when_gate_on() -> None:
+    """Con tope de correlación activo, "no la conozco" ⇒ veta (antes pasaba)."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA")],
+        regime="BULL_TREND",
+        tunables=V2Tunables(max_correlation=0.8),
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("correlation_unknown",)
+
+
+def test_plan_v2_tick_open_position_without_sector_blocks_new_entries() -> None:
+    """Cesta con sector opaco ⇒ la concentración NO es verificable ⇒ no se aumenta."""
+    snap = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={"ZZZ": 100.0},
+        entry_prices={"ZZZ": 100.0},
+        marks={"ZZZ": 100.0},
+        regime="BULL_TREND",
+        # Sin ``sectors``: la posición abierta queda sin sector (opaca).
+    )
+    plan = plan_v2_tick(
+        snapshot=snap,
+        signals=[_signal("AAA")],
+        regime="BULL_TREND",
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("sector_exposure_unverifiable",)
+
+
+def test_build_worker_snapshot_carries_open_position_sectors() -> None:
+    """``sectors`` transmite el sector real (y no un cajón ``<unknown>``)."""
+    snap = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={"AAA": 100.0},
+        entry_prices={"AAA": 100.0},
+        marks={"AAA": 100.0},
+        sectors={"AAA": "tech"},
+    )
+    assert snap.positions[0].sector == "tech"
+
+
+# ── V2.40.1 (P0): reserva intra-tick de riesgo y exposición ───────────────────
+
+
+def test_plan_v2_tick_reserves_risk_intra_tick() -> None:
+    """6 candidatas de 1% de riesgo con presupuesto 6% ⇒ 6 aprobadas y la 7ª vetada.
+
+    Es el invariante central del hallazgo más grave de v2.40-beta: sin reserva intra-tick
+    cada candidato decidía contra una foto con ``risk_used = 0``, así que el presupuesto
+    se podía multiplicar por el número de candidatos del mismo tick.
+    """
+    signals = [_signal(f"S{i}", sector=f"sector-{i}") for i in range(7)]
+    plan = plan_v2_tick(
+        snapshot=_snapshot(risk_budget_pct=6.0),
+        signals=signals,
+        regime="BULL_TREND",
+        tunables=V2Tunables(top_n=10, risk_budget_pct=6.0),
+    )
+    assert len(plan.approved_symbols) == 6
+    rejected = [d for d in plan.decisions if not d.approved]
+    assert len(rejected) == 1
+    assert rejected[0].reason_codes == ("risk_budget_exceeded",)
+    # El presupuesto queda EXACTAMENTE agotado (``risk_remaining == 0``): lo que se
+    # reservó intra-tick es la suma de los riesgos comprometidos, no un contador suelto.
+    committed = sum(
+        float(d.allocation["riskAmount"]) for d in plan.decisions if d.approved and d.allocation
+    )
+    assert committed == pytest.approx(6000.0)
+
+
+def test_plan_v2_tick_reserves_sector_exposure_intra_tick() -> None:
+    """La exposición sectorial se recalcula con lo ya aprobado en el mismo tick."""
+    signals = [
+        _signal("AAA", sector="tech"),
+        _signal("BBB", sector="tech"),
+        _signal("CCC", sector="tech"),
+    ]
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=signals,
+        regime="BULL_TREND",
+        tunables=V2Tunables(max_sector_pct=50.0),
+    )
+    # 20% + 20% = 40% (≤ 50%) pasa; la 3ª entrada tech llevaría el sector a 60% ⇒ veta.
+    assert plan.approved_symbols == ("AAA", "BBB")
+    vetoed = [d for d in plan.decisions if d.instrument_id == "CCC"]
+    assert vetoed and vetoed[0].reason_codes == ("concentration_exceeded",)
+
+
+# ── V2.40.1 (P0): deduplicación determinista ──────────────────────────────────
+
+
+def test_plan_v2_tick_dedupe_is_order_independent() -> None:
+    """El mismo conjunto de señales debe aprobar lo mismo en cualquier orden."""
+    weak = _signal("AAA", edge=0.5)
+    strong = _signal("AAA", edge=0.95)
+    forward = plan_v2_tick(
+        snapshot=_snapshot(), signals=[weak, strong], regime="BULL_TREND"
+    )
+    reverse = plan_v2_tick(
+        snapshot=_snapshot(), signals=[strong, weak], regime="BULL_TREND"
+    )
+    assert forward.approved_symbols == reverse.approved_symbols == ("AAA",)
+    assert forward.decisions[0].opportunity_score == reverse.decisions[0].opportunity_score
+    assert forward.decisions[0].opportunity_score == pytest.approx(0.95 * 0.30 + 0.10)
+
+
+def test_canonical_candidate_key_prefers_higher_edge() -> None:
+    from bolsa_application.auto_v2_entry import canonical_candidate_key
+
+    weak = _signal("AAA", edge=0.4)
+    strong = _signal("AAA", edge=0.9)
+    assert canonical_candidate_key(strong) < canonical_candidate_key(weak)
+
+
+def test_edge_from_package_has_no_default() -> None:
+    """Sin ``memo edge=`` el edge es ``None`` (no un valor de relleno)."""
+    from bolsa_application.auto_v2_entry import edge_from_package
+
+    assert edge_from_package(DecisionPackage(action="BUY", instrument_id="AAA", quantity=1)) is None
+    assert edge_from_package(
+        DecisionPackage(action="BUY", instrument_id="AAA", quantity=1, memo="sector=tech")
+    ) is None
+    assert edge_from_package(
+        DecisionPackage(action="BUY", instrument_id="AAA", quantity=1, memo="edge=0.85")
+    ) == pytest.approx(0.85)
+    assert edge_from_package(
+        DecisionPackage(action="BUY", instrument_id="AAA", quantity=1, memo="edge=basura")
+    ) is None
 
 
 # ── Gestión de posiciones ─────────────────────────────────────────────────────
@@ -309,8 +569,8 @@ def test_sector_concentration_blocks_second_entry_same_sector() -> None:
     plan = plan_v2_tick(
         snapshot=snap,
         signals=[
-            V2Signal("AAA", "BUY", price=100.0, atr=2.0, edge=0.9, sector="tech"),
-            V2Signal("BBB", "BUY", price=100.0, atr=2.0, edge=0.9, sector="tech"),
+            _signal("AAA", sector="tech"),
+            _signal("BBB", sector="tech"),
         ],
         regime="BULL_TREND",
         tunables=V2Tunables(max_sector_pct=25.0),
@@ -447,22 +707,7 @@ def test_signal_identity_fail_closed_without_timeframe() -> None:
 
 
 def _signals_with_identity(*symbols: str) -> list[V2Signal]:
-    out: list[V2Signal] = []
-    for symbol in symbols:
-        identity = _signal_identity(symbol)
-        out.append(
-            V2Signal(
-                "AAA" if symbol == "AAA" else symbol,
-                "BUY",
-                price=100.0,
-                atr=2.0,
-                edge=0.9,
-                signal_id=identity.signal_id,
-                bar_timestamp=identity.bar_timestamp,
-                valid_until=identity.valid_until,
-            )
-        )
-    return out
+    return [_signal(symbol) for symbol in symbols]
 
 
 def test_plan_v2_tick_blocks_consumed_signal() -> None:
@@ -510,16 +755,34 @@ def test_plan_v2_tick_blocks_stale_signal() -> None:
     assert plan.journal_entries[0].payload["reasonCodes"] == ["signal_stale"]
 
 
-def test_plan_v2_tick_without_identity_still_decides() -> None:
-    """Sin identidad no se puede deduplicar: se decide (el dedupe no es gate de riesgo)."""
+def test_plan_v2_tick_without_identity_is_rejected() -> None:
+    """V2.40.1 invierte la regla: sin identidad NO hay entrada (fail-closed).
+
+    Antes se decidía igual ("el dedupe no es un gate de riesgo"). Pero sin identidad no
+    hay idempotencia (no re-operar la misma barra), ni deduplicación, ni auditoría, ni
+    replay: en un sistema autónomo eso es un gate de riesgo, no una degradación.
+    """
     plan = plan_v2_tick(
         snapshot=_snapshot(),
-        signals=[V2Signal("AAA", "BUY", price=100.0, atr=2.0, edge=0.9)],
+        signals=[
+            V2Signal(
+                "AAA",
+                "BUY",
+                price=100.0,
+                atr=2.0,
+                edge=0.9,
+                sector="tech",
+                liquidity_notional=1_000_000.0,
+                signal_id="",
+            )
+        ],
         regime="BULL_TREND",
         as_of="2026-09-15T09:05:00Z",
         consumed_signal_ids={"AAA|v42|1d|2026-09-15|irrelevante"},
     )
-    assert plan.approved_symbols == ("AAA",)
+    assert plan.approved_symbols == ()
+    assert plan.decisions == ()
+    assert plan.journal_entries[0].payload["reasonCodes"] == ["signal_identity_missing"]
 
 
 def test_plan_v2_tick_consumed_signal_of_other_bar_still_decides() -> None:
@@ -530,12 +793,8 @@ def test_plan_v2_tick_consumed_signal_of_other_bar_still_decides() -> None:
     plan = plan_v2_tick(
         snapshot=_snapshot(),
         signals=[
-            V2Signal(
+            _signal(
                 "AAA",
-                "BUY",
-                price=100.0,
-                atr=2.0,
-                edge=0.9,
                 signal_id=next_bar.signal_id,
                 bar_timestamp=next_bar.bar_timestamp,
                 valid_until=next_bar.valid_until,

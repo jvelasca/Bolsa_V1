@@ -8,6 +8,13 @@ from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
 )
 from bolsa_analytics.cognitive.opportunity_ranker import score_opportunity
 from bolsa_analytics.cognitive.risk_allocator import RiskAllocatorConfig
+from bolsa_analytics.cognitive.trade_context import (
+    CORRELATION_UNAVAILABLE,
+    LIQUIDITY_KNOWN,
+    SECTOR_CONFLICTING,
+    SECTOR_STALE,
+    TradeContext,
+)
 from bolsa_application.portfolio_decision_engine import (
     PortfolioDecisionConfig,
     decide_portfolio,
@@ -43,6 +50,13 @@ def _score(combined: float) -> object:
     )
 
 
+def _known(**overrides: object) -> dict:
+    """Datos de cartera CONOCIDOS (V2.40.1): aíslan el gate que cada test certifica."""
+    base: dict = {"sector": "Technology", "liquidity_notional": 1_000_000.0}
+    base.update(overrides)
+    return base
+
+
 def test_approved_entry_builds_trade_plan() -> None:
     decision = decide_portfolio(
         instrument_id="AAPL",
@@ -53,6 +67,7 @@ def test_approved_entry_builds_trade_plan() -> None:
         snapshot=_fresh_snapshot(),
         regime="BULL_TREND",
         decision_id="dec-1",
+        **_known(),
     )
     assert decision.approved is True
     assert decision.action == "ENTRY"
@@ -90,6 +105,7 @@ def test_approved_entry_risk_sizing_without_position_cap() -> None:
                 max_position_value=None,
             ),
         ),
+        **_known(),
     )
     assert decision.approved is True
     assert decision.trade_plan.quantity == 500.0
@@ -103,6 +119,7 @@ def test_stale_data_blocks() -> None:
         opportunity_score=_score(0.8),
         snapshot=_fresh_snapshot(data_freshness=DATA_STALE),
         regime="BULL_TREND",
+        **_known(),
     )
     assert decision.approved is False
     assert "stale_data" in decision.reason_codes
@@ -120,6 +137,7 @@ def test_position_exists_holds() -> None:
         opportunity_score=_score(0.8),
         snapshot=snap,
         regime="BULL_TREND",
+        **_known(),
     )
     assert decision.action == "HOLD"
     assert "position_exists" in decision.reason_codes
@@ -133,6 +151,7 @@ def test_regime_invalid_blocks() -> None:
         opportunity_score=_score(0.8),
         snapshot=_fresh_snapshot(),
         regime="UNKNOWN",
+        **_known(),
     )
     assert "regime_invalid" in decision.reason_codes
 
@@ -147,6 +166,7 @@ def test_bear_trend_blocks_new_long() -> None:
         opportunity_score=_score(0.8),
         snapshot=_fresh_snapshot(),
         regime="BEAR_TREND",
+        **_known(),
     )
     assert decision.action == "HOLD"
     assert decision.reason_codes == ("regime_invalid",)
@@ -160,7 +180,7 @@ def test_liquidity_insufficient_blocks() -> None:
         opportunity_score=_score(0.8),
         snapshot=_fresh_snapshot(),
         regime="BULL_TREND",
-        liquidity_notional=0.0,
+        **_known(liquidity_notional=0.0),
     )
     assert "liquidity_insufficient" in decision.reason_codes
 
@@ -173,6 +193,7 @@ def test_edge_below_threshold_blocks() -> None:
         opportunity_score=_score(0.2),
         snapshot=_fresh_snapshot(),
         regime="BULL_TREND",
+        **_known(),
     )
     assert "edge_below_threshold" in decision.reason_codes
 
@@ -186,6 +207,7 @@ def test_risk_budget_exhausted_blocks() -> None:
         opportunity_score=_score(0.8),
         snapshot=snap,
         regime="BULL_TREND",
+        **_known(),
     )
     assert "risk_budget_exceeded" in decision.reason_codes
 
@@ -200,6 +222,7 @@ def test_correlation_conflict_blocks() -> None:
         regime="BULL_TREND",
         correlation_with_portfolio=0.85,
         config=PortfolioDecisionConfig(max_correlation=0.7),
+        **_known(),
     )
     assert "correlation_conflict" in decision.reason_codes
 
@@ -216,8 +239,8 @@ def test_sector_concentration_blocks() -> None:
         opportunity_score=_score(0.9),
         snapshot=snap,
         regime="BULL_TREND",
-        sector="Technology",
         config=PortfolioDecisionConfig(max_sector_pct=50.0),
+        **_known(),
     )
     assert "concentration_exceeded" in decision.reason_codes
 
@@ -231,6 +254,7 @@ def test_risk_reward_below_threshold_blocks() -> None:
         opportunity_score=_score(0.8),
         snapshot=_fresh_snapshot(),
         regime="BULL_TREND",
+        **_known(),
     )
     assert "risk_reward_below_threshold" in decision.reason_codes
 
@@ -243,6 +267,7 @@ def test_no_entry_price_blocks() -> None:
         opportunity_score=_score(0.8),
         snapshot=_fresh_snapshot(),
         regime="BULL_TREND",
+        **_known(),
     )
     assert decision.approved is False
 
@@ -256,9 +281,167 @@ def test_decision_to_dict_shape() -> None:
         snapshot=_fresh_snapshot(),
         regime="BULL_TREND",
         decision_id="dec-1",
+        **_known(),
     )
     d = decision.to_dict()
     assert d["decisionId"] == "dec-1"
     assert d["approved"] is True
     assert d["tradePlan"]["structuralStop"] == 96.0
     assert d["allocation"]["quantity"] > 0
+
+
+# ── V2.40.1 (P0): fail-closed por dato AUSENTE ────────────────────────────────
+# Antes estos casos decidían "sin problema" (el `None` se leía como exento). Ahora
+# cada ausencia se convierte en un veto con motivo auditable.
+
+
+def test_liquidity_unknown_blocks() -> None:
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=_fresh_snapshot(),
+        regime="BULL_TREND",
+        sector="Technology",
+        # Sin `liquidity_notional`: desconocida ⇒ NO ENTRY (nunca "capacidad perfecta").
+    )
+    assert decision.approved is False
+    assert decision.reason_codes == ("liquidity_unknown",)
+    assert decision.is_no_trade is True
+
+
+def test_sector_unknown_blocks() -> None:
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=_fresh_snapshot(),
+        regime="BULL_TREND",
+        liquidity_notional=1_000_000.0,
+    )
+    assert decision.reason_codes == ("sector_unknown",)
+
+
+def test_sector_conflicting_blocks() -> None:
+    """``memo sector=`` vs catálogo: discrepan ⇒ ninguna fuente es verificable ⇒ veta."""
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=_fresh_snapshot(),
+        regime="BULL_TREND",
+        trade_context=TradeContext(
+            sector=None,
+            sector_status=SECTOR_CONFLICTING,
+            liquidity_notional=1_000_000.0,
+            liquidity_status=LIQUIDITY_KNOWN,
+            correlation=None,
+            correlation_status=CORRELATION_UNAVAILABLE,
+        ),
+    )
+    assert decision.reason_codes == ("sector_conflicting",)
+
+
+def test_sector_stale_blocks() -> None:
+    """Sector caducado (fundamentales viejos) ⇒ no es ``KNOWN`` ⇒ no autoriza entrada."""
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=_fresh_snapshot(),
+        regime="BULL_TREND",
+        trade_context=TradeContext(
+            sector="Technology",
+            sector_status=SECTOR_STALE,
+            liquidity_notional=1_000_000.0,
+            liquidity_status=LIQUIDITY_KNOWN,
+            correlation=None,
+            correlation_status=CORRELATION_UNAVAILABLE,
+        ),
+    )
+    assert decision.reason_codes == ("sector_stale",)
+
+
+def test_correlation_unknown_blocks_when_gate_enabled() -> None:
+    """Con tope de correlación configurado, un valor ausente veta (antes pasaba)."""
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=_fresh_snapshot(),
+        regime="BULL_TREND",
+        config=PortfolioDecisionConfig(max_correlation=0.7),
+        **_known(),
+    )
+    assert decision.reason_codes == ("correlation_unknown",)
+
+
+def test_correlation_gate_off_ignores_absence() -> None:
+    """Sin tope configurado el gate está apagado EXPLÍCITAMENTE: no cambia nada."""
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=_fresh_snapshot(),
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.approved is True
+
+
+def test_sector_exposure_unverifiable_blocks() -> None:
+    """Una posición abierta sin sector hace la concentración NO verificable ⇒ veta."""
+    snap = _fresh_snapshot(
+        positions=[PortfolioPosition("MSFT", 10.0, market_value=20_000.0)]
+    )
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        config=PortfolioDecisionConfig(max_sector_pct=40.0),
+        **_known(),
+    )
+    assert decision.reason_codes == ("sector_exposure_unverifiable",)
+
+
+def test_unknown_sector_sentinel_is_unverifiable() -> None:
+    """El sentinel ``<unknown>`` es "sin sector", no un sector más."""
+    snap = _fresh_snapshot(
+        positions=[
+            PortfolioPosition("MSFT", 10.0, market_value=20_000.0, sector="<unknown>")
+        ]
+    )
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        config=PortfolioDecisionConfig(max_sector_pct=40.0),
+        **_known(),
+    )
+    assert decision.reason_codes == ("sector_exposure_unverifiable",)
+
+
+def test_require_flags_can_be_disabled_explicitly() -> None:
+    """Apagar un gate es una decisión EXPLÍCITA del llamante (no el default)."""
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=_fresh_snapshot(),
+        regime="BULL_TREND",
+        config=PortfolioDecisionConfig(require_sector=False, require_liquidity=False),
+    )
+    assert decision.approved is True

@@ -49,6 +49,7 @@ from bolsa_analytics.cognitive.position_state import (
     position_state_from_dict,
 )
 from bolsa_analytics.cognitive.signal_identity import bar_window
+from bolsa_analytics.cognitive.trade_context import TradeContext
 from bolsa_api.background.paper_auto_engine_worker import (
     DecisionProvider,
     _effective_venue,
@@ -62,6 +63,9 @@ from bolsa_application.auto_engine_state_store import (
     AutoEngineTickInput,
 )
 from bolsa_application.auto_v2_entry import (
+    CatalogTradeContextSource,
+    DiscoveryRegimeSource,
+    EdgeReportSource,
     V2Signal,
     V2Tunables,
     build_worker_snapshot,
@@ -355,6 +359,12 @@ class AutoSimulationWorker:
         require_account_id: bool = False,
         regime_source: Callable[[], str | None] | None = None,
         sector_source: Callable[[str], str | None] | None = None,
+        liquidity_source: Callable[[str], float | None] | None = None,
+        # Objetos con ``refresh()`` async + lectura sync (``CatalogTradeContextSource``,
+        # ``EdgeReportSource``). Se anotan como ``Any`` en la firma (seam inyectable para
+        # tests) y se estrechan en el ``__init__`` a la interfaz que consume el hot path.
+        edge_source: Any = None,
+        trade_context_source: Any = None,
         consumed_signal_store: Any = None,
     ) -> None:
         self._decider = decider
@@ -419,8 +429,17 @@ class AutoSimulationWorker:
         self._v2_regime_source = regime_source
         # AUTO 2.0 (V2): fuente del sector por símbolo (inyectable). Sin ella, el sector
         # solo existe si la propuesta lo declara en su ``memo``; si no, es desconocido y
-        # el gate de concentración sectorial no puede evaluarlo (nunca se asume exento).
+        # el gate de concentración sectorial veta (V2.40.1: nunca se asume exento).
         self._v2_sector_source = sector_source
+        # AUTO 2.0 · V2.40.1: liquidez real (ADV notional) por símbolo. Sin ella, la
+        # liquidez es desconocida ⇒ ``liquidity_unknown`` ⇒ no hay entrada (antes un
+        # ``None`` se puntuaba como "liquidez perfecta", que es fail-OPEN).
+        self._v2_liquidity_source = liquidity_source
+        # AUTO 2.0 · V2.40.1: contexto de cartera (sector+ADV+frescura) y edge real por
+        # versión de estrategia. Son objetos con ``refresh()`` async (I/O una vez por
+        # tick) y lectura SÍNCRONA en el hot path, igual que el régimen.
+        self._v2_trade_context_source: CatalogTradeContextSource | None = trade_context_source
+        self._v2_edge_source: EdgeReportSource | None = edge_source
         # AUTO 2.0 · P4: espejo durable de las señales consumidas (inyectable). Con él,
         # un reinicio NO autoriza a re-emitir la misma señal sobre la misma barra; sin
         # él (hermético) el dedupe vive solo en RAM, como hasta ahora.
@@ -868,11 +887,39 @@ class AutoSimulationWorker:
             entry_prices={s: float(p) for s, p in self._entry_price.items()},
             marks=marks,
             stops=self._v2_stop_map(),
+            sectors=self._v2_open_sectors(),
             strategies=tuple(sorted(set(self._position_version.values()))),
             regime=regime,
             risk_budget_pct=self._v2_tunables.risk_budget_pct,
             reconciliation_ok=not self.reconciliation_blocks_openings,
         )
+
+    def _v2_open_sectors(self) -> dict[str, str]:
+        """Sector (solo ``KNOWN``) de las posiciones ABIERTAS para el snapshot.
+
+        V2.40.1: si el sector de una posición no es fiable (desconocido, en conflicto con
+        el catálogo o caducado) NO se publica. La posición queda OPACA a propósito: así el
+        motor detecta que la exposición sectorial no es verificable y veta nuevas entradas
+        con ``sector_exposure_unverifiable``, en vez de que todas las posiciones caigan al
+        cajón ``<unknown>`` y un candidato se mida solo contra sí mismo.
+        """
+        symbols = [symbol for symbol, qty in self._open.items() if qty > 0]
+        if not symbols:
+            return {}
+        if self._v2_trade_context_source is not None:
+            return self._v2_trade_context_source.known_sectors(symbols)
+        if self._v2_sector_source is None:
+            return {}
+        sectors: dict[str, str] = {}
+        for symbol in symbols:
+            try:
+                sector = self._v2_sector_source(symbol)
+            except Exception:  # noqa: BLE001 — sin sector la posición queda opaca.
+                logger.exception("auto_sim v2 sector_source failed symbol=%s", symbol)
+                continue
+            if isinstance(sector, str) and sector.strip():
+                sectors[symbol] = sector.strip()
+        return sectors
 
     def _v2_stop_map(self) -> dict[str, float]:
         """Stop vivo por símbolo (del PositionState V2 si existe; si no, el implícito)."""
@@ -895,16 +942,26 @@ class AutoSimulationWorker:
                 stops[symbol] = float(stop)
         return stops
 
-    def _v2_signals(self) -> list[V2Signal]:
+    def _v2_collect_packages(self) -> dict[str, Any]:
+        """Consulta el decider una vez por símbolo en watch (propuestas del tick)."""
+        packages: dict[str, Any] = {}
+        for symbol in _watch_symbols():
+            key = symbol.strip()
+            if not key or key in packages:
+                continue
+            pkg = self._decider(key) if self._decider else None
+            if pkg is not None:
+                packages[key] = pkg
+        return packages
+
+    def _v2_signals(self, packages: Mapping[str, Any] | None = None) -> list[V2Signal]:
         """Recoge las señales crudas del decider para el tick (una por símbolo)."""
+        resolved = self._v2_collect_packages() if packages is None else dict(packages)
         signals: list[V2Signal] = []
         self._v2_tick_signals = {}
-        for symbol in _watch_symbols():
+        for symbol, pkg in resolved.items():
             symbol = symbol.strip()
             if not symbol:
-                continue
-            pkg = self._decider(symbol) if self._decider else None
-            if pkg is None:
                 continue
             price = Decimal(str(self._price_script(symbol, self._minute) or 0))
             action = str(getattr(pkg, "action", "HOLD")).upper()
@@ -922,14 +979,17 @@ class AutoSimulationWorker:
             signal_id = identity.signal_id if identity is not None else ""
             if signal_id:
                 self._v2_tick_signals[symbol] = signal_id
+            context = self._v2_context(symbol, pkg)
             signals.append(
                 V2Signal(
                     instrument_id=symbol,
                     action=action,
                     price=float(price),
                     atr=(float(price) * self._v2_tunables.atr_pct_fallback if price > 0 else None),
-                    edge=_edge_from_package(pkg, default=self._v2_tunables.default_edge),
-                    sector=self._v2_sector(symbol, pkg),
+                    edge=self._v2_edge(pkg, version or "unversioned"),
+                    sector=context.sector,
+                    liquidity_notional=context.liquidity_notional,
+                    trade_context=context,
                     strategy_version=version,
                     signal_id=signal_id,
                     bar_timestamp=identity.bar_timestamp if identity is not None else "",
@@ -942,12 +1002,18 @@ class AutoSimulationWorker:
         """Sector del candidato para el gate de concentración sectorial.
 
         Prioridad: lo que declare la propia propuesta (``memo``, canal explícito de la
-        estrategia) > la fuente inyectada > ``None`` (sector desconocido: el motor lo
-        trata como caja opaca, nunca como "sin exposición sectorial").
+        estrategia) > el catálogo (contexto de cartera) > la fuente inyectada > ``None``
+        (sector desconocido: el motor lo trata como caja opaca, nunca como "sin
+        exposición sectorial").
         """
         declared = sector_from_package(pkg)
         if declared:
             return declared
+        if self._v2_trade_context_source is not None:
+            context = self._v2_trade_context_source.context_for(symbol, declared_sector=declared)
+            if context.sector_is_known:
+                return context.sector
+            return None
         if self._v2_sector_source is None:
             return None
         try:
@@ -955,6 +1021,88 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — sin sector no se inventa uno.
             logger.exception("auto_sim v2 sector_source failed symbol=%s", symbol)
             return None
+
+    def _v2_context(self, symbol: str, pkg: Any) -> Any:
+        """Estado explícito (sector/liquidez/frescura) del candidato.
+
+        Con ``trade_context_source`` (producción) el estado sale del catálogo y su
+        ``observed_at``: un dato caducado es ``STALE`` y uno en conflicto con el ``memo``
+        es ``CONFLICTING``, así que el motor veta con motivo auditable. Sin esa fuente se
+        construye desde lo declarado + la fuente sync de liquidez (presente ⇒ ``KNOWN``).
+        """
+        declared = sector_from_package(pkg)
+        liquidity = self._v2_liquidity(symbol)
+        if self._v2_trade_context_source is not None:
+            return self._v2_trade_context_source.context_for(
+                symbol,
+                declared_sector=declared,
+                liquidity_fallback=liquidity,
+                as_of=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            )
+        return TradeContext.from_legacy(
+            sector=declared if declared else (self._v2_sector(symbol, pkg)),
+            liquidity_notional=liquidity,
+            correlation=None,
+        )
+
+    def _v2_liquidity(self, symbol: str) -> float | None:
+        """ADV notional por símbolo de la fuente inyectada (``None`` si no hay dato)."""
+        source = self._v2_liquidity_source
+        if source is None:
+            return None
+        try:
+            value = source(symbol)
+        except Exception:  # noqa: BLE001 — sin liquidez no se inventa una.
+            logger.exception("auto_sim v2 liquidity_source failed symbol=%s", symbol)
+            return None
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _v2_edge(self, pkg: Any, strategy_version: str | None) -> float | None:
+        """Edge de la oportunidad: ``memo edge=`` > EdgeReport persistido > nada.
+
+        V2.40.1: no hay valor por defecto. "La estrategia no declara edge" NO puede
+        significar "edge 0.9": el componente queda vacío (0) y el motor veta por
+        ``edge_below_threshold``.
+
+        La clave de búsqueda es la MISMA con la que se precarga el informe
+        (``version or "unversioned"``, el centinela canónico de identidad de señal): sin
+        esa normalización, una propuesta sin versión declarada nunca encontraría su
+        EdgeReport persistido.
+        """
+        declared = _edge_from_package(pkg)
+        if declared is not None:
+            return declared
+        source = self._v2_edge_source
+        if source is None:
+            return None
+        return source.edge_for(strategy_version or "unversioned")
+
+    async def _v2_refresh_trade_context(self, symbols: Sequence[str], versions: Sequence[str]) -> None:
+        """Precarga (async) el contexto de cartera y el edge del tick.
+
+        El hot path decide de forma SÍNCRONA, así que el I/O se concentra aquí una vez por
+        tick, igual que el régimen. Un fallo deja el dato ausente ⇒ el motor veta por
+        ``sector_unknown``/``liquidity_unknown``/``edge_below_threshold`` (fail-closed),
+        nunca asume que el instrumento es operable "porque no se pudo comprobar".
+        """
+        as_of = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        context_refresh = getattr(self._v2_trade_context_source, "refresh", None)
+        if callable(context_refresh):
+            try:
+                await context_refresh(symbols, as_of=as_of)
+            except Exception:  # noqa: BLE001 — sin contexto, el motor veta.
+                logger.exception("auto_sim v2 trade context refresh failed")
+        edge_refresh = getattr(self._v2_edge_source, "refresh", None)
+        if callable(edge_refresh):
+            try:
+                await edge_refresh(versions, account_id=self._account_id)
+            except Exception:  # noqa: BLE001 — sin edge, el motor veta.
+                logger.exception("auto_sim v2 edge refresh failed")
 
     async def _v2_refresh_regime(self) -> None:
         """Refresca el régimen si la fuente lo soporta (fuente async + lectura sync).
@@ -1071,10 +1219,22 @@ class AutoSimulationWorker:
         self._v2_roll_consumed_bar()
         await self._v2_load_consumed_signals()
         regime = self._v2_regime()
+        packages = self._v2_collect_packages()
+        # Contexto de cartera (sector/ADV) y edge son datos EXTERNOS: se precargan una vez
+        # por tick con las versiones realmente OBSERVADAS (no con una lista adivinada),
+        # antes de construir las señales, para que la decisión lea estado coherente y no
+        # haga I/O. También se refrescan las versiones de las posiciones abiertas (los
+        # cierres se atribuyen a su versión y necesitan el mismo edge).
+        versions = {
+            _strategy_version_from_source(getattr(pkg, "source", None)) or "unversioned"
+            for pkg in packages.values()
+        }
+        versions.update(self._position_version.values())
+        await self._v2_refresh_trade_context(tuple(packages), tuple(sorted(versions)))
         snapshot = self._v2_snapshot(regime)
         plan = plan_v2_tick(
             snapshot=snapshot,
-            signals=self._v2_signals(),
+            signals=self._v2_signals(packages),
             regime=regime,
             tunables=self._v2_tunables,
             as_of=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -1547,6 +1707,9 @@ class AutoSimulationWorker:
         position_store: Any = None,
         canonical_positions_reader: Any = None,
         consumed_signal_store: Any = None,
+        regime_source: Any = None,
+        trade_context_source: Any = None,
+        edge_source: Any = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -1556,6 +1719,10 @@ class AutoSimulationWorker:
         el PRIMER turno de un proceso se readopta la posición durable (Bloque 5 /
         G7) para no re-comprar tras crash. Restaura los valores anteriores al
         terminar para no dejar fugas entre ticks.
+
+        V2.40.1: las fuentes de DATO del tick (régimen, contexto de cartera y edge) se
+        enlazan aquí igual que los stores, sobre la sesión viva. Fuera del camino real
+        (hermético) se conservan las inyectadas en el constructor.
         """
         prev_exec, prev_auto, prev_fin, prev_acc, prev_ctx, prev_pos, prev_canon = (
             self._exec_store,
@@ -1567,6 +1734,11 @@ class AutoSimulationWorker:
             self._canonical_positions_reader,
         )
         prev_signals = self._consumed_signal_store
+        prev_regime, prev_context, prev_edge = (
+            self._v2_regime_source,
+            self._v2_trade_context_source,
+            self._v2_edge_source,
+        )
         try:
             self._exec_store = exec_store
             self._auto_store = auto_store
@@ -1582,6 +1754,12 @@ class AutoSimulationWorker:
             self._consumed_signal_store = (
                 consumed_signal_store if consumed_signal_store is not None else prev_signals
             )
+            # AUTO 2.0 · V2.40.1: fuentes de dato del tick (misma sesión que los stores).
+            self._v2_regime_source = regime_source if regime_source is not None else prev_regime
+            self._v2_trade_context_source = (
+                trade_context_source if trade_context_source is not None else prev_context
+            )
+            self._v2_edge_source = edge_source if edge_source is not None else prev_edge
             # V2.24/A9.1 (P1-04): sin cuenta inequívoca NO se readopta ni opera el
             # camino durable; auto_turn veta igualmente (defensa en profundidad).
             if not self._readopted and self._account_id:
@@ -1614,6 +1792,9 @@ class AutoSimulationWorker:
             self._position_store = prev_pos
             self._canonical_positions_reader = prev_canon
             self._consumed_signal_store = prev_signals
+            self._v2_regime_source = prev_regime
+            self._v2_trade_context_source = prev_context
+            self._v2_edge_source = prev_edge
 
 
 # V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.
@@ -1725,6 +1906,67 @@ def _compose_canonical_reader(session: Any) -> Any:
         return out
 
     return _read
+
+
+def _compose_regime_source(session: Any, *, watch: Sequence[str]) -> Any:
+    """V2.40.1: régimen REAL del tick (barras del universo → régimen operativo).
+
+    Sin esto, el AUTO en producción corría con régimen ``UNKNOWN`` ⇒ exit-only ⇒ nunca
+    abría nada: el motor parecía "prudente" cuando en realidad estaba ciego. El
+    ``bars_provider`` lee las últimas barras por símbolo en la MISMA sesión del tick; un
+    fallo deja el régimen en ``NO_REGIME`` (⇒ ``UNKNOWN`` ⇒ exit-only), nunca en
+    "mercado operable". El override ``AUTO_ENGINE_SIM_V2_REGIME`` sigue teniendo
+    prioridad (lo resuelve ``_v2_regime``).
+    """
+    from bolsa_application.active_strategy_signal_evaluator import (  # noqa: PLC0415
+        make_bar_snapshot_loader,
+    )
+    from bolsa_infrastructure.database.repositories.ohlcv_repository import (  # noqa: PLC0415
+        SqlAlchemyOhlcvRepository,
+    )
+
+    loader = make_bar_snapshot_loader(SqlAlchemyOhlcvRepository(session), list(watch))
+    return DiscoveryRegimeSource(bars_provider=loader)
+
+
+def _compose_trade_context_source(session: Any) -> Any:
+    """V2.40.1: contexto de cartera REAL (sector + ADV + frescura) del catálogo.
+
+    Una sola query por tick (``list_trade_context_by_ids``) sirve tanto el sector del
+    candidato como su ADV notional y el instante de observación de los fundamentales.
+    """
+    from bolsa_infrastructure.database.repositories.instrument_repository import (  # noqa: PLC0415
+        SqlAlchemyInstrumentRepository,
+    )
+
+    repository = SqlAlchemyInstrumentRepository(session)
+
+    async def _read(symbols: Sequence[str]) -> Mapping[str, Any]:
+        return await repository.list_trade_context_by_ids(list(symbols))
+
+    return CatalogTradeContextSource(reader=_read)
+
+
+def _compose_edge_source(session: Any) -> Any:
+    """V2.40.1: edge REAL por versión de estrategia (``EdgeReportRow.edge_score``).
+
+    Sustituye al antiguo ``default_edge = 0.9``: sin informe de edge persistido para la
+    versión, la oportunidad NO tiene edge (queda por debajo de ``min_edge`` y no entra).
+    Es la parte "fuente real" del fail-closed, no un valor de relleno.
+    """
+    from bolsa_infrastructure.database.repositories.cognitive_repository import (  # noqa: PLC0415
+        SqlAlchemyCognitiveRepository,
+    )
+
+    repository = SqlAlchemyCognitiveRepository(session)
+
+    async def _read(strategy_ref: str, account_id: str | None) -> float | None:
+        report = await repository.latest_edge_report(
+            strategy_or_signal_ref=strategy_ref, account_id=account_id
+        )
+        return None if report is None else report.edge_score
+
+    return EdgeReportSource(reader=_read)
 
 
 def active_strategy_enabled() -> bool:
@@ -1911,11 +2153,22 @@ class AutoSimRuntime:
         account_id: str | None = None,
         finance_resolver: Any = None,
         canonical_positions_reader: Any = None,
+        regime_source: Any = None,
+        trade_context_source: Any = None,
+        edge_source: Any = None,
+        liquidity_source: Callable[[str], float | None] | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._engine_id = engine_id
         self._account_id = account_id
         self._finance_resolver = finance_resolver
+        # V2.40.1: fuentes de dato inyectables. Con ``None`` (producción) se componen por
+        # sesión en cada tick (barras, catálogo y EdgeReport); inyectarlas permite que un
+        # test controle el dato sin PG.
+        self._regime_source = regime_source
+        self._trade_context_source = trade_context_source
+        self._edge_source = edge_source
+        self._liquidity_source = liquidity_source
         # V2.24/A9.1 (P1-01): lector canónico inyectable (por defecto se compone por
         # sesión desde ``position_state``). Sin él, la reconciliación es UNKNOWN.
         self._canonical_reader = canonical_positions_reader
@@ -1925,6 +2178,10 @@ class AutoSimRuntime:
                 engine_id=engine_id,
                 account_id=account_id,
                 require_account_id=True,
+                regime_source=regime_source,
+                liquidity_source=liquidity_source,
+                trade_context_source=trade_context_source,
+                edge_source=edge_source,
             )
         self._worker = worker
 
@@ -1965,6 +2222,10 @@ class AutoSimRuntime:
             # (misma sesión, commit propio): un crash no reabre la MISMA oportunidad
             # sobre la MISMA barra.
             consumed_signal_store = PostgresSimConsumedSignalStore(session)
+            # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
+            # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
+            # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor
+            # decide con barras, catálogo y EdgeReport; si el dato falta, veta (no asume).
             return await self._worker.real_turn(
                 exec_store=exec_store,
                 auto_store=auto_store,
@@ -1975,6 +2236,11 @@ class AutoSimRuntime:
                 consumed_signal_store=consumed_signal_store,
                 canonical_positions_reader=self._canonical_reader
                 or _compose_canonical_reader(session),
+                regime_source=self._regime_source
+                or _compose_regime_source(session, watch=tuple(_watch_symbols())),
+                trade_context_source=self._trade_context_source
+                or _compose_trade_context_source(session),
+                edge_source=self._edge_source or _compose_edge_source(session),
             )
 
 
@@ -2040,6 +2306,10 @@ def start_auto_sim_worker(
     engine_id: str | None = None,
     account_id: str | None = None,
     finance_resolver: Any = None,
+    regime_source: Any = None,
+    trade_context_source: Any = None,
+    edge_source: Any = None,
+    liquidity_source: Callable[[str], float | None] | None = None,
 ) -> asyncio.Task[None] | None:
     """start hook para ``_event_loop_starters()`` (env-gated; default OFF, SIM).
 
@@ -2088,6 +2358,10 @@ def start_auto_sim_worker(
             engine_id=engine_id or _sim_engine_id(),
             account_id=effective_account,
             finance_resolver=finance_resolver,
+            regime_source=regime_source,
+            trade_context_source=trade_context_source,
+            edge_source=edge_source,
+            liquidity_source=liquidity_source,
         )
         # V2.26/A10: solo con runtime PG real y sin decider inyectado; el seam es el
         # ``DecisionProvider`` (no se toca RiskGate/SimulationGate ni se abre LIVE).

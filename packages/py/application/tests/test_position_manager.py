@@ -69,6 +69,22 @@ def test_regime_exit_only_forces_full_sell() -> None:
     assert REGIME_EXIT in result.exit_reasons
 
 
+def test_regime_exit_only_overrides_take_profit() -> None:
+    """V2.40.1: EXIT_ONLY tiene precedencia ABSOLUTA sobre el take-profit.
+
+    Antes solo se forzaba la venta total cuando la decisión era ``hold``, así que un
+    ``TAKE_PROFIT`` (mark ≥ T1) prevalecía y dejaba el 70% de la posición abierta contra
+    la política declarada (solo SIM/cuenta simulada, pero riesgo real de diseño).
+    """
+    result = manage_position(
+        _open_long(), mark_price=105.0, regime="UNKNOWN", template_id="moderate"
+    )
+    assert result is not None
+    assert result.order_action == "sell"
+    assert result.order_qty == 10.0
+    assert REGIME_EXIT in result.exit_reasons
+
+
 def test_time_stop_exits() -> None:
     result = manage_position(
         _open_long(),

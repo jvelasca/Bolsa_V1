@@ -39,6 +39,18 @@ def _score(instrument_id: str, combined: float) -> object:
     )
 
 
+def _candidate(symbol: str, *, source: str = "active") -> EntryCandidate:
+    """Candidato con cartera CONOCIDA (V2.40.1: sin sector/liquidez no hay entrada)."""
+    return EntryCandidate(
+        instrument_id=symbol,
+        entry_price=100.0,
+        atr=2.0,
+        sector="tech",
+        liquidity_notional=1_000_000.0,
+        source=source,
+    )
+
+
 def test_is_research_only() -> None:
     assert is_research_only("active") is False
     assert is_research_only("discovery") is True
@@ -51,11 +63,7 @@ def test_full_cycle_entry_and_journal() -> None:
     report = run_auto_cycle(
         snapshot=_snapshot(),
         opportunities=[_score("AAPL", 0.8)],
-        candidates={
-            "AAPL": EntryCandidate(
-                instrument_id="AAPL", entry_price=100.0, atr=2.0, source="active"
-            )
-        },
+        candidates={"AAPL": _candidate("AAPL")},
         regime="BULL_TREND",
         as_of="2026-09-15T09:00:00Z",
     )
@@ -73,11 +81,7 @@ def test_research_candidates_never_trade() -> None:
     report = run_auto_cycle(
         snapshot=_snapshot(),
         opportunities=[_score("AAPL", 0.9)],
-        candidates={
-            "AAPL": EntryCandidate(
-                instrument_id="AAPL", entry_price=100.0, atr=2.0, source="adaptive"
-            )
-        },
+        candidates={"AAPL": _candidate("AAPL", source="adaptive")},
         regime="BULL_TREND",
     )
     assert report.decisions == ()
@@ -90,11 +94,7 @@ def test_no_trade_journal_reason_codes() -> None:
     report = run_auto_cycle(
         snapshot=_snapshot(),
         opportunities=[_score("AAPL", 0.2)],
-        candidates={
-            "AAPL": EntryCandidate(
-                instrument_id="AAPL", entry_price=100.0, atr=2.0, source="active"
-            )
-        },
+        candidates={"AAPL": _candidate("AAPL")},
         regime="BULL_TREND",
     )
     assert len(report.decisions) == 1
@@ -166,12 +166,7 @@ def test_regime_exit_only_full_report() -> None:
 
 
 def test_top_n_limits_trading_universe() -> None:
-    candidates = {
-        s: EntryCandidate(
-            instrument_id=s, entry_price=100.0, atr=2.0, source="active"
-        )
-        for s in ("A", "B", "C", "D", "E", "F")
-    }
+    candidates = {s: _candidate(s) for s in ("A", "B", "C", "D", "E", "F")}
     opportunities = [
         _score("F", 0.95),
         _score("E", 0.9),
@@ -197,11 +192,7 @@ def test_report_to_dict() -> None:
     report = run_auto_cycle(
         snapshot=_snapshot(),
         opportunities=[_score("AAPL", 0.8)],
-        candidates={
-            "AAPL": EntryCandidate(
-                instrument_id="AAPL", entry_price=100.0, atr=2.0, source="active"
-            )
-        },
+        candidates={"AAPL": _candidate("AAPL")},
         regime="BULL_TREND",
         as_of="2026-09-15T09:00:00Z",
     )
@@ -209,3 +200,19 @@ def test_report_to_dict() -> None:
     assert d["regime"] == "BULL_TREND"
     assert len(d["decisions"]) == 1
     assert len(d["journalEntries"]) == 1
+
+
+def test_candidate_without_trade_context_is_not_traded() -> None:
+    """V2.40.1: un candidato sin sector/liquidez conocidos NO opera (fail-closed)."""
+    report = run_auto_cycle(
+        snapshot=_snapshot(),
+        opportunities=[_score("AAPL", 0.8)],
+        candidates={
+            "AAPL": EntryCandidate(
+                instrument_id="AAPL", entry_price=100.0, atr=2.0, source="active"
+            )
+        },
+        regime="BULL_TREND",
+    )
+    assert report.decisions[0].approved is False
+    assert report.decisions[0].reason_codes == ("liquidity_unknown",)

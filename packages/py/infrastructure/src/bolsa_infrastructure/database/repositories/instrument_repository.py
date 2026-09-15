@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_domain.entities.instrument import Instrument
 from bolsa_domain.repositories.instrument_repository import (
+    InstrumentTradeContext,
     InstrumentWithMeta,
     SyncLogDetail,
     SyncLogSnapshot,
@@ -16,6 +17,19 @@ from bolsa_infrastructure.database.models import DataSyncLogRow, InstrumentRow, 
 from bolsa_infrastructure.instrument_search import normalize_isin
 from bolsa_market.instrument_fundamentals import parse_fundamentals_from_profile_snapshot
 from bolsa_market.list_freshness import resolve_list_freshness
+
+
+def _finite_float(value: Any) -> float | None:
+    """Float finito o ``None`` (no numérico/NaN/inf ⇒ ausente, nunca 0 inventado)."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:
+        return None
+    return number
 
 
 class SqlAlchemyInstrumentRepository:
@@ -194,6 +208,49 @@ class SqlAlchemyInstrumentRepository:
     async def get_fundamentals(self, instrument_id: str) -> dict[str, Any] | None:
         snapshot = await self.get_profile_snapshot(instrument_id)
         return parse_fundamentals_from_profile_snapshot(snapshot)
+
+    async def list_trade_context_by_ids(
+        self, instrument_ids: list[str]
+    ) -> dict[str, InstrumentTradeContext]:
+        """Sector + ADV + instante de observación por instrumento (UNA query).
+
+        V2.40.1: el tick del AUTO necesita resolver los gates de cartera (sector y
+        liquidez) sin hacer N lecturas ni inventar valores. Se acepta indistintamente el
+        ``id`` y el ``symbol`` del instrumento (el worker del AUTO se keya por símbolo) y
+        el mapa resultante responde por AMBAS claves apuntando al mismo contexto.
+
+        Sin fila ⇒ el instrumento no aparece en el mapa (el llamante lo trata como
+        desconocido). Se devuelve ``None``/``None`` cuando el catálogo no tiene el dato,
+        nunca un valor por defecto: la decisión de asumir o vetar es del motor.
+        """
+        wanted = [str(x).strip() for x in instrument_ids if str(x).strip()]
+        if not wanted:
+            return {}
+        stmt = select(
+            InstrumentRow.id,
+            InstrumentRow.symbol,
+            InstrumentRow.sector,
+            InstrumentRow.profile_snapshot,
+        ).where(or_(InstrumentRow.id.in_(wanted), InstrumentRow.symbol.in_(wanted)))
+        result = await self._session.execute(stmt)
+        contexts: dict[str, InstrumentTradeContext] = {}
+        for instrument_id, symbol, sector, profile_snapshot in result.all():
+            fundamentals = parse_fundamentals_from_profile_snapshot(profile_snapshot)
+            adv_usd: float | None = None
+            observed_at: str | None = None
+            if isinstance(fundamentals, dict):
+                adv_usd = _finite_float(fundamentals.get("advUsd"))
+                fetched_at = fundamentals.get("fetchedAt")
+                observed_at = fetched_at if isinstance(fetched_at, str) else None
+            context = InstrumentTradeContext(
+                sector=sector if isinstance(sector, str) and sector.strip() else None,
+                adv_usd=adv_usd,
+                observed_at=observed_at,
+            )
+            for key in (instrument_id, symbol):
+                if isinstance(key, str) and key.strip():
+                    contexts[key] = context
+        return contexts
 
     async def update_sector(self, instrument_id: str, sector: str | None) -> None:
         if not sector:

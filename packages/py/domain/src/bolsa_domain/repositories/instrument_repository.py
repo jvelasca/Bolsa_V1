@@ -41,6 +41,28 @@ class InstrumentWithMeta:
     expected_last_bar_date: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class InstrumentTradeContext:
+    """Contexto de trading resoluble desde el catálogo (V2.40.1 · AUTO 2.0).
+
+    Es lo que el hot path AUTO necesita para resolver los gates de cartera sin inventar
+    nada:
+
+    * ``sector`` — ``instruments.sector`` (``None`` si el catálogo no lo tiene).
+    * ``adv_usd`` — ADV notional diario derivado de ``profile_snapshot.fundamentals``
+      (``averageVolume × price``); ``None`` si no hay fundamentales.
+    * ``observed_at`` — instante (``fetchedAt``) del bloque de fundamentales, que permite
+      evaluar la frescura del dato en vez de asumir que sigue vigente.
+
+    Cualquier ausencia se representa con ``None`` explícito: la capa de decisión la
+    convierte en ``UNKNOWN``/``STALE`` y veta, nunca en "exento".
+    """
+
+    sector: str | None = None
+    adv_usd: float | None = None
+    observed_at: str | None = None
+
+
 class InstrumentRepository(Protocol):
     async def list_with_meta(
         self,
@@ -56,3 +78,7 @@ class InstrumentRepository(Protocol):
     async def get_last_sync_detail(self, instrument_id: str) -> SyncLogDetail | None: ...
 
     async def get_fundamentals(self, instrument_id: str) -> dict[str, Any] | None: ...
+
+    async def list_trade_context_by_ids(
+        self, instrument_ids: list[str]
+    ) -> dict[str, InstrumentTradeContext]: ...

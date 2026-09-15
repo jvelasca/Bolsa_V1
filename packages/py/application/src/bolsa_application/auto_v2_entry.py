@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
@@ -52,6 +52,7 @@ from bolsa_analytics.cognitive.signal_identity import (
     bar_window,
     build_signal_identity,
 )
+from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.discovery_market_regime import (
@@ -129,10 +130,10 @@ class V2Tunables:
     risk_budget_pct: float = 6.0
     # ATR de reserva cuando la señal no lo aporta (fracción del precio).
     atr_pct_fallback: float = 0.02
-    # Edge de reserva cuando la propuesta no declara confianza. El contrato actual
-    # (``DecisionPackage``) no porta edge, así que el pipeline V2 necesita un valor con
-    # el que poder rankear; es explícito y configurable (no se inventa por señal).
-    default_edge: float = 0.9
+    # V2.40.1 (P0): NO existe ``default_edge``. El edge de una oportunidad es el que
+    # declara la estrategia o el que aporta su EdgeReport persistido; si no hay ninguno
+    # vale 0 (el ranker ya puntúa 0 el componente ausente) y el motor veta por
+    # ``edge_below_threshold``. "No tengo edge" nunca puede leerse como "edge = 0.9".
     # Plantilla de salida (gradúa parciales de T1/T2). ``moderate`` reduce 30% en T1,
     # que es el estándar de la casa para gestión gradual; ``conservative`` (50%) y
     # ``aggressive_swing`` (0%: deja correr) quedan disponibles por env.
@@ -197,10 +198,6 @@ def tunables_from_env() -> V2Tunables:
             "AUTO_ENGINE_SIM_V2_ATR_PCT", base.atr_pct_fallback
         )
         or base.atr_pct_fallback,
-        default_edge=_env_float(
-            "AUTO_ENGINE_SIM_V2_DEFAULT_EDGE", base.default_edge
-        )
-        or base.default_edge,
         exit_template=(os.getenv("AUTO_ENGINE_SIM_V2_EXIT_TEMPLATE") or "").strip()
         or base.exit_template,
         regime_override=regime_raw or None,
@@ -209,22 +206,24 @@ def tunables_from_env() -> V2Tunables:
     )
 
 
-def edge_from_package(pkg: Any, *, default: float) -> float:
-    """Extrae el edge declarado por una propuesta (``memo`` estilo ``edge=0.85``).
+def edge_from_package(pkg: Any) -> float | None:
+    """Edge declarado por una propuesta (``memo`` estilo ``edge=0.85``) o ``None``.
 
-    El ``DecisionPackage`` no porta confianza, así que se admite un canal explícito y
-    opcional en ``memo`` para cuando la estrategia pueda aportarlo. Sin dato ⇒ el
-    ``default`` configurado (nunca se inventa por señal).
+    El ``DecisionPackage`` no porta confianza; se admite un canal explícito y opcional
+    en ``memo``. **Sin dato devuelve ``None``** (V2.40.1/P0: el motor AUTO no tiene
+    valor de reserva — inventar un edge convierte "no sé" en "oportunidad excelente").
+    El llamante decide la fuente alternativa legítima (el EdgeReport persistido de la
+    estrategia); si tampoco la hay, el componente vale 0 y el motor veta.
     """
     raw = _memo_field(pkg, "edge")
     if raw is None:
-        return default
+        return None
     try:
         value = float(raw)
     except ValueError:
-        return default
+        return None
     if value != value:  # NaN
-        return default
+        return None
     return min(1.0, max(0.0, value))
 
 
@@ -279,6 +278,10 @@ class V2Signal:
     signal_id: str = ""
     bar_timestamp: str = ""
     valid_until: str = ""
+    # V2.40.1 — estado EXPLÍCITO de los gates de cartera (sector/liquidez/correlación).
+    # Si se aporta, manda sobre ``sector``/``liquidity_notional`` sueltos: es la vía por
+    # la que el worker comunica KNOWN/STALE/CONFLICTING/UNKNOWN sin perder información.
+    trade_context: TradeContext | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,6 +314,7 @@ def build_worker_snapshot(
     risk_budget_pct: float | None = None,
     reconciliation_ok: bool = True,
     data_freshness: str = DATA_FRESH,
+    sectors: dict[str, str] | None = None,
 ) -> Any:
     """Construye el ``AutoPortfolioSnapshot`` desde el libro del worker (SIM).
 
@@ -318,9 +322,15 @@ def build_worker_snapshot(
     consumido se deriva de la distancia al stop de cada posición (``stops`` cuando se
     conoce, si no la implícita por ATR) y el presupuesto total de ``risk_budget_pct``
     sobre equity, de modo que el motor puede vetar por presupuesto agotado.
+
+    ``sectors`` (V2.40.1) transmite el sector de las posiciones ABIERTAS. Sin él todas
+    caían al cajón ``<unknown>``, la concentración sectorial dejaba de ser verificable y
+    el motor podía evaluar un candidato solo contra sí mismo; con él, el gate
+    ``sector_exposure_unverifiable`` puede distinguir "cesta opaca" de "cesta conocida".
     """
     marks = marks or {}
     stops = stops or {}
+    sectors = sectors or {}
     budget = None
     if risk_budget_pct is not None and risk_budget_pct > 0:
         budget = equity * risk_budget_pct / 100.0
@@ -338,6 +348,7 @@ def build_worker_snapshot(
         stop = stops.get(symbol)
         if stop is not None and entry is not None:
             risk_amount = max(0.0, (float(entry) - float(stop)) * float(qty))
+        sector = sectors.get(symbol)
         positions.append(
             PortfolioPosition(
                 instrument_id=symbol,
@@ -345,6 +356,7 @@ def build_worker_snapshot(
                 market_value=mv,
                 unrealized_pnl=unrealized,
                 risk_amount=risk_amount,
+                sector=sector if isinstance(sector, str) and sector.strip() else None,
             )
         )
     return build_auto_portfolio_snapshot(
@@ -399,16 +411,21 @@ def _score_from_signal(signal: V2Signal) -> OpportunityScore:
     Solo ``edge``/``liquidity``/``robustness`` tienen fuente directa en la señal; el
     resto queda a 0 (fail-closed: no se inventa evidencia que la señal no aporta).
     ``regime_fit`` lo aporta el llamante vía el gate de régimen (no aquí).
+
+    V2.40.1: ni el edge ni la liquidez tienen valor de reserva. Un ``edge`` ausente vale
+    0 (el ranker no redistribuye pesos) y una liquidez desconocida también vale 0, en vez
+    del antiguo ``1.0`` que convertía "no sé" en "liquidez perfecta". El motor, además,
+    veta explícitamente por ``liquidity_unknown``/``edge_below_threshold``.
     """
-    edge = signal.edge
+    liquidity = (
+        None
+        if signal.liquidity_notional is None
+        else min(1.0, max(0.0, signal.liquidity_notional / 1_000_000.0))
+    )
     return score_opportunity(
         signal.instrument_id,
-        edge=edge,
-        liquidity=(
-            1.0
-            if signal.liquidity_notional is None
-            else min(1.0, max(0.0, signal.liquidity_notional / 1_000_000.0))
-        ),
+        edge=signal.edge,
+        liquidity=liquidity,
     )
 
 
@@ -439,14 +456,16 @@ def plan_v2_tick(
     )
 
     entry_signals = [s for s in signals if str(s.action).upper() == "BUY"]
-    # Un símbolo, una señal: la primera manda (determinista, sin depender del orden).
-    deduped: dict[str, V2Signal] = {}
-    for s in entry_signals:
-        deduped.setdefault(s.instrument_id, s)
-    entry_signals = list(deduped.values())
+    # Un símbolo, UNA oportunidad por tick, elegida de forma determinista. El antiguo
+    # ``setdefault`` hacía ganar "la primera que llegue", y el orden de entrada lo fija
+    # el proveedor de señales (no es contractual): dos ticks con el mismo conjunto podían
+    # aprobar instrumentos distintos. ``_dedupe_candidates`` elige por clave canónica.
+    deduped = _dedupe_candidates(entry_signals)
+    entry_signals = sorted(deduped.values(), key=canonical_candidate_key)
 
     # Identidad y frescura ANTES del rankeo: no se rankea ni se le asigna presupuesto a
-    # una oportunidad que ya se emitió en esta barra o que ha caducado.
+    # una oportunidad que ya se emitió en esta barra, que ha caducado o que no tiene
+    # identidad verificable (V2.40.1: sin identidad no hay idempotencia ni auditoría).
     consumed = {str(x).strip() for x in consumed_signal_ids if str(x).strip()}
     blocked: list[DecisionJournalEntryRecord] = []
     eligible: list[V2Signal] = []
@@ -465,11 +484,9 @@ def plan_v2_tick(
     top = select_top_opportunities(ranked, top_n=cfg.top_n)
     score_by_symbol = {s.instrument_id: s for s in top}
 
-    # Se evalúa en ORDEN DE RANK (el mejor reclama presupuesto/exposición primero) y las
-    # aprobaciones del propio tick se ACUMULAN en la foto: sin esto, N candidatos del
-    # mismo sector cada uno al 20% se aprobarían todos y el sector acabaría al 60%
-    # saltándose su límite. El vetado por top-N (score None) se evalúa después y queda
-    # registrado en el journal con su motivo.
+    # TOP_N limita cuántos candidatos se consideran (no cuántos son operables): los que
+    # quedan fuera se evalúan igualmente, para que el journal registre su motivo real
+    # (liquidez, sector, correlación...) y puedan operar si los mejores se vetan.
     ordered: list[V2Signal] = []
     for score in top:
         signal = deduped.get(score.instrument_id)
@@ -488,11 +505,10 @@ def plan_v2_tick(
         atr = signal.atr
         if atr is None and signal.price > 0:
             atr = signal.price * cfg.atr_pct_fallback
-        working_snapshot = snapshot
-        if committed:
-            working_snapshot = replace(
-                snapshot, positions=tuple(snapshot.positions) + tuple(committed)
-            )
+        # Foto de trabajo: base + lo YA aprobado en este tick (riesgo y exposición
+        # reservados). Cada candidato se evalúa contra la foto reservada, no contra la
+        # foto inicial: A → reserva → B → reserva → C.
+        working_snapshot = _working_snapshot(snapshot, committed)
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
             direction="long",
@@ -501,8 +517,7 @@ def plan_v2_tick(
             opportunity_score=entry_score,
             snapshot=working_snapshot,
             regime=resolved_regime,
-            liquidity_notional=signal.liquidity_notional,
-            sector=signal.sector,
+            trade_context=_context_for_signal(signal),
             config=cfg.decision_config(),
             as_of=as_of,
         )
@@ -584,16 +599,116 @@ def position_manager_package(
     )
 
 
+def canonical_candidate_key(signal: V2Signal) -> tuple[Any, ...]:
+    """Clave canónica de una candidata: orden TOTAL y estable, no el de llegada.
+
+    Orden de prioridad (V2.40.1): edge más alto primero, después versión de estrategia,
+    instante de barra, identidad de señal e instrumento. Sirve para dos cosas:
+
+    1. **Deduplicar** señales del mismo instrumento dentro del tick sin depender del orden
+       en que el proveedor las entregue (antes ganaba "la primera", que no es determinista).
+    2. **Iterar** de forma reproducible, de modo que dos ejecuciones con el mismo conjunto
+       de señales produzcan exactamente las mismas decisiones.
+    """
+    edge = signal.edge
+    return (
+        -(float(edge)) if edge is not None else 0.0,
+        -1.0 if edge is None else 0.0,
+        str(signal.strategy_version or ""),
+        str(signal.bar_timestamp or ""),
+        str(signal.signal_id or ""),
+        str(signal.instrument_id or ""),
+    )
+
+
+def _dedupe_candidates(signals: Iterable[V2Signal]) -> dict[str, V2Signal]:
+    """Una candidata por instrumento: la de clave canónica MENOR (la mejor/estable)."""
+    best: dict[str, V2Signal] = {}
+    for signal in signals:
+        current = best.get(signal.instrument_id)
+        if current is None or canonical_candidate_key(signal) < canonical_candidate_key(current):
+            best[signal.instrument_id] = signal
+    return best
+
+
+def _context_for_signal(signal: V2Signal) -> TradeContext:
+    """Estado explícito de los gates de cartera para una señal del tick.
+
+    Con ``trade_context`` el llamante ya resolvió estado y frescura (vía preferente). Sin
+    él se sintetiza desde los valores sueltos: un valor presente es ``KNOWN`` y un ausente
+    es ``UNKNOWN`` ⇒ el motor lo veta. Nunca "exento por no saber".
+    """
+    if signal.trade_context is not None:
+        return signal.trade_context
+    return TradeContext.from_legacy(
+        sector=signal.sector,
+        liquidity_notional=signal.liquidity_notional,
+        correlation=None,
+    )
+
+
+def _working_snapshot(snapshot: Any, committed: Sequence[PortfolioPosition]) -> Any:
+    """Foto de trabajo del tick: base + lo YA aprobado, con su riesgo RESERVADO.
+
+    Reconstruye el snapshot para que ``risk_used`` incluya el riesgo de las aprobaciones
+    anteriores del MISMO tick y para que la exposición (total/sector/activo) se recalcule
+    con ellas. Sin esto, N candidatos del mismo tick se decidían cada uno creyendo
+    ``risk_used = 0`` y el presupuesto de riesgo se podía multiplicar por N (el hallazgo
+    más grave de la auditoría de v2.40-beta).
+
+    ``risk_used`` solo se sobrescribe cuando alguna posición comprometida **declara** su
+    riesgo: si no hay dato, se conserva el de la base (nunca un 0 engañoso).
+    """
+    if not committed or snapshot is None:
+        return snapshot
+    committed_risk = 0.0
+    has_committed_risk = False
+    for position in committed:
+        if position.risk_amount is not None:
+            has_committed_risk = True
+            committed_risk += max(0.0, float(position.risk_amount))
+    risk_used = snapshot.risk_used
+    if has_committed_risk:
+        risk_used = round(((snapshot.risk_used or 0.0) + committed_risk) * 10000) / 10000
+    return build_auto_portfolio_snapshot(
+        account_id=snapshot.account_id,
+        capital=snapshot.capital,
+        cash=snapshot.cash,
+        equity=snapshot.equity,
+        buying_power=snapshot.buying_power,
+        positions=tuple(snapshot.positions) + tuple(committed),
+        open_orders=snapshot.open_orders,
+        daily_pnl=snapshot.daily_pnl,
+        realized_pnl=snapshot.realized_pnl,
+        unrealized_pnl=snapshot.unrealized_pnl,
+        risk_used=risk_used,
+        risk_budget=snapshot.risk_budget,
+        drawdown_pct=snapshot.drawdown_pct,
+        active_strategies=snapshot.active_strategies,
+        market_regime=snapshot.market_regime,
+        last_reconciliation=snapshot.last_reconciliation,
+        data_freshness=snapshot.data_freshness,
+        as_of=snapshot.as_of,
+    )
+
+
 def _committed_position(
     signal: V2Signal, decision: PortfolioDecision
 ) -> PortfolioPosition:
-    """Posición comprometida en ESTE tick (para que los siguientes candidatos la vean)."""
+    """Posición comprometida en ESTE tick (para que los siguientes candidatos la vean).
+
+    V2.40.1: incluye ``risk_amount`` (lo que el ``RiskAllocator`` acaba de reservar) y el
+    sector ya resuelto por el motor, de modo que el siguiente candidato vea el riesgo
+    consumido Y la exposición sectorial real, no una foto vacía.
+    """
     allocation = decision.allocation or {}
+    risk_amount = allocation.get("riskAmount")
     return PortfolioPosition(
         instrument_id=signal.instrument_id,
         quantity=float(allocation.get("quantity") or 0.0),
         market_value=float(allocation.get("positionValue") or 0.0) or None,
-        sector=signal.sector,
+        sector=decision.sector if decision.sector is not None else signal.sector,
+        risk_amount=float(risk_amount) if risk_amount is not None else None,
     )
 
 
@@ -608,6 +723,8 @@ def _stamp(as_of: str) -> str:
 # Motivos de descarte de una señal ANTES de decidir (auditables en el journal).
 SIGNAL_DUPLICATE = "signal_duplicate"
 SIGNAL_STALE = "signal_stale"
+# V2.40.1: sin identidad no hay idempotencia, deduplicación, auditoría ni replay posibles.
+SIGNAL_IDENTITY_MISSING = "signal_identity_missing"
 
 
 def _signal_rejection(
@@ -615,22 +732,24 @@ def _signal_rejection(
 ) -> str | None:
     """Motivo por el que la señal no debe generar una oportunidad nueva (o ``None``).
 
-    Dos reglas, en este orden:
+    Tres reglas, en este orden:
 
+    0. ``signal_identity_missing`` — la señal no trae identidad verificable. V2.40.1: en
+       AUTO la ausencia de identidad es un VETO, no una degradación aceptable. Sin
+       identidad no se puede garantizar idempotencia (no re-operar la misma barra),
+       deduplicación, auditoría ni replay; sacrificar eso por disponibilidad es
+       exactamente lo que un sistema autónomo no debe hacer. La causa raíz (timeframe mal
+       configurado, reloj sin zona, instrumento vacío) se arregla en la fuente, no
+       relajando el gate.
     1. ``signal_duplicate`` — la identidad (instrumento+versión+timeframe+barra+acción)
        ya se consumió: es la MISMA señal sobre la MISMA barra re-emitida por el turno
        siguiente (worker 60s sobre señal D1), no una oportunidad nueva.
     2. ``signal_stale`` — la señal caducó (``valid_until < as_of``): alimentar una
        decisión con una barra vieja sería decidir sobre datos que ya no rigen.
-
-    Sin identidad (``signal_id`` vacío) no se puede deduplicar y NO se descarta: el
-    dedupe es anti-*churn*, no un gate de riesgo, y bloquear entradas porque el reloj o
-    el timeframe no se entienden convertiría un fallo de formato en una parada del motor.
-    Queda auditado en el journal con ``signalId: ""``.
     """
     signal_id = str(signal.signal_id or "").strip()
     if not signal_id:
-        return None
+        return SIGNAL_IDENTITY_MISSING
     if signal_id in consumed:
         return SIGNAL_DUPLICATE
     valid_until = str(signal.valid_until or "").strip()
@@ -770,14 +889,161 @@ class DiscoveryRegimeSource:
         return map_trial_regime(self._trial_regime)
 
 
+def _observed_field(observed: Any, name: str) -> Any:
+    """Lee un campo de una observación (dataclass, Mapping o atributo)."""
+    if observed is None:
+        return None
+    if isinstance(observed, Mapping):
+        return observed.get(name)
+    return getattr(observed, name, None)
+
+
+@dataclass
+class CatalogTradeContextSource:
+    """Contexto de cartera (sector + liquidez) respaldado por el catálogo.
+
+    V2.40.1: es la pieza que convierte "no tengo dato" en un VETO en vez de en una
+    entrada. ``refresh()`` es la parte async (UNA query por tick sobre el catálogo de
+    instrumentos); ``context_for()`` es la lectura SÍNCRONA del hot path, de modo que
+    decidir no depende de I/O. Un fallo de lectura deja el contexto vacío ⇒ el motor
+    veta por ``sector_unknown``/``liquidity_unknown`` (jamás asume que el instrumento
+    es operable "porque no se pudo comprobar").
+
+    La frescura la aporta el propio dato (``observed_at`` = ``fetchedAt`` de los
+    fundamentales) frente al ``as_of`` del tick: sin instantes parseables no se afirma
+    antigüedad, pero tampoco se inventa un dato.
+    """
+
+    reader: Callable[[Sequence[str]], Awaitable[Mapping[str, Any]]]
+    max_age_days: int = DEFAULT_MAX_AGE_DAYS
+    _by_symbol: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    _as_of: str = field(default="", init=False, repr=False)
+
+    async def refresh(self, symbols: Iterable[str], *, as_of: str = "") -> None:
+        """Recarga el contexto de los símbolos del tick (una sola lectura)."""
+        wanted = [str(s).strip() for s in symbols if str(s).strip()]
+        self._as_of = as_of or ""
+        self._by_symbol = {}
+        if not wanted:
+            return
+        try:
+            observed = await self.reader(wanted) or {}
+        except Exception:  # noqa: BLE001 — sin catálogo no hay contexto (fail-closed).
+            logger.exception("auto_v2 trade context read failed")
+            return
+        if isinstance(observed, Mapping):
+            self._by_symbol = {
+                str(symbol).strip(): value
+                for symbol, value in observed.items()
+                if str(symbol).strip()
+            }
+
+    def context_for(
+        self,
+        symbol: str,
+        *,
+        declared_sector: Any = None,
+        liquidity_fallback: float | None = None,
+        correlation: float | None = None,
+        as_of: str = "",
+    ) -> TradeContext:
+        """Contexto de UN candidato: catálogo + lo declarado por la estrategia."""
+        observed = self._by_symbol.get(str(symbol).strip())
+        catalog_sector = _observed_field(observed, "sector")
+        adv_usd = _observed_field(observed, "adv_usd")
+        if adv_usd is None:
+            adv_usd = liquidity_fallback
+        observed_at = _observed_field(observed, "observed_at")
+        return TradeContext.from_observation(
+            sector_declared=declared_sector,
+            sector_catalog=catalog_sector,
+            adv_usd=adv_usd,
+            correlation=correlation,
+            observed_at=observed_at,
+            as_of=as_of or self._as_of,
+            max_age_days=self.max_age_days,
+        )
+
+    def known_sectors(
+        self, symbols: Iterable[str], *, declared: Mapping[str, Any] | None = None
+    ) -> dict[str, str]:
+        """Sector por símbolo SOLO si su estado es ``KNOWN``.
+
+        Es lo que alimenta el snapshot de la cartera: una posición cuyo sector no es
+        fiable se omite del mapa (queda opaca) en vez de publicarse como si fuera
+        verificable. Esa opacidad es justo lo que el motor detecta para no aumentar
+        exposición sobre estado que no puede comprobar.
+        """
+        overrides = declared or {}
+        out: dict[str, str] = {}
+        for symbol in symbols:
+            key = str(symbol).strip()
+            if not key:
+                continue
+            context = self.context_for(key, declared_sector=overrides.get(key))
+            if context.sector_is_known and context.sector:
+                out[key] = context.sector
+        return out
+
+
+@dataclass
+class EdgeReportSource:
+    """Edge REAL por versión de estrategia (``EdgeReport`` persistido).
+
+    V2.40.1: sustituye al antiguo ``default_edge = 0.9``, que convertía "la estrategia no
+    declara edge" en "oportunidad excelente". Aquí el edge es un dato persistido y
+    auditable (``EdgeReportRow.edge_score`` de la versión de estrategia), y su ausencia
+    se propaga como ``None`` (el componente vale 0 y el motor veta).
+
+    ``refresh()`` (async) precarga por tick las versiones observadas; ``edge_for()`` es la
+    lectura síncrona del hot path. Un fallo deja el edge ausente, nunca inventado.
+    """
+
+    reader: Callable[[str, str | None], Awaitable[float | None]]
+    _by_version: dict[str, float] = field(default_factory=dict, init=False, repr=False)
+
+    async def refresh(
+        self, strategy_versions: Iterable[str], *, account_id: str | None = None
+    ) -> None:
+        versions = sorted({str(v).strip() for v in strategy_versions if str(v).strip()})
+        self._by_version = {}
+        for version in versions:
+            try:
+                value = await self.reader(version, account_id)
+            except Exception:  # noqa: BLE001 — sin edge no se inventa uno.
+                logger.exception("auto_v2 edge report read failed version=%s", version)
+                continue
+            if value is None:
+                continue
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if number != number:
+                continue
+            self._by_version[version] = min(1.0, max(0.0, number))
+
+    def edge_for(self, strategy_version: str | None) -> float | None:
+        key = str(strategy_version or "").strip()
+        if not key:
+            return None
+        return self._by_version.get(key)
+
+
 __all__ = [
     "V2_ENGINE_ENV",
+    "CatalogTradeContextSource",
     "DiscoveryRegimeSource",
+    "EdgeReportSource",
+    "SIGNAL_DUPLICATE",
+    "SIGNAL_IDENTITY_MISSING",
+    "SIGNAL_STALE",
     "V2Signal",
     "V2TickPlan",
     "V2Tunables",
     "aggregate_trial_regime",
     "build_worker_snapshot",
+    "canonical_candidate_key",
     "edge_from_package",
     "plan_v2_position_decision",
     "plan_v2_tick",

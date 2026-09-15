@@ -11,8 +11,17 @@ Flujo por barra de mercado::
 El manager NO ejecuta órdenes (SIM-only: solo decide la intención); la ejecución y la
 reconciliación viven aguas abajo. Añade la salida por régimen (``REGIME_EXIT``) a nivel
 de manager — sin tocar el ``ExitPlan`` existente — para no romper el contrato cognitivo:
-si el régimen es exit-only (UNKNOWN/RISK_OFF) y la posición sigue abierta, la intención
-es venta total con motivo ``regime_exit``.
+si el régimen es exit-only (UNKNOWN/RISK_OFF) la intención es venta TOTAL con motivo
+``regime_exit``, con **precedencia absoluta** sobre cualquier otra intención de gestión
+(V2.40.1: antes solo se forzaba sobre un ``hold``, así que un ``REDUCE``/``TAKE_PROFIT``
+podía ganarle a la política exit-only).
+
+Sobre la reconciliación: el invariante de la casa es que la reconciliación veta
+APERTURAS, nunca una salida protectora (ver
+``test_v2_recon_status_never_blocks_protective_exit``). Un recon crítico se refleja en el
+``ExitPlan``/``PositionDecision`` (y el llamante emite la venta con la cantidad CANÓNICA),
+pero no se usa aquí como excepción que pudiera dejar una posición abierta contra un
+régimen exit-only.
 
 Fail-closed: posición inexistente/cerrada, mark inválido o dirección no soportada ⇒
 ``None`` (no se inventa una orden). Los stops que empeoran son rechazados por
@@ -108,9 +117,9 @@ def manage_position(
 ) -> PositionManagerResult | None:
     """Gestiona una posición abierta: mark + decisión + intención de orden.
 
-    Devuelve ``None`` si no hay posición gestionable (fail-closed). El régimen
-    exit-only fuerza venta total con motivo ``regime_exit`` por encima de cualquier
-    otra intención.
+    Devuelve ``None`` si no hay posición gestionable (fail-closed). El régimen exit-only
+    fuerza venta total con motivo ``regime_exit`` con precedencia ABSOLUTA sobre
+    cualquier otra intención (hold/reduce/take-profit/trailing).
     """
     if position is None or position.status == "CLOSED":
         return None
@@ -143,10 +152,16 @@ def manage_position(
     if decision.primary_reason:
         exit_reasons.append(decision.primary_reason.lower())
 
-    # Salida por régimen (AUTO 2.0): prevalece y fuerza venta total.
-    if regime_is_exit_only(regime) and order_action == "hold":
+    # Salida por régimen (AUTO 2.0 · V2.40.1): precedencia ABSOLUTA. El régimen exit-only
+    # pide deshacer riesgo, así que no compite con la gestión normal: ignora hold, reduce,
+    # take-profit, trailing y cualquier actualización de stop, y emite venta TOTAL.
+    # Antes solo se forzaba cuando la decisión era ``hold``, de modo que en ``UNKNOWN``/
+    # ``RISK_OFF`` un ``REDUCE`` o un ``TAKE_PROFIT`` podían prevalecer y dejar posición
+    # abierta contra la política declarada (exit-only ⇒ deshacer, no "gestionar un poco").
+    if regime_is_exit_only(regime):
         order_action = "sell"
         order_qty = marked.remaining_quantity
+        stop_update = None
         exit_reasons.append(REGIME_EXIT)
 
     return PositionManagerResult(

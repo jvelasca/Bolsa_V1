@@ -14,12 +14,21 @@ Secuencia de veto (fail-closed; cada veto registra su ``reason_code`` en el
 1. ``stale_data``            — datos de mercado/cartera no frescos.
 2. ``position_exists``       — ya hay posición abierta (HOLD, sin nueva entrada).
 3. ``regime_invalid``        — régimen operativo no permite entrada (UNKNOWN/RISK_OFF).
-4. ``liquidity_insufficient``— liquidez/capacidad insuficiente.
-5. ``edge_below_threshold``  — score de oportunidad por debajo del umbral.
-6. ``risk_budget_exceeded``  — presupuesto de riesgo restante agotado.
-7. ``correlation_conflict``  — correlación con posiciones existentes por encima del tope.
-8. ``concentration_exceeded``— concentración activo/sector por encima del límite.
-9. ``risk_reward_below_threshold`` — R/R por debajo del mínimo.
+4. ``liquidity_insufficient``— liquidez/capacidad insuficiente (dato presente y nulo).
+5. ``liquidity_unknown``     — liquidez NO conocida (V2.40.1: ``None`` no es "perfecta").
+6. ``edge_below_threshold``  — score de oportunidad por debajo del umbral.
+7. ``risk_budget_exceeded``  — presupuesto de riesgo restante agotado.
+8. ``correlation_conflict``  — correlación con posiciones existentes por encima del tope.
+9. ``correlation_unknown``   — correlación NO calculada con el tope activo (V2.40.1).
+10. ``sector_unknown``/``sector_conflicting``/``sector_stale`` — sector del candidato NO
+    resoluble de forma fiable (V2.40.1: la ausencia de sector NO se asume exenta).
+11. ``sector_exposure_unverifiable`` — alguna posición abierta tiene sector no resoluble,
+    así que la concentración sectorial de la cesta no puede comprobarse.
+12. ``concentration_exceeded``— concentración activo/sector por encima del límite.
+13. ``risk_reward_below_threshold`` — R/R por debajo del mínimo.
+
+Todos los vetos de "dato ausente" (``*_unknown``, ``sector_*``, ``sector_exposure_unverifiable``)
+son ``fail-closed``: en AUTO un dato que no se puede verificar NO autoriza entrada.
 
 La DECISIÓN de tamaño la delega en ``RiskAllocator`` (la estrategia nunca fija lote);
 los niveles SL/TP se derivan por ATR (``compute_atr_stop``/``compute_take_profit``) o
@@ -45,6 +54,14 @@ from bolsa_analytics.cognitive.risk_allocator import (
     compute_atr_stop,
     compute_take_profit,
 )
+from bolsa_analytics.cognitive.trade_context import (
+    SECTOR_CONFLICTING,
+    SECTOR_KNOWN,
+    SECTOR_STALE,
+    SECTOR_UNKNOWN,
+    UNKNOWN_SECTOR_VALUE,
+    TradeContext,
+)
 from bolsa_analytics.cognitive.trade_plan import TradePlan
 
 PortfolioAction = Literal["ENTRY", "HOLD", "REDUCE", "EXIT"]
@@ -55,9 +72,15 @@ DecisionReasonCode = Literal[
     "position_exists",
     "regime_invalid",
     "liquidity_insufficient",
+    "liquidity_unknown",
     "risk_budget_exceeded",
     "concentration_exceeded",
     "correlation_conflict",
+    "correlation_unknown",
+    "sector_unknown",
+    "sector_conflicting",
+    "sector_stale",
+    "sector_exposure_unverifiable",
     "stale_data",
     "edge_below_threshold",
     "risk_reward_below_threshold",
@@ -69,14 +92,27 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         "position_exists",
         "regime_invalid",
         "liquidity_insufficient",
+        "liquidity_unknown",
         "risk_budget_exceeded",
         "concentration_exceeded",
         "correlation_conflict",
+        "correlation_unknown",
+        "sector_unknown",
+        "sector_conflicting",
+        "sector_stale",
+        "sector_exposure_unverifiable",
         "stale_data",
         "edge_below_threshold",
         "risk_reward_below_threshold",
     }
 )
+
+# Estado de sector ⇒ motivo de veto auditable (V2.40.1: nunca "exento" por ausencia).
+_SECTOR_REJECTION_CODE: dict[str, DecisionReasonCode] = {
+    SECTOR_UNKNOWN: "sector_unknown",
+    SECTOR_CONFLICTING: "sector_conflicting",
+    SECTOR_STALE: "sector_stale",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +126,12 @@ class PortfolioDecisionConfig:
     atr_multiplier: float = 1.5  # k para el stop por ATR.
     target1_r: float = 1.0  # R del T1 (si la estrategia no aporta target).
     target2_r: float = 2.0  # R del T2.
+    # V2.40.1 (fail-closed): un dato de cartera NO verificable NO autoriza entrada.
+    # ``require_sector`` exige sector resoluble del candidato y de las posiciones
+    # abiertas; ``require_liquidity`` exige liquidez conocida. Desactivarlos es una
+    # decisión EXPLÍCITA del llamante (herramientas manuales/legacy), nunca el default.
+    require_sector: bool = True
+    require_liquidity: bool = True
     allocator: RiskAllocatorConfig = field(default_factory=RiskAllocatorConfig)
 
 
@@ -154,6 +196,29 @@ def _correlation_conflict(
     return correlation > max_correlation
 
 
+def _sector_exposure_unverifiable(
+    snapshot: AutoPortfolioSnapshot | None,
+    *,
+    config: PortfolioDecisionConfig,
+) -> bool:
+    """True si la concentración sectorial de la cesta NO puede comprobarse.
+
+    V2.40.1: con ``require_sector``, una posición abierta cuyo sector no es resoluble
+    (o el sentinel ``<unknown>``) hace que la exposición sectorial sea opaca. En AUTO
+    eso NO autoriza aumentar exposición: se veta con ``sector_exposure_unverifiable``
+    en vez de agrupar toda la cesta en un cajón y evaluar el candidato contra sí mismo.
+    """
+    if not config.require_sector or snapshot is None:
+        return False
+    for position in snapshot.positions:
+        sector = position.sector
+        if not isinstance(sector, str) or not sector.strip():
+            return True
+        if sector.strip() == UNKNOWN_SECTOR_VALUE:
+            return True
+    return False
+
+
 def _concentration_violates(
     *,
     snapshot: AutoPortfolioSnapshot | None,
@@ -168,8 +233,13 @@ def _concentration_violates(
     capa la posición nueva); aquí se evalúa la concentración de SECTOR, que es
     portfolio-wide y solo puede verse sumando la puesta al resto de la cesta.
 
-    Sin snapshot, sin ``max_sector_pct`` o sin equidad evaluable ⇒ no se veta (no se
-    inventa una violación; el resto del motor ya es fail-closed).
+    Esta función es aritmética: sin snapshot, sin ``max_sector_pct`` o sin equidad
+    evaluable no afirma violación. La política *fail-closed* (V2.40.1) NO vive aquí sino
+    en ``decide_portfolio``, que antes de llegar a este punto veta con
+    ``sector_unknown``/``sector_conflicting``/``sector_stale`` si el sector del candidato
+    no es fiable y con ``sector_exposure_unverifiable`` si alguna posición de la cesta
+    tiene sector opaco (sin eso, todas caerían en el cajón ``<unknown>`` y el candidato
+    se compararía solo consigo mismo).
     """
     if snapshot is None or config.max_sector_pct is None:
         return False
@@ -252,6 +322,7 @@ def decide_portfolio(
     liquidity_notional: float | None = None,
     sector: str | None = None,
     correlation_with_portfolio: float | None = None,
+    trade_context: TradeContext | None = None,
     config: PortfolioDecisionConfig | None = None,
     decision_id: str = "",
     expires_at: str | None = None,
@@ -261,10 +332,27 @@ def decide_portfolio(
 
     Devuelve una ``PortfolioDecision`` con ``approved=True`` solo si la entrada es
     operable. Cualquier veto se refleja en ``reason_codes`` y NO se inventa tamaño.
+
+    ``trade_context`` (V2.40.1) es la vía preferente: aporta el **estado explícito** de
+    sector/liquidez/correlación (``KNOWN``/``STALE``/``CONFLICTING``/``UNKNOWN``). Si no
+    se aporta, se sintetiza desde los parámetros sueltos con ``TradeContext.from_legacy``:
+    un valor presente es ``KNOWN`` y un ``None`` es ``UNKNOWN`` ⇒ veto, nunca "exento".
     """
     cfg = config if config is not None else PortfolioDecisionConfig()
     did = decision_id.strip() if decision_id.strip() else f"dec-{uuid4().hex[:12]}"
     score = opportunity_score.combined if opportunity_score is not None else None
+    ctx = (
+        trade_context
+        if trade_context is not None
+        else TradeContext.from_legacy(
+            sector=sector,
+            liquidity_notional=liquidity_notional,
+            correlation=correlation_with_portfolio,
+        )
+    )
+    # El sector que publica la decisión es el ya resuelto (o el declarado si el contexto
+    # lo dio por CONFLICTING/STALE: se publica para que el journal muestre lo que se vio).
+    resolved_sector = ctx.sector if ctx.sector is not None else sector
 
     def _reject(action: PortfolioAction, *codes: DecisionReasonCode) -> PortfolioDecision:
         return PortfolioDecision(
@@ -279,7 +367,7 @@ def decide_portfolio(
             allocation=None,
             regime=regime,
             as_of=as_of,
-            sector=sector,
+            sector=resolved_sector,
         )
 
     # 1) Frescura de datos.
@@ -294,8 +382,10 @@ def decide_portfolio(
     if not regime_allows_entry_for(regime, direction):
         return _reject("HOLD", "regime_invalid")
 
-    # 4) Liquidez / capacidad.
-    if liquidity_notional is not None and liquidity_notional <= 0:
+    # 4) Liquidez / capacidad. V2.40.1: desconocida NO es "perfecta" ⇒ fail-closed.
+    if cfg.require_liquidity and not ctx.liquidity_is_known:
+        return _reject("HOLD", "liquidity_unknown")
+    if ctx.liquidity_notional is not None and ctx.liquidity_notional <= 0:
         return _reject("HOLD", "liquidity_insufficient")
 
     # 5) Edge esperado.
@@ -306,9 +396,25 @@ def decide_portfolio(
     if snapshot is not None and snapshot.risk_remaining is not None and snapshot.risk_remaining <= 0:
         return _reject("HOLD", "risk_budget_exceeded")
 
-    # 7) Correlación con posiciones existentes.
-    if _correlation_conflict(correlation_with_portfolio, cfg.max_correlation):
+    # 7) Sector del candidato (V2.40.1). Con ``require_sector``, solo un sector KNOWN es
+    # operable: desconocido / en conflicto con el catálogo / caducado ⇒ NO ENTRY.
+    if cfg.require_sector and ctx.sector_status != SECTOR_KNOWN:
+        return _reject("HOLD", _SECTOR_REJECTION_CODE.get(ctx.sector_status, "sector_unknown"))
+
+    # 8) Correlación con posiciones existentes. Con tope activo, solo un valor CALCULADO
+    # permite entrar; no hay valor ⇒ ``correlation_unknown`` (antes pasaba "sin problema").
+    if cfg.max_correlation is not None:
+        if not ctx.correlation_is_calculated:
+            return _reject("HOLD", "correlation_unknown")
+        if _correlation_conflict(ctx.correlation, cfg.max_correlation):
+            return _reject("HOLD", "correlation_conflict")
+    elif _correlation_conflict(ctx.correlation, cfg.max_correlation):
         return _reject("HOLD", "correlation_conflict")
+
+    # 9) Exposición sectorial de la cesta verificable (V2.40.1): si alguna posición
+    # abierta tiene sector opaco, la concentración NO puede comprobarse ⇒ NO ENTRY.
+    if _sector_exposure_unverifiable(snapshot, config=cfg):
+        return _reject("HOLD", "sector_exposure_unverifiable")
 
     # Geometría: entry/stop/targets (ATR o niveles de la estrategia).
     entry = entry_price
@@ -339,18 +445,18 @@ def decide_portfolio(
     if not allocation.approved:
         return _reject("HOLD", "risk_budget_exceeded")
 
-    # 8) Concentración (as-if fill con el tamaño calculado).
+    # 10) Concentración (as-if fill con el tamaño calculado).
     position_value = allocation.position_value or 0.0
     if _concentration_violates(
         snapshot=snapshot,
         instrument_id=instrument_id,
-        sector=sector,
+        sector=ctx.sector,
         position_value=position_value,
         config=cfg,
     ):
         return _reject("HOLD", "concentration_exceeded")
 
-    # 9) R/R contra target primario (solo si la estrategia aporta target).
+    # 11) R/R contra target primario (solo si la estrategia aporta target).
     if target_price is not None:
         distance = allocation.stop_distance
         if distance is not None and distance > 0:
@@ -391,5 +497,5 @@ def decide_portfolio(
         allocation=allocation.to_dict(),
         regime=regime,
         as_of=as_of,
-        sector=sector,
+        sector=resolved_sector,
     )

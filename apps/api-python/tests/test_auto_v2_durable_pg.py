@@ -85,6 +85,7 @@ async def _seed_instrument(session: AsyncSession, instrument_id: str) -> None:
 
     from bolsa_infrastructure.database.models.tables import InstrumentRow
 
+    now = datetime.now(UTC)
     session.add(
         InstrumentRow(
             id=instrument_id,
@@ -97,11 +98,52 @@ async def _seed_instrument(session: AsyncSession, instrument_id: str) -> None:
             currency="EUR",
             type="stock",
             is_active=True,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
+            # V2.40.1 — gates fail-closed REALES: el instrumento se siembra con sector y
+            # fundamentals FRESCOS (ADV + fetchedAt de ahora) porque sin dato el motor
+            # veta por ``sector_unknown``/``liquidity_unknown``. Sembrarlos es lo que
+            # certifica el camino real de producción, no un atajo del test.
+            sector="Technology",
+            profile_snapshot={
+                "fundamentals": {"advUsd": 50_000_000.0, "fetchedAt": now.isoformat()}
+            },
+            created_at=now,
+            updated_at=now,
         )
     )
     await session.commit()
+
+
+async def _seed_edge_report(
+    session: AsyncSession, *, account_id: str, strategy_ref: str, edge_score: float = 0.9
+) -> str:
+    """EdgeReport vigente para la versión: la fuente REAL de ``edge`` del tick.
+
+    V2.40.1 eliminó el ``default_edge``; sin este informe persistido el componente de
+    edge vale 0 y el motor veta por ``edge_below_threshold``.
+    """
+    from datetime import UTC, datetime
+
+    from bolsa_infrastructure.database.models.tables import EdgeReportRow
+
+    report_id = f"edge-v2d-{uuid.uuid4().hex[:10]}"
+    session.add(
+        EdgeReportRow(
+            id=report_id,
+            version="v2.40.1-test",
+            strategy_or_signal_ref=strategy_ref,
+            instrument_universe_ref=None,
+            account_id=account_id,
+            credibility=Decimal("0.80"),
+            edge_score=Decimal(str(edge_score)),
+            band="positive",
+            suite={},
+            notes=[],
+            payload=None,
+            created_at=datetime.now(UTC),
+        )
+    )
+    await session.commit()
+    return report_id
 
 
 class _BuyOnce:
@@ -176,10 +218,14 @@ async def test_v2_durable_plan_and_consumed_signal_survive_real_restart(
     monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "100000")
 
     account_id: str | None = None
+    edge_report_id: str | None = None
     try:
         async with v2_pg_factory() as session:
             account_id = await _seed_account(session)
             await _seed_instrument(session, instrument_id)
+            edge_report_id = await _seed_edge_report(
+                session, account_id=account_id, strategy_ref="unversioned"
+            )
 
         worker1 = AutoSimulationWorker(
             decider=_BuyOnce(instrument_id, lot=100.0),
@@ -230,6 +276,7 @@ async def test_v2_durable_plan_and_consumed_signal_survive_real_restart(
     finally:
         if account_id is not None:
             from bolsa_infrastructure.database.models.tables import (
+                EdgeReportRow,
                 SimAutoPositionRow,
                 SimConsumedSignalRow,
             )
@@ -245,4 +292,8 @@ async def test_v2_durable_plan_and_consumed_signal_survive_real_restart(
                         SimConsumedSignalRow.account_id == account_id
                     )
                 )
+                if edge_report_id is not None:
+                    await session.execute(
+                        delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
+                    )
                 await session.commit()

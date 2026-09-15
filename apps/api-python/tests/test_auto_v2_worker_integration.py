@@ -68,11 +68,37 @@ def _hold() -> _Prov:
 
 
 def _worker(**kwargs: object) -> AutoSimulationWorker:
+    defaults: dict[str, object] = dict(_trade_kwargs())
+    defaults.update(kwargs)
     return AutoSimulationWorker(
         clock=step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))[1],
         exec_store=InMemoryExecutionEventStore(),
-        **kwargs,  # type: ignore[arg-type]
+        **defaults,  # type: ignore[arg-type]
     )
+
+
+def _edge_source(value: float = 0.9):
+    """``EdgeReportSource`` fake: edge persistido por versión de estrategia (sin PG)."""
+    from bolsa_application.auto_v2_entry import EdgeReportSource
+
+    async def _read(_strategy_ref: str, _account_id: str | None) -> float | None:
+        return value
+
+    return EdgeReportSource(reader=_read)
+
+
+def _trade_kwargs() -> dict[str, object]:
+    """Fuentes de dato que hacen el pipeline OPERABLE (V2.40.1).
+
+    Sin sector/liquidez/edge conocidos el motor es fail-closed y NO abre nada, así que
+    los tests de mecánica del worker inyectan estos fakes. Los tests del propio
+    fail-closed pasan ``None``/valores ausentes para certificar el veto.
+    """
+    return {
+        "sector_source": lambda _symbol: "tech",
+        "liquidity_source": lambda _symbol: 1_000_000.0,
+        "edge_source": _edge_source(),
+    }
 
 
 @pytest.mark.asyncio
@@ -251,6 +277,7 @@ async def test_v2_adopts_readopted_position_after_restart(v2_env: None) -> None:
         exec_store=store,
         position_store=pos_store,
         account_id=account_id,
+        **_trade_kwargs(),
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()
@@ -274,6 +301,7 @@ async def test_v2_adopts_readopted_position_after_restart(v2_env: None) -> None:
         position_store=pos_store,
         account_id=account_id,
         price_script=script,
+        **_trade_kwargs(),
     )
     await w2.real_turn(
         exec_store=store,
@@ -437,6 +465,41 @@ async def test_v2_sector_from_memo_wins_over_source(v2_env: None) -> None:
     assert worker._v2_plan.decisions[0].sector == "energy"
 
 
+@pytest.mark.asyncio
+async def test_v2_without_trade_sources_is_fail_closed(v2_env: None) -> None:
+    """V2.40.1 (P0-7): sin sector/ADV/edge reales NO hay entrada, aunque haya régimen.
+
+    Es el invariante que cierra el gap de producción de ``v2.40-beta``: el worker real
+    corría sin fuentes y el motor, en vez de abrir a ciegas, debe quedarse en NO ENTRY
+    con el motivo auditable de la primera fuente que falta (liquidez → edge → sector).
+    """
+    cases = [
+        # (kwargs de fuentes, motivo esperado) — cascada en el orden del motor:
+        # liquidez → edge → sector.
+        ({"sector_source": None, "liquidity_source": None, "edge_source": None}, "liquidity_unknown"),
+        (
+            {"sector_source": None, "liquidity_source": lambda _s: 1_000_000.0, "edge_source": None},
+            "edge_below_threshold",
+        ),
+        (
+            {
+                "sector_source": None,
+                "liquidity_source": lambda _s: 1_000_000.0,
+                "edge_source": _edge_source(),
+            },
+            "sector_unknown",
+        ),
+    ]
+    for sources, expected in cases:
+        worker = _worker(**sources)
+        worker._decider = _buy_lot()
+        await worker.auto_turn()
+        assert worker._open.get("AAA", Decimal("0")) == 0, f"sin fuentes no se abre ({expected})"
+        assert worker._v2_plan.approved_symbols == ()
+        assert expected in worker._v2_plan.decisions[0].reason_codes
+        assert worker._v2_plan.journal_entries[0].payload["approved"] is False
+
+
 def test_v2_recon_status_never_blocks_protective_exit(v2_env: None) -> None:
     """Invariante: la reconciliación veta APERTURAS, nunca cierres.
 
@@ -551,7 +614,10 @@ async def test_v2_new_bar_signal_can_open_again(v2_env: None) -> None:
         return 100.0 if prices["n"] <= 1 else 96.0
 
     worker = AutoSimulationWorker(
-        clock=clock, exec_store=InMemoryExecutionEventStore(), price_script=script
+        clock=clock,
+        exec_store=InMemoryExecutionEventStore(),
+        price_script=script,
+        **_trade_kwargs(),
     )
     worker._decider = _buy_lot()
     await worker.auto_turn()
@@ -602,6 +668,7 @@ async def test_v2_consumed_signal_survives_restart(v2_env: None) -> None:
         account_id=account_id,
         consumed_signal_store=signals,
         price_script=lambda _symbol, _minute: 100.0,
+        **_trade_kwargs(),
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()
@@ -622,6 +689,7 @@ async def test_v2_consumed_signal_survives_restart(v2_env: None) -> None:
         account_id=account_id,
         consumed_signal_store=signals,
         price_script=lambda _symbol, _minute: 100.0,
+        **_trade_kwargs(),
     )
     assert w2._v2_consumed_signals == set(), "el proceso nuevo nace sin memoria de RAM"
     w2._decider = _buy_lot()
@@ -660,6 +728,7 @@ async def test_v2_consumed_signals_pruned_to_current_bar(v2_env: None) -> None:
         account_id=account_id,
         consumed_signal_store=signals,
         price_script=lambda _symbol, _minute: 100.0,
+        **_trade_kwargs(),
     )
     worker._decider = _hold()
     await worker.auto_turn()
