@@ -106,6 +106,16 @@ con las violaciones publicadas en el journal: `PortfolioDecision.plan_violations
   [`docs/engineering/plan-v2-40-4-auto-safety-accounting-2026-09-16.md`](./docs/engineering/plan-v2-40-4-auto-safety-accounting-2026-09-16.md)
   y [`docs/engineering/roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md`](./docs/engineering/roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md),
   con los P1 diferidos mapeados a su fase.
+- **Sellado de CI (GitHub, posterior al commit):** tag anotado **`v2.40.4-beta` → `1127d010`**
+  (`main` == `1127d010`; el commit docs-only de este sellado es posterior y **no** entra en el tag).
+  `Release-tag CI` **GREEN** run [`35155027506`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35155027506)
+  (9 jobs requeridos + `certify`) y `Python CI` **GREEN** run
+  [`35154788932`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35154788932) (5/5, `quality`
+  1734 passed). **Un rojo real, arreglado y declarado:** el primer `Python CI` (run
+  [`35150808768`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35150808768)) dejó `quality` en rojo
+  con `test_list_unapplied_filters_by_status`, que afirmaba el orden de inserción en vez de
+  `captured_at DESC` (en local empataban los sellos de tiempo del reloj y pasaba); se corrigió en
+  `1127d010` y el tag apunta al commit verde. Detalle en §7.1 del audit-pack.
 
 ## [1.65.3-beta] — V2.40.3 · Hotfix de la clave de idempotencia financiera (colisión por recorte) + invariante del A9 sobre el ledger real — 2026-09-16
 

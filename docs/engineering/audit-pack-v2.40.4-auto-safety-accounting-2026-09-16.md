@@ -4,8 +4,10 @@
 > `v2.40.2-beta` (semántica real de `TOP_N`, measurement status de riesgo/exposición, órdenes
 > pendientes/cash reservado, validación de `TradePlan`), **sin migración**.
 > **Bump:** `1.65.3-beta` → `1.65.4-beta`. **Alembic head:** `041_unique_natural_keys` (sin cambios).
-> **Estado:** implementado y verificado en local. Este documento **no** afirma CI de un tag que aún no
-> existe; la verificación se hizo con las baterías **extraídas del YAML** de CI y con PostgreSQL real.
+> **Estado:** implementado, verificado en local y **sellado con CI real de GitHub**. Tag anotado
+> **`v2.40.4-beta` → `1127d010`**; `main` en `1127d010` (el commit del sellado es posterior y **no**
+> entra en el tag). `Release-tag CI` **GREEN** (run `35155027506`: 9 jobs requeridos + `certify`) y
+> `Python CI` **GREEN** en `main` (run `35154788932`: 5/5 jobs). Esta versión **sí** afirma CI de tag.
 >
 > Plan de implementación: [`plan-v2-40-4-auto-safety-accounting-2026-09-16.md`](./plan-v2-40-4-auto-safety-accounting-2026-09-16.md).
 > Roadmap por fases: [`roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md`](./roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md).
@@ -173,7 +175,27 @@ AUTO_V2_DURABLE_PG_REQUIRED=1 uv run pytest apps/api-python/tests/test_auto_v2_d
 
 ---
 
-## 7. Evidencia de verificación (medida en local)
+## 7. Evidencia de verificación (medida en local **y** en CI real de GitHub)
+
+### 7.1 CI sellado (evidencia reproducible del tip certificado)
+
+| Gate                                              | Run                                                                            | Resultado                                                                                                                                                                                                                                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Python CI` (push a `main`, commit `1127d010`)    | [`35154788932`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35154788932) | **GREEN 5/5**: `quality` (**1734 passed, 37 skipped**), `lifecycle-pg`, `paper-forward-pg`, `grammar-discovery-pg`, `auto-v2-durable-pg`                                                                                                                            |
+| `Release tag CI` (tag `v2.40.4-beta`, `1127d010`) | [`35155027506`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35155027506) | **GREEN**: los **9 jobs requeridos** (`security`, `shared`, `spine`, `frontend`, `python`, `playwright-mock`, `lifecycle-pg`, `dr-verify`, `a7-gate`) + `certify (aggregate + artifact)`. `playwright (integrated E2E)` queda `skipped` porque es opt-in por diseño |
+| `Gitleaks` (ambos commits)                        | `35154789021`, `35150808784`                                                   | success                                                                                                                                                                                                                                                             |
+
+**Un rojo real de CI, arreglado y declarado (no tapado).** La primera pasada de `Python CI` sobre el
+commit del slice (`a60f72c1`, run [`35150808768`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35150808768))
+dejó `quality` en **rojo** con `test_execution_event.py::test_list_unapplied_filters_by_status`
+(`assert ['ev-failed', 'ev-captured'] == ['ev-captured', 'ev-failed']`). Era un defecto **del test
+nuevo**, no del código: afirmaba el orden de inserción cuando el contrato de `list_unapplied` es
+`captured_at DESC`; pasaba en local solo porque los dos `datetime.now(UTC)` que sella
+`ExecutionEvent.__post_init__` caían en el mismo tick del reloj y el sort estable conservaba el orden de
+inserción. Se corrigió fijando `captured_at` de forma explícita (`1127d010`) y la segunda pasada quedó
+verde. **El tag apunta al commit verde, no al que tuvo el rojo.**
+
+### 7.2 Baterías locales (medidas antes de publicar)
 
 | Batería                                                                                                                              | Resultado                                                                                                                                                                                                                                                                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -185,5 +207,9 @@ AUTO_V2_DURABLE_PG_REQUIRED=1 uv run pytest apps/api-python/tests/test_auto_v2_d
 | `mypy packages/py/{domain,market,infrastructure,application}/src apps/api-python/src --follow-imports=silent` (comando exacto de CI) | **Success: no issues found in 483 source files**                                                                                                                                                                                                                                                                                                       |
 | `lint-imports --config packages/py/.importlinter`                                                                                    | **4 kept, 0 broken**                                                                                                                                                                                                                                                                                                                                   |
 
-**No verificado en este entorno:** el `Release-tag CI` (no se ha creado tag) y la ejecución de los
-jobs de GitHub Actions (solo se ha validado el **contenido** de sus listas de pytest).
+**Lo que este pack NO afirma:** que las puertas de CI sean deterministas. El flake del scheduler
+(límite 6 de §5) se ejecuta **con PG real** en los jobs con `AUTO_SCHEDULER_PG_REQUIRED=1`
+(`lifecycle-pg` de ambos workflows, donde un skip es fallo duro), así que puede re-dispararse con el
+código base y con este tip; el criterio declarado es **re-ejecutar el job**. En las dos puertas de este
+sellado (`35154788932`, `35155027506`) salió **verde**. El `playwright (integrated E2E)` es opt-in y su
+`skipped` no es una excepción a la certificación.

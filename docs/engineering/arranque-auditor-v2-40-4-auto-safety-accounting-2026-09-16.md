@@ -2,13 +2,22 @@
 
 > **Qué auditar:** el slice `V2.40.4` (Safety & Accounting) sobre `1.65.3-beta`, **sin migración**
 > (Alembic head `041_unique_natural_keys`).
+> **Qué commit auditar:** tag anotado **`v2.40.4-beta` → `1127d010`** (slice `a60f72c1` + el fix de un
+> test que CI puso rojo). `main` está en `1127d010` + el commit **docs-only** de sellado que estás
+> leyendo, que **no** forma parte del tag.
+> **Estado de CI (sellado):** `Release tag CI` **GREEN** (run
+> [`35155027506`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35155027506): 9 jobs requeridos +
+> `certify`) y `Python CI` **GREEN** en `main` (run
+> [`35154788932`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35154788932): 5/5 jobs). El primer
+> intento (`35150808768`) dejó `quality` rojo por un test propio mal afirmado; el detalle está en §7.1
+> del audit-pack.
 > **De dónde leer (orden recomendado, 15-30 min):**
 >
 > 1. **Este fichero** (alcance, mapa de artefactos, qué NO se afirma).
 > 2. [`audit-pack-v2.40.4-auto-safety-accounting-2026-09-16.md`](./audit-pack-v2.40.4-auto-safety-accounting-2026-09-16.md) — matriz afirmación→código→test, mutaciones **medidas**, límites declarados.
 > 3. [`plan-v2-40-4-auto-safety-accounting-2026-09-16.md`](./plan-v2-40-4-auto-safety-accounting-2026-09-16.md) — plan de implementación (los 4 workstreams).
 > 4. [`roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md`](./roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md) — roadmap por fases (`AUTO-1`…`AUTO-8`) con invariante, gate y criterio de salida por fase.
-> 5. `CHANGELOG.md` `[1.65.4-beta]` y el diff del árbol de trabajo.
+> 5. El tag: `git show --stat v2.40.4-beta` (código auditado) y `CHANGELOG.md` `[1.65.4-beta]`.
 
 ---
 
@@ -29,7 +38,6 @@
 
 **No afirma**
 
-- CI de un tag **no publicado** (no hay tag `v2.40.4` creado).
 - Que la reserva de cartera sea un ledger explícito con rollback/replay: eso es `AUTO-1`
   (Reservation Engine) y está declarado como deuda.
 - Que el riesgo de un fill en vuelo sea **medible**: es un **suelo** que veta (política declarada).
@@ -38,7 +46,9 @@
 - Que **todas** las puertas de CI sean deterministas:
   `apps/api-python/tests/test_auto_scheduler_real_pg_zero_human_intervention.py` es un **flake
   pre-existente** (medido A/B a 30 ejecuciones: **4/30 en el commit base** y **8/30 con el slice**;
-  mismo mecanismo en ambos). Está declarado en §5.6 del audit-pack; si sale rojo, el criterio es
+  mismo mecanismo en ambos). Se ejecuta **con PG real** en los jobs `lifecycle-pg` (donde un skip es
+  fallo duro), así que puede re-dispararse; en el sellado de este tag salió verde en las dos puertas
+  (`35154788932`, `35155027506`). Declarado en §5.6 del audit-pack; si sale rojo, el criterio es
   re-ejecutar el job.
 
 ---
