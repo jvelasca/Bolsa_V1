@@ -144,9 +144,21 @@ Con F1 arreglado apareció el siguiente rojo, esta vez en
   en cada push, no solo en el job con PostgreSQL.
 - **`mypy` no se pudo ejecutar en la máquina de verificación** (política de control de aplicaciones
   de Windows bloquea el DLL `mypyc` del binario: `ImportError: DLL load failed while importing
-…__mypyc`). **No se afirma**: queda cubierto por el step _Mypy_ del job `quality` del CI. El cambio
-  de F1 es un módulo nuevo pequeño con firmas anotadas y sin dependencias nuevas, así que el riesgo
-  es bajo, pero no se declara como verificado.
+…__mypyc`). **No se afirma localmente**: lo cubre el step _Mypy_ del job `quality` y el job `python`
+  del tag, ambos verdes en CI (abajo). El cambio de F1 es un módulo nuevo pequeño con firmas
+  anotadas y sin dependencias nuevas.
+
+### Sellado de CI (GitHub, posterior al commit)
+
+| Gate                          | Run                                                                                                         | Resultado                                                                                                                                                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Python CI del push a `main`   | [`35068139514`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068139514) (`581067c4`)                 | **success**: `quality`, `lifecycle-pg`, `grammar-discovery-pg`, `paper-forward-pg`, `auto-v2-durable-pg`                                                                                                     |
+| Release-tag CI del tag movido | [`35068488972`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068488972) (`581067c4`, `v2.40.2-beta`) | **success**: `certify` ✓ con `python` (ruff/imports/**mypy**/pytest offline), `lifecycle-pg` (auth + golden restart), `dr-verify`, `a7-gate`, `playwright` (mock), `frontend`, `shared`, `spine`, `security` |
+
+El tag `v2.40.2-beta` se **movió** (borrado + re-tag) desde `11e2cb83`, cuyo CI quedó rojo por el bug
+que esta fase corrige, al commit del fix `581067c4`. **Nota declarada:** el tag apunta a un commit
+cuya versión es `1.65.3-beta`, así que el nombre del tag no coincide con la versión del código que
+señala; es el precio de que "el tag" siga significando "commit certificado".
 
 ## [1.65.2-beta] — V2.40.2 · Claves naturales únicas (reconciliación Prisma→Alembic + upsert atómico) — 2026-09-15
 

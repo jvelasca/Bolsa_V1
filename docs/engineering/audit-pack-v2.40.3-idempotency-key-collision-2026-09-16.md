@@ -12,10 +12,16 @@
 > **Contrato financiero:** sin cambios; el rango de las claves de idempotencia (`16..128`, sin
 > whitespace, estable por `execution_id`) se mantiene y ahora se cumple **de verdad** en todo el
 > rango de longitudes.
-> **Sello CI:** el tag `v2.40.2-beta` **se mueve** al commit del fix (borrado + re-tag) para que el
-> tag siga significando "commit certificado": el CI del tag antiguo quedó rojo precisamente por el
-> bug que esta fase corrige (ver §1). La evidencia de ejecución **local** está en §6 con la batería
-> **exacta** del job afectado; el run de GitHub se reporta cuando exista.
+> **Sello CI:** el tag `v2.40.2-beta` **se movió** al commit del fix (`581067c4`, borrado + re-tag) para
+> que el tag siga significando "commit certificado": el CI del tag antiguo (`11e2cb83`) quedó rojo
+> precisamente por el bug que esta fase corrige (ver §1). **Sellado y verificado:** push a `main` en
+> verde (Python CI [`35068139514`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068139514):
+> `quality`, `lifecycle-pg`, `grammar-discovery-pg`, `paper-forward-pg`, `auto-v2-durable-pg`) y
+> Release-tag CI del tag movido en verde (run
+> [`35068488972`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068488972), `sha=581067c4`,
+> `certify` ✓, incluido el job `python` con `ruff`/`imports`/`mypy`/`pytest` offline y `lifecycle-pg`
+> con auth + golden restart). La evidencia de ejecución **local** está en §6 con la batería **exacta**
+> del job afectado (la sonda del §6 se ejecutó antes de publicar; el sello de CI es posterior).
 > **Arranque auditor:** este mismo documento (§0 resumen, §1–§4 fix, §5 mutaciones, §6 verificación,
 > §7 limitaciones).
 
@@ -199,21 +205,23 @@ anterior solo permanecía estable porque el bug de F1 lo congelaba (verde falso)
 
 ## 6. Verificación (evidencia local)
 
-Toda la evidencia de ejecución es **local** (no se afirma CI de un tag que aún no se ha publicado);
-la batería es la **exacta** del job `lifecycle-pg` (`release-tag-ci.yml`), sobre PostgreSQL real en
-una **BD scratch recreada y migrada a head** y con los **mismos gates fail-if-skipped** del job.
+La evidencia de ejecución de esta sección es **local** (sondas y baterías completas sobre PostgreSQL
+real antes de publicar); la batería es la **exacta** del job `lifecycle-pg` (`release-tag-ci.yml`),
+sobre PostgreSQL real en una **BD scratch recreada y migrada a head** y con los **mismos gates
+fail-if-skipped** del job. El **sello de CI de GitHub** (posterior al commit) está en §0: push a `main`
+en verde y Release-tag CI del tag movido en verde.
 
-| Comprobación                                                                                                                      | Resultado                                                                                                                                                                                                                                   |
-| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/py/application/tests/test_idempotency_key_budget.py`                                                                    | **10 passed** (hermético, 0,22 s)                                                                                                                                                                                                           |
-| A/B del bug (derivación histórica restaurada, código del fix intacto)                                                             | día AUTO rojo: **`AssertionError: el día AUTO deja 3 ExecutionEvents sin materializar (RETRY/CAPTURED)`** (1 failed en 121,26 s: los 4 fills de la orden colapsan en 1 clave ⇒ 1 asentado y 3 en `RETRY` permanente)                        |
-| Mismo día con el fix (sin el A/B)                                                                                                 | **2 passed** en el fichero A9 (día completo 7,82 s + restart 22,67 s)                                                                                                                                                                       |
-| Batería del job `lifecycle-pg` (BD scratch recreada + migrada a `head`, gates fail-if-skipped activos)                            | **132 passed in 106,55 s** (0 failed, 0 errors, 0 skipped)                                                                                                                                                                                  |
-| Baterías **offline** de CI, con los comandos `pytest` **extraídos del propio YAML** (para que no se desincronicen): job `quality` | **1626 passed in 85,59 s**                                                                                                                                                                                                                  |
-| Misma extracción para el job `python` del tag                                                                                     | **1634 passed in 58,95 s**                                                                                                                                                                                                                  |
-| `ruff check packages/py apps/api-python --config pyproject.toml` (el comando del job `quality`)                                   | **0 hallazgos**                                                                                                                                                                                                                             |
-| `lint-imports --config packages/py/.importlinter`                                                                                 | **4/4 contratos KEPT**                                                                                                                                                                                                                      |
-| `mypy packages/py/… apps/api-python/src --follow-imports=silent` (step _Mypy_ del job `quality`)                                  | **NO ejecutado**: la política de control de aplicaciones de Windows de la máquina de verificación bloquea el DLL `mypyc` del binario (`ImportError: DLL load failed while importing …__mypyc`). No se afirma nada sobre él; lo cubre el CI. |
+| Comprobación                                                                                                                      | Resultado                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/py/application/tests/test_idempotency_key_budget.py`                                                                    | **10 passed** (hermético, 0,22 s)                                                                                                                                                                                                                                                                                                                                                                                  |
+| A/B del bug (derivación histórica restaurada, código del fix intacto)                                                             | día AUTO rojo: **`AssertionError: el día AUTO deja 3 ExecutionEvents sin materializar (RETRY/CAPTURED)`** (1 failed en 121,26 s: los 4 fills de la orden colapsan en 1 clave ⇒ 1 asentado y 3 en `RETRY` permanente)                                                                                                                                                                                               |
+| Mismo día con el fix (sin el A/B)                                                                                                 | **2 passed** en el fichero A9 (día completo 7,82 s + restart 22,67 s)                                                                                                                                                                                                                                                                                                                                              |
+| Batería del job `lifecycle-pg` (BD scratch recreada + migrada a `head`, gates fail-if-skipped activos)                            | **132 passed in 106,55 s** (0 failed, 0 errors, 0 skipped)                                                                                                                                                                                                                                                                                                                                                         |
+| Baterías **offline** de CI, con los comandos `pytest` **extraídos del propio YAML** (para que no se desincronicen): job `quality` | **1626 passed in 85,59 s**                                                                                                                                                                                                                                                                                                                                                                                         |
+| Misma extracción para el job `python` del tag                                                                                     | **1634 passed in 58,95 s**                                                                                                                                                                                                                                                                                                                                                                                         |
+| `ruff check packages/py apps/api-python --config pyproject.toml` (el comando del job `quality`)                                   | **0 hallazgos**                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `lint-imports --config packages/py/.importlinter`                                                                                 | **4/4 contratos KEPT**                                                                                                                                                                                                                                                                                                                                                                                             |
+| `mypy packages/py/… apps/api-python/src --follow-imports=silent` (step _Mypy_ del job `quality`)                                  | **NO ejecutado en local**: la política de control de aplicaciones de Windows de la máquina de verificación bloquea el DLL `mypyc` del binario (`ImportError: DLL load failed while importing …__mypyc`). **Sí cubierto por CI**: el job `python` del tag (que corre `ruff`/`imports`/`mypy`/`pytest` offline) quedó **verde** en el run `35068488972`, y el step _Mypy_ del job `quality` en el run `35068139514`. |
 
 Notas de reproducibilidad del §6:
 
@@ -241,7 +249,10 @@ Notas de reproducibilidad del §6:
 ## 7. Limitaciones declaradas
 
 1. **El tag se mueve.** `v2.40.2-beta` se borra y se re-crea sobre el commit de este fix: el tag
-   anterior apuntaba a un commit cuyo CI quedó rojo. Queda registrado aquí y en el CHANGELOG.
+   anterior (`11e2cb83`) apuntaba a un commit cuyo CI quedó rojo. Queda registrado aquí y en el
+   CHANGELOG. **Consecuencia declarada:** el tag `v2.40.2-beta` apunta a un commit cuya versión es
+   `1.65.3-beta` (fase V2.40.3); el nombre del tag no coincide con la versión del código que señala.
+   La base auditada de esta fase sigue siendo `11e2cb83` (por SHA, ya sin tag).
 2. **La rama larga de la clave introduce una marca (`~`).** No es un slug válido y por tanto ninguna
    clave nueva puede coincidir con una histórica que sí lo fuera; a cambio, los consumidores que
    validen el **alfabeto** de la clave de idempotencia (no solo longitud/whitespace) deben aceptar el
@@ -271,9 +282,10 @@ Notas de reproducibilidad del §6:
 7. **`mypy` no se pudo ejecutar en la máquina de verificación.** La política de control de
    aplicaciones de Windows bloquea el DLL compilado (`mypyc`) del binario
    (`ImportError: DLL load failed while importing 08ae81f72d5a2b5fa9e0__mypyc`), así que el step
-   _Mypy_ del job `quality` **no está verificado localmente** en esta fase. El módulo nuevo
-   (`idempotency_key.py`) tiene firmas anotadas y no añade dependencias, pero **no se declara
-   verificado**: lo certificará el CI. Es un límite del entorno, no del cambio.
+   _Mypy_ **no está verificado localmente**. Lo cubre el CI: el job `python` del tag
+   (`ruff`/`imports`/`mypy`/`pytest` offline) quedó verde en el run `35068488972` y el step _Mypy_
+   del job `quality` en el `35068139514`. El módulo nuevo (`idempotency_key.py`) tiene firmas
+   anotadas y no añade dependencias. Es un límite del entorno, no del cambio.
 8. **El test hermético nuevo se cablea en dos jobs de CI.** `test_idempotency_key_budget.py` no
    habría corrido en la red de CI si solo se hubiera escrito el fichero: hay que añadirlo a la lista
    explícita. Esta fase lo añade al job `quality` (`python-ci.yml`) y al job `python`
