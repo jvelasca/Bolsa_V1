@@ -11,11 +11,12 @@ entorno local.
   re-sellado) → commit sellado **`581067c4`** (tag **`v2.40.2-beta` movido aquí**: borrado + re-tag,
   ver §0 del pack).
 - **Commits posteriores a `581067c4` (docs + sondas, ninguna línea de producción):** `29466369`,
-  `d6b9e1f3` y la punta actual. Contienen `CHANGELOG.md`, `docs/engineering/*` y **tres scripts de
-  auditoría** en `apps/api-python/scripts/`: `a9_mutation_audit.py` y `a9_restart_mutation.py` (las
-  sondas con las que se midió §5) y `a9_identity_length_probe.py` (el barrido de longitudes que
-  respalda la tabla de §1). **Compruébalo tú** con `git diff --stat 581067c4 <punta de main>`: el
-  camino de dinero no debe aparecer.
+  `d6b9e1f3`, `d2a64d7e` y la punta actual. Contienen `CHANGELOG.md`, `docs/engineering/*` y **cuatro
+  scripts de auditoría** en `apps/api-python/scripts/`: `a9_mutation_audit.py` y
+  `a9_restart_mutation.py` (las sondas con las que se midió §5), `a9_identity_length_probe.py` (el
+  barrido de longitudes que respalda la tabla de §1) y `a9_doc_refs_probe.py` (comprueba que las
+  rutas citadas por estos documentos existen). **Compruébalo tú** con
+  `git diff --stat 581067c4 <punta de main>`: el camino de dinero no debe aparecer.
 - **Ojo con el nombre del tag:** `git rev-list -n 1 v2.40.2-beta` resuelve a **`581067c4`**, cuya
   versión es **`1.65.3-beta`** (fase V2.40.3). El nombre del tag **no** coincide con la versión del
   código que señala: es una **limitación declarada** (§7.1 del pack), no un error de sellado.

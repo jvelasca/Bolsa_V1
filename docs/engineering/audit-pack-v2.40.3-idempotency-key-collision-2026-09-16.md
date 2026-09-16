@@ -227,9 +227,15 @@ con `git checkout --`; el rojo se lee del `-rf` de pytest, no de la intuición d
 **Reproducible desde un clon** (las sondas están en el repo, no en una máquina):
 
 ```bash
-uv run --no-sync python apps/api-python/scripts/a9_mutation_audit.py          # M1–M6 (hermético, ~5 s)
-uv run --no-sync python apps/api-python/scripts/a9_restart_mutation.py        # M7 (PG real, ~50 s; ver nota)
+uv run --no-sync python apps/api-python/scripts/a9_mutation_audit.py      # M1–M6 (hermético, ~4 s medidos)
+uv run --no-sync python apps/api-python/scripts/a9_restart_mutation.py     # M7 (PG real, ~50 s; ver nota)
+uv run --no-sync python apps/api-python/scripts/a9_identity_length_probe.py  # longitudes (respalda §1)
+uv run --no-sync python apps/api-python/scripts/a9_doc_refs_probe.py       # ¿existen los ficheros que citan estos docs?
 ```
+
+La última no audita código sino **este documento**: comprueba que cada ruta de fichero citada en el
+pack y en el arranque resuelve a un fichero real del árbol (hoy: 43 referencias, 0 muertas). Si un
+auditor encuentra una cita que no existe, es que el documento se escribió a mano y nadie lo comprobó.
 
 ### 5.1 Medido (rojo exacto observado)
 
