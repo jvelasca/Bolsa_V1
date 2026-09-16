@@ -34,10 +34,13 @@ from uuid import uuid4
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import AutoPortfolioSnapshot
 from bolsa_analytics.cognitive.market_regime_gate import map_trial_regime
 from bolsa_analytics.cognitive.opportunity_ranker import (
+    TOP_N_EXCLUDED,
     OpportunityScore,
+    rank_opportunities,
     select_top_opportunities,
 )
 from bolsa_analytics.cognitive.position_state import PositionState
+from bolsa_analytics.cognitive.trade_plan import validate_trade_plan
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.portfolio_decision_engine import (
     Direction,
@@ -141,8 +144,13 @@ def trade_plan_to_decision_package(
 
     Fail-closed: sin ejecución permitida (``execution_allowed=False``, cantidad 0 o
     dirección no mapeable) ⇒ ``None`` (no se emite propuesta).
+    V2.40.4: además, un plan que se contradice a sí mismo (``validate_trade_plan``) ⇒
+    ``None``. Es defensa en profundidad en el seam que consume el worker: aunque el
+    motor ya lo vete, ningún camino alternativo puede emitir una propuesta incoherente.
     """
     if trade_plan is None:
+        return None
+    if validate_trade_plan(trade_plan):
         return None
     if not getattr(trade_plan, "execution_allowed", False):
         return None
@@ -189,6 +197,8 @@ def build_decision_journal_payload(decision: PortfolioDecision) -> dict[str, Any
         "regime": decision.regime,
         "tradePlan": None if decision.trade_plan is None else decision.trade_plan.to_dict(),
         "risk": decision.allocation,
+        # V2.40.4 — por qué el plan fue declarado incoherente (vacío si no lo fue).
+        "planViolations": list(decision.plan_violations),
     }
 
 
@@ -205,6 +215,29 @@ def build_position_journal_payload(result: PositionManagerResult) -> dict[str, A
         "attention": result.attention,
         "action": result.decision.action,
         "reason": result.decision.reason,
+    }
+
+
+def build_top_n_excluded_payload(
+    candidate: EntryCandidate, score: OpportunityScore | None
+) -> dict[str, Any]:
+    """Payload de journal de un candidato FUERA del TOP N (V2.40.4 · tope de evaluación).
+
+    El score es el REAL del ranking: ``top_n_excluded`` significa "no la evalué", no
+    "no tenía edge". Sin él, el journal no permitiría distinguir ambas cosas.
+    """
+    return {
+        "event": EVENT_ENTRY_DECISION,
+        "instrumentId": candidate.instrument_id,
+        "action": "HOLD",
+        "direction": candidate.direction,
+        "approved": False,
+        "reasonCodes": [TOP_N_EXCLUDED],
+        "opportunityScore": None if score is None else score.combined,
+        "rank": None if score is None else score.rank,
+        "regime": None,
+        "tradePlan": None,
+        "risk": None,
     }
 
 
@@ -244,8 +277,10 @@ def run_auto_cycle(
     """Ejecuta UNA pasada operativa completa y devuelve el reporte auditable.
 
     - Separa candidatos de Research (P3) de los operativos (solo ACTIVE).
-    - Rankea y selecciona el TOP N operativo (no "una señal = una compra").
-    - Decide cada candidato operativo con ``decide_portfolio`` (vetos fail-closed).
+    - Rankea y selecciona el TOP N a EVALUAR (V2.40.4: tope de evaluación, no
+      prioridad); los candidatos fuera del TOP se journalizan con ``top_n_excluded`` y
+      su score real, y no llegan al motor de decisión.
+    - Decide cada candidato del TOP con ``decide_portfolio`` (vetos fail-closed).
     - Gestiona cada posición abierta con ``manage_position``.
     - Registra en journal TODAS las decisiones (entrada y posición) con reason_codes.
     """
@@ -261,15 +296,32 @@ def run_auto_cycle(
         else:
             tradable.append(candidate)
 
-    # Ranking de oportunidad sobre el universo operativo.
-    scores = select_top_opportunities(opportunities, top_n=top_n)
-    score_by_instrument = {s.instrument_id: s for s in scores}
+    # Ranking de oportunidad sobre el universo operativo. V2.40.4: ``top_n`` acota qué
+    # se EVALÚA; el resto conserva su score en el journal con ``top_n_excluded``.
+    ranked = rank_opportunities(opportunities)
+    top = select_top_opportunities(ranked, top_n=top_n)
+    score_by_instrument = {s.instrument_id: s for s in top}
+    ranked_by_instrument = {s.instrument_id: s for s in ranked}
 
     decisions: list[PortfolioDecision] = []
     journal: list[DecisionJournalEntryRecord] = []
 
     for candidate in tradable:
-        score = score_by_instrument.get(candidate.instrument_id)
+        if candidate.instrument_id not in score_by_instrument:
+            journal.append(
+                _entry(
+                    event_type=EVENT_ENTRY_DECISION,
+                    decision_id=f"EXC-{uuid4().hex[:12]}",
+                    actor=actor,
+                    instrument_id=candidate.instrument_id,
+                    payload=build_top_n_excluded_payload(
+                        candidate, ranked_by_instrument.get(candidate.instrument_id)
+                    ),
+                    at=as_of,
+                )
+            )
+            continue
+        score = score_by_instrument[candidate.instrument_id]
         decision = decide_portfolio(
             instrument_id=candidate.instrument_id,
             direction=candidate.direction,

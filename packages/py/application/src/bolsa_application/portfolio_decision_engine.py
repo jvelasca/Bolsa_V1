@@ -24,11 +24,22 @@ Secuencia de veto (fail-closed; cada veto registra su ``reason_code`` en el
     resoluble de forma fiable (V2.40.1: la ausencia de sector NO se asume exenta).
 11. ``sector_exposure_unverifiable`` — alguna posición abierta tiene sector no resoluble,
     así que la concentración sectorial de la cesta no puede comprobarse.
-12. ``concentration_exceeded``— concentración activo/sector por encima del límite.
-13. ``risk_reward_below_threshold`` — R/R por debajo del mínimo.
+12. ``risk_measurement_partial``/``risk_measurement_unknown`` — el riesgo agregado de la
+    cesta solo cubre parte de las posiciones (o ninguna): es un SUELO, no el total
+    (V2.40.4).
+13. ``exposure_measurement_partial``/``exposure_measurement_unknown`` — la exposición
+    agregada no cubre todas las posiciones (V2.40.4).
+14. ``open_orders_unmeasurable`` — hay órdenes pendientes cuyo capital/riesgo/exposición
+    no se puede afirmar (o el libro no se pudo leer): no se añade riesgo sobre capital ya
+    comprometido (V2.40.4).
+15. ``concentration_exceeded``— concentración activo/sector por encima del límite.
+16. ``risk_reward_below_threshold`` — R/R por debajo del mínimo.
+17. ``plan_invalid``          — el ``TradePlan`` construido se contradice a sí mismo
+    (V2.40.4): un plan incoherente no se emite, se veta con sus violaciones en el journal.
 
-Todos los vetos de "dato ausente" (``*_unknown``, ``sector_*``, ``sector_exposure_unverifiable``)
-son ``fail-closed``: en AUTO un dato que no se puede verificar NO autoriza entrada.
+Todos los vetos de "dato ausente" (``*_unknown``, ``sector_*``, ``sector_exposure_unverifiable``,
+``*_measurement_*``, ``open_orders_unmeasurable``) son ``fail-closed``: en AUTO un dato que no
+se puede verificar NO autoriza entrada.
 
 La DECISIÓN de tamaño la delega en ``RiskAllocator`` (la estrategia nunca fija lote);
 los niveles SL/TP se derivan por ATR (``compute_atr_stop``/``compute_take_profit``) o
@@ -40,12 +51,18 @@ SIM-only / fail-closed: un fallo de cálculo o un input inválido ⇒ decisión 
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Literal
 from uuid import uuid4
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import AutoPortfolioSnapshot
 from bolsa_analytics.cognitive.market_regime_gate import regime_allows_entry_for
+from bolsa_analytics.cognitive.measurement import (
+    MEASUREMENT_COMPLETE,
+    MEASUREMENT_PARTIAL,
+    MEASUREMENT_UNKNOWN,
+)
 from bolsa_analytics.cognitive.opportunity_ranker import OpportunityScore
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition, compute_portfolio_fit
 from bolsa_analytics.cognitive.risk_allocator import (
@@ -62,7 +79,9 @@ from bolsa_analytics.cognitive.trade_context import (
     UNKNOWN_SECTOR_VALUE,
     TradeContext,
 )
-from bolsa_analytics.cognitive.trade_plan import TradePlan
+from bolsa_analytics.cognitive.trade_plan import TradePlan, validate_trade_plan
+
+logger = logging.getLogger(__name__)
 
 PortfolioAction = Literal["ENTRY", "HOLD", "REDUCE", "EXIT"]
 Direction = Literal["long", "short"]
@@ -84,6 +103,12 @@ DecisionReasonCode = Literal[
     "stale_data",
     "edge_below_threshold",
     "risk_reward_below_threshold",
+    "risk_measurement_partial",
+    "risk_measurement_unknown",
+    "exposure_measurement_partial",
+    "exposure_measurement_unknown",
+    "open_orders_unmeasurable",
+    "plan_invalid",
 ]
 
 # Códigos que se registran como NO-TRADE en el journal (el resto es aprobado).
@@ -104,6 +129,12 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         "stale_data",
         "edge_below_threshold",
         "risk_reward_below_threshold",
+        "risk_measurement_partial",
+        "risk_measurement_unknown",
+        "exposure_measurement_partial",
+        "exposure_measurement_unknown",
+        "open_orders_unmeasurable",
+        "plan_invalid",
     }
 )
 
@@ -112,6 +143,13 @@ _SECTOR_REJECTION_CODE: dict[str, DecisionReasonCode] = {
     SECTOR_UNKNOWN: "sector_unknown",
     SECTOR_CONFLICTING: "sector_conflicting",
     SECTOR_STALE: "sector_stale",
+}
+
+# V2.40.4 — estado de MEDICIÓN ⇒ motivo de veto auditable. Un agregado que solo suma lo
+# que sabe medir es un SUELO: "sé 100" no autoriza a tratar el total como 100.
+_MEASUREMENT_REJECTION_CODE: dict[str, DecisionReasonCode] = {
+    MEASUREMENT_PARTIAL: "risk_measurement_partial",
+    MEASUREMENT_UNKNOWN: "risk_measurement_unknown",
 }
 
 
@@ -132,6 +170,11 @@ class PortfolioDecisionConfig:
     # decisión EXPLÍCITA del llamante (herramientas manuales/legacy), nunca el default.
     require_sector: bool = True
     require_liquidity: bool = True
+    # V2.40.4 (fail-closed): un agregado de cartera INCOMPLETO no autoriza aumentar
+    # exposición. ``risk_used`` derivado de posiciones que no todas declaran su riesgo
+    # es un SUELO, y una exposición que no pudo valorar todas las posiciones es un
+    # ``>=``, no un total. Desactivarlo es una decisión EXPLÍCITA del llamante.
+    require_complete_measurement: bool = True
     allocator: RiskAllocatorConfig = field(default_factory=RiskAllocatorConfig)
 
 
@@ -153,6 +196,10 @@ class PortfolioDecision:
     # Sector ASUMIDO por el gate de concentración (auditoría: sin él no se puede
     # reconstruir por qué una decisión pasó o no el límite sectorial).
     sector: str | None = None
+    # V2.40.4 — violaciones de coherencia del ``TradePlan`` que motivaron ``plan_invalid``.
+    # El journal las publica tal cual: un veto por plan incoherente debe decir QUÉ campo
+    # se contradecía, no solo que "algo no cuadraba".
+    plan_violations: tuple[str, ...] = ()
 
     @property
     def is_no_trade(self) -> bool:
@@ -172,6 +219,7 @@ class PortfolioDecision:
             "allocation": self.allocation,
             "regime": self.regime,
             "asOf": self.as_of,
+            "planViolations": list(self.plan_violations),
         }
 
 
@@ -354,7 +402,11 @@ def decide_portfolio(
     # lo dio por CONFLICTING/STALE: se publica para que el journal muestre lo que se vio).
     resolved_sector = ctx.sector if ctx.sector is not None else sector
 
-    def _reject(action: PortfolioAction, *codes: DecisionReasonCode) -> PortfolioDecision:
+    def _reject(
+        action: PortfolioAction,
+        *codes: DecisionReasonCode,
+        plan_violations: tuple[str, ...] = (),
+    ) -> PortfolioDecision:
         return PortfolioDecision(
             decision_id=did,
             instrument_id=instrument_id,
@@ -368,6 +420,7 @@ def decide_portfolio(
             regime=regime,
             as_of=as_of,
             sector=resolved_sector,
+            plan_violations=plan_violations,
         )
 
     # 1) Frescura de datos.
@@ -416,6 +469,30 @@ def decide_portfolio(
     if _sector_exposure_unverifiable(snapshot, config=cfg):
         return _reject("HOLD", "sector_exposure_unverifiable")
 
+    # 10) Medición COMPLETA del riesgo y de la exposición agregados (V2.40.4). Colocado
+    # DESPUÉS del gate sectorial para no cambiar el motivo reportado en los casos ya
+    # cubiertos, y ANTES de dimensionar: decidir tamaño contra un riesgo que es un suelo
+    # (o una exposición que es un ">=") es exactamente lo que hay que impedir.
+    if cfg.require_complete_measurement and snapshot is not None:
+        if snapshot.risk_measurement != MEASUREMENT_COMPLETE:
+            return _reject(
+                "HOLD",
+                _MEASUREMENT_REJECTION_CODE.get(snapshot.risk_measurement, "risk_measurement_unknown"),
+            )
+        if snapshot.exposure.measurement != MEASUREMENT_COMPLETE:
+            return _reject(
+                "HOLD",
+                "exposure_measurement_partial"
+                if snapshot.exposure.measurement == MEASUREMENT_PARTIAL
+                else "exposure_measurement_unknown",
+            )
+        # 10.b) Libro de órdenes pendientes MEDIBLE (V2.40.4): si no se puede afirmar
+        # cuánto capital/riesgo/exposición hay comprometido en órdenes sin materializar
+        # (o si ni siquiera se pudo leer el libro), NO se añade riesgo nuevo. "No hay
+        # pendientes" solo se puede afirmar cuando la lectura fue COMPLETA.
+        if not snapshot.order_book_is_complete:
+            return _reject("HOLD", "open_orders_unmeasurable")
+
     # Geometría: entry/stop/targets (ATR o niveles de la estrategia).
     entry = entry_price
     if entry is None or entry <= 0:
@@ -440,7 +517,14 @@ def decide_portfolio(
         direction=direction,
         risk_budget=risk_budget,
         config=cfg.allocator,
-        buying_power=snapshot.buying_power if snapshot is not None else None,
+        # ``buying_power`` es BRUTO; el capital reservado por órdenes pendientes se le
+        # resta dentro del allocator (V2.40.4), que además lo registra con su propio
+        # motivo (``CAP_RESERVED_CASH``) para que el journal distinga "no hay dinero" de
+        # "el dinero está comprometido en órdenes sin materializar".
+        buying_power=(
+            snapshot.buying_power if snapshot is not None else None
+        ),
+        reserved_cash=(snapshot.reserved_cash if snapshot is not None else None),
     )
     if not allocation.approved:
         return _reject("HOLD", "risk_budget_exceeded")
@@ -485,6 +569,18 @@ def decide_portfolio(
         opportunity_score=score,
         expires_at=expires_at,
     )
+    # V2.40.4 — el plan que sale de aquí dimensiona una orden real: si se contradice a
+    # sí mismo, NADA aguas abajo lo detecta (viaja serializado hasta el worker). Se
+    # valida aquí, en el último punto donde todavía se puede vetar con motivo.
+    plan_violations = validate_trade_plan(plan)
+    if plan_violations:
+        logger.error(
+            "portfolio decision plan_invalid instrument=%s decision=%s violations=%s",
+            instrument_id,
+            did,
+            list(plan_violations),
+        )
+        return _reject("HOLD", "plan_invalid", plan_violations=plan_violations)
     return PortfolioDecision(
         decision_id=did,
         instrument_id=instrument_id,

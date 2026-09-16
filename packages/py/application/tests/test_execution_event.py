@@ -579,3 +579,93 @@ async def test_renew_apply_lease_keeps_legitimate_owner_alive() -> None:
         )
         is False
     )
+
+
+# ── V2.40.4: list_unapplied (órdenes PENDIENTES = dinero no materializado) ─────
+
+
+@pytest.mark.asyncio
+async def test_list_unapplied_only_returns_non_terminal_rows() -> None:
+    """``APPLIED`` es el único terminal financiero: no es una orden pendiente."""
+    store = InMemoryExecutionEventStore()
+    await store.capture(_exec("ev-pending"))
+    await store.capture(_exec("ev-applied", qty="10"))
+    assert await store.start_apply("ev-applied", owner="w") is True
+    await store.mark_applied("ev-applied", lease_owner="w")
+
+    pending = await store.list_unapplied("acc-1")
+    assert [row.execution_id for row in pending] == ["ev-pending"]
+
+
+@pytest.mark.asyncio
+async def test_list_unapplied_filters_by_account() -> None:
+    """El libro es POR CUENTA: la orden de otra cuenta no reserva mi capital."""
+    from decimal import Decimal
+
+    store = InMemoryExecutionEventStore()
+    await store.capture(_exec("ev-mine"))
+    await store.capture(
+        ExecutionEvent(
+            execution_id="ev-other",
+            order_id="lo-2",
+            venue="LIVE",
+            venue_order_id="xtb-22",
+            fill_seq=1,
+            qty=Decimal("5"),
+            account_id="acc-2",
+        )
+    )
+    assert [r.execution_id for r in await store.list_unapplied("acc-1")] == ["ev-mine"]
+    # ``None`` = sin filtro: ver TODO antes que asumir que no hay nada (fail-closed).
+    assert {r.execution_id for r in await store.list_unapplied(None)} == {
+        "ev-mine",
+        "ev-other",
+    }
+
+
+@pytest.mark.asyncio
+async def test_list_unapplied_filters_by_status() -> None:
+    """Solo los estados NO terminales; un ``FAILED`` sigue siendo dinero en vuelo."""
+    store = InMemoryExecutionEventStore()
+    await store.capture(_exec("ev-captured"))
+    await store.capture(_exec("ev-failed"))
+    assert await store.start_apply("ev-failed", owner="w") is True
+    assert await store.mark_failed("ev-failed", lease_owner="w", error="venue reject") is True
+
+    assert [r.execution_id for r in await store.list_unapplied("acc-1")] == [
+        "ev-captured",
+        "ev-failed",
+    ]
+    only_failed = await store.list_unapplied("acc-1", statuses=("FAILED",))
+    assert [r.execution_id for r in only_failed] == ["ev-failed"]
+
+
+@pytest.mark.asyncio
+async def test_list_unapplied_respects_limit_and_orders_by_capture() -> None:
+    """``captured_at DESC`` + ``LIMIT``: el llamante que recibe ``limit`` filas NO
+    puede afirmar que vio todo el libro (de ahí el veto fail-closed aguas arriba)."""
+    from datetime import timedelta
+
+    store = InMemoryExecutionEventStore()
+    base = datetime.now(UTC)
+    for index in range(3):
+        await store.capture(_exec(f"ev-{index}"))
+        # ``ev-0`` el más ANTIGUO: el orden de lectura es el de captura, no el de inserción.
+        row = store._rows[f"ev-{index}"]
+        store._rows[f"ev-{index}"] = replace(
+            row, captured_at=base - timedelta(minutes=index)
+        )
+
+    all_rows = await store.list_unapplied("acc-1")
+    assert [r.execution_id for r in all_rows] == ["ev-0", "ev-1", "ev-2"]
+    assert [r.execution_id for r in await store.list_unapplied("acc-1", limit=2)] == [
+        "ev-0",
+        "ev-1",
+    ]
+    assert await store.list_unapplied("acc-1", limit=0) == []
+
+
+@pytest.mark.asyncio
+async def test_list_unapplied_empty_book_is_empty_not_error() -> None:
+    """Sin trazas: lista vacía (el llamante la declara ``COMPLETE``)."""
+    assert await InMemoryExecutionEventStore().list_unapplied("acc-1") == []

@@ -109,11 +109,11 @@ def test_build_worker_snapshot_derives_risk_used_and_budget() -> None:
 # ── Pipeline de entradas ──────────────────────────────────────────────────────
 
 
-def _snapshot(*, risk_budget_pct: float | None = 6.0):
+def _snapshot(*, risk_budget_pct: float | None = 6.0, cash: float = 80_000.0):
     return build_worker_snapshot(
         account_id="acc-1",
         equity=100_000.0,
-        cash=80_000.0,
+        cash=cash,
         open_positions={},
         entry_prices={},
         regime="BULL_TREND",
@@ -190,8 +190,45 @@ def test_plan_v2_tick_top_n_limits_entries() -> None:
         regime="BULL_TREND",
         tunables=V2Tunables(top_n=2),
     )
-    # Solo TOP 2 tienen score ⇒ los otros 3 quedan vetados por edge_below_threshold.
+    # V2.40.4: TOP_N es un TOPE DE EVALUACIÓN. Solo el TOP 2 se decide contra la
+    # cartera; los otros 3 no se evalúan y su motivo es ``top_n_excluded`` (con su
+    # score real), NUNCA un ``edge_below_threshold`` falso.
     assert len(plan.approved_symbols) == 2
+    assert len(plan.decisions) == 2  # solo el TOP se evalúa
+    excluded = [e for e in plan.journal_entries if e.payload["reasonCodes"] == ["top_n_excluded"]]
+    assert len(excluded) == 3
+    assert all(e.payload["opportunityScore"] is not None for e in excluded)
+    assert not any(
+        "edge_below_threshold" in e.payload["reasonCodes"] for e in plan.journal_entries
+    )
+
+
+def test_plan_v2_tick_top_n_zero_excludes_everything() -> None:
+    """``top_n=0`` no evalúa nada (fail-closed) y lo dice con el motivo honesto."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9)],
+        regime="BULL_TREND",
+        tunables=V2Tunables(top_n=0),
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions == ()
+    assert [e.payload["reasonCodes"] for e in plan.journal_entries] == [["top_n_excluded"]]
+
+
+def test_plan_v2_tick_excluded_keeps_real_score_and_rank() -> None:
+    """El excluido conserva su score y su rank: el journal no pierde el ranking."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9), _signal("BBB", edge=0.8)],
+        regime="BULL_TREND",
+        tunables=V2Tunables(top_n=1),
+    )
+    assert plan.approved_symbols == ("AAA",)
+    excluded = {e.instrument_id: e.payload for e in plan.journal_entries}
+    assert excluded["BBB"]["reasonCodes"] == ["top_n_excluded"]
+    assert excluded["BBB"]["opportunityScore"] == plan.ranked[1].combined
+    assert excluded["BBB"]["rank"] == 2
 
 
 def test_plan_v2_tick_regime_unknown_blocks_all() -> None:
@@ -369,6 +406,39 @@ def test_plan_v2_tick_open_position_without_sector_blocks_new_entries() -> None:
     assert plan.decisions[0].reason_codes == ("sector_exposure_unverifiable",)
 
 
+def test_incomplete_measurement_blocks_entries_but_never_protective_exits() -> None:
+    """V2.40.4: el gate de medición veta APERTURAS; una salida protectora sigue viva.
+
+    Es el invariante que no puede regresar (mismo espíritu que
+    ``auto_sim v2 recon status never blocks protective exit``): un dato de cartera que no
+    se puede medir impide AÑADIR riesgo, jamás REDUCIRLO.
+    """
+    snap = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={"ZZZ": 100.0},
+        entry_prices={"ZZZ": 100.0},
+        marks={"ZZZ": 100.0},
+        sectors={"ZZZ": "tech"},
+        regime="BULL_TREND",
+        risk_budget_pct=6.0,
+        # Sin ``stops``: el riesgo consumido por ZZZ NO es medible.
+    )
+    assert snap.risk_measurement != "COMPLETE"
+
+    plan = plan_v2_tick(snapshot=snap, signals=[_signal("AAA")], regime="BULL_TREND")
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("risk_measurement_unknown",)
+
+    # La posición abierta conserva su protección: el camino de gestión no consulta el
+    # snapshot (no hay forma de que un agregado incompleto deje a nadie sin stop).
+    position = _open_long()  # AAA, entry 100, stop 95
+    result = plan_v2_position_decision(position, mark_price=94.0, regime="BULL_TREND")
+    assert result is not None
+    assert result.order_action == "sell"
+
+
 def test_build_worker_snapshot_carries_open_position_sectors() -> None:
     """``sectors`` transmite el sector real (y no un cajón ``<unknown>``)."""
     snap = build_worker_snapshot(
@@ -391,11 +461,13 @@ def test_plan_v2_tick_reserves_risk_intra_tick() -> None:
 
     Es el invariante central del hallazgo más grave de v2.40-beta: sin reserva intra-tick
     cada candidato decidía contra una foto con ``risk_used = 0``, así que el presupuesto
-    se podía multiplicar por el número de candidatos del mismo tick.
+    se podía multiplicar por el número de candidatos del mismo tick. ``cash`` holgado a
+    propósito: aquí quien debe agotarse es el RIESGO, no el capital (la reserva de cash
+    intra-tick tiene su propio test).
     """
     signals = [_signal(f"S{i}", sector=f"sector-{i}") for i in range(7)]
     plan = plan_v2_tick(
-        snapshot=_snapshot(risk_budget_pct=6.0),
+        snapshot=_snapshot(risk_budget_pct=6.0, cash=1_000_000.0),
         signals=signals,
         regime="BULL_TREND",
         tunables=V2Tunables(top_n=10, risk_budget_pct=6.0),
@@ -410,6 +482,33 @@ def test_plan_v2_tick_reserves_risk_intra_tick() -> None:
         float(d.allocation["riskAmount"]) for d in plan.decisions if d.approved and d.allocation
     )
     assert committed == pytest.approx(6000.0)
+
+
+def test_plan_v2_tick_reserves_cash_intra_tick() -> None:
+    """V2.40.4: el notional aprobado en el tick ya NO está disponible para el siguiente.
+
+    Sin esta reserva, N candidatas del mismo tick decidían cada una contra el cash
+    completo (``cash = 80k`` ⇒ 4 × 20k con 25k disponibles). El tope es de CAPITAL, no de
+    riesgo (presupuesto de riesgo holgado).
+    """
+    signals = [_signal(f"S{i}", sector=f"sector-{i}") for i in range(4)]
+    plan = plan_v2_tick(
+        snapshot=_snapshot(cash=25_000.0, risk_budget_pct=100.0),
+        signals=signals,
+        regime="BULL_TREND",
+        tunables=V2Tunables(top_n=10, risk_budget_pct=100.0),
+    )
+    # 20k (tope de concentración) + 5k (lo que queda de caja) = 25k exactos.
+    assert plan.approved_symbols == ("S0", "S1")
+    committed = sum(
+        float(d.allocation["positionValue"])
+        for d in plan.decisions
+        if d.approved and d.allocation
+    )
+    assert committed == pytest.approx(25_000.0)
+    assert all(
+        d.reason_codes == ("risk_budget_exceeded",) for d in plan.decisions if not d.approved
+    )
 
 
 def test_plan_v2_tick_reserves_sector_exposure_intra_tick() -> None:

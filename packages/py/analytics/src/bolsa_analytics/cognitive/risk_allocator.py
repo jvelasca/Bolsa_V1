@@ -15,7 +15,10 @@ Acotaciones posteriores (cada una registra su ``reason`` en el resultado):
 
 1. ``max_position_pct`` — peso máximo por activo (concentración).
 2. ``max_position_value`` — tope de notional por orden (liquidez/capacidad).
-3. ``buying_power`` — caja/poder de compra disponible.
+3. ``buying_power`` — caja/poder de compra disponible (BRUTO: el allocator le resta
+   ``reserved_cash`` antes de acotar, V2.40.4).
+4. ``reserved_cash`` — capital comprometido por órdenes PENDIENTES (BUY sin materializar):
+   no es falta de dinero, es dinero ya comprometido (``CAP_RESERVED_CASH``).
 
 También aporta la geometría dinámica de la operación (SL/TP por ATR), sustituyendo la
 política global de protección (``ProtectionConfig``) por niveles **por operación**:
@@ -39,6 +42,10 @@ CAP_RISK_PCT = "max_risk_per_trade_pct"
 CAP_POSITION_PCT = "max_position_pct"
 CAP_POSITION_VALUE = "max_position_value"
 CAP_BUYING_POWER = "buying_power"
+# V2.40.4 — el capital RESERVADO por órdenes pendientes no es poder de compra. Se separa
+# de ``CAP_BUYING_POWER`` para que el journal diga POR QUÉ no hay cash (no es lo mismo "no
+# queda dinero" que "el dinero está comprometido en órdenes sin materializar").
+CAP_RESERVED_CASH = "reserved_cash"
 
 
 def _finite_positive(value: Any) -> float | None:
@@ -179,12 +186,19 @@ def compute_allocation(
     risk_budget: float | None = None,
     config: RiskAllocatorConfig | None = None,
     buying_power: float | None = None,
+    reserved_cash: float | None = None,
 ) -> AllocationResult:
     """Calcula el tamaño de posición por riesgo, acotado por límites de cartera.
 
     ``risk_budget`` es el riesgo monetario MÁXIMO que se permite consumir en esta
     operación (estado de cartera). Si es ``None``, se usa solo el % de equity de
     ``config``. ``config`` por defecto aplica límites conservadores.
+
+    ``reserved_cash`` (V2.40.4) es capital comprometido por órdenes PENDIENTES (BUY sin
+    materializar). Se resta de ``buying_power`` porque ese dinero ya está comprometido:
+    sin esta resta, dos entradas del mismo tick podrían gastar el mismo cash. Si la
+    resta deja 0 ⇒ ``approved=False`` con ``CAP_RESERVED_CASH`` (motivo distinto de
+    ``CAP_BUYING_POWER``: no es falta de dinero, es dinero ya comprometido).
 
     Devuelve ``AllocationResult`` con ``approved=True`` solo si la cantidad final > 0.
     """
@@ -203,6 +217,10 @@ def compute_allocation(
         )
 
     capped: list[str] = []
+
+    # Capital ya comprometido por órdenes PENDIENTES (BUY sin materializar). Se resta del
+    # poder de compra para que dos entradas del mismo tick no gasten el mismo cash.
+    reserved = _finite(reserved_cash) or 0.0
 
     # 1) Riesgo monetario a consumir: min(risk_budget, equity × max_risk_per_trade_pct).
     max_by_pct = None
@@ -248,17 +266,19 @@ def compute_allocation(
                 qty = max_qty_value
                 capped.append(CAP_POSITION_VALUE)
 
-    # 4) Tope por poder de compra disponible.
+    # 4) Tope por poder de compra disponible, NETO del capital ya reservado por órdenes
+    #    pendientes (V2.40.4): si la reserva es lo que rebaja el tope, el motivo es
+    #    ``CAP_RESERVED_CASH`` (no es falta de dinero: es dinero ya comprometido).
     if buying_power is not None:
         bp = _finite(buying_power)
         if bp is not None and bp >= 0:
-            if bp <= 0:
-                qty = 0.0
-                capped.append(CAP_BUYING_POWER)
-            else:
-                max_qty_bp = bp / e
-                if max_qty_bp < qty:
-                    qty = max_qty_bp
+            gross_cap = bp / e
+            net_cap = max(0.0, bp - reserved) / e
+            if net_cap < qty:
+                qty = net_cap
+                if reserved > 0 and net_cap < gross_cap:
+                    capped.append(CAP_RESERVED_CASH)
+                else:
                     capped.append(CAP_BUYING_POWER)
 
     qty = _round4(max(0.0, qty))

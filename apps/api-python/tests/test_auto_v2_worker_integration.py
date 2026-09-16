@@ -21,6 +21,7 @@ import pytest
 
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
+    FillObservation,
     step_minute_clock,
 )
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
@@ -70,9 +71,11 @@ def _hold() -> _Prov:
 def _worker(**kwargs: object) -> AutoSimulationWorker:
     defaults: dict[str, object] = dict(_trade_kwargs())
     defaults.update(kwargs)
+    # Store hermético por defecto; un test puede inyectar el suyo (si no, el default
+    # pisaría su ``exec_store`` y no podría preparar trazas pendientes).
+    defaults.setdefault("exec_store", InMemoryExecutionEventStore())
     return AutoSimulationWorker(
         clock=step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))[1],
-        exec_store=InMemoryExecutionEventStore(),
         **defaults,  # type: ignore[arg-type]
     )
 
@@ -779,3 +782,170 @@ async def test_v2_full_day_produces_healthy_journal(v2_env: None) -> None:
     assert report.no_live_bridge_posts
     assert report.ledger_balanced
     assert report.healthy, report.errors
+
+
+# ── V2.40.4: órdenes PENDIENTES (capital ya comprometido) ──────────────────────
+
+
+class _StoreWithoutUnapplied(InMemoryExecutionEventStore):
+    """Store que NO sabe listar pendientes (protocolo anterior a V2.40.4)."""
+
+    list_unapplied = None  # type: ignore[assignment]
+
+
+async def _pending_trace(
+    store: InMemoryExecutionEventStore,
+    *,
+    execution_id: str = "ex-pending",
+    account_id: str = "acc-v2-open-orders",
+    qty: str = "850",
+) -> None:
+    """Deja una traza ``CAPTURED`` (fill de otro proceso, p.ej. tras un crash)."""
+    from bolsa_application.execution_event import ExecutionEvent
+
+    await store.capture(
+        ExecutionEvent(
+            execution_id=execution_id,
+            order_id="o-pending",
+            venue="paper",
+            venue_order_id="v-1",
+            fill_seq=1,
+            qty=Decimal(qty),
+            account_id=account_id,
+        )
+    )
+
+
+async def _finance_context(
+    *,
+    execution_id: str = "ex-pending",
+    account_id: str = "acc-v2-open-orders",
+    symbol: str = "AAA",
+    side: str = "buy",
+    qty: str = "850",
+    price: str = "100",
+) -> object:
+    """Contexto financiero durable del fill (lado/cantidad/precio)."""
+    from bolsa_application.sim_durable_store import (
+        InMemorySimFillFinanceContextStore,
+        SimFillFinanceContext,
+    )
+
+    store = InMemorySimFillFinanceContextStore()
+    await store.save(
+        SimFillFinanceContext(
+            execution_id=execution_id,
+            instrument_id=symbol,
+            side=side,
+            quantity=Decimal(qty),
+            price=Decimal(price),
+            account_id=account_id,
+        )
+    )
+    return store
+
+
+@pytest.mark.asyncio
+async def test_v2_pending_buy_reserves_cash_and_lowers_available(v2_env: None) -> None:
+    """Un BUY en vuelo reserva su notional: el snapshot publica ``available_cash``."""
+    account_id = "acc-v2-open-orders"
+    store = InMemoryExecutionEventStore()
+    await _pending_trace(store, account_id=account_id)
+    contexts = await _finance_context(account_id=account_id)
+    worker = _worker(exec_store=store, context_store=contexts, account_id=account_id)
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert len(worker._v2_open_orders) == 1, "el pendiente debe verse en el libro"
+    order = worker._v2_open_orders[0]
+    assert order.side == "buy"
+    assert order.reserved_cash == 85_000.0, "cantidad × precio del contexto financiero"
+
+    snapshot = worker._v2_snapshot("BULL_TREND")
+    assert snapshot.reserved_cash == 85_000.0
+    assert snapshot.available_cash == 15_000.0, "100k de equity − 85k comprometidos"
+
+
+@pytest.mark.asyncio
+async def test_v2_pending_buy_blocks_new_entry_fail_closed(v2_env: None) -> None:
+    """El libro no medible (riesgo del fill en vuelo desconocido) veta la entrada.
+
+    ``sim_fill_finance_context`` no lleva stop, así que el riesgo de una compra en vuelo
+    es un SUELO: el motor no puede afirmar el riesgo pendiente ⇒ no se añade riesgo nuevo
+    hasta que la reconciliación materialice el pendiente. El motivo queda en el journal.
+    """
+    account_id = "acc-v2-open-orders"
+    store = InMemoryExecutionEventStore()
+    await _pending_trace(store, account_id=account_id)
+    contexts = await _finance_context(account_id=account_id)
+    worker = _worker(exec_store=store, context_store=contexts, account_id=account_id)
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker.open_symbols == (), "un pendiente no cuantificable vetó la apertura"
+    reasons = [
+        code
+        for entry in worker._v2_journal
+        if entry.payload is not None
+        for code in entry.payload["reasonCodes"]
+    ]
+    assert "open_orders_unmeasurable" in reasons
+
+
+@pytest.mark.asyncio
+async def test_v2_pending_without_finance_context_is_unknown(v2_env: None) -> None:
+    """Sin contexto financiero la orden no se cuantifica: libro UNKNOWN ⇒ veto."""
+    account_id = "acc-v2-open-orders"
+    store = InMemoryExecutionEventStore()
+    await _pending_trace(store, account_id=account_id)
+    worker = _worker(exec_store=store, account_id=account_id)
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._v2_order_book_measurement == "UNKNOWN"
+    assert worker.open_symbols == ()
+    assert worker._v2_snapshot("BULL_TREND").reserved_cash == 0.0, (
+        "no se declara como 0: el capital es desconocido (el veto lo corta antes)"
+    )
+
+
+@pytest.mark.asyncio
+async def test_v2_store_without_list_unapplied_is_unknown(v2_env: None) -> None:
+    """Un store que no sabe listar pendientes NO puede afirmar que no hay ninguno."""
+    worker = _worker(exec_store=_StoreWithoutUnapplied(), account_id="acc-v2-open-orders")
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._v2_order_book_measurement == "UNKNOWN"
+    assert worker.open_symbols == ()
+
+
+@pytest.mark.asyncio
+async def test_v2_known_fill_is_not_reserved_twice(v2_env: None) -> None:
+    """Un fill ya reconocido por el libro del worker NO se reserva otra vez.
+
+    ``execution_events`` conserva la fila ``CAPTURED`` cuando no hay applier, pero si el
+    worker ya la reconoció su capital ya está en ``positions``: reservarlo de nuevo
+    contaría el mismo dinero dos veces y vetaría la cartera entera sin motivo.
+    """
+    account_id = "acc-v2-open-orders"
+    store = InMemoryExecutionEventStore()
+    await _pending_trace(store, execution_id="ex-known", account_id=account_id)
+    worker = _worker(exec_store=store, account_id=account_id)
+    worker._record_applied_event(
+        "AAA",
+        FillObservation(
+            side="buy",
+            venue="paper",
+            execution_id="ex-known",
+            order_id="o-known",
+            qty=Decimal("850"),
+        ),
+        Decimal("100"),
+    )
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._v2_open_orders == (), "el fill ya reconocido no está pendiente"
+    assert worker._v2_order_book_measurement == "COMPLETE"
+    assert worker._v2_snapshot("BULL_TREND").reserved_cash == 0.0

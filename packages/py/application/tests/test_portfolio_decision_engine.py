@@ -1,11 +1,16 @@
 """PortfolioDecisionEngine — decisión operativa con vetos fail-closed (AUTO 2.0 · P0)."""
 
+import pytest
+
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
     DATA_FRESH,
     DATA_STALE,
+    MEASUREMENT_COMPLETE,
+    MEASUREMENT_UNKNOWN,
     PortfolioPosition,
     build_auto_portfolio_snapshot,
 )
+from bolsa_analytics.cognitive.open_order import OpenOrder, build_open_order
 from bolsa_analytics.cognitive.opportunity_ranker import score_opportunity
 from bolsa_analytics.cognitive.risk_allocator import RiskAllocatorConfig
 from bolsa_analytics.cognitive.trade_context import (
@@ -15,6 +20,7 @@ from bolsa_analytics.cognitive.trade_context import (
     SECTOR_STALE,
     TradeContext,
 )
+from bolsa_analytics.cognitive.trade_plan import TradePlan
 from bolsa_application.portfolio_decision_engine import (
     PortfolioDecisionConfig,
     decide_portfolio,
@@ -445,3 +451,364 @@ def test_require_flags_can_be_disabled_explicitly() -> None:
         config=PortfolioDecisionConfig(require_sector=False, require_liquidity=False),
     )
     assert decision.approved is True
+
+
+# ── V2.40.4: medición COMPLETA de riesgo y exposición ─────────────────────────
+
+
+def _measured_snapshot(**overrides: object) -> object:
+    """Snapshot SIN ``risk_used`` explícito: el riesgo se DERIVA de las posiciones."""
+    base: dict[str, object] = {
+        "account_id": "acct-1",
+        "capital": 100_000.0,
+        "cash": 80_000.0,
+        "equity": 100_000.0,
+        "buying_power": 80_000.0,
+        "risk_budget": 2_000.0,
+        "data_freshness": DATA_FRESH,
+    }
+    base.update(overrides)
+    return build_auto_portfolio_snapshot(**base)
+
+
+def test_risk_measurement_partial_blocks_entry() -> None:
+    """Una posición sin riesgo medible hace el agregado un SUELO ⇒ no se aumenta."""
+    snap = _measured_snapshot(
+        positions=[
+            PortfolioPosition(
+                "MSFT", 10.0, market_value=20_000.0, sector="Technology", risk_amount=500.0
+            ),
+            PortfolioPosition("XOM", 10.0, market_value=20_000.0, sector="Energy"),
+        ]
+    )
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.reason_codes == ("risk_measurement_partial",)
+    assert decision.is_no_trade is True
+
+
+def test_risk_measurement_unknown_blocks_entry() -> None:
+    snap = _measured_snapshot(
+        positions=[PortfolioPosition("MSFT", 10.0, market_value=20_000.0, sector="Technology")]
+    )
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.reason_codes == ("risk_measurement_unknown",)
+
+
+def test_complete_measurement_still_approves() -> None:
+    """Con medición completa el camino aprobado no cambia (no es un veto nuevo)."""
+    snap = _measured_snapshot(
+        positions=[
+            PortfolioPosition(
+                "MSFT", 10.0, market_value=20_000.0, sector="Technology", risk_amount=500.0
+            )
+        ]
+    )
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.approved is True
+
+
+def test_exposure_measurement_partial_blocks_entry() -> None:
+    """Una posición que no se puede valorar hace la exposición un ``>=``, no un total."""
+    snap = _measured_snapshot(
+        positions=[
+            PortfolioPosition(
+                "MSFT", 10.0, market_value=20_000.0, sector="Technology", risk_amount=500.0
+            ),
+            PortfolioPosition("XOM", 10.0, sector="Energy", risk_amount=400.0),
+        ]
+    )
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.reason_codes == ("exposure_measurement_partial",)
+
+
+def test_exposure_measurement_unknown_blocks_entry() -> None:
+    snap = _measured_snapshot(
+        positions=[
+            PortfolioPosition("MSFT", 10.0, sector="Technology", risk_amount=500.0)
+        ]
+    )
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.reason_codes == ("exposure_measurement_unknown",)
+
+
+def test_measurement_gate_can_be_disabled_explicitly() -> None:
+    snap = _measured_snapshot(
+        positions=[PortfolioPosition("MSFT", 10.0, market_value=20_000.0, sector="Technology")]
+    )
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        config=PortfolioDecisionConfig(require_complete_measurement=False),
+        **_known(),
+    )
+    assert decision.approved is True
+
+
+# ── V2.40.4: capital RESERVADO por órdenes pendientes ──────────────────────────
+
+
+def _pending_buy(
+    *,
+    qty: float = 150.0,
+    price: float = 100.0,
+    risk_amount: float | None = 500.0,
+    sector: str | None = "Technology",
+    execution_id: str = "ex-pending",
+) -> OpenOrder:
+    """BUY en vuelo cuantificado (el ``risk_amount`` lo aporta quien lo conoce)."""
+    return build_open_order(
+        execution_id=execution_id,
+        instrument_id="MSFT",
+        side="buy",
+        quantity=qty,
+        price=price,
+        sector=sector,
+        risk_amount=risk_amount,
+    )
+
+
+def _uncapped_allocator() -> RiskAllocatorConfig:
+    """Sin tope de concentración: aísla el efecto del capital reservado."""
+    return RiskAllocatorConfig(max_position_pct=100.0, max_position_value=None)
+
+
+def test_reserved_cash_lowers_available_buying_power() -> None:
+    """El notional de un BUY pendiente NO es poder de compra disponible."""
+    snap = _measured_snapshot(
+        cash=20_000.0,
+        buying_power=20_000.0,
+        open_orders=(_pending_buy(),),
+    )
+    assert snap.reserved_cash == 15_000.0
+    assert snap.available_cash == 5_000.0
+
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        config=PortfolioDecisionConfig(allocator=_uncapped_allocator()),
+        **_known(),
+    )
+    # 5 000 € disponibles / 100 € ⇒ 50 uds (sin reserva serían 200: 20 000 €).
+    assert decision.approved is True
+    assert decision.trade_plan.quantity == 50.0
+    assert "reserved_cash" in decision.allocation["cappedReasons"], (
+        "el motivo debe distinguir 'dinero comprometido' de 'no queda dinero'"
+    )
+
+
+def test_pending_risk_reduces_risk_budget() -> None:
+    """El riesgo de una orden en vuelo ya está comprometido: no se reasigna."""
+    snap = _measured_snapshot(
+        cash=200_000.0,
+        buying_power=200_000.0,
+        risk_budget=2_000.0,
+        open_orders=(_pending_buy(risk_amount=1_500.0),),
+    )
+    assert snap.pending_risk == 1_500.0
+    assert snap.risk_remaining == 500.0
+
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        config=PortfolioDecisionConfig(allocator=_uncapped_allocator()),
+        **_known(),
+    )
+    assert decision.approved is True
+    assert decision.trade_plan.risk_amount == 500.0, "presupuesto restante, no 2 000"
+    assert decision.trade_plan.quantity == round(500.0 / 3.0, 4)
+
+
+def test_pending_order_without_risk_makes_book_unmeasurable() -> None:
+    """Sin riesgo cuantificable el libro es un SUELO ⇒ no se añade riesgo nuevo."""
+    snap = _measured_snapshot(open_orders=(_pending_buy(risk_amount=None),))
+    assert snap.order_book_measurement == MEASUREMENT_UNKNOWN
+    assert snap.order_book_is_complete is False
+
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.reason_codes == ("open_orders_unmeasurable",)
+    assert decision.is_no_trade is True
+
+
+def test_pending_order_without_sector_makes_book_unmeasurable() -> None:
+    """Sin sector no se puede afirmar la exposición pendiente por sector."""
+    snap = _measured_snapshot(open_orders=(_pending_buy(sector=None),))
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.reason_codes == ("open_orders_unmeasurable",)
+
+
+def test_order_book_can_be_declared_unknown_explicitly() -> None:
+    """Un store que no pudo LEER el libro lo declara: ``UNKNOWN`` ⇒ veto."""
+    snap = _measured_snapshot(order_book_measurement="UNKNOWN")
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.reason_codes == ("open_orders_unmeasurable",)
+
+
+def test_empty_order_book_keeps_cash_untouched() -> None:
+    """Sin pendientes el libro es COMPLETO y no reserva nada (camino actual intacto)."""
+    snap = _measured_snapshot()
+    assert snap.reserved_cash == 0.0
+    assert snap.available_cash == 80_000.0
+    assert snap.order_book_measurement == MEASUREMENT_COMPLETE
+
+    decision = decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=snap,
+        regime="BULL_TREND",
+        **_known(),
+    )
+    assert decision.approved is True
+    assert "reserved_cash" not in decision.allocation["cappedReasons"]
+
+
+def test_pending_sell_does_not_reserve_cash() -> None:
+    """Una VENTA en vuelo libera capital: no reserva cash ni añade riesgo."""
+    snap = _measured_snapshot(
+        open_orders=(
+            build_open_order(
+                execution_id="ex-sell",
+                instrument_id="MSFT",
+                side="sell",
+                quantity=100.0,
+                price=100.0,
+                sector="Technology",
+            ),
+        )
+    )
+    assert snap.reserved_cash == 0.0
+    assert snap.available_cash == 80_000.0
+    assert snap.pending_risk == 0.0
+    assert snap.open_order_summary.pending_sell_qty == {"MSFT": 100.0}
+    assert snap.order_book_measurement == MEASUREMENT_COMPLETE
+
+
+# ── V2.40.4: el plan emitido no puede contradecirse a sí mismo ─────────────────
+
+
+def _approved_entry(**overrides: object) -> object:
+    """Entrada aprobada por el camino real (para comparar contra el plan corrupto)."""
+    return decide_portfolio(
+        instrument_id="AAPL",
+        entry_price=100.0,
+        atr=2.0,
+        opportunity_score=_score(0.8),
+        snapshot=_measured_snapshot(**overrides),
+        regime="BULL_TREND",
+        **_known(),
+    )
+
+
+def test_approved_decision_publishes_no_plan_violations() -> None:
+    """El camino aprobado pasa el validador: ``planViolations`` queda vacío."""
+    decision = _approved_entry()
+    assert decision.approved is True
+    assert decision.plan_violations == ()
+    assert decision.to_dict()["planViolations"] == []
+
+
+def test_incoherent_plan_is_vetoed_not_emitted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Si el plan construido se contradice, el motor veta en vez de emitirlo.
+
+    Es la última puerta: aguas abajo el plan viaja serializado (journal, package,
+    worker) y nadie más lo valida. Se fuerza la corrupción por mutación para certificar
+    que el enganche existe (una mutación del validador pone esta suite en rojo).
+    """
+    from dataclasses import replace as _replace
+
+    from bolsa_application import portfolio_decision_engine as engine_module
+
+    original = engine_module._build_trade_plan
+
+    def _corrupt_plan(**kwargs: object) -> TradePlan:
+        plan = original(**kwargs)  # type: ignore[arg-type]
+        # Un plan que dice "ejecuta" pero no está disparado no puede abrir posición.
+        return _replace(plan, status="WATCH")
+
+    monkeypatch.setattr(engine_module, "_build_trade_plan", _corrupt_plan)
+    decision = _approved_entry()
+
+    assert decision.approved is False
+    assert decision.reason_codes == ("plan_invalid",)
+    assert decision.trade_plan is None, "un plan incoherente NUNCA se emite"
+    assert decision.is_no_trade is True
+    assert "status" in decision.plan_violations, (
+        "el journal debe decir QUÉ campo se contradecía"
+    )

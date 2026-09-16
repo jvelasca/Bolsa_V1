@@ -15,16 +15,23 @@ Trampa que costo una pasada de este mismo script: la primera version excluia en 
 backtick, de modo que **no** miraba las rutas completas citadas entre backticks (las mas importantes)
 y aun asi imprimia "TODAS existen". Si este script dice que todo esta bien, que sea habiendo mirado.
 
-Uso: uv run --no-sync python apps/api-python/scripts/a9_doc_refs_probe.py
+Uso (sin argumentos audita los dos documentos del hotfix v2.40.3; con argumentos, los que se citen):
+
+    uv run --no-sync python apps/api-python/scripts/a9_doc_refs_probe.py
+    uv run --no-sync python apps/api-python/scripts/a9_doc_refs_probe.py <doc.md> [<doc.md> ...]
+
+Devuelve 0 solo si NO hay referencias muertas, de modo que sirve como gate reproducible en CI o
+para el auditor externo (permitir "0 muertas" con un mensaje y exit 0 lo volveria inauditable).
 """
 
 from __future__ import annotations
 
 import pathlib
 import re
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-DOCS = (
+DEFAULT_DOCS = (
     "docs/engineering/arranque-auditor-v2-40-3-hotfix-idempotencia-2026-09-16.md",
     "docs/engineering/audit-pack-v2.40.3-idempotency-key-collision-2026-09-16.md",
 )
@@ -49,11 +56,16 @@ def _index_by_name() -> dict[str, int]:
     return counts
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
+    docs = tuple(argv) if argv else DEFAULT_DOCS
+    for doc in docs:
+        if not (ROOT / doc).is_file():
+            print(f"argumento no encontrado como fichero: {doc}")
+            return 2
     names = _index_by_name()
     missing: list[tuple[str, str]] = []
     checked = 0
-    for doc in DOCS:
+    for doc in docs:
         doc_dir = (ROOT / doc).parent
         text = (ROOT / doc).read_text(encoding="utf-8")
         tokens = {t.strip("`.,;:()") for t in _RELPATH.findall(text)}
@@ -73,14 +85,16 @@ def main() -> None:
                 continue
             missing.append((doc, token))
 
+    print(f"documentos auditados: {list(docs)}")
     print(f"referencias comprobadas: {checked}")
     print(f"referencias historicas declaradas: {sorted(_ALLOW_MISSING)}")
     if not missing:
         print("TODAS existen en el arbol actual")
-        return
+        return 0
     for doc, token in missing:
         print(f"  REFERENCIA MUERTA en {doc}: {token}")
+    return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main(sys.argv[1:]))

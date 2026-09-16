@@ -182,10 +182,35 @@ def test_top_n_limits_trading_universe() -> None:
         regime="BULL_TREND",
         top_n=3,
     )
-    # Solo TOP 3 tienen score y por tanto entran al pipeline; el resto no tiene score
-    # ⇒ score None ⇒ edge_below_threshold (no operan).
+    # V2.40.4: TOP_N es un tope de EVALUACIÓN. Solo el TOP 3 entra al pipeline de
+    # decisión; el resto se journaliza con ``top_n_excluded`` y su score real (no con
+    # un ``edge_below_threshold`` falso), y no opera.
     traded = [d.instrument_id for d in report.decisions if d.approved]
     assert set(traded) == {"F", "E", "D"}
+    excluded = [
+        e for e in report.journal_entries if e.payload["reasonCodes"] == ["top_n_excluded"]
+    ]
+    assert {e.instrument_id for e in excluded} == {"A", "B", "C"}
+    assert all(e.payload["opportunityScore"] is not None for e in excluded)
+    assert not any(
+        "edge_below_threshold" in e.payload["reasonCodes"] for e in report.journal_entries
+    )
+
+
+def test_top_n_excluded_never_reports_false_edge() -> None:
+    """Un candidato fuera del TOP con score alto no puede leerse como "sin edge"."""
+    report = run_auto_cycle(
+        snapshot=_snapshot(),
+        opportunities=[_score("AAA", 0.9), _score("BBB", 0.85)],
+        candidates={"AAA": _candidate("AAA"), "BBB": _candidate("BBB")},
+        regime="BULL_TREND",
+        top_n=1,
+    )
+    assert [d.instrument_id for d in report.decisions] == ["AAA"]
+    entry = next(e for e in report.journal_entries if e.instrument_id == "BBB")
+    assert entry.payload["reasonCodes"] == ["top_n_excluded"]
+    assert entry.payload["opportunityScore"] == 0.85
+    assert entry.payload["rank"] == 2
 
 
 def test_report_to_dict() -> None:

@@ -6,9 +6,20 @@ from bolsa_analytics.cognitive.trade_plan import (
     ARMED_ACTIONABILITY,
     ATR_MULT,
     BREAKOUT_LOOKBACK,
+    PLAN_VIOLATION_DIRECTION,
+    PLAN_VIOLATION_EXECUTION_FLAG,
+    PLAN_VIOLATION_IDENTITY,
+    PLAN_VIOLATION_OPPORTUNITY_SCORE,
+    PLAN_VIOLATION_POSITION_VALUE,
+    PLAN_VIOLATION_RISK,
+    PLAN_VIOLATION_STATUS,
+    PLAN_VIOLATION_STOP,
+    PLAN_VIOLATION_TARGETS,
+    PLAN_VIOLATION_UNREADABLE,
     WYCKOFF_PRIOR,
     WYCKOFF_RECLAIM_ATR_K,
     WYCKOFF_SPRING,
+    TradePlan,
     _detect_wyckoff_lps,
     _is_wyckoff_reclaim,
     _locate_wyckoff_spring,
@@ -24,6 +35,7 @@ from bolsa_analytics.cognitive.trade_plan import (
     no_new_longs_blocks,
     parse_wyckoff_spring_anchor,
     snapshot_wyckoff_spring_anchor,
+    validate_trade_plan,
 )
 
 
@@ -917,3 +929,151 @@ def test_f1_thesis_id_override() -> None:
     assert plan.thesis_id == "thesis-9"
     assert plan.to_dict()["thesisId"] == "thesis-9"
     assert plan.to_dict()["decisionId"] == "dec-1"
+
+
+# ── V2.40.4: coherencia interna del TradePlan ─────────────────────────────────
+
+
+def _executable_plan(**overrides: object) -> TradePlan:
+    """Plan EJECUTABLE coherente (el que el motor aprueba en el camino real)."""
+    base: dict[str, object] = {
+        "decision_id": "dec-1",
+        "instrument_id": "AAPL",
+        "direction": "long",
+        "status": "TRIGGERED",
+        "quantity": 200.0,
+        "risk_pct": 1.0,
+        "why_not": (),
+        "execution_allowed": True,
+        "entry": 100.0,
+        "structural_stop": 97.0,
+        "target1": 103.0,
+        "target2": 106.0,
+        "initial_risk_r": 3.0,
+        "risk_amount": 600.0,
+        "position_value": 20_000.0,
+    }
+    base.update(overrides)
+    return TradePlan(**base)  # type: ignore[arg-type]
+
+
+def test_validate_trade_plan_accepts_coherent_plan() -> None:
+    assert validate_trade_plan(_executable_plan()) == ()
+
+
+def test_validate_trade_plan_accepts_non_executing_plan_without_geometry() -> None:
+    """WATCH/ARMED/BLOCKED no ejecutan: no se les exige geometría."""
+    watch = build_trade_plan(
+        decision_id="dec-1",
+        instrument_id="AAPL",
+        action="recommend_long",
+        entry=100.0,
+        structural_stop=97.0,
+    )
+    assert watch.execution_allowed is False
+    assert validate_trade_plan(watch) == ()
+    blocked = build_trade_plan(
+        decision_id="dec-1",
+        instrument_id="AAPL",
+        action="recommend_long",
+        fit_ok=False,
+        entry_ready=True,
+        entry=100.0,
+        structural_stop=97.0,
+        equity=100_000,
+    )
+    assert blocked.status == "BLOCKED"
+    assert validate_trade_plan(blocked) == ()
+
+
+def test_validate_trade_plan_flags_identity() -> None:
+    assert PLAN_VIOLATION_IDENTITY in validate_trade_plan(
+        _executable_plan(instrument_id="  ")
+    )
+    assert PLAN_VIOLATION_IDENTITY in validate_trade_plan(_executable_plan(decision_id=""))
+
+
+def test_validate_trade_plan_flags_execution_flag_mismatch() -> None:
+    """``execution_allowed`` y cantidad>0 son la MISMA afirmación."""
+    assert PLAN_VIOLATION_EXECUTION_FLAG in validate_trade_plan(
+        _executable_plan(execution_allowed=False)
+    )
+    assert PLAN_VIOLATION_EXECUTION_FLAG in validate_trade_plan(
+        _executable_plan(quantity=0.0, position_value=None)
+    )
+
+
+def test_validate_trade_plan_flags_bad_status_and_direction() -> None:
+    """El ledger exige ``TRIGGERED``: un plan "armado" con cantidad no abre posición."""
+    assert PLAN_VIOLATION_STATUS in validate_trade_plan(_executable_plan(status="ARMED"))
+    violations = validate_trade_plan(_executable_plan(direction="none"))
+    assert PLAN_VIOLATION_DIRECTION in violations
+
+
+def test_validate_trade_plan_flags_wrong_side_stop() -> None:
+    """Un stop del lado equivocado no es un stop: es una pérdida sin suelo."""
+    assert PLAN_VIOLATION_STOP in validate_trade_plan(_executable_plan(structural_stop=101.0))
+    assert PLAN_VIOLATION_STOP in validate_trade_plan(_executable_plan(structural_stop=None))
+    # Short con stop por debajo del entry (mismo error, espejo).
+    assert PLAN_VIOLATION_STOP in validate_trade_plan(
+        _executable_plan(
+            direction="short",
+            structural_stop=99.0,
+            target1=97.0,
+            target2=94.0,
+        )
+    )
+
+
+def test_validate_trade_plan_flags_crossed_targets() -> None:
+    assert PLAN_VIOLATION_TARGETS in validate_trade_plan(
+        _executable_plan(target1=106.0, target2=103.0)
+    )
+    assert PLAN_VIOLATION_TARGETS in validate_trade_plan(_executable_plan(target2=None))
+
+
+def test_validate_trade_plan_flags_risk_that_does_not_match_geometry() -> None:
+    """``initialRiskR`` es la distancia al stop: si no cuadra, el size está mal."""
+    assert PLAN_VIOLATION_RISK in validate_trade_plan(_executable_plan(initial_risk_r=5.0))
+    assert PLAN_VIOLATION_RISK in validate_trade_plan(_executable_plan(risk_amount=0.0))
+    assert PLAN_VIOLATION_RISK in validate_trade_plan(_executable_plan(risk_pct=0.0))
+
+
+def test_validate_trade_plan_flags_position_value_mismatch() -> None:
+    """``positionValue`` debe ser exactamente ``qty × entry`` (misma precisión)."""
+    assert PLAN_VIOLATION_POSITION_VALUE in validate_trade_plan(
+        _executable_plan(position_value=1.0)
+    )
+
+
+def test_validate_trade_plan_flags_out_of_range_score() -> None:
+    assert PLAN_VIOLATION_OPPORTUNITY_SCORE in validate_trade_plan(
+        _executable_plan(opportunity_score=1.4)
+    )
+    assert PLAN_VIOLATION_OPPORTUNITY_SCORE in validate_trade_plan(
+        _executable_plan(opportunity_score=-0.01)
+    )
+    assert validate_trade_plan(_executable_plan(opportunity_score=1.0)) == ()
+
+
+def test_validate_trade_plan_is_fail_closed_for_unreadable_input() -> None:
+    """Lo que no se puede leer como plan no se puede certificar."""
+    assert validate_trade_plan(None) == (PLAN_VIOLATION_UNREADABLE,)
+    assert validate_trade_plan({"decisionId": "dec-1"}) == (PLAN_VIOLATION_UNREADABLE,)
+
+
+def test_validate_trade_plan_matches_factory_output() -> None:
+    """El plan REAL que produce el factory pasa el validador (no es un gate vacío)."""
+    plan = build_trade_plan(
+        decision_id="dec-1",
+        instrument_id="AAPL",
+        action="recommend_long",
+        entry_ready=True,
+        entry=100.0,
+        structural_stop=97.0,
+        equity=100_000,
+        entry_setup="breakout",
+    )
+    assert plan.status == "TRIGGERED"
+    assert plan.execution_allowed is True
+    assert validate_trade_plan(plan) == ()

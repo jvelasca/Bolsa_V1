@@ -42,6 +42,17 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from bolsa_analytics.cognitive.measurement import (
+    MEASUREMENT_COMPLETE,
+    MEASUREMENT_UNKNOWN,
+    MeasurementStatus,
+    combine_measurements,
+)
+from bolsa_analytics.cognitive.open_order import (
+    OpenOrder,
+    build_open_order,
+    summarize_open_orders,
+)
 from bolsa_analytics.cognitive.position_state import (
     PositionState,
     apply_position_reduce,
@@ -86,7 +97,10 @@ from bolsa_application.decision_contract import (
     risk_gate_auto_paper_dry,
     simulation_gate_allows,
 )
-from bolsa_application.execution_event import ExecutionEventStore
+from bolsa_application.execution_event import (
+    UNAPPLIED_EXECUTION_EVENT_STATUSES,
+    ExecutionEventStore,
+)
 from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
     POSITION_PROJECTION_OK,
@@ -103,6 +117,10 @@ logger = logging.getLogger(__name__)
 
 AUTO_SIM_WORKER_ENABLED = "AUTO_SIMULATION_WORKER_ENABLED"
 _FILL_CHUNKS = 4
+# V2.40.4 — tope de lectura del libro de órdenes pendientes por tick. Acotado a
+# propósito (no hay índice por ``account_id``): si se alcanza, el libro NO se puede
+# afirmar completo y el motor veta aperturas en vez de creer que no hay más.
+_V2_OPEN_ORDERS_LIMIT = 200
 
 
 def sim_worker_enabled() -> bool:
@@ -291,10 +309,37 @@ def _dec_or_none(value: Any) -> Decimal | None:
     return dec if dec.is_finite() else None
 
 
+def _open_order_from_fill(
+    row: Any,
+    context: Any,
+    *,
+    sector: str | None,
+) -> OpenOrder:
+    """Traduce una traza NO aplicada (+ contexto financiero) a ``OpenOrder``.
+
+    El ``execution_events`` da la identidad y el estado; el
+    ``sim_fill_finance_context`` da lado/cantidad/precio (su PK es ``execution_id``, ya
+    indexada). Si el contexto falta, la orden queda SIN cuantificar a propósito: su
+    capital no se declara como 0 (sería una afirmación falsa) y el resumen lo marca como
+    libro no medible ⇒ el motor veta aperturas.
+    """
+    return build_open_order(
+        execution_id=str(getattr(row, "execution_id", "") or ""),
+        order_id=str(getattr(row, "order_id", "") or ""),
+        venue_order_id=getattr(row, "venue_order_id", None),
+        instrument_id=str(getattr(context, "instrument_id", "") or ""),
+        side=getattr(context, "side", None),
+        quantity=getattr(context, "quantity", None),
+        price=getattr(context, "price", None),
+        sector=sector,
+        strategy_version_id=getattr(context, "strategy_version_id", None),
+        status=getattr(row, "status", None),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _AppliedFill:
     """Fill aplicado, en la forma que la reconciliación entiende (P1-01/P2-02)."""
-
     symbol: str
     side: str
     qty: Decimal
@@ -420,6 +465,11 @@ class AutoSimulationWorker:
         self._v2_enabled = v2_engine_enabled()
         self._v2_tunables: V2Tunables = tunables_from_env()
         self._v2_positions: dict[str, Any] = {}
+        # V2.40.4 — libro de órdenes PENDIENTES (fills no materializados) del último
+        # refresco, con su estado de medición. Por defecto vacío y COMPLETO (sin espejo
+        # durable no puede haber dinero en vuelo); el refresco por tick lo actualiza.
+        self._v2_open_orders: tuple[OpenOrder, ...] = ()
+        self._v2_order_book_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
         self._v2_plan: Any = None
         self._v2_journal: list[Any] = []
         self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
@@ -892,6 +942,8 @@ class AutoSimulationWorker:
             regime=regime,
             risk_budget_pct=self._v2_tunables.risk_budget_pct,
             reconciliation_ok=not self.reconciliation_blocks_openings,
+            open_orders=self._v2_open_orders,
+            order_book_measurement=self._v2_order_book_measurement,
         )
 
     def _v2_open_sectors(self) -> dict[str, str]:
@@ -904,10 +956,19 @@ class AutoSimulationWorker:
         cajón ``<unknown>`` y un candidato se mida solo contra sí mismo.
         """
         symbols = [symbol for symbol, qty in self._open.items() if qty > 0]
+        return self._v2_sectors_for(symbols)
+
+    def _v2_sectors_for(self, symbols: Sequence[str]) -> dict[str, str]:
+        """Sector (solo ``KNOWN``) de los símbolos dados, con el seam inyectado.
+
+        V2.40.1: un sector no fiable (desconocido, en conflicto con el catálogo o
+        caducado) NO se publica: la posición queda OPACA a propósito. V2.40.4 reutiliza
+        esta misma resolución para los instrumentos con orden pendiente.
+        """
         if not symbols:
             return {}
         if self._v2_trade_context_source is not None:
-            return self._v2_trade_context_source.known_sectors(symbols)
+            return self._v2_trade_context_source.known_sectors(list(symbols))
         if self._v2_sector_source is None:
             return {}
         sectors: dict[str, str] = {}
@@ -1104,6 +1165,95 @@ class AutoSimulationWorker:
             except Exception:  # noqa: BLE001 — sin edge, el motor veta.
                 logger.exception("auto_sim v2 edge refresh failed")
 
+    async def _v2_refresh_open_orders(self) -> None:
+        """Precarga (async) las órdenes AUTO NO materializadas (V2.40.4 · P1).
+
+        Productor real: ``execution_events`` en estado no-``APPLIED`` (fills capturados
+        cuyo dinero aún no se ha movido) + ``sim_fill_finance_context`` (lado, cantidad,
+        precio; su PK es ``execution_id``, ya indexada). Ese es el único rastro durable de
+        capital comprometido que no está representado como posición.
+
+        Dos filtros deliberados:
+
+        * Solo cuentan las trazas cuyo fill **no está ya reconocido** por el libro del
+          worker (``_applied_execution_events``). Si la posición ya está en ``self._open``
+          su capital ya se descontó vía ``positions``; reservarlo otra vez contaría el
+          mismo dinero dos veces. Tras un crash la memoria RAM está vacía ⇒ una traza
+          huérfana SÍ aparece como pendiente (que es el caso que debe proteger).
+        * Los sectores de los instrumentos pendientes se resuelven con el mismo seam que
+          los de las posiciones abiertas (sin I/O extra: la fuente ya se refrescó).
+
+        Fail-closed: sin store no hay pendientes que afirmar (libro ``COMPLETE``); si la
+        lectura falla o se agota el ``limit``, el libro queda ``UNKNOWN`` y el motor veta
+        aperturas — nunca "no hay pendientes porque no pude leer".
+        """
+        rows, read_measurement = await self._v2_read_unapplied()
+        known = self._v2_known_fill_ids()
+        pending = [row for row in rows if str(getattr(row, "execution_id", "")) not in known]
+        contexts = [await self._v2_fill_context(row) for row in pending]
+        sectors = self._v2_sectors_for(
+            sorted({str(getattr(c, "instrument_id", "") or "") for c in contexts} - {""})
+        )
+        orders: list[OpenOrder] = [
+            _open_order_from_fill(
+                row,
+                context,
+                sector=sectors.get(str(getattr(context, "instrument_id", "") or "")),
+            )
+            for row, context in zip(pending, contexts, strict=True)
+        ]
+        self._v2_open_orders = tuple(orders)
+        self._v2_order_book_measurement = combine_measurements(
+            read_measurement,
+            summarize_open_orders(
+                self._v2_open_orders, equity=self._v2_equity()
+            ).measurement,
+        )
+
+    async def _v2_read_unapplied(self) -> tuple[list[Any], MeasurementStatus]:
+        """Lee las trazas no aplicadas de la cuenta (o declara por qué no se pudo)."""
+        store = self._exec_store
+        if store is None:
+            # Sin espejo durable no hay settlement: no puede haber dinero en vuelo.
+            return [], MEASUREMENT_COMPLETE
+        lister = getattr(store, "list_unapplied", None)
+        if not callable(lister):
+            # Store que no soporta el listado: NO se puede afirmar el libro.
+            return [], MEASUREMENT_UNKNOWN
+        try:
+            rows = await lister(
+                self._account_id,
+                statuses=UNAPPLIED_EXECUTION_EVENT_STATUSES,
+                limit=_V2_OPEN_ORDERS_LIMIT,
+            )
+        except Exception:  # noqa: BLE001 — sin lectura, el libro es desconocido.
+            logger.exception("auto_sim v2 open orders read failed")
+            return [], MEASUREMENT_UNKNOWN
+        found = list(rows or ())
+        if len(found) >= _V2_OPEN_ORDERS_LIMIT:
+            # Puede haber más de las que se leyeron: el libro NO es afirmable.
+            return found, MEASUREMENT_UNKNOWN
+        return found, MEASUREMENT_COMPLETE
+
+    async def _v2_fill_context(self, row: Any) -> Any:
+        """Contexto financiero durable del fill (``None`` si no se puede resolver)."""
+        store = self._context_store
+        execution_id = str(getattr(row, "execution_id", "") or "")
+        if store is None or not execution_id:
+            return None
+        try:
+            return await store.get(execution_id)
+        except Exception:  # noqa: BLE001 — sin contexto, la orden queda sin cuantificar.
+            logger.exception("auto_sim v2 fill context read failed exec=%s", execution_id)
+            return None
+
+    def _v2_known_fill_ids(self) -> frozenset[str]:
+        """Ids de fill ya reconocidos por el libro del worker (no son pendientes)."""
+        events = getattr(self, "_applied_execution_events", None) or []
+        return frozenset(
+            str(getattr(event, "execution_id", "") or "") for event in events
+        )
+
     async def _v2_refresh_regime(self) -> None:
         """Refresca el régimen si la fuente lo soporta (fuente async + lectura sync).
 
@@ -1231,6 +1381,9 @@ class AutoSimulationWorker:
         }
         versions.update(self._position_version.values())
         await self._v2_refresh_trade_context(tuple(packages), tuple(sorted(versions)))
+        # Órdenes pendientes (capital ya comprometido): se leen ANTES de construir la
+        # foto para que la decisión del tick no pueda gastar dos veces el mismo cash.
+        await self._v2_refresh_open_orders()
         snapshot = self._v2_snapshot(regime)
         plan = plan_v2_tick(
             snapshot=snapshot,

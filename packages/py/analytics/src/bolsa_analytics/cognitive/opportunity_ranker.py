@@ -20,7 +20,9 @@ ranking es estrictamente descendente por ``combined`` (empates: orden estable po
 ``instrument_id`` para reproducibilidad).
 
 No es un gate: solo ORDENA. La decisión de operar (y el veto) vive en el
-``PortfolioDecisionEngine``.
+``PortfolioDecisionEngine``. ``select_top_opportunities`` sí acota QUÉ se evalúa
+(V2.40.4: ``TOP_N`` es un tope de evaluación, no una prioridad) y por eso marca las
+excluidas con ``TOP_N_EXCLUDED``.
 """
 
 from __future__ import annotations
@@ -50,6 +52,16 @@ OPPORTUNITY_COMPONENTS: tuple[str, ...] = (
     "risk_reward",
     "execution_quality",
 )
+
+# V2.40.4 — motivo de journal de una oportunidad que queda FUERA del TOP N.
+#
+# ``TOP_N`` es un **tope de evaluación** (no una prioridad): las candidatas fuera del
+# TOP no se evalúan contra la cartera, así que NO pueden llevar un motivo de decisión
+# (``edge_below_threshold`` sería falso: su score es perfectamente válido). Este código
+# es el motivo HONESTO de ese no-trade, y el journal publica además su score real.
+# Vive aquí porque el ranking es su dueño natural y lo comparten los dos llamantes del
+# pipeline.
+TOP_N_EXCLUDED = "top_n_excluded"
 
 
 def _clamp01(value: Any) -> float:
@@ -147,7 +159,11 @@ def select_top_opportunities(
     *,
     top_n: int,
 ) -> tuple[OpportunityScore, ...]:
-    """Devuelve el TOP ``top_n`` operativo (ya rankeado).
+    """Devuelve el TOP ``top_n`` a EVALUAR (ya rankeado).
+
+    V2.40.4: el resultado es el conjunto de oportunidades que se decide contra la
+    cartera, no un mero orden de prioridad. Las que quedan fuera no se evalúan y su
+    motivo de journal es ``TOP_N_EXCLUDED`` (nunca ``edge_below_threshold``).
 
     ``top_n <= 0`` ⇒ vacío (fail-closed, no se inventa un top). Orden estable.
     """

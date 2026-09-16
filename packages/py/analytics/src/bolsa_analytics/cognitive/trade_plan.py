@@ -44,6 +44,22 @@ WhyNotCode = Literal[
 PLAN_T1_R = 1.0
 PLAN_T2_R = 2.0
 
+# V2.40.4 — códigos de violación de coherencia INTERNA del plan. Un plan que se
+# contradice a sí mismo no es un plan "conservador": se serializa, viaja por el journal
+# y acaba dimensionando una orden real. El motor lo veta (``plan_invalid``) en vez de
+# intentar interpretarlo.
+PLAN_VIOLATION_IDENTITY = "identity"
+PLAN_VIOLATION_EXECUTION_FLAG = "execution_flag"
+PLAN_VIOLATION_DIRECTION = "direction"
+PLAN_VIOLATION_STATUS = "status"
+PLAN_VIOLATION_ENTRY = "entry"
+PLAN_VIOLATION_STOP = "stop"
+PLAN_VIOLATION_TARGETS = "targets"
+PLAN_VIOLATION_RISK = "risk"
+PLAN_VIOLATION_POSITION_VALUE = "position_value"
+PLAN_VIOLATION_OPPORTUNITY_SCORE = "opportunity_score"
+PLAN_VIOLATION_UNREADABLE = "unreadable"
+
 
 @dataclass(frozen=True, slots=True)
 class TradePlan:
@@ -1071,3 +1087,79 @@ def build_trade_plan(
         execution_allowed=qty > 0,
         actionability=0.95 if qty > 0 else 0.0,
     )
+
+
+def validate_trade_plan(plan: object) -> tuple[str, ...]:
+    """Coherencia INTERNA del plan: tupla de violaciones (vacía = válido).
+
+    No sustituye a los gates de cartera ni al allocator: comprueba que el plan **no se
+    contradice a sí mismo**, porque un plan incoherente se serializa, viaja por el
+    journal y acaba dimensionando una orden real. Divergencias de redondeo se comparan
+    ya redondeadas a 4 decimales (la misma precisión con la que el allocator publica
+    ``positionValue``/``stopDistance``), no con tolerancias elásticas.
+
+    Los campos que solo tienen sentido si el plan EJECUTA se exigen solo a los planes
+    ejecutables: ``WATCH``/``ARMED``/``BLOCKED``/``EXPIRED`` llevan ``quantity = 0`` y
+    pueden no tener geometría. Códigos en las constantes ``PLAN_VIOLATION_*``.
+    """
+    if not isinstance(plan, TradePlan):
+        # Fail-closed: lo que no se puede leer como plan no se puede certificar.
+        return (PLAN_VIOLATION_UNREADABLE,)
+
+    violations: list[str] = []
+
+    # Identidad: sin decisión/instrumento el plan no es atribuible (ni auditable).
+    if not str(plan.decision_id or "").strip() or not str(plan.instrument_id or "").strip():
+        violations.append(PLAN_VIOLATION_IDENTITY)
+
+    # Ejecutar es EXACTAMENTE tener cantidad positiva: ni "permitido" con 0 uds (una
+    # propuesta vacía) ni 0 uds "permitidas" invertidas (una cantidad que no se emite).
+    if plan.execution_allowed != (plan.quantity > 0):
+        violations.append(PLAN_VIOLATION_EXECUTION_FLAG)
+
+    score = plan.opportunity_score
+    if score is not None and not 0.0 <= score <= 1.0:
+        violations.append(PLAN_VIOLATION_OPPORTUNITY_SCORE)
+
+    if not plan.execution_allowed:
+        return tuple(violations)
+
+    if plan.direction not in ("long", "short"):
+        violations.append(PLAN_VIOLATION_DIRECTION)
+    # ``build_position_state_from_fill`` exige TRIGGERED: un plan con geometría y
+    # cantidad pero "sin disparar" es una entrada que el ledger no sabría abrir.
+    if plan.status != "TRIGGERED":
+        violations.append(PLAN_VIOLATION_STATUS)
+
+    entry = plan.entry
+    stop = plan.structural_stop
+    if entry is None or entry <= 0:
+        violations.append(PLAN_VIOLATION_ENTRY)
+    if stop is None or stop <= 0 or entry is None or entry <= 0:
+        violations.append(PLAN_VIOLATION_STOP)
+    elif plan.direction == "long" and stop >= entry:
+        violations.append(PLAN_VIOLATION_STOP)
+    elif plan.direction == "short" and stop <= entry:
+        violations.append(PLAN_VIOLATION_STOP)
+    elif plan.initial_risk_r != _round4(abs(entry - stop)):
+        # El riesgo por unidad es la distancia al stop: si no cuadra, el dimensionado
+        # (``risk_amount``) está calculado sobre otra geometría.
+        violations.append(PLAN_VIOLATION_RISK)
+
+    t1, t2 = plan.target1, plan.target2
+    if t1 is None or t2 is None:
+        violations.append(PLAN_VIOLATION_TARGETS)
+    elif plan.direction == "long" and not t1 < t2:
+        violations.append(PLAN_VIOLATION_TARGETS)
+    elif plan.direction == "short" and not t1 > t2:
+        violations.append(PLAN_VIOLATION_TARGETS)
+
+    risk_amount = plan.risk_amount
+    if risk_amount is None or risk_amount <= 0 or plan.risk_pct <= 0:
+        violations.append(PLAN_VIOLATION_RISK)
+
+    if entry is not None and entry > 0:
+        if plan.position_value != _round4(plan.quantity * entry):
+            violations.append(PLAN_VIOLATION_POSITION_VALUE)
+
+    return tuple(violations)

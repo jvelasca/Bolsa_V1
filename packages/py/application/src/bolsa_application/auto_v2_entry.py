@@ -40,6 +40,7 @@ from bolsa_analytics.cognitive.market_regime_gate import (
     regime_is_exit_only,
 )
 from bolsa_analytics.cognitive.opportunity_ranker import (
+    TOP_N_EXCLUDED,
     OpportunityScore,
     rank_opportunities,
     score_opportunity,
@@ -315,6 +316,8 @@ def build_worker_snapshot(
     reconciliation_ok: bool = True,
     data_freshness: str = DATA_FRESH,
     sectors: dict[str, str] | None = None,
+    open_orders: Any = (),
+    order_book_measurement: Any = None,
 ) -> Any:
     """Construye el ``AutoPortfolioSnapshot`` desde el libro del worker (SIM).
 
@@ -327,6 +330,11 @@ def build_worker_snapshot(
     caían al cajón ``<unknown>``, la concentración sectorial dejaba de ser verificable y
     el motor podía evaluar un candidato solo contra sí mismo; con él, el gate
     ``sector_exposure_unverifiable`` puede distinguir "cesta opaca" de "cesta conocida".
+
+    ``open_orders`` (V2.40.4) es el libro de órdenes PENDIENTES (fills no materializados) y
+    ``order_book_measurement`` declara si ese libro se pudo leer y cuantificar del todo.
+    Ambos se reenvían tal cual: el snapshot deriva de ellos ``reserved_cash`` /
+    ``available_cash`` / ``pending_risk`` / ``pending_exposure``.
     """
     marks = marks or {}
     stops = stops or {}
@@ -366,6 +374,8 @@ def build_worker_snapshot(
         equity=equity,
         buying_power=cash,
         positions=positions,
+        open_orders=open_orders,
+        order_book_measurement=order_book_measurement,
         risk_budget=budget,
         active_strategies=strategies,
         market_regime=regime,
@@ -445,6 +455,12 @@ def plan_v2_tick(
     gestionan aparte (``plan_v2_position_decision``). Cada decisión (aprobada o no)
     deja una entrada de journal con sus ``reason_codes``.
 
+    V2.40.4 — el TOP N es un **tope de evaluación**: solo ese subconjunto se decide
+    contra la cartera (``TOP_N = máximo de oportunidades evaluadas``). Las candidatas
+    fuera del TOP se journalizan con ``top_n_excluded`` y su score real, nunca con un
+    ``edge_below_threshold`` que sería falso, y no pueden operar aunque las del TOP se
+    veten.
+
     ``consumed_signal_ids`` son las identidades de señal YA consumidas (oportunidades
     que este worker ya emitió sobre esa misma barra). Una señal repetida se descarta
     con ``signal_duplicate`` y una señal expirada (``valid_until < as_of``) con
@@ -484,16 +500,28 @@ def plan_v2_tick(
     top = select_top_opportunities(ranked, top_n=cfg.top_n)
     score_by_symbol = {s.instrument_id: s for s in top}
 
-    # TOP_N limita cuántos candidatos se consideran (no cuántos son operables): los que
-    # quedan fuera se evalúan igualmente, para que el journal registre su motivo real
-    # (liquidez, sector, correlación...) y puedan operar si los mejores se vetan.
+    # V2.40.4 — TOP_N es un TOPE DE EVALUACIÓN, no una prioridad. Solo el TOP se decide
+    # contra la cartera; una candidata fuera del TOP **no se evalúa** y por tanto NO
+    # puede llevar un motivo de decisión (``edge_below_threshold`` sería FALSO: su score
+    # es válido, simplemente no compitió). Se journaliza con ``TOP_N_EXCLUDED`` y su
+    # score/rank reales, de modo que el motivo del no-trade es el verdadero y el ranking
+    # completo queda auditable. ``approved <= top_n`` es invariante de esta función.
     ordered: list[V2Signal] = []
     for score in top:
         signal = deduped.get(score.instrument_id)
         if signal is not None:
             ordered.append(signal)
-    approved_ids = {s.instrument_id for s in ordered}
-    ordered.extend(s for s in entry_signals if s.instrument_id not in approved_ids)
+    excluded: list[DecisionJournalEntryRecord] = [
+        _rejected_signal_entry(
+            deduped[score.instrument_id],
+            TOP_N_EXCLUDED,
+            actor=actor,
+            as_of=as_of,
+            score=score,
+        )
+        for score in ranked
+        if score.instrument_id not in score_by_symbol and score.instrument_id in deduped
+    ]
 
     packages: dict[str, DecisionPackage] = {}
     decisions: list[PortfolioDecision] = []
@@ -540,7 +568,7 @@ def plan_v2_tick(
         entry_packages=packages,
         decisions=tuple(decisions),
         ranked=tuple(ranked),
-        journal_entries=tuple((*blocked, *journal)),
+        journal_entries=tuple((*blocked, *excluded, *journal)),
         regime=resolved_regime,
         as_of=as_of,
     )
@@ -658,26 +686,40 @@ def _working_snapshot(snapshot: Any, committed: Sequence[PortfolioPosition]) -> 
 
     ``risk_used`` solo se sobrescribe cuando alguna posición comprometida **declara** su
     riesgo: si no hay dato, se conserva el de la base (nunca un 0 engañoso).
+
+    V2.40.4 — el notional ya aprobado en ESTE tick tampoco es poder de compra: se
+    descuenta de ``cash``/``buying_power``. Sin esta resta, N candidatas del mismo tick
+    decidían cada una contra la caja completa (``cash = 80k`` ⇒ 4 × 20k con 25k
+    disponibles). Es una reserva de CAPITAL, complementaria a la de riesgo.
     """
     if not committed or snapshot is None:
         return snapshot
     committed_risk = 0.0
     has_committed_risk = False
+    committed_notional = 0.0
     for position in committed:
         if position.risk_amount is not None:
             has_committed_risk = True
             committed_risk += max(0.0, float(position.risk_amount))
+        if position.market_value is not None:
+            committed_notional += max(0.0, float(position.market_value))
     risk_used = snapshot.risk_used
     if has_committed_risk:
         risk_used = round(((snapshot.risk_used or 0.0) + committed_risk) * 10000) / 10000
+    cash, buying_power = _reserve_committed_cash(
+        cash=snapshot.cash,
+        buying_power=snapshot.buying_power,
+        committed_notional=committed_notional,
+    )
     return build_auto_portfolio_snapshot(
         account_id=snapshot.account_id,
         capital=snapshot.capital,
-        cash=snapshot.cash,
+        cash=cash,
         equity=snapshot.equity,
-        buying_power=snapshot.buying_power,
+        buying_power=buying_power,
         positions=tuple(snapshot.positions) + tuple(committed),
         open_orders=snapshot.open_orders,
+        order_book_measurement=snapshot.order_book_measurement,
         daily_pnl=snapshot.daily_pnl,
         realized_pnl=snapshot.realized_pnl,
         unrealized_pnl=snapshot.unrealized_pnl,
@@ -690,6 +732,25 @@ def _working_snapshot(snapshot: Any, committed: Sequence[PortfolioPosition]) -> 
         data_freshness=snapshot.data_freshness,
         as_of=snapshot.as_of,
     )
+
+
+def _reserve_committed_cash(
+    *, cash: float | None, buying_power: float | None, committed_notional: float
+) -> tuple[float | None, float | None]:
+    """Descuenta el notional comprometido en el tick del cash y del poder de compra.
+
+    Nunca ``None`` → número: sin dato se conserva la ausencia (fail-closed aguas abajo).
+    El clamp a 0 evita publicar un poder de compra negativo, que no es un hecho.
+    """
+    if committed_notional <= 0:
+        return cash, buying_power
+
+    def _net(value: float | None) -> float | None:
+        if value is None:
+            return None
+        return round(max(0.0, float(value) - committed_notional) * 10000) / 10000
+
+    return _net(cash), _net(buying_power)
 
 
 def _committed_position(
@@ -759,10 +820,40 @@ def _signal_rejection(
 
 
 def _rejected_signal_entry(
-    signal: V2Signal, reason: str, *, actor: str, as_of: str
+    signal: V2Signal,
+    reason: str,
+    *,
+    actor: str,
+    as_of: str,
+    score: OpportunityScore | None = None,
 ) -> DecisionJournalEntryRecord:
-    """Entrada de journal de una señal descartada por identidad/frescura."""
+    """Entrada de journal de una señal descartada por identidad/frescura.
+
+    ``score`` (V2.40.4) solo llega para las candidatas descartadas DESPUÉS del rankeo
+    (``top_n_excluded``): el score es el REAL del ranking y se publica porque
+    "no la evalué" no es lo mismo que "no tenía edge". Para los descartes previos al
+    ranking (identidad/frescura) no existe score y la clave se omite.
+    """
     from uuid import uuid4
+
+    payload: dict[str, Any] = {
+        "event": "auto_entry_decision",
+        "instrumentId": signal.instrument_id,
+        "action": "BUY",
+        "approved": False,
+        "reasonCodes": [reason],
+        "regime": None,
+        "sector": signal.sector,
+        "tradePlan": None,
+        "risk": None,
+        "signalId": signal.signal_id,
+        "barTimestamp": signal.bar_timestamp,
+        "validUntil": signal.valid_until,
+        "indicator": "strategy",
+    }
+    if score is not None:
+        payload["opportunityScore"] = score.combined
+        payload["rank"] = score.rank
 
     return DecisionJournalEntryRecord(
         id=f"JNL-{uuid4().hex[:12]}",
@@ -771,21 +862,7 @@ def _rejected_signal_entry(
         actor=actor,
         created_at=_stamp(as_of),
         instrument_id=signal.instrument_id,
-        payload={
-            "event": "auto_entry_decision",
-            "instrumentId": signal.instrument_id,
-            "action": "BUY",
-            "approved": False,
-            "reasonCodes": [reason],
-            "regime": None,
-            "sector": signal.sector,
-            "tradePlan": None,
-            "risk": None,
-            "signalId": signal.signal_id,
-            "barTimestamp": signal.bar_timestamp,
-            "validUntil": signal.valid_until,
-            "indicator": "strategy",
-        },
+        payload=payload,
     )
 
 
@@ -811,6 +888,8 @@ def _journal_entry(
             "sector": decision.sector,
             "tradePlan": None if decision.trade_plan is None else decision.trade_plan.to_dict(),
             "risk": decision.allocation,
+            # V2.40.4 — violaciones de coherencia del TradePlan (vacío si fue válido).
+            "planViolations": list(decision.plan_violations),
         },
     )
 

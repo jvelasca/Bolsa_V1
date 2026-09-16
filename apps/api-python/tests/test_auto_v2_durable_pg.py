@@ -297,3 +297,133 @@ async def test_v2_durable_plan_and_consumed_signal_survive_real_restart(
                         delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
                     )
                 await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_v2_durable_crash_left_captured_blocks_new_entry_after_restart(
+    v2_pg_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Crash con un fill ``CAPTURED`` sin materializar ⇒ tras reiniciar, NO se abre.
+
+    El dinero en vuelo del proceso muerto vive en ``execution_events`` (no en la RAM del
+    worker nuevo). Al reiniciar, AUTO debe ver ese capital como RESERVADO y vetar la
+    entrada nueva (``open_orders_unmeasurable``: ``sim_fill_finance_context`` no lleva
+    riesgo, así que el libro no es medible del todo) en vez de gastar dos veces la caja.
+    """
+    from bolsa_api.background.auto_simulation_worker import (
+        AutoSimRuntime,
+        AutoSimulationWorker,
+    )
+    from bolsa_application.execution_event import (
+        ExecutionEvent,
+        PostgresExecutionEventStore,
+    )
+    from bolsa_application.sim_durable_store import (
+        PostgresSimFillFinanceContextStore,
+        SimFillFinanceContext,
+    )
+
+    instrument_id = f"inst-v2d-{uuid.uuid4().hex[:10]}"
+    engine_id = f"auto-v2d-{uuid.uuid4().hex[:10]}"
+    execution_id = f"ex-v2d-{uuid.uuid4().hex[:10]}"
+    monkeypatch.setenv("AUTO_ENGINE_SIMULATED_VENUE", "simulated")
+    monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", instrument_id)
+    monkeypatch.setenv("AUTO_SIMULATION_WORKER_ENABLED", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_REGIME", "BULL_TREND")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "100000")
+
+    account_id: str | None = None
+    edge_report_id: str | None = None
+    try:
+        async with v2_pg_factory() as session:
+            account_id = await _seed_account(session)
+            await _seed_instrument(session, instrument_id)
+            edge_report_id = await _seed_edge_report(
+                session, account_id=account_id, strategy_ref="unversioned"
+            )
+            # La huella del proceso muerto: traza CAPTURED + contexto financiero del fill.
+            await PostgresExecutionEventStore(session).capture(
+                ExecutionEvent(
+                    execution_id=execution_id,
+                    order_id=f"lo-{execution_id}",
+                    venue="simulated",
+                    venue_order_id=f"vo-{execution_id}",
+                    fill_seq=1,
+                    qty=Decimal("850"),
+                    account_id=account_id,
+                )
+            )
+            await PostgresSimFillFinanceContextStore(session).save(
+                SimFillFinanceContext(
+                    execution_id=execution_id,
+                    instrument_id=instrument_id,
+                    side="buy",
+                    quantity=Decimal("850"),
+                    price=Decimal("100"),
+                    account_id=account_id,
+                )
+            )
+
+        # Proceso NUEVO (RAM vacía) sobre la misma BD, con el spine diciendo BUY.
+        worker = AutoSimulationWorker(
+            decider=_BuyOnce(instrument_id, lot=100.0),
+            engine_id=engine_id,
+            account_id=account_id,
+        )
+        runtime = AutoSimRuntime(
+            v2_pg_factory, worker=worker, engine_id=engine_id, account_id=account_id
+        )
+        for _ in range(4):
+            await runtime.run_tick()
+
+        assert worker._open.get(instrument_id, Decimal("0")) == 0, (
+            "el capital en vuelo del proceso muerto impide abrir de nuevo"
+        )
+        assert worker._v2_open_orders, "el pendiente durable debe verse en el libro"
+        assert worker._v2_open_orders[0].reserved_cash == 85_000.0
+        assert worker._v2_order_book_measurement == "UNKNOWN"
+        reasons = [
+            code
+            for entry in worker._v2_journal
+            if entry.payload is not None
+            for code in entry.payload["reasonCodes"]
+        ]
+        assert "open_orders_unmeasurable" in reasons, (
+            "el journal debe declarar POR QUÉ no se abrió (no un veto silencioso)"
+        )
+    finally:
+        if account_id is not None:
+            from sqlalchemy import delete
+
+            from bolsa_infrastructure.database.models.tables import (
+                EdgeReportRow,
+                ExecutionEventRow,
+                SimAutoPositionRow,
+                SimConsumedSignalRow,
+                SimFillFinanceContextRow,
+            )
+
+            async with v2_pg_factory() as session:
+                await session.execute(
+                    delete(SimAutoPositionRow).where(SimAutoPositionRow.account_id == account_id)
+                )
+                await session.execute(
+                    delete(SimConsumedSignalRow).where(
+                        SimConsumedSignalRow.account_id == account_id
+                    )
+                )
+                await session.execute(
+                    delete(ExecutionEventRow).where(ExecutionEventRow.execution_id == execution_id)
+                )
+                await session.execute(
+                    delete(SimFillFinanceContextRow).where(
+                        SimFillFinanceContextRow.execution_id == execution_id
+                    )
+                )
+                if edge_report_id is not None:
+                    await session.execute(
+                        delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
+                    )
+                await session.commit()

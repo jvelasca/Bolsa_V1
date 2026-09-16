@@ -78,6 +78,17 @@ VALID_EXECUTION_EVENT_STATUSES: frozenset[ExecutionEventStatus] = frozenset(
     _EXECUTION_EVENT_ALLOWED
 )
 
+# V2.40.4 (P1) — estados en los que la fila NO ha materializado dinero: la orden sigue
+# PENDIENTE y su capital/riesgo están comprometidos. ``APPLIED`` es el único terminal
+# financiero (una vez aplicado, el dinero ya está en Position/Ledger y su compromiso se
+# contabiliza como POSICIÓN, no como orden).
+UNAPPLIED_EXECUTION_EVENT_STATUSES: tuple[ExecutionEventStatus, ...] = (
+    "CAPTURED",
+    "APPLYING",
+    "RETRY",
+    "FAILED",
+)
+
 # V2.20 (P2-01) — mapa inverso: estados de ORIGEN desde los que una transición a
 # ``nxt`` es legal. Deriva de ``_EXECUTION_EVENT_ALLOWED`` (una sola fuente de
 # verdad; sin una segunda tabla que pueda desincronizarse). Se usa para expresar
@@ -260,6 +271,22 @@ class ExecutionEventStore(Protocol):
         stale_before: datetime,
         limit: int = 100,
     ) -> list[str]: ...
+
+    # V2.40.4 (P1) — órdenes PENDIENTES: filas que NO han materializado dinero.
+    #
+    # ``account_id=None`` ⇒ sin filtro de cuenta (el llamante que no pudo determinar su
+    # cuenta prefiere ver TODO antes que asumir que no hay nada: fail-closed). Orden
+    # ``captured_at DESC`` + ``limit`` mantiene acotado el coste SIN índice parcial por
+    # ``(account_id, status)`` — deuda declarada, la migración llega con el Reservation
+    # Engine. Si el llamante recibe exactamente ``limit`` filas NO puede afirmar que vio
+    # todo el libro (lo declara como libro no medible).
+    async def list_unapplied(
+        self,
+        account_id: str | None,
+        *,
+        statuses: tuple[ExecutionEventStatus, ...] = UNAPPLIED_EXECUTION_EVENT_STATUSES,
+        limit: int = 100,
+    ) -> list[ExecutionEvent]: ...
 
 
 class InMemoryExecutionEventStore:
@@ -486,10 +513,52 @@ class InMemoryExecutionEventStore:
         )
         return True
 
+    async def list_unapplied(
+        self,
+        account_id: str | None,
+        *,
+        statuses: tuple[ExecutionEventStatus, ...] = UNAPPLIED_EXECUTION_EVENT_STATUSES,
+        limit: int = 100,
+    ) -> list[ExecutionEvent]:
+        """Órdenes pendientes (V2.40.4): espeja el ORDER BY/LIMIT del store PG."""
+        if limit <= 0:
+            return []
+        rows = [
+            row
+            for row in self._rows.values()
+            if row.status in statuses
+            and (account_id is None or row.account_id == account_id)
+        ]
+        rows.sort(
+            key=lambda r: r.captured_at or datetime.min.replace(tzinfo=UTC),
+            reverse=True,
+        )
+        return rows[:limit]
+
+
+def _row_to_execution_event(row: Any) -> ExecutionEvent:
+    """Mapeo fila ``execution_events`` → ``ExecutionEvent`` (una sola fuente de verdad)."""
+    return ExecutionEvent(
+        execution_id=row.execution_id,
+        order_id=row.order_id,
+        venue=row.venue,
+        qty=row.qty,
+        account_id=row.account_id,
+        venue_order_id=row.venue_order_id,
+        fill_seq=row.fill_seq,
+        captured_at=row.captured_at,
+        status=row.status,
+        applied_at=row.applied_at,
+        attempt_count=row.attempt_count,
+        last_error=row.last_error,
+        lease_owner=row.lease_owner,
+        updated_at=row.updated_at,
+        lease_generation=row.lease_generation,
+    )
+
 
 class PostgresExecutionEventStore:
     """``execution_events`` en PostgreSQL con idempotencia real (ON CONFLICT).
-
     El unique (PK) ``execution_id`` + ``ON CONFLICT DO NOTHING ... RETURNING``
     garantiza que solo el insert que gana devuelve fila → clasifica inserted vs
     duplicate SIN lectura previa y SIN carreras (correcto entre workers).
@@ -539,23 +608,39 @@ class PostgresExecutionEventStore:
         ).scalar_one_or_none()
         if row is None:
             return None
-        return ExecutionEvent(
-            execution_id=row.execution_id,
-            order_id=row.order_id,
-            venue=row.venue,
-            qty=row.qty,
-            account_id=row.account_id,
-            venue_order_id=row.venue_order_id,
-            fill_seq=row.fill_seq,
-            captured_at=row.captured_at,
-            status=row.status,
-            applied_at=row.applied_at,
-            attempt_count=row.attempt_count,
-            last_error=row.last_error,
-            lease_owner=row.lease_owner,
-            updated_at=row.updated_at,
-            lease_generation=row.lease_generation,
+        return _row_to_execution_event(row)
+
+    async def list_unapplied(
+        self,
+        account_id: str | None,
+        *,
+        statuses: tuple[ExecutionEventStatus, ...] = UNAPPLIED_EXECUTION_EVENT_STATUSES,
+        limit: int = 100,
+    ) -> list[ExecutionEvent]:
+        """Órdenes pendientes de materializar (V2.40.4 · P1).
+
+        ``WHERE status IN (...)`` (+ ``account_id`` cuando se conoce) ordenado por
+        ``captured_at DESC`` con ``LIMIT``: la lectura queda acotada aunque el índice
+        sea por ``execution_id``/``order_id`` (no hay índice por ``account_id``; deuda
+        declarada). El llamante que reciba exactamente ``limit`` filas debe asumir que
+        puede haber más y declarar el libro como NO medible.
+        """
+        import sqlalchemy as sa
+
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+
+        if limit <= 0:
+            return []
+        query = (
+            sa.select(ExecutionEventRow)
+            .where(ExecutionEventRow.status.in_(tuple(statuses)))
+            .order_by(ExecutionEventRow.captured_at.desc())
+            .limit(limit)
         )
+        if account_id is not None:
+            query = query.where(ExecutionEventRow.account_id == account_id)
+        rows = (await self._session.execute(query)).scalars().all()
+        return [_row_to_execution_event(row) for row in rows]
 
     # ------------------------------------------------------------------
     # V2.20 (P2-01) — adquisición EXCLUSIVA del apply (CAS real atómico).

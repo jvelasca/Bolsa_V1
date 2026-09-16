@@ -320,6 +320,10 @@ jobs:
         # claves naturales únicas → mismo criterio, los certifica el job con PG.
         # V2.40.3: la clave de idempotencia financiera (recorte sin pérdida) es hermética
         # y entra aquí; el día AUTO real que la destapó va en el job lifecycle-pg.
+        # V2.40.4/AUTO 2.0 Safety & Accounting: TOP_N como tope de evaluación, measurement
+        # status de riesgo/exposición, libro de órdenes pendientes y validación de
+        # TradePlan (herméticos, stores in-memory) entran aquí con nombre propio; el caso
+        # crash-left-CAPTURED con PG real va en el job auto-v2-durable-pg.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -355,6 +359,8 @@ jobs:
           packages/py/application/tests/test_auto_v2_entry.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
+          packages/py/application/tests/test_trade_plan.py
+          packages/py/application/tests/test_execution_event.py
           packages/py/application/tests/test_position_manager.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py

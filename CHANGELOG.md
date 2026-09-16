@@ -2,6 +2,111 @@
 
 All notable releases of Bolsa V1.
 
+## [1.65.4-beta] — V2.40.4 · AUTO Safety & Accounting (TOP_N real, measurement status, órdenes pendientes y validación de TradePlan) — 2026-09-16
+
+**Sin migración** (head sigue en `041_unique_natural_keys`). Cierra los cuatro agujeros de
+seguridad/contabilidad de AUTO que destapó la auditoría de `v2.40.2-beta`. Ninguno es cosmético: los
+cuatro podían hacer que AUTO gastara dinero que ya estaba comprometido, decidiera sobre un número que
+era un suelo disfrazado de total, o emitiera un plan que se contradecía a sí mismo.
+
+| #      | Qué                                                                                                                                                                                                                                                                                                                                         |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F1** | `TOP_N` era un tope de **prioridad**, no de **evaluación**: los candidatos fuera del TOP llegaban sin score y el journal los reportaba como `edge_below_threshold` (**un motivo falso**). Ahora es un tope de evaluación y los excluidos se journalizan con `top_n_excluded` y su score/rank **reales** (`approved <= top_n` es invariante) |
+| **F2** | `risk_used` y la exposición agregada se publicaban como un número "completo" sumando solo lo que sabían medir (**un suelo**). Nuevo `MeasurementStatus` (`COMPLETE`/`PARTIAL`/`UNKNOWN`): un agregado incompleto **veta** la apertura                                                                                                       |
+| **F3** | `open_orders: int` era un contador **muerto** (siempre 0): el sistema podía gastar dos veces el mismo cash. Nuevo libro de órdenes pendientes (`OpenOrder`) con `reserved_cash`/`available_cash`/`pending_risk`/`pending_exposure` y veto `open_orders_unmeasurable`                                                                        |
+| **F4** | `TradePlan` **sin validación**: un plan incoherente se serializaba, viajaba por el journal y acababa dimensionando una orden real. Nuevo `validate_trade_plan` + veto `plan_invalid` con las violaciones en el journal                                                                                                                      |
+
+### F1 — `TOP_N` (tope de evaluación) y journal honesto
+
+`plan_v2_tick` rankeaba todo pero **solo puntuaba el top-N**: los de fuera llegaban con `score=None` y
+el motor los rechazaba con `edge_below_threshold`. Es decir, el journal afirmaba una causa falsa (su
+edge era válido; simplemente no compitieron) y la semántica real era "solo el top-N es operable".
+
+Ahora `TOP_N` es el **máximo de oportunidades evaluadas** (Opción A de la auditoría, lectura literal):
+se decide solo contra la cartera el subconjunto del TOP, y las candidatas fuera de él emiten una
+entrada de journal `top_n_excluded` que **porta su `OpportunityScore` y su `rank` reales**, así que el
+motivo del no-trade es el verdadero y el ranking completo queda auditable. `run_auto_cycle` usa la
+misma regla (`build_top_n_excluded_payload`). `top_n = 0` excluye todo (fail-closed).
+
+### F2 — `MeasurementStatus`: un agregado incompleto es un SUELO
+
+Caso de la auditoría: `Position A → risk_amount = 100`, `Position B → risk_amount = UNKNOWN` producía
+`risk_used = 100` cuando la verdad es `risk_used >= 100` y el total es **desconocido**. Lo mismo con
+`aggregate_exposure` (saltaba las posiciones sin `market_value`).
+
+Módulo puro nuevo `bolsa_analytics.cognitive.measurement` (`MeasurementStatus`, `coerce_measurement`,
+`measurement_from_counts`, `is_complete`, `combine_measurements`). `AutoPortfolioSnapshot.risk_measurement`
+y `ExposureBreakdown.measurement` derivan el tri-estado del dato real, el motor veta con
+`risk_measurement_partial`/`risk_measurement_unknown`/`exposure_measurement_partial`/
+`exposure_measurement_unknown` y el gate se puede apagar **explícitamente**
+(`require_complete_measurement=False`), nunca por omisión. Un measurement incompleto **no** bloquea
+una salida protectora (invariante con test).
+
+### F3 — Órdenes pendientes: capital y riesgo comprometidos (sin migración)
+
+`Cash = 50.000 €` con `BUY pending = 40.000 €` **no** significa 50.000 € disponibles. AUTO SIM liquida
+en el mismo tick, así que el productor real de "órdenes en vuelo" son las filas de `execution_events`
+que **no** están `APPLIED` (sobreviven a un crash), con su lado/cantidad/precio en
+`sim_fill_finance_context`.
+
+- Módulo puro `bolsa_analytics.cognitive.open_order`: `OpenOrder`, `OpenOrderSummary`,
+  `build_open_order`, `summarize_open_orders`, `coerce_open_order`. Honestidad: una **venta** no
+  reserva cash ni añade riesgo; una **compra** reserva su notional y su riesgo **solo si alguien lo
+  declara** (no se inventa).
+- `AutoPortfolioSnapshot.open_orders: int → tuple[OpenOrder, ...]` (**breaking declarado en beta**),
+  con `order_book_measurement`, `reserved_cash`, `available_cash`, `pending_risk`, `pending_exposure`
+  y `risk_remaining = budget − (risk_used + pending_risk)`.
+- `ExecutionEventStore.list_unapplied(account_id, *, statuses, limit)` en el protocolo, in-memory y
+  PostgreSQL (`WHERE status IN (...) ORDER BY captured_at DESC LIMIT`).
+- `auto_simulation_worker._v2_refresh_open_orders()`: lee el libro una vez por tick **antes** de
+  construir la foto, descarta lo ya reconocido por el worker (no cuenta dos veces el mismo dinero) y
+  declara `UNKNOWN` ante fallo de lectura, `limit` alcanzado o store sin soporte ⇒ **veta aperturas**
+  (nunca "no hay pendientes porque no pude leer").
+- `RiskAllocator` acepta `reserved_cash` y resta el capital comprometido del poder de compra, con
+  motivo propio `CAP_RESERVED_CASH` (distinto de `CAP_BUYING_POWER`: no es "no queda dinero", es
+  "el dinero está comprometido"). La reserva intra-tick descuenta también el notional ya aprobado.
+
+**Deuda declarada:** no hay índice parcial `execution_events(account_id, status)`; la lectura queda
+acotada con `LIMIT` + orden por captura y la migración se asigna a la fase Reservation Engine.
+
+### F4 — El plan que sale del motor no puede contradecirse
+
+`TradePlan` no tenía `__post_init__` ni `validate()`: solo el factory armaba la máquina de estados, así
+que un plan incoherente (qty > 0 sin geometría de riesgo, stop del lado malo, targets cruzados,
+`initialRiskR` que no es `|entry − stop|`, `positionValue` que no es `qty × entry`, `status` distinto de
+`TRIGGERED` con ejecución) se serializaba y viajaba.
+
+Nuevo `validate_trade_plan(plan) -> tuple[str, ...]` (puro; vacío = válido) con códigos
+`PLAN_VIOLATION_*`; `decide_portfolio` valida antes de devolver la decisión aprobada (**`plan_invalid`**
+con las violaciones publicadas en el journal: `PortfolioDecision.plan_violations` →
+`planViolations`) y `trade_plan_to_decision_package` devuelve `None` si el plan es incoherente
+(defensa en profundidad en el seam que consume el worker). Los planes no ejecutables
+(`WATCH`/`ARMED`/`BLOCKED`/`EXPIRED`) no se validan contra geometría que no necesitan.
+
+### Certificación y gate CI
+
+- Suites herméticas nuevas con nombre propio en el job `quality` (`python-ci.yml`) y en el job `python`
+  del Release-tag CI: `test_trade_plan.py` (validación del plan) y `test_execution_event.py`
+  (`list_unapplied`).
+- Test nuevo con **PostgreSQL real** en el job `auto-v2-durable-pg`: un fill `CAPTURED` que dejó un
+  proceso muerto aparece como **capital reservado** al reiniciar y **veta** la entrada nueva
+  (`open_orders_unmeasurable`), en vez de gastar dos veces la caja.
+- **Matriz de mutaciones medida** (cada mutación aplicada, suite corrida y revertida): quitar
+  `top_n_excluded` ⇒ 3 suites rojas; volver `buying_power` a cash bruto ⇒ 1; desactivar los escalones
+  de measurement ⇒ 12; saltarse `validate_trade_plan` ⇒ 1.
+- **Límite declarado (pre-existente, NO introducido aquí)**: `test_auto_scheduler_real_pg_zero_human_intervention.py`
+  es no determinista. Medido A/B a 30 ejecuciones por lado (revirtiendo en memoria los 9 ficheros de
+  código del slice y restaurando byte a byte): **4/30 en el commit base** y **8/30 con el slice**.
+  Mecanismo: el entry solo materializa parte de sus chunks y el exit se dimensiona por la **orden** (no
+  por la posición materializada), así que los chunks cola quedan en `RETRY` (`apply_ineffective`)
+  **conservando fila en `sim_fill_finance_context`**, y la aserción de equity del test las cuenta como
+  realizado. Por eso esa puerta puede ponerse roja con el código base **y** con este tip: el criterio es
+  re-ejecutar el job. Causa raíz asignada a `AUTO-1`; detalle en §5.6 del audit-pack.
+- Plan de implementación y roadmap por fases (`V2.40.4` → Adaptive AUTO) en
+  [`docs/engineering/plan-v2-40-4-auto-safety-accounting-2026-09-16.md`](./docs/engineering/plan-v2-40-4-auto-safety-accounting-2026-09-16.md)
+  y [`docs/engineering/roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md`](./docs/engineering/roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md),
+  con los P1 diferidos mapeados a su fase.
+
 ## [1.65.3-beta] — V2.40.3 · Hotfix de la clave de idempotencia financiera (colisión por recorte) + invariante del A9 sobre el ledger real — 2026-09-16
 
 **Sin migración** (head sigue en `041_unique_natural_keys`). Tres cambios independientes, y el

@@ -40,6 +40,8 @@ def test_runtime_position_management_permission() -> None:
 def test_trade_plan_to_decision_package_buy() -> None:
     from bolsa_analytics.cognitive.trade_plan import TradePlan
 
+    # V2.40.4: el plan que llega a este seam ya pasó ``validate_trade_plan``, así que se
+    # construye coherente (riesgo = qty × distancia, valor = qty × entry, geometría ±1R/±2R).
     plan = TradePlan(
         decision_id="dec-1",
         instrument_id="AAPL",
@@ -53,6 +55,9 @@ def test_trade_plan_to_decision_package_buy() -> None:
         structural_stop=96.0,
         target1=104.0,
         target2=108.0,
+        initial_risk_r=4.0,
+        risk_amount=300.0,
+        position_value=7500.0,
     )
     pkg = trade_plan_to_decision_package(plan, source="auto-2.0")
     assert pkg is not None
@@ -78,6 +83,11 @@ def test_trade_plan_to_decision_package_sell() -> None:
         execution_allowed=True,
         entry=100.0,
         structural_stop=104.0,
+        target1=96.0,
+        target2=92.0,
+        initial_risk_r=4.0,
+        risk_amount=40.0,
+        position_value=1000.0,
     )
     pkg = trade_plan_to_decision_package(plan)
     assert pkg is not None
@@ -110,3 +120,29 @@ def test_trade_plan_to_decision_package_fail_closed() -> None:
         execution_allowed=True,
     )
     assert trade_plan_to_decision_package(no_direction) is None
+
+
+def test_trade_plan_to_decision_package_rejects_incoherent_plan() -> None:
+    """V2.40.4: defensa en profundidad en el seam que consume el worker.
+
+    Un plan que dice "ejecuta" con cantidad pero sin geometría de riesgo coherente NO
+    se convierte en propuesta, aunque ``execution_allowed`` sea True: el motor ya lo
+    veta (``plan_invalid``), y este seam lo vuelve a comprobar para que ningún camino
+    alternativo pueda emitir una propuesta incoherente.
+    """
+    from bolsa_analytics.cognitive.trade_plan import TradePlan
+
+    incoherent = TradePlan(
+        decision_id="dec-5",
+        instrument_id="AAPL",
+        direction="long",
+        status="TRIGGERED",
+        quantity=75.0,
+        risk_pct=0.75,
+        why_not=(),
+        execution_allowed=True,
+        entry=100.0,
+        structural_stop=96.0,
+        # Sin targets / initialRiskR / riskAmount / positionValue: el plan se contradice.
+    )
+    assert trade_plan_to_decision_package(incoherent) is None
