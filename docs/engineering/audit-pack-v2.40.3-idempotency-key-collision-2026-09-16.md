@@ -43,15 +43,15 @@ Desde P1-03 el `venue_order_id` del AUTO va namespaced (engine + UUID de cuenta 
   payload ⇒ `IdempotencyKeyReused` ⇒ `mark_retry` ⇒ fila en `RETRY` **permanente** (el reintento usa
   la misma clave, así que vuelve a chocar) ⇒ el lado que no liquidaba dejaba el libro abierto.
 
-| Eje                             | Antes (`v2.40.2-beta`)                                                      | Ahora (`v2.40.3-beta`)                                                             |
-| ------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Clave de fill (SIM)             | `f"sim-fin-{slug[:120]}"[-128:]` ⇒ 4 fills = **1** clave                    | `bounded_idempotency_key`: 4 fills = **4** claves (inyectiva)                      |
-| Clave de fill (recovery LIVE)   | `f"recovery-fin-{slug[:100]}"[-128:]` ⇒ mismo colapso                       | ídem, con digest del `execution_id` completo                                       |
-| Compatibilidad de claves        | —                                                                           | **exacta** por debajo del presupuesto histórico (un fill en vuelo no se re-aplica) |
-| Invariante de equity del A9     | posición desde `position_states` ⇒ no realizado **siempre 0** (punto ciego) | posición desde el estado canónico `positions` + P&L cerrado desde el contexto      |
-| Gate de cierre del día AUTO     | ninguno sobre el estado de los `execution_events`                           | **libro plano + cero fills sin materializar** (todos `APPLIED`, ledger cuadrado)   |
-| Instrumento del test de restart | aleatorio ⇒ 12,36 % de las veces el simulador no llena nada                 | determinista entre los que **sí** llenan                                           |
-| Invariante del restart          | contaba **tranchas** de fill (`execution_events`)                           | cuenta **órdenes** (`count(distinct venue_order_id)`)                              |
+| Eje                             | Antes (`v2.40.2-beta`)                                                                                      | Ahora (`v2.40.3-beta`)                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Clave de fill (SIM)             | `f"sim-fin-{slug[:120]}"[-128:]` ⇒ 4 fills = **1** clave (con `engine_id` largo; ver la tabla medida de §1) | `bounded_idempotency_key`: 4 fills = **4** claves (inyectiva)                      |
+| Clave de fill (recovery LIVE)   | `f"recovery-fin-{slug[:100]}"[-128:]` ⇒ mismo colapso **con cualquier** identidad AUTO                      | ídem, con digest del `execution_id` completo                                       |
+| Compatibilidad de claves        | —                                                                                                           | **exacta** por debajo del presupuesto histórico (un fill en vuelo no se re-aplica) |
+| Invariante de equity del A9     | posición desde `position_states` ⇒ no realizado **siempre 0** (punto ciego)                                 | posición desde el estado canónico `positions` + P&L cerrado desde el contexto      |
+| Gate de cierre del día AUTO     | ninguno sobre el estado de los `execution_events`                                                           | **libro plano + cero fills sin materializar** (todos `APPLIED`, ledger cuadrado)   |
+| Instrumento del test de restart | aleatorio ⇒ 12,36 % de las veces el simulador no llena nada                                                 | determinista entre los que **sí** llenan                                           |
+| Invariante del restart          | contaba **tranchas** de fill (`execution_events`)                                                           | cuenta **órdenes** (`count(distinct venue_order_id)`)                              |
 
 **Veredicto:** el camino SIM y el camino recovery vuelven a tener claves inyectivas conservando
 compatibilidad byte a byte con las claves históricas, y la certificación del día AUTO ahora **nombra**
@@ -78,17 +78,33 @@ return f"recovery-fin-{slug[:100]}"[-128:]   # recovery LIVE
 El `[-128:]` final es **inoperante** (el total nunca superaba 128) y el `[:presupuesto]` descarta la
 **cola** del `execution_id`, que es exactamente donde vive el `#fill_seq`.
 
-**Medición reproducible** (`uv run python -`, identidad construida con los mismos datos que usa el
-worker: engine `auto-a9proc-…`, cuenta UUID, instrumento; lado `buy`/`sell`):
+**Medición reproducible** (`apps/api-python/scripts/a9_identity_length_probe.py`; identidad
+construida con los **mismos** componentes que el worker y el mismo helper `auto_venue_order_id` de
+producción, barriendo engines realistas y ambos lados):
 
-| camino            | presupuesto | `len(execution_id)` | claves distintas / 4 fills (antes) | (ahora) |
-| ----------------- | ----------: | ------------------: | ---------------------------------: | ------: |
-| SIM (`sim-fin-`)  |         120 |                 126 |                              **1** |   **4** |
-| recovery (`rec-`) |         100 |                 128 |                              **1** |   **4** |
+```
+engine                             side len(exec)         legacy SIM         legacy REC SIM nueva REC nueva
+-----------------------------------------------------------------------------------------------------------
+auto-sim                           buy        104                4/4       1/4  COLAPSO       4/4       4/4
+auto-sim                           sell       106                4/4       1/4  COLAPSO       4/4       4/4
+auto-sim-live-eu-01                buy        120                4/4       1/4  COLAPSO       4/4       4/4
+auto-sim-live-eu-01                sell       122       1/4  COLAPSO       1/4  COLAPSO       4/4       4/4
+auto-a9proc-bcc03924               buy        126       1/4  COLAPSO       1/4  COLAPSO       4/4       4/4
+auto-a9proc-bcc03924               sell       128       1/4  COLAPSO       1/4  COLAPSO       4/4       4/4
+auto-simulado-produccion-eu-west-01 buy       150       1/4  COLAPSO       1/4  COLAPSO       4/4       4/4
+auto-simulado-produccion-eu-west-01 sell      152       1/4  COLAPSO       1/4  COLAPSO       4/4       4/4
+```
 
-Con una identidad aún más realista (engine con UUID completo) los `execution_id` miden **162-164**
-caracteres y el colapso es el mismo en ambos caminos. Es decir: **no era un caso de borde**, era el
-caso normal del AUTO.
+Dos lecturas que conviene no mezclar:
+
+- **Camino recovery (LIVE), presupuesto 100: colapsa en TODAS las filas**, también con el engine por
+  defecto `auto-sim` (104/106 chars). El bug del camino live **no** dependía de configuración.
+- **Camino SIM, presupuesto 120: colapsa cuando `len(execution_id) > 120`**, es decir con cualquier
+  `engine_id` de más de ~16 caracteres. El engine por defecto (`auto-sim`) se libraba; el engine que
+  usan los tests y los despliegues namespaceados (`auto-a9proc-…` en
+  `test_a9_scheduler_process_pg_zero_human.py:485`, `auto-v2d-…`, `auto-cert-…`) **no**. La longitud
+  del `engine_id` es configurable (`AUTO_ENGINE_SIM_ENGINE_ID`), así que esto era una lotería de
+  configuración, no un caso de borde.
 
 **Cadena del daño (leída en el código, no inferida):**
 
@@ -287,10 +303,6 @@ Notas de reproducibilidad del §6:
   única caída en `test_a9_scheduler_process_full_day_pg_zero_human`
   (`AssertionError: equity 89956.891432 != initial+realized+unrealized 99967.864700`) y `lifecycle-pg=failure`
   en el agregado `certify`; esta fase busca ese mismo job en verde.
-- Para el CI del tag: el run del `v2.40.2-beta` (`35026285805`) registró `1 failed, 131 passed` con la
-  única caída en `test_a9_scheduler_process_full_day_pg_zero_human`
-  (`AssertionError: equity 89956.891432 != initial+realized+unrealized 99967.864700`) y `lifecycle-pg=failure`
-  en el agregado `certify`; esta fase busca ese mismo job en verde.
 
 ---
 
@@ -339,3 +351,22 @@ Notas de reproducibilidad del §6:
    explícita. Esta fase lo añade al job `quality` (`python-ci.yml`) y al job `python`
    (`release-tag-ci.yml`), porque es un test que debe correr en **cada push** (es hermético, 0,2 s)
    y que es la regresión directa del bug de dinero.
+9. **La compatibilidad byte a byte solo cubre el régimen SIN recorte.** En el régimen truncado
+   (`len(execution_id) > presupuesto`: >120 SIM con `engine_id` largo, >100 recovery **siempre**) la
+   clave nueva **difiere a propósito** de la histórica — eso es el fix, no un efecto colateral —, de
+   modo que la garantía "el mismo fill re-deriva la misma clave y no se re-aplica dinero" **no**
+   cruza el borde del despliegue en ese régimen. Casos, sin dramatizar:
+   - **Fill que quedó en `RETRY`** (el caso normal del bug): su dinero **no** se había aplicado; tras
+     el despliegue, el reintento deriva la clave nueva y aplica **una** vez. Correcto.
+   - **Ventana estrecha y declarada:** dinero **ya aplicado** con la clave truncada pero cuya fila de
+     `execution_events` **no** llegó a `APPLIED` (caída del proceso entre `apply_finance` y
+     `mark_applied`), y el despliegue ocurre **antes** de que el lease venza y la fila se reclame. El
+     reintento posterior usa la clave nueva, que el ledger no había visto. El guard habitual
+     (`apply_execution_financial_once`: `row.status == "APPLIED"` ⇒ `already_applied`) **no** cubre
+     este caso porque la fila no es `APPLIED`; la mitigación es `sim_fill_finance_context`, escrito
+     por `execution_id` **antes** de mover dinero y **sin cambios** en esta fase (el `execution_id`
+     no cambia, solo su clave derivada), aunque el applier lo lee para construir la finance y no
+     como candado de "ya liquidado". **No está medido**, y por eso se declara en vez de negarse: si
+     el auditor quiere cerrarlo, el camino es un candado por `execution_id` en el ledger
+     (`ExecuteTrade` / `execute_trade`, `packages/py/application/src/bolsa_application/accounts/trade.py`)
+     independiente de la clave. Requiere caída + despliegue en la misma ventana.

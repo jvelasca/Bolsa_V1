@@ -7,9 +7,15 @@ Copia en chat nuevo (auditor):
 Eres auditor externo de Bolsa V1 **candidato V2.40.3**. Auditas **desde GitHub**, sin acceso al
 entorno local.
 
-- **Delta:** `11e2cb83` (base auditada; era el tag `v2.40.2-beta` **antes** del re-sellado) → commit
-  sellado **`581067c4`** (tag **`v2.40.2-beta` movido aquí**: borrado + re-tag, ver §0 del pack) →
-  punta de `main` con el sello de documentación: `29466369`.
+- **Delta de CÓDIGO a auditar:** `11e2cb83` (base auditada; era el tag `v2.40.2-beta` **antes** del
+  re-sellado) → commit sellado **`581067c4`** (tag **`v2.40.2-beta` movido aquí**: borrado + re-tag,
+  ver §0 del pack).
+- **Commits posteriores a `581067c4` (docs + sondas, ninguna línea de producción):** `29466369`,
+  `d6b9e1f3` y la punta actual. Contienen `CHANGELOG.md`, `docs/engineering/*` y **tres scripts de
+  auditoría** en `apps/api-python/scripts/`: `a9_mutation_audit.py` y `a9_restart_mutation.py` (las
+  sondas con las que se midió §5) y `a9_identity_length_probe.py` (el barrido de longitudes que
+  respalda la tabla de §1). **Compruébalo tú** con `git diff --stat 581067c4 <punta de main>`: el
+  camino de dinero no debe aparecer.
 - **Ojo con el nombre del tag:** `git rev-list -n 1 v2.40.2-beta` resuelve a **`581067c4`**, cuya
   versión es **`1.65.3-beta`** (fase V2.40.3). El nombre del tag **no** coincide con la versión del
   código que señala: es una **limitación declarada** (§7.1 del pack), no un error de sellado.
@@ -22,7 +28,9 @@ entorno local.
   (`quality` —con **Mypy**—, `lifecycle-pg`, `grammar-discovery-pg`, `paper-forward-pg`,
   `auto-v2-durable-pg`) · `release-tag-ci` **GREEN** — run
   [`35068488972`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068488972) sobre el tag movido
-  (`certify` ✓; único skip: `playwright` integrado, opt-in).
+  (`certify` ✓; único skip: `playwright` integrado, opt-in) · los commits posteriores de docs+sondas
+  también pasan `python-ci` (run
+  [`35070893441`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35070893441)).
 - **Verificación local (no sustituye al CI, la complementa):** batería **exacta** del job
   `lifecycle-pg` sobre PostgreSQL real en BD scratch recreada y migrada a `head` → **132 passed**;
   baterías offline de CI con el comando `pytest` **extraído del propio YAML** → **1626** (`quality`)
@@ -67,6 +75,8 @@ dinero**.
 - `packages/py/application/src/bolsa_application/execution_event.py`
   (`apply_execution_financial_once`, el `mark_retry`) y `apps/api-python/src/bolsa_api/background/auto_simulation_worker.py`
   (dónde se absorbe el fallo por símbolo)
+- `apps/api-python/scripts/a9_identity_length_probe.py` (barrido de longitudes: mide **en qué régimen**
+  de `engine_id` aparece el colapso, en vez de afirmarlo)
 
 **Foco:**
 
@@ -152,7 +162,11 @@ dinero, es P0. Si reaparece en un sitio que solo decide texto/nombres, es P3 y v
    tanto rompería con las claves largas? Búscalo: es la limitación §7.2 y, si existe, es un P1 real.
 2. **Reversibilidad del despliegue:** si se despliega esta versión y se vuelve atrás, ¿un fill nuevo
    (clave larga con digest) re-derivaría su clave histórica? ¿Puede eso re-aplicar dinero? Argumenta
-   con la rama corta y con el hecho de que el digest es función del `execution_id` completo.
+   con la rama corta y con el hecho de que el digest es función del `execution_id` completo. **Lee
+   antes §7.9 del pack**: ahí se declara el único caso en que la garantía **no** cruza el borde del
+   despliegue (régimen truncado + caída entre `apply_finance` y `mark_applied` + redespliegue antes
+   del vencimiento del lease). **No está medido**: si crees que el razonamiento es erróneo —en un
+   sentido o en otro— es un hallazgo, no una opinión.
 3. ¿La longitud máxima resultante es **exactamente** 128 en la rama larga con **ambos** prefijos
    (`sim-fin-` y `recovery-fin-`)? Calcula `head` para cada uno y comprueba que no se pasa (un
    `VARCHAR(128)` que revienta es fallo de dinero, no cosmético).

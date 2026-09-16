@@ -13,7 +13,9 @@ import pathlib
 import subprocess
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[3]  # raíz del repo (este script vive en apps/api-python/scripts)
+ROOT = (
+    pathlib.Path(__file__).resolve().parents[3]
+)  # raíz del repo (este script vive en apps/api-python/scripts)
 SIM = "packages/py/application/src/bolsa_application/simulated_settlement.py"
 REC = "packages/py/application/src/bolsa_application/recovery_apply.py"
 KEY = "packages/py/application/src/bolsa_application/idempotency_key.py"

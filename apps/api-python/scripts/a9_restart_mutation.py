@@ -17,7 +17,9 @@ import pathlib
 import subprocess
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[3]  # raíz del repo (este script vive en apps/api-python/scripts)
+ROOT = (
+    pathlib.Path(__file__).resolve().parents[3]
+)  # raíz del repo (este script vive en apps/api-python/scripts)
 TEST_FILE = "apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py"
 DB = os.environ.get("A9_SCRATCH_DB", "bolsa_a9v2403")
 
