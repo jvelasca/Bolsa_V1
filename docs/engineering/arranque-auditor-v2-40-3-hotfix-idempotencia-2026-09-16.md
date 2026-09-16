@@ -30,9 +30,9 @@ entorno local.
   `auto-v2-durable-pg`) · `release-tag-ci` **GREEN** — run
   [`35068488972`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068488972) sobre el tag movido
   (`certify` ✓; único skip: `playwright` integrado, opt-in) · **los commits posteriores de docs+sondas
-  van con `python-ci` verde en cada push**: compruébalo en la pestaña Actions de `main` — no debe
-  haber ningún run rojo de `python-ci` desde `581067c4` (los medidos al escribir esto: `35070893441`,
-  `35071398598`, `35071816212`).
+  disparan `python-ci` cuando tocan `apps/api-python/**`y todos sus runs están verdes**: compruébalo
+en la pestaña Actions de`main`— no debe haber ningún run **rojo** de`python-ci`desde`581067c4`(runs medidos al escribir esto:`35070893441`, `35071398598`, `35071816212`; un commit que solo toca
+`docs/\*\*`no dispara`python-ci`, por el filtro de rutas del workflow).
 - **Verificación local (no sustituye al CI, la complementa):** batería **exacta** del job
   `lifecycle-pg` sobre PostgreSQL real en BD scratch recreada y migrada a `head` → **132 passed**;
   baterías offline de CI con el comando `pytest` **extraído del propio YAML** → **1626** (`quality`)
