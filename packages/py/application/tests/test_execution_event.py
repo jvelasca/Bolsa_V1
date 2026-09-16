@@ -626,15 +626,22 @@ async def test_list_unapplied_filters_by_account() -> None:
 @pytest.mark.asyncio
 async def test_list_unapplied_filters_by_status() -> None:
     """Solo los estados NO terminales; un ``FAILED`` sigue siendo dinero en vuelo."""
+    from datetime import timedelta
+
     store = InMemoryExecutionEventStore()
-    await store.capture(_exec("ev-captured"))
-    await store.capture(_exec("ev-failed"))
+    # ``captured_at`` explícito: el contrato de lectura es ``captured_at DESC`` (el más
+    # reciente primero). Sin fijarlo, el orden dependería de la granularidad del reloj
+    # de ``ExecutionEvent.__post_init__``: en local los dos ``now()`` empataban y el
+    # orden caía al de inserción (verde falso), y en CI se separaban (rojo).
+    base = datetime.now(UTC)
+    await store.capture(replace(_exec("ev-captured"), captured_at=base - timedelta(minutes=1)))
+    await store.capture(replace(_exec("ev-failed"), captured_at=base))
     assert await store.start_apply("ev-failed", owner="w") is True
     assert await store.mark_failed("ev-failed", lease_owner="w", error="venue reject") is True
 
     assert [r.execution_id for r in await store.list_unapplied("acc-1")] == [
-        "ev-captured",
         "ev-failed",
+        "ev-captured",
     ]
     only_failed = await store.list_unapplied("acc-1", statuses=("FAILED",))
     assert [r.execution_id for r in only_failed] == ["ev-failed"]
@@ -650,7 +657,8 @@ async def test_list_unapplied_respects_limit_and_orders_by_capture() -> None:
     base = datetime.now(UTC)
     for index in range(3):
         await store.capture(_exec(f"ev-{index}"))
-        # ``ev-0`` el más ANTIGUO: el orden de lectura es el de captura, no el de inserción.
+        # ``ev-0`` el más RECIENTE (``base - 0``): el orden de lectura es por
+        # ``captured_at DESC``, no por inserción.
         row = store._rows[f"ev-{index}"]
         store._rows[f"ev-{index}"] = replace(
             row, captured_at=base - timedelta(minutes=index)
