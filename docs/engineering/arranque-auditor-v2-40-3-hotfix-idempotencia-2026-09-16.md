@@ -10,13 +10,13 @@ entorno local.
 - **Delta de CÓDIGO a auditar:** `11e2cb83` (base auditada; era el tag `v2.40.2-beta` **antes** del
   re-sellado) → commit sellado **`581067c4`** (tag **`v2.40.2-beta` movido aquí**: borrado + re-tag,
   ver §0 del pack).
-- **Commits posteriores a `581067c4` (docs + sondas, ninguna línea de producción):** `29466369`,
-  `d6b9e1f3`, `d2a64d7e` y la punta actual. Contienen `CHANGELOG.md`, `docs/engineering/*` y **cuatro
-  scripts de auditoría** en `apps/api-python/scripts/`: `a9_mutation_audit.py` y
-  `a9_restart_mutation.py` (las sondas con las que se midió §5), `a9_identity_length_probe.py` (el
-  barrido de longitudes que respalda la tabla de §1) y `a9_doc_refs_probe.py` (comprueba que las
-  rutas citadas por estos documentos existen). **Compruébalo tú** con
-  `git diff --stat 581067c4 <punta de main>`: el camino de dinero no debe aparecer.
+- **Escribe con precisión qué se selló:** el tag apunta al **código**; lo que vino después son
+  **docs y sondas, cero líneas de producción**. En vez de fiarte de una lista (se queda vieja),
+  compruébalo tú:
+  `git diff --stat 581067c4 origin/main` debe listar **solo** `CHANGELOG.md`, `docs/**` y
+  `apps/api-python/scripts/a9_*.py` (hoy: `a9_mutation_audit.py`, `a9_restart_mutation.py`,
+  `a9_identity_length_probe.py`, `a9_doc_refs_probe.py`). Si aparece cualquier fichero de
+  `packages/**` o del camino de dinero, **el sellado ya no vale** y es un P0 de proceso.
 - **Ojo con el nombre del tag:** `git rev-list -n 1 v2.40.2-beta` resuelve a **`581067c4`**, cuya
   versión es **`1.65.3-beta`** (fase V2.40.3). El nombre del tag **no** coincide con la versión del
   código que señala: es una **limitación declarada** (§7.1 del pack), no un error de sellado.
@@ -29,16 +29,41 @@ entorno local.
   (`quality` —con **Mypy**—, `lifecycle-pg`, `grammar-discovery-pg`, `paper-forward-pg`,
   `auto-v2-durable-pg`) · `release-tag-ci` **GREEN** — run
   [`35068488972`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068488972) sobre el tag movido
-  (`certify` ✓; único skip: `playwright` integrado, opt-in) · **los commits posteriores de docs+sondas
-  disparan `python-ci` cuando tocan `apps/api-python/**`y todos sus runs están verdes**: compruébalo
-en la pestaña Actions de`main`— no debe haber ningún run **rojo** de`python-ci`desde`581067c4`(runs medidos al escribir esto:`35070893441`, `35071398598`, `35071816212`; un commit que solo toca
-`docs/\*\*`no dispara`python-ci`, por el filtro de rutas del workflow).
+  (`certify` ✓; único skip: `playwright` integrado, opt-in) · los commits posteriores de docs+sondas
+  disparan `python-ci` cuando tocan `apps/api-python/**` y **todos sus runs están verdes**:
+  compruébalo en la pestaña Actions de `main` — **no debe haber ningún run rojo** de `python-ci`
+  desde `581067c4` (runs medidos al escribir esto: `35070893441`, `35071398598`, `35071816212`; un
+  commit que solo toca `docs/**` no dispara `python-ci`, por el filtro de rutas del workflow).
 - **Verificación local (no sustituye al CI, la complementa):** batería **exacta** del job
   `lifecycle-pg` sobre PostgreSQL real en BD scratch recreada y migrada a `head` → **132 passed**;
   baterías offline de CI con el comando `pytest` **extraído del propio YAML** → **1626** (`quality`)
   y **1634** (`python` del tag); `ruff check` **0** · `lint-imports` **4/4**. **`mypy` no se pudo
   ejecutar en la máquina de verificación** (política de control de aplicaciones de Windows bloquea el
   DLL `mypyc`): lo certifica el CI, no una afirmación local.
+
+### Qué leer y de dónde (esto importa; no lo mezcles)
+
+El **código certificado** es el del commit `581067c4`. Los **documentos de auditoría** (este arranque
+y el pack) viven en `main`, **más allá** de ese commit: el pack que está **dentro** del tag es una
+versión **previa y superada** (todavía afirmaba una cifra de longitudes que no estaba medida y no
+tenía §7.9). Si auditas leyendo el pack del tag, auditas un documento viejo.
+
+| Qué                                    | Dónde (URL exacta)                                                                                                                                                                                                    |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Código a auditar** (árbol congelado) | [`tree/581067c4`](https://github.com/jvelasca/Bolsa_V1/tree/581067c4)                                                                                                                                                 |
+| **Delta completo a revisar**           | [`compare/11e2cb83...581067c4`](https://github.com/jvelasca/Bolsa_V1/compare/11e2cb83...581067c4)                                                                                                                     |
+| **Pack (versión vigente)**             | [`blob/main/docs/engineering/audit-pack-v2.40.3-idempotency-key-collision-2026-09-16.md`](https://github.com/jvelasca/Bolsa_V1/blob/main/docs/engineering/audit-pack-v2.40.3-idempotency-key-collision-2026-09-16.md) |
+| **Este arranque**                      | [`blob/main/docs/engineering/arranque-auditor-v2-40-3-hotfix-idempotencia-2026-09-16.md`](https://github.com/jvelasca/Bolsa_V1/blob/main/docs/engineering/arranque-auditor-v2-40-3-hotfix-idempotencia-2026-09-16.md) |
+| **Sondas reproducibles**               | [`tree/main/apps/api-python/scripts`](https://github.com/jvelasca/Bolsa_V1/tree/main/apps/api-python/scripts) (filtra por `a9_`)                                                                                      |
+| **CI del sello / del tag**             | [`runs/35068139514`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068139514) · [`runs/35068488972`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35068488972)                                             |
+
+Nota de procedimiento: los enlaces a `main` son **móviles** a propósito (los documentos siguen
+corrigiéndose; el código auditado no). Al empezar, anota el SHA de `main` que estés leyendo y
+comprueba que el camino de dinero no cambió desde `581067c4`:
+
+```bash
+git diff --stat 581067c4 origin/main   # solo debe listar CHANGELOG.md, docs/** y apps/api-python/scripts/a9_*.py
+```
 
 **Regla:** NINGÚN estado ambiguo → NO CERTIFICAR. No inventes PASS. Compara **línea por línea**
 `11e2cb83` → `581067c4` y registra P0/P1/P2/P3 con evidencia `archivo:línea`.
