@@ -92,6 +92,9 @@ jobs:
         # V2.40.1/AUTO 2.0: el contexto de cartera del catálogo (sector + ADV +
         # frescura) se certifica con PG real en el mismo job auto-v2-durable-pg.
         # V2.40.2: las claves naturales únicas (índices + upsert atómico) exigen PG.
+        # V2.40.3: la clave de idempotencia financiera del fill (recorte sin pérdida) es
+        # hermética: sin PG, sin broker. Regresión del colapso de los N fills de una
+        # misma orden en una sola clave (bug de dinero que destapó el día AUTO en PG).
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -121,6 +124,7 @@ jobs:
           packages/py/application/tests/test_position_manager.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py
+          packages/py/application/tests/test_idempotency_key_budget.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
           packages/py/application/tests/test_strategy_shadow_phase.py
           packages/py/application/tests/test_paper_forward_phase.py

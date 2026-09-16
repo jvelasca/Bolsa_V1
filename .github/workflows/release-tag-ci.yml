@@ -318,6 +318,8 @@ jobs:
         # fail-if-skipped. Sin --ignore se recolectaría aquí y skipearía en mudo.
         # V2.40.1/AUTO 2.0 y V2.40.2: contexto de cartera (sector + ADV + frescura) y
         # claves naturales únicas → mismo criterio, los certifica el job con PG.
+        # V2.40.3: la clave de idempotencia financiera (recorte sin pérdida) es hermética
+        # y entra aquí; el día AUTO real que la destapó va en el job lifecycle-pg.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -356,6 +358,7 @@ jobs:
           packages/py/application/tests/test_position_manager.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py
+          packages/py/application/tests/test_idempotency_key_budget.py
           packages/py/application/tests/test_strategy_shadow_phase.py
           packages/py/infrastructure/tests/test_verify_financial_invariants.py
           apps/api-python/tests

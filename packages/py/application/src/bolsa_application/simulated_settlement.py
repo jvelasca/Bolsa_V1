@@ -32,6 +32,7 @@ from bolsa_application.execution_event import (
     ExecutionEventStore,
     apply_execution_financial_once,
 )
+from bolsa_application.idempotency_key import bounded_idempotency_key
 from bolsa_application.simulated_broker import (
     SimulatedOrderResult,
     simulated_fill_schedule,
@@ -146,12 +147,14 @@ def simulated_idempotency_key(execution_id: str) -> str:
     prefijo ``sim-fin-`` para no colisionar con el recovery. Estable por
     ``execution_id`` → un crash/reintento del mismo fill reutiliza la key y
     ``ExecuteTrade`` no duplica.
+
+    V2.40.3: la derivación vive en ``bounded_idempotency_key`` (recorte SIN PÉRDIDA).
+    El recorte histórico ``slug[:120]`` descartaba la cola del ``execution_id``, que es
+    donde va el ``#fill_seq``: con el ``venue_order_id`` namespaced del AUTO (P1-03)
+    los fills de una misma orden colapsaban en una clave y la liquidación quedaba a
+    medias. Ver el docstring módulo de ``idempotency_key``.
     """
-    slug = re.sub(r"[^A-Za-z0-9_]", "-", (execution_id or "").strip())
-    slug = slug.strip("-")
-    if not slug:
-        slug = "unknown"
-    return f"sim-fin-{slug[:120]}"[-128:]
+    return bounded_idempotency_key("sim-fin-", execution_id, legacy_budget=120)
 
 
 def _to_event_qty(qty: Decimal | None) -> Decimal:

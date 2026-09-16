@@ -2,6 +2,152 @@
 
 All notable releases of Bolsa V1.
 
+## [1.65.3-beta] — V2.40.3 · Hotfix de la clave de idempotencia financiera (colisión por recorte) + invariante del A9 sobre el ledger real — 2026-09-16
+
+**Sin migración** (head sigue en `041_unique_natural_keys`). Tres cambios independientes, y el
+primero es un **bug de dinero**, no de cosmética:
+
+| #      | Qué                                                                                                                                                                                                                                           |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F1** | `simulated_idempotency_key` (SIM) y `recovery_idempotency_key` (recovery LIVE) dejaban de ser inyectivas por el **recorte con pérdida** del `execution_id` ⇒ los N fills de una misma orden colapsaban en **una** clave y el libro no cerraba |
+| **F2** | El invariante de equity del test de certificación del día AUTO leía la posición de **`position_states`** (tabla que el camino AUTO SIM **no** escribe) ⇒ el término no realizado era siempre 0                                                |
+| **F3** | Gate nuevo: al cerrar el día AUTO, **libro plano** y **ningún fill sin materializar** (`execution_events` todos `APPLIED` y todo `sim_fill_finance_context` con su transacción en el ledger)                                                  |
+
+### La incidencia: el tag `v2.40.2-beta` dejó `lifecycle-pg` en rojo
+
+El Release-tag CI del tag anterior falló en el job `lifecycle-pg`, en el test de certificación del
+día AUTO completo (`test_a9_scheduler_process_full_day_pg_zero_human`), con el invariante de equity:
+
+```
+AssertionError: equity ... != initial + realized + unrealized ...
+```
+
+El mensaje apuntaba al sitio equivocado: el desajuste **no** era de la aritmética del ledger (que
+está certificada) sino de **tres fills que nunca llegaron a materializarse**. Ningún test lo decía,
+porque no existía un gate que mirara el estado de los `execution_events` al cerrar el día.
+
+### Causa raíz (F1): el recorte se comía justo el `#fill_seq`
+
+La identidad financiera de un fill es `execution_id = f"{venue_order_id}#{fill_seq}"`, y desde
+P1-03 el `venue_order_id` del AUTO va **namespaced** (engine + UUID de cuenta + instrumento + lado +
+secuencia lógica): medido, el `execution_id` de una orden AUTO realista mide **126-128 caracteres**.
+Las dos derivaciones históricas recortaban el slug **por la cola**:
+
+```python
+return f"sim-fin-{slug[:120]}"[-128:]          # SIM
+return f"recovery-fin-{slug[:100]}"[-128:]     # recovery LIVE
+```
+
+y la cola es exactamente donde vive el `#fill_seq`. Medido con la identidad del worker: **4 fills →
+1 clave distinta** (en ambos lados y en ambos caminos), cuando el contrato pide 4. Consecuencia
+medida en el camino real:
+
+1. La primera trancha se asienta con la clave `sim-fin-…`.
+2. La segunda llega a `ExecuteTrade` con la **misma** clave y **otro** payload ⇒
+   `IdempotencyKeyReused` (409 en la capa HTTP, excepción en la de aplicación).
+3. `apply_execution_financial_once` la captura y la degrada a
+   `mark_retry(error="apply_exception")` ⇒ `retry_scheduled`.
+4. El worker AUTO absorbe el fallo por símbolo (`auto_sim settle failed` ⇒ "sin fill este tick") y
+   esa fila se queda en `RETRY` **para siempre**: la clave es función del mismo `execution_id`, así
+   que el reintento vuelve a chocar. El lado vendedor no liquida y el día termina con el libro
+   abierto y dinero sin mover.
+
+Es un fallo **permanente y silencioso** (no un 500 transitorio): el sistema parece operar, cierra el
+día "sin incidencias" y deja tranchas sin materializar. Detectarlo requería mirar el estado de los
+eventos, que es justo lo que añade F3.
+
+### Fix (F1): recorte SIN pérdida en un módulo propio
+
+Nuevo `packages/py/application/src/bolsa_application/idempotency_key.py` con
+`bounded_idempotency_key(prefix, execution_id, *, legacy_budget)`:
+
+- `len(slug) <= legacy_budget` ⇒ `f"{prefix}{slug}"`: **byte a byte** la clave histórica (el
+  `[-128:]` histórico era inoperante porque el total nunca superaba 128) ⇒ **compatibilidad exacta**:
+  un fill en vuelo de un deploy anterior re-deriva LA MISMA clave y no se re-aplica dinero.
+- `len(slug) > legacy_budget` ⇒ `f"{prefix}{slug[:head]}~{sha256(execution_id)[:32]}"`, 128 chars
+  exactos. El marcador `~` **no puede** aparecer en un slug (`re.sub` manda todo lo que no sea
+  `[A-Za-z0-9_]` a `-`), así que ninguna clave "larga" puede coincidir con una "corta"; y el digest
+  del `execution_id` **completo** discrimina exactamente lo que el recorte tiraba (el `#fill_seq`).
+- Slug degenerado (p.ej. `unknown`) ⇒ se rellena hasta el mínimo de 16 con la **misma** marca.
+
+`simulated_idempotency_key` y `recovery_idempotency_key` pasan a delegar (presupuestos 120 y 100
+respectivamente). El contrato R-11 C2 (`16 <= len(key) <= 128`, sin whitespace, estable por
+`execution_id`) se mantiene para **todo** el rango.
+
+### Fix (F2): el invariante lee el estado canónico real
+
+El invariante anterior reconstruía la contabilidad desde el ledger, pero tomaba la **posición
+abierta** de `SqlAlchemyPositionStateRepository` (`position_states`). El camino AUTO SIM **no escribe
+esa tabla** (escribe `sim_auto_positions` y la canónica `positions`), así que `remaining = 0` y el
+término no realizado era **siempre 0**: el invariante se degradaba a una identidad de caja y era
+**ciego** a una posición a medio liquidar. La versión nueva (`_assert_full_day_closed`) reconstruye
+la identidad desde el **estado canónico** (`positions`) y el P&L cerrado desde
+`sim_fill_finance_context` (fuente independiente) contra el ledger real.
+
+### Fix (F3): gate nuevo de cierre del día
+
+El mismo test, antes de certificar, exige las tres cosas juntas:
+
+1. Todos los `execution_events` de la cuenta en `APPLIED` (**cero** `RETRY`/`CAPTURED`/`APPLYING`).
+2. Todo `sim_fill_finance_context` con su transacción correspondiente en el ledger (**ningún fill sin
+   materializar**).
+3. Posición final **plana** (libro cerrado) y el invariante de equity del dominio sobre el ledger.
+
+Es el gate que habría nombrado el fallo del tag en una línea: _"el día AUTO deja 3 ExecutionEvents
+sin materializar (RETRY/CAPTURED)"_.
+
+### Determinismo del test (y un verde falso retirado)
+
+Con F1 arreglado apareció el siguiente rojo, esta vez en
+`test_a9_scheduler_process_restart_with_open_protected_position_pg`:
+
+- **Instrumento aleatorio ⇒ lotería determinista.** El simulador rechaza la orden entera
+  (`fills=()`) según un ruido determinista por `(seed, instrument_id, lado)`: medido con la sonda,
+  **12,36 %** de los identificadores aleatorios no llenan nunca, así que el test fallaba por sorteo
+  (`el proceso debe abrir (BUY durable) antes del restart`). Ahora el instrumento se elige de forma
+  **determinista** entre los que sí llenan (`_filling_instrument_id`), y el test del día completo usa
+  una identidad fija.
+- **Se contaban tranchas en vez de órdenes.** El invariante del restart es "no **re-comprar**", pero
+  el test contaba filas de `execution_events` (tranchas de fill) filtradas por lado: materializar
+  tras el restart la trancha que quedó en vuelo al matar el proceso es lo **correcto** y se contaba
+  como re-compra. Ahora cuenta `count(distinct venue_order_id)` ⇒ una re-compra real es una
+  `venue_order_id` **nueva**. El contador anterior solo pasaba porque el bug de F1 lo congelaba en 1.
+
+### Tests
+
+- **Nuevo** `packages/py/application/tests/test_idempotency_key_budget.py` (hermético, sin PG ni
+  broker, entra en la batería offline del job `quality`): regresión del colapso (4 fills ⇒ 4 claves,
+  ambos lados, con la identidad del worker), comprobación de que el recorte histórico **sí** colapsaba
+  (para que el test no pueda "arreglarse" solo), compatibilidad **exacta** con las claves cortas,
+  disjunción estructural de las largas (`~`), contrato 16..128 sin whitespace, inyectividad entre
+  lados/órdenes/secuencias y caso degenerado.
+- `test_a9_scheduler_process_pg_zero_human.py`: invariante sobre el estado canónico, gate de libro
+  plano / sin fills pendientes, instrumento determinista que llena y conteo de órdenes en el restart.
+
+### Verificación (local)
+
+- **A/B del bug, sin tocar el código del repo**: restaurando la derivación histórica en runtime (un
+  `sitecustomize` por `PYTHONPATH` que también ve el subproceso del scheduler), el día AUTO falla con
+  `AssertionError: el día AUTO deja 3 ExecutionEvents sin materializar (RETRY/CAPTURED)` — los 4 fills
+  de la orden colapsan en 1 clave, 1 se asienta y 3 quedan en `RETRY` permanente. Con el fix, el
+  fichero A9 queda verde (día completo + restart, 2 passed).
+- Batería **exacta** del job `lifecycle-pg` sobre PostgreSQL real en una BD scratch recreada y
+  **pre-migrada a `head`** (mismos gates fail-if-skipped que CI): **132 passed in 106,55 s**
+  (0 failed, 0 errors, 0 skipped). En el tag rojo, el mismo job registró `1 failed, 131 passed`.
+- Baterías offline **exactas** de CI (comandos extraídos del propio YAML, para que no se
+  desincronicen): job `quality` → **1626 passed**; job `python` del tag (la lista grande sin
+  `apps/api-python/tests` completo) → **1634 passed**.
+  `ruff check packages/py apps/api-python --config pyproject.toml` → **0** · `lint-imports` →
+  **4/4 contratos KEPT**.
+- El test hermético nuevo se **cablea** en los dos jobs offline (`quality` y `python` del tag): pasó
+  a estar fuera de la red de CI cuando se escribió, y esa es justo la clase de test que debe correr
+  en cada push, no solo en el job con PostgreSQL.
+- **`mypy` no se pudo ejecutar en la máquina de verificación** (política de control de aplicaciones
+  de Windows bloquea el DLL `mypyc` del binario: `ImportError: DLL load failed while importing
+…__mypyc`). **No se afirma**: queda cubierto por el step _Mypy_ del job `quality` del CI. El cambio
+  de F1 es un módulo nuevo pequeño con firmas anotadas y sin dependencias nuevas, así que el riesgo
+  es bajo, pero no se declara como verificado.
+
 ## [1.65.2-beta] — V2.40.2 · Claves naturales únicas (reconciliación Prisma→Alembic + upsert atómico) — 2026-09-15
 
 Migración nueva **`041_unique_natural_keys`** (head `040` → **`041`**): las **8 claves naturales

@@ -29,6 +29,7 @@ from decimal import Decimal
 from typing import Literal
 
 from bolsa_application.execution_event import ExecutionEvent
+from bolsa_application.idempotency_key import bounded_idempotency_key
 from bolsa_application.live_order_query import BrokerOrderQueryResult
 
 RecoveryFinancialDecision = Literal[
@@ -139,14 +140,14 @@ def recovery_idempotency_key(execution_id: str) -> str:
     """Key estable para la transacción financiera (no-doble M4 por ExecuteTrade).
 
     Viene de la identidad financiera del fill; 16-128 chars, sin whitespace.
-    """
-    import re
 
-    slug = re.sub(r"[^A-Za-z0-9_]", "-", (execution_id or "").strip())
-    slug = slug.strip("-")
-    if not slug:
-        slug = "unknown"
-    return f"recovery-fin-{slug[:100]}"[-128:]
+    V2.40.3: la derivación vive en ``bounded_idempotency_key`` (recorte SIN PÉRDIDA).
+    El recorte histórico ``slug[:100]`` descartaba la cola del ``execution_id`` —donde va
+    el ``#fill_seq``—, de modo que los fills parciales de una misma orden podían
+    colapsar en una única clave y dejar dinero sin materializar. Ver el docstring módulo
+    de ``idempotency_key``.
+    """
+    return bounded_idempotency_key("recovery-fin-", execution_id, legacy_budget=100)
 
 
 # V2.20 (P2-03) — contrato de cantidad de fill parcial: DELTA por fill_seq.
