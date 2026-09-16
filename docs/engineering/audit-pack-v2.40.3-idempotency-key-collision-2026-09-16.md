@@ -145,6 +145,14 @@ canónico** (`positions`) y el P&L cerrado se deriva de `sim_fill_finance_contex
 **independiente** del ledger, para que la comparación no sea circular) contra las entradas reales del
 ledger.
 
+**Nota de honestidad (para el auditor, no para el marketing):** con el día cerrándose **plano**, el
+término no realizado es 0 de todas formas, así que este invariante **no** es lo que detecta un día a
+medias: lo que lo detecta es el gate F3 (§3) — y el A/B del §6 lo confirma, porque el rojo del día
+enfermo dice _"deja 3 ExecutionEvents sin materializar"_, no "el equity no cuadra". El valor de F2 es
+que el invariante **deja de ser vacuo** (antes el término no realizado era siempre 0 por leer una
+tabla que este camino no escribe) y que el diagnóstico deja de apuntar al sitio equivocado. Se declara
+en lugar de venderlo como el fix que caza el fallo.
+
 ---
 
 ## 3. F3 · Gate nuevo: libro plano y ningún fill sin materializar
@@ -182,24 +190,64 @@ Ahora el identificador se elige de forma **determinista** entre los que sí llen
 **4.2 Se contaban tranchas, no órdenes.** El invariante del restart es "no **re-comprar**", pero el
 test contaba filas de `execution_events` filtradas por lado: materializar tras el restart la trancha
 que quedó **en vuelo** al matar el proceso es lo correcto, y se contaba como re-compra. Ahora cuenta
-`count(distinct venue_order_id)`: una re-compra real es una `venue_order_id` **nueva**. El contador
-anterior solo permanecía estable porque el bug de F1 lo congelaba (verde falso).
+`count(distinct venue_order_id)`: una re-compra real es una `venue_order_id` **nueva**.
+
+**Medido (§5.1, fila `M7`):** con el contador anterior el test **también pasa** en una pasada limpia
+(`1 passed` en dos pasadas independientes: 23,46 s y 23,52 s). Es decir: esto **no** es la corrección
+de un fallo reproducido sino de un invariante **mal formulado**, que puede dar un rojo **espurio**
+cuando una trancha queda en vuelo al matar el proceso (lo observado al diagnosticar: 1
+`venue_order_id` con 4 fills, una en `APPLYING`) y que no distingue "seguir liquidando la orden
+abierta" de "re-comprar". Se retira el verde falso sin afirmar que antes estuviera rojo.
 
 ---
 
-## 5. Mutaciones que deben poner la suite en rojo
+## 5. Mutaciones: lo **medido** y lo que **no** (honestidad de la matriz)
 
-| Mutación                                                      | Test que debe fallar                                                              |
-| ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Volver a `slug[:120]` en `simulated_idempotency_key`          | `test_fills_of_one_order_do_not_collapse`, `test_legacy_derivation_did_collapse…` |
-| Volver a `slug[:100]` en `recovery_idempotency_key`           | `test_fills_of_one_order_do_not_collapse`, `test_short_execution_ids_…`           |
-| Quitar el digest de la rama larga (recorte duro a 128)        | `test_fills_of_one_order_do_not_collapse`                                         |
-| Usar un marcador que pueda existir en un slug (p.ej. `-`)     | `test_long_keys_are_structurally_disjoint_from_legacy_ones`                       |
-| Quitar el relleno del mínimo de 16                            | `test_contract_range_whitespace_and_stability`, `test_degenerate_…`               |
-| Volver a leer la posición del invariante en `position_states` | `test_a9_scheduler_process_full_day_pg_zero_human` (gate de libro plano)          |
-| Dejar de exigir "todo `APPLIED`" al cerrar el día             | `test_a9_scheduler_process_full_day_pg_zero_human` (gate F3)                      |
-| Contar filas en vez de órdenes en el restart                  | `test_a9_scheduler_process_restart_with_open_protected_position_pg`               |
-| Volver a un `instrument_id` aleatorio en el restart           | `test_a9_scheduler_process_restart_with_open_protected_position_pg` (flaky)       |
+La tabla mezcla a propósito dos columnas de estado: **medido** (se aplicó la mutación sobre el código
+real, se corrió la suite y se registró el rojo exacto) y **no medido** (es una expectativa, y como tal
+se declara — no se vende como hecho). Las filas medidas salen de una sonda que muta, corre y restaura
+con `git checkout --`; el rojo se lee del `-rf` de pytest, no de la intuición de quien la escribió.
+
+**Reproducible desde un clon** (las sondas están en el repo, no en una máquina):
+
+```bash
+uv run --no-sync python apps/api-python/scripts/a9_mutation_audit.py          # M1–M6 (hermético, ~5 s)
+uv run --no-sync python apps/api-python/scripts/a9_restart_mutation.py        # M7 (PG real, ~50 s; ver nota)
+```
+
+### 5.1 Medido (rojo exacto observado)
+
+| Mutación                                                            | Rojo observado (tests de `test_idempotency_key_budget.py`)                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `M1` revertir SIM a `slug[:120]` (recorte histórico)                | `test_fills_of_one_order_do_not_collapse`, `test_legacy_derivation_did_collapse_tails_that_share_prefix`, `test_long_keys_are_structurally_disjoint_from_legacy_ones`, `test_contract_range_whitespace_and_stability`, `test_keys_are_distinct_across_sides_and_orders`, `test_degenerate_execution_id_does_not_collide_with_a_real_one` (**6**) |
+| `M2` revertir recovery a `slug[:100]` (recorte histórico)           | `test_contract_range_whitespace_and_stability`, `test_short_execution_ids_keep_the_exact_legacy_key` (**2**)                                                                                                                                                                                                                                     |
+| `M3` rama larga sin digest (recorte duro, sin discriminador)        | `test_fills_of_one_order_do_not_collapse`, `test_bounded_helper_keeps_the_tail_discriminator`, `test_keys_are_distinct_across_sides_and_orders`, `test_legacy_derivation_did_collapse_tails_that_share_prefix`, `test_long_keys_are_structurally_disjoint_from_legacy_ones` (**5**)                                                              |
+| `M4` marcador que sí existe en un slug (`_MARK = "-"`)              | `test_long_keys_are_structurally_disjoint_from_legacy_ones`, `test_degenerate_execution_id_does_not_collide_with_a_real_one` (**2**)                                                                                                                                                                                                             |
+| `M5` quitar el relleno del mínimo de 16                             | `test_contract_range_whitespace_and_stability`, `test_degenerate_execution_id_does_not_collide_with_a_real_one` (**2**)                                                                                                                                                                                                                          |
+| `M6` digest del `venue_order_id` sin la cola (pierde el `fill_seq`) | `test_bounded_helper_keeps_the_tail_discriminator`, `test_fills_of_one_order_do_not_collapse`, `test_keys_are_distinct_across_sides_and_orders`, `test_legacy_derivation_did_collapse_tails_that_share_prefix` (**4**)                                                                                                                           |
+| `M7` contador del restart por **filas** en vez de órdenes           | **NADA: la suite sigue verde** (`1 passed` en 23,46 s y 23,52 s en dos pasadas independientes, PG real). Resultado **negativo** y se publica como tal: ver 5.3                                                                                                                                                                                   |
+
+Línea base de la sonda (sin mutación): **0 fallos**.
+
+### 5.2 No medido (declarado, no vendido)
+
+| Mutación propuesta                                                 | Por qué no está medida                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Revertir F2 (leer la posición del invariante en `position_states`) | Un día que cierra **plano** tiene el término no realizado a 0 de todas formas, así que revertir la **fuente** de la posición no cambia el veredicto: lo que detecta un día a medias es el gate F3, medido en el A/B del §6. Se deja como pregunta al auditor (§Foco 2 del arranque). |
+| Dejar de exigir "todo `APPLIED`" al cerrar el día (F3)             | Mutar el **propio test** para que no exija no puede detectarse a sí mismo: la evidencia relevante es el A/B del §6, donde el rojo **es** ese gate.                                                                                                                                   |
+| Volver a un `instrument_id` aleatorio en el restart                | La lotería del simulador es **probabilística** (12,36 % medido): no produce un rojo determinista, produce flakiness. Se declara como tal.                                                                                                                                            |
+
+### 5.3 El hallazgo incómodo: `M7` no se detecta
+
+`_scoped_buy_orders` pasó de contar **filas** de `execution_events` a contar **órdenes**
+(`count(distinct venue_order_id)`) porque un evento es una _trancha_ de fill y una re-compra real es una
+`venue_order_id` **nueva**. Medido: con el contador viejo, una pasada limpia **también pasa**.
+
+Conclusión honesta: **no** es la corrección de un fallo reproducido, es la corrección de un invariante
+**mal formulado** que puede dar un rojo **espurio** cuando queda una trancha en vuelo al matar el
+proceso (eso fue lo que se observó al diagnosticarlo: 1 `venue_order_id` con 4 fills, una en
+`APPLYING`) y que, en cualquier caso, no distinguía "seguir liquidando la orden abierta" de
+"re-comprar". Se retira el verde falso, pero **no se afirma** que el contador anterior estuviera rojo.
 
 ---
 
