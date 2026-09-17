@@ -399,8 +399,10 @@ Reglas de honestidad del repo (no negociables):
 
 ## 8. Checklist de arranque (haz esto primero)
 
-- [ ] `git log --oneline -4` → `35e38c24` (arreglo de test) sobre `6e53294f` (fase) sobre
-      `15618c0c` (relevo previo).
+- [ ] `git log --oneline -6` → cabecera de **sellado** (`60a6c984` y `1d6df658`, docs-only) sobre
+      `35e38c24` (arreglo de test) sobre `6e53294f` (fase) sobre `15618c0c` (relevo previo). El **tag
+      apunta al de arreglo** (`35e38c24`), no al sellado; y como el sellado es docs-only, de su commit
+      solo corre `Gitleaks` ⇒ **la evidencia de CI sigue anclada a `35e38c24`**.
 - [ ] `git status --short` → **vacío** (si hay ruido de `logs/`, `__pycache__/`, `.pytest_cache/`,
       es de tus propias pruebas).
 - [ ] `git tag -l -n5 v2.42-beta` → tag anotado apuntando a `35e38c24`.
