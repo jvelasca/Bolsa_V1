@@ -2,6 +2,94 @@
 
 All notable releases of Bolsa V1.
 
+## [1.67.1-beta] — V2.42 · AUTO-2 slice 2b: `TIME_EXIT`/`THESIS_EXIT`, ATR real y cierre de los hallazgos H-1..H-7 — 2026-09-17
+
+**Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`): el techo de mantenimiento y
+el nivel de invalidación viven en el JSONB `sim_auto_positions.position_state` (migración `040`). Cierra las
+tres deudas que el slice 2a declaró y los **siete hallazgos** que la auditoría externa del `v2.42-beta`
+dejó por escrito en el §9 de su pack:
+
+- **E1 · `TIME_EXIT` (decisión D1)**: el horizonte de mantenimiento se resuelve por plantilla
+  (`resolve_holding_horizon` sobre `trading_policy_templates`), se **congela en el nacimiento** de la
+  posición (`holdingDeadlineAt` en el JSONB) y, alcanzado, produce una **salida real** con motivo propio.
+  Antes `TIME_STOP` era **inalcanzable por construcción**: la gestión recibía `expires_at=None` y ningún
+  camino podía vencer.
+- **E3 · `THESIS_EXIT` (decisión D2, firmada por el owner)**: el nivel de invalidación se congela al nacer
+  (del plan o del stop estructural) y la invalidación **confirmada vende** (`EXIT` real, no `REVIEW`), con
+  la memoria del **peor adverso** (`maeR`) como único testigo — y esa memoria ahora **persiste** en el
+  espejo durable en vez de morir dentro de la copia del tick. La atribución del motivo es del **motivo
+  decisorio**: un stop-out no se disfraza de salida por tesis.
+- **E2 · ATR real (decisión D3)**: se **cablea y se mide** el ATR real de barras (`AtrSource`) con el veto
+  fail-closed detrás de `AUTO_ENGINE_SIM_V2_ATR_REQUIRED` (**default OFF**), y la geometría sintética se
+  **declara** como tal en el journal (`atr_geometry` + `atrSource`) en vez de disfrazarse de dato real.
+
+| #       | Qué                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **B1**  | **`resolve_holding_horizon`** (`exit_policy.py`, analytics puro): horizonte por plantilla con `DEFAULT_MAX_HOLDING_PERIOD_DAYS`, leído de `trading_policy_templates` con import perezoso (sin ciclo `analytics ↔ application`)                                                                                                                                                                                                                                                                                                              |
+| **B2**  | **`PositionState.holdingDeadlineAt` / `invalidationPrice`** (aditivos): emitidos en `to_dict()` **solo si existen** (misma doctrina que `lifecycleState`: ausente = "no persistido"), con round-trip y rehidratación, y congelados en `build_position_state_from_fill`                                                                                                                                                                                                                                                                      |
+| **B3**  | **`TIME_EXIT`/`THESIS_EXIT` en el FSM**: dos eventos de gestión que llevan a `EXIT_PENDING`; `is_thesis_invalidated`/`worst_adverse_price` (analytics, sobre el MAE persistido) como fuente única del juicio                                                                                                                                                                                                                                                                                                                                |
+| **B4**  | **D2 (dinero)**: `position_decision` deja de devolver `REVIEW` ante `THESIS_INVALIDATION`/`thesis_invalid` ⇒ **`EXIT`**. Bajo reconciliación `CRITICAL` sigue mandando el veto de la rama de arriba (la invalidación **no** es una salida protectora): el veto queda **declarado**, no silenciado                                                                                                                                                                                                                                           |
+| **B5**  | **Worker (E1+E3)**: el nacimiento pasa `max_holding_period_days` y el nivel de invalidación; la gestión recibe `now` **y** `expires_at` (sin ambos, `TIME_STOP` no puede dispararse); `_v2_journal_exit_request` journaliza `time_exit`/`thesis_exit` y avanza el FSM con la posición **viva** (no la copia previa al ratchet)                                                                                                                                                                                                              |
+| **B6**  | **Worker (E2)**: `_v2_atr_geometry` devuelve `(atr, atrSource)` y sustituye la fabricación del 2 % en el origen (que pisaba la rama de ATR real que `plan_v2_tick` ya prefería); `atrSource` se declara **una vez por (símbolo, origen)** y `matrix` de contadores por origen queda como medición interna                                                                                                                                                                                                                                   |
+| **B7**  | **`atr_unknown`** (reason code nuevo en `portfolio_decision_engine`): con el veto activo una señal sin ATR real cae por su camino normal de NO ENTRY **con un motivo que no miente** (antes habría caído por R/R con un ATR inventado)                                                                                                                                                                                                                                                                                                      |
+| **B8**  | **H-1**: `RECONCILED` exige estado **degradado de origen** + `resolved_state` verificado + **coherencia con el hecho de cantidad**; sin cantidad no se puede verificar y se rechaza (no se sale de una degradación a ciegas)                                                                                                                                                                                                                                                                                                                |
+| **B9**  | **H-2**: todo `PROTECT` **con efecto** deja traza (memo `_v2_protect_noop_stop`, una vez por stop) y la **marca del tick** (pico + MFE/MAE) se persiste cuando cambia de verdad (`_mark_observation_changed`) — con dos testigos medidos por separado (MAE y pico en precio)                                                                                                                                                                                                                                                                |
+| **B10** | **H-3/H-4/H-5**: `PARTIAL_EXIT` ya no arma el trailing; `compute_trail_stop` **sin pico devuelve `None`** (no cae al precio de entrada); los guardas de finitud usan `math.isfinite` (un `+inf` no pasa por "positivo")                                                                                                                                                                                                                                                                                                                     |
+| **B11** | **H-6/H-7**: `lifecycleState: null` **explícito** degrada en la rehidratación (no se lee como "no persistido"); el FSM es **forward-only** (`_LIFECYCLE_LADDER` + `_forward_target`: una transición cuyo destino nominal ya quedó atrás se queda en el estado actual en vez de retroceder)                                                                                                                                                                                                                                                  |
+| **B12** | **Tests**: 2 herméticos nuevos de excepción (`test_exit_plan.py`), 12 de FSM/decisión (E1/E3/H-1/H-4/H-5/H-6/H-7 en `test_position_lifecycle.py` y `test_position_decision.py`), 7 de aplicación (`test_auto_v2_entry.py`: veto, `atr_unknown`, `AtrSource` fail-closed) y **11 de worker** en el fichero nuevo `apps/api-python/tests/test_auto_v2_lifecycle_clock_thesis.py` (nacimiento congelado, `TIME_EXIT` real, invalidación que vende, no-atribución del stop-out, durabilidad de la marca adversarial, ATR real declarado y veto) |
+| **B13** | **PG**: 6 tests nuevos de durabilidad en `test_auto_v2_lifecycle_pg.py` (techo congelado y superviviente al reinicio, invalidación confirmada durable, geometría con ATR real) con el gate fail-if-skipped `AUTO_V2_LIFECYCLE_PG_REQUIRED` que ya existía                                                                                                                                                                                                                                                                                   |
+| **B14** | **CI**: el fichero hermético nuevo entra en la red de los dos jobs offline — en `quality` (`python-ci.yml`) lo **cubre el pase de directorio** `apps/api-python/tests`, y en `python` (`release-tag-ci.yml`) va **explícito** en su lista por fichero — y los ficheros PG siguen en el `--ignore` de los jobs offline (un skip mudo no certifica)                                                                                                                                                                                           |
+
+### B13 — Matriz de mutaciones **medida** (13 mutaciones, 13 rojos)
+
+Cada mutación se aplicó sobre el árbol de trabajo, se corrió el target acotado y **se revirtió
+verificando el contenido exacto** (el fallo de proceso de la auditoría de 2a — medir con el árbol
+moviéndose — no puede repetirse aquí):
+
+| #   | Mutación                                                           | Efecto medido                                                          |
+| --- | ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| M1  | La gestión no recibe el techo congelado (`expires_at=None`)        | **1 rojo** (`time_exit` no dispara)                                    |
+| M2  | El techo no se congela en el nacimiento                            | **5 rojos** (analytics + worker)                                       |
+| M3  | La invalidación no viaja a la decisión (`thesis_invalid=False`)    | **1 rojo** (la posición sobrevive a su tesis)                          |
+| M4  | El stop-out se atribuye **además** como salida por tesis           | **1 rojo** (journal mentiroso)                                         |
+| M5  | La invalidación confirmada vuelve a `REVIEW` (conducta de 2a)      | **2 rojos** (analytics + camino mesa)                                  |
+| M6  | El ATR real se ignora (geometría siempre sintética)                | **2 rojos**                                                            |
+| M7  | El veto por ATR real no veta                                       | **1 rojo** (`atr_unknown`)                                             |
+| M8  | Sin pico el trailing cae al precio de entrada (H-4)                | **2 rojos**                                                            |
+| M9  | `RECONCILED` se acepta desde cualquier estado (H-1)                | **1 rojo**                                                             |
+| M10 | La marca no se persiste por el pico favorable (H-2, sensor precio) | **1 rojo** (tras añadir el test que aísla el caso sin memoria en R)    |
+| M11 | `lifecycleState: null` explícito no degrada (H-6)                  | **1 rojo**                                                             |
+| M12 | La escalera deja retroceder el estado (H-7)                        | **1 rojo**                                                             |
+| M13 | La marca no se persiste por el `maeR` (H-2, sensor en R)           | **1 rojo** (tras endurecer el test con un **segundo** extremo adverso) |
+
+Dos mutaciones nacieron **verdes** y **no eran un agujero de cobertura sino una mutación mal puesta**: M5
+(«desactivar» la rama dejaba pasar el `full_exit` del plan por la puerta de atrás) y M10/M13 (cada sensor
+de la marca tapaba al otro). Las tres se rehicieron para romper **el comportamiento**, no la línea, y los
+tests que faltaban se añadieron (el del pico sin memoria en R y el del segundo extremo adverso).
+
+### Verificación medida (árbol final del slice, antes de publicar)
+
+- `ruff check packages/py apps/api-python --config pyproject.toml` (invocación exacta de CI): **All checks
+  passed**; `mypy` (invocación de CI, `--follow-imports=silent`): **487 ficheros, 0 issues**;
+  `lint-imports`: **4 kept / 0 broken**.
+- **Bloques offline de CI** (targets y `--ignore` **extraídos del YAML**, con verificación de que cada
+  ruta existe): job `quality` de `python-ci.yml` **1914 passed, 0 failed, 0 skipped** (51,7 s) y job
+  `python` de `release-tag-ci.yml` **1925 passed, 0 failed, 0 skipped** (18,4 s). Procedencia declarada:
+  los **8 ficheros PG** que en CI saltan rápido por falta de servidor aquí se **cuelgan** (el `connect`
+  del DSN no responde ni rechaza: medido), así que van a `--ignore`; y se corre con `--noconftest` para no
+  depender del conftest de la app (que también habla con PG). Esos ficheros **no** quedan sin certificar:
+  son los que corren con PG real en los jobs dedicados.
+- **Errata de esta misma fase (declarada)**: el primer wiring añadió a la lista de `quality` la ruta
+  `packages/py/application/tests/test_auto_v2_lifecycle_clock_thesis.py`, que **no existe** (el fichero vive
+  en `apps/api-python/tests`, que ese job ya recolecta entero); con la invocación de pytest eso es **exit 4**
+  y habría puesto **rojo** el job. Lo detectó el verificador de rutas del runner al re-medir con la lista
+  **extraída del YAML** (en vez de una copia a mano, que fue el origen del error). Corregido: la ruta se
+  eliminó y en `release-tag-ci.yml` se usa la **correcta** explícita.
+- **PG real: NO medido en esta máquina** (mismo motivo, medido y declarado). La certificación de durabilidad
+  de 2b la aporta CI en `auto-v2-durable-pg` (`python-ci.yml`) y `lifecycle-pg` (`release-tag-ci.yml`), con
+  el gate `AUTO_V2_LIFECYCLE_PG_REQUIRED=1` (un skip es FALLO). Este pack **no** afirma haberlos corrido
+  localmente.
+
 ## [1.67.0-beta] — V2.42 · AUTO-2 Position Lifecycle FSM & Real Protection — 2026-09-17
 
 **Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`): el ciclo de vida de la

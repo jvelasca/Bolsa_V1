@@ -39,7 +39,8 @@ def test_fail_recon_drift_blocks_new_openings() -> None:
     )
 
 
-def test_fail_thesis_invalidated_is_review_not_hold() -> None:
+def test_thesis_invalidated_is_exit_not_review() -> None:
+    """V2.42 slice 2b (D2): la tesis invalidada VENDE (antes se quedaba en ``REVIEW``)."""
     pos = build_position_state_from_fill(
         {
             "decisionId": "dec-fail",
@@ -61,8 +62,7 @@ def test_fail_thesis_invalidated_is_review_not_hold() -> None:
         portfolio_recon_status="clean",
     )
     assert d is not None
-    assert d.action != "HOLD"
-    assert d.action == "REVIEW"
+    assert d.action == "EXIT"
 
 
 def test_fail_excess_risk_blocks_without_override() -> None:

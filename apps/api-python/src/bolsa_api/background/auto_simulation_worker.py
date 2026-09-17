@@ -42,7 +42,11 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
-from bolsa_analytics.cognitive.exit_policy import resolve_exit_policy
+from bolsa_analytics.cognitive.exit_plan import is_thesis_invalidated
+from bolsa_analytics.cognitive.exit_policy import (
+    resolve_exit_policy,
+    resolve_holding_horizon,
+)
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_UNKNOWN,
@@ -66,6 +70,7 @@ from bolsa_analytics.cognitive.position_lifecycle import (
     advance_lifecycle,
     compute_trail_stop,
     derive_lifecycle_state,
+    high_watermark_from_position,
     is_trail_armed,
     protection_state_dict,
     trailing_status,
@@ -93,6 +98,10 @@ from bolsa_application.auto_engine_state_store import (
     AutoEngineTickInput,
 )
 from bolsa_application.auto_reason_codes import (
+    ATR_GEOMETRY,
+    ATR_SOURCE_FALLBACK,
+    ATR_SOURCE_MISSING,
+    ATR_SOURCE_REAL,
     EXIT_QTY_OVER_POSITION,
     FILL_NOT_MATERIALIZED,
     FILL_PARTIALLY_MATERIALIZED,
@@ -104,8 +113,11 @@ from bolsa_application.auto_reason_codes import (
     RESERVATION_UNMEASURABLE,
     STOP_RATCHET_APPLIED,
     STOP_RATCHET_REJECTED,
+    THESIS_EXIT,
+    TIME_EXIT,
 )
 from bolsa_application.auto_v2_entry import (
+    AtrSource,
     CatalogTradeContextSource,
     DiscoveryRegimeSource,
     EdgeReportSource,
@@ -299,6 +311,23 @@ class FillObservation:
 _ACTIVE_STRATEGY_SOURCE_PREFIX = "active-strategy:"
 
 
+def _mark_observation_changed(
+    current: PositionState | None,
+    marked: PositionState,
+) -> bool:
+    """¿La marca del tick aporta un hecho NUEVO (extremo o peor adverso)?
+
+    Compara sólo lo que la marca cambia de verdad: ``mfeMae`` (redondeado a 4dp por
+    ``apply_position_mark``, así que cambia únicamente con un extremo nuevo) y el pico del
+    trailing. No compara ``updatedAt``: si no, cada tick escribiría en el espejo durable.
+    """
+    if current is None:
+        return False
+    if dict(current.mfe_mae) != dict(marked.mfe_mae):
+        return True
+    return high_watermark_from_position(current) != high_watermark_from_position(marked)
+
+
 def _strategy_version_from_source(source: Any) -> str | None:
     """Extrae la versión de estrategia de ``DecisionPackage.source``.
 
@@ -483,6 +512,9 @@ class AutoSimulationWorker:
         regime_source: Callable[[], str | None] | None = None,
         sector_source: Callable[[str], str | None] | None = None,
         liquidity_source: Callable[[str], float | None] | None = None,
+        # V2.42 slice 2b (E2): ATR real por símbolo (barras as-of). ``None`` (hermético)
+        # ⇒ la geometría usa el fallback declarado, marcado como tal en el journal.
+        atr_source: Callable[[str], float | None] | None = None,
         # Objetos con ``refresh()`` async + lectura sync (``CatalogTradeContextSource``,
         # ``EdgeReportSource``). Se anotan como ``Any`` en la firma (seam inyectable para
         # tests) y se estrechan en el ``__init__`` a la interfaz que consume el hot path.
@@ -569,6 +601,24 @@ class AutoSimulationWorker:
         self._v2_plan: Any = None
         self._v2_journal: list[Any] = []
         self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
+        # H-2 (§9 del pack): un ``PROTECT`` que NO mueve el stop y NO cambia el estado
+        # quedaba mudo para siempre. Se journaliza UNA vez por (símbolo, stop) para no
+        # inundar el journal en cada tick de un trailing ya en régimen permanente.
+        self._v2_protect_noop_stop: dict[str, float] = {}
+        # V2.42 slice 2b (E2): medición de la procedencia del ATR del tick. El journal
+        # sólo declara las señales que CAEN al sintético (el caso interesante); estos
+        # contadores dan la fracción completa para el audit-pack.
+        self._v2_atr_source_counts: dict[str, int] = {
+            ATR_SOURCE_REAL: 0,
+            ATR_SOURCE_FALLBACK: 0,
+            ATR_SOURCE_MISSING: 0,
+        }
+        # H-2-style: la declaración de geometría sintética se journaliza UNA vez por
+        # (símbolo, origen) — es una propiedad de la geometría, no un hecho del tick. Sin
+        # el memo, un universo sin barras escribiría una entrada por candidata y por
+        # turno, y el journal del día (que es evidencia de decisiones) se ahogaría.
+        self._v2_atr_journaled: dict[str, str] = {}
+        self._v2_atr_source = atr_source
         # AUTO 2.0 (V2): fuente del régimen operativo (inyectable). Sin fuente y sin
         # override de env, el régimen es UNKNOWN ⇒ exit-only (fail-closed: sin régimen
         # no se abren entradas nuevas).
@@ -1131,6 +1181,33 @@ class AutoSimulationWorker:
                 sectors[symbol] = sector.strip()
         return sectors
 
+    def _v2_atr_geometry(self, symbol: str, price: float) -> tuple[float | None, str]:
+        """ATR real si existe; si no, el fallback declarado; ``missing`` si nada.
+
+        V2.42 slice 2b (E2 · D3). Antes ``_v2_signals`` FABRICABA el ATR sintético en el
+        origen, pisando la rama de ``plan_v2_tick`` que ya prefería el real. Aquí se
+        devuelve ``(atr, source)`` y NUNCA se disfraza la reserva de dato real.
+        """
+        real = None
+        if self._v2_atr_source is not None:
+            try:
+                raw = self._v2_atr_source(symbol)
+            except Exception:  # noqa: BLE001 — sin dato se cae al fallback declarado.
+                logger.exception("auto_sim v2 atr_source failed symbol=%s", symbol)
+                raw = None
+            if raw is not None:
+                try:
+                    candidate = float(raw)
+                except (TypeError, ValueError):
+                    candidate = 0.0
+                if candidate == candidate and candidate > 0 and candidate != float("inf"):
+                    real = candidate
+        if real is not None:
+            return real, ATR_SOURCE_REAL
+        if price > 0:
+            return price * self._v2_tunables.atr_pct_fallback, ATR_SOURCE_FALLBACK
+        return None, ATR_SOURCE_MISSING
+
     def _v2_stop_map(self) -> dict[str, float]:
         """Stop vivo por símbolo (del PositionState V2 si existe; si no, el implícito)."""
         stops: dict[str, float] = {}
@@ -1140,14 +1217,18 @@ class AutoSimulationWorker:
                 stops[symbol] = float(stop)
         # Sin estado V2 (posición readoptada) el stop aún no está adoptado: se estima
         # con la misma geometría del pipeline para que el riesgo consumido no sea 0.
+        # E2: la geometría usa el ATR REAL cuando existe (antes siempre el sintético).
         for symbol in self._open:
             if symbol in stops:
                 continue
             entry = self._entry_price.get(symbol)
             if entry is None or entry <= 0:
                 continue
-            atr = entry * Decimal(str(self._v2_tunables.atr_pct_fallback))
-            stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * atr
+            atr, _source = self._v2_atr_geometry(symbol, float(entry))
+            if atr is None:
+                continue
+            atr_dec = Decimal(str(atr))
+            stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * atr_dec
             if 0 < stop < entry:
                 stops[symbol] = float(stop)
         return stops
@@ -1190,12 +1271,46 @@ class AutoSimulationWorker:
             if signal_id:
                 self._v2_tick_signals[symbol] = signal_id
             context = self._v2_context(symbol, pkg)
+            atr, atr_source = self._v2_atr_geometry(symbol, float(price))
+            self._v2_atr_source_counts[atr_source] = (
+                self._v2_atr_source_counts.get(atr_source, 0) + 1
+            )
+            if atr_source != ATR_SOURCE_REAL:
+                # E2: la reserva se DECLARA (nunca se disfraza de dato real). Con el veto
+                # activo la señal además NO entra: el sintético no puede sostener una
+                # geometría de riesgo que la política exige precisa.
+                # Una sola entrada por (símbolo, origen): la ausencia de ATR real es una
+                # propiedad de la geometría, no un suceso por turno.
+                if self._v2_atr_journaled.get(symbol) != atr_source:
+                    self._v2_atr_journaled[symbol] = atr_source
+                    self._journal_position_event(
+                        symbol,
+                        ATR_GEOMETRY,
+                        at=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        detail={
+                            "atrSource": atr_source,
+                            "atr": atr,
+                            "atrRequired": self._v2_tunables.atr_required,
+                            "vetoed": self._v2_tunables.atr_required,
+                        },
+                    )
+            elif self._v2_atr_journaled.get(symbol) != ATR_SOURCE_REAL:
+                # Recuperación del dato real: se re-arma el memo para que una caída
+                # posterior a sintético vuelva a declararse (una sola vez más).
+                self._v2_atr_journaled[symbol] = ATR_SOURCE_REAL
+            if self._v2_tunables.atr_required and atr_source != ATR_SOURCE_REAL:
+                # Veto explícito: no se sustituye por el sintético. ``plan_v2_tick``
+                # recibe ``atr=None`` y aplica su camino normal de NO ENTRY (que ya está
+                # probado y journaliza su motivo), en vez de inventar geometría.
+                signal_atr: float | None = None
+            else:
+                signal_atr = atr
             signals.append(
                 V2Signal(
                     instrument_id=symbol,
                     action=action,
                     price=float(price),
-                    atr=(float(price) * self._v2_tunables.atr_pct_fallback if price > 0 else None),
+                    atr=signal_atr,
                     edge=self._v2_edge(pkg, version or "unversioned"),
                     sector=context.sector,
                     liquidity_notional=context.liquidity_notional,
@@ -1781,19 +1896,26 @@ class AutoSimulationWorker:
             return None
 
     async def _v2_refresh_regime(self) -> None:
-        """Refresca el régimen si la fuente lo soporta (fuente async + lectura sync).
+        """Refresca el régimen y el ATR si las fuentes lo soportan (async + lectura sync).
 
-        La lectura del régimen en el tick es SÍNCRONA; el I/O (barras) se concentra aquí,
-        una vez por tick, para que decidir no dependa de la red y para que
+        La lectura del régimen y del ATR en el tick es SÍNCRONA; el I/O (barras) se
+        concentra aquí, una vez por tick, para que decidir no dependa de la red y para que
         ``_v2_position_package`` lea siempre un valor coherente del mismo tick.
+
+        E2: el ATR se refresca en el MISMO punto que el régimen para que la geometría de
+        un tick sea consistente (una sola foto de barras por decisión).
         """
-        refresher = getattr(self._v2_regime_source, "refresh", None)
-        if refresher is None or not callable(refresher):
-            return
-        try:
-            await refresher()
-        except Exception:  # noqa: BLE001 — sin refresco el régimen queda como estaba.
-            logger.exception("auto_sim v2 regime refresh failed")
+        for source, label in (
+            (self._v2_regime_source, "regime"),
+            (self._v2_atr_source, "atr"),
+        ):
+            refresher = getattr(source, "refresh", None)
+            if refresher is None or not callable(refresher):
+                continue
+            try:
+                await refresher()
+            except Exception:  # noqa: BLE001 — sin refresco el valor queda como estaba.
+                logger.exception("auto_sim v2 %s refresh failed", label)
 
     def _v2_current_bar_start(self) -> str:
         """Inicio ISO-UTC de la barra corriente (``""`` si el timeframe no se entiende).
@@ -1985,8 +2107,22 @@ class AutoSimulationWorker:
                     at=at,
                 )
             return restored
-        atr = entry * Decimal(str(self._v2_tunables.atr_pct_fallback))
-        stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * atr
+        # E2: la geometría reconstruida usa el ATR REAL si existe; el sintético se declara
+        # como tal (antes se usaba siempre el 2% del precio, también para adoptar).
+        atr_value, atr_source = self._v2_atr_geometry(symbol, float(entry))
+        if atr_source != ATR_SOURCE_REAL:
+            self._journal_position_event(
+                symbol,
+                ATR_GEOMETRY,
+                at=at,
+                detail={"atrSource": atr_source, "atr": atr_value, "phase": "adoption"},
+            )
+        if atr_value is None:
+            # Ni siquiera la geometría de emergencia es construible sin ATR.
+            atr_value = float(entry) * self._v2_tunables.atr_pct_fallback
+        stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * Decimal(
+            str(atr_value)
+        )
         if stop <= 0 or stop >= entry:
             # Ni siquiera la geometría de emergencia es construible: se declara la
             # ausencia de protección SIN stop sintético (no se inventa un número).
@@ -2017,6 +2153,12 @@ class AutoSimulationWorker:
             fill_price=float(entry),
             fill_quantity=float(held),
             filled_at=at,
+            # E1: también una ADOPTADA necesita techo declarado; se congela desde el
+            # instante de adopción (no hay fill original que consultar). Sin él, la
+            # posición adoptada quedaría sin salida por tiempo para siempre.
+            max_holding_period_days=resolve_holding_horizon(
+                self._v2_tunables.exit_template
+            ).max_holding_period_days,
         )
         if position is None:
             return None
@@ -2150,12 +2292,22 @@ class AutoSimulationWorker:
             if armed
             else None
         )
+        # V2.42 slice 2b (E3 · D2): la invalidación CONFIRMADA de la tesis se deriva aquí,
+        # de hechos PERSISTIDOS (nivel congelado al nacer + peor adverso del MAE). No hay
+        # LLM ni recómputo del motor de señales: un reinicio conserva la invalidación.
+        thesis_invalid = is_thesis_invalidated(position, mark_price=float(price))
         outcome = plan_v2_position_outcome(
             position,
             mark_price=float(price),
             regime=self._v2_regime(),
             portfolio_recon_status=self._v2_recon_status(symbol),
+            thesis_invalid=thesis_invalid,
             exit_template=self._v2_tunables.exit_template,
+            # V2.42 slice 2b (E1): el techo CONGELADO en el nacimiento es el único
+            # ``expires_at`` que la gestión ve; ``now`` es el instante del tick. Sin ambos,
+            # ``TIME_STOP`` era inalcanzable por construcción (``expires_at`` ausente).
+            now=at,
+            expires_at=position.holding_deadline_at,
             # Sólo se declara TRAIL cuando hay un stop REAL que proponer: una alerta de
             # trailing sin stop sería journal ruidoso, no gestión.
             trail_hint=trail_stop is not None,
@@ -2188,7 +2340,69 @@ class AutoSimulationWorker:
             trailing_armed=armed,
             degraded=degraded,
         )
+        self._v2_journal_exit_request(
+            symbol, position, outcome, at=at, thesis_invalid=thesis_invalid
+        )
         return position_manager_package(outcome)
+
+    def _v2_journal_exit_request(
+        self,
+        symbol: str,
+        position: PositionState,
+        outcome: PositionManagerResult | None,
+        *,
+        at: str,
+        thesis_invalid: bool,
+    ) -> None:
+        """V2.42 slice 2b (E1/E3): declara POR QUÉ se pidió salir y avanza el FSM.
+
+        El spine ya emite la orden de venta; lo que faltaba era (a) que el FSM registrara
+        ``TIME_EXIT``/``THESIS_EXIT`` (hasta ahora cualquier salida era indistinguible de
+        un ``EXIT_REQUESTED`` genérico) y (b) que la invalidación de tesis tuviera una
+        traza propia. Sin esto, una salida por tiempo o por tesis era invisible al operador.
+
+        No vende nada aquí: la orden es del ``DecisionPackage`` que devuelve el llamante.
+        """
+        if outcome is None:
+            return
+        primary = outcome.decision.primary_reason
+        if primary == "TIME_STOP":
+            event, reason_code = "TIME_EXIT", TIME_EXIT
+        elif primary == "THESIS_INVALIDATION":
+            # La tesis es el motivo DECISORIO. Cuando quien decide es el stop estructural
+            # (``THESIS_INVALIDATION`` es posterior en ``EXIT_REASON_PRECEDENCE``), el flag
+            # viaja en el detalle como contexto pero NO se declara una salida por tesis:
+            # si no, todo stop-out se leería además como invalidación y el porqué real de
+            # la venta se perdería en el journal.
+            event, reason_code = "THESIS_EXIT", THESIS_EXIT
+        else:
+            return
+        # Partimos de la posición VIVA (el ratchet pudo reescribir el JSONB): si se usara
+        # la copia previa, el evento pisaría el stop recién ratcheado.
+        current = self._v2_positions.get(symbol) or position
+        advanced, transition = advance_lifecycle(current, event, at=at)
+        if transition.accepted:
+            self._v2_positions[symbol] = advanced
+        else:
+            self._journal_position_event(
+                symbol,
+                LIFECYCLE_TRANSITION_REJECTED,
+                at=at,
+                detail={"event": event, "from": transition.from_state},
+            )
+        self._journal_position_event(
+            symbol,
+            reason_code,
+            at=at,
+            detail={
+                "primaryReason": primary,
+                "lifecycle": transition.to_state,
+                "deadline": current.holding_deadline_at,
+                "invalidationPrice": current.invalidation_price,
+                "thesisInvalid": thesis_invalid,
+                "exitReasons": list(outcome.exit_reasons),
+            },
+        )
 
     async def _v2_apply_stop_update(
         self,
@@ -2217,6 +2431,20 @@ class AutoSimulationWorker:
             if isinstance(marked, PositionState)
             else (self._v2_positions.get(symbol) or position)
         )
+        # La MARCA del tick (pico observado + MFE/MAE) es un cambio de estado REAL aunque
+        # no mueva el stop. Antes se quedaba dentro de la copia del outcome y se perdía:
+        # el ancla del trailing y la memoria del peor adverso (de la que depende la
+        # invalidación de tesis, E3) volvían al valor del último fill/ratchet — y un
+        # reinicio las perdía del todo. Sólo se escribe cuando la observación cambia de
+        # verdad (un extremo nuevo), no en cada tick.
+        if (
+            isinstance(marked, PositionState)
+            and _mark_observation_changed(self._v2_positions.get(symbol), marked)
+        ):
+            self._v2_positions[symbol] = marked
+            held = self._open.get(symbol, Decimal("0"))
+            if held > 0:
+                await self._persist_position(symbol, held)
         if proposed is None:
             # Los motivos del spine van en minúscula (``decision.primary_reason.lower()``).
             if outcome is not None and "trail" in {r.lower() for r in outcome.exit_reasons}:
@@ -2292,6 +2520,24 @@ class AutoSimulationWorker:
                         "lifecycle": advanced.lifecycle_state,
                     },
                 )
+                self._v2_protect_noop_stop.pop(symbol, None)
+            elif advanced.current_stop is not None:
+                # H-2: el stop ya estaba aplicado y el estado no cambió. Antes esto era
+                # MUDO; ahora se declara UNA vez por stop (el journal no se inunda con un
+                # trailing en régimen permanente, pero el tick nunca es un no-op invisible).
+                if self._v2_protect_noop_stop.get(symbol) != advanced.current_stop:
+                    self._v2_protect_noop_stop[symbol] = advanced.current_stop
+                    self._journal_position_event(
+                        symbol,
+                        PROTECT_REQUESTED,
+                        at=at,
+                        detail={
+                            "stop": advanced.current_stop,
+                            "lifecycle": advanced.lifecycle_state,
+                            "idempotent": True,
+                            "reason": "stop_already_applied",
+                        },
+                    )
 
     def _journal_position_event(
         self,
@@ -2349,6 +2595,13 @@ class AutoSimulationWorker:
             fill_price=float(price),
             fill_quantity=float(qty),
             filled_at=at,
+            # V2.42 slice 2b (E1): el techo de mantenimiento se congela AQUÍ, en el
+            # nacimiento, desde la plantilla de salida vigente. Sin esto el plan de salida
+            # nunca recibía ``expires_at`` y ``TIME_STOP`` era inalcanzable (una posición
+            # de swing podía vivir indefinidamente).
+            max_holding_period_days=resolve_holding_horizon(
+                self._v2_tunables.exit_template
+            ).max_holding_period_days,
         )
         if position is None:
             return
@@ -2756,6 +3009,7 @@ class AutoSimulationWorker:
         regime_source: Any = None,
         trade_context_source: Any = None,
         edge_source: Any = None,
+        atr_source: Any = None,
         reservation_store: ReservationStore | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
@@ -2787,6 +3041,7 @@ class AutoSimulationWorker:
             self._v2_edge_source,
             self._reservation_store,
         )
+        prev_atr = self._v2_atr_source
         try:
             self._exec_store = exec_store
             self._auto_store = auto_store
@@ -2808,6 +3063,8 @@ class AutoSimulationWorker:
                 trade_context_source if trade_context_source is not None else prev_context
             )
             self._v2_edge_source = edge_source if edge_source is not None else prev_edge
+            # E2: la fuente de ATR del tick se enlaza igual que el régimen (misma sesión).
+            self._v2_atr_source = atr_source if atr_source is not None else prev_atr
             # AUTO-1b: el libro durable de reservas se enlaza también por sesión (una
             # sesión por tick). Sin él se conserva el del constructor (hermético/tests).
             self._reservation_store = (
@@ -2855,6 +3112,7 @@ class AutoSimulationWorker:
             self._v2_regime_source = prev_regime
             self._v2_trade_context_source = prev_context
             self._v2_edge_source = prev_edge
+            self._v2_atr_source = prev_atr
             self._reservation_store = prev_reservations
 
 
@@ -3008,6 +3266,31 @@ def _compose_regime_source(session: Any, *, watch: Sequence[str]) -> Any:
 
     loader = make_bar_snapshot_loader(SqlAlchemyOhlcvRepository(session), list(watch))
     return DiscoveryRegimeSource(bars_provider=loader)
+
+
+def _compose_atr_source(session: Any, *, watch: Sequence[str]) -> Any:
+    """V2.42 slice 2b (E2): ATR REAL del tick (barras del universo → ATR por símbolo).
+
+    El motor AUTO abría con una geometría sintética (2% del precio) *fabricada en el
+    origen*: la intención "ATR real si existe" ya estaba escrita aguas abajo pero el
+    worker la anulaba. Esta fuente lee las mismas barras que el régimen, con el MISMO
+    loader por sesión, para que la foto de un tick sea una sola.
+
+    Fail-closed: sin barras suficientes el símbolo queda SIN ATR (``atr_source`` lo
+    declara) y con ``AUTO_ENGINE_SIM_V2_ATR_REQUIRED=1`` la candidata no entra.
+    """
+    from bolsa_application.active_strategy_signal_evaluator import (  # noqa: PLC0415
+        make_bar_snapshot_loader,
+    )
+    from bolsa_infrastructure.database.repositories.ohlcv_repository import (  # noqa: PLC0415
+        SqlAlchemyOhlcvRepository,
+    )
+
+    loader = make_bar_snapshot_loader(
+        SqlAlchemyOhlcvRepository(session),
+        list(watch),
+    )
+    return AtrSource(bars_provider=loader)
 
 
 def _compose_trade_context_source(session: Any) -> Any:
@@ -3237,6 +3520,7 @@ class AutoSimRuntime:
         regime_source: Any = None,
         trade_context_source: Any = None,
         edge_source: Any = None,
+        atr_source: Any = None,
         liquidity_source: Callable[[str], float | None] | None = None,
     ) -> None:
         self._session_factory = session_factory
@@ -3249,6 +3533,7 @@ class AutoSimRuntime:
         self._regime_source = regime_source
         self._trade_context_source = trade_context_source
         self._edge_source = edge_source
+        self._atr_source = atr_source
         self._liquidity_source = liquidity_source
         # V2.24/A9.1 (P1-01): lector canónico inyectable (por defecto se compone por
         # sesión desde ``position_state``). Sin él, la reconciliación es UNKNOWN.
@@ -3263,6 +3548,7 @@ class AutoSimRuntime:
                 liquidity_source=liquidity_source,
                 trade_context_source=trade_context_source,
                 edge_source=edge_source,
+                atr_source=atr_source,
             )
         self._worker = worker
 
@@ -3331,6 +3617,8 @@ class AutoSimRuntime:
                 trade_context_source=self._trade_context_source
                 or _compose_trade_context_source(session),
                 edge_source=self._edge_source or _compose_edge_source(session),
+                atr_source=self._atr_source
+                or _compose_atr_source(session, watch=tuple(_watch_symbols())),
             )
 
 

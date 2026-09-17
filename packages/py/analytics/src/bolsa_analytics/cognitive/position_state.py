@@ -6,8 +6,9 @@ este módulo **no** importa ni copia esos mappers.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import uuid4
 
@@ -33,6 +34,14 @@ TradePlanDirection = Literal["long", "short", "none"]
 TargetLegStatus = Literal["pending", "triggered", "executed", "failed"]
 
 POSITION_STATE_KEY = "positionState"
+
+#: V2.42 slice 2b (E1) — techo de mantenimiento CONGELADO en el nacimiento. Es la entrada
+#: que el worker pasa como ``expires_at`` al plan de salida; sin él ``TIME_STOP`` es
+#: inalcanzable (``expires_at=None``) y una posición de swing viviría indefinidamente.
+HOLDING_DEADLINE_KEY = "holdingDeadlineAt"
+
+#: V2.42 slice 2b (E3) — nivel de invalidación de la tesis congelado en el nacimiento.
+INVALIDATION_PRICE_KEY = "invalidationPrice"
 
 _VALID_TARGET_LEG = frozenset({"pending", "triggered", "executed", "failed"})
 
@@ -150,11 +159,8 @@ def apply_target_leg(
 
 
 def _finite_positive(value: object) -> float | None:
-    try:
-        number = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    if number != number or number <= 0:
+    number = _finite(value)
+    if number is None or number <= 0:
         return None
     return number
 
@@ -164,7 +170,7 @@ def _finite(value: object) -> float | None:
         number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-    if number != number:
+    if not math.isfinite(number):
         return None
     return number
 
@@ -214,6 +220,31 @@ def _now_iso(at: str | None = None) -> str:
     if isinstance(at, str) and at.strip():
         return at
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def holding_deadline_from(
+    created_at: str | None, max_holding_period_days: int | None
+) -> str | None:
+    """``created_at + max_holding_period_days`` en ISO-UTC, o ``None`` si no es calculable.
+
+    El techo se congela en el NACIMIENTO (decisión D1 de 2b): se calcula una vez desde
+    ``created_at`` y se persiste, de modo que un reinicio no lo re-deriva con otro reloj ni
+    lo mueve. Días no positivos o fecha ilegible ⇒ ``None`` (nunca un deadline inventado:
+    ``None`` deja ``TIME_STOP`` inalcanzable, que es el comportamiento explícito de hoy).
+    """
+    if max_holding_period_days is None or max_holding_period_days <= 0:
+        return None
+    if not isinstance(created_at, str) or not created_at.strip():
+        return None
+    raw = created_at.strip().replace("Z", "+00:00")
+    try:
+        born = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if born.tzinfo is None:
+        born = born.replace(tzinfo=UTC)
+    deadline = born.astimezone(UTC) + timedelta(days=int(max_holding_period_days))
+    return deadline.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def signed_r_from_price(
@@ -300,6 +331,15 @@ class PositionState:
     # AUTO-2 / V2.42 — FSM explícito del ciclo de vida. ``None`` = no persistido por un
     # tag anterior (se proyecta desde los campos legacy); nunca se inventa al nacer.
     lifecycle_state: PositionLifecycleState | None = None
+    # V2.42 slice 2b (E1) — techo de mantenimiento congelado en el nacimiento. ``None``
+    # (blob de un tag anterior, adopción sin horizonte, o plantilla sin días) ⇒ el plan de
+    # salida no recibe ``expires_at`` y ``TIME_STOP`` queda inalcanzable, jamás adivinado.
+    holding_deadline_at: str | None = None
+    # V2.42 slice 2b (E3) — nivel de invalidación de la TESIS congelado en el nacimiento.
+    # Se lee del plan (``invalidationPrice``) si lo declara; si no, la regla estructural es
+    # su propio stop: el nivel en que el setup está muerto. ``None`` ⇒ no hay nivel
+    # declarado y la invalidación NO se inventa (fail-closed, no "vende por si acaso").
+    invalidation_price: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         out: dict[str, object] = {
@@ -338,6 +378,13 @@ class PositionState:
         # la rehidratación lo proyecta desde los campos legacy en vez de degradar.
         if self.lifecycle_state is not None:
             out["lifecycleState"] = self.lifecycle_state
+        # V2.42 slice 2b: el techo congelado se emite sólo si existe (misma doctrina:
+        # ausente = "no persistido", no "None" disfrazado de dato).
+        if self.holding_deadline_at is not None:
+            out[HOLDING_DEADLINE_KEY] = self.holding_deadline_at
+        # V2.42 slice 2b: el nivel de invalidación congelado, si existe.
+        if self.invalidation_price is not None:
+            out[INVALIDATION_PRICE_KEY] = self.invalidation_price
         return out
 
 
@@ -346,6 +393,27 @@ def _trim_id(value: object | None) -> str | None:
         return None
     t = value.strip()
     return t if t else None
+
+
+def _iso_or_none(value: object | None) -> str | None:
+    """Instante ISO persistido o ``None``. Un valor no-string no se coacciona."""
+    if not isinstance(value, str):
+        return None
+    t = value.strip()
+    return t if t else None
+
+
+def _invalidation_level(trade_plan: dict[str, object], initial_stop: float | None) -> float | None:
+    """Nivel de invalidación de la tesis, congelado: lo que declare el plan, o el stop.
+
+    V2.42 slice 2b (E3). El plan puede traerlo explícito (``invalidationPrice``); si no,
+    la regla estructural es su propio stop (el nivel en el que el setup está muerto). NO se
+    inventa un nivel: sin stop ni declaración ⇒ ``None`` y la invalidación no se deriva.
+    """
+    declared = _finite_positive(trade_plan.get(INVALIDATION_PRICE_KEY))
+    if declared is not None:
+        return declared
+    return initial_stop
 
 
 def _resolve_revision_decision_id(
@@ -438,6 +506,19 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
             forced_degradation = True
         else:
             lifecycle_state = coerced
+    elif LIFECYCLE_STATE_KEY in raw:
+        # H-6 del §9 del pack: clave PRESENTE con valor ``null`` no es "no persistido"
+        # (eso es la AUSENCIA): alguien escribió un FSM nulo ⇒ no verificable ⇒ degrada.
+        lifecycle_state = "RECONCILIATION_REQUIRED"
+        forced_degradation = True
+    if lifecycle_state is None and not (
+        (status == "CLOSED" and remaining <= 0) or (status != "CLOSED" and remaining > 0)
+    ):
+        # H-6: sin FSM persistido, el HECHO de cantidad sigue siendo la autoridad. Un blob
+        # de un tag anterior con ``status`` que desmiente la cantidad (CLOSED con posición
+        # viva, o una familia abierta sin cantidad) no se proyecta como verificado.
+        lifecycle_state = "RECONCILIATION_REQUIRED"
+        forced_degradation = True
     protection_state = dict(stub_protect) if isinstance(stub_protect, dict) else {"status": "none"}
     if forced_degradation:
         protection_state = {
@@ -480,6 +561,9 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
         revisions=revisions_from_raw(raw.get("revisions")),
         decision_id=decision_id,
         lifecycle_state=lifecycle_state,
+        # Round-trip exacto del techo YA congelado: no se re-deriva con otro reloj.
+        holding_deadline_at=_iso_or_none(raw.get(HOLDING_DEADLINE_KEY)),
+        invalidation_price=_finite_positive(raw.get(INVALIDATION_PRICE_KEY)),
     )
 
 
@@ -491,11 +575,17 @@ def build_position_state_from_fill(
     filled_at: str | None = None,
     position_id: str | None = None,
     override: dict[str, object] | None = None,
+    max_holding_period_days: int | None = None,
 ) -> PositionState | None:
     """Factory F2: TradePlan dict + fill → OPEN.
 
     H2: exige status TRIGGERED, o override auditado. WATCH/ARMED no nacen.
     Sin plan/fill válido → None.
+
+    V2.42 slice 2b (E1): ``max_holding_period_days`` (de la plantilla de salida) se
+    CONGELA aquí como ``holding_deadline_at = filled_at + días``. Llega como parámetro y no
+    desde el ``TradePlan`` porque el plan expresa su propia validez de ENTRADA
+    (``expiresAt``), no el horizonte de mantenimiento (decisión D1 de 2b).
     """
     if not isinstance(trade_plan, dict):
         return None
@@ -575,6 +665,11 @@ def build_position_state_from_fill(
         target1_leg=birth_target_leg(t1),
         target2_leg=birth_target_leg(t2),
         revisions=(),
+        # V2.42 slice 2b (E1): techo de mantenimiento congelado al nacer.
+        holding_deadline_at=holding_deadline_from(now, max_holding_period_days),
+        # V2.42 slice 2b (E3): nivel de invalidación congelado al nacer. El plan puede
+        # declararlo (``invalidationPrice``); si no, la regla estructural es su stop.
+        invalidation_price=_invalidation_level(trade_plan, initial_stop),
     )
 
 

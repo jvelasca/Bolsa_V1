@@ -108,6 +108,16 @@ jobs:
         # durable y la reconciliación se certifican en el job auto-v2-durable-pg.
         # AUTO-1b: ese fichero PG queda en ``--ignore`` de este job (no hay PG aquí: sin
         # ignore se recolectaría y skipearía en mudo) y corre con gate propio allí.
+        # V2.42 slice 2b (E1/E2/E3): el camino de la MESA (golden path de entrada →
+        # protección → T1 → salida → reconciliación, y sus gemelos fail) entra aquí con
+        # nombre propio. Es el A/B que certifica que la invalidación confirmada VENDE
+        # (D2) y que el techo de mantenimiento no se re-deriva: sin registro, un cambio de
+        # la decisión de posición sólo se vería en el `position_decision` hermético, no en
+        # el camino completo que la mesa ejecuta.
+        # El fichero nuevo del worker (reloj de mantenimiento, invalidación de tesis y ATR
+        # real) vive en ``apps/api-python/tests``, que ESTE job ya recolecta entero: no se
+        # lista aquí para no duplicarlo (y por el mismo motivo NO debe añadirse una ruta
+        # inexistente bajo ``packages/py/application/tests``: pytest aborta con exit 4).
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -138,6 +148,8 @@ jobs:
           packages/py/application/tests/test_execution_event.py
           packages/py/application/tests/test_applied_fills.py
           packages/py/application/tests/test_position_manager.py
+          packages/py/application/tests/test_v127_golden_path.py
+          packages/py/application/tests/test_v127_golden_path_fail.py
           packages/py/application/tests/test_auto_v2_lifecycle_stop.py
           packages/py/application/tests/test_portfolio_reservation.py
           packages/py/application/tests/test_active_strategy_runtime_state.py

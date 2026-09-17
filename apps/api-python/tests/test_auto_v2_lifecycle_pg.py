@@ -33,6 +33,10 @@ import pytest_asyncio
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bolsa_analytics.cognitive.exit_plan import (
+    build_exit_plan_from_position,
+    is_thesis_invalidated,
+)
 from bolsa_analytics.cognitive.position_lifecycle import (
     advance_lifecycle,
     compute_trail_stop,
@@ -41,6 +45,7 @@ from bolsa_analytics.cognitive.position_lifecycle import (
 )
 from bolsa_analytics.cognitive.position_state import (
     PositionState,
+    apply_position_mark,
     build_position_state_from_fill,
     position_state_from_dict,
 )
@@ -263,12 +268,14 @@ async def test_v2_trailing_continues_from_persisted_watermark_after_restart(
         assert next_stop is not None
         assert next_stop > restored.current_stop, "el ratchet continúa tras el reinicio"
         assert next_stop == 105.0, "110 − 1R (R=5)"
-        # Sin máximo no se inventa un stop: se conserva el vigente (H2, nunca empeora).
+        # Sin máximo no se inventa un stop (H-4): ``compute_trail_stop`` devuelve ``None``
+        # en vez de caer a la entrada o al stop vigente, así que el llamante no aplica
+        # ningún ratchet y la posición conserva el stop que ya tenía.
         without_peak = replace(restored, trailing={"status": "active"})
         assert (
-            compute_trail_stop(without_peak, trail_width="medium", high_watermark=None)
-            == restored.current_stop
+            compute_trail_stop(without_peak, trail_width="medium", high_watermark=None) is None
         )
+        assert restored.current_stop == original.current_stop, "el stop vivo no se toca"
     finally:
         await _cleanup(lifecycle_pg_factory, account_id)
 
@@ -318,6 +325,179 @@ async def test_v2_unverifiable_state_degrades_on_rehydration(
             assert restored is not None
             assert restored.lifecycle_state == "RECONCILIATION_REQUIRED"
             assert restored.protection_state["state"] == "RECONCILIATION_REQUIRED"
+    finally:
+        await _cleanup(lifecycle_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_v2_holding_deadline_survives_pg_and_stays_frozen(
+    lifecycle_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """E1: el techo de mantenimiento es durable y NO se re-deriva con el reloj del reinicio.
+
+    El techo se congela en el nacimiento (decisión D1). Si el reinicio lo recalculara con
+    su propio reloj, la fecha de salida se movería sola: la posición viviría más (o menos)
+    de lo que la plantilla declaró. Aquí se persiste, se lee de una sesión NUEVA y se
+    comprueba que el valor es el del nacimiento, no uno nuevo.
+    """
+    account_id: str | None = None
+    try:
+        async with lifecycle_pg_factory() as session:
+            account_id = await _seed_account(session)
+            born, _ = advance_lifecycle(
+                _open_long(), "ENTRY_FILLED", at="2026-09-17T09:00:00Z"
+            )
+            frozen = replace(
+                born,
+                holding_deadline_at="2026-11-01T09:00:00Z",
+                invalidation_price=97.5,
+            )
+            await PostgresSimAutoPositionStore(session).upsert(
+                account_id,
+                _ENGINE_ID,
+                "AAA",
+                Decimal(str(frozen.remaining_quantity)),
+                entry_price=Decimal("100"),
+                stop_price=Decimal(str(frozen.current_stop)),
+                position_state=frozen.to_dict(),
+            )
+            await session.commit()
+
+        async with lifecycle_pg_factory() as session:
+            row = (
+                await PostgresSimAutoPositionStore(session).read_projection(account_id, _ENGINE_ID)
+            )["AAA"]
+        assert row.position_state is not None
+        restored = position_state_from_dict(dict(row.position_state))
+        assert restored is not None
+        assert restored.holding_deadline_at == "2026-11-01T09:00:00Z"
+        assert restored.invalidation_price == 97.5
+        assert restored.to_dict() == frozen.to_dict(), "roundtrip exacto, sin re-derivar"
+
+        # Un tick con OTRO reloj no mueve el techo: la gestión lee el valor persistido.
+        before = build_exit_plan_from_position(
+            restored, now="2026-10-31T09:00:00Z", expires_at=restored.holding_deadline_at
+        )
+        after = build_exit_plan_from_position(
+            restored, now="2026-11-01T09:00:00Z", expires_at=restored.holding_deadline_at
+        )
+        assert before is not None and before.primary_reason is None
+        assert after is not None and after.primary_reason == "TIME_STOP"
+    finally:
+        await _cleanup(lifecycle_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_v2_confirmed_thesis_invalidation_survives_pg(
+    lifecycle_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """E3: una invalidación ya CONFIRMADA sigue confirmada tras el reinicio.
+
+    La confirmación vive en hechos persistidos: el nivel congelado al nacer
+    (``invalidationPrice``) y el peor adverso del MAE (``mfeMae.maeR``). Si el precio se
+    recuperó después, un motor que sólo mirara el mark actual "olvidaría" que la tesis ya
+    estaba muerta y dejaría viva una posición que debía venderse.
+    """
+    account_id: str | None = None
+    try:
+        async with lifecycle_pg_factory() as session:
+            account_id = await _seed_account(session)
+            born = replace(
+                _open_long(),
+                invalidation_price=98.0,
+                holding_deadline_at="2026-11-01T09:00:00Z",
+            )
+            dipped = apply_position_mark(born, 97.0, at="2026-09-17T09:05:00Z")
+            assert dipped is not None
+            recovered = apply_position_mark(dipped, 108.0, at="2026-09-17T09:10:00Z")
+            assert recovered is not None
+            assert is_thesis_invalidated(recovered, mark_price=108.0) is True
+            await PostgresSimAutoPositionStore(session).upsert(
+                account_id,
+                _ENGINE_ID,
+                "AAA",
+                Decimal(str(recovered.remaining_quantity)),
+                entry_price=Decimal("100"),
+                high_watermark=Decimal("108"),
+                stop_price=Decimal(str(recovered.current_stop)),
+                position_state=recovered.to_dict(),
+            )
+            await session.commit()
+
+        async with lifecycle_pg_factory() as session:
+            row = (
+                await PostgresSimAutoPositionStore(session).read_projection(account_id, _ENGINE_ID)
+            )["AAA"]
+        assert row.position_state is not None
+        restored = position_state_from_dict(dict(row.position_state))
+        assert restored is not None
+        assert restored.invalidation_price == 98.0
+        assert restored.mfe_mae.get("maeR") is not None
+        assert float(restored.mfe_mae["maeR"]) < 0, "el peor adverso es un hecho persistido"
+        # Ya recuperado, el mark actual NO desmiente la invalidación confirmada.
+        assert is_thesis_invalidated(restored, mark_price=108.0) is True
+        # Y el gestor de salida la declara con su precedencia propia (por debajo del stop).
+        plan = build_exit_plan_from_position(restored, mark_price=108.0, thesis_invalid=True)
+        assert plan is not None
+        assert "THESIS_INVALIDATION" in plan.reasons
+    finally:
+        await _cleanup(lifecycle_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_v2_real_atr_geometry_survives_pg(
+    lifecycle_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """E2: la geometría construida con ATR REAL es la que sobrevive (no se re-deriva).
+
+    ``atrSource`` es provenance de journal, no una columna: lo durable es la geometría que
+    ese ATR produjo. Si el reinicio la re-derivara con el fallback sintético, el stop de
+    una posición abierta cambiaría con el crash.
+    """
+    account_id: str | None = None
+    try:
+        real_atr = 2.5  # entry 100, k=1.5 ⇒ stop 96.25, R=3.75
+        async with lifecycle_pg_factory() as session:
+            account_id = await _seed_account(session)
+            plan = {
+                "decisionId": "dec-atr-pg",
+                "instrumentId": "AAA",
+                "direction": "long",
+                "status": "TRIGGERED",
+                "entry": 100.0,
+                "structuralStop": 96.25,
+                "target1": 100.0 + real_atr * 1.5,
+                "target2": 100.0 + real_atr * 1.5 * 2,
+            }
+            position = build_position_state_from_fill(
+                plan, fill_price=100.0, fill_quantity=10.0, position_id="pos-atr-pg"
+            )
+            assert position is not None
+            assert position.initial_stop == 96.25
+            await PostgresSimAutoPositionStore(session).upsert(
+                account_id,
+                _ENGINE_ID,
+                "AAA",
+                Decimal("10"),
+                entry_price=Decimal("100"),
+                stop_price=Decimal(str(position.current_stop)),
+                position_state=position.to_dict(),
+            )
+            await session.commit()
+
+        async with lifecycle_pg_factory() as session:
+            row = (
+                await PostgresSimAutoPositionStore(session).read_projection(account_id, _ENGINE_ID)
+            )["AAA"]
+        assert row.position_state is not None
+        restored = position_state_from_dict(dict(row.position_state))
+        assert restored is not None
+        assert restored.initial_stop == 96.25, "la geometría real no se re-deriva al rehidratar"
+        assert restored.current_stop == 96.25
+        assert restored.initial_risk == 3.75
+        assert row.stop_price == Decimal("96.2500") or row.stop_price == Decimal(
+            str(restored.current_stop)
+        )
     finally:
         await _cleanup(lifecycle_pg_factory, account_id)
 

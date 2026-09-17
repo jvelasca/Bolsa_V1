@@ -72,6 +72,22 @@ PROTECT_REQUESTED = "protect_requested"
 PROTECTION_MISSING = "protection_missing"
 RECONCILIATION_REQUIRED = "reconciliation_required"
 
+# V2.42 slice 2b — cierre del ciclo de vida completo (E1/E3) y procedencia del ATR (E2).
+# Son los motivos con los que el worker declara POR QUÉ se pidió salir (el ``primary_reason``
+# en minúsculas del plan de salida: ``time_stop``/``thesis_invalidation``) y DE DÓNDE salió la
+# geometría de riesgo. Sin ellos, una salida por tiempo o por tesis sería indistinguible de
+# un ``EXIT_REQUESTED`` genérico en el journal.
+TIME_EXIT = "time_exit"
+THESIS_EXIT = "thesis_exit"
+ATR_GEOMETRY = "atr_geometry"
+#: Valores de ``atrSource`` (procedencia del ATR que construyó la geometría).
+ATR_SOURCE_REAL = "real"
+ATR_SOURCE_FALLBACK = "fallback"
+ATR_SOURCE_MISSING = "missing"
+ATR_SOURCES: frozenset[str] = frozenset(
+    {ATR_SOURCE_REAL, ATR_SOURCE_FALLBACK, ATR_SOURCE_MISSING}
+)
+
 # Motivos con los que ``PositionManagerSkip`` declara una gestión no realizada.
 POSITION_SKIP_REASONS: frozenset[str] = frozenset(
     {POSITION_MARK_REJECTED, POSITION_DECISION_UNAVAILABLE}
@@ -107,10 +123,18 @@ POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
         LIFECYCLE_TRANSITION_REJECTED,
         LIFECYCLE_STATE_UNVERIFIED,
         LIFECYCLE_RESOLUTION_MISSING,
+        TIME_EXIT,
+        THESIS_EXIT,
+        ATR_GEOMETRY,
     }
 )
 
 __all__ = [
+    "ATR_GEOMETRY",
+    "ATR_SOURCES",
+    "ATR_SOURCE_FALLBACK",
+    "ATR_SOURCE_MISSING",
+    "ATR_SOURCE_REAL",
     "EXIT_QTY_OVER_POSITION",
     "FILL_NOT_MATERIALIZED",
     "FILL_PARTIALLY_MATERIALIZED",
@@ -137,4 +161,6 @@ __all__ = [
     "RESERVATION_UNMEASURABLE",
     "STOP_RATCHET_APPLIED",
     "STOP_RATCHET_REJECTED",
+    "THESIS_EXIT",
+    "TIME_EXIT",
 ]

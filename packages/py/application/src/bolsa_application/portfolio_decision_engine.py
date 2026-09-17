@@ -34,7 +34,11 @@ Secuencia de veto (fail-closed; cada veto registra su ``reason_code`` en el
     comprometido (V2.40.4).
 15. ``concentration_exceeded``— concentración activo/sector por encima del límite.
 16. ``risk_reward_below_threshold`` — R/R por debajo del mínimo.
-17. ``plan_invalid``          — el ``TradePlan`` construido se contradice a sí mismo
+17. ``atr_unknown``           — no hay geometría de riesgo: ni stop declarado ni ATR
+    verificable (V2.42/2b, E2). Antes se reportaba como R/R insuficiente, que era un
+    diagnóstico falso: el problema no es la relación, es que no hay nivel con el que
+    calcularla.
+18. ``plan_invalid``          — el ``TradePlan`` construido se contradice a sí mismo
     (V2.40.4): un plan incoherente no se emite, se veta con sus violaciones en el journal.
 
 Todos los vetos de "dato ausente" (``*_unknown``, ``sector_*``, ``sector_exposure_unverifiable``,
@@ -103,6 +107,7 @@ DecisionReasonCode = Literal[
     "sector_exposure_unverifiable",
     "stale_data",
     "edge_below_threshold",
+    "atr_unknown",
     "risk_reward_below_threshold",
     "risk_measurement_partial",
     "risk_measurement_unknown",
@@ -132,6 +137,7 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         "sector_exposure_unverifiable",
         "stale_data",
         "edge_below_threshold",
+        "atr_unknown",
         "risk_reward_below_threshold",
         "risk_measurement_partial",
         "risk_measurement_unknown",
@@ -513,7 +519,11 @@ def decide_portfolio(
             entry=entry, atr=atr, atr_multiplier=cfg.atr_multiplier, direction=direction
         )
     if stop is None:
-        return _reject("HOLD", "risk_reward_below_threshold")  # sin stop ⇒ no operable.
+        # V2.42/2b (E2 · D3): sin stop declarado NI ATR verificable no hay geometría de
+        # riesgo. Antes se reportaba como R/R insuficiente, que es un diagnóstico falso
+        # (no se puede calcular una relación sin niveles): el ATR sintético ya no tapa
+        # esta rama cuando la política exige precisión (``AUTO_ENGINE_SIM_V2_ATR_REQUIRED``).
+        return _reject("HOLD", "atr_unknown")
 
     # Tamaño por riesgo (delegado al RiskAllocator).
     risk_budget = snapshot.risk_remaining if snapshot is not None else None

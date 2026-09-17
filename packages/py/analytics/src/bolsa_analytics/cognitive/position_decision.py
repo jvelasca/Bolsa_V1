@@ -18,7 +18,7 @@ PositionDecisionAction = Literal[
 ]
 PositionAttention = Literal["NORMAL", "ATTENTION", "URGENT", "BLOCKED"]
 PositionNextEvent = Literal[
-    "NONE", "T1", "T2", "STOP", "TRAIL", "THESIS_REVIEW", "RECONCILIATION"
+    "NONE", "T1", "T2", "STOP", "TRAIL", "TIME", "THESIS_REVIEW", "RECONCILIATION"
 ]
 PositionReconHealth = Literal["CLEAN", "ATTENTION", "CRITICAL"]
 PositionProtection = Literal["ACTIVE", "NONE"]
@@ -72,7 +72,10 @@ def attention_to_urgency(attention: PositionAttention) -> PositionUrgency:
 #: del roadmap AUTO-2 §6.4). Con el libro sin verificar, ``CRITICAL`` degrada a ``REVIEW``
 #: **salvo** cuando el plan pide reducir riesgo ya (stop rebasado, trail alcanzado, riesgo
 #: de cartera): en ese caso manda la salida. Cualquier otro motivo (objetivos, manual,
-#: tesis) sigue vetado: tomar beneficio puede esperar, no cubrirse no.
+#: tesis, tiempo) sigue vetado: tomar beneficio puede esperar, no cubrirse no.
+#: ``TIME_STOP`` NO entra (una salida por tiempo no es cubrirse) y ``THESIS_INVALIDATION``
+#: tampoco (decisión D2 de 2b: vende cuando la reconciliación lo permite, y su veto bajo
+#: ``CRITICAL`` se declara en vez de silenciarse).
 _PROTECTIVE_EXIT_REASONS: frozenset[str] = frozenset(
     {"STRUCTURAL_STOP", "TRAIL", "PORTFOLIO_RISK"}
 )
@@ -100,6 +103,10 @@ def _next_event(position: PositionState, exit_plan: ExitPlan) -> PositionNextEve
         return "T2"
     if primary == "TRAIL":
         return "TRAIL"
+    if primary == "TIME_STOP":
+        # V2.42 slice 2b (E1): el techo de mantenimiento es el motivo; que no se confunda
+        # con "esperando T1/T2" (antes caía en la rama de objetivos).
+        return "TIME"
     if not position.target1_achieved_at and position.target1 is not None:
         return "T1"
     if not position.target2_achieved_at and position.target2 is not None:
@@ -174,13 +181,23 @@ def _action_from_plan(
     recon_health: PositionReconHealth,
     thesis_invalid: bool,
 ) -> PositionDecisionAction:
+    # H-4/§6.4: una salida PROTECTORA no se veta por reconciliación; cualquier otro motivo
+    # bajo ``CRITICAL`` degrada a ``REVIEW`` (tomar beneficio puede esperar).
     if (
         recon_health == "CRITICAL"
         and exit_plan.primary_reason not in _PROTECTIVE_EXIT_REASONS
     ):
         return "REVIEW"
+    # V2.42 slice 2b (E3 · decisión D2 firmada por el owner): la invalidación CONFIRMADA
+    # de la tesis es una salida REAL (proteger capital), no un ``REVIEW``. Antes esto
+    # devolvía ``REVIEW`` ⇒ el AUTO declaraba la tesis rota y NO vendía: la posición
+    # sobrevivía a su propia invalidación. ``THESIS_INVALIDATION`` está en
+    # ``_HARD_TRIGGER`` (``exit_plan``), de modo que el plan ya pidió ``full_exit``; aquí
+    # sólo se deja de vetar. Bajo ``CRITICAL`` sigue mandando la rama de arriba (la
+    # invalidación NO está en ``_PROTECTIVE_EXIT_REASONS``): el veto de reconciliación
+    # está declarado, no silenciado.
     if thesis_invalid or exit_plan.primary_reason == "THESIS_INVALIDATION":
-        return "REVIEW"
+        return "EXIT"
     sug = exit_plan.suggested_action
     primary = exit_plan.primary_reason
     if sug == "protect":

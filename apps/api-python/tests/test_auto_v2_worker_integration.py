@@ -254,9 +254,17 @@ async def test_v2_journal_records_reason_codes(v2_env: None) -> None:
     worker._decider = _buy_lot()
     await worker.auto_turn()
     assert worker._v2_journal, "el pipeline debe dejar journal del tick"
-    payload = worker._v2_journal[0].payload
+    # V2.42 slice 2b (E2): el tick puede abrir con la DECLARACIÓN de geometría (ATR
+    # sintético, sin barras reales). La decisión se busca por su contenido en vez de por
+    # índice, que es lo que el test pretende medir (que la aprobación quede registrada).
+    approved = [
+        entry
+        for entry in worker._v2_journal
+        if entry.payload is not None and entry.payload.get("reasonCodes") == ["approved"]
+    ]
+    assert approved, "el journal del tick debe registrar la aprobación"
+    payload = approved[0].payload
     assert payload is not None
-    assert payload["reasonCodes"] == ["approved"]
     assert payload["tradePlan"]["status"] == "TRIGGERED"
 
 

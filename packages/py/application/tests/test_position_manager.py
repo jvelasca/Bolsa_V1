@@ -48,17 +48,36 @@ def test_target1_reduces_partial() -> None:
     assert "target_1" in result.exit_reasons
 
 
-def test_thesis_invalidation_flagged_for_review() -> None:
-    # El spine cognitivo es conservador: thesis invalidation ⇒ REVIEW (human-in-loop),
-    # no venta automática. La salida queda auditada en exit_reasons.
+def test_thesis_invalidation_sells_full_position() -> None:
+    # V2.42 slice 2b (decisión D2 firmada): la invalidación CONFIRMADA de la tesis es una
+    # salida REAL (proteger capital), no un ``REVIEW``. Este es el A/B del camino MESA: la
+    # misma función compartida que usa el AUTO ahora emite VENTA total, y el motivo sigue
+    # auditado en ``exit_reasons``.
+    position = _open_long()
     result = manage_position(
-        _open_long(), mark_price=101.0, thesis_invalid=True, regime="BULL_TREND"
+        position, mark_price=101.0, thesis_invalid=True, regime="BULL_TREND"
+    )
+    assert result is not None
+    assert result.order_action == "sell"
+    assert result.order_qty == position.remaining_quantity
+    assert result.decision.action == "EXIT"
+    assert result.attention == "URGENT"
+    assert "thesis_invalidation" in result.exit_reasons
+
+
+def test_thesis_invalidation_under_recon_drift_reviews_not_sells() -> None:
+    # El veto de reconciliación sigue declarado: ``THESIS_INVALIDATION`` NO es una salida
+    # protectora (D2), así que con el libro en drift la venta no se autoriza a ciegas.
+    result = manage_position(
+        _open_long(),
+        mark_price=101.0,
+        thesis_invalid=True,
+        regime="BULL_TREND",
+        portfolio_recon_status="drift",
     )
     assert result is not None
     assert result.order_action == "hold"
     assert result.decision.action == "REVIEW"
-    assert result.attention == "URGENT"
-    assert "thesis_invalidation" in result.exit_reasons
 
 
 def test_regime_exit_only_forces_full_sell() -> None:

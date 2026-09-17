@@ -63,6 +63,54 @@ def resolve_exit_policy(template_id: str | None) -> ExitPolicy:
     return MODERATE_EXIT_POLICY
 
 
+#: Horizonte de mantenimiento por defecto (días) cuando la plantilla no se reconoce.
+#: Es el de ``moderate`` en ``POLICY_TEMPLATES``; se declara aquí para que la ausencia
+#: de plantilla tenga un valor EXPLÍCITO en vez de un ``None`` que nadie sabe leer.
+DEFAULT_MAX_HOLDING_PERIOD_DAYS = 45
+
+
+@dataclass(frozen=True, slots=True)
+class HoldingHorizon:
+    """Horizonte de mantenimiento declarado por la plantilla (V2.42 · AUTO-2 slice 2b).
+
+    ``expected`` no existe en el repo: la plantilla sólo declara el TECHO
+    (``max_holding_period_days``) y el mínimo (``min_holding_period_minutes``). El techo es
+    lo que ``TIME_EXIT`` consume; inventar un ``expected`` sería una segunda fuente.
+    """
+
+    max_holding_period_days: int
+    min_holding_period_minutes: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "maxHoldingPeriodDays": self.max_holding_period_days,
+            "minHoldingPeriodMinutes": self.min_holding_period_minutes,
+        }
+
+
+def resolve_holding_horizon(template_id: str | None) -> HoldingHorizon:
+    """Horizonte de la plantilla, con el MISMO id que ``resolve_exit_policy``.
+
+    Fuente única: ``trading_policy_templates.POLICY_TEMPLATES`` (que a su vez declara los
+    días en ``HorizonConstraints``). El import es **perezoso** a propósito: ``trading_policy``
+    importa este módulo, de modo que un import de módulo crearía un ciclo.
+
+    Ausencia/plantilla desconocida ⇒ ``moderate`` declarado (nunca ``None`` silencioso).
+    """
+    from bolsa_analytics.cognitive.trading_policy_templates import (  # noqa: PLC0415
+        POLICY_TEMPLATES,
+    )
+
+    template = POLICY_TEMPLATES.get(template_id or "")
+    if template is None:
+        template = POLICY_TEMPLATES["moderate"]
+    horizon = template.horizon
+    return HoldingHorizon(
+        max_holding_period_days=int(horizon.max_holding_period_days),
+        min_holding_period_minutes=int(horizon.min_holding_period_minutes),
+    )
+
+
 TRAIL_DISTANCE_R_BY_WIDTH: dict[ExitTrailWidth, float] = {
     "tight": 0.75,
     "medium": 1.0,

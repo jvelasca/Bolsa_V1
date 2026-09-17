@@ -300,6 +300,101 @@ def test_plan_v2_tick_atr_fallback_when_absent() -> None:
 # ── V2.40.1 (P0): gates fail-closed de la cartera ──────────────────────────────
 
 
+def test_plan_v2_tick_atr_required_vetoes_synthetic_geometry() -> None:
+    """E2 · D3: con el veto activo, una señal SIN ATR real no entra (y se dice por qué).
+
+    El camino histórico rellenaba el hueco con el 2% del precio. Con
+    ``AUTO_ENGINE_SIM_V2_ATR_REQUIRED`` ese relleno desaparece: la geometría de riesgo
+    exigida por la política no se puede afirmar, así que el candidato cae por su camino
+    normal de NO ENTRY con un motivo que ya NO miente (``atr_unknown``, no R/R).
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", atr=None)],
+        regime="BULL_TREND",
+        tunables=replace(V2Tunables(), atr_required=True),
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("atr_unknown",)
+
+
+def test_plan_v2_tick_atr_required_allows_real_geometry() -> None:
+    """El veto no bloquea el camino bueno: con ATR real la entrada sigue aprobándose."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", atr=2.0)],
+        regime="BULL_TREND",
+        tunables=replace(V2Tunables(), atr_required=True),
+    )
+    assert plan.approved_symbols == ("AAA",)
+    trade_plan = plan.decisions[0].trade_plan
+    assert trade_plan is not None
+    assert trade_plan.structural_stop == 97.0
+
+
+def test_atr_required_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """E2: el veto es un tunable de entorno, OFF por defecto (no cambia el histórico)."""
+    monkeypatch.delenv("AUTO_ENGINE_SIM_V2_ATR_REQUIRED", raising=False)
+    assert tunables_from_env().atr_required is False
+    for value in ("1", "true", "yes", "on"):
+        monkeypatch.setenv("AUTO_ENGINE_SIM_V2_ATR_REQUIRED", value)
+        assert tunables_from_env().atr_required is True
+    for value in ("0", "false", "off", ""):
+        monkeypatch.setenv("AUTO_ENGINE_SIM_V2_ATR_REQUIRED", value)
+        assert tunables_from_env().atr_required is False
+
+
+# ── V2.42 slice 2b (E2): ATR real desde barras ─────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_atr_source_computes_real_atr_from_bars() -> None:
+    """``AtrSource`` lee barras y publica el ATR por símbolo (I/O fuera del hot path)."""
+    from bolsa_application.auto_v2_entry import AtrSource
+
+    bars = [
+        {"high": 101.0, "low": 99.0, "close": 100.0},
+        {"high": 103.0, "low": 99.0, "close": 102.0},
+        {"high": 104.0, "low": 101.0, "close": 103.0},
+    ]
+
+    async def _provider() -> dict[str, list[dict[str, float]]]:
+        return {"AAA": bars}
+
+    source = AtrSource(bars_provider=_provider, period=2)
+    assert source("AAA") is None, "antes de refrescar no hay dato (no se inventa)"
+    assert await source.refresh() == 1
+    value = source("AAA")
+    assert value is not None and value > 0
+    assert source("BBB") is None
+
+
+@pytest.mark.asyncio
+async def test_atr_source_fail_closed_without_bars() -> None:
+    """Sin barras suficientes el símbolo queda SIN ATR: el llamante decide (fallback/veto)."""
+    from bolsa_application.auto_v2_entry import AtrSource
+
+    async def _provider() -> dict[str, list[dict[str, float]]]:
+        return {"AAA": [{"high": 101.0, "low": 99.0, "close": 100.0}]}
+
+    source = AtrSource(bars_provider=_provider, period=14)
+    assert await source.refresh() == 0
+    assert source("AAA") is None
+
+
+@pytest.mark.asyncio
+async def test_atr_source_provider_error_is_not_a_number() -> None:
+    """Un proveedor que revienta NO produce un ATR: fail-closed explícito."""
+    from bolsa_application.auto_v2_entry import AtrSource
+
+    async def _boom() -> dict[str, list[dict[str, float]]]:
+        raise RuntimeError("sin feed")
+
+    source = AtrSource(bars_provider=_boom, period=2)
+    assert await source.refresh() == 0
+    assert source("AAA") is None
+
+
 def test_plan_v2_tick_unknown_sector_is_rejected() -> None:
     """Sin sector NO se entra: antes caía al cajón ``<unknown>`` y pasaba."""
     plan = plan_v2_tick(

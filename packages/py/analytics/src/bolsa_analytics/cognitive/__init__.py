@@ -96,13 +96,17 @@ from bolsa_analytics.cognitive.exit_plan import (
     EXIT_PLAN_KEY,
     ExitPlan,
     build_exit_plan_from_position,
+    is_thesis_invalidated,
+    worst_adverse_price,
 )
 from bolsa_analytics.cognitive.exit_policy import (
     AGGRESSIVE_SWING_EXIT_POLICY,
     CONSERVATIVE_EXIT_POLICY,
     MODERATE_EXIT_POLICY,
     ExitPolicy,
+    HoldingHorizon,
     resolve_exit_policy,
+    resolve_holding_horizon,
     suggestion_from_exit_policy,
 )
 from bolsa_analytics.cognitive.exit_radar import (
@@ -533,6 +537,10 @@ __all__ = [
     "validate_operational_levels",
     "build_exit_plan_from_position",
     "resolve_exit_policy",
+    "resolve_holding_horizon",
+    "HoldingHorizon",
+    "is_thesis_invalidated",
+    "worst_adverse_price",
     "resolve_effective_trading_policy",
     "effective_max_sector_exposure_pct",
     "format_portfolio_fit_preview",

@@ -7,6 +7,7 @@ Thin exitRadar / trail / protect siguen advisory aparte; este módulo
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
@@ -54,12 +55,20 @@ _HARD_TRIGGER: frozenset[ExitReason] = frozenset(
 )
 
 
-def _finite_positive(value: object) -> float | None:
+def _finite(value: object) -> float | None:
+    """Número finito (admite signo). ``nan``/``inf`` no son hechos utilizables."""
     try:
         number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-    if number != number or number <= 0:
+    if not math.isfinite(number):
+        return None
+    return number
+
+
+def _finite_positive(value: object) -> float | None:
+    number = _finite(value)
+    if number is None or number <= 0:
         return None
     return number
 
@@ -200,6 +209,56 @@ def _derive_suggestion(
         return "hold", None, None
     policy = exit_policy if isinstance(exit_policy, ExitPolicy) else None
     return suggestion_from_exit_policy(primary, remaining, policy, trail_stop)
+
+
+def worst_adverse_price(position: PositionState) -> float | None:
+    """Peor precio ADVERSO implícito en el MAE persistido (en R). Durable al reinicio.
+
+    ``mfeMae['maeR']`` es el mínimo R observado por ``apply_position_mark``; convertirlo a
+    precio da un hecho que SOBREVIVE al reinicio aunque el mark actual se haya recuperado.
+    Sin MAE (blob antiguo) devuelve ``None``; nunca inventa una excursión.
+    """
+    if position.direction not in ("long", "short"):
+        return None
+    entry = position.actual_entry
+    risk = position.initial_risk
+    if entry is None or entry <= 0 or risk is None or risk <= 0:
+        return None
+    mae = _finite(position.mfe_mae.get("maeR"))
+    if mae is None:
+        return None
+    # long:  r = (price − entry)/risk  ⇒ price = entry + r·risk
+    # short: r = (entry − price)/risk  ⇒ price = entry − r·risk
+    return entry + mae * risk if position.direction == "long" else entry - mae * risk
+
+
+def is_thesis_invalidated(
+    position: PositionState | None,
+    *,
+    mark_price: float | None = None,
+) -> bool:
+    """V2.42 slice 2b (E3) — ¿la tesis está CONFIRMADA como invalidada?
+
+    Determinista y sin LLM: el nivel se congeló en el nacimiento (``invalidation_price``,
+    decisión D2) y la confirmación es que el precio lo haya **atravesado en algún momento**,
+    no sólo ahora. Por eso se combina el mark actual con el peor adverso persistido (MAE):
+    un stop que no llegó a materializarse NO se "des-hace" porque el precio se recupere.
+
+    ``None``/dirección inválida/sin nivel ⇒ ``False``: la invalidación no se inventa.
+    """
+    if position is None or position.remaining_quantity <= 0:
+        return False
+    if position.direction not in ("long", "short"):
+        return False
+    level = _finite_positive(position.invalidation_price)
+    if level is None:
+        return False
+    seen = [p for p in (_finite_positive(worst_adverse_price(position)), _finite_positive(mark_price)) if p is not None]
+    if not seen:
+        return False
+    if position.direction == "long":
+        return min(seen) <= level
+    return max(seen) >= level
 
 
 def build_exit_plan_from_position(

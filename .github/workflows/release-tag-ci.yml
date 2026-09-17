@@ -331,6 +331,10 @@ jobs:
         # persistencia durable y la reconciliación van en el job auto-v2-durable-pg.
         # AUTO-1b: ese fichero PG queda en ``--ignore`` de este job offline y corre con
         # gate propio en lifecycle-pg (migración 042 + reinicio por otra sesión).
+        # V2.42 slice 2b (E1/E2/E3): el golden path de la MESA (entrada → protección → T1
+        # → salida → reconciliación) y sus gemelos fail entran explícitos. Certifican que
+        # la invalidación confirmada VENDE (D2) y que el techo de mantenimiento no se
+        # re-deriva, en el camino completo, no sólo en el módulo de decisión.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -370,7 +374,10 @@ jobs:
           packages/py/application/tests/test_execution_event.py
           packages/py/application/tests/test_applied_fills.py
           packages/py/application/tests/test_position_manager.py
+          packages/py/application/tests/test_v127_golden_path.py
+          packages/py/application/tests/test_v127_golden_path_fail.py
           packages/py/application/tests/test_auto_v2_lifecycle_stop.py
+          apps/api-python/tests/test_auto_v2_lifecycle_clock_thesis.py
           packages/py/application/tests/test_portfolio_reservation.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py

@@ -24,6 +24,7 @@ Invariantes que este módulo sostiene:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Literal, TypedDict
@@ -58,6 +59,12 @@ PositionLifecycleEvent = Literal[
     "PARTIAL_FILL",
     "TRAIL_ARMED",
     "TRAIL_ADVANCED",
+    # V2.42 slice 2b: las dos salidas del ciclo de vida completo. Son eventos de
+    # GESTIÓN (piden salir) y desembocan en ``EXIT_PENDING``; el estado destino no se
+    # multiplica por motivo (el MOTIVO viaja en el ``primary_reason`` del plan y en el
+    # journal). Una salida pedida NUNCA se veta: se re-verifica desde cualquier estado.
+    "TIME_EXIT",
+    "THESIS_EXIT",
     "EXIT_REQUESTED",
     "EXIT_FILLED",
     "MANAGEMENT_SKIPPED",
@@ -120,6 +127,11 @@ _MANAGEMENT_EVENTS: dict[PositionLifecycleEvent, PositionLifecycleState] = {
     # RE-VERIFICA los degradados. Sin esto, el ratchet real desde ``T1_REACHED`` se
     # rechazaba por tabla y el estado quedaba congelado mientras el stop subía.
     "TRAIL_ADVANCED": "TRAILING",
+    # V2.42 slice 2b: las dos salidas del ciclo de vida completo. ``TIME_EXIT`` (el techo
+    # de mantenimiento de la plantilla) y ``THESIS_EXIT`` (invalidación confirmada) piden
+    # salir; el destino es ``EXIT_PENDING`` y el motivo viaja en el plan/journal.
+    "TIME_EXIT": "EXIT_PENDING",
+    "THESIS_EXIT": "EXIT_PENDING",
     "EXIT_REQUESTED": "EXIT_PENDING",
     "EXIT_FILLED": "CLOSED",
     "MANAGEMENT_SKIPPED": "RECONCILIATION_REQUIRED",
@@ -127,9 +139,53 @@ _MANAGEMENT_EVENTS: dict[PositionLifecycleEvent, PositionLifecycleState] = {
     "PROTECTION_UNVERIFIED": "PROTECTION_MISSING",
 }
 
+#: Escalera de estados con POSICIÓN VIVA, de menos a más avanzado. La tabla de la familia
+#: abierta se construye con ella para que sea **forward-only por construcción** (H-7 del
+#: §9 del pack: 7 transiciones aceptaban RETROCEDER, p. ej. ``TRAILING``+``T1_HIT`` volvía
+#: a ``T1_REACHED`` y ``PARTIAL_EXIT``+``PROTECT_APPLIED`` perdía la parcial).
+#:
+#: ``FLAT``/``ENTRY_PENDING`` (todavía no hay posición) y ``CLOSED`` (terminal) NO suben por
+#: esta escalera: mantienen su fila explícita. Los DEGRADADOS tampoco: un hecho observable
+#: los RE-VERIFICA al destino nominal, que es su contrato.
+_LIFECYCLE_LADDER: tuple[PositionLifecycleState, ...] = (
+    "OPEN",
+    "PROTECTED",
+    "T1_REACHED",
+    "PARTIAL_EXIT",
+    "TRAILING",
+    "EXIT_PENDING",
+    "CLOSED",
+)
+_LADDER_RANK: dict[str, int] = {state: rank for rank, state in enumerate(_LIFECYCLE_LADDER)}
+
+
+def _forward_target(
+    current: PositionLifecycleState, nominal: PositionLifecycleState
+) -> PositionLifecycleState:
+    """Destino de un evento de gestión sin retroceder nunca.
+
+    ``EXIT_FILLED`` (``CLOSED``) siempre avanza; el resto se queda en ``current`` si su
+    destino nominal ya quedó atrás (transición idempotente en vez de regresión).
+    """
+    if nominal == "CLOSED":
+        return "CLOSED"
+    current_rank = _LADDER_RANK.get(current)
+    nominal_rank = _LADDER_RANK.get(nominal)
+    if current_rank is None or nominal_rank is None:
+        return nominal
+    return nominal if nominal_rank > current_rank else current
+
+
+def _ladder_row(current: PositionLifecycleState) -> dict[PositionLifecycleEvent, PositionLifecycleState]:
+    return {
+        event: _forward_target(current, nominal)
+        for event, nominal in _MANAGEMENT_EVENTS.items()
+    }
+
+
 #: Tabla EXPLÍCITA de transiciones: estado → evento → estado destino.
-#: Se construye por composición para no repetir la familia abierta, pero el resultado
-#: es un mapa total y auditable (``ALLOWED_TRANSITIONS``).
+#: Se construye por composición (escalera forward-only para la familia abierta) pero el
+#: resultado es un mapa total y auditable (``ALLOWED_TRANSITIONS``).
 _TRANSITIONS: dict[PositionLifecycleState, dict[PositionLifecycleEvent, PositionLifecycleState]] = {
     "FLAT": {"ENTRY_SUBMITTED": "ENTRY_PENDING"},
     "ENTRY_PENDING": {
@@ -137,32 +193,23 @@ _TRANSITIONS: dict[PositionLifecycleState, dict[PositionLifecycleEvent, Position
         "ENTRY_CANCELLED": "FLAT",
         "EXIT_FILLED": "CLOSED",
         "EXIT_REQUESTED": "EXIT_PENDING",
+        "TIME_EXIT": "EXIT_PENDING",
+        "THESIS_EXIT": "EXIT_PENDING",
         "STATE_UNVERIFIED": "RECONCILIATION_REQUIRED",
         "MANAGEMENT_SKIPPED": "RECONCILIATION_REQUIRED",
     },
-    "OPEN": dict(_MANAGEMENT_EVENTS),
-    "PROTECTED": {**_MANAGEMENT_EVENTS, "PROTECT_APPLIED": "PROTECTED"},
-    "T1_REACHED": {
-        **_MANAGEMENT_EVENTS,
-        "PROTECT_APPLIED": "PROTECTED",
-        "T1_HIT": "T1_REACHED",
-    },
-    "PARTIAL_EXIT": {
-        **_MANAGEMENT_EVENTS,
-        "PARTIAL_FILL": "PARTIAL_EXIT",
-    },
-    "TRAILING": {
-        **_MANAGEMENT_EVENTS,
-        "PROTECT_APPLIED": "TRAILING",
-        "TRAIL_ARMED": "TRAILING",
-        "TRAIL_ADVANCED": "TRAILING",
-    },
+    # Familia abierta: forward-only (nunca retrocede).
+    "OPEN": _ladder_row("OPEN"),
+    "PROTECTED": _ladder_row("PROTECTED"),
+    "T1_REACHED": _ladder_row("T1_REACHED"),
+    "PARTIAL_EXIT": _ladder_row("PARTIAL_EXIT"),
+    "TRAILING": _ladder_row("TRAILING"),
+    # ``EXIT_PENDING``: la salida ya está pedida. Cerrar cierra; cualquier otro hecho de
+    # gestión es IDEMPOTENTE (se queda en ``EXIT_PENDING``), nunca retrocede a un estado
+    # de gestión anterior (H-7: antes ``PARTIAL_FILL`` devolvía a ``PARTIAL_EXIT``).
     "EXIT_PENDING": {
-        "EXIT_FILLED": "CLOSED",
+        **_ladder_row("EXIT_PENDING"),
         "EXIT_REQUESTED": "EXIT_PENDING",
-        "PARTIAL_FILL": "PARTIAL_EXIT",
-        "MANAGEMENT_SKIPPED": "RECONCILIATION_REQUIRED",
-        "STATE_UNVERIFIED": "RECONCILIATION_REQUIRED",
     },
     # ``CLOSED`` es terminal: sólo la idempotencia del cierre.
     "CLOSED": {"EXIT_FILLED": "CLOSED"},
@@ -191,6 +238,8 @@ LIFECYCLE_EVENTS: tuple[PositionLifecycleEvent, ...] = (
     "PARTIAL_FILL",
     "TRAIL_ARMED",
     "TRAIL_ADVANCED",
+    "TIME_EXIT",
+    "THESIS_EXIT",
     "EXIT_REQUESTED",
     "EXIT_FILLED",
     "MANAGEMENT_SKIPPED",
@@ -266,7 +315,7 @@ def _finite(value: object) -> float | None:
         number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-    if number != number:
+    if not math.isfinite(number):
         return None
     return number
 
@@ -324,14 +373,18 @@ def apply_lifecycle_event(
     *,
     at: str | None = None,
     resolved_state: object = None,
+    remaining_quantity: float | None = None,
+    quantity: float | None = None,
 ) -> LifecycleTransition:
     """Aplica un evento al estado del FSM. Fail-closed.
 
     * Transición no listada ⇒ ``accepted=False`` y el estado NO avanza.
     * Estado de entrada desconocido ⇒ degrada a ``RECONCILIATION_REQUIRED`` (un estado
       no verificable nunca se interpreta como "sin protección").
-    * ``RECONCILED`` sólo sale de la degradación con un ``resolved_state`` verificado
-      explícito; sin él se rechaza (no se adivina el estado de vuelta).
+    * ``RECONCILED`` exige (H-1 del §9 del pack) **estado degradado de origen**,
+      ``resolved_state`` verificado y **coherencia con el hecho de cantidad**. Sin
+      cantidad no se puede verificar ⇒ se rechaza: no se sale de una degradación a
+      ciegas ni desde un estado que nunca estuvo degradado.
     """
     when = _now_iso(at)
     parsed_event = _coerce_event(event)
@@ -358,7 +411,30 @@ def apply_lifecycle_event(
         )
     if parsed_event == "RECONCILED":
         resolved = coerce_lifecycle_state(resolved_state)
+        if current not in DEGRADED_LIFECYCLE_STATES:
+            # Ya no hay nada que reconciliar: aceptarlo sería un avance lateral silencioso.
+            return LifecycleTransition(
+                from_state=current,
+                event=parsed_event,
+                to_state=current,
+                accepted=False,
+                reason=LIFECYCLE_RESOLUTION_MISSING,
+                at=when,
+            )
         if resolved is None or resolved in DEGRADED_LIFECYCLE_STATES:
+            return LifecycleTransition(
+                from_state=current,
+                event=parsed_event,
+                to_state=current,
+                accepted=False,
+                reason=LIFECYCLE_RESOLUTION_MISSING,
+                at=when,
+            )
+        if not lifecycle_state_is_consistent(
+            resolved, remaining_quantity=remaining_quantity, quantity=quantity
+        ):
+            # Sin cantidad verificable (o incoherente con el estado resuelto) no se sale
+            # de la degradación: se declararía un estado que el hecho de cantidad desmiente.
             return LifecycleTransition(
                 from_state=current,
                 event=parsed_event,
@@ -412,7 +488,14 @@ def advance_lifecycle(
     se actualiza ``lifecycle_state`` y se re-deriva ``status`` con la autoridad nueva.
     """
     transition = apply_lifecycle_event(
-        derive_lifecycle_state(position), event, at=at, resolved_state=resolved_state
+        derive_lifecycle_state(position),
+        event,
+        at=at,
+        resolved_state=resolved_state,
+        # H-1: la coherencia con el hecho de cantidad se comprueba SIEMPRE que hay
+        # posición (aquí la hay): una resolución que el ledger desmiente se rechaza.
+        remaining_quantity=position.remaining_quantity,
+        quantity=position.quantity,
     )
     if not transition.accepted:
         return position, transition
@@ -518,7 +601,13 @@ def high_watermark_from_position(position: PositionState | None) -> float | None
 
 
 def is_trail_armed(position: PositionState | None) -> bool:
-    """El trailing sólo se arma tras T1 (misma regla que el motor legacy: T1 ⇒ trailing)."""
+    """El trailing sólo se arma tras T1 (misma regla que el motor legacy: T1 ⇒ trailing).
+
+    H-3 del §9 del pack: ``PARTIAL_EXIT`` NO arma por sí solo. Una reducción **sólo de
+    T2** dejaba el estado en ``PARTIAL_EXIT`` y el trailing se armaba sin haber alcanzado
+    T1. Si T1 se alcanzó, la evidencia viaja por ``target1_achieved_at``/``target1_leg``
+    o por el ``trailing`` persistido: nunca por el hecho de "haber reducido".
+    """
     if position is None:
         return False
     if trailing_status(position) in ("armed", "active"):
@@ -527,7 +616,7 @@ def is_trail_armed(position: PositionState | None) -> bool:
         return True
     if _leg_done(position.target1_leg):
         return True
-    return position.lifecycle_state in ("T1_REACHED", "PARTIAL_EXIT", "TRAILING")
+    return position.lifecycle_state in ("T1_REACHED", "TRAILING")
 
 
 def compute_trail_stop(
@@ -540,8 +629,13 @@ def compute_trail_stop(
     """Stop de trailing en R sobre el extremo favorable. ``None`` si no es calculable.
 
     ``stop = highWatermark ∓ trail_distance_r × initial_risk`` (long/short) y **nunca**
-    empeora el stop vigente (H2). No inventa riesgo: sin ``initial_risk`` no hay trailing
-    (y el llamante debe declararlo, no sustituirlo por un porcentaje del precio).
+    empeora el stop vigente (H2).
+
+    H-4 del §9 del pack: el ancla es el **pico observado** (``highWatermark`` inyectado o
+    persistido). Sin pico NO hay trailing — antes se caía a ``actual_entry`` y el motor
+    fingía un trailing anclado en la entrada (stop en la entrada ⇒ break-even "gratis").
+    No inventa riesgo ni pico: sin ``initial_risk`` o sin ``highWatermark`` devuelve
+    ``None`` y el llamante debe declararlo, no sustituirlo por un porcentaje del precio.
     """
     if position is None or position.status == "CLOSED":
         return None
@@ -557,8 +651,6 @@ def compute_trail_stop(
     hw = _finite_positive(high_watermark)
     if hw is None:
         hw = high_watermark_from_position(position)
-    if hw is None:
-        hw = _finite_positive(position.actual_entry)
     if hw is None:
         return None
     distance = trail_distance_r_from_width(trail_width) * risk

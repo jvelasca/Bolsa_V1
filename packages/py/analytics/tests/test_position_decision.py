@@ -81,7 +81,8 @@ def test_decision_t1_moderate_take_profit() -> None:
     assert d.attention == "ATTENTION"
 
 
-def test_decision_thesis_review_not_hold() -> None:
+def test_decision_thesis_invalidated_exits() -> None:
+    """D2 (2b): la invalidación CONFIRMADA vende; ya no se queda en ``REVIEW``."""
     d = build_position_decision(
         _pos(),
         mark_price=102.0,
@@ -89,8 +90,37 @@ def test_decision_thesis_review_not_hold() -> None:
         portfolio_recon_status="clean",
     )
     assert d is not None
-    assert d.action == "REVIEW"
+    assert d.action == "EXIT"
     assert d.attention == "URGENT"
+    assert d.primary_reason == "THESIS_INVALIDATION"
+
+
+def test_decision_thesis_invalidated_under_drift_reviews() -> None:
+    """D2: el veto de reconciliación sigue declarado (no es una salida protectora)."""
+    d = build_position_decision(
+        _pos(),
+        mark_price=102.0,
+        thesis_invalid=True,
+        portfolio_recon_status="drift",
+    )
+    assert d is not None
+    assert d.action == "REVIEW"
+
+
+def test_decision_time_stop_exits_with_time_next_event() -> None:
+    """E1 (2b): el techo de mantenimiento genera una salida REAL con motivo propio."""
+    d = build_position_decision(
+        _pos(),
+        mark_price=101.0,
+        now="2026-09-30T10:00:00Z",
+        expires_at="2026-09-29T10:00:00Z",
+        portfolio_recon_status="clean",
+    )
+    assert d is not None
+    assert d.action == "EXIT"
+    assert d.primary_reason == "TIME_STOP"
+    assert d.next_event == "TIME"
+    assert d.suggested_qty == 10.0
 
 
 def test_decision_recon_drift_blocks() -> None:

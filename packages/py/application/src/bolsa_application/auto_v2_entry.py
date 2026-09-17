@@ -64,6 +64,7 @@ from bolsa_analytics.cognitive.signal_identity import (
     build_signal_identity,
 )
 from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
+from bolsa_analytics.indicators.compute import compute_atr
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
 from bolsa_application.auto_reason_codes import RESERVATION_FAILED
 from bolsa_application.decision_contract import DecisionPackage
@@ -126,6 +127,23 @@ def _env_float(name: str, default: float | None) -> float | None:
         return default
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    """Flag de entorno booleano, con el default EXPLÍCITO de la casa.
+
+    Familia "off" (``0/false/off/no/none``) ⇒ ``False``; familia "on"
+    (``1/true/on/yes``) ⇒ ``True``; cualquier otra cosa (vacío incluido) ⇒ ``default``.
+    Un valor basura NO activa un veto de dinero: se queda en el default.
+    """
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    if raw in {"0", "false", "off", "no", "none"}:
+        return False
+    if raw in {"1", "true", "on", "yes"}:
+        return True
+    return default
+
+
 @dataclass(frozen=True, slots=True)
 class V2Tunables:
     """Umbrales del pipeline V2 (env; defaults conservadores)."""
@@ -147,6 +165,12 @@ class V2Tunables:
     risk_budget_pct: float = 6.0
     # ATR de reserva cuando la señal no lo aporta (fracción del precio).
     atr_pct_fallback: float = 0.02
+    # V2.42 slice 2b (E2 · decisión D3): el veto por ATR real nace DESACTIVADO y detrás de
+    # un tunable (``AUTO_ENGINE_SIM_V2_ATR_REQUIRED``). Primero se cablea y se MIDE qué
+    # fracción de señales trae ATR real; el veto se flipea con el número delante, porque
+    # ``NO ENTRY`` es un cambio de régimen en simulado. Con el flag ON, una señal sin ATR
+    # real NO se sustituye por el sintético: cae por el camino normal de NO ENTRY.
+    atr_required: bool = False
     # V2.40.1 (P0): NO existe ``default_edge``. El edge de una oportunidad es el que
     # declara la estrategia o el que aporta su EdgeReport persistido; si no hay ninguno
     # vale 0 (el ranker ya puntúa 0 el componente ausente) y el motor veta por
@@ -251,6 +275,8 @@ def tunables_from_env() -> V2Tunables:
         regime_override=regime_raw or None,
         signal_timeframe=(os.getenv("AUTO_ENGINE_SIM_V2_TIMEFRAME") or "").strip()
         or base.signal_timeframe,
+        # E2: el veto por ATR real es OPT-IN explícito (default OFF).
+        atr_required=_env_flag("AUTO_ENGINE_SIM_V2_ATR_REQUIRED", base.atr_required),
         cost_model=_cost_model_from_env(),
     )
 
@@ -593,7 +619,11 @@ def plan_v2_tick(
     for signal in ordered:
         entry_score = score_by_symbol.get(signal.instrument_id)
         atr = signal.atr
-        if atr is None and signal.price > 0:
+        if atr is None and signal.price > 0 and not cfg.atr_required:
+            # E2: con ``AUTO_ENGINE_SIM_V2_ATR_REQUIRED`` el sintético NO entra. La
+            # reserva sigue existiendo para el régimen histórico (flag OFF), pero cuando
+            # la política exige precisión de riesgo un ``None`` se queda ``None`` y el
+            # candidato cae por el camino normal de NO ENTRY.
             atr = signal.price * cfg.atr_pct_fallback
         # Foto de trabajo: base + lo YA reservado en este tick (riesgo, capital y
         # exposición). Cada candidato se evalúa contra la foto reservada, no contra la
@@ -1215,6 +1245,91 @@ class DiscoveryRegimeSource:
         return map_trial_regime(self._trial_regime)
 
 
+def _as_ohlcv_bar(raw: Any) -> Any | None:
+    """Normaliza una barra a ``OhlcvBar`` (o ``None`` si no es utilizable).
+
+    ``compute_atr`` accede por atributo; un ``Mapping`` (los seams de test del repo
+    sirven dicts) se convierte aquí, explícitamente. Barra malformada ⇒ ``None``: el
+    llamante la descarta y el ATR queda sin calcular, nunca inventado.
+    """
+    if hasattr(raw, "high") and hasattr(raw, "low") and hasattr(raw, "close"):
+        return raw
+    if not isinstance(raw, Mapping):
+        return None
+    try:
+        from bolsa_domain.entities.ohlcv_bar import OhlcvBar  # noqa: PLC0415
+
+        close = float(raw["close"])
+        return OhlcvBar(
+            timestamp=str(raw.get("timestamp") or raw.get("date") or ""),
+            open=float(raw.get("open", close)),
+            high=float(raw["high"]),
+            low=float(raw["low"]),
+            close=close,
+            volume=int(raw.get("volume", 0) or 0),
+        )
+    except Exception:  # noqa: BLE001 — barra incompleta ⇒ no hay barra.
+        return None
+
+
+@dataclass
+class AtrSource:
+    """ATR real por símbolo respaldado por barras (as-of, determinista).
+
+    V2.42 slice 2b (E2 · decisión D3). ``refresh()`` es la parte async (trae barras del
+    universo y calcula el ATR de cada una); ``__call__()`` es la lectura SÍNCRONA del hot
+    path, de modo que decidir no depende de I/O.
+
+    Fail-closed: un fallo de lectura, barras insuficientes o un ATR no finito dejan el
+    símbolo SIN valor ⇒ el llamante cae al fallback DECLARADO (``atr_source=fallback``) y
+    con ``AUTO_ENGINE_SIM_V2_ATR_REQUIRED=1`` la candidata no entra. Nunca se inventa un
+    ATR para poder abrir.
+
+    Las barras se aceptan en las DOS formas que circulan por el repo (``OhlcvBar`` del
+    repositorio y ``Mapping`` de los seams de test): ``compute_atr`` exige atributos, así
+    que un mapping se CONVIERTE explícitamente. Sin esa conversión el ATR real quedaría
+    mudo en cualquier camino que sirviera dicts —fail-closed, sí, pero indistinguible de
+    "no hay barras"— y la reserva sintética parecería obligatoria sin serlo.
+    """
+
+    bars_provider: Callable[[], Awaitable[Mapping[str, Sequence[Any]]]]
+    period: int = 14
+    _atr_by_symbol: dict[str, float] = field(default_factory=dict, init=False, repr=False)
+
+    async def refresh(self) -> int:
+        """Recalcula el ATR por símbolo. Devuelve cuántos símbolos tienen ATR real."""
+        try:
+            bars_by_symbol = await self.bars_provider() or {}
+        except Exception:  # noqa: BLE001 — sin barras no hay ATR (fail-closed).
+            logger.exception("auto_v2 atr refresh failed (atr_source=missing)")
+            self._atr_by_symbol = {}
+            return 0
+        computed: dict[str, float] = {}
+        for symbol, bars in bars_by_symbol.items():
+            rows = [bar for bar in (_as_ohlcv_bar(raw) for raw in (bars or [])) if bar is not None]
+            if len(rows) < self.period + 1:
+                continue
+            try:
+                series = compute_atr(rows, self.period)
+            except Exception:  # noqa: BLE001 — barras malformadas ≠ ATR inventado.
+                continue
+            value = next((v for v in reversed(series) if v is not None), None)
+            if value is None or value != value or value <= 0 or value in (float("inf"), float("-inf")):
+                continue
+            key = str(symbol or "").strip()
+            if key:
+                computed[key] = float(value)
+        self._atr_by_symbol = computed
+        return len(computed)
+
+    def atr_for(self, symbol: str) -> float | None:
+        """Lectura síncrona del ATR cacheado (``None`` si no hay dato verificable)."""
+        return self._atr_by_symbol.get(str(symbol or "").strip())
+
+    def __call__(self, symbol: str) -> float | None:
+        return self.atr_for(symbol)
+
+
 def _observed_field(observed: Any, name: str) -> Any:
     """Lee un campo de una observación (dataclass, Mapping o atributo)."""
     if observed is None:
@@ -1360,6 +1475,7 @@ __all__ = [
     "V2_ENGINE_ENV",
     "CatalogTradeContextSource",
     "DiscoveryRegimeSource",
+    "AtrSource",
     "EdgeReportSource",
     "SIGNAL_DUPLICATE",
     "SIGNAL_IDENTITY_MISSING",

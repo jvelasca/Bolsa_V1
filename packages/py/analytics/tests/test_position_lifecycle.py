@@ -36,6 +36,7 @@ from bolsa_analytics.cognitive.position_lifecycle import (
 from bolsa_analytics.cognitive.position_state import (
     apply_position_current_stop,
     apply_position_mark,
+    apply_position_reduce,
     build_position_state_from_fill,
     position_state_from_dict,
 )
@@ -160,11 +161,85 @@ def test_reconciled_requires_verified_target() -> None:
     )
     assert degraded_target.accepted is False
 
-    restored = apply_lifecycle_event(
+    # H-1 (§9 del pack): sin el HECHO de cantidad no se puede verificar la resolución.
+    unverifiable = apply_lifecycle_event(
         "RECONCILIATION_REQUIRED", "RECONCILED", resolved_state="PROTECTED"
+    )
+    assert unverifiable.accepted is False
+    assert unverifiable.reason == LIFECYCLE_RESOLUTION_MISSING
+
+    restored = apply_lifecycle_event(
+        "RECONCILIATION_REQUIRED",
+        "RECONCILED",
+        resolved_state="PROTECTED",
+        remaining_quantity=10.0,
+        quantity=10.0,
     )
     assert restored.accepted is True
     assert restored.to_state == "PROTECTED"
+
+
+def test_reconciled_rejected_from_non_degraded_state() -> None:
+    """H-1: ``RECONCILED`` sólo sale de una degradación; desde un estado vivo se rechaza."""
+    for state in ("OPEN", "PROTECTED", "TRAILING", "EXIT_PENDING"):
+        transition = apply_lifecycle_event(
+            state,
+            "RECONCILED",
+            resolved_state="PROTECTED",
+            remaining_quantity=10.0,
+            quantity=10.0,
+        )
+        assert transition.accepted is False, state
+        assert transition.to_state == state
+        assert transition.reason == LIFECYCLE_RESOLUTION_MISSING
+
+
+def test_reconciled_rejected_when_ledger_contradicts_target() -> None:
+    """H-1: el ledger manda. ``CLOSED`` con posición viva no se "reconcilia" a ciegas."""
+    transition = apply_lifecycle_event(
+        "RECONCILIATION_REQUIRED",
+        "RECONCILED",
+        resolved_state="CLOSED",
+        remaining_quantity=10.0,
+        quantity=10.0,
+    )
+    assert transition.accepted is False
+    assert transition.reason == LIFECYCLE_RESOLUTION_MISSING
+
+
+def test_time_exit_and_thesis_exit_request_the_exit() -> None:
+    """V2.42 slice 2b: las dos salidas nuevas piden salir desde cualquier estado vivo."""
+    for state in PROTECTIVE_EXIT_ALLOWED_STATES:
+        for event in ("TIME_EXIT", "THESIS_EXIT"):
+            transition = apply_lifecycle_event(state, event)
+            assert transition.accepted is True, (state, event)
+            assert transition.to_state == "EXIT_PENDING"
+
+
+def test_management_ladder_never_goes_backwards() -> None:
+    """H-7 (§9 del pack): ninguna transición de gestión retrocede de estado.
+
+    El caso que lo motivó: ``TRAILING`` + ``T1_HIT`` devolvía a ``T1_REACHED`` y
+    ``PARTIAL_EXIT`` + ``PROTECT_APPLIED`` perdía la parcial.
+    """
+    ladder = (
+        "OPEN",
+        "PROTECTED",
+        "T1_REACHED",
+        "PARTIAL_EXIT",
+        "TRAILING",
+        "EXIT_PENDING",
+    )
+    rank = {state: i for i, state in enumerate(ladder)}
+    for state in ladder:
+        for event in _ALL_EVENTS:
+            transition = apply_lifecycle_event(state, event)
+            if not transition.accepted:
+                continue
+            target = transition.to_state
+            if target not in rank:
+                continue
+            assert rank[target] >= rank[state], (state, event, target)
 
 
 def test_coerce_lifecycle_state_normalizes() -> None:
@@ -340,6 +415,79 @@ def test_trail_stop_needs_real_risk() -> None:
     pos, _ = advance_lifecycle(_open_long(), "T1_HIT")
     without_risk = replace(pos, initial_risk=None)
     assert compute_trail_stop(without_risk, trail_width="medium") is None
+
+
+def test_trail_stop_needs_a_watermark() -> None:
+    """H-4 (§9 del pack): sin pico observado NO hay trailing.
+
+    Antes se caía a ``actual_entry`` y el motor fingía un trailing anclado en la entrada
+    (break-even "gratis"): con ``highWatermark`` ausente el stop propuesto era la entrada
+    menos 1R, que no es un pico de nadie.
+    """
+    pos, _ = advance_lifecycle(_open_long(), "T1_HIT")
+    assert high_watermark_from_position(pos) is None
+    assert compute_trail_stop(pos, trail_width="medium") is None
+    # El pico inyectado a mano tampoco se inventa desde la entrada.
+    assert compute_trail_stop(pos, trail_width="medium", high_watermark=None) is None
+
+
+def test_non_finite_watermark_and_stop_are_rejected() -> None:
+    """H-5 (§9 del pack): ``inf`` no es un número utilizable (antes pasaba el filtro NaN)."""
+    pos, _ = advance_lifecycle(_open_long(), "T1_HIT")
+    assert compute_trail_stop(pos, trail_width="medium", high_watermark=float("inf")) is None
+    assert compute_trail_stop(pos, trail_width="tight", high_watermark=float("nan")) is None
+    assert apply_position_mark(pos, float("inf")) is None
+    assert apply_position_mark(pos, float("nan")) is None
+    assert apply_position_current_stop(pos, float("inf")) is None
+
+
+def test_partial_exit_alone_does_not_arm_trailing() -> None:
+    """H-3 (§9 del pack): una reducción SÓLO de T2 no arma el trailing.
+
+    Antes ``is_trail_armed`` incluía ``PARTIAL_EXIT``, de modo que reducir por T2 (sin T1)
+    habilitaba trailing sobre una posición que nunca alcanzó su primer objetivo.
+    """
+    pos = _open_long()
+    reduced = apply_position_reduce(
+        pos,
+        3.0,
+        exit_price=110.0,
+        at="2026-08-25T16:00:00Z",
+        mark_target2_achieved=True,
+    )
+    assert reduced is not None
+    partial, _ = advance_lifecycle(reduced, "PARTIAL_FILL", at="2026-08-25T16:00:00Z")
+    assert partial.lifecycle_state == "PARTIAL_EXIT"
+    assert is_trail_armed(partial) is False
+    assert compute_trail_stop(partial, trail_width="medium") is None
+
+
+def test_rehydration_degrades_explicit_null_lifecycle() -> None:
+    """H-6 (§9 del pack): ``lifecycleState: null`` PRESENTE no es "no persistido"."""
+    blob = dict(_open_long().to_dict())
+    blob[LIFECYCLE_STATE_KEY] = None
+    restored = position_state_from_dict(blob)
+    assert restored is not None
+    assert restored.lifecycle_state == "RECONCILIATION_REQUIRED"
+    assert protection_state_name(restored) == "RECONCILIATION_REQUIRED"
+
+
+def test_rehydration_validates_legacy_status_against_quantity() -> None:
+    """H-6: sin FSM persistido, un ``status`` que desmiente la cantidad degrada."""
+    blob = dict(_open_long().to_dict())
+    blob.pop(LIFECYCLE_STATE_KEY, None)
+    blob["status"] = "CLOSED"
+    restored = position_state_from_dict(blob)
+    assert restored is not None
+    assert restored.lifecycle_state == "RECONCILIATION_REQUIRED"
+    assert derive_lifecycle_state(restored) == "RECONCILIATION_REQUIRED"
+
+    live_without_qty = dict(_open_long().to_dict())
+    live_without_qty.pop(LIFECYCLE_STATE_KEY, None)
+    live_without_qty["remainingQuantity"] = 0.0
+    restored_live = position_state_from_dict(live_without_qty)
+    assert restored_live is not None
+    assert restored_live.lifecycle_state == "RECONCILIATION_REQUIRED"
 
 
 # --------------------------------------------------------------------------------------
