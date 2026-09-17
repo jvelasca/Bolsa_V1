@@ -13,6 +13,11 @@
 `042_portfolio_reservations`; el techo y el nivel de invalidación viven en el JSONB
 `sim_auto_positions.position_state`, decisión **D5**).
 
+**Qué auditar exactamente:** tag anotado **`v2.42.1-beta` → `4ea8c72a`** (la única ref que importa; `main`
+va por delante sólo con docs). CI del sello: `Python CI` **5/5** en `main` y en la ref del tag,
+`Release tag CI` **10/10 con `certify` en `success`** — job `python` offline **1925 passed / 35 skipped**,
+job `lifecycle-pg` (PG real) **144 + 45 passed**. Runs en el §8.1 del [pack](./audit-pack-v2.42.1-auto-2-slice-2b-2026-09-17.md).
+
 **Alcance del slice:** cierra **E1** (`TIME_EXIT`), **E2** (ATR real cableado y medido, veto tras flag) y
 **E3** (`THESIS_EXIT`, con la firma **D2** del owner) y los **siete hallazgos de código** del §9 de 2a
 (H-1..H-7). **Fuera:** la evidencia de journal de un **día completo** en producción, la entrada del

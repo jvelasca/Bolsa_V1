@@ -12,6 +12,12 @@
 
 **Bump:** `1.67.0-beta` → **`1.67.1-beta`** (tag nuevo `v2.42.1-beta`; `1.68.0-beta` sigue siendo de `AUTO-3`).
 **Migración: NINGUNA** (Alembic head sigue en `042_portfolio_reservations`).
+**Sello cerrado y verde (2026-09-17):** commit `4ea8c72a` + tag anotado `v2.42.1-beta`. `Python CI`
+**5/5** en `main` ([`35268151108`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35268151108)) y en la
+ref del tag ([`35268256591`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35268256591)); `Release tag CI`
+([`35268256718`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35268256718)) **10/10 con `certify` en
+`success`** (job `python` offline **1925 passed / 35 skipped**; `lifecycle-pg` con PG real **144 + 45 passed**,
+donde se certifican los PG de durabilidad de 2b). Detalle en el [audit-pack](./audit-pack-v2.42.1-auto-2-slice-2b-2026-09-17.md) §8.1.
 
 ---
 
@@ -95,7 +101,7 @@ Resumen operativo; el detalle auditado (con la matriz de mutación medida) está
    armar trailing, sin pico no hay trailing, `math.isfinite`, `lifecycleState: null` degrada, escalera
    forward-only.
 5. **Red de seguridad** — 11 tests hermeticos nuevos de worker
-   (`apps/api-python/tests/test_auto_v2_lifecycle_clock_thesis.py`), 6 PG de durabilidad y 13 mutaciones
+   (`apps/api-python/tests/test_auto_v2_lifecycle_clock_thesis.py`), 3 PG de durabilidad y 13 mutaciones
    medidas en rojo; cableado explícito en los dos workflows.
 
 ---
@@ -190,7 +196,8 @@ un día con `time_exit` y `thesis_exit` en el journal + medición del ATR real) 
 - `release-tag-ci.yml` → job `python`: el mismo fichero hermetico **explícito** en su lista por fichero
   (aquí no basta el pase de directorio: la lista del tag es por fichero, salvo los directorios que sí
   recolecta); bloque `lifecycle-pg` con PG real.
-- Los **6 tests PG nuevos** viven en `apps/api-python/tests/test_auto_v2_lifecycle_pg.py` y **un skip es
+- Los **3 tests PG nuevos** viven en `apps/api-python/tests/test_auto_v2_lifecycle_pg.py` (3 → 6 en el
+  fichero) y **un skip es
   un fallo**.
 - Alembic head: **`042_portfolio_reservations`** (2b no añade migración).
 

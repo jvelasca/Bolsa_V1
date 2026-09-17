@@ -14,6 +14,9 @@
 (`invalidationPrice`) viajan en el **mismo JSONB** `sim_auto_positions.position_state` (migración `040`):
 la decisión **D5** del relevo era no abrir migración `043` y se ha respetado.
 
+**Ref auditada:** tag anotado **`v2.42.1-beta` → `4ea8c72a`**. Todo lo que afirmas aquí se mide contra esa
+ref; `main` puede ir por delante sólo con docs. Evidencia de CI del sello en el §8.1.
+
 **Alcance:** cierra los E1/E2/E3 de `AUTO-2` (§4 del roadmap) y los **siete hallazgos H-1..H-7** del §9 del
 pack de 2a.
 
@@ -44,7 +47,7 @@ pack de 2a.
 **No afirma**
 
 - **No** afirma haber medido PG real en la máquina del slice 2b: el DSN local no responde ni rechaza (el
-  `connect` se cuelga, medido) ⇒ los **6 tests PG nuevos** se certifican en CI, no aquí. Cualquier
+  `connect` se cuelga, medido) ⇒ los **3 tests PG nuevos** se certifican en CI, no aquí. Cualquier
   afirmación en contrario sería falsa y este pack no la hace.
 - **No** afirma que el criterio de salida completo de `AUTO-2` esté cerrado en producción: el **veto**
   de ATR nace **OFF** (D3: primero medir), el horizonte depende de que la plantilla de política tenga
@@ -234,20 +237,32 @@ AUTO_V2_LIFECYCLE_PG_REQUIRED=1 uv run pytest apps/api-python/tests/test_auto_v2
 
 ### 8.1 CI real de GitHub
 
-Pendiente de sellado: se completa en el commit docs-only posterior al tag `v2.42.1-beta` (runs de
-`Python CI` en `main` y en la ref del tag, y `Release tag CI`), con el mismo criterio que el pack de 2a:
-la cifra que manda es la de CI, y la de local se declara con su procedencia.
+**Commit de fase `4ea8c72a`** (28 ficheros, `+2744/−82`), tag anotado **`v2.42.1-beta` → `4ea8c72a`**.
+
+| Run                                                                                             | Ref                 | Resultado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`35268151108`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35268151108) `Python CI`      | `main` @ `4ea8c72a` | **GREEN 5/5**. `quality`: **1914 passed, 38 skipped** (112,8 s; los skips son las suites gated por `*_PG_REQUIRED`, que corren en sus jobs). `auto-v2-durable-pg`: **39 passed, 0 skipped** con `AUTO_V2_LIFECYCLE_PG_REQUIRED=1` (incluye los 3 PG nuevos de 2b). `lifecycle-pg` (variante per-commit): 13 passed. `paper-forward-pg` y `grammar-discovery-pg`: verde                                                                                                                             |
+| [`35268256591`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35268256591) `Python CI`      | `v2.42.1-beta`      | **GREEN 5/5** (mismos cinco jobs: `quality`, `auto-v2-durable-pg`, `lifecycle-pg`, `paper-forward-pg`, `grammar-discovery-pg`)                                                                                                                                                                                                                                                                                                                                                                     |
+| [`35268256718`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35268256718) `Release tag CI` | `v2.42.1-beta`      | **GREEN 10/10** (+1 opt-in skipped, por diseño) con `certify` en `success`. Job `python` (offline): **1925 passed, 35 skipped**, `ruff` limpio, `mypy` **487 ficheros 0 issues**. Job `lifecycle-pg` (Alembic + auth + golden restart, **PG real**): **144 passed** y **45 passed** en sus dos bloques — aquí es donde se certifican de verdad los PG de durabilidad de 2b. `a7-gate`, `decision-spine`, `dr-verify`, `shared`, `frontend`, `playwright (mock E2E)` y `security (gitleaks)`: verde |
+| `Frontend CI`, `Optimize lab`, `Fase 2 scientific`, `Gitleaks`                                  | `main` y tag        | **GREEN** en las dos refs                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+> **Nota de lectura**: la cifra del job `quality` de CI (**1914 passed, 38 skipped**) coincide en número de
+> pasados con la medición local (**1914 passed, 0 skipped**) porque en local los 8 ficheros PG van a
+> `--ignore` (aquí cuelgan) mientras CI los recolecta y los **skipea** (38 tests) al no haber servidor en
+> ese job. No es una discrepancia: es la misma suite con dos tratamientos distintos de las suites gated.
+> Lo mismo en el job `python` del tag: **1925 passed** en CI (35 skipped) y **1925 passed** en local (0
+> skipped, con los PG en `--ignore`). Y el gate que **sí** certifica PG real (`lifecycle-pg` del tag,
+> **144+45 passed**) tiene ahí su evidencia.
 
 ### 8.2 Baterías locales (medidas en el árbol final del slice, antes de publicar)
 
 - `ruff`: **All checks passed!** · `mypy`: **487 ficheros, 0 issues** · `lint-imports`: **4 kept / 0 broken**.
 - Bloque **offline** del job `quality` (`python-ci.yml`): **1914 passed, 0 failed, 0 skipped** (51,7 s),
   con los **targets y los `--ignore` extraídos del YAML** por un runner que además **verifica que cada
-  ruta existe** (una ruta inexistente aborta la medición en vez de medir otra cosa). Procedencia: 2 tests
-  nuevos respecto a la medición anterior (el del pico sin memoria en R y su endurecimiento) y **6 ficheros
-  PG movidos a `--ignore`** con motivo medido (en CI saltan rápido porque no hay servidor; aquí el
-  `connect` del DSN **se queda colgado**), más `--noconftest` para no depender del conftest de la app (que
-  también habla con PG).
+  ruta existe** (una ruta inexistente aborta la medición en vez de medir otra cosa). Procedencia: **40
+  rutas** objetivo y **8 ficheros PG** movidos a `--ignore` respecto al YAML con motivo medido (en CI
+  saltan rápido porque no hay servidor; aquí el `connect` del DSN **se queda colgado**), más
+  `--noconftest` para no depender del conftest de la app (que también habla con PG).
 - Bloque **offline** del job `python` de `release-tag-ci.yml`: **1925 passed, 0 failed, 0 skipped**
   (18,4 s), misma lista extraída del YAML y **mismo verificador de existencia de rutas** (este job corre
   un conjunto algo mayor: incluye ficheros de orquestador y del worker que el job `quality` no lista).
