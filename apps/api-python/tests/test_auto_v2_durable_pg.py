@@ -80,10 +80,66 @@ async def _seed_account(session: AsyncSession) -> str:
     return scope.account.id
 
 
+# ── V2.42 · identidad determinista que LLENA (fin del sorteo de la cola SIM) ─────
+#
+# El worker deriva el ruido del venue de ``sha256(seed, instrument_id, side, ...)`` con
+# ``seed = self._minute * 100_003 + sum(ord(symbol)) % 9999`` y ``symbol`` = el id
+# vigilado. Con un id ALEATORIO (``inst-v2d-<10hex>``), medido sobre 5 000 ids de esa
+# familia en el minuto de la entrada, el **12,74 %** de las ejecuciones se queda sin
+# llenado (``noise_reject``/``noise_timeout``/``noise_unavailable``/``noise_unknown``
+# o el residual que topa a mitad) y el spine determinista NO vuelve a proponer la
+# entrada en ese proceso ⇒ ``_open`` vacío: rojo espurio, sin defecto de producto.
+# Es la misma clase de sorteo que el 12,4 % que documentó V2.40.3 para la familia
+# ``inst-a9restart-``; la diferencia es que aquí la semilla depende del MINUTO (la
+# entrada ocurre en el minuto 1), así que la barrida exige llenado en TODA la ventana
+# de ticks del test y no solo en el minuto 0.
+_FILL_WINDOW = range(0, 9)
+# = ``_FILL_CHUNKS`` del worker (solo importa para elegir un id cuya orden llene).
+_FILL_CHUNKS = 4
+
+
+def _filling_instrument_id(prefix: str, *, side: str = "buy") -> str:
+    """Id determinista cuya orden ``side`` LLENA en todos los minutos de la ventana.
+
+    Barrida pura (sin BD, sin proceso) y determinista: mismo id en cada ejecución. Si
+    ningún candidato llenara, falla con diagnóstico propio en vez de dejar el rojo
+    espurio al azar.
+    """
+    from bolsa_application.simulated_broker import simulated_fill_schedule
+
+    for n in range(64):
+        candidate = f"{prefix}{n:010d}"
+        fills = [
+            simulated_fill_schedule(
+                instrument_id=candidate,
+                side=side,
+                quantity=Decimal("100"),
+                venue_order_id=f"probe-{candidate}-{minute}",
+                seed=minute * 100_003 + sum(map(ord, candidate)) % 9999,
+                fill_chunks=_FILL_CHUNKS,
+                base_mid=100.0,
+            ).fills
+            for minute in _FILL_WINDOW
+        ]
+        if all(fills):
+            return candidate
+    raise AssertionError(
+        f"ningún id determinista de {prefix} llena en toda la ventana de minutos "
+        f"{_FILL_WINDOW} con la cola SIM ({side}); revisar draw_queue_noise"
+    )
+
+
 async def _seed_instrument(session: AsyncSession, instrument_id: str) -> None:
     from datetime import UTC, datetime
 
     from bolsa_infrastructure.database.models.tables import InstrumentRow
+
+    # Con identidad determinista (fin del sorteo) el segundo run reusa la MISMA PK; el
+    # alta es idempotente y no se borra (posiciones y reservas de runs anteriores la
+    # referencian). El ``fetchedAt`` fresco de aquel run sigue dentro de la ventana de
+    # frescura del motor.
+    if await session.get(InstrumentRow, instrument_id) is not None:
+        return
 
     now = datetime.now(UTC)
     session.add(
@@ -208,7 +264,9 @@ async def test_v2_durable_plan_and_consumed_signal_survive_real_restart(
         AutoSimulationWorker,
     )
 
-    instrument_id = f"inst-v2d-{uuid.uuid4().hex[:10]}"
+    # Identidad determinista que llena en toda la ventana: con un id aleatorio la
+    # entrada se pierde por el sorteo de la cola SIM en ~12,7 % de las ejecuciones.
+    instrument_id = _filling_instrument_id("inst-v2d-", side="buy")
     engine_id = f"auto-v2d-{uuid.uuid4().hex[:10]}"
     monkeypatch.setenv("AUTO_ENGINE_SIMULATED_VENUE", "simulated")
     monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", instrument_id)
