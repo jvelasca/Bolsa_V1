@@ -46,7 +46,8 @@ como motor del camino AUTO (queda un shim de compatibilidad) + política T1/T2 e
 **Fuera de lo cerrado (2b, es tu trabajo):** `TIME_EXIT`, `THESIS_EXIT`, **ATR real**,
 **horizonte de tiempo** y, si toca, migración `043`. El **criterio de salida completo** de `AUTO-2`
 **no** está cumplido: el roadmap exige `TIME_EXIT`/`THESIS_EXIT` **con evidencia en el journal de un
-día completo**, y eso no existe todavía.
+día completo**, y eso no existe todavía. **Las seis decisiones de diseño ya están resueltas con
+evidencia medida en el §4.2** (D1…D6): no las reabras, confirma solo D3 y D6.
 
 ---
 
@@ -230,24 +231,28 @@ tarea corta y recomendable **antes** de que muerda.
 
 1. **`TIME_EXIT` (salida por tiempo)**: no existe en el camino AUTO. `max_holding_period_days`
    existe en `trading_policy`/`operating_policy`/plantillas (**90/45/21 días**) y **no tiene ningún
-   consumidor**. Tampoco hay `expected_holding_period`.
+   consumidor**. Tampoco hay `expected_holding_period`. **Resuelto en D1**.
 2. **`THESIS_EXIT` (motor de tesis)**: no existe. `PositionState.thesis_health` sigue siendo el
    stub `{"status": "none"}` (**position_state.py L466**); `exit_radar.py` (advisory, camino mesa)
-   sí tiene una noción de `thesis_exit`, pero **no** la consume AUTO.
+   sí tiene una noción de `thesis_exit`, pero **no** la consume AUTO. **Resuelto en D2** (con el aviso
+   de dinero: hoy `thesis_invalid` mapea a `REVIEW`, no a `EXIT`).
 3. **`REGIME_EXIT`/`RISK_EXIT`**: `REGIME_EXIT` **ya existe** en
    `position_manager.py` (`REGIME_EXIT` L60, emitido L262) y `regime_exit_only` existe como veto de
    **entrada**; lo que el roadmap pide para `AUTO-2` en esta materia es que la salida por régimen
    forme parte del ciclo de vida completo, y `RISK_EXIT` pertenece de hecho a los gobernadores de
    `AUTO-3`. Léelo en el roadmap §4 y §5 antes de tocar nada.
 4. **ATR real**: AUTO sigue entrando con **ATR sintético** (`atr_pct_fallback`):
-   worker **L1149–1150** (geometría de entrada), **L1198** (`atr=` del plan), **L1988–1989**
-   (geometría de adopción). `compute_atr` existe en analytics y **no** llega a AUTO. El roadmap dice
+   worker **L1149–1150** (`_v2_stop_map`), **L1198** (el `atr=` que se **fabrica** para cada
+   `V2Signal` y pisa la rama que ya prefiere el real), **L1988–1989** (geometría de adopción).
+   `compute_atr` existe en analytics y **no** llega a AUTO. El roadmap dice
    literalmente _"sin ATR no hay stop ⇒ `NO ENTRY` cuando la política exija precisión de riesgo"_, y
-   eso es un **cambio de comportamiento grande** en producción simulada: confírmalo con el owner y
-   **mide cuántas señales caen** antes de activarlo.
+   eso es un **cambio de comportamiento grande** en producción simulada. **Resuelto en D3**: cablear →
+   medir → veto detrás de tunable.
 5. **Horizonte de tiempo**: sin consumidor (ver 1) y sin transporte en el `TradePlan`.
+   **Resuelto en D1**: se resuelve por plantilla y se congela en el JSONB.
 6. **Migración `043`** (si 2b la necesita): columnas de horizonte/tesis o tabla de transiciones. Si
    el estado cabe en el JSONB + columnas existentes, **no** la crees por inercia (2a no la necesitó).
+   **Resuelto en D5**: JSONB, sin migración.
 7. **`mfe_mae`**: sigue siendo un `dict[str, object]` sin esquema tipado (lee §3.3).
 
 ### 3.3 Trampas medidas (landmines que te van a morder)
@@ -285,7 +290,7 @@ tarea corta y recomendable **antes** de que muerda.
 
 ---
 
-## 4. Alcance declarado de `2b` y decisiones abiertas
+## 4. Alcance declarado de `2b` y decisiones **resueltas**
 
 ### 4.1 Lo que pide el roadmap §4 (texto normativo, lo que falta)
 
@@ -302,26 +307,163 @@ tarea corta y recomendable **antes** de que muerda.
   estado intermedio nuevo; y la certificación de que **ninguna** salida protectora se veta se
   mantiene.
 
-### 4.2 Decisiones que hay que tomar (pregúntalas al owner **antes** de codificar)
+### 4.2 Decisiones de 2b — **RECOMENDACIÓN CERRADA** (2026-09-17)
 
-1. **¿De dónde sale el horizonte de tiempo?** `trading_policy`/`operating_policy` ya declaran
-   `max_holding_period_days`/`min_holding_period_minutes` por plantilla (90/45/21 días) **sin
-   consumidor**. Recomendación: que el `TradePlan` los transporte (es el contrato que ya viaja al
-   `PositionState`) y que `TIME_EXIT` sea consecuencia del plan, no una constante del worker.
-2. **¿Quién evalúa la tesis?** Hay `thesis_health.py` (`map_thesis_health`) y el campo
-   `PositionState.thesis_health`. Recomendación: reutilizar + **condición de invalidación explícita**
-   en el plan; `AI`/LLM **no** entra en el hot path.
-3. **Severidad del ATR real**: convertirlo en `NO ENTRY` es un cambio **grande** de comportamiento
-   en simulado. **Mide primero** cuántas señales caen con las barras reales y decide con el número
-   delante (¿`NO ENTRY` o `ENTRY_REDUCED`?).
-4. **¿Qué es "protección mínima viable" para una posición adoptada** sin estado verificable? Hoy
-   degrada a `RECONCILIATION_REQUIRED` + `PROTECTION_MISSING`; con ATR real puede **no haber** stop,
-   y hay que decidir si eso obliga a cerrar, a reducir o a mantener con vigilancia.
-5. **¿Migración `043` o JSONB?** Si el horizonte y la tesis caben en `position_state`, **no** la
-   crees; si creas columnas para consultarlas desde SQL, recuerda el patrón obligatorio del §5.
-6. **¿Un solo slice (2b) o dos?** El patrón de AUTO-1/2a (a hermético + b durable) funcionó bien;
-   2b es más pequeño que 2a, así que un solo slice con las dos mitades dentro (hermético + PG) es
-   defendible.
+Estas seis decisiones quedaron **abiertas** al sellar 2a. Debajo va la recomendación técnica con su
+evidencia en código medida hoy, la alternativa descartada y el **gate de aceptación**. De las seis,
+**solo D3 y D6** cambian algo que el owner debe firmar (régimen de entrada y versionado); el resto es
+ejecución. Si discrepas, cambia la decisión **antes** de codificar, no a mitad.
+
+#### D1 — ¿De dónde sale el horizonte de tiempo? → del **modelo de plantilla**, congelado en el nacimiento
+
+**Recomendación.** Un `resolve_holding_horizon(template_id)` **junto a** `resolve_exit_policy` en
+`exit_policy.py`, que lea los días de `POLICY_TEMPLATES[template_id].horizon.max_holding_period_days`
+(hoy **90/45/21**), y que el worker **congele el deadline** en el nacimiento de la posición dentro del
+JSONB (`holdingDeadlineAt`, aditivo), calculado desde `PositionState.created_at`.
+
+**Evidencia.**
+
+- Los **mismos ids** gobiernan las dos tablas: `exit_policy.EXIT_POLICY_BY_TEMPLATE`
+  (`conservative`/`moderate`/`aggressive_swing`, `exit_policy.py` L51-55) y
+  `trading_policy_templates.POLICY_TEMPLATES` (`trading_policy_templates.py` L233-237, campos en
+  L77-78/146-147/214-215) ⇒ el join no necesita tabla nueva.
+- `max_holding_period_days` **no tiene hoy ningún consumidor**: solo se serializa
+  (`trading_policy.py` L173-174 · `operating_policy.py` L69-70).
+- `TradePlan` (`trade_plan.py` L65-121) **no tiene** campo de horizonte; el JSONB de posición **sí**
+  admite claves nuevas sin romper consumidores (2a ya lo hizo con `lifecycleState`) y `createdAt` ya
+  viaja y se persiste (`position_state.py` L291 y L331).
+- **Trampa medida (no reutilizar `expires_at`):** `build_exit_plan_from_position` dispara `TIME_STOP`
+  con `now >= expires_at` (`exit_plan.py` L169-171), pero ese `expires_at` es la **caducidad de la
+  entrada** del `TradePlan`, no un horizonte de mantenimiento: reutilizarlo haría que una posición
+  recién abierta cuyo plan de entrada ya caducó emitiera `TIME_STOP` **en el nacimiento**.
+- **Estado del cableado (esto es lo que falta, y es poco):** el worker llama
+  `plan_v2_position_outcome` **sin `now` y sin `expires_at`** (`auto_simulation_worker.py`
+  L2154-2164), así que `TIME_STOP` es **inalcanzable hoy** (guarda `now_s and exp_s`,
+  `exit_plan.py` L170). El resto ya está: `suggestion_from_exit_policy` devuelve `full_exit` para
+  `TIME_STOP` (`exit_policy.py` L112) y `_action_from_plan` lo mapea a `EXIT`
+  (`position_decision.py` L187-188).
+
+**Descartado.** Transportarlo en `TradePlan` (toca el contrato de la mesa y obliga a decidir su
+ausencia en el rebuild) y una constante del worker (segunda fuente de verdad).
+
+**Gate.** Hermético con `now` inyectado: deadline pasado ⇒ `EXIT` con `primary_reason=TIME_STOP` y
+motivo propio en el journal · un minuto antes ⇒ sin salida · reinicio (PG) donde el deadline
+sobrevive. Mutación a rojo: "el reloj no se lee".
+
+#### D2 — ¿Quién evalúa la tesis? → **invalidación explícita del plan** + degradación determinista; sin LLM
+
+**Recomendación.** Dos niveles, ambos deterministas: (i) **condición de invalidación congelada en el
+nacimiento** (`invalidationPrice`/regla estructural, aditivo en el JSONB): si el mark la atraviesa,
+`thesis_invalid=True`; (ii) **degradación con lo ya persistido** (`mfeMae`, `unrealizedR`, stop
+intacto, edad) reutilizando `map_thesis_health` con `hard_exit=True` cuando (i) dispara. El
+consumidor **ya existe**: `thesis_health` viaja en el JSONB (`position_state.py` L327),
+`exit_plan._collect_reasons` convierte `thesis_invalid` en `THESIS_INVALIDATION`
+(`exit_plan.py` L141-143) y `THESIS_INVALIDATION` está en `_HARD_TRIGGER` (L48-53).
+
+**Aviso de dinero (esto sí lo firma el owner).** Hoy `_action_from_plan` devuelve **`REVIEW`** ante
+`thesis_invalid`/`THESIS_INVALIDATION` (`position_decision.py` L182-183): **no vende**. Y
+`THESIS_INVALIDATION` **no** está en `_PROTECTIVE_EXIT_REASONS` = `{STRUCTURAL_STOP, TRAIL,
+PORTFOLIO_RISK}` (L76-78). Si 2b quiere que `THESIS_EXIT` sea una salida **real** hay que tocar una
+función **compartida con la mesa** (`build_position_decision`): recomiendo **sí** convertir la
+invalidación confirmada en `EXIT` (proteger capital), pero como cambio propio, con **A/B del camino
+mesa** medido y con la mutación "vuelve a `REVIEW`" en la matriz. `TIME_STOP` **no** entra en
+`_PROTECTIVE_EXIT_REASONS` (una salida por tiempo no es cubrirse).
+
+**Evidencia del hueco.** `thesis_invalid` está declarado en toda la cadena
+(`position_decision` L244 · `position_manager` L174 · `auto_v2_entry` L728) pero nadie lo **emite** en
+producción: el worker no lo pasa (`auto_simulation_worker.py` no tiene ni una coincidencia de
+`thesis_invalid`) y los únicos `thesis_invalid=True` del repo están en **tests**. `PositionState.thesis_health`
+sigue siendo el stub `{"status": "none"}` (`position_state.py` L466).
+
+**Descartado.** Recomputar la confianza del pipeline de señales en cada tick de gestión: el worker
+**no** corre el motor de señales por tick, y metería latencia y una fuente nueva de verdad.
+
+**Gate.** Cartesiano con `thesis_invalid` · reinicio que conserve la invalidación · y un test que
+falle si `THESIS_INVALIDATION` vuelve a `REVIEW` sin decisión explícita.
+
+#### D3 — Severidad del ATR real → **cablear, medir y solo después vetar** (detrás de tunable)
+
+**Hallazgo que cambia el tamaño del trabajo.** El worker **fabrica** el ATR sintético **en el
+origen**: `_v2_signals` construye `V2Signal(atr=price × atr_pct_fallback)`
+(`auto_simulation_worker.py` L1193-1198), y eso **pisa** una rama que ya prefiere el ATR real:
+`plan_v2_tick` hace `atr = signal.atr; if atr is None: atr = price × fallback`
+(`auto_v2_entry.py` L595-597). Es decir: la intención "real si existe, reserva si no" **ya está
+escrita** (y el propio tunable la documenta: _"ATR de reserva cuando la señal no lo aporta"_,
+L149) — el worker la anula. Quedan dos puntos sintéticos más: `_v2_stop_map` (L1149-1150) y la
+geometría de adopción (L1988-1989).
+
+**Recomendación.** **No** activar `NO ENTRY` en el mismo commit. Primero: (1) leer el ATR real donde
+existe y marcar `atr_source ∈ {real, fallback, missing}` en el journal; (2) **medir** qué fracción de
+señales trae ATR real y cuánto cambia la geometría; (3) aterrizar el veto **detrás de un tunable**
+(`AUTO_ENGINE_SIM_V2_ATR_REQUIRED`, default `0`) y flipearlo **con el número delante**. `NO ENTRY` es
+un cambio de régimen en simulado: sin número, no.
+
+**Fuentes reales disponibles.** `TechnicalInputs.atr` / `atr_percentile`
+(`knowledge/models.py` L22-24, alias de catálogo `atr_14`/`feat_atr_14`) y `compute_atr(bars, period)`
+(`indicators/compute.py` L175) con el loader de barras que el worker **ya** construye para el decider
+(`make_bar_snapshot_loader`, L3167-3175). Los tests ya construyen `V2Signal(..., atr=2.0)`
+(`test_auto_v2_entry.py` L259) ⇒ el camino real está probado, **no** ejercitado.
+
+**Descartado.** `NO ENTRY` incondicional: el roadmap lo pide _"cuando la política exija precisión de
+riesgo"_ (condicional, no global).
+
+**Gate.** Tres casos (real presente ⇒ geometría real · ausente ⇒ fallback **visible** como
+`atr_source=fallback` · `ATR_REQUIRED=1` + ausente ⇒ `NO ENTRY` con motivo propio) + la **fracción
+medida publicada** en el audit-pack.
+
+#### D4 — Protección mínima viable de una adoptada → **nunca sin suelo declarado, nunca inventando al alza**
+
+**Recomendación.** Al adoptar sin estado verificable: (a) reconstruir geometría como hoy
+(`_v2_adopt_position`); (b) si el stop reconstruido es válido ⇒ `RECONCILIATION_REQUIRED` **con** ese
+stop y **sin** `PROTECTION_MISSING` (hay protección); (c) si **no** hay stop reconstruible ⇒
+`RECONCILIATION_REQUIRED` + `PROTECTION_MISSING` y la posición entra en modo **EXIT-ONLY** (no
+amplía, no promedia; solo reduce/cierra) hasta reconciliar; (d) journalizar siempre la elección.
+**No** cerrar por defecto: cerrar es decisión de dinero y hoy no hay evidencia de que el stop
+reconstruido falte en la práctica ⇒ **mide** cuántas adopciones acaban sin stop antes de proponer el
+cierre forzoso.
+
+**Ojo con el atajo.** El trailing sintético sin pico (**H-4** del §9 del pack, hoy cae al precio de
+entrada) **no** puede ser la fuente del suelo de una adoptada: el suelo sale de geometría
+reconstruida o no existe (y entonces EXIT-ONLY).
+
+**Gate.** Adopción con geometría ⇒ estado + stop + journal · adopción sin geometría ⇒
+`PROTECTION_MISSING` + EXIT-ONLY + journal · mutación "deja pasar una compra en EXIT-ONLY" en rojo.
+
+#### D5 — ¿Migración `043` o JSONB? → **JSONB, sin migración**
+
+**Recomendación.** Nada de `043`: head sigue en `042_portfolio_reservations`. Todo lo que añade 2b es
+aditivo y cuelga de claves nuevas de `position_state`: `holdingDeadlineAt`, `invalidationPrice`,
+`plannedConfidence`, `atrSource`. `createdAt` ya está (`position_state.py` L331) ⇒ el reloj de D1 no
+necesita columna · `thesisHealth` ya está (L327) ⇒ el almacén de D2 tampoco ·
+`sim_auto_positions` (`tables.py` L2256-2294) ya tiene `entry_price`/`high_watermark`/`stop_price`/
+`t1_state`/`trailing_state` y **ninguna** columna nueva hace falta.
+
+**Cuándo sí crear `043`.** Solo si la evidencia del criterio de salida (_journal de un día completo_)
+se va a consultar **desde SQL** (agregados por horizonte/tesis) o si aparece un índice necesario. En
+ese caso: patrón del §5 y **bumpear `_ALEMBIC_HEAD`**.
+
+**Gate.** `test_discovery_evidence_snapshot_pg.py` **sin cambios** y round-trip del JSONB con las
+claves nuevas (un consumidor viejo las ignora).
+
+#### D6 — ¿Un slice o dos? → **un slice `2b`, tres entregables con gate propio**
+
+**Recomendación.** Un solo slice con tres entregables, **cada uno con su mutación medida y su test
+durable**, en este orden por blast radius:
+
+1. **E1 · `TIME_EXIT`** — el reloj, el evento y la evidencia de journal. El más barato: `TIME_STOP`
+   ya existe y ya mapea a `EXIT` (D1).
+2. **E2 · ATR real** — medición primero; veto detrás de tunable (D3).
+3. **E3 · `THESIS_EXIT`** — el último, porque toca `_action_from_plan`, **compartido con la mesa**, y
+   exige A/B (D2).
+
+**Versionado (corrección de una línea mía anterior).** 2b **sí** necesita bump: `1.67.0-beta` ya está
+**tagueado** (`v2.42-beta` → `35e38c24`) y **no se re-escribe un tag publicado**. Recomiendo
+**`1.67.1-beta`** (mismo `V2.42`/`AUTO-2` del roadmap, bump de parche) con tag nuevo `v2.42.1-beta`.
+**`1.68.0-beta` sigue siendo de `AUTO-3`** (roadmap L29): esa asignación no se toca.
+
+**Gate.** Las tres matrices publicadas · `CHANGELOG` de `1.67.1-beta` · y el criterio de salida del
+roadmap (_`TIME_EXIT`/`THESIS_EXIT` con evidencia en el journal de un día completo_) **medido, no
+prometido**.
 
 ---
 
@@ -434,13 +576,18 @@ Reglas de honestidad del repo (no negociables):
       es de tus propias pruebas).
 - [ ] `git tag -l -n5 v2.42-beta` → tag anotado apuntando a `35e38c24`.
 - [ ] `git stash list` → hay un stash **ajeno y antiguo** (`all-v170`). **No lo toques**.
-- [ ] `package.json` → `1.67.0-beta` (el bump a `1.68.0-beta` es de `AUTO-3`; 2b no lo necesita).
-- [ ] Head de Alembic → `042_portfolio_reservations` (2a **no** añadió migración).
+- [ ] `package.json` → `1.67.0-beta` (2a, **ya tagueado**). 2b sube a **`1.67.1-beta`** con tag nuevo
+      `v2.42.1-beta` (ver D6 del §4.2); **`1.68.0-beta` sigue siendo de `AUTO-3`**.
+- [ ] Head de Alembic → `042_portfolio_reservations` (2a **no** añadió migración, y D5 del §4.2 dice
+      que 2b tampoco).
 - [ ] Lee §3.2 y §3.3 **enteros** y verifica en código **dos** huecos (el de `TIME_EXIT` y el de
       `thesis_health` son los más rentables).
-- [ ] Pregunta al owner las **seis decisiones** de §4.2 **antes** de codificar.
-- [ ] Mide (no supongas) el impacto del ATR real sobre el número de entradas antes de convertirlo en
-      `NO ENTRY`.
+- [ ] Las **seis decisiones** de §4.2 ya traen **recomendación cerrada**: confirma con el owner solo
+      **D3** (severidad del ATR: régimen de entrada) y **D6** (bump a `1.67.1-beta`). No vuelvas a
+      preguntar por D1/D2/D4/D5: están resueltas con evidencia en el propio §4.2.
+- [ ] Mide (no supongas) el impacto del ATR real sobre el número de entradas antes de convertir el
+      fallback en veto: el ATR sintético se **fabrica en `_v2_signals`** (L1193-1198) y **pisa** la
+      rama que ya prefiere el real (`auto_v2_entry.py` L595-597).
 
 ---
 
