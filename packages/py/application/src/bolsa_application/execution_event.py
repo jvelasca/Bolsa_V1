@@ -288,6 +288,20 @@ class ExecutionEventStore(Protocol):
         limit: int = 100,
     ) -> list[ExecutionEvent]: ...
 
+    # AUTO-1A — fills MATERIALIZADOS: la fuente de verdad del ``PositionLedger``
+    # (``POSITION = Σ APPLIED``). ``ORDER BY applied_at, execution_id`` para que el fold
+    # sea determinista. ``account_id=None`` ⇒ sin filtro de cuenta (el llamante que no
+    # pudo determinar su cuenta prefiere ver todo antes que asumir que no hay nada).
+    # Recibir exactamente ``limit`` filas ⇒ el llamante NO puede afirmar que vio el libro
+    # completo (lo declara como medición incompleta). Sin índice parcial
+    # ``(account_id, status)``: deuda declarada, migración en AUTO-1.
+    async def list_applied(
+        self,
+        account_id: str | None,
+        *,
+        limit: int = 1000,
+    ) -> list[ExecutionEvent]: ...
+
 
 class InMemoryExecutionEventStore:
     """Test double: refleja la idempotencia por execution_id + workflow durable.
@@ -535,6 +549,34 @@ class InMemoryExecutionEventStore:
         )
         return rows[:limit]
 
+    async def list_applied(
+        self,
+        account_id: str | None,
+        *,
+        limit: int = 1000,
+    ) -> list[ExecutionEvent]:
+        """Fills APPLIED en orden de aplicación (AUTO-1A · espeja el store PG).
+
+        Orden por ``(applied_at, execution_id)`` — determinista para el fold del
+        ``PositionLedger``. A diferencia de ``list_unapplied`` (más reciente primero),
+        aquí el orden es CRONOLÓGICO: el coste medio y el P&L realizado dependen de él.
+        """
+        if limit <= 0:
+            return []
+        rows = [
+            row
+            for row in self._rows.values()
+            if row.status == "APPLIED"
+            and (account_id is None or row.account_id == account_id)
+        ]
+        rows.sort(
+            key=lambda r: (
+                r.applied_at or datetime.min.replace(tzinfo=UTC),
+                r.execution_id,
+            )
+        )
+        return rows[:limit]
+
 
 def _row_to_execution_event(row: Any) -> ExecutionEvent:
     """Mapeo fila ``execution_events`` → ``ExecutionEvent`` (una sola fuente de verdad)."""
@@ -635,6 +677,39 @@ class PostgresExecutionEventStore:
             sa.select(ExecutionEventRow)
             .where(ExecutionEventRow.status.in_(tuple(statuses)))
             .order_by(ExecutionEventRow.captured_at.desc())
+            .limit(limit)
+        )
+        if account_id is not None:
+            query = query.where(ExecutionEventRow.account_id == account_id)
+        rows = (await self._session.execute(query)).scalars().all()
+        return [_row_to_execution_event(row) for row in rows]
+
+    async def list_applied(
+        self,
+        account_id: str | None,
+        *,
+        limit: int = 1000,
+    ) -> list[ExecutionEvent]:
+        """Fills materializados (``status='APPLIED'``) en orden de aplicación (AUTO-1A).
+
+        Es la lectura con la que se reconstruye ``POSITION = Σ APPLIED``. Orden
+        ``applied_at, execution_id`` (determinista para el coste medio / P&L realizado);
+        ``account_id`` opcional. Recibir exactamente ``limit`` filas obliga al llamante a
+        declarar el libro como NO medible (puede haber más de las leídas).
+        """
+        import sqlalchemy as sa
+
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+
+        if limit <= 0:
+            return []
+        query = (
+            sa.select(ExecutionEventRow)
+            .where(ExecutionEventRow.status == "APPLIED")
+            .order_by(
+                ExecutionEventRow.applied_at.asc(),
+                ExecutionEventRow.execution_id.asc(),
+            )
             .limit(limit)
         )
         if account_id is not None:

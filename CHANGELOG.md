@@ -2,6 +2,89 @@
 
 All notable releases of Bolsa V1.
 
+## [1.65.5-beta] — V2.40.5 · AUTO-1A Position Materialization & Partial-Fill Integrity — 2026-09-17
+
+**Sin migración** (head sigue en `041_unique_natural_keys`). Cierra el **P0** de las auditorías de
+`v2.40.4-beta`: `simulated_fill_schedule` puede dejar una orden **parcialmente llena** (la cola queda
+en `RETRY`, dinero NO movido), pero el worker contabilizaba la cantidad **pedida**. Resultado: la
+posición real (`73,5`) y el exit (`200`) divergían, el hueco viajaba a riesgo, exposición, equity y
+protección, los chunks en `RETRY` desaparecían del libro de órdenes pendientes y el invariante de
+equity del test de scheduler descuadraba de forma **intermitente** (era el flake que la auditoría
+midió, no una casualidad de CI).
+
+| #        | Qué                                                                                                                                                                                                                                                                                                                                      |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P0.1** | La posición pasa a ser **Σ fills `APPLIED`** (`POSITION = Σ APPLIED BUY − Σ APPLIED SELL`). `_settle` deja de descartar los outcomes del apply y devuelve `applied`/`unapplied`/`requested`; `_open`, persistencia, `PositionState` (T1/stop/trailing) y libros usan la cantidad **aplicada**                                            |
+| **P0.2** | Nuevo **`PositionLedger`** (read-model puro, `bolsa_analytics.cognitive`) derivado de `execution_events(status='APPLIED')` + `sim_fill_finance_context`. **Sin migración**: la persistencia con rollback/replay es `AUTO-1`                                                                                                              |
+| **P0.3** | El exit se dimensiona contra la posición **materializada** con invariante duro `applied_qty <= held`: una venta aplicada de más se declara (`exit_qty_over_position`) y aplana, jamás deja posición negativa                                                                                                                             |
+| **P0.4** | Fail-closed del libro: `list_applied` acotado por `limit`, `get_many` batch, `read_applied_fill_facts` devuelve `UNKNOWN` (nunca un libro "vacío y plausible") si no pudo leerlo entero. Tras un crash, una proyección **inflada** se reconstruye (`REBUILT`) desde Σ `APPLIED`; libro ilegible ⇒ aperturas vetadas y salidas permitidas |
+| **P0.5** | Observabilidad (Auditoría 2): `manage_position_outcome` con `PositionManagerSkip` + reason codes `no_mark_data`, `mark_rejected`, `decision_unavailable`, `fill_not_materialized`, `fill_partially_materialized`, `exit_qty_over_position`. El `mark is None` deja de ser un `continue` mudo                                             |
+| **P0.6** | El helper de equity de las dos suites PG de jornada completa deriva el realizado **solo** de fills `APPLIED` (helper compartido `tests/applied_fill_equity.py`); suma el contexto entero era la causa medida del flake                                                                                                                   |
+| **P0.7** | Suite hermética nueva `apps/api-python/tests/test_auto_v2_partial_fills.py` con **seam determinista de settlement** (parcial fijo `50 + 23,5 = 73,5`, cola en `RETRY`) que ejecuta el camino real de liquidación, más bucle 30/30 del test de scheduler con PG real                                                                      |
+
+### P0.1 — `POSITION = Σ APPLIED` (lo pedido ≠ lo llenado ≠ lo materializado)
+
+`_settle` descartaba los outcomes (`result, _out = ...`) y devolvía **todas** las observaciones del
+schedule, incluidas las que quedaron en `RETRY`; `_record_applied_event` las daba por aplicadas. Ahora
+`_Settlement` distingue `applied` / `unapplied` / `requested_qty` (con modo _structural_ para el camino
+sin `finance_applier`, donde no hay dinero que mover) y todo el dimensionado (posición, persistencia,
+`PositionState`, `report.fills`, emits) usa la cantidad **aplicada**. El emit `order` conserva la
+pedida y el journal declara ambos números: `fill_partially_materialized` cuando parte de los chunks
+quedaron pendientes, `fill_not_materialized` cuando no se movió nada y `fill_unapplied` por chunk
+pendiente (que sigue siendo **capital reservado**, visible en el libro de órdenes pendientes).
+
+### P0.2 — `PositionLedger`: el libro de posición como read-model
+
+Módulo puro y determinista (sin I/O ni reloj): `AppliedFillFact` (una fila `APPLIED` con contexto
+financiero legible), `LedgerPosition` (`quantity`, `realized_qty`, `remaining_qty`, `average_entry`,
+`realized_pnl`, `violations`) y `build_position_ledger(facts, rejected=…)` con orden canónico
+`(applied_at, execution_id)`. Reglas de honestidad: una **sobreventa** aplicada es violación explícita
+(`oversell_above_position`, `oversell_without_position`) y nunca inventa un corto; una fila no
+interpretable **no se descarta en silencio** — baja el `measurement` (`COMPLETE`/`PARTIAL`/`UNKNOWN`),
+de modo que "no pude leer el libro" jamás se confunde con "el libro está plano".
+
+### P0.3 — Exit dimensionado por posición materializada
+
+El SELL se clampa contra la posición **materializada** y el invariante `applied_qty <= held` es duro:
+si un fill de venta excediera la posición, se aplanan las ventas aplicadas y se journaliza
+`exit_qty_over_position` (defensa en profundidad medida con un seam que devuelve 1 000 de más).
+`report.fills` cuenta **fills aplicados**.
+
+### P0.4 — Autoridad canónica y recuperación
+
+`execution_events.list_applied(account_id, *, limit)` (protocolo + in-memory + PG:
+`WHERE status='APPLIED' ORDER BY applied_at, execution_id`) y `SimFillFinanceContextStore.get_many`
+(batch, sin N+1). `applied_fills.read_applied_fill_facts` compone el libro y **declara** sus huecos
+(sin store, sin `list_applied`, excepción, sin contexto, `limit` agotado, descuadre
+evento↔contexto) en vez de devolver un libro plausible. `CanonicalPositions` transporta las trazas
+que sustentan cada cantidad (mismo contrato de `dict` que el seam `canonical_positions_reader`), así
+que la reconciliación contrasta el canónico en el mismo acto de leerlo: tras un reinicio con la RAM
+vacía, una proyección inflada se reescribe a la materializada (`REBUILT`).
+
+### P0.5 — Skips de gestión con rastro (Auditoría 2)
+
+`manage_position_outcome` devuelve `PositionManagerResult` | `PositionManagerSkip` | `None` (los casos
+benignos siguen siendo `None`; `manage_position` mantiene el contrato antiguo). `run_auto_cycle`
+journaliza `auto_position_skip` con `attention="high"` para `no_mark_data`, `mark_rejected` y
+`decision_unavailable`, y el worker propaga el motivo a `_v2_last_exit_reasons[symbol]`. Los literales
+viven en un dueño único (`auto_reason_codes.py`).
+
+### P0.6/P0.7 — Flake del scheduler cerrado y certificado
+
+El helper de equity sumaba **todas** las filas de `sim_fill_finance_context`, incluidas las
+planificadas que quedaron sin aplicar ⇒ `equity != initial + realized + unrealized` de forma
+intermitente. Ahora `realized_notional_from_applied_fills` (helper compartido por
+`test_auto_scheduler_real_pg_zero_human_intervention.py` y `test_a9_scheduler_process_pg_zero_human.py`)
+usa solo `execution_events.status='APPLIED'` (cantidad del evento, lado/precio del contexto) y
+**falla** si un `APPLIED` no tiene contexto o la cantidad diverge. Nuevo instrumento determinista
+`test_equity_realized_ignores_unapplied_fill_context` (BUY aplicado + BUY en `RETRY` + SELL aplicado
+⇒ el realizado ignora el `RETRY`) y suite hermética nueva con parcial determinista + bucle **30/30**
+del scheduler con PG real, sin retries ni `xfail`.
+
+**Deuda declarada:** sin índice parcial `execution_events(account_id, status)` (lectura acotada por
+`limit`); la cola no llena queda como capital en `RETRY` y su liberación explícita es `AUTO-1`
+(Reservation Engine); el `PositionLedger` es read-model, sin tabla propia.
+
 ## [1.65.4-beta] — V2.40.4 · AUTO Safety & Accounting (TOP_N real, measurement status, órdenes pendientes y validación de TradePlan) — 2026-09-16
 
 **Sin migración** (head sigue en `041_unique_natural_keys`). Cierra los cuatro agujeros de

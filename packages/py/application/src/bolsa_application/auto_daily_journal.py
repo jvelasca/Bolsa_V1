@@ -44,7 +44,7 @@ _ORDER_SIDES = ("buy", "sell")
 class SimJournalRow:
     """Aportación mínima a la agregación del día (venue del camino SIM)."""
 
-    kind: str  # "order" | "fill" | "position_open" | "position_close"
+    kind: str  # "order" | "fill" | "fill_unapplied" | "position_open" | "position_close"
     venue: str
     execution_id: str
     side: str = "buy"

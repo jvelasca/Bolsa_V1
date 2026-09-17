@@ -324,6 +324,9 @@ jobs:
         # status de riesgo/exposición, libro de órdenes pendientes y validación de
         # TradePlan (herméticos, stores in-memory) entran aquí con nombre propio; el caso
         # crash-left-CAPTURED con PG real va en el job auto-v2-durable-pg.
+        # V2.40.5/AUTO-1A: ledger de posición y lectura de fills APPLIED (puros/herméticos)
+        # con nombre propio; el reinicio con PG real y el bucle de la jornada completa del
+        # scheduler se certifican en lifecycle-pg / auto-v2-durable-pg.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -361,6 +364,7 @@ jobs:
           packages/py/application/tests/test_portfolio_decision_engine.py
           packages/py/application/tests/test_trade_plan.py
           packages/py/application/tests/test_execution_event.py
+          packages/py/application/tests/test_applied_fills.py
           packages/py/application/tests/test_position_manager.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py

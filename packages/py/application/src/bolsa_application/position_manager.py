@@ -26,6 +26,11 @@ régimen exit-only.
 Fail-closed: posición inexistente/cerrada, mark inválido o dirección no soportada ⇒
 ``None`` (no se inventa una orden). Los stops que empeoran son rechazados por
 ``PositionState`` (H2), así que el manager hereda esa garantía.
+
+AUTO-1A — ``manage_position_outcome`` distingue el ``None`` BENIGNO (nada que gestionar)
+del hueco OPERATIVO (``PositionManagerSkip``: mark rechazado o decisión no construible).
+``manage_position`` colapsa ambos a ``None`` (retrocompatible), pero el hot path AUTO usa
+el tri-estado para que ningún tick quede sin rastro en el journal.
 """
 
 from __future__ import annotations
@@ -43,12 +48,48 @@ from bolsa_analytics.cognitive.position_state import (
     PositionState,
     apply_position_mark,
 )
+from bolsa_application.auto_reason_codes import (
+    POSITION_DECISION_UNAVAILABLE,
+    POSITION_MARK_REJECTED,
+)
 
 OrderAction = Literal["hold", "reduce", "sell"]
 
 # Motivo de salida por régimen (AUTO 2.0). No vive en ExitPlan (contrato cognitivo
 # intacto); es una capa operativa del manager.
 REGIME_EXIT = "regime_exit"
+
+
+@dataclass(frozen=True, slots=True)
+class PositionManagerSkip:
+    """Gestión de posición NO realizada, con motivo explícito.
+
+    ``mark_rejected`` = el ``PositionState`` rechazó el mark (precio no finito/<=0 o
+    incoherente con el histórico) ⇒ la posición queda SIN gestionar en este tick.
+    ``decision_unavailable`` = no se pudo construir la ``PositionDecision`` (p. ej. falta
+    un dato obligatorio del contrato cognitivo) ⇒ no hay intención que ejecutar.
+
+    Antes estos dos casos eran ``return None`` mudos: indistinguibles de un tick sin nada
+    que hacer (Auditoría 2). Los literales son únicos y viven en ``auto_reason_codes``.
+    """
+
+    instrument_id: str
+    reason: str
+    detail: str = ""
+
+    @property
+    def is_protective(self) -> bool:
+        """Un skip NUNCA es una salida: la posición sigue viva y sin gestión."""
+        return False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": "position_skip",
+            "instrumentId": self.instrument_id,
+            "reason": self.reason,
+            "detail": self.detail,
+            "attention": "high",
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,18 +158,70 @@ def manage_position(
 ) -> PositionManagerResult | None:
     """Gestiona una posición abierta: mark + decisión + intención de orden.
 
-    Devuelve ``None`` si no hay posición gestionable (fail-closed). El régimen exit-only
+    Devuelve ``None`` si no hay posición gestionable (fail-closed) **o si la gestión no
+    pudo completarse** (mark rechazado / decisión no construible). El régimen exit-only
     fuerza venta total con motivo ``regime_exit`` con precedencia ABSOLUTA sobre
     cualquier otra intención (hold/reduce/take-profit/trailing).
+
+    Retrocompatible: delega en ``manage_position_outcome`` y colapsa los motivos de
+    no-gestión a ``None``. El llamante que necesite DISTINGUIR "no hay nada que hacer"
+    de "no pude gestionar" usa ``manage_position_outcome`` (hot path AUTO).
+    """
+    outcome = manage_position_outcome(
+        position,
+        mark_price=mark_price,
+        regime=regime,
+        thesis_invalid=thesis_invalid,
+        portfolio_recon_status=portfolio_recon_status,
+        expires_at=expires_at,
+        now=now,
+        exit_policy=exit_policy,
+        template_id=template_id,
+        trail_hint=trail_hint,
+        trail_stop=trail_stop,
+        at=at,
+    )
+    return outcome if isinstance(outcome, PositionManagerResult) else None
+
+
+def manage_position_outcome(
+    position: PositionState | None,
+    *,
+    mark_price: float,
+    regime: str | None = None,
+    thesis_invalid: bool = False,
+    portfolio_recon_status: str | None = None,
+    expires_at: str | None = None,
+    now: str | None = None,
+    exit_policy: ExitPolicy | None = None,
+    template_id: str | None = None,
+    trail_hint: bool = False,
+    trail_stop: float | None = None,
+    at: str | None = None,
+) -> PositionManagerResult | PositionManagerSkip | None:
+    """Como ``manage_position`` pero DEVOLVIENDO el motivo cuando no pudo gestionar.
+
+    Tri-estado del ciclo de gestión de posición:
+
+    * ``PositionManagerResult`` — gestionada (hold/reduce/sell/protect).
+    * ``PositionManagerSkip`` — NO gestionada: mark rechazado o decisión no construible.
+      El llamante DEBE journalizarlo con atención alta (la posición sigue viva y sin
+      gestión, que es un estado operativo, no un no-op).
+    * ``None`` — nada que gestionar (sin posición, cerrada o ya plana): benigno.
     """
     if position is None or position.status == "CLOSED":
         return None
     if position.remaining_quantity <= 0:
         return None
 
+    instrument_id = str(getattr(position, "instrument_id", "") or "")
     marked = apply_position_mark(position, mark_price, at=at)
     if marked is None:
-        return None
+        return PositionManagerSkip(
+            instrument_id=instrument_id,
+            reason=POSITION_MARK_REJECTED,
+            detail=f"mark_price={mark_price!r}",
+        )
 
     decision = build_position_decision(
         marked,
@@ -144,7 +237,11 @@ def manage_position(
         trail_stop=trail_stop,
     )
     if decision is None:
-        return None
+        return PositionManagerSkip(
+            instrument_id=instrument_id,
+            reason=POSITION_DECISION_UNAVAILABLE,
+            detail=f"mark_price={mark_price!r} recon={portfolio_recon_status!r}",
+        )
 
     order_action, order_qty, stop_update = _order_from_decision(decision, marked)
 

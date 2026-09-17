@@ -41,6 +41,7 @@ from bolsa_analytics.cognitive.opportunity_ranker import (
 )
 from bolsa_analytics.cognitive.position_state import PositionState
 from bolsa_analytics.cognitive.trade_plan import validate_trade_plan
+from bolsa_application.auto_reason_codes import NO_MARK_DATA
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.portfolio_decision_engine import (
     Direction,
@@ -50,7 +51,8 @@ from bolsa_application.portfolio_decision_engine import (
 )
 from bolsa_application.position_manager import (
     PositionManagerResult,
-    manage_position,
+    PositionManagerSkip,
+    manage_position_outcome,
 )
 from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 
@@ -62,6 +64,7 @@ ACTIVE_SOURCE = "active"
 
 EVENT_ENTRY_DECISION = "auto_entry_decision"
 EVENT_POSITION_DECISION = "auto_position_decision"
+EVENT_POSITION_SKIP = "auto_position_skip"
 
 _OPERATIONAL_REGIMES: frozenset[str] = frozenset(
     {"BULL_TREND", "BEAR_TREND", "SIDEWAYS", "HIGH_VOLATILITY", "LOW_VOLATILITY", "RISK_OFF", "UNKNOWN"}
@@ -241,6 +244,29 @@ def build_top_n_excluded_payload(
     }
 
 
+def build_position_skip_payload(skip: PositionManagerSkip) -> dict[str, Any]:
+    """Payload de journal de una posición que NO se pudo gestionar (AUTO-1A).
+
+    Antes estos casos eran ``continue`` mudos: el ciclo parecía "sin nada que hacer"
+    cuando en realidad había una posición viva sin gestión. ``attention="high"`` porque
+    es un estado OPERATIVO, no un no-op: alguien (o algo) debe poder verlo.
+    """
+    return {
+        "event": EVENT_POSITION_SKIP,
+        "instrumentId": skip.instrument_id,
+        "positionId": None,
+        "action": "SKIP",
+        "orderAction": None,
+        "orderQty": None,
+        "stopUpdate": None,
+        "exitReasons": [],
+        "attention": "high",
+        "reason": skip.reason,
+        "reasonCodes": [skip.reason],
+        "detail": skip.detail,
+    }
+
+
 def _entry(
     *,
     event_type: str,
@@ -355,23 +381,56 @@ def run_auto_cycle(
     for position in open_positions:
         mark = marks_map.get(position.instrument_id)
         if mark is None:
+            # AUTO-1A: antes era un ``continue`` mudo. Una posición SIN mark es una
+            # posición viva que el motor NO pudo gestionar (ni proteger): se journaliza
+            # con atención alta en vez de desaparecer del ciclo.
+            journal.append(
+                _entry(
+                    event_type=EVENT_POSITION_SKIP,
+                    decision_id=f"SKIP-{uuid4().hex[:12]}",
+                    actor=actor,
+                    instrument_id=position.instrument_id,
+                    payload=build_position_skip_payload(
+                        PositionManagerSkip(
+                            instrument_id=position.instrument_id,
+                            reason=NO_MARK_DATA,
+                            detail="marks_map sin instrumento en el tick",
+                        )
+                    ),
+                    at=as_of,
+                )
+            )
             continue
-        result = manage_position(
+        outcome = manage_position_outcome(
             position,
             mark_price=mark,
             regime=resolved_regime,
             at=as_of,
         )
-        if result is None:
+        if isinstance(outcome, PositionManagerSkip):
+            # AUTO-1A: mark rechazado / decisión no construible ⇒ motivo explícito.
+            journal.append(
+                _entry(
+                    event_type=EVENT_POSITION_SKIP,
+                    decision_id=f"SKIP-{uuid4().hex[:12]}",
+                    actor=actor,
+                    instrument_id=position.instrument_id,
+                    payload=build_position_skip_payload(outcome),
+                    at=as_of,
+                )
+            )
             continue
-        position_results.append(result)
+        if outcome is None:
+            # Benigno (sin posición gestionable): nada que journalizar.
+            continue
+        position_results.append(outcome)
         journal.append(
             _entry(
                 event_type=EVENT_POSITION_DECISION,
-                decision_id=result.position.decision_id or result.position.trade_plan_id,
+                decision_id=outcome.position.decision_id or outcome.position.trade_plan_id,
                 actor=actor,
-                instrument_id=result.position.instrument_id,
-                payload=build_position_journal_payload(result),
+                instrument_id=outcome.position.instrument_id,
+                payload=build_position_journal_payload(outcome),
                 at=as_of,
             )
         )

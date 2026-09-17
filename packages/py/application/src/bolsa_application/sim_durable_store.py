@@ -25,7 +25,7 @@ sigue en ``decision_contract`` + ``ExecuteTrade`` idempotente.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -138,6 +138,15 @@ class SimConsumedSignal:
 class SimFillFinanceContextStore(Protocol):
     async def save(self, context: SimFillFinanceContext) -> None: ...
     async def get(self, execution_id: str) -> SimFillFinanceContext | None: ...
+
+    # AUTO-1A: lectura por lote de la identidad financiera de los fills ya aplicados
+    # (el ``PositionLedger`` necesita lado/cantidad/precio de N fills sin N round-trips).
+    # Un ``execution_id`` ausente se OMITE del mapa: el llamante declara la fila como
+    # rechazada (medición incompleta), nunca la cuenta como cero.
+    async def get_many(
+        self, execution_ids: Sequence[str]
+    ) -> Mapping[str, SimFillFinanceContext]: ...
+
     async def list_for_strategy_version(
         self,
         strategy_version_id: str,
@@ -205,6 +214,17 @@ class InMemorySimFillFinanceContextStore:
 
     async def get(self, execution_id: str) -> SimFillFinanceContext | None:
         return self._rows.get(execution_id)
+
+    async def get_many(
+        self, execution_ids: Sequence[str]
+    ) -> Mapping[str, SimFillFinanceContext]:
+        """Batch hermético: espeja el contrato del store PG (ausentes se omiten)."""
+        out: dict[str, SimFillFinanceContext] = {}
+        for execution_id in execution_ids:
+            row = self._rows.get(execution_id)
+            if row is not None:
+                out[execution_id] = row
+        return out
 
     async def list_for_strategy_version(
         self,
@@ -388,6 +408,45 @@ class PostgresSimFillFinanceContextStore:
             idempotency_key=row.idempotency_key,
             strategy_version_id=row.strategy_version_id,
         )
+
+    async def get_many(
+        self, execution_ids: Sequence[str]
+    ) -> Mapping[str, SimFillFinanceContext]:
+        """Lee N contextos financieros en UNA consulta (AUTO-1A · PositionLedger).
+
+        Sin esto el libro de posición haría N round-trips (uno por fill aplicado).
+        Los ``execution_id`` no encontrados se OMITEN del mapa: el llamante los declara
+        como filas no interpretables (medición incompleta) y nunca los cuenta como cero.
+        Un lote vacío no consulta la base.
+        """
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+
+        wanted = [str(e).strip() for e in execution_ids if str(e).strip()]
+        if not wanted:
+            return {}
+        rows = (
+            await self._session.execute(
+                select(SimFillFinanceContextRow).where(
+                    SimFillFinanceContextRow.execution_id.in_(wanted)
+                )
+            )
+        ).scalars().all()
+        return {
+            row.execution_id: SimFillFinanceContext(
+                execution_id=row.execution_id,
+                instrument_id=row.instrument_id,
+                side=row.side,
+                quantity=row.quantity,
+                price=row.price,
+                account_id=row.account_id,
+                venue=row.venue,
+                idempotency_key=row.idempotency_key,
+                strategy_version_id=row.strategy_version_id,
+            )
+            for row in rows
+        }
 
     async def list_for_strategy_version(
         self,

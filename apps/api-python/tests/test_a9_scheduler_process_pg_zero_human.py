@@ -448,10 +448,11 @@ async def _assert_full_day_closed(
         ]
         # P&L cerrado desde el espejo de fills (fuente independiente del ``cash``):
         # el neto de notionales del día es, en un libro plano, el resultado realizado.
-        closed_pnl = Decimal("0")
-        for ctx in contexts:
-            notional = Decimal(str(ctx.quantity)) * Decimal(str(ctx.price))
-            closed_pnl += notional if (ctx.side or "").strip().lower() == "sell" else -notional
+        # AUTO-1A (P0.6): solo fills ``APPLIED`` (el contexto se persiste antes de mover
+        # dinero ⇒ sumarlo entero contabilizaba chunks en ``RETRY``).
+        from tests.applied_fill_equity import realized_notional_from_applied_fills
+
+        closed_pnl = await realized_notional_from_applied_fills(session, account_id)
         accounting = reconstruct_accounting_from_state(
             movements=movements,
             remaining=remaining,

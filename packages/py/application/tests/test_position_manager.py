@@ -128,3 +128,59 @@ def test_result_to_dict_shape() -> None:
     assert d["orderAction"] == "sell"
     assert d["positionDecision"]["action"] == "EXIT"
     assert "position" in d
+
+
+# ── AUTO-1A: los skips de gestión dejan de ser ``None`` mudo ───────────────────
+
+
+def test_manage_position_outcome_declares_rejected_mark() -> None:
+    """Un mark que el ``PositionState`` rechaza es un SKIP con motivo, no un ``None``.
+
+    Antes, ``manage_position`` devolvía ``None`` y el llamante no podía distinguir
+    "esta posición no se pudo gestionar" de "no había nada que hacer" (Auditoría 2):
+    la posición quedaba viva y sin gestión, sin rastro en el journal.
+    """
+    from bolsa_application.auto_reason_codes import POSITION_MARK_REJECTED
+    from bolsa_application.position_manager import PositionManagerSkip, manage_position_outcome
+
+    outcome = manage_position_outcome(_open_long(), mark_price=0.0, regime="BULL_TREND")
+    assert isinstance(outcome, PositionManagerSkip)
+    assert outcome.reason == POSITION_MARK_REJECTED
+    assert outcome.instrument_id == "AAPL"
+    assert outcome.is_protective is False
+    d = outcome.to_dict()
+    assert d["kind"] == "position_skip"
+    assert d["attention"] == "high"
+    assert d["reason"] == POSITION_MARK_REJECTED
+    assert d["instrumentId"] == "AAPL"
+    # Retrocompatibilidad: el wrapper clásico sigue colapsando a ``None``.
+    assert manage_position(_open_long(), mark_price=0.0, regime="BULL_TREND") is None
+
+
+def test_manage_position_outcome_declares_decision_unavailable() -> None:
+    """Sin decisión construible (p. ej. dirección inválida) ⇒ SKIP con motivo."""
+    from dataclasses import replace as _replace
+
+    from bolsa_application.auto_reason_codes import POSITION_DECISION_UNAVAILABLE
+    from bolsa_application.position_manager import PositionManagerSkip, manage_position_outcome
+
+    broken = _replace(_open_long(), direction="")
+    outcome = manage_position_outcome(broken, mark_price=101.0, regime="BULL_TREND")
+    assert isinstance(outcome, PositionManagerSkip)
+    assert outcome.reason == POSITION_DECISION_UNAVAILABLE
+    assert outcome.detail
+
+
+def test_manage_position_outcome_matches_result_for_managed_position() -> None:
+    from bolsa_application.position_manager import PositionManagerResult, manage_position_outcome
+
+    outcome = manage_position_outcome(_open_long(), mark_price=95.0, regime="BULL_TREND")
+    assert isinstance(outcome, PositionManagerResult)
+    assert outcome.order_action == "sell"
+
+
+def test_manage_position_outcome_benign_cases_stay_none() -> None:
+    """Sin posición / cerrada / plana NO son skips: no hay nada que journalizar."""
+    from bolsa_application.position_manager import manage_position_outcome
+
+    assert manage_position_outcome(None, mark_price=100.0) is None

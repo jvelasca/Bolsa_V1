@@ -37,7 +37,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -73,6 +73,11 @@ from bolsa_application.auto_engine_state_store import (
     AutoEngineStore,
     AutoEngineTickInput,
 )
+from bolsa_application.auto_reason_codes import (
+    EXIT_QTY_OVER_POSITION,
+    FILL_NOT_MATERIALIZED,
+    FILL_PARTIALLY_MATERIALIZED,
+)
 from bolsa_application.auto_v2_entry import (
     CatalogTradeContextSource,
     DiscoveryRegimeSource,
@@ -80,7 +85,7 @@ from bolsa_application.auto_v2_entry import (
     V2Signal,
     V2Tunables,
     build_worker_snapshot,
-    plan_v2_position_decision,
+    plan_v2_position_outcome,
     plan_v2_tick,
     position_manager_package,
     sector_from_package,
@@ -101,6 +106,7 @@ from bolsa_application.execution_event import (
     UNAPPLIED_EXECUTION_EVENT_STATUSES,
     ExecutionEventStore,
 )
+from bolsa_application.position_manager import PositionManagerSkip
 from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
     POSITION_PROJECTION_OK,
@@ -121,6 +127,29 @@ _FILL_CHUNKS = 4
 # propósito (no hay índice por ``account_id``): si se alcanza, el libro NO se puede
 # afirmar completo y el motor veta aperturas en vez de creer que no hay más.
 _V2_OPEN_ORDERS_LIMIT = 200
+
+# AUTO-1A — tope de lectura del libro de fills APLICADOS para reconstruir la posición
+# canónica. La lectura ocurre UNA vez por proceso (readopción tras crash), no por tick.
+# Sin índice parcial ``(account_id, status)``: deuda declarada, la migración llega en
+# AUTO-1 (Reservation Engine). Agotar el tope NO se interpreta como "no hay más": la
+# lectura queda NO medible y las aperturas se vetan (fail-closed) con log explícito.
+_CANONICAL_LEDGER_LIMIT = 10_000
+
+# AUTO-1A — ``execution_events`` ya materializados. ``already_applied`` también cuenta:
+# significa que OTRA instancia ya movió el dinero (idempotencia por ``execution_id``), que
+# es exactamente el hecho que la posición debe reflejar.
+_APPLIED_OUTCOMES: frozenset[str] = frozenset({"applied", "already_applied"})
+
+# AUTO-1A — reason codes de materialización (observabilidad del P0 de la auditoría v2.40.4).
+# Antes, una orden cuyo settlement no materializaba nada se contaba igual (con la cantidad
+# PEDIDA) y el journal no distinguía pedido de aplicado. Los literales son únicos y viven
+# en ``bolsa_application.auto_reason_codes``.
+
+# Kind de journal para los chunks que NO materializaron dinero: son capital PENDIENTE
+# (reservado), no posición ni realizado.
+JOURNAL_FILL_UNAPPLIED = "fill_unapplied"
+
+_QTY_EPS = Decimal("0.000001")
 
 
 def sim_worker_enabled() -> bool:
@@ -350,6 +379,46 @@ class _AppliedFill:
     @property
     def instrument_id(self) -> str:
         return self.symbol
+
+
+@dataclass(frozen=True, slots=True)
+class _Settlement:
+    """Resultado de liquidar una orden SIM, separando PEDIDO de MATERIALIZADO.
+
+    AUTO-1A: una orden puede llenarse en parte (la cola noisy corta los chunks finales) o
+    no llenarse nada. Solo ``applied`` movió dinero y por tanto **solo** ``applied`` es
+    posición, riesgo, protección y realizado. Lo no aplicado queda como capital PENDIENTE
+    (orden en vuelo) y lo recoge el libro de órdenes del siguiente tick.
+
+    ``structural=True`` marca el modo smoke del worker (sin ``finance_applier``): no
+    existe dinero que mover, la traza no puede llegar a ``APPLIED`` por construcción y la
+    confirmación del schedule es el único hecho observable. En ese modo lo confirmado es
+    lo aplicado — y sigue siendo la cantidad CONFIRMADA, nunca la pedida.
+    """
+
+    requested_qty: Decimal = Decimal("0")
+    applied: tuple[FillObservation, ...] = ()
+    unapplied: tuple[FillObservation, ...] = ()
+    outcomes: Mapping[str, str] = field(default_factory=dict)
+    structural: bool = False
+
+    @property
+    def applied_qty(self) -> Decimal:
+        total = Decimal("0")
+        for fill in self.applied:
+            total += fill.qty
+        return total
+
+    @property
+    def unapplied_qty(self) -> Decimal:
+        total = Decimal("0")
+        for fill in self.unapplied:
+            total += fill.qty
+        return total
+
+    @property
+    def is_partial(self) -> bool:
+        return bool(self.applied) and bool(self.unapplied)
 
 
 @dataclass
@@ -605,7 +674,6 @@ class AutoSimulationWorker:
         Devuelve el mapa canónico fiable (``{}`` si no se pudo determinar).
         """
         reader = self._canonical_positions_reader
-        events = getattr(self, "_applied_execution_events", None)
         if reader is None:
             self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
             return {}
@@ -620,6 +688,16 @@ class AutoSimulationWorker:
             # no se reconstruye nada y NO se autorizan aperturas.
             self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
             return {}
+        # AUTO-1A: ``expected`` sale del MISMO libro que el canónico (Σ fills aplicados)
+        # cuando el lector lo aporta (``CanonicalPositions.facts``). Tras un crash el
+        # libro en RAM está vacío, y con ``events=[]`` la reconciliación veía
+        # ``expected=0 != actual`` ⇒ DIVERGENT y la proyección inflada sobrevivía al
+        # reinicio (justo el hueco del P0). Con las trazas aplicadas, la proyección se
+        # RECONSTRUYE a la posición materializada. Si el lector no las aporta (seam
+        # hermético), se conserva el libro del worker.
+        events = getattr(canonical, "facts", None) or getattr(
+            self, "_applied_execution_events", None
+        )
         canonical_map: dict[str, Decimal] = {
             str(s): Decimal(str(q)) for s, q in dict(canonical).items()
         }
@@ -797,13 +875,26 @@ class AutoSimulationWorker:
         symbol: str,
         qty: Decimal,
         strategy_version_id: str | None = None,
-    ) -> list[FillObservation]:
+    ) -> _Settlement:
+        """Liquida la orden SIM y separa lo MATERIALIZADO de lo que quedó PENDIENTE.
+
+        AUTO-1A (P0): antes se devolvían TODOS los fills del schedule y el llamante los
+        contaba con la cantidad PEDIDA, de modo que un llenado parcial (p. ej. 50 + 23,5
+        de 100) producía una posición de 100 y un exit de 100 sobre 73,5 reales. Ahora se
+        cruza el resultado del settlement con el outcome durable del apply: solo
+        ``applied``/``already_applied`` movió dinero.
+        """
         if self._exec_store is None:
-            return []
+            return _Settlement(requested_qty=qty)
+        # Modo ESTRUCTURAL (smoke sin dinero, documentado en el módulo): sin
+        # ``finance_applier`` no hay caja que mover y la traza queda no-``APPLIED`` por
+        # construcción; el único hecho observable es la confirmación del schedule. Se
+        # declara para no confundirlo con un apply fallido en modo dinero.
+        structural = self._finance_applier is None
         venue = self._venue()
         logical_order_id = self._next_logical_order_id(symbol, side)
         try:
-            result, _out = await submit_simulated_order(
+            result, outcomes = await submit_simulated_order(
                 self._exec_store,
                 instrument_id=symbol,
                 side=side,
@@ -830,21 +921,52 @@ class AutoSimulationWorker:
             # romper el turno AUTOnomo (se degrada a "sin fill este tick"). El motor
             # reintentará; jamás se fabrica una posición sin settlement confirmado.
             logger.exception("auto_sim settle failed symbol=%s side=%s", symbol, side)
-            return []
+            return _Settlement(requested_qty=qty, structural=structural)
         if not result.fills:
-            return []
+            return _Settlement(
+                requested_qty=qty, outcomes=dict(outcomes or {}), structural=structural
+            )
         vid = str(result.venue_order_id or "").strip() or f"sim-{side}-{symbol}"
-        return [
-            FillObservation(
+        resolved_outcomes = dict(outcomes or {})
+        applied: list[FillObservation] = []
+        unapplied: list[FillObservation] = []
+        for f in result.fills:
+            if abs(f.qty_delta) <= 0:
+                continue
+            observation = FillObservation(
                 side=side,
                 venue=venue,
-                execution_id=f"{vid}#{f.fill_seq}",
+                execution_id=f.execution_id or f"{vid}#{f.fill_seq}",
                 order_id=vid,
                 qty=abs(f.qty_delta),
             )
-            for f in result.fills
-            if abs(f.qty_delta) > 0
-        ]
+            outcome = resolved_outcomes.get(observation.execution_id)
+            if structural or outcome in _APPLIED_OUTCOMES:
+                # Modo estructural: lo confirmado por el schedule ES el hecho.
+                # Modo dinero: solo ``applied``/``already_applied`` movieron caja.
+                applied.append(observation)
+            else:
+                # Un outcome no aplicado significa que NO materializó dinero: se
+                # declara como pendiente, nunca como posición.
+                unapplied.append(observation)
+        if unapplied:
+            logger.warning(
+                "auto_sim settlement partial symbol=%s side=%s requested=%s applied=%s "
+                "unapplied=%s outcomes=%s",
+                symbol,
+                side,
+                qty,
+                sum((o.qty for o in applied), Decimal("0")),
+                sum((o.qty for o in unapplied), Decimal("0")),
+                resolved_outcomes,
+            )
+        return _Settlement(
+            requested_qty=qty,
+            applied=tuple(applied),
+            unapplied=tuple(unapplied),
+            outcomes=resolved_outcomes,
+            structural=structural,
+        )
 
     # ---- journal de fila: mantiene el día y ofrece el turno --------------------
     def _record_applied_event(self, symbol: str, fill: FillObservation, price: Decimal) -> None:
@@ -1180,6 +1302,9 @@ class AutoSimulationWorker:
           su capital ya se descontó vía ``positions``; reservarlo otra vez contaría el
           mismo dinero dos veces. Tras un crash la memoria RAM está vacía ⇒ una traza
           huérfana SÍ aparece como pendiente (que es el caso que debe proteger).
+          AUTO-1A: ese libro contiene SOLO fills materializados, de modo que un chunk en
+          ``RETRY`` de un llenado parcial sigue apareciendo como capital pendiente (antes
+          entraba como "conocido" y desaparecía del libro).
         * Los sectores de los instrumentos pendientes se resuelven con el mismo seam que
           los de las posiciones abiertas (sin I/O extra: la fuente ya se refrescó).
 
@@ -1520,7 +1645,7 @@ class AutoSimulationWorker:
             if position is None:
                 return None
             self._v2_positions[symbol] = position
-        result = plan_v2_position_decision(
+        outcome = plan_v2_position_outcome(
             position,
             mark_price=float(price),
             regime=self._v2_regime(),
@@ -1528,8 +1653,22 @@ class AutoSimulationWorker:
             exit_template=self._v2_tunables.exit_template,
             at=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
-        self._v2_last_exit_reasons[symbol] = result.exit_reasons if result is not None else ()
-        return position_manager_package(result)
+        if isinstance(outcome, PositionManagerSkip):
+            # AUTO-1A: la posición NO se pudo gestionar (mark rechazado / decisión no
+            # construible). Antes el motivo se perdía y el libro de motivos del símbolo
+            # quedaba vacío, indistinguible de "sin gestión pendiente".
+            self._v2_last_exit_reasons[symbol] = (outcome.reason,)
+            logger.warning(
+                "auto_sim v2 position skip symbol=%s reason=%s detail=%s",
+                symbol,
+                outcome.reason,
+                outcome.detail,
+            )
+            return None
+        self._v2_last_exit_reasons[symbol] = (
+            outcome.exit_reasons if outcome is not None else ()
+        )
+        return position_manager_package(outcome)
 
     def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
         """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó)."""
@@ -1739,21 +1878,42 @@ class AutoSimulationWorker:
             # con compras sin ventas. ``None`` = sin atribución (spine determinista).
             proposed_version = _strategy_version_from_source(getattr(pkg, "source", None))
             effective_version = proposed_version or self._position_version.get(symbol)
-            fills = await self._settle(
+            settlement = await self._settle(
                 action.lower(),
                 symbol,
                 exec_qty,
                 strategy_version_id=effective_version,
             )
-            if not fills:
-                continue  # fila no abierta: la cola SIM no confirmó fill (no LIVE).
+            # AUTO-1A (P0) — SOLO lo materializado es posición/riesgo/protección. La
+            # cantidad PEDIDA (`exec_qty`) se sigue liquidando y se journaliza como
+            # orden; la cantidad APLICADA es la que mueve el libro. Antes se contaba la
+            # pedida, de modo que un llenado parcial (73,5 de 100) dejaba una posición
+            # inflada y un exit dimensionado contra ella.
+            for pending in settlement.unapplied:
+                self._emit(
+                    JOURNAL_FILL_UNAPPLIED,
+                    pending.venue,
+                    pending.execution_id,
+                    pending.side,
+                    pending.qty,
+                )
+            if not settlement.applied:
+                # Ningún chunk materializó dinero: no hay fill que contar. El capital
+                # queda comprometido (libro de órdenes pendientes) y el journal lo dice.
+                _veto(FILL_NOT_MATERIALIZED)
+                continue
+            applied_qty = settlement.applied_qty
+            if settlement.is_partial:
+                reasons.append(FILL_PARTIALLY_MATERIALIZED)
             self._emit("order", venue, None, action.lower(), exec_qty)
-            for o in fills:
+            for o in settlement.applied:
                 self._emit("fill", o.venue, o.execution_id, o.side, o.qty)
                 self._record_applied_event(symbol, o, price)
+            first_execution_id = settlement.applied[0].execution_id
             if action == "BUY":
-                self._emit("position_open", venue, fills[0].execution_id, "buy", exec_qty)
-                self._open[symbol] = held + exec_qty
+                materialized = held + applied_qty
+                self._emit("position_open", venue, first_execution_id, "buy", applied_qty)
+                self._open[symbol] = materialized
                 # AUTO 2.0 (V2): la señal de esta barra queda CONSUMIDA al ejecutarse la
                 # entrada. Si la posición muere después dentro de la misma barra (stop,
                 # exit-only), esa misma señal no puede re-abrir: es la MISMA oportunidad
@@ -1771,18 +1931,25 @@ class AutoSimulationWorker:
                     self._position_version[symbol] = effective_version
                 # AUTO 2.0 (V2): crea el PositionState de la operación desde el
                 # TradePlan que la originó (gestiona T1/T2/stop/trailing por estado).
+                # AUTO-1A: con la cantidad MATERIALIZADA (T1/trailing/stop se calculan
+                # sobre la posición real, no sobre lo pedido).
                 if self._v2_enabled and held <= 0:
-                    self._v2_track_entry(symbol, price, exec_qty)
-                await self._persist_position(symbol, held + exec_qty)
+                    self._v2_track_entry(symbol, price, applied_qty)
+                await self._persist_position(symbol, materialized)
                 report.opened += 1
             else:
-                new_held = held - exec_qty
+                # AUTO-1A — invariante DURO ``exit_qty <= materialized_position``. El
+                # settlement ya va clampado a ``held``, así que esto es defensa en
+                # profundidad: se declara y se aplana, nunca se inventa un corto.
+                if applied_qty > held + _QTY_EPS:
+                    _veto(EXIT_QTY_OVER_POSITION)
+                new_held = max(Decimal("0"), held - applied_qty)
                 # AUTO 2.0 (V2): actualiza el PositionState tras la venta (parcial o
                 # total) para que T1/T2 no se re-disparen en ticks sucesivos.
                 if self._v2_enabled:
                     self._v2_track_reduce(
                         symbol,
-                        exec_qty,
+                        applied_qty,
                         price,
                         self._v2_last_exit_reasons.get(symbol, ()),
                     )
@@ -1793,9 +1960,9 @@ class AutoSimulationWorker:
                     self._emit(
                         "position_close",
                         venue,
-                        fills[0].execution_id,
+                        first_execution_id,
                         "sell",
-                        exec_qty,
+                        applied_qty,
                     )
                     report.closed += 1
                     self._entry_price.pop(symbol, None)
@@ -1806,7 +1973,7 @@ class AutoSimulationWorker:
                 self._open[symbol] = new_held
                 await self._persist_position(symbol, new_held)
             report.orders += 1
-            report.fills += len(fills)
+            report.fills += len(settlement.applied)
         self._last_gate_reason = tuple(dict.fromkeys(reasons))
         return report
 
@@ -2023,40 +2190,60 @@ def _compose_real_stores(
 
 
 def _compose_canonical_reader(session: Any) -> Any:
-    """V2.24/A9.1 (P1-01): lector del estado financiero CANÓNICO de la cuenta.
+    """AUTO-1A: lector del estado financiero CANÓNICO = Σ FILLS APLICADOS.
 
-    Devuelve ``account_id -> {symbol: qty}`` desde las posiciones canónicas
-    (``position_state`` abiertas del portfolio). Es la autoridad contra la que se
-    reconcilia/reconstruye la proyección ``sim_auto_positions``. Fail-safe: si el
-    repositorio no está disponible, devuelve ``{}`` (el reconciliador marcará
-    ``UNKNOWN`` y vetará aperturas, sin inventar posición).
+    Devuelve ``account_id -> {symbol: qty}`` derivado del libro de fills
+    MATERIALIZADOS (``execution_events(status=APPLIED)`` + ``sim_fill_finance_context``)
+    a través del read-model ``PositionLedger`` (``POSITION = Σ APPLIED``).
+
+    Antes leía ``position_state``: la MISMA proyección que debía auditar, de modo que
+    una posición inflada por un llenado parcial (p. ej. 100 pedidos con 73,5 aplicados)
+    podía "validarse" a sí misma. Ahora la autoridad es el hecho financiero, y la
+    proyección ``sim_auto_positions`` vuelve a ser lo que declara ser: un espejo
+    reconstruible.
+
+    Fail-closed: si el libro no se puede leer ENTERO (store ausente, error de lectura,
+    tope agotado o alguna fila no interpretable), devuelve ``None`` ⇒ el reconciliador
+    marca ``UNKNOWN``, veta aperturas y permite salidas protectoras. Nunca devuelve un
+    mapa parcial, que haría parecer más pequeña la posición real.
     """
-    from bolsa_infrastructure.database.repositories.position_state_repository import (  # noqa: PLC0415
-        SqlAlchemyPositionStateRepository,
+    from bolsa_application.applied_fills import (
+        build_canonical_positions,
+        read_applied_fill_facts,
+    )
+    from bolsa_application.execution_event import PostgresExecutionEventStore  # noqa: PLC0415
+    from bolsa_application.sim_durable_store import (  # noqa: PLC0415
+        PostgresSimFillFinanceContextStore,
     )
 
     async def _read(account_id: str) -> dict[str, Decimal] | None:
         try:
-            rows = await SqlAlchemyPositionStateRepository(session).list_open_for_account(
-                account_id
+            read = await read_applied_fill_facts(
+                PostgresExecutionEventStore(session),
+                # ``autocommit=False``: la lectura del libro es SOLO lectura y no debe
+                # cerrar la unidad-de-trabajo del tick.
+                PostgresSimFillFinanceContextStore(session, autocommit=False),
+                account_id,
+                limit=_CANONICAL_LEDGER_LIMIT,
             )
         except Exception:  # noqa: BLE001 — sin canónico no se inventa posición.
-            logger.exception("auto_sim canonical positions read failed")
+            logger.exception("auto_sim canonical applied-ledger read failed")
             return None
-        out: dict[str, Decimal] = {}
-        for row in rows:
-            qty = row.position_state.get("remainingQuantity")
-            if qty is None:
-                qty = row.position_state.get("quantity")
-            if qty is None:
-                continue
-            try:
-                value = Decimal(str(qty))
-            except (ArithmeticError, ValueError):
-                continue
-            if value > 0:
-                out[str(row.instrument_id)] = out.get(str(row.instrument_id), Decimal("0")) + value
-        return out
+        if not read.is_complete:
+            logger.warning(
+                "auto_sim canonical applied-ledger not measurable: measurement=%s "
+                "rejected=%s mismatched=%s truncated=%s error=%s (aperturas vetadas)",
+                read.measurement,
+                read.rejected,
+                read.mismatched,
+                read.truncated,
+                read.error,
+            )
+            return None
+        # ``CanonicalPositions`` es un ``dict``: el seam sigue siendo
+        # ``account_id -> {symbol: qty}``, y además viaja con las trazas aplicadas que
+        # sustentan cada cantidad (necesarias para reconciliar tras un crash).
+        return build_canonical_positions(read)
 
     return _read
 

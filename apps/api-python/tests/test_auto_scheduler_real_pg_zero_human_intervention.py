@@ -218,24 +218,14 @@ async def _assert_real_equity_invariant(
         # (``sim_fill_finance_context``: lado/cantidad/precio) evita el descuadre que
         # provoca asumir ``closed_pnl=0`` cuando el día dejó operaciones en pérdida
         # (``cash`` ya incorpora ese resultado; ``realized_pnl`` debe reflejarlo).
-        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+        #
+        # AUTO-1A (P0.6): el realizado sale SOLO de ``execution_events.status='APPLIED'``
+        # (la identidad financiera), nunca del contexto completo — que incluye chunks
+        # planificados en ``RETRY`` (dinero NO movido) y descuadraba el invariante de
+        # forma intermitente. Helper compartido con la suite A9 de jornada completa.
+        from tests.applied_fill_equity import realized_notional_from_applied_fills
 
-        fills = (
-            await session.execute(
-                select(
-                    SimFillFinanceContextRow.side,
-                    SimFillFinanceContextRow.quantity,
-                    SimFillFinanceContextRow.price,
-                ).where(SimFillFinanceContextRow.account_id == account_id)
-            )
-        ).all()
-        closed_pnl = Decimal("0")
-        for side, quantity, price in fills:
-            notional = Decimal(str(quantity)) * Decimal(str(price))
-            if (side or "").strip().lower() == "sell":
-                closed_pnl += notional
-            else:
-                closed_pnl -= notional
+        closed_pnl = await realized_notional_from_applied_fills(session, account_id)
         accounting = reconstruct_accounting_from_state(
             movements=movements,
             remaining=remaining,
@@ -465,6 +455,105 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
                 await session.execute(
                     delete(SimFillFinanceContextRow).where(
                         SimFillFinanceContextRow.instrument_id == instrument_id
+                    )
+                )
+                try:
+                    await SqlAlchemyAccountRepository(session).close_account(account_id)
+                except Exception:  # noqa: BLE001 — cleanup nunca tira el test
+                    pass
+                await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_equity_realized_ignores_unapplied_fill_context(
+    sched_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """AUTO-1A (P0.6) — el realizado NO cuenta el contexto de un fill no aplicado.
+
+    Instrumento determinista de la mutación M3: el contexto financiero se persiste para
+    los fills PLANIFICADOS antes de mover dinero, así que sumar la tabla entera
+    contabiliza un chunk en ``RETRY`` (dinero NO movido) y hace descuadrar el invariante
+    de equity. Aquí se siembra un BUY aplicado + un BUY en ``RETRY`` (mismo importe) y un
+    SELL aplicado, y se exige que el realizado sea exactamente el de los aplicados.
+    """
+    from datetime import UTC, datetime
+    from decimal import Decimal
+
+    from bolsa_infrastructure.database.models.tables import (
+        ExecutionEventRow,
+        SimFillFinanceContextRow,
+    )
+    from tests.applied_fill_equity import realized_notional_from_applied_fills
+
+    instrument_id = f"inst-eq-{uuid.uuid4().hex[:10]}"
+    account_id: str | None = None
+    applied_buy, retry_buy, applied_sell = (
+        f"{instrument_id}-applied-buy",
+        f"{instrument_id}-retry-buy",
+        f"{instrument_id}-applied-sell",
+    )
+    try:
+        async with sched_pg_factory() as session:
+            account_id = await _seed_account(session)
+            now = datetime.now(UTC)
+            for execution_id, side, qty, status in (
+                (applied_buy, "buy", Decimal("50"), "APPLIED"),
+                (retry_buy, "buy", Decimal("50"), "RETRY"),
+                (applied_sell, "sell", Decimal("20"), "APPLIED"),
+            ):
+                session.add(
+                    ExecutionEventRow(
+                        execution_id=execution_id,
+                        order_id=f"ord-{execution_id}",
+                        venue="simulated",
+                        account_id=account_id,
+                        venue_order_id=f"sim-{execution_id}",
+                        fill_seq=1,
+                        qty=qty,
+                        captured_at=now,
+                        status=status,
+                        applied_at=now if status == "APPLIED" else None,
+                    )
+                )
+                session.add(
+                    SimFillFinanceContextRow(
+                        execution_id=execution_id,
+                        instrument_id=instrument_id,
+                        side=side,
+                        quantity=qty,
+                        price=Decimal("100"),
+                        account_id=account_id,
+                        venue="simulated",
+                        created_at=now,
+                    )
+                )
+            await session.commit()
+
+        async with sched_pg_factory() as session:
+            closed_pnl = await realized_notional_from_applied_fills(session, account_id)
+
+        # 20 vendidos × 100 − 50 comprados × 100 = −3.000 (el RETRY de 50 NO entra).
+        assert closed_pnl == Decimal("-3000"), (
+            f"el realizado debe ignorar el contexto no aplicado (got {closed_pnl})"
+        )
+    finally:
+        if account_id:
+            from sqlalchemy import delete
+
+            from bolsa_infrastructure.database.models.tables import (
+                ExecutionEventRow as EventRow,
+            )
+            from bolsa_infrastructure.database.repositories.account_repository import (
+                SqlAlchemyAccountRepository,
+            )
+
+            async with sched_pg_factory() as session:
+                await session.execute(
+                    delete(EventRow).where(EventRow.account_id == account_id)
+                )
+                await session.execute(
+                    delete(SimFillFinanceContextRow).where(
+                        SimFillFinanceContextRow.account_id == account_id
                     )
                 )
                 try:

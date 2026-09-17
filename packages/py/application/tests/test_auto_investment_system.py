@@ -165,6 +165,78 @@ def test_regime_exit_only_full_report() -> None:
     assert "regime_exit" in report.journal_entries[0].payload["exitReasons"]
 
 
+def test_missing_mark_is_journaled_not_silently_skipped() -> None:
+    """AUTO-1A: una posición sin mark deja rastro (``no_mark_data``, atención alta).
+
+    Antes era un ``continue`` mudo: la posición quedaba viva y sin gestión sin que el
+    journal pudiera distinguirlo de "este tick no había nada que hacer" (Auditoría 2).
+    """
+    from bolsa_application.auto_reason_codes import NO_MARK_DATA
+
+    pos = build_position_state_from_fill(
+        {
+            "decisionId": "dec-1",
+            "instrumentId": "AAPL",
+            "direction": "long",
+            "status": "TRIGGERED",
+            "entry": 100.0,
+            "structuralStop": 95.0,
+        },
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="pos-1",
+    )
+    assert pos is not None
+    report = run_auto_cycle(
+        snapshot=_snapshot(),
+        opportunities=[],
+        candidates={},
+        regime="BULL_TREND",
+        open_positions=[pos],
+        marks={},  # sin mark para AAPL
+        as_of="2026-09-15T09:00:00Z",
+    )
+    assert report.position_results == ()
+    assert len(report.journal_entries) == 1
+    payload = report.journal_entries[0].payload
+    assert payload["event"] == "auto_position_skip"
+    assert payload["reasonCodes"] == [NO_MARK_DATA]
+    assert payload["attention"] == "high"
+    assert payload["instrumentId"] == "AAPL"
+
+
+def test_rejected_mark_is_journaled_with_high_attention() -> None:
+    """AUTO-1A: un mark que el ``PositionState`` rechaza NO es un no-op."""
+    from bolsa_application.auto_reason_codes import POSITION_MARK_REJECTED
+
+    pos = build_position_state_from_fill(
+        {
+            "decisionId": "dec-1",
+            "instrumentId": "AAPL",
+            "direction": "long",
+            "status": "TRIGGERED",
+            "entry": 100.0,
+            "structuralStop": 95.0,
+        },
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="pos-1",
+    )
+    assert pos is not None
+    report = run_auto_cycle(
+        snapshot=_snapshot(),
+        opportunities=[],
+        candidates={},
+        regime="BULL_TREND",
+        open_positions=[pos],
+        marks={"AAPL": 0.0},  # mark no utilizable
+        as_of="2026-09-15T09:00:00Z",
+    )
+    assert report.position_results == ()
+    assert [e.payload["reason"] for e in report.journal_entries] == [POSITION_MARK_REJECTED]
+    assert report.journal_entries[0].payload["attention"] == "high"
+
+
 def test_top_n_limits_trading_universe() -> None:
     candidates = {s: _candidate(s) for s in ("A", "B", "C", "D", "E", "F")}
     opportunities = [

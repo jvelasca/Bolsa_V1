@@ -70,7 +70,11 @@ from bolsa_application.portfolio_decision_engine import (
     PortfolioDecisionConfig,
     decide_portfolio,
 )
-from bolsa_application.position_manager import PositionManagerResult, manage_position
+from bolsa_application.position_manager import (
+    PositionManagerResult,
+    PositionManagerSkip,
+    manage_position_outcome,
+)
 from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 
 logger = logging.getLogger(__name__)
@@ -590,8 +594,42 @@ def plan_v2_position_decision(
 
     Devuelve ``None`` si no hay posición gestionable. La intención (hold/reduce/sell)
     la consume el worker por el MISMO spine de settlement (nunca un atajo).
+
+    AUTO-1A: colapsa también los skips (mark rechazado / decisión no construible). El
+    worker con journal usa ``plan_v2_position_outcome`` para distinguirlos.
     """
-    return manage_position(
+    outcome = plan_v2_position_outcome(
+        position,
+        mark_price=mark_price,
+        regime=regime,
+        thesis_invalid=thesis_invalid,
+        portfolio_recon_status=portfolio_recon_status,
+        expires_at=expires_at,
+        now=now,
+        exit_template=exit_template,
+        at=at,
+    )
+    return outcome if isinstance(outcome, PositionManagerResult) else None
+
+
+def plan_v2_position_outcome(
+    position: PositionState | None,
+    *,
+    mark_price: float,
+    regime: str | None = None,
+    thesis_invalid: bool = False,
+    portfolio_recon_status: str | None = None,
+    expires_at: str | None = None,
+    now: str | None = None,
+    exit_template: str | None = None,
+    at: str | None = None,
+) -> PositionManagerResult | PositionManagerSkip | None:
+    """AUTO-1A — como ``plan_v2_position_decision`` pero conservando el motivo del skip.
+
+    El worker journaliza ``mark_rejected`` / ``decision_unavailable`` en vez de dejar el
+    tick mudo: la posición sigue viva y sin gestión, y eso es un estado operativo.
+    """
+    return manage_position_outcome(
         position,
         mark_price=mark_price,
         regime=_coerce_operational_regime(regime),
@@ -1125,6 +1163,7 @@ __all__ = [
     "canonical_candidate_key",
     "edge_from_package",
     "plan_v2_position_decision",
+    "plan_v2_position_outcome",
     "plan_v2_tick",
     "position_manager_package",
     "regime_exit_only",

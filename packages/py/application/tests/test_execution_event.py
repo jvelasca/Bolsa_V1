@@ -677,3 +677,79 @@ async def test_list_unapplied_respects_limit_and_orders_by_capture() -> None:
 async def test_list_unapplied_empty_book_is_empty_not_error() -> None:
     """Sin trazas: lista vacía (el llamante la declara ``COMPLETE``)."""
     assert await InMemoryExecutionEventStore().list_unapplied("acc-1") == []
+
+
+@pytest.mark.asyncio
+async def test_list_applied_only_returns_materialized_rows_in_chronological_order() -> None:
+    """AUTO-1A: el libro de posición lee SOLO ``APPLIED``, en orden de aplicación.
+
+    Un ``RETRY``/``CAPTURED`` no materializó dinero: si entrara aquí, la posición se
+    construiría con fills que no existen (el P0 de la auditoría v2.40.4).
+    """
+    store = InMemoryExecutionEventStore()
+    await store.capture(_exec("ev-pending"))
+    await store.capture(_exec("ev-applied"))
+    assert await store.start_apply("ev-applied", owner="w") is True
+    await store.mark_applied("ev-applied", lease_owner="w")
+    await store.capture(_exec("ev-retry"))
+    assert await store.start_apply("ev-retry", owner="w") is True
+    await store.mark_retry("ev-retry", error="venue busy", lease_owner="w")
+
+    applied = await store.list_applied("acc-1")
+    assert [row.execution_id for row in applied] == ["ev-applied"]
+
+
+@pytest.mark.asyncio
+async def test_list_applied_orders_by_applied_at_not_capture() -> None:
+    """El orden es CRONOLÓGICO (``applied_at``): el coste medio y el P&L dependen de él."""
+    from datetime import timedelta
+
+    store = InMemoryExecutionEventStore()
+    base = datetime.now(UTC)
+    for execution_id in ("ev-a", "ev-b", "ev-c"):
+        await store.capture(_exec(execution_id))
+        assert await store.start_apply(execution_id, owner="w") is True
+        await store.mark_applied(execution_id, lease_owner="w")
+        row = store._rows[execution_id]
+        # ``ev-c`` el más ANTIGUO: el orden no puede ser el de inserción.
+        offset = {"ev-a": 1, "ev-b": 2, "ev-c": 3}[execution_id]
+        store._rows[execution_id] = replace(row, applied_at=base - timedelta(minutes=offset))
+
+    assert [r.execution_id for r in await store.list_applied("acc-1")] == [
+        "ev-c",
+        "ev-b",
+        "ev-a",
+    ]
+    assert [r.execution_id for r in await store.list_applied("acc-1", limit=2)] == [
+        "ev-c",
+        "ev-b",
+    ]
+    assert await store.list_applied("acc-1", limit=0) == []
+
+
+@pytest.mark.asyncio
+async def test_list_applied_filters_by_account_and_empty_book_is_empty() -> None:
+    """El libro de posición es por cuenta; sin trazas aplicadas devuelve vacío."""
+    from decimal import Decimal
+
+    store = InMemoryExecutionEventStore()
+    await store.capture(_exec("ev-a"))
+    assert await store.start_apply("ev-a", owner="w") is True
+    await store.mark_applied("ev-a", lease_owner="w")
+    await store.capture(
+        ExecutionEvent(
+            execution_id="ev-b",
+            order_id="lo-2",
+            venue="SIMULATED",
+            venue_order_id="sim-22",
+            fill_seq=1,
+            qty=Decimal("5"),
+            account_id="acc-2",
+        )
+    )
+    assert await store.start_apply("ev-b", owner="w") is True
+    await store.mark_applied("ev-b", lease_owner="w")
+
+    assert [r.execution_id for r in await store.list_applied("acc-1")] == ["ev-a"]
+    assert {r.execution_id for r in await store.list_applied(None)} == {"ev-a", "ev-b"}
+    assert await InMemoryExecutionEventStore().list_applied("acc-1") == []
