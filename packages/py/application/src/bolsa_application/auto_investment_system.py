@@ -32,12 +32,17 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import AutoPortfolioSnapshot
+from bolsa_analytics.cognitive.exit_policy import resolve_exit_policy
 from bolsa_analytics.cognitive.market_regime_gate import map_trial_regime
 from bolsa_analytics.cognitive.opportunity_ranker import (
     TOP_N_EXCLUDED,
     OpportunityScore,
     rank_opportunities,
     select_top_opportunities,
+)
+from bolsa_analytics.cognitive.position_lifecycle import (
+    compute_trail_stop,
+    is_trail_armed,
 )
 from bolsa_analytics.cognitive.position_state import PositionState
 from bolsa_analytics.cognitive.trade_plan import validate_trade_plan
@@ -297,6 +302,7 @@ def run_auto_cycle(
     marks: Mapping[str, float] | None = None,
     config: PortfolioDecisionConfig | None = None,
     top_n: int = 5,
+    exit_template: str | None = None,
     actor: str = "auto-2.0",
     as_of: str = "",
 ) -> AutoRunReport:
@@ -377,6 +383,11 @@ def run_auto_cycle(
         )
 
     # Gestión de posiciones abiertas (PositionManager).
+    # AUTO-2: una sola fuente de política (``resolve_exit_policy``; sin plantilla ⇒
+    # MODERATE declarado) y el mismo ratchet de stop que el worker V2. ``trail_hint``
+    # sólo se declara cuando hay un stop REAL que proponer: una alerta de trailing sin
+    # stop sería journal ruidoso, no gestión.
+    exit_policy = resolve_exit_policy(exit_template)
     position_results: list[PositionManagerResult] = []
     for position in open_positions:
         mark = marks_map.get(position.instrument_id)
@@ -401,10 +412,18 @@ def run_auto_cycle(
                 )
             )
             continue
+        trail_stop = (
+            compute_trail_stop(position, trail_width=exit_policy.trail_width)
+            if is_trail_armed(position)
+            else None
+        )
         outcome = manage_position_outcome(
             position,
             mark_price=mark,
             regime=resolved_regime,
+            template_id=exit_template,
+            trail_hint=trail_stop is not None,
+            trail_stop=trail_stop,
             at=as_of,
         )
         if isinstance(outcome, PositionManagerSkip):

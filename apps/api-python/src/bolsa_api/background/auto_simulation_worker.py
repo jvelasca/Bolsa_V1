@@ -40,8 +40,9 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Literal
 
+from bolsa_analytics.cognitive.exit_policy import resolve_exit_policy
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_UNKNOWN,
@@ -61,8 +62,17 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     RESERVATION_RELEASED_BY_RESTART,
     PortfolioReservation,
 )
+from bolsa_analytics.cognitive.position_lifecycle import (
+    advance_lifecycle,
+    compute_trail_stop,
+    derive_lifecycle_state,
+    is_trail_armed,
+    protection_state_dict,
+    trailing_status,
+)
 from bolsa_analytics.cognitive.position_state import (
     PositionState,
+    apply_position_current_stop,
     apply_position_reduce,
     build_position_state_from_fill,
     position_state_from_dict,
@@ -86,8 +96,14 @@ from bolsa_application.auto_reason_codes import (
     EXIT_QTY_OVER_POSITION,
     FILL_NOT_MATERIALIZED,
     FILL_PARTIALLY_MATERIALIZED,
+    LIFECYCLE_TRANSITION_REJECTED,
+    PROTECT_REQUESTED,
+    PROTECTION_MISSING,
+    RECONCILIATION_REQUIRED,
     RESERVATION_ALREADY_LIVE,
     RESERVATION_UNMEASURABLE,
+    STOP_RATCHET_APPLIED,
+    STOP_RATCHET_REJECTED,
 )
 from bolsa_application.auto_v2_entry import (
     CatalogTradeContextSource,
@@ -95,10 +111,12 @@ from bolsa_application.auto_v2_entry import (
     EdgeReportSource,
     V2Signal,
     V2Tunables,
+    build_position_management_journal_entry,
     build_worker_snapshot,
     plan_v2_position_outcome,
     plan_v2_tick,
     position_manager_package,
+    position_manager_stop_update,
     sector_from_package,
     signal_identity_for_bar,
     tunables_from_env,
@@ -117,7 +135,12 @@ from bolsa_application.execution_event import (
     UNAPPLIED_EXECUTION_EVENT_STATUSES,
     ExecutionEventStore,
 )
-from bolsa_application.position_manager import PositionManagerSkip
+from bolsa_application.position_manager import PositionManagerResult, PositionManagerSkip
+from bolsa_application.protection_compat import (
+    ProtectionPolicy,
+    protection_exit_fraction,
+    protection_exit_reason,
+)
 from bolsa_application.reservation_store import ReservationStore
 from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
@@ -207,68 +230,14 @@ def flat_price_script(_symbol: str, _minute: int) -> float:
     return 100.0
 
 
-@dataclass(frozen=True, slots=True)
-class ProtectionConfig:
-    """V2.23/A9 (Bloque 6 · G8/G9) — protección autónoma determinista de posición.
-
-    Es política pura (sin I/O): el worker la evalúa con el precio del ``price_script``
-    y la posición abierta para forzar un SELL de protección (mismo gate/spine).
-    """
-
-    stop_pct: float = 0.02  # SL: cae ≥2% desde la entrada ⇒ salir.
-    t1_pct: float = 0.02  # T1: sube ≥2% desde la entrada ⇒ tomar beneficio.
-    trailing_pct: float = 0.015  # Trailing: retrocede ≥1.5% desde el máximo ⇒ salir.
-    session_end_minute: int = 0  # >0 ⇒ cierre por fin de sesión (minuto simulado).
-    # V2.24 / A9.1 (P2-06): T1 PARCIAL. Fracción de la posición que se toma en T1
-    # (0.3 = vender 30%, dejar 70% con trailing). 1.0 = comportamiento antiguo (cierre
-    # total). El resto se gestiona con trailing/stop.
-    t1_fraction: float = 1.0
-    enabled: bool = False  # fail-closed: sin activar, ninguna salida automática.
-
-    def exit_reason(
-        self, *, held: bool, entry: Decimal, high: Decimal, price: Decimal, minute: int
-    ) -> str | None:
-        """Razón de salida de protección (o None si no procede). Sólo con posición.
-
-        V2.24 / A9.1 (P2-06): el ORDEN importa. Si el máximo ya superó el umbral T1
-        (``high > entry*(1+t1_pct)``) el precio actual puede seguir por encima de T1 y
-        haber retrocedido desde el máximo: eso es un ``trailing_stop`` real, no un
-        ``t1_exit``. Antes se comprobaba T1 primero y se etiquetaba mal el motivo
-        (misma acción, distinta historia en el journal). Ahora se evalúa el trailing
-        antes que T1 cuando el máximo rebasó T1.
-        """
-        if not self.enabled or not held:
-            return None
-        if entry <= 0 or price <= 0:
-            return None
-        if self.session_end_minute and minute >= self.session_end_minute:
-            return "session_close"
-        if self.stop_pct > 0 and price <= entry * (Decimal(1) - Decimal(str(self.stop_pct))):
-            return "protective_stop"
-        high_above_t1 = self.t1_pct > 0 and high > entry * (Decimal(1) + Decimal(str(self.t1_pct)))
-        trailing_hit = (
-            self.trailing_pct > 0
-            and high > entry
-            and price <= high * (Decimal(1) - Decimal(str(self.trailing_pct)))
-        )
-        # Trailing tiene prioridad sobre T1 cuando el máximo ya rebasó T1 (un
-        # retroceso desde un máximo alto es un trailing real, no una toma en T1).
-        if trailing_hit and high_above_t1:
-            return "trailing_stop"
-        if self.t1_pct > 0 and price >= entry * (Decimal(1) + Decimal(str(self.t1_pct))):
-            return "t1_exit"
-        if trailing_hit:
-            return "trailing_stop"
-        return None
-
-    def exit_fraction(self, reason: str | None) -> float:
-        """Fracción de la posición a vender para una razón T1 (parcial) / resto 1.0."""
-        if reason == "t1_exit" and 0 < self.t1_fraction < 1:
-            return self.t1_fraction
-        return 1.0
+# AUTO-2: la política de protección (y su implementación) vive en
+# ``bolsa_application.protection_compat``. Aquí sólo queda el alias histórico que el
+# worker y los tests consumían, para no romper imports: NO es un motor, es un value
+# object con delegación.
+ProtectionConfig = ProtectionPolicy
 
 
-def _protection_config_from_env() -> ProtectionConfig:
+def _protection_config_from_env() -> ProtectionPolicy:
     """Lee la política de protección de env (default OFF = fail-closed).
 
     ``AUTO_ENGINE_SIM_PROTECTION=1`` activa. ``AUTO_ENGINE_SIM_STOP_PCT``/``_T1_PCT``/
@@ -300,7 +269,7 @@ def _protection_config_from_env() -> ProtectionConfig:
         "yes",
         "on",
     }
-    return ProtectionConfig(
+    return ProtectionPolicy(
         stop_pct=_f("AUTO_ENGINE_SIM_STOP_PCT", 0.02),
         t1_pct=_f("AUTO_ENGINE_SIM_T1_PCT", 0.02),
         trailing_pct=_f("AUTO_ENGINE_SIM_TRAILING_PCT", 0.015),
@@ -864,15 +833,15 @@ class AutoSimulationWorker:
         if position is None:
             return {}
         target1 = getattr(position, "target1_leg", None)
-        trailing = position.trailing if isinstance(position.trailing, dict) else None
+        # AUTO-2: la columna ``trailing_state`` refleja el FSM tipado (no el string de un
+        # dict vacío). El FSM completo (``lifecycleState``, ``trailing``, ``protection``)
+        # viaja DENTRO del JSONB ``position_state``: no hay columna nueva ni migración.
         return {
             "position_state": position.to_dict(),
             "avg_price": _dec_or_none(position.actual_entry),
             "stop_price": _dec_or_none(position.current_stop),
             "t1_state": getattr(target1, "status", None) if target1 else None,
-            "trailing_state": (
-                str(trailing.get("status")) if trailing and trailing.get("status") else None
-            ),
+            "trailing_state": trailing_status(position),
         }
 
     def _next_logical_order_id(self, symbol: str, side: str) -> str:
@@ -1991,17 +1960,45 @@ class AutoSimulationWorker:
            reconstruido se marca como ``adopted`` (auditoría explícita: no sobrevivió
            un plan real al reinicio) — gestionar sin estado es peor que un plan
            aproximado, pero nunca se disfraza de plan original.
+
+        AUTO-2 (fail-closed): si el estado NO es verificable (blob de un tag anterior sin
+        FSM, o geometría reconstruida) la adopción se DECLARA degradada
+        (``RECONCILIATION_REQUIRED`` + ``PROTECTION_MISSING``) con atención alta, en vez
+        de fingir que hay protección. El stop se conserva/reconstruye igual: una posición
+        declarada sin protección sigue protegida por el mejor stop conocido; lo que no se
+        puede fingir es la CERTEZA.
         """
         held = self._open.get(symbol, Decimal("0"))
         entry = self._entry_price.get(symbol)
         if held <= 0 or entry is None or entry <= 0 or price <= 0:
             return None
+        at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
         restored = self._v2_restore_durable_position(symbol, held)
         if restored is not None:
+            if restored.lifecycle_state is None:
+                # Plan de un tag anterior a AUTO-2: el estado no es verificable.
+                return self._v2_degrade_adoption(
+                    symbol,
+                    restored,
+                    source="plan",
+                    reason="durable_plan_without_lifecycle_state",
+                    at=at,
+                )
             return restored
         atr = entry * Decimal(str(self._v2_tunables.atr_pct_fallback))
         stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * atr
         if stop <= 0 or stop >= entry:
+            # Ni siquiera la geometría de emergencia es construible: se declara la
+            # ausencia de protección SIN stop sintético (no se inventa un número).
+            self._journal_position_event(
+                symbol,
+                PROTECTION_MISSING,
+                at=at,
+                detail={"source": "none", "reason": "geometry_not_constructible"},
+            )
+            logger.warning(
+                "auto_sim v2 adoption without protection symbol=%s entry=%s", symbol, entry
+            )
             return None
         r_multiple = entry - stop
         plan: dict[str, object] = {
@@ -2019,15 +2016,61 @@ class AutoSimulationWorker:
             plan,
             fill_price=float(entry),
             fill_quantity=float(held),
-            filled_at=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            filled_at=at,
         )
-        if position is not None:
-            logger.warning(
-                "auto_sim v2 adopted position without surviving plan symbol=%s stop=%s",
-                symbol,
-                stop,
-            )
-        return position
+        if position is None:
+            return None
+        logger.warning(
+            "auto_sim v2 adopted position without surviving plan symbol=%s stop=%s",
+            symbol,
+            stop,
+        )
+        return self._v2_degrade_adoption(
+            symbol,
+            position,
+            source="reconstructed",
+            reason="no_durable_plan",
+            at=at,
+        )
+
+    def _v2_degrade_adoption(
+        self,
+        symbol: str,
+        position: PositionState,
+        *,
+        source: Literal["plan", "reconstructed", "none"],
+        reason: str,
+        at: str,
+    ) -> PositionState:
+        """Declara la adopción como no verificable y journaliza con atención alta."""
+        degraded = replace(
+            position,
+            lifecycle_state="RECONCILIATION_REQUIRED",
+            protection_state=protection_state_dict(
+                "PROTECTION_MISSING", source=source, reason=reason, at=at
+            ),
+            updated_at=at,
+        )
+        self._journal_position_event(
+            symbol,
+            RECONCILIATION_REQUIRED,
+            at=at,
+            detail={
+                "source": source,
+                "reason": reason,
+                "reasonCode": PROTECTION_MISSING,
+                "stop": degraded.current_stop,
+                "attention": "high",
+            },
+        )
+        logger.warning(
+            "auto_sim v2 adoption degraded symbol=%s source=%s reason=%s stop=%s",
+            symbol,
+            source,
+            reason,
+            degraded.current_stop,
+        )
+        return degraded
 
     def _v2_restore_durable_position(self, symbol: str, held: Decimal) -> PositionState | None:
         """Rehidrata el plan V2 persistido (una sola vez) para ``symbol``.
@@ -2069,27 +2112,55 @@ class AutoSimulationWorker:
         )
         return position
 
-    def _v2_position_package(self, symbol: str, price: Decimal) -> DecisionPackage | None:
+    async def _v2_position_package(self, symbol: str, price: Decimal) -> DecisionPackage | None:
         """Intención de gestión de la posición abierta (PositionManager) o ``None``.
 
         Requiere un ``PositionState`` V2 vivo para el símbolo. Si no lo hay (posición
-        readoptada tras un reinicio) se ADOPTA con geometría reconstruida para no dejar
-        la posición sin stop; solo si la adopción no es posible se devuelve ``None`` y
-        la gestión cae a la política clásica (fail-safe).
+        readoptada tras un reinicio) se ADOPTA (degradada si el estado no es verificable)
+        para no dejar la posición sin stop; solo si la adopción no es posible se devuelve
+        ``None`` y la gestión cae a la política clásica (fail-safe).
+
+        AUTO-2: además de la orden, esta función **aplica y persiste el ratchet de stop**
+        (``stop_update`` de un ``PROTECT``) y journaliza el resultado. Antes el stop
+        propuesto se descartaba y ``current_stop`` quedaba congelado en el valor de
+        nacimiento: ni break-even ni trailing existían en AUTO.
         """
         position: PositionState | None = self._v2_positions.get(symbol)
+        degraded = False
         if position is None:
             position = self._v2_adopt_position(symbol, price)
             if position is None:
                 return None
+            degraded = derive_lifecycle_state(position) in (
+                "RECONCILIATION_REQUIRED",
+                "PROTECTION_MISSING",
+            )
             self._v2_positions[symbol] = position
+        at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        policy = resolve_exit_policy(self._v2_tunables.exit_template)
+        high = self._high_price.get(symbol)
+        high_watermark = float(high) if high is not None and high > 0 else None
+        armed = is_trail_armed(position)
+        trail_stop = (
+            compute_trail_stop(
+                position,
+                trail_width=policy.trail_width,
+                high_watermark=high_watermark,
+            )
+            if armed
+            else None
+        )
         outcome = plan_v2_position_outcome(
             position,
             mark_price=float(price),
             regime=self._v2_regime(),
             portfolio_recon_status=self._v2_recon_status(symbol),
             exit_template=self._v2_tunables.exit_template,
-            at=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            # Sólo se declara TRAIL cuando hay un stop REAL que proponer: una alerta de
+            # trailing sin stop sería journal ruidoso, no gestión.
+            trail_hint=trail_stop is not None,
+            trail_stop=trail_stop,
+            at=at,
         )
         if isinstance(outcome, PositionManagerSkip):
             # AUTO-1A: la posición NO se pudo gestionar (mark rechazado / decisión no
@@ -2102,14 +2173,167 @@ class AutoSimulationWorker:
                 outcome.reason,
                 outcome.detail,
             )
+            self._journal_position_event(
+                symbol, outcome.reason, at=at, detail={"detail": outcome.detail}
+            )
             return None
         self._v2_last_exit_reasons[symbol] = (
             outcome.exit_reasons if outcome is not None else ()
         )
+        await self._v2_apply_stop_update(
+            symbol,
+            position,
+            outcome,
+            at=at,
+            trailing_armed=armed,
+            degraded=degraded,
+        )
         return position_manager_package(outcome)
 
+    async def _v2_apply_stop_update(
+        self,
+        symbol: str,
+        position: PositionState,
+        outcome: PositionManagerResult | None,
+        *,
+        at: str,
+        trailing_armed: bool,
+        degraded: bool,
+    ) -> None:
+        """Aplica el ``stop_update`` de la gestión (monotonía H2) y lo persiste.
+
+        Un ratchet NO vende: aunque no haya orden, el stop nuevo debe quedar persistido
+        (si no, el próximo tick parte del stop viejo y la protección no existe). Todo
+        desenlace se journaliza: aplicado, rechazado por empeorar, o pedido sin efecto.
+        Nunca un ``PROTECT`` mudo.
+        """
+        proposed = position_manager_stop_update(outcome)
+        # La base es la posición MARCADA del outcome (``apply_position_mark`` actualizó el
+        # extremo favorable y ``mfe_mae``): si se partiera de la copia sin marcar, el pico
+        # del JSONB se quedaría congelado y el trailing no tendría memoria propia.
+        marked = getattr(outcome, "position", None)
+        current = (
+            marked
+            if isinstance(marked, PositionState)
+            else (self._v2_positions.get(symbol) or position)
+        )
+        if proposed is None:
+            # Los motivos del spine van en minúscula (``decision.primary_reason.lower()``).
+            if outcome is not None and "trail" in {r.lower() for r in outcome.exit_reasons}:
+                # Hubo intención de proteger y no produjo stop utilizable: se declara.
+                self._journal_position_event(
+                    symbol,
+                    PROTECT_REQUESTED,
+                    at=at,
+                    detail={"exitReasons": list(outcome.exit_reasons)},
+                )
+            return
+        before = current.current_stop
+        updated = apply_position_current_stop(
+            current,
+            proposed,
+            at=at,
+            origin="trail" if trailing_armed else "protect",
+            reason="auto_v2_ratchet",
+        )
+        if updated is None:
+            # H2: el stop propuesto empeoraba el vigente y no hay override auditado.
+            self._journal_position_event(
+                symbol,
+                STOP_RATCHET_REJECTED,
+                at=at,
+                detail={"proposed": proposed, "current": before},
+            )
+            return
+        event = "TRAIL_ADVANCED" if trailing_armed else "PROTECT_APPLIED"
+        advanced, transition = advance_lifecycle(
+            updated,
+            event,
+            at=at,
+            mark_trailing=trailing_armed,
+        )
+        if not transition.accepted:
+            # El estado vivo (o su proyección) no admite la transición: se declara y el
+            # stop SÍ se conserva (la aplicación del stop no depende del FSM).
+            self._journal_position_event(
+                symbol,
+                LIFECYCLE_TRANSITION_REJECTED,
+                at=at,
+                detail={"event": event, "from": transition.from_state},
+            )
+            advanced = updated
+        self._v2_positions[symbol] = advanced
+        changed = before != advanced.current_stop
+        if changed:
+            held = self._open.get(symbol, Decimal("0"))
+            if held > 0:
+                await self._persist_position(symbol, held)
+            self._journal_position_event(
+                symbol,
+                STOP_RATCHET_APPLIED,
+                at=at,
+                detail={
+                    "from": before,
+                    "to": advanced.current_stop,
+                    "lifecycle": advanced.lifecycle_state,
+                    "trailing": trailing_status(advanced),
+                    "degraded": degraded,
+                },
+            )
+        else:
+            # Idempotente: el stop no cambia, pero la transición sí puede haber ocurrido.
+            if advanced.lifecycle_state != current.lifecycle_state:
+                self._journal_position_event(
+                    symbol,
+                    PROTECT_REQUESTED,
+                    at=at,
+                    detail={
+                        "stop": advanced.current_stop,
+                        "lifecycle": advanced.lifecycle_state,
+                    },
+                )
+
+    def _journal_position_event(
+        self,
+        symbol: str,
+        reason_code: str,
+        *,
+        at: str,
+        detail: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Journal de gestión de posición: registro rico + fila observable del día.
+
+        El registro rico (``DecisionJournalEntryRecord``) conserva el detalle; la fila
+        (``SimJournalRow``) es la que el día AUTO agrega de verdad. Sin la fila, el
+        motivo quedaría en una lista que nadie consume (mudo a efectos de auditoría).
+        """
+        entry = build_position_management_journal_entry(
+            instrument_id=symbol,
+            reason_code=reason_code,
+            actor=self._engine_id,
+            as_of=at,
+            detail=detail,
+        )
+        self._v2_journal.append(entry)
+        try:
+            self._emit(
+                "position_management",
+                self._venue(),
+                f"{reason_code}:{symbol}",
+                "hold",
+                Decimal("0"),
+            )
+        except Exception:  # noqa: BLE001 — journalizar nunca tumba el turno.
+            logger.exception("auto_sim position journal emit failed symbol=%s", symbol)
+
     def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
-        """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó)."""
+        """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó).
+
+        AUTO-2: la entrada se registra como TRANSICIÓN del FSM
+        (``ENTRY_PENDING`` → ``ENTRY_FILLED`` → ``OPEN``) y la protección se declara
+        ``ACTIVE`` con ``source=plan``: el plan aporta el stop estructural. La
+        persistencia la hace el llamante (``_persist_position``) en el mismo tick.
+        """
         plan = getattr(self._v2_plan, "decisions", ()) if self._v2_plan else ()
         trade_plan_dict: dict[str, object] | None = None
         for decision in plan:
@@ -2119,14 +2343,32 @@ class AutoSimulationWorker:
             break
         if trade_plan_dict is None:
             return
+        at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
         position = build_position_state_from_fill(
             trade_plan_dict,
             fill_price=float(price),
             fill_quantity=float(qty),
-            filled_at=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            filled_at=at,
         )
-        if position is not None:
-            self._v2_positions[symbol] = position
+        if position is None:
+            return
+        pending = replace(
+            position,
+            lifecycle_state="ENTRY_PENDING",
+            protection_state=protection_state_dict("ACTIVE", source="plan", at=at),
+        )
+        entered, transition = advance_lifecycle(pending, "ENTRY_FILLED", at=at)
+        if not transition.accepted:
+            # Imposible en la tabla vigente; si el FSM cambiara, la entrada NO se pierde:
+            # se declara y se conserva el estado nacido del fill.
+            self._journal_position_event(
+                symbol,
+                LIFECYCLE_TRANSITION_REJECTED,
+                at=at,
+                detail={"event": "ENTRY_FILLED", "from": transition.from_state},
+            )
+            entered = replace(entered, lifecycle_state="OPEN")
+        self._v2_positions[symbol] = entered
 
     def _v2_track_reduce(
         self,
@@ -2135,7 +2377,11 @@ class AutoSimulationWorker:
         price: Decimal,
         exit_reasons: tuple[str, ...],
     ) -> None:
-        """Actualiza el ``PositionState`` V2 tras un fill de venta (parcial o total)."""
+        """Actualiza el ``PositionState`` V2 tras un fill de venta (parcial o total).
+
+        AUTO-2: emite las TRANSICIONES que el fill verifica (``T1_HIT``/``PARTIAL_FILL``/
+        ``EXIT_FILLED``) en vez de dejar el FSM congelado en el estado de nacimiento.
+        """
         position: PositionState | None = self._v2_positions.get(symbol)
         if position is None:
             return
@@ -2149,10 +2395,35 @@ class AutoSimulationWorker:
         )
         if reduced is None:
             return
+        at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        events: list[str] = []
+        if "target_1" in exit_reasons:
+            events.append("T1_HIT")
         if reduced.status == "CLOSED":
+            events.append("EXIT_FILLED")
+        elif reduced.remaining_quantity < reduced.quantity:
+            events.append("PARTIAL_FILL")
+        advanced = reduced
+        for event in events:
+            advanced, transition = advance_lifecycle(
+                advanced,
+                event,
+                at=at,
+                # T1 es lo que ARMA el trailing (misma regla que el motor legacy): el
+                # estado persistido lo declara para que el reinicio no lo re-derive.
+                mark_trailing="target_1" in exit_reasons,
+            )
+            if not transition.accepted:
+                self._journal_position_event(
+                    symbol,
+                    LIFECYCLE_TRANSITION_REJECTED,
+                    at=at,
+                    detail={"event": event, "from": transition.from_state},
+                )
+        if advanced.status == "CLOSED":
             self._v2_positions.pop(symbol, None)
         else:
-            self._v2_positions[symbol] = reduced
+            self._v2_positions[symbol] = advanced
 
     # ---- UN turno (decide + liquida SIM + actualiza el libro) ------------------
     async def auto_turn(self) -> TurnReport:
@@ -2217,11 +2488,13 @@ class AutoSimulationWorker:
             v2_pkg: DecisionPackage | None = None
             if self._v2_enabled and held > 0 and price > 0:
                 # AUTO 2.0 (V2): gestión por PositionManager (PositionState + ExitPlan
-                # + PositionDecision) en lugar de la política global ProtectionConfig.
-                v2_pkg = self._v2_position_package(symbol, price)
+                # + PositionDecision). AUTO-2: el ratchet de stop se aplica y se
+                # persiste AQUÍ mismo (aunque no haya orden).
+                v2_pkg = await self._v2_position_package(symbol, price)
                 reasons.extend(self._v2_last_exit_reasons.get(symbol, ()))
             else:
-                prot = self._protection.exit_reason(
+                prot = protection_exit_reason(
+                    self._protection,
                     held=held > 0,
                     entry=self._entry_price.get(symbol, Decimal("0")),
                     high=self._high_price.get(symbol, Decimal("0")),
@@ -2239,7 +2512,7 @@ class AutoSimulationWorker:
             elif prot is not None:
                 # V2.24/A9.1 (P2-06): T1 PARCIAL. La protección puede vender solo una
                 # fracción (p. ej. 30%) y dejar el resto gestionado por trailing/stop.
-                fraction = self._protection.exit_fraction(prot)
+                fraction = protection_exit_fraction(self._protection, prot)
                 sell_qty = held * Decimal(str(fraction)) if 0 < fraction < 1 else held
                 pkg = DecisionPackage(
                     action="SELL",

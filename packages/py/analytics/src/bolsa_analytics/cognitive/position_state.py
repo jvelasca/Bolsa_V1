@@ -11,6 +11,14 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
+from bolsa_analytics.cognitive.position_lifecycle import (
+    LIFECYCLE_STATE_KEY,
+    LIFECYCLE_STATE_UNVERIFIED,
+    PROTECTED_LIFECYCLE_STATES,
+    PositionLifecycleState,
+    coerce_lifecycle_state,
+    lifecycle_state_is_consistent,
+)
 from bolsa_analytics.cognitive.position_revision import (
     PositionRevision,
     PositionRevisionOrigin,
@@ -238,10 +246,17 @@ def _is_break_even_stop(position: PositionState) -> bool:
 
 
 def derive_position_status(position: PositionState) -> PositionStatus:
-    """Precedencia F2.1: CLOSED > BE→PROTECTED > PARTIAL > OPEN."""
+    """Precedencia F2.1: CLOSED > BE→PROTECTED > PARTIAL > OPEN.
+
+    AUTO-2: ``status`` sigue siendo el HECHO de cantidad/break-even (no se duplica la
+    autoridad). El FSM ``lifecycle_state`` es aditivo y añade una sola afirmación que el
+    stop no puede hacer: ``PROTECTED`` explícito. ``PARTIAL``/``CLOSED`` siguen mandando
+    porque son hechos de cantidad, no interpretaciones.
+    """
     if position.status == "CLOSED" or position.remaining_quantity <= 0:
         return "CLOSED"
-    if _is_break_even_stop(position):
+    lifecycle = coerce_lifecycle_state(position.lifecycle_state)
+    if lifecycle in PROTECTED_LIFECYCLE_STATES or _is_break_even_stop(position):
         return "PROTECTED"
     if position.remaining_quantity < position.quantity:
         return "PARTIAL"
@@ -282,6 +297,9 @@ class PositionState:
     revisions: tuple[PositionRevision, ...] = ()
     # V1.65 — origen DecisionPackage (≠ trade_plan_id cuando ambos existen).
     decision_id: str | None = None
+    # AUTO-2 / V2.42 — FSM explícito del ciclo de vida. ``None`` = no persistido por un
+    # tag anterior (se proyecta desde los campos legacy); nunca se inventa al nacer.
+    lifecycle_state: PositionLifecycleState | None = None
 
     def to_dict(self) -> dict[str, object]:
         out: dict[str, object] = {
@@ -316,6 +334,10 @@ class PositionState:
         }
         if self.decision_id:
             out["decisionId"] = self.decision_id
+        # AUTO-2: se emite sólo si el FSM está definido. Ausente = "no persistido":
+        # la rehidratación lo proyecta desde los campos legacy en vez de degradar.
+        if self.lifecycle_state is not None:
+            out["lifecycleState"] = self.lifecycle_state
         return out
 
 
@@ -395,6 +417,34 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
     t1_price = _finite(raw.get("target1"))
     t2_price = _finite(raw.get("target2"))
     decision_id = _trim_id(raw.get("decisionId"))
+    # AUTO-2: clave ausente ⇒ None (un blob de un tag anterior se proyecta desde los
+    # campos legacy). Clave presente pero inválida ⇒ RECONCILIATION_REQUIRED: un estado
+    # no verificable nunca se interpreta como "sin protección".
+    lifecycle_raw = raw.get(LIFECYCLE_STATE_KEY)
+    lifecycle_state: PositionLifecycleState | None = None
+    #: ``True`` sólo si la degradación la IMPUSO la rehidratación (valor desconocido o
+    #: inconsistente con el hecho de cantidad). Un estado degradado PERSISTIDO de verdad
+    #: conserva su ``protection_state`` rico (``PROTECTION_MISSING`` + source): forzarlo
+    #: al stub genérico perdería la fuente de la degradación (auditoría).
+    forced_degradation = False
+    if LIFECYCLE_STATE_KEY in raw and lifecycle_raw is not None:
+        coerced = coerce_lifecycle_state(lifecycle_raw)
+        if coerced is None or not lifecycle_state_is_consistent(
+            coerced, remaining_quantity=remaining, quantity=qty
+        ):
+            # Estado no verificable contra el hecho de cantidad (p. ej. CLOSED con
+            # posición viva) o inventado: degrada, nunca se confía en él.
+            lifecycle_state = "RECONCILIATION_REQUIRED"
+            forced_degradation = True
+        else:
+            lifecycle_state = coerced
+    protection_state = dict(stub_protect) if isinstance(stub_protect, dict) else {"status": "none"}
+    if forced_degradation:
+        protection_state = {
+            "state": "RECONCILIATION_REQUIRED",
+            "source": "none",
+            "reason": LIFECYCLE_STATE_UNVERIFIED,
+        }
     return PositionState(
         position_id=position_id.strip(),
         trade_plan_id=trade_plan_id.strip(),
@@ -414,7 +464,7 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
         unrealized_r=_finite(raw.get("unrealizedR")),
         mfe_mae=mfe_mae,
         thesis_health=dict(stub_health) if isinstance(stub_health, dict) else {"status": "none"},
-        protection_state=dict(stub_protect) if isinstance(stub_protect, dict) else {"status": "none"},
+        protection_state=protection_state,
         trailing=dict(stub_trail) if isinstance(stub_trail, dict) else {"status": "none"},
         exit_status=exit_status,  # type: ignore[arg-type]
         created_at=created.strip(),
@@ -429,6 +479,7 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
         ),
         revisions=revisions_from_raw(raw.get("revisions")),
         decision_id=decision_id,
+        lifecycle_state=lifecycle_state,
     )
 
 
@@ -595,10 +646,27 @@ def apply_position_mark(
             "source": source,
         }
 
+    # AUTO-2: extremo favorable en PRECIO (distinto del MFE en R). Es el ancla del
+    # trailing en R: sin este pico no hay trailing posible y el stop quedaría congelado.
+    trailing = dict(position.trailing) if isinstance(position.trailing, dict) else {}
+    anchor = _finite_positive(position.actual_entry)
+    prev_hw = _finite_positive(trailing.get("highWatermark"))
+    extreme: float | None = None
+    if position.direction == "long":
+        candidates = [c for c in (prev_hw, anchor, price) if c is not None]
+        extreme = max(candidates)
+    elif position.direction == "short":
+        candidates = [c for c in (prev_hw, anchor, price) if c is not None]
+        extreme = min(candidates)
+    if extreme is not None:
+        trailing["highWatermark"] = _round4(extreme)
+        trailing["updatedAt"] = _now_iso(at)
+
     return replace(
         position,
         unrealized_r=unrealized,
         mfe_mae=mfe_mae,
+        trailing=trailing or position.trailing,
         updated_at=_now_iso(at),
     )
 

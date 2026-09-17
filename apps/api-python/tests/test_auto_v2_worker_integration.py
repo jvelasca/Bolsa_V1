@@ -374,6 +374,14 @@ async def test_v2_adopts_with_reconstructed_geometry_without_durable_plan(
     assert adopted.trade_plan_id == "adopted-AAA"
     assert adopted.initial_stop == 97.0
     assert adopted.remaining_quantity == 100.0
+    # AUTO-2: la adopción NO se disfraza de estado verificado: se declara degradada
+    # (``RECONCILIATION_REQUIRED`` + ``PROTECTION_MISSING``) y se journaliza, aunque el
+    # stop de emergencia reconstruido siga protegiendo la posición.
+    assert adopted.lifecycle_state == "RECONCILIATION_REQUIRED"
+    assert adopted.protection_state["state"] == "PROTECTION_MISSING"
+    assert adopted.protection_state["source"] == "reconstructed"
+    assert adopted.current_stop == 97.0, "el stop de emergencia sigue vivo"
+    assert "reconciliation_required" in _journal_codes(worker)
 
 
 @pytest.mark.asyncio
@@ -949,3 +957,192 @@ async def test_v2_known_fill_is_not_reserved_twice(v2_env: None) -> None:
     assert worker._v2_open_orders == (), "el fill ya reconocido no está pendiente"
     assert worker._v2_order_book_measurement == "COMPLETE"
     assert worker._v2_snapshot("BULL_TREND").reserved_cash == 0.0
+
+
+def _journal_codes(worker: AutoSimulationWorker) -> list[str]:
+    """Motivos de gestión de posición journalizados (payload ``reasonCodes``)."""
+    return [
+        code
+        for entry in worker._v2_journal
+        if entry.payload is not None and entry.event_type == "auto_position_management"
+        for code in entry.payload["reasonCodes"]
+    ]
+
+
+@pytest.mark.asyncio
+async def test_v2_stop_ratchet_is_applied_persisted_and_journaled(v2_env: None) -> None:
+    """AUTO-2: el stop propuesto por el trailing deja de descartarse (ratchet real).
+
+    Apertura @100 (stop 97 ⇒ R=3) → T1 @103.5 (reduce 30%) → avance a 105 con el trail
+    armado: ``TRAIL`` propone 105 − 1R = 102 y el stop SUBE. Un ratchet NO vende (la
+    cantidad no cambia) pero DEBE persistirse: sin eso el tick siguiente parte del stop
+    viejo y la protección no existe (es lo que pasaba antes de AUTO-2).
+    """
+    from bolsa_analytics.cognitive.position_lifecycle import (
+        is_trail_armed,
+        trailing_status,
+    )
+    from bolsa_application.sim_durable_store import InMemorySimAutoPositionStore
+
+    prices = {"v": 100.0}
+
+    def script(_symbol: str, _minute: int) -> float:
+        return prices["v"]
+
+    account = "acc-v2-ratchet"
+    pos_store = InMemorySimAutoPositionStore()
+    worker = _worker(
+        exec_store=InMemoryExecutionEventStore(),
+        position_store=pos_store,
+        account_id=account,
+        price_script=script,
+    )
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+    born = worker._v2_positions["AAA"]
+    assert born.current_stop == 97.0
+    assert is_trail_armed(born) is False, "sin T1 no hay trailing"
+
+    prices["v"] = 103.5
+    worker._decider = _hold()
+    await worker.auto_turn()
+    after_t1 = worker._v2_positions["AAA"]
+    held_after_t1 = worker._open["AAA"]
+    assert held_after_t1 == Decimal("140.000000"), "T1 reduce 30%"
+    assert after_t1.current_stop == 97.0, "una parcial no mueve el stop"
+    assert is_trail_armed(after_t1) is True
+    assert trailing_status(after_t1) == "armed", "T1 arma el trailing y lo declara"
+
+    prices["v"] = 105.0
+    await worker.auto_turn()
+    ratcheted = worker._v2_positions["AAA"]
+    assert ratcheted.current_stop == 102.0, "105 − 1R (R=3) ⇒ stop 102"
+    assert ratcheted.current_stop > born.current_stop, "el stop nunca empeora"
+    assert worker._open["AAA"] == held_after_t1, "un ratchet no vende"
+    assert trailing_status(ratcheted) == "active"
+    assert ratcheted.lifecycle_state == "TRAILING"
+    assert "stop_ratchet_applied" in _journal_codes(worker)
+
+    durable = (await pos_store.read_projection(account, "auto-sim"))["AAA"]
+    assert float(durable.stop_price) == 102.0, "el stop nuevo es durable, no sólo RAM"
+    assert durable.position_state is not None
+    assert durable.position_state["lifecycleState"] == "TRAILING"
+    assert durable.position_state["currentStop"] == 102.0
+    assert durable.position_state["trailing"]["highWatermark"] == 105.0
+
+
+@pytest.mark.asyncio
+async def test_v2_restart_rehydrates_trailing_and_keeps_ratcheting(v2_env: None) -> None:
+    """Tras reiniciar, el trailing continúa desde el estado PERSISTIDO (no re-deriva).
+
+    Sin el FSM durable el worker olvidaría que T1 ya se alcanzó y que el trailing está
+    activo: el máximo y el stop persistidos son la única memoria que sobrevive.
+    """
+    from bolsa_analytics.cognitive.position_lifecycle import trailing_status
+    from bolsa_application.sim_durable_store import InMemorySimAutoPositionStore
+
+    prices = {"v": 100.0}
+
+    def script(_symbol: str, _minute: int) -> float:
+        return prices["v"]
+
+    account = "acc-v2-ratchet-restart"
+    store = InMemoryExecutionEventStore()
+    pos_store = InMemorySimAutoPositionStore()
+    _s1, clock1 = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    w1 = AutoSimulationWorker(
+        clock=clock1,
+        exec_store=store,
+        position_store=pos_store,
+        account_id=account,
+        price_script=script,
+        **_trade_kwargs(),
+    )
+    w1._decider = _buy_lot()
+    await w1.auto_turn()
+    prices["v"] = 103.5
+    w1._decider = _hold()
+    await w1.auto_turn()  # T1
+    prices["v"] = 105.0
+    await w1.auto_turn()  # ratchet a 102
+    assert w1._v2_positions["AAA"].current_stop == 102.0
+    durable_before = (await pos_store.read_projection(account, "auto-sim"))["AAA"]
+    assert float(durable_before.stop_price) == 102.0, "el ratchet es durable antes del crash"
+    assert durable_before.position_state is not None
+    assert durable_before.position_state["lifecycleState"] == "TRAILING"
+
+    _s2, clock2 = step_minute_clock(datetime(2026, 9, 15, 9, 30, tzinfo=UTC))
+    w2 = AutoSimulationWorker(
+        clock=clock2,
+        exec_store=store,
+        position_store=pos_store,
+        account_id=account,
+        price_script=script,
+        **_trade_kwargs(),
+    )
+    await w2.readopt_positions()
+    assert w2._open.get("AAA", Decimal("0")) > 0
+    assert w2._high_price["AAA"] == Decimal("105.0"), "el máximo persiste"
+
+    # 105.5: por encima del stop 102 (ratchet) y por debajo de T2 (106), para que el
+    # fill observado sea el ratchet y no una toma en T2.
+    prices["v"] = 105.5
+    w2._decider = _hold()
+    await w2.auto_turn()
+    rehydrated = w2._v2_positions["AAA"]
+    assert rehydrated.lifecycle_state == "TRAILING", "el FSM no se re-deriva de cero"
+    assert trailing_status(rehydrated) == "active"
+    assert rehydrated.current_stop == 102.5, "sigue ratcheando: 105.5 − 1R"
+
+
+@pytest.mark.asyncio
+async def test_v2_protect_is_never_silent(v2_env: None) -> None:
+    """Ni un stop que empeora ni un PROTECT sin stop utilizable quedan mudos (H2).
+
+    El caso normal (ratchet aplicado) lo cubre el test anterior; aquí se fuerzan los dos
+    desenlaces degradados que antes no dejaban NINGUNA traza: el rechazo por empeorar y
+    la petición sin stop. Ambos se declaran en el journal en vez de colapsar a
+    ``hold_no_op``.
+    """
+    from bolsa_application.auto_v2_entry import plan_v2_position_outcome
+
+    worker = _worker()
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+    position = worker._v2_positions["AAA"]
+
+    # (a) PROTECT que EMPEORA el stop vigente (96 < 97): rechazado y declarado.
+    worsening = plan_v2_position_outcome(
+        position,
+        mark_price=101.0,
+        regime="BULL_TREND",
+        trail_hint=True,
+        trail_stop=96.0,
+        at="2026-09-15T09:01:00Z",
+    )
+    await worker._v2_apply_stop_update(
+        "AAA",
+        position,
+        worsening,  # type: ignore[arg-type]
+        at="2026-09-15T09:01:00Z",
+        trailing_armed=False,
+        degraded=False,
+    )
+    assert worker._v2_positions["AAA"].current_stop == 97.0, "H2: no empeora"
+    codes = _journal_codes(worker)
+    assert "stop_ratchet_rejected" in codes
+
+    # (b) TRAIL sin stop utilizable: la intención se declara aunque no haya ratchet.
+    from dataclasses import replace as _replace
+
+    assert worsening is not None
+    mutilated = _replace(worsening, stop_update=None)
+    await worker._v2_apply_stop_update(
+        "AAA",
+        worker._v2_positions["AAA"],
+        mutilated,  # type: ignore[arg-type]
+        at="2026-09-15T09:02:00Z",
+        trailing_armed=True,
+        degraded=False,
+    )
+    assert "protect_requested" in _journal_codes(worker)

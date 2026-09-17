@@ -68,6 +68,16 @@ def attention_to_urgency(attention: PositionAttention) -> PositionUrgency:
     return "LOW"
 
 
+#: Salidas PROTECTORAS: deshacer riesgo no espera a la reconciliación (invariante de oro
+#: del roadmap AUTO-2 §6.4). Con el libro sin verificar, ``CRITICAL`` degrada a ``REVIEW``
+#: **salvo** cuando el plan pide reducir riesgo ya (stop rebasado, trail alcanzado, riesgo
+#: de cartera): en ese caso manda la salida. Cualquier otro motivo (objetivos, manual,
+#: tesis) sigue vetado: tomar beneficio puede esperar, no cubrirse no.
+_PROTECTIVE_EXIT_REASONS: frozenset[str] = frozenset(
+    {"STRUCTURAL_STOP", "TRAIL", "PORTFOLIO_RISK"}
+)
+
+
 def _max_attention(a: PositionAttention, b: PositionAttention) -> PositionAttention:
     return a if _ATT_RANK[a] >= _ATT_RANK[b] else b
 
@@ -164,7 +174,10 @@ def _action_from_plan(
     recon_health: PositionReconHealth,
     thesis_invalid: bool,
 ) -> PositionDecisionAction:
-    if recon_health == "CRITICAL":
+    if (
+        recon_health == "CRITICAL"
+        and exit_plan.primary_reason not in _PROTECTIVE_EXIT_REASONS
+    ):
         return "REVIEW"
     if thesis_invalid or exit_plan.primary_reason == "THESIS_INVALIDATION":
         return "REVIEW"
@@ -239,9 +252,11 @@ def build_position_decision(
         return None
     if position.direction not in ("long", "short"):
         return None
-    policy = exit_policy if exit_policy is not None else (
-        resolve_exit_policy(template_id) if template_id else None
-    )
+    # AUTO-2: fuente ÚNICA de política. Antes ``template_id=None`` ⇒ ``policy=None`` ⇒ el
+    # fallback suelto de ``suggestion_from_exit_policy`` (0.5/1.0) hacía que los dos
+    # caminos AUTO cerraran T1 con fracciones distintas. ``resolve_exit_policy`` ya tiene
+    # MODERATE como default declarado: se usa siempre, sin rama silenciosa.
+    policy = exit_policy if exit_policy is not None else resolve_exit_policy(template_id)
     exit_plan = build_exit_plan_from_position(
         position,
         mark_price=mark_price,

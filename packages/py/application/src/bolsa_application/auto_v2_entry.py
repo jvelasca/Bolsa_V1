@@ -670,6 +670,8 @@ def plan_v2_position_decision(
     expires_at: str | None = None,
     now: str | None = None,
     exit_template: str | None = None,
+    trail_hint: bool = False,
+    trail_stop: float | None = None,
     at: str | None = None,
 ) -> PositionManagerResult | None:
     """Decisión de gestión de una posición abierta vía ``PositionManager``.
@@ -689,6 +691,8 @@ def plan_v2_position_decision(
         expires_at=expires_at,
         now=now,
         exit_template=exit_template,
+        trail_hint=trail_hint,
+        trail_stop=trail_stop,
         at=at,
     )
     return outcome if isinstance(outcome, PositionManagerResult) else None
@@ -704,12 +708,18 @@ def plan_v2_position_outcome(
     expires_at: str | None = None,
     now: str | None = None,
     exit_template: str | None = None,
+    trail_hint: bool = False,
+    trail_stop: float | None = None,
     at: str | None = None,
 ) -> PositionManagerResult | PositionManagerSkip | None:
     """AUTO-1A — como ``plan_v2_position_decision`` pero conservando el motivo del skip.
 
     El worker journaliza ``mark_rejected`` / ``decision_unavailable`` en vez de dejar el
     tick mudo: la posición sigue viva y sin gestión, y eso es un estado operativo.
+
+    AUTO-2: acepta y propaga ``trail_hint``/``trail_stop`` (el ratchet de stop en R). Sin
+    esto, ``manage_position_outcome`` usaba los defaults ``False``/``None`` y el
+    ``stop_update`` de un ``PROTECT`` nacía siempre nulo.
     """
     return manage_position_outcome(
         position,
@@ -720,6 +730,8 @@ def plan_v2_position_outcome(
         expires_at=expires_at,
         now=now,
         template_id=exit_template or None,
+        trail_hint=trail_hint,
+        trail_stop=trail_stop,
         at=at,
     )
 
@@ -729,7 +741,13 @@ def position_manager_package(
     *,
     source_prefix: str = "auto-2.0-position",
 ) -> DecisionPackage | None:
-    """Convierte el resultado del PositionManager en propuesta (o ``None`` si hold)."""
+    """Convierte el resultado del PositionManager en propuesta (o ``None`` si hold).
+
+    AUTO-2: un ``PROTECT`` (trailing/break-even) colapsa aquí a ``None`` **a propósito**
+    — un ratchet no vende y no debe inventar una orden — pero ya NO se pierde: el stop
+    propuesto se surface con ``position_manager_stop_update`` y el worker lo aplica y lo
+    journaliza. ``suggested_price`` sigue siendo el stop vigente, que ahora sí avanza.
+    """
     if result is None:
         return None
     if result.order_action == "hold":
@@ -744,6 +762,63 @@ def position_manager_package(
         quantity=float(qty),
         suggested_price=float(result.position.current_stop or 0.0),
         source=f"{source_prefix}:{reasons}",
+    )
+
+
+def position_manager_stop_update(
+    result: PositionManagerResult | None,
+) -> float | None:
+    """Stop propuesto por la gestión (``PROTECT``), o ``None`` si no hay ninguno válido.
+
+    AUTO-2: el ``stop_update`` que ``manage_position_outcome`` calculaba se DESCARTABA
+    en ``position_manager_package`` (que sólo leía ``order_action``/``order_qty``) y
+    ``current_stop`` quedaba congelado en el valor de nacimiento: break-even nunca se
+    protegía y el trailing no existía en AUTO. Este es el único surface del stop
+    propuesto; aplicarlo es responsabilidad del llamante (con monotonía H2).
+    """
+    if result is None:
+        return None
+    raw = result.stop_update
+    try:
+        stop = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        return None
+    if stop is None or stop != stop or stop <= 0:
+        return None
+    return stop
+
+
+def build_position_management_journal_entry(
+    *,
+    instrument_id: str,
+    reason_code: str,
+    actor: str,
+    as_of: str,
+    detail: Mapping[str, Any] | None = None,
+) -> DecisionJournalEntryRecord:
+    """AUTO-2 — journal de la gestión de posición (ratchet, transiciones, degradación).
+
+    El worker V2 no journalizaba la decisión de posición: un ``PROTECT`` sin efecto, un
+    rechazo de transición o una protección ausente quedaban mudos. Este evento los hace
+    observables sin convertirlos en una orden (un ratchet no vende).
+    """
+    from uuid import uuid4
+
+    payload: dict[str, Any] = {
+        "event": "auto_position_management",
+        "instrumentId": instrument_id,
+        "reasonCodes": [reason_code],
+    }
+    if detail:
+        payload.update(dict(detail))
+    return DecisionJournalEntryRecord(
+        id=f"JNL-{uuid4().hex[:12]}",
+        decision_id=f"POS-{uuid4().hex[:12]}",
+        event_type="auto_position_management",
+        actor=actor,
+        created_at=_stamp(as_of),
+        instrument_id=instrument_id,
+        payload=payload,
     )
 
 

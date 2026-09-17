@@ -370,6 +370,7 @@ jobs:
           packages/py/application/tests/test_execution_event.py
           packages/py/application/tests/test_applied_fills.py
           packages/py/application/tests/test_position_manager.py
+          packages/py/application/tests/test_auto_v2_lifecycle_stop.py
           packages/py/application/tests/test_portfolio_reservation.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py
@@ -401,6 +402,7 @@ jobs:
           --ignore=apps/api-python/tests/test_live_order_recovery_concurrency_pg.py
           --ignore=apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
+          --ignore=apps/api-python/tests/test_auto_v2_lifecycle_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
@@ -463,6 +465,11 @@ jobs:
       # SOBREVIVIR a un reinicio de proceso y liberarse cuando el fill se materializa;
       # sin PG real el test skipearía en mudo e invalidaría la certificación del tag.
       AUTO_RESERVATION_PG_REQUIRED: '1'
+      # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
+      # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
+      # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
+      # de un estado no verificable solo se certifican contra PostgreSQL real.
+      AUTO_V2_LIFECYCLE_PG_REQUIRED: '1'
       # V2.25/A10: persistencia del Strategy Lifecycle (migración 030) en PG real.
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
       # V2.26/A10: ciclo completo del Auto Orchestrator sobre PG real (promoción solo
@@ -546,6 +553,7 @@ jobs:
           apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
           apps/api-python/tests/test_auto_v2_durable_pg.py
+          apps/api-python/tests/test_auto_v2_lifecycle_pg.py
           apps/api-python/tests/test_instrument_trade_context_pg.py
           apps/api-python/tests/test_unique_natural_keys_pg.py
           apps/api-python/tests/test_portfolio_reservation_pg.py

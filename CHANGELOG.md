@@ -2,6 +2,104 @@
 
 All notable releases of Bolsa V1.
 
+## [1.67.0-beta] — V2.42 · AUTO-2 Position Lifecycle FSM & Real Protection — 2026-09-17
+
+**Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`): el ciclo de vida de la
+posición vive en `sim_auto_positions.position_state` (JSONB, migración `040`) y en las columnas ya
+existentes. Cierra el agujero que dejaron `AUTO-1A`/`AUTO-1`: el **`stop_update` que proponía la gestión se
+descartaba** (`position_manager_package` solo leía `order_action`/`order_qty`), así que `current_stop`
+quedaba **congelado en el valor de nacimiento** — ni break-even ni trailing existían en AUTO — y un
+`PROTECT` colapsaba a `hold → hold_no_op` **mudo**, con una posición de stop rebasado que podía quedarse
+sin vender. AUTO-2 instala un **FSM de posición explícito y persistido**, un **ratchet de stop real en R**,
+la **degradación fail-closed** de las posiciones adoptadas sin estado verificable y la **política T1/T2
+única** (MODERATE 0.3/0.3).
+
+| #       | Qué                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A1**  | **`position_lifecycle.py`** (analytics puro, sin I/O ni reloj): `PositionLifecycleState` (13 estados, incluidos `RECONCILIATION_REQUIRED`/`PROTECTION_MISSING`), `PositionLifecycleEvent` (14 eventos), `ALLOWED_TRANSITIONS` como **tabla explícita** y `apply_lifecycle_event`/`advance_lifecycle` **fail-closed**: una transición no listada **no avanza** (`accepted=False`, motivo `lifecycle_transition_rejected`) y un estado desconocido **degrada**, nunca se interpreta como "sin protección"                                                                                                                                                |
+| **A2**  | **`PositionState.lifecycle_state`** (aditivo) con `to_dict()` que emite `lifecycleState` **solo si no es `None`** (preserva el canario de igualdad exacta de `test_sim_durable_v2_state.py`), `trailing`/`protection_state` **tipados** (`TrailingStateDict`/`ProtectionStateDict`) y rehidratación que **degrada a `RECONCILIATION_REQUIRED`** cualquier estado desconocido o inconsistente con el hecho de cantidad (p. ej. `CLOSED` con posición viva). `status` sigue siendo el hecho de cantidad/break-even: `derive_position_status` pasa a ser **proyección** del FSM cuando está definido (cero blast radius en los ~30 lectores de `.status`) |
+| **A3**  | **Trailing en R** (dueño único en analytics): `TRAIL_DISTANCE_R_BY_WIDTH` (tight 0.75 / medium 1.0 / wide 1.25), `compute_trail_stop = highWatermark − trail_distance_r × initial_risk` (long), **solo tras T1** (`is_trail_armed`) y con **H2 nunca-empeorar** (`stop_worsens` ⇒ devuelve el stop vigente con override auditado pendiente). `apply_position_mark` pasa a ser el **único writer** del extremo favorable (`trailing.highWatermark`)                                                                                                                                                                                                     |
+| **A4**  | **Política T1/T2 única**: `position_decision` resuelve **siempre** `resolve_exit_policy(template_id)` (MODERATE 0.3/0.3). Antes `template_id=None ⇒ policy=None ⇒ fallback 0.5/1.0`, así que los dos caminos AUTO cerraban T1 con fracciones **distintas**                                                                                                                                                                                                                                                                                                                                                                                             |
+| **A5**  | **El stop deja de descartarse**: `position_manager_stop_update(result)` surface el `stop_update` de un `PROTECT` (solo finito y positivo; `None`/NaN/0/negativos = no utilizable); `plan_v2_position_outcome` acepta `trail_hint`/`trail_stop`; `run_auto_cycle` pasa `template_id` y journaliza `stopUpdate`. El spine **no cambia**: `PROTECT` sigue sin emitir orden (`DecisionPackage` solo SELL) pero `suggested_price` deja de estar congelado                                                                                                                                                                                                   |
+| **A6**  | **`protection_compat.py`** (application): dueño único de la política legacy con **dos modos declarados** — `pct` (compat flag-off, reproduce los umbrales `v2.39.x` y sus fracciones) y `r` (V2, delega en `compute_trail_stop`). Incluye la **traducción** del vocabulario legacy al del FSM (`protective_stop`→`EXIT_REQUESTED`, `t1_exit`→`T1_HIT`, `trailing_stop`→`PROTECT_APPLIED`, `session_close`→`EXIT_REQUESTED`); `ProtectionConfig` queda como **value object** (delega su lógica), no como motor                                                                                                                                          |
+| **A7**  | **Worker — ratchet real**: `_v2_position_package` pasa a **async** y aplica el `stop_update` con `apply_position_current_stop` (H2) → actualiza `self._v2_positions` y **persiste aunque no haya orden** (un ratchet no vende); todo desenlace se **journaliza** (`stop_ratchet_applied`, `stop_ratchet_rejected`, `protect_requested`) — **ningún `PROTECT` queda mudo** — y `trail_hint` solo se declara cuando hay un stop **real** que proponer                                                                                                                                                                                                    |
+| **A8**  | **FSM en el ciclo de vida**: `_v2_track_entry` emite `ENTRY_FILLED → OPEN`; `_v2_track_reduce` emite `T1_HIT`/`PARTIAL_FILL`/`EXIT_FILLED` y **arma el trailing con el T1** (`mark_trailing`) para que el reinicio no lo re-derive; el JSONB guarda `lifecycleState` y el `trailing.highWatermark` viaja con la posición **marcada** (antes se persistía el pico de nacimiento)                                                                                                                                                                                                                                                                        |
+| **A9**  | **Adopción degradada (fail-closed)**: sin estado verificable (plan de un tag anterior, o sin plan durable que rehidratar) la adopción se declara `RECONCILIATION_REQUIRED` + `PROTECTION_MISSING` con `source` (`plan`/`reconstructed`), se **journaliza con atención alta** y conserva/reconstruye el **mejor stop conocido**; si ni la geometría de emergencia es construible se declara la ausencia de protección **sin stop sintético**                                                                                                                                                                                                            |
+| **A10** | **Invariante de oro**: **ninguna salida protectora se veta** por reconciliación degradada (stop rebasado, trailing alcanzado, riesgo de cartera siguen vendiendo con el libro sin cuadrar); el límite queda declarado: **tomar beneficio sí espera** al veredicto                                                                                                                                                                                                                                                                                                                                                                                      |
+| **A11** | **Reason codes y journal**: `POSITION_LIFECYCLE_REASONS` (`stop_ratchet_applied`, `stop_ratchet_rejected`, `protect_requested`, `protection_missing`, `reconciliation_required`, `lifecycle_transition_rejected` + los motivos del FSM re-exportados desde analytics) y helper único de journal de gestión                                                                                                                                                                                                                                                                                                                                             |
+| **A12** | **Tests**: 29 herméticos de FSM (producto cartesiano de eventos con transiciones inválidas rechazadas, reinicio por cada estado intermedio, degradación de estados no verificables, ratchet nunca-empeorar, trailing solo tras T1) + 17 herméticos de aplicación (portes **V2=1** de los 5 tests legacy de `A9.1` con semántica R, shim `pct` reproduciendo `v2.39.x`, invariante de no-veto, política única) + 3 de worker (ratchet aplicado/persistido/journalizado, reinicio que sigue ratcheando, `PROTECT` nunca mudo) + 3 **PG reales** (rehidratación por estado y degradación medida en PostgreSQL)                                            |
+| **A13** | **CI**: entradas **explícitas** para los herméticos nuevos en `python-ci.yml` (`quality`) y `release-tag-ci.yml` (`python`); el fichero PG entra en los jobs con PG real (`auto-v2-durable-pg` / `lifecycle-pg`) con gate **fail-if-skipped** `AUTO_V2_LIFECYCLE_PG_REQUIRED=1` y en el `--ignore` de los jobs offline (un skip mudo no certifica)                                                                                                                                                                                                                                                                                                     |
+| **A14** | **Dualidad declarada**: `docs/engineering/audit-pack-v2.42-auto-2-position-lifecycle-2026-09-17.md` + `arranque-auditor-...` dejan explícito que la autoridad sigue siendo `sim_auto_positions` (JSONB `position_state`) y que `position_states` (ADR-033) **no se toca** en este slice; la deuda (ATR real, `TIME_EXIT`/`THESIS_EXIT`, horizonte de tiempo) queda asignada a **2b/AUTO-3**                                                                                                                                                                                                                                                            |
+
+### A1–A3 — El FSM y el trailing en R
+
+El FSM no sustituye a `status`: lo **complementa** con la única afirmación que el stop no puede hacer
+(protección explícita, entrada pendiente, T1 como transición, degradación declarada). `CLOSED` es
+terminal, `FLAT` no tiene posición, y la familia degradada **no es un pozo sin salida**: un hecho
+observable (un fill, un T1, un ratchet de stop, una salida) la **re-verifica** por la misma tabla de
+gestión, y `RECONCILED` necesita un estado resuelto explícito (no se adivina la vuelta). El trailing se
+mide en **R sobre `initial_risk`** (no en % del precio): sin riesgo inicial **no hay trailing** y el
+llamante debe declararlo, no sustituirlo por un porcentaje inventado.
+
+### A5–A8 — El stop deja de descartarse (el dinero)
+
+El `PROTECT` es la única decisión que **no emite orden** y sí mueve el stop; su `stop_update` viajaba en el
+`PositionManagerResult` y **moría en `position_manager_package`**. Ahora se surface, se aplica con la red de
+seguridad de `apply_position_current_stop` (nunca empeora sin override) y **se persiste aunque el tick no
+venda**: sin esa persistencia el tick siguiente parte del stop viejo y la protección no existe. El
+`highWatermark` se escribe desde la posición **marcada** del outcome, así que el trailing tiene memoria
+propia en el JSONB y el reinicio continúa el ratchet desde el estado persistido (`trailing.highWatermark`
+intacto, medido en PG real).
+
+### A13 — Matriz de mutaciones **medida**
+
+Cada mutación se aplicó sobre el árbol de trabajo, se corrió la suite del slice y se revirtió (ninguna se
+declara sin medir):
+
+| #   | Mutación                                                          | Efecto medido                                                                                                                                                                           |
+| --- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1  | `apply_lifecycle_event` acepta transiciones no listadas           | **3 rojos** (`test_invalid_transitions_are_rejected_without_advancing`, `test_cartesian_product_is_total_and_fail_closed`, `test_advance_lifecycle_rejected_leaves_position_untouched`) |
+| M2  | La rehidratación **no** degrada un estado inconsistente           | **2 rojos** (hermético de analytics **y** el PG real `test_v2_unverifiable_state_degrades_on_rehydration`)                                                                              |
+| M3  | `compute_trail_stop` pierde el clamp nunca-empeorar (H2)          | **1 rojo** (`test_trail_stop_never_worsens`: 103 ≠ 107)                                                                                                                                 |
+| M4  | El worker descarta el `stop_update`                               | **3 rojos** (ratchet aplicado/persistido, reinicio que sigue ratcheando, `PROTECT` nunca mudo)                                                                                          |
+| M5  | La reconciliación `CRITICAL` veta también las salidas protectoras | **2 rojos** (`test_stop_hit_still_sells_with_recon_drift`, `test_ratchet_still_applies_with_recon_drift`)                                                                               |
+| M6  | `_v2_track_reduce` no arma el trailing con el T1                  | **1 rojo** (`trailing_status == "armed"` en el ratchet real)                                                                                                                            |
+| M7  | La adopción sin estado verificable no se degrada                  | **1 rojo** (`test_v2_adopts_with_reconstructed_geometry_without_durable_plan`)                                                                                                          |
+| M8  | Vuelve el fallback 0.5/1.0 sin `template_id`                      | **3 rojos** (`test_t1_reduce_is_moderate_without_template`, `test_v2_t1_reduces_when_no_retracement`, `test_v2_t1_partial_fraction_matches_legacy_shim`: 5.0 ≠ 3.0)                     |
+| M9  | El shim legacy evalúa T1 antes que el trailing                    | **2 rojos** (`test_exit_reason_trailing_wins_over_t1`, `test_restart_with_open_position_trailing_uses_persisted_watermark`: `t1_exit` ≠ `trailing_stop`)                                |
+| M10 | Un `PROTECT` sin stop utilizable queda mudo                       | **1 rojo** (`protect_requested` ausente en el journal)                                                                                                                                  |
+| M11 | El trailing se considera armado antes de T1                       | **3 rojos** (`test_trail_stop_not_armed_before_t1`, `test_trailing_status_of_birth_stub_is_inactive`, `sin T1 no hay trailing`)                                                         |
+
+### Verificación medida (árbol final del slice)
+
+- `ruff check packages/py apps/api-python --config pyproject.toml` (invocación exacta de CI): **All checks
+  passed**; `mypy` (invocación de CI, `--follow-imports=silent`): **487 ficheros, 0 issues**;
+  `lint-imports`: **4 kept / 0 broken**.
+- Job **`quality`** completo (comando **extraído del YAML**, con las listas nuevas y sus `--ignore`):
+  **exit 0**, **1903 passed** (85,7 s).
+- Bloque offline del job **`python`** de `release-tag-ci.yml` (extraído del YAML): **exit 0**,
+  **1915 passed** (61,1 s).
+- Batería completa de paquetes `uv run pytest packages/py -q`: **2825 passed**, 1 skipped (Ollama
+  ausente: entorno) y 1 xfailed ⇒ **0 rojos**.
+- PG real: batería `auto-v2-durable-pg` **36 passed** (incluye los 3 nuevos de lifecycle durable), bloque
+  `lifecycle-pg` de `release-tag-ci.yml` (comando y `env:` extraídos del YAML) **141 passed** — golden,
+  auth, outbox, integridad financiera, estado del motor AUTO, finanzas simuladas, **bucle real del
+  scheduler con cero intervención humana** y fencing de ejecución — y los 9 tests legacy de protección +
+  los 4 portes V2=1 + 35 de integración del worker en verde.
+
+### Deuda declarada (no silenciosa)
+
+1. **`TIME_EXIT`/`THESIS_EXIT`, ATR real y horizonte de tiempo** no entran en este slice: la salida por
+   tiempo y la invalidación de tesis siguen fuera del FSM (asignadas a **2b/AUTO-3**).
+2. La rehidratación **degrada** un estado no verificable pero **no lo repara**: resolverlo es
+   responsabilidad de la reconciliación (el FSM declara, no adivina).
+3. `position_states` (ADR-033) **no** se toca: sigue existiendo una segunda superficie de estado de
+   posición. La dualidad está **declarada** en el audit-pack, no resuelta.
+4. El trailing depende de `trailing.highWatermark`, que sólo se puebla si la posición se marca: una
+   posición **sin ticks** (sin mark) no tiene pico y por tanto no puede ratchear.
+5. `ProtectionConfig` se conserva como **value object** por compatibilidad del camino flag-off; su lógica
+   vive en `protection_compat` (un dueño único), pero la dataclass sigue exportándose desde el worker.
+
 ## [1.66.0-beta] — V2.41 · AUTO-1 Portfolio Reservation Engine — 2026-09-17
 
 **Migración aditiva `042_portfolio_reservations`** (Alembic head `041_unique_natural_keys` → `042_portfolio_reservations`).

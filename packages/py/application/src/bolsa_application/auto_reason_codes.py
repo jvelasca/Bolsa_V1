@@ -26,12 +26,26 @@ Tres familias:
 * NO-GESTIÓN (AUTO-1A) — el motor no pudo gestionar una posición viva. ``no_mark_data``:
   sin mark para ese instrumento en el tick. ``mark_rejected``: el ``PositionState`` rechazó
   el mark. ``decision_unavailable``: no se pudo construir la ``PositionDecision``.
+* CICLO DE VIDA (AUTO-2) — el FSM explícito de la posición. Los literales de transición
+  son dueño único de ``bolsa_analytics.cognitive.position_lifecycle`` (analytics no puede
+  importar application: se re-exportan aquí para que el journal tenga una sola casa).
+  ``stop_ratchet_applied`` / ``stop_ratchet_rejected``: el stop propuesto por un
+  ``PROTECT`` se aplicó (o se rechazó por empeorar sin override auditado).
+  ``protect_requested``: hubo intención de proteger sin efecto (nunca mudo).
+  ``protection_missing`` / ``reconciliation_required`` / ``lifecycle_state_unverified``:
+  la posición no tiene protección verificable y se declara, jamás se asume.
 
 Ninguno de estos códigos es un "hold" silencioso: todos implican que hay algo que el
 operador debe poder ver.
 """
 
 from __future__ import annotations
+
+from bolsa_analytics.cognitive.position_lifecycle import (
+    LIFECYCLE_RESOLUTION_MISSING,
+    LIFECYCLE_STATE_UNVERIFIED,
+    LIFECYCLE_TRANSITION_REJECTED,
+)
 
 NO_MARK_DATA = "no_mark_data"
 POSITION_MARK_REJECTED = "mark_rejected"
@@ -50,6 +64,13 @@ RESERVATION_FAILED = "reservation_failed"
 RESERVATION_UNMEASURABLE = "reservation_unmeasurable"
 # AUTO-1b — no se apila un segundo compromiso sobre un instrumento ya reservado.
 RESERVATION_ALREADY_LIVE = "reservation_already_live"
+
+# AUTO-2 — FSM de la posición: ratchet de stop y degradación de protección.
+STOP_RATCHET_APPLIED = "stop_ratchet_applied"
+STOP_RATCHET_REJECTED = "stop_ratchet_rejected"
+PROTECT_REQUESTED = "protect_requested"
+PROTECTION_MISSING = "protection_missing"
+RECONCILIATION_REQUIRED = "reconciliation_required"
 
 # Motivos con los que ``PositionManagerSkip`` declara una gestión no realizada.
 POSITION_SKIP_REASONS: frozenset[str] = frozenset(
@@ -75,15 +96,36 @@ RESERVATION_REASONS: frozenset[str] = frozenset(
     }
 )
 
+# AUTO-2 — motivos del FSM de la posición (ratchet, protección y degradación).
+POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
+    {
+        STOP_RATCHET_APPLIED,
+        STOP_RATCHET_REJECTED,
+        PROTECT_REQUESTED,
+        PROTECTION_MISSING,
+        RECONCILIATION_REQUIRED,
+        LIFECYCLE_TRANSITION_REJECTED,
+        LIFECYCLE_STATE_UNVERIFIED,
+        LIFECYCLE_RESOLUTION_MISSING,
+    }
+)
+
 __all__ = [
     "EXIT_QTY_OVER_POSITION",
     "FILL_NOT_MATERIALIZED",
     "FILL_PARTIALLY_MATERIALIZED",
+    "LIFECYCLE_RESOLUTION_MISSING",
+    "LIFECYCLE_STATE_UNVERIFIED",
+    "LIFECYCLE_TRANSITION_REJECTED",
     "MATERIALIZATION_REASONS",
     "NO_MARK_DATA",
     "POSITION_DECISION_UNAVAILABLE",
+    "POSITION_LIFECYCLE_REASONS",
     "POSITION_MARK_REJECTED",
     "POSITION_SKIP_REASONS",
+    "PROTECTION_MISSING",
+    "PROTECT_REQUESTED",
+    "RECONCILIATION_REQUIRED",
     "RESERVATION_ALREADY_LIVE",
     "RESERVATION_CREATED",
     "RESERVATION_FAILED",
@@ -93,4 +135,6 @@ __all__ = [
     "RESERVATION_RELEASED_RESTART",
     "RESERVATION_RELEASED_ROLLBACK",
     "RESERVATION_UNMEASURABLE",
+    "STOP_RATCHET_APPLIED",
+    "STOP_RATCHET_REJECTED",
 ]
