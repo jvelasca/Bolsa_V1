@@ -2,6 +2,99 @@
 
 All notable releases of Bolsa V1.
 
+## [1.66.0-beta] — V2.41 · AUTO-1 Portfolio Reservation Engine — 2026-09-17
+
+**Migración aditiva `042_portfolio_reservations`** (Alembic head `041_unique_natural_keys` → `042_portfolio_reservations`).
+Sustituye la **reserva artesanal intra-tick** (`committed[]` + `_working_snapshot` dentro de `plan_v2_tick`)
+por un **motor de reservas explícito**: cada aprobación produce `Decision + Reservation`, la reserva tiene
+**identidad**, **siete dimensiones** comprometidas, **coste real**, **ciclo de vida** (fill / cancelación /
+reinicio / rollback) y **`replay`**; y sobrevive al proceso porque tiene espejo durable. Invariante que
+instala: **no existe aprobación sin reserva y no existe reserva sin liberación**
+(`reserved_cash == Σ reservas vivas`, medido). Deuda declarada de `V2.40.4`/`V2.40.5` cerrada: la
+liberación explícita del capital en vuelo y el índice `execution_events(account_id, status)`.
+
+| #       | Qué                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **R1**  | **`PortfolioReservation` + `ReservationLedger`** (`bolsa_analytics.cognitive.portfolio_reservation`, puro, sin I/O ni reloj): identidad (`reservation_id`, `account_id`, `tick_id`, instrumento, sector, estrategia, lado) + siete dimensiones (`reserved_cash`, `reserved_risk`, `asset_exposure`, `sector_exposure`, `correlation`, `strategy_capacity`, `liquidity_capacity`) + coste + ciclo de vida. `reserve()` es **idempotente-rechazante**: una segunda reserva con la misma identidad devuelve `None`, nunca sobrescribe |
+| **R2**  | **Ciclo de vida explícito**: `OPEN`, `RELEASED_BY_FILL`, `RELEASED_BY_CANCEL`, `RELEASED_BY_RESTART`, `RELEASED_BY_ROLLBACK`. Una liberación **parcial** escala capital/riesgo/exposición a la cantidad viva (lo llenado deja de ser reserva y pasa a ser posición; la cola **sigue** siendo capital comprometido) y una total la deja a 0 dejando el importe original en el evento de alta (historia inmutable). `release` es **idempotente** (segunda llamada = `None`)                                                          |
+| **R3**  | **`replay(eventos)`** reproduce el libro exactamente (misma aritmética, orden determinista) ⇒ "¿cuánto riesgo había reservado AUTO antes de lanzar esta orden?" tiene respuesta reproducible                                                                                                                                                                                                                                                                                                                                       |
+| **R4**  | **`PortfolioRiskState`**: `gross_risk`, `net_risk`, `reserved_risk`, `pending_risk`, `sector_risk`, `strategy_risk` y `correlation_adjusted_risk` (cota **superior** conservadora: declarar correlación positiva la sube, nunca descuenta diversificación no medida), con `measurement` fail-closed compartido con `PositionLedger`                                                                                                                                                                                                |
+| **R5**  | **Coste real de negociación** en el sizing: `estimate_trading_cost` (comisión con el calendario real de `account_settings`, spread/slippage/gap en bps reutilizando los defaults de `cost_model_v2`) deriva `ExpectedLoss` / `WorstCaseLoss` / `GapAdjustedLoss`; `compute_allocation` ajusta la cantidad por `risk_real = stop_loss + comisión + spread + slippage`, publica `risk_real`/`risk_real_pct`/`trading_cost` y declara `cost_unmeasured` (nunca "coste = 0")                                                           |
+| **R6**  | `plan_v2_tick` sustituye `committed[]`/`_working_snapshot`/`_committed_position` por el `ReservationLedger` del tick y publica `V2TickPlan.reservations` + `.risk_state` (nuevos); si la reserva no se puede construir, la aprobación se **degrada a veto** (`reservation_failed`) en vez de emitir una orden sin compromiso trazable                                                                                                                                                                                              |
+| **R7**  | **Migración `042`**: tabla `portfolio_reservations` (PK `reservation_id`, dimensiones, coste, estado, `lease_generation`) + índices por `(account_id, status)`, `(account_id, sector)` y `(account_id, created_at DESC)` + **el índice que faltaba** `execution_events(account_id, status)` (cierra la deuda de `V2.40.4` §5.1 y `V2.40.5` §5.2). Aditiva, sin backfill, `downgrade()` completo, espejo 1:1 en `tables.py`                                                                                                         |
+| **R8**  | **`reservation_store.py`**: `ReservationStore` (Protocol) + `InMemoryReservationStore` + `PostgresReservationStore` (idempotente: `ON CONFLICT DO NOTHING` + `UPDATE`, `commit()` explícito)                                                                                                                                                                                                                                                                                                                                       |
+| **R9**  | **Worker**: las reservas vivas pasan a ser la **autoridad** de `reserved_cash`/`pending_risk` (una traza de `execution_events` de un instrumento con reserva viva **no** se suma otra vez: la reserva la cubre) y el productor anterior queda como **reconciliación de arranque**. Liberación por **fill** (parcial o total), por **cancelación** y por **reinicio**; veto `reservation_already_live` si ya hay reserva viva del instrumento y `reservation_unmeasurable` si el libro no es legible                                |
+| **R10** | **Bug real corregido en el camino**: `coerce_applied_fill_fact` solo aceptaba `applied_at` como `str`, así que **todo** hecho leído de PostgreSQL quedaba **sin fecha** (el fold del `PositionLedger` perdía su orden canónico y la reconciliación no podía ventanear "¿este fill es posterior al alta de la reserva?"). Normaliza `str` **y** `datetime` → ISO                                                                                                                                                                    |
+| **R11** | CI: gate propio **`AUTO_RESERVATION_PG_REQUIRED`** en `auto-v2-durable-pg` (`python-ci.yml`) y `lifecycle-pg` (`release-tag-ci.yml`); el fichero PG entra en el `--ignore` de los jobs offline (un skip mudo no certifica) y el test de snapshot de evidencia sube su head esperado a `042`                                                                                                                                                                                                                                        |
+
+### R1–R3 — La reserva como objeto con ciclo de vida
+
+La reserva es un `frozen` dataclass con identidad: el `reservation_id` deriva de la decisión
+(`RES-{decision_id}`), así que **la misma aprobación no puede reservar dos veces** (ni dos candidatas del
+mismo tick pueden pisarse) y el alta tiene fecha, cuenta y tick. Las dimensiones **no son decorativas**:
+`reserved_cash` es el notional comprometido (lo que el snapshot descuenta de caja/poder de compra) y
+`reserved_risk` el presupuesto de riesgo consumido (`riskAmount`), que con coste real es **mayor** que la
+pérdida del stop. El `TradingCost` viaja aparte para que el journal pueda mostrar la pérdida esperada
+real. Una reserva **sin cuantificar** no se descarta en silencio: cuenta como no medida y degrada el
+`measurement` del libro (fail-closed).
+
+`ReservationLedger` no tiene reloj ni I/O: `reserve`/`release`/`release_by_fill`/`release_by_cancel`/
+`release_by_restart`/`rollback`/`live`/`reserved_cash`/`reserved_risk`/`by_sector`/`by_strategy`, más
+`replay`. El `rollback` libera **solo** las reservas del tick pedido (la reversión de un tick no toca el
+resto del libro).
+
+### R4–R5 — Riesgo de cartera y coste real en el tamaño
+
+`PortfolioRiskState` se compone con las posiciones abiertas (su desglose sectorial medido; una posición sin
+`risk_amount` **no** aporta 0, cuenta como no medida) y con el libro de reservas. `pending_risk` deja de
+ser un suelo: el riesgo de la orden en vuelo entra por la reserva. En el sizing, sin `cost_model` el
+comportamiento es el histórico (retrocompatible); con él, la cantidad se recorta para que la **pérdida
+esperada real** quepa en el presupuesto, y si algún componente no es medible se declara `cost_unmeasured`
+en vez de asumir gratis.
+
+### R9 — Autoridad y liberación (el compromiso de `V2.40.5`)
+
+`reserved_cash` y `pending_risk` del libro pendiente se derivan de las **reservas vivas**; las trazas de
+`execution_events` solo entran si su instrumento **no** tiene reserva viva (crash entre la captura del fill
+y el alta de la reserva). La cola en `RETRY` sigue siendo **capital reservado** — nunca posición ni
+realizado — y ahora tiene sujeto: la reserva que la cubre. Al reiniciar, la reconciliación libera por fill
+lo materializado (parcial incluido) y libera entera la reserva de una orden que murió sin llenarse.
+
+### Matriz de mutaciones **medida**
+
+Cada mutación se aplicó sobre el árbol de trabajo, se corrió la suite y se revirtió:
+
+| #   | Mutación                                                                 | Efecto medido                                                                                                                                         |
+| --- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1  | `_working_snapshot` devuelve la foto base (muere la autoridad del libro) | **7 rojos** (3 de `test_portfolio_reservation.py`, 3 intra-tick y 1 de sector de `test_auto_v2_entry.py`)                                             |
+| M2  | La liberación parcial no escala las dimensiones (`factor = 1`)           | **2 rojos** (`test_release_by_fill_partial_scales_and_keeps_the_tail_reserved`, `test_release_by_fill_of_a_tick_reservation_keeps_the_tail_reserved`) |
+| M3  | El libro pendiente suma la traza **y** la reserva (sin `covered`)        | **1 rojo** (`test_retry_trace_keeps_the_reservation_as_reserved_capital`: 20000 ≠ 10000)                                                              |
+| M4  | `coerce_applied_fill_fact` vuelve a aceptar `applied_at` solo `str`      | **2 rojos** (el hermético nuevo y `test_reservation_survives_restart_and_is_released_by_the_materialized_fill` en PG)                                 |
+| M5  | El allocator asume coste 0 cuando no es medible                          | **1 rojo** (`test_allocator_declares_an_unmeasurable_cost_instead_of_assuming_zero`)                                                                  |
+
+**Sin mutación**: `ruff` limpio, `mypy` 486 ficheros 0 issues, `lint-imports` 4/0, job `quality` completo
+(comando extraído del YAML) **exit 0**, `pytest packages/py` **2779 passed**, PG real en verde
+(4 reservas durables, 29 durable/contexto/claves, 2 de proceso, bucle ×30 del scheduler **0 fallos**).
+
+### Deuda declarada (no silenciosa)
+
+1. **`correlation`, `strategy_capacity` y `liquidity_capacity`** se reservan cuando el contexto las
+   declara; hoy el tick no tiene universo de correlación ni capacidad por estrategia, así que quedan
+   `None` (no medidas) y `correlation_adjusted_risk` **no descuenta** diversificación. Poblarlas es
+   `AUTO-3`/`AUTO-4`.
+2. El **productor desde `execution_events`** no se borra: queda como reconciliación de arranque (es la red
+   de seguridad del crash entre fill y alta de reserva).
+3. La tabla `portfolio_reservations` **crece con cada aprobación** (es historia: una reserva liberada no se
+   borra). No hay job de compactación/purga declarado todavía.
+4. `pending_risk` es medible **solo** si la reserva declara riesgo; sin dato el agregado baja de medición y
+   el motor **veta** aperturas (las salidas protectoras siguen permitidas).
+5. **`lease_generation`** se persiste (espejo 1:1 con la tabla) pero **no** hay lógica de _lease_ para
+   reservas: no existe adquisición/robo de propiedad entre procesos. La exclusión es por identidad de
+   reserva (`RES-{decision_id}`) y por cuenta, no por fence.
+6. El índice de `execution_events` se crea **plano** `(account_id, status)`, no parcial (`WHERE status <>
+'APPLIED'` dejaría fuera la lectura de `APPLIED`, la autoridad de posición desde `V2.40.5`); decisión
+   documentada en el docstring de la migración.
+
 ## [1.65.5-beta] — V2.40.5 · AUTO-1A Position Materialization & Partial-Fill Integrity — 2026-09-17
 
 **Sin migración** (head sigue en `041_unique_natural_keys`). Cierra el **P0** de las auditorías de

@@ -104,6 +104,10 @@ jobs:
         # puros/herméticos y entran con nombre propio (un fichero nuevo NO entra solo en
         # la red de CI: la lista es explícita). El reinicio con PG real y el bucle de la
         # jornada completa del scheduler se certifican en lifecycle-pg / auto-v2-durable-pg.
+        # AUTO-1: el libro de reservas (hermético) entra igual de explícito; su persistencia
+        # durable y la reconciliación se certifican en el job auto-v2-durable-pg.
+        # AUTO-1b: ese fichero PG queda en ``--ignore`` de este job (no hay PG aquí: sin
+        # ignore se recolectaría y skipearía en mudo) y corre con gate propio allí.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -134,6 +138,7 @@ jobs:
           packages/py/application/tests/test_execution_event.py
           packages/py/application/tests/test_applied_fills.py
           packages/py/application/tests/test_position_manager.py
+          packages/py/application/tests/test_portfolio_reservation.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py
           packages/py/application/tests/test_idempotency_key_budget.py
@@ -167,6 +172,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
+          --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
 
@@ -356,7 +362,7 @@ jobs:
     # el worker nuevo rehidrata el mismo PositionState (no lo reconstruye por ATR) y
     # sigue vetando el re-emitir la misma señal. Gate fail-if-skipped: sin PG real un
     # skip silencioso sería una certificación fantasma.
-    name: auto-v2-durable-pg (Alembic 040-041 + reinicio real, per-commit)
+    name: auto-v2-durable-pg (Alembic 040-042 + reinicio real, per-commit)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -388,6 +394,10 @@ jobs:
       # El dedupe con duplicados preexistentes y la atomicidad de los upsert solo se
       # certifican contra PostgreSQL real (job auto-v2-durable-pg).
       UNIQUE_NATURAL_KEYS_PG_REQUIRED: '1'
+      # AUTO-1b (V2.41): libro de reservas durable (migración 042). La reserva tiene que
+      # SOBREVIVIR a un reinicio de proceso y liberarse cuando el fill se materializa;
+      # sin PG real el test skipearía en mudo e invalidaría la certificación.
+      AUTO_RESERVATION_PG_REQUIRED: '1'
       # El reinicio real usa el mismo camino durable del scheduler AUTO.
       AUTO_SCHEDULER_PG_REQUIRED: '1'
     steps:
@@ -400,13 +410,17 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Alembic upgrade head (hasta 041 incluida)
+      - name: Alembic upgrade head (hasta 042 incluida)
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
       # V2.40.2: ``pipefail`` es obligatorio. Con ``... | tee log`` el step devuelve el
       # exit code de ``tee`` (0), así que la certificación PG quedó en falso verde con
       # ``6 failed, 22 passed`` en el run 35009780076. Y el guard de skips exige el log:
       # sin fichero, ``grep`` falla en mudo y el guard no guardaba nada.
+      # AUTO-1b (V2.41): el libro de reservas durable (migración 042) se certifica aquí —
+      # roundtrip de la migración, supervivencia al reinicio, liberación por fill
+      # (parcial incluida) y capital reservado de una orden en vuelo (``RETRY``).
+      # Gate fail-if-skipped: AUTO_RESERVATION_PG_REQUIRED=1.
       - name: Pytest AUTO 2.0 durable PG (fail if skipped)
         run: |
           set -o pipefail
@@ -414,6 +428,7 @@ jobs:
             apps/api-python/tests/test_auto_v2_durable_pg.py \
             apps/api-python/tests/test_instrument_trade_context_pg.py \
             apps/api-python/tests/test_unique_natural_keys_pg.py \
+            apps/api-python/tests/test_portfolio_reservation_pg.py \
             apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 

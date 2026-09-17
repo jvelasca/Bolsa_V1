@@ -27,8 +27,8 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass, field, replace
+from typing import Any, cast
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
     DATA_FRESH,
@@ -46,6 +46,16 @@ from bolsa_analytics.cognitive.opportunity_ranker import (
     score_opportunity,
     select_top_opportunities,
 )
+from bolsa_analytics.cognitive.portfolio_reservation import (
+    PortfolioReservation,
+    PortfolioRiskState,
+    ReservationLedger,
+    TradingCostModel,
+    build_portfolio_risk_state,
+    build_reservation,
+    coerce_trading_cost,
+    sector_risk_from_positions,
+)
 from bolsa_analytics.cognitive.position_state import PositionState
 from bolsa_analytics.cognitive.risk_allocator import RiskAllocatorConfig
 from bolsa_analytics.cognitive.signal_identity import (
@@ -55,6 +65,7 @@ from bolsa_analytics.cognitive.signal_identity import (
 )
 from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
+from bolsa_application.auto_reason_codes import RESERVATION_FAILED
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.discovery_market_regime import (
     MATH_VERSION_MARKET_REGIME_V0,
@@ -66,6 +77,7 @@ from bolsa_application.discovery_market_regime import (
     classify_market_regime,
 )
 from bolsa_application.portfolio_decision_engine import (
+    DecisionReasonCode,
     PortfolioDecision,
     PortfolioDecisionConfig,
     decide_portfolio,
@@ -148,6 +160,11 @@ class V2Tunables:
     # deduplica. ``1d`` (default) evita re-emitir la MISMA señal intradía (el caso
     # real: worker cada 60s sobre una señal diaria); ``1m`` deduce a nivel de tick.
     signal_timeframe: str = "1d"
+    # AUTO-1 — coste real de negociación. ACTIVO por defecto: el presupuesto de riesgo
+    # debe cubrir el stop Y las fricciones (comisión + spread + slippage), no solo el stop.
+    # ``AUTO_ENGINE_SIM_V2_COST_MODEL=0`` lo desactiva EXPLÍCITAMENTE y devuelve el sizing
+    # histórico. ``None`` = sin modelo (mismo efecto que desactivarlo).
+    cost_model: TradingCostModel | None = field(default_factory=TradingCostModel)
 
     def decision_config(self) -> PortfolioDecisionConfig:
         return PortfolioDecisionConfig(
@@ -162,7 +179,33 @@ class V2Tunables:
                 max_risk_per_trade_pct=self.max_risk_per_trade_pct,
                 max_position_pct=self.max_position_pct,
             ),
+            cost_model=self.cost_model,
         )
+
+
+def _cost_model_from_env() -> TradingCostModel | None:
+    """Modelo de coste del sizing (AUTO-1); ``None`` si se desactiva explícitamente.
+
+    Ausencia de ``AUTO_ENGINE_SIM_V2_COST_MODEL`` ⇒ modelo ACTIVO con los defaults de la
+    casa (10 bps de comisión por lado, 2 bps de spread, 5 bps de slippage por lado). Un
+    valor de la familia "off" lo desactiva; los bps son calibrables por env.
+    """
+    raw = (os.getenv("AUTO_ENGINE_SIM_V2_COST_MODEL") or "").strip().lower()
+    if raw in {"0", "false", "off", "no", "none"}:
+        return None
+    base = TradingCostModel()
+    return TradingCostModel(
+        commission_bps=_env_float(
+            "AUTO_ENGINE_SIM_V2_COMMISSION_BPS", base.commission_bps
+        )
+        or base.commission_bps,
+        spread_bps=_env_float("AUTO_ENGINE_SIM_V2_SPREAD_BPS", base.spread_bps)
+        or base.spread_bps,
+        slippage_bps=_env_float("AUTO_ENGINE_SIM_V2_SLIPPAGE_BPS", base.slippage_bps)
+        or base.slippage_bps,
+        gap_bps=_env_float("AUTO_ENGINE_SIM_V2_GAP_BPS", base.gap_bps) or base.gap_bps,
+        settings=base.settings,
+    )
 
 
 def tunables_from_env() -> V2Tunables:
@@ -208,6 +251,7 @@ def tunables_from_env() -> V2Tunables:
         regime_override=regime_raw or None,
         signal_timeframe=(os.getenv("AUTO_ENGINE_SIM_V2_TIMEFRAME") or "").strip()
         or base.signal_timeframe,
+        cost_model=_cost_model_from_env(),
     )
 
 
@@ -291,7 +335,13 @@ class V2Signal:
 
 @dataclass(frozen=True, slots=True)
 class V2TickPlan:
-    """Plan de decisión del tick: propuestas de entrada + journal auditable."""
+    """Plan de decisión del tick: propuestas de entrada + journal auditable.
+
+    AUTO-1 — además de las propuestas, publica las **reservas vivas** del tick (identidad
+    y dimensiones comprometidas) y el ``PortfolioRiskState`` resultante. Sin esto, el
+    compromiso del tick solo existía como una lista local que moría al volver de la
+    función: no se podía auditar qué se reservó, ni liberarlo, ni reproducirlo.
+    """
 
     entry_packages: dict[str, DecisionPackage] = field(default_factory=dict)
     decisions: tuple[PortfolioDecision, ...] = ()
@@ -299,6 +349,8 @@ class V2TickPlan:
     journal_entries: tuple[DecisionJournalEntryRecord, ...] = ()
     regime: str = "UNKNOWN"
     as_of: str = ""
+    reservations: tuple[PortfolioReservation, ...] = ()
+    risk_state: PortfolioRiskState | None = None
 
     @property
     def approved_symbols(self) -> tuple[str, ...]:
@@ -530,17 +582,23 @@ def plan_v2_tick(
     packages: dict[str, DecisionPackage] = {}
     decisions: list[PortfolioDecision] = []
     journal: list[DecisionJournalEntryRecord] = []
-    committed: list[PortfolioPosition] = []
+    # AUTO-1 — libro de reservas del tick. Cada aprobación RESERVA con identidad y la
+    # candidata siguiente decide contra las reservas VIVAS (capital, riesgo, exposición y
+    # sector ya comprometidos). Es el sustituto explícito de la lista local ``committed``:
+    # mismo freno intra-tick, pero auditable, reversible y reproducible.
+    ledger = ReservationLedger(
+        account_id=str(getattr(snapshot, "account_id", "") or ""), tick_id=as_of
+    )
 
     for signal in ordered:
         entry_score = score_by_symbol.get(signal.instrument_id)
         atr = signal.atr
         if atr is None and signal.price > 0:
             atr = signal.price * cfg.atr_pct_fallback
-        # Foto de trabajo: base + lo YA aprobado en este tick (riesgo y exposición
-        # reservados). Cada candidato se evalúa contra la foto reservada, no contra la
+        # Foto de trabajo: base + lo YA reservado en este tick (riesgo, capital y
+        # exposición). Cada candidato se evalúa contra la foto reservada, no contra la
         # foto inicial: A → reserva → B → reserva → C.
-        working_snapshot = _working_snapshot(snapshot, committed)
+        working_snapshot = _working_snapshot(snapshot, ledger)
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
             direction="long",
@@ -564,8 +622,30 @@ def plan_v2_tick(
             proposed_at=_stamp(as_of),
         )
         if package is not None:
-            packages[signal.instrument_id] = package
-            committed.append(_committed_position(signal, decision))
+            # No existe aprobación sin reserva: la propuesta emitida se materializa en
+            # reserva en el MISMO acto. Si la reserva no se puede construir (la cantidad
+            # final no es reservable), la aprobación se DEGRADA a veto con su motivo en vez
+            # de emitir una orden sin compromiso trazable.
+            reservation = _reservation_for(
+                signal,
+                decision,
+                account_id=str(getattr(snapshot, "account_id", "") or ""),
+                tick_id=as_of,
+                created_at=as_of,
+            )
+            reserved = ledger.reserve(reservation) if reservation is not None else None
+            if reserved is None:
+                decision = replace(
+                    decision,
+                    approved=False,
+                    action="HOLD",
+                    reason_codes=cast(
+                        "tuple[DecisionReasonCode, ...]", (RESERVATION_FAILED,)
+                    ),
+                )
+                decisions[-1] = decision
+            else:
+                packages[signal.instrument_id] = package
         journal.append(_journal_entry(decision, actor=actor, as_of=as_of))
 
     return V2TickPlan(
@@ -575,6 +655,8 @@ def plan_v2_tick(
         journal_entries=tuple((*blocked, *excluded, *journal)),
         regime=resolved_regime,
         as_of=as_of,
+        reservations=ledger.live(),
+        risk_state=_risk_state_for(snapshot, ledger),
     )
 
 
@@ -713,23 +795,25 @@ def _context_for_signal(signal: V2Signal) -> TradeContext:
     )
 
 
-def _working_snapshot(snapshot: Any, committed: Sequence[PortfolioPosition]) -> Any:
-    """Foto de trabajo del tick: base + lo YA aprobado, con su riesgo RESERVADO.
+def _working_snapshot(snapshot: Any, ledger: ReservationLedger) -> Any:
+    """Foto de trabajo del tick: base + las reservas VIVAS, con su riesgo reservado.
 
-    Reconstruye el snapshot para que ``risk_used`` incluya el riesgo de las aprobaciones
-    anteriores del MISMO tick y para que la exposición (total/sector/activo) se recalcule
-    con ellas. Sin esto, N candidatos del mismo tick se decidían cada uno creyendo
-    ``risk_used = 0`` y el presupuesto de riesgo se podía multiplicar por N (el hallazgo
-    más grave de la auditoría de v2.40-beta).
+    La fuente es el ``ReservationLedger`` del tick (AUTO-1), no una lista local: cada
+    aprobación reserva con identidad y aquí se proyecta como posición comprometida para
+    que ``risk_used`` incluya el riesgo ya reservado y la exposición (total/sector/activo)
+    se recalcule con él. Sin esto, N candidatos del mismo tick se decidían cada uno
+    creyendo ``risk_used = 0`` y el presupuesto de riesgo se podía multiplicar por N (el
+    hallazgo más grave de la auditoría de v2.40-beta).
 
-    ``risk_used`` solo se sobrescribe cuando alguna posición comprometida **declara** su
-    riesgo: si no hay dato, se conserva el de la base (nunca un 0 engañoso).
+    ``risk_used`` solo se sobrescribe cuando alguna reserva **declara** su riesgo: si no
+    hay dato, se conserva el de la base (nunca un 0 engañoso).
 
-    V2.40.4 — el notional ya aprobado en ESTE tick tampoco es poder de compra: se
-    descuenta de ``cash``/``buying_power``. Sin esta resta, N candidatas del mismo tick
-    decidían cada una contra la caja completa (``cash = 80k`` ⇒ 4 × 20k con 25k
-    disponibles). Es una reserva de CAPITAL, complementaria a la de riesgo.
+    El notional ya reservado tampoco es poder de compra: se descuenta de
+    ``cash``/``buying_power``. Sin esta resta, N candidatas del mismo tick decidían cada
+    una contra la caja completa (``cash = 80k`` ⇒ 4 × 20k con 25k disponibles). Es una
+    reserva de CAPITAL, complementaria a la de riesgo.
     """
+    committed = ledger.committed_positions()
     if not committed or snapshot is None:
         return snapshot
     committed_risk = 0.0
@@ -791,23 +875,73 @@ def _reserve_committed_cash(
     return _net(cash), _net(buying_power)
 
 
-def _committed_position(
-    signal: V2Signal, decision: PortfolioDecision
-) -> PortfolioPosition:
-    """Posición comprometida en ESTE tick (para que los siguientes candidatos la vean).
+def _reservation_for(
+    signal: V2Signal,
+    decision: PortfolioDecision,
+    *,
+    account_id: str,
+    tick_id: str,
+    created_at: str,
+) -> PortfolioReservation | None:
+    """Reserva del tick para una aprobación: identidad + dimensiones comprometidas.
 
-    V2.40.1: incluye ``risk_amount`` (lo que el ``RiskAllocator`` acaba de reservar) y el
-    sector ya resuelto por el motor, de modo que el siguiente candidato vea el riesgo
-    consumido Y la exposición sectorial real, no una foto vacía.
+    ``reserved_cash`` es el notional comprometido y ``reserved_risk`` el presupuesto de
+    riesgo consumido (``riskAmount``), que es lo que el motor compromete — no la pérdida
+    del stop, que con coste real es menor. El ``TradingCost`` viaja aparte para que el
+    journal pueda mostrar la pérdida esperada real (stop + fricciones).
+
+    La reserva lleva la CUENTA del snapshot (AUTO-1b): sin ella la fila durable quedaría
+    con ``account_id`` NULL y la lectura "reservas vivas de ESTA cuenta" no la vería —
+    el compromiso se perdería en el arranque siguiente.
+
+    ``None`` si la aprobación no trae una cantidad reservable: el llamante lo trata como
+    veto (``reservation_failed``), nunca como reserva de 0.
     """
     allocation = decision.allocation or {}
-    risk_amount = allocation.get("riskAmount")
-    return PortfolioPosition(
+    quantity = allocation.get("quantity")
+    try:
+        reservable = float(quantity) if quantity is not None else 0.0
+    except (TypeError, ValueError):
+        reservable = 0.0
+    if reservable <= 0:
+        return None
+    plan = decision.trade_plan
+    entry = plan.entry if plan is not None and plan.entry else signal.price
+    stop = plan.structural_stop if plan is not None else None
+    return build_reservation(
+        reservation_id=f"RES-{decision.decision_id}",
+        account_id=account_id,
+        tick_id=tick_id,
         instrument_id=signal.instrument_id,
-        quantity=float(allocation.get("quantity") or 0.0),
-        market_value=float(allocation.get("positionValue") or 0.0) or None,
+        side="buy",
         sector=decision.sector if decision.sector is not None else signal.sector,
-        risk_amount=float(risk_amount) if risk_amount is not None else None,
+        strategy_version_id=signal.strategy_version,
+        quantity=reservable,
+        entry=entry,
+        stop=stop,
+        reserved_cash=allocation.get("positionValue"),
+        reserved_risk=allocation.get("riskAmount"),
+        cost=coerce_trading_cost(allocation.get("tradingCost")),
+        created_at=created_at or None,
+    )
+
+
+def _risk_state_for(snapshot: Any, ledger: ReservationLedger) -> PortfolioRiskState:
+    """Estado de riesgo del tick: posiciones abiertas + reservas vivas.
+
+    El desglose sectorial de las posiciones se mide aquí (una posición sin ``risk_amount``
+    no aporta 0: cuenta como NO medida y degrada el ``measurement``) y el de las reservas
+    lo aporta el libro. Es la foto con la que se puede responder "cuánto riesgo tenía el
+    tick comprometido" sin reconstruir nada a mano.
+    """
+    positions = getattr(snapshot, "positions", ()) or ()
+    by_sector, unmeasured = sector_risk_from_positions(positions)
+    return build_portfolio_risk_state(
+        ledger=ledger,
+        position_risk_total=getattr(snapshot, "risk_used", None),
+        position_risk_by_sector=by_sector,
+        unmeasured_positions=unmeasured,
+        pending_risk=getattr(snapshot, "pending_risk", 0.0),
     )
 
 

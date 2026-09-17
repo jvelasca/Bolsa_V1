@@ -1,5 +1,7 @@
 """PositionLedger — la posición es Σ fills APLICADOS (AUTO 2.0 · AUTO-1A · P0)."""
 
+from datetime import UTC, datetime
+
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE, MEASUREMENT_PARTIAL
 from bolsa_analytics.cognitive.position_ledger import (
     AppliedFillFact,
@@ -159,6 +161,40 @@ def test_coerce_rejects_uninterpretable_rows() -> None:
         }
         kwargs.update(bad)
         assert coerce_applied_fill_fact(**kwargs) is None, bad
+
+
+def test_coerce_normalizes_datetime_applied_at_to_iso() -> None:
+    """AUTO-1b — el espejo durable devuelve ``datetime``: la fecha NO se puede perder.
+
+    ``coerce_applied_fill_fact`` solo aceptaba ``str``, así que TODO hecho leído de
+    PostgreSQL quedaba sin fecha: el fold del libro perdía su orden determinista y la
+    reconciliación de reservas no podía saber si un fill era posterior al alta. La
+    normalización vive en un solo sitio y se mide aquí.
+    """
+    moment = datetime(2026, 9, 17, 9, 20, tzinfo=UTC)
+    fact = coerce_applied_fill_fact(
+        execution_id="e1",
+        instrument_id="AAA",
+        side="buy",
+        quantity=50.0,
+        price=100.0,
+        applied_at=moment,
+    )
+    assert fact is not None
+    assert fact.applied_at is not None
+    assert datetime.fromisoformat(fact.applied_at) == moment
+
+    assert (
+        coerce_applied_fill_fact(
+            execution_id="e1",
+            instrument_id="AAA",
+            side="buy",
+            quantity=50.0,
+            price=100.0,
+            applied_at="  ",
+        ).applied_at
+        is None
+    )
 
 
 def test_ledger_quantities_accepts_serialized_form() -> None:

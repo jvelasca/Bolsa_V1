@@ -65,6 +65,7 @@ from bolsa_analytics.cognitive.measurement import (
 )
 from bolsa_analytics.cognitive.opportunity_ranker import OpportunityScore
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition, compute_portfolio_fit
+from bolsa_analytics.cognitive.portfolio_reservation import TradingCostModel
 from bolsa_analytics.cognitive.risk_allocator import (
     RiskAllocatorConfig,
     compute_allocation,
@@ -109,6 +110,9 @@ DecisionReasonCode = Literal[
     "exposure_measurement_unknown",
     "open_orders_unmeasurable",
     "plan_invalid",
+    # AUTO-1 — no se pudo materializar la reserva de una aprobación (no existe aprobación
+    # sin reserva): la decisión se degrada a veto con este motivo.
+    "reservation_failed",
 ]
 
 # Códigos que se registran como NO-TRADE en el journal (el resto es aprobado).
@@ -135,6 +139,8 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         "exposure_measurement_unknown",
         "open_orders_unmeasurable",
         "plan_invalid",
+        # AUTO-1 — aprobación que no pudo materializarse en reserva.
+        "reservation_failed",
     }
 )
 
@@ -176,6 +182,10 @@ class PortfolioDecisionConfig:
     # ``>=``, no un total. Desactivarlo es una decisión EXPLÍCITA del llamante.
     require_complete_measurement: bool = True
     allocator: RiskAllocatorConfig = field(default_factory=RiskAllocatorConfig)
+    # AUTO-1 — coste real de negociación. Con modelo, el sizing reserva presupuesto para
+    # ``stop loss + comisión + spread + slippage`` y publica ``riskReal``. ``None``
+    # mantiene el sizing histórico (solo stop) para no cambiar el contrato de golpe.
+    cost_model: TradingCostModel | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -525,6 +535,7 @@ def decide_portfolio(
             snapshot.buying_power if snapshot is not None else None
         ),
         reserved_cash=(snapshot.reserved_cash if snapshot is not None else None),
+        cost_model=cfg.cost_model,
     )
     if not allocation.approved:
         return _reject("HOLD", "risk_budget_exceeded")

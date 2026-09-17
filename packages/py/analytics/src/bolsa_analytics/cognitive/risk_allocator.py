@@ -34,6 +34,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from bolsa_analytics.cognitive.portfolio_reservation import (
+    TradingCost,
+    TradingCostModel,
+    estimate_trading_cost,
+)
+
 TradePlanDirection = Literal["long", "short", "none"]
 
 # Razones de acotación (reason codes observables en el Decision Journal).
@@ -46,11 +52,19 @@ CAP_BUYING_POWER = "buying_power"
 # de ``CAP_BUYING_POWER`` para que el journal diga POR QUÉ no hay cash (no es lo mismo "no
 # queda dinero" que "el dinero está comprometido en órdenes sin materializar").
 CAP_RESERVED_CASH = "reserved_cash"
+# AUTO-1 — el coste de negociación (comisión + spread + slippage) consume presupuesto de
+# riesgo. El tamaño se reduce para que ``stop loss + coste`` quepa en el presupuesto: sin
+# esto, el riesgo real de la operación supera el que el motor cree estar asumiendo.
+CAP_TRADING_COST = "trading_cost"
+# AUTO-1 — el coste no se pudo cuantificar (falta un componente). El tamaño NO se ajusta
+# (se degrada al sizing por stop, el histórico) pero se declara: "no sé el coste" no puede
+# confundirse con "el coste es 0".
+CAP_COST_UNMEASURED = "cost_unmeasured"
 
 
 def _finite_positive(value: Any) -> float | None:
     try:
-        number = float(value)  # type: ignore[arg-type]
+        number = float(value)
     except (TypeError, ValueError):
         return None
     if number != number or number <= 0:
@@ -60,7 +74,7 @@ def _finite_positive(value: Any) -> float | None:
 
 def _finite(value: Any) -> float | None:
     try:
-        number = float(value)  # type: ignore[arg-type]
+        number = float(value)
     except (TypeError, ValueError):
         return None
     if number != number:
@@ -85,7 +99,13 @@ class RiskAllocatorConfig:
 
 @dataclass(frozen=True, slots=True)
 class AllocationResult:
-    """Resultado del sizing: cantidad, riesgo consumido y razones de acotación."""
+    """Resultado del sizing: cantidad, riesgo consumido y razones de acotación.
+
+    ``risk_amount`` es el **presupuesto de riesgo comprometido** (lo que se reserva), no la
+    pérdida del stop: con el coste real activado, parte de ese presupuesto se lo comen las
+    fricciones y por eso ``risk_real`` (pérdida esperada = stop loss + coste) es menor. Sin
+    ``cost_model`` ambos coinciden y el contrato es el histórico.
+    """
 
     quantity: float
     risk_amount: float | None
@@ -94,16 +114,24 @@ class AllocationResult:
     position_value: float | None
     approved: bool
     capped_reasons: tuple[str, ...] = ()
+    # AUTO-1 — riesgo REAL (stop loss + comisión + spread + slippage) de la cantidad final.
+    # ``None`` cuando no se pidió modelo de coste (retrocompatible) o no es medible.
+    risk_real: float | None = None
+    risk_real_pct: float | None = None
+    trading_cost: TradingCost | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "quantity": self.quantity,
             "riskAmount": self.risk_amount,
             "riskPct": self.risk_pct,
+            "riskReal": self.risk_real,
+            "riskRealPct": self.risk_real_pct,
             "stopDistance": self.stop_distance,
             "positionValue": self.position_value,
             "approved": self.approved,
             "cappedReasons": list(self.capped_reasons),
+            "tradingCost": None if self.trading_cost is None else self.trading_cost.to_dict(),
         }
 
 
@@ -187,6 +215,7 @@ def compute_allocation(
     config: RiskAllocatorConfig | None = None,
     buying_power: float | None = None,
     reserved_cash: float | None = None,
+    cost_model: TradingCostModel | None = None,
 ) -> AllocationResult:
     """Calcula el tamaño de posición por riesgo, acotado por límites de cartera.
 
@@ -199,6 +228,11 @@ def compute_allocation(
     sin esta resta, dos entradas del mismo tick podrían gastar el mismo cash. Si la
     resta deja 0 ⇒ ``approved=False`` con ``CAP_RESERVED_CASH`` (motivo distinto de
     ``CAP_BUYING_POWER``: no es falta de dinero, es dinero ya comprometido).
+
+    ``cost_model`` (AUTO-1) hace el riesgo **real**: ``risk_real = stop loss + comisión +
+    spread + slippage``. El presupuesto de riesgo debe cubrir los dos sumandos, así que el
+    tamaño se reduce para que la pérdida esperada (stop + fricciones) quepa en él. Sin
+    ``cost_model`` el contrato es el histórico (solo stop) y el resultado no cambia.
 
     Devuelve ``AllocationResult`` con ``approved=True`` solo si la cantidad final > 0.
     """
@@ -248,6 +282,30 @@ def compute_allocation(
 
     qty = risk_amount / distance
 
+    # 1-bis) AUTO-1 — coste real: el presupuesto de riesgo debe cubrir el stop loss Y las
+    # fricciones (comisión + spread + slippage). Se estima el coste de la cantidad por
+    # riesgo y se reduce el tamaño para que ``stop loss + coste`` quepa en el presupuesto.
+    # Como el coste depende del tamaño (y la comisión tiene mínimos/máximos), se resuelve
+    # en dos pasadas sobre la cantidad por riesgo ANTES de los topes de cartera: los topes
+    # siguen recortando después, y un recorte por concentración simplemente deja el riesgo
+    # real por debajo del presupuesto (conservador).
+    cost_real: TradingCost | None = None
+    if cost_model is not None:
+        preliminary = estimate_trading_cost(
+            quantity=qty, entry=e, stop=stop, direction=direction, model=cost_model
+        )
+        cost_real = preliminary
+        expected = _finite_positive(preliminary.expected_loss)
+        if expected is None:
+            # Coste no medible: NO se ajusta (se degrada al sizing por stop, el histórico)
+            # pero se declara. "No sé el coste" nunca puede leerse como "coste = 0".
+            capped.append(CAP_COST_UNMEASURED)
+        else:
+            adjusted = qty * (risk_amount / expected)
+            if adjusted < qty:
+                qty = adjusted
+                capped.append(CAP_TRADING_COST)
+
     # 2) Tope por concentración de activo (max_position_pct).
     if cfg.max_position_pct is not None:
         pct = _finite(cfg.max_position_pct)
@@ -283,6 +341,21 @@ def compute_allocation(
 
     qty = _round4(max(0.0, qty))
     risk_pct = _round4((risk_amount / eq) * 100.0) if eq > 0 else None
+
+    # Riesgo REAL de la cantidad FINAL (después de todos los topes). Se recalcula porque
+    # los topes cambian el tamaño y, con él, las fricciones. Se publica aunque no se haya
+    # podido ajustar: es la pérdida esperada que la operación asume de verdad.
+    risk_real: float | None = None
+    risk_real_pct: float | None = None
+    if cost_model is not None and qty > 0:
+        final_cost = estimate_trading_cost(
+            quantity=qty, entry=e, stop=stop, direction=direction, model=cost_model
+        )
+        cost_real = final_cost
+        risk_real = _finite_positive(final_cost.expected_loss)
+        if risk_real is not None and eq > 0:
+            risk_real_pct = _round4((risk_real / eq) * 100.0)
+
     return AllocationResult(
         quantity=qty,
         risk_amount=_round4(risk_amount),
@@ -291,4 +364,7 @@ def compute_allocation(
         position_value=_round4(qty * e) if qty > 0 else None,
         approved=qty > 0,
         capped_reasons=tuple(dict.fromkeys(capped)),
+        risk_real=risk_real,
+        risk_real_pct=risk_real_pct,
+        trading_cost=None if (cost_model is None or qty <= 0) else cost_real,
     )

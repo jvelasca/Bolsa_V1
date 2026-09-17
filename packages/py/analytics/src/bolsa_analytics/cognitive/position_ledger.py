@@ -304,6 +304,25 @@ def build_position_ledger(
     )
 
 
+def _instant_text(value: Any) -> str | None:
+    """Instante crudo (``str`` ISO o ``datetime``) → ``str`` ISO; ``None`` si no hay.
+
+    AUTO-1b: el espejo durable devuelve ``datetime`` (columna ``timestamptz``) y esta
+    normalización solo aceptaba ``str``, así que TODOS los hechos leídos de PostgreSQL
+    quedaban **sin fecha**: el fold del libro perdía su orden determinista y la
+    reconciliación de reservas no podía ventanear "¿este fill es posterior al alta?".
+    Se normaliza aquí, en el único sitio que traduce filas a hechos.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value.strip() or None
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        return str(isoformat()).strip() or None
+    return str(value).strip() or None
+
+
 def coerce_applied_fill_fact(
     *,
     execution_id: Any,
@@ -332,7 +351,7 @@ def coerce_applied_fill_fact(
         side=normalized,
         quantity=round4(qty),
         price=round4(px),
-        applied_at=str(applied_at).strip() if isinstance(applied_at, str) and applied_at.strip() else None,
+        applied_at=_instant_text(applied_at),
         strategy_version_id=(
             str(strategy_version_id).strip()
             if isinstance(strategy_version_id, str) and strategy_version_id.strip()

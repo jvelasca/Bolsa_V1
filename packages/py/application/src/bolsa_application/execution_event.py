@@ -276,10 +276,10 @@ class ExecutionEventStore(Protocol):
     #
     # ``account_id=None`` ⇒ sin filtro de cuenta (el llamante que no pudo determinar su
     # cuenta prefiere ver TODO antes que asumir que no hay nada: fail-closed). Orden
-    # ``captured_at DESC`` + ``limit`` mantiene acotado el coste SIN índice parcial por
-    # ``(account_id, status)`` — deuda declarada, la migración llega con el Reservation
-    # Engine. Si el llamante recibe exactamente ``limit`` filas NO puede afirmar que vio
-    # todo el libro (lo declara como libro no medible).
+    # ``captured_at DESC`` + ``limit`` mantiene acotado el coste; el índice
+    # ``execution_events_account_status_idx`` (``(account_id, status)``, migración 042 de
+    # AUTO-1) cubre el filtro de cuenta+estado. Si el llamante recibe exactamente ``limit``
+    # filas NO puede afirmar que vio todo el libro (lo declara como libro no medible).
     async def list_unapplied(
         self,
         account_id: str | None,
@@ -293,8 +293,9 @@ class ExecutionEventStore(Protocol):
     # sea determinista. ``account_id=None`` ⇒ sin filtro de cuenta (el llamante que no
     # pudo determinar su cuenta prefiere ver todo antes que asumir que no hay nada).
     # Recibir exactamente ``limit`` filas ⇒ el llamante NO puede afirmar que vio el libro
-    # completo (lo declara como medición incompleta). Sin índice parcial
-    # ``(account_id, status)``: deuda declarada, migración en AUTO-1.
+    # completo (lo declara como medición incompleta). El índice
+    # ``execution_events_account_status_idx`` (migración 042 de AUTO-1) cubre
+    # ``account_id + status``; el orden por ``applied_at`` sigue acotado por ``limit``.
     async def list_applied(
         self,
         account_id: str | None,
@@ -662,10 +663,10 @@ class PostgresExecutionEventStore:
         """Órdenes pendientes de materializar (V2.40.4 · P1).
 
         ``WHERE status IN (...)`` (+ ``account_id`` cuando se conoce) ordenado por
-        ``captured_at DESC`` con ``LIMIT``: la lectura queda acotada aunque el índice
-        sea por ``execution_id``/``order_id`` (no hay índice por ``account_id``; deuda
-        declarada). El llamante que reciba exactamente ``limit`` filas debe asumir que
-        puede haber más y declarar el libro como NO medible.
+        ``captured_at DESC`` con ``LIMIT``: la lectura queda acotada por el índice
+        ``execution_events_account_status_idx`` (``(account_id, status)``, migración 042 de
+        AUTO-1), que sirve al filtro cuenta+estado. El llamante que reciba exactamente
+        ``limit`` filas debe asumir que puede haber más y declarar el libro como NO medible.
         """
         import sqlalchemy as sa
 

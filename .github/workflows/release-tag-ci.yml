@@ -327,6 +327,10 @@ jobs:
         # V2.40.5/AUTO-1A: ledger de posición y lectura de fills APPLIED (puros/herméticos)
         # con nombre propio; el reinicio con PG real y el bucle de la jornada completa del
         # scheduler se certifican en lifecycle-pg / auto-v2-durable-pg.
+        # AUTO-1: el libro de reservas (hermético) entra igual de explícito; su
+        # persistencia durable y la reconciliación van en el job auto-v2-durable-pg.
+        # AUTO-1b: ese fichero PG queda en ``--ignore`` de este job offline y corre con
+        # gate propio en lifecycle-pg (migración 042 + reinicio por otra sesión).
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -366,6 +370,7 @@ jobs:
           packages/py/application/tests/test_execution_event.py
           packages/py/application/tests/test_applied_fills.py
           packages/py/application/tests/test_position_manager.py
+          packages/py/application/tests/test_portfolio_reservation.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py
           packages/py/application/tests/test_idempotency_key_budget.py
@@ -398,6 +403,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
+          --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           -q
 
   lifecycle-pg:
@@ -453,6 +459,10 @@ jobs:
       # El dedupe con duplicados preexistentes y la atomicidad de los upsert de tops/
       # narrativas/opiniones solo se certifican contra PostgreSQL real.
       UNIQUE_NATURAL_KEYS_PG_REQUIRED: '1'
+      # AUTO-1b (V2.41): libro de reservas durable (migración 042). La reserva tiene que
+      # SOBREVIVIR a un reinicio de proceso y liberarse cuando el fill se materializa;
+      # sin PG real el test skipearía en mudo e invalidaría la certificación del tag.
+      AUTO_RESERVATION_PG_REQUIRED: '1'
       # V2.25/A10: persistencia del Strategy Lifecycle (migración 030) en PG real.
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
       # V2.26/A10: ciclo completo del Auto Orchestrator sobre PG real (promoción solo
@@ -510,6 +520,10 @@ jobs:
         # V2.40.2: claves naturales únicas — el "sin backstop + check-then-insert" que
         # dejó la ruta de opiniones diarias en MultipleResultsFound permanente.
         # Gate fail-if-skipped: UNIQUE_NATURAL_KEYS_PG_REQUIRED=1.
+        # AUTO-1b (V2.41): libro de reservas durable (migración 042) — roundtrip de la
+        # migración, supervivencia al reinicio, liberación por fill (parcial incluida) y
+        # capital reservado de una orden en vuelo (``RETRY``).
+        # Gate fail-if-skipped: AUTO_RESERVATION_PG_REQUIRED=1.
         # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs (deuda:
         # drift silencioso). Ahora se ejecutan aquí con gate fail-if-skipped.
         run: >
@@ -534,6 +548,7 @@ jobs:
           apps/api-python/tests/test_auto_v2_durable_pg.py
           apps/api-python/tests/test_instrument_trade_context_pg.py
           apps/api-python/tests/test_unique_natural_keys_pg.py
+          apps/api-python/tests/test_portfolio_reservation_pg.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py

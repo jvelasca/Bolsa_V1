@@ -1457,6 +1457,12 @@ class ExecutionEventRow(Base):
     __table_args__ = (
         Index("execution_events_order_id_idx", "order_id"),
         Index("execution_events_venue_order_id_idx", "venue_order_id"),
+        # AUTO-1 — índice por ``(account_id, status)``: cierra la deuda declarada en
+        # V2.40.4/AUTO-1A. Las dos lecturas del libro (``list_applied`` y
+        # ``list_unapplied``) filtran por cuenta y estado; sin él, ambas caían a un scan
+        # acotado solo por ``LIMIT``. El baseline 003 no copia los ``Index`` de
+        # ``__table_args__``, así que la migración 042 lo crea explícitamente.
+        Index("execution_events_account_status_idx", "account_id", "status"),
     )
 
     execution_id: Mapped[str] = mapped_column("execution_id", String, primary_key=True)
@@ -2552,3 +2558,116 @@ class StrategyHealthRow(Base):
     thresholds: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     degraded: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
+class PortfolioReservationRow(Base):
+    """AUTO-1 — reserva explícita de cartera (el compromiso trazable de una aprobación).
+
+    Espejo 1:1 de ``bolsa_analytics.cognitive.portfolio_reservation.PortfolioReservation``
+    (misma forma que su ``to_dict()``, en snake_case). Invariante que sostiene: **no existe
+    aprobación sin reserva, y no existe reserva sin liberación**; ``reserved_cash`` de la
+    cuenta es la suma de las reservas con ``status='OPEN'``.
+
+    Las siete dimensiones reservadas del roadmap §3 viven aquí (``reserved_cash``,
+    ``reserved_risk``, ``asset_exposure``, ``sector_exposure``, ``correlation``,
+    ``strategy_capacity``, ``liquidity_capacity``); el coste estimado
+    (``TradingCost.to_dict()``) va en ``cost`` para que la pérdida esperada real
+    (stop + fricciones) sea auditable sin recalcularla.
+
+    Dos decisiones de forma, explícitas:
+
+    * ``quantity``/``entry``/``stop`` y las dimensiones monetarias son ``Numeric(18,6)``
+      (paridad con el resto de importes del repo); ``correlation``/``*_capacity`` son
+      ``Float`` porque son coeficientes, no dinero.
+    * ``released_qty``/``remaining_qty`` se persisten explícitamente en vez de derivarse:
+      una liberación **parcial** (fill parcial) escala las dimensiones a lo que sigue vivo
+      y la cola sigue siendo capital comprometido; el histórico original queda en el evento
+      de alta, no en esta fila.
+
+    Sin backfill: una fila ``OPEN`` sin ``released_at`` es válida y significa exactamente
+    "comprometida ahora".
+    """
+
+    __tablename__ = "portfolio_reservations"
+    __table_args__ = (
+        Index("portfolio_reservations_account_status_idx", "account_id", "status"),
+        Index("portfolio_reservations_account_sector_idx", "account_id", "sector"),
+        Index(
+            "portfolio_reservations_account_created_idx",
+            "account_id",
+            text("created_at DESC"),
+        ),
+    )
+
+    reservation_id: Mapped[str] = mapped_column("reservation_id", String, primary_key=True)
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    tick_id: Mapped[str | None] = mapped_column("tick_id", String, nullable=True)
+    instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
+    sector: Mapped[str | None] = mapped_column("sector", String, nullable=True)
+    strategy_version_id: Mapped[str | None] = mapped_column(
+        "strategy_version_id", String, nullable=True
+    )
+    side: Mapped[str | None] = mapped_column("side", String(16), nullable=True)
+    quantity: Mapped[Decimal | None] = mapped_column("quantity", Numeric(18, 6), nullable=True)
+    entry: Mapped[Decimal | None] = mapped_column("entry", Numeric(18, 6), nullable=True)
+    stop: Mapped[Decimal | None] = mapped_column("stop", Numeric(18, 6), nullable=True)
+    reserved_cash: Mapped[Decimal | None] = mapped_column(
+        "reserved_cash", Numeric(18, 6), nullable=True
+    )
+    reserved_risk: Mapped[Decimal | None] = mapped_column(
+        "reserved_risk", Numeric(18, 6), nullable=True
+    )
+    asset_exposure: Mapped[Decimal | None] = mapped_column(
+        "asset_exposure", Numeric(18, 6), nullable=True
+    )
+    sector_exposure: Mapped[Decimal | None] = mapped_column(
+        "sector_exposure", Numeric(18, 6), nullable=True
+    )
+    correlation: Mapped[float | None] = mapped_column("correlation", Float, nullable=True)
+    strategy_capacity: Mapped[float | None] = mapped_column(
+        "strategy_capacity", Float, nullable=True
+    )
+    liquidity_capacity: Mapped[float | None] = mapped_column(
+        "liquidity_capacity", Float, nullable=True
+    )
+    # ``TradingCost.to_dict()`` (comisión/spread/slippage/gap + pérdidas derivadas) o NULL
+    # cuando no se pudo cuantificar: ausencia de coste NO es coste 0.
+    cost: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    status: Mapped[str] = mapped_column(
+        "status",
+        # 32 y no 16 (migración 042): ``RELEASED_BY_RESTART``/``RELEASED_BY_CANCEL``/
+        # ``RELEASED_BY_ROLLBACK`` no caben en 16 y PostgreSQL abortaba la liberación
+        # con ``StringDataRightTruncation``.
+        String(32),
+        default="OPEN",
+        server_default="OPEN",
+        nullable=False,
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", DateTime(timezone=True), nullable=True
+    )
+    released_at: Mapped[datetime | None] = mapped_column(
+        "released_at", DateTime(timezone=True), nullable=True
+    )
+    release_reason: Mapped[str | None] = mapped_column("release_reason", String, nullable=True)
+    released_qty: Mapped[Decimal] = mapped_column(
+        "released_qty",
+        Numeric(18, 6),
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    remaining_qty: Mapped[Decimal] = mapped_column(
+        "remaining_qty",
+        Numeric(18, 6),
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    lease_generation: Mapped[int] = mapped_column(
+        "lease_generation",
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )

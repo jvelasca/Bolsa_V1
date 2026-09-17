@@ -47,11 +47,19 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_UNKNOWN,
     MeasurementStatus,
     combine_measurements,
+    measurement_from_counts,
 )
 from bolsa_analytics.cognitive.open_order import (
     OpenOrder,
     build_open_order,
     summarize_open_orders,
+)
+from bolsa_analytics.cognitive.portfolio_reservation import (
+    RELEASE_REASON_FILL,
+    RESERVATION_RELEASED_BY_CANCEL,
+    RESERVATION_RELEASED_BY_FILL,
+    RESERVATION_RELEASED_BY_RESTART,
+    PortfolioReservation,
 )
 from bolsa_analytics.cognitive.position_state import (
     PositionState,
@@ -67,6 +75,7 @@ from bolsa_api.background.paper_auto_engine_worker import (
     _kill_switch_env_on,
     _watch_symbols,
 )
+from bolsa_application.applied_fills import read_applied_fill_facts
 from bolsa_application.auto_daily_journal import SimJournalRow
 from bolsa_application.auto_engine_state_store import (
     AutoEngineSnapshot,
@@ -77,6 +86,8 @@ from bolsa_application.auto_reason_codes import (
     EXIT_QTY_OVER_POSITION,
     FILL_NOT_MATERIALIZED,
     FILL_PARTIALLY_MATERIALIZED,
+    RESERVATION_ALREADY_LIVE,
+    RESERVATION_UNMEASURABLE,
 )
 from bolsa_application.auto_v2_entry import (
     CatalogTradeContextSource,
@@ -107,6 +118,7 @@ from bolsa_application.execution_event import (
     ExecutionEventStore,
 )
 from bolsa_application.position_manager import PositionManagerSkip
+from bolsa_application.reservation_store import ReservationStore
 from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
     POSITION_PROJECTION_OK,
@@ -134,6 +146,11 @@ _V2_OPEN_ORDERS_LIMIT = 200
 # AUTO-1 (Reservation Engine). Agotar el tope NO se interpreta como "no hay más": la
 # lectura queda NO medible y las aperturas se vetan (fail-closed) con log explícito.
 _CANONICAL_LEDGER_LIMIT = 10_000
+
+# AUTO-1b — tope de lectura del libro durable de RESERVAS (``portfolio_reservations``).
+# Si se alcanza, no se puede afirmar que se vieron todas las reservas vivas: el libro de
+# compromiso queda NO medible y las aperturas se vetan (agotar un tope ≠ no hay más).
+_V2_RESERVATIONS_LIMIT = 500
 
 # AUTO-1A — ``execution_events`` ya materializados. ``already_applied`` también cuenta:
 # significa que OTRA instancia ya movió el dinero (idempotencia por ``execution_id``), que
@@ -338,6 +355,29 @@ def _dec_or_none(value: Any) -> Decimal | None:
     return dec if dec.is_finite() else None
 
 
+def _instant(value: Any) -> datetime | None:
+    """Instante ISO (``Z``, con offset o naive) → ``datetime`` UTC; ``None`` si no se lee.
+
+    Comparar instantes como TEXTO no vale: ``"…:00.500000+00:00"`` y ``"…:00Z"`` se ordenan
+    al revés de como ocurrieron (``"." < "Z"``), y la reconciliación de reservas decide con
+    esa comparación ("¿el fill es posterior al alta de la reserva?"). Se comparan instantes
+    de verdad; sin fecha legible no se afirma nada (el llamante conserva la reserva).
+    """
+    parsed: datetime
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def _open_order_from_fill(
     row: Any,
     context: Any,
@@ -480,6 +520,11 @@ class AutoSimulationWorker:
         edge_source: Any = None,
         trade_context_source: Any = None,
         consumed_signal_store: Any = None,
+        # AUTO-1b: espejo durable de las RESERVAS de cartera (``portfolio_reservations``).
+        # Con él, las reservas vivas son la autoridad de ``reserved_cash``/``pending_risk``
+        # y ``execution_events`` queda como reconciliación de arranque. Sin él (camino
+        # hermético) el libro de órdenes pendientes sigue derivándose como en V2.40.4.
+        reservation_store: ReservationStore | None = None,
     ) -> None:
         self._decider = decider
         self._exec_store = exec_store
@@ -539,6 +584,19 @@ class AutoSimulationWorker:
         # durable no puede haber dinero en vuelo); el refresco por tick lo actualiza.
         self._v2_open_orders: tuple[OpenOrder, ...] = ()
         self._v2_order_book_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
+        # AUTO-1b — libro durable de RESERVAS. ``_v2_reservations`` son las vivas (la
+        # autoridad de capital/riesgo comprometido), ``_v2_reservations_measurement`` su
+        # estado de medición y ``_v2_reservation_blocked`` los instrumentos cuya reserva
+        # NO llegó a persistirse en el tick (su aprobación no se emite: no existe
+        # aprobación sin reserva durable). ``_v2_reservation_carryover`` son los
+        # instrumentos con reserva viva de ticks ANTERIORES: no se apila otra igual.
+        self._reservation_store = reservation_store
+        self._v2_reservations: tuple[PortfolioReservation, ...] = ()
+        self._v2_reservations_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
+        self._v2_reservation_blocked: frozenset[str] = frozenset()
+        self._v2_reservation_carryover: frozenset[str] = frozenset()
+        self._v2_open_orders_read_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
+        self._v2_reservations_reconciled = False
         self._v2_plan: Any = None
         self._v2_journal: list[Any] = []
         self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
@@ -1064,8 +1122,8 @@ class AutoSimulationWorker:
             regime=regime,
             risk_budget_pct=self._v2_tunables.risk_budget_pct,
             reconciliation_ok=not self.reconciliation_blocks_openings,
-            open_orders=self._v2_open_orders,
-            order_book_measurement=self._v2_order_book_measurement,
+            open_orders=self._v2_pending_open_orders(),
+            order_book_measurement=self._v2_pending_book_measurement(),
         )
 
     def _v2_open_sectors(self) -> dict[str, str]:
@@ -1328,6 +1386,7 @@ class AutoSimulationWorker:
             for row, context in zip(pending, contexts, strict=True)
         ]
         self._v2_open_orders = tuple(orders)
+        self._v2_open_orders_read_measurement = read_measurement
         self._v2_order_book_measurement = combine_measurements(
             read_measurement,
             summarize_open_orders(
@@ -1378,6 +1437,379 @@ class AutoSimulationWorker:
         return frozenset(
             str(getattr(event, "execution_id", "") or "") for event in events
         )
+
+    # ---- AUTO-1: reservas durables (autoridad del compromiso) -------------------
+    #
+    # Invariante que sostiene esta sección: **no existe aprobación sin reserva, y no
+    # existe reserva sin liberación**. La reserva explícita (identidad + siete
+    # dimensiones + ciclo de vida) es la AUTORIDAD de ``reserved_cash``/``pending_risk``
+    # entre ticks; ``execution_events`` deja de ser el productor y pasa a ser la
+    # reconciliación de arranque (qué se materializó y qué orden murió sin llenarse).
+
+    @property
+    def _v2_reservation_book_active(self) -> bool:
+        """True cuando el libro durable de reservas es la autoridad del compromiso."""
+        return self._reservation_store is not None
+
+    def _v2_instant(self) -> str:
+        """Instante del tick en ISO-UTC (mismo formato que el ``tick_id`` del plan)."""
+        return self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    async def _v2_read_live_reservations(
+        self, *, limit: int = _V2_RESERVATIONS_LIMIT
+    ) -> tuple[tuple[PortfolioReservation, ...], MeasurementStatus]:
+        """Reservas VIVAS de la cuenta + su estado de medición (fail-closed).
+
+        Sin store no hay libro que afirmar y se devuelve vacío ``COMPLETE`` (el camino
+        hermético sigue con el libro de ``execution_events``). Un fallo de lectura, un
+        tope agotado o una reserva viva que no declara sus dimensiones **NO** se leen como
+        "no hay compromiso": bajan la medición y el motor veta aperturas.
+        """
+        store = self._reservation_store
+        if store is None:
+            return (), MEASUREMENT_COMPLETE
+        try:
+            rows = list(await store.list_live(self._account_id, limit=limit))
+        except Exception:  # noqa: BLE001 — sin lectura no se afirma el libro.
+            logger.exception("auto_sim v2 reservations read failed")
+            return (), MEASUREMENT_UNKNOWN
+        if len(rows) >= limit:
+            # Agotar el tope no es "no hay más": es no haber visto el libro entero.
+            return tuple(rows), MEASUREMENT_UNKNOWN
+        valued = sum(1 for row in rows if row.is_quantified)
+        return tuple(rows), measurement_from_counts(
+            valued=valued, unvalued=len(rows) - valued
+        )
+
+    def _v2_open_order_from_reservation(
+        self, reservation: PortfolioReservation
+    ) -> OpenOrder | None:
+        """Proyecta una reserva viva como orden pendiente del libro (AUTO-1b).
+
+        Es el puente con el ``AutoPortfolioSnapshot``: la reserva entra en el mismo libro
+        que consumían las trazas de ``execution_events``, de modo que capital, riesgo y
+        exposición comprometidos se descuentan una sola vez y con la MISMA aritmética.
+
+        Capital y riesgo se aportan **explícitos** desde la reserva (que es la autoridad);
+        la derivación ``cantidad × precio`` del helper sería una segunda aritmética que
+        podría discrepar del compromiso real. Una reserva sin cuantificar deja importes a
+        ``None`` y el agregado baja de medición (el motor veta nuevas aperturas).
+        """
+        if not reservation.instrument_id or reservation.remaining_qty <= 0:
+            return None
+        return build_open_order(
+            execution_id=f"reservation:{reservation.reservation_id}",
+            order_id=reservation.reservation_id,
+            instrument_id=reservation.instrument_id,
+            side=reservation.side,
+            quantity=reservation.remaining_qty,
+            price=reservation.entry,
+            requested_qty=reservation.quantity,
+            sector=reservation.sector,
+            reserved_cash=reservation.reserved_cash,
+            risk_amount=reservation.reserved_risk,
+            strategy_version_id=reservation.strategy_version_id,
+        )
+
+    def _v2_pending_open_orders(self) -> tuple[OpenOrder, ...]:
+        """Libro pendiente efectivo: reservas vivas (autoridad) + trazas huérfanas.
+
+        Con libro de reservas activo, una traza de ``execution_events`` de un instrumento
+        que YA tiene reserva viva no se suma otra vez (sería contar el mismo capital dos
+        veces): la reserva la cubre. Las trazas de instrumentos SIN reserva viva sí se
+        conservan — son el caso de crash entre la captura del fill y el alta de la
+        reserva, y su capital sigue comprometido.
+        """
+        if not self._v2_reservation_book_active:
+            return self._v2_open_orders
+        covered = {
+            reservation.instrument_id
+            for reservation in self._v2_reservations
+            if reservation.instrument_id
+        }
+        orders = [
+            order
+            for order in (
+                self._v2_open_order_from_reservation(reservation)
+                for reservation in self._v2_reservations
+            )
+            if order is not None
+        ]
+        orders.extend(
+            order for order in self._v2_open_orders if order.instrument_id not in covered
+        )
+        return tuple(orders)
+
+    def _v2_pending_book_measurement(self) -> MeasurementStatus:
+        """Medición del libro pendiente efectivo (reservas + trazas huérfanas).
+
+        Incluye la medición de LECTURA del libro de trazas (fallo de lectura o tope
+        agotado ⇒ ``UNKNOWN``) y la del agregado filtrado: si una reserva viva no declara
+        capital/riesgo/sector, el resumen es un suelo y el motor no debe autorizar nada.
+        """
+        if not self._v2_reservation_book_active:
+            return self._v2_order_book_measurement
+        return combine_measurements(
+            self._v2_reservations_measurement,
+            self._v2_open_orders_read_measurement,
+            summarize_open_orders(
+                self._v2_pending_open_orders(), equity=self._v2_equity()
+            ).measurement,
+        )
+
+    async def _v2_persist_tick_reservations(self, plan: Any) -> None:
+        """Persiste las reservas del tick ANTES de emitir la orden (AUTO-1b).
+
+        Fail-closed: la aprobación cuya reserva no llega a ser durable **no se emite**.
+        Esa es la mitad durable del invariante ("no existe aprobación sin reserva"): un
+        crash inmediatamente después de emitir la orden no puede perder el compromiso, y
+        el arranque siguiente lo reconcilia desde aquí, no adivinando desde las trazas.
+
+        El resultado se publica en dos conjuntos:
+
+        * ``_v2_reservation_blocked`` — instrumentos del tick cuya reserva NO se pudo
+          persistir; el bucle de ejecución los veta con ``reservation_unmeasurable``.
+        * ``_v2_reservation_carryover`` — instrumentos con reserva viva de ticks
+          ANTERIORES (aún sin fill): no se apila un segundo compromiso sobre el mismo
+          instrumento (``reservation_already_live``). Se captura ANTES de dar de alta las
+          del tick para no vetar la propia aprobación de este tick.
+        """
+        store = self._reservation_store
+        previous = self._v2_reservations
+        reservations = tuple(getattr(plan, "reservations", ()) or ())
+        if store is None:
+            self._v2_reservation_blocked = frozenset()
+            self._v2_reservation_carryover = frozenset()
+            return
+        self._v2_reservation_carryover = frozenset(
+            reservation.instrument_id
+            for reservation in previous
+            if reservation.is_live and reservation.instrument_id
+        )
+        if not reservations:
+            self._v2_reservation_blocked = frozenset()
+            self._v2_reservations = previous
+            return
+        blocked: set[str] = set()
+        persisted: list[PortfolioReservation] = []
+        for reservation in reservations:
+            try:
+                await store.save(reservation)
+            except Exception:  # noqa: BLE001 — una reserva no durable no se emite.
+                logger.exception(
+                    "auto_sim v2 reservation persist failed id=%s",
+                    reservation.reservation_id,
+                )
+                blocked.add(reservation.instrument_id)
+                continue
+            persisted.append(reservation)
+        try:
+            await store.commit()
+        except Exception:  # noqa: BLE001 — con autocommit ya es durable; se declara.
+            logger.exception("auto_sim v2 reservation commit failed")
+        self._v2_reservation_blocked = frozenset(blocked)
+        merged: dict[str, PortfolioReservation] = {
+            row.reservation_id: row for row in previous if row.is_live
+        }
+        for row in persisted:
+            merged[row.reservation_id] = row
+        self._v2_reservations = tuple(
+            sorted(merged.values(), key=lambda r: (r.created_at or "", r.reservation_id))
+        )
+
+    async def _v2_release_reservations_for_fill(
+        self, *, symbol: str, filled_qty: Any, at: str
+    ) -> None:
+        """Libera por FILL la reserva viva más reciente del instrumento (AUTO-1b).
+
+        Es la pata del invariante que corre en el camino caliente: lo MATERIALIZADO deja
+        de ser reserva y pasa a ser posición; con un fill parcial la liberación es parcial
+        (``ReservationLedger.release`` escala las dimensiones) y la cola sigue siendo
+        capital comprometido en ``RETRY``.
+
+        Si la liberación no se puede persistir, la reserva se **conserva**: jamás se libera
+        en memoria lo que no es durable (el arranque la reconciliará). Se elige la reserva
+        más reciente del instrumento (la del tick que acaba de llenar); una anterior, si
+        existiera, la reconcilia el arranque con la misma regla de consumo progresivo.
+        """
+        store = self._reservation_store
+        qty = _dec_or_none(filled_qty)
+        if store is None or qty is None or qty <= 0:
+            return
+        candidates = [
+            row
+            for row in self._v2_reservations
+            if row.is_live and row.instrument_id == symbol
+        ]
+        if not candidates:
+            return
+        target = max(candidates, key=lambda r: (r.created_at or "", r.reservation_id))
+        try:
+            released = await store.release(
+                target.reservation_id,
+                status=RESERVATION_RELEASED_BY_FILL,
+                reason=RELEASE_REASON_FILL,
+                released_qty=float(qty),
+                at=at,
+            )
+        except Exception:  # noqa: BLE001 — no se libera lo que no es durable.
+            logger.exception(
+                "auto_sim v2 reservation release failed id=%s", target.reservation_id
+            )
+            return
+        if released is None:
+            return
+        remaining = [
+            row
+            for row in self._v2_reservations
+            if row.reservation_id != released.reservation_id and row.is_live
+        ]
+        if released.is_live:
+            remaining.append(released)
+        self._v2_reservations = tuple(
+            sorted(remaining, key=lambda r: (r.created_at or "", r.reservation_id))
+        )
+
+    async def _v2_in_flight_instruments(
+        self, rows: Sequence[Any]
+    ) -> frozenset[str]:
+        """Instrumentos con una traza NO materializada (capital en vuelo) del libro."""
+        instruments: set[str] = set()
+        for row in rows:
+            context = await self._v2_fill_context(row)
+            instrument = str(getattr(context, "instrument_id", "") or "").strip()
+            if instrument:
+                instruments.add(instrument)
+        return frozenset(instruments)
+
+    async def _v2_reconcile_reservations(self, *, startup: bool) -> None:
+        """Reconcilia el libro durable de reservas con lo MATERIALIZADO (AUTO-1b).
+
+        Autoridad invertida respecto a V2.40.4: ``reserved_cash``/``pending_risk`` los
+        dicta la reserva explícita (identidad + dimensiones), no una reconstrucción desde
+        ``execution_events``. Esas trazas pasan a ser la **reconciliación de arranque**:
+        qué se materializó de verdad y qué orden murió sin llenarse.
+
+        Tres reglas, todas fail-closed:
+
+        1. **Fill** — un APPLIED de compra del instrumento, posterior al alta de la
+           reserva, libera esa cantidad (parcial: el resto sigue comprometido). El consumo
+           es progresivo en orden de alta, así que dos reservas del mismo instrumento no
+           cuentan el mismo fill dos veces.
+        2. **Cancelación / reinicio** — solo si las DOS lecturas son MEDIBLES (``COMPLETE``)
+           y la orden de esa reserva no está ni en vuelo ni materializada: la reserva murió
+           sin llenarse. Con una lectura incompleta la reserva se CONSERVA (liberar por un
+           hueco de lectura sería fail-OPEN: devolvería al mercado un capital que quizá
+           está comprometido).
+        3. **Lectura ilegible** — con reservas vivas que no se pudieron reconciliar, el
+           libro queda ``UNKNOWN`` y el motor veta aperturas. "No pude leerlo" nunca se
+           lee como "no había nada comprometido".
+
+        Una reserva sin ``created_at`` legible no se puede ventanear y se conserva
+        (sigue consumiendo presupuesto: el lado conservador del invariante).
+        """
+        store = self._reservation_store
+        if store is None:
+            self._v2_reservations = ()
+            self._v2_reservations_measurement = MEASUREMENT_COMPLETE
+            return
+        live, book_measurement = await self._v2_read_live_reservations()
+        if not live:
+            self._v2_reservations = ()
+            self._v2_reservations_measurement = book_measurement
+            return
+        facts_read = await read_applied_fill_facts(
+            self._exec_store, self._context_store, self._account_id
+        )
+        rows, in_flight_read = await self._v2_read_unapplied()
+        in_flight = (
+            await self._v2_in_flight_instruments(rows)
+            if in_flight_read == MEASUREMENT_COMPLETE
+            else None
+        )
+        measurable = (
+            facts_read.measurement == MEASUREMENT_COMPLETE and in_flight is not None
+        )
+        applied: dict[str, list[tuple[datetime, float]]] = {}
+        for fact in facts_read.facts:
+            instant = _instant(fact.applied_at)
+            if instant is None or not fact.is_buy:
+                continue
+            applied.setdefault(fact.instrument_id, []).append(
+                (instant, float(fact.quantity))
+            )
+        consumed: dict[str, float] = {}
+        resolved: list[PortfolioReservation] = []
+        for reservation in live:
+            created = _instant(reservation.created_at)
+            instrument = reservation.instrument_id
+            filled = 0.0
+            if created is not None:
+                for instant, qty in applied.get(instrument, ()):
+                    if instant >= created:
+                        filled += qty
+            available = max(0.0, filled - consumed.get(instrument, 0.0))
+            fill_qty = min(available, reservation.remaining_qty)
+            released: PortfolioReservation | None = None
+            if fill_qty > 0:
+                consumed[instrument] = consumed.get(instrument, 0.0) + fill_qty
+                released = await self._v2_release_reservation(
+                    reservation,
+                    status=RESERVATION_RELEASED_BY_FILL,
+                    reason=RELEASE_REASON_FILL,
+                    released_qty=fill_qty,
+                )
+            elif (
+                measurable
+                and created is not None
+                and instrument not in (in_flight or frozenset())
+                and filled == 0.0
+            ):
+                # Ni materializada ni en vuelo: la orden de esta reserva murió sin llenar.
+                released = await self._v2_release_reservation(
+                    reservation,
+                    status=(
+                        RESERVATION_RELEASED_BY_RESTART
+                        if startup
+                        else RESERVATION_RELEASED_BY_CANCEL
+                    ),
+                    reason="restart" if startup else "cancel",
+                    released_qty=None,
+                )
+            resolved.append(released if released is not None else reservation)
+        self._v2_reservations = tuple(row for row in resolved if row.is_live)
+        self._v2_reservations_measurement = (
+            book_measurement
+            if measurable
+            else combine_measurements(book_measurement, MEASUREMENT_UNKNOWN)
+        )
+
+    async def _v2_release_reservation(
+        self,
+        reservation: PortfolioReservation,
+        *,
+        status: Any,
+        reason: str,
+        released_qty: float | None,
+    ) -> PortfolioReservation | None:
+        """Libera una reserva en el store durable; ``None`` si no se pudo (se conserva)."""
+        store = self._reservation_store
+        if store is None:
+            return None
+        try:
+            return await store.release(
+                reservation.reservation_id,
+                status=status,
+                reason=reason,
+                released_qty=released_qty,
+                at=self._v2_instant(),
+            )
+        except Exception:  # noqa: BLE001 — no se libera lo que no es durable.
+            logger.exception(
+                "auto_sim v2 reservation reconcile release failed id=%s",
+                reservation.reservation_id,
+            )
+            return None
 
     async def _v2_refresh_regime(self) -> None:
         """Refresca el régimen si la fuente lo soporta (fuente async + lectura sync).
@@ -1508,6 +1940,9 @@ class AutoSimulationWorker:
         await self._v2_refresh_trade_context(tuple(packages), tuple(sorted(versions)))
         # Órdenes pendientes (capital ya comprometido): se leen ANTES de construir la
         # foto para que la decisión del tick no pueda gastar dos veces el mismo cash.
+        # AUTO-1b: con libro durable de reservas, la autoridad del compromiso son las
+        # reservas vivas y estas trazas quedan como reconciliación (solo suma lo que
+        # ninguna reserva cubre).
         await self._v2_refresh_open_orders()
         snapshot = self._v2_snapshot(regime)
         plan = plan_v2_tick(
@@ -1518,6 +1953,9 @@ class AutoSimulationWorker:
             as_of=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             consumed_signal_ids=self._v2_consumed_signals,
         )
+        # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
+        # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
+        await self._v2_persist_tick_reservations(plan)
         self._v2_journal.extend(plan.journal_entries)
         await self._v2_prune_consumed_signals()
         return plan
@@ -1814,6 +2252,16 @@ class AutoSimulationWorker:
                 # AUTO 2.0 (V2): la propuesta viene del plan del tick (TradePlan →
                 # DecisionPackage), no del decider directo.
                 plan = self._v2_plan
+                if plan is not None and symbol in self._v2_reservation_blocked:
+                    # AUTO-1b: la reserva de esta aprobación NO llegó a ser durable ⇒ la
+                    # orden no se emite (no existe aprobación sin reserva durable).
+                    _veto(RESERVATION_UNMEASURABLE)
+                    continue
+                if symbol in self._v2_reservation_carryover:
+                    # AUTO-1b: ya hay una reserva VIVA de un tick anterior para este
+                    # instrumento (orden sin fill): no se apila un segundo compromiso.
+                    _veto(RESERVATION_ALREADY_LIVE)
+                    continue
                 pkg = plan.entry_packages.get(symbol) if plan is not None else None
             else:
                 pkg = self._decider(symbol) if self._decider else None
@@ -1937,6 +2385,11 @@ class AutoSimulationWorker:
                     self._v2_track_entry(symbol, price, applied_qty)
                 await self._persist_position(symbol, materialized)
                 report.opened += 1
+                # AUTO-1b: lo MATERIALIZADO deja de ser reserva y pasa a ser posición.
+                # Con fill parcial la liberación es parcial y la cola sigue comprometida.
+                await self._v2_release_reservations_for_fill(
+                    symbol=symbol, filled_qty=applied_qty, at=self._v2_instant()
+                )
             else:
                 # AUTO-1A — invariante DURO ``exit_qty <= materialized_position``. El
                 # settlement ya va clampado a ``held``, así que esto es defensa en
@@ -2030,6 +2483,7 @@ class AutoSimulationWorker:
         regime_source: Any = None,
         trade_context_source: Any = None,
         edge_source: Any = None,
+        reservation_store: ReservationStore | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -2054,10 +2508,11 @@ class AutoSimulationWorker:
             self._canonical_positions_reader,
         )
         prev_signals = self._consumed_signal_store
-        prev_regime, prev_context, prev_edge = (
+        prev_regime, prev_context, prev_edge, prev_reservations = (
             self._v2_regime_source,
             self._v2_trade_context_source,
             self._v2_edge_source,
+            self._reservation_store,
         )
         try:
             self._exec_store = exec_store
@@ -2080,11 +2535,23 @@ class AutoSimulationWorker:
                 trade_context_source if trade_context_source is not None else prev_context
             )
             self._v2_edge_source = edge_source if edge_source is not None else prev_edge
+            # AUTO-1b: el libro durable de reservas se enlaza también por sesión (una
+            # sesión por tick). Sin él se conserva el del constructor (hermético/tests).
+            self._reservation_store = (
+                reservation_store if reservation_store is not None else prev_reservations
+            )
             # V2.24/A9.1 (P1-04): sin cuenta inequívoca NO se readopta ni opera el
             # camino durable; auto_turn veta igualmente (defensa en profundidad).
             if not self._readopted and self._account_id:
                 # Readopción una sola vez por proceso (crash/restart ⇒ adoptar posición).
                 await self.readopt_positions()
+            # AUTO-1b: reconciliación de ARRANQUE del libro de reservas, una vez por
+            # proceso (es independiente del libro de posición: son dos libros distintos).
+            # Convierte ``execution_events`` en lo que siempre debió ser: el contraste de
+            # qué se materializó, no el productor del capital comprometido.
+            if not self._v2_reservations_reconciled:
+                self._v2_reservations_reconciled = True
+                await self._v2_reconcile_reservations(startup=True)
             report = await self.auto_turn()
             if auto_store is not None:
                 snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
@@ -2115,6 +2582,7 @@ class AutoSimulationWorker:
             self._v2_regime_source = prev_regime
             self._v2_trade_context_source = prev_context
             self._v2_edge_source = prev_edge
+            self._reservation_store = prev_reservations
 
 
 # V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.
@@ -2547,6 +3015,9 @@ class AutoSimRuntime:
         ``real_turn`` readopta la posición durable (G7: no segundo BUY tras crash);
         los ticks siguientes ya operan con ``_open`` en memoria + espejo por cambio.
         """
+        from bolsa_application.reservation_store import (  # noqa: PLC0415
+            PostgresReservationStore,
+        )
         from bolsa_application.sim_durable_store import (  # noqa: PLC0415
             PostgresSimAutoPositionStore,
             PostgresSimConsumedSignalStore,
@@ -2562,6 +3033,11 @@ class AutoSimRuntime:
             # (misma sesión, commit propio): un crash no reabre la MISMA oportunidad
             # sobre la MISMA barra.
             consumed_signal_store = PostgresSimConsumedSignalStore(session)
+            # AUTO-1b: el libro durable de RESERVAS, sobre la misma sesión del tick. Es
+            # la autoridad de ``reserved_cash``/``pending_risk`` entre ticks; con
+            # ``autocommit=True`` (default) cada alta queda durable ANTES de emitir la
+            # orden, de modo que un crash inmediato no pierde el compromiso.
+            reservation_store = PostgresReservationStore(session)
             # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
             # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
             # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor
@@ -2574,6 +3050,7 @@ class AutoSimRuntime:
                 context_store=context_store,
                 position_store=position_store,
                 consumed_signal_store=consumed_signal_store,
+                reservation_store=reservation_store,
                 canonical_positions_reader=self._canonical_reader
                 or _compose_canonical_reader(session),
                 regime_source=self._regime_source
