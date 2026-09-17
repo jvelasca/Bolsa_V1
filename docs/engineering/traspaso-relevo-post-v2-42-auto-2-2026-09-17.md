@@ -422,11 +422,12 @@ Reglas de honestidad del repo (no negociables):
 ## 8. Checklist de arranque (haz esto primero)
 
 - [ ] `git log --oneline -8` → cabecera de **auditoría externa** (`c6bbb000`, docs-only: los 7
-      hallazgos declarados) sobre los tres docs-only del cierre (`da93cd20` checklist · `60a6c984`
-      prosa del tag y sonda · `1d6df658` sellado) sobre `35e38c24` (arreglo de test) sobre `6e53294f`
-      (fase) sobre `15618c0c` (relevo previo). El **tag apunta al de arreglo** (`35e38c24`), **no** a
-      los docs-only posteriores; y como todos ellos son docs-only, de sus commits solo corre
-      `Gitleaks` ⇒ **la evidencia de CI sigue anclada a `35e38c24`**.
+      hallazgos declarados) y los docs-only del cierre (`da93cd20` checklist · `60a6c984` prosa del tag
+      y sonda · `1d6df658` sellado) sobre `35e38c24` (arreglo de test) sobre `6e53294f` (fase) sobre
+      `15618c0c` (relevo previo). **Encima de `c6bbb000` puede haber más docs-only** (incluido el
+      commit que corrige este mismo párrafo): lo que importa es que **entre el tag y tú no haya un
+      commit de código**. El **tag apunta al de arreglo** (`35e38c24`); como todos los posteriores son
+      docs-only, de ellos solo corre `Gitleaks` ⇒ **la evidencia de CI sigue anclada a `35e38c24`**.
 - [ ] Lee el **§9 del audit-pack** (hallazgos H-1…H-7): son el **criterio de aceptación** de tu slice,
       no un anexo. El owner decidió **no** arreglarlos en 2a.
 - [ ] `git status --short` → **vacío** (si hay ruido de `logs/`, `__pycache__/`, `.pytest_cache/`,
