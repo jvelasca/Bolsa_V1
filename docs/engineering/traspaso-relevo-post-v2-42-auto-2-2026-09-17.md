@@ -185,6 +185,12 @@ salida protectora con reconciliación `CRITICAL` · no armar trailing tras T1 ·
 volver al fallback 0.5/1.0 · evaluar T1 antes del trailing en el shim · `PROTECT` silencioso · armar
 trailing antes de T1.
 
+> **Estado real de esa matriz tras la auditoría externa (§4 y §9 del pack):** **5 reproducidas con los
+> rojos exactos** (M1, M3, M4, M5, M7); **5 no reproducidas** en esa pasada (M2, M6, M8, M9, M10: no
+> refutadas, simplemente no se midieron) y **M11 con hueco de cobertura** — el rojo es real, pero el
+> test que lo respalda usa una posición **sin parcial**, así que **no** prueba "solo tras T1" (H-3). Si
+> tocas el trailing, **re-mide M11 con un caso de `PARTIAL_EXIT`**.
+
 **Deuda declarada de 2a (no la reabras sin motivo):** la dualidad `sim_auto_positions` (autoridad en
 AUTO) vs `position_states` (camino Confirm) **sigue viva**; la retención de `portfolio_reservations`
 (AUTO-1) sigue sin política; `correlation`/`strategy_capacity`/`liquidity_capacity` siguen **no
@@ -415,10 +421,14 @@ Reglas de honestidad del repo (no negociables):
 
 ## 8. Checklist de arranque (haz esto primero)
 
-- [ ] `git log --oneline -6` → cabecera de **sellado** (`60a6c984` y `1d6df658`, docs-only) sobre
-      `35e38c24` (arreglo de test) sobre `6e53294f` (fase) sobre `15618c0c` (relevo previo). El **tag
-      apunta al de arreglo** (`35e38c24`), no al sellado; y como el sellado es docs-only, de su commit
-      solo corre `Gitleaks` ⇒ **la evidencia de CI sigue anclada a `35e38c24`**.
+- [ ] `git log --oneline -8` → cabecera de **auditoría externa** (`c6bbb000`, docs-only: los 7
+      hallazgos declarados) sobre los tres docs-only del cierre (`da93cd20` checklist · `60a6c984`
+      prosa del tag y sonda · `1d6df658` sellado) sobre `35e38c24` (arreglo de test) sobre `6e53294f`
+      (fase) sobre `15618c0c` (relevo previo). El **tag apunta al de arreglo** (`35e38c24`), **no** a
+      los docs-only posteriores; y como todos ellos son docs-only, de sus commits solo corre
+      `Gitleaks` ⇒ **la evidencia de CI sigue anclada a `35e38c24`**.
+- [ ] Lee el **§9 del audit-pack** (hallazgos H-1…H-7): son el **criterio de aceptación** de tu slice,
+      no un anexo. El owner decidió **no** arreglarlos en 2a.
 - [ ] `git status --short` → **vacío** (si hay ruido de `logs/`, `__pycache__/`, `.pytest_cache/`,
       es de tus propias pruebas).
 - [ ] `git tag -l -n5 v2.42-beta` → tag anotado apuntando a `35e38c24`.
@@ -445,9 +455,10 @@ de PG** · long-only · Alembic head **`042_portfolio_reservations`** · **`POSI
 ni realizado · ningún skip de gestión queda mudo (**matiz H-2**: el no-op del trailing no es un skip,
 pero hoy tampoco deja journal) · **una posición siempre tiene estado persistido y
 verificable; un estado no verificable degrada a `RECONCILIATION_REQUIRED`, nunca a "sin protección"**
-(**matiz H-6**: hoy sólo degrada si la clave `lifecycleState` está presente y no nula)
-(`AUTO-2`) · **el stop nunca empeora y un `PROTECT` nunca es mudo** (`AUTO-2` slice 2a) · **la
-política de salida tiene una sola fuente** (`resolve_exit_policy`; sin plantilla ⇒ `MODERATE 0.3/0.3`).
+(**matiz H-6**: hoy sólo degrada si la clave `lifecycleState` está presente y no nula) (`AUTO-2`) ·
+**el stop nunca empeora** y **todo `PROTECT` con efecto deja traza** (el absoluto "ningún `PROTECT`
+mudo" era más ancho que el código; ver el matiz H-2 de arriba) (`AUTO-2` slice 2a) · **la política de
+salida tiene una sola fuente** (`resolve_exit_policy`; sin plantilla ⇒ `MODERATE 0.3/0.3`).
 
 **No hacer:** tocar las barreras LIVE · añadir un segundo motor de trading/FSM · leer
 `position_state`/`position_states` como autoridad de posición · contabilizar la cantidad **pedida** ·
