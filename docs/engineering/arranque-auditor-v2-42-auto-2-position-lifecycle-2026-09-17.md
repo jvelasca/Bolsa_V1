@@ -11,7 +11,9 @@
 > **Estado de la evidencia:** implementado, medido **en local** y **sellado**. Commit de fase `6e53294f`
 > (17 ficheros, `+2914/−99`), commit de arreglo de test `35e38c24` (1 fichero, `+59/−1`) y tag anotado
 > **`v2.42-beta` → `35e38c24`**; los runs de CI (con el rojo del commit de fase declarado) están en §8.1
-> del pack.
+> del pack. **Ya auditado externamente (2026-09-17): sin P0**, sello confirmado y **7 hallazgos de
+> código** declarados como deuda de 2b en el **§9** del pack (con la errata de cifras de los documentos).
+> Si vuelves a auditar, el arranque §"Ya auditado" te dice **qué no repetir** y qué quedó sin cubrir.
 
 **Bump:** `1.66.0-beta` → `1.67.0-beta`. **Migración: NINGUNA** (Alembic head sigue en
 `042_portfolio_reservations`; el estado vive en el JSONB `sim_auto_positions.position_state`).
@@ -126,6 +128,17 @@ Cifras medidas en el árbol del slice: **46 herméticos** (29 + 17), **35** de w
 **entorno**: en CI (limpio) da **1869 passed, 38 skipped** (run `35214904914`); las **1903 passed** que
 aparecen en otros documentos se midieron con `DATABASE_URL` y los seis `*_PG_REQUIRED` exportados, así
 que incluían suites gated que en CI se skipean (§8.1 del pack).
+
+### Ya auditado (2026-09-17) — **no repitas lo hecho, amplía**
+
+Una pasada externa de tres auditores (FSM/analítica · worker/shim · evidencia/mutaciones) sobre
+`da93cd20` encontró **sin P0** y **7 hallazgos de código** que quedaron declarados como deuda de 2b en
+el **§9 del pack** (H-1…H-7), más una **errata** de cifras de los documentos. Reprodujo **M1, M3, M4,
+M5, M7** con los rojos exactos. Si auditas de nuevo, **lo valioso es lo que no se cubrió**: M2, M6, M8,
+M9, M10 y M11 (no reproducidas), el **grid numérico del shim** flag-off, la cota de `thesis_invalid`
+(no alcanzable desde el worker) y todo lo que exija **PostgreSQL real** (durabilidad física del ratchet
+y del FSM). **Y muta en un `git worktree add` aislado**: la pasada anterior mutó en el árbol vivo
+mientras otro auditor lo leía y le contaminó una medición (ver §9.3 del pack).
 
 ### Mutaciones sugeridas (deben poner suites en rojo)
 

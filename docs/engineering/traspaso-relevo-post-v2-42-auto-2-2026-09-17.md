@@ -16,7 +16,7 @@
 > 5/5: `quality`, `auto-v2-durable-pg`, `lifecycle-pg`, `paper-forward-pg`, `grammar-discovery-pg`) y en
 > la ref del tag (run [`35214985401`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35214985401), 5/5);
 > `Release tag CI` **GREEN** @ `v2.42-beta` → `35e38c24` (run [`35214985392`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35214985392),
-> 10 jobs requeridos + `certify`). **Declarado, no escondido:** el primer sellado del tag (commit de fase
+> 10 jobs ejecutados + `certify` (**9 requeridos**, más 1 opt-in `skipped` por diseño)). **Declarado, no escondido:** el primer sellado del tag (commit de fase
 > `6e53294f`, run `35213906948`) puso **rojo** `auto-v2-durable-pg` — el test durable V2 **sorteaba**
 > instrumento (lotería de la cola SIM) y el mismo commit había pasado 5/5 minutos antes en `main` (run
 > `35213904170`) ⇒ **flaky preexistente, no regresión**; por eso `35e38c24` es test-only y el tag se
@@ -26,8 +26,12 @@
 > verás en packs de fases anteriores se midieron con `DATABASE_URL` y los `*_PG_REQUIRED` exportados
 > (suites gated corriendo de propina). **La cifra que manda es la de CI.**
 > **Sonda de referencias** (`apps/api-python/scripts/a9_doc_refs_probe.py`) sobre los tres documentos de
-> la fase: `97 referencias comprobadas / 0 muertas`; destapó y corrigió un enlace muerto **de este mismo
-> documento** (`arranque-auditor-v2.42-…` frente al nombre real `…-v2-42-…`).
+> la fase: `98 referencias comprobadas / 0 muertas`; destapó y corrigió un enlace muerto **de este mismo
+> documento** (`arranque-auditor-v2.42-…` frente al nombre real `…-v2-42-…`). **Ojo:** la sonda valida
+> rutas, **no** anclas de sección (una `§7.2` inexistente pasa la sonda).
+> **Auditoría externa (2026-09-17):** sin P0; **7 hallazgos de código** declarados en el §9 del pack como
+> criterio de aceptación de 2b, más la errata de mis cifras. Reprodujo 5 mutaciones (M1, M3, M4, M5, M7)
+> con los rojos exactos.
 > **Nota de artefacto:** la anotación del tag `v2.42-beta` (`git tag -n5`) enumera estados **en prosa** y
 > nombra `REDUCED`, que **no existe** en el FSM: los 13 estados reales son los de
 > `position_lifecycle.py`. La prosa del tag no es la fuente (y no se re-escribe un tag ya publicado).
@@ -92,6 +96,16 @@ tick AUTO (auto_simulation_worker.auto_turn; runtime: AutoSimRuntime.run_tick ~L
   → re-arranque: _v2_restore_durable_position ~L2075 / _v2_adopt_position ~L1949
         → _v2_degrade_adoption ~L2036 (fail-closed: RECONCILIATION_REQUIRED + PROTECTION_MISSING)
 ```
+
+> **Lo que la auditoría externa del 2026-09-17 encontró (y es tu trabajo en 2b):** 7 puntos donde el
+> código es **más débil que la prosa** del pack. Están listados con evidencia y criterio de aceptación en
+> el **§9 de [`audit-pack-v2.42-auto-2-position-lifecycle-2026-09-17.md`](./audit-pack-v2.42-auto-2-position-lifecycle-2026-09-17.md)**;
+> resumen: **H-1** `RECONCILED` se acepta desde cualquier estado sin verificar (`position_lifecycle.py:359-377`),
+> **H-2** no-op del trailing sin journal (`worker:2283-2293`), **H-3** `PARTIAL_EXIT` arma trailing sin T1
+> (`position_lifecycle.py:530`), **H-4** sin pico cae al precio de entrada, **H-5** `+inf` pasa y revienta
+> en `round()`, **H-6** `lifecycleState: null` con `status=CLOSED` y posición viva no degrada,
+> **H-7** 7 transiciones retroceden. **No los arregles de forma aislada**: entran en 2b con su propio
+> gate y su propia matriz de mutación.
 
 Rutas exactas que hay que leer antes de diseñar 2b:
 
@@ -340,12 +354,14 @@ Si 2b necesita esquema nuevo (`043_*`):
 Orden mínimo, **paridad con CI**. Extrae los comandos del YAML, **no** los reescribas de memoria:
 
 ```bash
-# 1) Calidad (invocación EXACTA de CI)
+# 1) Calidad (invocación de CI: SIN `packages/py/analytics/src`, que CI no compila).
+#    Corregido tras la auditoría externa: con analytics/src la línea da exit 2 por hallazgos
+#    PREEXISTENTES ajenos a la fase, así que etiquetarla "exacta de CI" era falso.
 uv run ruff check packages/py apps/api-python --config pyproject.toml
 uv run lint-imports --config packages/py/.importlinter
 uv run mypy packages/py/domain/src packages/py/market/src \
            packages/py/infrastructure/src packages/py/application/src \
-           packages/py/analytics/src apps/api-python/src --follow-imports=silent
+           apps/api-python/src --follow-imports=silent
 
 # 2) Herméticos del slice (segundos)
 uv run pytest packages/py/analytics/tests/test_position_lifecycle.py \
@@ -426,8 +442,10 @@ ni por medición · migraciones aditivas/nullables sin backfill con `downgrade()
 de PG** · long-only · Alembic head **`042_portfolio_reservations`** · **`POSITION = Σ APPLIED`** y
 **`exit_qty <= materialized_qty`** · **no existe aprobación sin reserva ni reserva sin liberación**
 (`reserved_cash == Σ reservas vivas`) · `RETRY`/`CAPTURED`/`APPLYING`/`FAILED` **nunca** son posición
-ni realizado · ningún skip de gestión queda mudo · **una posición siempre tiene estado persistido y
+ni realizado · ningún skip de gestión queda mudo (**matiz H-2**: el no-op del trailing no es un skip,
+pero hoy tampoco deja journal) · **una posición siempre tiene estado persistido y
 verificable; un estado no verificable degrada a `RECONCILIATION_REQUIRED`, nunca a "sin protección"**
+(**matiz H-6**: hoy sólo degrada si la clave `lifecycleState` está presente y no nula)
 (`AUTO-2`) · **el stop nunca empeora y un `PROTECT` nunca es mudo** (`AUTO-2` slice 2a) · **la
 política de salida tiene una sola fuente** (`resolve_exit_policy`; sin plantilla ⇒ `MODERATE 0.3/0.3`).
 
@@ -437,4 +455,6 @@ dejar dos fuentes de verdad del estado de posición · retirar el shim sin porta
 congelar el stop otra vez (ni "simplificar" quitando `apply_position_current_stop`) · elegir la
 identidad de un test que necesite fill **al azar** · certificar sin correr los bloques de §6 ·
 declarar CI de un tag que aún no existe · meter ruido de `logs/` y caches en un commit · editar los
-ficheros de plan de Cursor en `~/.cursor/plans/`.
+ficheros de plan de Cursor en `~/.cursor/plans/` · **mutar código en el árbol vivo mientras otro
+auditor lo lee** (usa `git worktree add`; ver §9.3 del pack) · reutilizar una cifra de un documento sin
+re-medirla (la auditoría de 2a encontró "7/28 citas", "36 ficheros" y "10 jobs requeridos" **falsos**).
