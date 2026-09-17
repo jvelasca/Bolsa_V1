@@ -47,7 +47,7 @@ como motor del camino AUTO (queda un shim de compatibilidad) + política T1/T2 e
 **horizonte de tiempo** y, si toca, migración `043`. El **criterio de salida completo** de `AUTO-2`
 **no** está cumplido: el roadmap exige `TIME_EXIT`/`THESIS_EXIT` **con evidencia en el journal de un
 día completo**, y eso no existe todavía. **Las seis decisiones de diseño ya están resueltas con
-evidencia medida en el §4.2** (D1…D6): no las reabras, confirma solo D3 y D6.
+evidencia medida en el §4.2** (D1…D6): no las reabras, confirma solo **D2**, **D3** y **D6**.
 
 ---
 
@@ -311,8 +311,9 @@ tarea corta y recomendable **antes** de que muerda.
 
 Estas seis decisiones quedaron **abiertas** al sellar 2a. Debajo va la recomendación técnica con su
 evidencia en código medida hoy, la alternativa descartada y el **gate de aceptación**. De las seis,
-**solo D3 y D6** cambian algo que el owner debe firmar (régimen de entrada y versionado); el resto es
-ejecución. Si discrepas, cambia la decisión **antes** de codificar, no a mitad.
+**tres exigen firma del owner**: **D2** (¿la invalidación de tesis vende o solo revisa?), **D3**
+(régimen de entrada con ATR) y **D6** (versionado); D1/D4/D5 son ejecución. Si discrepas, cambia la
+decisión **antes** de codificar, no a mitad.
 
 #### D1 — ¿De dónde sale el horizonte de tiempo? → del **modelo de plantilla**, congelado en el nacimiento
 
@@ -583,8 +584,9 @@ Reglas de honestidad del repo (no negociables):
 - [ ] Lee §3.2 y §3.3 **enteros** y verifica en código **dos** huecos (el de `TIME_EXIT` y el de
       `thesis_health` son los más rentables).
 - [ ] Las **seis decisiones** de §4.2 ya traen **recomendación cerrada**: confirma con el owner solo
-      **D3** (severidad del ATR: régimen de entrada) y **D6** (bump a `1.67.1-beta`). No vuelvas a
-      preguntar por D1/D2/D4/D5: están resueltas con evidencia en el propio §4.2.
+      **D2** (¿la invalidación de tesis vende o solo revisa?), **D3** (severidad del ATR: régimen de
+      entrada) y **D6** (bump a `1.67.1-beta`). No vuelvas a preguntar por D1/D4/D5: están resueltas
+      con evidencia en el propio §4.2.
 - [ ] Mide (no supongas) el impacto del ATR real sobre el número de entradas antes de convertir el
       fallback en veto: el ATR sintético se **fabrica en `_v2_signals`** (L1193-1198) y **pisa** la
       rama que ya prefiere el real (`auto_v2_entry.py` L595-597).
