@@ -46,8 +46,9 @@ como motor del camino AUTO (queda un shim de compatibilidad) + política T1/T2 e
 **Fuera de lo cerrado (2b, es tu trabajo):** `TIME_EXIT`, `THESIS_EXIT`, **ATR real**,
 **horizonte de tiempo** y, si toca, migración `043`. El **criterio de salida completo** de `AUTO-2`
 **no** está cumplido: el roadmap exige `TIME_EXIT`/`THESIS_EXIT` **con evidencia en el journal de un
-día completo**, y eso no existe todavía. **Las seis decisiones de diseño ya están resueltas con
-evidencia medida en el §4.2** (D1…D6): no las reabras, confirma solo **D2**, **D3** y **D6**.
+día completo**, y eso no existe todavía. **Las seis decisiones de diseño ya están resueltas en el §4.2**
+(D1…D6) y **las tres que exigían firma del owner (D2/D3/D6) quedaron firmadas el 2026-09-17**: al
+arrancar no hay nada que preguntar. Empieza por **E1 (`TIME_EXIT`)**.
 
 ---
 
@@ -314,6 +315,13 @@ evidencia en código medida hoy, la alternativa descartada y el **gate de acepta
 **tres exigen firma del owner**: **D2** (¿la invalidación de tesis vende o solo revisa?), **D3**
 (régimen de entrada con ATR) y **D6** (versionado); D1/D4/D5 son ejecución. Si discrepas, cambia la
 decisión **antes** de codificar, no a mitad.
+
+> **FIRMADO POR EL OWNER (2026-09-17).** Confirmadas las tres que lo requerían, **con la recomendación
+> de arriba tal cual**: **D2 ⇒ la invalidación confirmada vende** (`EXIT` real, con A/B del camino mesa
+> medido y la mutación "vuelve a `REVIEW`" en la matriz) · **D3 ⇒ cablear + medir**, con el veto
+> `NO ENTRY` detrás de `AUTO_ENGINE_SIM_V2_ATR_REQUIRED` (**default `0`**) y flipado solo con el número
+> delante · **D6 ⇒ `1.67.1-beta`** con tag nuevo `v2.42.1-beta`. **D1/D4/D5** quedan como recomendación
+> de ejecución. **No hay ninguna decisión pendiente de owner al arrancar 2b: empieza por E1.**
 
 #### D1 — ¿De dónde sale el horizonte de tiempo? → del **modelo de plantilla**, congelado en el nacimiento
 
@@ -583,10 +591,10 @@ Reglas de honestidad del repo (no negociables):
       que 2b tampoco).
 - [ ] Lee §3.2 y §3.3 **enteros** y verifica en código **dos** huecos (el de `TIME_EXIT` y el de
       `thesis_health` son los más rentables).
-- [ ] Las **seis decisiones** de §4.2 ya traen **recomendación cerrada**: confirma con el owner solo
-      **D2** (¿la invalidación de tesis vende o solo revisa?), **D3** (severidad del ATR: régimen de
-      entrada) y **D6** (bump a `1.67.1-beta`). No vuelvas a preguntar por D1/D4/D5: están resueltas
-      con evidencia en el propio §4.2.
+- [ ] Decisiones **firmadas por el owner el 2026-09-17** (§4.2): **no hay nada que preguntar**. D2 ⇒
+      la invalidación confirmada **vende** (con A/B de la mesa) · D3 ⇒ cablear + medir, veto detrás de
+      `AUTO_ENGINE_SIM_V2_ATR_REQUIRED=0` · D6 ⇒ **`1.67.1-beta`** / tag `v2.42.1-beta`. **Arranca por
+      E1 (`TIME_EXIT`)**.
 - [ ] Mide (no supongas) el impacto del ATR real sobre el número de entradas antes de convertir el
       fallback en veto: el ATR sintético se **fabrica en `_v2_signals`** (L1193-1198) y **pisa** la
       rama que ya prefiere el real (`auto_v2_entry.py` L595-597).
