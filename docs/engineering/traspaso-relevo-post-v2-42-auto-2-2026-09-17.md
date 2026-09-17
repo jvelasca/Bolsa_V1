@@ -28,6 +28,9 @@
 > **Sonda de referencias** (`apps/api-python/scripts/a9_doc_refs_probe.py`) sobre los tres documentos de
 > la fase: `97 referencias comprobadas / 0 muertas`; destapó y corrigió un enlace muerto **de este mismo
 > documento** (`arranque-auditor-v2.42-…` frente al nombre real `…-v2-42-…`).
+> **Nota de artefacto:** la anotación del tag `v2.42-beta` (`git tag -n5`) enumera estados **en prosa** y
+> nombra `REDUCED`, que **no existe** en el FSM: los 13 estados reales son los de
+> `position_lifecycle.py`. La prosa del tag no es la fuente (y no se re-escribe un tag ya publicado).
 
 **Bump:** `1.66.0-beta` → `1.67.0-beta`. **Migración: NINGUNA** (Alembic head sigue en
 `042_portfolio_reservations`: el ciclo de vida vive en el JSONB `sim_auto_positions.position_state`).

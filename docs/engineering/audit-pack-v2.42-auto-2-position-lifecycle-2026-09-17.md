@@ -317,6 +317,12 @@ el bloque offline del tag). En CI, con el entorno limpio, el mismo comando da `1
 batería gated que corrió de propina en local. Ninguna afirmación de este pack se apoya ya en una
 medición contaminada por el entorno.
 
+**Nota de artefacto (declarada, no escondida):** la **anotación del tag** (`git tag -n5 v2.42-beta`)
+enumera los estados **en prosa** y nombra `REDUCED`, que **no existe** en el FSM: los 13 estados reales
+son los de `position_lifecycle.py` (§1). La prosa del tag **no** es la fuente y se declara aquí en vez
+de re-escribir un tag ya publicado (mover el tag invalidaría el mapeo run ↔ commit de la tabla de
+arriba).
+
 ### 8.2 Baterías locales (medidas en el árbol final del slice, antes de publicar)
 
 | Batería                                                                                                             | Resultado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
