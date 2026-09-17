@@ -76,9 +76,13 @@ declara sin medir):
   passed**; `mypy` (invocación de CI, `--follow-imports=silent`): **487 ficheros, 0 issues**;
   `lint-imports`: **4 kept / 0 broken**.
 - Job **`quality`** completo (comando **extraído del YAML**, con las listas nuevas y sus `--ignore`):
-  **exit 0**, **1903 passed** (85,7 s).
-- Bloque offline del job **`python`** de `release-tag-ci.yml` (extraído del YAML): **exit 0**,
-  **1915 passed** (61,1 s).
+  **exit 0** en CI (`1869 passed, 38 skipped`, 114,4 s; run `35214904914`, job `quality`). Ojo con la
+  procedencia: la medición local de esta misma tabla dio `1903 passed, 0 skipped` porque la sesión tenía
+  `DATABASE_URL` y los seis `*_PG_REQUIRED` exportados, de modo que las suites gated corrieron **dentro**
+  del job en vez de skipear; la cifra que manda es la de CI.
+- Bloque offline del job **`python`** de `release-tag-ci.yml` (extraído del YAML): **exit 0** en CI
+  (`1880 passed, 35 skipped`, 60,7 s; run `35214985392`), con la misma salvedad de procedencia (local:
+  `1915 passed`).
 - Batería completa de paquetes `uv run pytest packages/py -q`: **2825 passed**, 1 skipped (Ollama
   ausente: entorno) y 1 xfailed ⇒ **0 rojos**.
 - PG real: batería `auto-v2-durable-pg` **36 passed** (incluye los 3 nuevos de lifecycle durable), bloque
@@ -86,6 +90,13 @@ declara sin medir):
   auth, outbox, integridad financiera, estado del motor AUTO, finanzas simuladas, **bucle real del
   scheduler con cero intervención humana** y fencing de ejecución — y los 9 tests legacy de protección +
   los 4 portes V2=1 + 35 de integración del worker en verde.
+- **CI de GitHub (sellado)**: `Python CI` **GREEN** en `main` @ `35e38c24` (run `35214904914`, 5/5) y en
+  la ref del tag (run `35214985401`, 5/5); `Release tag CI` **GREEN** @ `v2.42-beta` → `35e38c24` (run
+  `35214985392`, 10 jobs requeridos + `certify`). El **primer sellado** del tag (sobre el commit de fase
+  `6e53294f`, run `35213906948`) puso **rojo** `auto-v2-durable-pg`: el test durable V2 **sorteaba**
+  instrumento (lotería de la cola SIM) y el **mismo commit** había pasado 5/5 minutos antes en `main`
+  (run `35213904170`) ⇒ **flaky preexistente, no regresión** del slice; se arregla en `35e38c24`
+  (test-only: identidad determinista que llena) y el tag se **re-apunta** a ese commit.
 
 ### Deuda declarada (no silenciosa)
 
