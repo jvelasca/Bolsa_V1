@@ -15,8 +15,7 @@ Si una auditoría necesita reconstruir "el código tal cual se selló", ese comm
 [`35322991385`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35322991385): `quality` **1983 passed, 38
 skipped** en 114,94 s; `auto-v2-durable-pg` **39 passed** con su gate fail-if-skipped; `grammar-discovery-pg`,
 `paper-forward-pg` y `lifecycle-pg` per-commit también en verde). La certificación de la **ref del tag**
-(`Python CI` en la ref + `Release tag CI` con `certify`) se añade al §8.1 cuando el tag esté publicado; el
-run del commit de fase **no** depende de ella.
+(`Python CI` en la ref + `Release tag CI` con `certify`) está medida en el §8.1.
 
 **Alcance de la auditoría:** este slice **y** la afirmación de que la tabla **gobierna** la decisión (no la
 decora). Lo publicado en `AUTO-2` (2a/2b/2c) **ya se auditó** en sus packs; aquí se re-mide lo que este
@@ -284,9 +283,24 @@ del traspaso §4: comprueba que la mutación rompe **comportamiento**, no una l�
 `grammar-discovery-pg`, `paper-forward-pg` y `lifecycle-pg` per-commit en verde. Los 38 skips del job
 `quality` son las suites gated por `DATABASE_URL`/`*_PG_REQUIRED`, que corren en sus jobs dedicados.
 
-**Ref del tag `v2.43-beta` — pendiente al redactar:** `Python CI` en la ref del tag y `Release tag CI` con
-`certify` en `success` (jobs `python` offline y `lifecycle-pg` con PG real); se añaden aquí en el commit
-docs-only posterior al sellado (patrón de `v2.42.2`).
+**Ref sellada:** tag anotado **`v2.43-beta` → `4fc09f08`** (commit de sellado, docs-only), que incluye el
+commit de fase del código **`7ca4a0e1`**. **Medido:**
+
+- `Python CI` en la **ref del tag** (run
+  [`35323452519`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35323452519)): **GREEN 5/5** — `quality`
+  **1983 passed, 38 skipped** (116,14 s), `auto-v2-durable-pg` **39 passed** (6,09 s, gate fail-if-skipped
+  en `success`), `grammar-discovery-pg`, `paper-forward-pg` y `lifecycle-pg` per-commit en verde.
+- `Release tag CI` (run
+  [`35323452639`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35323452639)): **GREEN** con `certify
+(aggregate + artifact)` en `success` (artifact `release-tag-ci-summary`, 405 B) — job `python`
+  (ruff/imports/mypy/pytest offline) **1994 passed, 35 skipped** (58,64 s), `lifecycle-pg` con PG real
+  **144 passed** (90,49 s) + **45 passed** (14,55 s), `shared`, `security (gitleaks)`, `dr-verify`,
+  `decision-spine`, `frontend`, `a7-gate` y `shared` en verde; `playwright (integrated E2E)` `skipped` por
+  ser opt-in.
+- `Frontend CI`, `Optimize lab`, `Fase 2 scientific` y `Gitleaks` de `main` en verde tras el push del sello.
+
+Con eso, el tag↔commit y la certificación de la ref quedan verificables por el auditor con los tres runs
+citados (más el del commit de fase, arriba).
 
 ### 8.2 Baterías (medido en la máquina del autor, árbol final del slice)
 

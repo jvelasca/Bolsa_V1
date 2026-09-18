@@ -6,8 +6,10 @@
 **`v2.43-beta`**, que apunta al **commit de sellado** (docs-only, que entra en el tag a diferencia del
 patrón de `v2.42.2`). `Python CI` del commit de fase: **GREEN 5/5** en `main` (run
 [`35322991385`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35322991385); `quality` **1983 passed, 38
-skipped**, `auto-v2-durable-pg` **39 passed**). La certificación de la **ref del tag** (`Python CI` en la
-ref + `Release tag CI` con `certify`) se añade en el commit docs-only posterior al sellado.
+skipped**, `auto-v2-durable-pg` **39 passed**). **Ref del tag certificada:** `Python CI` en la ref
+**GREEN 5/5** (run [`35323452519`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35323452519)) y
+`Release tag CI` **GREEN** con `certify` (aggregate + artifact) en `success` (run
+[`35323452639`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35323452639)).
 
 **Punto de entrada obligatorio para quien siga:** el
 [audit-pack v2.43](./audit-pack-v2.43-auto-3-risk-market-governor-2026-09-18.md) y el

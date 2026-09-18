@@ -96,6 +96,21 @@ el contenido exacto** (hash del fichero) y se reporta:
   `HALTED` no tiene productor propio en este slice (tabla / kill switch); los umbrales de drawdown
   (5/10/15/20 %) son **declarados y calibrables**, no calibrados contra datos; y la evidencia es un día
   **hermético** (stores `InMemory*`, precios y ATR inyectados), no una sesión de mercado real.
+- **CI real (sellado)**: commit de fase `7ca4a0e1` (23 ficheros, `+3677/−58`), commit de sellado
+  `4fc09f08` y tag anotado **`v2.43-beta` → `4fc09f08`**. `Python CI` **GREEN 5/5** en `main` (run
+  [`35322991385`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35322991385): `quality` **1983 passed,
+  38 skipped** en 114,94 s; `auto-v2-durable-pg` **39 passed** con el gate fail-if-skipped activo) y
+  **GREEN 5/5** en la **ref del tag** (run
+  [`35323452519`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35323452519): `quality` **1983 passed,
+  38 skipped** en 116,14 s, `auto-v2-durable-pg` **39 passed** en 6,09 s, más los per-commit
+  `grammar-discovery-pg`, `paper-forward-pg` y `lifecycle-pg`); `Release tag CI` (run
+  [`35323452639`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35323452639)) **GREEN** con el
+  **`certify` (aggregate + artifact)** en `success` y los jobs requeridos en verde (job `python` offline:
+  **1994 passed, 35 skipped**, `mypy` 487 ficheros 0 issues; job `lifecycle-pg` con **PG real**: **144 +
+  45 passed**; `playwright (integrated E2E)` es opt-in y queda `skipped` por diseño), más `Frontend CI`,
+  `Optimize lab`, `Fase 2 scientific` y `Gitleaks` en verde. **Desviación declarada del patrón de
+  `v2.42.2`**: el tag apunta al **commit de sellado** (docs-only) y no al de fase, para que la ref sellada
+  **no cite refs inexistentes**; el código sellado es `7ca4a0e1`.
 
 ## [1.67.2-beta] — V2.42.2 · AUTO-2 slice 2c (cierre): evidencia de un día, ATR medido y cero política legacy — 2026-09-18
 
