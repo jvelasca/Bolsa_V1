@@ -110,7 +110,9 @@ el contenido exacto** (hash del fichero) y se reporta:
   45 passed**; `playwright (integrated E2E)` es opt-in y queda `skipped` por diseño), más `Frontend CI`,
   `Optimize lab`, `Fase 2 scientific` y `Gitleaks` en verde. **Desviación declarada del patrón de
   `v2.42.2`**: el tag apunta al **commit de sellado** (docs-only) y no al de fase, para que la ref sellada
-  **no cite refs inexistentes**; el código sellado es `7ca4a0e1`.
+  **no cite refs inexistentes**; el código sellado es `7ca4a0e1`. La **petición de auditoría externa** quedó
+  publicada en el [issue #62](https://github.com/jvelasca/Bolsa_V1/issues/62), con los puntos de entrada
+  fijados a la ref del tag.
 
 ## [1.67.2-beta] — V2.42.2 · AUTO-2 slice 2c (cierre): evidencia de un día, ATR medido y cero política legacy — 2026-09-18
 

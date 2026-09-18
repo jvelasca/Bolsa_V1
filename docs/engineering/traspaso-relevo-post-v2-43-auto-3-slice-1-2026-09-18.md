@@ -11,6 +11,10 @@ skipped**, `auto-v2-durable-pg` **39 passed**). **Ref del tag certificada:** `Py
 `Release tag CI` **GREEN** con `certify` (aggregate + artifact) en `success` (run
 [`35323452639`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35323452639)).
 
+**Auditoría externa en curso:** [issue #62](https://github.com/jvelasca/Bolsa_V1/issues/62), abierto el
+2026-09-18 sobre el tag. Si llegan hallazgos, se responden **en el hilo** (formato del §8 del issue) y la
+deuda que salga se traslada al slice 2 **antes** de tocar los ejes de salida.
+
 **Punto de entrada obligatorio para quien siga:** el
 [audit-pack v2.43](./audit-pack-v2.43-auto-3-risk-market-governor-2026-09-18.md) y el
 [arranque del auditor](./arranque-auditor-v2-43-auto-3-risk-market-governor-2026-09-18.md). Después, este

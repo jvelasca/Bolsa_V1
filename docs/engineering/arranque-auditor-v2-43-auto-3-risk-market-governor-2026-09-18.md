@@ -8,6 +8,10 @@ y en las **preguntas abiertas** de abajo.
 
 **Pack:** [`audit-pack-v2.43-auto-3-risk-market-governor-2026-09-18.md`](./audit-pack-v2.43-auto-3-risk-market-governor-2026-09-18.md)
 
+**Hilo de la auditoría (GitHub):** [issue #62](https://github.com/jvelasca/Bolsa_V1/issues/62) — petición
+publicada el 2026-09-18, con los puntos de entrada fijados a la ref del tag. **Reporta ahí** (formato del
+§8 del issue: severidad · afirmación atacada · ruta:línea · comando · salida · si el pack ya lo declaraba).
+
 **Qué auditar exactamente:** versión **`1.68.0-beta`**, partiendo de `v2.42.2-beta` → `3e8aa359`. El sello es
 el tag anotado **`v2.43-beta`**, que apunta al **commit de sellado** (docs-only) e incluye el commit de fase
 del código **`7ca4a0e1`** (23 ficheros, `+3677/−58`). `Python CI` del commit de fase: **GREEN 5/5** en `main`

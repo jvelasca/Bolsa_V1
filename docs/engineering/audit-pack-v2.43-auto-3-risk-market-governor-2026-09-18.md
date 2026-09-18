@@ -17,6 +17,10 @@ skipped** en 114,94 s; `auto-v2-durable-pg` **39 passed** con su gate fail-if-sk
 `paper-forward-pg` y `lifecycle-pg` per-commit también en verde). La certificación de la **ref del tag**
 (`Python CI` en la ref + `Release tag CI` con `certify`) está medida en el §8.1.
 
+**Hilo de la auditoría (GitHub):** [issue #62](https://github.com/jvelasca/Bolsa_V1/issues/62) — petición
+publicada el 2026-09-18 con las refs fijadas al tag; es el foro donde el auditor reporta y donde se
+responden los hallazgos.
+
 **Alcance de la auditoría:** este slice **y** la afirmación de que la tabla **gobierna** la decisión (no la
 decora). Lo publicado en `AUTO-2` (2a/2b/2c) **ya se auditó** en sus packs; aquí se re-mide lo que este
 slice toca (baterías completas en §8.2). El trabajo pesado de auditoría está en el §5 (mutaciones), el §6
