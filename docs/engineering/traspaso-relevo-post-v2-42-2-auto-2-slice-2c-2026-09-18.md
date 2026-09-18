@@ -1,8 +1,13 @@
 # Traspaso de relevo — post `v2.42.2-beta` (AUTO-2 slice 2c cerrado) → **AUTO-3** (Risk & Market Governor)
 
-**Fecha:** 2026-09-18 · **Versión:** `1.67.2-beta` · **Tag:** `v2.42.2-beta` _(commit en el §8.1 del
-[audit-pack](./audit-pack-v2.42.2-auto-2-slice-2c-2026-09-18.md))_ · **Migración:** **ninguna** (Alembic head
-sigue en `042_portfolio_reservations`).
+**Fecha:** 2026-09-18 · **Versión:** `1.67.2-beta` · **Tag:** `v2.42.2-beta` → `3e8aa359` · **Migración:**
+**ninguna** (Alembic head sigue en `042_portfolio_reservations`). Sello **verde**: `Python CI` **5/5** en
+`main` ([`35312788454`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312788454); `quality` **1935
+passed / 38 skipped**, `auto-v2-durable-pg` **39 passed / 0 skipped**) y **5/5** en la ref del tag
+([`35312807393`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312807393)); `Release tag CI`
+([`35312807338`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312807338)) **GREEN** con `certify` en
+`success` (job `python` offline **1946 passed / 35 skipped**, `mypy` 487 ficheros 0 issues; `lifecycle-pg`
+con **PG real** **144 + 45 passed**).
 
 **Punto de entrada obligatorio para quien siga:** el
 [audit-pack-v2.42.2](./audit-pack-v2.42.2-auto-2-slice-2c-2026-09-18.md) y el

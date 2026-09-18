@@ -4,8 +4,8 @@
 **evidencia** que el §4 del roadmap exige para dar `AUTO-2` por cerrado y convierte en **estructural** la
 afirmación de que con el motor V2 ON la política de protección antigua no se lee.
 
-**Ref auditada:** tag anotado **`v2.42.2-beta` → ** _(commit y runs de CI en el §8.1, se rellenan al sellar)_.
-Todo lo que se afirma aquí se mide contra esa ref; `main` puede ir por delante sólo con docs.
+**Ref auditada:** tag anotado **`v2.42.2-beta` → `3e8aa359`**. Todo lo que se afirma aquí se mide contra esa
+ref; `main` puede ir por delante sólo con docs. Evidencia de CI del sello en el §8.1.
 
 **Alcance de la auditoría:** slices 2c **y** la afirmación de cierre de `AUTO-2`. Lo publicado en 2b (E1, E2,
 E3, H-1..H-7) **ya se auditó** en su pack; aquí se re-mide lo que 2c toca y se comprueba que 2c **no**
@@ -206,7 +206,20 @@ AUTO_V2_LIFECYCLE_PG_REQUIRED=1 uv run pytest apps/api-python/tests/test_auto_v2
 
 ### 8.1 CI real de GitHub
 
-_(se rellena al sellar: commit, tag, runs de `Python CI` y `Release tag CI` con sus conteos)_
+**Sello cerrado y verde (2026-09-18):** commit `3e8aa359` + tag anotado **`v2.42.2-beta`**.
+
+| Run                                                                                             | Ref                 | Resultado                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`35312788454`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312788454) `Python CI`      | `main` @ `3e8aa359` | **GREEN 5/5**. `quality`: **1935 passed, 38 skipped** (65,25 s; los skips son las suites gated por `*_PG_REQUIRED`, que corren en sus jobs). `auto-v2-durable-pg`: **39 passed, 0 skipped** con `AUTO_V2_LIFECYCLE_PG_REQUIRED=1`. `lifecycle-pg` (per-commit): **13 passed**. `paper-forward-pg` y `grammar-discovery-pg`: verde                                                                                                                   |
+| [`35312807393`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312807393) `Python CI`      | `v2.42.2-beta`      | **GREEN 5/5**. `quality`: **1935 passed, 38 skipped** (88,46 s). `auto-v2-durable-pg`: **39 passed**. `lifecycle-pg`: 13 passed. Resto verde                                                                                                                                                                                                                                                                                                        |
+| [`35312807338`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312807338) `Release tag CI` | `v2.42.2-beta`      | **GREEN**: los **10 jobs requeridos** en `success` **+ `certify` (aggregate + artifact) en `success`**; `playwright (integrated E2E)` es **opt-in** y queda `skipped` por diseño. Job `python` (offline): **1946 passed, 35 skipped** (58,37 s) y `mypy` **487 ficheros 0 issues**. Job `lifecycle-pg` (**PG real**): **144 passed** + **45 passed**. `decision-spine`, `dr-verify`, `a7-gate`, `shared`, `frontend` y `security (gitleaks)`: verde |
+
+> **Nota de lectura (la misma de 2b):** el job `quality` de CI da **1935 passed, 38 skipped** y la medición
+> local **1935 passed, 0 skipped** porque en local los 8 ficheros PG van a `--ignore` (aquí el `connect` del
+> DSN se cuelga) mientras CI los recolecta y los **skipea** (38 tests) al no haber servidor en ese job. No es
+> una discrepancia: es la misma suite con dos tratamientos distintos de las suites gated. Igual en el job
+> `python` del tag: **1946 passed** en CI (35 skipped) y **1946 passed** en local (0 skipped).
+> Y el gate que **sí** certifica PG real (`lifecycle-pg` del tag, **144 + 45 passed**) tiene ahí su evidencia.
 
 ### 8.2 Baterías locales (medidas en el árbol final del slice, antes de publicar)
 

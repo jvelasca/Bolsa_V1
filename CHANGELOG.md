@@ -95,6 +95,17 @@ thesis_exit: 1, structural_stop: 1}`, `exits` 3 de `positions_created` 3, `healt
   segunda vez que un runner local mide **otra cosa** que CI, así que la verificación de rutas y la lista
   extraída del YAML pasan a ser una herramienta del repo, no un script suelto.
 
+- **CI real (sellado)**: commit `3e8aa359` + tag anotado **`v2.42.2-beta`**. `Python CI` **GREEN 5/5** en
+  `main` (run [`35312788454`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312788454): `quality`
+  **1935 passed, 38 skipped**; `auto-v2-durable-pg` **39 passed, 0 skipped** con el gate; `lifecycle-pg`
+  per-commit 13 passed) y **GREEN 5/5** en la ref del tag (run
+  [`35312807393`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312807393)); `Release tag CI`
+  (run [`35312807338`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312807338)) **GREEN** con los
+  **10 jobs requeridos** y el **`certify` (aggregate + artifact)** en `success` (`playwright (integrated
+E2E)` es opt-in y queda `skipped` por diseño) — job `python`: **1946 passed, 35 skipped** y `mypy` **487
+  ficheros 0 issues**; job `lifecycle-pg` (PG real): **144 + 45 passed** —, y `Frontend CI`, `Optimize lab`,
+  `Fase 2 scientific` y `Gitleaks` en verde.
+
 ## [1.67.1-beta] — V2.42 · AUTO-2 slice 2b: `TIME_EXIT`/`THESIS_EXIT`, ATR real y cierre de los hallazgos H-1..H-7 — 2026-09-17
 
 **Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`): el techo de mantenimiento y

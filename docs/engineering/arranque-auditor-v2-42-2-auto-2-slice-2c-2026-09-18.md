@@ -8,8 +8,14 @@ ficheros de código/test + 1 script + 1 runner de dev + docs), así que la audit
 
 **Pack:** [`audit-pack-v2.42.2-auto-2-slice-2c-2026-09-18.md`](./audit-pack-v2.42.2-auto-2-slice-2c-2026-09-18.md)
 
-**Qué auditar exactamente:** tag anotado **`v2.42.2-beta`** _(commit y runs en el §8.1 del pack, al sellar)_.
-`main` puede ir por delante sólo con docs.
+**Qué auditar exactamente:** tag anotado **`v2.42.2-beta` → `3e8aa359`** (la única ref que importa; `main` va
+por delante sólo con docs). CI del sello: `Python CI` **5/5** en `main`
+([`35312788454`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312788454), `quality` **1935 passed /
+38 skipped** y `auto-v2-durable-pg` **39 passed / 0 skipped** con el gate) y **5/5** en la ref del tag
+([`35312807393`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312807393)); `Release tag CI`
+([`35312807338`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35312807338)) **GREEN con `certify` en
+`success`** — job `python` offline **1946 passed / 35 skipped** y `mypy` 487 ficheros 0 issues, job
+`lifecycle-pg` (PG real) **144 + 45 passed**. Detalle en el §8.1 del pack.
 
 **Contexto que NO tienes que re-auditar:** E1/E2/E3 y H-1..H-7 (slice 2b) ya se auditaron en
 [`audit-pack-v2.42.1-auto-2-slice-2b-2026-09-17.md`](./audit-pack-v2.42.1-auto-2-slice-2b-2026-09-17.md).
