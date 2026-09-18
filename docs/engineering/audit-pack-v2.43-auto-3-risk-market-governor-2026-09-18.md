@@ -5,9 +5,18 @@ Instala los **tres ejes** (`MarketRegime`, `RiskRegime`, `OperationalState`), la
 su gate puro y cablea el **permiso operativo solo a las ENTRADAS** detrás de un flag **OFF por defecto**.
 
 **Ref auditada:** versión `1.68.0-beta`, partiendo del tag anterior **`v2.42.2-beta` → `3e8aa359`**. El
-sello de este slice es el tag anotado **`v2.43.0-beta`** sobre el commit de fase (mismo patrón que
-`v2.42.2`: el commit docs-only de evidencia de CI queda **fuera** del tag). **Documento honesto: aquí NO se
-afirma CI de un tag aún no publicado**; cuando el sello exista, sus runs y cifras se añaden al §8.1.
+sello de este slice es el tag anotado **`v2.43-beta`**, que apunta al **commit de sellado**; el **commit de
+fase del código** es `7ca4a0e1` (23 ficheros, `+3677/−58`) y los commits de sellado son **docs-only**.
+**Desviación declarada del patrón de `v2.42.2`** (allí el commit docs-only de evidencia de CI quedaba
+**fuera** del tag): aquí el sello lo **incluye**, para que la ref sellada no cite ninguna ref inexistente.
+Si una auditoría necesita reconstruir "el código tal cual se selló", ese commit es `7ca4a0e1`.
+
+**Evidencia de CI del commit de fase (ya medida):** `Python CI` **GREEN 5/5** en `main` (run
+[`35322991385`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35322991385): `quality` **1983 passed, 38
+skipped** en 114,94 s; `auto-v2-durable-pg` **39 passed** con su gate fail-if-skipped; `grammar-discovery-pg`,
+`paper-forward-pg` y `lifecycle-pg` per-commit también en verde). La certificación de la **ref del tag**
+(`Python CI` en la ref + `Release tag CI` con `certify`) se añade al §8.1 cuando el tag esté publicado; el
+run del commit de fase **no** depende de ella.
 
 **Alcance de la auditoría:** este slice **y** la afirmación de que la tabla **gobierna** la decisión (no la
 decora). Lo publicado en `AUTO-2` (2a/2b/2c) **ya se auditó** en sus packs; aquí se re-mide lo que este
@@ -269,10 +278,15 @@ del traspaso §4: comprueba que la mutación rompe **comportamiento**, no una l�
 
 ### 8.1 CI del sello
 
-**Pendiente de publicar** (este documento no afirma CI de un tag que aún no existe). Cuando el tag
-`v2.43.0-beta` esté sellado, aquí van: `Python CI` en `main` (5/5) y en la ref del tag, y `Release tag CI`
-con `certify` en `success` (jobs `python` offline y `lifecycle-pg` con PG real). El commit docs-only de
-evidencia de CI **no** entra en el tag, igual que en `v2.42.2`.
+**Commit de fase `7ca4a0e1` en `main` — medido:** `python-ci.yml` **GREEN 5/5** (run
+[`35322991385`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35322991385)): `quality` **1983 passed,
+38 skipped** (114,94 s), `auto-v2-durable-pg` **39 passed** (gate fail-if-skipped activo, 5,75 s),
+`grammar-discovery-pg`, `paper-forward-pg` y `lifecycle-pg` per-commit en verde. Los 38 skips del job
+`quality` son las suites gated por `DATABASE_URL`/`*_PG_REQUIRED`, que corren en sus jobs dedicados.
+
+**Ref del tag `v2.43-beta` — pendiente al redactar:** `Python CI` en la ref del tag y `Release tag CI` con
+`certify` en `success` (jobs `python` offline y `lifecycle-pg` con PG real); se añaden aquí en el commit
+docs-only posterior al sellado (patrón de `v2.42.2`).
 
 ### 8.2 Baterías (medido en la máquina del autor, árbol final del slice)
 

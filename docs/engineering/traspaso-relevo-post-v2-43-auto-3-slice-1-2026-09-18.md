@@ -2,8 +2,12 @@
 
 **Fecha:** 2026-09-18 · **Versión:** `1.68.0-beta` · **Punto de partida:** tag `v2.42.2-beta` →
 `3e8aa359` (AUTO-2 cerrado). **Migración: ninguna** (Alembic head sigue en `042_portfolio_reservations`).
-**Sello:** commit de fase + tag anotado **`v2.43.0-beta`**; **pendiente en el momento de redactar** — el
-commit docs-only de evidencia de CI añade los runs y las cifras del sello (patrón de `v2.42.2`).
+**Sello:** commit de fase del código **`7ca4a0e1`** (23 ficheros, `+3677/−58`) y tag anotado
+**`v2.43-beta`**, que apunta al **commit de sellado** (docs-only, que entra en el tag a diferencia del
+patrón de `v2.42.2`). `Python CI` del commit de fase: **GREEN 5/5** en `main` (run
+[`35322991385`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35322991385); `quality` **1983 passed, 38
+skipped**, `auto-v2-durable-pg` **39 passed**). La certificación de la **ref del tag** (`Python CI` en la
+ref + `Release tag CI` con `certify`) se añade en el commit docs-only posterior al sellado.
 
 **Punto de entrada obligatorio para quien siga:** el
 [audit-pack v2.43](./audit-pack-v2.43-auto-3-risk-market-governor-2026-09-18.md) y el

@@ -9,9 +9,11 @@ y en las **preguntas abiertas** de abajo.
 **Pack:** [`audit-pack-v2.43-auto-3-risk-market-governor-2026-09-18.md`](./audit-pack-v2.43-auto-3-risk-market-governor-2026-09-18.md)
 
 **Qué auditar exactamente:** versión **`1.68.0-beta`**, partiendo de `v2.42.2-beta` → `3e8aa359`. El sello es
-el tag anotado **`v2.43.0-beta`** sobre el commit de fase (el commit docs-only de evidencia de CI queda
-**fuera** del tag, como en `v2.42.2`). **Documento honesto: no se afirma CI de un tag aún no publicado**; las
-cifras y los runs del sello se añaden al §8.1 del pack cuando el sello exista.
+el tag anotado **`v2.43-beta`**, que apunta al **commit de sellado** (docs-only) e incluye el commit de fase
+del código **`7ca4a0e1`** (23 ficheros, `+3677/−58`). `Python CI` del commit de fase: **GREEN 5/5** en `main`
+(run [`35322991385`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35322991385); `quality` **1983
+passed, 38 skipped** y `auto-v2-durable-pg` **39 passed**). La `Python CI` de la ref del tag y el
+`Release tag CI` con `certify` se añaden al §8.1 del pack cuando el tag esté publicado.
 
 **Contexto que NO tienes que re-auditar:** `AUTO-1` (reservas) y `AUTO-2` (FSM, `TIME_EXIT`/`THESIS_EXIT`,
 ATR, cierre con evidencia) ya se auditaron en sus packs. Aquí basta comprobar que este slice **no los
