@@ -2,6 +2,77 @@
 
 All notable releases of Bolsa V1.
 
+## [1.68.1-beta] — Remediación de la auditoría externa de `v2.43-beta` (5 hallazgos, 2 de ellos de seguridad financiera) — 2026-09-18
+
+**Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Parche de remediación, **sin
+cambio de arquitectura y sin tocar el gobernador**: no se modifican los ejes, la tabla de decisión, el gate
+de entradas ni su evidencia. Los cinco hallazgos viven en las dos piezas que la auditoría declaró **pendientes
+de leer línea a línea** (`position_ledger.py` y el resto de `portfolio_reservation.py`), más dos hallazgos de
+contabilidad de posición ya reportados sobre `v2.43-beta`.
+
+- **R1 · `reserved_cash` del libro: el comentario contradecía a la propiedad.** El comentario de `release()`
+  afirmaba que `reserved_cash` se podía calcular sumando **todas** las reservas "sin tener que filtrar por
+  estado", mientras la propiedad filtra por `.live()`. Hoy las dos fórmulas coinciden (una reserva no viva
+  tiene sus dimensiones a 0), pero la promesa del comentario invitaba a que un futuro camino de liberación
+  **se ahorrase el filtro** y doble-contase. El comentario pasa a declarar el invariante real y el filtro
+  como cinturón de seguridad; la propiedad no se toca.
+- **R2 · `gross_risk` nunca era `None`: el riesgo de posiciones no medido se leía como 0 (seguridad
+  financiera).** En `build_portfolio_risk_state` la guarda `position_total is not None or reserved_risk is
+not None` era **siempre verdadera** (`reserved_risk` es un `float` property, nunca `None`), así que el
+  `(position_total or 0.0)` convertía "hay posiciones sin `risk_amount`" en 0 y el riesgo de cartera se
+  publicaba **por debajo del real**, en silencio, justo en el caso que el sistema declara no poder medir.
+  Ahora el total solo se publica si el riesgo de las posiciones está **medido**; si no, `gross_risk` y
+  `net_risk` quedan `None` y el `measurement` degrada. Es el mismo patrón `or 0.0` que el bug de
+  `total_samples` de `discovery_evidence.py`: "no lo sé" convertido en "es cero" en el cálculo más
+  importante del módulo.
+- **R3 · Un lado no interpretable se doblaba como VENTA (seguridad financiera).** `AppliedFillFact` solo
+  validaba `execution_id`, así que un `side` que no fuese `buy`/`sell` (p. ej. `"hold"`, o `"BUY"` en
+  mayúsculas) entraba al fold y caía en su `else`: **reducía la posición, realizaba P&L contra un coste
+  ajeno y no declaraba ninguna violación**. Ahora el tipo lo rechaza (la fila ilegible se declara al leer,
+  vía `coerce_applied_fill_fact` ⇒ rechazada ⇒ `measurement`), de modo que el `else` del fold es una venta
+  **por construcción**.
+- **R4 · Una posición PLANA publicaba `averageEntry: 0.0`.** La rama que dividía el residuo de `cost_basis`
+  (drift del redondeo a 4 decimales) entre la cantidad total publicaba "compré a 0,0" en una posición
+  cerrada, y una entrada histórica rancia en el caso del oversell: tres valores distintos para el mismo
+  hecho. Ahora una posición plana no tiene entrada (`average_entry = None`), sin importar por dónde se
+  llegó al cierre.
+- **R5 · `replay()` podía infradeclarar capital en silencio.** `ReservationEvent` no validaba nada: un
+  `kind` desconocido se aplicaba como **liberación** (relajando el libro) y un alta **sin su reserva** se
+  perdía sin más, dejando un libro que declara **menos** capital comprometido del real. El evento valida
+  ahora su `kind` (con constantes canónicas `RESERVATION_EVENT_RESERVE`/`_RELEASE`) y exige la reserva en el
+  alta: lo que no se puede reproducir no se puede representar.
+
+**Cambio observable declarado**: `V2TickPlan.risk_state` es un read-model **en memoria** (sin
+serialización: el payload del journal no cambia y la byte-identidad con `AUTO_ENGINE_SIM_V2_GOVERNOR=0`
+sigue intacta). Lo único que cambia en él es que `gross_risk` pasa de un **suelo** a `None` cuando hay
+posiciones abiertas sin `risk_amount` — que es exactamente el hallazgo R2, no una regresión.
+
+**Matriz de mutaciones medida** (3 mutaciones aplicadas a la vez, 3 rojos): quitar la validación de `side`
+⇒ `test_an_uninterpretable_side_cannot_be_represented_as_a_fact` rojo · restaurar la rama del residuo ⇒
+`test_flat_position_never_publishes_a_zero_or_stale_average_entry` rojo · quitar la validación de
+`ReservationEvent` ⇒ `test_a_non_replayable_event_cannot_be_represented` rojo. El cuarto test correlacionado
+(`test_full_exit_flattens_and_is_not_published_as_open`) queda **verde** con la mutación: el sensor del
+hallazgo R4 es el test dedicado, no una aserción decorativa.
+
+| #      | Qué                                                                                                                                                                                                       |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **R1** | Comentario de `release()` alineado con `reserved_cash`/`reserved_risk` (invariante declarado + filtro `.live()` como cinturón); test de doble vía `Σ all() == Σ live()` por las cuatro vías de liberación |
+| **R2** | `build_portfolio_risk_state` fail-closed: `gross_risk`/`net_risk` `None` si el riesgo de posiciones no está medido; traducción explícita "0 medido vs no medido" en `_risk_state_for`; 3 tests            |
+| **R3** | `AppliedFillFact.__post_init__` valida `side`; el `else` del fold documentado como "venta por construcción"; test de rechazo y de lectura                                                                 |
+| **R4** | `_fold_instrument`: posición plana ⇒ `average_entry = None` (sin residuo de redondeo ni entrada rancia); test con cierre limpio, con drift y con oversell                                                 |
+| **R5** | `ReservationEvent` valida `kind` y exige la reserva en el alta; constantes canónicas exportadas; test que prueba lo no-representable y la forma válida                                                    |
+
+### Verificación local medida (árbol final, mutaciones revertidas)
+
+`ruff check` **All checks passed** · `mypy` **487** ficheros, **0** issues · `lint-imports` **4 kept / 0
+broken** · evidencia del gobernador `v2_43_governor_evidence.py` **exit 0** (la tabla sigue gobernando: no
+se tocó) · bloques offline de CI **extraídos del YAML** ⇒ `quality` **1983 → 1991 passed (+8)** y job
+`python` del tag **1994 → 2002 passed (+8)**, **0 failed / 0 skipped**. El delta es **exactamente** el número
+de tests nuevos en los **dos** bloques: la comprobación de que lo nuevo **sí** corre en CI y no se queda
+fuera de las listas (la deuda que `v2.42.2` tuvo que cerrar a mano para
+`test_auto_daily_journal.py`). La certificación de CI **real** del sello se fija en el commit de sellado,
+como manda la casa: este documento no afirma un run que aún no existe.
+
 ## [1.68.0-beta] — V2.43 · AUTO-3 slice 1: `MarketRegime` × `RiskRegime` × `OperationalState` (ejes, tabla y gate de ENTRADAS) — 2026-09-18
 
 **Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Primer slice de `AUTO-3`

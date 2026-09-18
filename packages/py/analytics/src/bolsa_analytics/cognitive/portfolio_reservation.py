@@ -92,6 +92,13 @@ _RELEASED_STATUSES: frozenset[str] = frozenset(
 
 ReservationEventKind = Literal["reserve", "release"]
 
+RESERVATION_EVENT_RESERVE: ReservationEventKind = "reserve"
+RESERVATION_EVENT_RELEASE: ReservationEventKind = "release"
+
+_RESERVATION_EVENT_KINDS: frozenset[str] = frozenset(
+    {RESERVATION_EVENT_RESERVE, RESERVATION_EVENT_RELEASE}
+)
+
 _QTY_EPS = 1e-9
 
 
@@ -565,6 +572,12 @@ class ReservationEvent:
 
     ``kind="reserve"`` exige la reserva completa; ``kind="release"`` basta con su
     identidad más el estado y la cantidad liberada (que por defecto es la viva).
+
+    El evento es la unidad de ``replay``: un evento que no se puede aplicar **no puede
+    representarse**. Un ``kind`` desconocido se aplicaría como liberación (relajaría el
+    libro) y un alta sin su reserva se perdería en silencio (el libro reconstruido
+    declararía MENOS capital comprometido del real, que es la dirección peligrosa), así
+    que ambos se rechazan al construir en vez de degradarse al reproducir.
     """
 
     kind: ReservationEventKind
@@ -574,6 +587,15 @@ class ReservationEvent:
     reason: str | None = None
     released_qty: float | None = None
     at: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in _RESERVATION_EVENT_KINDS:
+            raise ValueError(
+                f"ReservationEvent exige kind {RESERVATION_EVENT_RESERVE!r}/"
+                f"{RESERVATION_EVENT_RELEASE!r}: {self.kind!r}"
+            )
+        if self.kind == RESERVATION_EVENT_RESERVE and self.reservation is None:
+            raise ValueError("ReservationEvent de alta exige la reserva completa")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -622,7 +644,7 @@ class ReservationLedger:
         self._reservations[key] = reservation
         self._events.append(
             ReservationEvent(
-                kind="reserve",
+                kind=RESERVATION_EVENT_RESERVE,
                 reservation_id=key,
                 reservation=reservation,
                 at=reservation.created_at,
@@ -665,8 +687,12 @@ class ReservationLedger:
         # Las dimensiones reservadas significan "comprometido AHORA": una liberación
         # parcial las escala a lo que queda vivo y una total las deja a 0. Lo que se
         # reservó originalmente queda en el evento de alta (historia inmutable), no en el
-        # estado del libro: así ``reserved_cash`` del libro es la suma de TODAS las
-        # reservas sin tener que filtrar por estado (una liberada aporta 0, no su importe).
+        # estado del libro. Invariante de este camino: una reserva NO viva tiene sus
+        # dimensiones a 0 (``factor=0.0``). OJO: ese invariante lo cumple ``release``, no
+        # la propiedad: ``reserved_cash``/``reserved_risk`` filtran ADEMÁS por ``.live()``
+        # como cinturón de seguridad, porque cualquier camino de liberación futuro debe
+        # seguir escalando a 0 para que sumar ``all()`` sin filtrar no doble-cuente. El
+        # contrato lo garantiza la propiedad; no te "ahorres" el filtro por este comentario.
         factor = 0.0 if fully_released else remaining / total
         resolved_reason = reason or current.release_reason
         updated = replace(
@@ -686,7 +712,7 @@ class ReservationLedger:
         self._reservations[key] = updated
         self._events.append(
             ReservationEvent(
-                kind="release",
+                kind=RESERVATION_EVENT_RELEASE,
                 reservation_id=key,
                 status=status,
                 reason=resolved_reason,
@@ -872,10 +898,14 @@ def replay(
     Determinista por construcción: mismo orden de eventos ⇒ mismo libro y mismo
     ``reserved_cash``/``reserved_risk``. Es lo que permite auditar/rehacer un tick sin
     volver a decidir: ``replay(ledger.events())`` reconstruye el estado exacto.
+
+    El ``kind`` de ``ReservationEvent`` es canónico por construcción y un alta siempre
+    trae su reserva, así que no hay evento que se pueda "aplicar por la puerta de atrás"
+    ni alta que se pierda: lo que no se puede reproducir no se puede ni representar.
     """
     ledger = ReservationLedger(account_id=account_id, tick_id=tick_id)
     for event in events:
-        if event.kind == "reserve":
+        if event.kind == RESERVATION_EVENT_RESERVE:
             if event.reservation is not None:
                 ledger.reserve(event.reservation)
             continue
@@ -902,6 +932,9 @@ class PortfolioRiskState:
     ``reserved_risk`` es el riesgo YA comprometido por reservas vivas, ``pending_risk`` el
     de las órdenes durables no materializadas, y ``correlation_adjusted_risk`` la cota
     superior conservadora (ver ``build_portfolio_risk_state``).
+
+    ``gross_risk``/``net_risk`` son ``None`` cuando el riesgo de las posiciones **no se
+    pudo medir**: "no sé cuánto arriesga la cartera" no puede leerse como un total menor.
     """
 
     gross_risk: float | None = None
@@ -967,6 +1000,12 @@ def build_portfolio_risk_state(
     ``unmeasured_positions`` cuántas posiciones no lo declaran. ``pending_risk`` es el de
     las órdenes durables no materializadas.
 
+    Fail-closed en el total: si el riesgo de las posiciones **no se pudo medir**
+    (``position_risk_total`` ``None``/inválido), ``gross_risk`` y ``net_risk`` quedan
+    ``None`` — nunca se publica "solo lo reservado" como si fuera el total, porque un
+    suelo leído como total es justo lo que este módulo existe para evitar. El
+    ``measurement`` degrada en consecuencia. Sin libro, el riesgo reservado es 0 medido.
+
     ``correlation_adjusted_risk`` es una **cota superior conservadora**: parte de
     ``reserved_risk`` y suma ``reserved_risk × max(0, correlación)`` por reserva. Con la
     correlación sin declarar no se descuenta nada — exactamente el estado actual del
@@ -980,8 +1019,13 @@ def build_portfolio_risk_state(
     position_total = _non_negative(position_risk_total)
 
     gross: float | None = None
-    if position_total is not None or reserved_risk is not None:
-        gross = _round4((position_total or 0.0) + (reserved_risk or 0.0))
+    if position_total is not None:
+        # Solo se publica un total cuando el riesgo de las posiciones está MEDIDO: un
+        # ``position_total=None`` (hay posiciones sin ``risk_amount``) no puede sumarse
+        # como 0 ni siquiera para publicar "solo lo reservado" — sería un suelo leído
+        # como total. ``reserved_risk`` nunca es ``None`` (es 0 medido sin libro), así que
+        # no decide si el cálculo es posible: solo forma parte del cálculo.
+        gross = _round4(position_total + reserved_risk)
 
     correlation_adjusted: float | None = None
     if book is not None:
@@ -1025,6 +1069,8 @@ __all__ = [
     "RELEASE_REASON_FILL",
     "RELEASE_REASON_RESTART",
     "RELEASE_REASON_ROLLBACK",
+    "RESERVATION_EVENT_RELEASE",
+    "RESERVATION_EVENT_RESERVE",
     "RESERVATION_OPEN",
     "RESERVATION_RELEASED_BY_CANCEL",
     "RESERVATION_RELEASED_BY_FILL",

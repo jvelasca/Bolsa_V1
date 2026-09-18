@@ -95,6 +95,15 @@ class AppliedFillFact:
     def __post_init__(self) -> None:
         if not str(self.execution_id or "").strip():
             raise ValueError("AppliedFillFact exige execution_id no vacío")
+        if self.side not in (SIDE_BUY, SIDE_SELL):
+            # Un lado que no es compra NI venta NO se puede doblar: el fold lo trataría
+            # como una venta (reduciría la posición y realizaría P&L contra un coste que
+            # no le corresponde). La fila no interpretable se declara al LEER
+            # (``coerce_applied_fill_fact`` ⇒ rechazada ⇒ measurement), nunca se
+            # representa como un hecho con un lado inventado.
+            raise ValueError(
+                f"AppliedFillFact exige side {SIDE_BUY!r}/{SIDE_SELL!r}: {self.side!r}"
+            )
 
     @property
     def is_buy(self) -> bool:
@@ -129,6 +138,10 @@ class LedgerPosition:
     posición viva; ``realized_qty`` es Σ ventas aplicadas. La relación canónica es
     ``remaining_qty == quantity - realized_qty`` (nunca negativa: si las ventas superan
     las compras, hay violación y se declara).
+
+    ``average_entry`` es el coste medio de lo que **queda abierto**: una posición plana no
+    tiene entrada y publica ``None`` (nunca 0,0). Un consumidor que necesite el precio de
+    entrada histórico lo tiene en ``fills``, no en un campo de la posición viva.
     """
 
     instrument_id: str
@@ -229,7 +242,10 @@ def _fold_instrument(facts: list[AppliedFillFact]) -> LedgerPosition:
             quantity += fact.quantity
             cost_basis += fact.quantity * fact.price
             continue
-        # Venta aplicada: realiza contra el coste medio vigente, nunca contra 0.
+        # Venta aplicada: realiza contra el coste medio vigente, nunca contra 0. Este
+        # ``else`` es una venta por CONSTRUCCIÓN: ``AppliedFillFact`` solo admite
+        # ``buy``/``sell``, así que ningún lado no interpretable puede llegar hasta aquí
+        # (una fila ilegible se declara al leerla, no se disfraza de venta).
         avg_entry = (cost_basis / quantity) if quantity > _QTY_EPS else None
         sellable = quantity - realized_qty
         if sellable <= _QTY_EPS:
@@ -249,8 +265,11 @@ def _fold_instrument(facts: list[AppliedFillFact]) -> LedgerPosition:
     if quantity > _QTY_EPS and remaining > _QTY_EPS:
         # Coste medio del inventario vivo (los recortes consumen coste proporcionalmente).
         avg_entry = round4(max(0.0, cost_basis) / remaining)
-    elif quantity > _QTY_EPS:
-        avg_entry = round4(cost_basis / quantity) if cost_basis > 0 else None
+    # Una posición PLANA no tiene entrada: ``average_entry`` es ``None``, no un 0,0 de
+    # arrastre ni una entrada histórica rancia. El residuo de ``cost_basis`` que deja el
+    # redondeo a 4 decimales no autoriza a publicar "la entrada era 0,0" (un consumidor
+    # que marque contra ese número lo haría contra cero). La historia de lo comprado vive
+    # en ``fills``, no en un campo de la posición viva.
 
     return LedgerPosition(
         instrument_id=instrument_id,

@@ -1224,12 +1224,22 @@ def _risk_state_for(snapshot: Any, ledger: ReservationLedger) -> PortfolioRiskSt
     no aporta 0: cuenta como NO medida y degrada el ``measurement``) y el de las reservas
     lo aporta el libro. Es la foto con la que se puede responder "cuánto riesgo tenía el
     tick comprometido" sin reconstruir nada a mano.
+
+    Traducción de "medido 0" vs "no medido": el snapshot deja ``risk_used`` a ``None``
+    también cuando no hay NINGUNA posición que medir (cartera vacía), que es un 0 medido y
+    exacto, no una ausencia. Si se pasara ``None`` tal cual, el estado publicaría
+    ``gross_risk = None`` sobre un total conocido. Solo se traduce a 0 cuando no queda
+    ninguna posición sin medir: con una sola posición sin ``risk_amount`` el total sigue
+    siendo desconocido y se publica ``None`` (fail-closed).
     """
     positions = getattr(snapshot, "positions", ()) or ()
     by_sector, unmeasured = sector_risk_from_positions(positions)
+    risk_used = getattr(snapshot, "risk_used", None)
+    if risk_used is None and unmeasured == 0:
+        risk_used = 0.0
     return build_portfolio_risk_state(
         ledger=ledger,
-        position_risk_total=getattr(snapshot, "risk_used", None),
+        position_risk_total=risk_used,
         position_risk_by_sector=by_sector,
         unmeasured_positions=unmeasured,
         pending_risk=getattr(snapshot, "pending_risk", 0.0),

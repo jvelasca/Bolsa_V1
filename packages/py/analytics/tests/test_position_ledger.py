@@ -2,6 +2,8 @@
 
 from datetime import UTC, datetime
 
+import pytest
+
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE, MEASUREMENT_PARTIAL
 from bolsa_analytics.cognitive.position_ledger import (
     AppliedFillFact,
@@ -91,6 +93,42 @@ def test_full_exit_flattens_and_is_not_published_as_open() -> None:
     assert position.realized_pnl == round(73.5 * 4.0, 4)
     # La posición cerrada NO aparece como cantidad viva (no reabre nada aguas abajo).
     assert ledger.quantities() == {}
+    # Y una posición PLANA no tiene entrada: ``None``, nunca un 0,0.
+    assert position.average_entry is None
+    assert position.cost_basis is None
+
+
+def test_flat_position_never_publishes_a_zero_or_stale_average_entry() -> None:
+    """El residuo de redondeo a 4 dp no puede publicar "la entrada era 0,0".
+
+    Cierre exacto: el coste se consume del todo. El redondeo del coste medio deja a veces
+    un residuo positivo, y la rama que dividía ese residuo entre la cantidad publicaba
+    ``averageEntry: 0.0`` en una posición plana (un número que un consumidor leería como
+    "compré a 0"). Plana ⇒ ``None``, sin importar por dónde se llegó al cierre.
+    """
+    clean = build_position_ledger([_buy("e1", 4.0, 10.0), _sell("e2", 4.0, 12.0)])
+    drifted = build_position_ledger(
+        [_buy("e1", 24.4097, 262.5983), _buy("e2", 57.4424, 437.5688), _sell("e3", 81.8521, 1.0)]
+    )
+    oversold = build_position_ledger([_sell("e1", 15.0, 6.0), _buy("e2", 10.0, 5.0)])
+
+    for ledger in (clean, drifted, oversold):
+        position = ledger.position("AAA")
+        assert position is not None
+        assert position.is_flat is True
+        assert position.average_entry is None
+        assert position.cost_basis is None
+        assert position.to_dict()["averageEntry"] is None
+
+
+def test_an_open_position_still_publishes_its_average_entry() -> None:
+    """El contrato no cambia para lo que SÍ está abierto."""
+    ledger = build_position_ledger([_buy("e1", 10.0, 5.0), _sell("e2", 4.0, 9.0)])
+    position = ledger.position("AAA")
+    assert position is not None
+    assert position.is_open is True
+    assert position.average_entry == 5.0
+    assert position.cost_basis == 30.0
 
 
 def test_oversell_is_a_declared_violation_not_an_invented_short() -> None:
@@ -161,6 +199,34 @@ def test_coerce_rejects_uninterpretable_rows() -> None:
         }
         kwargs.update(bad)
         assert coerce_applied_fill_fact(**kwargs) is None, bad
+
+
+def test_an_uninterpretable_side_cannot_be_represented_as_a_fact() -> None:
+    """Un lado que no es compra NI venta no se puede doblar: el tipo lo rechaza.
+
+    El fold tiene dos ramas (compra / venta) y el ``else`` es una venta por construcción.
+    Sin este gate, un lado ilegible se doblaba como VENTA: reducía la posición, realizaba
+    P&L contra un coste que no le corresponde y no declaraba ninguna violación.
+    """
+    with pytest.raises(ValueError, match="side"):
+        AppliedFillFact(
+            execution_id="e9", instrument_id="AAA", side="hold", quantity=40.0, price=100.0
+        )
+    with pytest.raises(ValueError, match="side"):
+        AppliedFillFact(
+            execution_id="e9", instrument_id="AAA", side="", quantity=40.0, price=100.0
+        )
+    # Y el gate de lectura sigue declarando la fila como rechazada (no como hecho).
+    assert (
+        coerce_applied_fill_fact(
+            execution_id="e9",
+            instrument_id="AAA",
+            side="HOLD",
+            quantity=40.0,
+            price=100.0,
+        )
+        is None
+    )
 
 
 def test_coerce_normalizes_datetime_applied_at_to_iso() -> None:

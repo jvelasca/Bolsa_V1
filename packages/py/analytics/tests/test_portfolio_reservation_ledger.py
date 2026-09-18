@@ -7,6 +7,8 @@ veces). El coste real es fail-closed: sin stop no hay pérdida esperada, y "no l
 vale 0.
 """
 
+from collections.abc import Callable, Iterable
+
 import pytest
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import PortfolioPosition
@@ -16,12 +18,15 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_UNKNOWN,
 )
 from bolsa_analytics.cognitive.portfolio_reservation import (
+    RESERVATION_EVENT_RELEASE,
+    RESERVATION_EVENT_RESERVE,
     RESERVATION_OPEN,
     RESERVATION_RELEASED_BY_CANCEL,
     RESERVATION_RELEASED_BY_FILL,
     RESERVATION_RELEASED_BY_RESTART,
     RESERVATION_RELEASED_BY_ROLLBACK,
     PortfolioReservation,
+    ReservationEvent,
     ReservationLedger,
     TradingCostModel,
     build_portfolio_risk_state,
@@ -250,6 +255,66 @@ def test_rollback_releases_only_the_requested_tick() -> None:
     assert untouched is not None and untouched.status == RESERVATION_OPEN
 
 
+def _assert_sum_all_matches_sum_live(ledger: ReservationLedger) -> None:
+    """Invariante de ``release``: ``Σ all()`` == ``Σ live()`` == propiedad del libro.
+
+    El comentario de ``release`` promete que una reserva no viva tiene sus dimensiones a 0;
+    la propiedad filtra ADEMÁS por ``.live()`` como cinturón de seguridad. Este predicado
+    comprueba las dos cosas: si un camino de liberación futuro deja de escalar a 0, la
+    primera igualdad cae; si alguien "se ahorra" el filtro en la propiedad, la segunda.
+    """
+
+    def _sum(
+        reservations: Iterable[PortfolioReservation],
+        pick: Callable[[PortfolioReservation], float | None],
+    ) -> float:
+        return round(sum(max(0.0, pick(r) or 0.0) for r in reservations) * 10000) / 10000
+
+    all_cash = _sum(ledger.all(), lambda r: r.reserved_cash)
+    all_risk = _sum(ledger.all(), lambda r: r.reserved_risk)
+    live_cash = _sum(ledger.live(), lambda r: r.reserved_cash)
+    live_risk = _sum(ledger.live(), lambda r: r.reserved_risk)
+
+    assert all_cash == pytest.approx(live_cash)
+    assert all_risk == pytest.approx(live_risk)
+    assert ledger.reserved_cash == pytest.approx(live_cash)
+    assert ledger.reserved_risk == pytest.approx(live_risk)
+
+
+def test_reserved_cash_matches_sum_all_vs_live_filtered() -> None:
+    """Las dos fórmulas de ``reserved_cash`` descritas en el código coinciden.
+
+    Recorre TODAS las vías de liberación (fill parcial, cancelación, reinicio y rollback)
+    paso a paso: si alguna dejara de poner a 0 las dimensiones de una reserva no viva, la
+    igualdad ``Σ all() == Σ live()`` fallaría y el doble conteo se detectaría aquí.
+    """
+    ledger = ReservationLedger(tick_id="t1")
+    ledger.reserve(_reservation("R1", quantity=100.0, risk=500.0))
+    ledger.reserve(_reservation("R2", instrument_id="BBB", quantity=40.0, risk=200.0))
+    ledger.reserve(
+        _reservation("R3", instrument_id="CCC", quantity=10.0, risk=50.0, tick_id="t2")
+    )
+    _assert_sum_all_matches_sum_live(ledger)
+
+    # Fill parcial: la reserva sigue viva con las dimensiones escaladas.
+    ledger.release_by_fill("R1", filled_qty=40.0)
+    _assert_sum_all_matches_sum_live(ledger)
+
+    # Cancelación total: la reserva deja de estar viva y sus importes caen a 0.
+    ledger.release_by_cancel("R2")
+    _assert_sum_all_matches_sum_live(ledger)
+
+    # Reinicio: otra vía de liberación total, mismo invariante.
+    ledger.release_by_restart("R1")
+    _assert_sum_all_matches_sum_live(ledger)
+
+    # Rollback del tick restante.
+    ledger.rollback(tick_id="t2")
+    _assert_sum_all_matches_sum_live(ledger)
+    assert ledger.reserved_cash == 0.0
+    assert ledger.reserved_risk == 0.0
+
+
 # ── Gate 3: reproducibilidad ──────────────────────────────────────────────────────
 
 
@@ -276,6 +341,30 @@ def test_replay_is_order_deterministic_and_survives_a_full_release() -> None:
     rebuilt = replay(ledger.events())
     assert rebuilt.to_dict() == ledger.to_dict()
     assert rebuilt.reserved_cash == 0.0
+
+
+def test_a_non_replayable_event_cannot_be_represented() -> None:
+    """Lo que no se puede reproducir no se puede representar.
+
+    Un ``kind`` desconocido se habría aplicado como LIBERACIÓN (relajando el libro) y un
+    alta sin su reserva se habría perdido en silencio (el libro reconstruido declararía
+    menos capital comprometido del real). Ambos se rechazan al construir el evento.
+    """
+    reservation = _reservation("R1", quantity=100.0, risk=500.0)
+
+    with pytest.raises(ValueError, match="kind"):
+        ReservationEvent(kind="releases", reservation_id="R1")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="reserva completa"):
+        ReservationEvent(kind=RESERVATION_EVENT_RESERVE, reservation_id="R1")
+
+    # La forma válida sí se construye y se reproduce sin pérdidas.
+    valid = ReservationEvent(
+        kind=RESERVATION_EVENT_RESERVE, reservation_id="R1", reservation=reservation
+    )
+    assert replay([valid]).reserved_cash == pytest.approx(5000.0)
+    assert replay(
+        [valid, ReservationEvent(kind=RESERVATION_EVENT_RELEASE, reservation_id="R1")]
+    ).reserved_cash == 0.0
 
 
 # ── Medición y proyección ─────────────────────────────────────────────────────────
@@ -488,6 +577,40 @@ def test_portfolio_risk_state_degrades_when_positions_are_unmeasured() -> None:
     state = build_portfolio_risk_state(position_risk_total=600.0, unmeasured_positions=2)
     assert state.measurement == MEASUREMENT_PARTIAL
     assert state.is_complete is False
+
+
+def test_gross_risk_is_none_when_position_risk_is_unmeasured() -> None:
+    """Riesgo de posiciones NO medido ⇒ ``gross_risk``/``net_risk`` = ``None``.
+
+    Antes este caso publicaba solo el riesgo reservado (un ``or 0.0`` convertía el
+    "no lo sé" en 0): un suelo leído como total. El riesgo reservado sí se publica — se
+    mide — pero el total no puede inventarse.
+    """
+    ledger = ReservationLedger()
+    ledger.reserve(_reservation("R1", risk=500.0))
+
+    state = build_portfolio_risk_state(ledger=ledger)
+
+    assert state.gross_risk is None
+    assert state.net_risk is None
+    assert state.reserved_risk == pytest.approx(500.0)
+    assert state.correlation_adjusted_risk == pytest.approx(500.0)
+    assert state.measurement == MEASUREMENT_PARTIAL
+    assert state.is_complete is False
+    assert state.to_dict()["grossRisk"] is None
+    assert state.to_dict()["netRisk"] is None
+
+
+def test_gross_risk_is_a_number_when_position_risk_is_measured_at_zero() -> None:
+    """Un 0 **medido** sí es un total: ``risk_used = 0`` no es lo mismo que ``None``."""
+    ledger = ReservationLedger()
+    ledger.reserve(_reservation("R1", risk=500.0))
+
+    state = build_portfolio_risk_state(ledger=ledger, position_risk_total=0.0)
+
+    assert state.gross_risk == pytest.approx(500.0)
+    assert state.net_risk == pytest.approx(500.0)
+    assert state.measurement == MEASUREMENT_COMPLETE
 
 
 # ── Coste real en el sizing (allocator) ───────────────────────────────────────────

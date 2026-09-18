@@ -193,6 +193,34 @@ def test_tick_publishes_a_risk_state_consistent_with_its_reservations() -> None:
     assert state.sector_risk  # el desglose sectorial de las reservas está publicado.
 
 
+def test_tick_risk_state_is_unknown_when_a_position_risk_is_unmeasured() -> None:
+    """El otro lado del contrato: "no lo sé" NO es 0.
+
+    Una posición abierta sin stop declarado no puede medir su riesgo. El snapshot deja
+    ``risk_used`` a ``None`` y el estado de riesgo del tick no puede publicar un total
+    (ni siquiera "solo lo reservado"): ``gross_risk``/``net_risk`` quedan ``None`` y el
+    ``measurement`` degrada. La cartera vacía, en cambio, sí mide 0 (test de arriba).
+    """
+    snapshot = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={"AAA": 10.0},
+        entry_prices={"AAA": 100.0},
+        stops={},
+        regime="BULL_TREND",
+        risk_budget_pct=6.0,
+    )
+    assert snapshot.risk_measurement != MEASUREMENT_COMPLETE
+
+    plan = _tick(snapshot=snapshot, signals=[_signal("AAA")])
+    state = plan.risk_state
+    assert state is not None
+    assert state.gross_risk is None
+    assert state.net_risk is None
+    assert state.measurement != MEASUREMENT_COMPLETE
+
+
 # ── Gate 4: toda reserva se puede liberar ─────────────────────────────────────────
 
 
