@@ -335,6 +335,10 @@ jobs:
         # → salida → reconciliación) y sus gemelos fail entran explícitos. Certifican que
         # la invalidación confirmada VENDE (D2) y que el techo de mantenimiento no se
         # re-deriva, en el camino completo, no sólo en el módulo de decisión.
+        # V2.42 slice 2c (cierre de AUTO-2): esta lista es POR FICHERO, así que el día
+        # golden del worker (``test_auto_v2_golden_day_evidence.py``) va explícito, igual
+        # que la agregación pura del día (``test_auto_daily_journal.py``: existía desde
+        # v2.24 pero NO estaba en la lista, así que sus gates nuevos no corrían aquí).
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -378,6 +382,8 @@ jobs:
           packages/py/application/tests/test_v127_golden_path_fail.py
           packages/py/application/tests/test_auto_v2_lifecycle_stop.py
           apps/api-python/tests/test_auto_v2_lifecycle_clock_thesis.py
+          apps/api-python/tests/test_auto_v2_golden_day_evidence.py
+          packages/py/application/tests/test_auto_daily_journal.py
           packages/py/application/tests/test_portfolio_reservation.py
           packages/py/application/tests/test_active_strategy_runtime_state.py
           packages/py/application/tests/test_sim_durable_v2_state.py

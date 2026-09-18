@@ -115,6 +115,7 @@ from bolsa_application.auto_reason_codes import (
     STOP_RATCHET_REJECTED,
     THESIS_EXIT,
     TIME_EXIT,
+    day_exit_reason,
 )
 from bolsa_application.auto_v2_entry import (
     AtrSource,
@@ -601,6 +602,10 @@ class AutoSimulationWorker:
         self._v2_plan: Any = None
         self._v2_journal: list[Any] = []
         self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
+        # V2.42 slice 2c: etiqueta del DÍA del motivo de cierre (``time_exit``/...), la que
+        # viaja en la fila ``position_close``. Se deriva del motivo DECISORIO del plan, así
+        # que un stop-out no se cuenta como salida por tesis.
+        self._v2_last_exit_label: dict[str, str] = {}
         # H-2 (§9 del pack): un ``PROTECT`` que NO mueve el stop y NO cambia el estado
         # quedaba mudo para siempre. Se journaliza UNA vez por (símbolo, stop) para no
         # inundar el journal en cada tick de un trailing ya en régimen permanente.
@@ -924,6 +929,15 @@ class AutoSimulationWorker:
         """Filas de journal completas del día simulado hasta ahora (M7)."""
         return tuple(self._journal)
 
+    def atr_source_counts(self) -> Mapping[str, int]:
+        """V2.42 slice 2c: procedencia del ATR de las candidatas del día (medición).
+
+        Cuenta las señales evaluadas por origen (``real``/``fallback``/``missing``): es la
+        medición con la que se decide el flip del veto de ATR (D3), no un juicio. Sin
+        señales el mapa queda a cero (jamás se asume una procedencia).
+        """
+        return dict(self._v2_atr_source_counts)
+
     @property
     def reconciliation_status(self) -> dict[str, str]:
         """V2.24.2 (P2-C) — estado de reconciliación por símbolo (observabilidad)."""
@@ -1069,7 +1083,14 @@ class AutoSimulationWorker:
         )
 
     def _emit(
-        self, kind: str, venue: str, exec_id: str | None, side: str, qty: Decimal
+        self,
+        kind: str,
+        venue: str,
+        exec_id: str | None,
+        side: str,
+        qty: Decimal,
+        *,
+        reason: str = "",
     ) -> SimJournalRow:
         row = SimJournalRow(
             kind=kind,
@@ -1077,6 +1098,7 @@ class AutoSimulationWorker:
             execution_id=exec_id or f"noex-{kind}",
             side=side,
             qty=qty,
+            reason=reason,
         )
         self._journal.append(row)
         return row
@@ -2332,6 +2354,14 @@ class AutoSimulationWorker:
         self._v2_last_exit_reasons[symbol] = (
             outcome.exit_reasons if outcome is not None else ()
         )
+        # V2.42 slice 2c: etiqueta del día del motivo DECISORIO (mismo criterio que el
+        # journal rico: ``primary_reason``, no el flag). Con esto la fila ``position_close``
+        # del día puede contar ``time_exit``/``thesis_exit`` sin reinterpretar nada.
+        self._v2_last_exit_label[symbol] = (
+            day_exit_reason(outcome.decision.primary_reason)
+            if outcome is not None
+            else ""
+        )
         await self._v2_apply_stop_update(
             symbol,
             position,
@@ -2568,6 +2598,9 @@ class AutoSimulationWorker:
                 f"{reason_code}:{symbol}",
                 "hold",
                 Decimal("0"),
+                # El motivo también viaja en la fila del día: es la traza del evento de
+                # gestión (``time_exit``, ``protect_requested``, ...).
+                reason=reason_code,
             )
         except Exception:  # noqa: BLE001 — journalizar nunca tumba el turno.
             logger.exception("auto_sim position journal emit failed symbol=%s", symbol)
@@ -2712,6 +2745,7 @@ class AutoSimulationWorker:
         # TradePlan) antes del bucle. El resultado lo consume el bucle por símbolo, y
         # sigue pasando por el MISMO spine (kill/sim-gate/RiskGate/settlement).
         self._v2_last_exit_reasons = {}
+        self._v2_last_exit_label = {}
         if self._v2_enabled and not kill and venue_ok and not account_required:
             try:
                 self._v2_plan = await self._v2_plan_tick()
@@ -2739,12 +2773,19 @@ class AutoSimulationWorker:
                     self._high_price[symbol] = price
             prot: str | None = None
             v2_pkg: DecisionPackage | None = None
-            if self._v2_enabled and held > 0 and price > 0:
-                # AUTO 2.0 (V2): gestión por PositionManager (PositionState + ExitPlan
-                # + PositionDecision). AUTO-2: el ratchet de stop se aplica y se
-                # persiste AQUÍ mismo (aunque no haya orden).
-                v2_pkg = await self._v2_position_package(symbol, price)
-                reasons.extend(self._v2_last_exit_reasons.get(symbol, ()))
+            if self._v2_enabled:
+                # AUTO-2 (criterio de salida) · V2.42 slice 2c: con el motor V2 ON la
+                # política legacy NO se evalúa — ni siquiera el caso ``held == 0``/``price
+                # <= 0`` que antes la llamaba para acabar devolviendo ``None``. Es una
+                # condición ESTRUCTURAL ("``ProtectionConfig`` sin ninguna lectura con
+                # ``AUTO_ENGINE_SIM_V2=1``"), no de valor, y el sensor del día golden la
+                # hace fallar si alguien vuelve a meter la llamada en el camino V2.
+                if held > 0 and price > 0:
+                    # AUTO 2.0 (V2): gestión por PositionManager (PositionState + ExitPlan
+                    # + PositionDecision). AUTO-2: el ratchet de stop se aplica y se
+                    # persiste AQUÍ mismo (aunque no haya orden).
+                    v2_pkg = await self._v2_position_package(symbol, price)
+                    reasons.extend(self._v2_last_exit_reasons.get(symbol, ()))
             else:
                 prot = protection_exit_reason(
                     self._protection,
@@ -2942,6 +2983,17 @@ class AutoSimulationWorker:
                         first_execution_id,
                         "sell",
                         applied_qty,
+                        # V2.42 slice 2c: el motivo del cierre viaja en la fila del día.
+                        # Con V2 ON es la etiqueta del motivo DECISORIO del plan
+                        # (``time_exit``/``thesis_exit``/...); en el camino legacy, el
+                        # motivo de protección (``protective_stop``/``t1_exit``/...).
+                        # Un cierre del decider sin motivo de protección queda sin
+                        # declarar y el día lo cuenta como ``undeclared``.
+                        reason=(
+                            self._v2_last_exit_label.get(symbol, "")
+                            if self._v2_enabled
+                            else (prot or "")
+                        ),
                     )
                     report.closed += 1
                     self._entry_price.pop(symbol, None)

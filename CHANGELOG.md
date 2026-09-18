@@ -2,6 +2,99 @@
 
 All notable releases of Bolsa V1.
 
+## [1.67.2-beta] — V2.42.2 · AUTO-2 slice 2c (cierre): evidencia de un día, ATR medido y cero política legacy — 2026-09-18
+
+**Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Cierra el **criterio de
+salida de `AUTO-2`** (§4 del roadmap), que exigía dos cosas que no existían:
+
+1. **`ProtectionConfig` sin ninguna lectura en el camino `AUTO_ENGINE_SIM_V2=1`.** Con el motor V2 ON el
+   `if` de la política legacy **ya no se evalúa** — antes se evaluaba (y devolvía `None`) en los casos
+   `held == 0`/`price <= 0`, así que la afirmación no era estructuralmente cierta. El gate es un **sensor
+   que explota** si alguien vuelve a meter la llamada: un test del día completo sustituye las dos funciones
+   legacy por un `AssertionError` y el día corre igual.
+2. **`TIME_EXIT`/`THESIS_EXIT` con evidencia en el journal de un día completo.** La evidencia era de test
+   (hermético + PG), que no responde a "cuántas posiciones cerró el día y por qué". Ahora el **día cuenta sus
+   motivos**: la fila `position_close` lleva la etiqueta del motivo **decisorio** y el reporte agrega
+   `exit_reasons` (con `undeclared` para un cierre sin motivo declarado: nunca se atribuye lo que no se
+   declaró) y la **procedencia del ATR** medida por el worker.
+
+- **`day_exit_reason`** (dueño único en `auto_reason_codes`): traduce el `primary_reason` del plan al
+  vocabulario del día (`TIME_STOP → time_exit`, `THESIS_INVALIDATION → thesis_exit`, `STRUCTURAL_STOP →
+structural_stop`, ...). Por motivo **decisorio**, así que un stop-out no se cuenta como salida por tesis.
+- **`SimJournalRow.reason`** (aditivo, default `""`): el motivo viaja en la propia fila del día. Con V2 ON
+  es la etiqueta del día; en el camino legacy, el motivo de protección; un cierre del decider sin motivo de
+  protección queda sin declarar ⇒ `undeclared`.
+- **`AutoDailyReport.exit_reasons` / `atr_sources`** (tuples deterministas, conteo desc + etiqueta asc) y
+  su reflejo en `as_dict()`: el día es comparable entre corridas y la suma de motivos es **exactamente**
+  `exits` (ningún cierre sin explicar).
+- **`AutoSimulationWorker.atr_source_counts()`**: accessor público de la medición de procedencia del ATR
+  (antes contadores privados que solo leían los tests). Es el número con el que D3 decide (o no) flipar el
+  veto; sin señales queda a cero (no se asume procedencia).
+- **Cero política legacy con V2 ON** (restructure de `auto_turn`): el `else` de la protección legacy solo se
+  ejecuta con `AUTO_ENGINE_SIM_V2` **OFF**, y con V2 ON la retirada del T1 parcial legacy queda intacta por
+  construcción. Consecuencia declarada: `qty <= 0` en una SELL legacy ya no cae por `hold_no_op` (antes sí).
+
+| #       | Qué                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C1**  | **`day_exit_reason`** (`auto_reason_codes`, puro): traducción del motivo decisorio al vocabulario del día, con `DAY_EXIT_REASON_UNDECLARED` para el cierre sin motivo declarado; un motivo no catalogado se declara en minúsculas tal cual (nunca se inventa etiqueta)                                                                                                                                                                                                                                         |
+| **C2**  | **`SimJournalRow.reason`** (aditivo) + `_emit(..., reason=...)`: el motivo de cierre viaja en la **fila del día** (la que agrega `build_auto_daily_report`), no solo en el journal rico                                                                                                                                                                                                                                                                                                                        |
+| **C3**  | **`AutoDailyReport.exit_reasons` + `atr_sources`** (tuples deterministas) y `as_dict()`: el día cuenta **por qué** cerró (`sum(exit_reasons) == exits`, con `undeclared` para lo no declarado) y **de dónde** salió el ATR (`real`/`fallback`/`missing`)                                                                                                                                                                                                                                                       |
+| **C4**  | **`build_auto_daily_report(atr_sources=...)`**: la medición del worker entra al reporte tal cual (el build sigue siendo puro; `None`/vacío ⇒ sin medición, jamás inventada)                                                                                                                                                                                                                                                                                                                                    |
+| **C5**  | **`AutoSimulationWorker.atr_source_counts()`**: accessor público de la procedencia del ATR del día (antes privado y solo legible desde los tests)                                                                                                                                                                                                                                                                                                                                                              |
+| **C6**  | **Cero política legacy con V2 ON** (`auto_turn`): el `else` de `protection_exit_reason` queda detrás de `not self._v2_enabled`, de modo que con V2 ON **no se evalúa** en ningún caso (antes sí en `held == 0`/`price <= 0`, con resultado `None`). La atribución del T1 parcial legacy (`_t1_done`) se preserva en el camino legacy, que es el único donde la política aplica                                                                                                                                 |
+| **C7**  | **Tests (21 nuevos)**: 5 puros en `test_auto_daily_journal.py` (conteo de motivos, `undeclared` que no se disfraza, orden determinista, ATR medido, ATR no inventado) y **3 herméticos de día completo** en el fichero nuevo `apps/api-python/tests/test_auto_v2_golden_day_evidence.py` (un día con `time_exit` + `thesis_exit` + `structural_stop`, sano y con `sum(motivos) == exits`; el mismo día con la política legacy sustituida por un sensor que explota; y la medición de ATR cuando el real falta) |
+| **C8**  | **Evidencia reproducible** (`apps/api-python/scripts/v2_42_2_golden_day_evidence.py`): corre el día golden y emite JSON con motivos, procedencia del ATR, techo congelado, **lecturas de la política legacy** y estado de cierre; `--out` lo guarda y el script **sale ≠ 0** si el día no cumple el criterio. Sin DB ni red (stores `InMemory*`)                                                                                                                                                               |
+| **C9**  | **CI**: el día golden lo cubre el **pase de directorio** de `apps/api-python/tests` en `quality` y va **explícito** en la lista por fichero del job `python` del tag. Además se añade **`packages/py/application/tests/test_auto_daily_journal.py`** a **ambos** jobs: existía desde `v2.24` pero **no estaba en ninguna lista**, así que sus gates no corrían en CI (deuda de cobertura detectada y cerrada aquí)                                                                                             |
+| **C10** | **Runner local de CI, versionado en el repo** (`scripts/verify/offline_ci_run_yaml.py`): extrae targets/`--ignore` **del YAML**, **verifica que cada ruta existe** (una ruta inexistente es `exit 4` = job rojo) y mide por **JUnit XML** (bajo `subprocess` en Windows la línea de resumen de pytest se pierde). Se versiona porque vivía fuera del repo y **dos veces** midió otra cosa que CI — ver la errata de abajo                                                                                      |
+
+### Matriz de mutaciones **medida** (7 mutaciones, 7 rojos)
+
+Sobre las superficies nuevas de 2c; se aplica, se corre el target acotado, se **revierte verificando el
+contenido exacto** y se reporta:
+
+| #   | Mutación                                                                           | Efecto medido                                        |
+| --- | ---------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| M1  | `TIME_STOP` se mapea a `thesis_exit` en la etiqueta del día                        | **2 rojos** (`test_auto_daily_journal` + día golden) |
+| M2  | La fila `position_close` pierde el motivo (el día vuelve a no saber por qué)       | **1 rojo** (el día golden exige los tres motivos)    |
+| M3  | Con V2 ON se vuelve a evaluar la política legacy (`held == 0` entra por el `else`) | **1 rojo** (el sensor del día explota)               |
+| M4  | La medición de ATR del día se queda vacía (`atr_source_counts → {}`)               | **2 rojos**                                          |
+| M5  | `STRUCTURAL_STOP` se mapea a `thesis_exit` (el stop-out se disfraza)               | **2 rojos**                                          |
+| M6  | Un cierre sin motivo declarado se atribuye a `time_exit`                           | **3 rojos**                                          |
+| M7  | El reporte del día olvida los motivos (`exit_reasons` vacío)                       | **4 rojos**                                          |
+
+### Verificación medida (árbol final del slice, antes de publicar)
+
+- `ruff check packages/py apps/api-python --config pyproject.toml` (invocación exacta de CI): **All checks
+  passed**; `mypy` (invocación de CI, `--follow-imports=silent`): **487 ficheros, 0 issues**;
+  `lint-imports`: **4 kept / 0 broken**.
+- **Bloques offline de CI** (targets y `--ignore` **extraídos del YAML**, con verificación de que cada ruta
+  existe): job `quality` de `python-ci.yml` **1935 passed, 0 failed, 0 skipped** (53,2 s) y job `python` de
+  `release-tag-ci.yml` **1946 passed, 0 failed, 0 skipped** (19,3 s). Procedencia: **41 rutas** (50 en el
+  job del tag) y **8 ficheros PG** movidos a `--ignore` (en CI saltan rápido porque no hay servidor; aquí el
+  `connect` del DSN **se cuelga**: medido), más `--noconftest` para no depender del conftest de la app (que
+  también habla con PG). Los 21 tests nuevos de 2c están dentro de esas cifras (+18 del fichero de diario que
+  ahora sí se recolecta y +3 del día golden).
+- **Evidencia del día** (salida del script, guardada como JSON): `exit_reasons` = `{time_exit: 1,
+thesis_exit: 1, structural_stop: 1}`, `exits` 3 de `positions_created` 3, `healthy` **true**,
+  `ledger_balance_status` `BALANCED`, `legacy_policy_reads` **0**, `atr` = 15 señales **100 % reales** (0
+  fallback, 0 missing) con el veto en `0` (OFF), `holding_deadline_at` `2026-10-30T09:00:00Z` y libro plano
+  al cierre. Es la evidencia que el §4 del roadmap pide para `AUTO-2`, con la limitación declarada abajo.
+- **Límite declarado de la evidencia**: el día corre **hermético** (stores `InMemory*`, precio y ATR
+  inyectados, sin PG). Es un día **completo del motor** (33 ticks, 6 órdenes, 24 fills, 3 posiciones con 3
+  desenlaces distintos), **no** una sesión de mercado real con datos de mercado; y la `ProtectionConfig` se
+  sigue **construyendo** en el constructor del worker (`_protection_config_from_env()`), porque el camino
+  `AUTO_ENGINE_SIM_V2=0` debe conservar el comportamiento `v2.39.x` byte a byte: lo que este slice hace
+  estructural es que **con V2 ON no se lee**.
+- **Errata de herramienta de esta fase (declarada)**: el runner local declaró colgada una corrida de
+  `quality` durante ~15 min. Causa medida: su detección de ficheros PG usaba un patrón que exigía `_pg`
+  **pegado al final del nombre**, y se le escapaban dos ficheros de scheduler
+  (`test_a9_scheduler_process_pg_zero_human.py` y
+  `test_auto_scheduler_real_pg_zero_human_intervention.py`): sin `--ignore`, su `connect` al DSN (que no
+  responde ni rechaza) cuelga la corrida. Corregido (`test_*_pg*.py`) y el runner **se versiona en el repo**
+  (`scripts/verify/offline_ci_run_yaml.py`) para que la medición local deje de ser una copia a mano: es la
+  segunda vez que un runner local mide **otra cosa** que CI, así que la verificación de rutas y la lista
+  extraída del YAML pasan a ser una herramienta del repo, no un script suelto.
+
 ## [1.67.1-beta] — V2.42 · AUTO-2 slice 2b: `TIME_EXIT`/`THESIS_EXIT`, ATR real y cierre de los hallazgos H-1..H-7 — 2026-09-17
 
 **Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`): el techo de mantenimiento y

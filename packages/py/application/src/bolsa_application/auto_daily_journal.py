@@ -15,15 +15,22 @@ caller (reina / worker / test) le entrega y decide la integridad. Los checks son
 predicados locales; la comprobación del ledger puede delegar en el dominio
 (``bolsa_domain.lifecycle.assert_equity_invariant``) cuando se le pasa un
 ``LifecycleAccounting``, o verificar una igualdad simple por importes si no.
+
+V2.42 slice 2c (cierre de ``AUTO-2``): además de los conteos, el reporte agrega **por qué**
+cerró cada posición (``exit_reasons``, leído de la ``reason`` de cada fila de cierre) y la
+**procedencia del ATR** de las candidatas del día (``atr_sources``, medición que el llamante
+lee del worker). Así "``TIME_EXIT``/``THESIS_EXIT`` con evidencia en el journal de un día
+completo" es un número verificable, no una impresión.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from bolsa_application.auto_reason_codes import DAY_EXIT_REASON_UNDECLARED
 from bolsa_domain.lifecycle import LifecycleAccounting
 
 # Venues que un día AUTO SIM-ONLY puede tocar (nunca LIVE real).
@@ -42,13 +49,20 @@ _ORDER_SIDES = ("buy", "sell")
 
 @dataclass(frozen=True, slots=True)
 class SimJournalRow:
-    """Aportación mínima a la agregación del día (venue del camino SIM)."""
+    """Aportación mínima a la agregación del día (venue del camino SIM).
 
-    kind: str  # "order" | "fill" | "fill_unapplied" | "position_open" | "position_close"
+    ``reason`` (V2.42 slice 2c) declara el motivo del cierre en la propia fila del día
+    (``time_exit``/``thesis_exit``/``structural_stop``/...). Sin él, el día sabía CUÁNTAS
+    posiciones cerró pero no POR QUÉ, y "``TIME_EXIT``/``THESIS_EXIT`` con evidencia en el
+    journal de un día completo" (criterio de salida de ``AUTO-2``) no era contable.
+    """
+
+    kind: str  # "order" | "fill" | "fill_unapplied" | "position_open" | "position_close" | ...
     venue: str
     execution_id: str
     side: str = "buy"
     qty: Decimal = Decimal("0")
+    reason: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +81,13 @@ class AutoDailyReport:
     # V2.23/A9 (Bloque 6): tri-estado del balance del ledger. ``NOT_CHECKED`` NUNCA
     # cuenta como balance verdadero (el "no comprobado" deja de ser un PASS silencioso).
     ledger_balance_status: str = LEDGER_NOT_CHECKED
+    # V2.42 slice 2c: POR QUÉ cerró cada posición (etiqueta -> conteo, orden determinista).
+    # ``sum(exit_reasons) == exits``: una salida sin motivo de protección se cuenta como
+    # ``undeclared`` (jamás se le atribuye un motivo que no declaró).
+    exit_reasons: tuple[tuple[str, int], ...] = ()
+    # V2.42 slice 2c: procedencia del ATR de las candidatas del día (``real``/``fallback``/
+    # ``missing``). Es la MEDICIÓN con la que se decide el flip del veto (D3), no un juicio.
+    atr_sources: tuple[tuple[str, int], ...] = ()
 
     @property
     def healthy(self) -> bool:
@@ -90,6 +111,8 @@ class AutoDailyReport:
             "fills": self.fills,
             "positions_created": self.positions_created,
             "exits": self.exits,
+            "exit_reasons": dict(self.exit_reasons),
+            "atr_sources": dict(self.atr_sources),
             "ledger_balanced": self.ledger_balanced,
             "ledger_balance_status": self.ledger_balance_status,
             "no_duplicate_execution_events": self.no_duplicate_execution_events,
@@ -293,6 +316,16 @@ def reconstruct_accounting_from_state(
     )
 
 
+def _sorted_counts(counts: Mapping[str, int]) -> tuple[tuple[str, int], ...]:
+    """Conteos con orden determinista (conteo desc, etiqueta asc) para poder compararlos."""
+    return tuple(
+        sorted(
+            ((str(k), int(v)) for k, v in counts.items()),
+            key=lambda kv: (-kv[1], kv[0]),
+        )
+    )
+
+
 def build_auto_daily_report(
     *,
     rows: Sequence[SimJournalRow],
@@ -300,12 +333,19 @@ def build_auto_daily_report(
     net_cash_delta: Decimal | None = None,
     ledger_remainder: Decimal | None = None,
     venue_overrides: Sequence[str] = (),
+    atr_sources: Mapping[str, int] | None = None,
 ) -> AutoDailyReport:
     """(PURA) agrega un recorrido de día AUTO en el resumen diario + invariantes.
 
-    ``rows`` son las aportaciones mínimas (orden/fill/position_open/position_close)
+    ``rows`` son las aportaciones mínimas (orden/fill/position_open/position_close/...)
     del día. La agregación local es suficiente para el conteo y las invariantes
     estructurales; para el balance del ledger se delega en ``ledger_balanced``.
+
+    V2.42 slice 2c: además del conteo de cierres, agrega **por qué** cerró cada posición
+    (``exit_reasons``, de la ``reason`` de cada fila de cierre) y la procedencia del ATR de
+    las candidatas del día (``atr_sources``, medición que el llamante lee del worker). Un
+    cierre sin motivo declarado se cuenta como ``undeclared``: la suma de ``exit_reasons``
+    es siempre igual a ``exits`` y ningún cierre se atribuye a un motivo que no declaró.
     """
     orders = 0
     fills = 0
@@ -314,6 +354,7 @@ def build_auto_daily_report(
     exec_ids: list[str] = []
     venues: list[str] = list(venue_overrides)
     errors: list[str] = []
+    exit_reason_counts: dict[str, int] = {}
     for r in rows:
         venues.append(r.venue)
         if r.kind == "order" and str(r.side).strip().lower() in _ORDER_SIDES:
@@ -325,6 +366,8 @@ def build_auto_daily_report(
             positions_created += 1
         elif r.kind == "position_close":
             exits += 1
+            label = str(r.reason or "").strip().lower() or DAY_EXIT_REASON_UNDECLARED
+            exit_reason_counts[label] = exit_reason_counts.get(label, 0) + 1
     if fills and not positions_created:
         errors.append("fills_without_opened_position")
     unique_events = execution_events_are_unique(exec_ids)
@@ -351,4 +394,6 @@ def build_auto_daily_report(
         all_venues_in_auto_sim=auto_venues,
         no_live_bridge_posts=no_live,
         errors=tuple(errors),
+        exit_reasons=_sorted_counts(exit_reason_counts),
+        atr_sources=_sorted_counts(atr_sources or {}),
     )

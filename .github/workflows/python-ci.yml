@@ -118,6 +118,12 @@ jobs:
         # real) vive en ``apps/api-python/tests``, que ESTE job ya recolecta entero: no se
         # lista aquí para no duplicarlo (y por el mismo motivo NO debe añadirse una ruta
         # inexistente bajo ``packages/py/application/tests``: pytest aborta con exit 4).
+        # V2.42 slice 2c (cierre de AUTO-2): el día golden (``time_exit``/``thesis_exit`` en
+        # el journal de un día + cero lecturas de la política legacy con V2 ON) vive también
+        # en ``apps/api-python/tests`` (pase de directorio). La agregación PURA del día
+        # (``packages/py/application/tests/test_auto_daily_journal.py``) SÍ se añade aquí:
+        # existe desde v2.24 pero no estaba en la lista offline, así que sus gates nuevos
+        # no corrían en CI.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -132,6 +138,7 @@ jobs:
           packages/py/application/tests/test_strategy_promotion_phase.py
           packages/py/application/tests/test_strategy_vigilance_phase.py
           packages/py/application/tests/test_auto_orchestrator.py
+          packages/py/application/tests/test_auto_daily_journal.py
           packages/py/application/tests/test_sim_durable_unit_of_work.py
           packages/py/application/tests/test_discovery_catalog.py
           packages/py/application/tests/test_strategy_discovery_engine.py

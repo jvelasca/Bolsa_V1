@@ -236,3 +236,111 @@ def test_reconstruct_accounting_with_closed_pnl() -> None:
     assert acct.cash == Decimal("10500.000000")
     assert_equity_invariant(acct)
 
+
+# ── V2.42 slice 2c: el día sabe POR QUÉ cerró (criterio de salida de AUTO-2) ──────────
+
+
+def _close_row(reason: str, exec_id: str) -> SimJournalRow:
+    return SimJournalRow(
+        kind="position_close",
+        venue="simulated",
+        execution_id=exec_id,
+        side="sell",
+        qty=Decimal("1"),
+        reason=reason,
+    )
+
+
+def test_day_counts_exit_reasons_from_close_rows() -> None:
+    """``time_exit``/``thesis_exit`` se cuentan en el día (evidencia, no impresión)."""
+    rows = [
+        *_healthy_rows(),
+        _close_row("time_exit", "c-time"),
+        _close_row("thesis_exit", "c-thesis"),
+        _close_row("structural_stop", "c-stop"),
+    ]
+    rep = build_auto_daily_report(
+        rows=rows,
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    counts = dict(rep.exit_reasons)
+    assert counts == {
+        "time_exit": 1,
+        "thesis_exit": 1,
+        "structural_stop": 1,
+        # ``_healthy_rows()`` cierra sin motivo de protección (lo cierra el decider):
+        # se declara como ``undeclared``, no se le atribuye un motivo que no dio.
+        "undeclared": 1,
+    }, counts
+    # Todo cierre está explicado: la suma de motivos es EXACTAMENTE el conteo de salidas.
+    assert sum(counts.values()) == rep.exits == 4  # 1 de _healthy_rows + 3 nuevos.
+    assert rep.as_dict()["exit_reasons"] == counts
+
+
+def test_day_exit_without_declared_reason_is_undeclared_not_attributed() -> None:
+    """Un cierre sin motivo declarado se cuenta como ``undeclared`` (nunca se disfraza)."""
+    rows = [*_healthy_rows(), _close_row("", "c-nodecl")]
+    rep = build_auto_daily_report(
+        rows=rows,
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    counts = dict(rep.exit_reasons)
+    assert counts == {"undeclared": 2}, counts
+    assert "time_exit" not in counts and "thesis_exit" not in counts
+    assert sum(counts.values()) == rep.exits
+
+
+def test_day_exit_reasons_order_is_deterministic() -> None:
+    """Orden estable (conteo desc, etiqueta asc): el reporte se puede comparar entre días."""
+    rows = [
+        *_healthy_rows(),
+        _close_row("trail", "c-1"),
+        _close_row("time_exit", "c-2"),
+        _close_row("time_exit", "c-3"),
+    ]
+    rep = build_auto_daily_report(
+        rows=rows,
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    assert rep.exit_reasons == (("time_exit", 2), ("trail", 1), ("undeclared", 1))
+
+
+def test_day_reports_atr_provenance_measured_by_caller() -> None:
+    """La procedencia del ATR del día entra al reporte tal cual la midió el worker."""
+    from bolsa_application.auto_reason_codes import (
+        ATR_SOURCE_FALLBACK,
+        ATR_SOURCE_REAL,
+        day_exit_reason,
+    )
+
+    assert day_exit_reason("TIME_STOP") == "time_exit"
+    assert day_exit_reason("THESIS_INVALIDATION") == "thesis_exit"
+    assert day_exit_reason("STRUCTURAL_STOP") == "structural_stop"
+    assert day_exit_reason("TRAIL") == "trail"
+    assert day_exit_reason(None) == ""
+    assert day_exit_reason("  ") == ""
+    assert day_exit_reason("algo_no_catalogado") == "algo_no_catalogado"
+
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        atr_sources={ATR_SOURCE_REAL: 7, ATR_SOURCE_FALLBACK: 3},
+    )
+    assert dict(rep.atr_sources) == {"real": 7, "fallback": 3}
+    assert rep.as_dict()["atr_sources"] == {"real": 7, "fallback": 3}
+
+
+def test_day_without_atr_measurement_reports_empty_not_invented() -> None:
+    """Sin medición de ATR el día declara vacío: jamás se asume procedencia."""
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    assert rep.atr_sources == ()
+    assert rep.as_dict()["atr_sources"] == {}
+

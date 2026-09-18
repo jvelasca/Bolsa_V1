@@ -37,6 +37,11 @@ Tres familias:
 
 Ninguno de estos códigos es un "hold" silencioso: todos implican que hay algo que el
 operador debe poder ver.
+
+V2.42 slice 2c (cierre de `AUTO-2`) añade aquí la **etiqueta del día** del motivo de cierre
+(`day_exit_reason`): el journal del día cuenta las salidas por su etiqueta
+(`time_exit`/`thesis_exit`/`structural_stop`/...) y las que el decider cierra sin motivo de
+protección se cuentan como `undeclared`, nunca como otra cosa.
 """
 
 from __future__ import annotations
@@ -88,6 +93,34 @@ ATR_SOURCES: frozenset[str] = frozenset(
     {ATR_SOURCE_REAL, ATR_SOURCE_FALLBACK, ATR_SOURCE_MISSING}
 )
 
+#: Etiqueta del motivo de cierre para el journal del DÍA (``SimJournalRow.reason``).
+#: El ``primary_reason`` del plan de salida (el MISMO que atribuye la salida en el journal
+#: rico) se traduce aquí al vocabulario del día: ``TIME_STOP`` -> ``time_exit`` y
+#: ``THESIS_INVALIDATION`` -> ``thesis_exit``. La traducción es por motivo DECISORIO, así
+#: que un stop-out (``STRUCTURAL_STOP``) NO se disfraza de salida por tesis. Un motivo no
+#: catalogado se declara en minúsculas tal cual: nunca se inventa una etiqueta.
+DAY_EXIT_REASON_UNDECLARED = "undeclared"
+_DAY_EXIT_REASON_BY_PRIMARY: dict[str, str] = {
+    "TIME_STOP": TIME_EXIT,
+    "THESIS_INVALIDATION": THESIS_EXIT,
+    "STRUCTURAL_STOP": "structural_stop",
+    "PORTFOLIO_RISK": "portfolio_risk",
+    "TARGET_1": "target_1",
+    "TARGET_2": "target_2",
+    "TRAIL": "trail",
+    "MANUAL": "manual",
+}
+
+
+def day_exit_reason(primary_reason: str | None) -> str:
+    """Etiqueta del día para el motivo de cierre (``""`` si no hay motivo decisorio)."""
+    raw = str(primary_reason or "").strip()
+    if not raw:
+        return ""
+    key = raw.upper()
+    return _DAY_EXIT_REASON_BY_PRIMARY.get(key, key.lower())
+
+
 # Motivos con los que ``PositionManagerSkip`` declara una gestión no realizada.
 POSITION_SKIP_REASONS: frozenset[str] = frozenset(
     {POSITION_MARK_REJECTED, POSITION_DECISION_UNAVAILABLE}
@@ -135,6 +168,7 @@ __all__ = [
     "ATR_SOURCE_FALLBACK",
     "ATR_SOURCE_MISSING",
     "ATR_SOURCE_REAL",
+    "DAY_EXIT_REASON_UNDECLARED",
     "EXIT_QTY_OVER_POSITION",
     "FILL_NOT_MATERIALIZED",
     "FILL_PARTIALLY_MATERIALIZED",
@@ -163,4 +197,5 @@ __all__ = [
     "STOP_RATCHET_REJECTED",
     "THESIS_EXIT",
     "TIME_EXIT",
+    "day_exit_reason",
 ]
