@@ -70,8 +70,21 @@ se tocó) · bloques offline de CI **extraídos del YAML** ⇒ `quality` **1983 
 `python` del tag **1994 → 2002 passed (+8)**, **0 failed / 0 skipped**. El delta es **exactamente** el número
 de tests nuevos en los **dos** bloques: la comprobación de que lo nuevo **sí** corre en CI y no se queda
 fuera de las listas (la deuda que `v2.42.2` tuvo que cerrar a mano para
-`test_auto_daily_journal.py`). La certificación de CI **real** del sello se fija en el commit de sellado,
-como manda la casa: este documento no afirma un run que aún no existe.
+`test_auto_daily_journal.py`).
+
+**CI real del sello (2026-09-18).** Commit de fase **`48856912`** (11 ficheros, `+721/−12`) + tag anotado
+**`v2.43.1-beta`** → commit de sellado `b27280de` (docs-only, que **sí** entra en el tag, convención de
+`v2.43-beta`); `v2.43-beta` **no se mueve** (ref nueva y aditiva).
+
+| Ref                         | Workflow       | Resultado                                                                                                                                                                                                                 | Run                                                                            |
+| --------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `main` @ `48856912`         | Python CI      | **GREEN 5/5** — `quality` **1991 passed, 38 skipped** (118,90 s), `auto-v2-durable-pg` **39 passed** (5,76 s)                                                                                                             | [`35343011292`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35343011292) |
+| `v2.43.1-beta` @ `b27280de` | Python CI      | **GREEN 5/5** — `quality` **1991 passed, 38 skipped** (82,41 s), `auto-v2-durable-pg` **39 passed** (6,54 s)                                                                                                              | [`35344945191`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35344945191) |
+| `v2.43.1-beta` @ `b27280de` | Release tag CI | **GREEN** con `certify (aggregate + artifact)` en `success`; job `python` offline **2002 passed, 35 skipped**, `lifecycle-pg` con **PG real** **144 + 45 passed**; `playwright (integrated E2E)` `skipped` por ser opt-in | [`35344945138`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35344945138) |
+| `main` @ `48856912`         | Gitleaks       | **GREEN**                                                                                                                                                                                                                 | [`35343011254`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35343011254) |
+
+Los `38 skipped` de `quality` son las suites gated por `DATABASE_URL` / `*_PG_REQUIRED`, que corren en sus
+jobs dedicados (y ahí el gate **falla si se saltan**).
 
 ## [1.68.0-beta] — V2.43 · AUTO-3 slice 1: `MarketRegime` × `RiskRegime` × `OperationalState` (ejes, tabla y gate de ENTRADAS) — 2026-09-18
 
