@@ -327,16 +327,22 @@ tests, 1 de versión) más la documentación. No hay nada que "auditar de fondo"
 
 ## 10. Sello
 
-**Commit de la remediación:** `<pendiente: se fija en el commit de sellado>` · **Tag anotado:**
+**Commit de la remediación:** `488569122d699c393490bc2b702bdd899857b11d` (`48856912`) · **Tag anotado:**
 `v2.43.1-beta` (apunta al **commit de sellado** docs-only, siguiendo la convención que estrenó `v2.43-beta`).
 
-**CI real medida** (la certificación del sello; este documento **no** afirma un run que aún no existe):
+**CI real medida** (el commit de fase ya está medido; los runs de la **ref del tag** no pueden citarse desde
+el propio tag — se fijan en el commit de evidencia posterior, como en `v2.42.2` y `v2.43`):
 
-| Ref                                | Workflow       | Resultado     | Run           |
-| ---------------------------------- | -------------- | ------------- | ------------- |
-| `main` @ commit de fase            | Python CI      | `<pendiente>` | `<pendiente>` |
-| `v2.43.1-beta` @ commit de sellado | Python CI      | `<pendiente>` | `<pendiente>` |
-| `v2.43.1-beta` @ commit de sellado | Release tag CI | `<pendiente>` | `<pendiente>` |
+| Ref                                | Workflow       | Resultado                                                                                                                                                                                 | Run                                                                            |
+| ---------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `main` @ `48856912`                | Python CI      | **GREEN 5/5** — `quality` **1991 passed, 38 skipped** (118,90 s), `auto-v2-durable-pg` **39 passed** (5,76 s), más `grammar-discovery-pg`, `lifecycle-pg` y `paper-forward-pg` per-commit | [`35343011292`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35343011292) |
+| `main` @ `48856912`                | Gitleaks       | **GREEN**                                                                                                                                                                                 | [`35343011254`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35343011254) |
+| `v2.43.1-beta` @ commit de sellado | Python CI      | **GREEN 5/5**                                                                                                                                                                             | ver commit de evidencia posterior al tag                                       |
+| `v2.43.1-beta` @ commit de sellado | Release tag CI | **GREEN** con `certify` (aggregate + artifact) en `success`                                                                                                                               | ver commit de evidencia posterior al tag                                       |
+
+Los `38 skipped` de `quality` son las suites gated por `DATABASE_URL` / `*_PG_REQUIRED`, que corren en sus
+jobs dedicados (y ahí el gate **falla si se saltan**). La cifra de `quality` es la prueba de cobertura del
+§7: **1983 (base de `v2.43`) → 1991 (+8)**, exactamente los ocho tests nuevos.
 
 **Sobre la ref auditada.** `v2.43-beta` **no se mueve** (sigue siendo el slice 1 tal cual se selló, y su
 auditoría en curso sigue siendo válida); esta remediación es una ref **nueva** y aditiva. Un hallazgo del
