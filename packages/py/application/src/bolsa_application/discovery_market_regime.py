@@ -23,34 +23,46 @@ Invariantes del modulo:
   ``math_version`` para poder reproducir clasificaciones historicas.
 * **Fail-closed**: barras insuficientes, valores no finitos o ventana degenerada NO
   reciben regimen (``""``); no se aproxima con la ventana parcial.
-* **Un solo eje**: el clasificador emite exactamente una de cuatro etiquetas
-  (``trend_up`` / ``trend_down`` / ``range`` / ``high_vol``), no una combinacion.
+* **Un solo eje**: el clasificador emite exactamente una etiqueta
+  (``trend_up`` / ``trend_down`` / ``range`` / ``high_vol``), no una combinacion. V2.43
+  anade ``v1`` (opt-in) con una quinta etiqueta, ``low_vol``, para el tramo "sin
+  direccion y muy calmado"; ``v0`` sigue devolviendo exactamente las mismas cuatro.
 * **Sin LLM, sin red, sin BD**: aritmetica pura sobre la serie OHLC.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 # Version de la matematica del clasificador (separada del esquema persistido): permite
 # auditar con que formula se derivo un regimen y reproducirlo. Analoga a
 # ``MATH_VERSION_PARAM_REGION_V0``.
 MATH_VERSION_MARKET_REGIME_V0 = "discovery_market_regime_v0"
+# V2.43/AUTO-3: V1 anade el tramo ``low_vol`` (mercado inusualmente calmado). ``v0`` NO
+# cambia: un ``low_vol`` solo aparece si el llamante pide la version V1 explicitamente.
+MATH_VERSION_MARKET_REGIME_V1 = "discovery_market_regime_v1"
 
 # Etiquetas del unico eje de regimen. El orden es el canonico (y el de la documentacion).
 REGIME_TREND_UP = "trend_up"
 REGIME_TREND_DOWN = "trend_down"
 REGIME_RANGE = "range"
 REGIME_HIGH_VOL = "high_vol"
+# V2.43/AUTO-3 (solo V1): ``range`` con volatilidad por debajo del umbral calibrado.
+REGIME_LOW_VOL = "low_vol"
 
+# Eje canonico de ``v0`` (lo que ``v0`` puede devolver). NO se le anade ``low_vol``: v0 es
+# inmutable, y admitir la etiqueta aqui ampliaria en silencio lo que "v0" significa.
 TRIAL_REGIMES: tuple[str, ...] = (
     REGIME_TREND_UP,
     REGIME_TREND_DOWN,
     REGIME_RANGE,
     REGIME_HIGH_VOL,
 )
+
+# Eje canonico de ``v1`` (v0 + ``low_vol``).
+TRIAL_REGIMES_V1: tuple[str, ...] = (*TRIAL_REGIMES, REGIME_LOW_VOL)
 
 # Sin regimen: fail-closed (barras insuficientes o degeneradas). Compatibilidad con la
 # agregacion historica: la clave de evidencia no cambia cuando no hay regimen.
@@ -73,6 +85,11 @@ _VOL_WINDOW = 14
 _TREND_SLOPE_THRESHOLD = 0.5
 # Umbral de volatilidad relativa (rango medio / precio) para declarar ``high_vol``.
 _HIGH_VOL_RATIO_THRESHOLD = 0.045
+# V2.43 (solo V1) — umbral por DEBAJO del cual un ``range`` se declara ``low_vol``.
+# Declarado y conservador a proposito: solo un mercado inusualmente calmado lo activa
+# (rango medio intradia por debajo del 0,5 % del precio). No tiene prioridad sobre la
+# tendencia: ``low_vol`` especializa "sin direccion", nunca la sustituye.
+_LOW_VOL_RATIO_THRESHOLD = 0.005
 
 
 def _as_finite(value: Any) -> float | None:
@@ -140,40 +157,31 @@ def _normalized_slope(closes: Sequence[float], *, vol_ratio: float) -> float | N
     return (short - long) / long / scale
 
 
-def classify_market_regime(
-    bars: Sequence[Any],
-    *,
-    math_version: str = MATH_VERSION_MARKET_REGIME_V0,
-) -> str:
-    """Clasifica el regimen de mercado del tramo cubierto por ``bars`` (as-of, puro).
+def _regime_measurements(series: Sequence[Any]) -> tuple[float, list[float]] | None:
+    """Medidas comunes del clasificador (fail-closed): volatilidad relativa y cierres.
 
-    El as-of es la ultima barra de ``bars``: el clasificador solo mira la ventana dada,
-    nunca datos posteriores ni el reloj. Devuelve una de ``TRIAL_REGIMES`` o ``NO_REGIME``.
-
-    Reglas (un solo eje, en este orden):
-
-    1. **Fail-closed**: menos de ``MIN_REGIME_BARS`` barras, o volatilidad/cierre no
-       calculables ⇒ ``""``. No se aproxima con la ventana parcial.
-    2. ``high_vol`` si la volatilidad relativa supera ``_HIGH_VOL_RATIO_THRESHOLD``.
-       Tiene prioridad: en un mercado revuelto la direccion es poco fiable.
-    3. ``trend_up`` / ``trend_down`` si la pendiente normalizada supera el umbral, con el
-       signo correspondiente.
-    4. ``range`` en cualquier otro caso.
-
-    Determinista: la misma ``bars`` produce siempre el mismo resultado.
+    ``None`` si no se puede clasificar: pocas barras, cierres insuficientes o volatilidad
+    no calculable. Compartida por ``v0`` y ``v1`` para que la unica diferencia entre
+    versiones sea la RAMA de clasificacion, nunca la medicion.
     """
-    if math_version != MATH_VERSION_MARKET_REGIME_V0:
-        # Version desconocida: fail-closed, no se inventa una clasificacion.
-        return NO_REGIME
-    series = list(bars or [])
-    if len(series) < MIN_REGIME_BARS:
-        return NO_REGIME
-    closes = [c for c in (_field(bar, "close") for bar in series) if c is not None]
+    bars = list(series or [])
+    if len(bars) < MIN_REGIME_BARS:
+        return None
+    closes = [c for c in (_field(bar, "close") for bar in bars) if c is not None]
     if len(closes) < _LONG_WINDOW:
-        return NO_REGIME
-    vol_ratio = _range_ratio(series)
+        return None
+    vol_ratio = _range_ratio(bars)
     if vol_ratio is None:
+        return None
+    return vol_ratio, closes
+
+
+def _classify_v0(series: Sequence[Any]) -> str:
+    """Clasificador ``v0`` (inmutable): ``high_vol`` > tendencia > ``range``."""
+    measurements = _regime_measurements(series)
+    if measurements is None:
         return NO_REGIME
+    vol_ratio, closes = measurements
     if vol_ratio > _HIGH_VOL_RATIO_THRESHOLD:
         return REGIME_HIGH_VOL
     slope = _normalized_slope(closes, vol_ratio=vol_ratio)
@@ -186,6 +194,85 @@ def classify_market_regime(
     return REGIME_RANGE
 
 
-def is_valid_regime(regime: str | None) -> bool:
-    """True si ``regime`` es una etiqueta del conjunto canonico (no vacio ni desconocido)."""
-    return str(regime or "") in TRIAL_REGIMES
+def _classify_v1(series: Sequence[Any]) -> str:
+    """Clasificador ``v1``: ``v0`` + ``low_vol`` como especializacion de ``range``.
+
+    El unico cambio respecto a ``v0`` es el ultimo tramo: un ``range`` con volatilidad
+    relativa por debajo de ``_LOW_VOL_RATIO_THRESHOLD`` se declara ``low_vol``. La
+    prioridad de ``high_vol`` y de la tendencia se mantiene intacta, de modo que todo
+    resultado de ``v0`` distinto de ``range`` es tambien resultado de ``v1``.
+    """
+    measurements = _regime_measurements(series)
+    if measurements is None:
+        return NO_REGIME
+    vol_ratio, closes = measurements
+    if vol_ratio > _HIGH_VOL_RATIO_THRESHOLD:
+        return REGIME_HIGH_VOL
+    slope = _normalized_slope(closes, vol_ratio=vol_ratio)
+    if slope is None:
+        return NO_REGIME
+    if slope >= _TREND_SLOPE_THRESHOLD:
+        return REGIME_TREND_UP
+    if slope <= -_TREND_SLOPE_THRESHOLD:
+        return REGIME_TREND_DOWN
+    if vol_ratio < _LOW_VOL_RATIO_THRESHOLD:
+        return REGIME_LOW_VOL
+    return REGIME_RANGE
+
+
+_CLASSIFIERS: dict[str, Callable[[Sequence[Any]], str]] = {
+    MATH_VERSION_MARKET_REGIME_V0: _classify_v0,
+    MATH_VERSION_MARKET_REGIME_V1: _classify_v1,
+}
+
+_VALID_REGIMES_BY_VERSION: dict[str, tuple[str, ...]] = {
+    MATH_VERSION_MARKET_REGIME_V0: TRIAL_REGIMES,
+    MATH_VERSION_MARKET_REGIME_V1: TRIAL_REGIMES_V1,
+}
+
+
+def classify_market_regime(
+    bars: Sequence[Any],
+    *,
+    math_version: str = MATH_VERSION_MARKET_REGIME_V0,
+) -> str:
+    """Clasifica el regimen de mercado del tramo cubierto por ``bars`` (as-of, puro).
+
+    El as-of es la ultima barra de ``bars``: el clasificador solo mira la ventana dada,
+    nunca datos posteriores ni el reloj. Devuelve una de las etiquetas del eje de la
+    ``math_version`` pedida, o ``NO_REGIME``.
+
+    Reglas (un solo eje, en este orden):
+
+    1. **Fail-closed**: menos de ``MIN_REGIME_BARS`` barras, o volatilidad/cierre no
+       calculables ⇒ ``""``. No se aproxima con la ventana parcial.
+    2. ``high_vol`` si la volatilidad relativa supera ``_HIGH_VOL_RATIO_THRESHOLD``.
+       Tiene prioridad: en un mercado revuelto la direccion es poco fiable.
+    3. ``trend_up`` / ``trend_down`` si la pendiente normalizada supera el umbral, con el
+       signo correspondiente.
+    4. ``low_vol`` (solo ``v1``) si la volatilidad esta por debajo del umbral de calma;
+       ``range`` en cualquier otro caso.
+
+    Determinista: la misma ``bars`` y la misma ``math_version`` producen siempre el mismo
+    resultado. Una version desconocida ⇒ ``NO_REGIME`` (fail-closed, no se inventa).
+    """
+    classifier = _CLASSIFIERS.get(str(math_version or ""))
+    if classifier is None:
+        return NO_REGIME
+    return classifier(bars)
+
+
+def is_valid_regime(
+    regime: str | None,
+    *,
+    math_version: str = MATH_VERSION_MARKET_REGIME_V0,
+) -> bool:
+    """True si ``regime`` pertenece al eje canonico de ``math_version``.
+
+    Con la version por defecto (``v0``) el contrato es EXACTAMENTE el de siempre; una
+    version desconocida no valida nada (fail-closed).
+    """
+    allowed = _VALID_REGIMES_BY_VERSION.get(str(math_version or ""))
+    if allowed is None:
+        return False
+    return str(regime or "") in allowed

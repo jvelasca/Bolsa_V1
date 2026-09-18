@@ -124,6 +124,10 @@ jobs:
         # (``packages/py/application/tests/test_auto_daily_journal.py``) SÍ se añade aquí:
         # existe desde v2.24 pero no estaba en la lista offline, así que sus gates nuevos
         # no corrían en CI.
+        # V2.43/AUTO-3: la tabla pura del gobernador vive en ``packages/py/analytics/tests``
+        # (pase de directorio) y la evidencia integrada en ``apps/api-python/tests``; el GATE
+        # (flag OFF byte-idéntico, vetos ``governor_*``, escalado y las tres dimensiones en
+        # el journal) va explícito: es aplicación, y sin registro no correría aquí.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -148,6 +152,7 @@ jobs:
           packages/py/application/tests/test_discovery_search_policy.py
           packages/py/application/tests/test_discovery_param_region.py
           packages/py/application/tests/test_discovery_market_regime.py
+          packages/py/application/tests/test_auto_v3_governor_gate.py
           packages/py/application/tests/test_auto_v2_entry.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py

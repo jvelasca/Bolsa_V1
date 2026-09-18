@@ -14,6 +14,10 @@ Secuencia de veto (fail-closed; cada veto registra su ``reason_code`` en el
 1. ``stale_data``            — datos de mercado/cartera no frescos.
 2. ``position_exists``       — ya hay posición abierta (HOLD, sin nueva entrada).
 3. ``regime_invalid``        — régimen operativo no permite entrada (UNKNOWN/RISK_OFF).
+3.b ``governor_exit_only``/``governor_halted`` — el PERMISO del gobernador (V2.43/AUTO-3)
+    no autoriza entradas nuevas (``EXIT_ONLY``) o declara la parada total (``HALTED``). Es
+    un veto DISTINTO de ``regime_invalid``: el journal debe poder separar "el mercado está
+    bajista" de "AUTO tiene prohibido abrir".
 4. ``liquidity_insufficient``— liquidez/capacidad insuficiente (dato presente y nulo).
 5. ``liquidity_unknown``     — liquidez NO conocida (V2.40.1: ``None`` no es "perfecta").
 6. ``edge_below_threshold``  — score de oportunidad por debajo del umbral.
@@ -67,6 +71,10 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_PARTIAL,
     MEASUREMENT_UNKNOWN,
 )
+from bolsa_analytics.cognitive.operational_governor import (
+    OperationalAssessment,
+    coerce_operational_state,
+)
 from bolsa_analytics.cognitive.opportunity_ranker import OpportunityScore
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition, compute_portfolio_fit
 from bolsa_analytics.cognitive.portfolio_reservation import TradingCostModel
@@ -118,6 +126,12 @@ DecisionReasonCode = Literal[
     # AUTO-1 — no se pudo materializar la reserva de una aprobación (no existe aprobación
     # sin reserva): la decisión se degrada a veto con este motivo.
     "reservation_failed",
+    # V2.43/AUTO-3 — gobernador operativo: sin entradas nuevas (``EXIT_ONLY``) o parada
+    # total (``HALTED``). Son vetos de PERMISO, distintos del hecho de mercado
+    # (``regime_invalid``): el journal puede así distinguir "el mercado está bajista" de
+    # "AUTO tiene prohibido abrir".
+    "governor_exit_only",
+    "governor_halted",
 ]
 
 # Códigos que se registran como NO-TRADE en el journal (el resto es aprobado).
@@ -147,6 +161,9 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         "plan_invalid",
         # AUTO-1 — aprobación que no pudo materializarse en reserva.
         "reservation_failed",
+        # V2.43/AUTO-3 — veto de PERMISO del gobernador (sin entradas / parada total).
+        "governor_exit_only",
+        "governor_halted",
     }
 )
 
@@ -192,6 +209,12 @@ class PortfolioDecisionConfig:
     # ``stop loss + comisión + spread + slippage`` y publica ``riskReal``. ``None``
     # mantiene el sizing histórico (solo stop) para no cambiar el contrato de golpe.
     cost_model: TradingCostModel | None = None
+    # V2.43/AUTO-3 — lectura del gobernador de riesgo y mercado (SOLO ENTRADAS). ``None``
+    # = no consultado (flag OFF ⇒ comportamiento actual, byte-idéntico). Con una lectura,
+    # el motor OBEDECE el permiso (``EXIT_ONLY``/``HALTED`` vetan) y PUBLICITA las tres
+    # dimensiones en la decisión para que el journal las publique. El motor NO reconstruye
+    # política de riesgo: lee el veredicto y, a lo sumo, endurece.
+    governor: OperationalAssessment | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,6 +239,14 @@ class PortfolioDecision:
     # El journal las publica tal cual: un veto por plan incoherente debe decir QUÉ campo
     # se contradecía, no solo que "algo no cuadraba".
     plan_violations: tuple[str, ...] = ()
+    # V2.43/AUTO-3 — las TRES dimensiones del gobernador, publicadas en toda decisión
+    # (aprobada o no). ``market_regime`` y ``risk_regime`` son HECHOS con fuente;
+    # ``operational_state`` es el PERMISO derivado. ``None`` cuando el gobernador no se
+    # consultó (flag OFF): en ese caso ``to_dict()`` NO emite las claves, de modo que el
+    # payload del journal es idéntico al de siempre.
+    market_regime: str | None = None
+    risk_regime: str | None = None
+    operational_state: str | None = None
 
     @property
     def is_no_trade(self) -> bool:
@@ -223,7 +254,7 @@ class PortfolioDecision:
         return bool(set(self.reason_codes) & _NO_TRADE_REASONS)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "decisionId": self.decision_id,
             "instrumentId": self.instrument_id,
             "action": self.action,
@@ -237,6 +268,13 @@ class PortfolioDecision:
             "asOf": self.as_of,
             "planViolations": list(self.plan_violations),
         }
+        # V2.43/AUTO-3 — las tres dimensiones SOLO cuando el gobernador se consultó: con
+        # el flag OFF el payload queda byte-idéntico al histórico.
+        if self.operational_state is not None:
+            payload["marketRegime"] = self.market_regime
+            payload["riskRegime"] = self.risk_regime
+            payload["operationalState"] = self.operational_state
+        return payload
 
 
 def _round4(value: float) -> float:
@@ -418,6 +456,17 @@ def decide_portfolio(
     # lo dio por CONFLICTING/STALE: se publica para que el journal muestre lo que se vio).
     resolved_sector = ctx.sector if ctx.sector is not None else sector
 
+    # V2.43/AUTO-3 — gobernador de riesgo y mercado. ``None`` = no consultado (flag OFF).
+    # Un estado NO canónico se trata como ``HALTED`` (fail-closed: no se confía en lo que
+    # no se entiende). El gobernador SOLO endurece; no relaja la regla direccional.
+    governor_state: str | None = None
+    governor_market: str | None = None
+    governor_risk: str | None = None
+    if cfg.governor is not None:
+        governor_state = coerce_operational_state(cfg.governor.state) or "HALTED"
+        governor_market = cfg.governor.market_regime
+        governor_risk = cfg.governor.risk_regime
+
     def _reject(
         action: PortfolioAction,
         *codes: DecisionReasonCode,
@@ -437,6 +486,9 @@ def decide_portfolio(
             as_of=as_of,
             sector=resolved_sector,
             plan_violations=plan_violations,
+            market_regime=governor_market,
+            risk_regime=governor_risk,
+            operational_state=governor_state,
         )
 
     # 1) Frescura de datos.
@@ -450,6 +502,16 @@ def decide_portfolio(
     # 3) Régimen operativo (DIRECCIONAL: un LONG no se abre en tendencia bajista).
     if not regime_allows_entry_for(regime, direction):
         return _reject("HOLD", "regime_invalid")
+
+    # 3.b) PERMISO operativo (V2.43/AUTO-3). Se coloca justo tras el régimen para que el
+    # journal distinga el hecho de mercado (``regime_invalid``) del permiso (``governor_*``)
+    # en el caso en que ambos coincidan. ``ENTRY_ALLOWED``/``ENTRY_REDUCED``/``ENTRY_RESTRICTED``
+    # no vetan: el tamaño ya lo ajustó quien construyó la config (``risk_scale``).
+    if governor_state in ("EXIT_ONLY", "HALTED"):
+        return _reject(
+            "HOLD",
+            "governor_halted" if governor_state == "HALTED" else "governor_exit_only",
+        )
 
     # 4) Liquidez / capacidad. V2.40.1: desconocida NO es "perfecta" ⇒ fail-closed.
     if cfg.require_liquidity and not ctx.liquidity_is_known:
@@ -615,4 +677,7 @@ def decide_portfolio(
         regime=regime,
         as_of=as_of,
         sector=resolved_sector,
+        market_regime=governor_market,
+        risk_regime=governor_risk,
+        operational_state=governor_state,
     )

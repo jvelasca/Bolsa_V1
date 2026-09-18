@@ -22,6 +22,12 @@ from bolsa_application.reconcile_lifecycle_integrity import (
 
 FinancialIntegrityStatus = Literal["clean", "lag", "drift", "blocked"]
 OperationalState = Literal["OK", "DEGRADED", "BLOCKED"]
+# Alias ADITIVO (V2.43/AUTO-3). Este módulo declara su propio ``OperationalState``
+# (salud de la reconciliación: OK/DEGRADED/BLOCKED), que NO es el permiso operativo del
+# gobernador (ENTRY_ALLOWED/…/HALTED). El eje canónico de AUTO-3 vive en
+# ``bolsa_analytics.cognitive.operational_governor``; aquí se expone el nombre explícito
+# ``FinancialIntegrityState`` para poder citarlo sin ambigüedad desde fuera.
+FinancialIntegrityState = OperationalState
 FillLinkIssueCode = Literal["open_tx_mismatch", "missing_fill_in_ledger"]
 
 # Domain fill kinds that must appear in ledger.reference_id when applied.
@@ -326,6 +332,8 @@ class ReconcileFinancialIntegrity:
 __all__ = [
     "FillLinkIssue",
     "FinancialIntegrityReport",
+    # Alias explícito del eje local (V2.43/AUTO-3): ver la definición en la cabecera.
+    "FinancialIntegrityState",
     "OperationalState",
     "ReconcileFinancialIntegrity",
     "ReconcileFinancialIntegrityInput",

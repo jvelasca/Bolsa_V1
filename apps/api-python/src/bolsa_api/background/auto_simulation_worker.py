@@ -90,6 +90,7 @@ from bolsa_api.background.paper_auto_engine_worker import (
     _kill_switch_env_on,
     _watch_symbols,
 )
+from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.applied_fills import read_applied_fill_facts
 from bolsa_application.auto_daily_journal import SimJournalRow
 from bolsa_application.auto_engine_state_store import (
@@ -527,6 +528,10 @@ class AutoSimulationWorker:
         # y ``execution_events`` queda como reconciliación de arranque. Sin él (camino
         # hermético) el libro de órdenes pendientes sigue derivándose como en V2.40.4.
         reservation_store: ReservationStore | None = None,
+        # V2.43/AUTO-3: libro de marcas de equity (drawdown medido para el gobernador).
+        # Inyectable para que un test/evidencia fije la marca del día de forma determinista;
+        # en producción cada worker lleva el suyo (una serie por proceso de la misma cuenta).
+        equity_marks: EquityMarkBook | None = None,
     ) -> None:
         self._decider = decider
         self._exec_store = exec_store
@@ -624,6 +629,14 @@ class AutoSimulationWorker:
         # turno, y el journal del día (que es evidencia de decisiones) se ahogaría.
         self._v2_atr_journaled: dict[str, str] = {}
         self._v2_atr_source = atr_source
+        # V2.43/AUTO-3 — drawdown MEDIDO para el gobernador de riesgo y mercado. La serie
+        # de equity del proceso es la MISMA cuenta (marca día/semana desde el primer
+        # equity del día). ``_sim_realized_pnl`` acumula el P&L de las ventas aplicadas
+        # (el worker SIM no lleva caja; sin este término, una pérdida ya cerrada
+        # desaparecería de la equity de marca en el tick siguiente). Solo se LEE con el
+        # governor ON, así que con el flag OFF no cambia ningún comportamiento.
+        self._v2_equity_marks = equity_marks if equity_marks is not None else EquityMarkBook()
+        self._sim_realized_pnl: Decimal = Decimal("0")
         # AUTO 2.0 (V2): fuente del régimen operativo (inyectable). Sin fuente y sin
         # override de env, el régimen es UNKNOWN ⇒ exit-only (fail-closed: sin régimen
         # no se abren entradas nuevas).
@@ -1137,6 +1150,47 @@ class AutoSimulationWorker:
                 return value
         return 100_000.0
 
+    def _v2_governor_drawdown_pct(self) -> float | None:
+        """Drawdown diario MEDIDO de la cuenta para el gobernador (V2.43/AUTO-3).
+
+        Se calcula sobre la equity **marcada a mercado** del tick: base declarada
+        (``AUTO_ENGINE_SIM_V2_EQUITY``) + P&L realizado acumulado + P&L no realizado de
+        las posiciones vivas (marca vs entrada). Es la contabilidad que el worker ya usa
+        para valorar la cartera (``_v2_snapshot``), expuesta como serie temporal.
+
+        Devuelve ``None`` con el flag OFF: así el camino por defecto no paga ni el
+        cómputo y el eje de riesgo queda ``UNKNOWN`` (fail-closed) si alguien lo pidiera.
+        """
+        if not self._v2_tunables.governor_enabled:
+            return None
+        base = self._v2_equity()
+        unrealized = Decimal("0")
+        for symbol, qty in self._open.items():
+            if qty <= 0:
+                continue
+            entry = self._entry_price.get(symbol)
+            if entry is None:
+                continue
+            price = Decimal(str(self._price_script(symbol, self._minute) or 0))
+            if price > 0:
+                unrealized += (price - entry) * qty
+        equity = Decimal(str(base)) + self._sim_realized_pnl + unrealized
+        marks = self._v2_equity_marks.update(
+            self._account_id or "auto-sim",
+            float(equity),
+            initial_deposit=base,
+            now=self._v2_marks_now(),
+        )
+        return marks.daily_pct
+
+    def _v2_marks_now(self) -> Any:
+        """Instante UTC de la marca de equity (inyectable en tests vía ``_time``)."""
+        raw = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            return datetime.fromisoformat(raw).replace(tzinfo=UTC)
+        except ValueError:
+            return datetime.now(UTC)
+
     def _v2_snapshot(self, regime: str | None) -> Any:
         """Construye la foto canónica del tick desde el libro del worker."""
         equity = self._v2_equity()
@@ -1165,6 +1219,7 @@ class AutoSimulationWorker:
             reconciliation_ok=not self.reconciliation_blocks_openings,
             open_orders=self._v2_pending_open_orders(),
             order_book_measurement=self._v2_pending_book_measurement(),
+            drawdown_pct=self._v2_governor_drawdown_pct(),
         )
 
     def _v2_open_sectors(self) -> dict[str, str]:
@@ -2964,6 +3019,15 @@ class AutoSimulationWorker:
                 if applied_qty > held + _QTY_EPS:
                     _veto(EXIT_QTY_OVER_POSITION)
                 new_held = max(Decimal("0"), held - applied_qty)
+                # V2.43/AUTO-3 — P&L REALIZADO de lo MATERIALIZADO en esta venta. Es la
+                # pata que faltaba para que la equity de marca no "olvide" una pérdida
+                # cuando la posición se cierra. No emite filas ni cambia decisiones: solo
+                # alimenta la serie de drawdown del gobernador (que solo se lee con el
+                # flag ON). Referencia = entrada de la posición (la misma que usa la
+                # protección); sin referencia no se inventa P&L.
+                entry_ref = self._entry_price.get(symbol)
+                if entry_ref is not None and applied_qty > 0:
+                    self._sim_realized_pnl += (price - entry_ref) * applied_qty
                 # AUTO 2.0 (V2): actualiza el PositionState tras la venta (parcial o
                 # total) para que T1/T2 no se re-disparen en ticks sucesivos.
                 if self._v2_enabled:
@@ -3299,7 +3363,9 @@ def _compose_canonical_reader(session: Any) -> Any:
     return _read
 
 
-def _compose_regime_source(session: Any, *, watch: Sequence[str]) -> Any:
+def _compose_regime_source(
+    session: Any, *, watch: Sequence[str], math_version: str | None = None
+) -> Any:
     """V2.40.1: régimen REAL del tick (barras del universo → régimen operativo).
 
     Sin esto, el AUTO en producción corría con régimen ``UNKNOWN`` ⇒ exit-only ⇒ nunca
@@ -3308,6 +3374,9 @@ def _compose_regime_source(session: Any, *, watch: Sequence[str]) -> Any:
     fallo deja el régimen en ``NO_REGIME`` (⇒ ``UNKNOWN`` ⇒ exit-only), nunca en
     "mercado operable". El override ``AUTO_ENGINE_SIM_V2_REGIME`` sigue teniendo
     prioridad (lo resuelve ``_v2_regime``).
+
+    V2.43/AUTO-3: ``math_version`` permite pedir ``discovery_market_regime_v1`` (añade
+    ``low_vol``). Por defecto ``v0`` ⇒ comportamiento y etiquetas de siempre.
     """
     from bolsa_application.active_strategy_signal_evaluator import (  # noqa: PLC0415
         make_bar_snapshot_loader,
@@ -3317,7 +3386,9 @@ def _compose_regime_source(session: Any, *, watch: Sequence[str]) -> Any:
     )
 
     loader = make_bar_snapshot_loader(SqlAlchemyOhlcvRepository(session), list(watch))
-    return DiscoveryRegimeSource(bars_provider=loader)
+    if math_version is None:
+        return DiscoveryRegimeSource(bars_provider=loader)
+    return DiscoveryRegimeSource(bars_provider=loader, math_version=math_version)
 
 
 def _compose_atr_source(session: Any, *, watch: Sequence[str]) -> Any:
@@ -3665,7 +3736,11 @@ class AutoSimRuntime:
                 canonical_positions_reader=self._canonical_reader
                 or _compose_canonical_reader(session),
                 regime_source=self._regime_source
-                or _compose_regime_source(session, watch=tuple(_watch_symbols())),
+                or _compose_regime_source(
+                    session,
+                    watch=tuple(_watch_symbols()),
+                    math_version=tunables_from_env().regime_math_version,
+                ),
                 trade_context_source=self._trade_context_source
                 or _compose_trade_context_source(session),
                 edge_source=self._edge_source or _compose_edge_source(session),

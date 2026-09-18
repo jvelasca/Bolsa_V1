@@ -2,6 +2,101 @@
 
 All notable releases of Bolsa V1.
 
+## [1.68.0-beta] — V2.43 · AUTO-3 slice 1: `MarketRegime` × `RiskRegime` × `OperationalState` (ejes, tabla y gate de ENTRADAS) — 2026-09-18
+
+**Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Primer slice de `AUTO-3`
+(§5 del roadmap): instala los **tres ejes** y la **tabla de decisión** con su gate puro, y cablea el
+**permiso operativo solo a las ENTRADAS** detrás de un flag **OFF por defecto**. No cambia ninguna
+política de salida.
+
+El cambio de fondo es conceptual: hasta ahora "el mercado está bajista" y "AUTO tiene prohibido
+abrir" viajaban **mezclados** en un único eje de régimen. Ahora son dos hechos distintos, cada uno
+con fuente: `MarketRegime` (hecho de mercado, derivado de barras) y `OperationalState` (permiso
+derivado de la tabla), y el veto de permiso tiene **motivo propio** en el journal
+(`governor_exit_only` / `governor_halted`), separado de `regime_invalid`.
+
+- **`operational_governor`** (nuevo, `bolsa_analytics.cognitive`, puro y hermético): ejes
+  `MarketRegime` / `RiskRegime` / `OperationalState` + bandas de entrada (`DrawdownBand`,
+  `VolatilityBand`, `LiquidityBand`), los techos declarados por eje (`_*_CAP`, que **son** la
+  política) y `resolve_operational_state(...)` = techo más estricto. La tabla es **total** (todo eje
+  tiene default `UNKNOWN`) y **monótona** (más riesgo nunca es más permisivo); un `UNKNOWN` nunca es
+  "libre". La severidad es el contrato, y el tamaño se **deriva del estado resuelto**
+  (`risk_scale`), con la composición declarada "el más estricto gana" (no producto de factores).
+- **`drawdown_pct` medido, por fin, en AUTO V2**: el worker alimenta un `EquityMarkBook` inyectable
+  una vez por tick con el equity **marcado a mercado** (base declarada + P&L realizado de las ventas
+  aplicadas + no realizado de marcas vs entrada). Antes el snapshot V2 no recibía drawdown (siempre
+  `None`), así que el eje de riesgo no podía existir. Sin dato ⇒ `UNKNOWN` ⇒ fail-closed, nunca 0.
+- **Bandas de volatilidad y liquidez** con umbral declarado (`HIGH_VOL`/`LOW_VOL` medidos; liquidez
+  contra `min_liquidity_notional`), y **`LOW_VOL` deja de ser un valor muerto**: la matemática `v1` de
+  `discovery_market_regime` (`AUTO_ENGINE_SIM_V2_REGIME_MATH=v1`, opt-in) añade `low_vol` para el
+  tramo "sin dirección y muy calmado". `v0` no cambia ni una etiqueta.
+- **Gate en el motor (solo entradas)**: `EXIT_ONLY` ⇒ veto `governor_exit_only`; `HALTED` ⇒ veto
+  `governor_halted`; `REDUCED`/`RESTRICTED` escalan el riesgo (0,75 / 0,50) y `RESTRICTED` sube
+  además el listón de edge (`min_edge × restricted_edge_factor`, factor ≥ 1 por invariante). El motor
+  **lee** el permiso: no reconstruye política, y solo **endurece** (nunca relaja la regla direccional).
+- **Las tres dimensiones en el journal** de toda decisión que pasa por el motor
+  (`marketRegime` / `riskRegime` / `operationalState`), con el `bindingAxis` declarado dentro de la
+  lectura. Con el flag OFF las claves **no se emiten**: el payload es el histórico byte a byte.
+
+| #       | Qué                                                                                                                                                                                                                                                                                                                                                                     |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C1**  | **`operational_governor`** (módulo nuevo): ejes, bandas, `_STATE_SEVERITY`, `RISK_SCALE_BY_STATE`, techos declarados por eje, `resolve_operational_state` (total, monótona, fail-closed) y `OperationalAssessment` con `risk_scale` / `binding_axis` / `to_dict()`                                                                                                      |
+| **C2**  | **`DrawdownPolicy` + `GovernorPolicy`**: cortes declarados y estrictamente crecientes (si no, `ValueError`), `min_liquidity_notional ≥ 0` y `restricted_edge_factor ≥ 1` (un factor que relajaría el listón está prohibido por construcción)                                                                                                                            |
+| **C3**  | **Alias aditivos** por colisión de nombre: `MacroRegime` (`weight_rules`), `FinancialIntegrityState` (`reconcile_financial_integrity`) y export `GovernorMarketRegime` (`cognitive/__init__`); ningún eje existente cambia de significado                                                                                                                               |
+| **C4**  | **`to_market_regime`** traduce el eje operativo existente al de mercado; `RISK_OFF` macro **no** se traduce (es un hecho de riesgo ⇒ `UNKNOWN`)                                                                                                                                                                                                                         |
+| **C5**  | **`MATH_VERSION_MARKET_REGIME_V1`** (`discovery_market_regime`): rama `low_vol` con umbral declarado, `TRIAL_REGIMES_V1` e `is_valid_regime(math_version=...)`; `v0` inmutable y versión desconocida ⇒ `NO_REGIME`. `map_trial_regime` gana `low_vol` y la agregación del universo lo incorpora a su prioridad                                                          |
+| **C6**  | **Drawdown cableado al worker**: `EquityMarkBook` inyectable (`equity_marks=`), `_v2_governor_drawdown_pct()` (con el flag OFF devuelve `None`: ni se mide ni se paga el cómputo) y `_sim_realized_pnl` alimentado por las ventas aplicadas, para que una pérdida cerrada no desaparezca de la equity de marca                                                          |
+| **C7**  | **`build_worker_snapshot(drawdown_pct=...)`** y **`V2TickPlan.governor_states`** (estado efectivo por candidata, en orden de evaluación): el tick publica el permiso que realmente aplicó                                                                                                                                                                               |
+| **C8**  | **`V2Tunables`**: flag `AUTO_ENGINE_SIM_V2_GOVERNOR` (OFF), cortes de drawdown, `governor_min_liquidity_notional`, `governor_restricted_edge_factor` y `regime_math_version`; `governor_policy()` y `decision_config(governor=...)` (escala el riesgo y sube el listón en `RESTRICTED`)                                                                                 |
+| **C9**  | **Env saneada como bloque** (`_governor_env_overrides`): un corte no creciente, un número no finito o un factor `< 1` descartan **todos** los umbrales de env y quedan los defaults declarados; una env mal puesta no puede tumbar el tick ni relajar el listón                                                                                                         |
+| **C10** | **Gate de permiso en `decide_portfolio`** (paso 3.b, tras el régimen y antes de liquidez) con motivos propios `governor_exit_only` / `governor_halted`, alta en `_NO_TRADE_REASONS` y estado no canónico ⇒ `HALTED` (fail-closed)                                                                                                                                       |
+| **C11** | **Journal**: `PortfolioDecision.market_regime` / `risk_regime` / `operational_state` y publicación de `marketRegime` / `riskRegime` / `operationalState` en el payload, **solo** cuando el gobernador se consultó (flag OFF = payload histórico). Un descarte previo al motor no inventa dimensiones                                                                    |
+| **C12** | **Tests (48, todos nuevos)**: 25 puros (`test_operational_governor.py`: totalidad sobre 1 728 combinaciones, techo por eje, monotonía por dominancia, `UNKNOWN` nunca libre), 20 de gate (`test_auto_v3_governor_gate.py`: byte-identidad con el flag OFF, vetos, escalado, listón, journal, env y `v1` vs `v0`) y 3 de evidencia (`test_auto_v3_governor_evidence.py`) |
+| **C13** | **Evidencia reproducible** (`apps/api-python/scripts/v2_43_governor_evidence.py`): corre la escalera de drawdown por el camino real del worker con su **control con el flag OFF** en cada tramo, emite JSON y **sale ≠ 0** si la tabla no gobierna la decisión. Sin PG, sin red, sin reloj real                                                                         |
+| **C14** | **CI**: el gate de aplicación va **explícito** en `python-ci.yml` (job `quality`) y `release-tag-ci.yml` (job `python`); la tabla pura y la evidencia las recogen los pases de directorio de `packages/py/analytics/tests` y `apps/api-python/tests`                                                                                                                    |
+
+### Matriz de mutaciones **medida** (7 mutaciones, 7 rojos)
+
+Sobre las superficies nuevas del slice; se aplica, se corre el target acotado, se **revierte verificando
+el contenido exacto** (hash del fichero) y se reporta:
+
+| #   | Mutación                                                                  | Efecto medido                                                                             |
+| --- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| M1  | Un techo de eje mal mapeado (`HIGH_VOL` deja de reducir)                  | **1 rojo** (el test de techos declarados)                                                 |
+| M2  | Se quita `UNKNOWN ⇒ nunca libre` en un eje                                | **3 rojos** (techos, el test por eje de `UNKNOWN`, `assess` extremo a extremo)            |
+| M3  | `EXIT_ONLY` deja pasar entradas (solo `HALTED` veta)                      | **4 rojos** (veredicto del permiso, medición ausente, journal, lectura directa del motor) |
+| M4  | Se rompe la monotonía (`strictest_state` devuelve el menos severo)        | **11 rojos** (totalidad/máximo, monotonía, `UNKNOWN`, ejes y `bindingAxis`)               |
+| M5  | `drawdown_pct` no cableado (el worker publica siempre `0` ⇒ banda `FULL`) | **3 rojos** (escalera medida, pata no realizada y seam de medición)                       |
+| M6  | El journal pierde las tres dimensiones                                    | **2 rojos** (journal del gate + evidencia)                                                |
+| M7  | `risk_scale` ignorado en el sizing (`scale = 1.0`)                        | **2 rojos** (REDUCED al 75 % y RESTRICTED al 50 %)                                        |
+
+### Verificación medida (árbol final del slice)
+
+- `ruff check packages/py apps/api-python --config pyproject.toml` (invocación exacta de CI): **All checks
+  passed**; `mypy` (invocación de CI, `--follow-imports=silent`): **487 ficheros, 0 issues**;
+  `lint-imports`: **4 kept / 0 broken**.
+- **Tests del slice**: **48 passed** (25 puros + 20 de gate + 3 de evidencia).
+- **Evidencia** (salida del script, guardada como JSON, `exit 0`): la escalera de drawdown produce la
+  escalera declarada de estados y de efectos — `0 % ENTRY_ALLOWED`, `6 % ENTRY_REDUCED` (cantidad × 0,75
+  sobre su control), `12 % ENTRY_RESTRICTED` (tamaño × 0,50 y listón de edge que separa `edge=0.5` de
+  `edge=0.9`), `15 % EXIT_ONLY` (`governor_exit_only`), `22 % HALTED` (`governor_halted`) — y **cada
+  tramo vetado tiene su control con el flag OFF aprobando**: el freno se atribuye al gobernador, no a
+  otro gate. La pata **no realizada** también se mide (posición viva marcada −10 % sobre 60 000 de
+  exposición ⇒ 6 % de drawdown con la equity base declarada intacta). Con el flag OFF no hay drawdown,
+  ni dimensiones, ni cambio de motivo ni de tamaño.
+- **Freeze comprobado**: sin migración (head `042_portfolio_reservations`), `AUTO_ENGINE_SIM_V2=0` intacto
+  (el gate vive dentro del pipeline V2) y con `AUTO_ENGINE_SIM_V2_GOVERNOR=0` el camino V2 es
+  **byte-idéntico** (test de byte-identidad del journal con y sin drawdown en el snapshot).
+- **Bloques offline de CI** (targets y `--ignore` **extraídos del YAML**, con verificación de que cada
+  ruta existe): job `quality` de `python-ci.yml` **1983 passed, 0 failed, 0 skipped** (42 rutas, 8
+  ficheros PG a `--ignore`) y job `python` de `release-tag-ci.yml` **1994 passed, 0 failed, 0 skipped**
+  (51 rutas, 8 ficheros PG a `--ignore`), los dos con `exit 0`. Las cifras incorporan **exactamente** los
+  48 tests nuevos (1935 → 1983 y 1946 → 1994), que es la comprobación de que lo nuevo corre en CI.
+- **Límites declarados**: el gobernador **solo gobierna entradas** (el camino de salida no cambia);
+  `HALTED` no tiene productor propio en este slice (tabla / kill switch); los umbrales de drawdown
+  (5/10/15/20 %) son **declarados y calibrables**, no calibrados contra datos; y la evidencia es un día
+  **hermético** (stores `InMemory*`, precios y ATR inyectados), no una sesión de mercado real.
+
 ## [1.67.2-beta] — V2.42.2 · AUTO-2 slice 2c (cierre): evidencia de un día, ATR medido y cero política legacy — 2026-09-18
 
 **Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Cierra el **criterio de

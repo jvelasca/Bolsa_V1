@@ -39,6 +39,16 @@ from bolsa_analytics.cognitive.market_regime_gate import (
     map_trial_regime,
     regime_is_exit_only,
 )
+from bolsa_analytics.cognitive.measurement import (
+    MEASUREMENT_COMPLETE,
+    MEASUREMENT_UNKNOWN,
+)
+from bolsa_analytics.cognitive.operational_governor import (
+    DrawdownPolicy,
+    GovernorPolicy,
+    OperationalAssessment,
+    assess_from_measurements,
+)
 from bolsa_analytics.cognitive.opportunity_ranker import (
     TOP_N_EXCLUDED,
     OpportunityScore,
@@ -70,8 +80,10 @@ from bolsa_application.auto_reason_codes import RESERVATION_FAILED
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.discovery_market_regime import (
     MATH_VERSION_MARKET_REGIME_V0,
+    MATH_VERSION_MARKET_REGIME_V1,
     NO_REGIME,
     REGIME_HIGH_VOL,
+    REGIME_LOW_VOL,
     REGIME_RANGE,
     REGIME_TREND_DOWN,
     REGIME_TREND_UP,
@@ -190,9 +202,56 @@ class V2Tunables:
     # histórico. ``None`` = sin modelo (mismo efecto que desactivarlo).
     cost_model: TradingCostModel | None = field(default_factory=TradingCostModel)
 
-    def decision_config(self) -> PortfolioDecisionConfig:
+    # --- V2.43 / AUTO-3 — gobernador de riesgo y mercado (ENTRADAS) -------------------
+    # Matemática del clasificador de régimen de barras. ``v0`` por defecto: el
+    # comportamiento histórico no cambia. ``v1`` AÑADE el tramo ``low_vol`` (opt-in).
+    regime_math_version: str = MATH_VERSION_MARKET_REGIME_V0
+    # Flag del gobernador. OFF por defecto ⇒ el camino V2 es BYTE-IDÉNTICO: nada de lo de
+    # abajo se consulta. Se flipea con el número delante (mismo patrón que el veto de ATR).
+    governor_enabled: bool = False
+    # Cortes de drawdown del día (% de caída desde la marca de referencia). Declarados y
+    # calibrables; SIEMPRE presentes (el mecanismo no depende del flag, solo su uso).
+    governor_drawdown_reduced_pct: float = 5.0
+    governor_drawdown_half_pct: float = 10.0
+    governor_drawdown_no_entry_pct: float = 15.0
+    governor_drawdown_exit_only_pct: float = 20.0
+    # Notional mínimo (estricto: ``>``) para considerar la liquidez suficiente.
+    governor_min_liquidity_notional: float = 0.0
+    # Factor sobre ``min_edge`` en ``ENTRY_RESTRICTED`` (>= 1: nunca relaja el listón).
+    governor_restricted_edge_factor: float = 2.0
+
+    def governor_policy(self) -> GovernorPolicy:
+        """Política del gobernador derivada de los tunables (pura, sin env)."""
+        return GovernorPolicy(
+            drawdown=DrawdownPolicy(
+                reduced_pct=self.governor_drawdown_reduced_pct,
+                half_pct=self.governor_drawdown_half_pct,
+                no_entry_pct=self.governor_drawdown_no_entry_pct,
+                exit_only_pct=self.governor_drawdown_exit_only_pct,
+            ),
+            min_liquidity_notional=self.governor_min_liquidity_notional,
+            restricted_edge_factor=self.governor_restricted_edge_factor,
+        )
+
+    def decision_config(
+        self, governor: OperationalAssessment | None = None
+    ) -> PortfolioDecisionConfig:
+        """Configuración del motor para este tick.
+
+        ``governor`` (V2.43/AUTO-3) es la lectura del gobernador: con ella el tamaño se
+        ESCALA (``risk_scale`` del estado) y, en ``ENTRY_RESTRICTED``, el listón de edge
+        sube por ``restricted_edge_factor``. El motor además lee el PERMISO de la propia
+        lectura y veta ``EXIT_ONLY``/``HALTED``. Sin lectura (``None``, flag OFF) la
+        configuración es exactamente la histórica: nada se escala.
+        """
+        scale = 1.0
+        min_edge = self.min_edge
+        if governor is not None and governor.allows_new_entry:
+            scale = governor.risk_scale
+            if governor.state == "ENTRY_RESTRICTED":
+                min_edge = self.min_edge * self.governor_restricted_edge_factor
         return PortfolioDecisionConfig(
-            min_edge=self.min_edge,
+            min_edge=min_edge,
             min_risk_reward=1.0,
             max_correlation=self.max_correlation,
             max_sector_pct=self.max_sector_pct,
@@ -200,10 +259,11 @@ class V2Tunables:
             target1_r=self.target1_r,
             target2_r=self.target2_r,
             allocator=RiskAllocatorConfig(
-                max_risk_per_trade_pct=self.max_risk_per_trade_pct,
+                max_risk_per_trade_pct=self.max_risk_per_trade_pct * scale,
                 max_position_pct=self.max_position_pct,
             ),
             cost_model=self.cost_model,
+            governor=governor,
         )
 
 
@@ -277,8 +337,96 @@ def tunables_from_env() -> V2Tunables:
         or base.signal_timeframe,
         # E2: el veto por ATR real es OPT-IN explícito (default OFF).
         atr_required=_env_flag("AUTO_ENGINE_SIM_V2_ATR_REQUIRED", base.atr_required),
+        # V2.43/AUTO-3 — matemática del régimen (``v0`` salvo petición explícita de ``v1``).
+        regime_math_version=_regime_math_version_from_env(),
+        # V2.43/AUTO-3 — gobernador de riesgo y mercado: OPT-IN explícito (default OFF) y
+        # umbrales SANEADOS como bloque (ver ``_governor_env_overrides``).
+        governor_enabled=_env_flag("AUTO_ENGINE_SIM_V2_GOVERNOR", base.governor_enabled),
+        **_governor_env_overrides(base),
         cost_model=_cost_model_from_env(),
     )
+
+
+def _governor_env_overrides(base: V2Tunables) -> dict[str, Any]:
+    """Umbrales del gobernador leídos de env, saneados como POLÍTICA completa.
+
+    Env es entrada no confiable y ``governor_policy()`` se construye en CADA tick (también
+    con el flag OFF), así que un valor incoherente no puede llegar a la política: un corte
+    de drawdown no estrictamente creciente, un número no finito o un
+    ``restricted_edge_factor`` que RELAJARÍA el listón harían fallar el tick por una env
+    mal puesta. Regla: se valida el bloque entero y, si algo no cuadra, se descartan los
+    umbrales de env y quedan los defaults declarados (fail-closed, nunca a medias).
+    """
+    default_cuts = [
+        base.governor_drawdown_reduced_pct,
+        base.governor_drawdown_half_pct,
+        base.governor_drawdown_no_entry_pct,
+        base.governor_drawdown_exit_only_pct,
+    ]
+    env_cuts = [
+        _env_float("AUTO_ENGINE_SIM_V2_GOV_DD_REDUCED_PCT", base.governor_drawdown_reduced_pct),
+        _env_float("AUTO_ENGINE_SIM_V2_GOV_DD_HALF_PCT", base.governor_drawdown_half_pct),
+        _env_float("AUTO_ENGINE_SIM_V2_GOV_DD_NO_ENTRY_PCT", base.governor_drawdown_no_entry_pct),
+        _env_float("AUTO_ENGINE_SIM_V2_GOV_DD_EXIT_ONLY_PCT", base.governor_drawdown_exit_only_pct),
+    ]
+    # Se valida el BLOQUE: cuatro números finitos y no negativos, estrictamente crecientes.
+    # Cualquier otra cosa descarta TODOS los cortes de env (no se mezcla env con defaults).
+    cuts: list[float] = default_cuts
+    if all(value is not None and _is_finite_non_negative(value) for value in env_cuts):
+        candidate = [float(value) for value in env_cuts if value is not None]
+        if all(a < b for a, b in zip(candidate, candidate[1:], strict=False)):
+            cuts = candidate
+
+    min_liquidity = _env_float(
+        "AUTO_ENGINE_SIM_V2_GOV_MIN_LIQUIDITY", base.governor_min_liquidity_notional
+    )
+    if min_liquidity is None or not _is_finite_non_negative(min_liquidity):
+        min_liquidity = base.governor_min_liquidity_notional
+    else:
+        min_liquidity = float(min_liquidity)
+
+    factor = _env_float(
+        "AUTO_ENGINE_SIM_V2_GOV_RESTRICTED_EDGE_FACTOR",
+        base.governor_restricted_edge_factor,
+    )
+    if factor is None or not _is_finite_non_negative(factor) or float(factor) < 1.0:
+        factor = base.governor_restricted_edge_factor
+    else:
+        factor = float(factor)
+
+    reduced, half, no_entry, exit_only = cuts
+    return {
+        "governor_drawdown_reduced_pct": reduced,
+        "governor_drawdown_half_pct": half,
+        "governor_drawdown_no_entry_pct": no_entry,
+        "governor_drawdown_exit_only_pct": exit_only,
+        "governor_min_liquidity_notional": float(min_liquidity),
+        "governor_restricted_edge_factor": float(factor),
+    }
+
+
+def _is_finite_non_negative(value: Any) -> bool:
+    """True si ``value`` es un número finito ``>= 0`` (``bool`` excluido: no es medida)."""
+    if value is None or isinstance(value, bool):
+        return False
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return False
+    return number == number and abs(number) != float("inf") and number >= 0
+
+
+def _regime_math_version_from_env() -> str:
+    """Matemática del clasificador de régimen pedida por env (``v0`` si no se entiende).
+
+    Familia "off"/vacío/ausente ⇒ ``v0`` (el comportamiento histórico). Familia "v1"
+    (``v1``/``1``/``latest``) ⇒ ``v1``. Cualquier otro valor ⇒ ``v0``: una matemática
+    desconocida no puede activarse por error, y ``v0`` es el contrato ya auditado.
+    """
+    raw = (os.getenv("AUTO_ENGINE_SIM_V2_REGIME_MATH") or "").strip().lower()
+    if raw in {"v1", "1", "latest"}:
+        return MATH_VERSION_MARKET_REGIME_V1
+    return MATH_VERSION_MARKET_REGIME_V0
 
 
 def edge_from_package(pkg: Any) -> float | None:
@@ -377,6 +525,12 @@ class V2TickPlan:
     as_of: str = ""
     reservations: tuple[PortfolioReservation, ...] = ()
     risk_state: PortfolioRiskState | None = None
+    # V2.43/AUTO-3 — estado operativo EFECTIVO por candidata evaluada (``símbolo →
+    # ENTRY_ALLOWED/…``), en el orden de evaluación. Es por candidata y no por tick porque
+    # las bandas de volatilidad (ATR de la señal) y liquidez (su ``TradeContext``) son
+    # datos DE LA CANDIDATA; el detalle completo de las tres dimensiones vive en la entrada
+    # de journal de cada decisión. Vacío con el governor OFF (comportamiento actual).
+    governor_states: tuple[tuple[str, str], ...] = ()
 
     @property
     def approved_symbols(self) -> tuple[str, ...]:
@@ -400,6 +554,7 @@ def build_worker_snapshot(
     sectors: dict[str, str] | None = None,
     open_orders: Any = (),
     order_book_measurement: Any = None,
+    drawdown_pct: float | None = None,
 ) -> Any:
     """Construye el ``AutoPortfolioSnapshot`` desde el libro del worker (SIM).
 
@@ -417,6 +572,12 @@ def build_worker_snapshot(
     ``order_book_measurement`` declara si ese libro se pudo leer y cuantificar del todo.
     Ambos se reenvían tal cual: el snapshot deriva de ellos ``reserved_cash`` /
     ``available_cash`` / ``pending_risk`` / ``pending_exposure``.
+
+    ``drawdown_pct`` (V2.43/AUTO-3) es la caída MEDIDA de la cuenta desde la marca de
+    referencia del día (``EquityMarkBook``), en %. El contrato es: un número SOLO se
+    publica cuando la medición es completa; ``None`` significa "no medido" (y el
+    gobernador lo lee como ``UNKNOWN``, nunca como 0). Con el governor OFF se pasa
+    ``None``, así que el snapshot es idéntico al histórico.
     """
     marks = marks or {}
     stops = stops or {}
@@ -461,6 +622,7 @@ def build_worker_snapshot(
         risk_budget=budget,
         active_strategies=strategies,
         market_regime=regime,
+        drawdown_pct=drawdown_pct,
         last_reconciliation="clean" if reconciliation_ok else "attention",
         data_freshness=data_freshness,
     )
@@ -608,6 +770,12 @@ def plan_v2_tick(
     packages: dict[str, DecisionPackage] = {}
     decisions: list[PortfolioDecision] = []
     journal: list[DecisionJournalEntryRecord] = []
+    # V2.43/AUTO-3 — el gobernador se consulta SOLO si el flag está ON. La política se
+    # resuelve UNA vez por tick; la lectura se resuelve por candidata porque las bandas de
+    # volatilidad (ATR de la señal) y liquidez (su ``TradeContext``) son datos suyos.
+    governor_policy = cfg.governor_policy()
+    governor_states: list[tuple[str, str]] = []
+    tick_drawdown_pct = getattr(snapshot, "drawdown_pct", None)
     # AUTO-1 — libro de reservas del tick. Cada aprobación RESERVA con identidad y la
     # candidata siguiente decide contra las reservas VIVAS (capital, riesgo, exposición y
     # sector ya comprometidos). Es el sustituto explícito de la lista local ``committed``:
@@ -629,6 +797,23 @@ def plan_v2_tick(
         # exposición). Cada candidato se evalúa contra la foto reservada, no contra la
         # foto inicial: A → reserva → B → reserva → C.
         working_snapshot = _working_snapshot(snapshot, ledger)
+        signal_ctx = _context_for_signal(signal)
+        governor: OperationalAssessment | None = None
+        if cfg.governor_enabled:
+            governor = assess_from_measurements(
+                operational_regime=resolved_regime,
+                drawdown_pct=tick_drawdown_pct,
+                # Un drawdown publicado es una medición COMPLETA por contrato; su
+                # ausencia es UNKNOWN (nunca 0).
+                drawdown_measurement=(
+                    MEASUREMENT_COMPLETE if tick_drawdown_pct is not None else MEASUREMENT_UNKNOWN
+                ),
+                atr_known=atr is not None,
+                liquidity_known=signal_ctx.liquidity_is_known,
+                liquidity_notional=signal_ctx.liquidity_notional,
+                policy=governor_policy,
+            )
+            governor_states.append((signal.instrument_id, governor.state))
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
             direction="long",
@@ -637,8 +822,8 @@ def plan_v2_tick(
             opportunity_score=entry_score,
             snapshot=working_snapshot,
             regime=resolved_regime,
-            trade_context=_context_for_signal(signal),
-            config=cfg.decision_config(),
+            trade_context=signal_ctx,
+            config=cfg.decision_config(governor=governor),
             as_of=as_of,
         )
         decisions.append(decision)
@@ -687,6 +872,7 @@ def plan_v2_tick(
         as_of=as_of,
         reservations=ledger.live(),
         risk_state=_risk_state_for(snapshot, ledger),
+        governor_states=tuple(governor_states),
     )
 
 
@@ -1148,6 +1334,28 @@ def _journal_entry(
 ) -> DecisionJournalEntryRecord:
     from uuid import uuid4
 
+    payload: dict[str, Any] = {
+        "event": "auto_entry_decision",
+        "instrumentId": decision.instrument_id,
+        "action": decision.action,
+        "approved": decision.approved,
+        "reasonCodes": list(decision.reason_codes),
+        "regime": decision.regime,
+        "sector": decision.sector,
+        "tradePlan": None if decision.trade_plan is None else decision.trade_plan.to_dict(),
+        "risk": decision.allocation,
+        # V2.40.4 — violaciones de coherencia del TradePlan (vacío si fue válido).
+        "planViolations": list(decision.plan_violations),
+    }
+    # V2.43/AUTO-3 — las TRES dimensiones del gobernador en TODA decisión no-trade
+    # (criterio de salida del roadmap): ``marketRegime``/``riskRegime`` son HECHOS con
+    # fuente y ``operationalState`` es el PERMISO derivado. Se emiten SOLO cuando el
+    # gobernador se consultó, para que con el flag OFF el payload sea el histórico.
+    if decision.operational_state is not None:
+        payload["marketRegime"] = decision.market_regime
+        payload["riskRegime"] = decision.risk_regime
+        payload["operationalState"] = decision.operational_state
+
     return DecisionJournalEntryRecord(
         id=f"JNL-{uuid4().hex[:12]}",
         decision_id=decision.decision_id,
@@ -1155,19 +1363,7 @@ def _journal_entry(
         actor=actor,
         created_at=_stamp(as_of),
         instrument_id=decision.instrument_id,
-        payload={
-            "event": "auto_entry_decision",
-            "instrumentId": decision.instrument_id,
-            "action": decision.action,
-            "approved": decision.approved,
-            "reasonCodes": list(decision.reason_codes),
-            "regime": decision.regime,
-            "sector": decision.sector,
-            "tradePlan": None if decision.trade_plan is None else decision.trade_plan.to_dict(),
-            "risk": decision.allocation,
-            # V2.40.4 — violaciones de coherencia del TradePlan (vacío si fue válido).
-            "planViolations": list(decision.plan_violations),
-        },
+        payload=payload,
     )
 
 
@@ -1191,6 +1387,12 @@ _REGIME_CONSERVATIVE_PRIORITY: tuple[str, ...] = (
     REGIME_TREND_DOWN,
     REGIME_RANGE,
     REGIME_TREND_UP,
+    # V2.43/AUTO-3: ``low_vol`` (solo lo produce la matematica ``v1``, opt-in) es el
+    # veredicto MENOS conservador: un mercado calmado y sin direccion no puede pintar de
+    # riesgo un universo mixto, así que va el ultimo. No es "libre": el eje operativo lo
+    # lee como ``LOW_VOLATILITY`` (permite entrada) y el gobernador lo lee como
+    # ``VolatilityBand.LOW``.
+    REGIME_LOW_VOL,
 )
 
 

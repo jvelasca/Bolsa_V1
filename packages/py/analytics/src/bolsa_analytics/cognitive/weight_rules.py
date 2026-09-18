@@ -9,7 +9,13 @@ from typing import Literal
 WEIGHT_RULES_VERSION = "2.0.0"
 
 HorizonHint = Literal["intraday", "swing", "position", "long_term"]
+# Eje MACRO (risk_on/neutral/risk_off/crisis/uncertain), histórico de ``weight_rules``.
+# AUTO-3 (V2.43) instaló otro eje con el mismo nombre corto —el HECHO de mercado
+# ``TREND_UP``/``TREND_DOWN``/...— en ``bolsa_analytics.cognitive.operational_governor``.
+# Este alias deja el nombre libre sin romper a los consumidores del macro: quien quiera el
+# eje de mercado debe importar de ``operational_governor``.
 MarketRegime = Literal["risk_on", "neutral", "risk_off", "crisis", "uncertain"]
+MacroRegime = MarketRegime
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,10 +2,10 @@
 
 Distingue el régimen de **Research** (ligado a la evidencia adaptativa del trial) del
 régimen **operativo** que AUTO necesita ANTES de operar. El clasificador de barras
-``discovery_market_regime_v0`` emite ``trend_up/trend_down/range/high_vol`` (o vacío);
-el régimen macro cognitivo emite ``risk_on/risk_off/crisis/neutral/uncertain``. Este
-módulo mapea ambos a un eje operativo único y decide si una entrada nueva está
-permitida.
+``discovery_market_regime_v0`` emite ``trend_up/trend_down/range/high_vol`` (o vacío) y,
+desde V2.43, ``v1`` añade ``low_vol``; el régimen macro cognitivo emite
+``risk_on/risk_off/crisis/neutral/uncertain``. Este módulo mapea ambos a un eje operativo
+único y decide si una entrada nueva está permitida.
 
 Eje operativo canónico::
 
@@ -38,6 +38,8 @@ _TRIAL_TREND_UP = "trend_up"
 _TRIAL_TREND_DOWN = "trend_down"
 _TRIAL_RANGE = "range"
 _TRIAL_HIGH_VOL = "high_vol"
+# V2.43/AUTO-3: etiqueta de ``discovery_market_regime_v1`` (mercado calmado sin direccion).
+_TRIAL_LOW_VOL = "low_vol"
 _NO_REGIME = ""
 
 # Etiquetas del régimen macro cognitivo (market_state.classify_regime).
@@ -52,7 +54,13 @@ _BLOCKED_ENTRY: frozenset[str] = frozenset({"UNKNOWN", "RISK_OFF"})
 
 
 def map_trial_regime(trial_regime: str | None) -> OperationalRegime:
-    """Mapea el régimen de barras (v0) al eje operativo. Vacío/desconocido ⇒ UNKNOWN."""
+    """Mapea el régimen de barras al eje operativo. Vacío/desconocido ⇒ UNKNOWN.
+
+    Acepta las etiquetas de ``v0`` y, desde V2.43, la de ``v1`` (``low_vol`` ⇒
+    ``LOW_VOLATILITY``). La etiqueta ``low_vol`` nunca la produce ``v0``, así que el
+    contrato de ``v0`` no cambia: solo se deja de leer como ``UNKNOWN`` cuando un
+    llamante pide expresamente la matemática ``v1``.
+    """
     value = str(trial_regime or "").strip()
     if value == _TRIAL_TREND_UP:
         return "BULL_TREND"
@@ -62,6 +70,8 @@ def map_trial_regime(trial_regime: str | None) -> OperationalRegime:
         return "SIDEWAYS"
     if value == _TRIAL_HIGH_VOL:
         return "HIGH_VOLATILITY"
+    if value == _TRIAL_LOW_VOL:
+        return "LOW_VOLATILITY"
     return "UNKNOWN"
 
 
