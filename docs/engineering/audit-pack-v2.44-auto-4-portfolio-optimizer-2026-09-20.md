@@ -195,22 +195,40 @@ restauración **desde memoria**, nunca `git checkout --`, y verificación de **h
 ruff check packages/py apps/api-python --config pyproject.toml     → All checks passed (0)
 mypy <5 paquetes + apps/api-python/src> --follow-imports=silent    → Success: 489 ficheros, 0 issues
 lint-imports --config packages/py/.importlinter                    → 4 kept, 0 broken (607 ficheros)
-offline_ci_run_yaml.py ... python-ci.yml quality --with-pg-ignores → 2075 passed, 0 skipped, 0 failed
-offline_ci_run_yaml.py ... release-tag-ci.yml python --with-pg-ignores
-                                                                   → 2086 passed, 0 skipped, 0 failed
+las 33 suites nuevas (EV 12 + optimizador 12 + cableado 8 + worker 1) → 33 passed
+offline_ci_run_yaml.py ... release-tag-ci.yml python (baseline)    → 2053 passed, 0 skipped, 0 failed (exit 0)
+CI real · commit de fase · python-ci.yml quality (run 35510546044)  → 2075 passed, 0 skipped, 0 failed
+CI real · ref del tag · release-tag-ci.yml python (run 35510840734) → 2086 passed, 0 skipped, 0 failed
 baseline de la sonda (sin mutación)                                → ninguno rojo en las 3 listas
 v2_44_mutation_audit.py                                            → 7/7 muerden, huella intacta
 ```
 
-**Delta exacto de tests (medido, no estimado):**
+> **Corrección de procedencia (2026-09-20, posterior al sello).** La primera redacción de este §5 y del §9
+> atribuía los conteos **2075**/**2086** a los bloques `offline_ci_run_yaml.py` corridos en la máquina del
+> autor. Lo que está **artefactado en local** es el **baseline** del bloque del tag (**2053**, JUnit propio,
+> `exit 0`) y las **33 suites nuevas** (`33 passed`); los bloques completos de `v2.44` **no llegaron a
+> término** en local — sin PostgreSQL alcanzable, el `conftest` paga un _timeout_ de conexión por test y el
+> bloque se vuelve inviable (la corrida del bloque del tag se mató a los ~34 min, y `test_account_isolation`
+> falla 23 tests en 261,73 s por `psycopg.errors.ConnectionTimeout` contra `localhost:5432`). Los conteos
+> **2075** y **2086** los **certifica CI real** (`quality` **2075** en el run
+> [`35510546044`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546044) y `python` del tag
+> **2086** en el run [`35510840734`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840734)), que
+> es lo que la fase quería afirmar: el mismo **+33** en **los dos** workflows, medido en la nube. La ref
+> sellada **`v2.44-beta`** (`c95819c1`) conserva la redacción anterior: esto es una corrección **aditiva y
+> declarada** sobre `main`, no una reescritura del sello. Nada más cambia: los números eran y son ciertos;
+> lo que se corrige es **dónde** se midieron.
+
+**Delta exacto de tests (medido en CI real, no estimado):**
 
 | Bloque                          | v2.43.3 | v2.44    | Δ       |
 | ------------------------------- | ------- | -------- | ------- |
 | `python-ci.yml` · `quality`     | 2042    | **2075** | **+33** |
 | `release-tag-ci.yml` · `python` | 2053    | **2086** | **+33** |
 
-Los 33 son exactamente los tests nuevos de §3. El delta es **idéntico en los dos workflow** porque el
-test de aplicación va **explícito** en ambos: si solo estuviera en uno, el otro bloquearía menos.
+Los `v2.44` salen de CI real (run `35510546044` y run `35510840734`); los `v2.43.3` son los conteos de CI
+de esa versión (runs citados en su pack). Los 33 son exactamente los tests nuevos de §3. El delta es
+**idéntico en los dos workflow** porque el test de aplicación va **explícito** en ambos: si solo estuviera
+en uno, el otro bloquearía menos.
 
 **Nada de esto corre PG:** no hay migración nueva y ninguna suite PG se toca. Los jobs PG de CI
 (`auto-v2-durable-pg`, `lifecycle-pg`, `paper-forward-pg`, `grammar-discovery-pg`) no cambian de
@@ -308,8 +326,9 @@ Desglose de `Python CI` (medido, no esperado):
 
 - `quality` **2075 passed, 38 skipped** en **89,26 s** — exactamente **+33** sobre los **2042** de
   `v2.43.3-beta`, que son los 33 tests nuevos de `AUTO-4` (12 EV + 12 optimizador + 8 cableado + 1
-  worker real). El bloque offline local anticipó el mismo número (**2075**): la red de CI **no** corre
-  nada menos que el bloque reproducido a mano.
+  worker real). Este `+33` es la medición que vale: el bloque offline del YAML **no llegó a término en la
+  máquina del autor** (ver la corrección de procedencia en §5), así que quien lo certifica es **CI real**,
+  no una corrida a mano.
 - `auto-v2-durable-pg (Alembic 040-043 + reinicio real)` **43 passed** — sin cambio respecto de
   `v2.43.3-beta`, como debe ser: `AUTO-4` **no** trae migración y el head sigue en `043`.
 - `paper-forward-pg` **2 passed** · `grammar-discovery-pg` **21 passed** · `lifecycle-pg` **13 passed**.
@@ -333,7 +352,7 @@ recuento local de tests nuevos.
 Desglose de la ref del tag:
 
 - `python (ruff/imports/mypy/pytest offline)` **2086 passed, 35 skipped** en **60,68 s** — los mismos
-  **+33** sobre los **2053** de `v2.43.3-beta`. El bloque local medía **2086**: igual.
+  **+33** sobre los **2053** de `v2.43.3-beta`, medidos en CI real (no en local: ver §5).
 - `lifecycle-pg` con PostgreSQL real **148 + 45 passed**; `a7-gate` **7 passed**; `shared`
   **778 tests / 94 ficheros**; `playwright (mock E2E)` **success** y `playwright (integrated E2E)`
   **`skipped`** por ser opt-in, igual que en `v2.43.3-beta`.

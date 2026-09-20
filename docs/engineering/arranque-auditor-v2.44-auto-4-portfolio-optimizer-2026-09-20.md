@@ -150,8 +150,8 @@ uv run lint-imports --config packages/py/.importlinter
 git diff -- apps/api-python/scripts/v2_43_governor_evidence.py
 uv run python apps/api-python/scripts/v2_43_governor_evidence.py --out governor.json; echo "exit=$?"
 
-uv run python scripts/verify/offline_ci_run_yaml.py .github/workflows/python-ci.yml quality --with-pg-ignores      # 2075 passed
-uv run python scripts/verify/offline_ci_run_yaml.py .github/workflows/release-tag-ci.yml python --with-pg-ignores # 2086 passed
+uv run python scripts/verify/offline_ci_run_yaml.py .github/workflows/python-ci.yml quality --with-pg-ignores      # baseline: 2042 passed (v2.43.3); +33 de v2.44 certificado por CI real -> pack §9
+uv run python scripts/verify/offline_ci_run_yaml.py .github/workflows/release-tag-ci.yml python --with-pg-ignores # baseline: 2053 passed (v2.43.3); +33 de v2.44 certificado por CI real -> pack §9
 uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py                                          # 7/7 muerden
 ```
 

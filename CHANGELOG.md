@@ -68,7 +68,11 @@ su evidencia (`v2_43_governor_evidence.py`) **no se tocan**.
   `test_auto_v4_optimizer_wiring.py` 8 + 1 en `test_auto_v2_worker_integration.py` (el flag ON está
   cableado en el worker real).
 - `quality`: **2042 → 2075 passed**, `0 skipped`; `release-tag-ci` · `python`: **2053 → 2086 passed**,
-  `0 skipped` (+33 en **ambos**; el test de aplicación va **explícito** en las dos listas).
+  `0 skipped` (+33 en **ambos**; el test de aplicación va **explícito** en las dos listas). Los conteos de
+  `v2.44` son de **CI real** (runs [35510546044](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546044)
+  y [35510840734](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840734)): los bloques offline
+  completos **no** llegaron a término en la máquina del autor (sin PostgreSQL local el `conftest` paga un
+  timeout por test), así que la red de CI es la que mide.
 - `ruff` limpio · `mypy` **0 issues** (489 ficheros) · `lint-imports` **4 kept / 0 broken**.
 - **Matriz de mutaciones medida** (`v2_44_mutation_audit.py`): **7 de 7 muerden**, huella del árbol
   intacta (objetivo, conjunto vacío, tope, EV no medido, correlación fail-open, motivo honesto en el

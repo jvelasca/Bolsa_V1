@@ -208,12 +208,16 @@ fail-closed declarado y está **fijado en test**; el productor real es de `AUTO-
 ruff check packages/py apps/api-python --config pyproject.toml     → All checks passed
 mypy <5 paquetes + apps/api-python/src> --follow-imports=silent    → Success: 489 ficheros, 0 issues
 lint-imports --config packages/py/.importlinter                    → 4 kept, 0 broken (607 ficheros)
-offline_ci_run_yaml.py ... python-ci.yml quality --with-pg-ignores → 2075 passed, 0 skipped (v2.43.3: 2042 ⇒ +33)
-offline_ci_run_yaml.py ... release-tag-ci.yml python --with-pg-ignores
-                                                                   → 2086 passed, 0 skipped (v2.43.3: 2053 ⇒ +33)
-nuevos: expected_value 12 + portfolio_optimizer 12 + wiring 8 + worker 1 = 33
+las 33 suites nuevas (EV 12 + optimizador 12 + cableado 8 + worker 1) → 33 passed
+offline_ci_run_yaml.py ... release-tag-ci.yml python (baseline)    → 2053 passed, 0 skipped (exit 0)
+CI real · quality (run 35510546044) → 2075 passed, 0 skipped (v2.43.3: 2042 ⇒ +33)
+CI real · python del tag (run 35510840734) → 2086 passed, 0 skipped (v2.43.3: 2053 ⇒ +33)
 v2_44_mutation_audit.py                                            → 7/7 muerden, huella intacta
 ```
+
+Los bloques completos de `v2.44` **no se midieron en local**: sin PostgreSQL alcanzable el `conftest` paga
+un _timeout_ por test y el bloque se vuelve inviable (ver la **corrección de procedencia** del pack §5). El
+`+33` de cada workflow lo certifica **CI real**; los `v2.43.3` son los conteos de CI de esa versión.
 
 `lint-imports`: `analytics y market no se importan entre sí` + `Domain no importa infra/analytics/
 application` siguen **KEPT** con los dos módulos nuevos (que solo importan analytics).
