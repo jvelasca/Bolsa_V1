@@ -190,6 +190,24 @@ POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
     }
 )
 
+# V2.45/AUTO-5 — estados FINALES del embudo de oportunidades (``V2.47``/AUTO-7 adelanta aquí
+# su vocabulario para poder certificarlo desde ya). Cada oportunidad del día termina en
+# EXACTAMENTE uno de los cuatro, y los tres no-operados llevan motivo: `seen == traded +
+# rejected + expired + missed`. La casa única del literal es este módulo, de modo que el
+# productor (``auto_v2_entry``) y el agregador (``auto_daily_journal``) no puedan divergir.
+OPPORTUNITY_TRADED = "traded"
+OPPORTUNITY_REJECTED = "rejected"
+OPPORTUNITY_EXPIRED = "expired"
+OPPORTUNITY_MISSED = "missed"
+OPPORTUNITY_STATUSES: frozenset[str] = frozenset(
+    {OPPORTUNITY_TRADED, OPPORTUNITY_REJECTED, OPPORTUNITY_EXPIRED, OPPORTUNITY_MISSED}
+)
+
+# V2.45/AUTO-5 — disciplina de medición: un agregado que NO se pudo medir se declara
+# (``unmeasured``), jamás se publica como ``0`` (que se leería como "coste cero").
+OPPORTUNITY_COST_UNMEASURED = "opportunity_cost_unmeasured"
+MAE_MFE_UNMEASURED = "mae_mfe_unmeasured"
+
 # V2.44/AUTO-4 — motivos del optimizador de cartera: por qué una candidata del conjunto no
 # entró en la combinación elegida (``optimizer_not_selected`` o una infeasibilidad concreta)
 # o por qué el optimizador no llegó a decidir (``optimizer_enumeration_cap_exceeded``).
@@ -224,8 +242,15 @@ __all__ = [
     "LIFECYCLE_RESOLUTION_MISSING",
     "LIFECYCLE_STATE_UNVERIFIED",
     "LIFECYCLE_TRANSITION_REJECTED",
+    "MAE_MFE_UNMEASURED",
     "MATERIALIZATION_REASONS",
     "NO_MARK_DATA",
+    "OPPORTUNITY_COST_UNMEASURED",
+    "OPPORTUNITY_EXPIRED",
+    "OPPORTUNITY_MISSED",
+    "OPPORTUNITY_REJECTED",
+    "OPPORTUNITY_STATUSES",
+    "OPPORTUNITY_TRADED",
     "OPTIMIZER_CAPITAL_EXCEEDED",
     "OPTIMIZER_CORRELATION_EXCEEDED",
     "OPTIMIZER_CORRELATION_UNKNOWN",

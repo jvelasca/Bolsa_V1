@@ -347,6 +347,10 @@ jobs:
         # directorio de ``packages/py/analytics/tests``; el GATE del cableado (flag OFF
         # byte-idéntico y el TOP que la combinación no elige con su motivo REAL) va
         # explícito por el mismo motivo.
+        # V2.45/AUTO-5 (Golden Day 2.0): el embudo hermético (``test_auto_daily_journal``)
+        # y la identidad de estrategia en el payload entran explícitos/pase de directorio.
+        # El día REAL (proceso scheduler + PG) se certifica en el job lifecycle-pg del tag
+        # con su gate fail-if-skipped, así que va en ``--ignore`` de este job offline.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -430,6 +434,7 @@ jobs:
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
+          --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           -q
 
   lifecycle-pg:
@@ -507,6 +512,10 @@ jobs:
       LIVE_PG_REQUIRED: '1'
       E2_PG_REQUIRED: '1'
       EXECUTION_FENCE_PG_REQUIRED: '1'
+      # V2.45/AUTO-5 (Golden Day 2.0): el día REAL con proceso de scheduler + PG debe
+      # ejecutarse; sin PG real el test skipearía en mudo e invalidaría la certificación
+      # del tag. Guard anti-skip dedicado más abajo (log + grep de ``skipped``).
+      AUTO_GOLDEN_DAY_V2_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -640,6 +649,30 @@ jobs:
           apps/api-python/tests/test_trackers_policies_isolation.py
           -q
           --tb=short
+
+      # V2.45/AUTO-5 (Golden Day 2.0): el DÍA REAL con el proceso de scheduler y PG real
+      # se certifica con gate propio fail-if-skipped. Va en paso DEDICADO (no se toca el
+      # ``run: >`` de arriba) para poder dejar log y aplicar el guard anti-skip: un skip
+      # silencioso sería una certificación fantasma del día real.
+      - name: Pytest Golden Day 2.0 (proceso scheduler V2 + PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_golden_day_v2_process_pg.py \
+            -q --tb=short -rs | tee /tmp/golden-day-v2-pg.log
+
+      - name: Fail on skipped Golden Day 2.0 (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/golden-day-v2-pg.log ]; then
+            echo "::error::Golden Day 2.0 no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/golden-day-v2-pg.log; then
+            echo "::error::Golden Day 2.0 dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/golden-day-v2-pg.log || true
+            exit 1
+          fi
 
   dr-verify:
     # DR honesta en el CI del tag (hallazgo C2-12 P2 / C2-13): `pnpm db:dr:test`

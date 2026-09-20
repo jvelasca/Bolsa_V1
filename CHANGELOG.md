@@ -2,6 +2,63 @@
 
 All notable releases of Bolsa V1.
 
+## [1.70.0-beta] — AUTO-5 · Golden Day 2.0: el día real y su embudo — 2026-09-20
+
+**Sin migración** (la identidad de estrategia entra como clave **aditiva** del `payload` JSONB del
+journal; el head de Alembic sigue en `043_exit_identity_and_kill_state`). AUTO-5 cierra el criterio
+"Hermetic Golden Path" del roadmap: el día completo se reproduce con **PostgreSQL real** y **proceso
+de scheduler real**, y **toda** oportunidad termina en un estado final con motivo
+(`seen == traded + rejected + expired + missed`). El gobernador y su evidencia
+(`v2_43_governor_evidence.py`) **no se tocan** (byte a byte igual y `exit 0`, con `"bump"` todavía en
+`1.68.0-beta`).
+
+### Embudo del día y atribución (`auto_daily_journal.py`, puro)
+
+- `AutoDailyReport` gana campos **aditivos** (defaults que no rompen a ningún llamante): embudo
+  (`seen`/`traded`/`rejected`/`expired`/`missed` + `rejection_reasons`), atribución por estrategia
+  (`strategy_traded`/`strategy_exits`), MAE/MFE por operación y **coste de oportunidad** de las
+  rechazadas.
+- **Partición disjunta y exhaustiva:** cada oportunidad cae en **exactamente** un estado. Un estado
+  fuera del vocabulario deja el embudo **abierto** (`opportunity_status_unknown`); una rechazada sin
+  motivo es una decisión en silencio (`rejection_without_reason`); si el `seen` del productor no cuadra
+  con las filas construidas, el día lo declara (`funnel_seen_mismatch`).
+- **Disciplina de medición del repo:** lo no medible se declara (`UNKNOWN`/`PARTIAL` + `notes`), jamás
+  un `0` que se leería como "coste cero". El coste de oportunidad se mide con el **precio posterior**
+  observado; el MAE/MFE se **recoge** del `mfe_mae` del JSONB (`AUTO-7` lo calibrará).
+
+### Identidad de estrategia sin migración
+
+- El worker añade la clave **aditiva** `strategyVersion` al `payload` de las decisiones del journal
+  (entradas y propuestas rechazadas) y a la fila del día; el cierre la **hereda** de la posición. Sin
+  versión la clave se **omite**: la ausencia es información, nunca se inventa un "unversioned".
+- `_strategy_version_from_source` aprende la fuente `auto-2.0:<version>` del pipeline V2 (antes sólo
+  entendía `active-strategy:`), de modo que el fill/cierre del camino V2 deja de quedar sin atribuir.
+
+### Capa hermética (por commit)
+
+- `packages/py/application/tests/test_auto_daily_journal.py`: embudo cerrado, motivo en cada rechazo,
+  estado desconocido, `seen` descuadrado, coste declarado y MAE/MFE declarado.
+- `apps/api-python/tests/test_auto_v2_golden_day_evidence.py`: el día del worker demuestra `time_exit`
+  - `thesis_exit`, dos versiones de estrategia atribuidas, MAE/MFE completo y la identidad en el
+    `payload` — y el rechazo tipado con su coste (`TOP_N=1`).
+
+### Capa real del tag (`lifecycle-pg`)
+
+- `apps/api-python/tests/test_golden_day_v2_process_pg.py` (NUEVO): el **proceso real**
+  `python -m bolsa_api.workers.scheduler_worker` con V2 ON abre ≥3 posiciones (una por instrumento,
+  ids **deterministas** que garantizan `fills > orders`) y cierra el libro: se detiene el proceso, se
+  lleva el techo de mantenimiento durable (`holdingDeadlineAt`) al pasado y el reinicio lo **rehidrata**
+  ⇒ venta por `time_exit`, todo `APPLIED`, cada fill con su transacción y libro canónico plano.
+  Gate fail-if-skipped propio (`AUTO_GOLDEN_DAY_V2_PG_REQUIRED`), guard anti-skip dedicado y el fichero
+  en `--ignore` de los jobs offline.
+
+### Matriz de mutaciones
+
+- `apps/api-python/scripts/v2_45_mutation_audit.py`: ocho mutaciones (motivo tipificado, estado no
+  catalogado, `seen` descuadrado, coste declarado, MAE/MFE declarado, atribución por estrategia,
+  identidad aditiva y fuente `auto-2.0`), cada una **medida** contra su suite y con la huella del árbol
+  intacta.
+
 ## [1.69.0-beta] — AUTO-4 · Portfolio Optimizer: el ranking deja de ser la decisión — 2026-09-20
 
 **Sin migración** (el optimizador es **puro** y el journal es **aditivo**; el head de Alembic sigue en

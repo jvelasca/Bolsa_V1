@@ -136,6 +136,12 @@ jobs:
         # ``packages/py/analytics/tests`` (pase de directorio). El GATE del cableado
         # (flag OFF byte-idéntico, el TOP que la combinación no elige con su motivo REAL)
         # va explícito porque es aplicación y sin registro no correría aquí.
+        # V2.45/AUTO-5 (Golden Day 2.0): el embudo hermético (``seen == traded + rejected +
+        # expired + missed`` con motivo y coste declarado) y la identidad de estrategia en
+        # el payload del journal viven en ``test_auto_daily_journal.py`` (ya registrado
+        # arriba) y en ``apps/api-python/tests`` (pase de directorio). El fichero PG nuevo
+        # (``test_golden_day_v2_process_pg.py``) se ignora aquí y se certifica en
+        # ``lifecycle-pg`` del tag con su gate propio.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -209,6 +215,7 @@ jobs:
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
+          --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
 

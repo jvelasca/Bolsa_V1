@@ -107,7 +107,7 @@ from bolsa_api.background.paper_auto_engine_worker import (
 )
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.applied_fills import read_applied_fill_facts
-from bolsa_application.auto_daily_journal import SimJournalRow
+from bolsa_application.auto_daily_journal import OperationMeasurement, OpportunityRow, SimJournalRow
 from bolsa_application.auto_engine_state_store import (
     AutoEngineSnapshot,
     AutoEngineStore,
@@ -122,6 +122,7 @@ from bolsa_application.auto_reason_codes import (
     FILL_NOT_MATERIALIZED,
     FILL_PARTIALLY_MATERIALIZED,
     LIFECYCLE_TRANSITION_REJECTED,
+    OPPORTUNITY_TRADED,
     PROTECT_REQUESTED,
     PROTECTION_MISSING,
     RECONCILIATION_REQUIRED,
@@ -333,6 +334,11 @@ class FillObservation:
 # ``DecisionPackage.source``. Es el único vínculo entre una propuesta y la versión de
 # estrategia que la originó; aquí se extrae para atribuir el fill en el settlement.
 _ACTIVE_STRATEGY_SOURCE_PREFIX = "active-strategy:"
+# V2.45/AUTO-5: el pipeline V2 (``plan_v2_tick``) emite la propuesta de entrada con
+# ``auto-2.0:<version>`` cuando la señal declara versión (y ``auto-2.0`` sin ella). Se
+# reconoce para que la atribución de V2.28 NO se pierda en el camino V2: antes solo
+# entendía ``active-strategy:`` y el fill/cierre del día V2 quedaba con versión NULL.
+_V2_ENTRY_SOURCE_PREFIX = "auto-2.0:"
 
 
 def _mark_observation_changed(
@@ -355,15 +361,17 @@ def _mark_observation_changed(
 def _strategy_version_from_source(source: Any) -> str | None:
     """Extrae la versión de estrategia de ``DecisionPackage.source``.
 
-    Devuelve ``None`` cuando la propuesta no proviene de una estrategia ACTIVE (spine
-    determinista u otro origen): la ausencia de atribución es información, nunca se
-    inventa una versión.
+    Reconoce ``active-strategy:<v>`` (decider directo) y ``auto-2.0:<v>`` (propuesta del
+    pipeline V2, V2.45/AUTO-5). Devuelve ``None`` cuando la propuesta no proviene de una
+    estrategia con versión (spine determinista, protección, ``auto-2.0`` sin versión): la
+    ausencia de atribución es información, nunca se inventa una versión.
     """
     text = str(source or "").strip()
-    if not text.startswith(_ACTIVE_STRATEGY_SOURCE_PREFIX):
-        return None
-    version_id = text[len(_ACTIVE_STRATEGY_SOURCE_PREFIX) :].strip()
-    return version_id or None
+    for prefix in (_ACTIVE_STRATEGY_SOURCE_PREFIX, _V2_ENTRY_SOURCE_PREFIX):
+        if text.startswith(prefix):
+            version_id = text[len(prefix) :].strip()
+            return version_id or None
+    return None
 
 
 def _dec_or_none(value: Any) -> Decimal | None:
@@ -656,6 +664,14 @@ class AutoSimulationWorker:
         self._v2_freshness_policy = FreshnessPolicy()
         self._v2_plan: Any = None
         self._v2_journal: list[Any] = []
+        # V2.45/AUTO-5 — embudo del día (Golden Day 2.0): filas de oportunidad con su
+        # estado FINAL y su motivo, más el contador INDEPENDIENTE de candidatas vistas
+        # (así "faltó una oportunidad por explicar" es detectable, no silencioso).
+        self._v2_opportunities: list[OpportunityRow] = []
+        self._v2_seen_signals: int = 0
+        # V2.45/AUTO-5 — MAE/MFE por operación, leído del ``mfe_mae`` del PositionState al
+        # cerrar (se RECOGE, no se calibra: la calibración stop/T1/trailing es AUTO-7).
+        self._v2_operation_measurements: list[OperationMeasurement] = []
         self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
         # V2.42 slice 2c: etiqueta del DÍA del motivo de cierre (``time_exit``/...), la que
         # viaja en la fila ``position_close``. Se deriva del motivo DECISORIO del plan, así
@@ -1025,6 +1041,55 @@ class AutoSimulationWorker:
         """
         return dict(self._v2_atr_source_counts)
 
+    def opportunity_rows(self) -> tuple[OpportunityRow, ...]:
+        """V2.45/AUTO-5 — embudo del día: oportunidades con su estado FINAL y su motivo.
+
+        Cada fila es UNA oportunidad vista (o la mejor candidata por instrumento dentro del
+        tick) con ``traded``/``rejected``/``expired``/``missed``. Las rechazadas llevan su
+        ``reason`` tipificado y, cuando el dato existe, su precio posterior (coste de
+        oportunidad). El agregado puro (``build_auto_daily_report``) certifica el cierre.
+        """
+        return tuple(self._v2_opportunities)
+
+    def seen_signals(self) -> int:
+        """V2.45/AUTO-5 — candidatas vistas en el día (contador INDEPENDIENTE de las filas)."""
+        return int(self._v2_seen_signals)
+
+    def operation_measurements(self) -> tuple[OperationMeasurement, ...]:
+        """V2.45/AUTO-5 — MAE/MFE por operación cerrada (recogido del JSONB, no calibrado)."""
+        return tuple(self._v2_operation_measurements)
+
+    def _v2_mfe_mae_snapshot(self, symbol: str) -> Mapping[str, Any]:
+        """``mfe_mae`` vigente del PositionState (copia), o vacío si no hay estado."""
+        position = self._v2_positions.get(symbol)
+        raw = getattr(position, "mfe_mae", None)
+        return dict(raw) if isinstance(raw, Mapping) else {}
+
+    def _v2_record_operation_measurement(
+        self,
+        symbol: str,
+        strategy_version: str | None,
+        mfe_mae: Mapping[str, Any],
+    ) -> None:
+        """Registra el MAE/MFE de la operación cerrada. Sin números NO se registra.
+
+        ``mfeR``/``maeR`` viven en R en el JSONB del PositionState (fuente única): aquí solo
+        se copian. Si el estado no los trae (o trae ``None``), la operación queda sin fila y
+        el día publica la medición como ``UNKNOWN``/``PARTIAL`` — jamás un 0 inventado.
+        """
+        mfe = _dec_or_none(mfe_mae.get("mfeR"))
+        mae = _dec_or_none(mfe_mae.get("maeR"))
+        if mfe is None and mae is None:
+            return
+        self._v2_operation_measurements.append(
+            OperationMeasurement(
+                instrument_id=symbol,
+                strategy_version=str(strategy_version or ""),
+                mfe=mfe,
+                mae=mae,
+            )
+        )
+
     @property
     def reconciliation_status(self) -> dict[str, str]:
         """V2.24.2 (P2-C) — estado de reconciliación por símbolo (observabilidad)."""
@@ -1183,6 +1248,7 @@ class AutoSimulationWorker:
         qty: Decimal,
         *,
         reason: str = "",
+        strategy_version: str | None = None,
     ) -> SimJournalRow:
         row = SimJournalRow(
             kind=kind,
@@ -1191,6 +1257,10 @@ class AutoSimulationWorker:
             side=side,
             qty=qty,
             reason=reason,
+            # V2.45/AUTO-5 — atribución por estrategia de la fila del día (aditiva): la
+            # apertura la aporta la propuesta y el cierre la hereda de la posición. Sin
+            # versión la fila NO se atribuye (la ausencia es información).
+            strategy_version=str(strategy_version or ""),
         )
         self._journal.append(row)
         return row
@@ -2655,8 +2725,40 @@ class AutoSimulationWorker:
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
         await self._v2_persist_tick_reservations(plan)
         self._v2_journal.extend(plan.journal_entries)
+        # V2.45/AUTO-5 — embudo del día. El precio posterior de las rechazadas de ticks
+        # ANTERIORES se mide con el tick corriente (es su primer precio DESPUÉS del
+        # descarte); las filas de ESTE tick se incorporan después, porque una oportunidad no
+        # puede ser su propio "precio posterior".
+        self._v2_measure_opportunity_costs()
+        self._v2_opportunities.extend(plan.opportunities)
+        self._v2_seen_signals += int(getattr(plan, "seen_signals", 0) or 0)
         await self._v2_prune_consumed_signals()
         return plan
+
+    def _v2_measure_opportunity_costs(self) -> None:
+        """V2.45/AUTO-5 — coste de oportunidad: precio POSTERIOR de las rechazadas.
+
+        Para cada oportunidad NO operada que aún no tiene precio posterior, se toma el
+        precio del símbolo en el tick corriente (el primero observado tras el descarte).
+        Si el símbolo no cotiza este tick se deja ``None`` y el día lo declara
+        ``unmeasured``: nunca se inventa un precio.
+        """
+        for index, row in enumerate(self._v2_opportunities):
+            if row.status == OPPORTUNITY_TRADED or row.subsequent_price is not None:
+                continue
+            try:
+                price = self._price_script(row.instrument_id, self._minute)
+            except Exception:  # noqa: BLE001 — un fallo de precio no rompe el tick.
+                continue
+            if price is None:
+                continue
+            try:
+                measured = Decimal(str(price))
+            except (ArithmeticError, ValueError):
+                continue
+            if not measured.is_finite() or measured <= 0:
+                continue
+            self._v2_opportunities[index] = replace(row, subsequent_price=measured)
 
     def _v2_recon_status(self, symbol: str) -> str | None:
         """Estado de reconciliación que ve el PositionManager para ese símbolo.
@@ -3218,6 +3320,9 @@ class AutoSimulationWorker:
             actor=self._engine_id,
             as_of=at,
             detail=detail,
+            # V2.45/AUTO-5 — la gestión de la posición se atribuye a la estrategia que la
+            # abrió (aditivo en el payload).
+            strategy_version=self._position_version.get(symbol),
         )
         self._v2_journal.append(entry)
         try:
@@ -3584,7 +3689,15 @@ class AutoSimulationWorker:
             first_execution_id = settlement.applied[0].execution_id
             if action == "BUY":
                 materialized = held + applied_qty
-                self._emit("position_open", venue, first_execution_id, "buy", applied_qty)
+                self._emit(
+                    "position_open",
+                    venue,
+                    first_execution_id,
+                    "buy",
+                    applied_qty,
+                    # V2.45/AUTO-5 — la apertura se atribuye a la estrategia que la propuso.
+                    strategy_version=effective_version,
+                )
                 self._open[symbol] = materialized
                 # AUTO 2.0 (V2): la señal de esta barra queda CONSUMIDA al ejecutarse la
                 # entrada. Si la posición muere después dentro de la misma barra (stop,
@@ -3630,6 +3743,10 @@ class AutoSimulationWorker:
                 entry_ref = self._entry_price.get(symbol)
                 if entry_ref is not None and applied_qty > 0:
                     self._sim_realized_pnl += (price - entry_ref) * applied_qty
+                # V2.45/AUTO-5 — MAE/MFE del ``mfe_mae`` del PositionState ANTES de reducir:
+                # tras el cierre puede desaparecer del mapa y la medición se perdería. Se
+                # RECOGE tal cual (si falta alguna pata, se declara sin números).
+                mfe_mae = self._v2_mfe_mae_snapshot(symbol)
                 # AUTO 2.0 (V2): actualiza el PositionState tras la venta (parcial o
                 # total) para que T1/T2 no se re-disparen en ticks sucesivos.
                 if self._v2_enabled:
@@ -3668,6 +3785,14 @@ class AutoSimulationWorker:
                             if self._v2_enabled
                             else (prot or "")
                         ),
+                        # V2.45/AUTO-5 — el CIERRE hereda la versión que abrió la posición
+                        # (para no dejar la serie con compras sin ventas).
+                        strategy_version=effective_version,
+                    )
+                    # V2.45/AUTO-5 — MAE/MFE de la OPERACIÓN cerrada (medido en el JSONB y
+                    # recogido aquí). Sin las dos patas no se publica: el día lo declara.
+                    self._v2_record_operation_measurement(
+                        symbol, effective_version, mfe_mae
                     )
                     report.closed += 1
                     self._entry_price.pop(symbol, None)

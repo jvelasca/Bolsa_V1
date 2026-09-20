@@ -344,3 +344,258 @@ def test_day_without_atr_measurement_reports_empty_not_invented() -> None:
     assert rep.atr_sources == ()
     assert rep.as_dict()["atr_sources"] == {}
 
+
+# ── V2.45/AUTO-5 (Golden Day 2.0): embudo + atribución + MAE/MFE + coste ──────────────
+
+
+def _opportunity(
+    instrument: str,
+    status: str,
+    *,
+    reason: str = "",
+    version: str = "",
+    reference: str | None = None,
+    subsequent: str | None = None,
+):
+    from bolsa_application.auto_daily_journal import OpportunityRow
+
+    return OpportunityRow(
+        instrument_id=instrument,
+        status=status,
+        reason=reason,
+        strategy_version=version,
+        reference_price=Decimal(reference) if reference is not None else None,
+        subsequent_price=Decimal(subsequent) if subsequent is not None else None,
+    )
+
+
+def test_day_without_opportunities_declares_funnel_unknown_not_zero() -> None:
+    """Sin oportunidades aportadas el embudo es UNKNOWN: no medir NO es un 0 medido."""
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    day = rep.as_dict()
+    assert rep.funnel_measurement == "UNKNOWN"
+    assert rep.funnel_closed is False
+    assert (rep.seen, rep.traded, rep.rejected, rep.expired, rep.missed) == (0, 0, 0, 0, 0)
+    assert rep.rejection_reasons == ()
+    assert rep.opportunity_cost == ()
+    assert rep.opportunity_cost_measurement == "UNKNOWN"
+    assert rep.mae_mfe_measurement == "UNKNOWN"
+    assert day["funnel_measurement"] == "UNKNOWN"
+    # Sin oportunidades la ausencia NO ensucia el día vigente (aditivo, no rompe).
+    assert "funnel_unbalanced" not in rep.errors
+    assert rep.healthy
+
+
+def test_day_funnel_covers_every_opportunity_exactly_once() -> None:
+    """``seen == traded + rejected + expired + missed`` con motivo en cada no-operada."""
+    from bolsa_application.auto_reason_codes import (
+        OPPORTUNITY_EXPIRED,
+        OPPORTUNITY_MISSED,
+        OPPORTUNITY_REJECTED,
+        OPPORTUNITY_TRADED,
+    )
+
+    opportunities = [
+        _opportunity("AAA", OPPORTUNITY_TRADED, version="v1"),
+        _opportunity("BBB", OPPORTUNITY_REJECTED, reason="top_n_excluded", version="v2"),
+        _opportunity("CCC", OPPORTUNITY_EXPIRED, reason="signal_stale", version="v1"),
+        _opportunity("DDD", OPPORTUNITY_MISSED, reason="not_evaluated", version="v2"),
+    ]
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        opportunities=opportunities,
+    )
+    assert rep.funnel_measurement == "COMPLETE"
+    assert rep.funnel_closed is True
+    assert (rep.seen, rep.traded, rep.rejected, rep.expired, rep.missed) == (4, 1, 1, 1, 1)
+    assert rep.seen == rep.traded + rep.rejected + rep.expired + rep.missed
+    assert dict(rep.rejection_reasons) == {"top_n_excluded": 1}
+    # La atribución por estrategia sale del estado de la oportunidad (no se inventa).
+    assert dict(rep.strategy_traded) == {"v1": 1}
+    assert "funnel_unbalanced" not in rep.errors
+
+
+def test_day_funnel_declares_seen_mismatch_when_an_opportunity_is_dropped() -> None:
+    """Si el productor vio MÁS oportunidades que filas construyó, el día lo declara."""
+    from bolsa_application.auto_reason_codes import OPPORTUNITY_TRADED
+
+    opportunities = [_opportunity("AAA", OPPORTUNITY_TRADED, version="v1")]
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        opportunities=opportunities,
+        seen=3,  # el productor vio 3; solo 1 terminó en un estado ⇒ faltan 2.
+    )
+    assert rep.funnel_measurement == "PARTIAL"
+    assert rep.funnel_closed is False
+    assert "funnel_seen_mismatch" in rep.errors
+    assert "funnel_unbalanced" in rep.errors
+    assert rep.healthy is False
+
+
+def test_day_rejection_without_reason_is_declared_not_dressed() -> None:
+    """Una rechazada sin motivo tipificado es una decisión en silencio: el día la declara."""
+    from bolsa_application.auto_reason_codes import OPPORTUNITY_REJECTED
+
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        opportunities=[_opportunity("BBB", OPPORTUNITY_REJECTED)],  # sin motivo
+    )
+    assert "rejection_without_reason" in rep.errors
+    assert rep.funnel_measurement == "PARTIAL"
+    assert rep.funnel_closed is False
+
+
+def test_day_unknown_opportunity_status_keeps_funnel_open() -> None:
+    """Un estado no catalogado no cae en ningún cajón: el embudo queda abierto."""
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        opportunities=[_opportunity("XYZ", "maybe", reason="?")],
+    )
+    assert "opportunity_status_unknown" in rep.errors
+    assert "funnel_unbalanced" in rep.errors
+    assert rep.funnel_closed is False
+
+
+def test_day_opportunity_cost_measured_and_declared_when_missing() -> None:
+    """El coste de oportunidad se mide con el precio posterior; sin él, se declara."""
+    from bolsa_application.auto_reason_codes import (
+        OPPORTUNITY_COST_UNMEASURED,
+        OPPORTUNITY_REJECTED,
+    )
+
+    opportunities = [
+        _opportunity(
+            "BBB",
+            OPPORTUNITY_REJECTED,
+            reason="top_n_excluded",
+            version="v2",
+            reference="100",
+            subsequent="110",
+        ),
+        _opportunity(
+            "CCC",
+            OPPORTUNITY_REJECTED,
+            reason="top_n_excluded",
+            version="v2",
+            reference="100",  # sin precio posterior ⇒ no se inventa.
+        ),
+    ]
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        opportunities=opportunities,
+    )
+    assert rep.opportunity_cost_measurement == "PARTIAL"
+    assert OPPORTUNITY_COST_UNMEASURED in rep.notes
+    by_id = {c.instrument_id: c for c in rep.opportunity_cost}
+    assert by_id["BBB"].missed_return == Decimal("0.100000")
+    assert by_id["BBB"].measurement == "COMPLETE"
+    assert by_id["CCC"].missed_return is None
+    assert by_id["CCC"].measurement == "UNKNOWN"
+    assert by_id["CCC"].notes == (OPPORTUNITY_COST_UNMEASURED,)
+    assert rep.as_dict()["opportunity_cost"][0]["measurement"] == "COMPLETE"
+
+
+def test_day_mae_mfe_aggregate_declares_partial_when_a_leg_is_missing() -> None:
+    """MAE/MFE se RECOGE: con una pata ausente el agregado se declara PARTIAL."""
+    from bolsa_application.auto_daily_journal import OperationMeasurement
+    from bolsa_application.auto_reason_codes import MAE_MFE_UNMEASURED
+
+    measurements = [
+        OperationMeasurement(
+            instrument_id="AAA",
+            strategy_version="v1",
+            mfe=Decimal("1.5"),
+            mae=Decimal("-0.5"),
+        ),
+        OperationMeasurement(
+            instrument_id="BBB",
+            strategy_version="v2",
+            mfe=None,
+            mae=Decimal("-1.0"),
+        ),
+    ]
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        measurements=measurements,
+    )
+    assert rep.mae_mfe_measurement == "PARTIAL"
+    assert MAE_MFE_UNMEASURED in rep.notes
+    assert len(rep.mae_mfe) == 2
+    day = rep.as_dict()
+    assert day["mae_mfe"][0]["instrumentId"] == "AAA"
+    assert day["mae_mfe"][0]["mfe"] == "1.5"
+
+
+def test_day_mae_mfe_complete_when_both_legs_present() -> None:
+    from bolsa_application.auto_daily_journal import OperationMeasurement
+
+    rep = build_auto_daily_report(
+        rows=_healthy_rows(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        measurements=[
+            OperationMeasurement(
+                instrument_id="AAA", strategy_version="v1", mfe=Decimal("1.5"), mae=Decimal("-0.5")
+            )
+        ],
+    )
+    assert rep.mae_mfe_measurement == "COMPLETE"
+    assert rep.notes == ()
+
+
+def test_day_strategy_exits_attributed_from_close_rows() -> None:
+    """La salida se atribuye a la estrategia que la declaró en la fila de cierre."""
+    rows = [
+        *_healthy_rows(),
+        SimJournalRow(
+            kind="position_close",
+            venue="simulated",
+            execution_id="c-v1",
+            side="sell",
+            qty=Decimal("1"),
+            reason="time_exit",
+            strategy_version="v1",
+        ),
+        SimJournalRow(
+            kind="position_close",
+            venue="simulated",
+            execution_id="c-v2",
+            side="sell",
+            qty=Decimal("1"),
+            reason="thesis_exit",
+            strategy_version="v2",
+        ),
+        SimJournalRow(
+            kind="position_close",
+            venue="simulated",
+            execution_id="c-none",
+            side="sell",
+            qty=Decimal("1"),
+            reason="structural_stop",
+            strategy_version="",  # sin versión: NO se reparte, se declara ausente.
+        ),
+    ]
+    rep = build_auto_daily_report(
+        rows=rows,
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    assert dict(rep.strategy_exits) == {"v1": 1, "v2": 1}
+    assert rep.as_dict()["strategy_exits"] == {"v1": 1, "v2": 1}
+

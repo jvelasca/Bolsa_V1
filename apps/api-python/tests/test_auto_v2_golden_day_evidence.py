@@ -46,6 +46,9 @@ from bolsa_application.execution_event import InMemoryExecutionEventStore
 #: Tres símbolos, tres sectores: el gate de concentración sectorial no veta el día.
 _SYMBOLS = ["AAA", "BBB", "CCC"]
 _SECTORS = {"AAA": "tech", "BBB": "health", "CCC": "energy"}
+#: V2.45/AUTO-5 — DOS versiones de estrategia distintas abren el día: la atribución por
+#: estrategia y la identidad en el ``payload`` del journal deben poder distinguirlas.
+_STRATEGY_BY_SYMBOL = {"AAA": "orb-1", "BBB": "orb-1", "CCC": "meanrev-2"}
 #: ATR real inyectado (2 % de 100): el stop estructural queda en 100 − 1.5×2 = 97.
 _ATR = {"v": 2.0}
 #: Nivel de invalidación de tesis de ``BBB``: por debajo del precio y por encima del stop.
@@ -105,11 +108,20 @@ def _clock_holder(now: datetime):
 
 
 def _decider_for(worker: AutoSimulationWorker, want: set[str]) -> _Prov:
-    """BUY sólo para los símbolos planos que el día quiere abrir; HOLD en el resto."""
+    """BUY sólo para los símbolos planos que el día quiere abrir; HOLD en el resto.
+
+    V2.45/AUTO-5: la propuesta declara su versión de estrategia en ``source``
+    (``active-strategy:<v>``), que es el ÚNICO vínculo que atribuye el fill y el cierre.
+    """
 
     def _d(symbol: str) -> DecisionPackage:
         if symbol in want and worker._open.get(symbol, Decimal("0")) <= 0:
-            return DecisionPackage(action="BUY", instrument_id=symbol, quantity=250.0)
+            return DecisionPackage(
+                action="BUY",
+                instrument_id=symbol,
+                quantity=250.0,
+                source=f"active-strategy:{_STRATEGY_BY_SYMBOL.get(symbol, 'unversioned')}",
+            )
         return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
 
     return _d
@@ -196,6 +208,10 @@ async def test_v2_golden_day_journal_evidences_time_exit_and_thesis_exit(
         atr_sources=worker.atr_source_counts(),
         net_cash_delta=Decimal("0"),
         ledger_remainder=Decimal("0"),
+        # V2.45/AUTO-5 — embudo, atribución, MAE/MFE y coste, medidos por el worker.
+        opportunities=worker.opportunity_rows(),
+        measurements=worker.operation_measurements(),
+        seen=worker.seen_signals(),
     )
     day = report.as_dict()
 
@@ -226,6 +242,25 @@ async def test_v2_golden_day_journal_evidences_time_exit_and_thesis_exit(
     # 4) La medición del ATR del día viaja en el reporte (procedencia, no impresión).
     assert dict(report.atr_sources).get(ATR_SOURCE_REAL, 0) > 0, day
     assert dict(report.atr_sources).get(ATR_SOURCE_FALLBACK, 0) == 0, day
+
+    # 5) V2.45/AUTO-5 — el EMBUDO del día cierra: toda oportunidad vista termina en un
+    #    estado final y las tres acaban operadas (nada se queda sin explicar).
+    assert report.funnel_closed, report.errors
+    assert report.seen == worker.seen_signals() == 3, day
+    assert report.seen == report.traded + report.rejected + report.expired + report.missed
+    assert (report.traded, report.rejected, report.expired, report.missed) == (3, 0, 0, 0), day
+
+    # 6) Atribución por estrategia: DOS versiones distintas abren el día y cada salida se
+    #    atribuye a la versión que la declaró (nunca a un cajón «unversioned»).
+    assert dict(report.strategy_traded) == {"orb-1": 2, "meanrev-2": 1}, day
+    assert dict(report.strategy_exits) == {"orb-1": 2, "meanrev-2": 1}, day
+    assert sum(dict(report.strategy_exits).values()) == report.exits
+
+    # 7) MAE/MFE RECOGIDO del ``mfe_mae`` del JSONB (no calibrado): las tres operaciones
+    #    traen sus dos patas y el agregado se declara COMPLETE.
+    assert report.mae_mfe_measurement == "COMPLETE", day
+    assert len(report.mae_mfe) == 3, day
+    assert all(m.mfe is not None and m.mae is not None for m in report.mae_mfe)
 
 
 @pytest.mark.asyncio
@@ -286,3 +321,78 @@ async def test_v2_golden_day_measures_atr_provenance_when_real_is_missing(
     ]
     assert declared, "el ATR sintético debe declararse en el journal (nunca disfrazarse)"
     assert declared[0].payload["atrSource"] == ATR_SOURCE_FALLBACK
+
+
+# ── V2.45/AUTO-5: embudo con rechazos tipificados y su coste de oportunidad ───────────
+
+
+@pytest.mark.asyncio
+async def test_v2_golden_day_funnel_types_every_rejection_and_prices_its_cost(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Con ``TOP_N=1`` el día RECHAZA con motivo real y mide el coste de lo no operado.
+
+    Es el otro lado del embudo: no basta con que lo operado cuadre, hay que declarar POR QUÉ
+    se quedó fuera cada candidata (``top_n_excluded``, no un motivo ajeno) y con qué precio
+    posterior se midió esa ausencia (``unmeasured`` declarado si faltara el dato).
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_TOP_N", "1")
+    prices = {"AAA": 100.0, "BBB": 100.0, "CCC": 100.0}
+    holder, clock = _clock_holder(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    worker = _worker(clock=clock, prices=prices)
+
+    # El día abre las tres: con TOP_N=1 hay que rechazar candidatas en cada turno.
+    await _open_all_three(worker)
+    assert set(worker.open_symbols) == set(_SYMBOLS), worker.open_symbols
+
+    report = build_auto_daily_report(
+        rows=worker.journal_pairs(),
+        atr_sources=worker.atr_source_counts(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+        opportunities=worker.opportunity_rows(),
+        measurements=worker.operation_measurements(),
+        seen=worker.seen_signals(),
+    )
+    day = report.as_dict()
+
+    # 1) El embudo cierra con rechazos presentes y todos tipificados igual (top_n).
+    assert report.funnel_closed, report.errors
+    assert report.seen == worker.seen_signals()
+    assert report.traded == 3, day  # las tres posiciones del día se abren.
+    assert report.expired == 0 and report.missed == 0, day
+    assert report.rejected == report.seen - report.traded, day
+    assert report.rejected > 0, "TOP_N=1 debe rechazar candidatas (no un día sin embudo)"
+    assert dict(report.rejection_reasons) == {"top_n_excluded": report.rejected}, day
+    assert report.seen == report.traded + report.rejected + report.expired + report.missed
+
+    # 2) El coste de oportunidad de las rechazadas se MIDE con el precio posterior observado
+    #    (no se inventa): todas las filas quedan COMPLETE con su ``missedReturn``.
+    assert report.opportunity_cost_measurement == "COMPLETE", day
+    assert len(report.opportunity_cost) == report.rejected
+    assert all(c.missed_return is not None for c in report.opportunity_cost), day
+    assert all(c.reason == "top_n_excluded" for c in report.opportunity_cost), day
+    assert report.notes == (), day
+
+
+@pytest.mark.asyncio
+async def test_v2_golden_day_journal_payload_carries_strategy_identity(
+    v2_env: None,
+) -> None:
+    """V2.45/AUTO-5 — la identidad de estrategia viaja ADITIVA en el ``payload`` JSONB.
+
+    Sin migración: el journal gana la clave ``strategyVersion`` (y la omite cuando no hay
+    versión). Aquí se comprueba en las decisiones del día, no en una promesa.
+    """
+    prices = {"AAA": 100.0, "BBB": 100.0, "CCC": 100.0}
+    worker = _worker(prices=prices)
+    worker._decider = _decider_for(worker, {"AAA"})
+    await worker.auto_turn()
+
+    entries = [
+        entry
+        for entry in worker._v2_journal
+        if entry.payload is not None and entry.event_type == "auto_entry_decision"
+    ]
+    versions = {entry.payload.get("strategyVersion") for entry in entries}
+    assert "orb-1" in versions, versions

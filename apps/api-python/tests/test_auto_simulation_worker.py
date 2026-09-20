@@ -264,6 +264,21 @@ def test_strategy_version_from_source_ignores_non_strategy_sources() -> None:
     assert _strategy_version_from_source("active-strategy:") is None
 
 
+def test_strategy_version_from_source_reads_v2_entry_proposal() -> None:
+    """V2.45/AUTO-5: el camino V2 (``auto-2.0:<v>``) también atribuye su versión.
+
+    Antes solo se entendía ``active-strategy:`` y una entrada del pipeline V2 quedaba sin
+    versión (fill y cierre con atribución NULL). Un ``auto-2.0`` SIN versión sigue sin
+    atribuir: la ausencia es información, no un cajón «unversioned».
+    """
+    from bolsa_api.background.auto_simulation_worker import _strategy_version_from_source
+
+    assert _strategy_version_from_source("auto-2.0:orb-1") == "orb-1"
+    assert _strategy_version_from_source("auto-2.0") is None
+    # El prefijo de gestión de posición NO es el de entrada (el ``:`` lo distingue).
+    assert _strategy_version_from_source("auto-2.0-position:time_exit") is None
+
+
 @pytest.mark.asyncio
 async def test_open_fills_carry_active_strategy_version(auto_env: None) -> None:
     """La apertura atribuye sus fills a la versión del ``DecisionPackage.source``."""

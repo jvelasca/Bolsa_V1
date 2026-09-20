@@ -28,6 +28,7 @@ import logging
 import os
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from decimal import Decimal
 from typing import Any, cast
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
@@ -85,8 +86,14 @@ from bolsa_analytics.cognitive.signal_identity import (
 )
 from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
 from bolsa_analytics.indicators.compute import compute_atr
+from bolsa_application.auto_daily_journal import OpportunityRow
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
-from bolsa_application.auto_reason_codes import RESERVATION_FAILED
+from bolsa_application.auto_reason_codes import (
+    OPPORTUNITY_EXPIRED,
+    OPPORTUNITY_REJECTED,
+    OPPORTUNITY_TRADED,
+    RESERVATION_FAILED,
+)
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.discovery_market_regime import (
     MATH_VERSION_MARKET_REGIME_V0,
@@ -617,6 +624,13 @@ class V2TickPlan:
     # V2.44/AUTO-4 — decisión del optimizador de cartera (solo con el flag ON; ``None`` con
     # el flag OFF ⇒ el payload del tick es byte-idéntico al histórico).
     optimizer: OptimizerDecision | None = None
+    # V2.45/AUTO-5 — embudo del tick: UNA fila por oportunidad vista, con su estado FINAL
+    # auditado (``traded``/``rejected``/``expired``/``missed``) y, para las no operadas, su
+    # motivo. ``seen_signals`` es el número de candidatas que compitieron (medido de forma
+    # INDEPENDIENTE de las filas): si no cuadra con el número de filas, faltó una
+    # oportunidad por explicar y el día lo declara (``funnel_seen_mismatch``).
+    opportunities: tuple[OpportunityRow, ...] = ()
+    seen_signals: int = 0
 
     @property
     def approved_symbols(self) -> tuple[str, ...]:
@@ -933,6 +947,7 @@ def plan_v2_tick(
     # identidad verificable (V2.40.1: sin identidad no hay idempotencia ni auditoría).
     consumed = {str(x).strip() for x in consumed_signal_ids if str(x).strip()}
     blocked: list[DecisionJournalEntryRecord] = []
+    blocked_opportunities: list[OpportunityRow] = []
     eligible: list[V2Signal] = []
     for candidate in entry_signals:
         reason = _signal_rejection(candidate, consumed=consumed, as_of=as_of)
@@ -941,6 +956,18 @@ def plan_v2_tick(
         else:
             blocked.append(
                 _rejected_signal_entry(candidate, reason, actor=actor, as_of=as_of)
+            )
+            # V2.45/AUTO-5 — el descarte pre-rankeo también es un estado FINAL del embudo:
+            # ``signal_stale`` es EXPIRADA (la señal caducó), el resto son rechazos. Un
+            # descarte sin motivo tipificado dejaría el embudo abierto.
+            blocked_opportunities.append(
+                _opportunity_row(
+                    candidate,
+                    status=(
+                        OPPORTUNITY_EXPIRED if reason == SIGNAL_STALE else OPPORTUNITY_REJECTED
+                    ),
+                    reason=reason,
+                )
             )
     entry_signals = eligible
 
@@ -971,6 +998,17 @@ def plan_v2_tick(
         for score in ranked
         if score.instrument_id not in score_by_symbol and score.instrument_id in deduped
     ]
+    # V2.45/AUTO-5 — las candidatas del ranking que NO entraron en el TOP son rechazadas
+    # con su motivo REAL (``top_n_excluded``), nunca con uno ajeno.
+    excluded_opportunities: list[OpportunityRow] = [
+        _opportunity_row(
+            deduped[score.instrument_id],
+            status=OPPORTUNITY_REJECTED,
+            reason=TOP_N_EXCLUDED,
+        )
+        for score in ranked
+        if score.instrument_id not in score_by_symbol and score.instrument_id in deduped
+    ]
 
     packages: dict[str, DecisionPackage] = {}
     decisions: list[PortfolioDecision] = []
@@ -981,6 +1019,7 @@ def plan_v2_tick(
     # es byte-idéntico al histórico (``optimizer`` queda ``None``).
     optimizer_decision: OptimizerDecision | None = None
     optimizer_excluded: list[DecisionJournalEntryRecord] = []
+    optimizer_opportunities: list[OpportunityRow] = []
     if cfg.optimizer_enabled and ordered:
         optimizer_decision = _optimize_candidate_set(
             ordered,
@@ -1007,6 +1046,17 @@ def plan_v2_tick(
                     actor=actor,
                     as_of=as_of,
                     score=score_by_symbol.get(signal.instrument_id),
+                )
+                for signal in ordered
+                if signal.instrument_id not in chosen
+            ]
+            # V2.45/AUTO-5 — la candidata del conjunto que la cartera NO eligió es un
+            # rechazo con su motivo REAL (infeasibilidad concreta o ``optimizer_not_selected``).
+            optimizer_opportunities = [
+                _opportunity_row(
+                    signal,
+                    status=OPPORTUNITY_REJECTED,
+                    reason=reason_by_id.get(signal.instrument_id, OPTIMIZER_NOT_SELECTED),
                 )
                 for signal in ordered
                 if signal.instrument_id not in chosen
@@ -1115,7 +1165,38 @@ def plan_v2_tick(
                 decisions[-1] = decision
             else:
                 packages[signal.instrument_id] = package
-        journal.append(_journal_entry(decision, actor=actor, as_of=as_of))
+        journal.append(
+            _journal_entry(
+                decision,
+                actor=actor,
+                as_of=as_of,
+                strategy_version=signal.strategy_version,
+            )
+        )
+
+    # V2.45/AUTO-5 — embudo del tick: una fila por candidata vista, con su estado FINAL.
+    # ``seen_signals`` se mide sobre el conjunto deduplicado (lo que de verdad compitió) y
+    # es INDEPENDIENTE de las filas: si una candidata no termina en ninguna fila, el
+    # agregado del día lo declara (``funnel_seen_mismatch``) en vez de perderla en silencio.
+    evaluated_opportunities: list[OpportunityRow] = []
+    for decision in decisions:
+        candidate_signal = deduped.get(decision.instrument_id)
+        if decision.approved:
+            evaluated_opportunities.append(
+                _opportunity_row(candidate_signal, status=OPPORTUNITY_TRADED)
+            )
+        else:
+            evaluated_opportunities.append(
+                _opportunity_row(
+                    candidate_signal,
+                    status=OPPORTUNITY_REJECTED,
+                    reason=(
+                        str(decision.reason_codes[0])
+                        if decision.reason_codes
+                        else "hold_no_op"
+                    ),
+                )
+            )
 
     return V2TickPlan(
         entry_packages=packages,
@@ -1128,6 +1209,15 @@ def plan_v2_tick(
         risk_state=_risk_state_for(snapshot, ledger),
         governor_states=tuple(governor_states),
         optimizer=optimizer_decision,
+        opportunities=tuple(
+            (
+                *blocked_opportunities,
+                *excluded_opportunities,
+                *optimizer_opportunities,
+                *evaluated_opportunities,
+            )
+        ),
+        seen_signals=len(deduped),
     )
 
 
@@ -1290,12 +1380,17 @@ def build_position_management_journal_entry(
     actor: str,
     as_of: str,
     detail: Mapping[str, Any] | None = None,
+    strategy_version: str | None = None,
 ) -> DecisionJournalEntryRecord:
     """AUTO-2 — journal de la gestión de posición (ratchet, transiciones, degradación).
 
     El worker V2 no journalizaba la decisión de posición: un ``PROTECT`` sin efecto, un
     rechazo de transición o una protección ausente quedaban mudos. Este evento los hace
     observables sin convertirlos en una orden (un ratchet no vende).
+
+    V2.45/AUTO-5: ``strategy_version`` viaja como clave ADITIVA del ``payload`` (sin
+    migración), de modo que la gestión de una posición se atribuye a la estrategia que la
+    abrió. Sin versión la clave se omite (la ausencia no se disfraza).
     """
     from uuid import uuid4
 
@@ -1304,6 +1399,8 @@ def build_position_management_journal_entry(
         "instrumentId": instrument_id,
         "reasonCodes": [reason_code],
     }
+    if str(strategy_version or "").strip():
+        payload["strategyVersion"] = str(strategy_version)
     if detail:
         payload.update(dict(detail))
     return DecisionJournalEntryRecord(
@@ -1581,6 +1678,39 @@ def _signal_rejection(
     return None
 
 
+def _opportunity_row(
+    signal: V2Signal | None,
+    *,
+    status: str,
+    reason: str = "",
+) -> OpportunityRow:
+    """V2.45/AUTO-5 — fila del embudo para UNA candidata vista en el tick.
+
+    ``reference_price`` es el precio de la señal (la referencia del coste de oportunidad);
+    ``subsequent_price`` lo rellena después el worker con el primer precio observado
+    DESPUÉS del descarte. Sin señal (defensa) la fila se declara sin precio ni versión —
+    nunca se inventa una referencia.
+    """
+    instrument_id = str(getattr(signal, "instrument_id", "") or "")
+    version = str(getattr(signal, "strategy_version", "") or "")
+    price_raw = getattr(signal, "price", None)
+    reference: Decimal | None = None
+    if price_raw is not None:
+        try:
+            candidate = Decimal(str(price_raw))
+        except (ArithmeticError, ValueError):
+            candidate = None
+        if candidate is not None and candidate.is_finite() and candidate > 0:
+            reference = candidate
+    return OpportunityRow(
+        instrument_id=instrument_id,
+        status=status,
+        reason=str(reason or ""),
+        strategy_version=version,
+        reference_price=reference,
+    )
+
+
 def _rejected_signal_entry(
     signal: V2Signal,
     reason: str,
@@ -1613,6 +1743,11 @@ def _rejected_signal_entry(
         "validUntil": signal.valid_until,
         "indicator": "strategy",
     }
+    # V2.45/AUTO-5 — identidad de estrategia ADITIVA en el ``payload`` JSONB (sin migración:
+    # el journal durable no tiene columna de estrategia y no la gana aquí). Sin versión la
+    # clave se OMITE: la ausencia es información, jamás se inventa un "unversioned".
+    if str(signal.strategy_version or "").strip():
+        payload["strategyVersion"] = str(signal.strategy_version)
     if score is not None:
         payload["opportunityScore"] = score.combined
         payload["rank"] = score.rank
@@ -1629,7 +1764,11 @@ def _rejected_signal_entry(
 
 
 def _journal_entry(
-    decision: PortfolioDecision, *, actor: str, as_of: str
+    decision: PortfolioDecision,
+    *,
+    actor: str,
+    as_of: str,
+    strategy_version: str | None = None,
 ) -> DecisionJournalEntryRecord:
     from uuid import uuid4
 
@@ -1646,6 +1785,10 @@ def _journal_entry(
         # V2.40.4 — violaciones de coherencia del TradePlan (vacío si fue válido).
         "planViolations": list(decision.plan_violations),
     }
+    # V2.45/AUTO-5 — identidad de estrategia ADITIVA (misma doctrina que el rechazo: la
+    # clave se omite si no hay versión). Permite atribuir la decisión del día sin migración.
+    if str(strategy_version or "").strip():
+        payload["strategyVersion"] = str(strategy_version)
     # V2.43/AUTO-3 — las TRES dimensiones del gobernador en TODA decisión no-trade
     # (criterio de salida del roadmap): ``marketRegime``/``riskRegime`` son HECHOS con
     # fuente y ``operationalState`` es el PERMISO derivado. Se emiten SOLO cuando el
