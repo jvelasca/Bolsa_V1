@@ -245,3 +245,17 @@ Desglose de `Python CI` (cifras del log, no estimadas):
   y el enlace reserva→intent con fill parcial **corrieron contra PostgreSQL real** (gate
   fail-if-skipped), no skipearon.
 - `paper-forward-pg` **2 passed** · `grammar-discovery-pg` **21 passed** · `lifecycle-pg` **13 passed**.
+
+### 9.1 CI real de la ref del tag `v2.43.3-beta` (`52b97126`, docs-only)
+
+| Run                                                                            | Workflow         | Resultado                                                                      |
+| ------------------------------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------ |
+| [`35508331525`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35508331525) | `Python CI`      | **GREEN 5/5**                                                                  |
+| [`35508331431`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35508331431) | `Release tag CI` | **GREEN** — 10 jobs requeridos + `certify (aggregate + artifact)` en `success` |
+| [`35508329936`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35508329936) | `Gitleaks`       | **GREEN**                                                                      |
+
+Cifras del log del `Release tag CI`: job `python` (offline) **2053 passed, 35 skipped** en 56,53 s
+(coincide con el runner offline local: **2053 passed**, mismos _passed_); `lifecycle-pg` con **PG real**
+**148 passed** + **45 passed** (gate de aislamiento) — los **144 → 148 = +4** son otra vez los cuatro
+tests de la 043, aquí por el job del tag; `frontend` 1261, `shared` 778, `decision-spine` 604, `a7-gate`
+7, `playwright (mock E2E)` 76; `playwright (integrated E2E)` **`skipped`** por opt-in.

@@ -108,7 +108,14 @@ de sellado docs-only (convención de `v2.43-beta`…`v2.43.2-beta`); `v2.43-beta
 **GREEN 5/5** (run [`35507944960`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35507944960):
 `quality` **2042 passed, 38 skipped** en 115,73 s, `auto-v2-durable-pg` **43 passed**, `paper-forward-pg`
 2 passed, `grammar-discovery-pg` 21 passed, `lifecycle-pg` 13 passed) y `Gitleaks` **GREEN**
-(run [`35507944962`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35507944962)).
+(run [`35507944962`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35507944962)). **CI real de la ref del
+tag `v2.43.3-beta`** (`52b97126`): `Python CI` **GREEN 5/5**
+(run [`35508331525`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35508331525), `auto-v2-durable-pg`
+**43 passed**) y `Release tag CI` **GREEN** con `certify (aggregate + artifact)` en `success`
+(run [`35508331431`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35508331431): job `python` offline
+**2053 passed, 35 skipped**, `lifecycle-pg` con PG real **148 + 45 passed**; `playwright (integrated E2E)`
+`skipped` por opt-in), más `Gitleaks` **GREEN**
+(run [`35508329936`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35508329936)).
 
 ### Deuda diferida (fuera de esta versión, declarada)
 
