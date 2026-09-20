@@ -323,10 +323,11 @@ que restaura), ni `governor.json` (generado, sin trackear).
 
 ## 9. Sello
 
-**Producido parcialmente a propósito**: lo que ya existe **cita el run que lo produjo**; lo que falta se
-declara como pendiente y **ninguna** cifra se atribuye a un artefacto que no exista.
+**Completo.** §9.1 es el sello en `main` (commit de fase) y §9.2 el sello en la ref del **tag**. Cada
+cifra **cita el run que la produjo**: no se atribuye ninguna a un artefacto que no exista, y la medición
+local de §5 **no** se mezcla con la del CI.
 
-### 9.1 Producido (2026-09-20)
+### 9.1 Producido en `main` (commit de fase)
 
 1. **Commit de fase** [`a14b71d7`](https://github.com/jvelasca/Bolsa_V1/commit/a14b71d750fd28f60b6ca7ec9db6e6cca020700e)
    — los **17 ficheros** del §8 (`+2869/−25`). Nota de honestidad sobre el diff: el `git diff --cached`
@@ -348,14 +349,45 @@ declara como pendiente y **ninguna** cifra se atribuye a un artefacto que no exi
    [`35534775681`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775681) (1m30s) y
    `Fase 2 scientific` [`35534775675`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775675) (1m18s).
 
-### 9.2 Pendiente de producir (se cierra en el commit de evidencia, no antes)
+### 9.2 Producido en la ref del tag (cierra el sello)
 
-4. **`Release tag CI`** con `certify` en `success` sobre la ref del tag: job `python` offline
-   **2102 passed** (los mismos **+4** sobre los 2098 de `v2.45-beta`), y en `lifecycle-pg` los **dos pasos
-   dedicados** nuevos (**1 passed** cada uno) con sus guards anti-skip **pasando**; `a7-gate`, `dr-verify`,
-   `decision-spine`, `shared`, `security` y `frontend` en `success`.
-5. **Tag anotado `v2.46-beta`** sobre la ref de sellado, y `Python CI` en la ref del tag.
+4. **Tag anotado `v2.46-beta`** sobre la ref de sellado docs-only `5eb654b9` (aditivo: los seis tags
+   anteriores — `v2.43*`, `v2.44-beta`, `v2.45-beta` — **no se mueven**).
+5. **`Release tag CI`** — run [`35535111995`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35535111995)
+   **GREEN** (8m5s) con `certify (aggregate + artifact)` en `success`:
+   - job `python` offline: **2102 passed, 35 skipped** en 58,91 s ⇒ los **+4** exactos sobre los 2098 de
+     `v2.45-beta`, tal y como predecía el §9.2 previo a este commit.
+   - `lifecycle-pg`: **148 passed** + **45 passed** (account-isolation) y **tres pasos dedicados** en
+     verde — `Golden Day 2.0` **1 passed in 10,68 s**, **`Crash/Recovery Day` (NUEVO) 1 passed in
+     9,44 s** y **`Concurrent AUTO` (NUEVO) 1 passed in 1,64 s** — cada uno con su guard
+     `Fail on skipped … (no skip silencioso)` **pasando** y sus `*_PG_REQUIRED=1` presentes en el `env:`
+     del step (`AUTO_CRASH_RECOVERY_PG_REQUIRED` y `AUTO_CONCURRENT_PG_REQUIRED` visibles en el log).
+   - `security (gitleaks)`, `dr-verify`, `decision-spine`, `shared`, `frontend`, `playwright (mock E2E)`,
+     `a7-gate` y `certify`: **success**; `playwright (integrated E2E)` `skipped` por **opt-in**.
+6. **`Python CI` en la ref del tag** — run
+   [`35535111988`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35535111988) **GREEN 5/5**:
+   `quality` **2091 passed, 38 skipped** (idéntico al de `main`, que es lo exigible: un commit docs-only
+   no debe mover la cifra) y `auto-v2-durable-pg` **43 passed**. En el mismo push del tag:
+   `Gitleaks` [`35535110216`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35535110216) (main),
+   `Frontend CI` [`35535112005`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35535112005),
+   `Optimize lab` [`35535112002`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35535112002) y
+   `Fase 2 scientific` [`35535112008`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35535112008)
+   **GREEN**.
 
-Las cifras de §9.2 se escribirán **citando el run que las produjo**, sin mezclar la medición local de §5
-con la del CI (el aprendizaje de `v2.44` §5 y `v2.45` §8: una cifra correcta atribuida al instrumento
-equivocado es un defecto de honestidad, no un redondeo).
+### 9.3 Cómo se verifica este sello (sin creerme)
+
+```bash
+# la ref del tag y su commit
+git rev-parse v2.46-beta^{commit}          # 5eb654b9…  (sello docs-only)
+git log --oneline -3 v2.46-beta
+
+# los dos pasos dedicados del gate, en el log del job lifecycle-pg del tag
+gh run view 35535111995 --log | rg 'Pytest (Crash/Recovery|Concurrent)'
+#   => "1 passed in 9.44s"  y  "1 passed in 1.64s"
+
+# el guard anti-skip existe y pasó
+gh run view 35535111995 --log | rg 'Fail on skipped (Crash/Recovery|Concurrent)'
+```
+
+Nota de honestidad sobre la cifra del job `python` del tag (**2102**): es una predicción escrita **antes**
+del tag (en `5eb654b9`) y cumplida **después**; no se ajustó a posteriori.
