@@ -132,6 +132,10 @@ jobs:
         # viven en ``apps/api-python/tests`` (pase de directorio). Su gemelo PG
         # (``test_auto_v44_exit_identity_pg.py``) se ignora aquí y se certifica en
         # auto-v2-durable-pg: sin ``--ignore`` skipearía en mudo en este job.
+        # V2.44/AUTO-4: el valor esperado y el optimizador puros viven en
+        # ``packages/py/analytics/tests`` (pase de directorio). El GATE del cableado
+        # (flag OFF byte-idéntico, el TOP que la combinación no elige con su motivo REAL)
+        # va explícito porque es aplicación y sin registro no correría aquí.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -157,6 +161,7 @@ jobs:
           packages/py/application/tests/test_discovery_param_region.py
           packages/py/application/tests/test_discovery_market_regime.py
           packages/py/application/tests/test_auto_v3_governor_gate.py
+          packages/py/application/tests/test_auto_v4_optimizer_wiring.py
           packages/py/application/tests/test_auto_v2_entry.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py

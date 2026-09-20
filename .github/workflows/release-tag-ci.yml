@@ -343,6 +343,10 @@ jobs:
         # ``packages/py/analytics/tests`` y la evidencia la de ``apps/api-python/tests``;
         # el GATE de aplicación (flag OFF byte-idéntico, vetos ``governor_*``, escalado de
         # tamaño/edge y las tres dimensiones en el journal) va explícito por ser POR FICHERO.
+        # V2.44/AUTO-4: el valor esperado y el optimizador puros entran por el pase de
+        # directorio de ``packages/py/analytics/tests``; el GATE del cableado (flag OFF
+        # byte-idéntico y el TOP que la combinación no elige con su motivo REAL) va
+        # explícito por el mismo motivo.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -376,6 +380,7 @@ jobs:
           packages/py/application/tests/test_discovery_param_region.py
           packages/py/application/tests/test_discovery_market_regime.py
           packages/py/application/tests/test_auto_v3_governor_gate.py
+          packages/py/application/tests/test_auto_v4_optimizer_wiring.py
           packages/py/application/tests/test_auto_v2_entry.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py

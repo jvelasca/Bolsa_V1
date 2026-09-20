@@ -42,10 +42,31 @@ V2.42 slice 2c (cierre de `AUTO-2`) añade aquí la **etiqueta del día** del mo
 (`day_exit_reason`): el journal del día cuenta las salidas por su etiqueta
 (`time_exit`/`thesis_exit`/`structural_stop`/...) y las que el decider cierra sin motivo de
 protección se cuentan como `undeclared`, nunca como otra cosa.
+
+V2.44 / AUTO-4 añade aquí los motivos del **optimizador de cartera** (``OPTIMIZER_REASONS``):
+son la razón por la que una candidata del conjunto no entró en la combinación elegida
+(``optimizer_not_selected`` o una infeasibilidad concreta) y la razón por la que el
+optimizador no llegó a decidir (``optimizer_enumeration_cap_exceeded``). El literal vive en
+``portfolio_optimizer`` (analytics) y se re-exporta aquí para el journal.
 """
 
 from __future__ import annotations
 
+from bolsa_analytics.cognitive.portfolio_optimizer import (
+    OPTIMIZER_CAPITAL_EXCEEDED,
+    OPTIMIZER_CORRELATION_EXCEEDED,
+    OPTIMIZER_CORRELATION_UNKNOWN,
+    OPTIMIZER_DRAWDOWN_BLOCKS_NEW_RISK,
+    OPTIMIZER_ENUMERATION_CAP_EXCEEDED,
+    OPTIMIZER_EXPECTED_VALUE_UNMEASURED,
+    OPTIMIZER_LIQUIDITY_BELOW_MINIMUM,
+    OPTIMIZER_LIQUIDITY_UNKNOWN,
+    OPTIMIZER_NOT_SELECTED,
+    OPTIMIZER_NOTIONAL_UNMEASURED,
+    OPTIMIZER_RISK_UNMEASURED,
+    OPTIMIZER_SECTOR_EXCEEDED,
+    OPTIMIZER_SECTOR_UNMEASURED,
+)
 from bolsa_analytics.cognitive.position_lifecycle import (
     LIFECYCLE_RESOLUTION_MISSING,
     LIFECYCLE_STATE_UNVERIFIED,
@@ -169,6 +190,27 @@ POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
     }
 )
 
+# V2.44/AUTO-4 — motivos del optimizador de cartera: por qué una candidata del conjunto no
+# entró en la combinación elegida (``optimizer_not_selected`` o una infeasibilidad concreta)
+# o por qué el optimizador no llegó a decidir (``optimizer_enumeration_cap_exceeded``).
+OPTIMIZER_REASONS: frozenset[str] = frozenset(
+    {
+        OPTIMIZER_NOT_SELECTED,
+        OPTIMIZER_EXPECTED_VALUE_UNMEASURED,
+        OPTIMIZER_NOTIONAL_UNMEASURED,
+        OPTIMIZER_RISK_UNMEASURED,
+        OPTIMIZER_CORRELATION_UNKNOWN,
+        OPTIMIZER_CORRELATION_EXCEEDED,
+        OPTIMIZER_LIQUIDITY_UNKNOWN,
+        OPTIMIZER_LIQUIDITY_BELOW_MINIMUM,
+        OPTIMIZER_CAPITAL_EXCEEDED,
+        OPTIMIZER_SECTOR_UNMEASURED,
+        OPTIMIZER_SECTOR_EXCEEDED,
+        OPTIMIZER_DRAWDOWN_BLOCKS_NEW_RISK,
+        OPTIMIZER_ENUMERATION_CAP_EXCEEDED,
+    }
+)
+
 __all__ = [
     "ATR_GEOMETRY",
     "ATR_SOURCES",
@@ -184,6 +226,20 @@ __all__ = [
     "LIFECYCLE_TRANSITION_REJECTED",
     "MATERIALIZATION_REASONS",
     "NO_MARK_DATA",
+    "OPTIMIZER_CAPITAL_EXCEEDED",
+    "OPTIMIZER_CORRELATION_EXCEEDED",
+    "OPTIMIZER_CORRELATION_UNKNOWN",
+    "OPTIMIZER_DRAWDOWN_BLOCKS_NEW_RISK",
+    "OPTIMIZER_ENUMERATION_CAP_EXCEEDED",
+    "OPTIMIZER_EXPECTED_VALUE_UNMEASURED",
+    "OPTIMIZER_LIQUIDITY_BELOW_MINIMUM",
+    "OPTIMIZER_LIQUIDITY_UNKNOWN",
+    "OPTIMIZER_NOT_SELECTED",
+    "OPTIMIZER_NOTIONAL_UNMEASURED",
+    "OPTIMIZER_REASONS",
+    "OPTIMIZER_RISK_UNMEASURED",
+    "OPTIMIZER_SECTOR_EXCEEDED",
+    "OPTIMIZER_SECTOR_UNMEASURED",
     "POSITION_DECISION_UNAVAILABLE",
     "POSITION_LIFECYCLE_REASONS",
     "POSITION_MARK_REJECTED",

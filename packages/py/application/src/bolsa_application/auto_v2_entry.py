@@ -35,6 +35,7 @@ from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
     PortfolioPosition,
     build_auto_portfolio_snapshot,
 )
+from bolsa_analytics.cognitive.expected_value import build_expected_value
 from bolsa_analytics.cognitive.market_regime_gate import (
     map_trial_regime,
     regime_is_exit_only,
@@ -55,6 +56,14 @@ from bolsa_analytics.cognitive.opportunity_ranker import (
     rank_opportunities,
     score_opportunity,
     select_top_opportunities,
+)
+from bolsa_analytics.cognitive.portfolio_optimizer import (
+    DEFAULT_MAX_COMBINATIONS,
+    OPTIMIZER_NOT_SELECTED,
+    OptimizerCandidate,
+    OptimizerConstraints,
+    OptimizerDecision,
+    optimize_portfolio,
 )
 from bolsa_analytics.cognitive.portfolio_reservation import (
     PortfolioReservation,
@@ -221,6 +230,34 @@ class V2Tunables:
     # Factor sobre ``min_edge`` en ``ENTRY_RESTRICTED`` (>= 1: nunca relaja el listón).
     governor_restricted_edge_factor: float = 2.0
 
+    # --- V2.44 / AUTO-4 — optimizador de cartera --------------------------------------
+    # OFF por defecto ⇒ el camino V2 es BYTE-IDÉNTICO: no se construye ninguna candidata,
+    # no se llama al optimizador y el journal no gana ninguna clave. Con ON, el ``top_n``
+    # pasa a ser el tamaño del CONJUNTO CANDIDATO y la combinación la elige la cartera
+    # (`portfolio_optimizer`), no el ranking.
+    optimizer_enabled: bool = False
+    # Tope declarado de subconjuntos a evaluar (enumeración EXACTA, no heurística). Si el
+    # espacio del conjunto candidato lo supera, el optimizador NO optimiza (fail-closed) y
+    # el tick cae al camino del ranking, declarándolo.
+    optimizer_max_combinations: int = DEFAULT_MAX_COMBINATIONS
+    # Capacidad máxima de la combinación. ``None`` ⇒ ``top_n`` (el conjunto candidato
+    # entero es, como mucho, toda la cartera del tick).
+    optimizer_max_positions: int | None = None
+
+    def optimizer_constraints(self) -> OptimizerConstraints:
+        """Restricciones duras del optimizador derivadas de los tunables (pura)."""
+        return OptimizerConstraints(
+            max_positions=(
+                self.optimizer_max_positions
+                if self.optimizer_max_positions is not None and self.optimizer_max_positions > 0
+                else self.top_n
+            ),
+            max_sector_pct=self.max_sector_pct,
+            max_correlation=self.max_correlation,
+            min_liquidity_notional=self.governor_min_liquidity_notional,
+            max_combinations=self.optimizer_max_combinations,
+        )
+
     def governor_policy(self) -> GovernorPolicy:
         """Política del gobernador derivada de los tunables (pura, sin env)."""
         return GovernorPolicy(
@@ -293,6 +330,34 @@ def _cost_model_from_env() -> TradingCostModel | None:
     )
 
 
+def _optimizer_max_combinations_from_env(base: V2Tunables) -> int:
+    """Tope de combinatoria del optimizador (entero > 0; cualquier otra cosa ⇒ default).
+
+    No se "sana a medias": un valor no entero o no positivo descarta la env y queda el
+    default declarado, porque el tope es la barrera que evita una explosión combinatoria.
+    """
+    raw = (os.getenv("AUTO_ENGINE_SIM_V2_OPT_MAX_COMBINATIONS") or "").strip()
+    if not raw:
+        return base.optimizer_max_combinations
+    try:
+        value = int(raw)
+    except ValueError:
+        return base.optimizer_max_combinations
+    return value if value > 0 else base.optimizer_max_combinations
+
+
+def _optimizer_max_positions_from_env(base: V2Tunables) -> int | None:
+    """Capacidad de la combinación (entero > 0; ausencia o inválido ⇒ ``None`` = ``top_n``)."""
+    raw = (os.getenv("AUTO_ENGINE_SIM_V2_OPT_MAX_POSITIONS") or "").strip()
+    if not raw:
+        return base.optimizer_max_positions
+    try:
+        value = int(raw)
+    except ValueError:
+        return base.optimizer_max_positions
+    return value if value > 0 else base.optimizer_max_positions
+
+
 def tunables_from_env() -> V2Tunables:
     """Lee los umbrales del pipeline V2 de env (valores inválidos ⇒ default seguro)."""
     base = V2Tunables()
@@ -344,6 +409,13 @@ def tunables_from_env() -> V2Tunables:
         # umbrales SANEADOS como bloque (ver ``_governor_env_overrides``).
         governor_enabled=_env_flag("AUTO_ENGINE_SIM_V2_GOVERNOR", base.governor_enabled),
         **_governor_env_overrides(base),
+        # V2.44/AUTO-4 — optimizador de cartera: OPT-IN explícito (default OFF) ⇒ con OFF
+        # el tick es byte-idéntico al de v2.43.3.
+        optimizer_enabled=_env_flag(
+            "AUTO_ENGINE_SIM_V2_OPTIMIZER", base.optimizer_enabled
+        ),
+        optimizer_max_combinations=_optimizer_max_combinations_from_env(base),
+        optimizer_max_positions=_optimizer_max_positions_from_env(base),
         cost_model=_cost_model_from_env(),
     )
 
@@ -502,6 +574,16 @@ class V2Signal:
     signal_id: str = ""
     bar_timestamp: str = ""
     valid_until: str = ""
+    # V2.44/AUTO-4 — geometría y economía de la oportunidad. ``target_price`` es el
+    # objetivo declarado (si lo hay) y las tres medias son el valor esperado **económico**
+    # que la estrategia declara sobre su propio setup: ``p_win`` (probabilidad de acierto),
+    # ``avg_win_r`` (R medio de las ganadoras) y ``avg_loss_r`` (R medio de las perdedoras,
+    # ``<= 0``). Son ADITIVOS y opcionales: sin ellos la oportunidad no es comparable
+    # económicamente y el optimizador la declara no medible (nunca la puntúa 0).
+    target_price: float | None = None
+    p_win: float | None = None
+    avg_win_r: float | None = None
+    avg_loss_r: float | None = None
     # V2.40.1 — estado EXPLÍCITO de los gates de cartera (sector/liquidez/correlación).
     # Si se aporta, manda sobre ``sector``/``liquidity_notional`` sueltos: es la vía por
     # la que el worker comunica KNOWN/STALE/CONFLICTING/UNKNOWN sin perder información.
@@ -532,6 +614,9 @@ class V2TickPlan:
     # datos DE LA CANDIDATA; el detalle completo de las tres dimensiones vive en la entrada
     # de journal de cada decisión. Vacío con el governor OFF (comportamiento actual).
     governor_states: tuple[tuple[str, str], ...] = ()
+    # V2.44/AUTO-4 — decisión del optimizador de cartera (solo con el flag ON; ``None`` con
+    # el flag OFF ⇒ el payload del tick es byte-idéntico al histórico).
+    optimizer: OptimizerDecision | None = None
 
     @property
     def approved_symbols(self) -> tuple[str, ...]:
@@ -693,6 +778,111 @@ def _score_from_signal(signal: V2Signal) -> OpportunityScore:
     )
 
 
+def _optimizer_candidate(
+    signal: V2Signal,
+    *,
+    snapshot: Any,
+    cfg: V2Tunables,
+    regime: str | None,
+) -> OptimizerCandidate:
+    """Candidata del optimizador para UNA señal, con la foto de sizing del motor.
+
+    El tamaño y el riesgo **no se estiman aquí**: se piden al MISMO motor
+    (``decide_portfolio``) contra la foto INICIAL del tick, de modo que la combinación que
+    elige el optimizador no pueda discrepar de lo que el motor dimensionará después. El
+    gobernador NO se aplica en esta foto (se aplica en el bucle real de decisión): aquí
+    solo se mide la ECONOMÍA y el encaje de cartera de la candidata.
+
+    La geometría del valor esperado sale de la distancia de stop que el propio allocator
+    calculó (``stopDistance``), no de una segunda fórmula de stop paralela.
+    """
+    signal_ctx = _context_for_signal(signal)
+    # La MISMA geometría que usará la decisión real: si la señal no trae ATR y la política
+    # no lo exige, se usa el sintético ``atr_pct_fallback`` (nunca se dimensiona el
+    # optimizador con una geometría distinta a la del motor).
+    atr = signal.atr
+    if atr is None and signal.price > 0 and not cfg.atr_required:
+        atr = signal.price * cfg.atr_pct_fallback
+    probe = decide_portfolio(
+        instrument_id=signal.instrument_id,
+        direction="long",
+        entry_price=signal.price if signal.price > 0 else None,
+        atr=atr,
+        opportunity_score=_score_from_signal(signal),
+        snapshot=snapshot,
+        regime=regime,
+        trade_context=signal_ctx,
+        config=cfg.decision_config(),
+        as_of="",
+    )
+    allocation = probe.allocation or {}
+    quantity = _finite_or_none(allocation.get("quantity"))
+    distance = _finite_or_none(allocation.get("stopDistance"))
+    entry = float(signal.price) if signal.price and signal.price > 0 else None
+    stop = (entry - distance) if (entry is not None and distance is not None) else None
+
+    expected = build_expected_value(
+        entry=entry,
+        stop=stop,
+        target=signal.target_price,
+        quantity=quantity,
+        p_win=signal.p_win,
+        avg_win_r=signal.avg_win_r,
+        avg_loss_r=signal.avg_loss_r,
+        cost_model=cfg.cost_model,
+    )
+    return OptimizerCandidate(
+        instrument_id=signal.instrument_id,
+        expected_value=expected,
+        notional=_finite_or_none(allocation.get("positionValue")),
+        risk_amount=_finite_or_none(allocation.get("riskAmount")),
+        sector=signal_ctx.sector,
+        liquidity_notional=signal_ctx.liquidity_notional,
+        correlation_with_portfolio=signal_ctx.correlation,
+    )
+
+
+def _finite_or_none(value: Any) -> float | None:
+    """Número finito de un payload serializado; cualquier otra cosa ⇒ ``None``."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number or number in (float("inf"), float("-inf")):
+        return None
+    return number
+
+
+def _optimize_candidate_set(
+    ordered: Sequence[V2Signal],
+    *,
+    snapshot: Any,
+    cfg: V2Tunables,
+    regime: str | None,
+    governor_blocks_new_risk: bool,
+) -> OptimizerDecision:
+    """Corre el optimizador sobre el conjunto candidato (el TOP N del ranking).
+
+    ``available_cash``/``equity`` salen de la foto INICIAL del tick y el permiso de riesgo
+    nuevo del gobernador (si veta aperturas, el conjunto vacío gana por construcción, no
+    por un cero inventado).
+    """
+    constraints = cfg.optimizer_constraints()
+    constraints = replace(
+        constraints,
+        available_cash=getattr(snapshot, "available_cash", None),
+        equity=getattr(snapshot, "equity", None),
+        new_risk_allowed=not governor_blocks_new_risk,
+    )
+    candidates = [
+        _optimizer_candidate(signal, snapshot=snapshot, cfg=cfg, regime=regime)
+        for signal in ordered
+    ]
+    return optimize_portfolio(candidates, constraints)
+
+
 def plan_v2_tick(
     *,
     snapshot: Any,
@@ -785,6 +975,48 @@ def plan_v2_tick(
     packages: dict[str, DecisionPackage] = {}
     decisions: list[PortfolioDecision] = []
     journal: list[DecisionJournalEntryRecord] = []
+    # V2.44/AUTO-4 — el ranking deja de ser la decisión. Con el flag ON, el TOP N es el
+    # CONJUNTO CANDIDATO y la combinación la elige la cartera por valor esperado sujeto a
+    # restricciones duras. Con el flag OFF nada de esto se ejecuta y el payload del tick
+    # es byte-idéntico al histórico (``optimizer`` queda ``None``).
+    optimizer_decision: OptimizerDecision | None = None
+    optimizer_excluded: list[DecisionJournalEntryRecord] = []
+    if cfg.optimizer_enabled and ordered:
+        optimizer_decision = _optimize_candidate_set(
+            ordered,
+            snapshot=snapshot,
+            cfg=cfg,
+            regime=resolved_regime,
+            # La parada DURA es del tick (no de la candidata) y es el único veto que el
+            # optimizador puede aplicar como restricción de conjunto. Los vetos por
+            # candidata del gobernador (EXIT_ONLY, listón de edge) siguen aplicándose
+            # íntegros en el bucle de decisión de abajo: el optimizador no los sustituye.
+            governor_blocks_new_risk=halted,
+        )
+        if optimizer_decision.decided:
+            chosen = set(optimizer_decision.selected)
+            reason_by_id = optimizer_decision.reasons_by_instrument()
+            by_id = {s.instrument_id: s for s in ordered}
+            # Las candidatas del TOP que la combinación NO eligió se declaran con su
+            # motivo REAL (infeasibilidad concreta o ``optimizer_not_selected``); nunca
+            # con ``edge_below_threshold``, que sería falso: su score es válido.
+            optimizer_excluded = [
+                _rejected_signal_entry(
+                    signal,
+                    reason_by_id.get(signal.instrument_id, OPTIMIZER_NOT_SELECTED),
+                    actor=actor,
+                    as_of=as_of,
+                    score=score_by_symbol.get(signal.instrument_id),
+                )
+                for signal in ordered
+                if signal.instrument_id not in chosen
+            ]
+            # El orden de evaluación pasa a ser el de la combinación elegida (determinista
+            # por construcción), no el del ranking.
+            ordered = [by_id[i] for i in optimizer_decision.selected if i in by_id]
+        # Si el optimizador NO llegó a decidir (tope de combinatoria), el tick cae al
+        # camino del ranking sin inventar nada y ``optimizer_decision`` lleva el motivo.
+
     # V2.43/AUTO-3 — el gobernador se consulta SOLO si el flag está ON. La política se
     # resuelve UNA vez por tick; la lectura se resuelve por candidata porque las bandas de
     # volatilidad (ATR de la señal) y liquidez (su ``TradeContext``) son datos suyos.
@@ -889,12 +1121,13 @@ def plan_v2_tick(
         entry_packages=packages,
         decisions=tuple(decisions),
         ranked=tuple(ranked),
-        journal_entries=tuple((*blocked, *excluded, *journal)),
+        journal_entries=tuple((*blocked, *excluded, *optimizer_excluded, *journal)),
         regime=resolved_regime,
         as_of=as_of,
         reservations=ledger.live(),
         risk_state=_risk_state_for(snapshot, ledger),
         governor_states=tuple(governor_states),
+        optimizer=optimizer_decision,
     )
 
 

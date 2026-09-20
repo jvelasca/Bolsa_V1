@@ -1154,3 +1154,43 @@ async def test_v2_protect_is_never_silent(v2_env: None) -> None:
         degraded=False,
     )
     assert "protect_requested" in _journal_codes(worker)
+
+
+@pytest.mark.asyncio
+async def test_v2_optimizer_on_without_an_economic_producer_is_fail_closed(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AUTO-4 · el flag ON está cableado en el worker y, sin economía, NO opera.
+
+    El worker construye hoy las señales sin ``p_win``/medias históricas (el productor
+    real es de ``AUTO-7``), así que ninguna candidata es comparable **económicamente**.
+    El optimizador no puede puntuarlas ni con ``0.0`` ni con un default: las declara
+    ``optimizer_expected_value_unmeasured`` y el conjunto vacío gana. Es fail-closed
+    **declarado**, no un silencio — y la prueba de que la diferencia la pone el
+    optimizador (y no el mercado) es que el MISMO tick con el flag OFF sí abre.
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_OPTIMIZER", "0")
+    off = _worker()
+    off._decider = _buy_lot()
+    await off.auto_turn()
+    assert off._open.get("AAA", Decimal("0")) > 0, (
+        "con el flag OFF el tick abre como siempre (byte-identidad)"
+    )
+
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_OPTIMIZER", "1")
+    on = _worker()
+    on._decider = _buy_lot()
+    await on.auto_turn()
+
+    assert on._open.get("AAA", Decimal("0")) == 0, (
+        "sin economía medible el optimizador no opera: el vacío gana"
+    )
+    codes = [
+        code
+        for entry in on._v2_journal
+        if entry.payload is not None
+        for code in entry.payload.get("reasonCodes", ())
+    ]
+    assert "optimizer_expected_value_unmeasured" in codes
+    assert "approved" not in codes
+

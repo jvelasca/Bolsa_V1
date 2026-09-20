@@ -2,6 +2,85 @@
 
 All notable releases of Bolsa V1.
 
+## [1.69.0-beta] — AUTO-4 · Portfolio Optimizer: el ranking deja de ser la decisión — 2026-09-20
+
+**Sin migración** (el optimizador es **puro** y el journal es **aditivo**; el head de Alembic sigue en
+`043_exit_identity_and_kill_state`). Hasta aquí `plan_v2_tick` recortaba al `TOP_N` y decidía **una a
+una** en el orden del ranking: la primera entraba y las siguientes solo si la anterior dejaba hueco, de
+modo que el **ranking era la respuesta**. Ahora, con `AUTO_ENGINE_SIM_V2_OPTIMIZER=1`, el `TOP_N` es el
+**tamaño del conjunto candidato** y la **cartera elige la combinación** que maximiza valor esperado
+**económico** sujeto a riesgo. **Flag OFF por defecto ⇒ byte-identidad con `v2.43.3`.** El gobernador y
+su evidencia (`v2_43_governor_evidence.py`) **no se tocan**.
+
+### Valor esperado económico (`expected_value.py`, puro)
+
+- Lo que faltaba: hasta aquí la decisión comparaba **heurísticas** (`OpportunityScore` es una suma
+  ponderada de componentes normalizados; el `edge` es una **confianza declarada**, no dinero). Ahora:
+  `Expected R = p·avg_win_r + (1−p)·avg_loss_r`, `Expected € = Expected R × risk_amount` y
+  `Expected € neto = Expected € − coste de ida y vuelta` (el coste, por `TradingCostModel`, la casa
+  única del coste).
+- **Disciplina de medición del repo, sin excepciones:** `p_win` fuera de `[0, 1]`, media ausente,
+  signo imposible o geometría invertida **degradan** la medición (`UNKNOWN`/`PARTIAL`) **y lo declaran**
+  en `notes`; **jamás** se convierten en un `0.0` que se colaría como "una oportunidad más". Un stop del
+  lado equivocado **no** es "riesgo 0" (misma lección que `H3` de `v2.43.2`).
+- El `avg_win_r` puede **derivarse** del `target` si la estrategia no declara media histórica: es una
+  media _declarada como derivada_ (`avg_win_r_derived_from_target`), no una invención.
+
+### Optimizador de cartera (`portfolio_optimizer.py`, puro)
+
+- **Enumeración EXACTA acotada** de subconjuntos (`1..max_positions`), determinista, con **desempate
+  declarado**: máximo `Σ net_expected_currency`; a igual valor, **menor riesgo** (`Σ risk_amount`); a
+  igual riesgo, combinación **lexicográficamente menor**. El «MIN Portfolio Risk» del roadmap entra como
+  **desempate + restricciones duras**, no como optimización multi-objetivo con pesos.
+- **Restricciones duras:** capacidad, capital (`Σ notional <= available_cash`), concentración sectorial
+  **de la combinación**, correlación y liquidez (**fail-closed**: un límite activo con el dato ausente
+  es **infeasible**, no "sin límite"), y permiso de riesgo nuevo. Un límite `None` es **sin límite
+  declarado**, nunca "cero".
+- **La opción de NO operar compite:** el conjunto vacío vale `0`; si nada factible tiene valor
+  positivo, se elige **no operar** (`empty_set_wins`). Un optimizador que siempre encuentra algo que
+  comprar no es un optimizador.
+- **Tope de combinatoria fail-closed:** si el espacio supera `max_combinations` (default `4096`), el
+  optimizador **no optimiza** (`measurement=UNKNOWN` + `optimizer_enumeration_cap_exceeded`) y el tick
+  **cae al camino del ranking**. Nada de greedy silencioso.
+
+### Cableado en `plan_v2_tick` (flag OFF por defecto)
+
+- `AUTO_ENGINE_SIM_V2_OPTIMIZER=0` (default) ⇒ no se construye ninguna candidata, no se llama al
+  optimizador, `V2TickPlan.optimizer` queda `None` y el **journal no gana ninguna clave**.
+- Con **ON**, el TOP del ranking es el **conjunto candidato** y el `ordered` de evaluación pasa a ser la
+  **combinación elegida**. Las candidatas del TOP que **no** entran se journalizan con su **motivo REAL**
+  (infeasibilidad concreta o `optimizer_not_selected`) y su **score real** — **nunca**
+  `edge_below_threshold`, que sería falso.
+- **El tamaño lo fija el propio motor:** la candidata se dimensiona con una **sonda**
+  `decide_portfolio` contra la foto inicial del tick, con la **misma** caída de ATR que la decisión real
+  (no hay una segunda fórmula de stop ni de sizing). Si el motor no la dimensiona, la candidata no es
+  medible económicamente y el optimizador lo declara.
+- **El gobernador y el kill switch siguen mandando:** la parada dura entra como permiso de cartera; los
+  vetos **por candidata** (`EXIT_ONLY`, listón de edge escalado, bandas de volatilidad/liquidez) se
+  aplican **sin cambios** en el bucle de decisión. El optimizador solo decide **qué** se evalúa y **en
+  qué orden**; toda la maquinaria de reservas, `_working_snapshot` y `RESERVATION_FAILED` queda intacta.
+- `V2Signal` gana cuatro campos **aditivos y opcionales** (`target_price`, `p_win`, `avg_win_r`,
+  `avg_loss_r`) y `auto_reason_codes` añade `OPTIMIZER_REASONS` (el journal tiene una sola casa).
+
+### Verificación medida (no declarada)
+
+- **33 tests nuevos**: `test_expected_value.py` 12 + `test_portfolio_optimizer.py` 12 +
+  `test_auto_v4_optimizer_wiring.py` 8 + 1 en `test_auto_v2_worker_integration.py` (el flag ON está
+  cableado en el worker real).
+- `quality`: **2042 → 2075 passed**, `0 skipped`; `release-tag-ci` · `python`: **2053 → 2086 passed**,
+  `0 skipped` (+33 en **ambos**; el test de aplicación va **explícito** en las dos listas).
+- `ruff` limpio · `mypy` **0 issues** (489 ficheros) · `lint-imports` **4 kept / 0 broken**.
+- **Matriz de mutaciones medida** (`v2_44_mutation_audit.py`): **7 de 7 muerden**, huella del árbol
+  intacta (objetivo, conjunto vacío, tope, EV no medido, correlación fail-open, motivo honesto en el
+  journal y el propio flag).
+
+### Límite declarado
+
+**No hay productor de economía en el camino del tick** (`_v2_signals` no aporta `p_win`/medias: el
+productor real es de `AUTO-7`). Con el flag **ON** y sin economía, **todas** las candidatas son
+`optimizer_expected_value_unmeasured` y el tick **no opera**: es **fail-closed declarado** y está fijado
+en test. Con el flag **OFF por defecto**, el camino de producción no cambia.
+
 ## [1.68.3-beta] — AUTO-3 reliability closure: kill durable, identidad de salida y orden UTC — 2026-09-20
 
 **Migración 043** (`043_exit_identity_and_kill_state`): nacen `auto_kill_state` y `auto_exit_orders` y la
