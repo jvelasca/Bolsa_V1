@@ -318,3 +318,25 @@ Desglose de `Python CI` (medido, no esperado):
 (`test_auto_v4_optimizer_wiring.py`) corre **en CI** y no solo en local — el YAML lo lista
 explícitamente en `quality` y en `python` del tag, y el incremento coincide dígito a dígito con el
 recuento local de tests nuevos.
+
+**CI real de la ref del tag `v2.44-beta` (`c95819c1`, el commit docs-only):**
+
+| Workflow            | Run                                                                            | Resultado                                                |
+| ------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| `Release tag CI`    | [`35510840734`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840734) | **GREEN**, `certify (aggregate + artifact)` en `success` |
+| `Python CI`         | [`35510840771`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840771) | **GREEN 5/5**                                            |
+| `Gitleaks`          | [`35510839339`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510839339) | **GREEN**                                                |
+| `Optimize lab`      | [`35510840762`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840762) | **GREEN**                                                |
+| `Frontend CI`       | [`35510840724`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840724) | **GREEN**                                                |
+| `Fase 2 scientific` | [`35510840720`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840720) | **GREEN**                                                |
+
+Desglose de la ref del tag:
+
+- `python (ruff/imports/mypy/pytest offline)` **2086 passed, 35 skipped** en **60,68 s** — los mismos
+  **+33** sobre los **2053** de `v2.43.3-beta`. El bloque local medía **2086**: igual.
+- `lifecycle-pg` con PostgreSQL real **148 + 45 passed**; `a7-gate` **7 passed**; `shared`
+  **778 tests / 94 ficheros**; `playwright (mock E2E)` **success** y `playwright (integrated E2E)`
+  **`skipped`** por ser opt-in, igual que en `v2.43.3-beta`.
+- `Python CI` en la ref del tag: `quality` **2075 passed, 38 skipped** y `auto-v2-durable-pg`
+  **43 passed**, idénticos a los del commit de fase — la ref sellada mide lo mismo que el commit de fase,
+  que es justo lo que se quiere poder afirmar.

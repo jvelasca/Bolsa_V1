@@ -95,7 +95,18 @@ sellado docs-only (convención de `v2.43-beta`…`v2.43.3-beta`); `v2.43-beta`/`
 `Fase 2 scientific` **GREEN**
 (run [`35510546060`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546060)). El `+33` de `quality`
 es la prueba de que el test de aplicación (`test_auto_v4_optimizer_wiring.py`) corre **en CI** y no solo en
-local.
+local. **CI real de la ref del tag `v2.44-beta`** (`c95819c1`): `Release tag CI` **GREEN** con
+`certify (aggregate + artifact)` en `success`
+(run [`35510840734`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840734): job `python` offline
+**2086 passed, 35 skipped** — los mismos **+33** sobre los 2053 de `v2.43.3-beta` —, `lifecycle-pg` con PG
+real **148 + 45 passed**, `a7-gate` 7 passed, `shared` 778 tests / 94 ficheros, `playwright (mock E2E)`
+`success` y `playwright (integrated E2E)` `skipped` por opt-in), `Python CI` **GREEN 5/5**
+(run [`35510840771`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840771): `quality` **2075
+passed, 38 skipped**, `auto-v2-durable-pg` **43 passed** — idénticos al commit de fase), `Gitleaks`
+**GREEN** (run [`35510839339`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510839339)),
+`Optimize lab` **GREEN** (run [`35510840762`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840762)),
+`Frontend CI` **GREEN** (run [`35510840724`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840724))
+y `Fase 2 scientific` **GREEN** (run [`35510840720`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510840720)).
 
 ## [1.68.3-beta] — AUTO-3 reliability closure: kill durable, identidad de salida y orden UTC — 2026-09-20
 
