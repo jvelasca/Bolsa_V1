@@ -36,6 +36,38 @@
 - **Especificación:** §8 del [`roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md`](./roadmap-auto-v2-40-4-a-v2-48-2026-09-16.md)
   (`AUTO-6` es **gate de certificación**: «si los dos escenarios no corren, la versión no se pone»).
 
+**Aviso de lectura si auditas desde GitHub (no pises esta trampa).** El **código** se lee en la ref del
+tag (contiene `a14b71d7`); **los documentos**, en **`main`**. Motivo medido, no supuesto: en la ref del
+**tag**, el pack es la versión **pre-evidencia** (su §9.2 todavía dice «Pendiente de producir») y **este
+brief no existe** (`git ls-tree --name-only v2.46-beta docs/engineering/ | rg 'v2[.-]46'` lista **3**
+ficheros; en `main`, **4**). Es el **mismo patrón medido de `v2.45-beta`**: su pack en la ref del tag
+contenía **1** run id y en `main` **2** — el segundo entró en
+`9ef57aff` (`docs(v2.45): evidencia de CI del sello…`), **posterior** al tag. Es decir: el tag es el
+**sello**, y la evidencia es un commit docs-only **después** del sello.
+
+| Qué                                             | Dónde leerlo                                                 |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| Código de la fase (17 ficheros)                 | ref del tag **`v2.46-beta`** o commit de fase **`a14b71d7`** |
+| Pack (con §9 completo), brief, plan, estado     | **`main`** (`d7f902f2`)                                      |
+| Logs de CI y artefacto `release-tag-ci-summary` | página pública de los runs (abajo)                           |
+
+**Lo que NO está en GitHub y hay que re-ejecutar** (declarado, no escondido): el log de la matriz de
+mutaciones vive en `logs/agent/v2_46_mutation_audit.txt`, que el §8.1 del plan declara **local y no
+versionado**, y `governor.json` es **generado y sin trackear**. La matriz se re-mide con el comando del
+§7; no se «cita» un fichero que no existe en el repo.
+
+**URLs públicas** (repo **público**, comprobado con petición anónima: `200` en la raw del pack en la ref
+del tag, en la raw del brief en `main`, en la página del run del tag y en la del tag):
+
+- Tag: <https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.46-beta> · commit de fase:
+  <https://github.com/jvelasca/Bolsa_V1/commit/a14b71d7>
+- Run del sello (tag): <https://github.com/jvelasca/Bolsa_V1/actions/runs/35535111995> · artefacto
+  `release-tag-ci-summary`
+- Run de `main` (fase): <https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775724>
+- Pack / brief en `main`:
+  <https://github.com/jvelasca/Bolsa_V1/blob/main/docs/engineering/audit-pack-v2.46-auto-6-crash-recovery-concurrent-2026-09-20.md> ·
+  <https://github.com/jvelasca/Bolsa_V1/blob/main/docs/engineering/audit-brief-v2.46-auto-6-crash-recovery-concurrent-2026-09-20.md>
+
 **Freeze (congelado — tocarlo _es_ hallazgo):**
 
 - `apps/api-python/scripts/v2_43_governor_evidence.py` **byte a byte igual** y `exit 0`, con su
