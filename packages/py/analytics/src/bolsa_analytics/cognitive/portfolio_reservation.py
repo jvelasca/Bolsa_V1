@@ -408,6 +408,9 @@ class PortfolioReservation:
     released_qty: float = 0.0
     remaining_qty: float = 0.0
     lease_generation: int = 0
+    # V2.43.3 — identidad del INTENT de salida (``auto_exit_orders``) que esta reserva
+    # sirve. Es aditiva y opcional: las reservas de compra y las históricas no la tienen.
+    exit_order_id: str | None = None
 
     def __post_init__(self) -> None:
         if not str(self.reservation_id or "").strip():
@@ -471,6 +474,7 @@ class PortfolioReservation:
             "releasedQty": self.released_qty,
             "remainingQty": self.remaining_qty,
             "leaseGeneration": self.lease_generation,
+            "exitOrderId": self.exit_order_id,
         }
 
 
@@ -496,6 +500,7 @@ def build_reservation(
     cost: TradingCost | None = None,
     created_at: str | None = None,
     lease_generation: int = 0,
+    exit_order_id: str | None = None,
 ) -> PortfolioReservation:
     """Construye una reserva normalizando lo que se conozca (fail-closed).
 
@@ -560,6 +565,11 @@ def build_reservation(
         created_at=created_at,
         remaining_qty=_round4(qty) if qty is not None else 0.0,
         lease_generation=max(0, int(lease_generation)),
+        exit_order_id=(
+            str(exit_order_id).strip()
+            if isinstance(exit_order_id, str) and exit_order_id.strip()
+            else None
+        ),
     )
 
 

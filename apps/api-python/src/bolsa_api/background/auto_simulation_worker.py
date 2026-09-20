@@ -47,6 +47,11 @@ from bolsa_analytics.cognitive.data_freshness import (
     FreshnessPolicy,
     assess_data_freshness,
 )
+from bolsa_analytics.cognitive.exit_order import (
+    ExitOrder,
+    build_exit_order,
+    new_exit_order_id,
+)
 from bolsa_analytics.cognitive.exit_plan import is_thesis_invalidated
 from bolsa_analytics.cognitive.exit_policy import (
     resolve_exit_policy,
@@ -159,6 +164,8 @@ from bolsa_application.execution_event import (
     UNAPPLIED_EXECUTION_EVENT_STATUSES,
     ExecutionEventStore,
 )
+from bolsa_application.exit_order_store import ExitOrderStore
+from bolsa_application.kill_switch_store import KillState, KillSwitchStore
 from bolsa_application.position_manager import (
     KILL_SWITCH,
     RISK_EXIT,
@@ -543,6 +550,14 @@ class AutoSimulationWorker:
         # y ``execution_events`` queda como reconciliación de arranque. Sin él (camino
         # hermético) el libro de órdenes pendientes sigue derivándose como en V2.40.4.
         reservation_store: ReservationStore | None = None,
+        # V2.43.3 (P0-1): espejo durable del latch de la parada dura (``auto_kill_state``).
+        # Sin él la parada es solo del proceso y un reinicio la olvida. Con él, el arranque
+        # la LEE antes de readoptar posición y el motor no puede reabrirse solo.
+        kill_switch_store: KillSwitchStore | None = None,
+        # V2.43.3 (P0-2): espejo durable de la identidad de las SALIDAS (``auto_exit_orders``).
+        # Da a cada cierre una identidad (``exit_order_id``) que sobrevive al reinicio, en
+        # vez de depender del contador de proceso ``_v2_exit_seq``.
+        exit_order_store: ExitOrderStore | None = None,
         # V2.43/AUTO-3: libro de marcas de equity (drawdown medido para el gobernador).
         # Inyectable para que un test/evidencia fije la marca del día de forma determinista;
         # en producción cada worker lleva el suyo (una serie por proceso de la misma cuenta).
@@ -619,14 +634,21 @@ class AutoSimulationWorker:
         self._v2_reservation_carryover: frozenset[str] = frozenset()
         self._v2_open_orders_read_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
         self._v2_reservations_reconciled = False
+        # V2.43.3 (P0-1) — espejo durable del latch de la parada dura. Sin store la parada
+        # queda SOLO en memoria (camino hermético): se declara y el arranque no puede
+        # restaurarla. Con store, ``_v2_kill_state_loaded`` garantiza que el load ocurre una
+        # vez por proceso y ANTES de cualquier evaluación del gobernador.
+        self._kill_switch_store = kill_switch_store
+        self._v2_kill_state_loaded = False
+        # V2.43.3 (P0-2) — identidad durable de las salidas. ``_v2_exit_orders`` son los
+        # INTENT vivos conocidos en memoria (espejo del libro durable); el store es la
+        # autoridad tras un reinicio.
+        self._exit_order_store = exit_order_store
+        self._v2_exit_orders: dict[str, ExitOrder] = {}
         # V2.44 — parada DURA latcheada, por encima del gobernador. Nace desactivada; el
         # worker la activa con motivos tipificados (reconciliación rota, ejecución
         # duplicada, datos corruptos) y solo una reconciliación explícita la libera.
         self._v2_kill_switch = HardKillSwitch()
-        # V2.44 — contador de reservas de SALIDA: da identidad única a cada orden de
-        # cierre (un ``RISK_EXIT`` con fill parcial no puede reutilizar la reserva de la
-        # orden anterior ni colisionar con la de otra salida del mismo instrumento).
-        self._v2_exit_seq = 0
         # Relojes por DIMENSIÓN para la frescura (V2.44). Se pueblan al leer precios/ATR
         # del tick; una prueba (o un feed real parado) puede dejar ``market_data`` viejo
         # para forzar el veto de aperturas sin congelar las salidas protectoras.
@@ -868,6 +890,21 @@ class AutoSimulationWorker:
                     verdict.status,
                     symbol,
                 )
+        # V2.43.3 (P0-1) — productor real de la parada dura: una identidad de ejecución
+        # DUPLICADA en el libro canónico significa que el mismo hecho financiero llegó dos
+        # veces (o que una fuente lo reintrodujo). El fold lo deduplica y declara la
+        # violación, pero un sistema que ve dinero duplicado no debe seguir abriendo: se
+        # para HASTA que una reconciliación explícita lo levante.
+        seen_execution_ids: set[str] = set()
+        for fact in getattr(canonical, "facts", ()) or ():
+            key = str(getattr(fact, "execution_id", "") or "").strip()
+            if not key:
+                continue
+            if key in seen_execution_ids:
+                logger.error("auto_sim duplicate execution id detected id=%s; HALT", key)
+                await self.engage_kill_switch_durable("DUPLICATE_EXECUTION")
+                break
+            seen_execution_ids.add(key)
         return canonical_map
 
     def _openings_vetoed(self, symbol: str) -> bool:
@@ -940,8 +977,17 @@ class AutoSimulationWorker:
             "trailing_state": trailing_status(position),
         }
 
-    def _next_logical_order_id(self, symbol: str, side: str) -> str:
-        """P1-03: identidad lógica única por INTENCIÓN (namespace del execution_id)."""
+    def _next_logical_order_id(
+        self, symbol: str, side: str, exit_order_id: str | None = None
+    ) -> str:
+        """P1-03: identidad lógica única por INTENCIÓN (namespace del execution_id).
+
+        V2.43.3: una salida con ``exit_order_id`` embebe su identidad durable, de modo que
+        ``logical_order_id`` → ``venue_order_id`` → ``execution_id`` queden atribuidos al
+        INTENT concreto (y un reinicio no re-genere la misma traza por casualidad).
+        """
+        if exit_order_id:
+            return f"{self._engine_id}-{side}-{symbol}-{exit_order_id}"
         self._order_seq += 1
         return f"{self._engine_id}-{self._minute}-{side}-{symbol}-{self._order_seq}"
 
@@ -1007,6 +1053,7 @@ class AutoSimulationWorker:
         symbol: str,
         qty: Decimal,
         strategy_version_id: str | None = None,
+        exit_order_id: str | None = None,
     ) -> _Settlement:
         """Liquida la orden SIM y separa lo MATERIALIZADO de lo que quedó PENDIENTE.
 
@@ -1024,7 +1071,7 @@ class AutoSimulationWorker:
         # declara para no confundirlo con un apply fallido en modo dinero.
         structural = self._finance_applier is None
         venue = self._venue()
-        logical_order_id = self._next_logical_order_id(symbol, side)
+        logical_order_id = self._next_logical_order_id(symbol, side, exit_order_id)
         try:
             result, outcomes = await submit_simulated_order(
                 self._exec_store,
@@ -1037,7 +1084,11 @@ class AutoSimulationWorker:
                 seed=self._minute * 100_003 + sum(map(ord, symbol)) % 9999,
                 base_mid=self._price_script(symbol, self._minute) or 100.0,
                 fill_chunks=_FILL_CHUNKS,
-                order_id=f"auto-{side}-{symbol}-{self._minute}",
+                order_id=(
+                    f"auto-{side}-{symbol}-{exit_order_id}"
+                    if exit_order_id
+                    else f"auto-{side}-{symbol}-{self._minute}"
+                ),
                 # V2.24/A9.1 (P1-03): namespace de identidad (no colisión entre cuentas).
                 engine_id=self._engine_id,
                 logical_order_id=logical_order_id,
@@ -1224,17 +1275,175 @@ class AutoSimulationWorker:
         switch = getattr(self, "_v2_kill_switch", None)
         return bool(switch is not None and switch.engaged)
 
-    def engage_kill_switch(self, reason: Any, *, at: str | None = None) -> bool:
-        """Activa la parada dura con un motivo tipificado (V2.44).
+    def _v2_kill_state(self, *, at: str | None = None) -> KillState | None:
+        """Foto durable del latch actual; ``None`` sin cuenta/engine (no persistible)."""
+        switch = self._v2_kill_switch
+        account_id = self._account_id or ""
+        engine_id = self._engine_id or ""
+        if not account_id or not engine_id:
+            return None
+        return KillState(
+            account_id=account_id,
+            engine_id=engine_id,
+            engaged=switch.engaged,
+            reason=switch.reason,
+            engaged_at=switch.engaged_at,
+            engagement_id=switch.engagement_id,
+            reengagements=switch.reengagements,
+            updated_at=at or self._v2_instant(),
+        )
 
-        Es idempotente y latcheada: reavisar no reinicia el motivo original. Se expone
-        como API del worker (p. ej. desde el endpoint de kill switch o desde una prueba).
+    async def _v2_load_kill_state(self) -> None:
+        """Restaura el latch desde su espejo durable (V2.43.3 · P0-1).
+
+        Se llama en cada turno real ANTES de readoptar posición y de reconciliar. Regla de
+        adopción, unidireccional a propósito:
+
+        * una parada durable ``engaged`` se adopta SIEMPRE (jamás se ignora un HALT
+          persistido: el reinicio no puede reabrir el motor);
+        * una parada durable liberada NO levanta un halt local (el latch es monótono dentro
+          del proceso: solo una liberación explícita lo quita, y esa liberación ya pasa por
+          ``release_kill_switch``).
+
+        Sin store (o sin cuenta/engine) no hay nada que leer: se declara y el latch local se
+        conserva. Un fallo de lectura tampoco levanta la parada.
         """
-        return self._v2_kill_switch.engage(reason, at=at)
+        store = self._kill_switch_store
+        account_id = self._account_id or ""
+        engine_id = self._engine_id or ""
+        self._v2_kill_state_loaded = True
+        if store is None or not account_id or not engine_id:
+            return
+        try:
+            state = await store.load(account_id, engine_id)
+        except Exception:  # noqa: BLE001 — no poder leer no autoriza a operar.
+            logger.exception("auto_sim v2 kill state load failed")
+            return
+        if state is None or not state.engaged or self._v2_kill_switch.engaged:
+            return
+        self._v2_kill_switch = HardKillSwitch.from_persisted(
+            engaged=True,
+            reason=state.reason,
+            engaged_at=state.engaged_at,
+            engagement_id=state.engagement_id,
+            reengagements=state.reengagements,
+        )
+        logger.warning(
+            "auto_sim v2 hard kill RESTORED from durable state reason=%s engagement=%s",
+            state.reason,
+            state.engagement_id,
+        )
 
-    def release_kill_switch(self, *, reconciliation_ok: bool) -> bool:
-        """Libera la parada SOLO con reconciliación explícita (nunca por sí sola)."""
+    async def _v2_persist_kill_state(self, *, at: str | None = None) -> bool:
+        """Persiste el latch actual; ``False`` si no fue durable.
+
+        Fail-closed en la dirección que importa: un fallo de escritura NO desactiva la
+        parada (el latch sigue in-memory y se declara). Lo que no se hace es creer que el
+        sistema está protegido por un HALT que nadie podrá leer tras un crash.
+        """
+        store = self._kill_switch_store
+        state = self._v2_kill_state(at=at)
+        if store is None or state is None:
+            return False
+        try:
+            await store.save(state)
+            await store.commit()
+        except Exception:  # noqa: BLE001 — no persistir no levanta la parada.
+            logger.exception("auto_sim v2 kill state persist failed reason=%s", state.reason)
+            return False
+        return True
+
+    def engage_kill_switch(
+        self,
+        reason: Any,
+        *,
+        at: str | None = None,
+        engagement_id: str | None = None,
+    ) -> bool:
+        """Activa la parada dura con un motivo tipificado (V2.44 · V2.43.3).
+
+        Es idempotente y latcheada: reavisar no reinicia el motivo original. Devuelve True
+        si CAMBIÓ el estado. La activación asigna una identidad (``engagement_id``) para que
+        el rastro sea auditable ("qué activación concreta paró el sistema"). Esta variante
+        solo mueve el latch; la persistencia durable la hace ``engage_kill_switch_durable``.
+        """
+        changed = self._v2_kill_switch.engage(
+            reason, at=at or self._v2_instant(), engagement_id=engagement_id
+        )
+        if changed and self._v2_kill_switch.engagement_id is None:
+            self._v2_kill_switch.engagement_id = new_exit_order_id()
+        return changed
+
+    async def engage_kill_switch_durable(
+        self, reason: Any, *, at: str | None = None
+    ) -> bool:
+        """Activa la parada dura Y la persiste (P0-1), para que sobreviva al reinicio.
+
+        Si el persist falla, el latch se mantiene (nunca se levanta la parada por un fallo
+        de escritura) y el fallo queda declarado en el log.
+        """
+        changed = self.engage_kill_switch(reason, at=at)
+        await self._v2_persist_kill_state(at=at)
+        return changed
+
+    def release_kill_switch(
+        self,
+        *,
+        reconciliation_ok: bool,
+        reconciliation_id: str | None = None,
+    ) -> bool:
+        """Libera la parada SOLO con reconciliación explícita (nunca por sí sola).
+
+        V2.43.3: para liberar de verdad hace falta una ``reconciliation_id`` (la identidad
+        de la reconciliación que autoriza el levantamiento): un halt que se levanta "porque
+        sí" no es auditable. Esta variante mueve el latch; la persistencia del rastro la
+        hace ``release_kill_switch_durable``.
+        """
+        if reconciliation_ok and not reconciliation_id:
+            logger.error("auto_sim v2 kill release rejected: missing reconciliation_id")
+            return False
         return self._v2_kill_switch.release(reconciliation_ok=reconciliation_ok)
+
+    async def release_kill_switch_durable(
+        self, *, reconciliation_ok: bool, reconciliation_id: str | None = None
+    ) -> bool:
+        """Libera la parada Y persiste el rastro de la liberación (P0-1)."""
+        released = self.release_kill_switch(
+            reconciliation_ok=reconciliation_ok, reconciliation_id=reconciliation_id
+        )
+        if not released:
+            return False
+        await self._v2_persist_kill_release(reconciliation_id=reconciliation_id)
+        return True
+
+    async def _v2_persist_kill_release(self, *, reconciliation_id: str | None) -> bool:
+        """Persiste ``engaged=False`` con el actor y la identidad de reconciliación."""
+        store = self._kill_switch_store
+        account_id = self._account_id or ""
+        engine_id = self._engine_id or ""
+        if store is None or not account_id or not engine_id:
+            return False
+        at = self._v2_instant()
+        state = KillState(
+            account_id=account_id,
+            engine_id=engine_id,
+            engaged=False,
+            reason=None,
+            engaged_at=None,
+            engagement_id=None,
+            reengagements=self._v2_kill_switch.reengagements,
+            released_at=at,
+            release_actor="auto_sim_worker",
+            release_reconciliation_id=reconciliation_id,
+            updated_at=at,
+        )
+        try:
+            await store.save(state)
+            await store.commit()
+        except Exception:  # noqa: BLE001 — se declara; el latch in-memory ya está liberado.
+            logger.exception("auto_sim v2 kill state release persist failed")
+            return False
+        return True
 
     def _v2_governor_position_inputs(self) -> dict[str, Any]:
         """Lectura del gobernador para la GESTIÓN de posición (V2.44 · AUTO-3 slice 2).
@@ -1884,6 +2093,54 @@ class AutoSimulationWorker:
             sorted(merged.values(), key=lambda r: (r.created_at or "", r.reservation_id))
         )
 
+    async def _v2_save_exit_order(self, order: ExitOrder) -> bool:
+        """Persiste un INTENT de salida; ``False`` si el store falta o no fue durable."""
+        store = self._exit_order_store
+        if store is None:
+            return False
+        try:
+            await store.save(order)
+            await store.commit()
+        except Exception:  # noqa: BLE001 — se declara; el llamante decide (política B).
+            logger.exception(
+                "auto_sim v2 exit order persist failed id=%s", order.exit_order_id
+            )
+            return False
+        return True
+
+    async def _v2_apply_exit_fill(
+        self, exit_order_id: str | None, qty: Any, *, at: str
+    ) -> None:
+        """Aplica un fill materializado al INTENT de salida (V2.43.3 · separación I/O/F).
+
+        Un fill no positivo o un intent desconocido no mueven nada (fail-closed: no se
+        inventa materialización). ``filled_qty``/``remaining_qty`` del intent quedan así en
+        fase con el fill real, no con la cantidad pedida.
+        """
+        key = str(exit_order_id or "").strip()
+        if not key:
+            return
+        order = self._v2_exit_orders.get(key)
+        if order is None:
+            store = self._exit_order_store
+            if store is None:
+                return
+            try:
+                order = await store.get(key)
+            except Exception:  # noqa: BLE001 — no poder leer no autoriza a inventar.
+                logger.exception("auto_sim v2 exit order get failed id=%s", key)
+                return
+        if order is None:
+            return
+        updated = order.apply_fill(qty, at=at)
+        if updated is order:
+            return
+        await self._v2_save_exit_order(updated)
+        if updated.is_open:
+            self._v2_exit_orders[key] = updated
+        else:
+            self._v2_exit_orders.pop(key, None)
+
     async def _v2_reserve_exit(
         self,
         *,
@@ -1893,7 +2150,7 @@ class AutoSimulationWorker:
         sector: str | None,
         at: str,
     ) -> str | None:
-        """Reserva VIVA de una orden de SALIDA (V2.44 · F9).
+        """Reserva VIVA de una orden de SALIDA con identidad DURABLE (V2.44 · F9 · V2.43.3).
 
         Un exit del gobernador (``RISK_EXIT``/``REGIME_EXIT``/``KILL_SWITCH``), un stop o un
         objetivo puede llenarse PARCIALMENTE. Sin reserva de venta, al reiniciar nadie sabe
@@ -1901,19 +2158,41 @@ class AutoSimulationWorker:
         emite otra vez la MISMA orden. La reserva de venta le da identidad y ciclo de vida a
         esa cola.
 
-        No reserva capital ni riesgo NUEVO (``0.0`` declarados): su dimensión es la CANTIDAD
-        viva. Se persiste antes de emitir; si no llega a ser durable, la salida se emite
-        igual (una salida protectora NUNCA se bloquea por un fallo de reserva: reducir riesgo
-        no empeora la situación) pero el fallo queda declarado.
+        V2.43.3 (P0-2): la identidad ya NO es ``exit:{engine}:{symbol}:{seq}`` con un
+        contador de proceso que vuelve a 0 en cada arranque (lo que permitía REUTILIZAR una
+        identidad histórica). Se mintea ``exit_order_id`` (ULID) y se persiste el INTENT
+        ANTES de reservar y de emitir; la reserva lo referencia y su ``reservation_id`` lo
+        incorpora. El valor devuelto es el ``exit_order_id`` (la identidad del INTENT).
+
+        V2.43.3 (P1-4, política B): la salida protectora NUNCA se bloquea por un fallo de
+        reserva (reducir riesgo no empeora la situación). Pero tampoco se emite jamás sin
+        identidad durable: si la reserva no es durable se persiste un INTENT de emergencia
+        (``EMERGENCY``) y, si eso tampoco es durable, el sistema se para (``SYSTEM_ERROR``)
+        en vez de emitir una salida sin rastro.
         """
         store = self._reservation_store
         amount = _dec_or_none(qty)
         if store is None or amount is None or amount <= 0:
             return None
         entry = _dec_or_none(price)
-        self._v2_exit_seq += 1
+        # P0-2 — la identidad se mintea UNA vez y se persiste antes de cualquier efecto.
+        exit_order_id = new_exit_order_id()
+        order = build_exit_order(
+            exit_order_id=exit_order_id,
+            instrument_id=symbol,
+            side=SIDE_SELL,
+            requested_qty=float(amount),
+            account_id=self._account_id or "",
+            engine_id=self._engine_id,
+            created_at=at,
+            updated_at=at,
+        )
+        if order is None:  # defensivo: la salida no tiene datos suficientes para un INTENT.
+            logger.error("auto_sim v2 exit order not buildable symbol=%s qty=%s", symbol, qty)
+            return None
+        await self._v2_save_exit_order(order)
         reservation = build_reservation(
-            reservation_id=f"exit:{self._engine_id}:{symbol}:{self._v2_exit_seq}",
+            reservation_id=f"exit:{exit_order_id}",
             account_id=self._account_id or "",
             tick_id=at,
             instrument_id=symbol,
@@ -1924,16 +2203,31 @@ class AutoSimulationWorker:
             reserved_cash=0.0,
             reserved_risk=0.0,
             created_at=at,
+            exit_order_id=exit_order_id,
         )
         try:
             await store.save(reservation)
             await store.commit()
         except Exception:  # noqa: BLE001 — la salida no se bloquea por la reserva.
             logger.exception(
-                "auto_sim v2 exit reservation persist failed id=%s",
+                "auto_sim v2 exit reservation persist failed id=%s intent=%s",
                 reservation.reservation_id,
+                exit_order_id,
             )
-            return None
+            # Política B: identidad durable de emergencia o parada. Nunca emitir sin rastro.
+            emergency = order.as_emergency("reservation_persist_failed", at=at)
+            if not await self._v2_save_exit_order(emergency):
+                logger.error(
+                    "auto_sim v2 exit intent emergency persist failed intent=%s; HALT",
+                    exit_order_id,
+                )
+                await self.engage_kill_switch_durable("SYSTEM_ERROR", at=at)
+                return None
+            self._v2_exit_orders[exit_order_id] = emergency
+            return exit_order_id
+        reserved = order.with_reserved(reservation.reservation_id, at=at)
+        await self._v2_save_exit_order(reserved)
+        self._v2_exit_orders[exit_order_id] = reserved
         merged: dict[str, PortfolioReservation] = {
             row.reservation_id: row for row in self._v2_reservations if row.is_live
         }
@@ -1941,7 +2235,7 @@ class AutoSimulationWorker:
         self._v2_reservations = tuple(
             sorted(merged.values(), key=lambda r: (r.created_at or "", r.reservation_id))
         )
-        return reservation.reservation_id
+        return exit_order_id
 
     async def _v2_release_reservations_for_fill(
         self, *, symbol: str, filled_qty: Any, at: str, side: str = SIDE_BUY
@@ -1992,6 +2286,13 @@ class AutoSimulationWorker:
             return
         if released is None:
             return
+        # V2.43.3: el INTENT de salida sigue al fill (identidad duradera). Se localiza por
+        # la columna de la reserva o, para filas legadas, por el prefijo del
+        # ``reservation_id`` (``exit:{exit_order_id}``).
+        exit_order_id = getattr(target, "exit_order_id", None)
+        if not exit_order_id and target.reservation_id.startswith("exit:"):
+            exit_order_id = target.reservation_id.split(":", 1)[1]
+        await self._v2_apply_exit_fill(exit_order_id, qty, at=at)
         remaining = [
             row
             for row in self._v2_reservations
@@ -2077,6 +2378,7 @@ class AutoSimulationWorker:
             )
         consumed: dict[tuple[str, str], float] = {}
         resolved: list[PortfolioReservation] = []
+        outcomes: dict[str, tuple[float, PortfolioReservation | None]] = {}
         for reservation in live:
             created = _instant(reservation.created_at)
             instrument = reservation.instrument_id
@@ -2114,6 +2416,7 @@ class AutoSimulationWorker:
                     reason="restart" if startup else "cancel",
                     released_qty=None,
                 )
+            outcomes[reservation.reservation_id] = (fill_qty, released)
             resolved.append(released if released is not None else reservation)
         self._v2_reservations = tuple(row for row in resolved if row.is_live)
         self._v2_reservations_measurement = (
@@ -2121,6 +2424,55 @@ class AutoSimulationWorker:
             if measurable
             else combine_measurements(book_measurement, MEASUREMENT_UNKNOWN)
         )
+        # V2.43.3: los INTENT de salida siguen la misma reconciliación (identidad duradera).
+        await self._v2_sync_exit_orders(outcomes)
+        # V2.43.3 (P0-1) — productor real de la parada dura: un libro de compromiso que NO
+        # se pudo medir CON reservas vivas es exactamente el caso que la auditoría pidió
+        # escalar. No basta con vetar aperturas: el sistema queda HALTED (persistido) hasta
+        # que una reconciliación explícita lo levante.
+        if not measurable and self._v2_reservations:
+            await self.engage_kill_switch_durable("RECONCILIATION_FAILURE")
+
+    async def _v2_sync_exit_orders(
+        self, outcomes: Mapping[str, tuple[float, PortfolioReservation | None]]
+    ) -> None:
+        """Resincroniza los INTENT de salida con lo materializado (V2.43.3 · P0-2).
+
+        Cada intent se actualiza con los fills que casaron contra SU reserva
+        (``reservation_id``): un fill parcial deja el intent ``PARTIAL`` con su cola viva, y
+        una reserva muerta sin fill lo deja ``ABANDONED``. Así el intent nunca queda "vivo
+        para siempre" ni es re-emitible dos veces, y ``filled_qty``/``remaining_qty`` son la
+        separación INTENT/ORDER/FILL que la auditoría pidió.
+        """
+        store = self._exit_order_store
+        if store is None:
+            return
+        try:
+            open_orders = await store.list_open(self._account_id)
+        except Exception:  # noqa: BLE001 — no poder leer no autoriza a inventar estado.
+            logger.exception("auto_sim v2 exit order read failed")
+            return
+        merged: dict[str, ExitOrder] = {}
+        for order in open_orders:
+            filled, released = outcomes.get(order.reservation_id or "", (0.0, None))
+            updated = order
+            if filled > 0:
+                updated = order.apply_fill(filled, at=self._v2_instant())
+            elif released is not None and not released.is_live:
+                updated = order.abandon(
+                    released.release_reason or "cancel", at=self._v2_instant()
+                )
+            if updated is not order:
+                try:
+                    await store.save(updated)
+                except Exception:  # noqa: BLE001 — se declara; el intent no se pierde.
+                    logger.exception(
+                        "auto_sim v2 exit order save failed id=%s", order.exit_order_id
+                    )
+                    continue
+            if updated.is_open:
+                merged[updated.exit_order_id] = updated
+        self._v2_exit_orders = merged
 
     async def _v2_release_reservation(
         self,
@@ -3173,23 +3525,36 @@ class AutoSimulationWorker:
             # V2.44 · F9: la salida deja una reserva VIVA y DURABLE antes de emitirse. Con
             # fill parcial la cola queda comprometida (no se re-emite por duplicado) y un
             # reinicio la ve como compromiso explícito en vez de adivinar por las trazas.
+            # V2.43.3 (P1-4, política B): si el intent de la salida no llega a ser durable
+            # NI siquiera en su forma de emergencia, ``_v2_reserve_exit`` devuelve ``None`` y
+            # la orden NO se emite (fail-closed): una salida sin identidad durable es una
+            # salida que un reinicio no podrá reconciliar.
             if (
                 action == "SELL"
                 and self._v2_enabled
                 and self._reservation_store is not None
             ):
-                await self._v2_reserve_exit(
+                exit_order_id = await self._v2_reserve_exit(
                     symbol=symbol,
                     qty=exec_qty,
                     price=price,
                     sector=self._v2_sector(symbol, pkg),
                     at=self._v2_instant(),
                 )
+                if exit_order_id is None:
+                    _veto("exit_intent_not_durable")
+                    continue
+            else:
+                exit_order_id = None
             settlement = await self._settle(
                 action.lower(),
                 symbol,
                 exec_qty,
                 strategy_version_id=effective_version,
+                # V2.43.3 (P0-2): la identidad del INTENT viaja a la orden para que cada
+                # ``execution_id`` quede atribuido a la salida concreta (y no a un contador
+                # de proceso que un reinicio reinicia).
+                exit_order_id=exit_order_id,
             )
             # AUTO-1A (P0) — SOLO lo materializado es posición/riesgo/protección. La
             # cantidad PEDIDA (`exec_qty`) se sigue liquidando y se journaliza como
@@ -3372,6 +3737,8 @@ class AutoSimulationWorker:
         edge_source: Any = None,
         atr_source: Any = None,
         reservation_store: ReservationStore | None = None,
+        kill_switch_store: KillSwitchStore | None = None,
+        exit_order_store: ExitOrderStore | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -3403,6 +3770,8 @@ class AutoSimulationWorker:
             self._reservation_store,
         )
         prev_atr = self._v2_atr_source
+        prev_kill_store = self._kill_switch_store
+        prev_exit_store = self._exit_order_store
         try:
             self._exec_store = exec_store
             self._auto_store = auto_store
@@ -3431,6 +3800,18 @@ class AutoSimulationWorker:
             self._reservation_store = (
                 reservation_store if reservation_store is not None else prev_reservations
             )
+            # V2.43.3: los espejos durables de la parada dura y de la identidad de salida
+            # se enlazan igual (una sesión por tick).
+            self._kill_switch_store = (
+                kill_switch_store if kill_switch_store is not None else prev_kill_store
+            )
+            self._exit_order_store = (
+                exit_order_store if exit_order_store is not None else prev_exit_store
+            )
+            # V2.43.3 (P0-1) — BOOT SAFETY GATE: la parada dura se LEE de su espejo durable
+            # ANTES de readoptar posición y de reconciliar. Un reinicio NO puede reabrir el
+            # motor: si el HALT estaba activo, sigue activo (el in-memory lo olvidaba).
+            await self._v2_load_kill_state()
             # V2.24/A9.1 (P1-04): sin cuenta inequívoca NO se readopta ni opera el
             # camino durable; auto_turn veta igualmente (defensa en profundidad).
             if not self._readopted and self._account_id:
@@ -3475,6 +3856,8 @@ class AutoSimulationWorker:
             self._v2_edge_source = prev_edge
             self._v2_atr_source = prev_atr
             self._reservation_store = prev_reservations
+            self._kill_switch_store = prev_kill_store
+            self._exit_order_store = prev_exit_store
 
 
 # V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.
@@ -3965,6 +4348,18 @@ class AutoSimRuntime:
             # ``autocommit=True`` (default) cada alta queda durable ANTES de emitir la
             # orden, de modo que un crash inmediato no pierde el compromiso.
             reservation_store = PostgresReservationStore(session)
+            # V2.43.3 (P0-1/P0-2): los dos espejos durables nuevos, sobre la misma sesión.
+            # ``kill_switch_store`` hace que la parada dura sobreviva al reinicio;
+            # ``exit_order_store`` da identidad duradera a cada salida.
+            from bolsa_application.exit_order_store import (  # noqa: PLC0415
+                PostgresExitOrderStore,
+            )
+            from bolsa_application.kill_switch_store import (  # noqa: PLC0415
+                PostgresKillSwitchStore,
+            )
+
+            kill_switch_store = PostgresKillSwitchStore(session)
+            exit_order_store = PostgresExitOrderStore(session)
             # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
             # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
             # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor
@@ -3978,6 +4373,8 @@ class AutoSimRuntime:
                 position_store=position_store,
                 consumed_signal_store=consumed_signal_store,
                 reservation_store=reservation_store,
+                kill_switch_store=kill_switch_store,
+                exit_order_store=exit_order_store,
                 canonical_positions_reader=self._canonical_reader
                 or _compose_canonical_reader(session),
                 regime_source=self._regime_source

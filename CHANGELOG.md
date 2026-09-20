@@ -2,6 +2,109 @@
 
 All notable releases of Bolsa V1.
 
+## [1.68.3-beta] — AUTO-3 reliability closure: kill durable, identidad de salida y orden UTC — 2026-09-20
+
+**Migración 043** (`043_exit_identity_and_kill_state`): nacen `auto_kill_state` y `auto_exit_orders` y la
+columna `portfolio_reservations.exit_order_id`. **El head de Alembic pasa de `042` a `043`.** Cierra los
+cinco hallazgos P0/P1 de la auditoría de `v2.43.2-beta`: la parada dura y la identidad de una salida
+pertenecían a la **memoria del proceso** (un reinicio olvidaba el HALT y podía **reutilizar** una
+identidad histórica), el fallo de reserva no tenía política declarada, y el fold del ledger ordenaba por
+**cadena** ISO en vez de por instante. **El gobernador no se toca**: `v2_43_governor_evidence.py` sigue
+byte a byte igual y **exit 0**.
+
+### P0-1 — El HALT es del SISTEMA, no del proceso
+
+- **`auto_kill_state`** (una fila por `(account_id, engine_id)`): `engaged`, `reason` tipificado,
+  `engaged_at`, **`engagement_id`** (identidad de la activación concreta), `reengagements` y el rastro de
+  la liberación (`released_at`, `release_actor`, **`release_reconciliation_id`**). Sin fila ⇒ la parada
+  nunca se activó: la **ausencia es información**, no un `engaged=false` inventado.
+- **Nuevo orden de arranque**: `LOAD KILL STATE` → si `engaged`, latchear y vetar entradas →
+  `readopt_positions()` → `_v2_reconcile_reservations(startup=True)`. El arranque **jamás** ignora un HALT
+  persistido; una parada durable **liberada** no levanta un halt local (el latch es monótono en el
+  proceso y solo una liberación explícita lo quita).
+- **`engage_kill_switch_durable` / `release_kill_switch_durable`**: la activación persiste (`save` +
+  `commit`) junto al latch y **un fallo de escritura NO levanta la parada** (el latch sigue in-memory y
+  se declara; jamás se cree protegido por un HALT que nadie podrá leer tras un crash). La liberación
+  **exige `reconciliation_id`**: un halt que se levanta "porque sí" no es auditable, y sin id la
+  liberación se rechaza.
+- **Productores reales**: un libro de compromiso que **no se pudo medir** con reservas vivas
+  (`RECONCILIATION_FAILURE`) deja de ser un veto de aperturas y pasa a ser un **HALT persistido**; un
+  **`DUPLICATE_EXECUTION`** detectado al reconciliar hace lo mismo. Antes `engage_kill_switch` no tenía
+  productor en producción.
+
+### P0-2 — `exit_order_id`: identidad de salida durable (migración 043)
+
+- Se **retira** `_v2_exit_seq` como fuente de identidad: era un contador de proceso que volvía a 0 en
+  cada arranque, así que un reinicio podía **reutilizar** una identidad histórica (y, con
+  `ON CONFLICT ... UPDATE`, actualizar una reserva antigua). Ahora se mintea un **ULID** y se persiste el
+  **INTENT** (`auto_exit_orders`) **antes** de reservar y de emitir: `INTENT → RESERVED → EMITTED →
+PARTIAL/FILLED` (+ `EMERGENCY`/`ABANDONED`), con `filled_qty`/`remaining_qty` explícitas.
+- La reserva referencia el intent (`reservation_id = exit:{exit_order_id}` y columna
+  `portfolio_reservations.exit_order_id`), y **la identidad viaja a la orden**: `logical_order_id` →
+  `venue_order_id` → `execution_id` embeben el id, de modo que cada fill de `execution_events` queda
+  **atribuido al intent concreto**.
+- La reconciliación de arranque y la liberación por fill **casan por `exit_order_id`** (fallback
+  posicional solo para filas legadas por el prefijo `exit:`), y actualizan el intent: un fill parcial lo
+  deja `PARTIAL` con su cola viva y una reserva muerta sin fill lo deja `ABANDONED`.
+
+### P1-4 — Política de fallo de reserva (opción B, declarada)
+
+- Si la **reserva** de salida no llega a ser durable, se persiste un **intent de emergencia**
+  (`emergency=true`, `EMERGENCY`, motivo `reservation_persist_failed`) y **solo entonces** se emite: una
+  salida protectora nunca se bloquea por un fallo de reserva (reducir riesgo no empeora), pero tampoco
+  se emite jamás sin identidad durable.
+- Si el intent de emergencia **tampoco** es durable ⇒ `engage_kill_switch_durable("SYSTEM_ERROR")` y
+  **la orden NO se emite** (fail-closed). El call-site veta con `exit_intent_not_durable`: antes un
+  `None` de `_v2_reserve_exit` se ignoraba y el SELL salía igual.
+
+### P1-5 — El ledger ordena por INSTANTE UTC, no por cadena
+
+- `_fold_sort_key` normaliza `applied_at` a **epoch UTC** (`_applied_instant`): ISO con offset y sufijo
+  `Z` se parsean, un naive se asume UTC (el espejo durable guarda `timestamptz`) y lo ilegible es "sin
+  fecha". Dos hechos con offsets distintos del **mismo** instante comparan igual, y el orden es el real
+  (antes `str()` lexicográfico separaba `09:00:00+02:00` de `08:00:00Z`).
+- Un hecho **sin fecha** deja de ser "simplemente el último": cuenta como **no valorado** y degrada
+  `measurement` a `PARTIAL`/`UNKNOWN` (no se afirma un P&L exacto). Ya no se ordena como el más antiguo.
+
+### P0-3 — Matriz de crash C1–C4, Golden Day y certificación PG
+
+- Nuevo `apps/api-python/tests/test_auto_v44_exit_crash_matrix.py`: cuatro ventanas (C1 decisión→antes de
+  reservar, C2 reserva→antes de emitir, C3 emitida→antes de APPLIED, C4 fill parcial), cada una con el
+  reinicio modelado como lo que es (**la RAM se pierde, los stores no**): exactly-once del INTENT, sin
+  reserva duplicada, sin ejecución duplicada, posición correcta y latch coherente.
+- El **Golden Day** dinámico y el **reinicio RISK_EXIT** (`test_auto_v44_exit_governance.py`) se amplían
+  con la ventana **crash-antes-de-reservar** (solo posición durable, ni reserva ni intent) y verifican el
+  `exit_order_id` del día completo.
+- Nuevo `apps/api-python/tests/test_auto_v44_exit_identity_pg.py`: roundtrip de la **043**
+  (tablas + índices + columna, `downgrade` a 042 y `upgrade head`), supervivencia del INTENT y del HALT a
+  un **reinicio real por segunda sesión**, y el enlace reserva→intent con un fill parcial. Gate
+  `AUTO_RESERVATION_PG_REQUIRED=1` fail-if-skipped en el job `auto-v2-durable-pg` (y en `lifecycle-pg` del
+  tag); el fichero queda en `--ignore` del job hermético.
+
+### Verificación medida (2026-09-20)
+
+- `ruff check packages/py apps/api-python` → **0**; `mypy` (5 paquetes + api) → **489 ficheros, 0 issues**;
+  `lint-imports` → **4 contratos, 0 roto**.
+- Bloque offline del job `quality` (extraído del YAML con `offline_ci_run_yaml.py --with-pg-ignores`):
+  **2042 passed, 0 skipped, 0 failed**; bloque offline del job `python` del tag (mismo runner, mismo flag):
+  **2053 passed, 0 skipped, 0 failed**.
+- `test_auto_v44_exit_crash_matrix.py` **8 passed** + `test_auto_v44_exit_governance.py` **9 passed**;
+  baterías nombradas (`test_position_ledger.py`, `test_hard_kill_switch.py`,
+  `test_portfolio_reservation_ledger.py`, `test_position_manager.py`): el conjunto de las **seis** suites
+  del cierre queda en **110 passed**.
+- **Matriz de mutaciones** (`apps/api-python/scripts/v2_43_3_mutation_audit.py`): **6 de 6 muerden**
+  (M1/M2 kill durable, M3/M4 identidad de salida, M5 política B, M6 orden UTC) y la sonda deja la
+  **huella del árbol intacta**.
+- **PG real**: no ejecutado en esta máquina (sin PostgreSQL alcanzable); la certificación de la 043 es la
+  del CI, donde el gate **fail-if-skipped** convierte un skip mudo en fallo duro.
+
+### Deuda diferida (fuera de esta versión, declarada)
+
+API de ledger por `(account_id, instrument_id)`; separación `pending_entry`/`pending_exit` en
+`committed_positions`; renombrado de `EXIT_ONLY`; frescura de quote como condición de ejecución;
+hysteresis/calibración del gobernador; gobernador ON por defecto; tags firmados / CI attestation;
+Portfolio Optimizer.
+
 ## [1.68.2-beta] — Hardening de contabilidad de posición + Exit Governance (AUTO-3 slice 2) — 2026-09-19
 
 **Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Dos fases en un solo

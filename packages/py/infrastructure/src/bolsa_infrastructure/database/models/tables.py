@@ -2597,10 +2597,16 @@ class PortfolioReservationRow(Base):
             "account_id",
             text("created_at DESC"),
         ),
+        # V2.43.3: resolver "¿qué reserva es de este exit intent?" sin recorrer el libro.
+        Index("portfolio_reservations_exit_order_id_idx", "exit_order_id"),
     )
 
     reservation_id: Mapped[str] = mapped_column("reservation_id", String, primary_key=True)
     account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    # V2.43.3 — enlace con el INTENT de salida (``auto_exit_orders``). Nullable: las
+    # reservas históricas (compras y filas previas a esta migración) no tienen intent y
+    # siguen siendo válidas; una reserva de salida nueva SÍ lo declara.
+    exit_order_id: Mapped[str | None] = mapped_column("exit_order_id", String, nullable=True)
     tick_id: Mapped[str | None] = mapped_column("tick_id", String, nullable=True)
     instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
     sector: Mapped[str | None] = mapped_column("sector", String, nullable=True)
@@ -2670,4 +2676,99 @@ class PortfolioReservationRow(Base):
         default=0,
         server_default="0",
         nullable=False,
+    )
+
+
+class AutoKillStateRow(Base):
+    """V2.43.3 — estado durable del ``HardKillSwitch`` (una fila por cuenta + motor).
+
+    El latcheo de la parada dura era propiedad del PROCESO (``HardKillSwitch()`` en cada
+    worker): un crash olvidaba el HALT y el sistema volvía a operar como si nunca hubiera
+    visto el problema. Esta tabla convierte la parada en propiedad del SISTEMA.
+
+    ``engaged`` es el latch; ``reason`` el motivo tipificado (32 chars: los canónicos más
+    largos no caben en 16); ``engagement_id`` identifica la activación (no solo el motivo,
+    para poder auditar "qué activación concreta"); ``reengagements`` cuenta reavisos sin
+    reiniciar el latch; la liberación deja ``released_at``/``release_actor``/
+    ``release_reconciliation_id``. Sin fila ⇒ la parada nunca se activó (la ausencia es
+    información, nunca un ``engaged=False`` inventado).
+    """
+
+    __tablename__ = "auto_kill_state"
+    __table_args__ = (Index("auto_kill_state_account_engaged_idx", "account_id", "engaged"),)
+
+    account_id: Mapped[str] = mapped_column("account_id", String, primary_key=True)
+    engine_id: Mapped[str] = mapped_column("engine_id", String, primary_key=True)
+    engaged: Mapped[bool] = mapped_column(
+        "engaged", Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    reason: Mapped[str | None] = mapped_column("reason", String(32), nullable=True)
+    engaged_at: Mapped[datetime | None] = mapped_column(
+        "engaged_at", DateTime(timezone=True), nullable=True
+    )
+    engagement_id: Mapped[str | None] = mapped_column("engagement_id", String, nullable=True)
+    reengagements: Mapped[int] = mapped_column(
+        "reengagements", Integer, nullable=False, default=0, server_default="0"
+    )
+    released_at: Mapped[datetime | None] = mapped_column(
+        "released_at", DateTime(timezone=True), nullable=True
+    )
+    release_actor: Mapped[str | None] = mapped_column("release_actor", String, nullable=True)
+    release_reconciliation_id: Mapped[str | None] = mapped_column(
+        "release_reconciliation_id", String, nullable=True
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=True
+    )
+
+
+class AutoExitOrderRow(Base):
+    """V2.43.3 — INTENT de salida con identidad duradera (``exit_order_id``).
+
+    El intermedio que faltaba entre el ``ExitPlan`` y el ``execution_id`` (que es por
+    FILL): sobrevive a decisión → reserva → orden → fills parciales → reintento →
+    reinicio. Antes la identidad de una salida era ``exit:{engine}:{symbol}:{seq}`` con
+    ``seq`` de un contador de proceso que volvía a 0 en cada arranque, así que un reinicio
+    podía REUTILIZAR (y por tanto actualizar) una reserva histórica.
+
+    ``state`` recorre ``INTENT``/``RESERVED``/``EMITTED``/``PARTIAL``/``FILLED``/
+    ``EMERGENCY``/``ABANDONED`` como String (convención enum-igual del repo, sin ENUM DDL).
+    ``emergency`` marca el intent que se persiste cuando la reserva NO llega a ser durable:
+    una salida protectora nunca se queda sin identidad (política B de la auditoría).
+    """
+
+    __tablename__ = "auto_exit_orders"
+    __table_args__ = (
+        Index("auto_exit_orders_account_state_idx", "account_id", "state"),
+        Index("auto_exit_orders_account_instrument_idx", "account_id", "instrument_id"),
+    )
+
+    exit_order_id: Mapped[str] = mapped_column("exit_order_id", String, primary_key=True)
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    engine_id: Mapped[str | None] = mapped_column("engine_id", String, nullable=True)
+    instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
+    side: Mapped[str | None] = mapped_column("side", String(16), nullable=True)
+    requested_qty: Mapped[Decimal | None] = mapped_column(
+        "requested_qty", Numeric(18, 6), nullable=True
+    )
+    filled_qty: Mapped[Decimal] = mapped_column(
+        "filled_qty", Numeric(18, 6), nullable=False, default=0, server_default="0"
+    )
+    remaining_qty: Mapped[Decimal] = mapped_column(
+        "remaining_qty", Numeric(18, 6), nullable=False, default=0, server_default="0"
+    )
+    reservation_id: Mapped[str | None] = mapped_column("reservation_id", String, nullable=True)
+    venue_order_id: Mapped[str | None] = mapped_column("venue_order_id", String, nullable=True)
+    state: Mapped[str] = mapped_column(
+        "state", String(32), nullable=False, default="INTENT", server_default="INTENT"
+    )
+    emergency: Mapped[bool] = mapped_column(
+        "emergency", Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    reason: Mapped[str | None] = mapped_column("reason", String, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", DateTime(timezone=True), nullable=True
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=True
     )

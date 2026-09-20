@@ -424,6 +424,7 @@ jobs:
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
+          --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           -q
 
   lifecycle-pg:
@@ -575,6 +576,7 @@ jobs:
           apps/api-python/tests/test_instrument_trade_context_pg.py
           apps/api-python/tests/test_unique_natural_keys_pg.py
           apps/api-python/tests/test_portfolio_reservation_pg.py
+          apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py

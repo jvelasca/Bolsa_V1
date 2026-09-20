@@ -30,6 +30,7 @@ from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
 from bolsa_application.reservation_store import InMemoryReservationStore
 from bolsa_application.sim_durable_store import InMemorySimAutoPositionStore
 
@@ -251,6 +252,7 @@ def _golden_worker(
     account_id: str,
     marks: EquityMarkBook,
     minute: int,
+    exit_orders: InMemoryExitOrderStore | None = None,
 ) -> AutoSimulationWorker:
     _s, clock = step_minute_clock(datetime(2026, 9, 15, 9, minute, tzinfo=UTC))
     return AutoSimulationWorker(
@@ -259,6 +261,7 @@ def _golden_worker(
         context_store=contexts,
         reservation_store=reservations,
         position_store=positions,
+        exit_order_store=exit_orders,
         account_id=account_id,
         equity_marks=marks,
         price_script=lambda _symbol, _minute: 100.0,
@@ -280,6 +283,7 @@ async def test_v2_golden_day_dynamic_entry_risk_exit_flat_with_restart(
     contexts = InMemorySimFillFinanceContextStore()
     reservations = InMemoryReservationStore()
     positions = InMemorySimAutoPositionStore()
+    exit_orders = InMemoryExitOrderStore()
 
     w1 = _golden_worker(
         store=store,
@@ -289,6 +293,7 @@ async def test_v2_golden_day_dynamic_entry_risk_exit_flat_with_restart(
         account_id=account_id,
         marks=marks,
         minute=0,
+        exit_orders=exit_orders,
     )
     w1._decider = _buy()
     await w1.auto_turn()  # T0: DD 0 % ⇒ ENTRY_ALLOWED
@@ -313,6 +318,7 @@ async def test_v2_golden_day_dynamic_entry_risk_exit_flat_with_restart(
         account_id=account_id,
         marks=marks,
         minute=1,
+        exit_orders=exit_orders,
     )
     await w2.readopt_positions()
     await w2._v2_reconcile_reservations(startup=True)
@@ -320,6 +326,12 @@ async def test_v2_golden_day_dynamic_entry_risk_exit_flat_with_restart(
     await w2.auto_turn()
     assert w2._open.get("AAA", Decimal("0")) == 0, "tras el reinicio sigue FLAT"
     assert await reservations.list_live(account_id) == [], "sin compromisos vivos"
+    # V2.43.3 (P0-2): la salida del día dorado tiene UNA identidad durable y queda cerrada.
+    assert await exit_orders.list_open(account_id) == [], "ningún INTENT de salida abierto"
+    intents = list(exit_orders._rows.values())  # noqa: SLF001 — lectura de test.
+    assert len(intents) == 1, "exactly-once del INTENT de salida en todo el día"
+    assert intents[0].state == "FILLED"
+    assert intents[0].filled_qty == 200.0
 
 
 @pytest.mark.asyncio
@@ -432,3 +444,92 @@ async def test_v2_restart_mid_risk_exit_releases_the_dead_sell_reservation_once(
     await w2.auto_turn()
     assert w2._open.get("AAA", Decimal("0")) == 0
     assert await reservations.list_live(account_id) == []
+
+
+@pytest.mark.asyncio
+async def test_v2_restart_crash_before_reserving_still_closes_once_with_a_durable_intent(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """V2.43.3 (P0-2/C1): crash ANTES de reservar. No hay reserva ni INTENT: solo la posición.
+
+    La ventana más peligrosa del ciclo de salida: la decisión se tomó, el proceso murió antes
+    de dejar rastro. Al reiniciar no hay nada que reconciliar, así que la gestión vuelve a
+    decidir (RISK_OFF sigue) y la salida se emite EXACTAMENTE UNA vez, ahora con identidad
+    durable (``exit_order_id``) que el reinicio posterior puede seguir.
+    """
+    from bolsa_application.execution_event import ExecutionEvent, apply_execution_financial_once
+    from bolsa_application.sim_durable_store import (
+        InMemorySimFillFinanceContextStore,
+        SimFillFinanceContext,
+    )
+
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_GOVERNOR", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "84000")  # RISK_OFF desde el arranque
+    account_id = "acc-golden-pre-reserve"
+    marks = EquityMarkBook()
+    store = InMemoryExecutionEventStore()
+    contexts = InMemorySimFillFinanceContextStore()
+    reservations = InMemoryReservationStore()
+    positions = InMemorySimAutoPositionStore()
+    exit_orders = InMemoryExitOrderStore()
+
+    async def _finance(_event: object) -> bool:
+        return True
+
+    # Estado durable de ANTES del crash: SOLO la posición materializada. Ni reserva de
+    # salida ni INTENT (el proceso murió en la ventana).
+    buy = ExecutionEvent(
+        execution_id="buy-pre-reserve",
+        order_id="o-pre-reserve",
+        venue="paper",
+        venue_order_id="v-pre-reserve",
+        fill_seq=1,
+        qty=Decimal("200"),
+        account_id=account_id,
+    )
+    await store.capture(buy)
+    await apply_execution_financial_once(store, execution=buy, apply_finance=_finance)
+    await contexts.save(
+        SimFillFinanceContext(
+            execution_id="buy-pre-reserve",
+            instrument_id="AAA",
+            side="buy",
+            quantity=Decimal("200"),
+            price=Decimal("100"),
+            account_id=account_id,
+        )
+    )
+    await positions.upsert(
+        account_id,
+        "auto-sim",
+        "AAA",
+        Decimal("200"),
+        entry_price=Decimal("100"),
+        high_watermark=Decimal("100"),
+        stop_price=Decimal("97"),
+    )
+    marks.update(account_id, 100000.0, now=datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    assert await reservations.list_all(account_id) == []
+    assert await exit_orders.list_open(account_id) == []
+
+    w = _golden_worker(
+        store=store,
+        contexts=contexts,
+        reservations=reservations,
+        positions=positions,
+        account_id=account_id,
+        marks=marks,
+        minute=1,
+        exit_orders=exit_orders,
+    )
+    await w.readopt_positions()
+    await w._v2_reconcile_reservations(startup=True)  # no-op: no hay nada que reconciliar
+    w._decider = _hold()
+    await w.auto_turn()
+
+    assert w._open.get("AAA", Decimal("0")) == 0, "la salida pendiente se ejecuta al reiniciar"
+    assert await reservations.list_live(account_id) == []
+    intents = list(exit_orders._rows.values())  # noqa: SLF001 — lectura de test.
+    assert len(intents) == 1, "un INTENT, no uno por tick"
+    assert intents[0].state == "FILLED"
+    assert intents[0].emergency is False

@@ -77,10 +77,20 @@ class HardKillSwitch:
     engaged: bool = False
     reason: KillSwitchReason | None = None
     engaged_at: str | None = None
+    # V2.43.3: identidad de la ACTIVACIÓN (no solo el motivo). Es lo que permite auditar
+    # "qué activación concreta" y lo que se persiste para que un reinicio restaure el latch
+    # con su rastro, no solo con un booleano.
+    engagement_id: str | None = None
     reengagements: int = 0
     force_protective_exits: bool = True
 
-    def engage(self, reason: Any, *, at: str | None = None) -> bool:
+    def engage(
+        self,
+        reason: Any,
+        *,
+        at: str | None = None,
+        engagement_id: str | None = None,
+    ) -> bool:
         """Activa la parada con un motivo tipificado. Devuelve True si CAMBIÓ el estado.
 
         Un motivo no canónico levanta ``ValueError``: no se puede parar el sistema "de
@@ -100,6 +110,7 @@ class HardKillSwitch:
         self.engaged = True
         self.reason = coerced
         self.engaged_at = at
+        self.engagement_id = engagement_id
         return True
 
     def release(self, *, reconciliation_ok: bool, at: str | None = None) -> bool:
@@ -113,7 +124,38 @@ class HardKillSwitch:
         self.engaged = False
         self.reason = None
         self.engaged_at = None
+        self.engagement_id = None
         return True
+
+    @classmethod
+    def from_persisted(
+        cls,
+        *,
+        engaged: bool,
+        reason: Any = None,
+        engaged_at: str | None = None,
+        engagement_id: str | None = None,
+        reengagements: int = 0,
+        force_protective_exits: bool = True,
+    ) -> HardKillSwitch:
+        """Reconstruye el latch desde su forma durable (V2.43.3), fail-closed.
+
+        Si la fila dice ``engaged=True`` pero el motivo guardado no es canónico, la parada
+        se restaura con ``SYSTEM_ERROR``: un halt con causa ilegible **sigue siendo un
+        halt** (levantarlo por un dato que no se pudo leer sería fail-OPEN). Con
+        ``engaged=False`` el latch se restaura limpio, sin motivo inventado.
+        """
+        coerced = coerce_kill_switch_reason(reason)
+        if engaged and coerced is None:
+            coerced = "SYSTEM_ERROR"
+        return cls(
+            engaged=bool(engaged),
+            reason=coerced if engaged else None,
+            engaged_at=engaged_at if engaged else None,
+            engagement_id=engagement_id if engaged else None,
+            reengagements=int(reengagements or 0),
+            force_protective_exits=force_protective_exits,
+        )
 
     @property
     def blocks_new_entry(self) -> bool:
@@ -125,6 +167,7 @@ class HardKillSwitch:
             "engaged": self.engaged,
             "reason": self.reason,
             "engagedAt": self.engaged_at,
+            "engagementId": self.engagement_id,
             "reengagements": self.reengagements,
             "forceProtectiveExits": self.force_protective_exits,
             "blocksNewEntry": self.blocks_new_entry,

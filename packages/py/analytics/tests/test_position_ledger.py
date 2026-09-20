@@ -70,7 +70,11 @@ def test_weighted_average_entry() -> None:
 
 def test_partial_exit_realizes_pnl_and_keeps_position_open() -> None:
     ledger = build_position_ledger(
-        [_buy("e1", 50.0, 100.0), _buy("e2", 50.0, 102.0), _sell("e3", 40.0, 110.0)]
+        [
+            _buy("e1", 50.0, 100.0, at="2026-09-17T09:00:00Z"),
+            _buy("e2", 50.0, 102.0, at="2026-09-17T09:01:00Z"),
+            _sell("e3", 40.0, 110.0, at="2026-09-17T09:02:00Z"),
+        ]
     )
     position = ledger.position("AAA")
     assert position is not None
@@ -214,6 +218,51 @@ def test_facts_without_date_are_folded_last_not_first() -> None:
     assert position.realized_qty == 100.0
     assert position.realized_pnl == 1000.0
     assert position.violations == ()
+
+
+def test_facts_are_ordered_by_utc_instant_not_by_string() -> None:
+    """V2.43.3 (P1-5) — el orden temporal es por INSTANTE, no por la cadena ISO.
+
+    ``09:00:00+02:00`` y ``08:00:00Z`` ordenan al revés en lexicográfico (el ``08``
+    precede al ``09``) pero el primero es el instante MÁS TEMPRANO (07:00Z < 08:00Z). Con
+    el orden de cadena, la venta se doblaba ANTES de la compra (oversell fantasma) y el
+    P&L se perdía; con el orden por instante, la compra casa y el P&L es el real.
+    """
+    ledger = build_position_ledger(
+        [
+            _buy("b", 100.0, 10.0, at="2026-09-17T09:00:00+02:00"),
+            _sell("s", 100.0, 20.0, at="2026-09-17T08:00:00Z"),
+        ]
+    )
+    position = ledger.position("AAA")
+    assert position is not None
+    assert position.realized_qty == 100.0
+    assert position.realized_pnl == 1000.0
+    assert position.remaining_qty == 0.0
+    assert position.violations == ()
+    assert ledger.measurement == MEASUREMENT_COMPLETE
+
+
+def test_a_fact_without_a_readable_date_degrades_the_measurement() -> None:
+    """V2.43.3 (P1-5): sin fecha NO se puede afirmar el orden, y sin orden no hay P&L exacto.
+
+    Un hecho sin ``applied_at`` se dobla al final de forma determinista, pero la posición y
+    el P&L dependen del ORDEN: el libro lo declara bajando a ``PARTIAL`` en vez de publicar
+    un número exacto sobre una cronología que no pudo medir.
+    """
+    ledger = build_position_ledger([_buy("e1", 10.0, 5.0, at=None)])
+    assert ledger.measurement == MEASUREMENT_PARTIAL
+    assert ledger.is_complete is False
+
+    mixed = build_position_ledger(
+        [
+            _buy("e1", 10.0, 5.0, at="2026-09-17T09:00:00Z"),
+            _buy("e2", 10.0, 6.0, at="no-es-una-fecha"),
+        ]
+    )
+    assert mixed.measurement == MEASUREMENT_PARTIAL
+    # El orden entre los ilegibles sigue siendo determinista (por ``execution_id``).
+    assert mixed.position("AAA") is not None
 
 
 def test_an_open_position_still_publishes_its_average_entry() -> None:

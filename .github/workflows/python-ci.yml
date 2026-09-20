@@ -128,6 +128,10 @@ jobs:
         # (pase de directorio) y la evidencia integrada en ``apps/api-python/tests``; el GATE
         # (flag OFF byte-idéntico, vetos ``governor_*``, escalado y las tres dimensiones en
         # el journal) va explícito: es aplicación, y sin registro no correría aquí.
+        # V2.43.3/AUTO-3: la matriz de crash C1-C4 y el caso de reinicio con el HALT durable
+        # viven en ``apps/api-python/tests`` (pase de directorio). Su gemelo PG
+        # (``test_auto_v44_exit_identity_pg.py``) se ignora aquí y se certifica en
+        # auto-v2-durable-pg: sin ``--ignore`` skipearía en mudo en este job.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -199,6 +203,7 @@ jobs:
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
+          --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
 
@@ -388,7 +393,7 @@ jobs:
     # el worker nuevo rehidrata el mismo PositionState (no lo reconstruye por ATR) y
     # sigue vetando el re-emitir la misma señal. Gate fail-if-skipped: sin PG real un
     # skip silencioso sería una certificación fantasma.
-    name: auto-v2-durable-pg (Alembic 040-042 + reinicio real, per-commit)
+    name: auto-v2-durable-pg (Alembic 040-043 + reinicio real, per-commit)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -423,6 +428,9 @@ jobs:
       # AUTO-1b (V2.41): libro de reservas durable (migración 042). La reserva tiene que
       # SOBREVIVIR a un reinicio de proceso y liberarse cuando el fill se materializa;
       # sin PG real el test skipearía en mudo e invalidaría la certificación.
+      # V2.43.3/AUTO-3: el mismo gate cubre la identidad de salida (``exit_order_id``) y el
+      # HALT durable (``auto_kill_state``) de la 043: un reinicio real no puede olvidar la
+      # parada ni reutilizar una identidad histórica, y eso solo se mide contra PG real.
       AUTO_RESERVATION_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
@@ -441,7 +449,7 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Alembic upgrade head (hasta 042 incluida)
+      - name: Alembic upgrade head (hasta 043 incluida)
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
       # V2.40.2: ``pipefail`` es obligatorio. Con ``... | tee log`` el step devuelve el
@@ -451,6 +459,10 @@ jobs:
       # AUTO-1b (V2.41): el libro de reservas durable (migración 042) se certifica aquí —
       # roundtrip de la migración, supervivencia al reinicio, liberación por fill
       # (parcial incluida) y capital reservado de una orden en vuelo (``RETRY``).
+      # V2.43.3/AUTO-3: la 043 añade ``auto_kill_state`` (HALT durable) y ``auto_exit_orders``
+      # (identidad de salida) más la columna ``exit_order_id`` de la reserva: se certifica el
+      # roundtrip, que el INTENT y el HALT SOBREVIVEN al reinicio real (otra sesión) y que un
+      # fill parcial actualiza el INTENT sin mintear una segunda identidad.
       # Gate fail-if-skipped: AUTO_RESERVATION_PG_REQUIRED=1.
       - name: Pytest AUTO 2.0 durable PG (fail if skipped)
         run: |
@@ -461,6 +473,7 @@ jobs:
             apps/api-python/tests/test_instrument_trade_context_pg.py \
             apps/api-python/tests/test_unique_natural_keys_pg.py \
             apps/api-python/tests/test_portfolio_reservation_pg.py \
+            apps/api-python/tests/test_auto_v44_exit_identity_pg.py \
             apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 

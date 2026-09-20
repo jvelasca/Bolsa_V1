@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.cognitive.measurement import (
@@ -317,8 +318,40 @@ def _fold_instrument(facts: list[AppliedFillFact]) -> LedgerPosition:
     )
 
 
-def _fold_sort_key(fact: AppliedFillFact) -> tuple[int, str, str]:
-    """Clave determinista del fold: ``(tiene_fecha, applied_at, execution_id)``.
+def _applied_instant(value: Any) -> float | None:
+    """``applied_at`` → instante UTC en epoch; ``None`` si no es interpretable.
+
+    V2.43.3 (P1-5): el ORDEN del fold es por INSTANTE, no por la cadena ISO. Dos hechos con
+    offsets distintos (``09:00:00+02:00`` y ``08:00:00Z``) son el MISMO instante y la
+    comparación lexicográfica los separaba; y uno con un offset "mayor" podía ordenarse
+    después aunque ocurriera antes. Se parsea ISO (con ``Z`` o con offset) y un ``datetime``;
+    un naive se asume UTC (el espejo durable guarda ``timestamptz``). Lo ilegible devuelve
+    ``None``: eso es "sin fecha", no un instante inventado.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return None if value != value else float(value)
+    parsed: datetime
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        raw = str(value).strip()
+        if not raw:
+            return None
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.timestamp()
+
+
+def _fold_sort_key(fact: AppliedFillFact) -> tuple[int, float, str]:
+    """Clave determinista del fold: ``(tiene_fecha, instante_utc, execution_id)``.
 
     AUTO hardening (v2.43.2): un hecho SIN fecha no puede ordenarse como si fuera el
     PRIMERO. ``str(None or "") == ""`` precede a cualquier ISO real en orden lexicográfico,
@@ -327,12 +360,14 @@ def _fold_sort_key(fact: AppliedFillFact) -> tuple[int, str, str]:
     separan al FINAL de forma declarada (``1``) y el orden entre ellos sigue siendo
     determinista por ``execution_id``. AUTO-1b ya cerró la causa raíz (un ``datetime`` de
     PostgreSQL dejaba de perder su fecha al normalizarse); esto protege el residuo legado.
+
+    V2.43.3 (P1-5): dentro de los fechados, el segundo componente es el INSTANTE UTC, no la
+    cadena: dos offsets distintos del mismo momento comparan igual y el orden es el real.
     """
-    return (
-        0 if fact.applied_at else 1,
-        str(fact.applied_at or ""),
-        str(fact.execution_id or ""),
-    )
+    instant = _applied_instant(fact.applied_at)
+    if instant is None:
+        return (1, 0.0, str(fact.execution_id or ""))
+    return (0, instant, str(fact.execution_id or ""))
 
 
 def build_position_ledger(
@@ -391,7 +426,17 @@ def build_position_ledger(
         for position in positions
         for violation in position.violations
     ) + tuple(f"duplicate_execution_id:{execution_id}" for execution_id in duplicates)
-    unvalued = max(0, rejected) + len(duplicates) + (1 if cross_account_collision else 0)
+    # V2.43.3 (P1-5): un hecho sin ``applied_at`` legible NO es "el último": es una medición
+    # INCOMPLETA. El fold lo coloca al final de forma determinista, pero el P&L y el coste
+    # medio dependen del ORDEN temporal, así que afirmar "estos son los números exactos"
+    # sería afirmar sobre un orden que no se pudo medir. Baja la medición a PARTIAL/UNKNOWN.
+    undated = sum(1 for fact in deduped if _applied_instant(fact.applied_at) is None)
+    unvalued = (
+        max(0, rejected)
+        + len(duplicates)
+        + (1 if cross_account_collision else 0)
+        + undated
+    )
     return PositionLedger(
         positions=positions,
         measurement=measurement_from_counts(valued=len(deduped), unvalued=unvalued),
