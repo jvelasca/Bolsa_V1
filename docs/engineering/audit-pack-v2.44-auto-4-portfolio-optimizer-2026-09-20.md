@@ -290,6 +290,31 @@ hysteresis del gobernador; gobernador ON por defecto; tags firmados / CI attesta
 
 ## 9. Sello
 
-**PENDIENTE al escribir este pack.** El sello (commit de fase + tag anotado `v2.44-beta` + push) y los
-runs de CI reales se añaden aquí, medidos, en cuanto el commit esté en `main` — misma convención que
-`v2.43.3-beta`: la ref sellada es el commit **docs-only** y los tags anteriores **no se mueven**.
+**SELLADO (2026-09-20).** Commit de fase **`f692159d`** (18 ficheros, `+2728/−2`) y tag anotado
+**`v2.44-beta`** sobre el commit de sellado **docs-only** (convención de `v2.43-beta`…`v2.43.3-beta`:
+la ref sellada no cita refs inexistentes); `v2.43-beta`/`v2.43.1-beta`/`v2.43.2-beta`/`v2.43.3-beta`
+**no se mueven** (ref nueva y aditiva).
+
+**CI real medida del commit de fase (`f692159d`):**
+
+| Workflow            | Run                                                                            | Resultado     |
+| ------------------- | ------------------------------------------------------------------------------ | ------------- |
+| `Python CI`         | [`35510546044`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546044) | **GREEN 5/5** |
+| `Gitleaks`          | [`35510546045`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546045) | **GREEN**     |
+| `Optimize lab`      | [`35510546041`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546041) | **GREEN**     |
+| `Fase 2 scientific` | [`35510546060`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546060) | **GREEN**     |
+
+Desglose de `Python CI` (medido, no esperado):
+
+- `quality` **2075 passed, 38 skipped** en **89,26 s** — exactamente **+33** sobre los **2042** de
+  `v2.43.3-beta`, que son los 33 tests nuevos de `AUTO-4` (12 EV + 12 optimizador + 8 cableado + 1
+  worker real). El bloque offline local anticipó el mismo número (**2075**): la red de CI **no** corre
+  nada menos que el bloque reproducido a mano.
+- `auto-v2-durable-pg (Alembic 040-043 + reinicio real)` **43 passed** — sin cambio respecto de
+  `v2.43.3-beta`, como debe ser: `AUTO-4` **no** trae migración y el head sigue en `043`.
+- `paper-forward-pg` **2 passed** · `grammar-discovery-pg` **21 passed** · `lifecycle-pg` **13 passed**.
+
+**Nota de honestidad:** el `+33` del CI es la única prueba de que el test de aplicación
+(`test_auto_v4_optimizer_wiring.py`) corre **en CI** y no solo en local — el YAML lo lista
+explícitamente en `quality` y en `python` del tag, y el incremento coincide dígito a dígito con el
+recuento local de tests nuevos.

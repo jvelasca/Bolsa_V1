@@ -81,6 +81,22 @@ productor real es de `AUTO-7`). Con el flag **ON** y sin economía, **todas** la
 `optimizer_expected_value_unmeasured` y el tick **no opera**: es **fail-closed declarado** y está fijado
 en test. Con el flag **OFF por defecto**, el camino de producción no cambia.
 
+### Sello (2026-09-20)
+
+Commit de fase **`f692159d`** (18 ficheros, `+2728/−2`) + tag anotado **`v2.44-beta`** sobre el commit de
+sellado docs-only (convención de `v2.43-beta`…`v2.43.3-beta`); `v2.43-beta`/`v2.43.1-beta`/`v2.43.2-beta`/
+`v2.43.3-beta` **no se mueven** (ref nueva y aditiva). **CI real del commit de fase**: `Python CI`
+**GREEN 5/5** (run [`35510546044`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546044):
+`quality` **2075 passed, 38 skipped** en 89,26 s — el **`+33`** exacto sobre los 2042 de `v2.43.3-beta`,
+`auto-v2-durable-pg` **43 passed** — sin cambio, porque no hay migración —, `paper-forward-pg` 2 passed,
+`grammar-discovery-pg` 21 passed, `lifecycle-pg` 13 passed), `Gitleaks` **GREEN**
+(run [`35510546045`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546045)), `Optimize lab`
+**GREEN** (run [`35510546041`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546041)) y
+`Fase 2 scientific` **GREEN**
+(run [`35510546060`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35510546060)). El `+33` de `quality`
+es la prueba de que el test de aplicación (`test_auto_v4_optimizer_wiring.py`) corre **en CI** y no solo en
+local.
+
 ## [1.68.3-beta] — AUTO-3 reliability closure: kill durable, identidad de salida y orden UTC — 2026-09-20
 
 **Migración 043** (`043_exit_identity_and_kill_state`): nacen `auto_kill_state` y `auto_exit_orders` y la
