@@ -271,7 +271,8 @@ re-mide como gate).
 Todo lo de esta tabla es **medición local de esta máquina el 2026-09-20**, con
 `PostgreSQL` alcanzable (excepto las dos líneas de baseline offline, que no lo tocan). El sello
 (commit de fase, runs de CI del `main` y del tag, ref `v2.46-beta`) se registra en §9 del
-audit-pack cuando se produzca: **no se atribuye aquí ninguna cifra a un run que no exista**.
+audit-pack: su mitad **producida** está en §8.2 de aquí abajo y en el §9.1 del pack, y **no se
+atribuye ninguna cifra a un run que no exista**.
 
 | Medida                                                    | Comando                                                                                                                                                 | Resultado medido                                                                       |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -308,3 +309,25 @@ presente ⇒ aborta). Línea base de las cinco suites implicadas: **ningún rojo
 | M6  | el **perdedor** del claim emite igualmente su orden                 | `auto_simulation_worker.py` (`_v2_persist_tick_reservations`) | `test_concurrent_auto_three_workers_claim_one_signal_one_order`                                                  |
 
 Artefacto de la corrida: `logs/agent/v2_46_mutation_audit.txt` (log local, no versionado).
+
+### 8.2 Sello — mitad producida (lo demás, en el §9 del pack)
+
+Medido **en el CI real**, no en local, sobre el commit de fase
+[`a14b71d7`](https://github.com/jvelasca/Bolsa_V1/commit/a14b71d750fd28f60b6ca7ec9db6e6cca020700e):
+
+| Medida                                                            | Run / job                                                                                                                                                                                                                                                                                                                         | Resultado medido                                                        |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `Python CI` en `main` (5/5 verde, 2m40s)                          | [`35534775724`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775724)                                                                                                                                                                                                                                                    | —                                                                       |
+| · job `quality`                                                   | (mismo run)                                                                                                                                                                                                                                                                                                                       | **2091 passed, 38 skipped** en 115,49 s (los **+4** exactos sobre 2087) |
+| · job `auto-v2-durable-pg`                                        | (mismo run)                                                                                                                                                                                                                                                                                                                       | **43 passed**, **0 skipped** (sin cambio: no hay migración)             |
+| · jobs `lifecycle-pg` / `paper-forward-pg`                        | (mismo run)                                                                                                                                                                                                                                                                                                                       | **13** / **2 passed**; `grammar-discovery-pg` verde                     |
+| `Gitleaks` / `Frontend CI` / `Optimize lab` / `Fase 2 scientific` | [`35534775676`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775676) · [`35534775682`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775682) · [`35534775681`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775681) · [`35534775675`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775675) | **GREEN** (11s / 3m25s / 1m30s / 1m18s)                                 |
+| `Release tag CI` + tag `v2.46-beta`                               | `pending` — se cierra en el commit de evidencia, con su enlace                                                                                                                                                                                                                                                                    | —                                                                       |
+
+El `quality` de CI da **2091 passed** y el baseline local del **mismo YAML** (medido aquí con el runner
+versionado, por JUnit: `{'tests': 2091, 'failures': 0, 'errors': 0, 'skipped': 0, 'passed': 2091}`)
+también **2091 passed**: cuadra al dígito, así que la predicción del §9 del pack («debe dar 2091») se
+cumple. **Divergencia declarada, no inventada**: el job de CI publica además **38 skipped** que el runner
+local **no recolecta** (CI total `2129` vs local `2091`) — es la **misma** divergencia estable de
+`v2.45-beta` (CI `2087 passed / 38 skipped` frente a local `2087 passed / 0 skipped`), es decir
+**pre-existente y ajena a esta fase**; no se le atribuye aquí una causa medida porque no se ha medido.

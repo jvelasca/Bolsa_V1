@@ -323,16 +323,39 @@ que restaura), ni `governor.json` (generado, sin trackear).
 
 ## 9. Sello
 
-**Pendiente de producir** (no se atribuye ninguna cifra a un artefacto que aún no existe):
+**Producido parcialmente a propósito**: lo que ya existe **cita el run que lo produjo**; lo que falta se
+declara como pendiente y **ninguna** cifra se atribuye a un artefacto que no exista.
 
-1. **Commit de fase** con los 17 ficheros del §8.
-2. **`Python CI`** en `main`: `quality` debe dar **2091 passed** (los **+4** exactos) y
-   `auto-v2-durable-pg` sin cambio (no hay migración).
-3. **`Release tag CI`** con `certify` en `success`: job `python` offline **2102 passed**, y en
-   `lifecycle-pg` los **dos pasos dedicados** nuevos (**1 passed** cada uno) con sus guards
-   anti-skip **pasando**; `a7-gate`, `dr-verify`, `decision-spine`, `shared`, `security` y
-   `frontend` en `success`.
-4. **Tag anotado `v2.46-beta`** en la ref de sellado (docs-only) + `Python CI` en la ref del tag.
+### 9.1 Producido (2026-09-20)
 
-Cada cifra de las que se escriban aquí deberá citar **el run que la produjo** (enlace), sin mezclar
-la medición local de §5 con la del CI.
+1. **Commit de fase** [`a14b71d7`](https://github.com/jvelasca/Bolsa_V1/commit/a14b71d750fd28f60b6ca7ec9db6e6cca020700e)
+   — los **17 ficheros** del §8 (`+2869/−25`). Nota de honestidad sobre el diff: el `git diff --cached`
+   del staging daba `+2856/−11`; el commit sale `+2869/−25` porque `lint-staged` corrió `prettier --write`
+   sobre los `*.md`/`*.json` (reflujo de tablas y listas, **sin cambio de contenido**: verificado que
+   `version` sigue en `1.71.0-beta`, la línea `AUDIT-PACK v2.46` sigue en `PROJECT_STATE.md` y los §7/§8 del
+   plan y §7/§8/§9 del pack siguen presentes).
+2. **`Python CI`** en `main` — run [`35534775724`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775724)
+   **GREEN 5/5** (2m40s):
+   - `quality` **2091 passed, 38 skipped** en **115,49 s** ⇒ los **+4** exactos sobre los 2087 de
+     `v2.45-beta` (los 4 tests herméticos nuevos, que entran por el **pase de directorio**).
+   - `auto-v2-durable-pg` **43 passed** / **0 skipped** ⇒ **sin cambio**, que es justo lo predicho en §9.2
+     (no hay migración).
+   - `lifecycle-pg` **13 passed** · `paper-forward-pg` **2 passed** · `grammar-discovery-pg` verde.
+   - `Ruff`: _All checks passed_ (el `quality` vuelve a correr el linter sobre el árbol).
+3. **En el mismo commit**, el resto de workflows en **GREEN**: `Gitleaks`
+   [`35534775676`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775676) (11s), `Frontend CI`
+   [`35534775682`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775682) (3m25s), `Optimize lab`
+   [`35534775681`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775681) (1m30s) y
+   `Fase 2 scientific` [`35534775675`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35534775675) (1m18s).
+
+### 9.2 Pendiente de producir (se cierra en el commit de evidencia, no antes)
+
+4. **`Release tag CI`** con `certify` en `success` sobre la ref del tag: job `python` offline
+   **2102 passed** (los mismos **+4** sobre los 2098 de `v2.45-beta`), y en `lifecycle-pg` los **dos pasos
+   dedicados** nuevos (**1 passed** cada uno) con sus guards anti-skip **pasando**; `a7-gate`, `dr-verify`,
+   `decision-spine`, `shared`, `security` y `frontend` en `success`.
+5. **Tag anotado `v2.46-beta`** sobre la ref de sellado, y `Python CI` en la ref del tag.
+
+Las cifras de §9.2 se escribirán **citando el run que las produjo**, sin mezclar la medición local de §5
+con la del CI (el aprendizaje de `v2.44` §5 y `v2.45` §8: una cifra correcta atribuida al instrumento
+equivocado es un defecto de honestidad, no un redondeo).
