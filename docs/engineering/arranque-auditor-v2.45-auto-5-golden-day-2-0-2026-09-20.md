@@ -134,9 +134,11 @@ uv run pytest packages/py/application/tests/test_auto_daily_journal.py \
 # Matriz de mutaciones (mide y restaura; deja la huella intacta)
 uv run --no-sync python apps/api-python/scripts/v2_45_mutation_audit.py
 
-# Capa real (necesita PostgreSQL): el CI la corre con el gate fail-if-skipped
-#   env AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1
-uv run pytest apps/api-python/tests/test_golden_day_v2_process_pg.py -q --tb=short
+# Capa real. CON PostgreSQL alcanzable se mide YA en local (sin el gate, un skip es honesto):
+#   env AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1  →  un skip pasa a ser FALLO duro.
+# OJO: no la corras en paralelo con otra sesión de pytest contra la misma base (el
+# purgado de residuos del conftest borra las cuentas e instrumentos de la otra sesión).
+uv run pytest apps/api-python/tests/test_golden_day_v2_process_pg.py -q --tb=short -rs
 ```
 
 ---
@@ -152,15 +154,25 @@ uv run pytest apps/api-python/tests/test_golden_day_v2_process_pg.py -q --tb=sho
   de fase (head `043`).
 - Que `packages/py/application/tests/test_auto_daily_journal.py` ya estuviera en las listas offline: se
   añadió en `v2.42.2`.
+- Que el **día real** no cierre por geometría, no atribuya por estrategia desde la BD y no lea MAE/MFE ni
+  coste de la BD: está **declarado** en §7.1 del pack, con el motivo técnico (precio SIM plano, horizonte
+  21–90 d, y el bucle AUTO SIM que acumula el journal **en memoria**). Los cinco puntos que no cubre la
+  capa real los certifica la capa **hermética**.
+- Que el día real **sí** se midió en local (`AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1` ⇒ `1 passed` en 10,05 s,
+  seis corridas en solitario): el arranque del plan decía que no había PG alcanzable y el contenedor
+  `bolsa-postgres` estaba **sano**.
+- Que **no** se puedan correr dos sesiones de pytest en paralelo contra la misma base: el barrido de
+  residuos del conftest borra cuentas e instrumentos `inst-%` al cerrar cada sesión. Es un límite de
+  **método** del arnés, medido y declarado; el gate del tag corre el fichero en paso dedicado.
 
 ---
 
 ## 6. Formato del hallazgo
 
 ```
-P0/P1/P2 · afirmación · ruta:línea · comando exacto · salida · ¿ya declarado en §4/§5 del pack?
+P0/P1/P2 · afirmación · ruta:línea · comando exacto · salida · ¿ya declarado en §4/§5/§7 del pack?
 ```
 
-La ref sellada debe citar el **run de CI** que produjo cada cifra del día real, porque en la máquina
-del autor **no hay PostgreSQL alcanzable** (el `connect` del DSN se cuelga) y esa capa solo la certifica
-CI.
+Las cifras del **tag** (`lifecycle-pg` con el día real) citan el run de `Release tag CI` que las produjo;
+las locales citan el comando y su salida (§5 del pack). Ninguna cifra se atribuye a un artefacto que no
+la produjo.

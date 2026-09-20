@@ -143,10 +143,108 @@ Requisitos de cableado (un fichero nuevo **no entra solo**):
 
 ## 7. Estado de ejecución (2026-09-20) — lo implementado, con sus desviaciones
 
-**PENDIENTE.** Se rellena al ejecutar la fase, por el agente que la implemente: qué se hizo, qué se
-midió (con el **run** de CI de cada cifra), qué se desvió del plan y qué límite se **confirmó** al medir.
+**Cerrado en el mismo día.** **Sin migración** (Alembic head sigue en `043_exit_identity_and_kill_state`)
+y **sin tocar el gobernador** (`v2_43_governor_evidence.py` byte a byte igual y `exit 0`, con `"bump"`
+todavía en `1.68.0-beta`).
+
+| Pieza del plan                             | Estado                | Fichero                                                                                                                                |
+| ------------------------------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| §3.1 el día real (capa de proceso)         | hecho (con **D1–D5**) | `apps/api-python/tests/test_golden_day_v2_process_pg.py` (**nuevo**)                                                                   |
+| §3.2 el embudo (capa hermética)            | hecho                 | `packages/py/application/src/bolsa_application/auto_daily_journal.py`                                                                  |
+| §3.3 identidad de estrategia sin migración | hecho                 | `packages/py/application/src/bolsa_application/auto_v2_entry.py`, `apps/api-python/src/bolsa_api/background/auto_simulation_worker.py` |
+| §3.4 reason codes aditivos                 | hecho                 | `packages/py/application/src/bolsa_application/auto_reason_codes.py`                                                                   |
+| §4 gate en dos capas                       | hecho (ver **D4**)    | `python-ci.yml` (`quality`), `release-tag-ci.yml` (`python`, `lifecycle-pg`)                                                           |
+| §5 matriz de mutaciones medida             | hecho                 | `apps/api-python/scripts/v2_45_mutation_audit.py`                                                                                      |
+
+### 7.1 Desviaciones declaradas (el plan decía otra cosa)
+
+- **D1 — el día real cierra por `time_exit` por el SEAM DURABLE, no por geometría.** El precio del camino
+  SIM real es **plano** (`flat_price_script`, `auto_simulation_worker.py:265`, sin env que lo cambie) y el
+  horizonte de la plantilla de política es de **21–90 días**: un día V2 **no** puede disparar T1
+  parcial/trailing/régimen dentro del presupuesto de un test. La fase 2 detiene el proceso, lleva el
+  **techo de mantenimiento** (`holdingDeadlineAt` del JSONB) al pasado —el techo se congela al nacer y
+  sobrevive al reinicio, E1— y **reinicia el mismo engine**: el worker rehidrata el plan y vende por
+  `time_exit`; libro canónico plano, todo `APPLIED` y cada fill con su transacción. El cierre por
+  **geometría** (T1/trailing/régimen) y `Σ exit_reasons == exits` se certifican en la capa **hermética**,
+  donde precio, reloj y decider se **inyectan**.
+- **D2 — el día real no puede certificar atribución por estrategia, MAE/MFE ni coste «leídos desde la
+  BD».** El spine determinista del proceso real es **`unversioned`** (`auto_simulation_worker.py:1728`) y
+  el bucle AUTO SIM **no escribe** el journal durable (`DecisionJournalEntryRow` lo escriben los casos de
+  uso de la API; el worker acumula `DecisionJournalEntryRecord` **en memoria** y el espejo durable de
+  fills no tiene versión de estrategia). Esos tres agregados se certifican en la **capa hermética**
+  (día del worker con dos versiones **distintas** —`orb-1` ×2 y `meanrev-2`— y 9 tests del agregado
+  puro), junto con su disciplina de declaración (`UNKNOWN`/`PARTIAL`, nunca `0`).
+- **D3 — identidad determinista por BARRIDA pura, y presupuestos propios.** El ruido de la cola SIM sale
+  de `sha256(seed, instrument_id, side, ...)`; con id aleatorio el día es una moneda al aire. En vez del
+  id del `a9` (elegido solo para `_minute = 0`) aquí se barre un id que garantiza, en **toda** la ventana
+  de ticks del test, `≥2` tranchas en BUY y SELL **completa** (la SELL del cierre cae en el 2º proceso
+  recién arrancado, que vuelve a `_minute = 0/1`). Sin `run_tick()` manual y con los presupuestos
+  declarados (`_STARTUP_GRACE_S`, `_OPEN_POLLS`, `_CLOSE_POLLS`, `_CLOSED_DAY_POLLS`) y **fallo al
+  instante** si el subproceso muere.
+- **D4 — el gate se cuelga de las listas que YA existen.** El agregado puro (`test_auto_daily_journal.py`)
+  ya estaba registrado explícitamente en `quality` desde `v2.42.2`; el día del worker entra por el pase de
+  directorio de `apps/api-python/tests`; el fichero **PG nuevo** se añade a los `--ignore` de los dos
+  jobs **offline** y corre en un **paso dedicado** de `lifecycle-pg` con `AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1`
+  y guard anti-skip (log no vacío + `grep` de `skipped`). No se toca el `run: >` de los bloques
+  existentes.
+- **D5 — «≥2 estrategias» en el día REAL: no; en la capa hermética: sí.** Por D2 el proceso real produce
+  tres señales (una por instrumento, 3 sectores) todas `unversioned`. Las dos versiones distintas del
+  punto 1 del plan se certifican en la capa hermética.
+
+### 7.2 Límites confirmados al medir (eran §6, ahora medidos)
+
+- **Corrección de procedencia frente al §0 del plan:** esta máquina **SÍ tenía PostgreSQL alcanzable**
+  (contenedor `bolsa-postgres` sano en `localhost:5432`, DSN de `docker-compose.yml`) ⇒ la capa real
+  **se midió en local**: `1 passed` (solo) en **10,05 s**, con seis corridas en solitario de
+  8,89 / 9,66 / 9,85 / 9,88 / 9,90 / 10,05 s. El «sin PG local» del arranque era cierto para el
+  entorno del relevo, no para el estado del contenedor al ejecutar la fase.
+- **Límite de método medido (y declarado en el fichero):** el barrido de residuos del conftest
+  (`purge_all_residuals`: borra **toda** cuenta ajena y todo instrumento `inst-%` al terminar la
+  **sesión** de pytest) hace que **dos sesiones de pytest a la vez contra la misma base se borren los
+  datos entre sí** — se reprodujo: el motor quedaba reintentando liquidaciones (`retry_scheduled`) contra
+  filas ya borradas. El gate del tag corre el fichero en **paso dedicado**, que es la forma soportada.
+- **MAE/MFE se recogen, no se calibran**; **el coste se recoge, no decide**; **correlación de hoy**, no
+  matriz por pares; **identidad de estrategia en `payload` JSONB no indexado**. Todo confirmado.
+- **Presupuesto del job del tag:** el día real añade un paso con dos arranques de scheduler (×3
+  instrumentos); medido en local en ~10 s por corrida, con techo declarado (120 s por fase) que **falla
+  con diagnóstico**, no se queda en silencio.
+
+### 7.3 Verificación medida
+
+```text
+ruff check packages/py apps/api-python --config pyproject.toml     → All checks passed (0)
+mypy <5 paquetes + apps/api-python/src> --follow-imports=silent    → Success: 489 ficheros, 0 issues
+lint-imports --config packages/py/.importlinter                    → 4 kept, 0 broken
+git diff -- apps/api-python/scripts/v2_43_governor_evidence.py     → vacío; script exit 0
+las 3 suites de la fase juntas                                     → 44 passed
+offline_ci_run_yaml.py ... python-ci.yml quality (baseline)        → 2087 passed, 0 skipped (exit 0)
+offline_ci_run_yaml.py ... release-tag-ci.yml python (baseline)    → 2098 passed, 0 skipped (exit 0)
+CI real · quality (run 35520898909)                                → 2087 passed, 38 skipped (v2.44: 2075 ⇒ +12)
+CI real · auto-v2-durable-pg (mismo run)                           → 43 passed (sin cambio: no hay migración)
+v2_45_mutation_audit.py                                            → 8/8 muerden, huella intacta (exit 0)
+capa real PG (local, 6 corridas en solitario)                      → 1 passed cada una (8,89–10,05 s)
+```
+
+El `+12` de tests nuevos (9 en `test_auto_daily_journal.py`, 2 en `test_auto_v2_golden_day_evidence.py`,
+1 en `test_auto_simulation_worker.py`) coincide **exacto** en las dos listas offline medidas (2087/2098
+sobre 2075/2086) y con el `quality` de CI real.
+
+---
 
 ## 8. Verificación (a rellenar con artefactos)
 
 Cada cifra del informe final debe citar **el artefacto que la produjo** (aprendizaje declarado de `v2.44` §5:
 una cifra atribuida al instrumento equivocado es un defecto de honestidad, no un redondeo).
+
+| Artefacto                                                                                                              | Qué certifica                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **commit de fase `ad800262`** (17 ficheros, `+2581/−16`)                                                               | el cuerpo entero de la fase (embudo, identidad, capa real, mutaciones, docs de auditoría)                                                                                                            |
+| **commit `0fc85c17`**                                                                                                  | corrección del contrato declarado del id determinista + límite de método medido (paralelismo de sesiones)                                                                                            |
+| `Python CI` run [`35520898909`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35520898909) **GREEN 5/5** en `main` | `quality` **2087 passed, 38 skipped, 0 failed** en 72,43 s (los **+12** exactos); `auto-v2-durable-pg` **43 passed**; `paper-forward-pg` **2**; `grammar-discovery-pg` **21**; `lifecycle-pg` **13** |
+| `Gitleaks` run [`35520899318`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35520899318) **GREEN**                | sin secretos                                                                                                                                                                                         |
+| `apps/api-python/scripts/v2_45_mutation_audit.py` (corrida local, `exit 0`)                                            | matriz **8/8 muerden** y huella del árbol intacta (el log nombra el test en rojo de cada mutación)                                                                                                   |
+| `offline_ci_run_yaml.py` (JUnit XML, no copia a mano)                                                                  | baseline de `quality` **2087/0/0** y de `python` del tag **2098/0/0**                                                                                                                                |
+| **capa real PG** corrida local con `AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1`                                                  | proceso real abre 3 posiciones (`fills > orders`), reinicio con el techo vencido cierra por `time_exit`, libro plano, todo `APPLIED` y cada fill con su transacción                                  |
+| `ruff` / `mypy` / `lint-imports` (locales)                                                                             | 0 / 489 ficheros 0 issues / 4 kept 0 broken                                                                                                                                                          |
+| gobernador                                                                                                             | `git diff` **vacío** y `exit 0` (freeze respetado)                                                                                                                                                   |
+| **`Release tag CI`** del tag `v2.45-beta`                                                                              | `python` offline, `lifecycle-pg` con el **paso dedicado** del día real y el guard anti-skip, `certify` en `success` (cifras y run en el commit de evidencia posterior al sello)                      |

@@ -164,12 +164,23 @@ idéntica a la inicial ⇒ _«intacto: la sonda no alteró el árbol»_.
 `apps/api-python/tests/test_auto_v2_golden_day_evidence.py` + 1 en
 `apps/api-python/tests/test_auto_simulation_worker.py`. El `+12` coincide en **ambos** bloques offline.
 
-### Capa real (PG + proceso): la certifica CI
+### Capa real (PG + proceso): medida también en LOCAL
 
-En la máquina del autor **no hay PostgreSQL alcanzable** (el `connect` del DSN **se cuelga**, no
-rechaza) ⇒ `test_golden_day_v2_process_pg.py` no se puede medir localmente. La certificación es la del
-**CI**, con el gate fail-if-skipped: un skip mudo sería un fallo duro. Cifras **del run que las
-produjo** en §6.
+**Corrección de procedencia frente al arranque del plan:** esta máquina **sí** tenía PostgreSQL
+alcanzable (contenedor `bolsa-postgres` **sano** en `localhost:5432`, con el DSN de `docker-compose.yml`),
+así que la capa real **no** hubo que dejarla solo al CI: se midió en local con
+`AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1`, **`1 passed`** en **10,05 s**, y seis corridas en solitario de
+8,89 / 9,66 / 9,85 / 9,88 / 9,90 / 10,05 s.
+
+**Límite de método medido (declarado también en el propio fichero):** el barrido de residuos del conftest
+(`purge_all_residuals` borra **toda** cuenta ajena y todo instrumento `inst-%` al terminar la **sesión**
+de pytest) hace que **dos sesiones de pytest simultáneas contra la misma base se borren los datos entre
+sí** — se reprodujo: el motor quedaba reintentando liquidaciones (`retry_scheduled`) contra filas ya
+borradas y la fase de apertura agotaba su presupuesto. **No** es un defecto del motor ni del test: es el
+teardown de la otra sesión. En CI el fichero corre en un **paso dedicado**, sin sesiones solapadas.
+
+La cifra del `lifecycle-pg` del tag (con su guard anti-skip) la produce el **run del tag** y se registra
+en §9.
 
 ---
 
@@ -198,19 +209,44 @@ AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1 uv run pytest \
 
 ## 7. Límites declarados y deuda diferida
 
-1. **El día real no cierra por geometría dentro del presupuesto del test.** El precio del camino SIM
-   real es **plano** (`flat_price_script`) y el horizonte de la plantilla de política es de **21–90
-   días**: por eso la fase 2 dispara el `time_exit` por el **seam durable** (techo congelado → pasado →
-   reinicio). El cierre por **geometría** (T1/trailing/régimen) se certifica en la capa **hermética**,
-   con precio y reloj **inyectados**.
+### 7.1 Desviaciones frente al plan §3.1 (declaradas, no maquilladas)
+
+El plan pedía que el **día real** certificase nueve cosas. Se certifican **cuatro** en la capa real y las
+otras **cinco** en la capa hermética, donde precio, reloj y decider se **inyectan**:
+
+| Punto del plan §3.1                           | Capa real (PG + proceso)                                                          | Capa hermética                                                              |
+| --------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1. 3–10 señales                               | **sí** (3, una por instrumento/sector)                                            | sí                                                                          |
+| 1b. ≥2 estrategias                            | **no**: el spine determinista es `unversioned` (`auto_simulation_worker.py:1728`) | **sí** (`orb-1` ×2 y `meanrev-2`)                                           |
+| 2. `fills > orders`                           | **sí** (tranzas de la cola SIM)                                                   | sí                                                                          |
+| 3. T1 parcial + trailing + cierre por régimen | **no**: precio SIM **plano** (`flat_price_script`) y horizonte 21–90 d            | **sí** (`test_auto_v2_golden_day_evidence.py`: `time_exit` + `thesis_exit`) |
+| 4. libro plano                                | **sí** (canónico `positions` a cero)                                              | sí                                                                          |
+| 5. todo `APPLIED` + fill con transacción      | **sí** (espejo durable vs `transactions.idempotency_key`)                         | sí                                                                          |
+| 6. `Σ exit_reasons == exits`                  | **no** (los planes `sim_auto_positions` se retiran al cerrar)                     | **sí**                                                                      |
+| 7. atribución por estrategia desde la BD      | **no** (D2: el bucle SIM AUTO **no** escribe el journal durable)                  | **sí**                                                                      |
+| 8. MAE/MFE leídos de la BD                    | **no** (D2 + el plan se retira al cerrar)                                         | **sí** (del `mfe_mae` del JSONB)                                            |
+| 9. coste de oportunidad de las rechazadas     | **no** (D2)                                                                       | **sí** (precio posterior; `unmeasured` declarado si falta)                  |
+
+**Por qué el día real no puede con 3/7/8/9:** el precio del camino SIM real es **plano** (no hay env que
+cambie el `price_script` del proceso) y el horizonte de la plantilla es de **21–90 días**; y el bucle AUTO
+SIM acumula el journal **en memoria** (el `DecisionJournalEntryRow` lo escriben los casos de uso de la
+API, no el worker), así que no hay journal durable del que agregar atribución, MAE/MFE ni coste. Cambiar
+cualquiera de las dos cosas es **producción**, no certificación.
+
+### 7.2 Límites (heredados o confirmados)
+
+1. **El día real cierra por el seam durable, no por geometría.** La fase 2 detiene el proceso, lleva el
+   **techo de mantenimiento** (`holdingDeadlineAt`) al pasado y **reinicia el mismo engine**: el plan se
+   **rehidrata** y vende por `time_exit`. El cierre por geometría se certifica en la capa hermética.
 2. **Sin productor de economía en el tick** para el día real (heredado de `AUTO-4`): `p_win`/medias
    son de `AUTO-7`.
 3. **MAE/MFE se recogen, no se calibran** (calibrar stop/T1/T2/trailing/tiempo es `AUTO-7`).
 4. **El coste de oportunidad se recoge, no decide**: ninguna regla se relaja por esta medición.
 5. **Correlación de hoy, no matriz por pares** (heredado de `AUTO-4`).
 6. **La identidad de estrategia viaja en `payload` JSONB**: consultable, **no** indexada.
-7. **Presupuesto de tiempo del job del tag**: el día real alarga `lifecycle-pg`; el coste se declara en
-   §8 del plan.
+7. **Presupuesto de tiempo del job del tag**: el día real alarga `lifecycle-pg`; medido ~10 s por corrida
+   en local, con techo declarado por fase (120 s) que **falla con diagnóstico**.
+8. **Límite de método:** no correr dos sesiones de pytest en paralelo contra la misma base (ver §5).
 
 ---
 
@@ -245,5 +281,16 @@ dos ficheros con CRLF/LF pendientes, ni `governor.json` (generado, sin trackear)
 
 ## 9. Sello
 
-**PENDIENTE.** Se rellena con los runs de CI que produzcan cada cifra del día real (`Python CI` 5/5 y
-`Release tag CI` GREEN), el commit de fase y el commit docs-only de sellado, y el tag `v2.45-beta`.
+- **Commit de fase: `ad800262`** (17 ficheros, `+2581/−16`) — el cuerpo de la fase.
+- **Commit de corrección: `0fc85c17`** — contrato declarado del id determinista + límite de método medido
+  (dos sesiones de pytest en paralelo contra la misma base).
+- **`Python CI` GREEN 5/5 en `main`** (run
+  [`35520898909`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35520898909)): `quality` **2087
+  passed, 38 skipped, 0 failed** en 72,43 s (los **+12** exactos de los tests nuevos), `auto-v2-durable-pg`
+  **43 passed** (sin cambio: no hay migración), `paper-forward-pg` **2**, `grammar-discovery-pg` **21**,
+  `lifecycle-pg` **13**. `Gitleaks` GREEN (run
+  [`35520899318`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35520899318)).
+- **Tag `v2.45-beta`** sobre el commit docs-only de sellado, y `Release tag CI` (job `python` offline +
+  `lifecycle-pg` con el **paso dedicado** del día real y su guard anti-skip + `certify`): el run que lo
+  certifica y sus cifras se registran en el commit de **evidencia** posterior al sello (los tags previos
+  no se mueven; `v2.45-beta` es ref nueva y aditiva).
