@@ -106,7 +106,9 @@ Preguntas abiertas: paridad 1:1 migración↔row model (tipos, `NULL`/`default`,
 
 - **Los tests PG no se midieron en la máquina del autor.** Es un **límite declarado**, no un agujero:
   el gate `AUTO_RESERVATION_PG_REQUIRED=1` convierte un skip mudo en fallo duro en CI. Si el auditor
-  tiene PG, es la medida que más aporta (comando en el §6 del pack).
+  tiene PG, es la medida que más aporta (comando en el §6 del pack). **Ya medida en CI:** el job
+  `auto-v2-durable-pg` del run [`35507944960`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35507944960)
+  fue de **39 → 43 passed** (`+4`), los cuatro tests de la 043 contra PostgreSQL real (pack §9).
 - `force_protective_exits` sin productor automático y el emisor de `RECONCILED` inexistente: **deuda
   heredada declarada** de `AUTO-2`, fuera del alcance de esta versión.
 - El gobernador **default OFF** y sus umbrales sin calibrar: decisión de roadmap, no un bug.

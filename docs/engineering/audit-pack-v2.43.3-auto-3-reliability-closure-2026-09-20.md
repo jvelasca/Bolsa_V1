@@ -157,7 +157,8 @@ v2_43_3_mutation_audit.py                                          → 6/6 muerd
 (sin PostgreSQL alcanzable: el `connect` del DSN se cuelga). La certificación de la migración y del
 reinicio real es la del **CI**, con gate **fail-if-skipped** (`AUTO_RESERVATION_PG_REQUIRED=1`) en el job
 `auto-v2-durable-pg` de `python-ci.yml` y en `lifecycle-pg` de `release-tag-ci.yml`; el fichero queda en
-`--ignore` del job hermético (si no, skipearía en mudo).
+`--ignore` del job hermético (si no, skipearía en mudo). **Medido en CI (§9): `auto-v2-durable-pg` pasó de
+39 a 43 (`+4`), los cuatro tests de la 043 corriendo contra PostgreSQL real.**
 
 ## 6. Comandos exactos de CI
 
@@ -221,7 +222,26 @@ firmados / CI attestation; **`AUTO-4` Portfolio Optimizer** (`V2.44` / `1.69.0-b
 
 ## 9. Sello
 
-**PENDIENTE al publicar este pack** (el documento se publica antes de sellar y **no afirma CI de un tag
-que aún no existe**). Aquí irán el commit de fase, el `+N/−M` real del diff, el tag anotado
-`v2.43.3-beta` y las URLs de los runs reales (`Python CI` en `main` y en la ref del tag, `Gitleaks` y
-`Release tag CI` con `certify`).
+**SELLADO (2026-09-20).** Commit de fase **`379b8cc9`** (24 ficheros, **`+3688/−42`**) y tag anotado
+**`v2.43.3-beta`** sobre el commit de **sellado** docs-only (convención de `v2.43-beta`/`v2.43.1-beta`/
+`v2.43.2-beta`: la ref sellada no cita refs inexistentes). `v2.43-beta`/`v2.43.1-beta`/`v2.43.2-beta`
+**no se mueven**: `v2.43.3-beta` es una ref **nueva y aditiva**.
+
+**CI real del commit de fase `379b8cc9` (medida, no esperada):**
+
+| Run                                                                            | Workflow    | Resultado     |
+| ------------------------------------------------------------------------------ | ----------- | ------------- |
+| [`35507944960`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35507944960) | `Python CI` | **GREEN 5/5** |
+| [`35507944962`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35507944962) | `Gitleaks`  | **GREEN**     |
+
+Desglose de `Python CI` (cifras del log, no estimadas):
+
+- `quality` → **2042 passed, 38 skipped** en 115,73 s (los 38 skips son los ficheros PG que el job
+  hermético recoge y salta; el runner offline los mueve a `--ignore` y da **2042 passed, 0 skipped**,
+  el mismo número de _passed_).
+- `auto-v2-durable-pg (Alembic 040-043 + reinicio real, per-commit)` → **43 passed** en 5,22 s. Los
+  **39 → 43 = +4** son exactamente los cuatro tests de `test_auto_v44_exit_identity_pg.py`: el
+  roundtrip de la **043**, el INTENT y el HALT que sobreviven a un **reinicio real por segunda sesión**
+  y el enlace reserva→intent con fill parcial **corrieron contra PostgreSQL real** (gate
+  fail-if-skipped), no skipearon.
+- `paper-forward-pg` **2 passed** · `grammar-discovery-pg` **21 passed** · `lifecycle-pg` **13 passed**.

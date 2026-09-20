@@ -95,8 +95,20 @@ PARTIAL/FILLED` (+ `EMERGENCY`/`ABANDONED`), con `filled_qty`/`remaining_qty` ex
 - **Matriz de mutaciones** (`apps/api-python/scripts/v2_43_3_mutation_audit.py`): **6 de 6 muerden**
   (M1/M2 kill durable, M3/M4 identidad de salida, M5 política B, M6 orden UTC) y la sonda deja la
   **huella del árbol intacta**.
-- **PG real**: no ejecutado en esta máquina (sin PostgreSQL alcanzable); la certificación de la 043 es la
-  del CI, donde el gate **fail-if-skipped** convierte un skip mudo en fallo duro.
+- **PG real**: no ejecutado en esta máquina (sin PostgreSQL alcanzable), pero **certificado en CI**: el
+  job `auto-v2-durable-pg` (gate **fail-if-skipped**) pasó de **39 a 43 passed** — los cuatro tests de la
+  043 (roundtrip de la migración, INTENT y HALT que sobreviven a un reinicio real por segunda sesión y el
+  enlace reserva→intent con fill parcial) corrieron contra PostgreSQL real, no skipearon.
+
+### Sello (2026-09-20)
+
+Commit de fase **`379b8cc9`** (24 ficheros, `+3688/−42`) + tag anotado **`v2.43.3-beta`** sobre el commit
+de sellado docs-only (convención de `v2.43-beta`…`v2.43.2-beta`); `v2.43-beta`/`v2.43.1-beta`/
+`v2.43.2-beta` **no se mueven** (ref nueva y aditiva). **CI real del commit de fase**: `Python CI`
+**GREEN 5/5** (run [`35507944960`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35507944960):
+`quality` **2042 passed, 38 skipped** en 115,73 s, `auto-v2-durable-pg` **43 passed**, `paper-forward-pg`
+2 passed, `grammar-discovery-pg` 21 passed, `lifecycle-pg` 13 passed) y `Gitleaks` **GREEN**
+(run [`35507944962`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35507944962)).
 
 ### Deuda diferida (fuera de esta versión, declarada)
 
