@@ -45,11 +45,11 @@ contenía **1** run id y en `main` **2** — el segundo entró en
 `9ef57aff` (`docs(v2.45): evidencia de CI del sello…`), **posterior** al tag. Es decir: el tag es el
 **sello**, y la evidencia es un commit docs-only **después** del sello.
 
-| Qué                                             | Dónde leerlo                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------ |
-| Código de la fase (17 ficheros)                 | ref del tag **`v2.46-beta`** o commit de fase **`a14b71d7`** |
-| Pack (con §9 completo), brief, plan, estado     | **`main`** (`d7f902f2`)                                      |
-| Logs de CI y artefacto `release-tag-ci-summary` | página pública de los runs (abajo)                           |
+| Qué                                             | Dónde leerlo                                                                                          |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Código de la fase (17 ficheros)                 | ref del tag **`v2.46-beta`** o commit de fase **`a14b71d7`**                                          |
+| Pack (con §9 completo), brief, plan, estado     | **`main`** (rama viva: **no** se cita su hash aquí a propósito — cualquier commit docs-only la mueve) |
+| Logs de CI y artefacto `release-tag-ci-summary` | página pública de los runs (abajo)                                                                    |
 
 **Lo que NO está en GitHub y hay que re-ejecutar** (declarado, no escondido): el log de la matriz de
 mutaciones vive en `logs/agent/v2_46_mutation_audit.txt`, que el §8.1 del plan declara **local y no
