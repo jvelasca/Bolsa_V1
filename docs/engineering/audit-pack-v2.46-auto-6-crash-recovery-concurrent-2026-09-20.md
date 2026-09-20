@@ -339,7 +339,7 @@ local de §5 **no** se mezcla con la del CI.
    **GREEN 5/5** (2m40s):
    - `quality` **2091 passed, 38 skipped** en **115,49 s** ⇒ los **+4** exactos sobre los 2087 de
      `v2.45-beta` (los 4 tests herméticos nuevos, que entran por el **pase de directorio**).
-   - `auto-v2-durable-pg` **43 passed** / **0 skipped** ⇒ **sin cambio**, que es justo lo predicho en §9.2
+   - `auto-v2-durable-pg` **43 passed** / **0 skipped** ⇒ **sin cambio**, que es justo lo predicho
      (no hay migración).
    - `lifecycle-pg` **13 passed** · `paper-forward-pg` **2 passed** · `grammar-discovery-pg` verde.
    - `Ruff`: _All checks passed_ (el `quality` vuelve a correr el linter sobre el árbol).
@@ -356,7 +356,8 @@ local de §5 **no** se mezcla con la del CI.
 5. **`Release tag CI`** — run [`35535111995`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35535111995)
    **GREEN** (8m5s) con `certify (aggregate + artifact)` en `success`:
    - job `python` offline: **2102 passed, 35 skipped** en 58,91 s ⇒ los **+4** exactos sobre los 2098 de
-     `v2.45-beta`, tal y como predecía el §9.2 previo a este commit.
+     `v2.45-beta`, tal y como predecía la versión **pre-sello** de este §9 (recuperable, para verificar
+     que no se ajustó a posteriori: `git show 5eb654b9:docs/engineering/audit-pack-v2.46-auto-6-crash-recovery-concurrent-2026-09-20.md`).
    - `lifecycle-pg`: **148 passed** + **45 passed** (account-isolation) y **tres pasos dedicados** en
      verde — `Golden Day 2.0` **1 passed in 10,68 s**, **`Crash/Recovery Day` (NUEVO) 1 passed in
      9,44 s** y **`Concurrent AUTO` (NUEVO) 1 passed in 1,64 s** — cada uno con su guard
