@@ -770,8 +770,17 @@ muerden** (M1–M5, M7–M9, M11) y **4 nacen verdes** (M6, M10, M12, M13) con s
 **Tres agujeros reales** (M6, M12, M13) quedan **declarados y reproducibles**; **no** se tocó una línea de
 código de producción ni se añadieron tests en el cierre (regla de oro del relevo §0).
 
-**CI en la ref del tag:** medida **después** de crear el tag y registrada en el **§12.1** (este commit de
-sellado no puede citar la CI de una ref que aún no existía cuando se escribió).
+**CI en la ref del tag:** medida **después** de crear el tag y registrada en el **§12.1**.
+
+### 12.1 CI en la ref del tag `v2.43.2-beta`
+
+Medida sobre el commit de sellado `13b54ceb` (al que apunta el tag anotado `v2.43.2-beta`):
+
+| Workflow         | Resultado                                                                                                                                                 | Run                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `Release tag CI` | **GREEN — todos los jobs requeridos + `certify`**: `certify (aggregate + artifact)` success; `playwright (integrated E2E, opt-in)` **skipped por diseño** | [35498499879](https://github.com/jvelasca/Bolsa_V1/actions/runs/35498499879) |
+| `Python CI`      | **GREEN — 5/5 jobs**                                                                                                                                      | [35498499864](https://github.com/jvelasca/Bolsa_V1/actions/runs/35498499864) |
+| `Gitleaks`       | **GREEN** (sobre el commit de sellado `13b54ceb` en `main`)                                                                                               | [35498498856](https://github.com/jvelasca/Bolsa_V1/actions/runs/35498498856) |
 
 ---
 

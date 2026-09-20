@@ -142,6 +142,17 @@ con `ruff check --fix` **antes** de sellar; la lección está en el relevo.
 [`arranque-auditor-v2.43.2-hardening-y-auto-3-slice-2-2026-09-19.md`](docs/engineering/arranque-auditor-v2.43.2-hardening-y-auto-3-slice-2-2026-09-19.md) ·
 [`traspaso-relevo-post-v2-43-2-auto-3-slice-2-2026-09-19.md`](docs/engineering/traspaso-relevo-post-v2-43-2-auto-3-slice-2-2026-09-19.md).
 
+**Sello (`v2.43.2-beta`).** Commit de fase **`ef35e3aa`** (29 ficheros, `+3814/−66`) y tag anotado
+**`v2.43.2-beta`** → commit de sellado docs-only **`13b54ceb`**. **CI real medida**: en `main` (`ef35e3aa`)
+`Python CI` **GREEN 5/5** ([run 35497681654](https://github.com/jvelasca/Bolsa_V1/actions/runs/35497681654),
+con `auto-v2-durable-pg` fail-if-skipped) y `Gitleaks` **GREEN**
+([run 35497681645](https://github.com/jvelasca/Bolsa_V1/actions/runs/35497681645)); en la **ref del tag**
+(`13b54ceb`) `Release tag CI` **GREEN** (jobs requeridos + `certify`;
+[run 35498499879](https://github.com/jvelasca/Bolsa_V1/actions/runs/35498499879)), `Python CI` **GREEN 5/5**
+([run 35498499864](https://github.com/jvelasca/Bolsa_V1/actions/runs/35498499864)) y `Gitleaks` **GREEN**
+([run 35498498856](https://github.com/jvelasca/Bolsa_V1/actions/runs/35498498856)). Detalle en el §12/§12.1
+del pack.
+
 ## [1.68.1-beta] — Remediación de la auditoría externa de `v2.43-beta` (5 hallazgos, 2 de ellos de seguridad financiera) — 2026-09-18
 
 **Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Parche de remediación, **sin
