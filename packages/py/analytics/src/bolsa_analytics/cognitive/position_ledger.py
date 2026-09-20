@@ -91,6 +91,11 @@ class AppliedFillFact:
     price: float
     applied_at: str | None = None
     strategy_version_id: str | None = None
+    # AUTO hardening (v2.43.2): la posición es POR CUENTA. Sin esto, un libro leído con
+    # ``account_id=None`` (todas las cuentas) fundía en ``quantities()`` dos posiciones del
+    # mismo instrumento en cuentas distintas y la reconciliación no podía distinguirlas.
+    # Un hecho sin cuenta declarada va al cajón ``""`` (se agrupa, nunca se suma a otra).
+    account_id: str = ""
 
     def __post_init__(self) -> None:
         if not str(self.execution_id or "").strip():
@@ -127,6 +132,7 @@ class AppliedFillFact:
             "notional": self.notional,
             "appliedAt": self.applied_at,
             "strategyVersionId": self.strategy_version_id,
+            "accountId": self.account_id,
         }
 
 
@@ -135,9 +141,16 @@ class LedgerPosition:
     """Posición materializada de un instrumento, derivada SOLO de fills aplicados.
 
     ``quantity`` es Σ compras aplicadas (tamaño bruto de entrada) y ``remaining_qty`` la
-    posición viva; ``realized_qty`` es Σ ventas aplicadas. La relación canónica es
+    posición viva; ``realized_qty`` es la cantidad de ventas que **realmente casó** contra
+    inventario comprado (``quantity_closed``). La relación canónica es
     ``remaining_qty == quantity - realized_qty`` (nunca negativa: si las ventas superan
     las compras, hay violación y se declara).
+
+    ``sold_qty`` es Σ ventas **ejecutadas** (lo que el venue movió) y
+    ``unmatched_exit_qty = sold_qty - realized_qty`` el exceso que no tenía inventario
+    contra el que casar. Separarlos es lo que evita que una venta rechazada (o el exceso
+    de un oversell) se cuele en ``realized_qty`` y oculte compras legítimas posteriores:
+    ``realized_qty`` solo avanza por lo casado, igual que ``cost_basis``/``realized_pnl``.
 
     ``average_entry`` es el coste medio de lo que **queda abierto**: una posición plana no
     tiene entrada y publica ``None`` (nunca 0,0). Un consumidor que necesite el precio de
@@ -152,6 +165,12 @@ class LedgerPosition:
     realized_pnl: float
     fills: tuple[AppliedFillFact, ...] = ()
     violations: tuple[str, ...] = ()
+    # AUTO hardening (v2.43.2) — cantidad vendida EJECUTADA y exceso no casado. Aditivos:
+    # un consumidor anterior que solo lea ``realized_qty`` sigue viendo la cantidad
+    # cerrada real (que ahora sí es ``min(Σ SELL, Σ BUY)``, no ``Σ SELL``).
+    sold_qty: float = 0.0
+    unmatched_exit_qty: float = 0.0
+    account_id: str = ""
 
     @property
     def is_open(self) -> bool:
@@ -171,8 +190,11 @@ class LedgerPosition:
     def to_dict(self) -> dict[str, Any]:
         return {
             "instrumentId": self.instrument_id,
+            "accountId": self.account_id,
             "quantity": self.quantity,
             "realizedQty": self.realized_qty,
+            "soldQty": self.sold_qty,
+            "unmatchedExitQty": self.unmatched_exit_qty,
             "remainingQty": self.remaining_qty,
             "averageEntry": self.average_entry,
             "costBasis": self.cost_basis,
@@ -229,10 +251,18 @@ def _fold_instrument(facts: list[AppliedFillFact]) -> LedgerPosition:
     ponderado y las ventas realizan P&L contra ese coste medio **en el momento de la
     venta**. Una venta sin compra previa suficiente no realiza P&L de lo que no existe:
     se registra como violación y el resto se ignora.
+
+    Regla de oro (v2.43.2): ``realized_qty`` avanza SOLO por ``matched`` (lo que casó
+    contra inventario), igual que ``cost_basis`` y ``realized_pnl``. Sumar la cantidad
+    solicitada inflaba ``remaining_qty = quantity - realized_qty`` y podía reportar como
+    plana una compra real posterior; el exceso rechazado queda declarado en
+    ``sold_qty``/``unmatched_exit_qty`` y en ``violations``, nunca en la cantidad viva.
     """
     instrument_id = facts[0].instrument_id
+    account_id = facts[0].account_id
     quantity = 0.0
     realized_qty = 0.0
+    sold_qty = 0.0
     cost_basis = 0.0
     realized_pnl = 0.0
     violations: list[str] = []
@@ -242,15 +272,16 @@ def _fold_instrument(facts: list[AppliedFillFact]) -> LedgerPosition:
             quantity += fact.quantity
             cost_basis += fact.quantity * fact.price
             continue
-        # Venta aplicada: realiza contra el coste medio vigente, nunca contra 0. Este
-        # ``else`` es una venta por CONSTRUCCIÓN: ``AppliedFillFact`` solo admite
+        # Venta aplicada: se cuenta SIEMPRE como venta ejecutada (es un hecho del venue),
+        # pero solo realiza P&L / cierra cantidad en la parte que casa contra inventario.
+        # El ``else`` es una venta por CONSTRUCCIÓN: ``AppliedFillFact`` solo admite
         # ``buy``/``sell``, así que ningún lado no interpretable puede llegar hasta aquí
         # (una fila ilegible se declara al leerla, no se disfraza de venta).
+        sold_qty += fact.quantity
         avg_entry = (cost_basis / quantity) if quantity > _QTY_EPS else None
         sellable = quantity - realized_qty
         if sellable <= _QTY_EPS:
             violations.append(f"oversell_without_position:{fact.execution_id}")
-            realized_qty += fact.quantity
             continue
         matched = min(fact.quantity, sellable)
         if avg_entry is not None:
@@ -258,7 +289,7 @@ def _fold_instrument(facts: list[AppliedFillFact]) -> LedgerPosition:
             cost_basis -= matched * avg_entry
         if fact.quantity > matched + _QTY_EPS:
             violations.append(f"oversell_above_position:{fact.execution_id}")
-        realized_qty += fact.quantity
+        realized_qty += matched
 
     remaining = max(0.0, quantity - realized_qty)
     avg_entry = None
@@ -273,13 +304,34 @@ def _fold_instrument(facts: list[AppliedFillFact]) -> LedgerPosition:
 
     return LedgerPosition(
         instrument_id=instrument_id,
+        account_id=account_id,
         quantity=round4(quantity),
         realized_qty=round4(realized_qty),
+        sold_qty=round4(sold_qty),
+        unmatched_exit_qty=round4(max(0.0, sold_qty - realized_qty)),
         remaining_qty=round4(remaining),
         average_entry=avg_entry,
         realized_pnl=round4(realized_pnl),
         fills=tuple(facts),
         violations=tuple(violations),
+    )
+
+
+def _fold_sort_key(fact: AppliedFillFact) -> tuple[int, str, str]:
+    """Clave determinista del fold: ``(tiene_fecha, applied_at, execution_id)``.
+
+    AUTO hardening (v2.43.2): un hecho SIN fecha no puede ordenarse como si fuera el
+    PRIMERO. ``str(None or "") == ""`` precede a cualquier ISO real en orden lexicográfico,
+    así que una fila legada sin fecha se doblaba como "la compra más antigua" y torcía el
+    coste medio (que depende del orden de compras y ventas). Los hechos sin fecha se
+    separan al FINAL de forma declarada (``1``) y el orden entre ellos sigue siendo
+    determinista por ``execution_id``. AUTO-1b ya cerró la causa raíz (un ``datetime`` de
+    PostgreSQL dejaba de perder su fecha al normalizarse); esto protege el residuo legado.
+    """
+    return (
+        0 if fact.applied_at else 1,
+        str(fact.applied_at or ""),
+        str(fact.execution_id or ""),
     )
 
 
@@ -293,32 +345,58 @@ def build_position_ledger(
     Orden determinista por ``(applied_at, execution_id)``: dos ejecuciones con el mismo
     conjunto de fills producen exactamente el mismo libro y el mismo P&L realizado.
 
+    Idempotencia (v2.43.2): ``execution_id`` es la clave financiera del fill (PK de
+    ``execution_events`` con ``ON CONFLICT DO NOTHING``), así que un MISMO hecho no puede
+    contarse dos veces: el fold lo deduplica aquí y declara los repetidos como rechazados.
+    Sin esta disciplina, dos hechos con el mismo ``execution_id`` doblaban posición, riesgo,
+    cash y P&L (``APPLIED fill #123`` × 2 ⇒ 2 × fill).
+
     ``rejected`` declara las filas que el lector no pudo interpretar (sin lado/cantidad/
     precio): si hay alguna, el libro baja a ``PARTIAL``/``UNKNOWN`` y **no** puede
     leerse como "la posición es exactamente esta". Un libro vacío es exacto (``COMPLETE``)
-    solo si no hubo filas rechazadas.
+    solo si no hubo filas rechazadas, duplicadas ni colisión de cuenta.
     """
-    ordered = sorted(
-        facts,
-        key=lambda f: (str(f.applied_at or ""), str(f.execution_id or "")),
-    )
-    grouped: dict[str, list[AppliedFillFact]] = {}
+    ordered = sorted(facts, key=_fold_sort_key)
+    # Idempotencia por identidad financiera: gana la PRIMERA aparición (ya ordenada) y las
+    # repeticiones se declaran. ``execution_id`` es global (PK), no por instrumento.
+    seen: set[str] = set()
+    deduped: list[AppliedFillFact] = []
+    duplicates: list[str] = []
     for fact in ordered:
-        grouped.setdefault(fact.instrument_id, []).append(fact)
+        key = str(fact.execution_id or "").strip()
+        if key in seen:
+            duplicates.append(key)
+            continue
+        seen.add(key)
+        deduped.append(fact)
 
-    positions = tuple(
-        _fold_instrument(grouped[instrument_id]) for instrument_id in sorted(grouped)
+    grouped: dict[tuple[str, str], list[AppliedFillFact]] = {}
+    for fact in deduped:
+        grouped.setdefault((fact.account_id, fact.instrument_id), []).append(fact)
+
+    # Colisión de instrumento entre cuentas: el mapa ``quantities()`` (instrumento →
+    # cantidad viva) no puede representar dos posiciones del MISMO símbolo en cuentas
+    # distintas sin fundirlas en una. Se declara degradando la medición en lugar de
+    # publicar una cantidad fusionada que la reconciliación tomaría por real.
+    accounts_by_instrument: dict[str, set[str]] = {}
+    for account_id, instrument_id in grouped:
+        accounts_by_instrument.setdefault(instrument_id, set()).add(account_id)
+    cross_account_collision = any(
+        len(accounts) > 1 for accounts in accounts_by_instrument.values()
     )
+
+    positions = tuple(_fold_instrument(grouped[key]) for key in sorted(grouped))
     violations = tuple(
         f"{position.instrument_id}:{violation}"
         for position in positions
         for violation in position.violations
-    )
+    ) + tuple(f"duplicate_execution_id:{execution_id}" for execution_id in duplicates)
+    unvalued = max(0, rejected) + len(duplicates) + (1 if cross_account_collision else 0)
     return PositionLedger(
         positions=positions,
-        measurement=measurement_from_counts(valued=len(ordered), unvalued=max(0, rejected)),
-        facts_applied=len(ordered),
-        facts_rejected=max(0, rejected),
+        measurement=measurement_from_counts(valued=len(deduped), unvalued=unvalued),
+        facts_applied=len(deduped),
+        facts_rejected=max(0, rejected) + len(duplicates),
         violations=violations,
     )
 
@@ -351,6 +429,7 @@ def coerce_applied_fill_fact(
     price: Any,
     applied_at: Any = None,
     strategy_version_id: Any = None,
+    account_id: Any = None,
 ) -> AppliedFillFact | None:
     """Normaliza una fila cruda a ``AppliedFillFact``; ``None`` si NO es interpretable.
 
@@ -376,6 +455,9 @@ def coerce_applied_fill_fact(
             if isinstance(strategy_version_id, str) and strategy_version_id.strip()
             else None
         ),
+        # La cuenta del hecho acota la posición (AUTO hardening v2.43.2). Sin ella el
+        # hecho cae al cajón ``""`` y el libro no lo funde con una cuenta concreta.
+        account_id=(str(account_id).strip() if account_id is not None else ""),
     )
 
 

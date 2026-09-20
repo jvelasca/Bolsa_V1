@@ -211,6 +211,10 @@ async def read_applied_fill_facts(
             price=getattr(context, "price", None),
             applied_at=getattr(event, "applied_at", None),
             strategy_version_id=getattr(context, "strategy_version_id", None),
+            # La CUENTA del hecho acota la posición (AUTO hardening v2.43.2): con
+            # ``account_id=None`` la lectura ve todas las cuentas y sin esto el libro
+            # fundía dos posiciones del mismo símbolo en una sola cantidad.
+            account_id=getattr(event, "account_id", None),
         )
         if fact is None:
             rejected += 1

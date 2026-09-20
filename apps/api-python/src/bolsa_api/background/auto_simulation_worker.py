@@ -42,11 +42,17 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
+from bolsa_analytics.cognitive.auto_portfolio_snapshot import UNKNOWN_SECTOR
+from bolsa_analytics.cognitive.data_freshness import (
+    FreshnessPolicy,
+    assess_data_freshness,
+)
 from bolsa_analytics.cognitive.exit_plan import is_thesis_invalidated
 from bolsa_analytics.cognitive.exit_policy import (
     resolve_exit_policy,
     resolve_holding_horizon,
 )
+from bolsa_analytics.cognitive.hard_kill_switch import HardKillSwitch
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_UNKNOWN,
@@ -59,12 +65,16 @@ from bolsa_analytics.cognitive.open_order import (
     build_open_order,
     summarize_open_orders,
 )
+from bolsa_analytics.cognitive.operational_governor import assess_from_measurements
 from bolsa_analytics.cognitive.portfolio_reservation import (
     RELEASE_REASON_FILL,
     RESERVATION_RELEASED_BY_CANCEL,
     RESERVATION_RELEASED_BY_FILL,
     RESERVATION_RELEASED_BY_RESTART,
+    SIDE_BUY,
+    SIDE_SELL,
     PortfolioReservation,
+    build_reservation,
 )
 from bolsa_analytics.cognitive.position_lifecycle import (
     advance_lifecycle,
@@ -149,7 +159,12 @@ from bolsa_application.execution_event import (
     UNAPPLIED_EXECUTION_EVENT_STATUSES,
     ExecutionEventStore,
 )
-from bolsa_application.position_manager import PositionManagerResult, PositionManagerSkip
+from bolsa_application.position_manager import (
+    KILL_SWITCH,
+    RISK_EXIT,
+    PositionManagerResult,
+    PositionManagerSkip,
+)
 from bolsa_application.protection_compat import (
     ProtectionPolicy,
     protection_exit_fraction,
@@ -604,6 +619,19 @@ class AutoSimulationWorker:
         self._v2_reservation_carryover: frozenset[str] = frozenset()
         self._v2_open_orders_read_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
         self._v2_reservations_reconciled = False
+        # V2.44 — parada DURA latcheada, por encima del gobernador. Nace desactivada; el
+        # worker la activa con motivos tipificados (reconciliación rota, ejecución
+        # duplicada, datos corruptos) y solo una reconciliación explícita la libera.
+        self._v2_kill_switch = HardKillSwitch()
+        # V2.44 — contador de reservas de SALIDA: da identidad única a cada orden de
+        # cierre (un ``RISK_EXIT`` con fill parcial no puede reutilizar la reserva de la
+        # orden anterior ni colisionar con la de otra salida del mismo instrumento).
+        self._v2_exit_seq = 0
+        # Relojes por DIMENSIÓN para la frescura (V2.44). Se pueblan al leer precios/ATR
+        # del tick; una prueba (o un feed real parado) puede dejar ``market_data`` viejo
+        # para forzar el veto de aperturas sin congelar las salidas protectoras.
+        self._v2_data_timestamps: dict[str, float] = {}
+        self._v2_freshness_policy = FreshnessPolicy()
         self._v2_plan: Any = None
         self._v2_journal: list[Any] = []
         self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
@@ -1191,6 +1219,80 @@ class AutoSimulationWorker:
         except ValueError:
             return datetime.now(UTC)
 
+    def _v2_kill_switch_halted(self) -> bool:
+        """True si la parada DURA latcheada está activa (V2.44)."""
+        switch = getattr(self, "_v2_kill_switch", None)
+        return bool(switch is not None and switch.engaged)
+
+    def engage_kill_switch(self, reason: Any, *, at: str | None = None) -> bool:
+        """Activa la parada dura con un motivo tipificado (V2.44).
+
+        Es idempotente y latcheada: reavisar no reinicia el motivo original. Se expone
+        como API del worker (p. ej. desde el endpoint de kill switch o desde una prueba).
+        """
+        return self._v2_kill_switch.engage(reason, at=at)
+
+    def release_kill_switch(self, *, reconciliation_ok: bool) -> bool:
+        """Libera la parada SOLO con reconciliación explícita (nunca por sí sola)."""
+        return self._v2_kill_switch.release(reconciliation_ok=reconciliation_ok)
+
+    def _v2_governor_position_inputs(self) -> dict[str, Any]:
+        """Lectura del gobernador para la GESTIÓN de posición (V2.44 · AUTO-3 slice 2).
+
+        Con el gobernador OFF devuelve todo ``None``: el manager sigue gobernado solo por
+        el régimen de mercado (byte-idéntico al histórico). Con el gobernador ON evalúa el
+        permiso del tick con la MISMA tabla que las entradas, más la parada dura.
+
+        Ojo con la semántica: ``EXIT_ONLY``/``ENTRY_RESTRICTED`` vetan APERTURAS, pero NO
+        liquidan por sí solos. La liquidación la piden ``RiskRegime == RISK_OFF`` (⇒
+        ``RISK_EXIT``) y ``OperationalState == HALTED`` (⇒ ``KILL_SWITCH``).
+
+        La parada DURA es INDEPENDIENTE del flag: con la parada activa se evalúa la tabla
+        aunque el gobernador esté OFF (un kill switch no puede quedar desactivado por un
+        flag de conveniencia).
+        """
+        kill = self._v2_kill_switch_halted()
+        if not self._v2_tunables.governor_enabled and not kill:
+            return {"risk_regime": None, "drawdown_band": None, "operational_state": None}
+        drawdown_pct = self._v2_governor_drawdown_pct()
+        assessment = assess_from_measurements(
+            operational_regime=self._v2_regime(),
+            drawdown_pct=drawdown_pct,
+            drawdown_measurement=(
+                MEASUREMENT_COMPLETE if drawdown_pct is not None else MEASUREMENT_UNKNOWN
+            ),
+            # La gestión de posición no decide el tamaño por ATR/liquidez: se declaran
+            # desconocidos (fail-closed) para no relajar el permiso por un dato ausente.
+            atr_known=False,
+            liquidity_known=False,
+            liquidity_notional=None,
+            policy=self._v2_tunables.governor_policy(),
+            halted=self._v2_kill_switch_halted(),
+        )
+        return {
+            "risk_regime": assessment.risk_regime,
+            "drawdown_band": assessment.drawdown_band,
+            "operational_state": assessment.state,
+        }
+
+    def _v2_data_freshness(self) -> Any:
+        """Frescura por dimensión del tick (V2.44).
+
+        Por defecto ``market_data``/``quote`` se consideran fechados AHORA (el sim genera
+        precios cada tick); un test o un feed parado pueden fijar
+        ``_v2_data_timestamps['market_data']`` a un instante viejo para provocar el veto.
+        """
+        now = self._v2_marks_now().timestamp()
+        stamps = getattr(self, "_v2_data_timestamps", {})
+        return assess_data_freshness(
+            now=now,
+            market_data_at=stamps.get("market_data", now),
+            atr_at=stamps.get("atr"),
+            quote_at=stamps.get("quote", stamps.get("market_data", now)),
+            volume_at=stamps.get("volume"),
+            policy=getattr(self, "_v2_freshness_policy", FreshnessPolicy()),
+        )
+
     def _v2_snapshot(self, regime: str | None) -> Any:
         """Construye la foto canónica del tick desde el libro del worker."""
         equity = self._v2_equity()
@@ -1220,6 +1322,10 @@ class AutoSimulationWorker:
             open_orders=self._v2_pending_open_orders(),
             order_book_measurement=self._v2_pending_book_measurement(),
             drawdown_pct=self._v2_governor_drawdown_pct(),
+            # V2.44: la frescura por dimensión entra en el snapshot. Con mercado stale el
+            # motor veta APERTURAS (``stale_data``); las salidas protectoras no consultan
+            # el snapshot, así que siguen vivas (invariante de la casa).
+            data_freshness=self._v2_data_freshness().data_freshness,
         )
 
     def _v2_open_sectors(self) -> dict[str, str]:
@@ -1778,29 +1884,95 @@ class AutoSimulationWorker:
             sorted(merged.values(), key=lambda r: (r.created_at or "", r.reservation_id))
         )
 
+    async def _v2_reserve_exit(
+        self,
+        *,
+        symbol: str,
+        qty: Any,
+        price: Any,
+        sector: str | None,
+        at: str,
+    ) -> str | None:
+        """Reserva VIVA de una orden de SALIDA (V2.44 · F9).
+
+        Un exit del gobernador (``RISK_EXIT``/``REGIME_EXIT``/``KILL_SWITCH``), un stop o un
+        objetivo puede llenarse PARCIALMENTE. Sin reserva de venta, al reiniciar nadie sabe
+        que había una salida en vuelo: la gestión vuelve a dimensionar contra la posición y
+        emite otra vez la MISMA orden. La reserva de venta le da identidad y ciclo de vida a
+        esa cola.
+
+        No reserva capital ni riesgo NUEVO (``0.0`` declarados): su dimensión es la CANTIDAD
+        viva. Se persiste antes de emitir; si no llega a ser durable, la salida se emite
+        igual (una salida protectora NUNCA se bloquea por un fallo de reserva: reducir riesgo
+        no empeora la situación) pero el fallo queda declarado.
+        """
+        store = self._reservation_store
+        amount = _dec_or_none(qty)
+        if store is None or amount is None or amount <= 0:
+            return None
+        entry = _dec_or_none(price)
+        self._v2_exit_seq += 1
+        reservation = build_reservation(
+            reservation_id=f"exit:{self._engine_id}:{symbol}:{self._v2_exit_seq}",
+            account_id=self._account_id or "",
+            tick_id=at,
+            instrument_id=symbol,
+            side=SIDE_SELL,
+            quantity=float(amount),
+            entry=float(entry) if entry is not None else None,
+            sector=sector or UNKNOWN_SECTOR,
+            reserved_cash=0.0,
+            reserved_risk=0.0,
+            created_at=at,
+        )
+        try:
+            await store.save(reservation)
+            await store.commit()
+        except Exception:  # noqa: BLE001 — la salida no se bloquea por la reserva.
+            logger.exception(
+                "auto_sim v2 exit reservation persist failed id=%s",
+                reservation.reservation_id,
+            )
+            return None
+        merged: dict[str, PortfolioReservation] = {
+            row.reservation_id: row for row in self._v2_reservations if row.is_live
+        }
+        merged[reservation.reservation_id] = reservation
+        self._v2_reservations = tuple(
+            sorted(merged.values(), key=lambda r: (r.created_at or "", r.reservation_id))
+        )
+        return reservation.reservation_id
+
     async def _v2_release_reservations_for_fill(
-        self, *, symbol: str, filled_qty: Any, at: str
+        self, *, symbol: str, filled_qty: Any, at: str, side: str = SIDE_BUY
     ) -> None:
-        """Libera por FILL la reserva viva más reciente del instrumento (AUTO-1b).
+        """Libera por FILL la reserva viva más reciente del instrumento y LADO (AUTO-1b).
 
         Es la pata del invariante que corre en el camino caliente: lo MATERIALIZADO deja
         de ser reserva y pasa a ser posición; con un fill parcial la liberación es parcial
         (``ReservationLedger.release`` escala las dimensiones) y la cola sigue siendo
         capital comprometido en ``RETRY``.
 
+        V2.44 — el LADO filtra los candidatos: un fill de VENTA libera la reserva de la
+        salida, no la de una compra viva (ni al revés). Antes solo se consumían compras, así
+        que la cola de un ``RISK_EXIT`` parcial quedaba viva para siempre.
+
         Si la liberación no se puede persistir, la reserva se **conserva**: jamás se libera
         en memoria lo que no es durable (el arranque la reconciliará). Se elige la reserva
-        más reciente del instrumento (la del tick que acaba de llenar); una anterior, si
+        más reciente del instrumento+lado (la del tick que acaba de llenar); una anterior, si
         existiera, la reconcilia el arranque con la misma regla de consumo progresivo.
         """
         store = self._reservation_store
         qty = _dec_or_none(filled_qty)
         if store is None or qty is None or qty <= 0:
             return
+        wanted_side = str(side or "").strip().lower()
         candidates = [
             row
             for row in self._v2_reservations
-            if row.is_live and row.instrument_id == symbol
+            if row.is_live
+            and row.instrument_id == symbol
+            and (not wanted_side or row.side == wanted_side)
         ]
         if not candidates:
             return
@@ -1891,29 +2063,34 @@ class AutoSimulationWorker:
         measurable = (
             facts_read.measurement == MEASUREMENT_COMPLETE and in_flight is not None
         )
-        applied: dict[str, list[tuple[datetime, float]]] = {}
+        applied: dict[tuple[str, str], list[tuple[datetime, float]]] = {}
         for fact in facts_read.facts:
             instant = _instant(fact.applied_at)
-            if instant is None or not fact.is_buy:
+            if instant is None:
                 continue
-            applied.setdefault(fact.instrument_id, []).append(
+            # V2.44: el fill se casa con la reserva por LADO, no solo por instrumento. Un
+            # ``RISK_EXIT`` (reserva sell) se libera con los fills de VENTA; antes solo se
+            # consumían los ``is_buy``, así que la cola de una salida parcial se declaraba
+            # "muerta sin llenar" y podía re-emitirse al reiniciar.
+            applied.setdefault((fact.instrument_id, fact.side), []).append(
                 (instant, float(fact.quantity))
             )
-        consumed: dict[str, float] = {}
+        consumed: dict[tuple[str, str], float] = {}
         resolved: list[PortfolioReservation] = []
         for reservation in live:
             created = _instant(reservation.created_at)
             instrument = reservation.instrument_id
+            fill_key = (instrument, reservation.side)
             filled = 0.0
             if created is not None:
-                for instant, qty in applied.get(instrument, ()):
+                for instant, qty in applied.get(fill_key, ()):
                     if instant >= created:
                         filled += qty
-            available = max(0.0, filled - consumed.get(instrument, 0.0))
+            available = max(0.0, filled - consumed.get(fill_key, 0.0))
             fill_qty = min(available, reservation.remaining_qty)
             released: PortfolioReservation | None = None
             if fill_qty > 0:
-                consumed[instrument] = consumed.get(instrument, 0.0) + fill_qty
+                consumed[fill_key] = consumed.get(fill_key, 0.0) + fill_qty
                 released = await self._v2_release_reservation(
                     reservation,
                     status=RESERVATION_RELEASED_BY_FILL,
@@ -2120,6 +2297,7 @@ class AutoSimulationWorker:
             tunables=self._v2_tunables,
             as_of=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             consumed_signal_ids=self._v2_consumed_signals,
+            halted=self._v2_kill_switch_halted(),
         )
         # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
@@ -2373,6 +2551,11 @@ class AutoSimulationWorker:
         # de hechos PERSISTIDOS (nivel congelado al nacer + peor adverso del MAE). No hay
         # LLM ni recómputo del motor de señales: un reinicio conserva la invalidación.
         thesis_invalid = is_thesis_invalidated(position, mark_price=float(price))
+        # V2.44 — AUTO-3 slice 2: el gobernador entra en la gestión, no solo en la
+        # entrada. ``RISK_OFF`` ⇒ ``RISK_EXIT`` (exit total), ``HALTED`` ⇒ ``KILL_SWITCH``,
+        # con precedencia sobre objetivo/trailing/tiempo. Con el gobernador OFF los tres
+        # valores son ``None`` y el manager se gobierna solo por el régimen de mercado.
+        governor = self._v2_governor_position_inputs()
         outcome = plan_v2_position_outcome(
             position,
             mark_price=float(price),
@@ -2390,6 +2573,9 @@ class AutoSimulationWorker:
             trail_hint=trail_stop is not None,
             trail_stop=trail_stop,
             at=at,
+            risk_regime=governor["risk_regime"],
+            drawdown_band=governor["drawdown_band"],
+            operational_state=governor["operational_state"],
         )
         if isinstance(outcome, PositionManagerSkip):
             # AUTO-1A: la posición NO se pudo gestionar (mark rechazado / decisión no
@@ -2409,6 +2595,37 @@ class AutoSimulationWorker:
         self._v2_last_exit_reasons[symbol] = (
             outcome.exit_reasons if outcome is not None else ()
         )
+        # V2.44 — AUTO-3 slice 2: si el motivo DECISORIO es un exit de gobernador
+        # (``RISK_EXIT``/``REGIME_EXIT``/``KILL_SWITCH``) se journaliza como evento de
+        # gestión propio, con el detalle de la decisión, para que el operador vea POR QUÉ
+        # se liquidó (antes era una venta indistinguible de un stop o de un objetivo).
+        if outcome is not None:
+            primary = outcome.decision.primary_reason
+            if primary == RISK_EXIT.upper():
+                self._journal_position_event(
+                    symbol,
+                    RISK_EXIT,
+                    at=at,
+                    detail={
+                        "primary_reason": primary,
+                        "secondary_reasons": list(outcome.decision.secondary_reasons),
+                        "risk_regime": governor["risk_regime"],
+                        "drawdown_band": governor["drawdown_band"],
+                        "operational_state": governor["operational_state"],
+                    },
+                )
+            elif primary == KILL_SWITCH.upper():
+                self._journal_position_event(
+                    symbol,
+                    KILL_SWITCH,
+                    at=at,
+                    detail={
+                        "primary_reason": primary,
+                        "secondary_reasons": list(outcome.decision.secondary_reasons),
+                        "kill_switch_reason": self._v2_kill_switch.reason,
+                        "operational_state": governor["operational_state"],
+                    },
+                )
         # V2.42 slice 2c: etiqueta del día del motivo DECISORIO (mismo criterio que el
         # journal rico: ``primary_reason``, no el flag). Con esto la fila ``position_close``
         # del día puede contar ``time_exit``/``thesis_exit`` sin reinterpretar nada.
@@ -2460,6 +2677,11 @@ class AutoSimulationWorker:
             # si no, todo stop-out se leería además como invalidación y el porqué real de
             # la venta se perdería en el journal.
             event, reason_code = "THESIS_EXIT", THESIS_EXIT
+        elif primary in (RISK_EXIT.upper(), "REGIME_EXIT", KILL_SWITCH.upper()):
+            # V2.44 — los exits de gobernador también avanzan el FSM (``EXIT_PENDING``):
+            # sin esto la posición quedaba ``OPEN`` mientras la orden de venta viajaba, y
+            # un reinicio en mitad del exit no veía el estado de salida.
+            event, reason_code = "EXIT_REQUESTED", primary.lower()
         else:
             return
         # Partimos de la posición VIVA (el ratchet pudo reescribir el JSONB): si se usara
@@ -2948,6 +3170,21 @@ class AutoSimulationWorker:
             # con compras sin ventas. ``None`` = sin atribución (spine determinista).
             proposed_version = _strategy_version_from_source(getattr(pkg, "source", None))
             effective_version = proposed_version or self._position_version.get(symbol)
+            # V2.44 · F9: la salida deja una reserva VIVA y DURABLE antes de emitirse. Con
+            # fill parcial la cola queda comprometida (no se re-emite por duplicado) y un
+            # reinicio la ve como compromiso explícito en vez de adivinar por las trazas.
+            if (
+                action == "SELL"
+                and self._v2_enabled
+                and self._reservation_store is not None
+            ):
+                await self._v2_reserve_exit(
+                    symbol=symbol,
+                    qty=exec_qty,
+                    price=price,
+                    sector=self._v2_sector(symbol, pkg),
+                    at=self._v2_instant(),
+                )
             settlement = await self._settle(
                 action.lower(),
                 symbol,
@@ -3037,6 +3274,14 @@ class AutoSimulationWorker:
                         price,
                         self._v2_last_exit_reasons.get(symbol, ()),
                     )
+                # V2.44 · F9 — lo vendido deja de ser reserva de salida; con fill parcial la
+                # cola sigue viva (la MISMA orden no puede duplicarse al reiniciar).
+                await self._v2_release_reservations_for_fill(
+                    symbol=symbol,
+                    filled_qty=applied_qty,
+                    at=self._v2_instant(),
+                    side=SIDE_SELL,
+                )
                 if prot == "t1_exit" and new_held > 0:
                     # T1 parcial ejecutado: marca para no repetirlo.
                     self._t1_done.add(symbol)

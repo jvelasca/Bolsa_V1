@@ -141,6 +141,11 @@ def suggestion_from_exit_policy(
     if primary == "TRAIL":
         stop = _round4(trail_stop) if trail_stop is not None and trail_stop > 0 else None
         return "protect", None, stop
+    # V2.44: las tres salidas del gobernador son SIEMPRE venta TOTAL (deshacer riesgo no
+    # se negocia por tramos ni se protege con un stop). Explícitas para que no dependan
+    # del fallback: si mañana se añade otro motivo, este contrato no cambia por accidente.
+    if primary in ("KILL_SWITCH", "REGIME_EXIT", "RISK_EXIT"):
+        return "full_exit", _round4(remaining), None
     if primary == "TARGET_1":
         fraction = policy.t1_reduce_fraction if policy is not None else 0.5
         qty = qty_from_exit_fraction(remaining, fraction)

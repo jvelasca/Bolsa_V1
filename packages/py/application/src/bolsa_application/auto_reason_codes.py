@@ -109,6 +109,13 @@ _DAY_EXIT_REASON_BY_PRIMARY: dict[str, str] = {
     "TARGET_2": "target_2",
     "TRAIL": "trail",
     "MANUAL": "manual",
+    # V2.44 — exits del gobernador: el día distingue una liquidación de riesgo
+    # (``RISK_EXIT``), una salida por régimen (``REGIME_EXIT``) y un halt
+    # (``KILL_SWITCH``) de un stop o de un objetivo. Sin estas entradas el motivo
+    # quedaría en minúsculas por defecto y el agregado del día lo perdería.
+    "RISK_EXIT": "risk_exit",
+    "REGIME_EXIT": "regime_exit",
+    "KILL_SWITCH": "kill_switch",
 }
 
 

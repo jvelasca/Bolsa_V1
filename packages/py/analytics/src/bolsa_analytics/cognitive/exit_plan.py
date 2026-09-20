@@ -17,6 +17,9 @@ from bolsa_analytics.cognitive.exit_policy import ExitPolicy, suggestion_from_ex
 from bolsa_analytics.cognitive.position_state import PositionState
 
 ExitReason = Literal[
+    "KILL_SWITCH",
+    "REGIME_EXIT",
+    "RISK_EXIT",
     "STRUCTURAL_STOP",
     "THESIS_INVALIDATION",
     "TARGET_1",
@@ -32,7 +35,16 @@ TradePlanDirection = Literal["long", "short", "none"]
 
 EXIT_PLAN_KEY = "exitPlan"
 
+# Precedencia ÚNICA de motivos (V2.44 · AUTO-3 slice 2: se reutiliza y se EXTIENDE, no se
+# crea un segundo sistema). El primero que dispara es el ``primary_reason``; el resto
+# viajan como ``secondary_reasons`` (el journal deja de perder la atribución múltiple).
+# Orden por autoridad de deshacer riesgo:
+#   KILL_SWITCH (halt) > REGIME_EXIT (permiso exit-only) > RISK_EXIT (RiskRegime RISK_OFF)
+#   > MANUAL > STOP estructural > tesis > riesgo de cartera > objetivos > trail > tiempo.
 EXIT_REASON_PRECEDENCE: tuple[ExitReason, ...] = (
+    "KILL_SWITCH",
+    "REGIME_EXIT",
+    "RISK_EXIT",
     "MANUAL",
     "STRUCTURAL_STOP",
     "THESIS_INVALIDATION",
@@ -45,6 +57,9 @@ EXIT_REASON_PRECEDENCE: tuple[ExitReason, ...] = (
 
 _HARD_TRIGGER: frozenset[ExitReason] = frozenset(
     {
+        "KILL_SWITCH",
+        "REGIME_EXIT",
+        "RISK_EXIT",
         "MANUAL",
         "STRUCTURAL_STOP",
         "THESIS_INVALIDATION",
@@ -143,8 +158,19 @@ def _collect_reasons(
     portfolio_risk: bool,
     manual: bool,
     trail_hint: bool,
+    risk_exit: bool = False,
+    regime_exit: bool = False,
+    kill_switch: bool = False,
 ) -> list[ExitReason]:
     fired: set[ExitReason] = set()
+    # V2.44: los tres motivos del gobernador entran en la MISMA taxonomía (no hay override
+    # post-hoc fuera del ``Literal``). Precedencia en ``EXIT_REASON_PRECEDENCE``.
+    if kill_switch:
+        fired.add("KILL_SWITCH")
+    if regime_exit:
+        fired.add("REGIME_EXIT")
+    if risk_exit:
+        fired.add("RISK_EXIT")
     if manual:
         fired.add("MANUAL")
     if thesis_invalid:
@@ -272,6 +298,9 @@ def build_exit_plan_from_position(
     manual: bool = False,
     trail_hint: bool = False,
     trail_stop: float | None = None,
+    risk_exit: bool = False,
+    regime_exit: bool = False,
+    kill_switch: bool = False,
     exit_plan_id: str | None = None,
     at: str | None = None,
     exit_policy: ExitPolicy | None = None,
@@ -294,6 +323,9 @@ def build_exit_plan_from_position(
         portfolio_risk=portfolio_risk,
         manual=manual,
         trail_hint=trail_hint,
+        risk_exit=risk_exit,
+        regime_exit=regime_exit,
+        kill_switch=kill_switch,
     )
     primary: ExitReason | None = reasons[0] if reasons else None
     status = _derive_status(position, primary, trail_s)

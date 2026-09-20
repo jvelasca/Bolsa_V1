@@ -426,9 +426,14 @@ def build_auto_portfolio_snapshot(
     explicit_used = _non_negative(risk_used)
     measurable = [p for p in pos_tuple if p.quantity > 0]
     declared = [p for p in measurable if p.risk_amount is not None]
+    asserted_measurement = coerce_measurement(risk_measurement)
 
     used = explicit_used
-    if used is None and declared:
+    # Deriva un SUELO de los ``risk_amount`` SOLO si el llamante no ha declarado ya que
+    # el agregado NO es medible. Un ``risk_measurement`` explícito y no ``COMPLETE``
+    # prohíbe fabricar un total: el número sería un suelo publicado bajo una etiqueta que
+    # dice "no sé" (AUTO hardening v2.43.2 — no resucitar R2 desde el snapshot de trabajo).
+    if used is None and declared and asserted_measurement in (None, MEASUREMENT_COMPLETE):
         used = _round4(sum(_non_negative(p.risk_amount) or 0.0 for p in declared))
 
     # Un ``risk_used`` explícito es una AFIRMACIÓN del llamante ⇒ medido. Derivado, el
@@ -441,7 +446,7 @@ def build_auto_portfolio_snapshot(
             valued=len(declared), unvalued=len(measurable) - len(declared)
         )
     )
-    resolved_measurement = coerce_measurement(risk_measurement) or derived_measurement
+    resolved_measurement = asserted_measurement or derived_measurement
 
     strategies = tuple(dict.fromkeys(str(s).strip() for s in (active_strategies or ()) if str(s).strip()))
 

@@ -110,15 +110,110 @@ def test_flat_position_never_publishes_a_zero_or_stale_average_entry() -> None:
     drifted = build_position_ledger(
         [_buy("e1", 24.4097, 262.5983), _buy("e2", 57.4424, 437.5688), _sell("e3", 81.8521, 1.0)]
     )
-    oversold = build_position_ledger([_sell("e1", 15.0, 6.0), _buy("e2", 10.0, 5.0)])
 
-    for ledger in (clean, drifted, oversold):
+    for ledger in (clean, drifted):
         position = ledger.position("AAA")
         assert position is not None
         assert position.is_flat is True
         assert position.average_entry is None
         assert position.cost_basis is None
         assert position.to_dict()["averageEntry"] is None
+
+
+def test_orphan_oversell_never_swallows_a_later_legit_buy() -> None:
+    """Invariante v2.43.2: una venta huérfana NO puede hacer desaparecer una compra real.
+
+    Antes, una venta sin posición incrementaba ``realized_qty`` por la cantidad COMPLETA
+    solicitada, de modo que una compra legítima posterior quedaba absorbida:
+    ``remaining = max(0, 10 - 15) == 0`` y el instrumento se reportaba PLANO aunque se
+    acabaran de comprar 10 acciones reales. ``quantities()`` (la forma que consume la
+    reconciliación del worker) publicaba ausencia de posición; ahora la violación se
+    declara y la compra posterior sobrevive intacta.
+    """
+    ledger = build_position_ledger([_sell("e1", 15.0, 6.0), _buy("e2", 10.0, 5.0)])
+    position = ledger.position("AAA")
+    assert position is not None
+    assert "oversell_without_position:e1" in position.violations
+    assert position.sold_qty == 15.0
+    assert position.unmatched_exit_qty == 15.0
+    assert position.realized_qty == 0.0
+    # La compra real NO se pierde: sigue viva con su entrada real.
+    assert position.is_open is True
+    assert position.remaining_qty == 10.0
+    assert position.average_entry == 5.0
+    assert ledger.quantities() == {"AAA": 10.0}
+
+
+def test_orphan_oversell_before_a_legit_buy_keeps_position_via_quantities() -> None:
+    """Reproducción del hallazgo: ``sell 100`` huérfana + ``buy 50`` ⇒ 50, nunca 0."""
+    ledger = build_position_ledger([_sell("e1", 100.0, 10.0), _buy("e2", 50.0, 10.0)])
+    position = ledger.position("AAA")
+    assert position is not None
+    assert position.remaining_qty == 50.0
+    assert position.average_entry == 10.0
+    assert position.realized_qty == 0.0
+    assert position.sold_qty == 100.0
+    assert ledger.quantities() == {"AAA": 50.0}
+
+
+def test_oversell_excess_never_inflates_realized_qty_nor_average_entry() -> None:
+    """BUY 100@10 + SELL 130@12 + BUY 50@10 ⇒ 20 vivas a 10, no 20 a 25.
+
+    Con la semántica inflada (``realized_qty = Σ SELL = 130``) el inventario vivo era
+    ``max(0, 150 − 130) = 20`` y el coste medio de esas 20, ``500/20 = 25`` — un precio de
+    entrada que nunca existió y que envenenaba P&L, mark-to-market y la invalidación de
+    tesis. Solo avanza por lo CASADO (100): quedan 50 vivas a 10.
+    """
+    ledger = build_position_ledger(
+        [_buy("e1", 100.0, 10.0), _sell("e2", 130.0, 12.0), _buy("e3", 50.0, 10.0)]
+    )
+    position = ledger.position("AAA")
+    assert position is not None
+    assert position.realized_qty == 100.0
+    assert position.sold_qty == 130.0
+    assert position.unmatched_exit_qty == 30.0
+    assert position.remaining_qty == 50.0
+    assert position.average_entry == 10.0
+    assert "oversell_above_position:e2" in position.violations
+
+
+def test_duplicate_execution_id_cannot_double_the_position() -> None:
+    """Idempotencia financiera (v2.43.2): el MISMO ``execution_id`` no se dobla.
+
+    ``execution_id`` es la PK de ``execution_events`` (``ON CONFLICT DO NOTHING``), así que
+    el mismo hecho no debería llegar dos veces; pero el fold no puede fiarlo todo a esa
+    capa. Si una unión de fuentes o un replay reencuentra el mismo fill, la posición debe
+    seguir siendo 100, jamás 200.
+    """
+    fact = _buy("X", 100.0, 10.0)
+    ledger = build_position_ledger([fact, fact])
+    position = ledger.position("AAA")
+    assert position is not None
+    assert position.quantity == 100.0
+    assert position.remaining_qty == 100.0
+    assert ledger.facts_applied == 1
+    assert ledger.facts_rejected == 1
+    assert ledger.measurement == MEASUREMENT_PARTIAL
+    assert "duplicate_execution_id:X" in ledger.violations
+
+
+def test_facts_without_date_are_folded_last_not_first() -> None:
+    """Un hecho sin ``applied_at`` no puede ordenarse como el MÁS ANTIGUO.
+
+    ``""`` precede a cualquier ISO, así que una venta sin fecha se doblaba ANTES de la
+    compra fechada y se declaraba ``oversell_without_position`` (la compra real quedaba
+    viva). Ahora los hechos sin fecha se separan al final (deterministas por
+    ``execution_id``): la venta casa contra la compra y el P&L realizado es el verdadero.
+    """
+    ledger = build_position_ledger(
+        [_sell("z", 100.0, 20.0, at=None), _buy("a", 100.0, 10.0, at="2026-09-17T09:00:00Z")]
+    )
+    position = ledger.position("AAA")
+    assert position is not None
+    assert position.remaining_qty == 0.0
+    assert position.realized_qty == 100.0
+    assert position.realized_pnl == 1000.0
+    assert position.violations == ()
 
 
 def test_an_open_position_still_publishes_its_average_entry() -> None:
@@ -132,14 +227,22 @@ def test_an_open_position_still_publishes_its_average_entry() -> None:
 
 
 def test_oversell_is_a_declared_violation_not_an_invented_short() -> None:
-    """Vender más de lo materializado: violación explícita, nunca posición negativa."""
+    """Vender más de lo materializado: violación explícita, nunca posición negativa.
+
+    ``realized_qty`` (cantidad CERRADA) es solo lo que casó (73,5); ``sold_qty`` (venta
+    EJECUTADA) es lo que movió el venue (100) y la diferencia queda como
+    ``unmatched_exit_qty``. Antes ``realized_qty`` sumaba la venta completa (100) y la
+    cantidad cerrada se confundía con la vendida.
+    """
     ledger = build_position_ledger(
         [_buy("e1", 50.0, 100.0), _buy("e2", 23.5, 100.0), _sell("e3", 100.0, 110.0)]
     )
     position = ledger.position("AAA")
     assert position is not None
     assert position.remaining_qty == 0.0
-    assert position.realized_qty == 100.0
+    assert position.realized_qty == 73.5
+    assert position.sold_qty == 100.0
+    assert position.unmatched_exit_qty == 26.5
     assert "oversell_above_position:e3" in position.violations
     assert ledger.violations == ("AAA:oversell_above_position:e3",)
     # El P&L solo se realiza sobre lo que existía: 73,5 × (110 − 100).
@@ -151,6 +254,9 @@ def test_sell_without_any_buy_is_a_violation() -> None:
     position = ledger.position("AAA")
     assert position is not None
     assert position.remaining_qty == 0.0
+    assert position.realized_qty == 0.0
+    assert position.sold_qty == 10.0
+    assert position.unmatched_exit_qty == 10.0
     assert position.realized_pnl == 0.0
     assert position.violations == ("oversell_without_position:e1",)
 

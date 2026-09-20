@@ -5,11 +5,16 @@ from datetime import UTC, datetime
 
 import pytest
 
+from bolsa_analytics.cognitive.portfolio_reservation import (
+    ReservationLedger,
+    build_reservation,
+)
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
 from bolsa_application.auto_v2_entry import (
     V2_ENGINE_ENV,
     V2Signal,
     V2Tunables,
+    _working_snapshot,
     build_worker_snapshot,
     plan_v2_position_decision,
     plan_v2_tick,
@@ -532,6 +537,111 @@ def test_incomplete_measurement_blocks_entries_but_never_protective_exits() -> N
     result = plan_v2_position_decision(position, mark_price=94.0, regime="BULL_TREND")
     assert result is not None
     assert result.order_action == "sell"
+
+
+def test_build_worker_snapshot_wrong_side_stop_is_unmeasured_risk() -> None:
+    """Un stop del lado equivocado no es un stop: el riesgo es DESCONOCIDO (``None``).
+
+    Un long con ``stop >= entry`` producía ``risk_amount = 0.0`` — un 0 DECLARADO que
+    contaba como riesgo medido (``COMPLETE``) y desarmaba el veto por medición incompleta.
+    El riesgo de esa posición no es "cero", es "no medible"; el motor debe veta la entrada.
+    """
+    snap = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={"ZZZ": 100.0},
+        entry_prices={"ZZZ": 100.0},
+        marks={"ZZZ": 100.0},
+        stops={"ZZZ": 105.0},  # long con stop POR ENCIMA de la entrada
+        sectors={"ZZZ": "tech"},
+        regime="BULL_TREND",
+        risk_budget_pct=6.0,
+    )
+    assert snap.positions[0].risk_amount is None
+    assert snap.risk_measurement != "COMPLETE"
+    plan = plan_v2_tick(snapshot=snap, signals=[_signal("AAA")], regime="BULL_TREND")
+    assert plan.approved_symbols == ()
+    assert plan.decisions[0].reason_codes == ("risk_measurement_unknown",)
+
+
+def test_build_worker_snapshot_valid_stop_is_measured_risk() -> None:
+    """El contrato no cambia para un stop VÁLIDO."""
+    snap = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={"AAA": 100.0},
+        entry_prices={"AAA": 100.0},
+        marks={"AAA": 100.0},
+        stops={"AAA": 97.0},
+        regime="BULL_TREND",
+    )
+    assert snap.positions[0].risk_amount == pytest.approx(300.0)
+    assert snap.risk_measurement == "COMPLETE"
+
+
+def _live_reservation(*, risk: float = 50.0) -> ReservationLedger:
+    ledger = ReservationLedger(account_id="acc-1", tick_id="T")
+    reservation = build_reservation(
+        reservation_id="RES-1",
+        account_id="acc-1",
+        tick_id="T",
+        instrument_id="AAA",
+        side="buy",
+        sector="tech",
+        quantity=10.0,
+        entry=100.0,
+        reserved_cash=1000.0,
+        reserved_risk=risk,
+        created_at="2026-09-17T09:00:00Z",
+    )
+    assert ledger.reserve(reservation) is not None
+    return ledger
+
+
+def test_working_snapshot_never_fabricates_measured_risk() -> None:
+    """El snapshot de trabajo NO puede resucitar R2: riesgo no medido sigue siendo ``None``.
+
+    Con una posición abierta cuyo riesgo no se puede medir (``risk_used = None``), sumar el
+    riesgo de una reserva viva publicaba ``0 + committed`` como si fuera un total medido:
+    el motor dejaba de vetar. La ausencia se conserva y la medición se reenvía.
+    """
+    base = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={"ZZZ": 100.0},
+        entry_prices={"ZZZ": 100.0},
+        marks={"ZZZ": 100.0},
+        sectors={"ZZZ": "tech"},
+        regime="BULL_TREND",
+        risk_budget_pct=6.0,
+        # Sin ``stops``: el riesgo de ZZZ NO es medible.
+    )
+    assert base.risk_used is None
+    assert base.risk_measurement != "COMPLETE"
+
+    working = _working_snapshot(base, _live_reservation())
+    assert working.risk_used is None, "un suelo no se publica como total medido"
+    assert working.risk_measurement != "COMPLETE"
+
+
+def test_working_snapshot_adds_committed_risk_when_base_is_measured() -> None:
+    """Con el riesgo base MEDIDO, la reserva viva sí suma (comportamiento histórico)."""
+    base = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={},
+        entry_prices={},
+        sectors={},
+        regime="BULL_TREND",
+        risk_budget_pct=6.0,
+    )
+    working = _working_snapshot(base, _live_reservation(risk=50.0))
+    assert working.risk_used == pytest.approx(50.0)
+    assert working.risk_measurement == "COMPLETE"
 
 
 def test_build_worker_snapshot_carries_open_position_sectors() -> None:

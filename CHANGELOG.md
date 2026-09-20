@@ -2,6 +2,139 @@
 
 All notable releases of Bolsa V1.
 
+## [1.68.2-beta] — Hardening de contabilidad de posición + Exit Governance (AUTO-3 slice 2) — 2026-09-19
+
+**Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Dos fases en un solo
+parche: **hardening** de la contabilidad de posición (6 hallazgos, 2 de ellos P0) y **Exit Governance**
+(AUTO-3 slice 2), que hace que el gobernador gobierne también el **ciclo de vida** de la posición, no
+solo la entrada. **El gobernador no se toca**: `v2_43_governor_evidence.py` sigue byte a byte igual y
+**exit 0** (la escalera de drawdown gobierna igual), y su `"bump": "1.68.0-beta"` se queda como está por
+el mismo motivo declarado en `v2.43.1`.
+
+### Fase 1 — Hardening (sin migración, gobernador intacto)
+
+- **H1 · `realized_qty` se inflaba (P0).** El fold de `PositionLedger` sumaba la cantidad de la **venta
+  solicitada** (`realized_qty += fact.quantity`) en vez de la que **casó** contra inventario. Una venta
+  rechazada o el exceso de un oversell avanzaba la cantidad cerrada sin que existiera inventario que
+  cerrar, y como `remaining_qty = quantity - realized_qty`, eso **podía reportar como plana una compra
+  real posterior** (una posición viva invisible para la reconciliación). Ahora `realized_qty` avanza solo
+  por `matched`, igual que `cost_basis` y `realized_pnl`, y se añaden dos campos explícitos:
+  **`sold_qty`** (Σ ventas ejecutadas, el hecho del venue) y **`unmatched_exit_qty`**
+  (`sold_qty - realized_qty`, el exceso que no tenía inventario contra el que casar). La relación
+  `realized_qty == quantity_closed` vuelve a ser cierta y `sold_qty` deja de ser ambiguo.
+- **H2 · El snapshot de trabajo resucitaba R2 (P0).** `_working_snapshot` hacía
+  `(snapshot.risk_used or 0.0) + committed_risk`, es decir convertía "alguna posición no declara su
+  riesgo" en un **total medido** y el motor dejaba de vetar por medición incompleta. Ahora el riesgo
+  reservado solo se suma si la base es **medible** (`snapshot.risk_is_complete`); si `risk_used is None`
+  se conserva `None` y se **reenvía `risk_measurement`** al rebuild, porque un `risk_used` explícito se
+  leía como una afirmación `COMPLETE` y borraba el `UNKNOWN` de la base.
+- **H3 · Un stop del lado equivocado se publicaba como riesgo CERO (P1).** `max(0.0, (entry - stop) * qty)`
+  convertía "stop mal puesto" en `0.0` **declarado**, que el sistema leía como riesgo medido. Ahora la
+  geometría la valida la **misma casa** que el resto del motor (`stop_distance`): un long con
+  `stop >= entry` no tiene stop válido ⇒ `risk_amount = None` (riesgo desconocido) ⇒ degrada la medición
+  y **veta**, en vez de publicar 0.
+- **H4 · El fold no garantizaba la idempotencia por `execution_id` (P1).** La idempotencia durable ya
+  existe (PK + `ON CONFLICT` de `execution_events`), pero el fold no la garantizaba **por sí mismo**: dos
+  hechos con el mismo `execution_id` doblaban posición, riesgo, cash y P&L. Ahora `build_position_ledger`
+  deduplica (gana la primera aparición tras ordenar) y declara los repetidos como **rechazados**
+  (`duplicate_execution_id:<id>`) en vez de ignorarlos en silencio; la medición degrada.
+- **H5 · El libro no tenía cuota de cuenta (P1).** `AppliedFillFact` no llevaba `account_id`, así que una
+  lectura con `account_id=None` (todas las cuentas) **fundía** dos posiciones del mismo instrumento en
+  cuentas distintas en una sola cantidad, y el `quantities()` que alimenta la reconciliación tomaba esa
+  fusión por real. Ahora el `account_id` viaja al hecho, el fold agrupa por `(account_id, instrument_id)`
+  y una **colisión entre cuentas** del mismo símbolo se **declara** degradando la medición (el mapa
+  instrumento → cantidad no puede representar dos posiciones del mismo símbolo sin fundirlas).
+- **H6 · Un hecho sin fecha se ordenaba como el más antiguo (P2).** `str(None or "")` precede a cualquier
+  ISO real en orden lexicográfico, así que una fila legada sin `applied_at` se doblaba como "la compra
+  más antigua" y torcía el coste medio (que depende del orden de compras y ventas). La clave del fold
+  pasa a `(tiene_fecha, applied_at, execution_id)`: los hechos sin fecha van **al final**, de forma
+  declarada. AUTO-1b ya cerró la causa raíz (un `datetime` de PostgreSQL perdía su fecha al normalizarse);
+  esto protege el residuo legado.
+
+### Fase 2 — Exit Governance (AUTO-3 slice 2)
+
+- **Taxonomía de motivos, extendida, no duplicada.** `ExitReason` gana **`KILL_SWITCH`**, **`REGIME_EXIT`**
+  y **`RISK_EXIT`**, insertados en la `EXIT_REASON_PRECEDENCE` que ya existía (orden por autoridad de
+  deshacer riesgo: `KILL_SWITCH` > `REGIME_EXIT` > `RISK_EXIT` > `MANUAL` > stop estructural > tesis >
+  riesgo de cartera > objetivos > trail > tiempo). `REGIME_EXIT` deja de ser un override **post-hoc**
+  fuera del `Literal`: nace en el `ExitPlan`. Se añade **`secondary_reasons`** para que el journal deje de
+  perder la atribución múltiple (un solo `primary_reason` decisorio + los demás que también dispararon).
+- **`portfolio_risk`/`manual` dejan de ser inalcanzables.** `build_exit_plan_from_position` ya los
+  aceptaba, pero nadie los pasaba desde AUTO. Ahora se propagan por `build_position_decision` y
+  `manage_position_outcome`.
+- **El gobernador gobierna el ciclo de vida.** `manage_position_outcome` recibe la lectura del gobernador
+  (`risk_regime`, `drawdown_band`, `operational_state`) además del régimen de mercado:
+  `RiskRegime == RISK_OFF` (o banda `EXIT_ONLY`) ⇒ **`RISK_EXIT`**; `OperationalState == HALTED` ⇒
+  **`KILL_SWITCH`**; régimen exit-only ⇒ `REGIME_EXIT`. Los tres se **reafirman defensivamente** como venta
+  **total** para que ningún camino (reconciliación, fracción de T2, ratchet de stop) deje posición abierta
+  contra el gobernador. Los coercers canónicos normalizan lo no reconocido a `UNKNOWN` (fail-closed: un
+  valor raro no es permisivo). Se añaden `primary_exit_reason`/`secondary_reasons` a
+  `PositionManagerResult`, y `RISK_EXIT`/`REGIME_EXIT`/`KILL_SWITCH` entran en el **journal del día**
+  (`auto_reason_codes`) y en `_journal_exit_request` para **avanzar el FSM** (`EXIT_REQUESTED`).
+- **`HardKillSwitch` latcheado por encima del gobernador** (módulo nuevo
+  `bolsa_analytics/cognitive/hard_kill_switch.py`). `resolve_operational_state` aceptaba `halted` desde el
+  slice 1, pero **`plan_v2_tick` no lo pasaba nunca**: era un parámetro muerto. Ahora hay un **productor**
+  con motivos **tipificados** (`DATA_CORRUPTION`, `BROKER_DESYNC`, `RECONCILIATION_FAILURE`,
+  `DUPLICATE_EXECUTION`, `RISK_BREACH`, `STALE_DATA`, `MANUAL_KILL`, `SYSTEM_ERROR`): un motivo no
+  canónico **no se puede** activar (`ValueError`), el estado es **latcheado** (no se auto-libera: reavisar
+  cuenta el reintento y conserva el motivo original) y liberarlo exige **reconciliación explícita**. Bloquea
+  entradas **siempre**; por defecto **permite** las salidas protectoras (el invariante de la casa). La
+  parada es **independiente del flag del gobernador**: con la parada activa la tabla se evalúa aunque el
+  gobernador esté OFF, porque un kill switch no puede quedar desactivado por un flag de conveniencia.
+- **Frescura por dimensión** (módulo nuevo `bolsa_analytics/cognitive/data_freshness.py`). La frescura
+  era un único booleano; ahora son **cuatro relojes** (`market_data`, `atr`, `quote`, `volume`) con umbral
+  declarado por dimensión. `market_data` no fresca (stale **o sin dato**) ⇒ **no se abre**, pero las
+  **salidas protectoras siguen permitidas** (el veredicto se publica como `blocks_new_entry`, nunca como un
+  halt que congelaría también las salidas). Un instante no interpretable ⇒ `unknown`, **nunca epoch 0** (que
+  fabricaría un stale). `unknown` se publica como `stale` en el snapshot booleano: "no sé" jamás puede
+  leerse como fresco.
+- **Reservas de SALIDA vivas (F9).** `committed_positions()` **saltaba** las reservas `sell` y la
+  reconciliación del worker solo consumía fills `buy`, así que la cola de un `RISK_EXIT` con fill parcial
+  era invisible: la exposición comprometida se sobreestimaba y al reiniciar nadie sabía que había una salida
+  en vuelo ⇒ la MISMA orden podía re-emitirse. Ahora una reserva de venta viva **se netea** contra la compra
+  del mismo instrumento (neto `Σ compras − Σ ventas`, nunca negativo), el worker crea una reserva de salida
+  **durable antes de emitir** (`_v2_reserve_exit`) y la libera con los fills de **venta**
+  (`_v2_release_reservations_for_fill(side=SIDE_SELL)`), casando por **lado**.
+
+### Verificación medida (árbol final, mutaciones pendientes)
+
+| Comprobación             | Comando                                                                                                              | Resultado                                |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Estático (invocación CI) | `uv run ruff check packages/py apps/api-python --config pyproject.toml`                                              | **All checks passed!**                   |
+| Tipos                    | `uv run mypy packages/py/{domain,market,infrastructure,application}/src apps/api-python/src --follow-imports=silent` | **487 ficheros, 0 issues**               |
+| Fronteras                | `uv run lint-imports --config packages/py/.importlinter`                                                             | **4 kept / 0 broken** (602 ficheros)     |
+| Evidencia del gobernador | `uv run python apps/api-python/scripts/v2_43_governor_evidence.py --out governor.json`                               | **exit 0** (la tabla sigue gobernando)   |
+| Bloque `quality` de CI   | `uv run python scripts/verify/offline_ci_run_yaml.py .github/workflows/python-ci.yml quality --with-pg-ignores`      | **2031 passed** (`1991 → 2031`, **+40**) |
+| Bloque `python` del tag  | `uv run python scripts/verify/offline_ci_run_yaml.py .github/workflows/release-tag-ci.yml python --with-pg-ignores`  | **2042 passed** (`2002 → 2042`, **+40**) |
+| Suites de `analytics`    | `uv run pytest packages/py/analytics -q`                                                                             | **862 passed**                           |
+| Suites de `application`  | `uv run pytest packages/py/application -q`                                                                           | **1705 passed, 5 skipped**               |
+
+El delta `+40/+40` es la comprobación de cobertura: los **40 tests nuevos** entran por las listas
+**existentes** de CI en **ambos** bloques, así que ninguno queda fuera de la red (la deuda que `v2.42.2`
+tuvo que cerrar a mano para `test_auto_daily_journal.py`). Reparto: 5 en `test_position_ledger.py`,
+4 en `test_auto_v2_entry.py`, 8 en `test_position_manager.py`, y **tres ficheros nuevos** —
+`test_hard_kill_switch.py` (7), `test_data_freshness.py` (8) y
+`apps/api-python/tests/test_auto_v44_exit_governance.py` (8, incluido el **Golden Day dinámico** y el
+**reinicio en mitad de un `RISK_EXIT`**).
+
+**Matriz de mutaciones: MEDIDA** (sonda versionada `apps/api-python/scripts/v2_43_2_mutation_audit.py`,
+2026-09-20). **9 de las 13** mutaciones muerden (M1–M5, M7–M9, M11) y **4 nacen verdes** (M6, M10, M12,
+M13) con su causa declarada en el §10.1 del pack: **tres agujeros reales** (M6, el eje cuenta del libro;
+M12, el neteo de reservas de F9; M13, la reconciliación de arranque) quedan **declarados y reproducibles**
+— no se añadió test ni se tocó código de producción en el cierre. Tampoco se mide **PG real** en la máquina
+del autor (motivo ya declarado en fases anteriores: el `connect` del DSN se cuelga); no hace falta para la
+fase 1 (no toca ningún fichero PG) y la certificación de durabilidad de la fase 2 la aporta CI.
+
+**Errata declarada de esta pasada (método):** la primera verificación de `ruff` se hizo **sin** el flag
+`--config pyproject.toml` y concluyó «2 avisos, ambos preexistentes». **Con la invocación de la casa** el
+resultado era **7 avisos y todos eran míos** (imports desordenados al añadir los imports nuevos): el
+ejemplo de que verificar con una copia a mano de la invocación del CI mide otra cosa que el CI. Corregido
+con `ruff check --fix` **antes** de sellar; la lección está en el relevo.
+
+**Documentación:** [`audit-pack-v2.43.2-hardening-y-auto-3-slice-2-2026-09-19.md`](docs/engineering/audit-pack-v2.43.2-hardening-y-auto-3-slice-2-2026-09-19.md) ·
+[`arranque-auditor-v2.43.2-hardening-y-auto-3-slice-2-2026-09-19.md`](docs/engineering/arranque-auditor-v2.43.2-hardening-y-auto-3-slice-2-2026-09-19.md) ·
+[`traspaso-relevo-post-v2-43-2-auto-3-slice-2-2026-09-19.md`](docs/engineering/traspaso-relevo-post-v2-43-2-auto-3-slice-2-2026-09-19.md).
+
 ## [1.68.1-beta] — Remediación de la auditoría externa de `v2.43-beta` (5 hallazgos, 2 de ellos de seguridad financiera) — 2026-09-18
 
 **Sin migración** (el head de Alembic sigue en `042_portfolio_reservations`). Parche de remediación, **sin

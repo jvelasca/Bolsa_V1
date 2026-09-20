@@ -138,7 +138,14 @@ def test_manual_beats_structural_stop() -> None:
     assert plan.primary_reason == "MANUAL"
     assert plan.reasons[0] == "MANUAL"
     assert "STRUCTURAL_STOP" in plan.reasons
-    assert EXIT_REASON_PRECEDENCE[0] == "MANUAL"
+    # V2.44: MANUAL sigue siendo el motivo humano de mayor autoridad, por debajo solo de
+    # las tres salidas del gobernador (kill switch / permiso exit-only / RISK_OFF).
+    assert EXIT_REASON_PRECEDENCE[:4] == (
+        "KILL_SWITCH",
+        "REGIME_EXIT",
+        "RISK_EXIT",
+        "MANUAL",
+    )
 
 
 def test_explicit_thesis_and_portfolio() -> None:

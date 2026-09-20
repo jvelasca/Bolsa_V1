@@ -65,6 +65,7 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     build_reservation,
     coerce_trading_cost,
     sector_risk_from_positions,
+    stop_distance,
 )
 from bolsa_analytics.cognitive.position_state import PositionState
 from bolsa_analytics.cognitive.risk_allocator import RiskAllocatorConfig
@@ -598,7 +599,16 @@ def build_worker_snapshot(
         risk_amount = None
         stop = stops.get(symbol)
         if stop is not None and entry is not None:
-            risk_amount = max(0.0, (float(entry) - float(stop)) * float(qty))
+            # La geometría la valida la MISMA casa que el resto del motor
+            # (``stop_distance``): un long con ``stop >= entry`` NO tiene stop válido, así
+            # que su riesgo es DESCONOCIDO (``None``), nunca un 0 declarado. Un 0 aquí
+            # contaba como riesgo medido (``COMPLETE``) y el motor dejaba de vetar por
+            # medición incompleta: "stop mal puesto" se leía como "posición sin riesgo".
+            distance = stop_distance(
+                entry=float(entry), stop=float(stop), direction="long"
+            )
+            if distance is not None:
+                risk_amount = distance * float(qty)
         sector = sectors.get(symbol)
         positions.append(
             PortfolioPosition(
@@ -692,6 +702,7 @@ def plan_v2_tick(
     as_of: str = "",
     actor: str = "auto-2.0",
     consumed_signal_ids: Iterable[str] = (),
+    halted: bool = False,
 ) -> V2TickPlan:
     """Planifica las entradas del tick: rankeo → decisión → TradePlan → propuesta.
 
@@ -709,6 +720,10 @@ def plan_v2_tick(
     que este worker ya emitió sobre esa misma barra). Una señal repetida se descarta
     con ``signal_duplicate`` y una señal expirada (``valid_until < as_of``) con
     ``signal_stale``; ambas quedan en el journal con su motivo, nunca en silencio.
+
+    ``halted`` (V2.44 · AUTO-3 slice 2) es la parada DURA (``HardKillSwitch``): fuerza
+    ``HALTED`` en la tabla del gobernador y veta toda apertura. Es independiente de los
+    umbrales: un halt no se puede "compensar" con un eje benigno.
     """
     cfg = tunables if tunables is not None else V2Tunables()
     resolved_regime = _coerce_operational_regime(
@@ -799,7 +814,10 @@ def plan_v2_tick(
         working_snapshot = _working_snapshot(snapshot, ledger)
         signal_ctx = _context_for_signal(signal)
         governor: OperationalAssessment | None = None
-        if cfg.governor_enabled:
+        # V2.44: la parada DURA es INDEPENDIENTE del flag del gobernador. Si ``halted``
+        # está activo se evalúa la tabla aunque el gobernador esté OFF, porque un kill
+        # switch no puede quedar desactivado por un flag de conveniencia.
+        if cfg.governor_enabled or halted:
             governor = assess_from_measurements(
                 operational_regime=resolved_regime,
                 drawdown_pct=tick_drawdown_pct,
@@ -812,6 +830,10 @@ def plan_v2_tick(
                 liquidity_known=signal_ctx.liquidity_is_known,
                 liquidity_notional=signal_ctx.liquidity_notional,
                 policy=governor_policy,
+                # V2.44: la parada DURA se pasa por fin. ``resolve_operational_state``
+                # aceptaba ``halted`` desde el slice 1, pero ``plan_v2_tick`` nunca lo
+                # pasaba: el kill switch era un parámetro muerto.
+                halted=halted,
             )
             governor_states.append((signal.instrument_id, governor.state))
         decision = decide_portfolio(
@@ -889,6 +911,11 @@ def plan_v2_position_decision(
     trail_hint: bool = False,
     trail_stop: float | None = None,
     at: str | None = None,
+    manual: bool = False,
+    portfolio_risk: bool = False,
+    risk_regime: str | None = None,
+    drawdown_band: str | None = None,
+    operational_state: str | None = None,
 ) -> PositionManagerResult | None:
     """Decisión de gestión de una posición abierta vía ``PositionManager``.
 
@@ -910,6 +937,11 @@ def plan_v2_position_decision(
         trail_hint=trail_hint,
         trail_stop=trail_stop,
         at=at,
+        manual=manual,
+        portfolio_risk=portfolio_risk,
+        risk_regime=risk_regime,
+        drawdown_band=drawdown_band,
+        operational_state=operational_state,
     )
     return outcome if isinstance(outcome, PositionManagerResult) else None
 
@@ -927,6 +959,11 @@ def plan_v2_position_outcome(
     trail_hint: bool = False,
     trail_stop: float | None = None,
     at: str | None = None,
+    manual: bool = False,
+    portfolio_risk: bool = False,
+    risk_regime: str | None = None,
+    drawdown_band: str | None = None,
+    operational_state: str | None = None,
 ) -> PositionManagerResult | PositionManagerSkip | None:
     """AUTO-1A — como ``plan_v2_position_decision`` pero conservando el motivo del skip.
 
@@ -936,6 +973,10 @@ def plan_v2_position_outcome(
     AUTO-2: acepta y propaga ``trail_hint``/``trail_stop`` (el ratchet de stop en R). Sin
     esto, ``manage_position_outcome`` usaba los defaults ``False``/``None`` y el
     ``stop_update`` de un ``PROTECT`` nacía siempre nulo.
+
+    V2.44: acepta y propaga la lectura del GOBERNADOR (``risk_regime``/``drawdown_band``/
+    ``operational_state``) y los flags ``manual``/``portfolio_risk``. Sin esto, la gestión
+    de posición solo veía el régimen de mercado y ``RISK_OFF``/``HALTED`` no llegaban.
     """
     return manage_position_outcome(
         position,
@@ -949,6 +990,11 @@ def plan_v2_position_outcome(
         trail_hint=trail_hint,
         trail_stop=trail_stop,
         at=at,
+        manual=manual,
+        portfolio_risk=portfolio_risk,
+        risk_regime=risk_regime,
+        drawdown_band=drawdown_band,
+        operational_state=operational_state,
     )
 
 
@@ -1117,7 +1163,14 @@ def _working_snapshot(snapshot: Any, ledger: ReservationLedger) -> Any:
         if position.market_value is not None:
             committed_notional += max(0.0, float(position.market_value))
     risk_used = snapshot.risk_used
-    if has_committed_risk:
+    # AUTO hardening (v2.43.2): solo se puede SUMAR el riesgo reservado cuando la base
+    # está MEDIDA. Un ``snapshot.risk_used = None`` significa "alguna posición abierta no
+    # declara su riesgo" ⇒ la cartera tiene ``gross_risk`` DESCONOCIDO. El antiguo
+    # ``(None or 0.0) + committed_risk`` convertía esa ausencia en un total medido y el
+    # motor dejaba de vetar por medición incompleta: es exactamente "riesgo no medido ≠
+    # riesgo 0" (R2), reintroducido por el snapshot de trabajo. Se conserva la ausencia y
+    # se reenvía la medición tal cual para que el rebuild no la re-derive a COMPLETE.
+    if has_committed_risk and snapshot.risk_is_complete:
         risk_used = round(((snapshot.risk_used or 0.0) + committed_risk) * 10000) / 10000
     cash, buying_power = _reserve_committed_cash(
         cash=snapshot.cash,
@@ -1138,6 +1191,9 @@ def _working_snapshot(snapshot: Any, ledger: ReservationLedger) -> Any:
         unrealized_pnl=snapshot.unrealized_pnl,
         risk_used=risk_used,
         risk_budget=snapshot.risk_budget,
+        # La medición NO se re-deriva: un ``risk_used`` explícito se leería como una
+        # AFIRMACIÓN completa en el rebuild y borraría el ``UNKNOWN`` de la base.
+        risk_measurement=snapshot.risk_measurement,
         drawdown_pct=snapshot.drawdown_pct,
         active_strategies=snapshot.active_strategies,
         market_regime=snapshot.market_regime,

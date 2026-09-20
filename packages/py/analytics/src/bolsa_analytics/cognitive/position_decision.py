@@ -73,11 +73,21 @@ def attention_to_urgency(attention: PositionAttention) -> PositionUrgency:
 #: **salvo** cuando el plan pide reducir riesgo ya (stop rebasado, trail alcanzado, riesgo
 #: de cartera): en ese caso manda la salida. Cualquier otro motivo (objetivos, manual,
 #: tesis, tiempo) sigue vetado: tomar beneficio puede esperar, no cubrirse no.
-#: ``TIME_STOP`` NO entra (una salida por tiempo no es cubrirse) y ``THESIS_INVALIDATION``
+#: ``TIME_STOP`` NO entra (una salida por tiempo no es cubrirse), ``THESIS_INVALIDATION``
 #: tampoco (decisión D2 de 2b: vende cuando la reconciliación lo permite, y su veto bajo
-#: ``CRITICAL`` se declara en vez de silenciarse).
+#: ``CRITICAL`` se declara en vez de silenciarse) y ``MANUAL`` tampoco (una orden humana
+#: no es una cobertura automática). V2.44: las tres salidas del GOBERNADOR sí entran —
+#: un kill switch, un permiso exit-only o un ``RISK_OFF`` reducen riesgo y no pueden
+#: quedar bloqueados por un libro en drift.
 _PROTECTIVE_EXIT_REASONS: frozenset[str] = frozenset(
-    {"STRUCTURAL_STOP", "TRAIL", "PORTFOLIO_RISK"}
+    {
+        "STRUCTURAL_STOP",
+        "TRAIL",
+        "PORTFOLIO_RISK",
+        "RISK_EXIT",
+        "REGIME_EXIT",
+        "KILL_SWITCH",
+    }
 )
 
 
@@ -229,6 +239,10 @@ class PositionDecision:
     primary_reason: str | None
     market_as_of: str | None
     expires_at: str | None
+    # V2.44: el journal deja de perder la atribución MÚLTIPLE. ``primary_reason`` es el
+    # motivo decisorio (único, por precedencia) y ``secondary_reasons`` los demás que
+    # también dispararon (p. ej. ``RISK_EXIT`` con ``TARGET_2`` detrás).
+    secondary_reasons: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -246,6 +260,7 @@ class PositionDecision:
             "suggestedQty": self.suggested_qty,
             "suggestedStop": self.suggested_stop,
             "primaryReason": self.primary_reason,
+            "secondaryReasons": list(self.secondary_reasons),
             "marketAsOf": self.market_as_of,
             "expiresAt": self.expires_at,
         }
@@ -264,6 +279,11 @@ def build_position_decision(
     expires_at: str | None = None,
     trail_hint: bool = False,
     trail_stop: float | None = None,
+    portfolio_risk: bool = False,
+    manual: bool = False,
+    risk_exit: bool = False,
+    regime_exit: bool = False,
+    kill_switch: bool = False,
 ) -> PositionDecision | None:
     if position is None:
         return None
@@ -282,6 +302,11 @@ def build_position_decision(
         thesis_invalid=thesis_invalid,
         trail_hint=trail_hint,
         trail_stop=trail_stop,
+        portfolio_risk=portfolio_risk,
+        manual=manual,
+        risk_exit=risk_exit,
+        regime_exit=regime_exit,
+        kill_switch=kill_switch,
         at=at,
         exit_policy=policy,
     )
@@ -323,6 +348,10 @@ def build_position_decision(
         next_event=next_event,
     )
     stamp = at or exit_plan.updated_at
+    # El motivo decisorio es ``primary_reason`` (por precedencia); el resto de motivos que
+    # también dispararon viajan como ``secondary_reasons`` (V2.44). Se conserva el orden
+    # de ``EXIT_REASON_PRECEDENCE`` que fija ``_collect_reasons``.
+    secondary = tuple(r for r in exit_plan.reasons if r != primary)
 
     return PositionDecision(
         position_id=position.position_id,
@@ -341,4 +370,5 @@ def build_position_decision(
         primary_reason=primary,
         market_as_of=stamp,
         expires_at=None,
+        secondary_reasons=secondary,
     )

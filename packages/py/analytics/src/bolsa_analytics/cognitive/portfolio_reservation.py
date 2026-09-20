@@ -851,22 +851,51 @@ class ReservationLedger:
         sumando estas posiciones a las reales, de modo que el motor de decisión vea el
         capital y el riesgo YA reservados. La proyección no es la reserva (la reserva tiene
         identidad y ciclo de vida); es su forma agregable para la aritmética del snapshot.
+
+        V2.44 — una reserva de VENTA viva **no se ignora**: se NETEA contra la compra del
+        mismo instrumento. Antes se saltaba, así que un ``RISK_EXIT`` con fill parcial
+        dejaba su cola invisible para la foto de trabajo (la exposición comprometida se
+        sobreestimaba y la reconciliación podía volver a dimensionar contra ella). El neto
+        por instrumento es ``Σ compras vivas − Σ ventas vivas``, nunca negativo: si la
+        venta cubre todo el compromiso de compra, no queda nada que proyectar.
         """
-        positions: list[PortfolioPosition] = []
+        buys: dict[str, list[PortfolioReservation]] = {}
+        sells: dict[str, list[PortfolioReservation]] = {}
         for reservation in self.live():
-            if reservation.is_sell:
-                # Una VENTA no compromete capital: libera/cierra, no consume presupuesto.
-                continue
             if not reservation.instrument_id:
                 continue
-            market_value = _finite(reservation.reserved_cash)
+            bucket = buys if reservation.is_buy else sells
+            bucket.setdefault(reservation.instrument_id, []).append(reservation)
+
+        positions: list[PortfolioPosition] = []
+        for instrument_id, rows in buys.items():
+            sell_rows = sells.get(instrument_id, [])
+            buy_qty = _round4(sum(row.remaining_qty for row in rows))
+            sell_qty = _round4(sum(row.remaining_qty for row in sell_rows))
+            net_qty = _round4(buy_qty - sell_qty)
+            if net_qty <= _QTY_EPS:
+                continue
+            buy_cash = [_finite(row.reserved_cash) for row in rows]
+            sell_cash = [_finite(row.reserved_cash) for row in sell_rows]
+            market_value: float | None = None
+            if all(value is not None for value in buy_cash) and all(
+                value is not None for value in sell_cash
+            ):
+                market_value = _round4(
+                    max(0.0, sum(buy_cash) - sum(sell_cash))  # type: ignore[arg-type]
+                )
+            risks = [_finite(row.reserved_risk) for row in rows]
+            risk_amount: float | None = None
+            if all(value is not None for value in risks):
+                risk_amount = _round4(sum(risks))  # type: ignore[arg-type]
+            sector = next((row.sector for row in rows if row.sector), None)
             positions.append(
                 PortfolioPosition(
-                    instrument_id=reservation.instrument_id,
-                    quantity=reservation.remaining_qty,
+                    instrument_id=instrument_id,
+                    quantity=net_qty,
                     market_value=market_value,
-                    sector=reservation.sector,
-                    risk_amount=_finite(reservation.reserved_risk),
+                    sector=sector,
+                    risk_amount=risk_amount,
                 )
             )
         return tuple(positions)

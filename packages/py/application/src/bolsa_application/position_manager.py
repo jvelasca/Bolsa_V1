@@ -40,6 +40,11 @@ from typing import Any, Literal
 
 from bolsa_analytics.cognitive.exit_policy import ExitPolicy
 from bolsa_analytics.cognitive.market_regime_gate import regime_is_exit_only
+from bolsa_analytics.cognitive.operational_governor import (
+    coerce_drawdown_band,
+    coerce_operational_state,
+    coerce_risk_regime,
+)
 from bolsa_analytics.cognitive.position_decision import (
     PositionDecision,
     build_position_decision,
@@ -58,6 +63,12 @@ OrderAction = Literal["hold", "reduce", "sell"]
 # Motivo de salida por régimen (AUTO 2.0). No vive en ExitPlan (contrato cognitivo
 # intacto); es una capa operativa del manager.
 REGIME_EXIT = "regime_exit"
+
+# V2.44: el gobernador entra en la gestión de posición. Los motivos canónicos (mayúsculas)
+# viven en ``exit_plan.ExitReason``; aquí se declaran los literales que el manager emite
+# para que el journal y los tests no dependan de strings sueltos.
+KILL_SWITCH = "kill_switch"
+RISK_EXIT = "risk_exit"
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +116,21 @@ class PositionManagerResult:
     attention: str
     as_of: str
 
+    @property
+    def primary_exit_reason(self) -> str:
+        """Motivo DECISORIO único (canónico, minúsculas) o ``"managed"`` si no hay."""
+        return self.exit_reasons[0] if self.exit_reasons else "managed"
+
+    @property
+    def secondary_reasons(self) -> tuple[str, ...]:
+        """Motivos que también dispararon, por precedencia (V2.44).
+
+        ``exit_reasons`` conserva el orden de ``EXIT_REASON_PRECEDENCE``, así que el
+        primero es el decisorio y el resto son secundarios: el journal deja de perder la
+        atribución múltiple sin inventar un segundo eje.
+        """
+        return self.exit_reasons[1:]
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "positionId": self.position.position_id,
@@ -113,6 +139,8 @@ class PositionManagerResult:
             "orderQty": self.order_qty,
             "stopUpdate": self.stop_update,
             "exitReasons": list(self.exit_reasons),
+            "primaryExitReason": self.primary_exit_reason,
+            "secondaryReasons": list(self.secondary_reasons),
             "attention": self.attention,
             "positionDecision": self.decision.to_dict(),
             "position": self.position.to_dict(),
@@ -155,13 +183,26 @@ def manage_position(
     trail_hint: bool = False,
     trail_stop: float | None = None,
     at: str | None = None,
+    manual: bool = False,
+    portfolio_risk: bool = False,
+    risk_regime: str | None = None,
+    drawdown_band: str | None = None,
+    operational_state: str | None = None,
 ) -> PositionManagerResult | None:
     """Gestiona una posición abierta: mark + decisión + intención de orden.
 
     Devuelve ``None`` si no hay posición gestionable (fail-closed) **o si la gestión no
-    pudo completarse** (mark rechazado / decisión no construible). El régimen exit-only
-    fuerza venta total con motivo ``regime_exit`` con precedencia ABSOLUTA sobre
-    cualquier otra intención (hold/reduce/take-profit/trailing).
+    pudo completarse** (mark rechazado / decisión no construible).
+
+    V2.44 — el GOBERNADOR gobierna también el ciclo de vida, no solo la entrada:
+
+    * ``regime`` exit-only (``UNKNOWN``/``RISK_OFF``) ⇒ ``REGIME_EXIT`` (venta total).
+    * ``risk_regime == RISK_OFF`` (o banda de drawdown ``EXIT_ONLY``) ⇒ ``RISK_EXIT``.
+    * ``operational_state == HALTED`` ⇒ ``KILL_SWITCH`` (venta total forzada).
+    * ``manual``/``portfolio_risk`` se propagan tal cual (antes eran inalcanzables).
+
+    Los tres motivos del gobernador tienen **precedencia absoluta** sobre hold/reduce/
+    take-profit/trailing (una salida de reducción de riesgo no compite con la gestión).
 
     Retrocompatible: delega en ``manage_position_outcome`` y colapsa los motivos de
     no-gestión a ``None``. El llamante que necesite DISTINGUIR "no hay nada que hacer"
@@ -180,6 +221,11 @@ def manage_position(
         trail_hint=trail_hint,
         trail_stop=trail_stop,
         at=at,
+        manual=manual,
+        portfolio_risk=portfolio_risk,
+        risk_regime=risk_regime,
+        drawdown_band=drawdown_band,
+        operational_state=operational_state,
     )
     return outcome if isinstance(outcome, PositionManagerResult) else None
 
@@ -198,6 +244,11 @@ def manage_position_outcome(
     trail_hint: bool = False,
     trail_stop: float | None = None,
     at: str | None = None,
+    manual: bool = False,
+    portfolio_risk: bool = False,
+    risk_regime: str | None = None,
+    drawdown_band: str | None = None,
+    operational_state: str | None = None,
 ) -> PositionManagerResult | PositionManagerSkip | None:
     """Como ``manage_position`` pero DEVOLVIENDO el motivo cuando no pudo gestionar.
 
@@ -208,6 +259,10 @@ def manage_position_outcome(
       El llamante DEBE journalizarlo con atención alta (la posición sigue viva y sin
       gestión, que es un estado operativo, no un no-op).
     * ``None`` — nada que gestionar (sin posición, cerrada o ya plana): benigno.
+
+    V2.44: ``risk_regime``/``drawdown_band``/``operational_state`` son la lectura del
+    gobernador para ESTA posición (no el régimen de mercado). Se normalizan con los
+    coercers canónicos: un valor no reconocido ⇒ ``UNKNOWN`` (nunca permisivo).
     """
     if position is None or position.status == "CLOSED":
         return None
@@ -223,6 +278,12 @@ def manage_position_outcome(
             detail=f"mark_price={mark_price!r}",
         )
 
+    # Lectura del gobernador (fail-closed: lo no reconocido no es permisivo).
+    halted = coerce_operational_state(operational_state) == "HALTED"
+    band = coerce_drawdown_band(drawdown_band)
+    risk_off = coerce_risk_regime(risk_regime) == "RISK_OFF" or band == "EXIT_ONLY"
+    regime_exit = regime_is_exit_only(regime)
+
     decision = build_position_decision(
         marked,
         mark_price=mark_price,
@@ -235,6 +296,14 @@ def manage_position_outcome(
         expires_at=expires_at,
         trail_hint=trail_hint,
         trail_stop=trail_stop,
+        # ``RiskRegime == RISK_OFF`` ⇒ ``portfolio_risk`` (contrato del roadmap AUTO-3),
+        # y además ``risk_exit`` para que el motivo DECISORIO sea ``RISK_EXIT`` (más alto
+        # en ``EXIT_REASON_PRECEDENCE``) con ``PORTFOLIO_RISK`` como secundario.
+        portfolio_risk=portfolio_risk or risk_off,
+        risk_exit=risk_off,
+        regime_exit=regime_exit,
+        kill_switch=halted,
+        manual=manual,
     )
     if decision is None:
         return PositionManagerSkip(
@@ -245,21 +314,21 @@ def manage_position_outcome(
 
     order_action, order_qty, stop_update = _order_from_decision(decision, marked)
 
+    # Orden por PRECEDENCIA: el motivo decisorio primero y los secundarios detrás. El
+    # manager ya no "añade" un motivo post-hoc: ``REGIME_EXIT``/``RISK_EXIT``/
+    # ``KILL_SWITCH`` nacen en el ``ExitPlan`` (misma taxonomía, un solo ``Literal``).
     exit_reasons: list[str] = []
     if decision.primary_reason:
         exit_reasons.append(decision.primary_reason.lower())
+    exit_reasons.extend(reason.lower() for reason in decision.secondary_reasons)
 
-    # Salida por régimen (AUTO 2.0 · V2.40.1): precedencia ABSOLUTA. El régimen exit-only
-    # pide deshacer riesgo, así que no compite con la gestión normal: ignora hold, reduce,
-    # take-profit, trailing y cualquier actualización de stop, y emite venta TOTAL.
-    # Antes solo se forzaba cuando la decisión era ``hold``, de modo que en ``UNKNOWN``/
-    # ``RISK_OFF`` un ``REDUCE`` o un ``TAKE_PROFIT`` podían prevalecer y dejar posición
-    # abierta contra la política declarada (exit-only ⇒ deshacer, no "gestionar un poco").
-    if regime_is_exit_only(regime):
+    # Reafirmación defensiva: un halt, un permiso exit-only o un ``RISK_OFF`` son SIEMPRE
+    # venta TOTAL. La decisión ya pide ``full_exit``, pero así ningún camino (recon,
+    # fracción de T2, ratchet de stop) puede dejar posición abierta contra el gobernador.
+    if halted or regime_exit or risk_off:
         order_action = "sell"
         order_qty = marked.remaining_quantity
         stop_update = None
-        exit_reasons.append(REGIME_EXIT)
 
     return PositionManagerResult(
         position=marked,
