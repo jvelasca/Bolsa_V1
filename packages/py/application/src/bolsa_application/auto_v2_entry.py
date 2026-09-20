@@ -29,6 +29,7 @@ import os
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
+from hashlib import sha256
 from typing import Any, cast
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
@@ -1129,6 +1130,13 @@ def plan_v2_tick(
             trade_context=signal_ctx,
             config=cfg.decision_config(governor=governor),
             as_of=as_of,
+            # AUTO-6: identidad determinista por (cuenta, señal) ⇒ la reserva derivada
+            # (``RES-<decision_id>``) es un CLAIM atómico y dos workers concurrentes no
+            # pueden comprometer el mismo capital dos veces.
+            decision_id=entry_decision_id(
+                account_id=str(getattr(snapshot, "account_id", "") or ""),
+                signal=signal,
+            ),
         )
         decisions.append(decision)
         package = trade_plan_to_decision_package(
@@ -1434,6 +1442,31 @@ def canonical_candidate_key(signal: V2Signal) -> tuple[Any, ...]:
         str(signal.signal_id or ""),
         str(signal.instrument_id or ""),
     )
+
+
+def entry_decision_id(*, account_id: str, signal: V2Signal) -> str:
+    """AUTO-6 — identidad DETERMINISTA de la decisión de una señal (claim de reserva).
+
+    Dos workers/procesos que evalúan la MISMA señal sobre la MISMA barra para la MISMA
+    cuenta producen la MISMA identidad de decisión. Es lo que convierte la reserva
+    durable en un **claim atómico** (``INSERT ... ON CONFLICT`` sobre su PK derivada) en
+    vez de una carrera "leer presupuesto → reservar": el perdedor recibe
+    ``inserted=False`` del store y veta su propia emisión, en lugar de apilar un segundo
+    compromiso de capital sobre la misma oportunidad.
+
+    Incluye la CUENTA porque el capital —y la PK de ``portfolio_reservations``— es por
+    cuenta: la identidad de señal, por sí sola, haría colisionar a dos cuentas que vigilen
+    el mismo instrumento. Sin identidad de señal (señal sin barra) se conserva la
+    identidad aleatoria histórica: no hay clave estable que reclamar (fail-open al azar
+    de siempre, no a un id compartido por accidente).
+    """
+    signal_id = str(signal.signal_id or "").strip()
+    if not signal_id:
+        from uuid import uuid4
+
+        return f"dec-{uuid4().hex[:12]}"
+    key = f"{str(account_id or '').strip()}\x1f{signal_id}"
+    return f"dec-{sha256(key.encode('utf-8')).hexdigest()[:12]}"
 
 
 def _dedupe_candidates(signals: Iterable[V2Signal]) -> dict[str, V2Signal]:
@@ -2131,6 +2164,7 @@ __all__ = [
     "build_worker_snapshot",
     "canonical_candidate_key",
     "edge_from_package",
+    "entry_decision_id",
     "plan_v2_position_decision",
     "plan_v2_position_outcome",
     "plan_v2_tick",

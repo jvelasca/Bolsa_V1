@@ -2137,10 +2137,11 @@ class AutoSimulationWorker:
             self._v2_reservations = previous
             return
         blocked: set[str] = set()
+        claimed: set[str] = set()
         persisted: list[PortfolioReservation] = []
         for reservation in reservations:
             try:
-                await store.save(reservation)
+                claimed_ok = await store.save_claim(reservation)
             except Exception:  # noqa: BLE001 — una reserva no durable no se emite.
                 logger.exception(
                     "auto_sim v2 reservation persist failed id=%s",
@@ -2148,12 +2149,27 @@ class AutoSimulationWorker:
                 )
                 blocked.add(reservation.instrument_id)
                 continue
+            if not claimed_ok:
+                # AUTO-6: la identidad de la reserva es DETERMINISTA por (cuenta, señal)
+                # (``RES-dec-<hash>``), así que la PK de ``portfolio_reservations`` arbitra
+                # la carrera sin locks extra: ``save_claim`` devuelve ``False`` SOLO si ya
+                # había un compromiso VIVO con esa identidad — la ganó otro worker/proceso
+                # (o un tick anterior). Es un CLAIM atómico: el perdedor veta su emisión en
+                # vez de apilar un segundo compromiso sobre el mismo capital. No es un
+                # fallo de medición, es una carrera perdida — se declara con
+                # ``reservation_already_live``. Una identidad ya LIBERADA no llega aquí:
+                # se re-compromete (re-intento legítimo dentro de la barra).
+                claimed.add(reservation.instrument_id)
+                continue
             persisted.append(reservation)
         try:
             await store.commit()
         except Exception:  # noqa: BLE001 — con autocommit ya es durable; se declara.
             logger.exception("auto_sim v2 reservation commit failed")
         self._v2_reservation_blocked = frozenset(blocked)
+        # Las carreras perdidas se suman al carryover: el veteo de emisión es el mismo
+        # ("ya hay una reserva viva para este instrumento") y usa el mismo motivo.
+        self._v2_reservation_carryover = self._v2_reservation_carryover | frozenset(claimed)
         merged: dict[str, PortfolioReservation] = {
             row.reservation_id: row for row in previous if row.is_live
         }

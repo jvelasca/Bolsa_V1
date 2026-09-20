@@ -184,12 +184,127 @@ Requisitos de cableado (un fichero nuevo **no entra solo**, y esto ya mordió en
 6. **Window/POSIX**: la muerte sucia “de verdad” es `SIGKILL` (POSIX, CI Linux); en Windows `terminate()`
    es lo máximo disponible. El test debe **declararlo**, no fingir equivalencia.
 
-## 7. Estado de ejecución (a rellenar al cerrar la fase)
+## 7. Estado de ejecución (cerrado 2026-09-20)
 
-_(Reservado: pieza del plan → estado → fichero, más las desviaciones **declaradas** frente a lo que este
-plan decía.)_
+**Cifras locales de esta máquina** (PostgreSQL del `docker-compose.yml` **alcanzable** en
+`localhost:5432`, así que las dos capas —hermética y real— se midieron aquí; el CI del tag las
+re-mide como gate).
 
-## 8. Verificación (a rellenar con artefactos)
+| Pieza del plan (§)                                                           | Estado    | Fichero                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §3.1 Crash/Recovery **hermético** (por commit)                               | **hecho** | `apps/api-python/tests/test_auto_v46_crash_recovery.py` (NUEVO, 2 tests)                                                                                                                                          |
+| §3.2 Concurrent AUTO **hermético** (por commit)                              | **hecho** | `apps/api-python/tests/test_auto_v46_concurrent.py` (NUEVO, 2 tests)                                                                                                                                              |
+| §3.1 Crash/Recovery **real** (proceso + PG, al sellar)                       | **hecho** | `apps/api-python/tests/test_crash_recovery_day_process_pg.py` (NUEVO, 1 test)                                                                                                                                     |
+| §3.2 Concurrent AUTO **real** (gemelo estrecho, al sellar)                   | **hecho** | `apps/api-python/tests/test_concurrent_auto_pg.py` (NUEVO, 1 test)                                                                                                                                                |
+| §3.2 claim atómico (el «arreglo mínimo sin migración» que el plan autoriza)  | **hecho** | `auto_v2_entry.py` (`entry_decision_id` + `decision_id` del plan del tick) · `reservation_store.py` (`save_claim` en protocolo/InMemory/Postgres) · `auto_simulation_worker.py` (`_v2_persist_tick_reservations`) |
+| §3.5 Matriz de mutaciones                                                    | **hecho** | `apps/api-python/scripts/v2_46_mutation_audit.py` (NUEVO, 6 mutaciones, 6/6 muerden)                                                                                                                              |
+| §4 Cableado de CI (dos `--ignore` + dos pasos dedicados + gates + anti-skip) | **hecho** | `.github/workflows/python-ci.yml`, `.github/workflows/release-tag-ci.yml`                                                                                                                                         |
+| §5 Cierre documental                                                         | **hecho** | este §7/§8 + `audit-pack-v2.46-…` + `arranque-auditor-v2.46-…` + bump/CHANGELOG/PROJECT_STATE/engineering-index                                                                                                   |
 
-_(Reservado: cada cifra con **el artefacto que la produjo** — commit de fase, runs de CI con su enlace,
-baselines del runner versionado, gobernador, matriz de mutaciones.)_
+### 7.1 Desviaciones declaradas frente a lo que este plan decía
+
+1. **La «muerte en mitad del fill» no es observable en vivo** (§2.3 del plan lo dejaba abierto
+   como plan B: «si la cola SIM materializa todo dentro de un tick … se siembra el parcial
+   durable y se mata el proceso»). **Medido**: el venue SIM aplica el **schedule completo de la
+   orden dentro del mismo tick** (`_settle`), así que la ventana «parcial en vuelo» **no
+   existe**. La capa real **no siembra nada**: el parcial durable lo produce el propio proceso
+   (una orden BUY cortada con la cola sin llenar, `status='partial'` + reserva viva) y **se
+   mata el proceso sobre ese estado**. Lo certificado es el **estado durable del fill parcial**
+   y su cierre contable tras el reinicio, **no** una interrupción en vuelo imposible por
+   construcción del venue. Está declarado en el docstring del propio test, no maquillado.
+2. **Muerte sucia = `terminate()` en Windows / `kill()` en POSIX**. La plataforma de esta
+   máquina es Windows: la muerte «de verdad» (`SIGKILL`) es la del CI Linux y el test usa el
+   máximo disponible en cada plataforma, declarándolo. No se finge equivalencia.
+3. **El arreglo de concurrencia fue el que el plan anticipó** (§2.2 «nota de honestidad»:
+   derivar la identidad de la reserva de la identidad determinista de la señal): la identidad
+   de la decisión de entrada pasa a derivarse de `(cuenta, señal)` y la reserva se compromete
+   con **claim atómico** (`save_claim`: `INSERT … ON CONFLICT DO NOTHING` + `UPDATE`
+   condicional + `RETURNING`), **sin migración**. **No** hizo falta la escalada a «serializar el
+   tramo leer-presupuesto → reservar» (locks explícitos) ni una restricción de esquema nueva.
+4. **La identidad determinista entra en la costura que el camino V2 usa con o sin optimizador**
+   (declarado, porque roza el freeze del plan §2). `decision_id=entry_decision_id(...)` se pasa en
+   `plan_v2_tick` **sin** depender de `AUTO_ENGINE_SIM_V2_OPTIMIZER`, así que la **byte-identidad**
+   del camino V2 con el flag del optimizador **OFF** se conserva en **producto** (no se construye
+   ninguna candidata, el journal **no** gana claves y `V2TickPlan.optimizer` queda `None`) pero
+   **no** en la identidad de la reserva: los ids pasan de **aleatorios**
+   (`portfolio_decision_engine.py:444`, `dec-<uuid4>`) a **deterministas** por `(cuenta, señal)`.
+   Eso **es** el arreglo que el plan autoriza (§2.2) y su efecto observable es precisamente el que
+   el escenario concurrente demostró: dos compromisos de capital sobre la misma oportunidad dejan
+   de ser posibles. Nota de alcance: como con ids **aleatorios** la identidad de una reserva **no
+   podía repetirse**, la distinción `save`/`save_claim` era **inalcanzable** en cualquier flujo
+   histórico: el método nuevo es **neutro** para todo lo anterior y sólo muerde ahora que la
+   identidad es estable. Con `AUTO-ENGINE-SIM-V2=0` el camino legacy no toca las reservas del tick
+   y no cambia nada.
+5. **Defecto semántico encontrado al medir la matriz (y arreglado, no tapado)**: el `save`
+   histórico del store responde «¿la fila existía?» (idempotencia de replay). Leído como
+   claim, **vetaba para siempre** la re-entrada sobre una identidad ya **liberada**
+   (re-intento legítimo dentro de la barra). De ahí el método nuevo y explícito `save_claim`
+   («¿soy el dueño del compromiso **vivo**?»), con su caso cubierto: la identidad liberada se
+   **re-compromete**.
+6. **La sonda de mutaciones se endureció sobre el patrón de `v2_45`** (declarado, porque
+   cambia el mecanismo de dos garantías): (a) **sondeo de puerto** en vez de asumir el DSN
+   fast-fail — en Windows un puerto cerrado **no** rechaza al instante y las suites de
+   `apps/api-python` **se colgaban** en vez de devolver el rojo con nombre; (b) huella de
+   integridad por **sha256 del raw** (los ficheros del árbol están en CRLF y
+   `read_text`/`write_text` normalizan EOL: la comparación «byte a byte» habría medido la copia
+   **normalizada**); (c) guarda que **aborta** si encuentra el marcador `# MUTATION:` al
+   arrancar (una corrida interrumpida a mitad de mutación no puede pasar por «original»).
+7. **Dos tests herméticos por escenario, no uno**: el escenario de crash hermético separa
+   «sobrevive a la muerte y converge» de «libera la cola NO llenada de la reserva parcial»
+   (esta última es la que mordió la mutación M2). El concurrente separa «la carrera de la
+   primera oleada» de «la segunda oleada no añade ni una orden» (esta última es la que detecta
+   la no-determinación de la identidad, M5).
+
+### 7.2 Límites (heredados del plan §6, confirmados al ejecutar)
+
+- MAE/MFE se **recogen**, no se calibran; sin productor de economía en el tick (`AUTO-7`).
+- Precio SIM **plano** y horizonte 21–90 d ⇒ el cierre del día real es por **seam durable**
+  (`holdingDeadlineAt` vencido + reinicio), no por geometría.
+- El bucle AUTO SIM **no** escribe el journal durable ⇒ los agregados post-crash se leen de
+  `execution_events` / `sim_*` / `transactions` / `portfolio_reservations`.
+- **Límite de método**: no correr dos sesiones de pytest en paralelo contra la misma base (el
+  purgado de residuos del conftest es de sesión) ⇒ cada escenario real va en **paso dedicado**
+  del tag, sin solape.
+
+## 8. Verificación (cada cifra, con el artefacto que la produjo)
+
+Todo lo de esta tabla es **medición local de esta máquina el 2026-09-20**, con
+`PostgreSQL` alcanzable (excepto las dos líneas de baseline offline, que no lo tocan). El sello
+(commit de fase, runs de CI del `main` y del tag, ref `v2.46-beta`) se registra en §9 del
+audit-pack cuando se produzca: **no se atribuye aquí ninguna cifra a un run que no exista**.
+
+| Medida                                                    | Comando                                                                                                                                                 | Resultado medido                                                                       |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Ruff (CI-style, árbol completo)                           | `uv run ruff check packages/py apps/api-python --config pyproject.toml`                                                                                 | **0** (`All checks passed!`) — se corrigieron 12 `I001` propios **antes** de medir     |
+| Mypy (full-tree, como CI)                                 | `uv run mypy packages/py/{domain,market,infrastructure,application}/src apps/api-python/src --follow-imports=silent`                                    | **489 files, 0 issues**                                                                |
+| Import-linter                                             | `uv run lint-imports --config packages/py/.importlinter`                                                                                                | **4 kept, 0 broken**                                                                   |
+| Gobernador congelado                                      | `git diff -- apps/api-python/scripts/v2_43_governor_evidence.py`                                                                                        | **vacío** (byte a byte igual)                                                          |
+| Gobernador, ejecución                                     | `uv run --no-sync python apps/api-python/scripts/v2_43_governor_evidence.py`                                                                            | **`exit 0`** con `"bump": "1.68.0-beta"` conservado                                    |
+| Las 4 suites nuevas de AUTO-6 (2 herm. + 2 PG)            | `AUTO_CRASH_RECOVERY_PG_REQUIRED=1 AUTO_CONCURRENT_PG_REQUIRED=1 uv run pytest <4 ficheros> -q`                                                         | **6 passed** (2+2+1+1) en **8,92 s**                                                   |
+| Gemelos PG en solitario (capa real del tag)               | `AUTO_CRASH_RECOVERY_PG_REQUIRED=1 AUTO_CONCURRENT_PG_REQUIRED=1 uv run pytest test_crash_recovery_day_process_pg.py test_concurrent_auto_pg.py -q -rs` | **2 passed** en **8,66 s** (9,21 s de pared)                                           |
+| Terreno AUTO-6 existente (no regresión)                   | `uv run pytest test_auto_v2_entry.py test_execution_event.py test_auto_v2_partial_fills.py test_auto_v46_*.py -q`                                       | **96 passed** en **1,03 s**                                                            |
+| Baseline `quality` (`python-ci.yml`, del YAML, por JUnit) | `uv run --no-sync python scripts/verify/offline_ci_run_yaml.py .github/workflows/python-ci.yml quality --with-pg-ignores`                               | **2091 passed, 0 skipped, 0 failed** (v2.45: 2087 ⇒ **+4** exactos)                    |
+| Baseline `python` del tag (del YAML, por JUnit)           | `uv run --no-sync python scripts/verify/offline_ci_run_yaml.py .github/workflows/release-tag-ci.yml python --with-pg-ignores`                           | **2102 passed, 0 skipped, 0 failed** (v2.45: 2098 ⇒ **+4** exactos)                    |
+| Matriz de mutaciones                                      | `uv run --no-sync python apps/api-python/scripts/v2_46_mutation_audit.py`                                                                               | **6/6 muerden**, `sha256` de los ficheros tocados **idéntico** antes/después, `exit 0` |
+
+Los **`+4`** cuadran en los **dos** bloques offline porque los dos ficheros herméticos entran por
+el **pase de directorio** de `apps/api-python/tests` (y sus gemelos PG van en `--ignore` de
+**ambos** jobs offline, sin PG). Los **2** de la capa real viven en `lifecycle-pg` del tag con
+paso dedicado y guard anti-skip.
+
+### 8.1 Matriz de mutaciones (MEDIDA, no esperada)
+
+`apps/api-python/scripts/v2_46_mutation_audit.py` — restauración **desde memoria** (nunca
+`git checkout --`), aborta si el fragmento no es único, y **guarda anti-resto** (`# MUTATION:`
+presente ⇒ aborta). Línea base de las cinco suites implicadas: **ningún rojo**.
+
+| #   | Mutación                                                            | Costura de producción                                         | Test(s) en rojo                                                                                                  |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| M1  | la señal ya **consumida** deja de filtrarse                         | `auto_v2_entry.py` (`consumed_signal_ids`)                    | `test_plan_v2_tick_blocks_consumed_signal`, `test_crash_recovery_day_partial_fill_survives_kill_and_restart`     |
+| M2  | el fill materializado deja de **liberar** el compromiso             | `auto_simulation_worker.py` (`_v2_reconcile_reservations`)    | `test_crash_recovery_releases_the_unfilled_tail_of_the_partial_reservation`                                      |
+| M3  | una proyección **divergente** deja de vetar aperturas               | `auto_simulation_worker.py` (`_openings_vetoed`)              | `test_unreadable_ledger_vetoes_openings_and_keeps_position`                                                      |
+| M4  | un `ExecutionEvent` ya **`APPLIED`** deja de atajarse               | `execution_event.py` (`apply_execution_financial_once`)       | `test_durable_apply_skips_when_already_applied`                                                                  |
+| M5  | la identidad de la decisión de entrada deja de ser **determinista** | `auto_v2_entry.py` (`entry_decision_id`)                      | `test_concurrent_auto_three_workers_claim_one_signal_one_order`, `test_concurrent_auto_second_wave_adds_nothing` |
+| M6  | el **perdedor** del claim emite igualmente su orden                 | `auto_simulation_worker.py` (`_v2_persist_tick_reservations`) | `test_concurrent_auto_three_workers_claim_one_signal_one_order`                                                  |
+
+Artefacto de la corrida: `logs/agent/v2_46_mutation_audit.txt` (log local, no versionado).

@@ -142,6 +142,12 @@ jobs:
         # arriba) y en ``apps/api-python/tests`` (pase de directorio). El fichero PG nuevo
         # (``test_golden_day_v2_process_pg.py``) se ignora aquí y se certifica en
         # ``lifecycle-pg`` del tag con su gate propio.
+        # V2.46/AUTO-6 (Crash/Recovery + Concurrent AUTO): las dos capas HERMÉTICAS
+        # (``test_auto_v46_crash_recovery.py`` y ``test_auto_v46_concurrent.py``) viven en
+        # ``apps/api-python/tests`` (pase de directorio). Sus gemelos PG
+        # (``test_crash_recovery_day_process_pg.py`` y ``test_concurrent_auto_pg.py``) se
+        # ignoran aquí —no hay PG en este job: sin ``--ignore`` skipearían en mudo— y se
+        # certifican en pasos DEDICADOS de ``lifecycle-pg`` del tag con gate propio.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -216,6 +222,8 @@ jobs:
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
+          --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
+          --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
 

@@ -97,6 +97,30 @@ class ReservationStore(Protocol):
         """
         ...
 
+    async def save_claim(self, reservation: PortfolioReservation) -> bool:
+        """AUTO-6 — alta/actualización ATÓMICA del **compromiso vivo** de esa identidad.
+
+        Devuelve ``True`` si el compromiso VIVO pasa a ser de este llamante: o la fila no
+        existía (alta), o existía ya **liberada** (la identidad se vuelve a comprometer, que
+        es el caso legítimo de un re-intento o de una re-entrada sobre la misma barra tras
+        una cancelación). Devuelve ``False`` si ya había un compromiso **VIVO** con esa
+        misma identidad: carrera perdida — el llamante NO debe emitir la orden, porque
+        apilaría un segundo compromiso de capital sobre la misma oportunidad.
+
+        La diferencia con ``save`` es la pregunta que responde: ``save`` contesta "¿la fila
+        existía?" (idempotencia de replay); ``save_claim`` contesta "¿soy el dueño del
+        compromiso vivo?" (claim de concurrencia). Confundirlas es un fallo silencioso en
+        los dos sentidos: con ``inserted=False`` leído como claim perdido, una identidad
+        ya liberada veta la re-entrada para SIEMPRE dentro de la barra; con ``inserted``
+        leído como claim ganado, dos workers que planifican la misma señal a la vez
+        comprometen el capital dos veces.
+
+        La comprobación de "sigue vivo" es ATÓMICA (una sola sentencia con ``WHERE``
+        condicional + ``RETURNING``): no hay ventana leer-presupuesto→reservar entre la
+        lectura del estado y la escritura.
+        """
+        ...
+
     async def get(self, reservation_id: str) -> PortfolioReservation | None:
         """La reserva con esa identidad, o ``None`` (desconocida ≠ liberada)."""
         ...
@@ -319,6 +343,23 @@ class InMemoryReservationStore:
         self._rows[key] = reservation
         return inserted
 
+    async def save_claim(self, reservation: PortfolioReservation) -> bool:
+        """Espeja el claim del PG: ``False`` solo si YA hay un compromiso VIVO.
+
+        Una identidad liberada (fill/cancel/restart) NO es un claim vivo: se vuelve a
+        comprometer (es el caso legítimo del re-intento dentro de la barra). El espejo
+        in-memory delega en ``save`` para no duplicar el upsert — y para que un store de
+        test que sustituya ``save`` siga interceptando el alta.
+        """
+        existing = self._rows.get(reservation.reservation_id)
+        if existing is not None and existing.is_live:
+            return False
+        # Ojo: ``save`` devuelve "¿existía la fila?" (semántica de replay), no "¿soy el
+        # dueño del compromiso?". Aquí la pregunta es la segunda: tomar el relevo de una
+        # identidad LIBERADA es un claim GANADO, aunque la fila existiera.
+        await self.save(reservation)
+        return True
+
     async def get(self, reservation_id: str) -> PortfolioReservation | None:
         return self._rows.get(str(reservation_id or "").strip())
 
@@ -409,6 +450,52 @@ class PostgresReservationStore:
             )
         await _commit_if(self._session, self._autocommit)
         return inserted
+
+    async def save_claim(self, reservation: PortfolioReservation) -> bool:
+        """AUTO-6 — claim atómico del compromiso VIVO (ver ``ReservationStore``).
+
+        Dos workers que planifican la MISMA señal derivan la MISMA ``reservation_id``
+        (``RES-dec-<hash>`` de ``(cuenta, señal)``), así que la PK de la tabla arbitra la
+        carrera sin ningún lock adicional: el perdedor no recibe fila en el ``INSERT`` y
+        su ``UPDATE`` condicional tampoco casa (la fila ya está VIVA), de modo que devuelve
+        ``False`` y el llamante veta su emisión.
+
+        El ``UPDATE`` condicional (``status != OPEN OR remaining_qty <= 0``) es lo que hace
+        ATÓMICA la decisión y, a la vez, permite el caso legítimo de re-comprometer una
+        identidad ya **liberada** (re-intento, o re-entrada en la misma barra tras una
+        cancelación): ahí sí casa y la fila vuelve a ``OPEN`` con las dimensiones nuevas.
+        Sin la condición, una identidad liberada vetaría para siempre; sin el ``RETURNING``,
+        no habría forma de saber quién ganó.
+        """
+        import sqlalchemy as sa
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import PortfolioReservationRow
+
+        values = _reservation_values(reservation)
+        insert_statement = (
+            pg_insert(PortfolioReservationRow)
+            .values(**values)
+            .on_conflict_do_nothing(index_elements=["reservation_id"])
+            .returning(PortfolioReservationRow.reservation_id)
+        )
+        claimed = (await self._session.execute(insert_statement)).scalars().first() is not None
+        if not claimed:
+            taken_over = await self._session.execute(
+                sa.update(PortfolioReservationRow)
+                .where(
+                    PortfolioReservationRow.reservation_id == reservation.reservation_id,
+                    sa.or_(
+                        PortfolioReservationRow.status != RESERVATION_OPEN,
+                        PortfolioReservationRow.remaining_qty <= 0,
+                    ),
+                )
+                .values(**{name: values[name] for name in _WRITABLE_COLUMNS})
+                .returning(PortfolioReservationRow.reservation_id)
+            )
+            claimed = taken_over.scalars().first() is not None
+        await _commit_if(self._session, self._autocommit)
+        return claimed
 
     async def get(self, reservation_id: str) -> PortfolioReservation | None:
         import sqlalchemy as sa

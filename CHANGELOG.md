@@ -2,6 +2,78 @@
 
 All notable releases of Bolsa V1.
 
+## [1.71.0-beta] — AUTO-6 · Crash/Recovery + Concurrent AUTO: un crash no duplica ni pierde — 2026-09-20
+
+**Sin migración** (el head de Alembic sigue en `043_exit_identity_and_kill_state`; el claim atómico
+usa la **PK existente** de `portfolio_reservations` como árbitro). AUTO-6 (roadmap §8) certifica dos
+escenarios, cada uno en **dos capas**: el **Crash/Recovery Day** (fill **parcial** → **muerte** del
+proceso → **reinicio** → reconciliación → cierre limpio) y el **Concurrent AUTO** (varias instancias
+del motor sobre la **misma** cuenta/barra/señal). El invariante: **un crash no duplica nada y no
+pierde nada**, y **1 señal ⇒ 1 decisión ⇒ 1 orden ⇒ fills correctos** bajo concurrencia. El
+gobernador y su evidencia (`v2_43_governor_evidence.py`) **no se tocan** (byte a byte igual y
+`exit 0`, con `"bump"` todavía en `1.68.0-beta`).
+
+### Claim atómico de la reserva (la única costura de producción que cambia)
+
+- `auto_v2_entry.entry_decision_id`: la identidad de la decisión de entrada pasa a ser
+  **determinista** por `(cuenta, señal)` (`dec-<sha256(cuenta ␟ signal_id)[:12]>`). Dos
+  workers/procesos que evalúan la **misma** señal sobre la **misma** barra producen la **misma**
+  identidad. Sin `signal_id` (señal sin barra) se conserva la identidad **aleatoria** histórica: no
+  hay clave estable que reclamar (nunca un id compartido por accidente).
+- `reservation_store.save_claim` (protocolo + `InMemoryReservationStore` + `PostgresReservationStore`):
+  alta/actualización **atómica** del **compromiso vivo** de esa identidad (`INSERT … ON CONFLICT DO
+NOTHING … RETURNING` y, si no hay fila nueva, un `UPDATE` **condicional** con `RETURNING`).
+  Devuelve `True` sólo si el compromiso vivo pasa a ser del llamante; una identidad ya **liberada**
+  se **re-compromete** (re-intento legítimo dentro de la barra). Es la pregunta correcta frente a
+  `save`, que responde «¿la fila existía?» (idempotencia de replay): confundirlas veta la re-entrada
+  legítima **o** compromete el mismo capital dos veces.
+- `auto_simulation_worker._v2_persist_tick_reservations` usa el claim y, si lo **pierde**, veta su
+  propia emisión con el motivo ya existente `reservation_already_live` (mismo desenlace, sin inventar
+  un motivo nuevo).
+
+### Capa hermética (por commit)
+
+- `apps/api-python/tests/test_auto_v46_crash_recovery.py` (NUEVO): descarta el objeto worker (la RAM
+  se pierde) y reinicia sobre los **mismos** espejos durables → reconciliación **convergente**, todo
+  `ExecutionEvent` en `APPLIED`, cada fill con su contexto financiero, `POSITION == Σ APPLIED`,
+  **sin doble efecto**, libro plano y reservas vivas a 0. Un segundo test aísla la **liberación de
+  la cola no llenada** de la reserva parcial; una fase extra prueba que la señal ya consumida **no
+  re-abre** la oportunidad de la barra.
+- `apps/api-python/tests/test_auto_v46_concurrent.py` (NUEVO): tres workers sobre los mismos stores
+  durables compartidos, con `await asyncio.sleep(0)` en los espejos para que el interleaving sea
+  **real** (un `gather` sobre stores que no suspenden sería una mentira). Invariantes: una sola
+  orden por señal/barra, **un solo** worker abre y los demás **declaran por qué**, una sola fila de
+  reserva, `Σ reserved_cash` viva == la cola **no llenada** (nunca × nº de workers), contabilidad
+  cerrada y una segunda oleada que **no añade ni una orden**.
+
+### Capa real del tag (`lifecycle-pg`)
+
+- `apps/api-python/tests/test_crash_recovery_day_process_pg.py` (NUEVO): el **proceso real**
+  `python -m bolsa_api.workers.scheduler_worker` sobre PostgreSQL real, con id de instrumento
+  determinista (`_crash_instrument_id`: BUY parcial con ≥2 tranchas y SELL completo), **muerte
+  sucia** (`kill()`/`terminate()`) sobre el fill parcial **durable** que produce el propio proceso
+  (sin sembrar nada) → **reinicio** → reconciliación + cierre limpio por el **seam durable**
+  (`holdingDeadlineAt` vencido). Gate `AUTO_CRASH_RECOVERY_PG_REQUIRED=1` + guard anti-skip.
+- `apps/api-python/tests/test_concurrent_auto_pg.py` (NUEVO): **tres sesiones** concurrentes sobre
+  la misma cuenta/engine/instrumento/barra en PG real, conduciendo el tick por la **misma costura de
+  producción** (`AutoSimRuntime.run_tick` + stores `Postgres*`). El invariante mide el **INTENT** de
+  orden (`Σ _order_seq == 1`), no `count(distinct venue_order_id)`: la identidad de orden del venue
+  es determinista y una emisión duplicada **reutilizaría** el mismo id (invisible al `count`). Gate
+  `AUTO_CONCURRENT_PG_REQUIRED=1` + guard anti-skip.
+- Cableado: los dos herméticos entran por **pase de directorio**; los dos PG se añaden al
+  `--ignore` de los **dos** jobs offline y corren en **pasos dedicados** de `lifecycle-pg` con
+  `set -o pipefail`, `tee` a log y guard anti-skip.
+
+### Matriz de mutaciones
+
+- `apps/api-python/scripts/v2_46_mutation_audit.py` (NUEVO): seis mutaciones —señal consumida,
+  liberación de la reserva por fill, gate de reconciliación, idempotencia de `execution_events`,
+  identidad determinista de la decisión y el perdedor del claim—, cada una **medida** contra su
+  suite y con restauración **desde memoria**. **6/6 muerden** y la huella `sha256` del raw de los
+  ficheros tocados queda **idéntica**. La sonda **sondea el puerto** de PostgreSQL (en Windows un
+  puerto cerrado no rechaza al instante: las suites se colgaban) y **aborta** si encuentra un
+  `# MUTATION:` sin restaurar.
+
 ## [1.70.0-beta] — AUTO-5 · Golden Day 2.0: el día real y su embudo — 2026-09-20
 
 **Sin migración** (la identidad de estrategia entra como clave **aditiva** del `payload` JSONB del
