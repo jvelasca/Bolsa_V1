@@ -1,8 +1,8 @@
 # Audit-pack v2.43.2 — Hardening de contabilidad de posición + Exit Governance (AUTO-3 slice 2) (2026-09-19)
 
 **Versión:** `1.68.2-beta` (bump `1.68.1-beta` → `1.68.2-beta`) · **Sin migración** (el head de Alembic
-sigue en `042_portfolio_reservations`) · **Tag de certificación:** **PENDIENTE** (este documento se
-publica **antes** del sello; §9 declara qué falta y no afirma CI de un tag que aún no existe).
+sigue en `042_portfolio_reservations`) · **Tag de certificación:** `v2.43.2-beta` (commit de fase `ef35e3aa`; el tag apunta al commit de sellado
+docs-only). CI real medida en `main` y en la ref del tag — ver §12 y §12.1.
 
 **Alcance.** Dos fases en un solo parche:
 
@@ -671,6 +671,11 @@ descartar que el mutante sea más fuerte (o más débil) que el bug real.
 
 ### 10.2 Otros límites declarados (no silenciosos)
 
+- **Lanzador `pytest` bloqueado (máquina del autor).** El console script `pytest` (invocado como
+  `uv run pytest`) está bloqueado por **Windows Application Control** (`os error 4551`); los dos bloques
+  offline del YAML se midieron con la **misma selección** extraída por el runner y lanzada como
+  `python -m pytest` (`2031` en `quality` y `2042` en el job `python` del tag, los conteos declarados). No
+  cambia la selección de tests, solo el lanzador, y los corrobora la **CI real** (§12).
 - **PG real NO medido** en la máquina del autor (motivo ya declarado en fases anteriores: el `connect` del
   DSN no responde ni rechaza, se cuelga). La fase 1 **no toca ningún fichero PG** ni añade migración, así
   que la certificación de durabilidad de `auto-v2-durable-pg` cubre lo mismo que en `v2.43.1`; la
@@ -735,18 +740,38 @@ documento ya lo declara?`
 
 ## 12. Sello
 
-**PENDIENTE.** Este documento se publica **antes** del sello y **no afirma** CI de un tag que aún no
-existe. Lo que falta, explícitamente (orden de trabajo:
-[`relevo-cierre-v2.43.2-matriz-mutaciones-y-sello-2026-09-20.md`](./relevo-cierre-v2.43.2-matriz-mutaciones-y-sello-2026-09-20.md)):
+**SELLADO.** Tag anotado **`v2.43.2-beta`**, siguiendo la convención de `v2.43-beta`/`v2.43.1-beta`: el tag
+apunta al commit de **sellado** docs-only, de modo que la ref sellada no cita refs inexistentes.
 
-1. **La matriz de mutaciones del §10** (medida, una a una, con reversión verificada) — orden de trabajo en [`relevo-cierre-v2.43.2-matriz-mutaciones-y-sello-2026-09-20.md`](./relevo-cierre-v2.43.2-matriz-mutaciones-y-sello-2026-09-20.md).
-2. **Commit de fase** y **tag anotado** (`v2.43.2-beta`, siguiendo la convención de `v2.43-beta` y
-   `v2.43.1-beta`: el tag apunta al commit de **sellado** docs-only, para que la ref sellada no cite refs
-   inexistentes).
-3. **CI real medida** en `main` y en la ref del tag: `Python CI` (5/5, con `quality` y
-   `auto-v2-durable-pg`) y `Release tag CI` (jobs requeridos + `certify`), y `Gitleaks`. Los jobs con
-   **PG real** son donde se certifica la durabilidad de las reservas de salida del §7.6.
-4. **Errata del diff** (ficheros y `+N/−M` reales), que se fija en el commit de fase.
+**Commit de fase:** `ef35e3aa` — `feat(v2.43.2): hardening de contabilidad de posicion + Exit Governance
+(AUTO-3 slice 2) y matriz de mutaciones medida`.
+
+**Errata del diff del commit de fase:** **29 ficheros**, **`+3814 / −66`**. Reparto: **16 ficheros de
+producción** (`packages/py/analytics/src` 7, `packages/py/application/src` 4, `apps/api-python/src` 1, más
+los dos módulos puros nuevos `data_freshness.py` y `hard_kill_switch.py`), **9 de tests** (los de
+`packages/py/analytics/tests` y `packages/py/application/tests` más el nuevo
+`apps/api-python/tests/test_auto_v44_exit_governance.py`), **la sonda** `v2_43_2_mutation_audit.py`,
+`package.json` (bump a `1.68.2-beta`), `CHANGELOG.md` y los **4 docs** del parche. Los dos docs de
+`v2.40.4` **no** se comitean: aparecen como ` M` por fin de línea CRLF con `git diff` **vacío**.
+
+**CI real medida sobre el commit de fase `ef35e3aa` (en `main`):**
+
+| Workflow    | Resultado                                                                                                                                   | Run                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `Python CI` | **GREEN — 5/5 jobs**: `quality` 2m06s · `auto-v2-durable-pg` 46s · `paper-forward-pg` 44s · `lifecycle-pg` 58s · `grammar-discovery-pg` 45s | [35497681654](https://github.com/jvelasca/Bolsa_V1/actions/runs/35497681654) |
+| `Gitleaks`  | **GREEN**                                                                                                                                   | [35497681645](https://github.com/jvelasca/Bolsa_V1/actions/runs/35497681645) |
+
+El job **`auto-v2-durable-pg`** (Alembic 040→042 + reinicio real, **fail-if-skipped**) es donde se
+certifica en CI la **durabilidad de las reservas de salida** del §7.6 — justo lo que la máquina del autor
+**no** mide (PG real no medido, §10.2). **Un skip mudo no certifica nada**: el job lleva su gate explícito.
+
+**La matriz de mutaciones del §10 está MEDIDA** (sonda `v2_43_2_mutation_audit.py`, 2026-09-20): **9 de 13
+muerden** (M1–M5, M7–M9, M11) y **4 nacen verdes** (M6, M10, M12, M13) con su causa declarada en el §10.1.
+**Tres agujeros reales** (M6, M12, M13) quedan **declarados y reproducibles**; **no** se tocó una línea de
+código de producción ni se añadieron tests en el cierre (regla de oro del relevo §0).
+
+**CI en la ref del tag:** medida **después** de crear el tag y registrada en el **§12.1** (este commit de
+sellado no puede citar la CI de una ref que aún no existía cuando se escribió).
 
 ---
 

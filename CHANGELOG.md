@@ -96,7 +96,7 @@ el mismo motivo declarado en `v2.43.1`.
   **durable antes de emitir** (`_v2_reserve_exit`) y la libera con los fills de **venta**
   (`_v2_release_reservations_for_fill(side=SIDE_SELL)`), casando por **lado**.
 
-### Verificación medida (árbol final, mutaciones pendientes)
+### Verificación medida (árbol final, matriz de mutaciones medida)
 
 | Comprobación             | Comando                                                                                                              | Resultado                                |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
@@ -108,6 +108,13 @@ el mismo motivo declarado en `v2.43.1`.
 | Bloque `python` del tag  | `uv run python scripts/verify/offline_ci_run_yaml.py .github/workflows/release-tag-ci.yml python --with-pg-ignores`  | **2042 passed** (`2002 → 2042`, **+40**) |
 | Suites de `analytics`    | `uv run pytest packages/py/analytics -q`                                                                             | **862 passed**                           |
 | Suites de `application`  | `uv run pytest packages/py/application -q`                                                                           | **1705 passed, 5 skipped**               |
+
+**Nota de método (bloques offline).** En la máquina del autor el lanzador `pytest` del console script
+(`uv run pytest`) está **bloqueado por Windows Application Control** (`os error 4551`), así que los dos
+bloques del YAML se midieron con la **misma selección extraída del runner** lanzada como `python -m pytest`
+(no cambia la selección de tests, solo el lanzador): `2031` y `2042`, los conteos declarados. Son cifras
+además corroboradas por la **CI real** (`quality` en el run del commit de fase y `Release tag CI` en la ref
+del tag).
 
 El delta `+40/+40` es la comprobación de cobertura: los **40 tests nuevos** entran por las listas
 **existentes** de CI en **ambos** bloques, así que ninguno queda fuera de la red (la deuda que `v2.42.2`

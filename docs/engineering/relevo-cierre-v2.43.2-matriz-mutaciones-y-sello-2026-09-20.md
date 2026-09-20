@@ -37,12 +37,14 @@ y [`traspaso-relevo-post-v2-43-2-auto-3-slice-2-2026-09-19.md`](./traspaso-relev
 | `packages/py/application`   | **1705 passed, 5 skipped**                                                   |
 | Docs (pack/arranque/relevo) | escritos; **65/65 referencias citadas existen** (`a9_doc_refs_probe` exit 0) |
 
-**NO hecho** — es el trabajo de este relevo:
+**HECHO en esta pasada** (2026-09-20):
 
-1. **La matriz de mutaciones (§10 del pack).** Está **declarada como deuda y NO medida**. Hay que medir
-   las **13 mutaciones** de §2 y escribir los rojos observados en el §10 del pack.
-2. **El sello (§12 del pack).** Commit de fase + tag anotado `v2.43.2-beta` + CI real en `main` y en la
-   ref del tag + `Gitleaks` + errata del diff.
+1. **La matriz de mutaciones (§10 del pack).** **MEDIDA**: las 13 mutaciones de §2 aplicadas y revertidas
+   con la sonda `v2_43_2_mutation_audit.py`; **9 muerden** (M1–M5, M7–M9, M11) y **4 verdes** (M6, M10,
+   M12, M13) con su causa declarada en el §10.1 del pack.
+2. **El sello (§12 del pack).** Commit de fase `ef35e3aa` (29 ficheros, `+3814/−66`) + tag anotado
+   `v2.43.2-beta` sobre el commit de sellado docs-only + CI real en `main` (`Python CI` `GREEN` 5/5 y
+   `Gitleaks` `GREEN`) y en la ref del tag (§12.1).
 
 **Regla de oro de este relevo:** no se cambia **ni una línea de código de producción**. Si una mutación
 descubre un agujero de cobertura real, **se declara en el pack** y se decide con el owner; no se "arregla

@@ -1,11 +1,13 @@
-# Traspaso de relevo — post `v2.43.2` (hardening de posición + AUTO-3 slice 2: Exit Governance) → **cierre del sello** y después `AUTO-4`
+# Traspaso de relevo — post `v2.43.2` (hardening de posición + AUTO-3 slice 2: Exit Governance) → **sello CERRADO**; siguiente `AUTO-4`
 
 **Fecha:** 2026-09-19 · **Versión:** `1.68.2-beta` · **Punto de partida:** tag `v2.43.1-beta` →
 `b27280de` (remediación de la auditoría de `v2.43-beta` cerrada). **Migración: ninguna** (Alembic head sigue
 en `042_portfolio_reservations`).
-**Sello:** **PENDIENTE** (§12 del pack). El commit de fase y el tag `v2.43.2-beta` se fijan al sellar,
-siguiendo la convención de `v2.43-beta`/`v2.43.1-beta`: el tag apunta al commit de **sellado** docs-only,
-para que la ref sellada no cite refs inexistentes.
+**Sello:** **CERRADO** (§12 del pack). Commit de fase **`ef35e3aa`** (29 ficheros, `+3814/−66`) y tag
+anotado **`v2.43.2-beta`** sobre el commit de **sellado** docs-only, siguiendo la convención de
+`v2.43-beta`/`v2.43.1-beta` (la ref sellada no cita refs inexistentes). CI real en `main`: `Python CI`
+**GREEN 5/5** ([run 35497681654](https://github.com/jvelasca/Bolsa_V1/actions/runs/35497681654)) y
+`Gitleaks` **GREEN** ([run 35497681645](https://github.com/jvelasca/Bolsa_V1/actions/runs/35497681645)).
 
 **Punto de entrada obligatorio para quien siga:** el
 [audit-pack v2.43.2](./audit-pack-v2.43.2-hardening-y-auto-3-slice-2-2026-09-19.md) y el
