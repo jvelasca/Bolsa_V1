@@ -290,7 +290,18 @@ dos ficheros con CRLF/LF pendientes, ni `governor.json` (generado, sin trackear)
   **43 passed** (sin cambio: no hay migración), `paper-forward-pg` **2**, `grammar-discovery-pg` **21**,
   `lifecycle-pg` **13**. `Gitleaks` GREEN (run
   [`35520899318`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35520899318)).
-- **Tag `v2.45-beta`** sobre el commit docs-only de sellado, y `Release tag CI` (job `python` offline +
-  `lifecycle-pg` con el **paso dedicado** del día real y su guard anti-skip + `certify`): el run que lo
-  certifica y sus cifras se registran en el commit de **evidencia** posterior al sello (los tags previos
-  no se mueven; `v2.45-beta` es ref nueva y aditiva).
+- **Tag `v2.45-beta` → `1abfc7fb`** (commit docs-only de sellado). **`Release tag CI` GREEN** con
+  `certify (aggregate + artifact)` en `success` (run
+  [`35522747332`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35522747332), 8m8s): job `python`
+  offline **2098 passed, 35 skipped** en 42,75 s (los **+12** sobre los 2086 de `v2.44-beta`),
+  `lifecycle-pg` **148 + 45 passed** y el **paso dedicado del día real**
+  (`Pytest Golden Day 2.0 (proceso scheduler V2 + PG, fail if skipped)` con
+  `AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1`) **1 passed en 9,32 s**; su guard anti-skip (`log no vacío` +
+  `grep` de `skipped`) **pasó**; `a7-gate`, `decision-spine`, `dr-verify`, `shared`, `security
+(gitleaks)` y `frontend` en `success`; `playwright (integrated E2E)` `skipped` por opt-in.
+- **En la ref del tag**, `Python CI` GREEN 5/5 (run
+  [`35522747381`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35522747381), 2m14s): `quality`
+  **2087 passed, 38 skipped** en 91,47 s y `auto-v2-durable-pg` **43 passed**, idénticos al commit de
+  fase; `Optimize lab` GREEN (run
+  [`35522747321`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35522747321)) y `Fase 2 scientific`
+  GREEN (run [`35522747311`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35522747311)).
