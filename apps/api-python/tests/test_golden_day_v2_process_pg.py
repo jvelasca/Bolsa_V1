@@ -34,6 +34,13 @@ FASE 2 — cierre real (libro plano) por ``time_exit`` + rehidratación durable:
 Gobierno de honestidad (patrón del repo): sin PostgreSQL real/credenciales hace
 ``pytest.skip``; con ``AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1`` un skip silencioso es un
 FALLO duro. NUNCA abre el bridge LIVE.
+
+Límite declarado de MÉTODO: el barrido de residuos del conftest
+(``purge_all_residuals``; borra toda cuenta ajena y todo instrumento ``inst-%`` al
+terminar la SESIÓN de pytest) impide correr esta suite en PARALELO con otra sesión
+de pytest contra la misma base: dos sesiones vivas a la vez se borran los datos
+entre sí y el motor queda reintentando liquidaciones contra filas que ya no están.
+El gate del tag corre el fichero en un paso DEDICADO, que es la forma soportada.
 """
 
 from __future__ import annotations
@@ -206,9 +213,13 @@ async def _seed_instrument(
 
     V2.40.1 — gates fail-closed REALES: sin sector el motor veta por ``sector_unknown``
     y sin ADV/frescura por ``liquidity_unknown``. Sembrarlos es lo que certifica el
-    camino real de producción. El id es DETERMINISTA (día reproducible), así que el
-    segundo run no puede re-insertar la PK y no se borra (el ledger de runs anteriores
-    la referencia: ``ON DELETE SET NULL`` contaminaría asientos ya escritos).
+    camino real de producción.
+
+    El id es DETERMINISTA (día reproducible) y la barrida que lo elige es PURA (sin BD):
+    no depende de que el instrumento exista. El barrido de residuos del conftest
+    (``purge_all_residuals``, ``inst-%``) lo borra al terminar la sesión de pytest —
+    también a las cuentas—, así que cada corrida vuelve a sembrarlo; por eso la
+    idempotencia aquí es un no-op en la práctica y no un contrato de persistencia.
     """
     from bolsa_infrastructure.database.models.tables import InstrumentRow
 
