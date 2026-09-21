@@ -269,6 +269,14 @@ se corre con `PYTHONDONTWRITEBYTECODE=1`) están en el §10 del pack.
 
 ### 8.2 Sello
 
-Pendiente de producir en el momento de escribir este plan: commit de fase, `main`, tag `v2.47-beta` y CI real
-observada con `gh` (bloques offline y CI del tag). La evidencia se añade en el commit de sellado docs-only, con
-los **runs** enlazados (convención de `v2.43.2`/`v2.44`/`v2.45`/`v2.46`).
+Producido. Commit de fase **`0ce3ab81`** (`feat(v2.47)`) + fix de sonda **`44486fc3`**, ambos en `main`.
+**CI real de `main` (observada con `gh`, 2026-09-21):**
+
+| Workflow      | Run                                                                            | Resultado                                                                                                                                                             |
+| ------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Python CI`   | [`35619063064`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063064) | **GREEN** — `quality` **2178 passed, 38 skipped** (base `2091/38` ⇒ **+87**); `lifecycle-pg`, `auto-v2-durable-pg`, `grammar-discovery-pg`, `paper-forward-pg` verdes |
+| `Frontend CI` | [`35619063046`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063046) | **GREEN** — `quality` verde                                                                                                                                           |
+
+La **CI del tag** (`Release tag CI` sobre `v2.47-beta`, con los **seis** pasos dedicados de
+`lifecycle-pg` y sus guards anti-skip) se observa y enlaza en el commit docs-only posterior al tag
+(`evidencia de CI del sello`), siguiendo la convención de `v2.44`/`v2.45`/`v2.46`.

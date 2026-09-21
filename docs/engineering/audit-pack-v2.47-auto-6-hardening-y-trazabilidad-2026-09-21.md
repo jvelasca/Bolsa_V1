@@ -339,6 +339,21 @@ matriz podía reportar un rojo que **no** venía del árbol actual (o, peor, un 
 **Corrección:** la sonda borra el `.pyc` de **cada** módulo mutado antes de **cada** corrida y ejecuta pytest
 con `PYTHONDONTWRITEBYTECODE=1`. Una sonda que mide bytecode cacheado no mide el árbol.
 
+**Dos defectos más de la sonda, destapados al cerrar el sello (fix `44486fc3`).** Con las 18 mutaciones ya
+mordiendo, la **huella final** (`git status --porcelain` de los ficheros tocados) daba un falso
+"árbol alterado":
+
+1. **`write_text` en Windows traduce `\n` → `\r\n`** (modo texto), y con `attr/text=auto eol=lf` git marca el
+   fichero como modificado aunque el contenido lógico sea **idéntico**. La sonda restauraba con `write_text`
+   sin `newline` y **se auto-falsificaba la huella** (un fichero "modificado" que no venía del mutante). Se
+   pasó a `write_bytes` con LF explícito: escritura binaria, inequívoca.
+2. **Las etiquetas llevan `⇒` y acentos**, y con `stdout` en un pipe (corrida en segundo plano o con
+   `Tee-Object`) Windows usa `cp1252`: el `print` reventaba con `UnicodeEncodeError` **antes** de llegar a la
+   huella. Se reconfigure `stdout`/`stderr` a UTF-8 al arrancar.
+
+Con los tres fixes, la matriz corre **18/18 muerden** y termina `intacto: la sonda no alteró el arbol`
+(`AUDIT_EXIT=0`).
+
 ### 10.2 Otros límites declarados (no silenciosos)
 
 - **El camino del "Crash Day" de proceso sigue liquidando por tick.** La ventana mid-fill se cubre **por
@@ -407,10 +422,21 @@ pnpm --filter @bolsa/web contract:check
 
 ## 12. Sello
 
-Pendiente de producirse al escribir este pack: commit de fase, `main`, tag **`v2.47-beta`** y CI real
-observada con `gh` (`Python CI` en `main` y en la ref del tag + `Release tag CI` con los **seis** pasos
-dedicados de `lifecycle-pg` y sus guards anti-skip). La evidencia (con los **runs** enlazados) se añade en el
-commit de sellado docs-only, siguiendo la convención de `v2.43.2`/`v2.44`/`v2.45`/`v2.46`.
+Producido (2026-09-21). Commit de fase **`0ce3ab81`** (`feat(v2.47)`, 82 ficheros) + fix de sonda
+**`44486fc3`**, ambos en `main`.
+
+**CI real de `main` (observada con `gh`):**
+
+| Workflow      | Run                                                                            | Resultado                                                                                                                                                             |
+| ------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Python CI`   | [`35619063064`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063064) | **GREEN** — `quality` **2178 passed, 38 skipped** (base `2091/38` ⇒ **+87**); `lifecycle-pg`, `auto-v2-durable-pg`, `grammar-discovery-pg`, `paper-forward-pg` verdes |
+| `Frontend CI` | [`35619063046`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063046) | **GREEN** — `quality` verde                                                                                                                                           |
+| `Gitleaks`    | [`35619063066`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063066) | **GREEN**                                                                                                                                                             |
+
+**CI del tag `v2.47-beta`** (`Release tag CI`, con los **seis** pasos dedicados de `lifecycle-pg` y sus
+guards anti-skip): se observa y enlaza en el commit docs-only posterior al tag, siguiendo la convención de
+`v2.44`/`v2.45`/`v2.46` (el tag se crea sobre este commit de sellado y la evidencia de su CI llega en el
+siguiente commit).
 
 ---
 
@@ -429,6 +455,9 @@ commit de sellado docs-only, siguiendo la convención de `v2.43.2`/`v2.44`/`v2.4
    comprobación de que los dos bloques crezcan **igual** es lo que destapó que uno de ellos no estaba en
    ninguna lista.
 4. **`.pyc` cacheado en la sonda** (§10.1): un falso rojo que parecía del árbol y venía del bytecode.
+5. **La sonda se auto-falsificaba la huella** (§10.1, fix `44486fc3`): `write_text` traducía `\n` → `\r\n`
+   y las etiquetas `⇒` reventaban `cp1252` con stdout en pipe — la matriz mordía las 18, pero el cierre
+   reportaba un "árbol alterado" que **no** venía del mutante.
 
 ---
 
