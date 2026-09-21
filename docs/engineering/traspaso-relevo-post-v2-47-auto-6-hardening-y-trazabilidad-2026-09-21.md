@@ -50,6 +50,11 @@ la migración `044` hace imposible un sello `V2.46.x` "sin migración" una vez q
 - Frontend: `shared` **786 passed + 1 todo**; `web` typecheck OK, lint **0 errores** (23 warnings legacy),
   **1290 passed**, build OK; `contract:check` **OK**.
 - **Mutaciones: 18/18 muerden**, restauración byte a byte y huella `git status` **intacta**.
+- **CI real (sellado)**: commit de fase `0ce3ab81` + fix de sonda `44486fc3` + sellado `2712ce87`; tag
+  **`v2.47-beta` → `2712ce87`**. `main`: `Python CI` `35619063064` **GREEN** (`quality` **2178/38**).
+  Ref del tag: `Release tag CI` `35623922429` **GREEN** (`python` **2189/35**, los **seis** pasos dedicados
+  de `lifecycle-pg` con guards anti-skip: HardKill **2**, crash injection **2**, multiprocess **1**,
+  Concurrent **3**, Crash/Recovery **1**, Golden Day **1**; `certify` verde).
 
 ---
 

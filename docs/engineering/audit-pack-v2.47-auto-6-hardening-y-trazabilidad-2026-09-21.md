@@ -433,10 +433,11 @@ Producido (2026-09-21). Commit de fase **`0ce3ab81`** (`feat(v2.47)`, 82 fichero
 | `Frontend CI` | [`35619063046`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063046) | **GREEN** — `quality` verde                                                                                                                                           |
 | `Gitleaks`    | [`35619063066`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063066) | **GREEN**                                                                                                                                                             |
 
-**CI del tag `v2.47-beta`** (`Release tag CI`, con los **seis** pasos dedicados de `lifecycle-pg` y sus
-guards anti-skip): se observa y enlaza en el commit docs-only posterior al tag, siguiendo la convención de
-`v2.44`/`v2.45`/`v2.46` (el tag se crea sobre este commit de sellado y la evidencia de su CI llega en el
-siguiente commit).
+**CI del tag `v2.47-beta` (observada con `gh`):**
+
+| Workflow         | Run                                                                            | Resultado                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Release tag CI` | [`35623922429`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35623922429) | **GREEN** — `python` **2189 passed, 35 skipped**; `shared` **786 + 1 todo**; `frontend` **1290 passed** (contract:check OK); los **seis** pasos dedicados de `lifecycle-pg` con sus guards anti-skip: `HardKill recovery` **2 passed**, `crash injection matrix` **2 passed**, `multiprocess AUTO` **1 passed**, `Concurrent AUTO` **3 passed**, `Crash/Recovery Day` **1 passed**, `Golden Day 2.0` **1 passed**; `certify` verde; `playwright (integrated E2E)` `skipped` por opt-in |
 
 ---
 

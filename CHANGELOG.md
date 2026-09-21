@@ -98,8 +98,21 @@ multi-proceso) y la **trazabilidad de `V2.47`** (`cycle_id` + identidad formal d
 con `git diff` **vacío** · bloques offline (targets **extraídos del YAML**) `quality` **2178** y job `python`
 del tag **2189** ⇒ **+87 en AMBOS** sobre `2091`/`2102` (77 del trabajo de la fase + 10 del fichero de la
 pasada) · suites PG nuevas con sus gates **5 passed, 0 skipped** · **matriz de mutaciones 18/18 muerden**
-(sonda `v2_44_mutation_audit.py`, restauración byte a byte y árbol intacto; incluye el defecto de bytecode
-`.pyc` de la sonda, corregido).
+(sonda `v2_44_mutation_audit.py`, restauración byte a byte y árbol intacto; incluye los tres defectos de la
+sonda corregidos: bytecode `.pyc`, `write_text`→LF y stdout UTF-8).
+
+**CI real (sellado).** Commit de fase **`0ce3ab81`** + fix de sonda **`44486fc3`** + commit de sellado
+**`2712ce87`**; tag anotado **`v2.47-beta` → `2712ce87`**. En `main`: `Python CI`
+[`35619063064`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063064) **GREEN** (`quality` **2178
+passed, 38 skipped**; `lifecycle-pg`, `auto-v2-durable-pg`, `grammar-discovery-pg`, `paper-forward-pg`
+verdes), `Frontend CI` [`35619063046`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35619063046)
+**GREEN**. En la ref del tag: `Release tag CI`
+[`35623922429`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35623922429) **GREEN** — `python` **2189
+passed, 35 skipped**, `shared` **786 + 1 todo**, `frontend` **1290 passed** (contract:check OK), y los **seis**
+pasos dedicados de `lifecycle-pg` con sus guards anti-skip: `HardKill recovery` **2 passed**, `crash injection
+matrix` **2 passed**, `multiprocess AUTO` **1 passed**, `Concurrent AUTO` **3 passed**, `Crash/Recovery Day`
+**1 passed**, `Golden Day 2.0` **1 passed**; `certify` verde y `playwright (integrated E2E)` `skipped` por
+opt-in.
 
 **Documentación:** [`plan de fase`](./docs/engineering/plan-v2-47-auto-6-hardening-y-trazabilidad-2026-09-21.md) ·
 [`audit-pack`](./docs/engineering/audit-pack-v2.47-auto-6-hardening-y-trazabilidad-2026-09-21.md) ·
