@@ -4,6 +4,17 @@
 fase ([`plan-v2-47-auto-6-hardening-y-trazabilidad-2026-09-21.md`](./plan-v2-47-auto-6-hardening-y-trazabilidad-2026-09-21.md)),
 manda el [audit-pack](./audit-pack-v2.47-auto-6-hardening-y-trazabilidad-2026-09-21.md).
 
+> **AsOf:** 2026-09-21 · **Base:** `main` · HEAD **`bf60ca31`** (docs-only, evidencia de CI) ·
+> **tag vigente:** `v2.47-beta` → **`2712ce87`** (commit de sellado docs-only; `main` va un commit por
+> delante con la evidencia de CI — patrón del repo: el código certificado en el tag y la guía de lectura
+> en el tip de `main`). **Versión de paquete:** `1.72.0-beta` · **Alembic head:** `044_auto_cycle_trace`.
+> **Árbol:** limpio salvo `governor.json` **untracked** — lo genera `v2_43_governor_evidence.py --out` y es
+> **sin trackear por diseño**: **no** lo añadas a un commit.
+> **Fase que arranca:** `V2.48+` / **`AUTO-8` — Adaptive AUTO** → bump a **`1.73.0-beta`** (roadmap §10).
+>
+> **Veredicto:** `v2.47-beta` está **sellado y certificado** — ver §2 para los runs. **Nada pendiente de
+> esta fase.**
+
 ---
 
 ## 1. Estado en una frase
