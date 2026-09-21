@@ -42,6 +42,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
+from bolsa_analytics.cognitive.auto_adaptive import AdaptivePlan, build_adaptive_plan
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import UNKNOWN_SECTOR
 from bolsa_analytics.cognitive.data_freshness import (
     FreshnessPolicy,
@@ -70,7 +71,10 @@ from bolsa_analytics.cognitive.open_order import (
     build_open_order,
     summarize_open_orders,
 )
-from bolsa_analytics.cognitive.operational_governor import assess_from_measurements
+from bolsa_analytics.cognitive.operational_governor import (
+    assess_from_measurements,
+    to_market_regime,
+)
 from bolsa_analytics.cognitive.portfolio_reservation import (
     RELEASE_REASON_FILL,
     RESERVATION_RELEASED_BY_CANCEL,
@@ -134,6 +138,7 @@ from bolsa_application.auto_reason_codes import (
     TIME_EXIT,
     day_exit_reason,
 )
+from bolsa_application.auto_self_evaluation_feed import build_auto_self_evaluation
 from bolsa_application.auto_v2_entry import (
     AtrSource,
     CatalogTradeContextSource,
@@ -2776,6 +2781,14 @@ class AutoSimulationWorker:
         # reservas vivas y estas trazas quedan como reconciliación (solo suma lo que
         # ninguna reserva cubre).
         await self._v2_refresh_open_orders()
+        # V2.48/AUTO-8 — Adaptive: con el flag ON se construye la recomendación desde los
+        # fills durables de las versiones observadas; con OFF (o sin store) es ``None`` y
+        # el tick no paga ningún I/O nuevo (byte-idéntico).
+        adaptive = (
+            await self._v2_build_adaptive_plan(versions, regime)
+            if self._v2_tunables.adaptive_enabled
+            else None
+        )
         snapshot = self._v2_snapshot(regime)
         plan = plan_v2_tick(
             snapshot=snapshot,
@@ -2785,6 +2798,7 @@ class AutoSimulationWorker:
             as_of=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             consumed_signal_ids=self._v2_consumed_signals,
             halted=self._v2_kill_switch_halted(),
+            adaptive=adaptive,
         )
         # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
@@ -2799,6 +2813,39 @@ class AutoSimulationWorker:
         self._v2_seen_signals += int(getattr(plan, "seen_signals", 0) or 0)
         await self._v2_prune_consumed_signals()
         return plan
+
+    async def _v2_build_adaptive_plan(
+        self, versions: set[str], regime: str | None
+    ) -> AdaptivePlan | None:
+        """V2.48/AUTO-8 — recomendación Adaptive desde los fills durables observados.
+
+        Lee SOLO los fills de las versiones REALES del tick (una fila sin versión no se
+        rota ni se asigna: el módulo puro la declara ``unknown``). Ante un fallo de
+        lectura devuelve ``None`` (fail-closed): sin salud medible no se rota ni se
+        estrecha nada — nunca se pausa a ciegas.
+        """
+        adaptive_versions = {v for v in versions if v and v != "unversioned"}
+        if not adaptive_versions or self._context_store is None:
+            return None
+        fills: list[Any] = []
+        for version in adaptive_versions:
+            try:
+                fills.extend(
+                    await self._context_store.list_for_strategy_version(
+                        version, account_id=self._account_id
+                    )
+                )
+            except Exception:  # noqa: BLE001 — sin lectura no hay salud; no se inventa.
+                logger.exception(
+                    "auto_sim v2 adaptive fill read failed version=%s", version
+                )
+                return None
+        report = build_auto_self_evaluation(fills=fills)
+        return build_adaptive_plan(
+            report.by_strategy,
+            to_market_regime(regime),
+            win_rate_floor=self._v2_tunables.adaptive_win_rate_floor,
+        )
 
     def _v2_measure_opportunity_costs(self) -> None:
         """V2.45/AUTO-5 — coste de oportunidad: precio POSTERIOR de las rechazadas.

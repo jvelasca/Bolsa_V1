@@ -208,6 +208,13 @@ OPPORTUNITY_STATUSES: frozenset[str] = frozenset(
 OPPORTUNITY_COST_UNMEASURED = "opportunity_cost_unmeasured"
 MAE_MFE_UNMEASURED = "mae_mfe_unmeasured"
 
+# V2.48/AUTO-8 — Adaptive AUTO: una candidata cuya estrategia está PAUSADA por la rotación
+# adaptativa se descarta antes del ranking con este motivo. El motivo DE LA pausa
+# (``adaptive_strategy_unhealthy``/``adaptive_strategy_regime_risk``) viaja en el detalle
+# del journal; este literal es el del no-trade observable (el operador ve QUÉ se pausó y
+# el detalle dice POR QUÉ). La casa única del literal es este módulo.
+ADAPTIVE_STRATEGY_PAUSED = "adaptive_strategy_paused"
+
 # V2.44/AUTO-4 — motivos del optimizador de cartera: por qué una candidata del conjunto no
 # entró en la combinación elegida (``optimizer_not_selected`` o una infeasibilidad concreta)
 # o por qué el optimizador no llegó a decidir (``optimizer_enumeration_cap_exceeded``).
@@ -230,6 +237,7 @@ OPTIMIZER_REASONS: frozenset[str] = frozenset(
 )
 
 __all__ = [
+    "ADAPTIVE_STRATEGY_PAUSED",
     "ATR_GEOMETRY",
     "ATR_SOURCES",
     "ATR_SOURCE_FALLBACK",

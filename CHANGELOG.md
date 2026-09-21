@@ -2,6 +2,50 @@
 
 All notable releases of Bolsa V1.
 
+## [1.73.0-beta] — AUTO-8 Adaptive AUTO · slice 1 (V2.48) — 2026-09-21
+
+**Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, `governor.json`
+sin trackear. El gobernador y su evidencia (`v2_43_governor_evidence.py`) **no se tocan** (byte a byte igual
+y `exit 0`, con `"bump"` todavía en `1.68.0-beta`).
+
+### El invariante del roadmap §10: _Adaptive recomienda, el motor determinista decide_
+
+- **Módulo puro** `packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py`: deriva de la
+  self-evaluation de AUTO-7 (solo fills) una **recomendación** `AdaptivePlan` (rotación + asignación) que el
+  motor determinista `plan_v2_tick` consume como **entradas**, nunca como permisos. `AdaptivePlan.read_only`
+  es `True` y su `decisive` de origen no es un permiso: **nunca `AI → BUY`**.
+- **Rotación** (`recommend_rotation`): pausa una versión de estrategia con motivo
+  `adaptive_strategy_unhealthy` (muestra **decisoria** y expectancy ≤ 0 o profit factor < 1) o
+  `adaptive_strategy_regime_risk` (régimen adverso `TREND_DOWN`/`HIGH_VOL`, muestra no decisoria y win rate
+  por debajo del suelo `0.35`). **Sin dato ⇒ no se rota** (se declara `unknown`, nunca se pausa a ciegas).
+- **Asignación** (`recommend_allocation`): reparto proporcional a la expectancy positiva cuando hay al menos
+  una decisoria con expectancy > 0, y **uniforme `1/n`** en caso contrario (fail-safe). El multiplicador
+  `share * n` se acota a `[0, 1]`: **solo estrecha** el riesgo por operación, nunca lo ensancha.
+
+### Flag OFF ⇒ byte-identidad
+
+- `adaptive_enabled: bool = False` en `V2Tunables` + `AUTO_ENGINE_SIM_V2_ADAPTIVE` (opt-in) y
+  `AUTO_ENGINE_SIM_V2_ADAPTIVE_WIN_RATE_FLOOR` (saneado fail-closed en bloque). Con OFF el payload del tick
+  es **byte-idéntico** a AUTO-7: `plan_v2_tick(adaptive=None)`, cero I/O nuevo en el worker, ninguna clave
+  `adaptive` en el journal.
+
+### Consumo determinista (rotación antes del ranking; asignación estrechando el techo)
+
+- **Rotación**: las candidatas de estrategias pausadas se descartan **antes** del ranking con el no-trade
+  observable `adaptive_strategy_paused` (motivo nuevo en `auto_reason_codes.py`) y el motivo de la pausa en el
+  detalle del journal.
+- **Asignación**: `PortfolioDecisionConfig.adaptive_risk_multiplier` estrecha el `max_risk_per_trade_pct` con
+  `min(escalado_del_gobernador, multiplicador_adaptativo)`. El gobernador, los gates y el sizing de
+  `RiskAllocator` (camino duro) **siguen intactos**.
+
+### Gates medidos
+
+- `test_auto_adaptive.py` (puro, 17) + `test_auto_adaptive_entry.py` (aplicación, 5: flag OFF byte-idéntico,
+  Adaptive no salta el kill switch ni el régimen UNKNOWN, rotación con régimen sintético, estrechamiento del
+  risk cap). Registrados en CI con **delta simétrico** y extendidos en la matriz de mutaciones (**M19/M20/M21**).
+
+---
+
 ## [1.72.0-beta] — AUTO-6 hardening + trazabilidad de ciclo (V2.47) + AUTO-7 self-evaluation — 2026-09-21
 
 **CON migración** (primera de la línea AUTO desde `043`): Alembic head

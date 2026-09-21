@@ -165,6 +165,11 @@ jobs:
         # la de NINGÚN job, así que sus 10 tests no corrían en CI en ninguna parte. Se
         # registra aquí y en el job ``python`` del tag: la misma deuda que v2.42.2 cerró
         # a mano para ``test_auto_daily_journal.py``.
+        # V2.48/AUTO-8 (Adaptive AUTO): el puro ``test_auto_adaptive.py`` entra por el pase
+        # de directorio de ``packages/py/analytics/tests``; el gate de APLICACIÓN
+        # ``test_auto_adaptive_entry.py`` (flag OFF byte-idéntico, Adaptive no salta los
+        # gates duros, rotación con régimen sintético) va EXPLÍCITO porque sin registro no
+        # correría en este job.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -196,6 +201,7 @@ jobs:
           packages/py/application/tests/test_auto_v47_expected_value_journal.py
           packages/py/application/tests/test_auto_v47_signal_identity.py
           packages/py/application/tests/test_auto_self_evaluation_feed.py
+          packages/py/application/tests/test_auto_adaptive_entry.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py

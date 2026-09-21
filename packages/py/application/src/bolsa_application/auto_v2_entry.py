@@ -32,6 +32,9 @@ from decimal import Decimal
 from hashlib import sha256
 from typing import Any, Final, Literal, cast
 
+from bolsa_analytics.cognitive.auto_adaptive import (
+    AdaptivePlan,
+)
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
     DATA_FRESH,
     PortfolioPosition,
@@ -90,6 +93,7 @@ from bolsa_analytics.indicators.compute import compute_atr
 from bolsa_application.auto_daily_journal import OpportunityRow
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
 from bolsa_application.auto_reason_codes import (
+    ADAPTIVE_STRATEGY_PAUSED,
     OPPORTUNITY_EXPIRED,
     OPPORTUNITY_REJECTED,
     OPPORTUNITY_TRADED,
@@ -264,6 +268,18 @@ class V2Tunables:
     # ``signal_distinct_strategy_not_representable`` (nunca se emiten dos entradas sobre
     # el mismo símbolo ni se pisa una en silencio).
     allow_distinct_strategies: bool = False
+
+    # --- V2.48 / AUTO-8 — Adaptive AUTO ---------------------------------------------
+    # OFF por defecto ⇒ el camino V2 es BYTE-IDÉNTICO: no se consulta ningún informe de
+    # salud, no se rota ninguna estrategia y el tick no gana ninguna clave ``adaptive``
+    # en el journal ni en el plan. Con ON, la recomendación Adaptive (rotación +
+    # asignación por ``strategyVersion``) se consume como ENTRADAS del motor
+    # determinista, nunca como permisos: Adaptive recomienda, el motor decide.
+    adaptive_enabled: bool = False
+    # Suelo de win rate (0..1] para la regla de rotación por régimen adverso: una
+    # estrategia NO decisoria se pausa en ``TREND_DOWN``/``HIGH_VOL`` si su win rate
+    # cae por debajo. Saneado fail-closed (ver ``_adaptive_env_overrides``).
+    adaptive_win_rate_floor: float = 0.35
 
     def optimizer_constraints(self) -> OptimizerConstraints:
         """Restricciones duras del optimizador derivadas de los tunables (pura)."""
@@ -443,6 +459,12 @@ def tunables_from_env() -> V2Tunables:
         allow_distinct_strategies=_env_flag(
             "AUTO_ENGINE_SIM_V2_ALLOW_DISTINCT_STRATEGIES", base.allow_distinct_strategies
         ),
+        # V2.48/AUTO-8 — Adaptive AUTO: OPT-IN explícito (default OFF ⇒ byte-idéntico).
+        # El suelo de win rate se sanea como BLOQUE (ver ``_adaptive_env_overrides``).
+        adaptive_enabled=_env_flag(
+            "AUTO_ENGINE_SIM_V2_ADAPTIVE", base.adaptive_enabled
+        ),
+        **_adaptive_env_overrides(base),
     )
 
 
@@ -502,6 +524,21 @@ def _governor_env_overrides(base: V2Tunables) -> dict[str, Any]:
         "governor_min_liquidity_notional": float(min_liquidity),
         "governor_restricted_edge_factor": float(factor),
     }
+
+
+def _adaptive_env_overrides(base: V2Tunables) -> dict[str, Any]:
+    """Umbrales de Adaptive leídos de env, saneados fail-closed (nunca a medias).
+
+    El suelo de win rate debe ser un número finito en ``(0, 0.5]``: un suelo negativo o
+    ``0`` pausaría estrategias con muestra anecdótica buena (demasiado agresivo) y un
+    suelo por encima de 0.5 pausaría casi todo en régimen adverso. Un valor incoherente
+    descarta el suelo de env y queda el default declarado.
+    """
+    raw = _env_float("AUTO_ENGINE_SIM_V2_ADAPTIVE_WIN_RATE_FLOOR", base.adaptive_win_rate_floor)
+    floor = base.adaptive_win_rate_floor
+    if raw is not None and _is_finite_non_negative(raw) and 0.0 < float(raw) <= 0.5:
+        floor = float(raw)
+    return {"adaptive_win_rate_floor": floor}
 
 
 def _is_finite_non_negative(value: Any) -> bool:
@@ -654,6 +691,9 @@ class V2TickPlan:
     # lo propaga a la posición durable (``position_state`` JSONB) para que la cadena
     # señal→…→PnL sea trazable sin migración.
     cycles: tuple[tuple[str, str], ...] = ()
+    # V2.48/AUTO-8 — recomendación Adaptive del tick (rotación + asignación). ``None`` con
+    # el flag OFF ⇒ el payload del tick es byte-idéntico al histórico.
+    adaptive: AdaptivePlan | None = None
 
     @property
     def approved_symbols(self) -> tuple[str, ...]:
@@ -988,6 +1028,7 @@ def plan_v2_tick(
     actor: str = "auto-2.0",
     consumed_signal_ids: Iterable[str] = (),
     halted: bool = False,
+    adaptive: AdaptivePlan | None = None,
 ) -> V2TickPlan:
     """Planifica las entradas del tick: rankeo → decisión → TradePlan → propuesta.
 
@@ -1009,6 +1050,13 @@ def plan_v2_tick(
     ``halted`` (V2.44 · AUTO-3 slice 2) es la parada DURA (``HardKillSwitch``): fuerza
     ``HALTED`` en la tabla del gobernador y veta toda apertura. Es independiente de los
     umbrales: un halt no se puede "compensar" con un eje benigno.
+
+    ``adaptive`` (V2.48 · AUTO-8 slice 1) es la recomendación Adaptive del tick. Con
+    ``None`` (flag OFF) nada cambia: el payload es byte-idéntico. Con una recomendación,
+    la ROTACIÓN descarta candidatas de estrategias pausadas ANTES del ranking (con su
+    motivo ``adaptive_strategy_paused``) y la ASIGNACIÓN estrecha el techo de riesgo por
+    estrategia (``min(escalado_del_gobernador, multiplicador_adaptativo)``). Adaptive
+    recomienda; el motor determinista (gates, gobernador, sizing) sigue decidiendo.
     """
     cfg = tunables if tunables is not None else V2Tunables()
     resolved_regime = _coerce_operational_regime(
@@ -1062,6 +1110,41 @@ def plan_v2_tick(
                 )
             )
     entry_signals = eligible
+
+    # V2.48/AUTO-8 — Adaptive: la ROTACIÓN pausa estrategias ANTES del ranking. Una
+    # candidata de una estrategia pausada se descarta con su motivo REAL
+    # (``adaptive_strategy_paused``) y la razón de la pausa en el detalle; no compite, no
+    # se rankea y no consume presupuesto. Con el flag OFF ``adaptive`` es ``None`` y nada
+    # de esto se ejecuta (byte-idéntico).
+    adaptive_paused: list[DecisionJournalEntryRecord] = []
+    adaptive_paused_opportunities: list[OpportunityRow] = []
+    if adaptive is not None:
+        kept: list[V2Signal] = []
+        for candidate in entry_signals:
+            version = str(candidate.strategy_version or "")
+            if adaptive.is_paused(version):
+                adaptive_paused.append(
+                    _rejected_signal_entry(
+                        candidate,
+                        ADAPTIVE_STRATEGY_PAUSED,
+                        actor=actor,
+                        as_of=as_of,
+                        detail={
+                            "adaptiveReason": adaptive.rotation.reason_for(version),
+                            "adaptive": adaptive.as_dict(),
+                        },
+                    )
+                )
+                adaptive_paused_opportunities.append(
+                    _opportunity_row(
+                        candidate,
+                        status=OPPORTUNITY_REJECTED,
+                        reason=ADAPTIVE_STRATEGY_PAUSED,
+                    )
+                )
+            else:
+                kept.append(candidate)
+        entry_signals = kept
 
     # La clave de candidata identifica la oportunidad en ranking y cartera (con el dedupe
     # histórico es el instrumento: el pipeline es byte-idéntico).
@@ -1248,6 +1331,17 @@ def plan_v2_tick(
         # decisión para que dos workers converjan al mismo ciclo.
         account_id_value = str(getattr(snapshot, "account_id", "") or "")
         cycle_id = auto_cycle_id(account_id=account_id_value, signal=signal)
+        # V2.48/AUTO-8 — Adaptive: la ASIGNACIÓN estrecha el techo de riesgo por
+        # estrategia. El multiplicador se aplica SOLO estrechando (``<= 1``) y SOLO sobre
+        # el presupuesto por operación; el gobernador, los gates y el sizing siguen
+        # intactos. Con el flag OFF ``adaptive`` es ``None`` y el config es el histórico.
+        decision_config = cfg.decision_config(governor=governor)
+        if adaptive is not None:
+            multiplier = adaptive.risk_multiplier_for(str(signal.strategy_version or ""))
+            if multiplier < 1.0:
+                decision_config = replace(
+                    decision_config, adaptive_risk_multiplier=multiplier
+                )
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
             direction=_ENTRY_DIRECTION,
@@ -1257,7 +1351,7 @@ def plan_v2_tick(
             snapshot=working_snapshot,
             regime=resolved_regime,
             trade_context=signal_ctx,
-            config=cfg.decision_config(governor=governor),
+            config=decision_config,
             as_of=as_of,
             # AUTO-6: identidad determinista por (cuenta, señal) ⇒ la reserva derivada
             # (``RES-<decision_id>``) es un CLAIM atómico y dos workers concurrentes no
@@ -1345,6 +1439,7 @@ def plan_v2_tick(
                 )
                 if decision.approved
                 else None,
+                adaptive=adaptive,
             )
         )
 
@@ -1377,7 +1472,14 @@ def plan_v2_tick(
         decisions=tuple(decisions),
         ranked=tuple(ranked),
         journal_entries=tuple(
-            (*superseded_entries, *blocked, *excluded, *optimizer_excluded, *journal)
+            (
+                *superseded_entries,
+                *adaptive_paused,
+                *blocked,
+                *excluded,
+                *optimizer_excluded,
+                *journal,
+            )
         ),
         regime=resolved_regime,
         as_of=as_of,
@@ -1387,6 +1489,7 @@ def plan_v2_tick(
         optimizer=optimizer_decision,
         opportunities=tuple(
             (
+                *adaptive_paused_opportunities,
                 *blocked_opportunities,
                 *excluded_opportunities,
                 *optimizer_opportunities,
@@ -1395,6 +1498,7 @@ def plan_v2_tick(
         ),
         seen_signals=len(deduped),
         cycles=tuple(cycles),
+        adaptive=adaptive,
     )
 
 
@@ -2127,6 +2231,7 @@ def _journal_entry(
     strategy_version: str | None = None,
     cycle_id: str | None = None,
     expected_value: ExpectedValue | None = None,
+    adaptive: AdaptivePlan | None = None,
 ) -> DecisionJournalEntryRecord:
     from uuid import uuid4
 
@@ -2151,6 +2256,19 @@ def _journal_entry(
     # que une esta decisión con su reserva, su orden, su fill, su posición y su PnL.
     if str(cycle_id or "").strip():
         payload["cycleId"] = str(cycle_id)
+    # V2.48/AUTO-8 — la asignación Adaptive que estrechó (o dejó intacto) el techo de
+    # riesgo de esta estrategia. Solo se publica cuando Adaptive está activo Y hay algo
+    # que declarar (multiplicador < 1): con el flag OFF o sin estrechamiento, el payload
+    # es el histórico (byte-idéntico).
+    if adaptive is not None:
+        version = str(strategy_version or "").strip()
+        if version:
+            multiplier = adaptive.risk_multiplier_for(version)
+            if multiplier < 1.0:
+                payload["adaptive"] = {
+                    "riskMultiplier": multiplier,
+                    "regime": adaptive.regime,
+                }
     # V2.47 — la ECONOMÍA de la decisión viaja con ella: sin ella el operador ve el plan
     # pero no su valor esperado, y el neto no es reconstruible aguas abajo. Se publican las
     # claves de ``ExpectedValue.to_dict()`` que la superficie consume, y SIEMPRE con su

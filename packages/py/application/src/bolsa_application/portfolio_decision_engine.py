@@ -60,7 +60,7 @@ SIM-only / fail-closed: un fallo de cálculo o un input inválido ⇒ decisión 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -215,6 +215,11 @@ class PortfolioDecisionConfig:
     # dimensiones en la decisión para que el journal las publique. El motor NO reconstruye
     # política de riesgo: lee el veredicto y, a lo sumo, endurece.
     governor: OperationalAssessment | None = None
+    # V2.48/AUTO-8 — multiplicador Adaptive del techo de riesgo por estrategia (``None`` =
+    # no aplicado ⇒ comportamiento actual). Se aplica SOLO estrechando (``[0, 1]``) sobre
+    # ``max_risk_per_trade_pct`` del allocator: Adaptive recomienda un presupuesto menor,
+    # nunca mayor; capital, buying power, stop y coste siguen igual.
+    adaptive_risk_multiplier: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -592,13 +597,31 @@ def decide_portfolio(
     equity = snapshot.equity if snapshot is not None else None
     if equity is None or equity <= 0:
         return _reject("HOLD", "risk_budget_exceeded")
+    # V2.48/AUTO-8 — el multiplicador Adaptive estrecha el techo de riesgo por operación
+    # (solo ``max_risk_per_trade_pct``): ``min(escalado_del_gobernador, asignación)``. Un
+    # multiplicador inválido (no-finito, < 0 o > 1) se descarta: nunca ensancha ni rompe.
+    allocator_config = cfg.allocator
+    if cfg.adaptive_risk_multiplier is not None:
+        multiplier = cfg.adaptive_risk_multiplier
+        if (
+            multiplier == multiplier
+            and multiplier not in (float("inf"), float("-inf"))
+            and 0.0 <= multiplier <= 1.0
+        ):
+            base_pct = allocator_config.max_risk_per_trade_pct
+            allocator_config = replace(
+                allocator_config,
+                max_risk_per_trade_pct=(
+                    base_pct * multiplier if base_pct is not None else None
+                ),
+            )
     allocation = compute_allocation(
         equity=equity,
         entry=entry,
         stop=stop,
         direction=direction,
         risk_budget=risk_budget,
-        config=cfg.allocator,
+        config=allocator_config,
         # ``buying_power`` es BRUTO; el capital reservado por órdenes pendientes se le
         # resta dentro del allocator (V2.40.4), que además lo registra con su propio
         # motivo (``CAP_RESERVED_CASH``) para que el journal distinga "no hay dinero" de

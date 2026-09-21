@@ -86,6 +86,7 @@ OPTIMIZER = "packages/py/analytics/src/bolsa_analytics/cognitive/portfolio_optim
 ENTRY = "packages/py/application/src/bolsa_application/auto_v2_entry.py"
 EXPECTED_VALUE = "packages/py/analytics/src/bolsa_analytics/cognitive/expected_value.py"
 AUTO_SELF_EVAL = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_self_evaluation.py"
+AUTO_ADAPTIVE = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 
 # --- suites que deben morder ----------------------------------------------------------------
@@ -99,6 +100,8 @@ T_SELF = (
     "packages/py/analytics/tests/test_auto_self_evaluation.py",
     "packages/py/application/tests/test_auto_self_evaluation_feed.py",
 )
+T_ADAPTIVE = "packages/py/analytics/tests/test_auto_adaptive.py"
+T_ADAPTIVE_ENTRY = "packages/py/application/tests/test_auto_adaptive_entry.py"
 T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
@@ -252,6 +255,33 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "            direction=resolved_direction,\n            model=cost_model,\n",
         "            direction=_LONG,\n            model=cost_model,\n",
         (T_EV,),
+    ),
+    (
+        "M19 (rotacion por salud): la estrategia probadamente negativa deja de pausarse",
+        AUTO_ADAPTIVE,
+        "            if expectancy_bad or pf_bad:\n"
+        "                reason = ADAPTIVE_STRATEGY_UNHEALTHY\n",
+        "            if False:\n"
+        "                reason = ADAPTIVE_STRATEGY_UNHEALTHY\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M20 (rotacion por regimen): la pausa en regimen adverso deja de aplicarse",
+        AUTO_ADAPTIVE,
+        "        if reason is None and adverse and not health.decisive:\n"
+        "            if health.win_rate is not None and health.win_rate < win_rate_floor:\n"
+        "                reason = ADAPTIVE_STRATEGY_REGIME_RISK\n",
+        "        if False:\n"
+        "            if health.win_rate is not None and health.win_rate < win_rate_floor:\n"
+        "                reason = ADAPTIVE_STRATEGY_REGIME_RISK\n",
+        (T_ADAPTIVE, T_ADAPTIVE_ENTRY),
+    ),
+    (
+        "M21 (asignacion monotona): el multiplicador deja de acotarse a [0, 1]",
+        AUTO_ADAPTIVE,
+        "        multipliers[row.strategy_version] = _clamp_unit(share * n)\n",
+        "        multipliers[row.strategy_version] = share * n\n",
+        (T_ADAPTIVE,),
     ),
 ]
 
