@@ -72,6 +72,13 @@ import pathlib
 import subprocess
 import sys
 
+# La salida de la sonda incluye ``⇒``/acentos; cuando stdout es un pipe (p. ej. corrida en
+# segundo plano o con ``Tee-Object``), Windows usa ``cp1252`` y el ``print`` revienta con
+# ``UnicodeEncodeError`` ANTES de llegar a la huella del árbol. Forzar UTF-8 explícitamente.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 
 # --- código de producción mutado ----------------------------------------------------------------
@@ -344,11 +351,16 @@ def main() -> int:
                 f"`.replace(..., 1)` mutaria la PRIMERA y la sonda mentiria. ABORTO."
             )
             return 1
-        path.write_text(current.replace(old, new, 1), encoding="utf-8")
+        # Escritura binaria con LF explícito: en Windows el modo texto convierte
+        # ``\n`` → ``\r\n`` y la huella ``git status --porcelain`` marcaría el fichero
+        # como modificado aunque el contenido lógico sea idéntico
+        # (``attr/text=auto eol=lf``). ``newline="\n"`` no basta en todos los
+        # intérpretes/versiones; ``write_bytes`` es inequívoco.
+        path.write_bytes(current.replace(old, new, 1).encode("utf-8"))
         try:
             failed = _run(tests, (rel,))
         finally:
-            path.write_text(originals[rel], encoding="utf-8")
+            path.write_bytes(originals[rel].encode("utf-8"))
         _drop_bytecode((rel,))
         restored = path.read_text(encoding="utf-8") == originals[rel]
         print(f"\n### {label}")
