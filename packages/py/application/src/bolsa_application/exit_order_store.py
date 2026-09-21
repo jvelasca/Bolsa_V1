@@ -56,6 +56,7 @@ _WRITABLE_COLUMNS: tuple[str, ...] = (
     "reason",
     "created_at",
     "updated_at",
+    "cycle_id",
 )
 
 #: Estados que representan un INTENT vivo.
@@ -140,6 +141,7 @@ def _row_to_order(row: Any) -> ExitOrder | None:
         reason=row.reason,
         created_at=_to_iso(row.created_at),
         updated_at=_to_iso(row.updated_at),
+        cycle_id=getattr(row, "cycle_id", None),
     )
 
 
@@ -160,6 +162,7 @@ def _order_values(order: ExitOrder) -> dict[str, Any]:
         "reason": order.reason,
         "created_at": _to_instant(order.created_at),
         "updated_at": _to_instant(order.updated_at),
+        "cycle_id": order.cycle_id,
     }
 
 

@@ -411,6 +411,10 @@ class PortfolioReservation:
     # V2.43.3 — identidad del INTENT de salida (``auto_exit_orders``) que esta reserva
     # sirve. Es aditiva y opcional: las reservas de compra y las históricas no la tienen.
     exit_order_id: str | None = None
+    # V2.47 — identidad del CICLO financiero (``señal → decisión → reserva → orden → fill
+    # → posición → salida → PnL``). Aditiva y opcional: las reservas históricas quedan en
+    # ``None`` ("anterior a 2.47", que NO es lo mismo que "ciclo vacío").
+    cycle_id: str | None = None
 
     def __post_init__(self) -> None:
         if not str(self.reservation_id or "").strip():
@@ -475,6 +479,7 @@ class PortfolioReservation:
             "remainingQty": self.remaining_qty,
             "leaseGeneration": self.lease_generation,
             "exitOrderId": self.exit_order_id,
+            "cycleId": self.cycle_id,
         }
 
 
@@ -501,6 +506,7 @@ def build_reservation(
     created_at: str | None = None,
     lease_generation: int = 0,
     exit_order_id: str | None = None,
+    cycle_id: Any = None,
 ) -> PortfolioReservation:
     """Construye una reserva normalizando lo que se conozca (fail-closed).
 
@@ -568,6 +574,11 @@ def build_reservation(
         exit_order_id=(
             str(exit_order_id).strip()
             if isinstance(exit_order_id, str) and exit_order_id.strip()
+            else None
+        ),
+        cycle_id=(
+            str(cycle_id).strip()
+            if isinstance(cycle_id, str) and cycle_id.strip()
             else None
         ),
     )

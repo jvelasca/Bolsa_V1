@@ -148,6 +148,23 @@ jobs:
         # (``test_crash_recovery_day_process_pg.py`` y ``test_concurrent_auto_pg.py``) se
         # ignoran aquí —no hay PG en este job: sin ``--ignore`` skipearían en mudo— y se
         # certifican en pasos DEDICADOS de ``lifecycle-pg`` del tag con gate propio.
+        # V2.46.x/AUTO-6 HARDENING: la recuperación de la parada dura, la inyección de
+        # crash por transición y la concurrencia MULTI-PROCESO son capas PG (sus gemelos
+        # herméticos —``test_auto_v46_hardkill_recovery.py`` y
+        # ``test_auto_v46_crash_injection_matrix.py``— entran por el pase de directorio).
+        # Sus ficheros PG se ignoran aquí y corren en pasos DEDICADOS del tag.
+        # V2.47 (trazabilidad de ciclo, identidad de señales, valor esperado en el journal
+        # y AUTO-7) + AUTO-6.1: sus gates de APLICACIÓN NO entran por el pase de directorio
+        # de ``packages/py/analytics/tests`` (a diferencia del informe PURO de
+        # auto-evaluación, que sí entra por analytics), así que van REGISTRADOS a mano o no
+        # correrían nunca en este job: ``test_auto_v47_cycle_trace.py``,
+        # ``test_auto_v47_expected_value_journal.py``, ``test_auto_v47_signal_identity.py``
+        # y ``test_auto_self_evaluation_feed.py``.
+        # V2.47 (hallazgo de cobertura de la PASADA, no de esta fase): esta lista es POR
+        # FICHERO y ``test_decision_journal_studies.py`` (existe desde v2.44) no estaba en
+        # la de NINGÚN job, así que sus 10 tests no corrían en CI en ninguna parte. Se
+        # registra aquí y en el job ``python`` del tag: la misma deuda que v2.42.2 cerró
+        # a mano para ``test_auto_daily_journal.py``.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -175,6 +192,11 @@ jobs:
           packages/py/application/tests/test_auto_v3_governor_gate.py
           packages/py/application/tests/test_auto_v4_optimizer_wiring.py
           packages/py/application/tests/test_auto_v2_entry.py
+          packages/py/application/tests/test_auto_v47_cycle_trace.py
+          packages/py/application/tests/test_auto_v47_expected_value_journal.py
+          packages/py/application/tests/test_auto_v47_signal_identity.py
+          packages/py/application/tests/test_auto_self_evaluation_feed.py
+          packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
           packages/py/application/tests/test_trade_plan.py
@@ -224,6 +246,9 @@ jobs:
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
+          --ignore=apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py
+          --ignore=apps/api-python/tests/test_auto_v46_crash_injection_pg.py
+          --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           -q
 

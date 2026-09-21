@@ -1119,6 +1119,7 @@ class AutoSimulationWorker:
         qty: Decimal,
         strategy_version_id: str | None = None,
         exit_order_id: str | None = None,
+        cycle_id: str | None = None,
     ) -> _Settlement:
         """Liquida la orden SIM y separa lo MATERIALIZADO de lo que quedó PENDIENTE.
 
@@ -1163,6 +1164,9 @@ class AutoSimulationWorker:
                 # V2.28/A10 (P1-02 real): atribuye el fill a la versión ACTIVE que lo
                 # originó (``None`` si la propuesta no viene de una estrategia).
                 strategy_version_id=strategy_version_id,
+                # V2.47: el fill hereda el ciclo financiero para que el trazado inverso
+                # posición→fill→reserva→decisión sea posible.
+                cycle_id=cycle_id,
             )
         except Exception:  # noqa: BLE001 — un fallo de settlement no tumba el motor.
             # Fail-closed: un problema al persistir contexto/aplicar dinero NO debe
@@ -1389,19 +1393,41 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — no poder leer no autoriza a operar.
             logger.exception("auto_sim v2 kill state load failed")
             return
-        if state is None or not state.engaged or self._v2_kill_switch.engaged:
+        if state is None:
             return
-        self._v2_kill_switch = HardKillSwitch.from_persisted(
-            engaged=True,
-            reason=state.reason,
-            engaged_at=state.engaged_at,
-            engagement_id=state.engagement_id,
-            reengagements=state.reengagements,
-        )
+        if state.engaged:
+            if self._v2_kill_switch.engaged:
+                return
+            self._v2_kill_switch = HardKillSwitch.from_persisted(
+                engaged=True,
+                reason=state.reason,
+                engaged_at=state.engaged_at,
+                engagement_id=state.engagement_id,
+                reengagements=state.reengagements,
+            )
+            logger.warning(
+                "auto_sim v2 hard kill RESTORED from durable state reason=%s engagement=%s",
+                state.reason,
+                state.engagement_id,
+            )
+            return
+        # La fila durable está LIBERADA. Un HALT local solo se levanta por una liberación
+        # durable EXPLÍCITA (con reconciliación) y POSTERIOR a la activación: es la vía por
+        # la que un operador (o el proceso de la API) levanta la parada de ESTE worker sin
+        # reiniciarlo. Una fila liberada más ANTIGUA que el halt local no lo revive al revés
+        # (una re-activación posterior manda sobre un release previo): por eso se comparan
+        # instantes, nunca texto.
+        if not self._v2_kill_switch.engaged or not state.release_reconciliation_id:
+            return
+        released_at = _instant(state.released_at)
+        engaged_at = _instant(self._v2_kill_switch.engaged_at)
+        if released_at is None or engaged_at is None or released_at < engaged_at:
+            return
+        self._v2_kill_switch.release(reconciliation_ok=True)
         logger.warning(
-            "auto_sim v2 hard kill RESTORED from durable state reason=%s engagement=%s",
-            state.reason,
-            state.engagement_id,
+            "auto_sim v2 hard kill RELEASED by durable reconciliation=%s actor=%s",
+            state.release_reconciliation_id,
+            state.release_actor,
         )
 
     async def _v2_persist_kill_state(self, *, at: str | None = None) -> bool:
@@ -2001,6 +2027,24 @@ class AutoSimulationWorker:
         """Instante del tick en ISO-UTC (mismo formato que el ``tick_id`` del plan)."""
         return self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    def _v2_cycle_for(self, symbol: str) -> str | None:
+        """V2.47 — ciclo financiero vivo del símbolo (fuente única de la cadena).
+
+        Precedencia: la POSICIÓN abierta (su ciclo nació en el fill y es el que deben
+        heredar su salida y su PnL) y, si no hay posición, el plan del tick corriente
+        (donde el ciclo acaba de acuñarse junto a la decisión). ``None`` = no conocido:
+        nunca se inventa un ciclo.
+        """
+        position = self._v2_positions.get(symbol)
+        cycle_id = getattr(position, "cycle_id", None) if position is not None else None
+        if str(cycle_id or "").strip():
+            return str(cycle_id)
+        cycle_for = getattr(self._v2_plan, "cycle_for", None)
+        if callable(cycle_for):
+            planned = cycle_for(symbol)
+            return str(planned) if str(planned or "").strip() else None
+        return None
+
     async def _v2_read_live_reservations(
         self, *, limit: int = _V2_RESERVATIONS_LIMIT
     ) -> tuple[tuple[PortfolioReservation, ...], MeasurementStatus]:
@@ -2261,6 +2305,9 @@ class AutoSimulationWorker:
         if store is None or amount is None or amount <= 0:
             return None
         entry = _dec_or_none(price)
+        # V2.47 — el intent de salida HEREDA el ciclo de la posición que cierra: sin él,
+        # el PnL del ciclo no se podría reconstruir desde la salida hacia atrás.
+        cycle_id = self._v2_cycle_for(symbol)
         # P0-2 — la identidad se mintea UNA vez y se persiste antes de cualquier efecto.
         exit_order_id = new_exit_order_id()
         order = build_exit_order(
@@ -2272,6 +2319,7 @@ class AutoSimulationWorker:
             engine_id=self._engine_id,
             created_at=at,
             updated_at=at,
+            cycle_id=cycle_id,
         )
         if order is None:  # defensivo: la salida no tiene datos suficientes para un INTENT.
             logger.error("auto_sim v2 exit order not buildable symbol=%s qty=%s", symbol, qty)
@@ -2290,6 +2338,7 @@ class AutoSimulationWorker:
             reserved_risk=0.0,
             created_at=at,
             exit_order_id=exit_order_id,
+            cycle_id=cycle_id,
         )
         try:
             await store.save(reservation)
@@ -3385,6 +3434,9 @@ class AutoSimulationWorker:
             max_holding_period_days=resolve_holding_horizon(
                 self._v2_tunables.exit_template
             ).max_holding_period_days,
+            # V2.47: el ciclo se CONGELA en el nacimiento y viaja en el JSONB de la
+            # posición, de modo que su salida y su PnL lo heredan.
+            cycle_id=self._v2_cycle_for(symbol),
         )
         if position is None:
             return
@@ -3676,6 +3728,8 @@ class AutoSimulationWorker:
                 # ``execution_id`` quede atribuido a la salida concreta (y no a un contador
                 # de proceso que un reinicio reinicia).
                 exit_order_id=exit_order_id,
+                # V2.47: el fill (entrada o salida) queda atado a su ciclo financiero.
+                cycle_id=self._v2_cycle_for(symbol),
             )
             # AUTO-1A (P0) — SOLO lo materializado es posición/riesgo/protección. La
             # cantidad PEDIDA (`exec_qty`) se sigue liquidando y se journaliza como

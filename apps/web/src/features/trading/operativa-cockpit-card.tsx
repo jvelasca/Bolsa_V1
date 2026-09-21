@@ -70,6 +70,10 @@ import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-d
 import { AutoDeskPanel } from "@/features/trading/auto-desk-panel";
 import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 import {
+  cabinWidth,
+  useNarrowCabin,
+} from "@/features/trading/use-narrow-cabin";
+import {
   CABIN_FOCUS_RING,
   CABIN_INTERACTIVE,
   CABIN_TYPE,
@@ -159,6 +163,7 @@ export function OperativaCockpitCard({
   className,
   markPrice,
 }: OperativaCockpitCardProps) {
+  const narrow = useNarrowCabin();
   const [whyOpen, setWhyOpen] = useState(false);
   const actionFocusRef = useRef<HTMLDivElement>(null);
   const context = useInstrumentOperationalContext(instrumentId);
@@ -370,12 +375,14 @@ export function OperativaCockpitCard({
     <section
       className={cn(
         "min-w-0 space-y-2 rounded-md border px-3 py-2",
+        narrow && "px-2 py-1.5",
         phaseTone(phase, { povTone, entryTone }),
         className,
       )}
       data-testid="operativa-cockpit"
       data-cabin-composition="4-levels"
       data-cabin-density="v2.25"
+      data-cabin-width={cabinWidth(narrow)}
       data-cabin-visual={CABIN_VISUAL_VERSION}
       data-phase={phase}
       data-instrument-id={instrumentId}
@@ -646,7 +653,10 @@ export function OperativaCockpitCard({
       >
         <button
           type="button"
-          className={CABIN_INTERACTIVE}
+          className={cn(
+            CABIN_INTERACTIVE,
+            narrow && "w-full justify-start text-left",
+          )}
           onClick={() => setWhyOpen((v) => !v)}
           data-testid="operativa-cockpit-why"
         >

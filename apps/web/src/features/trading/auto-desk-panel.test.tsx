@@ -14,6 +14,7 @@ import {
   tryArmAuto,
 } from "@/features/trading/demo-book-auto-arm";
 import { loadDemoBookPrefs } from "@/features/trading/demo-book-prefs";
+import { stubNarrowViewport, stubWideViewport } from "@/lib/test-viewport";
 
 vi.mock("@/features/mesa/use-mesa-entries-blocked", () => ({
   useMesaEntriesBlocked: () => ({
@@ -242,6 +243,42 @@ describe("AutoDeskPanel V2.39 arm honesty", () => {
     ).toBe("armed");
     expect(screen.getByTestId("auto-desk-arm-state-label").textContent).toBe(
       "AUTO ARMADO",
+    );
+  });
+});
+
+describe("AutoDeskPanel V2.47 — móvil", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("en teléfono declara el ancho, autonomía en columna y plan a una columna", () => {
+    stubNarrowViewport();
+    renderOpen();
+    const root = screen.getByTestId("auto-desk-panel");
+    expect(root.getAttribute("data-cabin-width")).toBe("narrow");
+
+    const autonomy = screen.getByTestId("auto-desk-mode-manual");
+    expect(autonomy.className).toMatch(/w-full/);
+    // Sigue siendo objetivo táctil de 44 px al apilar.
+    expect(autonomy.className).toMatch(/min-h-11/);
+
+    const amounts = screen.getByTestId("auto-desk-plan-amounts");
+    expect(amounts.className).toMatch(/grid-cols-1/);
+    expect(amounts.className).not.toMatch(/grid-cols-2/);
+  });
+
+  it("en escritorio mantiene dos columnas de plan y sin w-full en autonomía", () => {
+    stubWideViewport();
+    renderOpen();
+    expect(
+      screen.getByTestId("auto-desk-panel").getAttribute("data-cabin-width"),
+    ).toBe("wide");
+    expect(screen.getByTestId("auto-desk-plan-amounts").className).toMatch(
+      /grid-cols-2/,
+    );
+    expect(screen.getByTestId("auto-desk-mode-manual").className).not.toMatch(
+      /w-full/,
     );
   });
 });

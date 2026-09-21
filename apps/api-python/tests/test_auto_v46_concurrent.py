@@ -229,16 +229,22 @@ async def _buy_orders(stores: _Stores, symbol: str) -> dict[str, Decimal]:
     return orders
 
 
+@pytest.mark.parametrize("n", [2, 3, 5, 10])
 @pytest.mark.asyncio
-async def test_concurrent_auto_three_workers_claim_one_signal_one_order(
-    v46_env: None, monkeypatch: pytest.MonkeyPatch
+async def test_concurrent_auto_n_workers_claim_one_signal_one_order(
+    v46_env: None, monkeypatch: pytest.MonkeyPatch, n: int
 ) -> None:
-    """Tres workers concurrentes: una sola orden, una sola reserva, sin sobre-riesgo."""
+    """``N`` workers concurrentes: una sola orden, una sola reserva, sin sobre-riesgo.
+
+    Se parametriza el tamaño de la oleada: el invariante (claim atómico por identidad
+    determinista) no puede depender de cuántos contendientes haya. Dos, tres, cinco o
+    diez workers sobre la MISMA cuenta/cartera/barra deben producir exactamente UNA orden.
+    """
     symbol = _partial_fill_instrument_id("inst-v46conc-")
     monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", symbol)
     stores = _Stores()
 
-    workers = await _run_wave(stores, symbol)
+    workers = await _run_wave(stores, symbol, count=n)
 
     # (1) 1 señal ⇒ 1 orden: una sola identidad de orden, aunque tres lo intentaron.
     buys = await _buy_orders(stores, symbol)
@@ -278,7 +284,7 @@ async def test_concurrent_auto_three_workers_claim_one_signal_one_order(
 
     # (5) Los perdedores declaran POR QUÉ no emitieron (no un veto silencioso).
     losers = [w for w in workers if w._open.get(symbol, Decimal("0")) <= 0]
-    assert len(losers) == 2
+    assert len(losers) == n - 1
     for loser in losers:
         assert RESERVATION_ALREADY_LIVE in loser._last_gate_reason, loser._last_gate_reason
 

@@ -3,8 +3,8 @@
 Es la capa del TAG del escenario ``Concurrent AUTO`` (el núcleo hermético por commit vive
 en ``apps/api-python/tests/test_auto_v46_concurrent.py``). El gemelo real es ESTRECHO a
 propósito: no inventa un segundo producto, ejercita la MISMA costura de producción
-—``AutoSimRuntime.run_tick`` con los stores ``Postgres*``— desde **tres sesiones
-concurrentes** sobre la MISMA cuenta/engine/instrumento/barra/señales.
+—``AutoSimRuntime.run_tick`` con los stores ``Postgres*``— desde **N sesiones
+concurrentes** (N ∈ {2, 3, 5}) sobre la MISMA cuenta/engine/instrumento/barra/señales.
 
 Qué se conduce igual que el proceso real: el tick va por ``real_turn`` (composición real
 de stores/fuentes por sesión, ingestión de la señal del spine, RiskGate, reserva durable,
@@ -62,7 +62,6 @@ _REQUIRED_ENV = "AUTO_CONCURRENT_PG_REQUIRED"
 _SYMBOL = "CNC46"
 _SECTOR = "Technology"
 _INSTRUMENT_PREFIX = "inst-v46conc-"
-_SESSIONS = 3
 _FILL_CHUNKS = 4
 _MIN_BUY_CHUNKS = 2
 #: La entrada real del proceso ocurre en el primer tick (minuto 1); se exige además el
@@ -232,11 +231,16 @@ async def _applied_buy_qty(factory: Any, account_id: str) -> Decimal:
     return total
 
 
+@pytest.mark.parametrize("sessions", [2, 3, 5])
 @pytest.mark.asyncio
-async def test_concurrent_auto_three_sessions_claim_one_signal_pg(
-    concurrent_pg_factory: Any, monkeypatch: pytest.MonkeyPatch
+async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
+    concurrent_pg_factory: Any, monkeypatch: pytest.MonkeyPatch, sessions: int
 ) -> None:
-    """Tres sesiones concurrentes sobre la misma cuenta: 1 señal ⇒ 1 intent ⇒ 1 reserva."""
+    """``N`` sesiones concurrentes sobre la misma cuenta: 1 señal ⇒ 1 intent ⇒ 1 reserva.
+
+    El claim atómico por identidad determinista (``RES-dec-<hash>``) no puede depender del
+    número de contendientes: la carrera se parametriza para medirlo con 2, 3 y 5 sesiones.
+    """
     instrument_id = _partial_buy_instrument_id(_INSTRUMENT_PREFIX)
     engine_id = f"auto-cn46-{uuid.uuid4().hex[:8]}"
     account_id: str | None = None
@@ -258,7 +262,7 @@ async def test_concurrent_auto_three_sessions_claim_one_signal_pg(
             _env_for(account_id, engine_id, instrument_ids=[instrument_id]),
         )
 
-        # ── OLEADA 1 · tres sesiones concurrentes sobre la MISMA señal ─────────────
+        # ── OLEADA 1 · N sesiones concurrentes sobre la MISMA señal ────────────────
         wave = [
             await _make_runtime(
                 concurrent_pg_factory,
@@ -266,7 +270,7 @@ async def test_concurrent_auto_three_sessions_claim_one_signal_pg(
                 account_id=account_id,
                 symbol=instrument_id,
             )
-            for _ in range(_SESSIONS)
+            for _ in range(sessions)
         ]
         await asyncio.gather(*(runtime.run_tick() for runtime in wave))
 
@@ -275,7 +279,7 @@ async def test_concurrent_auto_three_sessions_claim_one_signal_pg(
         # (1) 1 señal ⇒ 1 INTENT de orden entre las tres instancias.
         intents = sum(int(worker._order_seq) for worker in workers)  # noqa: SLF001
         assert intents == 1, (
-            f"la misma señal produjo {intents} intents de orden entre {_SESSIONS} "
+            f"la misma señal produjo {intents} intents de orden entre {sessions} "
             "instancias concurrentes (debe ser exactamente 1)"
         )
 
@@ -347,7 +351,7 @@ async def test_concurrent_auto_three_sessions_claim_one_signal_pg(
             f"sobre-riesgo: comprometido {committed} > tope de una reserva {ceiling}"
         )
 
-        # ── OLEADA 2 · tres instancias NUEVAS (RAM vacía) sobre la MISMA base ──────
+        # ── OLEADA 2 · N instancias NUEVAS (RAM vacía) sobre la MISMA base ─────────
         events_before = len(await _execution_rows(concurrent_pg_factory, account_id))
         second = [
             await _make_runtime(
@@ -356,7 +360,7 @@ async def test_concurrent_auto_three_sessions_claim_one_signal_pg(
                 account_id=account_id,
                 symbol=instrument_id,
             )
-            for _ in range(_SESSIONS)
+            for _ in range(sessions)
         ]
         await asyncio.gather(*(runtime.run_tick() for runtime in second))
 

@@ -43,6 +43,10 @@ HOLDING_DEADLINE_KEY = "holdingDeadlineAt"
 #: V2.42 slice 2b (E3) — nivel de invalidación de la tesis congelado en el nacimiento.
 INVALIDATION_PRICE_KEY = "invalidationPrice"
 
+#: V2.47 — identidad del ciclo financiero (señal→…→PnL) congelada en el nacimiento. Viaja
+#: dentro del JSONB ``position_state`` para que la posición/cierre hereden el ciclo.
+CYCLE_ID_KEY = "cycleId"
+
 _VALID_TARGET_LEG = frozenset({"pending", "triggered", "executed", "failed"})
 
 
@@ -340,6 +344,11 @@ class PositionState:
     # su propio stop: el nivel en que el setup está muerto. ``None`` ⇒ no hay nivel
     # declarado y la invalidación NO se inventa (fail-closed, no "vende por si acaso").
     invalidation_price: float | None = None
+    # V2.47 — identidad del ciclo financiero (señal→…→PnL) que abrió esta posición. Viaja
+    # dentro del JSONB ``position_state`` (sin migración) para que el cierre herede el
+    # ciclo. ``None`` = no persistido por un tag anterior / fill sin decisión AUTO:
+    # desconocido ≠ fabricado.
+    cycle_id: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         out: dict[str, object] = {
@@ -385,6 +394,10 @@ class PositionState:
         # V2.42 slice 2b: el nivel de invalidación congelado, si existe.
         if self.invalidation_price is not None:
             out[INVALIDATION_PRICE_KEY] = self.invalidation_price
+        # V2.47: el ciclo financiero se emite sólo si existe (misma doctrina: ausente =
+        # "no persistido", nunca "None" disfrazado de dato).
+        if self.cycle_id:
+            out[CYCLE_ID_KEY] = self.cycle_id
         return out
 
 
@@ -564,6 +577,7 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
         # Round-trip exacto del techo YA congelado: no se re-deriva con otro reloj.
         holding_deadline_at=_iso_or_none(raw.get(HOLDING_DEADLINE_KEY)),
         invalidation_price=_finite_positive(raw.get(INVALIDATION_PRICE_KEY)),
+        cycle_id=_trim_id(raw.get(CYCLE_ID_KEY)),
     )
 
 
@@ -576,6 +590,7 @@ def build_position_state_from_fill(
     position_id: str | None = None,
     override: dict[str, object] | None = None,
     max_holding_period_days: int | None = None,
+    cycle_id: str | None = None,
 ) -> PositionState | None:
     """Factory F2: TradePlan dict + fill → OPEN.
 
@@ -670,6 +685,9 @@ def build_position_state_from_fill(
         # V2.42 slice 2b (E3): nivel de invalidación congelado al nacer. El plan puede
         # declararlo (``invalidationPrice``); si no, la regla estructural es su stop.
         invalidation_price=_invalidation_level(trade_plan, initial_stop),
+        # V2.47: el ciclo se hereda del llamante (fuente única: el motor de entrada). Si no
+        # se pasa, se acepta el que declare el plan; nunca se inventa.
+        cycle_id=_trim_id(cycle_id) or _trim_id(trade_plan.get(CYCLE_ID_KEY)),
     )
 
 

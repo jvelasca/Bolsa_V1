@@ -288,6 +288,8 @@ describe("G-OPERATOR-05 V2.35 UI Truth", () => {
         expectedRR: 1.46,
         riskR: 0.8,
         positionValue: 11420,
+        expectedR: null,
+        netExpectedCurrency: null,
       },
       entriesBlocked: false,
       gateStatus: null,

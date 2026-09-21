@@ -218,6 +218,27 @@ describe("buildDecisionExplainView GP-V166-01", () => {
       label: "Trail no aplicado · requiere Confirm",
     });
   });
+
+  it("V2.47 — economía medida entra en la vista; sin medición queda null", () => {
+    const measured = buildDecisionExplainView({
+      study: armedStudy({ expectedR: 0.8, netExpectedCurrency: 34 }),
+    });
+    expect(measured.expectedValue).toEqual({
+      expectedR: 0.8,
+      netExpectedCurrency: 34,
+    });
+
+    const partial = buildDecisionExplainView({
+      study: armedStudy({ expectedR: 0.42, netExpectedCurrency: null }),
+    });
+    expect(partial.expectedValue).toEqual({
+      expectedR: 0.42,
+      netExpectedCurrency: null,
+    });
+
+    const unmeasured = buildDecisionExplainView({ study: armedStudy() });
+    expect(unmeasured.expectedValue).toBeNull();
+  });
 });
 
 describe("sameDecisionExplainAcrossSurfaces GP-V166-04", () => {

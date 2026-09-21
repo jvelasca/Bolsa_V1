@@ -14,6 +14,7 @@ OE-1: ``GET /ops-self-eval`` scorecard SEMI+AUTO read-only (measure ≠ Accept).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -33,6 +34,12 @@ from bolsa_application.broker_venue_runtime import (
     effective_broker_venue_async,
     normalize_broker_venue,
     set_broker_venue,
+)
+from bolsa_application.kill_switch_store import (
+    KillState as DurableKillState,
+)
+from bolsa_application.kill_switch_store import (
+    PostgresKillSwitchStore,
 )
 from bolsa_application.ops_self_eval import build_ops_self_eval_report
 from bolsa_application.ops_self_eval_counts import load_semi_account_counts
@@ -58,6 +65,29 @@ class KillSwitchResponse(BaseModel):
     paperDExecuteEnv: bool = False
     brokerVenue: Literal["paper", "live"] = "paper"
     updated: dict[str, Any] | None = None
+
+
+class DurableKillReleaseBody(BaseModel):
+    """Body POST de la liberación DURABLE de la parada dura (AUTO-6 hardening).
+
+    ``reconciliationId`` es OBLIGATORIO: la parada dura solo se levanta con la identidad de
+    la reconciliación que lo autoriza (un halt que se levanta "porque sí" no es auditable).
+    """
+
+    accountId: str = Field(..., min_length=1, max_length=128)
+    engineId: str = Field(..., min_length=1, max_length=128)
+    reconciliationId: str = Field(..., min_length=1, max_length=128)
+    actor: str = Field("operator", min_length=1, max_length=64)
+
+
+class DurableKillReleaseResponse(BaseModel):
+    """Resultado de intentar levantar la parada dura durable."""
+
+    released: bool
+    accountId: str
+    engineId: str
+    reconciliationId: str
+    reason: str | None = None
 
 
 class BrokerVenueBody(BaseModel):
@@ -99,6 +129,66 @@ async def post_kill_switch(body: KillSwitchBody) -> KillSwitchResponse:
         paperDExecuteEnv=paper_d_execute_allowed(),
         brokerVenue=await effective_broker_venue_async(),
         updated=updated,
+    )
+
+
+@router.post("/kill-switch/durable-release", response_model=DurableKillReleaseResponse)
+async def post_durable_kill_release(
+    body: DurableKillReleaseBody,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> DurableKillReleaseResponse:
+    """Levanta la parada DURA persistida exigiendo ``reconciliationId`` (AUTO-6 hardening).
+
+    La parada dura vive en ``auto_kill_state`` (la escribe el worker). Este endpoint NO
+    habla con el proceso del worker: escribe la liberación DURABLE (con su actor y su
+    identidad de reconciliación) y el worker la adopta en su siguiente turno
+    (``_v2_load_kill_state``), sin reiniciarlo. Sin ``reconciliationId`` no se libera.
+
+    ``not_engaged`` no es un error: una parada que no estaba activa es un no-op idempotente.
+    """
+    reconciliation_id = body.reconciliationId.strip()
+    if not reconciliation_id:
+        return DurableKillReleaseResponse(
+            released=False,
+            accountId=body.accountId,
+            engineId=body.engineId,
+            reconciliationId=body.reconciliationId,
+            reason="missing_reconciliation_id",
+        )
+
+    store = PostgresKillSwitchStore(session)
+    state = await store.load(body.accountId, body.engineId)
+    if state is None or not state.engaged:
+        return DurableKillReleaseResponse(
+            released=False,
+            accountId=body.accountId,
+            engineId=body.engineId,
+            reconciliationId=reconciliation_id,
+            reason="not_engaged",
+        )
+
+    at = datetime.now(UTC).isoformat()
+    await store.save(
+        DurableKillState(
+            account_id=body.accountId,
+            engine_id=body.engineId,
+            engaged=False,
+            reason=None,
+            engaged_at=None,
+            engagement_id=None,
+            reengagements=state.reengagements,
+            released_at=at,
+            release_actor=body.actor,
+            release_reconciliation_id=reconciliation_id,
+            updated_at=at,
+        )
+    )
+    await store.commit()
+    return DurableKillReleaseResponse(
+        released=True,
+        accountId=body.accountId,
+        engineId=body.engineId,
+        reconciliationId=reconciliation_id,
     )
 
 

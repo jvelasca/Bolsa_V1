@@ -166,6 +166,13 @@ export type DecisionJournalStudyViewV1 = {
   tradePlanStatus: TradePlanStatusV1 | null;
   action: DecisionAction | null;
   /**
+   * V2.47 — economía de la oportunidad (opcional, aditiva): la publica el productor que
+   * la mida. `null`/ausente = NO medida, nunca `0`. `expectedR` es adimensional;
+   * `netExpectedCurrency` es el neto en dinero una vez descontado el coste de ida y vuelta.
+   */
+  expectedR?: number | null;
+  netExpectedCurrency?: number | null;
+  /**
    * V2.27 — eco opcional de `runtime.mfeMae` (session SoT). No es pico de vida completa.
    */
   mfeMae?: MfeMaeV1 | null;
@@ -226,6 +233,12 @@ export type BuildJournalStudyViewInput = {
   mfeMae?: MfeMaeV1 | null;
   /** V2.27 — SessionOutcome.verdict only (not returnPct). */
   learningVerdict?: SessionOutcomeVerdict | null;
+  /**
+   * V2.47 — economía de la oportunidad publicada por el productor (aditiva y opcional).
+   * Ausente ⇒ no medida (`buildJournalStudyView` NO rellena con ceros).
+   */
+  expectedR?: number | null;
+  netExpectedCurrency?: number | null;
 };
 
 const EMPTY_GEOMETRY: JournalStudyGeometryV1 = {
@@ -754,6 +767,8 @@ export function buildJournalStudyView(
     nextReviewAt: input.expiresAt ?? input.tradePlan?.expiresAt ?? null,
     tradePlanStatus: input.tradePlan?.status ?? null,
     action: input.action ?? null,
+    expectedR: finiteNumber(input.expectedR),
+    netExpectedCurrency: finiteNumber(input.netExpectedCurrency),
     mfeMae: input.mfeMae ?? null,
     learningVerdict: input.learningVerdict ?? null,
   };

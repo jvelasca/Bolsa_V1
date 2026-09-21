@@ -1,10 +1,18 @@
 /**
  * V1.66 / V1.72 — Panel «¿Por qué?» determinista sobre DecisionExplainViewV1.
  * Layout TOP: score · LONG · factors · geometría · invalidación · autorización.
+ * V2.47 — móvil: filas y factores apilados en estrecho; misma información, sin
+ * eliminar secciones (regla 2 de docs/RESPONSIVE_PREMISES.md).
  */
 
 import type { DecisionExplainViewV1 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import {
+  cabinWidth,
+  cabinRowClass,
+  cabinRowValueClass,
+  useNarrowCabin,
+} from "@/features/trading/use-narrow-cabin";
 import {
   CABIN_TYPE,
   CabinSectionLabel,
@@ -23,19 +31,21 @@ function SectionLabel({ children }: { children: string }) {
 
 function KeyValueRows({
   rows,
+  narrow,
   testId,
 }: {
   rows: Array<{ label: string; value: string; testId?: string }>;
+  narrow: boolean;
   testId?: string;
 }) {
   if (rows.length === 0) return null;
   return (
     <dl className={cn("space-y-0.5", CABIN_TYPE.meta)} data-testid={testId}>
       {rows.map((row) => (
-        <div key={row.label} className="flex justify-between gap-2">
+        <div key={row.label} className={cabinRowClass(narrow)}>
           <dt>{row.label}</dt>
           <dd
-            className={cn("text-right", cabinNumClass())}
+            className={cn(cabinRowValueClass(narrow), cabinNumClass())}
             data-testid={row.testId}
           >
             {row.value}
@@ -76,11 +86,26 @@ function formatDistance(abs: number | null, pct: number | null): string | null {
   return `${sign}${abs.toFixed(2)}${pctPart}`;
 }
 
+/** V2.47 — `+34.00 €` / `−12.50 €`: signo y moneda explícitos (R se publica aparte). */
+function formatExpectedCurrency(value: number | null): string | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${sign}${Math.abs(value).toFixed(2)} €`;
+}
+
+/** V2.47 — `0.80`: magnitud adimensional del valor esperado. */
+function formatExpectedR(value: number | null): string | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  return value.toFixed(2);
+}
+
 export function DecisionExplainPanel({
   view,
   loading = false,
   className,
 }: DecisionExplainPanelProps) {
+  // Hook SIEMPRE antes de las salidas tempranas (loading / sin vista).
+  const narrow = useNarrowCabin();
   if (loading) {
     return (
       <p
@@ -179,6 +204,30 @@ export function DecisionExplainPanel({
       : null,
   ].filter((row): row is { label: string; value: string } => row != null);
 
+  // V2.47 — economía medida: se publica SOLO lo que existe. Sin R ni neto no hay fila
+  // (un `0 €` afirmaría que la operación no deja dinero, que es otra cosa que no medirlo).
+  const expectedValueRows = [
+    formatExpectedCurrency(view.expectedValue?.netExpectedCurrency ?? null)
+      ? {
+          label: "Valor esperado neto",
+          value: formatExpectedCurrency(
+            view.expectedValue?.netExpectedCurrency ?? null,
+          )!,
+          testId: "decision-explain-expected-currency",
+        }
+      : null,
+    formatExpectedR(view.expectedValue?.expectedR ?? null)
+      ? {
+          label: "R esperado",
+          value: formatExpectedR(view.expectedValue?.expectedR ?? null)!,
+          testId: "decision-explain-expected-r",
+        }
+      : null,
+  ].filter(
+    (row): row is { label: string; value: string; testId: string } =>
+      row != null,
+  );
+
   const authRows = [
     {
       label: "Estado",
@@ -221,6 +270,7 @@ export function DecisionExplainPanel({
     conditionRows.length > 0 ||
     whyNotItems.length > 0 ||
     entryRows.length > 0 ||
+    expectedValueRows.length > 0 ||
     protectionRows.length > 0 ||
     objectiveRows.length > 0 ||
     view.invalidators.length > 0 ||
@@ -246,6 +296,7 @@ export function DecisionExplainPanel({
         className,
       )}
       data-testid="decision-explain-panel"
+      data-cabin-width={cabinWidth(narrow)}
     >
       {heroParts.length > 0 ? (
         <p
@@ -275,7 +326,11 @@ export function DecisionExplainPanel({
             {view.factors.map((item) => (
               <li
                 key={item.id}
-                className="flex justify-between gap-2"
+                className={cn(
+                  narrow
+                    ? "flex flex-col items-start gap-0.5"
+                    : "flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5",
+                )}
                 data-testid={`decision-explain-factor-${item.id}`}
                 data-state={item.state}
               >
@@ -285,7 +340,7 @@ export function DecisionExplainPanel({
                   </span>{" "}
                   {item.label}
                 </span>
-                <span className="text-right text-muted-foreground">
+                <span className="text-muted-foreground">
                   {item.state === "unknown" ? "sin dato" : item.detail}
                 </span>
               </li>
@@ -297,21 +352,28 @@ export function DecisionExplainPanel({
       {entryRows.length > 0 ? (
         <section data-testid="decision-explain-section-entry">
           <SectionLabel>Entrada</SectionLabel>
-          <KeyValueRows rows={entryRows} />
+          <KeyValueRows rows={entryRows} narrow={narrow} />
+        </section>
+      ) : null}
+
+      {expectedValueRows.length > 0 ? (
+        <section data-testid="decision-explain-section-expected-value">
+          <SectionLabel>Economía</SectionLabel>
+          <KeyValueRows rows={expectedValueRows} narrow={narrow} />
         </section>
       ) : null}
 
       {protectionRows.length > 0 ? (
         <section data-testid="decision-explain-section-protection">
           <SectionLabel>Protección</SectionLabel>
-          <KeyValueRows rows={protectionRows} />
+          <KeyValueRows rows={protectionRows} narrow={narrow} />
         </section>
       ) : null}
 
       {objectiveRows.length > 0 ? (
         <section data-testid="decision-explain-section-objectives">
           <SectionLabel>Objetivos</SectionLabel>
-          <KeyValueRows rows={objectiveRows} />
+          <KeyValueRows rows={objectiveRows} narrow={narrow} />
         </section>
       ) : null}
 
@@ -325,13 +387,13 @@ export function DecisionExplainPanel({
       <section data-testid="decision-explain-section-authorization">
         <SectionLabel>Autorización</SectionLabel>
         <p className={CABIN_TYPE.meta}>{view.authorization.copy}</p>
-        <KeyValueRows rows={authRows} />
+        <KeyValueRows rows={authRows} narrow={narrow} />
       </section>
 
       {thesisRows.length > 0 ? (
         <section data-testid="decision-explain-section-thesis">
           <SectionLabel>Tesis</SectionLabel>
-          <KeyValueRows rows={thesisRows} />
+          <KeyValueRows rows={thesisRows} narrow={narrow} />
         </section>
       ) : null}
 
@@ -345,7 +407,7 @@ export function DecisionExplainPanel({
       {conditionRows.length > 0 || whyNotItems.length > 0 ? (
         <section data-testid="decision-explain-section-conditions">
           <SectionLabel>Condiciones</SectionLabel>
-          <KeyValueRows rows={conditionRows} />
+          <KeyValueRows rows={conditionRows} narrow={narrow} />
           {whyNotItems.length > 0 ? <BulletList items={whyNotItems} /> : null}
         </section>
       ) : null}
@@ -353,14 +415,14 @@ export function DecisionExplainPanel({
       {policyRows.length > 0 ? (
         <section data-testid="decision-explain-section-policy">
           <SectionLabel>Política</SectionLabel>
-          <KeyValueRows rows={policyRows} />
+          <KeyValueRows rows={policyRows} narrow={narrow} />
         </section>
       ) : null}
 
       {traceRows.length > 0 ? (
         <section data-testid="decision-explain-section-traceability">
           <SectionLabel>Trazabilidad</SectionLabel>
-          <KeyValueRows rows={traceRows} />
+          <KeyValueRows rows={traceRows} narrow={narrow} />
         </section>
       ) : null}
     </div>

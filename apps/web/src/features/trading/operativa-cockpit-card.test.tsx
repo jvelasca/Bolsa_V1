@@ -10,6 +10,7 @@ import type { ReactElement } from "react";
 import type { OperationalPlanViewV1, PositionDto } from "@bolsa/shared";
 import { OperativaCockpitCard } from "@/features/trading/operativa-cockpit-card";
 import type { InstrumentOperationalContextV1 } from "@/features/trading/use-instrument-operational-context";
+import { stubNarrowViewport, stubWideViewport } from "@/lib/test-viewport";
 
 const useInstrumentOperationalContext = vi.fn();
 
@@ -798,5 +799,53 @@ describe("OperativaCockpitCard V1.63 Decision Surface placement", () => {
     expect(screen.getByTestId("decision-accion")).toBeTruthy();
     expect(screen.getByText("Mantener")).toBeTruthy();
     expect(screen.queryByText(/^COMPRAR$/i)).toBeNull();
+  });
+});
+
+describe("OperativaCockpitCard V2.47 — móvil", () => {
+  beforeEach(() => {
+    portfolioReconStatusFromReport.mockReturnValue("ok");
+    useMesaEntriesBlocked.mockReturnValue({
+      entriesBlocked: false,
+      killOn: false,
+      vetoed: 0,
+      incidentCount: 0,
+      incidentsFailed: false,
+      paperDExecuteEnv: false,
+    });
+    useMercadoDecisionSurfacePrefs.mockReturnValue({ placement: "panel" });
+    useInstrumentOperationalContext.mockReturnValue(posicionContext());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("en teléfono declara el ancho y el disparador de «¿Por qué?» ocupa la fila", () => {
+    stubNarrowViewport();
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    const root = screen.getByTestId("operativa-cockpit");
+    expect(root.getAttribute("data-cabin-width")).toBe("narrow");
+    // La composición de 4 niveles y la fase no cambian con el ancho.
+    expect(root.getAttribute("data-cabin-composition")).toBe("4-levels");
+    expect(screen.getByTestId("decision-accion")).toBeTruthy();
+    expect(screen.getByTestId("operativa-cockpit-why").className).toMatch(
+      /w-full/,
+    );
+  });
+
+  it("en escritorio el disparador de «¿Por qué?» conserva su ancho natural", () => {
+    stubWideViewport();
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    expect(
+      screen.getByTestId("operativa-cockpit").getAttribute("data-cabin-width"),
+    ).toBe("wide");
+    expect(screen.getByTestId("operativa-cockpit-why").className).not.toMatch(
+      /w-full/,
+    );
   });
 });

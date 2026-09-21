@@ -157,6 +157,9 @@ class ExitOrder:
     reason: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+    # V2.47 — identidad del ciclo financiero (señal→…→PnL) que este intent cierra. Aditiva
+    # y nullable: las filas anteriores a 2.47 no tienen ciclo conocido (``None`` ≠ inventado).
+    cycle_id: str | None = None
 
     def __post_init__(self) -> None:
         if not str(self.exit_order_id or "").strip():
@@ -261,6 +264,7 @@ class ExitOrder:
             "reason": self.reason,
             "createdAt": self.created_at,
             "updatedAt": self.updated_at,
+            "cycleId": self.cycle_id,
         }
 
 
@@ -281,6 +285,7 @@ def build_exit_order(
     reason: Any = None,
     created_at: Any = None,
     updated_at: Any = None,
+    cycle_id: Any = None,
 ) -> ExitOrder | None:
     """Normaliza una fila cruda a ``ExitOrder``; ``None`` si NO es interpretable.
 
@@ -325,6 +330,7 @@ def build_exit_order(
         reason=(str(reason).strip() or None) if reason is not None else None,
         created_at=(str(created_at).strip() or None) if created_at is not None else None,
         updated_at=(str(updated_at).strip() or None) if updated_at is not None else None,
+        cycle_id=(str(cycle_id).strip() or None) if cycle_id is not None else None,
     )
 
 

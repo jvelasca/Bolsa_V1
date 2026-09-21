@@ -82,6 +82,7 @@ _WRITABLE_COLUMNS: tuple[str, ...] = (
     "remaining_qty",
     "lease_generation",
     "exit_order_id",
+    "cycle_id",
 )
 
 
@@ -273,6 +274,7 @@ def _row_to_reservation(row: Any) -> PortfolioReservation:
         remaining_qty=_as_float(row.remaining_qty) or 0.0,
         lease_generation=int(row.lease_generation or 0),
         exit_order_id=getattr(row, "exit_order_id", None),
+        cycle_id=getattr(row, "cycle_id", None),
     )
 
 
@@ -305,6 +307,7 @@ def _reservation_values(reservation: PortfolioReservation) -> dict[str, Any]:
         "remaining_qty": reservation.remaining_qty,
         "lease_generation": reservation.lease_generation,
         "exit_order_id": reservation.exit_order_id,
+        "cycle_id": reservation.cycle_id,
     }
 
 

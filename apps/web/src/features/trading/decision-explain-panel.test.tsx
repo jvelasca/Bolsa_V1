@@ -3,14 +3,17 @@
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DecisionJournalStudyViewV1 } from "@bolsa/shared";
 import { buildDecisionExplainView } from "@bolsa/shared";
 import { DecisionExplainPanel } from "@/features/trading/decision-explain-panel";
+import { stubNarrowViewport, stubWideViewport } from "@/lib/test-viewport";
 
 afterEach(() => cleanup());
 
-function triggeredStudy(): DecisionJournalStudyViewV1 {
+function triggeredStudy(
+  overrides: Partial<DecisionJournalStudyViewV1> = {},
+): DecisionJournalStudyViewV1 {
   return {
     instrumentId: "inst-nvda",
     symbol: "NVDA",
@@ -44,6 +47,7 @@ function triggeredStudy(): DecisionJournalStudyViewV1 {
     ],
     consensus: { bullish: 3, bearish: 0, neutral: 1, total: 4 },
     indicators: { primary: "ADX + DI", confirmation: "RSI" },
+    ...overrides,
   } as DecisionJournalStudyViewV1;
 }
 
@@ -96,10 +100,95 @@ describe("DecisionExplainPanel V1.72", () => {
     expect(screen.queryByTestId("decision-explain-entry-distance")).toBeNull();
   });
 
+  it("V2.47 — sin economía medida NO aparece la sección (ni un 0 €)", () => {
+    const view = buildDecisionExplainView({ study: triggeredStudy() });
+    render(<DecisionExplainPanel view={view} />);
+    expect(
+      screen.queryByTestId("decision-explain-section-expected-value"),
+    ).toBeNull();
+  });
+
+  it("V2.47 — economía medida se publica con signo y moneda", () => {
+    const view = buildDecisionExplainView({
+      study: triggeredStudy({ expectedR: 0.8, netExpectedCurrency: 34 }),
+    });
+    render(<DecisionExplainPanel view={view} />);
+    expect(
+      screen.getByTestId("decision-explain-section-expected-value"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("decision-explain-expected-currency").textContent,
+    ).toBe("+34.00 €");
+    expect(screen.getByTestId("decision-explain-expected-r").textContent).toBe(
+      "0.80",
+    );
+  });
+
+  it("V2.47 — una pérdida esperada se pinta con signo negativo (no como ganancia)", () => {
+    const view = buildDecisionExplainView({
+      study: triggeredStudy({ expectedR: -0.25, netExpectedCurrency: -12.5 }),
+    });
+    render(<DecisionExplainPanel view={view} />);
+    expect(
+      screen.getByTestId("decision-explain-expected-currency").textContent,
+    ).toBe("−12.50 €");
+  });
+
   it("shows fallback copy when view is empty", () => {
     render(<DecisionExplainPanel view={null} />);
     expect(screen.getByTestId("decision-explain-panel").textContent).toMatch(
       /Sin explicación disponible/i,
     );
+  });
+});
+
+describe("DecisionExplainPanel V2.47 — móvil", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("en teléfono declara el ancho y apila filas y factores (sin perder secciones)", () => {
+    stubNarrowViewport();
+    const view = buildDecisionExplainView({
+      study: triggeredStudy({ expectedR: 0.8, netExpectedCurrency: 34 }),
+    });
+    render(<DecisionExplainPanel view={view} />);
+
+    const root = screen.getByTestId("decision-explain-panel");
+    expect(root.getAttribute("data-cabin-width")).toBe("narrow");
+
+    const expectedRow = screen.getByTestId(
+      "decision-explain-expected-currency",
+    ).parentElement!;
+    expect(expectedRow.className).toMatch(/flex-col/);
+    expect(expectedRow.className).not.toMatch(/justify-between/);
+
+    // Las secciones siguen todas presentes (regla 2: nada se elimina en estrecho).
+    for (const section of [
+      "decision-explain-section-decision",
+      "decision-explain-section-why",
+      "decision-explain-section-entry",
+      "decision-explain-section-expected-value",
+      "decision-explain-section-authorization",
+    ]) {
+      expect(screen.getByTestId(section)).toBeTruthy();
+    }
+  });
+
+  it("en escritorio conserva fila a dos extremos y ancho declarado", () => {
+    stubWideViewport();
+    const view = buildDecisionExplainView({
+      study: triggeredStudy({ expectedR: 0.8, netExpectedCurrency: 34 }),
+    });
+    render(<DecisionExplainPanel view={view} />);
+    expect(
+      screen
+        .getByTestId("decision-explain-panel")
+        .getAttribute("data-cabin-width"),
+    ).toBe("wide");
+    expect(
+      screen.getByTestId("decision-explain-expected-currency").parentElement!
+        .className,
+    ).toMatch(/justify-between/);
   });
 });

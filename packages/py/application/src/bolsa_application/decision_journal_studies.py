@@ -513,6 +513,10 @@ class DecisionJournalStudyView:
     initial_risk_r: float | None = None
     position_value: float | None = None
     direction: str | None = None
+    # V2.47 — economía medida de la oportunidad (aditiva): la publica el productor que la
+    # mida. ``None`` = NO medida, nunca ``0``.
+    expected_r: float | None = None
+    net_expected_currency: float | None = None
     user_thesis: None = None
     decision_summary: str | None = None
     analysis_notes: list[str] = field(default_factory=list)
@@ -556,6 +560,10 @@ class DecisionJournalStudyView:
             "initialRiskR": self.initial_risk_r,
             "positionValue": self.position_value,
             "direction": self.direction,
+            # V2.47 — economía medida (o declarada ausente): el hueco se publica como
+            # ``None`` y la superficie decide no pintar fila, nunca pintar un 0.
+            "expectedR": self.expected_r,
+            "netExpectedCurrency": self.net_expected_currency,
             "hasOperationalPlan": self.has_operational_plan,
             "userThesis": None,
             "decisionSummary": self.decision_summary,
@@ -755,6 +763,10 @@ def build_study_view(
         initial_risk_r=geometry["initialRiskR"],
         position_value=geometry["positionValue"],
         direction=geometry["direction"],
+        # V2.47 — la economía del study la publica el productor de la sesión cuando la
+        # mide. Ausente ⇒ ``None`` (no medida): no se deriva del R/R ni del riesgo.
+        expected_r=_finite(payload.get("expectedR")),
+        net_expected_currency=_finite(payload.get("netExpectedCurrency")),
         decision_summary=notes[0] if notes else None,
         analysis_notes=notes,
         trends=map_journal_study_trends(facts, opinion),

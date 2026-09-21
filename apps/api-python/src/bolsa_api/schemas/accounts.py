@@ -481,6 +481,12 @@ class DecisionJournalStudyDto(BaseModel):
     quantity: float | None = None
     initial_risk_r: float | None = Field(default=None, alias="initialRiskR")
     position_value: float | None = Field(default=None, alias="positionValue")
+    # V2.47 — economía MEDIDA de la oportunidad (aditiva). `None` = no medida (jamás 0):
+    # la superficie omite la fila en vez de afirmar una economía que nadie calculó.
+    expected_r: float | None = Field(default=None, alias="expectedR")
+    net_expected_currency: float | None = Field(
+        default=None, alias="netExpectedCurrency"
+    )
     direction: str | None = None
     has_operational_plan: bool = Field(alias="hasOperationalPlan")
     user_thesis: Any | None = Field(default=None, alias="userThesis")

@@ -36,6 +36,12 @@ export type EntryOperatingSizingV1 = {
   expectedRR: number | null;
   positionValue: number | null;
   quantity: number | null;
+  /**
+   * V2.47 — economía MEDIDA de la oportunidad. `null` = no medida (jamás `0`): la fila
+   * de valor esperado se OMITE en vez de afirmar una economía que nadie calculó.
+   */
+  expectedR: number | null;
+  netExpectedCurrency: number | null;
 };
 
 /** V1.62 — proyección canónica de entrada (alias simétrico a PositionOperationalView). */
@@ -85,6 +91,9 @@ export type EntryOperatingSurfaceSnapshotV1 = {
   target2: number | null;
   expectedRR: number | null;
   riskAmount: number | null;
+  /** V2.47 — economía medida (null = no medida; la superficie omite la fila). */
+  expectedR: number | null;
+  netExpectedCurrency: number | null;
   asOf: string | null;
 };
 
@@ -156,6 +165,17 @@ export function buildEntryOperatingTruth(
       expectedRR: study.expectedRR ?? plan.expectedRR,
       positionValue: study.positionValue,
       quantity: study.quantity,
+      // V2.47 — la economía la publica el STUDY (el plan no la lleva): si no viene, se
+      // declara no medida. No se deriva del R/R ni del riesgo: eso sería inventarla.
+      expectedR:
+        typeof study.expectedR === "number" && Number.isFinite(study.expectedR)
+          ? study.expectedR
+          : null,
+      netExpectedCurrency:
+        typeof study.netExpectedCurrency === "number" &&
+        Number.isFinite(study.netExpectedCurrency)
+          ? study.netExpectedCurrency
+          : null,
     },
     asOf,
     expiryLabel: expiryLabelFromStudy(study),
@@ -180,6 +200,8 @@ export function entryOperatingSurfaceSnapshot(
     target2: truth.plan.target2,
     expectedRR: truth.sizing.expectedRR,
     riskAmount: truth.sizing.riskAmount,
+    expectedR: truth.sizing.expectedR,
+    netExpectedCurrency: truth.sizing.netExpectedCurrency,
     asOf: truth.asOf,
   };
 }

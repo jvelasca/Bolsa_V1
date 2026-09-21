@@ -643,6 +643,409 @@
         "title": "AuthStatusResponseDto",
         "type": "object"
       },
+      "AutoSelfEvaluationDto": {
+        "description": "Informe completo: roll-up + filas por versión + embudo + huecos declarados.",
+        "properties": {
+          "byStrategy": {
+            "items": {
+              "$ref": "#/components/schemas/AutoStrategySelfEvaluationDto"
+            },
+            "title": "Bystrategy",
+            "type": "array"
+          },
+          "cycles": {
+            "title": "Cycles",
+            "type": "integer"
+          },
+          "cyclesWithoutIdentity": {
+            "title": "Cycleswithoutidentity",
+            "type": "integer"
+          },
+          "decisive": {
+            "title": "Decisive",
+            "type": "boolean"
+          },
+          "drawdownCurrency": {
+            "title": "Drawdowncurrency",
+            "type": "string"
+          },
+          "duplicateCycles": {
+            "title": "Duplicatecycles",
+            "type": "integer"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "expectancyCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectancycurrency"
+          },
+          "expectancyR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectancyr"
+          },
+          "funnel": {
+            "additionalProperties": true,
+            "title": "Funnel",
+            "type": "object"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "measurement": {
+            "title": "Measurement",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "opportunityCostMeasurement": {
+            "title": "Opportunitycostmeasurement",
+            "type": "string"
+          },
+          "opportunityCostReturn": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opportunitycostreturn"
+          },
+          "profitFactor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profitfactor"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "realizedPnl": {
+            "title": "Realizedpnl",
+            "type": "string"
+          },
+          "rejectionReasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Rejectionreasons",
+            "type": "object"
+          },
+          "resultsMeasurement": {
+            "title": "Resultsmeasurement",
+            "type": "string"
+          },
+          "slippageCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slippagecurrency"
+          },
+          "trades": {
+            "title": "Trades",
+            "type": "integer"
+          },
+          "unattributedCycles": {
+            "title": "Unattributedcycles",
+            "type": "integer"
+          },
+          "unattributedPnl": {
+            "title": "Unattributedpnl",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "winRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winrate"
+          }
+        },
+        "required": [
+          "key",
+          "readOnly",
+          "cycles",
+          "trades",
+          "realizedPnl",
+          "opportunityCostMeasurement",
+          "drawdownCurrency",
+          "unattributedCycles",
+          "unattributedPnl",
+          "cyclesWithoutIdentity",
+          "duplicateCycles",
+          "resultsMeasurement",
+          "measurement",
+          "decisive"
+        ],
+        "title": "AutoSelfEvaluationDto",
+        "type": "object"
+      },
+      "AutoStrategySelfEvaluationDto": {
+        "description": "Lectura de UNA versión de estrategia (lo medido + lo declarado como no medido).",
+        "properties": {
+          "avgLossCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avglosscurrency"
+          },
+          "avgWinCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avgwincurrency"
+          },
+          "decisive": {
+            "title": "Decisive",
+            "type": "boolean"
+          },
+          "drawdownCurrency": {
+            "title": "Drawdowncurrency",
+            "type": "string"
+          },
+          "drawdownMeasurement": {
+            "title": "Drawdownmeasurement",
+            "type": "string"
+          },
+          "drawdownShare": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawdownshare"
+          },
+          "excursionsMeasurement": {
+            "title": "Excursionsmeasurement",
+            "type": "string"
+          },
+          "expectancyCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectancycurrency"
+          },
+          "expectancyR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectancyr"
+          },
+          "funnel": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Funnel",
+            "type": "object"
+          },
+          "losses": {
+            "title": "Losses",
+            "type": "integer"
+          },
+          "maeR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maer"
+          },
+          "mfeR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfer"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "profitFactor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profitfactor"
+          },
+          "realizedPnl": {
+            "title": "Realizedpnl",
+            "type": "string"
+          },
+          "rejectionCostMeasurement": {
+            "title": "Rejectioncostmeasurement",
+            "type": "string"
+          },
+          "rejectionCostReturn": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejectioncostreturn"
+          },
+          "resultsMeasurement": {
+            "title": "Resultsmeasurement",
+            "type": "string"
+          },
+          "riskMeasurement": {
+            "title": "Riskmeasurement",
+            "type": "string"
+          },
+          "sampleQuality": {
+            "title": "Samplequality",
+            "type": "string"
+          },
+          "slippageCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slippagecurrency"
+          },
+          "slippageMeasurement": {
+            "title": "Slippagemeasurement",
+            "type": "string"
+          },
+          "strategyVersion": {
+            "title": "Strategyversion",
+            "type": "string"
+          },
+          "trades": {
+            "title": "Trades",
+            "type": "integer"
+          },
+          "winRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winrate"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "strategyVersion",
+          "trades",
+          "wins",
+          "losses",
+          "realizedPnl",
+          "drawdownCurrency",
+          "sampleQuality",
+          "resultsMeasurement",
+          "riskMeasurement",
+          "excursionsMeasurement",
+          "slippageMeasurement",
+          "rejectionCostMeasurement",
+          "drawdownMeasurement",
+          "decisive"
+        ],
+        "title": "AutoStrategySelfEvaluationDto",
+        "type": "object"
+      },
       "BacktestCoachAnalyzeRequest": {
         "properties": {
           "battery": {
@@ -3818,6 +4221,17 @@
             ],
             "title": "Entry"
           },
+          "expectedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedr"
+          },
           "expectedRR": {
             "anyOf": [
               {
@@ -3893,6 +4307,17 @@
               }
             ],
             "title": "Name"
+          },
+          "netExpectedCurrency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Netexpectedcurrency"
           },
           "nextReviewAt": {
             "anyOf": [
@@ -5030,6 +5455,83 @@
           "data"
         ],
         "title": "DrawingReplayResponseDto",
+        "type": "object"
+      },
+      "DurableKillReleaseBody": {
+        "description": "Body POST de la liberación DURABLE de la parada dura (AUTO-6 hardening).\n\n``reconciliationId`` es OBLIGATORIO: la parada dura solo se levanta con la identidad de\nla reconciliación que lo autoriza (un halt que se levanta \"porque sí\" no es auditable).",
+        "properties": {
+          "accountId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Accountid",
+            "type": "string"
+          },
+          "actor": {
+            "default": "operator",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Actor",
+            "type": "string"
+          },
+          "engineId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Engineid",
+            "type": "string"
+          },
+          "reconciliationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Reconciliationid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "engineId",
+          "reconciliationId"
+        ],
+        "title": "DurableKillReleaseBody",
+        "type": "object"
+      },
+      "DurableKillReleaseResponse": {
+        "description": "Resultado de intentar levantar la parada dura durable.",
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "engineId": {
+            "title": "Engineid",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reconciliationId": {
+            "title": "Reconciliationid",
+            "type": "string"
+          },
+          "released": {
+            "title": "Released",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "released",
+          "accountId",
+          "engineId",
+          "reconciliationId"
+        ],
+        "title": "DurableKillReleaseResponse",
         "type": "object"
       },
       "EnqueueStaleResponseDto": {
@@ -16915,6 +17417,145 @@
         "title": "StrategyDefinitionsListResponseDto",
         "type": "object"
       },
+      "StrategyHealthDto": {
+        "description": "V2.25/A10 — estado de salud de la estrategia activa + decisión de vigilancia.",
+        "properties": {
+          "breaches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Breaches",
+            "type": "array"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "degraded": {
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyHealthSnapshotDto"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyHealthSnapshotDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "versionId": {
+            "title": "Versionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "versionId",
+          "decision",
+          "degraded"
+        ],
+        "title": "StrategyHealthDto",
+        "type": "object"
+      },
+      "StrategyHealthResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StrategyHealthDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "StrategyHealthResponseDto",
+        "type": "object"
+      },
+      "StrategyHealthSnapshotDto": {
+        "description": "V2.25/A10 — un snapshot de salud de una estrategia activa.",
+        "properties": {
+          "asOf": {
+            "title": "Asof",
+            "type": "string"
+          },
+          "credibility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credibility"
+          },
+          "degraded": {
+            "default": false,
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "dsr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dsr"
+          },
+          "edge": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge"
+          },
+          "versionId": {
+            "title": "Versionid",
+            "type": "string"
+          },
+          "walkForwardEfficiency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walkforwardefficiency"
+          }
+        },
+        "required": [
+          "versionId",
+          "asOf"
+        ],
+        "title": "StrategyHealthSnapshotDto",
+        "type": "object"
+      },
       "SubmitIntentListItemDto": {
         "description": "F2b — DurableSubmitIntent wire + soft-join instrumentId (fail-closed null).",
         "properties": {
@@ -22681,6 +23322,67 @@
         "summary": "Auth Status",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/auto/self-evaluation": {
+      "get": {
+        "description": "Informe AUTO-7 de UNA versión de estrategia, desde los fills durables.\n\nLa versión es OBLIGATORIA: el informe se agrega POR ``strategyVersion`` y devolver un\nroll-up de \"todas\" sin saber cuáles son sería una lectura incompleta disfrazada. El\n``account_id`` (de la cabecera) acota la lectura a una cuenta visible del principal:\nsin cuenta operativa la respuesta es vacía (fail-closed), nunca global.",
+        "operationId": "get_auto_self_evaluation_api_auto_self_evaluation_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoSelfEvaluationDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Self Evaluation",
+        "tags": [
+          "auto"
         ]
       }
     },
@@ -29400,6 +30102,49 @@
         ]
       }
     },
+    "/api/research/strategy/{version_id}/health": {
+      "get": {
+        "description": "V2.25/A10 — salud de una estrategia activa (serie de snapshots + decisión).\n\nLee los snapshots persistidos de ``strategy_health_snapshots``. La decisión\n(``continue`` vs ``relab``) se deriva del último snapshot; si no hay snapshots,\nse responde un estado neutro (``continue`` sin evidencia), nunca una degradación\ninventada. La degradación real dispara re-LABORATORIO, **nunca** un swap directo.",
+        "operationId": "get_strategy_health_api_research_strategy__version_id__health_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyHealthResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Health",
+        "tags": [
+          "research"
+        ]
+      }
+    },
     "/api/research/summary": {
       "get": {
         "operationId": "get_laboratory_research_summary_api_research_summary_get",
@@ -30127,6 +30872,49 @@
           }
         },
         "summary": "Post Kill Switch",
+        "tags": [
+          "risk",
+          "risk"
+        ]
+      }
+    },
+    "/api/risk/kill-switch/durable-release": {
+      "post": {
+        "description": "Levanta la parada DURA persistida exigiendo ``reconciliationId`` (AUTO-6 hardening).\n\nLa parada dura vive en ``auto_kill_state`` (la escribe el worker). Este endpoint NO\nhabla con el proceso del worker: escribe la liberación DURABLE (con su actor y su\nidentidad de reconciliación) y el worker la adopta en su siguiente turno\n(``_v2_load_kill_state``), sin reiniciarlo. Sin ``reconciliationId`` no se libera.\n\n``not_engaged`` no es un error: una parada que no estaba activa es un no-op idempotente.",
+        "operationId": "post_durable_kill_release_api_risk_kill_switch_durable_release_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DurableKillReleaseBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DurableKillReleaseResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Durable Kill Release",
         "tags": [
           "risk",
           "risk"

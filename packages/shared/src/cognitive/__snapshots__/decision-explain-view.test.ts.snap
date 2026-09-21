@@ -28,6 +28,7 @@ exports[`sameDecisionExplainAcrossSurfaces GP-V166-04 > same fixture → same ex
     "distancePct": null,
     "entry": 421.5,
   },
+  "expectedValue": null,
   "factors": [
     {
       "detail": "Alcista",

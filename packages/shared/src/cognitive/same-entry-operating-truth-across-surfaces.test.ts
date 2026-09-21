@@ -97,6 +97,8 @@ describe("sameEntryOperatingTruthAcrossSurfaces V1.38", () => {
       target2: 470,
       expectedRR: 2,
       riskAmount: 250,
+      expectedR: null,
+      netExpectedCurrency: null,
       asOf: ASOF,
     });
     expect(entryOperatingSurfaceSnapshot(hoy!)).toEqual(snap);
@@ -232,5 +234,24 @@ describe("GP-V162-06 cross-surface EntryOperationalView facts", () => {
     const hoy = buildEntryOperatingTruth(input);
     expect(mercado?.plan.currentPrice).toBe(425);
     expect(hoy?.plan.currentPrice).toBe(425);
+  });
+});
+
+describe("V2.47 — economía medida en la verdad de entrada", () => {
+  it("el study con EV medido lo lleva a sizing y al snapshot (misma verdad)", () => {
+    const study = armedStudy({ expectedR: 0.8, netExpectedCurrency: 34 });
+    const truth = buildEntryOperatingTruth({ study, asOf: ASOF });
+    expect(truth?.sizing.expectedR).toBe(0.8);
+    expect(truth?.sizing.netExpectedCurrency).toBe(34);
+    const snap = entryOperatingSurfaceSnapshot(truth!);
+    expect(snap.expectedR).toBe(0.8);
+    expect(snap.netExpectedCurrency).toBe(34);
+  });
+
+  it("sin EV medido la verdad lo declara null (jamás 0)", () => {
+    const truth = buildEntryOperatingTruth({ study: armedStudy(), asOf: ASOF });
+    expect(truth?.sizing.expectedR).toBeNull();
+    expect(truth?.sizing.netExpectedCurrency).toBeNull();
+    expect(entryOperatingSurfaceSnapshot(truth!).expectedR).toBeNull();
   });
 });

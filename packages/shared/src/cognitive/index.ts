@@ -39,6 +39,7 @@ export * from "./protect-stop-source.js";
 export * from "./mercado-cockpit-phase.js";
 export * from "./entry-operating-copy.js";
 export * from "./entry-operating-truth.js";
+export * from "./expected-value-copy.js";
 export * from "./execution-plan.js";
 export * from "./execution-record.js";
 export * from "./execution-state.js";

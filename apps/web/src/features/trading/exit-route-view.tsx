@@ -1,6 +1,8 @@
 /**
  * V1.40 — Ruta visual Entrada → Stop / T1 / T2 (Exit Management UX).
  * Proyección read-only; Confirm = firma.
+ * V2.47 — móvil: cada nodo envuelve en líneas en vez de comprimirse; el punto de
+ * la ruta y la lectura vertical se conservan (nada se oculta).
  */
 
 import type {
@@ -12,6 +14,10 @@ import type {
 import { buildExitRouteView } from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
+import {
+  cabinWidth,
+  useNarrowCabin,
+} from "@/features/trading/use-narrow-cabin";
 
 function nodeDotClass(kind: ExitRouteViewV1["nodes"][number]["kind"]): string {
   switch (kind) {
@@ -46,13 +52,14 @@ export function ExitRouteView({
   className?: string;
   testId?: string;
 }) {
+  // Hook SIEMPRE antes de la salida temprana (sin ruta).
+  const narrow = useNarrowCabin();
   const route =
     routeProp ??
     (truth && position
       ? buildExitRouteView({ truth, position, study, originStudy })
       : null);
   if (!route?.hasRoute) return null;
-
   const id =
     testId ?? `exit-route-${route.symbol.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 
@@ -61,6 +68,7 @@ export function ExitRouteView({
       className={cn("relative ml-2 border-l border-border/60 pl-3", className)}
       data-testid={id}
       data-trailing={route.trailingActive ? "true" : "false"}
+      data-cabin-width={cabinWidth(narrow)}
     >
       <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         Ruta de salida
@@ -78,26 +86,33 @@ export function ExitRouteView({
               nodeDotClass(node.kind),
             )}
           />
-          <span className="font-medium">{node.label}</span>
-          <span className="text-muted-foreground"> · {node.roleLabel}</span>
-          {" · "}
-          <span className="tabular-nums">{formatPrice(node.value)}</span>
-          {node.distanceR != null ? (
-            <span className="ml-1 text-muted-foreground tabular-nums">
-              {node.distanceR >= 0 ? "+" : ""}
-              {node.distanceR.toFixed(1)}R
-            </span>
-          ) : null}
-          {node.progressHint ? (
-            <span className="ml-1 text-[10px] text-muted-foreground">
-              {node.progressHint}
-            </span>
-          ) : node.kind === "entry" && node.reached ? (
-            <span className="ml-1 text-emerald-600">✓</span>
-          ) : null}
+          {/* Móvil: bloque envuelto por nodo — sin separadores que queden colgando. */}
+          <span className="flex flex-wrap items-baseline gap-x-1">
+            <span className="font-medium">{node.label}</span>
+            <span className="text-muted-foreground">{node.roleLabel}</span>
+            <span className="tabular-nums">{formatPrice(node.value)}</span>
+            {node.distanceR != null ? (
+              <span className="text-muted-foreground tabular-nums">
+                {node.distanceR >= 0 ? "+" : ""}
+                {node.distanceR.toFixed(1)}R
+              </span>
+            ) : null}
+            {node.progressHint ? (
+              <span className="text-[10px] text-muted-foreground">
+                {node.progressHint}
+              </span>
+            ) : node.kind === "entry" && node.reached ? (
+              <span className="text-emerald-600">✓</span>
+            ) : null}
+          </span>
         </div>
       ))}
-      <p className="mt-1 text-[9px] text-muted-foreground">
+      <p
+        className={cn(
+          "mt-1 text-muted-foreground",
+          narrow ? "text-[11px]" : "text-[9px]",
+        )}
+      >
         Stop planificado ≠ stop confirmado en libro.
       </p>
     </div>

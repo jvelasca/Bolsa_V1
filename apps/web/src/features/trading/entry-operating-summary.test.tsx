@@ -3,14 +3,17 @@
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DecisionJournalStudyViewV1 } from "@bolsa/shared";
 import { buildEntryOperatingTruth } from "@bolsa/shared";
 import { EntryOperatingSummary } from "@/features/trading/entry-operating-summary";
+import { stubNarrowViewport, stubWideViewport } from "@/lib/test-viewport";
 
 afterEach(() => cleanup());
 
-function triggeredStudy(): DecisionJournalStudyViewV1 {
+function triggeredStudy(
+  overrides: Partial<DecisionJournalStudyViewV1> = {},
+): DecisionJournalStudyViewV1 {
   return {
     instrumentId: "inst-nvda",
     symbol: "NVDA",
@@ -26,6 +29,7 @@ function triggeredStudy(): DecisionJournalStudyViewV1 {
     initialRiskR: 1,
     positionValue: 4215,
     quantity: 10,
+    ...overrides,
   } as DecisionJournalStudyViewV1;
 }
 
@@ -51,6 +55,38 @@ describe("EntryOperatingSummary V1.38", () => {
     render(<EntryOperatingSummary study={triggeredStudy()} />);
     expect(screen.getByText(/Riesgo al stop/i)).toBeTruthy();
     expect(screen.getByText(/R\/R esperado/i)).toBeTruthy();
+  });
+
+  it("V2.47 — valor esperado neto medido se pinta con signo y moneda", () => {
+    render(
+      <EntryOperatingSummary
+        study={triggeredStudy({
+          expectedR: 0.8,
+          netExpectedCurrency: 34,
+        })}
+      />,
+    );
+    expect(
+      screen.getByTestId("entry-operating-expected-value").textContent,
+    ).toBe("+34.00 € · R esperado 0.80");
+    expect(screen.getByText(/Valor esperado neto/i)).toBeTruthy();
+  });
+
+  it("V2.47 — sin medición NO se pinta fila (jamás un 0 € inventado)", () => {
+    render(<EntryOperatingSummary study={triggeredStudy()} />);
+    expect(screen.queryByTestId("entry-operating-expected-value")).toBeNull();
+    expect(screen.queryByText(/Valor esperado neto/i)).toBeNull();
+  });
+
+  it("V2.47 — R medido sin coste cerrado publica solo el R (y declara el hueco)", () => {
+    render(
+      <EntryOperatingSummary
+        study={triggeredStudy({ expectedR: 0.42, netExpectedCurrency: null })}
+      />,
+    );
+    expect(
+      screen.getByTestId("entry-operating-expected-value").textContent,
+    ).toBe("R esperado 0.42");
   });
 
   it("shows Ranking ≠ BUY disclaimer", () => {
@@ -125,5 +161,47 @@ describe("EntryOperatingSummary V1.38", () => {
     expect(screen.getByTestId("entry-operating-execution").textContent).toMatch(
       /desconocida|no duplicar/i,
     );
+  });
+});
+
+describe("EntryOperatingSummary V2.47 — móvil", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("en teléfono declara el ancho y apila cada fila (misma información)", () => {
+    stubNarrowViewport();
+    render(
+      <EntryOperatingSummary
+        study={triggeredStudy({ expectedR: 0.8, netExpectedCurrency: 34 })}
+      />,
+    );
+    const root = screen.getByTestId("entry-operating-summary");
+    expect(root.getAttribute("data-cabin-width")).toBe("narrow");
+
+    const actionRow = screen.getByTestId(
+      "entry-operating-action",
+    ).parentElement!;
+    expect(actionRow.className).toMatch(/flex-col/);
+    expect(actionRow.className).not.toMatch(/justify-between/);
+
+    // Nada se oculta al apilar: etiqueta y valor siguen ahí.
+    expect(screen.getByText("Riesgo al stop")).toBeTruthy();
+    expect(screen.getByText("Valor esperado neto")).toBeTruthy();
+    expect(
+      screen.getByTestId("entry-operating-expected-value").textContent,
+    ).toBe("+34.00 € · R esperado 0.80");
+  });
+
+  it("en escritorio mantiene la fila en una línea", () => {
+    stubWideViewport();
+    render(<EntryOperatingSummary study={triggeredStudy()} />);
+    const root = screen.getByTestId("entry-operating-summary");
+    expect(root.getAttribute("data-cabin-width")).toBe("wide");
+    const actionRow = screen.getByTestId(
+      "entry-operating-action",
+    ).parentElement!;
+    expect(actionRow.className).toMatch(/justify-between/);
+    expect(actionRow.className).toMatch(/flex-wrap/);
   });
 });

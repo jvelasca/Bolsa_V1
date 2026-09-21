@@ -8,6 +8,14 @@ from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
     aggregate_exposure,
     build_auto_portfolio_snapshot,
 )
+from bolsa_analytics.cognitive.auto_self_evaluation import (
+    AUTO_SELF_EVALUATION_KEY,
+    SELF_EVAL_MIN_TRADES_DEFAULT,
+    SELF_EVAL_OPPORTUNITY_STATUSES,
+    AutoSelfEvaluation,
+    StrategySelfEvaluation,
+    evaluate_auto_self_evaluation,
+)
 from bolsa_analytics.cognitive.bracket_plan import (
     BRACKET_PLAN_KEY,
     build_bracket_plan_dict,
@@ -440,6 +448,12 @@ __all__ = [
     "POLICY_TEMPLATES",
     "WEIGHT_RULES_VERSION",
     "AutoLiveCheck",
+    "AUTO_SELF_EVALUATION_KEY",
+    "AutoSelfEvaluation",
+    "StrategySelfEvaluation",
+    "SELF_EVAL_MIN_TRADES_DEFAULT",
+    "SELF_EVAL_OPPORTUNITY_STATUSES",
+    "evaluate_auto_self_evaluation",
     "BasketPosition",
     "BehaviorTradeSample",
     "ConfidenceEvent",

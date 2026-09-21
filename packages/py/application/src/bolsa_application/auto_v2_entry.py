@@ -30,14 +30,14 @@ from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from hashlib import sha256
-from typing import Any, cast
+from typing import Any, Final, Literal, cast
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
     DATA_FRESH,
     PortfolioPosition,
     build_auto_portfolio_snapshot,
 )
-from bolsa_analytics.cognitive.expected_value import build_expected_value
+from bolsa_analytics.cognitive.expected_value import ExpectedValue, build_expected_value
 from bolsa_analytics.cognitive.market_regime_gate import (
     map_trial_regime,
     regime_is_exit_only,
@@ -252,6 +252,19 @@ class V2Tunables:
     # entero es, como mucho, toda la cartera del tick).
     optimizer_max_positions: int | None = None
 
+    # --- V2.47 — identidad formal de señales -------------------------------------------
+    # Política de colisión de candidatas sobre el MISMO instrumento y la MISMA barra.
+    # OFF (default) = comportamiento histórico: gana la de clave canónica menor (mejor
+    # edge, después versión/barra/identidad) y las demás se journalizan como
+    # ``signal_superseded_by_candidate`` (ya NO en silencio).
+    # ON = dos ``strategy_version`` DISTINTAS sobre el mismo instrumento/barra NO se
+    # colapsan: compiten como oportunidades separadas y la cartera decide (capital,
+    # correlación, sector), no el dedupe ciego. Como el libro del worker sostiene una
+    # posición por instrumento, si ambas son seleccionadas la segunda se declara
+    # ``signal_distinct_strategy_not_representable`` (nunca se emiten dos entradas sobre
+    # el mismo símbolo ni se pisa una en silencio).
+    allow_distinct_strategies: bool = False
+
     def optimizer_constraints(self) -> OptimizerConstraints:
         """Restricciones duras del optimizador derivadas de los tunables (pura)."""
         return OptimizerConstraints(
@@ -425,6 +438,11 @@ def tunables_from_env() -> V2Tunables:
         optimizer_max_combinations=_optimizer_max_combinations_from_env(base),
         optimizer_max_positions=_optimizer_max_positions_from_env(base),
         cost_model=_cost_model_from_env(),
+        # V2.47 — identidad formal de señales: OPT-IN explícito (default OFF ⇒ el dedupe
+        # por instrumento se conserva; solo deja de ser silencioso en el journal).
+        allow_distinct_strategies=_env_flag(
+            "AUTO_ENGINE_SIM_V2_ALLOW_DISTINCT_STRATEGIES", base.allow_distinct_strategies
+        ),
     )
 
 
@@ -632,10 +650,21 @@ class V2TickPlan:
     # oportunidad por explicar y el día lo declara (``funnel_seen_mismatch``).
     opportunities: tuple[OpportunityRow, ...] = ()
     seen_signals: int = 0
+    # V2.47 — ciclo financiero por candidata evaluada (``símbolo → cycle_id``). El worker
+    # lo propaga a la posición durable (``position_state`` JSONB) para que la cadena
+    # señal→…→PnL sea trazable sin migración.
+    cycles: tuple[tuple[str, str], ...] = ()
 
     @property
     def approved_symbols(self) -> tuple[str, ...]:
         return tuple(self.entry_packages.keys())
+
+    def cycle_for(self, instrument_id: str) -> str | None:
+        """``cycle_id`` de la candidata (o ``None`` si no se evaluó)."""
+        for symbol, cycle_id in self.cycles:
+            if symbol == instrument_id:
+                return cycle_id
+        return None
 
 
 def build_worker_snapshot(
@@ -705,7 +734,7 @@ def build_worker_snapshot(
             # contaba como riesgo medido (``COMPLETE``) y el motor dejaba de vetar por
             # medición incompleta: "stop mal puesto" se leía como "posición sin riesgo".
             distance = stop_distance(
-                entry=float(entry), stop=float(stop), direction="long"
+                entry=float(entry), stop=float(stop), direction=_ENTRY_DIRECTION
             )
             if distance is not None:
                 risk_amount = distance * float(qty)
@@ -769,8 +798,13 @@ def signal_identity_for_bar(
     )
 
 
-def _score_from_signal(signal: V2Signal) -> OpportunityScore:
+def _score_from_signal(signal: V2Signal, *, key: str | None = None) -> OpportunityScore:
     """Score de oportunidad de una señal (componentes derivados de la señal).
+
+    ``key`` (V2.47) es la clave de candidata que el pipeline usa para identificar la
+    oportunidad. Con ``allow_distinct_strategies`` puede ser ``instrumento#versión`` de
+    modo que dos candidatas del mismo símbolo no colisionen en el ranking y la cartera.
+    Sin ``key`` se conserva el identificador histórico (el instrumento).
 
     Solo ``edge``/``liquidity``/``robustness`` tienen fuente directa en la señal; el
     resto queda a 0 (fail-closed: no se inventa evidencia que la señal no aporta).
@@ -787,10 +821,29 @@ def _score_from_signal(signal: V2Signal) -> OpportunityScore:
         else min(1.0, max(0.0, signal.liquidity_notional / 1_000_000.0))
     )
     return score_opportunity(
-        signal.instrument_id,
+        key if key is not None else signal.instrument_id,
         edge=signal.edge,
         liquidity=liquidity,
     )
+
+
+#: Dirección de las entradas AUTO. AUTO es largo-only hoy: esta constante es la ÚNICA
+#: fuente de la dirección del motor de entrada (dimensionado, snapshot y geometría
+#: económica), de modo que no existan dos direcciones que puedan discrepar.
+_ENTRY_DIRECTION: Final[Literal["long", "short"]] = "long"
+
+
+def entry_direction(signal: V2Signal) -> Literal["long", "short"] | None:
+    """Dirección de entrada soportada por esta señal, o ``None`` (no soportada).
+
+    ``BUY`` se traduce a la dirección única del motor (``_ENTRY_DIRECTION``). Cualquier
+    otra acción devuelve ``None`` **a propósito**: la capa de economía la declarará no
+    soportada (``EV_DIRECTION_UNSUPPORTED``) en vez de calcular su valor esperado con la
+    geometría y el coste de una larga. Cuando AUTO soporte entrada corta, este helper será
+    el único sitio donde mapearla.
+    """
+    action = str(getattr(signal, "action", "") or "").strip().upper()
+    return _ENTRY_DIRECTION if action == "BUY" else None
 
 
 def _optimizer_candidate(
@@ -799,6 +852,7 @@ def _optimizer_candidate(
     snapshot: Any,
     cfg: V2Tunables,
     regime: str | None,
+    key: str | None = None,
 ) -> OptimizerCandidate:
     """Candidata del optimizador para UNA señal, con la foto de sizing del motor.
 
@@ -818,9 +872,10 @@ def _optimizer_candidate(
     atr = signal.atr
     if atr is None and signal.price > 0 and not cfg.atr_required:
         atr = signal.price * cfg.atr_pct_fallback
+    direction = entry_direction(signal)
     probe = decide_portfolio(
         instrument_id=signal.instrument_id,
-        direction="long",
+        direction=_ENTRY_DIRECTION,
         entry_price=signal.price if signal.price > 0 else None,
         atr=atr,
         opportunity_score=_score_from_signal(signal),
@@ -834,7 +889,16 @@ def _optimizer_candidate(
     quantity = _finite_or_none(allocation.get("quantity"))
     distance = _finite_or_none(allocation.get("stopDistance"))
     entry = float(signal.price) if signal.price and signal.price > 0 else None
-    stop = (entry - distance) if (entry is not None and distance is not None) else None
+    # La geometría se construye en la MISMA dirección que el motor dimensionó. Si la
+    # acción no es una dirección soportada NO se fabrica un stop largo: se deja que la
+    # capa de economía lo declare no soportado (fail-closed) en vez de calcular con el
+    # modelo equivocado.
+    if direction == "long":
+        stop = (entry - distance) if (entry is not None and distance is not None) else None
+    elif direction == "short":
+        stop = (entry + distance) if (entry is not None and distance is not None) else None
+    else:
+        stop = None
 
     expected = build_expected_value(
         entry=entry,
@@ -844,10 +908,15 @@ def _optimizer_candidate(
         p_win=signal.p_win,
         avg_win_r=signal.avg_win_r,
         avg_loss_r=signal.avg_loss_r,
+        direction=direction,
         cost_model=cfg.cost_model,
     )
     return OptimizerCandidate(
-        instrument_id=signal.instrument_id,
+        # V2.47 — el identificador de la candidata en la cartera es su CLAVE (con el dedupe
+        # histórico, el instrumento). Con ``allow_distinct_strategies`` permite que dos
+        # versiones del mismo símbolo compitan como oportunidades distintas. El instrumento
+        # real se conserva en la señal; aquí la clave solo identifica la oportunidad.
+        instrument_id=key if key is not None else signal.instrument_id,
         expected_value=expected,
         notional=_finite_or_none(allocation.get("positionValue")),
         risk_amount=_finite_or_none(allocation.get("riskAmount")),
@@ -877,12 +946,15 @@ def _optimize_candidate_set(
     cfg: V2Tunables,
     regime: str | None,
     governor_blocks_new_risk: bool,
-) -> OptimizerDecision:
+) -> tuple[OptimizerDecision, tuple[OptimizerCandidate, ...]]:
     """Corre el optimizador sobre el conjunto candidato (el TOP N del ranking).
 
     ``available_cash``/``equity`` salen de la foto INICIAL del tick y el permiso de riesgo
     nuevo del gobernador (si veta aperturas, el conjunto vacío gana por construcción, no
     por un cero inventado).
+
+    Devuelve también las candidatas: su ``expected_value`` es la economía YA medida del
+    tick y el journal la publica tal cual (V2.47) en vez de recalcularla por segunda vez.
     """
     constraints = cfg.optimizer_constraints()
     constraints = replace(
@@ -892,10 +964,18 @@ def _optimize_candidate_set(
         new_risk_allowed=not governor_blocks_new_risk,
     )
     candidates = [
-        _optimizer_candidate(signal, snapshot=snapshot, cfg=cfg, regime=regime)
+        _optimizer_candidate(
+            signal,
+            snapshot=snapshot,
+            cfg=cfg,
+            regime=regime,
+            key=candidate_key(
+                signal, allow_distinct_strategies=cfg.allow_distinct_strategies
+            ),
+        )
         for signal in ordered
     ]
-    return optimize_portfolio(candidates, constraints)
+    return optimize_portfolio(candidates, constraints), tuple(candidates)
 
 
 def plan_v2_tick(
@@ -936,12 +1016,23 @@ def plan_v2_tick(
     )
 
     entry_signals = [s for s in signals if str(s.action).upper() == "BUY"]
-    # Un símbolo, UNA oportunidad por tick, elegida de forma determinista. El antiguo
-    # ``setdefault`` hacía ganar "la primera que llegue", y el orden de entrada lo fija
-    # el proveedor de señales (no es contractual): dos ticks con el mismo conjunto podían
-    # aprobar instrumentos distintos. ``_dedupe_candidates`` elige por clave canónica.
-    deduped = _dedupe_candidates(entry_signals)
+    # Una candidata por CLAVE, elegida de forma determinista. El antiguo ``setdefault``
+    # hacía ganar "la primera que llegue", y el orden de entrada lo fija el proveedor de
+    # señales (no es contractual): dos ticks con el mismo conjunto podían aprobar
+    # instrumentos distintos. ``_dedupe_candidates`` elige por clave canónica.
+    #
+    # V2.47 — la clave es el instrumento por defecto; con ``allow_distinct_strategies``
+    # pasa a ``instrumento#versión`` para que dos estrategias distintas del mismo símbolo
+    # compitan en la cartera. Y la política deja de ser SILENCIOSA: cada candidata superada
+    # se journaliza con ambos ``signal_id`` y ``strategy_version``.
+    deduped, superseded_pairs = _dedupe_candidates(
+        entry_signals, allow_distinct_strategies=cfg.allow_distinct_strategies
+    )
     entry_signals = sorted(deduped.values(), key=canonical_candidate_key)
+    superseded_entries: list[DecisionJournalEntryRecord] = [
+        _superseded_candidate_entry(superada, ganadora, actor=actor, as_of=as_of)
+        for superada, ganadora in superseded_pairs
+    ]
 
     # Identidad y frescura ANTES del rankeo: no se rankea ni se le asigna presupuesto a
     # una oportunidad que ya se emitió en esta barra, que ha caducado o que no tiene
@@ -972,10 +1063,27 @@ def plan_v2_tick(
             )
     entry_signals = eligible
 
-    scored: list[OpportunityScore] = [_score_from_signal(s) for s in entry_signals]
+    # La clave de candidata identifica la oportunidad en ranking y cartera (con el dedupe
+    # histórico es el instrumento: el pipeline es byte-idéntico).
+    keys_by_signal = {
+        id(signal): candidate_key(
+            signal, allow_distinct_strategies=cfg.allow_distinct_strategies
+        )
+        for signal in entry_signals
+    }
+    def _key_of(signal: V2Signal) -> str:
+        """Clave de candidata de una señal del tick (estable dentro del tick)."""
+        cached = keys_by_signal.get(id(signal))
+        if cached is not None:
+            return cached
+        return candidate_key(signal, allow_distinct_strategies=cfg.allow_distinct_strategies)
+
+    scored: list[OpportunityScore] = [
+        _score_from_signal(s, key=_key_of(s)) for s in entry_signals
+    ]
     ranked = rank_opportunities(scored)
     top = select_top_opportunities(ranked, top_n=cfg.top_n)
-    score_by_symbol = {s.instrument_id: s for s in top}
+    score_by_candidate = {s.instrument_id: s for s in top}
 
     # V2.40.4 — TOP_N es un TOPE DE EVALUACIÓN, no una prioridad. Solo el TOP se decide
     # contra la cartera; una candidata fuera del TOP **no se evalúa** y por tanto NO
@@ -997,7 +1105,7 @@ def plan_v2_tick(
             score=score,
         )
         for score in ranked
-        if score.instrument_id not in score_by_symbol and score.instrument_id in deduped
+        if score.instrument_id not in score_by_candidate and score.instrument_id in deduped
     ]
     # V2.45/AUTO-5 — las candidatas del ranking que NO entraron en el TOP son rechazadas
     # con su motivo REAL (``top_n_excluded``), nunca con uno ajeno.
@@ -1008,7 +1116,7 @@ def plan_v2_tick(
             reason=TOP_N_EXCLUDED,
         )
         for score in ranked
-        if score.instrument_id not in score_by_symbol and score.instrument_id in deduped
+        if score.instrument_id not in score_by_candidate and score.instrument_id in deduped
     ]
 
     packages: dict[str, DecisionPackage] = {}
@@ -1019,10 +1127,12 @@ def plan_v2_tick(
     # restricciones duras. Con el flag OFF nada de esto se ejecuta y el payload del tick
     # es byte-idéntico al histórico (``optimizer`` queda ``None``).
     optimizer_decision: OptimizerDecision | None = None
+    # V2.47 — economía por CLAVE de candidata, medida una sola vez por el optimizador.
+    expected_by_candidate: dict[str, ExpectedValue] = {}
     optimizer_excluded: list[DecisionJournalEntryRecord] = []
     optimizer_opportunities: list[OpportunityRow] = []
     if cfg.optimizer_enabled and ordered:
-        optimizer_decision = _optimize_candidate_set(
+        optimizer_decision, optimizer_candidates = _optimize_candidate_set(
             ordered,
             snapshot=snapshot,
             cfg=cfg,
@@ -1036,20 +1146,22 @@ def plan_v2_tick(
         if optimizer_decision.decided:
             chosen = set(optimizer_decision.selected)
             reason_by_id = optimizer_decision.reasons_by_instrument()
-            by_id = {s.instrument_id: s for s in ordered}
+            # El optimizador decide sobre CLAVES de candidata (con el dedupe histórico son
+            # el instrumento; con ``allow_distinct_strategies`` distinguen versión).
+            by_id = {_key_of(s): s for s in ordered}
             # Las candidatas del TOP que la combinación NO eligió se declaran con su
             # motivo REAL (infeasibilidad concreta o ``optimizer_not_selected``); nunca
             # con ``edge_below_threshold``, que sería falso: su score es válido.
             optimizer_excluded = [
                 _rejected_signal_entry(
                     signal,
-                    reason_by_id.get(signal.instrument_id, OPTIMIZER_NOT_SELECTED),
+                    reason_by_id.get(_key_of(signal), OPTIMIZER_NOT_SELECTED),
                     actor=actor,
                     as_of=as_of,
-                    score=score_by_symbol.get(signal.instrument_id),
+                    score=score_by_candidate.get(_key_of(signal)),
                 )
                 for signal in ordered
-                if signal.instrument_id not in chosen
+                if _key_of(signal) not in chosen
             ]
             # V2.45/AUTO-5 — la candidata del conjunto que la cartera NO eligió es un
             # rechazo con su motivo REAL (infeasibilidad concreta o ``optimizer_not_selected``).
@@ -1057,14 +1169,21 @@ def plan_v2_tick(
                 _opportunity_row(
                     signal,
                     status=OPPORTUNITY_REJECTED,
-                    reason=reason_by_id.get(signal.instrument_id, OPTIMIZER_NOT_SELECTED),
+                    reason=reason_by_id.get(_key_of(signal), OPTIMIZER_NOT_SELECTED),
                 )
                 for signal in ordered
-                if signal.instrument_id not in chosen
+                if _key_of(signal) not in chosen
             ]
             # El orden de evaluación pasa a ser el de la combinación elegida (determinista
             # por construcción), no el del ranking.
             ordered = [by_id[i] for i in optimizer_decision.selected if i in by_id]
+        # V2.47 — la economía medida del conjunto candidato, indexada por la MISMA clave
+        # con la que el tick decide. El journal la publica para la candidata aprobada sin
+        # recalcular nada (una sola medición por candidata y tick).
+        expected_by_candidate = {
+            candidate.instrument_id: candidate.expected_value
+            for candidate in optimizer_candidates
+        }
         # Si el optimizador NO llegó a decidir (tope de combinatoria), el tick cae al
         # camino del ranking sin inventar nada y ``optimizer_decision`` lleva el motivo.
 
@@ -1073,6 +1192,9 @@ def plan_v2_tick(
     # volatilidad (ATR de la señal) y liquidez (su ``TradeContext``) son datos suyos.
     governor_policy = cfg.governor_policy()
     governor_states: list[tuple[str, str]] = []
+    # V2.47 — ciclo financiero por candidata evaluada (``símbolo → cycle_id``), para que
+    # el plan del tick lo publique y el worker lo propague a la posición durable.
+    cycles: list[tuple[str, str]] = []
     tick_drawdown_pct = getattr(snapshot, "drawdown_pct", None)
     # AUTO-1 — libro de reservas del tick. Cada aprobación RESERVA con identidad y la
     # candidata siguiente decide contra las reservas VIVAS (capital, riesgo, exposición y
@@ -1082,8 +1204,10 @@ def plan_v2_tick(
         account_id=str(getattr(snapshot, "account_id", "") or ""), tick_id=as_of
     )
 
+    decision_keys: list[str] = []
     for signal in ordered:
-        entry_score = score_by_symbol.get(signal.instrument_id)
+        signal_key = _key_of(signal)
+        entry_score = score_by_candidate.get(signal_key)
         atr = signal.atr
         if atr is None and signal.price > 0 and not cfg.atr_required:
             # E2: con ``AUTO_ENGINE_SIM_V2_ATR_REQUIRED`` el sintético NO entra. La
@@ -1119,9 +1243,14 @@ def plan_v2_tick(
                 halted=halted,
             )
             governor_states.append((signal.instrument_id, governor.state))
+        # V2.47 — el ciclo se acuña UNA vez por candidata y viaja por TODA su cadena
+        # (reserva durable + journal del tick), con la misma clave determinista que la
+        # decisión para que dos workers converjan al mismo ciclo.
+        account_id_value = str(getattr(snapshot, "account_id", "") or "")
+        cycle_id = auto_cycle_id(account_id=account_id_value, signal=signal)
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
-            direction="long",
+            direction=_ENTRY_DIRECTION,
             entry_price=signal.price if signal.price > 0 else None,
             atr=atr,
             opportunity_score=entry_score,
@@ -1134,11 +1263,12 @@ def plan_v2_tick(
             # (``RES-<decision_id>``) es un CLAIM atómico y dos workers concurrentes no
             # pueden comprometer el mismo capital dos veces.
             decision_id=entry_decision_id(
-                account_id=str(getattr(snapshot, "account_id", "") or ""),
+                account_id=account_id_value,
                 signal=signal,
             ),
         )
         decisions.append(decision)
+        decision_keys.append(signal_key)
         package = trade_plan_to_decision_package(
             decision.trade_plan,
             source=(
@@ -1149,19 +1279,43 @@ def plan_v2_tick(
             proposed_at=_stamp(as_of),
         )
         if package is not None:
+            # V2.47 — con ``allow_distinct_strategies`` dos versiones distintas del mismo
+            # instrumento pueden ganar la cartera, pero el libro del worker sostiene UNA
+            # posición por instrumento: la segunda no es representable. Se declara
+            # (fail-closed) ANTES de reservar capital, en vez de pisar la primera o emitir
+            # dos entradas sobre el mismo símbolo.
+            collision = (
+                cfg.allow_distinct_strategies and signal.instrument_id in packages
+            )
             # No existe aprobación sin reserva: la propuesta emitida se materializa en
             # reserva en el MISMO acto. Si la reserva no se puede construir (la cantidad
             # final no es reservable), la aprobación se DEGRADA a veto con su motivo en vez
             # de emitir una orden sin compromiso trazable.
-            reservation = _reservation_for(
-                signal,
-                decision,
-                account_id=str(getattr(snapshot, "account_id", "") or ""),
-                tick_id=as_of,
-                created_at=as_of,
+            reservation = (
+                None
+                if collision
+                else _reservation_for(
+                    signal,
+                    decision,
+                    account_id=account_id_value,
+                    tick_id=as_of,
+                    created_at=as_of,
+                    cycle_id=cycle_id,
+                )
             )
             reserved = ledger.reserve(reservation) if reservation is not None else None
-            if reserved is None:
+            if collision:
+                decision = replace(
+                    decision,
+                    approved=False,
+                    action="HOLD",
+                    reason_codes=cast(
+                        "tuple[DecisionReasonCode, ...]",
+                        (SIGNAL_DISTINCT_STRATEGY_NOT_REPRESENTABLE,),
+                    ),
+                )
+                decisions[-1] = decision
+            elif reserved is None:
                 decision = replace(
                     decision,
                     approved=False,
@@ -1173,12 +1327,24 @@ def plan_v2_tick(
                 decisions[-1] = decision
             else:
                 packages[signal.instrument_id] = package
+                # El ciclo solo se publica para la candidata REALMENTE aprobada: es el que
+                # el worker propagará a la posición durable de ese instrumento.
+                cycles.append((signal.instrument_id, cycle_id))
         journal.append(
             _journal_entry(
                 decision,
                 actor=actor,
                 as_of=as_of,
                 strategy_version=signal.strategy_version,
+                cycle_id=cycle_id,
+                # La economía de la candidata APROBADA: la que midió el optimizador o, si
+                # no corrió, la de su propia geometría. Un rechazo no publica economía.
+                expected_value=(
+                    expected_by_candidate.get(signal_key)
+                    or _expected_value_for_decision(signal, decision, cfg)
+                )
+                if decision.approved
+                else None,
             )
         )
 
@@ -1187,8 +1353,8 @@ def plan_v2_tick(
     # es INDEPENDIENTE de las filas: si una candidata no termina en ninguna fila, el
     # agregado del día lo declara (``funnel_seen_mismatch``) en vez de perderla en silencio.
     evaluated_opportunities: list[OpportunityRow] = []
-    for decision in decisions:
-        candidate_signal = deduped.get(decision.instrument_id)
+    for decision, key in zip(decisions, decision_keys, strict=True):
+        candidate_signal = deduped.get(key)
         if decision.approved:
             evaluated_opportunities.append(
                 _opportunity_row(candidate_signal, status=OPPORTUNITY_TRADED)
@@ -1210,7 +1376,9 @@ def plan_v2_tick(
         entry_packages=packages,
         decisions=tuple(decisions),
         ranked=tuple(ranked),
-        journal_entries=tuple((*blocked, *excluded, *optimizer_excluded, *journal)),
+        journal_entries=tuple(
+            (*superseded_entries, *blocked, *excluded, *optimizer_excluded, *journal)
+        ),
         regime=resolved_regime,
         as_of=as_of,
         reservations=ledger.live(),
@@ -1226,6 +1394,7 @@ def plan_v2_tick(
             )
         ),
         seen_signals=len(deduped),
+        cycles=tuple(cycles),
     )
 
 
@@ -1469,14 +1638,72 @@ def entry_decision_id(*, account_id: str, signal: V2Signal) -> str:
     return f"dec-{sha256(key.encode('utf-8')).hexdigest()[:12]}"
 
 
-def _dedupe_candidates(signals: Iterable[V2Signal]) -> dict[str, V2Signal]:
-    """Una candidata por instrumento: la de clave canónica MENOR (la mejor/estable)."""
+def auto_cycle_id(*, account_id: str, signal: V2Signal) -> str:
+    """V2.47 — identidad DETERMINISTA del CICLO financiero de una señal.
+
+    Es el hilo que une el ciclo completo de dinero: ``señal → decisión → reserva → orden →
+    fill → posición → salida → PnL``. Se acuña con la MISMA clave que la decisión
+    (``cuenta + signal_id``) para que dos workers/procesos que evalúan la misma señal
+    converjan al MISMO ciclo — si fuera aleatorio, un reintento tras un crash partiría el
+    ciclo en dos y la trazabilidad mentiría. Prefijo ``cyc-`` para no confundirlo con
+    ``dec-`` (decisión) ni ``RES-`` (reserva).
+
+    Sin identidad de señal (señal sin barra) se conserva el fallback aleatorio histórico,
+    igual que la decisión: no hay clave estable que unir.
+    """
+    signal_id = str(signal.signal_id or "").strip()
+    if not signal_id:
+        from uuid import uuid4
+
+        return f"cyc-{uuid4().hex[:12]}"
+    key = f"{str(account_id or '').strip()}\x1f{signal_id}"
+    return f"cyc-{sha256(key.encode('utf-8')).hexdigest()[:12]}"
+
+
+def candidate_key(signal: V2Signal, *, allow_distinct_strategies: bool = False) -> str:
+    """Clave de la candidata dentro del tick (identidad explícita, no ``(cuenta, instr, bar)``).
+
+    Por defecto es el **instrumento**: una sola oportunidad por símbolo y tick, como el
+    comportamiento histórico. Con ``allow_distinct_strategies`` pasa a ser
+    ``instrumento#versión`` (y el instrumento a secas cuando la señal no declara versión):
+    dos ``strategy_version`` DISTINTAS sobre el mismo instrumento/barra dejan de colapsar y
+    llegan como dos candidatas al ranking y a la cartera. La clave es un identificador
+    OPACO para el pipeline (el instrumento real se recupera de la señal), de modo que el
+    optimizador puede distinguir dos candidatas del mismo símbolo.
+    """
+    instrument = str(signal.instrument_id or "")
+    if not allow_distinct_strategies:
+        return instrument
+    version = str(signal.strategy_version or "").strip()
+    return f"{instrument}#{version}" if version else instrument
+
+
+def _dedupe_candidates(
+    signals: Iterable[V2Signal], *, allow_distinct_strategies: bool = False
+) -> tuple[dict[str, V2Signal], tuple[tuple[V2Signal, V2Signal], ...]]:
+    """Una candidata por CLAVE, la de clave canónica MENOR (la mejor/estable).
+
+    Devuelve ``(ganadoras, superadas)`` donde ``superadas`` son pares
+    ``(superada, ganadora)``: la candidata descartada y la que la superó. V2.47 hace
+    EXPLÍCITA la política — cada superada se journaliza con ambos ``signal_id`` y
+    ``strategy_version`` (``signal_superseded_by_candidate``) en vez de desaparecer en
+    silencio. El par se devuelve en vez de journalizarse aquí para que esta función siga
+    siendo pura.
+    """
     best: dict[str, V2Signal] = {}
+    superseded: list[tuple[V2Signal, V2Signal]] = []
     for signal in signals:
-        current = best.get(signal.instrument_id)
-        if current is None or canonical_candidate_key(signal) < canonical_candidate_key(current):
-            best[signal.instrument_id] = signal
-    return best
+        key = candidate_key(signal, allow_distinct_strategies=allow_distinct_strategies)
+        current = best.get(key)
+        if current is None:
+            best[key] = signal
+            continue
+        if canonical_candidate_key(signal) < canonical_candidate_key(current):
+            superseded.append((current, signal))
+            best[key] = signal
+        else:
+            superseded.append((signal, current))
+    return best, tuple(superseded)
 
 
 def _context_for_signal(signal: V2Signal) -> TradeContext:
@@ -1592,6 +1819,7 @@ def _reservation_for(
     account_id: str,
     tick_id: str,
     created_at: str,
+    cycle_id: str | None = None,
 ) -> PortfolioReservation | None:
     """Reserva del tick para una aprobación: identidad + dimensiones comprometidas.
 
@@ -1633,6 +1861,7 @@ def _reservation_for(
         reserved_risk=allocation.get("riskAmount"),
         cost=coerce_trading_cost(allocation.get("tradingCost")),
         created_at=created_at or None,
+        cycle_id=cycle_id,
     )
 
 
@@ -1678,6 +1907,17 @@ SIGNAL_DUPLICATE = "signal_duplicate"
 SIGNAL_STALE = "signal_stale"
 # V2.40.1: sin identidad no hay idempotencia, deduplicación, auditoría ni replay posibles.
 SIGNAL_IDENTITY_MISSING = "signal_identity_missing"
+# V2.47 — el dedupe por instrumento YA NO es silencioso: cada candidata descartada porque
+# otra de la misma clave canónica (mismo instrumento — y misma versión salvo
+# ``allow_distinct_strategies``) la superó queda journalizada con AMBOS ``signal_id`` y
+# ``strategy_version``. La discriminación depende de identidad + versión + política de
+# cartera, nunca de ``(cuenta, instrumento, barra)`` a secas.
+SIGNAL_SUPERSEDED_BY_CANDIDATE = "signal_superseded_by_candidate"
+# El libro del worker sostiene UNA posición por instrumento: si la política deja competir a
+# dos estrategias sobre el mismo instrumento y AMBAS ganan la cartera, la segunda no es
+# representable. Se declara con este motivo (fail-closed) en vez de emitir dos entradas
+# sobre el mismo símbolo o de pisar una silenciosamente.
+SIGNAL_DISTINCT_STRATEGY_NOT_REPRESENTABLE = "signal_distinct_strategy_not_representable"
 
 
 def _signal_rejection(
@@ -1751,6 +1991,7 @@ def _rejected_signal_entry(
     actor: str,
     as_of: str,
     score: OpportunityScore | None = None,
+    detail: Mapping[str, Any] | None = None,
 ) -> DecisionJournalEntryRecord:
     """Entrada de journal de una señal descartada por identidad/frescura.
 
@@ -1758,6 +1999,9 @@ def _rejected_signal_entry(
     (``top_n_excluded``): el score es el REAL del ranking y se publica porque
     "no la evalué" no es lo mismo que "no tenía edge". Para los descartes previos al
     ranking (identidad/frescura) no existe score y la clave se omite.
+
+    ``detail`` (V2.47) añade claves ADITIVAS al ``payload`` (p. ej. la candidata que
+    superó a esta en el dedupe): el journal durable no gana columnas, gana contexto.
     """
     from uuid import uuid4
 
@@ -1781,6 +2025,8 @@ def _rejected_signal_entry(
     # clave se OMITE: la ausencia es información, jamás se inventa un "unversioned".
     if str(signal.strategy_version or "").strip():
         payload["strategyVersion"] = str(signal.strategy_version)
+    if detail:
+        payload.update(dict(detail))
     if score is not None:
         payload["opportunityScore"] = score.combined
         payload["rank"] = score.rank
@@ -1796,12 +2042,91 @@ def _rejected_signal_entry(
     )
 
 
+def _superseded_candidate_entry(
+    superseded: V2Signal,
+    winner: V2Signal,
+    *,
+    actor: str,
+    as_of: str,
+) -> DecisionJournalEntryRecord:
+    """V2.47 — journal de la candidata SUPERADA por otra en el dedupe del tick.
+
+    La política de colisión deja de ser silenciosa: esta entrada documenta, con motivo
+    tipificado ``signal_superseded_by_candidate``, QUÉ candidata se descartó y CUÁL la
+    superó, con ambos ``signal_id`` y ``strategy_version``. La discriminación depende de
+    identidad + versión + política de cartera, nunca de ``(cuenta, instrumento, barra)``.
+    """
+    return _rejected_signal_entry(
+        superseded,
+        SIGNAL_SUPERSEDED_BY_CANDIDATE,
+        actor=actor,
+        as_of=as_of,
+        detail={
+            "supersededSignalId": str(superseded.signal_id or ""),
+            "supersededStrategyVersion": str(superseded.strategy_version or ""),
+            "supersededBySignalId": str(winner.signal_id or ""),
+            "supersededByStrategyVersion": str(winner.strategy_version or ""),
+            "supersededByEdge": winner.edge,
+            # Dos versiones distintas del mismo instrumento: la información que hace
+            # explícito POR QUÉ la clave de candidata importa (con
+            # ``allow_distinct_strategies`` no se habrían superado entre sí).
+            "distinctStrategies": bool(
+                str(winner.strategy_version or "") != str(superseded.strategy_version or "")
+            ),
+        },
+    )
+
+
+def _expected_value_for_decision(
+    signal: V2Signal,
+    decision: PortfolioDecision,
+    cfg: V2Tunables,
+) -> ExpectedValue | None:
+    """V2.47 — economía de una decisión APROBADA, con la geometría que la dimensionó.
+
+    Se usa cuando el optimizador NO corrió (o no tiene candidata para esta clave): en ese
+    caso la economía NO se había medido en ningún sitio, y dimensionar el panel con un
+    cero sería inventarla. Se recalcula con la MISMA fórmula del optimizador
+    (``quantity``/``stopDistance`` de su propio ``allocation``) para que el número que ve
+    el operador sea el de su decisión, no el de una foto paralela.
+
+    ``None`` cuando la decisión no está aprobada: una oportunidad vetada no tiene economía
+    que publicar (y publicarla invitaría a leer un rechazo como una compra perdida).
+    """
+    if not decision.approved:
+        return None
+    allocation = decision.allocation or {}
+    quantity = _finite_or_none(allocation.get("quantity"))
+    distance = _finite_or_none(allocation.get("stopDistance"))
+    entry = float(signal.price) if signal.price and signal.price > 0 else None
+    direction = entry_direction(signal)
+    if direction == "long":
+        stop = (entry - distance) if (entry is not None and distance is not None) else None
+    elif direction == "short":
+        stop = (entry + distance) if (entry is not None and distance is not None) else None
+    else:
+        stop = None
+    return build_expected_value(
+        entry=entry,
+        stop=stop,
+        target=signal.target_price,
+        quantity=quantity,
+        p_win=signal.p_win,
+        avg_win_r=signal.avg_win_r,
+        avg_loss_r=signal.avg_loss_r,
+        direction=direction,
+        cost_model=cfg.cost_model,
+    )
+
+
 def _journal_entry(
     decision: PortfolioDecision,
     *,
     actor: str,
     as_of: str,
     strategy_version: str | None = None,
+    cycle_id: str | None = None,
+    expected_value: ExpectedValue | None = None,
 ) -> DecisionJournalEntryRecord:
     from uuid import uuid4
 
@@ -1822,6 +2147,22 @@ def _journal_entry(
     # clave se omite si no hay versión). Permite atribuir la decisión del día sin migración.
     if str(strategy_version or "").strip():
         payload["strategyVersion"] = str(strategy_version)
+    # V2.47 — el ciclo financiero viaja en el payload (JSONB, sin migración): es el hilo
+    # que une esta decisión con su reserva, su orden, su fill, su posición y su PnL.
+    if str(cycle_id or "").strip():
+        payload["cycleId"] = str(cycle_id)
+    # V2.47 — la ECONOMÍA de la decisión viaja con ella: sin ella el operador ve el plan
+    # pero no su valor esperado, y el neto no es reconstruible aguas abajo. Se publican las
+    # claves de ``ExpectedValue.to_dict()`` que la superficie consume, y SIEMPRE con su
+    # estado de medición: un EV no medido se declara (``expectedMeasurement``), jamás se
+    # publica como un ``0`` que afirmaría "esta operación no deja dinero".
+    if expected_value is not None:
+        expected_payload = expected_value.to_dict()
+        payload["expectedR"] = expected_payload["expectedR"]
+        payload["netExpectedCurrency"] = expected_payload["netExpectedCurrency"]
+        payload["expectedMeasurement"] = expected_payload["measurement"]
+        if expected_payload["notes"]:
+            payload["expectedNotes"] = expected_payload["notes"]
     # V2.43/AUTO-3 — las TRES dimensiones del gobernador en TODA decisión no-trade
     # (criterio de salida del roadmap): ``marketRegime``/``riskRegime`` son HECHOS con
     # fuente y ``operationalState`` es el PERMISO derivado. Se emiten SOLO cuando el
@@ -2154,17 +2495,22 @@ __all__ = [
     "DiscoveryRegimeSource",
     "AtrSource",
     "EdgeReportSource",
+    "SIGNAL_DISTINCT_STRATEGY_NOT_REPRESENTABLE",
     "SIGNAL_DUPLICATE",
     "SIGNAL_IDENTITY_MISSING",
     "SIGNAL_STALE",
+    "SIGNAL_SUPERSEDED_BY_CANDIDATE",
     "V2Signal",
     "V2TickPlan",
     "V2Tunables",
     "aggregate_trial_regime",
     "build_worker_snapshot",
+    "candidate_key",
     "canonical_candidate_key",
+    "auto_cycle_id",
     "edge_from_package",
     "entry_decision_id",
+    "entry_direction",
     "plan_v2_position_decision",
     "plan_v2_position_outcome",
     "plan_v2_tick",

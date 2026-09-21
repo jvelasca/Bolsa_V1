@@ -40,6 +40,7 @@ async def persist_fill_finance_context(
     account_id: str | None,
     venue: str,
     strategy_version_id: str | None = None,
+    cycle_id: str | None = None,
 ) -> int:
     """Persiste el contexto durable de cada fill del order. Devuelve nº de filas.
 
@@ -70,6 +71,7 @@ async def persist_fill_finance_context(
                 venue=fin.venue,
                 idempotency_key=fin.idempotency_key,
                 strategy_version_id=strategy_version_id,
+                cycle_id=cycle_id,
             )
         )
         saved += 1

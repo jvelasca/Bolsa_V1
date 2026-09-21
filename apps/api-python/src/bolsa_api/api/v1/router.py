@@ -5,6 +5,7 @@ from bolsa_api.api.v1.routes import (
     ai_governance,
     alerts,
     auth,
+    auto_self_evaluation,
     backtests,
     core_r,
     database,
@@ -67,6 +68,7 @@ api_v1_router.include_router(lists.router, tags=["lists"])
 api_v1_router.include_router(market_indices.router, tags=["market-indices"])
 api_v1_router.include_router(alerts.router, tags=["alerts"])
 api_v1_router.include_router(accounts.router, tags=["accounts"])
+api_v1_router.include_router(auto_self_evaluation.router, tags=["auto"])
 api_v1_router.include_router(mandates.router, tags=["mandates"])
 api_v1_router.include_router(core_r.router, tags=["core-r"])
 api_v1_router.include_router(supervised_f3.router, tags=["supervised-f3"])

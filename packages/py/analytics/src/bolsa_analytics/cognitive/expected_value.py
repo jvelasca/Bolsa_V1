@@ -10,6 +10,15 @@ en R y en moneda, con qué probabilidad y a qué coste.
     Expected €     = Expected R × risk_amount                (1R en dinero)
     Expected € neto = Expected € − coste de ida y vuelta
 
+**La dirección es un parámetro, nunca una suposición.** La geometría de riesgo de una
+oportunidad **corta** es la espejo de la larga: el stop válido está *por encima* de la
+entrada (``stop > entry``) y el 1R en dinero es ``(stop − entry) × qty``. Un módulo que
+asumiera geometría larga (``stop < entry``) declararía toda oportunidad corta como
+"geometría no medible" y, peor, calcularía su coste con el modelo de la dirección
+equivocada. Aquí ``direction`` entra explícito (``"long"`` / ``"short"``) y un valor que no
+es una dirección conocida **degrada** la medición (``EV_DIRECTION_UNSUPPORTED``): fail-closed,
+nunca "asumimos larga".
+
 **Disciplina de medición (la del repo, no una nueva).** Un dato ininterpretable **no**
 se convierte en `0` ni en un default plausible: `p_win` fuera de `[0, 1]`, una media
 de la que no se sabe el signo, o una geometría invertida **degradan** la medición
@@ -47,6 +56,22 @@ EV_WIN_MEAN_NEGATIVE = "avg_win_r_negative"
 EV_LOSS_MEAN_POSITIVE = "avg_loss_r_positive"
 EV_COST_UNMEASURED = "cost_unmeasured"
 EV_WIN_DERIVED_FROM_TARGET = "avg_win_r_derived_from_target"
+EV_DIRECTION_UNSUPPORTED = "direction_unsupported"
+
+#: Las dos direcciones que este módulo sabe leer. Cualquier otra cosa NO se interpreta
+#: como larga por defecto: degrada y lo declara (``EV_DIRECTION_UNSUPPORTED``).
+_LONG = "long"
+_SHORT = "short"
+
+
+def _coerce_direction(value: Any) -> str | None:
+    """``"long"``/``"short"`` (normalizado) o ``None`` si no es una dirección conocida."""
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    if normalized in (_LONG, _SHORT):
+        return normalized
+    return None
 
 
 def _finite(value: Any) -> float | None:
@@ -121,9 +146,15 @@ def build_expected_value(
     p_win: Any = None,
     avg_win_r: Any = None,
     avg_loss_r: Any = None,
+    direction: Any = "long",
     cost_model: TradingCostModel | None = None,
 ) -> ExpectedValue:
-    """Valor esperado económico a partir de la geometría, las medias y el coste.
+    """Valor esperado económico a partir de la geometría, las medias, la dirección y el coste.
+
+    ``direction`` es ``"long"`` o ``"short"`` y entra en las tres piezas direccionales: el
+    ``1R`` en dinero, el ``R`` derivado del target y el modelo de coste. Una dirección que
+    no es ninguna de las dos **degrada** la medición (``EV_DIRECTION_UNSUPPORTED``): no se
+    asume larga por defecto.
 
     ``avg_win_r`` puede **derivarse** del target si la estrategia no declara media
     histórica: es una media *declarada como derivada* (va en ``notes``), no una
@@ -142,12 +173,27 @@ def build_expected_value(
             notes=tuple(notes),
         )
 
+    resolved_direction = _coerce_direction(direction)
+    if resolved_direction is None:
+        notes.append(EV_DIRECTION_UNSUPPORTED)
+        return ExpectedValue(
+            p_win=p,
+            avg_win_r=_finite(avg_win_r),
+            avg_loss_r=_finite(avg_loss_r),
+            measurement=MEASUREMENT_UNKNOWN,
+            notes=tuple(notes),
+        )
+
     win_mean = _finite(avg_win_r)
     loss_mean = _finite(avg_loss_r)
-    direction = _risk_geometry(entry=entry, stop=stop, quantity=quantity)
+    risk_geometry = _risk_geometry(
+        entry=entry, stop=stop, quantity=quantity, direction=resolved_direction
+    )
 
     if win_mean is None:
-        derived = _target_r(entry=entry, stop=stop, target=target)
+        derived = _target_r(
+            entry=entry, stop=stop, target=target, direction=resolved_direction
+        )
         if derived is not None and p > 0.0:
             win_mean = derived
             notes.append(EV_WIN_DERIVED_FROM_TARGET)
@@ -193,7 +239,7 @@ def build_expected_value(
     loss_term = (1.0 - p) * (loss_mean or 0.0)
     expected_r = _round4(win_term + loss_term)
 
-    risk_amount, risk_note = direction
+    risk_amount, risk_note = risk_geometry
     if risk_note is not None:
         notes.append(risk_note)
     expected_currency = _round4(expected_r * risk_amount) if risk_amount is not None else None
@@ -204,7 +250,7 @@ def build_expected_value(
             entry=entry,
             stop=stop,
             quantity=quantity,
-            direction="long",
+            direction=resolved_direction,
             model=cost_model,
         )
         if cost.total is None:
@@ -238,35 +284,60 @@ def build_expected_value(
 
 
 def _risk_geometry(
-    *, entry: Any, stop: Any, quantity: Any
+    *, entry: Any, stop: Any, quantity: Any, direction: str = _LONG
 ) -> tuple[float | None, str | None]:
-    """`1R` en dinero (`|entry − stop| × qty`) o `None` con su motivo.
+    """`1R` en dinero (`distancia × qty`) o `None` con su motivo, según la dirección.
 
-    Un stop del **lado equivocado** (o igual al precio de entrada) no es "riesgo cero":
-    es una geometría que no se puede medir. Es la misma lección de `H3` en `v2.43.2`
-    (un `max(0.0, …)` convertía un stop mal puesto en un riesgo medido de `0.0`).
+    Long exige ``stop < entry`` (riesgo = ``(entry − stop) × qty``); short exige
+    ``stop > entry`` (riesgo = ``(stop − entry) × qty``). Un stop del **lado
+    equivocado** (o igual al precio de entrada) no es "riesgo cero": es una geometría que
+    no se puede medir. Es la misma lección de `H3` en `v2.43.2` (un `max(0.0, …)`
+    convertía un stop mal puesto en un riesgo medido de `0.0`), ahora también con la
+    dirección como parte del contrato y no como suposición.
     """
+    resolved = _coerce_direction(direction)
+    if resolved is None:
+        return None, EV_DIRECTION_UNSUPPORTED
     e = _finite(entry)
     s = _finite(stop)
     q = _finite(quantity)
     if e is None or e <= 0.0 or s is None or s <= 0.0 or q is None or q <= 0.0:
         return None, EV_GEOMETRY_UNMEASURED
+    if resolved == _SHORT:
+        if s <= e:
+            return None, EV_GEOMETRY_UNMEASURED
+        return _round4((s - e) * q), None
     if s >= e:
         return None, EV_GEOMETRY_UNMEASURED
     return _round4((e - s) * q), None
 
 
-def _target_r(*, entry: Any, stop: Any, target: Any) -> float | None:
-    """R que representa alcanzar el target (``None`` si la geometría no es medible)."""
+def _target_r(
+    *, entry: Any, stop: Any, target: Any, direction: str = _LONG
+) -> float | None:
+    """R que representa alcanzar el target (``None`` si la geometría no es medible).
+
+    También direccional: en una corta el premio es que el precio **baje** hasta el target
+    (``entry − target``) sobre una distancia de riesgo ``stop − entry``.
+    """
+    resolved = _coerce_direction(direction)
+    if resolved is None:
+        return None
     e = _finite(entry)
     s = _finite(stop)
     t = _finite(target)
     if e is None or s is None or t is None:
         return None
-    distance = e - s
-    if distance <= 0.0:
-        return None
-    reward = t - e
+    if resolved == _SHORT:
+        distance = s - e
+        if distance <= 0.0:
+            return None
+        reward = e - t
+    else:
+        distance = e - s
+        if distance <= 0.0:
+            return None
+        reward = t - e
     if reward < 0.0:
         return None
     return _round4(reward / distance)
@@ -274,6 +345,7 @@ def _target_r(*, entry: Any, stop: Any, target: Any) -> float | None:
 
 __all__ = [
     "EV_COST_UNMEASURED",
+    "EV_DIRECTION_UNSUPPORTED",
     "EV_GEOMETRY_UNMEASURED",
     "EV_LOSS_MEAN_MISSING",
     "EV_LOSS_MEAN_POSITIVE",

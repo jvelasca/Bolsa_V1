@@ -186,6 +186,22 @@ def _build_factors(
     ]
 
 
+def _expected_value_section(study: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Economía del study → sección del panel «¿Por qué?» (V2.47).
+
+    Sin medición (ni R ni neto) devuelve ``None``: el hueco se declara con la AUSENCIA de
+    la sección, nunca con un ``0 €``. Un R medido sin neto (medición PARTIAL: el coste no
+    está cerrado) publica solo el R — ese hueco es exactamente el dato que falta.
+    """
+    expected_r = study.get("expectedR")
+    net = study.get("netExpectedCurrency")
+    r_out = float(expected_r) if _finite(expected_r) else None
+    net_out = float(net) if _finite(net) else None
+    if r_out is None and net_out is None:
+        return None
+    return {"expectedR": r_out, "netExpectedCurrency": net_out}
+
+
 def build_decision_explain_view(
     study: Mapping[str, Any],
     *,
@@ -248,4 +264,7 @@ def build_decision_explain_view(
             "executionAllowed": execution_allowed,
             "copy": AUTHORIZATION_COPY,
         },
+        # V2.47 — economía MEDIDA (null cuando no se midió: el panel omite la sección en
+        # vez de publicar un 0 € que afirmaría una economía inexistente).
+        "expectedValue": _expected_value_section(study),
     }

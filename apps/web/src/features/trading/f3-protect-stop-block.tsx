@@ -2,6 +2,7 @@
  * P4.2 — preview stop amend (proteger) en ticket Confirm.
  * Informativo + override H2; no ejecuta ni persiste stop.
  * V2.10 — bootstrap = emergency −5% (warning), not technical stop.
+ * V2.47 — móvil: filas apiladas y motivo de override con objetivo táctil.
  */
 
 import { bootstrapProtectStopLabel } from "@bolsa/shared";
@@ -9,6 +10,12 @@ import type { OperativaProtectMetaV1 } from "@/features/operations/propose-posit
 import { formatPrice } from "@/features/charts/chart-utils";
 import { MesaTipButton } from "@/features/help/mesa-tip-button";
 import { cn } from "@/lib/utils";
+import {
+  cabinRowClass,
+  cabinRowValueClass,
+  cabinWidth,
+  useNarrowCabin,
+} from "@/features/trading/use-narrow-cabin";
 
 type F3ProtectStopBlockProps = {
   meta: OperativaProtectMetaV1;
@@ -18,11 +25,21 @@ type F3ProtectStopBlockProps = {
   className?: string;
 };
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  narrow,
+}: {
+  label: string;
+  value: string;
+  narrow: boolean;
+}) {
   return (
-    <div className="flex justify-between gap-2">
+    <div className={cabinRowClass(narrow)}>
       <span className="text-muted-foreground">{label}</span>
-      <span className="tabular-nums">{value}</span>
+      <span className={cn("tabular-nums", cabinRowValueClass(narrow))}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -34,6 +51,7 @@ export function F3ProtectStopBlock({
   onOverrideReasonChange,
   className,
 }: F3ProtectStopBlockProps) {
+  const narrow = useNarrowCabin();
   const money = (n: number | null) =>
     n != null ? `${formatPrice(n)} ${currency}` : "—";
   const isBootstrap = meta.protectKind === "bootstrap";
@@ -50,6 +68,7 @@ export function F3ProtectStopBlock({
       )}
       data-testid="f3-protect-stop"
       data-protect-kind={meta.protectKind ?? "plan"}
+      data-cabin-width={cabinWidth(narrow)}
     >
       <div className="flex flex-wrap items-center gap-1.5">
         <p className="text-[11px] font-medium text-foreground">
@@ -71,12 +90,17 @@ export function F3ProtectStopBlock({
         </p>
       ) : null}
       <div className="space-y-0.5">
-        <Row label="Stop actual" value={money(meta.currentStop)} />
+        <Row
+          label="Stop actual"
+          value={money(meta.currentStop)}
+          narrow={narrow}
+        />
         <Row
           label={isBootstrap ? "Stop de emergencia" : "Stop propuesto"}
           value={money(meta.suggestedStop)}
+          narrow={narrow}
         />
-        <Row label="Dirección" value={meta.direction} />
+        <Row label="Dirección" value={meta.direction} narrow={narrow} />
       </div>
       {meta.stopOverrideRequired ? (
         <div className="space-y-1 border-t border-border/60 pt-1.5">

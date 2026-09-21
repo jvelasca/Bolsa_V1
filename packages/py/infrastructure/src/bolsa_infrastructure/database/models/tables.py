@@ -2231,6 +2231,9 @@ class SimFillFinanceContextRow(Base):
             "strategy_version_id",
             "created_at",
         ),
+        # V2.47 — trazado inverso posición→fill→reserva→decisión por ciclo financiero
+        # (migración 044). Nullable: filas previas a 2.47 sin ciclo conocido.
+        Index("sim_fill_finance_context_cycle_id_idx", "cycle_id"),
     )
 
     execution_id: Mapped[str] = mapped_column("execution_id", String, primary_key=True)
@@ -2246,6 +2249,9 @@ class SimFillFinanceContextRow(Base):
         "strategy_version_id", String, nullable=True
     )
     idempotency_key: Mapped[str | None] = mapped_column("idempotency_key", String, nullable=True)
+    # V2.47 — ciclo financiero del fill (migración 044): la costura que ata el efecto
+    # financiero a su señal/decisión. Nullable: filas previas a 2.47 sin ciclo conocido.
+    cycle_id: Mapped[str | None] = mapped_column("cycle_id", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         DateTime(timezone=True),
@@ -2599,6 +2605,8 @@ class PortfolioReservationRow(Base):
         ),
         # V2.43.3: resolver "¿qué reserva es de este exit intent?" sin recorrer el libro.
         Index("portfolio_reservations_exit_order_id_idx", "exit_order_id"),
+        # V2.47: resolver "¿qué reservas pertenecen a este ciclo?" sin recorrer el libro.
+        Index("portfolio_reservations_cycle_id_idx", "cycle_id"),
     )
 
     reservation_id: Mapped[str] = mapped_column("reservation_id", String, primary_key=True)
@@ -2607,6 +2615,9 @@ class PortfolioReservationRow(Base):
     # reservas históricas (compras y filas previas a esta migración) no tienen intent y
     # siguen siendo válidas; una reserva de salida nueva SÍ lo declara.
     exit_order_id: Mapped[str | None] = mapped_column("exit_order_id", String, nullable=True)
+    # V2.47 — ciclo financiero de la reserva (migración 044). Nullable: reservas previas a
+    # 2.47 no tienen ciclo conocido.
+    cycle_id: Mapped[str | None] = mapped_column("cycle_id", String, nullable=True)
     tick_id: Mapped[str | None] = mapped_column("tick_id", String, nullable=True)
     instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
     sector: Mapped[str | None] = mapped_column("sector", String, nullable=True)
@@ -2772,3 +2783,6 @@ class AutoExitOrderRow(Base):
     updated_at: Mapped[datetime | None] = mapped_column(
         "updated_at", DateTime(timezone=True), nullable=True
     )
+    # V2.47 — ciclo financiero del intent (migración 044). Nullable: filas previas a 2.47
+    # no tienen ciclo conocido (``NULL`` ≠ fabricado).
+    cycle_id: Mapped[str | None] = mapped_column("cycle_id", String, nullable=True)

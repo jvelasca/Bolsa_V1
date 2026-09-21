@@ -83,6 +83,8 @@ function entryTruth(
       expectedRR: 1.46,
       riskR: 0.8,
       positionValue: 11420,
+      expectedR: null,
+      netExpectedCurrency: null,
     },
     entriesBlocked: false,
     gateStatus: null,

@@ -1,6 +1,7 @@
 /**
  * V1.38 — Resumen operativo de entrada («¿qué está pasando?» pre-posición).
  * Fase + frase + trigger + sizing. Niveles en OperationalPlanView.
+ * V2.47 — móvil: filas etiqueta→valor apiladas en estrecho (misma información).
  */
 
 import type {
@@ -13,9 +14,16 @@ import {
   buildExecutionState,
   formatEntryOperatingAsOf,
   formatExecutionStateCopy,
+  formatExpectedValueLabel,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
+import {
+  cabinRowClass,
+  cabinRowValueClass,
+  cabinWidth,
+  useNarrowCabin,
+} from "@/features/trading/use-narrow-cabin";
 
 function formatMoney(value: number | null | undefined): string | null {
   if (value == null || !Number.isFinite(value)) return null;
@@ -30,6 +38,31 @@ function formatR(value: number | null | undefined): string | null {
 function formatRR(value: number | null | undefined): string | null {
   if (value == null || !Number.isFinite(value)) return null;
   return `${value.toFixed(1)}:1`;
+}
+
+/** Fila etiqueta→valor: en estrecho se apila (label arriba, valor debajo). */
+function SummaryRow({
+  label,
+  value,
+  narrow,
+  testId,
+}: {
+  label: string;
+  value: string;
+  narrow: boolean;
+  testId?: string;
+}) {
+  return (
+    <div className={cabinRowClass(narrow)}>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd
+        className={cn("font-medium tabular-nums", cabinRowValueClass(narrow))}
+        data-testid={testId}
+      >
+        {value}
+      </dd>
+    </div>
+  );
 }
 
 export function EntryOperatingSummary({
@@ -51,6 +84,8 @@ export function EntryOperatingSummary({
   gateStatus?: string | null;
   className?: string;
 }) {
+  // Hook SIEMPRE antes de cualquier salida temprana (reglas de hooks).
+  const narrow = useNarrowCabin();
   const truth =
     truthProp ??
     (study
@@ -76,6 +111,13 @@ export function EntryOperatingSummary({
   const riskMoney = formatMoney(sizing.riskAmount);
   const riskR = formatR(sizing.riskR);
   const rr = formatRR(sizing.expectedRR);
+  // V2.47 — valor esperado neto: formateador PROPIO (el de dinero de la casa no añade
+  // símbolo ni signo, y un valor esperado sin signo se lee como un precio). Sin medición
+  // devuelve `null` y la fila se OMITE: no se pinta un `0 €` que nadie calculó.
+  const expectedValueLabel = formatExpectedValueLabel({
+    expectedR: sizing.expectedR,
+    netExpectedCurrency: sizing.netExpectedCurrency,
+  });
   const notional = formatMoney(sizing.positionValue);
   const qty =
     sizing.quantity != null && Number.isFinite(sizing.quantity)
@@ -86,12 +128,14 @@ export function EntryOperatingSummary({
     <div
       className={cn(
         "space-y-2 rounded-md border border-border/60 bg-background/40 px-2.5 py-2",
+        narrow && "px-2",
         className,
       )}
       data-testid="entry-operating-summary"
       data-phase={truth.phase}
       data-cta={primaryCta.kind}
       data-execution-lifecycle={executionState.lifecycle}
+      data-cabin-width={cabinWidth(narrow)}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p
@@ -113,55 +157,56 @@ export function EntryOperatingSummary({
       >
         {truth.phrase}
       </p>
-      <dl className="grid gap-1 text-[10px]">
-        <div className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">Acción</dt>
-          <dd className="font-medium" data-testid="entry-operating-action">
-            {primaryCta.label}
-          </dd>
-        </div>
+      {/* Móvil: el suelo tipográfico sube a 12 px (12/10 px es ilegible en teléfono). */}
+      <dl className={cn("grid gap-1", narrow ? "text-xs" : "text-[10px]")}>
+        <SummaryRow
+          label="Acción"
+          value={primaryCta.label}
+          narrow={narrow}
+          testId="entry-operating-action"
+        />
         {riskMoney ? (
-          <div className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">Riesgo al stop</dt>
-            <dd className="font-medium tabular-nums">{riskMoney}</dd>
-          </div>
+          <SummaryRow
+            label="Riesgo al stop"
+            value={riskMoney}
+            narrow={narrow}
+          />
         ) : null}
         {riskR ? (
-          <div className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">R planificado</dt>
-            <dd className="font-medium tabular-nums">{riskR}</dd>
-          </div>
+          <SummaryRow label="R planificado" value={riskR} narrow={narrow} />
         ) : null}
         {rr ? (
-          <div className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">R/R esperado</dt>
-            <dd className="font-medium tabular-nums">{rr}</dd>
-          </div>
+          <SummaryRow label="R/R esperado" value={rr} narrow={narrow} />
+        ) : null}
+        {expectedValueLabel ? (
+          <SummaryRow
+            label="Valor esperado neto"
+            value={expectedValueLabel}
+            narrow={narrow}
+            testId="entry-operating-expected-value"
+          />
         ) : null}
         {notional || qty ? (
-          <div className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">Tamaño</dt>
-            <dd className="font-medium tabular-nums">
-              {[notional, qty].filter(Boolean).join(" · ")}
-            </dd>
-          </div>
+          <SummaryRow
+            label="Tamaño"
+            value={[notional, qty].filter(Boolean).join(" · ")}
+            narrow={narrow}
+          />
         ) : null}
         {truth.expiryLabel ? (
-          <div className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">Vigencia</dt>
-            <dd className="font-medium">{truth.expiryLabel}</dd>
-          </div>
+          <SummaryRow
+            label="Vigencia"
+            value={truth.expiryLabel}
+            narrow={narrow}
+          />
         ) : null}
         {asOfLabel ? (
-          <div className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">Datos</dt>
-            <dd
-              className="font-medium tabular-nums"
-              data-testid="entry-operating-asof"
-            >
-              {asOfLabel}
-            </dd>
-          </div>
+          <SummaryRow
+            label="Datos"
+            value={asOfLabel}
+            narrow={narrow}
+            testId="entry-operating-asof"
+          />
         ) : null}
       </dl>
       {executionCopy ? (
@@ -172,7 +217,12 @@ export function EntryOperatingSummary({
           {executionCopy}
         </p>
       ) : null}
-      <p className="text-[9px] text-muted-foreground">
+      <p
+        className={cn(
+          "text-muted-foreground",
+          narrow ? "text-[11px]" : "text-[9px]",
+        )}
+      >
         Ranking ≠ BUY. Confirm = firma.
       </p>
     </div>

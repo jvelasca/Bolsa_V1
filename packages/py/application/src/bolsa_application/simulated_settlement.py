@@ -182,6 +182,7 @@ async def apply_simulated_order_once(
     owner: str = "auto-sim",
     retryable_on_ineffective: bool = True,
     strategy_version_id: str | None = None,
+    cycle_id: str | None = None,
 ) -> dict[str, str]:
     """Liquida un order simulado (buy o sell) en trazas idempotentes una sola vez.
 
@@ -216,6 +217,7 @@ async def apply_simulated_order_once(
             account_id=account_id,
             venue=venue,
             strategy_version_id=strategy_version_id,
+            cycle_id=cycle_id,
         )
     outcomes: dict[str, str] = {}
     for ev in events:
@@ -249,6 +251,7 @@ async def submit_simulated_order(
     context_store: Any | None = None,
     owner: str = "auto-sim",
     strategy_version_id: str | None = None,
+    cycle_id: str | None = None,
 ) -> tuple[SimulatedOrderResult, dict[str, str]]:
     """Submit determinista simulado (buy/sell) + liquidación idempotente.
 
@@ -316,5 +319,6 @@ async def submit_simulated_order(
         apply_finance=apply_finance,
         owner=owner,
         strategy_version_id=strategy_version_id,
+        cycle_id=cycle_id,
     )
     return result, outcomes

@@ -151,6 +151,14 @@ export type DecisionExplainViewV1 = {
     source: string;
     decisionId: string | null;
   };
+  /**
+   * V2.47 — economía medida de la oportunidad. `null` = NO medida (ni R ni neto): el panel
+   * omite la sección en vez de publicar un `0 €` que afirmaría una economía inexistente.
+   */
+  expectedValue: {
+    expectedR: number | null;
+    netExpectedCurrency: number | null;
+  } | null;
 };
 
 export type DecisionExplainTaComponentsV1 = {
@@ -549,7 +557,26 @@ export function buildDecisionExplainView(
       source: input.source?.trim() || DECISION_JOURNAL_STUDY_ARTIFACT,
       decisionId: study.decisionId,
     },
+    expectedValue: buildExplainExpectedValue(study),
   };
+}
+
+/**
+ * V2.47 — economía del study → sección del panel «¿Por qué?».
+ *
+ * Sin medición (ni R ni neto) devuelve `null`: el hueco se declara con la AUSENCIA de la
+ * sección, nunca con un `0 €`. Un R medido sin neto (medición PARTIAL, coste no cerrado)
+ * publica solo el R: ese hueco es el dato que falta.
+ */
+function buildExplainExpectedValue(
+  study: DecisionJournalStudyViewV1,
+): { expectedR: number | null; netExpectedCurrency: number | null } | null {
+  const expectedR = finite(study.expectedR) ? study.expectedR : null;
+  const netExpectedCurrency = finite(study.netExpectedCurrency)
+    ? study.netExpectedCurrency
+    : null;
+  if (expectedR === null && netExpectedCurrency === null) return null;
+  return { expectedR, netExpectedCurrency };
 }
 
 export type DecisionExplainSurfaceSnapshotV1 = Omit<

@@ -334,3 +334,71 @@ def test_study_view_echoes_mfe_mae_and_learning_verdict() -> None:
     assert wire["learningVerdict"] == "hit"
     assert "returnPct" not in wire
     assert "finalR" not in wire
+
+
+def test_study_view_publishes_measured_economy_and_declares_the_hole() -> None:
+    """V2.47 — `expectedR`/`netExpectedCurrency` del payload llegan al study.
+
+    El study NO deriva economía de R/R ni de riesgo: si el productor no la midió,
+    el campo viaja como ``None`` (hueco declarado), jamás como un ``0`` inventado.
+    """
+    from bolsa_application.decision_journal_studies import build_study_view
+
+    def _view(payload_extra: dict[str, Any]) -> dict[str, Any]:
+        payload = {
+            "sessionId": "s-ev",
+            "kind": "propose",
+            "timeframe": "1d",
+            "assessments": [{"type": "technical", "metadata": {"bias": "bullish"}}],
+            "runtime": {
+                "decisionPackage": {
+                    "action": "buy",
+                    "overallConfidence": 0.7,
+                    "timestamp": "2026-09-02T08:00:00Z",
+                    "notes": ["ok"],
+                },
+                "tradePlan": {
+                    "status": "TRIGGERED",
+                    "direction": "long",
+                    "whyNot": [],
+                    "entry": 100,
+                    "structuralStop": 95,
+                    "target1": 110,
+                    "initialRiskR": 1,
+                    "executionAllowed": True,
+                },
+            },
+            "recommendation": {"status": "open"},
+            **payload_extra,
+        }
+        return build_study_view(
+            session=DecisionSessionRecord(
+                id="s-ev",
+                kind="propose",
+                status="open",
+                instrument_id="inst-1",
+                created_at="2026-09-02T08:00:00Z",
+                account_id="acc-1",
+                symbol="AAPL",
+                decision_id="d-ev",
+                payload=payload,
+            ),
+            name="Apple",
+            position_status="WATCH",
+            has_open_position=False,
+            exit_primary_reason=None,
+            now=datetime(2026, 9, 2, 9, 0, tzinfo=UTC),
+        ).to_dict()
+
+    measured = _view({"expectedR": 0.8, "netExpectedCurrency": 34.0})
+    assert measured["expectedR"] == 0.8
+    assert measured["netExpectedCurrency"] == 34.0
+
+    # R medido sin coste cerrado: el hueco del dinero se declara, no se rellena.
+    partial = _view({"expectedR": 0.42})
+    assert partial["expectedR"] == 0.42
+    assert partial["netExpectedCurrency"] is None
+
+    unmeasured = _view({})
+    assert unmeasured["expectedR"] is None
+    assert unmeasured["netExpectedCurrency"] is None

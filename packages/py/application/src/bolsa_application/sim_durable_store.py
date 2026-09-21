@@ -91,6 +91,9 @@ class SimFillFinanceContext:
     # V2.28 / A10 (P1-02 real): versión de estrategia que originó el fill. ``None``
     # cuando no hay atribución (spine determinista sin ACTIVE) — no se inventa.
     strategy_version_id: str | None = None
+    # V2.47 — ciclo financiero (señal→…→PnL) al que pertenece el fill. ``None`` cuando no
+    # se conoce (filas previas a 2.47 / fill sin decisión AUTO) — desconocido ≠ fabricado.
+    cycle_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.execution_id:
@@ -374,6 +377,7 @@ class PostgresSimFillFinanceContextStore:
                 venue=context.venue,
                 strategy_version_id=context.strategy_version_id,
                 idempotency_key=context.idempotency_key,
+                cycle_id=context.cycle_id,
                 created_at=_now(),
             )
             .on_conflict_do_nothing(index_elements=["execution_id"])
@@ -407,6 +411,7 @@ class PostgresSimFillFinanceContextStore:
             venue=row.venue,
             idempotency_key=row.idempotency_key,
             strategy_version_id=row.strategy_version_id,
+            cycle_id=getattr(row, "cycle_id", None),
         )
 
     async def get_many(
@@ -444,6 +449,7 @@ class PostgresSimFillFinanceContextStore:
                 venue=row.venue,
                 idempotency_key=row.idempotency_key,
                 strategy_version_id=row.strategy_version_id,
+                cycle_id=getattr(row, "cycle_id", None),
             )
             for row in rows
         }
@@ -489,6 +495,7 @@ class PostgresSimFillFinanceContextStore:
                 venue=row.venue,
                 idempotency_key=row.idempotency_key,
                 strategy_version_id=row.strategy_version_id,
+                cycle_id=getattr(row, "cycle_id", None),
             )
             for row in rows
         ]

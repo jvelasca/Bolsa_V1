@@ -2,6 +2,109 @@
 
 All notable releases of Bolsa V1.
 
+## [1.72.0-beta] — AUTO-6 hardening + trazabilidad de ciclo (V2.47) + AUTO-7 self-evaluation — 2026-09-21
+
+**CON migración** (primera de la línea AUTO desde `043`): Alembic head
+`043_exit_identity_and_kill_state` → **`044_auto_cycle_trace`**, con `cycle_id` **nullable e indexado** en
+`portfolio_reservations`, `auto_exit_orders` y `sim_fill_finance_context` (**sin backfill**: `NULL` = fila
+anterior a `2.47`; desconocido ≠ fabricado). En el mismo sello viajan **dos trabajos que el plan repartía en
+dos releases** —lo declara el [pack](./docs/engineering/audit-pack-v2.47-auto-6-hardening-y-trazabilidad-2026-09-21.md)
+§7.1—: el **hardening de AUTO-6.x** (economía direccional, parada dura DURABLE, inyección de crash y
+multi-proceso) y la **trazabilidad de `V2.47`** (`cycle_id` + identidad formal de señales + primeras fases de
+`AUTO-7`). El gobernador y su evidencia (`v2_43_governor_evidence.py`) **no se tocan** (byte a byte igual y
+`exit 0`, con `"bump"` todavía en `1.68.0-beta`).
+
+### El defecto real de la auditoría: la economía era LARGO-only
+
+- `expected_value._risk_geometry` y `_target_r` pasan a ser **direccionales** (una corta exige `stop > entry`,
+  su distancia es `s − e` y su premio se mide hacia **abajo**) y `build_expected_value` propaga la dirección a
+  `estimate_trading_cost`, que cobra la pata de salida sobre **su propio** stop. Una dirección que no se sabe
+  leer **degrada** con motivo tipado `EV_DIRECTION_UNSUPPORTED`: **nunca** se asume larga.
+- Fuente **única** de la dirección en el motor de entrada: `auto_v2_entry._ENTRY_DIRECTION`
+  (`Final[Literal["long","short"]]`) y `entry_direction(signal)` (`BUY → long`). Un `SELL` devuelve `None` y la
+  economía lo declara: **no se habilita SHORT por la puerta de atrás** (el dimensionado, el snapshot y la
+  economía leen de la misma constante, así que no pueden discrepar).
+
+### Parada dura DURABLE (engage → crash → restart → HALTED → release → RUNNING)
+
+- El worker **adopta** en el arranque tanto el engagement durable como una **liberación** escrita desde fuera
+  (si es posterior), **sin reiniciar**: un crash ya no reabre el sistema contra una parada persistida.
+- Vía de liberación con **productor real**: `POST /api/v1/risk/kill-switch/durable-release`, con
+  `reconciliationId` **obligatorio** (un halt que se levanta "porque sí" no es auditable). `not_engaged` es un
+  no-op idempotente. `BROKER_DESYNC` sigue **sin productor**: declarado, no maquillado.
+
+### Exactly-once bajo muerte y concurrencia
+
+- `apps/api-python/tests/test_auto_v46_crash_injection_matrix.py` (NUEVO, 6): `CrashInjected` en las costuras
+  (`save_claim`, `start_apply`, `apply_finance` antes de `mark_applied`, primer chunk APPLIED…) con invariante
+  **exactly-once** tras el reinicio y convergencia del FSM. Su gemelo PG en las transiciones críticas cierra la
+  desviación declarada del Crash Day (el broker SIM liquidaba todas las tranchas en el mismo tick).
+- `test_auto_v46_concurrent.py`: **parametrizado** en `N ∈ {2, 3, 5, 10}` (`Σ _order_seq == 1`, una reserva
+  viva). `test_auto_v46_multiprocess_pg.py` (NUEVO): **N procesos** `scheduler_worker` reales compitiendo por
+  la misma señal, con el invariante medido **en la BD** y convergencia tras matar uno.
+
+### `cycle_id`: una identidad para todo el ciclo financiero
+
+- Acuñado **determinista** por `(cuenta, señal)` (`cyc-<sha256(…)[:12]>`): dos workers duplicados convergen al
+  mismo ciclo. Se propaga por **JSONB** donde ya había JSONB (payload del journal con la clave aditiva
+  `cycleId`, `V2TickPlan`, `position_state` de la posición —que lo **congela** al nacer—) y por **columna
+  indexada** (migración `044`) en reservas, órdenes de salida y contexto financiero del fill. La salida
+  **hereda** el ciclo de la posición que cierra.
+
+### Identidad formal de señales (la colisión deja de ser muda)
+
+- El candidato superado por otro se **journaliza** (`signal_superseded_by_candidate`, con ambos `signal_id` y
+  `strategy_version`). Opción `allow_distinct_strategies` (default **OFF** = comportamiento actual): dos
+  versiones de estrategia sobre la misma cuenta/instrumento/barra compiten como dos oportunidades legítimas
+  sujetas al **optimizador de cartera**, no al dedupe ciego. Si no son representables en una sola posición, se
+  declara (`signal_distinct_strategy_not_representable`) en vez de emitir dos veces.
+
+### `AUTO-7` slice 1 — self-evaluation puro y read-only
+
+- `packages/py/analytics/src/bolsa_analytics/cognitive/auto_self_evaluation.py` (NUEVO): agrega por
+  `strategyVersion` expectancy, win rate, profit factor, MAE/MFE, contribución al drawdown, slippage, coste de
+  rechazo y coste de oportunidad, y **reconcilia el embudo** (`seen == traded + rejected + expired + missed`).
+- **Declara huecos en vez de rellenarlos**: sin oportunidades el embudo queda **abierto** (`seen = None`), un
+  coste sin precios se declara **no medido** (nunca `0.0`), un ciclo repetido se cuenta **una vez** y se
+  declara, y un ciclo sin versión **no se reparte** entre estrategias. No toca pesos ni sizing.
+- Puente con lo durable: `auto_self_evaluation_feed.py` (reconstruye ciclos desde `SimFillFinanceContext`) y
+  endpoint `GET /api/v1/auto/self-evaluation?version=…` (fail-closed sin ámbito de cuenta). **Sin UI** en esta
+  fase.
+
+### UI: valor esperado medido (nunca un `0 €`) y primer slice móvil
+
+- El journal de AUTO publica `expectedR`, `netExpectedCurrency`, `expectedMeasurement` y `expectedNotes`
+  (aditivos); el DTO del estudio los lleva al cliente (`openapi.json` y `schema.d.ts` regenerados) y la UI los
+  pinta con un formateador **propio** (signo y `€`, porque el de dinero de la casa no añade ninguno de los
+  dos): fila en `entry-operating-summary` y sección en el panel «¿Por qué?». **Lo no medido no se pinta.**
+- Móvil: primer slice responsivo de los seis componentes _cabin_ de más valor con un **único** módulo
+  (`use-narrow-cabin.ts`), el hook `use-media-query` **endurecido** (`matchMedia` puede no existir) y stub de
+  viewport en test. Cada componente declara `data-cabin-width`, así que el layout es **medible** en test, y al
+  estrechar **se apila, no se oculta**.
+
+### Cableado de CI (que nada quede fuera de la red)
+
+- `python-ci.yml` (`quality`): `--ignore` de las **tres** suites PG nuevas y registro **explícito** de los
+  cuatro ficheros de test de aplicación de `V2.47` (no entran por pase de directorio). Además se registra
+  `test_decision_journal_studies.py`, que **existía desde v2.44 y no estaba en la lista de ningún job** (sus 10
+  tests no corrían en CI): hallazgo de cobertura de la pasada, cerrado aquí.
+- `release-tag-ci.yml` (`lifecycle-pg`): gates `AUTO_HARDKILL_PG_REQUIRED`, `AUTO_CRASH_INJECT_PG_REQUIRED` y
+  `AUTO_MULTIPROCESS_PG_REQUIRED` con **paso dedicado**, `set -o pipefail`, `tee` a log y **guard anti-skip**
+  (`grep` de `skipped`).
+
+### Verificación
+
+`ruff` limpio · `mypy` **491** ficheros 0 issues · `lint-imports` **4 kept / 0 broken** · gobernador **exit 0**
+con `git diff` **vacío** · bloques offline (targets **extraídos del YAML**) `quality` **2178** y job `python`
+del tag **2189** ⇒ **+87 en AMBOS** sobre `2091`/`2102` (77 del trabajo de la fase + 10 del fichero de la
+pasada) · suites PG nuevas con sus gates **5 passed, 0 skipped** · **matriz de mutaciones 18/18 muerden**
+(sonda `v2_44_mutation_audit.py`, restauración byte a byte y árbol intacto; incluye el defecto de bytecode
+`.pyc` de la sonda, corregido).
+
+**Documentación:** [`plan de fase`](./docs/engineering/plan-v2-47-auto-6-hardening-y-trazabilidad-2026-09-21.md) ·
+[`audit-pack`](./docs/engineering/audit-pack-v2.47-auto-6-hardening-y-trazabilidad-2026-09-21.md) ·
+[`traspaso de relevo`](./docs/engineering/traspaso-relevo-post-v2-47-auto-6-hardening-y-trazabilidad-2026-09-21.md)
+
 ## [1.71.0-beta] — AUTO-6 · Crash/Recovery + Concurrent AUTO: un crash no duplica ni pierde — 2026-09-20
 
 **Sin migración** (el head de Alembic sigue en `043_exit_identity_and_kill_state`; el claim atómico

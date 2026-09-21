@@ -357,6 +357,24 @@ jobs:
         # (``test_crash_recovery_day_process_pg.py`` y ``test_concurrent_auto_pg.py``) van en
         # ``--ignore`` aquí (sin PG skipearían en mudo) y corren en pasos dedicados del job
         # ``lifecycle-pg`` del tag con gate propio.
+        # V2.46.x/AUTO-6 HARDENING: la recuperación de la parada dura
+        # (``test_auto_v46_hardkill_recovery_pg.py``), la inyección de crash por transición
+        # (``test_auto_v46_crash_injection_pg.py``) y la concurrencia MULTI-PROCESO
+        # (``test_auto_v46_multiprocess_pg.py``) son capas PG y van por el mismo camino
+        # (``--ignore`` aquí; pasos dedicados en ``lifecycle-pg`` con gate fail-if-skipped).
+        # V2.47 (trazabilidad de ciclo + identidad de señales + AUTO-7 + valor esperado en
+        # el journal): sus gates de APLICACIÓN van EXPLÍCITOS porque esta lista es POR
+        # FICHERO (``packages/py/analytics/tests`` llega por pase de directorio, y ahí solo
+        # entra el informe PURO ``test_auto_self_evaluation.py``). Sin registrarlos, los
+        # cuatro ficheros no correrían en este job: ``test_auto_v47_cycle_trace.py``,
+        # ``test_auto_v47_expected_value_journal.py``, ``test_auto_v47_signal_identity.py``
+        # y ``test_auto_self_evaluation_feed.py``. Los herméticos de ``V2.46.x``
+        # (``test_auto_v46_hardkill_recovery.py``, ``test_auto_v46_crash_injection_matrix.py``)
+        # entran por el pase de directorio de ``apps/api-python/tests``.
+        # V2.47: ``test_decision_journal_studies.py`` (existe desde v2.44) no estaba en la
+        # lista de NINGÚN job, así que sus 10 tests no corrían en CI; se registra aquí y en
+        # el job ``quality`` de ``python-ci.yml`` (misma deuda que v2.42.2 cerró para
+        # ``test_auto_daily_journal.py``).
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -392,6 +410,11 @@ jobs:
           packages/py/application/tests/test_auto_v3_governor_gate.py
           packages/py/application/tests/test_auto_v4_optimizer_wiring.py
           packages/py/application/tests/test_auto_v2_entry.py
+          packages/py/application/tests/test_auto_v47_cycle_trace.py
+          packages/py/application/tests/test_auto_v47_expected_value_journal.py
+          packages/py/application/tests/test_auto_v47_signal_identity.py
+          packages/py/application/tests/test_auto_self_evaluation_feed.py
+          packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
           packages/py/application/tests/test_trade_plan.py
@@ -443,6 +466,9 @@ jobs:
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
+          --ignore=apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py
+          --ignore=apps/api-python/tests/test_auto_v46_crash_injection_pg.py
+          --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
           -q
 
   lifecycle-pg:
@@ -530,6 +556,15 @@ jobs:
       # escenario tiene su paso DEDICADO y su guard anti-skip (log + grep de ``skipped``).
       AUTO_CRASH_RECOVERY_PG_REQUIRED: '1'
       AUTO_CONCURRENT_PG_REQUIRED: '1'
+      # V2.46.x/AUTO-6 HARDENING: la recuperación de la parada dura (engage → crash →
+      # restart HALTED → release con reconciliación → RUNNING), la inyección de crash por
+      # transición (exactly-once del efecto financiero) y la concurrencia MULTI-PROCESO
+      # real (N ``scheduler_worker`` sobre la misma señal) son capas PG. Un skip mudo
+      # invalidaría la certificación del tag; cada una tiene su paso DEDICADO con guard
+      # anti-skip (log + grep de ``skipped``).
+      AUTO_HARDKILL_PG_REQUIRED: '1'
+      AUTO_CRASH_INJECT_PG_REQUIRED: '1'
+      AUTO_MULTIPROCESS_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -732,6 +767,75 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-concurrent-pg.log; then
             echo "::error::Concurrent AUTO dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/auto-concurrent-pg.log || true
+            exit 1
+          fi
+
+      # V2.46.x/AUTO-6 HARDENING (parada dura durable): engage con productor real →
+      # crash → restart HALTED → release con ``reconciliation_id`` → RUNNING, sobre PG y
+      # con sesiones/procesos distintos. Paso DEDICADO con guard anti-skip.
+      - name: Pytest HardKill recovery (parada dura durable + PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-hardkill-pg.log
+
+      - name: Fail on skipped HardKill recovery (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/auto-hardkill-pg.log ]; then
+            echo "::error::HardKill recovery no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-hardkill-pg.log; then
+            echo "::error::HardKill recovery dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-hardkill-pg.log || true
+            exit 1
+          fi
+
+      # V2.46.x/AUTO-6 HARDENING (inyección de crash): la muerte EN MEDIO de la
+      # materialización (APPLYING con lease caído, fill parcial entre tranchas) sobre PG
+      # y con sesiones distintas: exactly-once del efecto financiero. Paso DEDICADO.
+      - name: Pytest crash injection matrix (exactly-once + PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_v46_crash_injection_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-crash-inject-pg.log
+
+      - name: Fail on skipped crash injection matrix (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/auto-crash-inject-pg.log ]; then
+            echo "::error::Crash injection matrix no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-crash-inject-pg.log; then
+            echo "::error::Crash injection matrix dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-crash-inject-pg.log || true
+            exit 1
+          fi
+
+      # V2.46.x/AUTO-6 HARDENING (concurrencia multi-proceso): N ``scheduler_worker``
+      # reales compitiendo por la misma señal; invariante medido en BD (1 orden, 1
+      # reserva, 1 efecto financiero) y convergencia tras matar uno. Paso DEDICADO.
+      - name: Pytest multiprocess AUTO (N procesos reales + PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_v46_multiprocess_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-multiprocess-pg.log
+
+      - name: Fail on skipped multiprocess AUTO (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/auto-multiprocess-pg.log ]; then
+            echo "::error::Multiprocess AUTO no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-multiprocess-pg.log; then
+            echo "::error::Multiprocess AUTO dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-multiprocess-pg.log || true
             exit 1
           fi
 

@@ -3,10 +3,11 @@
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PositionDto } from "@bolsa/shared";
 import { buildExitRouteView, buildOperationalTruth } from "@bolsa/shared";
 import { ExitRouteView } from "@/features/trading/exit-route-view";
+import { stubNarrowViewport, stubWideViewport } from "@/lib/test-viewport";
 
 afterEach(() => cleanup());
 
@@ -75,5 +76,48 @@ describe("ExitRouteView V1.40", () => {
     render(<ExitRouteView route={route} testId="exit-route-custom" />);
     expect(screen.getByTestId("exit-route-custom")).toBeTruthy();
     expect(screen.getByTestId("exit-route-custom-node-stop")).toBeTruthy();
+  });
+});
+
+describe("ExitRouteView V2.47 — móvil", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("en teléfono declara el ancho y cada nodo sigue mostrando rol, precio y R", () => {
+    stubNarrowViewport();
+    const position = openPosition();
+    const truth = buildOperationalTruth({
+      position,
+      portfolioReconStatus: "ok",
+    });
+    render(<ExitRouteView truth={truth} position={position} />);
+
+    const root = screen.getByTestId("exit-route-AAPL");
+    expect(root.getAttribute("data-cabin-width")).toBe("narrow");
+
+    const entryNode = screen.getByTestId("exit-route-AAPL-node-entry");
+    expect(entryNode.textContent).toMatch(/Entrada/);
+    // Precio, R y marca de alcanzado sobreviven al apilado (nada se oculta).
+    expect(entryNode.textContent).toMatch(/100\.00/);
+    expect(entryNode.textContent).toMatch(/\+0\.0R/);
+    expect(entryNode.textContent).toMatch(/fill/);
+    // El aviso de honestidad sube al suelo legible en teléfono.
+    expect(screen.getByText(/Stop planificado/i).className).toMatch(
+      /text-\[11px\]/,
+    );
+  });
+
+  it("en escritorio mantiene el aviso en su tamaño de cabina", () => {
+    stubWideViewport();
+    const position = openPosition();
+    const truth = buildOperationalTruth({ position })!;
+    render(<ExitRouteView truth={truth} position={position} />);
+    expect(
+      screen.getByTestId("exit-route-AAPL").getAttribute("data-cabin-width"),
+    ).toBe("wide");
+    expect(screen.getByText(/Stop planificado/i).className).toMatch(
+      /text-\[9px\]/,
+    );
   });
 });

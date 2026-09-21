@@ -5,6 +5,7 @@
  * V2.39 — AUTO arm honesty: misma puerta A3 que Cuentas (tryArmAuto + frase).
  * V2.43 — chrome ESTADO AUTO DESARMADO/ARMADO · EJECUCIÓN PAPER · Arm ≠ autorización.
  * V2.46 — data-arm from autoActive (not the raw latch).
+ * V2.47 — móvil: autonomía en columna y rejilla de plan a una columna.
  * Arm ≠ execute · Confirm = firma · Ranking ≠ BUY.
  */
 
@@ -30,6 +31,10 @@ import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-p
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
+import {
+  cabinWidth,
+  useNarrowCabin,
+} from "@/features/trading/use-narrow-cabin";
 import {
   CABIN_FOCUS_RING,
   CABIN_KV_GRID,
@@ -78,6 +83,7 @@ export function AutoDeskPanel({
   journey = null,
   birthQuantity = null,
 }: AutoDeskPanelProps) {
+  const narrow = useNarrowCabin();
   const bookPrefs = useDemoBookPrefs();
   const { paperDExecuteEnv, killOn } = useMesaEntriesBlocked();
   const arm = useAutoArmState();
@@ -140,6 +146,7 @@ export function AutoDeskPanel({
         className,
       )}
       data-testid="auto-desk-panel"
+      data-cabin-width={cabinWidth(narrow)}
       open={defaultOpen || undefined}
     >
       <summary
@@ -155,7 +162,7 @@ export function AutoDeskPanel({
       <div className="space-y-2 border-t border-border/40 px-2 py-1.5">
         <fieldset data-testid="auto-desk-autonomy">
           <legend className="sr-only">Autonomía</legend>
-          <div className="flex flex-wrap gap-1">
+          <div className={cn("flex gap-1", narrow ? "flex-col" : "flex-wrap")}>
             {AUTONOMY_OPTIONS.map((opt) => {
               const active =
                 opt.mode === "auto"
@@ -169,6 +176,7 @@ export function AutoDeskPanel({
                     CABIN_TOUCH_TARGET,
                     CABIN_FOCUS_RING,
                     CABIN_TYPE.operativa,
+                    narrow ? "w-full" : "",
                     "rounded-md border px-3 font-medium text-foreground",
                     active
                       ? "border-sky-600/50 bg-sky-500/15"
@@ -243,7 +251,7 @@ export function AutoDeskPanel({
             </span>
           </p>
           <dl
-            className={cn(CABIN_KV_GRID, "mt-1")}
+            className={cn(CABIN_KV_GRID, narrow && "grid-cols-1", "mt-1")}
             data-testid="auto-desk-plan-amounts"
           >
             {planPreview.entry != null ? (
@@ -277,7 +285,12 @@ export function AutoDeskPanel({
               </div>
             ) : null}
             {planPreview.t1Price != null ? (
-              <div className="flex justify-between gap-2 col-span-2">
+              <div
+                className={cn(
+                  "flex justify-between gap-2",
+                  narrow ? "col-span-1" : "col-span-2",
+                )}
+              >
                 <dt>T1</dt>
                 <dd className={cabinNumClass()}>
                   {planPreview.t1Price.toFixed(2)} € · vende {planPreview.t1Pct}
@@ -286,7 +299,12 @@ export function AutoDeskPanel({
               </div>
             ) : null}
             {planPreview.t2Price != null ? (
-              <div className="flex justify-between gap-2 col-span-2">
+              <div
+                className={cn(
+                  "flex justify-between gap-2",
+                  narrow ? "col-span-1" : "col-span-2",
+                )}
+              >
                 <dt>T2</dt>
                 <dd className={cabinNumClass()}>
                   {planPreview.t2Price.toFixed(2)} € · vende {planPreview.t2Pct}
@@ -295,7 +313,12 @@ export function AutoDeskPanel({
               </div>
             ) : null}
             {planPreview.remainingPct != null ? (
-              <div className="flex justify-between gap-2 col-span-2">
+              <div
+                className={cn(
+                  "flex justify-between gap-2",
+                  narrow ? "col-span-1" : "col-span-2",
+                )}
+              >
                 <dt>RESTANTE</dt>
                 <dd
                   className={cabinNumClass()}
@@ -305,7 +328,12 @@ export function AutoDeskPanel({
                 </dd>
               </div>
             ) : null}
-            <div className="flex justify-between gap-2 col-span-2">
+            <div
+              className={cn(
+                "flex justify-between gap-2",
+                narrow ? "col-span-1" : "col-span-2",
+              )}
+            >
               <dt>Trailing</dt>
               <dd
                 className={cn(

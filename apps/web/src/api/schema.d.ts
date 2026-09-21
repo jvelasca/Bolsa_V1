@@ -1064,6 +1064,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/self-evaluation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Self Evaluation
+         * @description Informe AUTO-7 de UNA versión de estrategia, desde los fills durables.
+         *
+         *     La versión es OBLIGATORIA: el informe se agrega POR ``strategyVersion`` y devolver un
+         *     roll-up de "todas" sin saber cuáles son sería una lectura incompleta disfrazada. El
+         *     ``account_id`` (de la cabecera) acota la lectura a una cuenta visible del principal:
+         *     sin cuenta operativa la respuesta es vacía (fail-closed), nunca global.
+         */
+        get: operations["get_auto_self_evaluation_api_auto_self_evaluation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/backtests": {
         parameters: {
             query?: never;
@@ -3241,6 +3266,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/research/strategy/{version_id}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy Health
+         * @description V2.25/A10 — salud de una estrategia activa (serie de snapshots + decisión).
+         *
+         *     Lee los snapshots persistidos de ``strategy_health_snapshots``. La decisión
+         *     (``continue`` vs ``relab``) se deriva del último snapshot; si no hay snapshots,
+         *     se responde un estado neutro (``continue`` sin evidencia), nunca una degradación
+         *     inventada. La degradación real dispara re-LABORATORIO, **nunca** un swap directo.
+         */
+        get: operations["get_strategy_health_api_research_strategy__version_id__health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research/summary": {
         parameters: {
             query?: never;
@@ -3386,6 +3436,33 @@ export interface paths {
          * @description Activa o desactiva el kill switch runtime (memoria + Redis si hay).
          */
         post: operations["post_kill_switch_api_risk_kill_switch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/risk/kill-switch/durable-release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Durable Kill Release
+         * @description Levanta la parada DURA persistida exigiendo ``reconciliationId`` (AUTO-6 hardening).
+         *
+         *     La parada dura vive en ``auto_kill_state`` (la escribe el worker). Este endpoint NO
+         *     habla con el proceso del worker: escribe la liberación DURABLE (con su actor y su
+         *     identidad de reconciliación) y el worker la adopta en su siguiente turno
+         *     (``_v2_load_kill_state``), sin reiniciarlo. Sin ``reconciliationId`` no se libera.
+         *
+         *     ``not_engaged`` no es un error: una parada que no estaba activa es un no-op idempotente.
+         */
+        post: operations["post_durable_kill_release_api_risk_kill_switch_durable_release_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4077,6 +4154,130 @@ export interface components {
         /** AuthStatusResponseDto */
         AuthStatusResponseDto: {
             data: components["schemas"]["AuthStatusDataDto"];
+        };
+        /**
+         * AutoSelfEvaluationDto
+         * @description Informe completo: roll-up + filas por versión + embudo + huecos declarados.
+         */
+        AutoSelfEvaluationDto: {
+            /** Bystrategy */
+            byStrategy?: components["schemas"]["AutoStrategySelfEvaluationDto"][];
+            /** Cycles */
+            cycles: number;
+            /** Cycleswithoutidentity */
+            cyclesWithoutIdentity: number;
+            /** Decisive */
+            decisive: boolean;
+            /** Drawdowncurrency */
+            drawdownCurrency: string;
+            /** Duplicatecycles */
+            duplicateCycles: number;
+            /** Errors */
+            errors?: string[];
+            /** Expectancycurrency */
+            expectancyCurrency?: string | null;
+            /** Expectancyr */
+            expectancyR?: number | null;
+            /** Funnel */
+            funnel?: {
+                [key: string]: unknown;
+            };
+            /** Key */
+            key: string;
+            /** Measurement */
+            measurement: string;
+            /** Notes */
+            notes?: string[];
+            /** Opportunitycostmeasurement */
+            opportunityCostMeasurement: string;
+            /** Opportunitycostreturn */
+            opportunityCostReturn?: number | null;
+            /** Profitfactor */
+            profitFactor?: number | null;
+            /** Readonly */
+            readOnly: boolean;
+            /** Realizedpnl */
+            realizedPnl: string;
+            /** Rejectionreasons */
+            rejectionReasons?: {
+                [key: string]: number;
+            };
+            /** Resultsmeasurement */
+            resultsMeasurement: string;
+            /** Slippagecurrency */
+            slippageCurrency?: string | null;
+            /** Trades */
+            trades: number;
+            /** Unattributedcycles */
+            unattributedCycles: number;
+            /** Unattributedpnl */
+            unattributedPnl: string;
+            /** Version */
+            version?: string | null;
+            /** Winrate */
+            winRate?: number | null;
+        };
+        /**
+         * AutoStrategySelfEvaluationDto
+         * @description Lectura de UNA versión de estrategia (lo medido + lo declarado como no medido).
+         */
+        AutoStrategySelfEvaluationDto: {
+            /** Avglosscurrency */
+            avgLossCurrency?: string | null;
+            /** Avgwincurrency */
+            avgWinCurrency?: string | null;
+            /** Decisive */
+            decisive: boolean;
+            /** Drawdowncurrency */
+            drawdownCurrency: string;
+            /** Drawdownmeasurement */
+            drawdownMeasurement: string;
+            /** Drawdownshare */
+            drawdownShare?: number | null;
+            /** Excursionsmeasurement */
+            excursionsMeasurement: string;
+            /** Expectancycurrency */
+            expectancyCurrency?: string | null;
+            /** Expectancyr */
+            expectancyR?: number | null;
+            /** Funnel */
+            funnel?: {
+                [key: string]: number;
+            };
+            /** Losses */
+            losses: number;
+            /** Maer */
+            maeR?: number | null;
+            /** Mfer */
+            mfeR?: number | null;
+            /** Notes */
+            notes?: string[];
+            /** Profitfactor */
+            profitFactor?: number | null;
+            /** Realizedpnl */
+            realizedPnl: string;
+            /** Rejectioncostmeasurement */
+            rejectionCostMeasurement: string;
+            /** Rejectioncostreturn */
+            rejectionCostReturn?: number | null;
+            /** Resultsmeasurement */
+            resultsMeasurement: string;
+            /** Riskmeasurement */
+            riskMeasurement: string;
+            /** Samplequality */
+            sampleQuality: string;
+            /** Slippagecurrency */
+            slippageCurrency?: string | null;
+            /** Slippagemeasurement */
+            slippageMeasurement: string;
+            /** Strategyversion */
+            strategyVersion: string;
+            /** Trades */
+            trades: number;
+            /** Winrate */
+            winRate?: number | null;
+            /** Wins */
+            wins: number;
         };
         /** BacktestCoachAnalyzeRequest */
         BacktestCoachAnalyzeRequest: {
@@ -5181,6 +5382,8 @@ export interface components {
             direction?: string | null;
             /** Entry */
             entry?: number | null;
+            /** Expectedr */
+            expectedR?: number | null;
             /** Expectedrr */
             expectedRR?: number | null;
             /** Hasoperationalplan */
@@ -5203,6 +5406,8 @@ export interface components {
             } | null;
             /** Name */
             name?: string | null;
+            /** Netexpectedcurrency */
+            netExpectedCurrency?: number | null;
             /** Nextreviewat */
             nextReviewAt?: string | null;
             /** Opinion */
@@ -5574,6 +5779,42 @@ export interface components {
         DrawingReplayResponseDto: {
             /** Data */
             data: components["schemas"]["DrawingReplayMarkerDto"][];
+        };
+        /**
+         * DurableKillReleaseBody
+         * @description Body POST de la liberación DURABLE de la parada dura (AUTO-6 hardening).
+         *
+         *     ``reconciliationId`` es OBLIGATORIO: la parada dura solo se levanta con la identidad de
+         *     la reconciliación que lo autoriza (un halt que se levanta "porque sí" no es auditable).
+         */
+        DurableKillReleaseBody: {
+            /** Accountid */
+            accountId: string;
+            /**
+             * Actor
+             * @default operator
+             */
+            actor: string;
+            /** Engineid */
+            engineId: string;
+            /** Reconciliationid */
+            reconciliationId: string;
+        };
+        /**
+         * DurableKillReleaseResponse
+         * @description Resultado de intentar levantar la parada dura durable.
+         */
+        DurableKillReleaseResponse: {
+            /** Accountid */
+            accountId: string;
+            /** Engineid */
+            engineId: string;
+            /** Reason */
+            reason?: string | null;
+            /** Reconciliationid */
+            reconciliationId: string;
+            /** Released */
+            released: boolean;
         };
         /** EnqueueStaleResponseDto */
         EnqueueStaleResponseDto: {
@@ -9426,6 +9667,52 @@ export interface components {
             data: components["schemas"]["StrategyDefinitionSummaryDto"][];
         };
         /**
+         * StrategyHealthDto
+         * @description V2.25/A10 — estado de salud de la estrategia activa + decisión de vigilancia.
+         */
+        StrategyHealthDto: {
+            /** Breaches */
+            breaches?: string[];
+            /** Decision */
+            decision: string;
+            /** Degraded */
+            degraded: boolean;
+            /** History */
+            history?: components["schemas"]["StrategyHealthSnapshotDto"][];
+            /** Instrumentid */
+            instrumentId?: string | null;
+            latest?: components["schemas"]["StrategyHealthSnapshotDto"] | null;
+            /** Versionid */
+            versionId: string;
+        };
+        /** StrategyHealthResponseDto */
+        StrategyHealthResponseDto: {
+            data: components["schemas"]["StrategyHealthDto"];
+        };
+        /**
+         * StrategyHealthSnapshotDto
+         * @description V2.25/A10 — un snapshot de salud de una estrategia activa.
+         */
+        StrategyHealthSnapshotDto: {
+            /** Asof */
+            asOf: string;
+            /** Credibility */
+            credibility?: number | null;
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+            /** Dsr */
+            dsr?: number | null;
+            /** Edge */
+            edge?: number | null;
+            /** Versionid */
+            versionId: string;
+            /** Walkforwardefficiency */
+            walkForwardEfficiency?: number | null;
+        };
+        /**
          * SubmitIntentListItemDto
          * @description F2b — DurableSubmitIntent wire + soft-join instrumentId (fail-closed null).
          */
@@ -12321,6 +12608,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthStatusResponseDto"];
+                };
+            };
+        };
+    };
+    get_auto_self_evaluation_api_auto_self_evaluation_get: {
+        parameters: {
+            query: {
+                version: string;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoSelfEvaluationDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -16781,6 +17101,37 @@ export interface operations {
             };
         };
     };
+    get_strategy_health_api_research_strategy__version_id__health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyHealthResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_laboratory_research_summary_api_research_summary_get: {
         parameters: {
             query?: never;
@@ -17107,6 +17458,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KillSwitchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_durable_kill_release_api_risk_kill_switch_durable_release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DurableKillReleaseBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DurableKillReleaseResponse"];
                 };
             };
             /** @description Validation Error */
