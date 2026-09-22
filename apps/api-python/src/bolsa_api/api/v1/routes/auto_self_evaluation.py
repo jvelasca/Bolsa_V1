@@ -37,6 +37,7 @@ class AutoStrategySelfEvaluationDto(BaseModel):
     realizedPnl: str
     expectancyCurrency: str | None = None
     expectancyR: float | None = None
+    netExpectancyR: float | None = None
     winRate: float | None = None
     profitFactor: float | None = None
     avgWinCurrency: str | None = None
@@ -51,10 +52,37 @@ class AutoStrategySelfEvaluationDto(BaseModel):
     sampleQuality: str
     resultsMeasurement: str
     riskMeasurement: str
+    netRMeasurement: str
+    cyclesWithoutCost: int
     excursionsMeasurement: str
     slippageMeasurement: str
     rejectionCostMeasurement: str
     drawdownMeasurement: str
+    decisive: bool
+    notes: list[str] = Field(default_factory=list)
+
+
+class AutoStrategyRegimeEvaluationDto(BaseModel):
+    """AUTO-9 — celda ``strategyVersion × régime``: el R condicionado al mercado.
+
+    ``regime == "UNKNOWN"`` es un cubo PROPIO (los ciclos que no declaran régimen), no un
+    comodín. El embudo no viaja aquí: no tiene dimensión de régimen en el dato durable.
+    """
+
+    strategyVersion: str
+    regime: str
+    cycles: int
+    wins: int
+    losses: int
+    realizedPnl: str
+    expectancyR: float | None = None
+    netExpectancyR: float | None = None
+    winRate: float | None = None
+    cyclesWithoutRisk: int
+    cyclesWithoutCost: int
+    rMeasurement: str
+    netRMeasurement: str
+    sampleQuality: str
     decisive: bool
     notes: list[str] = Field(default_factory=list)
 
@@ -79,10 +107,12 @@ class AutoSelfEvaluationDto(BaseModel):
     unattributedCycles: int
     unattributedPnl: str
     cyclesWithoutIdentity: int
+    cyclesWithoutRegime: int
     duplicateCycles: int
     funnel: dict[str, Any] = Field(default_factory=dict)
     rejectionReasons: dict[str, int] = Field(default_factory=dict)
     byStrategy: list[AutoStrategySelfEvaluationDto] = Field(default_factory=list)
+    byRegime: list[AutoStrategyRegimeEvaluationDto] = Field(default_factory=list)
     resultsMeasurement: str
     measurement: str
     decisive: bool
@@ -109,10 +139,12 @@ def _to_dto(payload: dict[str, Any], *, version: str | None) -> AutoSelfEvaluati
         unattributedCycles=int(payload["unattributedCycles"]),
         unattributedPnl=str(payload["unattributedPnl"]),
         cyclesWithoutIdentity=int(payload["cyclesWithoutIdentity"]),
+        cyclesWithoutRegime=int(payload["cyclesWithoutRegime"]),
         duplicateCycles=int(payload["duplicateCycles"]),
         funnel=payload["funnel"],
         rejectionReasons=payload["rejectionReasons"],
         byStrategy=[AutoStrategySelfEvaluationDto(**row) for row in payload["byStrategy"]],
+        byRegime=[AutoStrategyRegimeEvaluationDto(**row) for row in payload["byRegime"]],
         resultsMeasurement=str(payload["resultsMeasurement"]),
         measurement=str(payload["measurement"]),
         decisive=bool(payload["decisive"]),

@@ -14,10 +14,12 @@ Qué hace, exactamente:
 * **Legacy sin ``cycle_id``**: los fills anteriores a la 044 se emparejan FIFO por versión
   de estrategia, emitiendo un ciclo por emparejamiento (anónimos, declarados como tales por
   el módulo puro: ``cycle_without_identity``).
-* **Lo que NO se puede medir aquí se declara, no se inventa**: el R realizado, el MAE/MFE,
-  el slippage y el embudo exigen productores que hoy viven en el worker (riesgo asumido,
-  excursiones de precio, journal de oportunidades). Se pasan como ``None`` y el módulo los
-  publica como ``UNKNOWN``/``PARTIAL`` con su nota. Este adaptador nunca rellena un 0.
+* **Lo que NO se puede medir aquí se declara, no se inventa**: el R realizado exige un
+  denominador de riesgo que los fills NO llevan, así que se calcula solo si el llamante
+  aporta la evidencia por ciclo (``cycle_risk``, productor de ``AUTO-9``); el MAE/MFE, el
+  slippage y el embudo exigen otros productores que viven en el worker. Sin esos aportes se
+  pasan como ``None`` y el módulo los publica como ``UNKNOWN``/``PARTIAL`` con su nota. Este
+  adaptador nunca rellena un 0.
 * Un ciclo que declare DOS versiones de estrategia distintas es un defecto de atribución:
   se emite SIN versión (el módulo lo declara en el cajón ``unattributed``) en vez de
   repartirlo entre las dos.
@@ -29,7 +31,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -38,6 +40,7 @@ from bolsa_analytics.cognitive.auto_self_evaluation import (
     AutoSelfEvaluation,
     evaluate_auto_self_evaluation,
 )
+from bolsa_application.cycle_risk import CycleRisk, apply_cycle_risk
 from bolsa_application.sim_durable_store import (
     PostgresSimFillFinanceContextStore,
     SimFillFinanceContextStore,
@@ -159,14 +162,19 @@ def build_auto_self_evaluation(
     seen: int | None = None,
     durable_seen: int | None = None,
     min_trades: int = SELF_EVAL_MIN_TRADES_DEFAULT,
+    cycle_risk: Mapping[str, CycleRisk] | None = None,
 ) -> AutoSelfEvaluation:
     """(PURA) informe AUTO-7 a partir de los fills durables (+ embudo si el llamante lo tiene).
 
     ``opportunities``/``seen``/``durable_seen`` son opcionales y se pasan TAL CUAL: si no
     se aportan, el embudo queda declarado ``UNKNOWN`` en vez de cerrarse con un cero.
+
+    ``cycle_risk`` es la evidencia de riesgo por ciclo del productor ``AUTO-9`` (denominador
+    y coste estimado, atados por ``cycle_id``). Sin ella el informe es **byte-idéntico** al
+    de ``AUTO-7``: los ciclos quedan sin R, que es el hueco que el módulo ya declaraba.
     """
     return evaluate_auto_self_evaluation(
-        cycles=cycles_from_fills(fills or ()),
+        cycles=apply_cycle_risk(cycles_from_fills(fills or ()), cycle_risk),
         opportunities=opportunities,
         seen=seen,
         durable_seen=durable_seen,
@@ -187,9 +195,7 @@ def make_auto_self_evaluation_provider(
     invocación y, ante un fallo de lectura, devuelve un informe con el motivo declarado
     (nunca métricas fabricadas).
     """
-    build_store = store_factory or (
-        lambda session: PostgresSimFillFinanceContextStore(session)
-    )
+    build_store = store_factory or (lambda session: PostgresSimFillFinanceContextStore(session))
 
     async def _self_evaluation(version_id: str) -> dict[str, Any]:
         vid = str(version_id or "").strip()

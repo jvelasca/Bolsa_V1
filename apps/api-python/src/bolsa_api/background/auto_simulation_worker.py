@@ -164,6 +164,7 @@ from bolsa_application.auto_v2_entry import (
 from bolsa_application.auto_v2_entry import (
     edge_from_package as _edge_from_package,
 )
+from bolsa_application.cycle_risk import CycleRisk, cycle_risk_from_reservations
 from bolsa_application.decision_contract import (
     DecisionPackage,
     derive_execution_plan,
@@ -220,6 +221,13 @@ _CANONICAL_LEDGER_LIMIT = 10_000
 # Si se alcanza, no se puede afirmar que se vieron todas las reservas vivas: el libro de
 # compromiso queda NO medible y las aperturas se vetan (agotar un tope ≠ no hay más).
 _V2_RESERVATIONS_LIMIT = 500
+
+# AUTO-9 — tope de lectura del material de RIESGO por ciclo (``list_by_cycle_ids``). A
+# diferencia del libro de compromiso, agotar este tope NO veta: los ciclos que no cupieron
+# quedan declarados SIN reserva (hueco honesto, ``cycle_without_risk``), nunca con el
+# denominador de otro ciclo. El tope es 4× el del libro porque un ciclo tiene varias filas
+# (entrada + salidas) y la consulta va por ``cycle_id`` (índice dedicado).
+_V2_CYCLE_RISK_READ_LIMIT = 2000
 
 # AUTO-1A — ``execution_events`` ya materializados. ``already_applied`` también cuenta:
 # significa que OTRA instancia ya movió el dinero (idempotencia por ``execution_id``), que
@@ -448,6 +456,7 @@ def _open_order_from_fill(
 @dataclass(frozen=True, slots=True)
 class _AppliedFill:
     """Fill aplicado, en la forma que la reconciliación entiende (P1-01/P2-02)."""
+
     symbol: str
     side: str
     qty: Decimal
@@ -1483,9 +1492,7 @@ class AutoSimulationWorker:
             self._v2_kill_switch.engagement_id = new_exit_order_id()
         return changed
 
-    async def engage_kill_switch_durable(
-        self, reason: Any, *, at: str | None = None
-    ) -> bool:
+    async def engage_kill_switch_durable(self, reason: Any, *, at: str | None = None) -> bool:
         """Activa la parada dura Y la persiste (P0-1), para que sobreviva al reinicio.
 
         Si el persist falla, el latch se mantiene (nunca se levanta la parada por un fallo
@@ -1908,7 +1915,9 @@ class AutoSimulationWorker:
             return None
         return source.edge_for(strategy_version or "unversioned")
 
-    async def _v2_refresh_trade_context(self, symbols: Sequence[str], versions: Sequence[str]) -> None:
+    async def _v2_refresh_trade_context(
+        self, symbols: Sequence[str], versions: Sequence[str]
+    ) -> None:
         """Precarga (async) el contexto de cartera y el edge del tick.
 
         El hot path decide de forma SÍNCRONA, así que el I/O se concentra aquí una vez por
@@ -1974,9 +1983,7 @@ class AutoSimulationWorker:
         self._v2_open_orders_read_measurement = read_measurement
         self._v2_order_book_measurement = combine_measurements(
             read_measurement,
-            summarize_open_orders(
-                self._v2_open_orders, equity=self._v2_equity()
-            ).measurement,
+            summarize_open_orders(self._v2_open_orders, equity=self._v2_equity()).measurement,
         )
 
     async def _v2_read_unapplied(self) -> tuple[list[Any], MeasurementStatus]:
@@ -2019,9 +2026,7 @@ class AutoSimulationWorker:
     def _v2_known_fill_ids(self) -> frozenset[str]:
         """Ids de fill ya reconocidos por el libro del worker (no son pendientes)."""
         events = getattr(self, "_applied_execution_events", None) or []
-        return frozenset(
-            str(getattr(event, "execution_id", "") or "") for event in events
-        )
+        return frozenset(str(getattr(event, "execution_id", "") or "") for event in events)
 
     # ---- AUTO-1: reservas durables (autoridad del compromiso) -------------------
     #
@@ -2080,9 +2085,7 @@ class AutoSimulationWorker:
             # Agotar el tope no es "no hay más": es no haber visto el libro entero.
             return tuple(rows), MEASUREMENT_UNKNOWN
         valued = sum(1 for row in rows if row.is_quantified)
-        return tuple(rows), measurement_from_counts(
-            valued=valued, unvalued=len(rows) - valued
-        )
+        return tuple(rows), measurement_from_counts(valued=valued, unvalued=len(rows) - valued)
 
     def _v2_open_order_from_reservation(
         self, reservation: PortfolioReservation
@@ -2138,9 +2141,7 @@ class AutoSimulationWorker:
             )
             if order is not None
         ]
-        orders.extend(
-            order for order in self._v2_open_orders if order.instrument_id not in covered
-        )
+        orders.extend(order for order in self._v2_open_orders if order.instrument_id not in covered)
         return tuple(orders)
 
     def _v2_pending_book_measurement(self) -> MeasurementStatus:
@@ -2245,15 +2246,11 @@ class AutoSimulationWorker:
             await store.save(order)
             await store.commit()
         except Exception:  # noqa: BLE001 — se declara; el llamante decide (política B).
-            logger.exception(
-                "auto_sim v2 exit order persist failed id=%s", order.exit_order_id
-            )
+            logger.exception("auto_sim v2 exit order persist failed id=%s", order.exit_order_id)
             return False
         return True
 
-    async def _v2_apply_exit_fill(
-        self, exit_order_id: str | None, qty: Any, *, at: str
-    ) -> None:
+    async def _v2_apply_exit_fill(self, exit_order_id: str | None, qty: Any, *, at: str) -> None:
         """Aplica un fill materializado al INTENT de salida (V2.43.3 · separación I/O/F).
 
         Un fill no positivo o un intent desconocido no mueven nada (fail-closed: no se
@@ -2428,9 +2425,7 @@ class AutoSimulationWorker:
                 at=at,
             )
         except Exception:  # noqa: BLE001 — no se libera lo que no es durable.
-            logger.exception(
-                "auto_sim v2 reservation release failed id=%s", target.reservation_id
-            )
+            logger.exception("auto_sim v2 reservation release failed id=%s", target.reservation_id)
             return
         if released is None:
             return
@@ -2452,9 +2447,7 @@ class AutoSimulationWorker:
             sorted(remaining, key=lambda r: (r.created_at or "", r.reservation_id))
         )
 
-    async def _v2_in_flight_instruments(
-        self, rows: Sequence[Any]
-    ) -> frozenset[str]:
+    async def _v2_in_flight_instruments(self, rows: Sequence[Any]) -> frozenset[str]:
         """Instrumentos con una traza NO materializada (capital en vuelo) del libro."""
         instruments: set[str] = set()
         for row in rows:
@@ -2509,9 +2502,7 @@ class AutoSimulationWorker:
             if in_flight_read == MEASUREMENT_COMPLETE
             else None
         )
-        measurable = (
-            facts_read.measurement == MEASUREMENT_COMPLETE and in_flight is not None
-        )
+        measurable = facts_read.measurement == MEASUREMENT_COMPLETE and in_flight is not None
         applied: dict[tuple[str, str], list[tuple[datetime, float]]] = {}
         for fact in facts_read.facts:
             instant = _instant(fact.applied_at)
@@ -2607,9 +2598,7 @@ class AutoSimulationWorker:
             if filled > 0:
                 updated = order.apply_fill(filled, at=self._v2_instant())
             elif released is not None and not released.is_live:
-                updated = order.abandon(
-                    released.release_reason or "cancel", at=self._v2_instant()
-                )
+                updated = order.abandon(released.release_reason or "cancel", at=self._v2_instant())
             if updated is not order:
                 try:
                     await store.save(updated)
@@ -2822,6 +2811,47 @@ class AutoSimulationWorker:
         await self._v2_prune_consumed_signals()
         return plan
 
+    async def _v2_cycle_risk(self, fills: Sequence[Any]) -> dict[str, CycleRisk] | None:
+        """AUTO-9 — denominador de R y coste estimado por CICLO, desde las reservas.
+
+        READ-ONLY y aditivo: lee las reservas de los ciclos que aparecen en los fills del
+        tick (``list_by_cycle_ids``, vivas y liberadas — un ciclo cerrado ya no tiene
+        reserva viva) y las agrega con el módulo puro. El informe pasa de declarar "R no
+        medible" a declararlo **medido o ausente ciclo a ciclo**, sin inventar ninguno.
+
+        **Sin productor de régimen.** El ``marketRegime`` por ciclo vive en el journal del
+        worker, que es EN MEMORIA (no hay fila durable por ciclo), así que ningún ciclo
+        aporta régimen y el productor lo declara (``regime_not_durable``). El régimen del
+        tick sigue entrando a la rotación como siempre; lo que no se puede es atribuirlo
+        hacia atrás a un ciclo histórico. El día que exista ese productor durable, basta
+        pasar ``regime_by_cycle``: la costura ya está.
+
+        Un fallo de lectura devuelve ``None`` (degradación DECLARADA): el informe vuelve a
+        su forma AUTO-7 en vez de estrechar o rotar con un R que no se pudo medir.
+        """
+        store = self._reservation_store
+        cycle_ids = sorted(
+            {str(fill.cycle_id).strip() for fill in fills if str(fill.cycle_id or "").strip()}
+        )
+        if not cycle_ids or store is None:
+            return None
+        try:
+            reservations = await store.list_by_cycle_ids(
+                self._account_id, cycle_ids, limit=_V2_CYCLE_RISK_READ_LIMIT
+            )
+        except Exception:  # noqa: BLE001 — sin lectura no hay R; no se inventa.
+            logger.exception("auto_sim v2 adaptive cycle risk read failed")
+            return None
+        if len(reservations) >= _V2_CYCLE_RISK_READ_LIMIT:
+            # Lectura saturada: los ciclos que no cupieron quedan declarados sin reserva
+            # (hueco honesto) en vez de recibir el denominador de otro ciclo.
+            logger.warning(
+                "auto_sim v2 adaptive cycle risk read saturated limit=%s cycles=%s",
+                _V2_CYCLE_RISK_READ_LIMIT,
+                len(cycle_ids),
+            )
+        return cycle_risk_from_reservations(cycle_ids, reservations)
+
     async def _v2_build_adaptive_plan(
         self, versions: set[str], regime: str | None
     ) -> AdaptivePlan | None:
@@ -2844,23 +2874,22 @@ class AutoSimulationWorker:
                     )
                 )
             except Exception:  # noqa: BLE001 — sin lectura no hay salud; no se inventa.
-                logger.exception(
-                    "auto_sim v2 adaptive fill read failed version=%s", version
-                )
+                logger.exception("auto_sim v2 adaptive fill read failed version=%s", version)
                 return None
-        report = build_auto_self_evaluation(fills=fills)
+        report = build_auto_self_evaluation(
+            fills=fills, cycle_risk=await self._v2_cycle_risk(fills)
+        )
         # V2.49/AUTO-8.1 — política versionada + estado de pausa previo (hysteresis y
         # cooldown). El estado es EN MEMORIA y derivado del plan anterior: se declara como
         # límite (tras un reinicio la cuenta vuelve a 0, así que una pausa puede levantarse
         # antes de su ventana mínima). No añade tabla ni migración.
-        policy = AdaptivePolicy(
-            win_rate_floor=self._v2_tunables.adaptive_win_rate_floor
-        )
+        policy = AdaptivePolicy(win_rate_floor=self._v2_tunables.adaptive_win_rate_floor)
         plan = build_adaptive_plan(
             report.by_strategy,
             to_market_regime(regime),
             policy=policy,
             paused_cycles=self._v2_adaptive_paused_cycles,
+            by_regime=report.by_regime,
         )
         self._v2_adaptive_paused_cycles = self._v2_next_paused_cycles(plan)
         return plan
@@ -2970,9 +2999,7 @@ class AutoSimulationWorker:
         if atr_value is None:
             # Ni siquiera la geometría de emergencia es construible sin ATR.
             atr_value = float(entry) * self._v2_tunables.atr_pct_fallback
-        stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * Decimal(
-            str(atr_value)
-        )
+        stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * Decimal(str(atr_value))
         if stop <= 0 or stop >= entry:
             # Ni siquiera la geometría de emergencia es construible: se declara la
             # ausencia de protección SIN stop sintético (no se inventa un número).
@@ -3187,9 +3214,7 @@ class AutoSimulationWorker:
                 symbol, outcome.reason, at=at, detail={"detail": outcome.detail}
             )
             return None
-        self._v2_last_exit_reasons[symbol] = (
-            outcome.exit_reasons if outcome is not None else ()
-        )
+        self._v2_last_exit_reasons[symbol] = outcome.exit_reasons if outcome is not None else ()
         # V2.44 — AUTO-3 slice 2: si el motivo DECISORIO es un exit de gobernador
         # (``RISK_EXIT``/``REGIME_EXIT``/``KILL_SWITCH``) se journaliza como evento de
         # gestión propio, con el detalle de la decisión, para que el operador vea POR QUÉ
@@ -3225,9 +3250,7 @@ class AutoSimulationWorker:
         # journal rico: ``primary_reason``, no el flag). Con esto la fila ``position_close``
         # del día puede contar ``time_exit``/``thesis_exit`` sin reinterpretar nada.
         self._v2_last_exit_label[symbol] = (
-            day_exit_reason(outcome.decision.primary_reason)
-            if outcome is not None
-            else ""
+            day_exit_reason(outcome.decision.primary_reason) if outcome is not None else ""
         )
         await self._v2_apply_stop_update(
             symbol,
@@ -3339,9 +3362,8 @@ class AutoSimulationWorker:
         # invalidación de tesis, E3) volvían al valor del último fill/ratchet — y un
         # reinicio las perdía del todo. Sólo se escribe cuando la observación cambia de
         # verdad (un extremo nuevo), no en cada tick.
-        if (
-            isinstance(marked, PositionState)
-            and _mark_observation_changed(self._v2_positions.get(symbol), marked)
+        if isinstance(marked, PositionState) and _mark_observation_changed(
+            self._v2_positions.get(symbol), marked
         ):
             self._v2_positions[symbol] = marked
             held = self._open.get(symbol, Decimal("0"))
@@ -3778,11 +3800,7 @@ class AutoSimulationWorker:
             # NI siquiera en su forma de emergencia, ``_v2_reserve_exit`` devuelve ``None`` y
             # la orden NO se emite (fail-closed): una salida sin identidad durable es una
             # salida que un reinicio no podrá reconciliar.
-            if (
-                action == "SELL"
-                and self._v2_enabled
-                and self._reservation_store is not None
-            ):
+            if action == "SELL" and self._v2_enabled and self._reservation_store is not None:
                 exit_order_id = await self._v2_reserve_exit(
                     symbol=symbol,
                     qty=exec_qty,
@@ -3937,9 +3955,7 @@ class AutoSimulationWorker:
                     )
                     # V2.45/AUTO-5 — MAE/MFE de la OPERACIÓN cerrada (medido en el JSONB y
                     # recogido aquí). Sin las dos patas no se publica: el día lo declara.
-                    self._v2_record_operation_measurement(
-                        symbol, effective_version, mfe_mae
-                    )
+                    self._v2_record_operation_measurement(symbol, effective_version, mfe_mae)
                     report.closed += 1
                     self._entry_price.pop(symbol, None)
                     self._high_price.pop(symbol, None)

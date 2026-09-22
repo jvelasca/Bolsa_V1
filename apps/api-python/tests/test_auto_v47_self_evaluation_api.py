@@ -86,8 +86,18 @@ async def test_reports_the_version_read_only_and_with_declared_gaps(
     assert dto.byStrategy[0].realizedPnl == "50.000000"
     assert dto.byStrategy[0].expectancyCurrency == "50.000000"
     assert dto.byStrategy[0].riskMeasurement == "UNKNOWN"
+    assert dto.byStrategy[0].netExpectancyR is None
+    assert dto.byStrategy[0].netRMeasurement == "UNKNOWN"
+    assert dto.byStrategy[0].cyclesWithoutCost == 1
     assert dto.byStrategy[0].mfeR is None and dto.byStrategy[0].maeR is None
     assert dto.byStrategy[0].slippageCurrency is None
+    # AUTO-9: el cruce `strategy × regime` viaja por la ruta con el régimen AUSENTE como
+    # cubo propio (los fills de este test no declaran régimen), no repartido ni inventado.
+    assert [cell.regime for cell in dto.byRegime] == ["UNKNOWN"]
+    assert dto.byRegime[0].cycles == 1
+    assert dto.byRegime[0].netExpectancyR is None
+    assert dto.byRegime[0].cyclesWithoutRisk == 1
+    assert dto.cyclesWithoutRegime == 1
     assert dto.funnel["seen"] is None and dto.funnel["closed"] is False
     assert dto.decisive is False
     assert dto.errors == []
@@ -111,6 +121,6 @@ async def test_without_account_scope_it_declares_the_gap_instead_of_reading_glob
 
     assert _Store.calls == [], "sin cuenta visible NO se lee global"
     assert dto.errors == ["no_account_scope"]
-    assert dto.cycles == 0 and dto.byStrategy == []
+    assert dto.cycles == 0 and dto.byStrategy == [] and dto.byRegime == []
     assert dto.measurement == "UNKNOWN"
     assert dto.decisive is False

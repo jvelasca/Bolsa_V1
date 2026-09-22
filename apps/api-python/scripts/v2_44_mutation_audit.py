@@ -4,10 +4,14 @@ Aplica cada mutación del plan de fase, corre las suites que DEBEN morder y **re
 texto original en memoria**. El objetivo es que la matriz del audit-pack afirme lo MEDIDO y no lo
 esperado: una sonda que dice "este test se pondría rojo" sin haberlo medido es humo.
 
-Patrón copiado de ``v2_43_3_mutation_audit.py`` (y de ``v2_43_2``/``v2_40_4``): NUNCA
-``git checkout -- <file>`` (descartaría trabajo no commiteado). La restauración es la copia en
-memoria y, además, la sonda **verifica que deja el árbol exactamente como lo encontró** (huella
-``git status --porcelain`` de los ficheros tocados, antes y después).
+Patrón copiado de ``v2_43_3_mutation_audit.py`` (y de ``v2_43_2``/``v2_40_4``): la restauración es la copia
+en memoria y, además, la sonda **verifica que deja el árbol exactamente como lo encontró** (huella
+``git status --porcelain`` de los ficheros tocados, antes y después). El ``git checkout`` NO es la vía
+normal —descartaría trabajo no commiteado— pero SÍ es la red de seguridad de último recurso: en esta
+máquina, restaurar ``auto_v2_entry.py`` tras la mutación 16 falla de forma reproducible con
+``OSError [Errno 22]`` de Windows (el mismo par escritura/restauración funciona aislado), y una sonda
+que se cae dejando el MUTANTE dentro del árbol es peor que una que aborta. Esa ruta solo se usa si
+fallan el reintento y el reemplazo atómico, y entonces la sonda **aborta** en vez de seguir midiendo.
 
 El invariante nuevo tiene una forma de romperse en silencio por mutación:
 
@@ -88,6 +92,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import time
 
 # La salida de la sonda incluye ``⇒``/acentos; cuando stdout es un pipe (p. ej. corrida en
 # segundo plano o con ``Tee-Object``), Windows usa ``cp1252`` y el ``print`` revienta con
@@ -104,6 +109,8 @@ ENTRY = "packages/py/application/src/bolsa_application/auto_v2_entry.py"
 EXPECTED_VALUE = "packages/py/analytics/src/bolsa_analytics/cognitive/expected_value.py"
 AUTO_SELF_EVAL = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_self_evaluation.py"
 AUTO_ADAPTIVE = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py"
+CYCLE_RISK = "packages/py/application/src/bolsa_application/cycle_risk.py"
+FEED = "packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 
 # --- suites que deben morder ----------------------------------------------------------------
@@ -119,6 +126,8 @@ T_SELF = (
 )
 T_ADAPTIVE = "packages/py/analytics/tests/test_auto_adaptive.py"
 T_ADAPTIVE_ENTRY = "packages/py/application/tests/test_auto_adaptive_entry.py"
+T_CYCLE_RISK = "packages/py/application/tests/test_cycle_risk.py"
+T_CYCLE_RISK_SEAM = "apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py"
 T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
@@ -167,8 +176,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         ENTRY,
         "                    reason_by_id.get(_key_of(signal), OPTIMIZER_NOT_SELECTED),\n"
         "                    actor=actor,\n",
-        '                    "edge_below_threshold",\n'
-        "                    actor=actor,\n",
+        '                    "edge_below_threshold",\n                    actor=actor,\n',
         (T_WIRE,),
     ),
     (
@@ -220,15 +228,14 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         ENTRY,
         "    key = f\"{str(account_id or '').strip()}\\x1f{signal_id}\"\n"
         "    return f\"cyc-{sha256(key.encode('utf-8')).hexdigest()[:12]}\"",
-        "    from uuid import uuid4 as _u\n"
-        "    return f\"cyc-{_u().hex[:12]}\"",
+        '    from uuid import uuid4 as _u\n    return f"cyc-{_u().hex[:12]}"',
         (T_CYCLE,),
     ),
     (
         "M12 (cycle propagado): el journal deja de publicar el cycleId",
         ENTRY,
-        "    if str(cycle_id or \"\").strip():\n        payload[\"cycleId\"] = str(cycle_id)\n",
-        "    if False:\n        payload[\"cycleId\"] = str(cycle_id)\n",
+        '    if str(cycle_id or "").strip():\n        payload["cycleId"] = str(cycle_id)\n',
+        '    if False:\n        payload["cycleId"] = str(cycle_id)\n',
         (T_CYCLE,),
     ),
     (
@@ -276,10 +283,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M19 (rotacion por salud): la estrategia probadamente negativa deja de pausarse",
         AUTO_ADAPTIVE,
-        "        if expectancy_bad or pf_bad:\n"
-        "            return ADAPTIVE_STRATEGY_UNHEALTHY\n",
-        "        if False:\n"
-        "            return ADAPTIVE_STRATEGY_UNHEALTHY\n",
+        "        if expectancy_bad or pf_bad:\n            return ADAPTIVE_STRATEGY_UNHEALTHY\n",
+        "        if False:\n            return ADAPTIVE_STRATEGY_UNHEALTHY\n",
         (T_ADAPTIVE,),
     ),
     (
@@ -310,15 +315,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M23 (gate por fila): una muestra no decisoria entra al reparto proporcional",
         AUTO_ADAPTIVE,
-        "        if (\n"
-        "            row.decisive\n"
-        "            and row.expectancy_currency is not None\n"
-        "            and row.expectancy_currency > 0\n"
-        "        ):\n",
-        "        if (\n"
-        "            row.expectancy_currency is not None\n"
-        "            and row.expectancy_currency > 0\n"
-        "        ):\n",
+        "        if row is None or not row.decisive:\n            continue\n",
+        "        if row is None:\n            continue\n",
         (T_ADAPTIVE,),
     ),
     (
@@ -352,6 +350,48 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        if count < max(0, int(resolved.min_pause_cycles)):\n",
         "        if False:\n",
         (T_ADAPTIVE,),
+    ),
+    (
+        "M28 (denominador de R): se usa la reserva de entrada MAS NUEVA en vez de la mas antigua",
+        CYCLE_RISK,
+        "    entry = candidates[0] if candidates else None\n",
+        "    entry = candidates[-1] if candidates else None\n",
+        (T_CYCLE_RISK,),
+    ),
+    (
+        "M29 (reserva de venta): la venta entra como denominador (riesgo 0 admitido)",
+        CYCLE_RISK,
+        "        if row.is_buy and (risk := _dec(row.reserved_risk)) is not None and risk > 0\n",
+        "        if (risk := _dec(row.reserved_risk)) is not None and risk >= 0\n",
+        (T_CYCLE_RISK,),
+    ),
+    (
+        "M30 (hueco silencioso): un ciclo sin reservas desaparece del mapa en vez de declararse",
+        CYCLE_RISK,
+        "    return {key: _cycle_risk(key, grouped.get(key, ()), regimes) for key in keys}\n",
+        "    return {key: _cycle_risk(key, grouped[key], regimes) for key in keys if key in grouped}\n",
+        (T_CYCLE_RISK,),
+    ),
+    (
+        "M31 (dato no medido): el coste ausente se publica como clave nula en vez de omitirse",
+        CYCLE_RISK,
+        '        if self.cost is not None:\n            fields["cost"] = self.cost\n',
+        '        fields["cost"] = self.cost\n',
+        (T_CYCLE_RISK,),
+    ),
+    (
+        "M32 (costura muda): el informe ignora la evidencia de riesgo que le llega",
+        FEED,
+        "        cycles=apply_cycle_risk(cycles_from_fills(fills or ()), cycle_risk),\n",
+        "        cycles=cycles_from_fills(fills or ()),\n",
+        (T_CYCLE_RISK,),
+    ),
+    (
+        "M33 (worker sin denominador): el camino Adaptive deja de leer el riesgo por ciclo",
+        WORKER,
+        "        report = build_auto_self_evaluation(fills=fills, cycle_risk=await self._v2_cycle_risk(fills))\n",
+        "        report = build_auto_self_evaluation(fills=fills)\n",
+        (T_CYCLE_RISK_SEAM,),
     ),
 ]
 
@@ -398,7 +438,9 @@ def _run(tests: tuple[str, ...], sources: tuple[str, ...]) -> set[str]:
             env=env,
         )
     except subprocess.TimeoutExpired:
-        return {"<TIMEOUT 600s: revisar Postgres del teardown de apps/api-python/tests/conftest.py>"}
+        return {
+            "<TIMEOUT 600s: revisar Postgres del teardown de apps/api-python/tests/conftest.py>"
+        }
     failed: set[str] = set()
     for line in out.stdout.splitlines():
         line = line.strip()
@@ -421,8 +463,73 @@ def _status(files: tuple[str, ...]) -> str:
     return out.stdout
 
 
-def main() -> int:
-    files = tuple(sorted({rel for _, rel, _, _, _ in MUTATIONS}))
+def _is_clean_in_git(rel: str) -> bool:
+    """True si ``rel`` no tiene cambios sin commitear (``git checkout`` sería inocuo)."""
+    out = subprocess.run(
+        ["git", "status", "--porcelain", "--", rel],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    return not out.stdout.strip()
+
+
+def _restore(path: pathlib.Path, rel: str, original: str) -> bool:
+    """Devuelve el fichero a su contenido original; NUNCA deja el árbol mutado.
+
+    Un ``write_bytes`` que falla aquí deja el MUTANTE dentro del árbol, que es el peor
+    resultado posible de una sonda (el siguiente paso mediría sobre un árbol corrupto). Se
+    observó en esta máquina un ``OSError [Errno 22]`` de Windows al restaurar
+    ``auto_v2_entry.py`` tras la mutación 16, reproducible y no atribuible al contenido
+    (el mismo par escritura/restauración funciona aislado). Por eso hay tres capas: reintento
+    con pausa, reemplazo atómico con ``os.replace`` y, como último recurso, ``git checkout``.
+
+    **El último recurso solo se usa si el fichero está LIMPIO en git.** Si tuviera cambios sin
+    commitear, ``git checkout`` los descartaría: en ese caso la sonda **aborta** declarándolo
+    en vez de destruir trabajo ajeno. Es la regla que el patrón de este script protegía.
+    """
+    payload = original.encode("utf-8")
+    for attempt in range(3):
+        try:
+            path.write_bytes(payload)
+            if path.read_text(encoding="utf-8") == original:
+                return True
+        except OSError:
+            pass
+        time.sleep(0.5 * (attempt + 1))
+    try:
+        tmp = path.with_suffix(path.suffix + ".restore")
+        tmp.write_bytes(payload)
+        os.replace(tmp, path)
+        if path.read_text(encoding="utf-8") == original:
+            return True
+    except OSError:
+        pass
+    if not _is_clean_in_git(rel):
+        print(
+            f"  !! {rel} tiene cambios SIN COMMITEAR y no se puede restaurar en memoria: "
+            "NO se usa git checkout (descartaria trabajo). Abortar y revisar a mano."
+        )
+        return False
+    subprocess.run(["git", "checkout", "--", rel], cwd=ROOT, capture_output=True, text=True)
+    return path.read_text(encoding="utf-8") == original
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Filtro opcional por etiqueta (``M28``, ``M29``…): permite verificar un tramo de la
+    # matriz sin arrastrar las 30 corridas anteriores (útil cuando una sola mutación se
+    # quiere comprobar sola). Sin argumentos corre la matriz COMPLETA, como siempre.
+    selected = [token.strip().upper() for token in (argv or sys.argv[1:]) if token.strip()]
+    matrix = [
+        mutation
+        for mutation in MUTATIONS
+        if not selected or any(str(mutation[0]).upper().startswith(token) for token in selected)
+    ]
+    if selected and not matrix:
+        print("!! ningun rotulo casa con el filtro:", ", ".join(selected))
+        return 1
+
+    files = tuple(sorted({rel for _, rel, _, _, _ in matrix}))
     originals = {rel: (ROOT / rel).read_text(encoding="utf-8") for rel in files}
     status_before = _status(files)
 
@@ -430,20 +537,26 @@ def main() -> int:
     for rel in files:
         print(f"  {rel}")
     print("estado git de esos ficheros (antes):", status_before.strip() or "limpio")
+    if selected:
+        print("filtro de rotulos:", ", ".join(selected), f"({len(matrix)}/{len(MUTATIONS)})")
 
     print("\n=== linea base (sin mutacion) ===")
-    for tests in sorted({m[4] for m in MUTATIONS}, key=lambda t: t):
+    for tests in sorted({m[4] for m in matrix}, key=lambda t: t):
         print(f"  {', '.join(tests)} ->", sorted(_run(tests, files)) or "ninguno")
 
-    for label, rel, old, new, tests in MUTATIONS:
+    for label, rel, old, new, tests in matrix:
         path = ROOT / rel
         current = path.read_text(encoding="utf-8")
         if current != originals[rel]:
-            print(f"\n### {label}\n  !! {rel} cambio desde el inicio de la sonda; ABORTO por seguridad")
+            print(
+                f"\n### {label}\n  !! {rel} cambio desde el inicio de la sonda; ABORTO por seguridad"
+            )
             return 1
         hits = current.count(old)
         if hits == 0:
-            print(f"\n### {label}\n  !! no encontre el fragmento a mutar en {rel}; revisar la sonda")
+            print(
+                f"\n### {label}\n  !! no encontre el fragmento a mutar en {rel}; revisar la sonda"
+            )
             continue
         if hits > 1:
             print(
@@ -460,12 +573,16 @@ def main() -> int:
         try:
             failed = _run(tests, (rel,))
         finally:
-            path.write_bytes(originals[rel].encode("utf-8"))
-        _drop_bytecode((rel,))
-        restored = path.read_text(encoding="utf-8") == originals[rel]
+            restored_ok = _restore(path, rel, originals[rel])
+            _drop_bytecode((rel,))
         print(f"\n### {label}")
         print("  rojo en:", ", ".join(sorted(failed)) or "NADA (la mutacion NO se detecta)")
-        print("  restaurado byte a byte:", "si" if restored else "NO !! revisar a mano")
+        print(
+            "  restaurado byte a byte:",
+            "si" if restored_ok else "NO !! arbol restaurado por git, revisar a mano",
+        )
+        if not restored_ok:
+            return 1
 
     status_after = _status(files)
     print("\n=== huella del arbol ===")

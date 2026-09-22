@@ -10,6 +10,9 @@ del contrato híbrido:
 * **Propagación sin migración** por donde ya hay JSONB/identidad (plan del tick, journal,
   reserva, ``position_state``) y por las columnas de la migración ``044`` (reserva, exit
   order, fill context) — con ``None`` = "desconocido", nunca un ciclo inventado.
+* **Lectura por ciclo** (``AUTO-9``, paso 2 del plan ``v2.50``): ``list_by_cycle_ids`` recupera el
+  material completo de un ciclo desde la única costura que ya existe (``cycle_id``), declarando que
+  ``NULL`` **no** es un ciclo — el hueco lo contará quien lo consuma, no se rellena aquí.
 
 Módulo puro + stores in-memory: sin I/O, sin reloj real, sin PostgreSQL.
 """
@@ -18,8 +21,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from bolsa_analytics.cognitive.exit_order import build_exit_order
-from bolsa_analytics.cognitive.portfolio_reservation import build_reservation
+from bolsa_analytics.cognitive.portfolio_reservation import (
+    PortfolioReservation,
+    build_reservation,
+)
 from bolsa_analytics.cognitive.position_state import (
     CYCLE_ID_KEY,
     PositionState,
@@ -174,6 +182,137 @@ def test_a_reservation_persists_its_cycle_through_the_store() -> None:
 
     asyncio.run(store.save(reservation))
     assert asyncio.run(store.list_live("acc-1"))[0].cycle_id == "cyc-abc"
+
+
+# ── AUTO-9 — lectura por ciclo (paso 2 del plan `v2.50`) ─────────────────────────
+
+
+def test_a_cycle_returns_all_its_reservations_not_just_the_entry() -> None:
+    """AUTO-9 — el lector por ciclo devuelve el material COMPLETO del ciclo.
+
+    Un ciclo tiene una reserva de ENTRADA y, si hubo salida, una de SALIDA. El store no
+    elige: devuelve las dos y deja la elección del denominador de R al llamante.
+    """
+    import asyncio
+
+    entry = build_reservation(
+        reservation_id="RES-entry",
+        account_id="acc-1",
+        tick_id="2026-09-15T09:00:00Z",
+        instrument_id="AAA",
+        side="buy",
+        quantity=10.0,
+        entry=100.0,
+        stop=98.0,
+        reserved_risk=200.0,
+        cycle_id="cyc-abc",
+        created_at="2026-09-15T09:00:00Z",
+    )
+    exit_row = build_reservation(
+        reservation_id="RES-exit",
+        account_id="acc-1",
+        tick_id="2026-09-15T10:00:00Z",
+        instrument_id="AAA",
+        side="sell",
+        quantity=10.0,
+        entry=104.0,
+        cycle_id="cyc-abc",
+        created_at="2026-09-15T10:00:00Z",
+    )
+    store = InMemoryReservationStore([entry, exit_row])
+
+    rows = asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"]))
+
+    assert [row.reservation_id for row in rows] == ["RES-entry", "RES-exit"]
+    assert {row.side for row in rows} == {"buy", "sell"}
+    assert rows[0].reserved_risk == pytest.approx(200.0)
+
+
+def test_a_reservation_without_cycle_never_matches_a_cycle_query() -> None:
+    """``NULL`` no es un ciclo: "anterior a 2.47" no puede colarse en un informe de R."""
+    import asyncio
+
+    historic = build_reservation(
+        reservation_id="RES-historic",
+        account_id="acc-1",
+        tick_id="2026-09-15T09:00:00Z",
+        instrument_id="AAA",
+        side="buy",
+        quantity=10.0,
+        entry=100.0,
+        stop=98.0,
+    )
+    assert historic.cycle_id is None
+    store = InMemoryReservationStore([historic])
+
+    assert asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"])) == []
+    # Un conjunto vacío o en blanco tampoco es un ciclo: se corta sin devolver la histórica.
+    assert asyncio.run(store.list_by_cycle_ids("acc-1", ["", "   "])) == []
+    assert asyncio.run(store.list_by_cycle_ids("acc-1", [])) == []
+
+
+def test_a_cycle_query_filters_by_account_and_stays_deterministic() -> None:
+    import asyncio
+
+    def _row(reservation_id: str, account_id: str, moment: str) -> PortfolioReservation:
+        return build_reservation(
+            reservation_id=reservation_id,
+            account_id=account_id,
+            tick_id=moment,
+            instrument_id="AAA",
+            side="buy",
+            quantity=10.0,
+            entry=100.0,
+            stop=98.0,
+            cycle_id="cyc-abc",
+            created_at=moment,
+        )
+
+    store = InMemoryReservationStore(
+        [
+            _row("RES-late", "acc-1", "2026-09-15T11:00:00Z"),
+            _row("RES-early", "acc-1", "2026-09-15T09:00:00Z"),
+            _row("RES-other-account", "acc-2", "2026-09-15T09:00:00Z"),
+        ]
+    )
+
+    scoped = asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"]))
+    assert [row.reservation_id for row in scoped] == ["RES-early", "RES-late"]
+
+    # ``account_id=None`` es "sin filtro de cuenta" (el fail-closed del llamante que no pudo
+    # determinarla): prefiere ver todo antes que asumir que no hay nada.
+    every_account = asyncio.run(store.list_by_cycle_ids(None, ["cyc-abc"]))
+    assert [row.reservation_id for row in every_account] == [
+        "RES-early",
+        "RES-other-account",
+        "RES-late",
+    ]
+
+    # Pedir el mismo ciclo dos veces no duplica filas.
+    twice = asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc", "cyc-abc"]))
+    assert [row.reservation_id for row in twice] == ["RES-early", "RES-late"]
+
+
+def test_a_cycle_query_respects_the_limit_it_declares() -> None:
+    """``limit <= 0`` no es "sin límite": es "no leo nada" (suelo declarado del store)."""
+    import asyncio
+
+    reservation = build_reservation(
+        reservation_id="RES-1",
+        account_id="acc-1",
+        tick_id="2026-09-15T09:00:00Z",
+        instrument_id="AAA",
+        side="buy",
+        quantity=10.0,
+        entry=100.0,
+        stop=98.0,
+        cycle_id="cyc-abc",
+        created_at="2026-09-15T09:00:00Z",
+    )
+    store = InMemoryReservationStore([reservation])
+
+    assert asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"], limit=0)) == []
+    assert len(asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"], limit=1))) == 1
 
 
 def test_an_exit_order_persists_and_round_trips_its_cycle() -> None:

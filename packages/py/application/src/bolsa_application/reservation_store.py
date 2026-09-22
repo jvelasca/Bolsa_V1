@@ -25,9 +25,9 @@ Convenciones del repo (patrón ``execution_event``/``sim_durable_store``): impor
 (``True`` por defecto: la reserva debe ser durable antes de emitir la orden; ``False`` cede
 el commit a la unidad-de-trabajo del llamante).
 
-La lectura declara su suelo: ``list_live``/``list_all`` devuelven como máximo ``limit``
-filas y el llamante que reciba exactamente ``limit`` **no** puede afirmar que vio todo el
-libro (fail-closed: "no pude leerlo todo" ≠ "no hay más").
+La lectura declara su suelo: ``list_live``/``list_all``/``list_by_cycle_ids`` devuelven como
+máximo ``limit`` filas y el llamante que reciba exactamente ``limit`` **no** puede afirmar que vio
+todo el libro (fail-closed: "no pude leerlo todo" ≠ "no hay más").
 """
 
 from __future__ import annotations
@@ -141,6 +141,26 @@ class ReservationStore(Protocol):
         self, account_id: str | None, *, limit: int = 500
     ) -> list[PortfolioReservation]:
         """Todas las reservas de la cuenta (vivas y liberadas), para auditoría/replay."""
+        ...
+
+    async def list_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Iterable[str],
+        *,
+        limit: int = 500,
+    ) -> list[PortfolioReservation]:
+        """AUTO-9 — todas las reservas de esos **ciclos** financieros (vivas y liberadas).
+
+        Es la costura que ata la reserva a su ciclo (``cycle_id``, migración ``044``) y
+        devuelve el material **completo** del ciclo: la reserva de ENTRADA y las de salida.
+        Cuál de ellas es el denominador de R es una decisión del llamante, no del store.
+
+        ``cycle_ids`` vacío ⇒ ``[]`` sin consultar la base. Un ciclo **sin** reserva no
+        aparece: el hueco lo declara el llamante (``cycles_without_risk``), no se rellena
+        con una reserva de ceros. Las filas sin ciclo (``cycle_id IS NULL``, anteriores a
+        ``2.47``) no casan nunca: "anterior a 2.47" no es un ciclo.
+        """
         ...
 
     async def release(
@@ -328,6 +348,24 @@ def _order_key(reservation: PortfolioReservation) -> tuple[str, str]:
     return (reservation.created_at or "", reservation.reservation_id)
 
 
+def _clean_cycle_ids(cycle_ids: Iterable[str]) -> list[str]:
+    """Normaliza y desduplica identidades de ciclo (el orden no le importa al filtro).
+
+    Un ``cycle_id`` vacío, ``None`` o en blanco **no es un ciclo**: se descarta, de modo que
+    el filtro nunca acabe casando ``""`` con nada. La desduplicación es por identidad, no
+    por posición: pedir el mismo ciclo dos veces no cambia la respuesta.
+    """
+    clean: list[str] = []
+    seen: set[str] = set()
+    for raw in cycle_ids:
+        key = str(raw or "").strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        clean.append(key)
+    return clean
+
+
 class InMemoryReservationStore:
     """Store in-memory con la MISMA semántica que el PG (tests y camino hermético)."""
 
@@ -385,9 +423,27 @@ class InMemoryReservationStore:
         if limit <= 0:
             return []
         rows = [
+            row for row in self._rows.values() if account_id is None or row.account_id == account_id
+        ]
+        rows.sort(key=_order_key)
+        return rows[:limit]
+
+    async def list_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Iterable[str],
+        *,
+        limit: int = 500,
+    ) -> list[PortfolioReservation]:
+        wanted = set(_clean_cycle_ids(cycle_ids))
+        if not wanted or limit <= 0:
+            return []
+        rows = [
             row
             for row in self._rows.values()
-            if account_id is None or row.account_id == account_id
+            # ``cycle_id`` es ``str | None``: ``None not in wanted`` es lo que impide que
+            # una fila histórica sin ciclo entre por un conjunto que no la menciona.
+            if row.cycle_id in wanted and (account_id is None or row.account_id == account_id)
         ]
         rows.sort(key=_order_key)
         return rows[:limit]
@@ -446,9 +502,7 @@ class PostgresReservationStore:
             update_values = {name: values[name] for name in _WRITABLE_COLUMNS}
             await self._session.execute(
                 sa.update(PortfolioReservationRow)
-                .where(
-                    PortfolioReservationRow.reservation_id == reservation.reservation_id
-                )
+                .where(PortfolioReservationRow.reservation_id == reservation.reservation_id)
                 .values(**update_values)
             )
         await _commit_if(self._session, self._autocommit)
@@ -554,6 +608,42 @@ class PostgresReservationStore:
             return []
         query = (
             sa.select(PortfolioReservationRow)
+            .order_by(
+                PortfolioReservationRow.created_at.asc().nulls_first(),
+                PortfolioReservationRow.reservation_id.asc(),
+            )
+            .limit(limit)
+        )
+        if account_id is not None:
+            query = query.where(PortfolioReservationRow.account_id == account_id)
+        rows = (await self._session.execute(query)).scalars().all()
+        return [_row_to_reservation(row) for row in rows]
+
+    async def list_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Iterable[str],
+        *,
+        limit: int = 500,
+    ) -> list[PortfolioReservation]:
+        """AUTO-9 — reservas del ciclo, por el índice ``portfolio_reservations_cycle_id_idx``.
+
+        El ``IN`` va **saneado** (§``_clean_cycle_ids``): un conjunto vacío corta antes de
+        consultar, y las filas con ``cycle_id IS NULL`` no pueden casar porque ``IN`` sobre
+        una lista no nula nunca es cierto para ``NULL`` (en SQL, ``NULL IN (…)`` es
+        ``UNKNOWN``, que filtra). Eso es justo lo que se quiere: "anterior a 2.47" no es un
+        ciclo y no debe colarse en un informe de R.
+        """
+        import sqlalchemy as sa
+
+        from bolsa_infrastructure.database.models.tables import PortfolioReservationRow
+
+        wanted = _clean_cycle_ids(cycle_ids)
+        if not wanted or limit <= 0:
+            return []
+        query = (
+            sa.select(PortfolioReservationRow)
+            .where(PortfolioReservationRow.cycle_id.in_(wanted))
             .order_by(
                 PortfolioReservationRow.created_at.asc().nulls_first(),
                 PortfolioReservationRow.reservation_id.asc(),

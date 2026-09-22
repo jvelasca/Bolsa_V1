@@ -170,6 +170,12 @@ jobs:
         # ``test_auto_adaptive_entry.py`` (flag OFF byte-idéntico, Adaptive no salta los
         # gates duros, rotación con régimen sintético) va EXPLÍCITO porque sin registro no
         # correría en este job.
+        # V2.50/AUTO-9 (R medido por ciclo): ``test_cycle_risk.py`` prueba el productor
+        # READ-ONLY de denominador de R y su costura con el informe AUTO-7. Vive en
+        # ``packages/py/application/tests``, que NO tiene pase de directorio en este job:
+        # sin registro explícito no correría en ninguna parte. Su costura en el worker
+        # (``apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py``) sí entra por
+        # el pase de directorio de ``apps/api-python/tests`` de abajo.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -202,6 +208,7 @@ jobs:
           packages/py/application/tests/test_auto_v47_signal_identity.py
           packages/py/application/tests/test_auto_self_evaluation_feed.py
           packages/py/application/tests/test_auto_adaptive_entry.py
+          packages/py/application/tests/test_cycle_risk.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py

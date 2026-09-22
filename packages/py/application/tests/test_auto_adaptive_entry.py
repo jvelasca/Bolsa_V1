@@ -57,6 +57,7 @@ def _row(
         realized_pnl=Decimal("0"),
         expectancy_currency=Decimal(expectancy) if expectancy is not None else None,
         expectancy_r=None,
+        net_expectancy_r=None,
         win_rate=win_rate,
         profit_factor=None,
         avg_win_currency=None,
@@ -74,6 +75,8 @@ def _row(
         sample_quality="",
         results_measurement=MEASUREMENT_COMPLETE if decisive else MEASUREMENT_UNKNOWN,
         risk_measurement=MEASUREMENT_UNKNOWN,
+        net_r_measurement=MEASUREMENT_UNKNOWN,
+        cycles_without_cost=0,
         excursions_measurement=MEASUREMENT_UNKNOWN,
         slippage_measurement=MEASUREMENT_UNKNOWN,
         rejection_cost_measurement=MEASUREMENT_UNKNOWN,
@@ -202,9 +205,7 @@ def test_rotation_synthetic_regime_pauses_then_activates() -> None:
     )
     assert paused.approved_symbols == ()
     assert paused.journal_entries[0].payload["reasonCodes"] == [ADAPTIVE_STRATEGY_PAUSED]
-    assert any(
-        row.reason == ADAPTIVE_STRATEGY_PAUSED for row in paused.opportunities
-    )
+    assert any(row.reason == ADAPTIVE_STRATEGY_PAUSED for row in paused.opportunities)
 
     active = plan_v2_tick(
         snapshot=_snapshot(),

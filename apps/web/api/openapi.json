@@ -646,6 +646,13 @@
       "AutoSelfEvaluationDto": {
         "description": "Informe completo: roll-up + filas por versión + embudo + huecos declarados.",
         "properties": {
+          "byRegime": {
+            "items": {
+              "$ref": "#/components/schemas/AutoStrategyRegimeEvaluationDto"
+            },
+            "title": "Byregime",
+            "type": "array"
+          },
           "byStrategy": {
             "items": {
               "$ref": "#/components/schemas/AutoStrategySelfEvaluationDto"
@@ -659,6 +666,10 @@
           },
           "cyclesWithoutIdentity": {
             "title": "Cycleswithoutidentity",
+            "type": "integer"
+          },
+          "cyclesWithoutRegime": {
+            "title": "Cycleswithoutregime",
             "type": "integer"
           },
           "decisive": {
@@ -824,12 +835,122 @@
           "unattributedCycles",
           "unattributedPnl",
           "cyclesWithoutIdentity",
+          "cyclesWithoutRegime",
           "duplicateCycles",
           "resultsMeasurement",
           "measurement",
           "decisive"
         ],
         "title": "AutoSelfEvaluationDto",
+        "type": "object"
+      },
+      "AutoStrategyRegimeEvaluationDto": {
+        "description": "AUTO-9 — celda ``strategyVersion × régime``: el R condicionado al mercado.\n\n``regime == \"UNKNOWN\"`` es un cubo PROPIO (los ciclos que no declaran régimen), no un\ncomodín. El embudo no viaja aquí: no tiene dimensión de régimen en el dato durable.",
+        "properties": {
+          "cycles": {
+            "title": "Cycles",
+            "type": "integer"
+          },
+          "cyclesWithoutCost": {
+            "title": "Cycleswithoutcost",
+            "type": "integer"
+          },
+          "cyclesWithoutRisk": {
+            "title": "Cycleswithoutrisk",
+            "type": "integer"
+          },
+          "decisive": {
+            "title": "Decisive",
+            "type": "boolean"
+          },
+          "expectancyR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectancyr"
+          },
+          "losses": {
+            "title": "Losses",
+            "type": "integer"
+          },
+          "netExpectancyR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Netexpectancyr"
+          },
+          "netRMeasurement": {
+            "title": "Netrmeasurement",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "rMeasurement": {
+            "title": "Rmeasurement",
+            "type": "string"
+          },
+          "realizedPnl": {
+            "title": "Realizedpnl",
+            "type": "string"
+          },
+          "regime": {
+            "title": "Regime",
+            "type": "string"
+          },
+          "sampleQuality": {
+            "title": "Samplequality",
+            "type": "string"
+          },
+          "strategyVersion": {
+            "title": "Strategyversion",
+            "type": "string"
+          },
+          "winRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winrate"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "strategyVersion",
+          "regime",
+          "cycles",
+          "wins",
+          "losses",
+          "realizedPnl",
+          "cyclesWithoutRisk",
+          "cyclesWithoutCost",
+          "rMeasurement",
+          "netRMeasurement",
+          "sampleQuality",
+          "decisive"
+        ],
+        "title": "AutoStrategyRegimeEvaluationDto",
         "type": "object"
       },
       "AutoStrategySelfEvaluationDto": {
@@ -856,6 +977,10 @@
               }
             ],
             "title": "Avgwincurrency"
+          },
+          "cyclesWithoutCost": {
+            "title": "Cycleswithoutcost",
+            "type": "integer"
           },
           "decisive": {
             "title": "Decisive",
@@ -938,6 +1063,21 @@
               }
             ],
             "title": "Mfer"
+          },
+          "netExpectancyR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Netexpectancyr"
+          },
+          "netRMeasurement": {
+            "title": "Netrmeasurement",
+            "type": "string"
           },
           "notes": {
             "items": {
@@ -1037,6 +1177,8 @@
           "sampleQuality",
           "resultsMeasurement",
           "riskMeasurement",
+          "netRMeasurement",
+          "cyclesWithoutCost",
           "excursionsMeasurement",
           "slippageMeasurement",
           "rejectionCostMeasurement",

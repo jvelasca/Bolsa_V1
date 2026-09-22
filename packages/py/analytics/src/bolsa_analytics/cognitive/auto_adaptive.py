@@ -20,6 +20,15 @@ Qué recomienda, a partir de la self-evaluation de AUTO-7 (``StrategySelfEvaluat
   defecto ``1.0``) para las que no. El resultado es un **multiplicador** acotado a
   ``[0, 1]``: la asignación SOLO estrecha el riesgo por operación, nunca lo ensancha.
 
+**Eje de evidencia de la asignación (AUTO-9).** El reparto pesa con el **R neto medido**
+(``net_expectancy_r`` con ``net_r_measurement == COMPLETE``) cuando ese eje está medido
+para TODO el grupo que compite; si no, cae a la moneda bruta (``expectancy_currency``),
+que es el comportamiento histórico. El eje se declara en ``AllocationPlan.evidence_axis``
+y viaja en ``as_dict()``: sin esa declaración, dos planes con los mismos multiplicadores
+podrían venir de ejes distintos. Nunca se MEZCLAN ejes en el mismo reparto (los pesos
+serían incomparables: R es adimensional y la moneda absoluta) y nunca se cambia QUIÉN
+compite por un hueco de medición — con el R no medido, el reparto no cambia en nada.
+
 Disciplina de medición (la del repo): todo lo que no se pudo medir se DECLARA, no se
 rellena. Una estrategia sin muestra no es "mala", es desconocida; una pausa exige
 evidencia, no ausencia de evidencia.
@@ -47,7 +56,16 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from bolsa_analytics.cognitive.auto_self_evaluation import StrategySelfEvaluation
+from bolsa_analytics.cognitive.auto_self_evaluation import (
+    StrategyRegimeEvaluation,
+    StrategySelfEvaluation,
+    declared_regime,
+)
+from bolsa_analytics.cognitive.measurement import (
+    MEASUREMENT_UNKNOWN,
+    MeasurementStatus,
+    is_complete,
+)
 
 __all__ = [
     "ADAPTIVE_ADVERSE_REGIMES",
@@ -64,6 +82,8 @@ __all__ = [
     "ADAPTIVE_UNKNOWN_MULTIPLIER_DEFAULT",
     "ADAPTIVE_WIN_RATE_FLOOR_DEFAULT",
     "ADAPTIVE_WIN_RATE_REACTIVATE_DEFAULT",
+    "ALLOCATION_AXIS_CURRENCY",
+    "ALLOCATION_AXIS_NET_R",
     "AdaptivePlan",
     "AdaptivePolicy",
     "AllocationPlan",
@@ -84,7 +104,7 @@ ADAPTIVE_KEY = "adaptive"
 #: asignación o el suelo de régimen EXIGE subir esta versión (dentro de seis meses, dos
 #: operaciones aparentemente iguales no pueden haber sido decididas por reglas distintas
 #: sin que se note).
-ADAPTIVE_POLICY_VERSION = "auto8-v2"
+ADAPTIVE_POLICY_VERSION = "auto9-v1"
 
 #: Motivos de rotación (vocabulario PROPIO de este módulo; el journal de la capa de
 #: aplicación los lleva en el detalle de ``adaptive_strategy_paused``). La casa única
@@ -120,9 +140,19 @@ ADAPTIVE_MIN_PAUSE_CYCLES_DEFAULT = 3
 #: defecto ("sin dato no penalizo"); es una POLÍTICA declarada, no un accidente.
 ADAPTIVE_UNKNOWN_MULTIPLIER_DEFAULT = 1.0
 
-#: Régimen por estrategia: hoy NO existe productor por ciclo (``SimFillFinanceContext`` no
-#: lleva régimen). Se declara ``UNKNOWN`` y la política lo IGNORA (no se inventa un
-#: ``strategy × regime`` sin dato). La forma queda lista para cuando el productor exista.
+#: Eje de evidencia del reparto: la MONEDA bruta (``expectancy_currency``). Es el
+#: comportamiento histórico y el fallback DECLARADO cuando el R neto no está medido.
+ALLOCATION_AXIS_CURRENCY = "expectancy_currency"
+#: Eje de evidencia del reparto: el **R neto medido** (``net_expectancy_r``). Se adopta
+#: SOLO si todo el grupo que compite lo tiene medido (``AUTO-9``, §5.4): así el cambio de
+#: eje puede mover los pesos relativos, nunca la composición del numerador.
+ALLOCATION_AXIS_NET_R = "net_expectancy_r"
+
+#: Régimen por estrategia: el cruce ``strategy × regime`` ya tiene productor (``AUTO-9``),
+#: así que ``StrategyHealth.regime`` se puebla con el régimen **determinado** de la
+#: estrategia (una única celda decisiva con régimen). Si opera en dos regímenes —o solo en
+#: el cubo ``UNKNOWN``— NO se elige uno: queda ``UNKNOWN`` y la política lo IGNORA, como
+#: hoy. El detalle por régimen vive en ``by_regime``.
 ADAPTIVE_REGIME_UNKNOWN = "UNKNOWN"
 
 
@@ -173,18 +203,33 @@ class StrategyHealth:
     expectancy_currency: Decimal | None
     profit_factor: float | None
     win_rate: float | None
-    # R bruto realizado (adimensional). Hoy el productor no lo emite (los fills no llevan
-    # ``r_multiple``): se declara ``None``, no se rellena con 0.
+    # R bruto realizado (adimensional), agregado de la estrategia. ``None`` cuando ningún
+    # ciclo trae riesgo comprometido: se declara, no se rellena con 0.
     expectancy_r: float | None = None
-    # R NETO (descontado el coste ida y vuelta). Exige ``risk_amount`` y coste por ciclo,
-    # que hoy no existen: se declara ``None`` y NUNCA se publica como una medida.
+    # R NETO (descontado el coste **estimado** ida y vuelta) agregado de la estrategia, con
+    # su estado de medición. El neto depende de un coste estimado (§6.3): quien decida con
+    # él exige ``net_r_measurement == COMPLETE`` — con ``PARTIAL`` el número es la media de
+    # los ciclos que SÍ tenían coste, y ``cycle_without_cost`` dice cuántos faltan.
     net_expectancy_r: float | None = None
-    # Régimen observado para esta estrategia (``strategy × regime``). Sin productor por
-    # ciclo ⇒ ``UNKNOWN`` declarado; la política lo ignora (no se inventa el cruce).
+    net_r_measurement: MeasurementStatus = MEASUREMENT_UNKNOWN
+    # Régimen DETERMINADO de la estrategia (``strategy × regime``): solo se puebla si hay
+    # exactamente una celda decisiva con régimen. Con dos regímenes decisivos —o con solo
+    # el cubo ``UNKNOWN``— queda ``UNKNOWN``: nunca uno elegido a dedo.
     regime: str = ADAPTIVE_REGIME_UNKNOWN
 
     @classmethod
-    def from_evaluation(cls, row: StrategySelfEvaluation) -> StrategyHealth:
+    def from_evaluation(
+        cls,
+        row: StrategySelfEvaluation,
+        *,
+        regime_cells: Sequence[StrategyRegimeEvaluation] = (),
+    ) -> StrategyHealth:
+        """Proyecta la fila de self-evaluation y, si se aportan, sus celdas por régimen.
+
+        El régimen sale del cruce ``strategy × regime`` del mismo informe: la fila sola no
+        lo sabe. Sin celdas (o con el régimen no determinado) queda ``UNKNOWN``.
+        """
+        regime, _undetermined = declared_regime(regime_cells, row.strategy_version)
         return cls(
             strategy_version=row.strategy_version,
             trades=row.trades,
@@ -193,14 +238,24 @@ class StrategyHealth:
             profit_factor=row.profit_factor,
             win_rate=row.win_rate,
             expectancy_r=row.expectancy_r,
+            net_expectancy_r=row.net_expectancy_r,
+            net_r_measurement=row.net_r_measurement,
+            regime=regime or ADAPTIVE_REGIME_UNKNOWN,
         )
 
 
 def build_strategy_health(
     by_strategy: Sequence[StrategySelfEvaluation],
+    *,
+    by_regime: Sequence[StrategyRegimeEvaluation] = (),
 ) -> tuple[StrategyHealth, ...]:
-    """Proyección read-only de las filas de self-evaluation al contrato de Adaptive."""
-    return tuple(StrategyHealth.from_evaluation(row) for row in by_strategy)
+    """Proyección read-only de las filas de self-evaluation al contrato de Adaptive.
+
+    ``by_regime`` son las celdas del cruce ``strategy × regime`` del MISMO informe: son la
+    única fuente del régimen determinado (la fila de estrategia no lo lleva).
+    """
+    cells = tuple(by_regime)
+    return tuple(StrategyHealth.from_evaluation(row, regime_cells=cells) for row in by_strategy)
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,9 +275,7 @@ class RotationPlan:
 
     @property
     def paused(self) -> frozenset[str]:
-        return frozenset(
-            d.strategy_version for d in self.decisions if not d.active
-        )
+        return frozenset(d.strategy_version for d in self.decisions if not d.active)
 
     def reason_for(self, strategy_version: str) -> str | None:
         for d in self.decisions:
@@ -257,15 +310,24 @@ class AllocationPlan:
     es una pausa, es "no hubo nada que estrechar". ``recommend_allocation`` materializa
     una entrada por CADA versión activa (con el multiplicador de la política cuando no
     hay evidencia), de modo que la semántica no dependa de este default.
+
+    ``evidence_axis`` declara con QUÉ se pesó el reparto (``expectancy_currency`` o
+    ``net_expectancy_r``): es parte de la recomendación, no un detalle interno. El default
+    es el eje histórico, así que una construcción directa del plan (``AUTO-8``) sigue
+    significando exactamente lo que significaba.
     """
 
     multipliers: dict[str, float]
+    evidence_axis: str = ALLOCATION_AXIS_CURRENCY
 
     def multiplier_for(self, strategy_version: str) -> float:
         return self.multipliers.get(str(strategy_version or ""), 1.0)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"riskMultipliers": dict(sorted(self.multipliers.items()))}
+        return {
+            "riskMultipliers": dict(sorted(self.multipliers.items())),
+            "evidenceAxis": self.evidence_axis,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,6 +373,7 @@ class AdaptivePlan:
             ),
             "expectancyR": row.expectancy_r,
             "netExpectancyR": row.net_expectancy_r,
+            "netRMeasurement": row.net_r_measurement,
             "profitFactor": row.profit_factor,
             "winRate": row.win_rate,
             "regime": row.regime,
@@ -327,18 +390,14 @@ class AdaptivePlan:
         }
 
 
-def _pause_reason(
-    health: StrategyHealth, adverse: bool, policy: AdaptivePolicy
-) -> str | None:
+def _pause_reason(health: StrategyHealth, adverse: bool, policy: AdaptivePolicy) -> str | None:
     """Motivo de pausa con los umbrales de PAUSA (``None`` si no procede pausar)."""
     if health.decisive:
         expectancy_bad = (
-            health.expectancy_currency is not None
-            and health.expectancy_currency <= Decimal("0")
+            health.expectancy_currency is not None and health.expectancy_currency <= Decimal("0")
         )
         pf_bad = (
-            health.profit_factor is not None
-            and health.profit_factor < policy.profit_factor_pause
+            health.profit_factor is not None and health.profit_factor < policy.profit_factor_pause
         )
         if expectancy_bad or pf_bad:
             return ADAPTIVE_STRATEGY_UNHEALTHY
@@ -359,27 +418,20 @@ def _still_unhealthy(health: StrategyHealth, policy: AdaptivePolicy) -> bool:
     """
     if not health.decisive:
         return False
-    expectancy_ok = (
-        health.expectancy_currency is not None and health.expectancy_currency > Decimal("0")
+    expectancy_ok = health.expectancy_currency is not None and health.expectancy_currency > Decimal(
+        "0"
     )
-    pf_ok = (
-        health.profit_factor is None
-        or health.profit_factor >= policy.profit_factor_reactivate
-    )
+    pf_ok = health.profit_factor is None or health.profit_factor >= policy.profit_factor_reactivate
     return not (expectancy_ok and pf_ok)
 
 
-def _still_regime_risk(
-    health: StrategyHealth, adverse: bool, policy: AdaptivePolicy
-) -> bool:
+def _still_regime_risk(health: StrategyHealth, adverse: bool, policy: AdaptivePolicy) -> bool:
     """Para una pausa de RÉGIMEN ya vigente: True si sigue en zona muerta/riesgo."""
     if not adverse:
         return False
     if health.decisive:
         return False
-    return (
-        health.win_rate is not None and health.win_rate < policy.win_rate_reactivate_floor
-    )
+    return health.win_rate is not None and health.win_rate < policy.win_rate_reactivate_floor
 
 
 def recommend_rotation(
@@ -388,6 +440,7 @@ def recommend_rotation(
     *,
     policy: AdaptivePolicy | None = None,
     paused_cycles: Mapping[str, int] | None = None,
+    by_regime: Sequence[StrategyRegimeEvaluation] = (),
 ) -> RotationPlan:
     """(PURA) decide qué versiones pausar, con reglas deterministas y declarativas.
 
@@ -411,10 +464,11 @@ def recommend_rotation(
     """
     resolved = policy or AdaptivePolicy()
     counts = paused_cycles or {}
+    cells = tuple(by_regime)
     adverse = str(regime or "").strip().upper() in ADAPTIVE_ADVERSE_REGIMES
     decisions: list[RotationDecision] = []
     for row in by_strategy:
-        health = StrategyHealth.from_evaluation(row)
+        health = StrategyHealth.from_evaluation(row, regime_cells=cells)
         version = health.strategy_version
         count = int(counts.get(version, 0) or 0)
         reason = _pause_reason(health, adverse, resolved)
@@ -438,6 +492,44 @@ def recommend_rotation(
     return RotationPlan(tuple(decisions))
 
 
+def _allocation_weights(
+    rows_by_version: Mapping[str, StrategySelfEvaluation],
+    active_versions: Sequence[str],
+) -> tuple[str, dict[str, float]]:
+    """(PURA) eje de evidencia del reparto y los pesos que compiten en él.
+
+    Los dos ejes NO son comparables entre sí: ``expectancy_currency`` es absoluta
+    (moneda) y ``net_expectancy_r`` es adimensional (múltiplos de R), así que un reparto
+    que mezclase pesos de ambos sería aritmética sin sentido. Por eso el eje se elige
+    para el GRUPO —nunca por fila— y el R neto solo se adopta cuando los dos ejes
+    coinciden en QUIÉN compite: así el cambio de eje puede mover los pesos relativos pero
+    jamás la composición del numerador, y una estrategia con R no medido no queda fuera
+    del reparto por un hueco de medición (el desconocido no es un defecto).
+
+    El gate de decisividad es POR FILA en los dos ejes: una expectativa no validada por
+    su muestra no entra al numerador, aunque otra estrategia del grupo sí sea decisoria.
+    El R neto exige además ``net_r_measurement == COMPLETE`` (§6.3: el coste es
+    **estimado**, así que un ``PARTIAL`` no habilita decidir contra el agregado).
+    """
+    currency: dict[str, float] = {}
+    net_r: dict[str, float] = {}
+    for version in active_versions:
+        row = rows_by_version.get(version)
+        if row is None or not row.decisive:
+            continue
+        if row.expectancy_currency is not None and row.expectancy_currency > 0:
+            currency[version] = float(row.expectancy_currency)
+        if (
+            is_complete(row.net_r_measurement)
+            and row.net_expectancy_r is not None
+            and row.net_expectancy_r > 0
+        ):
+            net_r[version] = float(row.net_expectancy_r)
+    if net_r and net_r.keys() == currency.keys():
+        return ALLOCATION_AXIS_NET_R, net_r
+    return ALLOCATION_AXIS_CURRENCY, currency
+
+
 def recommend_allocation(
     active: Iterable[str],
     by_strategy: Sequence[StrategySelfEvaluation],
@@ -457,6 +549,9 @@ def recommend_allocation(
       activas recibe el multiplicador de la política para "sin evidencia decisoria"
       (``unknown_multiplier``, neutral ``1.0`` por defecto).
     * Sin ninguna decisoria positiva, TODAS reciben ese mismo multiplicador neutral.
+    * El **eje** de esos pesos es el R neto MEDIDO cuando está medido para todo el grupo
+      que compite; si no, la moneda bruta, que es el comportamiento histórico. El eje se
+      declara en ``AllocationPlan.evidence_axis`` y nunca se mezclan los dos.
 
     Se materializa una entrada por CADA versión activa: la semántica de "sin evidencia"
     queda en la política, nunca en el default de ``AllocationPlan.multiplier_for``.
@@ -473,19 +568,7 @@ def recommend_allocation(
         return AllocationPlan({})
 
     rows_by_version = {row.strategy_version: row for row in by_strategy}
-    positive: dict[str, float] = {}
-    for version in active_versions:
-        row = rows_by_version.get(version)
-        if row is None:
-            continue
-        # El gate de decisividad es POR FILA: una expectativa no validada por su muestra
-        # no entra al numerador, aunque otra estrategia del grupo sí sea decisoria.
-        if (
-            row.decisive
-            and row.expectancy_currency is not None
-            and row.expectancy_currency > 0
-        ):
-            positive[version] = float(row.expectancy_currency)
+    axis, positive = _allocation_weights(rows_by_version, active_versions)
 
     neutral = _clamp_unit(resolved.unknown_multiplier)
     multipliers: dict[str, float] = {}
@@ -501,7 +584,7 @@ def recommend_allocation(
     else:
         for version in active_versions:
             multipliers[version] = neutral
-    return AllocationPlan(multipliers)
+    return AllocationPlan(multipliers, evidence_axis=axis)
 
 
 def build_adaptive_plan(
@@ -510,6 +593,7 @@ def build_adaptive_plan(
     *,
     policy: AdaptivePolicy | None = None,
     paused_cycles: Mapping[str, int] | None = None,
+    by_regime: Sequence[StrategyRegimeEvaluation] = (),
 ) -> AdaptivePlan:
     """(PURA) plan Adaptive completo: rotación + asignación sobre las mismas filas.
 
@@ -517,13 +601,16 @@ def build_adaptive_plan(
     ``RANGE``/``HIGH_VOL``/``LOW_VOL``/``UNKNOWN``), no el eje operativo.
     """
     resolved = policy or AdaptivePolicy()
+    cells = tuple(by_regime)
     rotation = recommend_rotation(
-        by_strategy, regime, policy=resolved, paused_cycles=paused_cycles
+        by_strategy,
+        regime,
+        policy=resolved,
+        paused_cycles=paused_cycles,
+        by_regime=cells,
     )
     active_versions = [
-        row.strategy_version
-        for row in by_strategy
-        if not rotation.is_paused(row.strategy_version)
+        row.strategy_version for row in by_strategy if not rotation.is_paused(row.strategy_version)
     ]
     allocation = recommend_allocation(active_versions, by_strategy, policy=resolved)
     return AdaptivePlan(
@@ -531,5 +618,5 @@ def build_adaptive_plan(
         allocation=allocation,
         regime=regime,
         policy_version=resolved.policy_version,
-        health=build_strategy_health(by_strategy),
+        health=build_strategy_health(by_strategy, by_regime=cells),
     )

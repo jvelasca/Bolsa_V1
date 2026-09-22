@@ -98,8 +98,7 @@ def _index_present(connection: Any, name: str) -> bool:
 def _table_present(connection: Any, name: str) -> bool:
     found = connection.execute(
         text(
-            "SELECT 1 FROM information_schema.tables "
-            "WHERE table_schema='public' AND table_name=:t"
+            "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=:t"
         ),
         {"t": name},
     ).scalar_one_or_none()
@@ -119,6 +118,8 @@ def _reservation(
     entry: float = 100.0,
     risk: float = 600.0,
     sector: str = "banca",
+    side: str = "buy",
+    cycle_id: str | None = None,
 ) -> Any:
     """Una reserva de compra cuantificada, con la forma exacta del tick real."""
     from bolsa_analytics.cognitive.portfolio_reservation import build_reservation
@@ -128,7 +129,7 @@ def _reservation(
         account_id=account_id,
         tick_id=created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
         instrument_id=instrument_id,
-        side="buy",
+        side=side,
         sector=sector,
         quantity=quantity,
         entry=entry,
@@ -136,6 +137,7 @@ def _reservation(
         reserved_cash=round(quantity * entry, 4),
         reserved_risk=risk,
         created_at=created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        cycle_id=cycle_id,
     )
 
 
@@ -204,14 +206,10 @@ async def _cleanup(
                 )
             )
             await session.execute(
-                delete(ExecutionEventRow).where(
-                    ExecutionEventRow.execution_id.in_(execution_ids)
-                )
+                delete(ExecutionEventRow).where(ExecutionEventRow.execution_id.in_(execution_ids))
             )
         await session.execute(
-            delete(PortfolioReservationRow).where(
-                PortfolioReservationRow.account_id == account_id
-            )
+            delete(PortfolioReservationRow).where(PortfolioReservationRow.account_id == account_id)
         )
         await session.commit()
 
@@ -222,9 +220,7 @@ def _store(session: AsyncSession) -> Any:
     return PostgresReservationStore(session)
 
 
-def _worker(
-    session: AsyncSession, *, account_id: str
-) -> Any:
+def _worker(session: AsyncSession, *, account_id: str) -> Any:
     """Worker mínimo con los tres stores reales que la reconciliación necesita.
 
     No se conduce un turno (no hay decider ni gate): se ejercita el punto de entrada de
@@ -297,9 +293,7 @@ async def test_migration_042_roundtrip_creates_and_drops_the_reservation_book(
         with engine.connect() as connection:
             assert _table_present(connection, _TABLE), "upgrade recrea la tabla"
             for index_name in _INDICES:
-                assert _index_present(connection, index_name), (
-                    f"upgrade debe recrear {index_name}"
-                )
+                assert _index_present(connection, index_name), f"upgrade debe recrear {index_name}"
         assert alembic_head() != _PREVIOUS_REVISION
     finally:
         engine.dispose()
@@ -482,5 +476,72 @@ async def test_reservation_of_a_dead_order_is_released_on_restart(
             rows = await _store(session).list_all(account_id)
             assert len(rows) == 1
             assert rows[0].status == "RELEASED_BY_RESTART"
+    finally:
+        await _cleanup(reservation_pg_factory, account_id=account_id, execution_ids=())
+
+
+# ── 5) AUTO-9 — el lector por ciclo devuelve el ciclo entero y no inventa huecos ──
+
+
+@pytest.mark.asyncio
+async def test_cycle_reader_returns_the_whole_cycle_and_declares_the_untraceable(
+    reservation_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Paso 2 del plan ``v2.50``: leer el material de un ciclo por su ``cycle_id``.
+
+    El lector no elige el denominador de R: devuelve la reserva de ENTRADA y la de SALIDA.
+    Y no rellena huecos: un ciclo inexistente, un conjunto vacío o una fila sin ciclo
+    (anterior a ``2.47``) devuelven ``[]``, para que el informe declare ``UNKNOWN``.
+    """
+    account_id = f"acc-cyc-{uuid.uuid4().hex[:10]}"
+    instrument_id = f"inst-cyc-{uuid.uuid4().hex[:10]}"
+    cycle_id = f"cyc-{uuid.uuid4().hex[:12]}"
+    created = datetime.now(UTC) - timedelta(minutes=5)
+    entry = _reservation(
+        account_id=account_id,
+        instrument_id=instrument_id,
+        created_at=created,
+        cycle_id=cycle_id,
+    )
+    exit_row = _reservation(
+        account_id=account_id,
+        instrument_id=instrument_id,
+        created_at=created + timedelta(minutes=1),
+        side="sell",
+        risk=0.0,
+        cycle_id=cycle_id,
+    )
+    historic = _reservation(
+        account_id=account_id,
+        instrument_id=instrument_id,
+        created_at=created + timedelta(minutes=2),
+    )
+    try:
+        async with reservation_pg_factory() as session:
+            store = _store(session)
+            assert await store.save(entry) is True
+            assert await store.save(exit_row) is True
+            assert await store.save(historic) is True
+            await session.commit()
+
+        async with reservation_pg_factory() as session:
+            rows = await _store(session).list_by_cycle_ids(account_id, [cycle_id])
+            assert [row.reservation_id for row in rows] == [
+                entry.reservation_id,
+                exit_row.reservation_id,
+            ]
+            assert {row.side for row in rows} == {"buy", "sell"}
+            assert rows[0].reserved_risk == pytest.approx(600.0)
+
+        async with reservation_pg_factory() as session:
+            store = _store(session)
+            # Un ciclo que no existe NO se inventa; y el hueco tampoco se rellena con la
+            # reserva histórica sin ciclo (``NULL`` no es un ciclo).
+            assert await store.list_by_cycle_ids(account_id, [f"cyc-{uuid.uuid4().hex[:12]}"]) == []
+            assert await store.list_by_cycle_ids(account_id, []) == []
+            assert await store.list_by_cycle_ids(account_id, ["", "   "]) == []
+            # El histórico sin ciclo sigue siendo legible por el canal que sí lo cubre.
+            every = await store.list_all(account_id)
+            assert len(every) == 3
     finally:
         await _cleanup(reservation_pg_factory, account_id=account_id, execution_ids=())

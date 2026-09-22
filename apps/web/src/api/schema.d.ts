@@ -4160,12 +4160,16 @@ export interface components {
          * @description Informe completo: roll-up + filas por versión + embudo + huecos declarados.
          */
         AutoSelfEvaluationDto: {
+            /** Byregime */
+            byRegime?: components["schemas"]["AutoStrategyRegimeEvaluationDto"][];
             /** Bystrategy */
             byStrategy?: components["schemas"]["AutoStrategySelfEvaluationDto"][];
             /** Cycles */
             cycles: number;
             /** Cycleswithoutidentity */
             cyclesWithoutIdentity: number;
+            /** Cycleswithoutregime */
+            cyclesWithoutRegime: number;
             /** Decisive */
             decisive: boolean;
             /** Drawdowncurrency */
@@ -4218,6 +4222,47 @@ export interface components {
             winRate?: number | null;
         };
         /**
+         * AutoStrategyRegimeEvaluationDto
+         * @description AUTO-9 — celda ``strategyVersion × régime``: el R condicionado al mercado.
+         *
+         *     ``regime == "UNKNOWN"`` es un cubo PROPIO (los ciclos que no declaran régimen), no un
+         *     comodín. El embudo no viaja aquí: no tiene dimensión de régimen en el dato durable.
+         */
+        AutoStrategyRegimeEvaluationDto: {
+            /** Cycles */
+            cycles: number;
+            /** Cycleswithoutcost */
+            cyclesWithoutCost: number;
+            /** Cycleswithoutrisk */
+            cyclesWithoutRisk: number;
+            /** Decisive */
+            decisive: boolean;
+            /** Expectancyr */
+            expectancyR?: number | null;
+            /** Losses */
+            losses: number;
+            /** Netexpectancyr */
+            netExpectancyR?: number | null;
+            /** Netrmeasurement */
+            netRMeasurement: string;
+            /** Notes */
+            notes?: string[];
+            /** Rmeasurement */
+            rMeasurement: string;
+            /** Realizedpnl */
+            realizedPnl: string;
+            /** Regime */
+            regime: string;
+            /** Samplequality */
+            sampleQuality: string;
+            /** Strategyversion */
+            strategyVersion: string;
+            /** Winrate */
+            winRate?: number | null;
+            /** Wins */
+            wins: number;
+        };
+        /**
          * AutoStrategySelfEvaluationDto
          * @description Lectura de UNA versión de estrategia (lo medido + lo declarado como no medido).
          */
@@ -4226,6 +4271,8 @@ export interface components {
             avgLossCurrency?: string | null;
             /** Avgwincurrency */
             avgWinCurrency?: string | null;
+            /** Cycleswithoutcost */
+            cyclesWithoutCost: number;
             /** Decisive */
             decisive: boolean;
             /** Drawdowncurrency */
@@ -4250,6 +4297,10 @@ export interface components {
             maeR?: number | null;
             /** Mfer */
             mfeR?: number | null;
+            /** Netexpectancyr */
+            netExpectancyR?: number | null;
+            /** Netrmeasurement */
+            netRMeasurement: string;
             /** Notes */
             notes?: string[];
             /** Profitfactor */

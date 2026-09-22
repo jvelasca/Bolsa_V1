@@ -13,7 +13,10 @@ Qué agrega por ``strategyVersion``:
   oportunidades NO operadas con precio medido);
 * **riesgo**: contribución al **drawdown** realizado de la estrategia y su cuota sobre la
   suma de drawdowns de las estrategias (proxy aditivo, declarado como tal);
-* **embudo**: ``traded``/``rejected``/``expired``/``missed`` con sus motivos.
+* **embudo**: ``traded``/``rejected``/``expired``/``missed`` con sus motivos;
+* **régimen** (``AUTO-9``): el mismo material cruzado por estado de mercado
+  (``by_regime``), porque una esperanza agregada mezcla regímenes que no se parecen. El
+  régimen **ausente** es un cubo propio (``UNKNOWN``): no se reparte ni se hereda.
 
 Disciplina de medición (la del repo, y aquí es el punto entero del módulo):
 
@@ -52,14 +55,24 @@ from bolsa_analytics.cognitive.measurement import (
     combine_measurements,
     measurement_from_counts,
 )
+from bolsa_analytics.cognitive.portfolio_reservation import coerce_trading_cost
 
 __all__ = [
     "AUTO_SELF_EVALUATION_KEY",
+    "SELF_EVAL_FUNNEL_NOT_DIMENSIONED",
     "SELF_EVAL_MIN_TRADES_DEFAULT",
     "SELF_EVAL_OPPORTUNITY_STATUSES",
+    "SELF_EVAL_REGIME_UNDETERMINED",
+    "SELF_EVAL_REGIME_UNKNOWN",
     "AutoSelfEvaluation",
+    "CycleR",
+    "StrategyRegimeEvaluation",
     "StrategySelfEvaluation",
+    "aggregate_by_regime",
+    "cycle_r",
+    "declared_regime",
     "evaluate_auto_self_evaluation",
+    "single_decisive_regime",
 ]
 
 AUTO_SELF_EVALUATION_KEY = "autoSelfEvaluation"
@@ -99,6 +112,14 @@ SELF_EVAL_CYCLE_WITHOUT_IDENTITY = "cycle_without_identity"
 SELF_EVAL_UNVERSIONED_CYCLE = "unversioned_cycle"
 SELF_EVAL_THIN_SAMPLE = "thin_sample"
 SELF_EVAL_MISSING_INPUTS = "missing_inputs"
+SELF_EVAL_PNL_UNMEASURED = "pnl_unmeasured"
+SELF_EVAL_COST_UNMEASURED = "cost_unmeasured"
+# AUTO-9 — el cruce ``strategy × regime``. El régimen **ausente** no se reparte ni se suma al
+# de otro ciclo: tiene cubo PROPIO. ``UNKNOWN`` es aquí un valor de agrupación, no un hueco
+# por rellenar.
+SELF_EVAL_REGIME_UNKNOWN = "UNKNOWN"
+SELF_EVAL_REGIME_UNDETERMINED = "regime_undetermined"
+SELF_EVAL_FUNNEL_NOT_DIMENSIONED = "funnel_not_dimensioned_by_regime"
 
 _MONEY = Decimal("0.000001")
 
@@ -173,14 +194,37 @@ class _Cycle:
     identity: str
     pnl: Decimal | None
     r_multiple: float | None
+    net_r_multiple: float | None
+    regime: str
     mfe_r: float | None
     mae_r: float | None
     slippage: Decimal | None
     closed_at: str | None
 
 
+def _regime(value: Any) -> str:
+    """Régimen de mercado declarado por el ciclo, o el cubo ``UNKNOWN``.
+
+    ``UNKNOWN`` **es un cubo propio** del cruce ``strategy × regime``: un ciclo sin régimen
+    declarado —o que se declara literalmente ``unknown``, en cualquier caja— se agrupa con
+    los demás sin régimen. Nunca se le atribuye el régimen de otro ciclo ni se suma a otro
+    cubo, porque eso sería afirmar un cruce que nadie midió.
+    """
+    text = _explicit(value)
+    if text is None or text.upper() == SELF_EVAL_REGIME_UNKNOWN:
+        return SELF_EVAL_REGIME_UNKNOWN
+    return text
+
+
 def _read_cycle(raw: Any) -> _Cycle:
-    """Normaliza una fila de ciclo (dict u objeto) sin inventar ningún campo ausente."""
+    """Normaliza una fila de ciclo (dict u objeto) sin inventar ningún campo ausente.
+
+    El R se **lee** cuando la fila ya lo declara —es una medida hecha por su productor, y
+    sobrescribirla sería desconfiar de un dato que sí se midió— y, si no, se **calcula** con
+    el riesgo y el coste que la fila declare (``AUTO-9``). Así el mismo módulo sirve al
+    informe AUTO-7, que recibe el R ya medido, y al productor por ciclo del ``v2.50``, que
+    solo tiene el material en crudo.
+    """
     nested_mfe = _field(raw, "mfe_mae", "mfeMae")
     mfe = _num(_field(raw, "mfe_r", "mfeR"))
     mae = _num(_field(raw, "mae_r", "maeR"))
@@ -189,6 +233,18 @@ def _read_cycle(raw: Any) -> _Cycle:
         mae = mae if mae is not None else _num(_field(nested_mfe, "maeR", "mae_r"))
     cycle_id = _explicit(_field(raw, "cycle_id", "cycleId"))
     signal_id = _explicit(_field(raw, "signal_id", "signalId"))
+    pnl = _dec(_field(raw, "pnl", "realized_pnl", "realizedPnl", "pnl_currency"))
+    declared_r = _num(_field(raw, "r_multiple", "rMultiple", "r"))
+    declared_net = _num(_field(raw, "net_r_multiple", "netRMultiple", "netR"))
+    computed: CycleR | None = None
+    if declared_r is None or declared_net is None:
+        computed = cycle_r(
+            pnl=pnl,
+            risk_amount=_field(raw, "risk_amount", "riskAmount", "reserved_risk", "reservedRisk"),
+            cost=_field(raw, "cost", "trading_cost", "tradingCost"),
+        )
+    measured_r = declared_r if declared_r is not None else _computed_r(computed, net=False)
+    measured_net = declared_net if declared_net is not None else _computed_r(computed, net=True)
     return _Cycle(
         strategy_version=(
             _explicit(
@@ -203,13 +259,22 @@ def _read_cycle(raw: Any) -> _Cycle:
             or ""
         ),
         identity=cycle_id or signal_id or "",
-        pnl=_dec(_field(raw, "pnl", "realized_pnl", "realizedPnl", "pnl_currency")),
-        r_multiple=_num(_field(raw, "r_multiple", "rMultiple", "r")),
+        pnl=pnl,
+        r_multiple=measured_r,
+        net_r_multiple=measured_net,
+        regime=_regime(_field(raw, "regime", "marketRegime", "market_regime")),
         mfe_r=mfe,
         mae_r=mae,
         slippage=_dec(_field(raw, "slippage", "slippage_currency", "slippageCurrency")),
         closed_at=_explicit(_field(raw, "closed_at", "closedAt")),
     )
+
+
+def _computed_r(computed: CycleR | None, *, net: bool) -> float | None:
+    """El R calculado (o el neto) de un ``CycleR``; ``None`` si no se pudo calcular."""
+    if computed is None:
+        return None
+    return computed.net_r_multiple if net else computed.r_multiple
 
 
 def _dedupe_cycles(
@@ -235,6 +300,109 @@ def _dedupe_cycles(
         seen.add(cycle.identity)
         unique.append(cycle)
     return tuple(unique), duplicates, anonymous
+
+
+# ── AUTO-9 — el R de un ciclo (adimensional: medido, o declarado ausente) ───────────
+
+
+def _ratio(numerator: Decimal, denominator: Decimal) -> float | None:
+    """Cociente adimensional a 4 decimales; ``None`` si no es un número utilizable.
+
+    El denominador es un RIESGO: ``0`` o negativo **no divide**, y no se sustituye por
+    ``0`` — un R de cero afirmaría "no pasó nada", que es una conclusión que nadie ha
+    medido. Tampoco se deja escapar un ``inf``: "riesgo gratis" no es un resultado.
+    """
+    if denominator <= 0:
+        return None
+    try:
+        quotient = numerator / denominator
+    except (InvalidOperation, ZeroDivisionError):
+        return None
+    value = _num(quotient)
+    return None if value is None else _round4(value)
+
+
+@dataclass(frozen=True, slots=True)
+class CycleR:
+    """AUTO-9 — el R de UN ciclo: lo medido y lo que no se pudo medir, con su motivo.
+
+    ``r_multiple`` es ``pnl / risk_amount`` y ``net_r_multiple`` es
+    ``(pnl − coste_estimado) / risk_amount``. ``risk_amount`` y ``cost_estimate`` se
+    publican junto al resultado porque son el **rastro de la división**: sin ellos, un R
+    no es auditable.
+    """
+
+    r_multiple: float | None
+    net_r_multiple: float | None
+    risk_amount: Decimal | None
+    cost_estimate: Decimal | None
+    measurement: MeasurementStatus
+    notes: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "rMultiple": self.r_multiple,
+            "netRMultiple": self.net_r_multiple,
+            "riskAmount": None if self.risk_amount is None else str(self.risk_amount),
+            "costEstimate": None if self.cost_estimate is None else str(self.cost_estimate),
+            "measurement": self.measurement,
+            "notes": list(self.notes),
+        }
+
+
+def cycle_r(*, pnl: Any, risk_amount: Any, cost: Any = None) -> CycleR:
+    """(PURA) el R de un ciclo desde su PnL, su riesgo comprometido y su coste estimado.
+
+    ``pnl`` es el PnL **realizado** del ciclo, ``risk_amount`` el riesgo que se comprometió
+    en la reserva (``reserved_risk``: el denominador que hace adimensional la medida) y
+    ``cost`` el ``TradingCost`` estimado en la decisión, en su forma serializada
+    (``to_dict()``) o ya reconstruido. Sin I/O, sin reloj, sin estado.
+
+    Reglas duras — ninguna es negociable:
+
+    * ``risk_amount`` ausente, ``0`` o negativo ⇒ **los dos** R son ``None`` y se declara
+      ``risk_unmeasured``. Nunca ``0`` (diría "no pasó nada") ni ``inf`` (diría "riesgo
+      gratis").
+    * ``pnl`` ausente ⇒ ``None`` y ``pnl_unmeasured``: sin numerador no hay cociente.
+    * ``cost`` ausente —o presente pero **incompleto**, con ``total`` sin cuantificar— ⇒
+      ``net_r_multiple`` es ``None`` y se declara ``cost_unmeasured``. Un coste que no se
+      pudo cerrar no se lee como coste cero: eso sería **regalar R**.
+    * ``pnl == 0`` **sí** es una medida (``r_multiple = 0.0``, ``COMPLETE``): un resultado
+      plano medido no es un hueco, y confundirlos es la mitad de este módulo.
+
+    El coste es el **estimado en el instante de la decisión**, no el realizado (la
+    atribución por fill exigiría el spine de settlement, fuera de esta fase). Quien publique
+    ``net_r_multiple`` debe etiquetarlo como estimado, nunca como "R neto realizado".
+    """
+    amount = _dec(pnl)
+    risk = _dec(risk_amount)
+    cost_row = coerce_trading_cost(cost)
+    friction = None if cost_row is None else _dec(cost_row.total)
+
+    notes: list[str] = []
+    if risk is None or risk <= 0:
+        notes.append(SELF_EVAL_RISK_UNMEASURED)
+    if amount is None:
+        notes.append(SELF_EVAL_PNL_UNMEASURED)
+
+    r_multiple: float | None = None
+    net_r_multiple: float | None = None
+    if amount is not None and risk is not None and risk > 0:
+        r_multiple = _ratio(amount, risk)
+        if friction is None:
+            notes.append(SELF_EVAL_COST_UNMEASURED)
+        else:
+            net_r_multiple = _ratio(amount - friction, risk)
+
+    valued = sum(1 for value in (r_multiple, net_r_multiple) if value is not None)
+    return CycleR(
+        r_multiple=r_multiple,
+        net_r_multiple=net_r_multiple,
+        risk_amount=risk,
+        cost_estimate=friction,
+        measurement=measurement_from_counts(valued=valued, unvalued=2 - valued),
+        notes=tuple(notes),
+    )
 
 
 # ── Embudo de oportunidades ─────────────────────────────────────────────────────────
@@ -354,8 +522,7 @@ def _read_opportunities(
         errors.append(SELF_EVAL_FUNNEL_UNBALANCED)
 
     rejected_like = sum(
-        counts[status]
-        for status in (SELF_EVAL_REJECTED, SELF_EVAL_EXPIRED, SELF_EVAL_MISSED)
+        counts[status] for status in (SELF_EVAL_REJECTED, SELF_EVAL_EXPIRED, SELF_EVAL_MISSED)
     )
     if rejected_like == 0:
         cost_measurement: MeasurementStatus = MEASUREMENT_UNKNOWN
@@ -423,6 +590,7 @@ class StrategySelfEvaluation:
     realized_pnl: Decimal
     expectancy_currency: Decimal | None
     expectancy_r: float | None
+    net_expectancy_r: float | None
     win_rate: float | None
     profit_factor: float | None
     avg_win_currency: Decimal | None
@@ -440,6 +608,8 @@ class StrategySelfEvaluation:
     sample_quality: str
     results_measurement: MeasurementStatus
     risk_measurement: MeasurementStatus
+    net_r_measurement: MeasurementStatus
+    cycles_without_cost: int
     excursions_measurement: MeasurementStatus
     slippage_measurement: MeasurementStatus
     rejection_cost_measurement: MeasurementStatus
@@ -458,6 +628,7 @@ class StrategySelfEvaluation:
                 None if self.expectancy_currency is None else str(self.expectancy_currency)
             ),
             "expectancyR": self.expectancy_r,
+            "netExpectancyR": self.net_expectancy_r,
             "winRate": self.win_rate,
             "profitFactor": self.profit_factor,
             "avgWinCurrency": (
@@ -483,6 +654,8 @@ class StrategySelfEvaluation:
             "sampleQuality": self.sample_quality,
             "resultsMeasurement": self.results_measurement,
             "riskMeasurement": self.risk_measurement,
+            "netRMeasurement": self.net_r_measurement,
+            "cyclesWithoutCost": self.cycles_without_cost,
             "excursionsMeasurement": self.excursions_measurement,
             "slippageMeasurement": self.slippage_measurement,
             "rejectionCostMeasurement": self.rejection_cost_measurement,
@@ -493,10 +666,73 @@ class StrategySelfEvaluation:
 
 
 @dataclass(frozen=True, slots=True)
+class StrategyRegimeEvaluation:
+    """AUTO-9 — una celda ``strategyVersion × régime`` del informe.
+
+    El cruce existe para que la esperanza de una estrategia se **condicione** al estado de
+    mercado en que se midió: una esperanza agregada mezcla regímenes que no se parecen, y
+    decidir con ella es decidir con un promedio que nadie vivió.
+
+    Dos cosas que esta celda **no** hace, y las declara en vez de disimularlas:
+
+    * El embudo (``traded``/``rejected``/...) **no tiene dimensión de régimen** en el dato
+      durable: por eso el informe publica ``funnel_not_dimensioned_by_regime``. El embudo
+      sigue viviendo en ``byStrategy``, donde sí está medido.
+    * ``regime == UNKNOWN`` es un cubo **propio**, no un comodín: agrupa los ciclos que no
+      declaran régimen, y nadie hereda el régimen de otro ciclo.
+
+    ``decisive`` exige que el R **bruto** esté medido en TODOS los ciclos de la celda y que
+    la celda alcance ``min_trades``. **No** cubre el R neto: ``net_expectancy_r`` se publica
+    con su propia medida (``net_r_measurement``) porque depende de un coste *estimado*, así
+    que quien decida con el neto **tiene que exigir** ``net_r_measurement == COMPLETE``.
+    Mirar solo ``decisive`` leería como comparable un neto medido sobre la mitad de la celda.
+    Es una bandera de lectura, nunca un permiso.
+    """
+
+    strategy_version: str
+    regime: str
+    cycles: int
+    wins: int
+    losses: int
+    realized_pnl: Decimal
+    expectancy_r: float | None
+    net_expectancy_r: float | None
+    win_rate: float | None
+    cycles_without_risk: int
+    cycles_without_cost: int
+    r_measurement: MeasurementStatus
+    net_r_measurement: MeasurementStatus
+    sample_quality: str
+    decisive: bool
+    notes: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "strategyVersion": self.strategy_version,
+            "regime": self.regime,
+            "cycles": self.cycles,
+            "wins": self.wins,
+            "losses": self.losses,
+            "realizedPnl": str(self.realized_pnl),
+            "expectancyR": self.expectancy_r,
+            "netExpectancyR": self.net_expectancy_r,
+            "winRate": self.win_rate,
+            "cyclesWithoutRisk": self.cycles_without_risk,
+            "cyclesWithoutCost": self.cycles_without_cost,
+            "rMeasurement": self.r_measurement,
+            "netRMeasurement": self.net_r_measurement,
+            "sampleQuality": self.sample_quality,
+            "decisive": self.decisive,
+            "notes": list(self.notes),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class AutoSelfEvaluation:
     """Informe AUTO-7 completo: por estrategia + embudo + huecos de medición declarados."""
 
     by_strategy: tuple[StrategySelfEvaluation, ...]
+    by_regime: tuple[StrategyRegimeEvaluation, ...]
     cycles: int
     trades: int
     realized_pnl: Decimal
@@ -511,6 +747,7 @@ class AutoSelfEvaluation:
     unattributed_cycles: int
     unattributed_pnl: Decimal
     cycles_without_identity: int
+    cycles_without_regime: int
     duplicate_cycles: int
     seen: int | None
     traded: int | None
@@ -565,6 +802,8 @@ class AutoSelfEvaluation:
             },
             "rejectionReasons": dict(self.rejection_reasons),
             "byStrategy": [row.as_dict() for row in self.by_strategy],
+            "byRegime": [row.as_dict() for row in self.by_regime],
+            "cyclesWithoutRegime": self.cycles_without_regime,
             "resultsMeasurement": self.results_measurement,
             "measurement": self.measurement,
             "decisive": self.decisive,
@@ -648,9 +887,17 @@ def evaluate_auto_self_evaluation(
     # de resultado no existen y se declaran como tales.
     versions = sorted(set(groups) | set(funnel.by_strategy_counts))
     for version in versions:
-        rows.append(
-            _strategy_row(version, groups.get(version, ()), funnel, min_trades=min_trades)
-        )
+        rows.append(_strategy_row(version, groups.get(version, ()), funnel, min_trades=min_trades))
+
+    # AUTO-9 — el mismo material, cruzado por régimen. Las celdas se construyen sobre los
+    # ciclos ATRIBUIBLES que ya pasaron por la deduplicación: el cruce no inventa filas ni
+    # reparte las anónimas.
+    regime_rows = _aggregate_by_regime(attributed, min_trades=min_trades)
+    cycles_without_regime = sum(
+        1 for cycle in attributed if cycle.regime == SELF_EVAL_REGIME_UNKNOWN
+    )
+    if regime_rows:
+        notes.append(SELF_EVAL_FUNNEL_NOT_DIMENSIONED)
 
     total_dd = sum((row.drawdown_currency for row in rows), Decimal("0"))
     if total_dd > 0:
@@ -658,8 +905,7 @@ def evaluate_auto_self_evaluation(
         # ADITIVO (los drawdowns de dos estrategias pueden solaparse en el tiempo), nunca
         # una atribución temporal. Se declara como tal.
         rows = [
-            _with_share(row, share=_round4(float(row.drawdown_currency / total_dd)))
-            for row in rows
+            _with_share(row, share=_round4(float(row.drawdown_currency / total_dd))) for row in rows
         ]
         notes.append(SELF_EVAL_DRAWDOWN_SHARE_PROXY)
 
@@ -676,9 +922,7 @@ def evaluate_auto_self_evaluation(
         valued=len(agg_r_values), unvalued=len(attributed) - len(agg_r_values)
     )
     excursions = [
-        cycle
-        for cycle in attributed
-        if cycle.mfe_r is not None and cycle.mae_r is not None
+        cycle for cycle in attributed if cycle.mfe_r is not None and cycle.mae_r is not None
     ]
     excursions_measurement = measurement_from_counts(
         valued=len(excursions), unvalued=len(attributed) - len(excursions)
@@ -711,15 +955,12 @@ def evaluate_auto_self_evaluation(
 
     return AutoSelfEvaluation(
         by_strategy=tuple(rows),
+        by_regime=regime_rows,
         cycles=len(unique_cycles),
         trades=total_trades,
         realized_pnl=total_pnl.quantize(_MONEY),
-        expectancy_currency=(
-            (total_pnl / total_trades).quantize(_MONEY) if total_trades else None
-        ),
-        expectancy_r=(
-            _round4(sum(agg_r_values) / len(agg_r_values)) if agg_r_values else None
-        ),
+        expectancy_currency=((total_pnl / total_trades).quantize(_MONEY) if total_trades else None),
+        expectancy_r=(_round4(sum(agg_r_values) / len(agg_r_values)) if agg_r_values else None),
         win_rate=_round4(agg_wins / len(pnls_measured)) if pnls_measured else None,
         profit_factor=_profit_factor(pnls_measured),
         slippage_currency=(
@@ -733,6 +974,7 @@ def evaluate_auto_self_evaluation(
             (cycle.pnl for cycle in unattributed if cycle.pnl is not None), Decimal("0")
         ).quantize(_MONEY),
         cycles_without_identity=anonymous,
+        cycles_without_regime=cycles_without_regime,
         duplicate_cycles=duplicates,
         seen=funnel.seen,
         traded=funnel.counts[SELF_EVAL_TRADED] if funnel.provided else None,
@@ -774,9 +1016,8 @@ def _strategy_row(
     with_pnl = [cycle for cycle in cycles if cycle.pnl is not None]
     pnls = [cycle.pnl for cycle in with_pnl if cycle.pnl is not None]
     r_values = [cycle.r_multiple for cycle in cycles if cycle.r_multiple is not None]
-    excursions = [
-        cycle for cycle in cycles if cycle.mfe_r is not None and cycle.mae_r is not None
-    ]
+    net_values = [cycle.net_r_multiple for cycle in cycles if cycle.net_r_multiple is not None]
+    excursions = [cycle for cycle in cycles if cycle.mfe_r is not None and cycle.mae_r is not None]
     mfe_values = [cycle.mfe_r for cycle in excursions if cycle.mfe_r is not None]
     mae_values = [cycle.mae_r for cycle in excursions if cycle.mae_r is not None]
     slippages = [cycle.slippage for cycle in cycles if cycle.slippage is not None]
@@ -788,11 +1029,16 @@ def _strategy_row(
     gross_profit = sum((pnl for pnl in pnls if pnl > 0), Decimal("0"))
     gross_loss = -sum((pnl for pnl in pnls if pnl < 0), Decimal("0"))
 
-    results_measurement = measurement_from_counts(
-        valued=len(with_pnl), unvalued=trades - len(with_pnl)
-    ) if cycles else MEASUREMENT_UNKNOWN
+    results_measurement = (
+        measurement_from_counts(valued=len(with_pnl), unvalued=trades - len(with_pnl))
+        if cycles
+        else MEASUREMENT_UNKNOWN
+    )
     risk_measurement = measurement_from_counts(
         valued=len(r_values), unvalued=trades - len(r_values)
+    )
+    net_r_measurement = measurement_from_counts(
+        valued=len(net_values), unvalued=trades - len(net_values)
     )
     excursions_measurement = measurement_from_counts(
         valued=len(excursions), unvalued=trades - len(excursions)
@@ -830,6 +1076,8 @@ def _strategy_row(
         # ningún ciclo, "R no medido" no aporta nada que "0 ciclos" no diga ya.
         if risk_measurement != MEASUREMENT_COMPLETE:
             notes.append(SELF_EVAL_RISK_UNMEASURED)
+        if net_r_measurement != MEASUREMENT_COMPLETE:
+            notes.append(SELF_EVAL_COST_UNMEASURED)
         if excursions_measurement != MEASUREMENT_COMPLETE:
             notes.append(SELF_EVAL_EXCURSIONS_UNMEASURED)
         if slippage_measurement != MEASUREMENT_COMPLETE:
@@ -847,29 +1095,16 @@ def _strategy_row(
         wins=wins,
         losses=losses,
         realized_pnl=realized.quantize(_MONEY),
-        expectancy_currency=(
-            (realized / len(with_pnl)).quantize(_MONEY) if with_pnl else None
-        ),
-        expectancy_r=(
-            _round4(sum(r_values) / len(r_values)) if r_values else None
-        ),
+        expectancy_currency=((realized / len(with_pnl)).quantize(_MONEY) if with_pnl else None),
+        expectancy_r=(_round4(sum(r_values) / len(r_values)) if r_values else None),
+        net_expectancy_r=(_round4(sum(net_values) / len(net_values)) if net_values else None),
         win_rate=_round4(wins / len(with_pnl)) if with_pnl else None,
         profit_factor=_profit_factor(pnls),
-        avg_win_currency=(
-            (gross_profit / wins).quantize(_MONEY) if wins else None
-        ),
-        avg_loss_currency=(
-            (gross_loss / losses).quantize(_MONEY) if losses else None
-        ),
-        mfe_r=(
-            _round4(sum(mfe_values) / len(mfe_values)) if mfe_values else None
-        ),
-        mae_r=(
-            _round4(sum(mae_values) / len(mae_values)) if mae_values else None
-        ),
-        slippage_currency=(
-            sum(slippages, Decimal("0")).quantize(_MONEY) if slippages else None
-        ),
+        avg_win_currency=((gross_profit / wins).quantize(_MONEY) if wins else None),
+        avg_loss_currency=((gross_loss / losses).quantize(_MONEY) if losses else None),
+        mfe_r=(_round4(sum(mfe_values) / len(mfe_values)) if mfe_values else None),
+        mae_r=(_round4(sum(mae_values) / len(mae_values)) if mae_values else None),
+        slippage_currency=(sum(slippages, Decimal("0")).quantize(_MONEY) if slippages else None),
         rejection_cost_return=rejection_cost,
         drawdown_currency=_max_drawdown(pnls),
         drawdown_share=None,
@@ -880,13 +1115,131 @@ def _strategy_row(
         sample_quality=sample_quality_from_n(trades),
         results_measurement=results_measurement,
         risk_measurement=risk_measurement,
+        net_r_measurement=net_r_measurement,
+        cycles_without_cost=trades - len(net_values),
         excursions_measurement=excursions_measurement,
         slippage_measurement=slippage_measurement,
         rejection_cost_measurement=rejection_cost_measurement,
         drawdown_measurement=drawdown_measurement,
-        decisive=(
-            trades >= max(1, min_trades)
-            and results_measurement == MEASUREMENT_COMPLETE
-        ),
+        decisive=(trades >= max(1, min_trades) and results_measurement == MEASUREMENT_COMPLETE),
         notes=tuple(dict.fromkeys(notes)),
+    )
+
+
+# ── AUTO-9 — el cruce strategy × regime ─────────────────────────────────────────────
+
+
+def _aggregate_by_regime(
+    cycles: Sequence[_Cycle],
+    *,
+    min_trades: int,
+) -> tuple[StrategyRegimeEvaluation, ...]:
+    """Celdas ``(strategyVersion, régime)`` de ciclos ya deduplicados y atribuibles."""
+    cells: dict[tuple[str, str], list[_Cycle]] = {}
+    for cycle in cycles:
+        if not cycle.strategy_version:
+            continue  # el cajón ``unattributed`` ya lo declara el informe entero
+        cells.setdefault((cycle.strategy_version, cycle.regime), []).append(cycle)
+    # Orden canónico: el cruce no depende del orden en que lleguen las filas.
+    return tuple(
+        _regime_row(version, regime, group, min_trades=min_trades)
+        for (version, regime), group in sorted(cells.items())
+    )
+
+
+def aggregate_by_regime(
+    cycles: Iterable[Any],
+    *,
+    min_trades: int = SELF_EVAL_MIN_TRADES_DEFAULT,
+) -> tuple[StrategyRegimeEvaluation, ...]:
+    """(PURA) el cruce ``strategyVersion × régime`` desde ciclos crudos.
+
+    Es el mismo cruce que publica ``evaluate_auto_self_evaluation``, pero desde ciclos
+    sueltos: lo usa el productor por ciclo del ``v2.50``, que no arma el informe entero. La
+    deduplicación es la misma que la del informe, así que un ciclo **repetido** no infla
+    ninguna celda, y los ciclos **sin versión** no se reparten. Sin I/O, sin reloj, sin
+    estado.
+
+    El tamaño de celda importa: una estrategia con 90 ciclos repartidos en 3 regímenes tiene
+    celdas de 30, no una muestra de 90. Por eso ``min_trades`` se aplica **por celda**.
+    """
+    unique, _duplicates, _anonymous = _dedupe_cycles([_read_cycle(row) for row in cycles])
+    return _aggregate_by_regime(unique, min_trades=min_trades)
+
+
+def single_decisive_regime(
+    cells: Sequence[StrategyRegimeEvaluation],
+    version: str,
+) -> str | None:
+    """El régimen de ``version`` **si y solo si** hay exactamente una celda decisiva.
+
+    Devuelve ``None`` si no hay ninguna celda decisiva, si hay más de una, o si la única
+    decisiva es ``UNKNOWN``: en los tres casos el régimen **no está determinado**, y quien lo
+    publique debe declararlo (``SELF_EVAL_REGIME_UNDETERMINED``) en vez de elegir uno. Una
+    celda ``UNKNOWN`` decisiva no asciende a régimen: sigue significando "no se midió".
+    """
+    decisive = [
+        cell
+        for cell in cells
+        if cell.strategy_version == version
+        and cell.decisive
+        and cell.regime != SELF_EVAL_REGIME_UNKNOWN
+    ]
+    if len(decisive) != 1:
+        return None
+    return decisive[0].regime
+
+
+def declared_regime(
+    cells: Sequence[StrategyRegimeEvaluation],
+    version: str,
+) -> tuple[str | None, str | None]:
+    """El régimen de ``version`` **y la declaración de su hueco**, como un solo par.
+
+    Devuelve ``(régimen, None)`` cuando hay exactamente una celda decisiva con régimen, y
+    ``(None, SELF_EVAL_REGIME_UNDETERMINED)`` en cualquier otro caso. Quien publique el
+    régimen de una estrategia publica **el par**: o el régimen, o el motivo por el que no
+    hay. Nunca un régimen elegido entre varios candidatos.
+    """
+    regime = single_decisive_regime(cells, version)
+    if regime is None:
+        return None, SELF_EVAL_REGIME_UNDETERMINED
+    return regime, None
+
+
+def _regime_row(
+    version: str,
+    regime: str,
+    cycles: Sequence[_Cycle],
+    *,
+    min_trades: int,
+) -> StrategyRegimeEvaluation:
+    """Agrega UNA celda y declara lo que no se pudo medir en ella, sin rellenarlo."""
+    pnls = [cycle.pnl for cycle in cycles if cycle.pnl is not None]
+    r_values = [cycle.r_multiple for cycle in cycles if cycle.r_multiple is not None]
+    net_values = [cycle.net_r_multiple for cycle in cycles if cycle.net_r_multiple is not None]
+    trades = len(cycles)
+    wins = sum(1 for pnl in pnls if pnl > 0)
+    losses = sum(1 for pnl in pnls if pnl < 0)
+    r_measurement = measurement_from_counts(valued=len(r_values), unvalued=trades - len(r_values))
+    net_measurement = measurement_from_counts(
+        valued=len(net_values), unvalued=trades - len(net_values)
+    )
+    return StrategyRegimeEvaluation(
+        strategy_version=version,
+        regime=regime,
+        cycles=trades,
+        wins=wins,
+        losses=losses,
+        realized_pnl=sum(pnls, Decimal("0")).quantize(_MONEY),
+        expectancy_r=(_round4(sum(r_values) / len(r_values)) if r_values else None),
+        net_expectancy_r=(_round4(sum(net_values) / len(net_values)) if net_values else None),
+        win_rate=_round4(wins / len(pnls)) if pnls else None,
+        cycles_without_risk=trades - len(r_values),
+        cycles_without_cost=trades - len(net_values),
+        r_measurement=r_measurement,
+        net_r_measurement=net_measurement,
+        sample_quality=sample_quality_from_n(trades),
+        decisive=(trades >= max(1, min_trades) and r_measurement == MEASUREMENT_COMPLETE),
+        notes=((SELF_EVAL_COST_UNMEASURED,) if net_measurement != MEASUREMENT_COMPLETE else ()),
     )

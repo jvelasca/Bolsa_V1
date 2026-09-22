@@ -2,6 +2,86 @@
 
 All notable releases of Bolsa V1.
 
+## [1.75.0-beta] — AUTO-9 Strategy × Regime y net expectancy_R (V2.50) — 2026-09-22
+
+**Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva.
+El gobernador y su evidencia siguen **intactos** (byte a byte igual y `exit 0`). El invariante que
+instala: **el R de un ciclo deja de ser un `None` permanente** — pasa a ser un dato **medido** o un hueco
+**declarado con su motivo**, nunca un `0`.
+
+### Añadido: el denominador de R y el coste, por ciclo (read-only)
+
+- **`cycle_risk.py`** (nuevo, `packages/py/application/src/bolsa_application/cycle_risk.py`): adaptador
+  read-only que ata por `cycle_id` el **denominador** de R (`portfolio_reservations.reserved_risk`) y el
+  **coste estimado** (`cost`). Cuatro reglas duras, cada una con test: el denominador es **uno** (la
+  reserva de ENTRADA **más antigua** con riesgo positivo; con varias candidatas se usa la más antigua y
+  se declaran — repartir el riesgo sería una media de denominadores, no una razón); las reservas
+  **liberadas cuentan** (un ciclo cerrado ya no tiene reserva viva, y filtrar por viva dejaría el
+  denominador en `None` justo en los ciclos con resultado); la **ausencia se declara** (`None` + nota,
+  nunca un `0` de relleno ni un `inf`); y el **régimen no se inventa** (`None` + `regime_not_durable`, con
+  la costura `regime_by_cycle` lista para el productor durable que falta).
+- **Cálculo puro `cycle_r` / `CycleR`** en `auto_self_evaluation.py`: `r_multiple = pnl / risk_amount` y
+  `net_r_multiple = (pnl − coste) / risk_amount`; coste ausente o incompleto ⇒ neto `None` +
+  `cost_unmeasured` (`PARTIAL`), y `pnl = 0` **medido** ⇒ `0.0` (`COMPLETE`).
+- **Agregación `strategy × regime`** con `UNKNOWN` como cubo **propio** (no se reparte ni se suma), el
+  ciclo repetido contado **una vez** y celdas en orden canónico; `min_trades` es **por celda**.
+- **`list_by_cycle_ids`** en `ReservationStore` (Protocol + `InMemory` + `Postgres`, por el índice ya
+  existente `portfolio_reservations_cycle_id_idx`), vivas y liberadas.
+
+### Cambiado: Adaptive pesa con el R medido solo cuando puede
+
+- **`StrategyHealth`** gana `net_r_measurement` y su `regime` deja de ser un literal: lo **deriva** del
+  cruce `strategy × regime` del **mismo** informe (`declared_regime`). Una celda decisiva con régimen ⇒
+  ese régimen; **dos** celdas decisivas, una `UNKNOWN` decisiva o ninguna celda ⇒ `UNKNOWN`. Mapear
+  evidencia **no** mueve decisiones: test explícito de que el cruce deja rotación y asignación idénticas.
+- **Eje de evidencia por POOL, nunca por fila** en `recommend_allocation`: pesa con `net_expectancy_r`
+  (exigiendo `net_r_measurement == COMPLETE` estricto) **solo** si está medido para **todo** el grupo que
+  compite; en cualquier otro caso cae a `expectancy_currency`, que es el comportamiento histórico. Un hueco
+  de medición no puede sacar a nadie del numerador ni mezclar unidades (R adimensional vs moneda
+  absoluta). El eje se declara en `AllocationPlan.evidence_axis` y viaja en `as_dict()`.
+- **`adaptivePolicyVersion` sube a `auto9-v1`** (el contrato de evidencia cambió), sellado en
+  `AdaptivePlan`, `as_dict()` y journal.
+
+### Limitado y declarado (no silencioso)
+
+- **El régimen por ciclo no es durable hoy**: el payload de la decisión sí lleva `cycleId` y las tres
+  dimensiones del gobernador, pero el worker que ejecuta el ciclo escribe su journal **en memoria**, así
+  que no hay fila durable con `cycleId`. El productor lo declara (`regime_not_durable`) en vez de inventar
+  un `UNKNOWN` que parecería medido; convertir ese journal en el durable es deuda del **worker**, con nombre.
+- **Fail-closed por degradación**: una lectura rota devuelve `None` y el informe recupera su forma AUTO-7
+  (los ciclos quedan sin R, que es el hueco que ya declaraba); **no** se marca `decisive = False`, para no
+  confundir «no pude leer el riesgo» con «la muestra no es decisoria». Una lectura **saturada** tampoco
+  veta: los ciclos que no cupieron quedan sin denominador —nunca con el de otro— y se avisa.
+- **Cooldown en memoria** (heredado de `v2.49`): se reinicia con el proceso.
+
+### Verificación
+
+- **+69 tests en cada bloque offline**: `quality` **2287/2287** y job `python` del tag **2298/2298**, **0
+  rojos en ambos**; el delta es la cuenta exacta de la fase (+4 lector, +8 cálculo, +13 cruce, +8
+  `StrategyHealth`, +8 eje de asignación, +21 `cycle_risk`, +7 costura del worker). Con ello queda
+  **cerrada** la discontinuidad que §13.8 del plan dejó declarada (2500/2511 eran el artefacto).
+- **`test_cycle_risk.py` (21)** y **`test_auto_v50_auto9_cycle_risk_seam.py` (7)** nuevos, registrados en
+  CI **de forma simétrica** (el primero explícito en los dos jobs por vivir en
+  `packages/py/application/tests`, sin pase de directorio).
+- **Mutaciones `M28…M33`** nuevas: **33/33** de la matriz muerden, 0 restauraciones fallidas y huella
+  `git status` de los ficheros tocados idéntica antes y después.
+- `ruff check` (config de CI) limpio · `mypy` **0 errores / 492 ficheros** · `import-linter` **4/4** ·
+  `analytics` **975** · `application` **58** · costura **7**.
+
+### Hallazgos operativos del tooling
+
+- **Una sonda de mutaciones puede dejar el mutante dentro del árbol**: `M16` no pudo restaurar
+  `auto_v2_entry.py` (`OSError [Errno 22]` de Windows, reproducible, con el fichero **limpio** y el mismo
+  par escritura/restauración funcionando aislado) y dos corridas abortaron con `return best, ()` dentro
+  del árbol. La sonda ahora reintenta con pausa, prueba `os.replace` y solo usa `git checkout` **si el
+  fichero está limpio** (si tuviera cambios sin commitear, **aborta declarándolo** en vez de descartar
+  trabajo ajeno); además admite **filtro por rótulo** para verificar un tramo sin correr la matriz entera.
+- **`ruff format` no es un invariante del repo**: la compuerta de CI es `ruff check … --config
+pyproject.toml` y `ruff format` no está en ningún job. Formatear en masa con la config de la raíz
+  reescribió **608 ficheros ajenos**; se revirtió con criterio exacto (reconstruir `HEAD`, reformatear con
+  la misma invocación y comparar ⇒ 610 analizados, 597 restaurados como ruido, 13 conservados). Queda como
+  regla: `ruff format` **solo** sobre los ficheros que uno ha tocado.
+
 ## [1.74.0-beta] — AUTO-8.1 Adaptive correcto, explícito y reproducible (V2.49) — 2026-09-21
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva.
