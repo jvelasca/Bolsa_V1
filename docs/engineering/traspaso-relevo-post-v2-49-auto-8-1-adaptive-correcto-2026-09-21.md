@@ -66,9 +66,13 @@ gobernador manda.**
 El siguiente salto NO es "más IA": es hacer la adaptación **estratificación × régimen** y **económicamente
 válida**. Todo pasa por **construir el productor de datos por ciclo**, que hoy no existe:
 
-1. **Productor por ciclo** (probable migración `045`, hoy head `044`): régimen de entrada, `risk_amount`
-   (presupuesto de riesgo de la operación), coste realizado y `r_multiple`. De ahí salen `net expectancy_R` y
-   `strategy × regime health` **medidos**, con backfill declarado `UNKNOWN` para lo previo.
+1. **Productor por ciclo** (**adaptador read-only, SIN migración**: el head sigue en `044`): los tres insumos
+   ya son durables y están atados por `cycle_id` — `risk_amount` en `portfolio_reservations.reserved_risk`
+   (con `entry`/`stop`/`quantity`/`side`/`cost`), PnL en `sim_fill_finance_context`, y régimen en el
+   `marketRegime` del payload del journal. De ahí salen `r_multiple`, `net expectancy_R` (coste **estimado**,
+   etiquetado como tal) y `strategy × regime health` **medidos**, con `UNKNOWN` declarado para lo previo y
+   `cycles_without_risk` publicado para que el R no se calcule sobre un subconjunto silencioso. Plan de la
+   fase: [`plan-v2-50-auto-9-strategy-regime-y-net-expectancy-r-2026-09-22.md`](./plan-v2-50-auto-9-strategy-regime-y-net-expectancy-r-2026-09-22.md).
 2. **`strategy × regime health`**: tabla por estrategia y régimen, manteniendo que Adaptive **solo estrecha**
    (un régimen favorable puede devolver a `1.0`, nunca subir por encima).
 3. **Hysteresis sobre la nueva señal**: extender la zona muerta a la confianza de muestra (intervalo/bootstrap),

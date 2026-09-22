@@ -208,12 +208,26 @@ delta asimétrico que corregir.
 
 ## 11. Gate de `AUTO-9` (lo que falta y por qué no se inventó)
 
-`strategy × regime` y `net expectancy_R` requieren datos que hoy **no existen por ciclo**: régimen de entrada,
-`risk_amount` (presupuesto de riesgo de la operación), coste realizado y `r_multiple`. `SimFillFinanceContext`
-solo lleva `side/quantity/price/strategy_version_id/cycle_id`, `cycles_from_fills` solo emite `pnl`, y
-`ObservedMetrics` no tiene R ni régimen. Construirlo implica probable migración **`045`** (el head dejaría de ser
-`044`) y backfill declarado `UNKNOWN` para lo previo. Se entrega la **forma** (`UNKNOWN`/`None` declarados) y se
-documenta el gate, en vez de publicar un cruce o un neto fabricados.
+`strategy × regime` y `net expectancy_R` **no tienen productor, pero sí tienen datos**: los tres insumos ya
+viven en fuentes durables, atados por `cycle_id` (migración `044`). Lo que falta es el adaptador que los lea y
+la agregación, no el esquema. **Corrección medida el 2026-09-22** (lo que aquí decía «probable migración `045`»
+era una inferencia, y era falsa):
+
+- **`risk_amount`** (el denominador de R): `portfolio_reservations.reserved_risk`, junto a `entry`, `stop`,
+  `quantity`, `side` y `cost` (JSONB de `TradingCost`: comisión/spread/slippage/gap), indexado por `cycle_id`
+  (`portfolio_reservations_cycle_id_idx`, migración `044`). El motor ya lo escribe con el `riskAmount` de la
+  asignación (`auto_v2_entry._reserved_sizing`), y el store ya mapea `cycle_id`.
+- **PnL realizado**: `sim_fill_finance_context` por `cycle_id` — exactamente lo que `cycles_from_fills` agrega.
+- **Régimen de entrada**: `marketRegime` del payload del journal, que ya viaja con el `cycleId`.
+
+Por tanto **AUTO-9 no exige migración de esquema**: el head sigue en `044`. Lo que sí hay que **medir** es el
+coste de leer el régimen desde el JSONB del journal (no hay índice sobre `payload->>'cycleId'`); si sale caro, la
+respuesta es un índice **aditivo**, no una tabla nueva. Y el coste disponible es el **estimado en la decisión**,
+no el realizado, así que `netExpectancyR` tendrá que publicarse etiquetado como tal y `net_expectancy_r` seguirá
+siendo un subconjunto declarado (`PARTIAL`), nunca un total silencioso. Se entrega la **forma**
+(`UNKNOWN`/`None` declarados) y el plan de la fase en
+[`plan-v2-50-auto-9-strategy-regime-y-net-expectancy-r-2026-09-22.md`](./plan-v2-50-auto-9-strategy-regime-y-net-expectancy-r-2026-09-22.md),
+en vez de publicar un cruce o un neto fabricados.
 
 ---
 
