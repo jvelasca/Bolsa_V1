@@ -123,3 +123,39 @@ def test_allocation_uses_equity_pct_when_no_budget() -> None:
     )
     assert result.risk_amount == 1000.0
     assert result.quantity == 200.0
+
+
+def test_allocation_zero_pct_is_an_explicit_zero_ceiling_not_uncapped() -> None:
+    """``max_risk_per_trade_pct == 0`` (multiplicador Adaptive 0.0) VETA la operación.
+
+    Regresión AUTO-8.1: antes el guard ``pct > 0`` dejaba ``max_by_pct = None`` y el
+    sizing caía a TODO el ``risk_budget`` de cartera, de modo que el caso "riesgo cero"
+    asignaba MÁS riesgo por operación que cualquier otro. ``0.0`` debe ser techo cero
+    explícito y declarar su motivo, nunca "sin techo".
+    """
+    result = compute_allocation(
+        equity=100_000.0,
+        entry=100.0,
+        stop=95.0,
+        direction="long",
+        risk_budget=5_000.0,
+        config=RiskAllocatorConfig(max_risk_per_trade_pct=0.0),
+    )
+    assert result.approved is False
+    assert result.quantity == 0.0
+    assert result.risk_amount == 0.0
+    assert CAP_RISK_PCT in result.capped_reasons
+
+
+def test_allocation_zero_pct_without_budget_still_vetoes() -> None:
+    result = compute_allocation(
+        equity=100_000.0,
+        entry=100.0,
+        stop=95.0,
+        direction="long",
+        risk_budget=None,
+        config=RiskAllocatorConfig(max_risk_per_trade_pct=0.0),
+    )
+    assert result.approved is False
+    assert result.quantity == 0.0
+    assert CAP_RISK_PCT in result.capped_reasons

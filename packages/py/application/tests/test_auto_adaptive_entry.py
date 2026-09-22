@@ -243,3 +243,104 @@ def test_allocation_narrows_risk_cap() -> None:
     )
     half_risk = narrowed.decisions[0].allocation["riskAmount"]
     assert half_risk == pytest.approx(full_risk * 0.5)
+
+
+# ── AUTO-8.1: neutralidad, invariante de gates y trazabilidad ────────────────────
+
+
+def test_adaptive_on_neutral_is_byte_identical_to_off() -> None:
+    """Sin rotación y con multiplicadores 1.0, AUTO-8 neutral debe ser == AUTO-7.
+
+    Es la prueba de que la capa Adaptive no introduce efectos laterales cuando no tiene
+    nada que recomendar: solo el flag OFF estaba cubierto antes.
+    """
+    neutral = build_adaptive_plan((_row("v42", decisive=False),), "TREND_UP")
+    assert not neutral.is_paused("v42")
+    assert neutral.risk_multiplier_for("v42") == pytest.approx(1.0)
+
+    off = plan_v2_tick(
+        snapshot=_snapshot(), signals=[_signal("AAA")], regime="BULL_TREND", as_of=AS_OF
+    )
+    on = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA")],
+        regime="BULL_TREND",
+        as_of=AS_OF,
+        adaptive=neutral,
+    )
+    assert on.adaptive is neutral
+    assert _payloads(on) == _payloads(off)
+    assert on.approved_symbols == off.approved_symbols
+
+
+def test_adaptive_only_changes_candidates_and_risk_cap_not_hard_gates() -> None:
+    """Invariante: Adaptive NO toca gobernador, kill, régimen ni gates duros.
+
+    Al estrechar la asignación (0.5) el gobernador, el conjunto aprobado y las candidatas
+    vistas deben ser IDÉNTICOS al baseline; lo único que cambia es el techo de riesgo.
+    """
+    off = plan_v2_tick(
+        snapshot=_snapshot(), signals=[_signal("AAA")], regime="BULL_TREND", as_of=AS_OF
+    )
+    adaptive = AdaptivePlan(
+        rotation=RotationPlan((RotationDecision(strategy_version="v42", active=True),)),
+        allocation=AllocationPlan({"v42": 0.5}),
+    )
+    on = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA")],
+        regime="BULL_TREND",
+        as_of=AS_OF,
+        adaptive=adaptive,
+    )
+    assert on.governor_states == off.governor_states
+    assert on.approved_symbols == off.approved_symbols
+    assert on.seen_signals == off.seen_signals
+    assert on.decisions[0].reason_codes == off.decisions[0].reason_codes
+    assert on.decisions[0].allocation["riskAmount"] == pytest.approx(
+        off.decisions[0].allocation["riskAmount"] * 0.5
+    )
+
+
+def test_narrowing_journal_carries_policy_version_and_evidence() -> None:
+    """El journal declara la política y la evidencia que justificó el estrechamiento."""
+    rows = (
+        _row("v42", decisive=True, expectancy="3"),
+        _row("v99", decisive=True, expectancy="1"),
+    )
+    adaptive = build_adaptive_plan(rows, "TREND_UP")
+    assert adaptive.risk_multiplier_for("v99") == pytest.approx(0.5)
+
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", strategy_version="v99")],
+        regime="BULL_TREND",
+        as_of=AS_OF,
+        adaptive=adaptive,
+    )
+    entry = plan.journal_entries[0].payload
+    assert entry["adaptive"]["riskMultiplier"] == pytest.approx(0.5)
+    assert entry["adaptive"]["policyVersion"] == adaptive.policy_version
+    evidence = entry["adaptive"]["evidence"]
+    assert evidence["decisive"] is True
+    assert evidence["expectancyCurrency"] == "1"
+    assert evidence["netExpectancyR"] is None  # sin productor: declarado, no inventado
+    assert evidence["regime"] == "UNKNOWN"
+
+
+def test_pause_journal_carries_evidence_and_policy_version() -> None:
+    rows = (_row("v42", decisive=True, expectancy="-2"),)
+    adaptive = build_adaptive_plan(rows, "TREND_UP")
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA")],
+        regime="BULL_TREND",
+        as_of=AS_OF,
+        adaptive=adaptive,
+    )
+    entry = plan.journal_entries[0].payload
+    assert entry["reasonCodes"] == [ADAPTIVE_STRATEGY_PAUSED]
+    assert entry["adaptive"]["policyVersion"] == adaptive.policy_version
+    evidence = entry["adaptiveEvidence"]
+    assert evidence["decisive"] is True
+    assert evidence["expectancyCurrency"] == "-2"

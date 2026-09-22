@@ -2,6 +2,58 @@
 
 All notable releases of Bolsa V1.
 
+## [1.74.0-beta] — AUTO-8.1 Adaptive correcto, explícito y reproducible (V2.49) — 2026-09-21
+
+**Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva.
+El gobernador y su evidencia siguen **intactos** (byte a byte igual y `exit 0`). Cierra los hallazgos de la
+auditoría externa de `v2.48-beta` sobre la asignación Adaptive y la frontera de "sin evidencia".
+
+### Corregido: la asignación no puede ensanchar ni castigar al desconocido
+
+- **Gate de decisividad POR FILA** en `recommend_allocation`: solo entran al reparto proporcional las
+  estrategias `decisive` con expectancy > 0. Antes, una muestra fina con una racha favorable entraba al
+  numerador mientras `decisive` solo se comprobaba a nivel de grupo; una estrategia sin muestra no validada
+  movía el presupuesto de las que sí la tenían.
+- **Política explícita de "sin evidencia"** (`AdaptivePolicy.unknown_multiplier`, neutral `1.0`): una
+  estrategia sin muestra decisoria, o una versión activa sin fila de self-evaluation, recibe una entrada del
+  mapa con el multiplicador de la POLÍTICA, nunca un `0.0` derivado de la ausencia de clave. "No medido" deja
+  de leerse como "riesgo cero".
+- **`0.0` deja de ser un techo inexistente**: `RiskAllocator.compute_allocation` trataba
+  `max_risk_per_trade_pct == 0.0` como "sin techo" (el guard `pct > 0` dejaba `max_by_pct = None`) y cedía
+  TODO el `risk_budget` de cartera — el multiplicador Adaptive `0.0` ensanchaba el riesgo en vez de vetarlo.
+  Ahora `0.0` es un techo CERO explícito, declara `max_risk_per_trade_pct` en `cappedReasons` y veta la
+  operación. `None` conserva su único significado histórico.
+
+### Añadido: estabilidad, trazabilidad y reproducibilidad
+
+- **Hysteresis** en la rotación: umbrales de PAUSA y de REACTIVACIÓN distintos (profit factor `1.0` → `1.10`,
+  win rate `0.35` → `0.45`). El hueco es una zona muerta: una métrica que oscila alrededor del umbral no
+  produce un sistema nervioso pausa/activa/pausa.
+- **Cooldown**: `min_pause_cycles` mantiene una pausa un mínimo de ciclos antes de poder reactivarse. El
+  estado previo entra como DATO (`paused_cycles`), no como estado interno del módulo puro; el worker lo
+  mantiene en memoria (límite declarado: tras un reinicio arranca vacío).
+- **`adaptivePolicyVersion`** (`auto8-v2`): viaja en `AdaptivePlan`, en `as_dict()` y en el journal. Dos
+  planes con la misma evidencia, régimen y versión de política son idénticos; sin el sello, dos operaciones
+  iguales podrían haber sido decididas por reglas distintas sin que se note.
+- **Evidencia en el journal**: el estrechamiento y la pausa publican `decisive`, `trades`,
+  `expectancyCurrency`, `profitFactor`, `winRate`, `regime` y `netExpectancyR`. "¿Por qué AUTO estrechó (o
+  pausó) esta estrategia?" pasa a ser contestable desde el journal.
+- **Forma declarada sin datos inventados**: `StrategyHealth.netExpectancyR` (neto) y `regime`
+  (`strategy × regime`) se emiten como `None`/`UNKNOWN` declarados. Hoy NO existe productor por ciclo
+  (los fills no llevan régimen, coste, riesgo ni R), así que la política ignora el régimen por estrategia y
+  no se rellena ningún hueco.
+
+### Verificación
+
+- **29 tests puros** (`test_auto_adaptive.py`) + **9 de integración** (`test_auto_adaptive_entry.py`) + **13 de
+  sizing** (`test_risk_allocator.py`), incluidos los nuevos: golden de reproducibilidad (mismo plan con filas en
+  orden inverso), gate **ON neutral ≡ OFF** (byte a byte) e invariante "Adaptive solo cambia candidatas y techo de
+  riesgo" (gobernador, kill, régimen y decisiones idénticas).
+- Matriz de mutaciones extendida con **M22–M27**: 6 de 6 nuevas muerden (M19–M21 actualizadas a los nuevos
+  fragmentos y verdes), y el árbol queda intacto.
+- `ruff`, `mypy` (491 ficheros, 0 issues), `import-linter` (4 kept / 0 broken) y los dos bloques offline de CI
+  (**2218** y **2229** passed, 0 skipped; delta simétrico **+18/+18**) verdes.
+
 ## [1.73.0-beta] — AUTO-8 Adaptive AUTO · slice 1 (V2.48) — 2026-09-21
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, `governor.json`

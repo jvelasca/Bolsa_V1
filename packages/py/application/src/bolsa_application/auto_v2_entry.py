@@ -1132,6 +1132,10 @@ def plan_v2_tick(
                         detail={
                             "adaptiveReason": adaptive.rotation.reason_for(version),
                             "adaptive": adaptive.as_dict(),
+                            # Evidencia (decisiva, muestra, expectancy, PF, WR, régimen) que
+                            # sustentó la pausa: el operador no solo ve QUÉ se pausó, sino
+                            # POR QUÉ con los números que lo decidieron.
+                            "adaptiveEvidence": adaptive.evidence_for(version),
                         },
                     )
                 )
@@ -2268,6 +2272,13 @@ def _journal_entry(
                 payload["adaptive"] = {
                     "riskMultiplier": multiplier,
                     "regime": adaptive.regime,
+                    # V2.49/AUTO-8.1 — la versión de POLÍTICA que produjo la decisión y la
+                    # evidencia que la sustentó: sin ellas, "¿por qué AUTO estrechó esta
+                    # operación?" no es contestable desde el journal. Solo se publican
+                    # cuando HAY estrechamiento (con el flag OFF o neutral, el payload es
+                    # el histórico, byte-idéntico).
+                    "policyVersion": adaptive.policy_version,
+                    "evidence": adaptive.evidence_for(version),
                 }
     # V2.47 — la ECONOMÍA de la decisión viaja con ella: sin ella el operador ve el plan
     # pero no su valor esperado, y el neto no es reconstruible aguas abajo. Se publican las

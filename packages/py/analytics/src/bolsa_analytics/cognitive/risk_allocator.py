@@ -260,8 +260,14 @@ def compute_allocation(
     max_by_pct = None
     if cfg.max_risk_per_trade_pct is not None:
         pct = _finite(cfg.max_risk_per_trade_pct)
-        if pct is not None and pct > 0:
-            max_by_pct = eq * (pct / 100.0)
+        if pct is not None and pct >= 0:
+            # ``pct == 0`` es un techo CERO EXPLÍCITO, no "sin techo". Un multiplicador
+            # Adaptive de ``0.0`` (el estrechamiento máximo) debe VETAR la operación;
+            # antes, ``max_by_pct`` quedaba ``None`` y el sizing caía a TODO el
+            # ``risk_budget`` de cartera — es decir, el caso "riesgo cero" asignaba MÁS
+            # riesgo por operación que cualquier otro. ``None`` sigue significando el
+            # único contrato histórico de "sin techo por porcentaje".
+            max_by_pct = eq * (pct / 100.0) if pct > 0 else 0.0
     risk_amount: float | None = None
     if risk_budget is not None and risk_budget > 0:
         risk_amount = risk_budget
@@ -270,6 +276,9 @@ def compute_allocation(
             capped.append(CAP_RISK_PCT)
     elif max_by_pct is not None:
         risk_amount = max_by_pct
+        if max_by_pct <= 0.0:
+            # Techo cero SIN presupuesto global: se declara el motivo (nunca mudo).
+            capped.append(CAP_RISK_PCT)
     else:
         return AllocationResult(
             quantity=0.0,

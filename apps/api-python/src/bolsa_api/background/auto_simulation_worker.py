@@ -42,7 +42,11 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
-from bolsa_analytics.cognitive.auto_adaptive import AdaptivePlan, build_adaptive_plan
+from bolsa_analytics.cognitive.auto_adaptive import (
+    AdaptivePlan,
+    AdaptivePolicy,
+    build_adaptive_plan,
+)
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import UNKNOWN_SECTOR
 from bolsa_analytics.cognitive.data_freshness import (
     FreshnessPolicy,
@@ -669,6 +673,10 @@ class AutoSimulationWorker:
         self._v2_freshness_policy = FreshnessPolicy()
         self._v2_plan: Any = None
         self._v2_journal: list[Any] = []
+        # V2.49/AUTO-8.1 — ciclos consecutivos que cada versión lleva PAUSADA por la
+        # rotación Adaptive. Es el DATO de estado que habilita hysteresis y cooldown; vive
+        # en memoria y se reconstruye del plan anterior (tras un reinicio arranca vacío).
+        self._v2_adaptive_paused_cycles: dict[str, int] = {}
         # V2.45/AUTO-5 — embudo del día (Golden Day 2.0): filas de oportunidad con su
         # estado FINAL y su motivo, más el contador INDEPENDIENTE de candidatas vistas
         # (así "faltó una oportunidad por explicar" es detectable, no silencioso).
@@ -2841,11 +2849,32 @@ class AutoSimulationWorker:
                 )
                 return None
         report = build_auto_self_evaluation(fills=fills)
-        return build_adaptive_plan(
+        # V2.49/AUTO-8.1 — política versionada + estado de pausa previo (hysteresis y
+        # cooldown). El estado es EN MEMORIA y derivado del plan anterior: se declara como
+        # límite (tras un reinicio la cuenta vuelve a 0, así que una pausa puede levantarse
+        # antes de su ventana mínima). No añade tabla ni migración.
+        policy = AdaptivePolicy(
+            win_rate_floor=self._v2_tunables.adaptive_win_rate_floor
+        )
+        plan = build_adaptive_plan(
             report.by_strategy,
             to_market_regime(regime),
-            win_rate_floor=self._v2_tunables.adaptive_win_rate_floor,
+            policy=policy,
+            paused_cycles=self._v2_adaptive_paused_cycles,
         )
+        self._v2_adaptive_paused_cycles = self._v2_next_paused_cycles(plan)
+        return plan
+
+    def _v2_next_paused_cycles(self, plan: AdaptivePlan) -> dict[str, int]:
+        """Ciclos consecutivos de pausa por versión, para hysteresis/cooldown del próximo tick.
+
+        Una versión que deja de estar pausada DESAPARECE del mapa (cuenta a 0): la
+        reactivación efectiva del plan es la que manda, no la historia.
+        """
+        return {
+            version: int(self._v2_adaptive_paused_cycles.get(version, 0)) + 1
+            for version in plan.rotation.paused
+        }
 
     def _v2_measure_opportunity_costs(self) -> None:
         """V2.45/AUTO-5 — coste de oportunidad: precio POSTERIOR de las rechazadas.

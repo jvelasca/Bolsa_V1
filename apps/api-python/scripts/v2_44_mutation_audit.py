@@ -47,6 +47,23 @@ El invariante nuevo tiene una forma de romperse en silencio por mutación:
 * **M18 (coste de otra dirección)** — si la dirección deja de llegar al estimador de coste, el
   ida y vuelta de una corta se cobra con las patas de una larga y el neto sale más barato de lo
   que la operación cuesta de verdad.
+* **M19 (rotación por salud)** — si la salud probadamente negativa deja de pausar, una estrategia
+  perdedora sigue compitiendo.
+* **M20 (rotación por régimen)** — si la pausa en régimen adverso deja de aplicarse, una muestra
+  fina se activa a ciegas en un mercado que castiga.
+* **M21 (asignación monótona)** — si el multiplicador deja de acotarse a ``[0, 1]``, la asignación
+  puede ENSANCHAR el riesgo por operación.
+* **M22 (sin evidencia neutral)** — si el multiplicador de una versión sin evidencia cae a ``0``,
+  "no medido" se convierte en "riesgo cero" (el defecto que AUTO-8.1 corrige).
+* **M23 (gate por fila)** — si una muestra no decisoria entra al reparto proporcional, una racha
+  de suerte mueve el presupuesto de las estrategias que SÍ demostraron.
+* **M24 (policy version)** — si el plan deja de sellar la versión de política, dos planes iguales
+  no son reproducibles ni distinguibles de reglas futuras.
+* **M25 (hysteresis régimen)** — si el umbral de reactivación baja al de pausa, desaparece la zona
+  muerta y la rotación oscila.
+* **M26 (muestra decisoria)** — si sin decisividad la pausa de salud se declara vigente, una
+  métrica fina mantiene una pausa que su evidencia no sostiene.
+* **M27 (cooldown)** — si la pausa mínima deja de respetarse, la rotación parpadea tick a tick.
 
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
@@ -259,28 +276,81 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M19 (rotacion por salud): la estrategia probadamente negativa deja de pausarse",
         AUTO_ADAPTIVE,
-        "            if expectancy_bad or pf_bad:\n"
-        "                reason = ADAPTIVE_STRATEGY_UNHEALTHY\n",
-        "            if False:\n"
-        "                reason = ADAPTIVE_STRATEGY_UNHEALTHY\n",
+        "        if expectancy_bad or pf_bad:\n"
+        "            return ADAPTIVE_STRATEGY_UNHEALTHY\n",
+        "        if False:\n"
+        "            return ADAPTIVE_STRATEGY_UNHEALTHY\n",
         (T_ADAPTIVE,),
     ),
     (
         "M20 (rotacion por regimen): la pausa en regimen adverso deja de aplicarse",
         AUTO_ADAPTIVE,
-        "        if reason is None and adverse and not health.decisive:\n"
-        "            if health.win_rate is not None and health.win_rate < win_rate_floor:\n"
-        "                reason = ADAPTIVE_STRATEGY_REGIME_RISK\n",
-        "        if False:\n"
-        "            if health.win_rate is not None and health.win_rate < win_rate_floor:\n"
-        "                reason = ADAPTIVE_STRATEGY_REGIME_RISK\n",
+        "    if adverse and not health.decisive:\n"
+        "        if health.win_rate is not None and health.win_rate < policy.win_rate_floor:\n"
+        "            return ADAPTIVE_STRATEGY_REGIME_RISK\n",
+        "    if False and not health.decisive:\n"
+        "        if health.win_rate is not None and health.win_rate < policy.win_rate_floor:\n"
+        "            return ADAPTIVE_STRATEGY_REGIME_RISK\n",
         (T_ADAPTIVE, T_ADAPTIVE_ENTRY),
     ),
     (
         "M21 (asignacion monotona): el multiplicador deja de acotarse a [0, 1]",
         AUTO_ADAPTIVE,
-        "        multipliers[row.strategy_version] = _clamp_unit(share * n)\n",
-        "        multipliers[row.strategy_version] = share * n\n",
+        "                multipliers[version] = _clamp_unit((weight / total) * count)\n",
+        "                multipliers[version] = (weight / total) * count\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M22 (sin evidencia neutral): el multiplicador de una version sin evidencia cae a 0",
+        AUTO_ADAPTIVE,
+        "    neutral = _clamp_unit(resolved.unknown_multiplier)\n",
+        "    neutral = 0.0\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M23 (gate por fila): una muestra no decisoria entra al reparto proporcional",
+        AUTO_ADAPTIVE,
+        "        if (\n"
+        "            row.decisive\n"
+        "            and row.expectancy_currency is not None\n"
+        "            and row.expectancy_currency > 0\n"
+        "        ):\n",
+        "        if (\n"
+        "            row.expectancy_currency is not None\n"
+        "            and row.expectancy_currency > 0\n"
+        "        ):\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M24 (policy version): el plan deja de sellar la version de politica",
+        AUTO_ADAPTIVE,
+        '            "policyVersion": self.policy_version,\n',
+        '            "policyVersion": "auto8-v0",\n',
+        (T_ADAPTIVE, T_ADAPTIVE_ENTRY),
+    ),
+    (
+        "M25 (hysteresis regimen): el umbral de reactivacion baja al de pausa (sin zona muerta)",
+        AUTO_ADAPTIVE,
+        "    return (\n"
+        "        health.win_rate is not None and health.win_rate < policy.win_rate_reactivate_floor\n"
+        "    )\n",
+        "    return (\n"
+        "        health.win_rate is not None and health.win_rate < policy.win_rate_floor\n"
+        "    )\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M26 (muestra decisoria): sin decisividad la pausa de salud se declara vigente",
+        AUTO_ADAPTIVE,
+        "    if not health.decisive:\n        return False\n    expectancy_ok = (\n",
+        "    if not health.decisive:\n        return True\n    expectancy_ok = (\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M27 (cooldown): la pausa minima deja de respetarse",
+        AUTO_ADAPTIVE,
+        "        if count < max(0, int(resolved.min_pause_cycles)):\n",
+        "        if False:\n",
         (T_ADAPTIVE,),
     ),
 ]
