@@ -89,6 +89,8 @@ y el gobernador manda.** Esta fase añade el dato que faltaba para que «estrech
 4. **No usar `--follow-tags`** al sellar si hay tags locales antiguos: empujar el tag de la fase **de uno en
    uno** (medido en `v2.49`, aplicado aquí sin incidencias).
 
+5. **El hash del objeto del tag no cabe dentro del tag.** Citar `01e745c6` en el pack y **mover** el tag son incompatibles: el texto que describe el sello viaja en el árbol que el sello etiqueta. Convención medida en `v2.49`: dentro del tag se cita el **commit de código** y el tag por su **nombre**; el hash del objeto se anota **después**, en `main` (aquí `01620ef9` → `e724f19d`).
+
 ---
 
 ## 4. Qué mirar primero si hay que auditar esta fase

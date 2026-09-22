@@ -192,6 +192,8 @@ de directorio de `apps/api-python/tests`.
 
 ---
 
+4. **Quién borra los espacios, medido: `prettier`, no la ruta de escritura.** El ciclo repetido sobre el mismo documento lo aísla: reparado con el script queda en **0** huecos, pasa el `prettier` **local** (`3.8.4`, el del hook `lint-staged`) y **vuelven los mismos**, se repara y vuelve a **0**, y sin `prettier` de por medio el contador no se mueve. El diff por caracteres da la regla: **borra el espacio que sigue a un span de código** al reimprimir la línea — **44** borrados en `PROJECT_STATE:22` (la línea de índice de packs, que además normaliza añadiendo el prefijo `> `) y **~3** por fila de tabla larga. Las **dos** rutas de escritura (script y editor) escriben el texto **intacto** en todos los contextos probados (párrafo, blockquote, lista, tabla) y `prettier` respeta el espaciado en fragmentos pequeños: el daño aparece solo en el documento grande que él reimprime. Consecuencia declarada: **la reparación de `PROJECT_STATE` no sobrevive al commit** (el hook reescribe `*.md` con `prettier` y `format:check` exige su salida), así que este sello deja ese fichero **como lo deja `prettier`** y el defecto queda **abierto** con propuesta: sacar `*.md` de `prettier` (`format`, `format:check` y `lint-staged`) o añadir la reparación como paso _post-`prettier`_ junto con esa exclusión. En el pack, el índice y el relevo **no queda ningún hueco vivo**: el material que lee el auditor está limpio.
+
 ## 7. Sello y CI
 
 Commit de **código** **`df2002e7`** — `feat(v2.50): AUTO-9 Strategy x Regime y net expectancy_R (1.75.0-beta)`
@@ -218,6 +220,8 @@ empujado de uno en uno** (lección de
 ruff/imports/mypy/pytest offline, `decision-spine`, `lifecycle-pg`, `dr-verify`, `a7-gate`, `frontend` con
 `contract:check`, `playwright` mock, `shared`, `security`), con el único job **opt-in** de E2E integrado
 omitido, como está diseñado.
+
+**El tag se MOVIÓ para que los documentos de fase viajen dentro.** El sello inicial (`df2002e7` + tag `01e745c6`) dejó el pack y el relevo **sin trackear** y el índice **sin commitear**; se corrigió con el commit de documentos `e724f19d` y el tag se recreó apuntándolo: `v2.50-beta` → objeto **`01620ef9`** → commit **`e724f19d`** (force-push declarado; el objeto anterior queda en el reflog del remoto). El tag movido re-ejecutó los cinco workflows sobre el árbol final: `Release tag CI` **`35726585605`** (8m04s), `Python CI` `35726585560`, `Frontend CI` `35726585544`, `Optimize lab` `35726585533`, `Fase 2 scientific` `35726585569` — **5/5 `success`** —, y el push a `main` del commit de documentos disparó **solo** `Gitleaks` (`35726559597`, `success`), porque los workflows pesados llevan listas `paths:` que **no** incluyen `docs/**` (medido en los YAML, no supuesto). **Comprobado contra la API**: en el ref `v2.50-beta`, `docs/engineering` contiene el pack, el plan **y** el relevo.
 
 ---
 
