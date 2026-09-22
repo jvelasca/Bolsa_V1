@@ -7,10 +7,9 @@
 [`plan-v2-51-auto-10-journal-durable-por-ciclo-2026-09-22.md`](./plan-v2-51-auto-10-journal-durable-por-ciclo-2026-09-22.md)
 · **Relevo:** [`traspaso-relevo-post-v2.51-auto-10-journal-durable-por-ciclo-2026-09-22.md`](./traspaso-relevo-post-v2.51-auto-10-journal-durable-por-ciclo-2026-09-22.md)
 **Sello:** commit de **código** `8dda5e3a` (19 ficheros, `+2242/−38`) + commit de **documentos de fase**
-(este pack, el relevo y el índice). **Tag anotado** `v2.51-beta` → commit de documentos, para que los tres
-viajen **dentro** del tag como en `v2.47`–`v2.50`. `package.json` → **`1.76.0-beta`**. La tabla de CI
-vive en §7 y se añade **después** de que el tag corra (documento honesto: no afirma CI de un tag que aún
-no ha corrido; ver §7).
+`dba3d4f8` (este pack, el relevo y el índice). **Tag anotado** `v2.51-beta` → objeto **`f9930db4`** →
+commit **`dba3d4f8`**: los tres documentos de fase viajan **dentro** del tag, como en `v2.47`–`v2.50`.
+`package.json` → **`1.76.0-beta`**. **CI real: 10/10 `success`** sobre el tag (§7).
 
 ---
 
@@ -207,10 +206,39 @@ viajen **dentro** del tag. Push a `main` en **fast-forward** y el tag **empujado
 de `v2.49`: **no** usar `--follow-tags` con tags locales antiguos, porque más de tres tags en un push
 **no** disparan los workflows de tag en GitHub).
 
-**CI: pendiente de correr en el momento de escribir este pack** (documento honesto, como el
-`v2.40.1`): la tabla de runs se añade **después** de que el tag dispare `Release tag CI` y los demás
-workflows, en el commit de enmienda inmediatamente posterior. Este pack **no** afirma resultados de CI que
-no ha observado.
+**CI: 10/10 `success` sobre el tag** (observado con `gh`, no supuesto). El tag disparó los cinco
+workflows y todos cerraron en verde; el push a `main` disparó los suyos, también verdes:
+
+| Ref          | Workflow           | Run                                                                            |
+| ------------ | ------------------ | ------------------------------------------------------------------------------ |
+| `v2.51-beta` | **Release tag CI** | [`35787648126`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787648126) |
+| `v2.51-beta` | Python CI          | [`35787648092`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787648092) |
+| `v2.51-beta` | Frontend CI        | [`35787648145`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787648145) |
+| `v2.51-beta` | Optimize lab       | [`35787647996`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787647996) |
+| `v2.51-beta` | Fase 2 scientific  | [`35787648173`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787648173) |
+| `main`       | Python CI          | [`35787635754`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787635754) |
+| `main`       | Frontend CI        | [`35787635696`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787635696) |
+| `main`       | Optimize lab       | [`35787635767`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787635767) |
+| `main`       | Fase 2 scientific  | [`35787635669`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787635669) |
+| `main`       | Gitleaks           | [`35787635685`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787635685) |
+
+En `Release tag CI`, los diez jobs de decisión en verde (`python`
+ruff/imports/mypy/pytest offline, `decision-spine`, `lifecycle-pg`, `dr-verify`, `a7-gate`, `frontend` con
+`contract:check`, `playwright` mock, `shared`, `security`) y `certify` agregado, con el único job
+**opt-in** de E2E integrado omitido, como está diseñado.
+
+**La certificación PG del tramo corrió de verdad, y se comprobó por su nombre.** El job
+`auto-v2-durable-pg` del tag (`Python CI`) dio **45 passed** —los mismos **45** que colecciona la lista
+exacta de sus siete ficheros en local— y el test nuevo
+`test_auto_cycle_regime_trace_is_durable_and_readable_from_another_session` está **entre los 45
+recolectados**: la escritura durable y la lectura desde **otra sesión** quedan certificadas en CI, no solo
+en local. El job `quality` del mismo run dio **2334 passed, 38 skipped**: la diferencia con el local
+(2368) son las suites PG que ese job **ignora** por diseño (en CI no hay PostgreSQL ahí), que es
+exactamente el mecanismo por el que el rojo local declarado en §6 **no** existe en CI.
+
+**Este §7 se escribe DESPUÉS del tag**, en el commit de enmienda inmediatamente posterior (precedente:
+la enmienda del sello movido de `v2.50`), porque la tabla necesita runs reales: el pack y el relevo sí
+viajan **dentro** de `v2.51-beta`, y el commit de enmienda lo declara.
 
 ---
 

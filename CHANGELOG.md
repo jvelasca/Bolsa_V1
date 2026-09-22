@@ -90,6 +90,14 @@ el régimen del turno que **decidió**, no el de un instante posterior.
   producto de `v2.50` **no** cambia; se corrige la afirmación (plan, audit-pack, relevo y `PROJECT_STATE`).
 - `ruff check` (config de CI) limpio · `mypy` **0 errores / 494 ficheros** · `import-linter` **4/4** ·
   `durable-pg` **3 passed** (con `AUTO_V2_DURABLE_PG_REQUIRED=1`).
+- **CI real: 10/10 `success`** sobre el tag (`Release tag CI`
+  [`35787648126`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35787648126), `Python CI`
+  `35787648092`, `Frontend CI` `35787648145`, `Optimize lab` `35787647996`, `Fase 2 scientific`
+  `35787648173`) y 5/5 sobre `main`. En el job `quality` de CI: **2334 passed / 38 skipped** (los
+  `skipped` son las suites PG que ese job ignora por diseño: es el mecanismo por el que el rojo local
+  declarado no existe en CI). En `auto-v2-durable-pg`: **45 passed**, con el test nuevo de durabilidad
+  (lectura desde **otra sesión**) **entre los 45 recolectados** — la certificación PG del tramo corrió de
+  verdad.
 
 ### Limitado y declarado (no silencioso)
 
