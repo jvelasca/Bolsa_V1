@@ -91,6 +91,8 @@ y el gobernador manda.** Esta fase añade el dato que faltaba para que «estrech
 
 5. **El hash del objeto del tag no cabe dentro del tag.** Citar `01e745c6` en el pack y **mover** el tag son incompatibles: el texto que describe el sello viaja en el árbol que el sello etiqueta. Convención medida en `v2.49`: dentro del tag se cita el **commit de código** y el tag por su **nombre**; el hash del objeto se anota **después**, en `main` (aquí `01620ef9` → `e724f19d`).
 
+6. **`prettier` borra el espacio que sigue a un span de código en Markdown, y el hook lo re-aplicaba en cada commit.** Aislado con el ciclo reparar → `prettier` → reparar (**0** → vuelven → **0**; sin `prettier` de por medio el contador no se mueve) y con diff por caracteres (**44** borrados en `PROJECT_STATE:22`, la línea índice de packs, que además normaliza añadiendo el prefijo `> `). Las **dos** rutas de escritura (script y editor) escriben intacto: el daño era del impresor, no del autor. **CERRADO** en el tramo de tooling: `*.md` **fuera** de `prettier` (`format`, `format:check` y `lint-staged`) + reparador determinista `tools/fix_md_spacing.py` (**251** huecos en **19** ficheros; invariante `git diff -w` = **solo** los dos ficheros de configuración).
+
 ---
 
 ## 4. Qué mirar primero si hay que auditar esta fase

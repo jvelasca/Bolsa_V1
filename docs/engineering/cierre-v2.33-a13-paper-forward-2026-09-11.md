@@ -106,7 +106,7 @@ resultado, no una excepción que rompa el ciclo).
   5. La vigilancia sigue operando y **cero** publicaciones al bridge LIVE.
 - `.github/workflows/python-ci.yml`: nuevo job **`paper-forward-pg`** (per-commit) con
   `postgres:16-alpine`, `alembic upgrade head` y gate `PAPER_FORWARD_PG_REQUIRED=1`
-  (un skip es fallo duro). El E2E se `--ignore`d en el job offline (sin PG), igual que
+  (un skip es fallo duro). El E2E se `--ignore` d en el job offline (sin PG), igual que
   el A11 E2E.
 
 ---

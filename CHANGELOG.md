@@ -2908,7 +2908,7 @@ tocar la ruta SIM-only. Endurece la honestidad estadística y la certificación 
 - **P1-02 — E2E PG por commit**: nuevo job `lifecycle-pg` en `python-ci.yml` que arranca
   `postgres:16`, aplica `alembic upgrade head` (032/033/034) y ejecuta la suite A12
   crítica con gates `*_PG_REQUIRED=1` (un skip es fallo duro). El E2E
-  `test_a11_discovery_to_auto_sim_pg.py` deja de estar `--ignore`d en la certificación.
+  `test_a11_discovery_to_auto_sim_pg.py` deja de estar `--ignore` d en la certificación.
 - **P1-02 — E2E determinista (sin SKIPPED)**: dataset sembrado que produce un cruce SMA
   real en la última barra ⇒ `ACTIVE → SIGNAL → SIM BUY → FILL` certificado como
   aserción dura. Se corrige además un fallo preexistente de lectura de gates

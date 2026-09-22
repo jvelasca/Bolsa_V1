@@ -17,7 +17,7 @@
 - **F0.6b — Decision Board v1 CERRADO** (commit `8df8a65`, **backend-only**, UI fuera de alcance por decisión del propietario):
   - **Nuevo** `packages/py/application/src/bolsa_application/decision_board.py` — use-case **`GetDecisionBoard`** (solo lectura, no muta, no ejeccuta ExecuteTrade ni crea orquestador).
     - `extract_gate_outcome(payload)` (`:25`): lee `compliance_check`/`complianceCheck`/`runtime.decisionPackage.complianceCheck` (caso `propose`) y, si no resultó en `passed`, cae al fallback `policyGate`/`policy_gate` top-level via `_resolve_policy_gate` (`:94`) — cubre los shapes reales de las sesiones AUTO del hot-path (`allowed`, `gate.passed`, `riskEngine.verdict`, `riskEngine.allowed`).
-    - `_classify_session(status, gate)` (`:180`): `status` en {`open`,`pending`}; gate `VETO`→`vetoed`, `DEFERRED`→`deferred`, resto→`auto_waiting`; fuera de {`open`,`pending`}→`None` (decidida, no cuenta).
+    - `_classify_session(status, gate)` (`:180`): `status` en {`open`, `pending`}; gate `VETO`→`vetoed`, `DEFERRED`→`deferred`, resto→`auto_waiting`; fuera de {`open`, `pending`}→`None` (decidida, no cuenta).
     - Buckets `pendingConfirm/vetoed/deferred/autoWaiting` + cola SEMI_F3 (`supervised_f3.get().queue`) + `decisionSessions` recientes.
   - **Endpoint** `GET /accounts/{account_id}/decision-board` (`apps/api-python/src/bolsa_api/api/v1/routes/accounts.py:293`) + DTOs (`schemas/accounts.py:352`), dependency `get_decision_board_use_case` (`dependencies.py:421`).
   - **Batería 22 passed** (17 board incl. H-1 corregido + 3 API + 2 daily regression) · **ruff 0** · **mypy 0**.

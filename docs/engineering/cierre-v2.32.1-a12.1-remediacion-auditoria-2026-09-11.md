@@ -15,7 +15,7 @@ Commit de la remediación: `aefbf7eb` (23 ficheros, +1150 / −106). Tag de cert
 | ID     | Hallazgo                                                                                     | Evidencia en HEAD                                                 | Estado  |
 | ------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------- |
 | P1-01  | La ventana shadow se solapa con la del LAB (ambas leen las últimas N barras)                 | `orchestrator_lab_runner.py` `bar_limit: 400` + worker shadow 250 | CERRADO |
-| P1-02  | El E2E A12 no se certifica por commit (está `--ignore`d en `python-ci.yml`)                  | `python-ci.yml` líneas 104/351                                    | CERRADO |
+| P1-02  | El E2E A12 no se certifica por commit (está `--ignore` d en `python-ci.yml`)                  | `python-ci.yml` líneas 104/351                                    | CERRADO |
 | P2-01  | DD fail-open: `max_drawdown_pct is None` salta la comprobación (asimétrico con `return_pct`) | `strategy_lifecycle.py`                                           | CERRADO |
 | P2-02  | Override humano cableado en la ruta AUTO real                                                | `auto_orchestrator_worker.py`                                     | CERRADO |
 | P2-03  | Sin fingerprint del dataset shadow                                                           | tabla de la migración `032`                                       | CERRADO |

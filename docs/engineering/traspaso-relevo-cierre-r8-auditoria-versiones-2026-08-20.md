@@ -21,7 +21,7 @@
   | `89b179b` | docs: cerrar R-8B.3 Fase A + registrar CONTRACT-STALE |
   | `158b3db` | R-8B.3 Fase A (cash `description?`) |
   | `71fd957` | (base) docs: cerrar R-8C y R-8D |
-- **R-8 COMPLETA en `main`:** R-8A (`edf2d0c`+`7f327ab`) · R-8B.1 (`ac147fe`+`a1360bb`) · R-8B.2 (`abf3dc2`) · R-8C (`3ad48aa`) · R-8D (`dbd1ee5`) · **R-8B.3** (`158b3db`,`756e3a1`,`ce1d5ca`,`e6dde15`,`fb95b27`).
+- **R-8 COMPLETA en `main`:** R-8A (`edf2d0c`+`7f327ab`) · R-8B.1 (`ac147fe`+`a1360bb`) · R-8B.2 (`abf3dc2`) · R-8C (`3ad48aa`) · R-8D (`dbd1ee5`) · **R-8B.3** (`158b3db`, `756e3a1`, `ce1d5ca`, `e6dde15`, `fb95b27`).
 - **R-7 COMPLETA** (deuda dinero real cerrada; solo `M-4/T-M4` diferido por freeze).
 
 ---
@@ -108,6 +108,6 @@
 | Fecha      | Hito                                 | Commits `main`                                                                  |
 | ---------- | ------------------------------------ | ------------------------------------------------------------------------------- |
 | 2026-08-20 | R-7 COMPLETA                         | (serie R-7 ya en main)                                                          |
-| 2026-08-20 | R-8A · R-8B.1 · R-8B.2 · R-8C · R-8D | `edf2d0c`,`7f327ab`,`ac147fe`,`a1360bb`,`abf3dc2`,`3ad48aa`,`dbd1ee5`,`71fd957` |
+| 2026-08-20 | R-8A · R-8B.1 · R-8B.2 · R-8C · R-8D | `edf2d0c`, `7f327ab`, `ac147fe`, `a1360bb`, `abf3dc2`, `3ad48aa`, `dbd1ee5`, `71fd957` |
 | 2026-08-20 | R-8B.3 Fase A cash                   | `158b3db` (+docs `89b179b`)                                                     |
-| 2026-08-20 | R-8B.3 FIE FUND / B / C / D          | `756e3a1`,`ce1d5ca`,`e6dde15`,`fb95b27` (+docs `681a46c`)                       |
+| 2026-08-20 | R-8B.3 FIE FUND / B / C / D          | `756e3a1`, `ce1d5ca`, `e6dde15`, `fb95b27` (+docs `681a46c`)                       |

@@ -61,7 +61,7 @@ Decisión owner (opción "honesto/descopla"): copia local `db-backups/` **+ espe
 
 | Fichero                          | Cambio                                                                                                                                  |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `scripts/db-dr-verify.mjs`       | Snapshot atómico `REPEATABLE READ` (una tx), parser `                                                                                   | `corregido, digest por bloques,`MARKET_ENTITIES` (OHLCV/instruments/data_sync_log), medida RTO. |
+| `scripts/db-dr-verify.mjs`       | Snapshot atómico `REPEATABLE READ` (una tx), parser `                                                                                   | ` corregido, digest por bloques, `MARKET_ENTITIES` (OHLCV/instruments/data_sync_log), medida RTO. |
 | `scripts/db-restore.mjs`         | C2-01: validación `--target-db` ANTES del DDL destructivo.                                                                              |
 | `scripts/lib/backup.mjs`         | Espejo 3-2-1 (`mirrorDir`+`resolveMirrorDir`, `mirror` en manifest preservado por reconcile), `readManifest` exportada, `copyFileSync`. |
 | `scripts/db-dump.mjs`            | Pasa `mirrorDir`, loguea espejo + RPO/duración.                                                                                         |

@@ -62,7 +62,7 @@ Orden sugerido del plan 08-10:
   - `mypy` deuda pre-existente no bloqueante (`continue-on-error` en CI): 561 en el conjunto CI
     (domain 8, application 107).
 - **Batería pytest CI** (`python-ci.yml`): `pytest packages/py/market/tests packages/py/analytics/tests
-  apps/api-python/tests` con `--ignore=apps/api-python/tests/integration --ignore=apps/api-python/tests/
+  apps/api-python/tests ` con `--ignore=apps/api-python/tests/integration --ignore=apps/api-python/tests/
   test_lists.py --ignore=apps/api-python/tests/test_workspaces.py`. `mypy` corre sobre
   `domain/src market/src infrastructure/src apps/api-python/src --follow-imports=silent`.
 - **Nota entorno Windows:** `uv` **NO** está en PATH de PowerShell; usar ruta completa

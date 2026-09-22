@@ -68,7 +68,7 @@ Tras «Ajustes avanzados» / equivalente:
 
 | Bloque                                           | Hoy (V1.24)                  | V1.25                                                  |
 | ------------------------------------------------ | ---------------------------- | ------------------------------------------------------ |
-| Assessment checkboxes + `AssessmentBlock`s       | Siempre visibles             | **Dentro** de avanzado                                 |
+| Assessment checkboxes + `AssessmentBlock` s       | Siempre visibles             | **Dentro** de avanzado                                 |
 | Protect / trailing / conflictos entre finalistas | Mezclados en el panel        | Avanzado                                               |
 | Fees / margen detallado                          | `F3TicketPreviewBlock`       | Puede quedar bajo avanzado o segundo nivel del default |
 | Override textarea                                | Ya en `F3RiskSignatureBlock` | Sigue; obligatorio cuando `overrideRequired`           |

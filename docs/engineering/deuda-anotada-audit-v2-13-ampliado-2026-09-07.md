@@ -61,7 +61,7 @@ Se ejecutó una auditoría de solo lectura del delta `b9b35ec2..6e279e2d` + pila
 
 ### Hallazgo N-2 — P2 (informativo): suggestion de reconcile CANCEL_REQUESTED repetida
 
-En `live_order_machine_reconcile.py`, branch cancel, cuando la máquina local YA está `CANCEL_REQUESTED` y el broker confirma `cancelled`, se vuelve a sugerir `CANCEL_REQUESTED` (no `CANCELLED`). Read-only/sin auto-heal → la máquina puede quedar presentada como «in-flight» una orden que el broker tiene muerta hasta que otra capa la pase a CANCELLED. No fabrica dinero. Falta en test el caso `CANCEL_REQUESTED`local→broker cancelled.
+En `live_order_machine_reconcile.py`, branch cancel, cuando la máquina local YA está `CANCEL_REQUESTED` y el broker confirma `cancelled`, se vuelve a sugerir `CANCEL_REQUESTED` (no `CANCELLED`). Read-only/sin auto-heal → la máquina puede quedar presentada como «in-flight» una orden que el broker tiene muerta hasta que otra capa la pase a CANCELLED. No fabrica dinero. Falta en test el caso `CANCEL_REQUESTED` local→broker cancelled.
 
 ### Hallazgo N-3 — P3 (nuevo): `resolve_one_unknown` sin bump cuando la transición lanza
 

@@ -133,7 +133,7 @@ determinista: sin I/O, sin reloj, sin red):
 - `ALLOWED` no cambia nada; `REDUCED` / `RESTRICTED` escalan el riesgo por `risk_scale` (aplicado a
   `max_risk_per_trade_pct` vía `decision_config`) y `RESTRICTED` sube además el listón de edge
   (`min_edge * restricted_edge_factor`). El motor **no** reconstruye política: lee el veredicto.
-- Nuevos `DecisionReasonCode`s `governor_exit_only` / `governor_halted` y alta en `_NO_TRADE_REASONS`
+- Nuevos `DecisionReasonCode` s `governor_exit_only` / `governor_halted` y alta en `_NO_TRADE_REASONS`
   (sin eso, un veto del gobernador no contaría como no-trade en el journal).
 - `plan_v2_tick` computa la lectura **por candidata** (las bandas de volatilidad y liquidez son datos
   de la candidata) y la pasa a `decide_portfolio`; con el flag OFF la lectura es `None`.

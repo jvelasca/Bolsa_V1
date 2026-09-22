@@ -65,7 +65,7 @@
 - **API** `apps/api-python/...`:
   - `routes/trackers.py`: `:72 GET /trackers`, `:82 /trackers/schedules/evaluate`, `:121 POST /trackers`, `:149 PATCH`, `:186 DELETE`, `:197 POST /trackers/{id}/scan`, `:212 POST /trackers/{id}/scan-jobs`.
   - `routes/scans.py`: `:51 POST /scans/run`, `:91 POST /scans/jobs`, `:105 GET /scans/jobs`, `:114 GET /scans/manifests/{scan_id}`, `:126 GET /scans/jobs/{job_id}`.
-  - `routes/research.py`: trials (`:116`,`:161`,`:173`), hypotheses (`:219`,`:242`,`:298`,…), knowledge (`:380`,`:406`,…), tree (`:491`), evidence (`:583`,`:633`), summary (`:645`), lab-health (`:667`).
+  - `routes/research.py`: trials (`:116`, `:161`, `:173`), hypotheses (`:219`, `:242`, `:298`,…), knowledge (`:380`, `:406`,…), tree (`:491`), evidence (`:583`, `:633`), summary (`:645`), lab-health (`:667`).
   - `schemas/: trackers.py`, `scans.py`, `research.py`.
 - **Shared types FE** `packages/shared/src/`: `tracker-definitions.ts`, `scan-api.ts`, `scan-manifests.ts`, `research-trials-api.ts`, `research-platform.ts`.
 
