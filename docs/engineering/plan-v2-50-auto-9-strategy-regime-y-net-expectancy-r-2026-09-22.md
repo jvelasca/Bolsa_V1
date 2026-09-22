@@ -354,7 +354,7 @@ Verificación (batería **exacta** de los jobs afectados, patrón del repo):
   **2229 → 2233**, **0 fallos**, ⇒ **delta simétrico +4** (los 4 tests in-memory viven en
   `test_auto_v47_cycle_trace.py`, registrado en **ambas** listas, así que ninguno quedó fuera de una).
 - 1 test PG gated en `test_portfolio_reservation_pg.py` (registrado en los jobs con Postgres e
-  `--ignore`d en los offline), **ejecutado en local contra PostgreSQL 16.14 real** (head `044`):
+  `--ignore` d en los offline), **ejecutado en local contra PostgreSQL 16.14 real** (head `044`):
   **5 passed, 0 skipped** con el gate fail-if-skipped `AUTO_RESERVATION_PG_REQUIRED=1`.
 
 ### 13.3 Paso 1 — coste de la lectura de régimen · **MEDIDO Y DECIDIDO: (a)**, sin migración
