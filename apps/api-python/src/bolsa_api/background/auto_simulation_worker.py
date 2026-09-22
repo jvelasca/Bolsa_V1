@@ -115,6 +115,8 @@ from bolsa_api.background.paper_auto_engine_worker import (
 )
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.applied_fills import read_applied_fill_facts
+from bolsa_application.auto_cycle_journal import build_auto_cycle_regime_entry
+from bolsa_application.auto_cycle_regime_reader import CycleRegimeReading, read_cycle_regimes
 from bolsa_application.auto_daily_journal import OperationMeasurement, OpportunityRow, SimJournalRow
 from bolsa_application.auto_engine_state_store import (
     AutoEngineSnapshot,
@@ -576,6 +578,15 @@ class AutoSimulationWorker:
         # y ``execution_events`` queda como reconciliación de arranque. Sin él (camino
         # hermético) el libro de órdenes pendientes sigue derivándose como en V2.40.4.
         reservation_store: ReservationStore | None = None,
+        # AUTO-10: sink DURABLE del régimen por ciclo (``decision_journal_entries``). Con él,
+        # el ``marketRegime`` de un ciclo deja de vivir solo en la lista del proceso y el eje
+        # ``strategy × regime`` gana su insumo. Sin él (camino hermético o test) no se escribe
+        # nada: el hueco sigue declarado, nunca inventado.
+        cycle_regime_sink: Callable[[Any], Awaitable[None]] | None = None,
+        # AUTO-10: LECTOR de ese mismo journal (la otra mitad). Recibe los ``cycle_id`` del tick
+        # y devuelve la lectura con sus huecos declarados. Sin él, el productor de R conserva el
+        # comportamiento de AUTO-9 (``regime_not_durable``): no se finge que se leyó.
+        cycle_regime_reader: Callable[[Sequence[str]], Awaitable[CycleRegimeReading]] | None = None,
         # V2.43.3 (P0-1): espejo durable del latch de la parada dura (``auto_kill_state``).
         # Sin él la parada es solo del proceso y un reinicio la olvida. Con él, el arranque
         # la LEE antes de readoptar posición y el motor no puede reabrirse solo.
@@ -729,6 +740,12 @@ class AutoSimulationWorker:
         # override de env, el régimen es UNKNOWN ⇒ exit-only (fail-closed: sin régimen
         # no se abren entradas nuevas).
         self._v2_regime_source = regime_source
+        # AUTO-10: lo que se publica DURABLEMENTE cuando un ciclo abre. Sin sink no hay
+        # escritura (ni se finge): el hueco de régimen por ciclo sigue declarado.
+        self._cycle_regime_sink = cycle_regime_sink
+        # AUTO-10: lo que se LEE de vuelta. Sin lector, el R por ciclo sigue midiéndose pero el
+        # régimen queda declarado como no durable (comportamiento de AUTO-9).
+        self._cycle_regime_reader = cycle_regime_reader
         # AUTO 2.0 (V2): fuente del sector por símbolo (inyectable). Sin ella, el sector
         # solo existe si la propuesta lo declara en su ``memo``; si no, es desconocido y
         # el gate de concentración sectorial veta (V2.40.1: nunca se asume exento).
@@ -2224,6 +2241,10 @@ class AutoSimulationWorker:
             await store.commit()
         except Exception:  # noqa: BLE001 — con autocommit ya es durable; se declara.
             logger.exception("auto_sim v2 reservation commit failed")
+        # AUTO-10 — el ciclo que acaba de abrir deja su régimen en el journal DURABLE. Se
+        # publica DESPUÉS del commit de la reserva: primero el compromiso de capital, después
+        # la traza (si la traza falla, el dinero sigue comprometido y el hueco se declara).
+        await self._v2_journal_cycle_regime(persisted)
         self._v2_reservation_blocked = frozenset(blocked)
         # Las carreras perdidas se suman al carryover: el veteo de emisión es el mismo
         # ("ya hay una reserva viva para este instrumento") y usa el mismo motivo.
@@ -2236,6 +2257,45 @@ class AutoSimulationWorker:
         self._v2_reservations = tuple(
             sorted(merged.values(), key=lambda r: (r.created_at or "", r.reservation_id))
         )
+
+    async def _v2_journal_cycle_regime(self, reservations: Sequence[PortfolioReservation]) -> None:
+        """AUTO-10 — publica el régimen del ciclo recién abierto en el journal durable.
+
+        El ciclo abre con su reserva de ENTRADA (``_v2_persist_tick_reservations``), así que
+        el régimen que se publica es el del turno que **decidió** (``_v2_regime()``), no el de
+        un instante posterior. Un ciclo sin régimen se publica igual: con
+        ``marketRegime = None`` y ``regimeMeasurement = UNKNOWN`` **declarados**, para que el
+        lector pueda distinguir "no medido" de "medido".
+
+        Fail-open **declarado**: sin sink no se escribe (no hay nada que fingir) y un fallo del
+        sink no tumba el turno —el compromiso de capital ya es durable—, pero se registra: un
+        silencio aquí volvería a convertir el hueco en mentira por omisión. Un ciclo que ya se
+        publicó en este turno no se repite (una apertura, una traza).
+        """
+        sink = self._cycle_regime_sink
+        if sink is None:
+            return
+        published: set[str] = set()
+        for reservation in reservations:
+            cycle_id = str(getattr(reservation, "cycle_id", None) or "").strip()
+            if not cycle_id or cycle_id in published:
+                continue
+            entry = build_auto_cycle_regime_entry(
+                cycle_id=cycle_id,
+                market_regime=self._v2_regime(),
+                actor=self._engine_id,
+                as_of=self._v2_instant(),
+                account_id=self._account_id,
+                instrument_id=getattr(reservation, "instrument_id", None),
+                strategy_version=getattr(reservation, "strategy_version_id", None),
+            )
+            if entry is None:
+                continue
+            published.add(cycle_id)
+            try:
+                await sink(entry)
+            except Exception:  # noqa: BLE001 — publicar no puede tumbar el turno.
+                logger.exception("auto_sim v2 cycle regime journal failed cycle=%s", cycle_id)
 
     async def _v2_save_exit_order(self, order: ExitOrder) -> bool:
         """Persiste un INTENT de salida; ``False`` si el store falta o no fue durable."""
@@ -2812,22 +2872,25 @@ class AutoSimulationWorker:
         return plan
 
     async def _v2_cycle_risk(self, fills: Sequence[Any]) -> dict[str, CycleRisk] | None:
-        """AUTO-9 — denominador de R y coste estimado por CICLO, desde las reservas.
+        """AUTO-9/AUTO-10 — denominador de R, coste y RÉGIMEN por CICLO.
 
         READ-ONLY y aditivo: lee las reservas de los ciclos que aparecen en los fills del
         tick (``list_by_cycle_ids``, vivas y liberadas — un ciclo cerrado ya no tiene
         reserva viva) y las agrega con el módulo puro. El informe pasa de declarar "R no
         medible" a declararlo **medido o ausente ciclo a ciclo**, sin inventar ninguno.
 
-        **Sin productor de régimen.** El ``marketRegime`` por ciclo vive en el journal del
-        worker, que es EN MEMORIA (no hay fila durable por ciclo), así que ningún ciclo
-        aporta régimen y el productor lo declara (``regime_not_durable``). El régimen del
-        tick sigue entrando a la rotación como siempre; lo que no se puede es atribuirlo
-        hacia atrás a un ciclo histórico. El día que exista ese productor durable, basta
-        pasar ``regime_by_cycle``: la costura ya está.
+        **Régimen durable (AUTO-10).** Con lector inyectado, el ``marketRegime`` de cada ciclo
+        se lee del journal durable por ``decision_id`` derivado y CONFIRMANDO el
+        ``payload['cycleId']`` (una fila que no confirma no se cree: la forma no prueba
+        origen), y el productor pasa a declarar ``regime_not_found`` en vez de
+        ``regime_not_durable``. Sin lector se conserva el comportamiento de ``AUTO-9``: el
+        régimen sigue entrando a la rotación del tick como siempre, pero no se atribuye hacia
+        atrás a un ciclo histórico.
 
         Un fallo de lectura devuelve ``None`` (degradación DECLARADA): el informe vuelve a
-        su forma AUTO-7 en vez de estrechar o rotar con un R que no se pudo medir.
+        su forma AUTO-7 en vez de estrechar o rotar con un R que no se pudo medir. El fallo
+        del lector de régimen NO tumba el turno ni anula el R: los ciclos afectados quedan
+        con su hueco declarado (``regime_not_found``).
         """
         store = self._reservation_store
         cycle_ids = sorted(
@@ -2850,7 +2913,45 @@ class AutoSimulationWorker:
                 _V2_CYCLE_RISK_READ_LIMIT,
                 len(cycle_ids),
             )
-        return cycle_risk_from_reservations(cycle_ids, reservations)
+        regimes, durable = await self._v2_read_cycle_regimes(cycle_ids)
+        return cycle_risk_from_reservations(
+            cycle_ids,
+            reservations,
+            regime_by_cycle=regimes,
+            regime_source_durable=durable,
+        )
+
+    async def _v2_read_cycle_regimes(
+        self, cycle_ids: Sequence[str]
+    ) -> tuple[Mapping[str, str], bool]:
+        """AUTO-10 — régimen por ciclo desde el journal durable, o huecos DECLARADOS.
+
+        Devuelve ``(regime_by_cycle, source_durable)``. ``source_durable`` es ``True`` solo si
+        la fuente durable se consultó de verdad: con él, un ciclo sin régimen se declara
+        ``regime_not_found`` en vez de ``regime_not_durable``. Sin lector inyectado, o si el
+        lector revienta, la fuente NO se consultó y el hueco se declara como siempre (por eso
+        el par de valores viaja junto: un mapa vacío sin ese flag mentiría).
+
+        Los huecos se registran como ``warning`` (con su motivo) y las filas de más de un
+        reintento como ``info`` (el valor publicado no cambia: gana la confirmación más nueva).
+        """
+        reader = self._cycle_regime_reader
+        if reader is None:
+            return {}, False
+        try:
+            reading = await reader(cycle_ids)
+        except Exception:  # noqa: BLE001 — sin lectura de régimen el R sigue midiéndose.
+            logger.exception("auto_sim v2 adaptive cycle regime read failed")
+            return {}, False
+        summary = reading.as_dict()
+        if summary["unconfirmed"] or summary["absent"] or summary["notDerivable"]:
+            # Huecos declarados, con su motivo: silenciarlos convertiría el hueco en mentira.
+            logger.warning("auto_sim v2 adaptive cycle regime gaps %s", summary)
+        elif summary["collapsedRows"]:
+            # Un reintento del tick reescribe la traza del mismo ciclo: no es un fallo, pero se
+            # declara (AUTO-10 paso 4) para que un duplicado anómalo no sea invisible.
+            logger.info("auto_sim v2 adaptive cycle regime duplicates %s", summary)
+        return dict(reading.regime_by_cycle), True
 
     async def _v2_build_adaptive_plan(
         self, versions: set[str], regime: str | None
@@ -4026,6 +4127,10 @@ class AutoSimulationWorker:
         reservation_store: ReservationStore | None = None,
         kill_switch_store: KillSwitchStore | None = None,
         exit_order_store: ExitOrderStore | None = None,
+        # AUTO-10: sink durable del régimen por ciclo, atado a la MISMA sesión del tick.
+        cycle_regime_sink: Callable[[Any], Awaitable[None]] | None = None,
+        # AUTO-10: lector de ese journal, también sobre la sesión del tick.
+        cycle_regime_reader: Callable[[Sequence[str]], Awaitable[CycleRegimeReading]] | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -4059,6 +4164,8 @@ class AutoSimulationWorker:
         prev_atr = self._v2_atr_source
         prev_kill_store = self._kill_switch_store
         prev_exit_store = self._exit_order_store
+        prev_cycle_sink = self._cycle_regime_sink
+        prev_cycle_reader = self._cycle_regime_reader
         try:
             self._exec_store = exec_store
             self._auto_store = auto_store
@@ -4094,6 +4201,15 @@ class AutoSimulationWorker:
             )
             self._exit_order_store = (
                 exit_order_store if exit_order_store is not None else prev_exit_store
+            )
+            # AUTO-10: el sink del régimen por ciclo viaja con la sesión del tick (como los
+            # demás espejos). Sin él se conserva el del constructor (hermético/tests).
+            self._cycle_regime_sink = (
+                cycle_regime_sink if cycle_regime_sink is not None else prev_cycle_sink
+            )
+            # AUTO-10: y su mitad de lectura, con la misma regla.
+            self._cycle_regime_reader = (
+                cycle_regime_reader if cycle_regime_reader is not None else prev_cycle_reader
             )
             # V2.43.3 (P0-1) — BOOT SAFETY GATE: la parada dura se LEE de su espejo durable
             # ANTES de readoptar posición y de reconciliar. Un reinicio NO puede reabrir el
@@ -4145,6 +4261,8 @@ class AutoSimulationWorker:
             self._reservation_store = prev_reservations
             self._kill_switch_store = prev_kill_store
             self._exit_order_store = prev_exit_store
+            self._cycle_regime_sink = prev_cycle_sink
+            self._cycle_regime_reader = prev_cycle_reader
 
 
 # V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.
@@ -4217,6 +4335,67 @@ def _compose_real_stores(
     # acepta resolver síncrono o asíncrono (durable).
     applier = build_simulated_execute_trade_applier(trade, resolver)
     return exec_store, auto_store, applier, context_store
+
+
+def build_cycle_regime_sink(session: Any) -> Callable[[Any], Awaitable[None]]:
+    """AUTO-10: sink durable del régimen por ciclo, atado a la sesión del tick.
+
+    El repositorio del spine (``decision_journal_entries``, ADR-029 F1) ya existía y solo lo
+    usaba la API; aquí se le da el uso que faltaba (``AUTO-10``). Va por sesión, como el resto
+    de espejos del turno: el runner abre una sesión por tick y esto se construye sobre ESA.
+
+    Commitea él mismo, a diferencia de ``JournalRepository.append`` (que solo hace ``flush``):
+    la sesión del tick se cierra con ``close()``, así que un ``flush`` sin commit dejaría la
+    fila sin escribir —el hueco volvería a mentir por omisión, que es justo lo que ``AUTO-10``
+    cierra. El commit cae justo después del commit de la reserva de entrada, cuando no hay
+    nada más pendiente de otro store en la misma sesión.
+    """
+    from bolsa_infrastructure.database.repositories.journal_repository import (  # noqa: PLC0415
+        SqlAlchemyJournalRepository,
+    )
+
+    repository = SqlAlchemyJournalRepository(session)
+
+    async def sink(entry: Any) -> None:
+        try:
+            await repository.append(entry)
+            await session.commit()
+        except Exception:
+            # Fail-open DE VERDAD: una escritura fallida deja la sesión envenenada y sin
+            # ``rollback`` el siguiente store del MISMO turno fallaría con
+            # ``PendingRollbackError`` —la traza rota tumbaría el compromiso de capital—.
+            # Se limpia aquí y el error sube para que el worker lo DECLARE en el log.
+            await session.rollback()
+            raise
+
+    return sink
+
+
+def build_cycle_regime_reader(
+    session: Any,
+) -> Callable[[Sequence[str]], Awaitable[CycleRegimeReading]]:
+    """AUTO-10: lector del régimen por ciclo desde el journal durable de la sesión del tick.
+
+    Es la mitad de lectura del mismo repositorio que usa ``build_cycle_regime_sink``, sobre la
+    MISMA sesión del turno. Cierra el circuito ``escribir → leer`` de ``AUTO-10``: la lectura va
+    por ``decision_id`` (campo con índice, sin migración) y **confirma** el ``payload['cycleId']``
+    antes de creerse un régimen, así que una derivación equivocada solo deja el hueco declarado.
+    El coste de la tanda está medido y declarado en ``auto_cycle_regime_reader``.
+
+    Fail-open DECLARADO: si la lectura revienta, el error sube al worker, que lo registra y deja
+    los ciclos con su hueco (``regime_not_found``/``regime_not_durable``). El denominador de R,
+    que es otra fuente, no se pierde por esto.
+    """
+    from bolsa_infrastructure.database.repositories.journal_repository import (  # noqa: PLC0415
+        SqlAlchemyJournalRepository,
+    )
+
+    repository = SqlAlchemyJournalRepository(session)
+
+    async def reader(cycle_ids: Sequence[str]) -> CycleRegimeReading:
+        return await read_cycle_regimes(repository.list_by_decision_ids, cycle_ids)
+
+    return reader
 
 
 def _compose_canonical_reader(session: Any) -> Any:
@@ -4647,6 +4826,9 @@ class AutoSimRuntime:
 
             kill_switch_store = PostgresKillSwitchStore(session)
             exit_order_store = PostgresExitOrderStore(session)
+            # AUTO-10: la traza DURABLE del régimen por ciclo, sobre la misma sesión del tick.
+            cycle_regime_sink = build_cycle_regime_sink(session)
+            cycle_regime_reader = build_cycle_regime_reader(session)
             # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
             # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
             # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor
@@ -4662,6 +4844,8 @@ class AutoSimRuntime:
                 reservation_store=reservation_store,
                 kill_switch_store=kill_switch_store,
                 exit_order_store=exit_order_store,
+                cycle_regime_sink=cycle_regime_sink,
+                cycle_regime_reader=cycle_regime_reader,
                 canonical_positions_reader=self._canonical_reader
                 or _compose_canonical_reader(session),
                 regime_source=self._regime_source

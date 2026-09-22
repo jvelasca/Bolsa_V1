@@ -69,6 +69,37 @@ El invariante nuevo tiene una forma de romperse en silencio por mutación:
   métrica fina mantiene una pausa que su evidencia no sostiene.
 * **M27 (cooldown)** — si la pausa mínima deja de respetarse, la rotación parpadea tick a tick.
 
+AUTO-9 (evidencia por ciclo) y AUTO-10 (journal durable del régimen) añaden:
+
+* **M28 (denominador de R)** — si el denominador toma la reserva más NUEVA en vez de la más
+  antigua del ciclo, el riesgo comprometido deja de ser el de la entrada.
+* **M29 (reserva de venta)** — si la venta entra como denominador, un ciclo sin riesgo real se
+  mide como si lo tuviera.
+* **M30 (hueco silencioso)** — si un ciclo sin reservas desaparece del mapa, "no medido" se
+  convierte en "no existía".
+* **M31 (dato no medido)** — si el coste ausente se publica como clave nula, `null` pasa a leerse
+  como una medición.
+* **M32 (costura muda)** — si el informe ignora la evidencia de riesgo que se le pasa, el
+  productor deja de entrar en la evaluación.
+* **M33 (worker sin denominador)** — si el camino Adaptive deja de leer el riesgo por ciclo, la
+  evidencia existe pero nadie la consume.
+* **M34 (identidad derivada)** — si un `cycle_id` ajeno al prefijo también se deriva, se afirma
+  una identidad que no se puede probar.
+* **M35 (payload sin cycleId)** — si la traza deja de publicar de qué ciclo es, la lectura
+  confirma contra la nada y el régimen se pierde.
+* **M36 (régimen disfrazado)** — si el régimen ausente se declara `COMPLETE`, "no medido" se lee
+  como medido.
+* **M37 (sink sin usar)** — si el turno deja de publicar el régimen del ciclo, el hueco que
+  `AUTO-10` cierra vuelve a abrirse en silencio.
+* **M38 (sink sin commit)** — si la escritura se queda en `flush`, la fila muere al cerrar la
+  sesión: "escrito" sin serlo.
+* **M39 (sin confirmar)** — si una fila con ese `decision_id` se cree sin mirar el payload, una
+  derivación equivocada lee el régimen de un ciclo ajeno.
+* **M40 (dedupe por llegada)** — si gana la fila más nueva aunque no confirme, la entrada de
+  ventana (que comparte `decision_id` y es más nueva) roba el régimen.
+* **M41 (duplicado silencioso)** — si la lectura deja de declarar las filas de más, una tormenta
+  de reintentos se vuelve invisible.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -111,6 +142,8 @@ AUTO_SELF_EVAL = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_self_
 AUTO_ADAPTIVE = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py"
 CYCLE_RISK = "packages/py/application/src/bolsa_application/cycle_risk.py"
 FEED = "packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py"
+AUTO_CYCLE_JOURNAL = "packages/py/application/src/bolsa_application/auto_cycle_journal.py"
+REGIME_READER = "packages/py/application/src/bolsa_application/auto_cycle_regime_reader.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 
 # --- suites que deben morder ----------------------------------------------------------------
@@ -128,6 +161,10 @@ T_ADAPTIVE = "packages/py/analytics/tests/test_auto_adaptive.py"
 T_ADAPTIVE_ENTRY = "packages/py/application/tests/test_auto_adaptive_entry.py"
 T_CYCLE_RISK = "packages/py/application/tests/test_cycle_risk.py"
 T_CYCLE_RISK_SEAM = "apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py"
+T_CYCLE_JOURNAL = "packages/py/application/tests/test_auto_cycle_journal.py"
+T_REGIME_READER = "packages/py/application/tests/test_auto_cycle_regime_reader.py"
+T_CYCLE_JOURNAL_SEAM = "apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py"
+T_REGIME_SEAM = "apps/api-python/tests/test_auto_v51_auto10_cycle_regime_seam.py"
 T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
@@ -329,19 +366,15 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M25 (hysteresis regimen): el umbral de reactivacion baja al de pausa (sin zona muerta)",
         AUTO_ADAPTIVE,
-        "    return (\n"
-        "        health.win_rate is not None and health.win_rate < policy.win_rate_reactivate_floor\n"
-        "    )\n",
-        "    return (\n"
-        "        health.win_rate is not None and health.win_rate < policy.win_rate_floor\n"
-        "    )\n",
+        "    return health.win_rate is not None and health.win_rate < policy.win_rate_reactivate_floor\n",
+        "    return health.win_rate is not None and health.win_rate < policy.win_rate_floor\n",
         (T_ADAPTIVE,),
     ),
     (
         "M26 (muestra decisoria): sin decisividad la pausa de salud se declara vigente",
         AUTO_ADAPTIVE,
-        "    if not health.decisive:\n        return False\n    expectancy_ok = (\n",
-        "    if not health.decisive:\n        return True\n    expectancy_ok = (\n",
+        "    if not health.decisive:\n        return False\n    expectancy_ok = health.expectancy_currency is not None and health.expectancy_currency > Decimal(\n",
+        "    if not health.decisive:\n        return True\n    expectancy_ok = health.expectancy_currency is not None and health.expectancy_currency > Decimal(\n",
         (T_ADAPTIVE,),
     ),
     (
@@ -368,8 +401,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M30 (hueco silencioso): un ciclo sin reservas desaparece del mapa en vez de declararse",
         CYCLE_RISK,
-        "    return {key: _cycle_risk(key, grouped.get(key, ()), regimes) for key in keys}\n",
-        "    return {key: _cycle_risk(key, grouped[key], regimes) for key in keys if key in grouped}\n",
+        "        for key in keys\n    }\n",
+        "        for key in keys\n        if key in grouped\n    }\n",
         (T_CYCLE_RISK,),
     ),
     (
@@ -389,9 +422,70 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M33 (worker sin denominador): el camino Adaptive deja de leer el riesgo por ciclo",
         WORKER,
-        "        report = build_auto_self_evaluation(fills=fills, cycle_risk=await self._v2_cycle_risk(fills))\n",
-        "        report = build_auto_self_evaluation(fills=fills)\n",
+        "        report = build_auto_self_evaluation(\n"
+        "            fills=fills, cycle_risk=await self._v2_cycle_risk(fills)\n"
+        "        )\n",
+        "        report = build_auto_self_evaluation(\n            fills=fills\n        )\n",
         (T_CYCLE_RISK_SEAM,),
+    ),
+    (
+        "M34 (identidad derivada): un cycle_id ajeno al prefijo tambien se deriva",
+        AUTO_CYCLE_JOURNAL,
+        "    if not text.startswith(CYCLE_ID_PREFIX):\n        return None\n",
+        "    if False:\n        return None\n",
+        (T_CYCLE_JOURNAL, T_REGIME_READER),
+    ),
+    (
+        "M35 (payload sin cycleId): la traza deja de publicar de que ciclo es",
+        AUTO_CYCLE_JOURNAL,
+        '        "event": AUTO_CYCLE_REGIME_EVENT,\n        "cycleId": text,\n',
+        '        "event": AUTO_CYCLE_REGIME_EVENT,\n        "cycleId": "",\n',
+        (T_CYCLE_JOURNAL,),
+    ),
+    (
+        "M36 (regimen disfrazado): el regimen ausente se declara COMPLETE",
+        AUTO_CYCLE_JOURNAL,
+        "    measurement: MeasurementStatus = MEASUREMENT_COMPLETE if regime else MEASUREMENT_UNKNOWN\n",
+        "    measurement: MeasurementStatus = MEASUREMENT_COMPLETE\n",
+        (T_CYCLE_JOURNAL,),
+    ),
+    (
+        "M37 (sink sin usar): el turno deja de publicar el regimen del ciclo",
+        WORKER,
+        "        await self._v2_journal_cycle_regime(persisted)\n",
+        "        if False:\n            await self._v2_journal_cycle_regime(persisted)\n",
+        (T_CYCLE_JOURNAL_SEAM,),
+    ),
+    (
+        "M38 (sink sin commit): la traza se hace flush y se pierde al cerrar la sesion",
+        WORKER,
+        "            await repository.append(entry)\n            await session.commit()\n",
+        "            await repository.append(entry)\n            if False:\n                await session.commit()\n",
+        (T_CYCLE_JOURNAL_SEAM,),
+    ),
+    (
+        "M39 (sin confirmar): una fila con ese decision_id se cree sin mirar el payload",
+        REGIME_READER,
+        '    if _clean(payload.get("cycleId")) != cycle_id:\n        return None\n',
+        "    if False:\n        return None\n",
+        (T_REGIME_READER, T_REGIME_SEAM),
+    ),
+    (
+        "M40 (dedupe por llegada): gana la fila mas nueva aunque no confirme el ciclo",
+        REGIME_READER,
+        "        regime = next(\n"
+        "            (found for entry in candidates if (found := _confirmed_regime(entry, cycle_id))),\n"
+        "            None,\n"
+        "        )\n",
+        "        regime = _confirmed_regime(candidates[0], cycle_id)\n",
+        (T_REGIME_READER,),
+    ),
+    (
+        "M41 (duplicado silencioso): la lectura deja de declarar las filas de mas",
+        REGIME_READER,
+        "            if len(candidates) > 1:\n",
+        "            if False:\n",
+        (T_REGIME_READER, T_REGIME_SEAM),
     ),
 ]
 
@@ -544,6 +638,10 @@ def main(argv: list[str] | None = None) -> int:
     for tests in sorted({m[4] for m in matrix}, key=lambda t: t):
         print(f"  {', '.join(tests)} ->", sorted(_run(tests, files)) or "ninguno")
 
+    # Mutaciones cuyo fragmento ya no existe: NO midieron nada. Se listan al final y la sonda
+    # falla, porque una matriz con huecos silenciosos afirma mas cobertura de la que tiene.
+    missing: list[str] = []
+
     for label, rel, old, new, tests in matrix:
         path = ROOT / rel
         current = path.read_text(encoding="utf-8")
@@ -554,9 +652,13 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         hits = current.count(old)
         if hits == 0:
+            # Un fragmento que ya no existe es una mutacion que NO mide: la matriz perderia
+            # cobertura en silencio (paso 5 de AUTO-10: M25/M26/M30/M33 se quedaron sin
+            # morder asi, por deriva del codigo). Se declara y la sonda falla al final.
             print(
                 f"\n### {label}\n  !! no encontre el fragmento a mutar en {rel}; revisar la sonda"
             )
+            missing.append(label)
             continue
         if hits > 1:
             print(
@@ -591,6 +693,11 @@ def main(argv: list[str] | None = None) -> int:
         print("  !! la sonda dejo los ficheros en un estado distinto al inicial")
         return 1
     print("  intacto: la sonda no altero el arbol")
+    if missing:
+        print("\n  !! mutaciones SIN medir (fragmento ausente): " + "; ".join(missing))
+        print("  La matriz no puede afirmar cobertura sobre esas etiquetas: sonda en ROJO.")
+        return 1
+    print(f"  medidas: {len(matrix)}/{len(matrix)} (ninguna se quedo sin fragmento)")
     return 0
 
 

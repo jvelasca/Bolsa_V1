@@ -385,6 +385,18 @@ jobs:
         # razón: ``packages/py/application/tests`` no tiene pase de directorio aquí. Su
         # costura en el worker (``test_auto_v50_auto9_cycle_risk_seam.py``) entra por el
         # pase de directorio de ``apps/api-python/tests``.
+        # V2.51/AUTO-10 (journal durable por ciclo): el constructor PURO
+        # ``test_auto_cycle_journal.py`` (derivación determinista de ``decision_id``, hueco
+        # declarado, payload estable) va EXPLÍCITO por la misma razón: sin registro no
+        # correría en ninguna parte. Su costura en el worker
+        # (``test_auto_v51_auto10_cycle_journal_seam.py``) entra por el pase de directorio
+        # de ``apps/api-python/tests``, que este job ya recolecta entero.
+        # V2.51/AUTO-10 (lector del journal, paso 3): ``test_auto_cycle_regime_reader.py``
+        # (derivación del ``decision_id``, confirmación por payload, los tres huecos
+        # separados, tandas acotadas) va EXPLÍCITO por la misma razón. La costura de consumo
+        # en el worker entra por el pase de directorio, y la durabilidad real (escritor +
+        # lector desde OTRA sesión sobre la tabla del spine) se certifica con PG en el
+        # bloque ``auto-v2-durable-pg``.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -426,6 +438,8 @@ jobs:
           packages/py/application/tests/test_auto_self_evaluation_feed.py
           packages/py/application/tests/test_auto_adaptive_entry.py
           packages/py/application/tests/test_cycle_risk.py
+          packages/py/application/tests/test_auto_cycle_journal.py
+          packages/py/application/tests/test_auto_cycle_regime_reader.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py

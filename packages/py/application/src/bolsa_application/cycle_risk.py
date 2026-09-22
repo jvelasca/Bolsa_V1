@@ -14,10 +14,12 @@ Tres reglas duras, declaradas en vez de asumidas:
 * **Ausencia declarada.** Un ciclo sin reserva de entrada —o con ``reserved_risk <= 0``,
   que es lo que declara una reserva de venta— queda con ``risk_amount = None`` y su motivo.
   Nunca un ``0``: el R de un riesgo cero es ``inf``, no ``0``.
-* **Régimen no durable.** El régimen de mercado por ciclo **no** es legible hoy de ninguna
-  fuente durable para el motor AUTO (su journal es en memoria), así que se publica ``None``
-  + ``regime_not_durable``. Es un hueco declarado, no un ``UNKNOWN`` inventado: el día que
-  exista productor durable, se pasa por ``regime_by_cycle`` y el hueco se cierra solo.
+* **Régimen: medido o declarado, con el motivo exacto.** El mapa ``regime_by_cycle`` viene de
+  fuera (``AUTO-10`` lo lee del journal durable por ``decision_id`` derivado + confirmación de
+  ``payload['cycleId']``). Si el llamante **no** consultó ninguna fuente durable, el hueco se
+  declara ``regime_not_durable``; si la consultó y ese ciclo no trae régimen confirmado, se
+  declara ``regime_not_found`` — dos hechos distintos que no se colapsan. Nunca un ``UNKNOWN``
+  inventado.
 
 **Las reservas LIBERADAS cuentan.** Cuando un ciclo se cierra, su reserva de entrada ya no
 está viva: filtrar por ``is_live`` dejaría el denominador en ``None`` justo en los ciclos
@@ -46,6 +48,7 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
 __all__ = [
     "CYCLE_RISK_MULTIPLE_RESERVATIONS",
     "CYCLE_RISK_REGIME_NOT_DURABLE",
+    "CYCLE_RISK_REGIME_NOT_FOUND",
     "CYCLE_RISK_WITHOUT_RISK",
     "CycleRisk",
     "apply_cycle_risk",
@@ -56,8 +59,10 @@ __all__ = [
 CYCLE_RISK_WITHOUT_RISK = "cycle_without_risk"
 #: El ciclo tiene varias reservas de entrada: se usa la más antigua y se declara el resto.
 CYCLE_RISK_MULTIPLE_RESERVATIONS = "cycle_with_multiple_reservations"
-#: El régimen por ciclo no es legible de ninguna fuente durable HOY (journal en memoria).
+#: El régimen por ciclo no es legible de ninguna fuente durable (ningún lector consultado).
 CYCLE_RISK_REGIME_NOT_DURABLE = "regime_not_durable"
+#: Se SÍ consultó la fuente durable y ese ciclo no trae régimen confirmado (hueco distinto).
+CYCLE_RISK_REGIME_NOT_FOUND = "regime_not_found"
 
 
 def _clean(value: Any) -> str:
@@ -145,6 +150,8 @@ def _cycle_risk(
     cycle_id: str,
     rows: Sequence[PortfolioReservation],
     regimes: Mapping[str, str],
+    *,
+    regime_source_durable: bool,
 ) -> CycleRisk:
     candidates = _entry_candidates(rows)
     entry = candidates[0] if candidates else None
@@ -155,7 +162,9 @@ def _cycle_risk(
         notes.append(CYCLE_RISK_MULTIPLE_RESERVATIONS)
     regime = _clean(regimes.get(cycle_id))
     if not regime:
-        notes.append(CYCLE_RISK_REGIME_NOT_DURABLE)
+        notes.append(
+            CYCLE_RISK_REGIME_NOT_FOUND if regime_source_durable else CYCLE_RISK_REGIME_NOT_DURABLE
+        )
     risk = _dec(entry.reserved_risk) if entry is not None else None
     cost = (entry.cost or None) if entry is not None else None
     return CycleRisk(
@@ -177,12 +186,18 @@ def cycle_risk_from_reservations(
     reservations: Iterable[PortfolioReservation],
     *,
     regime_by_cycle: Mapping[str, str] | None = None,
+    regime_source_durable: bool = False,
 ) -> dict[str, CycleRisk]:
     """(PURA) evidencia de riesgo por ciclo, a partir de las reservas de esos ciclos.
 
     Devuelve una entrada por CADA ciclo pedido, incluidas las que declaran su hueco: una
     ausencia silenciosa en el mapa sería "no lo miré", no "no lo hay". El orden de salida
     sigue el de ``cycle_ids`` (estable, sin depender del orden de las reservas).
+
+    ``regime_source_durable`` declara si el llamante **sí** consultó una fuente durable de
+    régimen (el journal de ``AUTO-10``): un ciclo ausente del mapa pasa entonces de
+    ``regime_not_durable`` ("no hay fuente") a ``regime_not_found`` ("la fuente se leyó y no
+    lo tiene"). Sin el flag, el comportamiento de ``AUTO-9`` queda intacto.
     """
     keys: list[str] = []
     seen: set[str] = set()
@@ -197,7 +212,15 @@ def cycle_risk_from_reservations(
         if key and key in seen:
             grouped.setdefault(key, []).append(row)
     regimes = regime_by_cycle or {}
-    return {key: _cycle_risk(key, grouped.get(key, ()), regimes) for key in keys}
+    return {
+        key: _cycle_risk(
+            key,
+            grouped.get(key, ()),
+            regimes,
+            regime_source_durable=regime_source_durable,
+        )
+        for key in keys
+    }
 
 
 def apply_cycle_risk(

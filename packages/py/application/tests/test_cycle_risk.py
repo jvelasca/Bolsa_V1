@@ -28,6 +28,7 @@ from bolsa_application.auto_self_evaluation_feed import build_auto_self_evaluati
 from bolsa_application.cycle_risk import (
     CYCLE_RISK_MULTIPLE_RESERVATIONS,
     CYCLE_RISK_REGIME_NOT_DURABLE,
+    CYCLE_RISK_REGIME_NOT_FOUND,
     CYCLE_RISK_WITHOUT_RISK,
     CycleRisk,
     apply_cycle_risk,
@@ -225,6 +226,33 @@ def test_a_declared_regime_closes_the_gap() -> None:
     assert evidence.regime == "TREND_UP"
     assert evidence.regime_measurement == MEASUREMENT_COMPLETE
     assert CYCLE_RISK_REGIME_NOT_DURABLE not in evidence.notes
+
+
+def test_a_durable_source_that_lacks_the_cycle_declares_not_found() -> None:
+    """AUTO-10 — "la fuente se leyó y no lo tiene" NO es "no hay fuente": son dos huecos."""
+    evidence = cycle_risk_from_reservations(
+        ["cyc-1"],
+        [_reservation()],
+        regime_source_durable=True,
+    )["cyc-1"]
+
+    assert evidence.regime is None
+    assert CYCLE_RISK_REGIME_NOT_FOUND in evidence.notes
+    assert CYCLE_RISK_REGIME_NOT_DURABLE not in evidence.notes
+
+
+def test_the_durable_flag_does_not_touch_a_measured_regime() -> None:
+    """El flag solo cambia el MOTIVO del hueco: un régimen medido no se toca."""
+    evidence = cycle_risk_from_reservations(
+        ["cyc-1"],
+        [_reservation()],
+        regime_by_cycle={"cyc-1": "TREND_UP"},
+        regime_source_durable=True,
+    )["cyc-1"]
+
+    assert evidence.regime == "TREND_UP"
+    assert evidence.regime_measurement == MEASUREMENT_COMPLETE
+    assert evidence.notes == ()
 
 
 def test_as_dict_publishes_every_dimension_with_its_own_status() -> None:

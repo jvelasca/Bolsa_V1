@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -58,6 +59,42 @@ class SqlAlchemyJournalRepository:
         self._session.add(row)
         await self._session.flush()
         return entry
+
+    async def list_by_decision_ids(
+        self,
+        decision_ids: Sequence[str],
+        *,
+        limit: int | None = None,
+    ) -> list[DecisionJournalEntryRecord]:
+        """AUTO-10 — entradas de un conjunto de ``decision_id``, por el índice existente.
+
+        Se lee por ``decision_id`` y **no** por ``payload->>'cycleId'``: la sonda de coste midió
+        que la segunda obliga a un recorrido de la tabla (1348 filas, 56 buffers), mientras que
+        la primera **tiene índice** y lo usa cuando se pide un solo id (0,03 ms frente a
+        0,13 ms). Con una tanda grande sobre una tabla pequeña el planner prefiere el recorrido
+        —es más barato que N sondas—, y eso está MEDIDO y declarado: <0,1 ms por tanda de 15
+        ciclos. A escala no está medido; si el spine crece, la decisión es un índice parcial o de
+        expresión, no cambiar la identidad.
+
+        Más nueva primero (``created_at DESC``), que es justo lo que necesita la resolución del
+        reintento ("última gana").
+
+        No filtra por ``account_id`` ni por ``event_type``: el ``decision_id`` de un ciclo lo
+        comparten su entrada de ventana y su traza de régimen, así que quien lee es quien
+        confirma en el ``payload`` lo que le sirve (el lector puro lo hace y lo declara).
+        """
+        ids = [text for text in (str(value).strip() for value in decision_ids) if text]
+        if not ids:
+            return []
+        statement = (
+            select(DecisionJournalEntryRow)
+            .where(DecisionJournalEntryRow.decision_id.in_(ids))
+            .order_by(DecisionJournalEntryRow.created_at.desc())
+        )
+        if limit is not None:
+            statement = statement.limit(limit)
+        result = await self._session.execute(statement)
+        return [_row_to_record(row) for row in result.scalars().all()]
 
     async def list_entries(
         self,

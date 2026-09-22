@@ -485,3 +485,117 @@ async def test_v2_durable_crash_left_captured_blocks_new_entry_after_restart(
                         delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
                     )
                 await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_auto_cycle_regime_trace_is_durable_and_readable_from_another_session(
+    v2_pg_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AUTO-10 — la traza del ciclo (``cycleId`` + ``marketRegime``) sobrevive al turno.
+
+    El escritor y el lector se cablean en ``run_tick`` sobre la sesión del tick; lo que aquí se
+    certifica es lo que separa "escrito" de "durable": la fila se lee desde una sesión NUEVA
+    (la del tick ya está cerrada) por el ``decision_id`` DERIVADO del ciclo, y el lector la
+    confirma por ``payload['cycleId']`` antes de devolverla como régimen de ese ciclo. Además,
+    el régimen leído es el del turno que DECIDIÓ (``BULL_TREND``), no uno posterior.
+    """
+    from bolsa_api.background.auto_simulation_worker import (
+        AutoSimRuntime,
+        AutoSimulationWorker,
+        build_cycle_regime_reader,
+    )
+    from bolsa_application.auto_cycle_journal import AUTO_CYCLE_REGIME_EVENT
+
+    instrument_id = _filling_instrument_id("inst-v2r-", side="buy")
+    engine_id = f"auto-v2r-{uuid.uuid4().hex[:10]}"
+    monkeypatch.setenv("AUTO_ENGINE_SIMULATED_VENUE", "simulated")
+    monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", instrument_id)
+    monkeypatch.setenv("AUTO_SIMULATION_WORKER_ENABLED", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_REGIME", "BULL_TREND")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "100000")
+
+    account_id: str | None = None
+    edge_report_id: str | None = None
+    try:
+        async with v2_pg_factory() as session:
+            account_id = await _seed_account(session)
+            await _seed_instrument(session, instrument_id)
+            edge_report_id = await _seed_edge_report(
+                session, account_id=account_id, strategy_ref="unversioned"
+            )
+
+        worker = AutoSimulationWorker(
+            decider=_BuyOnce(instrument_id, lot=100.0),
+            engine_id=engine_id,
+            account_id=account_id,
+        )
+        runtime = AutoSimRuntime(
+            v2_pg_factory, worker=worker, engine_id=engine_id, account_id=account_id
+        )
+        for _ in range(8):
+            await runtime.run_tick()
+            if worker._open.get(instrument_id, Decimal("0")) > 0:
+                break
+        assert worker._open.get(instrument_id, Decimal("0")) > 0, "abre en el camino real"
+
+        # ── La traza es DURABLE: se lee desde una sesión NUEVA ────────────────────
+        from bolsa_infrastructure.database.models.tables import DecisionJournalEntryRow
+
+        async with v2_pg_factory() as session:
+            rows = (
+                await session.execute(
+                    select(
+                        DecisionJournalEntryRow.decision_id,
+                        DecisionJournalEntryRow.payload,
+                    )
+                    .where(DecisionJournalEntryRow.account_id == account_id)
+                    .where(DecisionJournalEntryRow.event_type == AUTO_CYCLE_REGIME_EVENT)
+                )
+            ).all()
+            assert rows, "el ciclo abierto dejó su traza en el journal durable"
+            cycle_ids: list[str] = []
+            for row in rows:
+                cycle_id = str(row.payload["cycleId"])
+                cycle_ids.append(cycle_id)
+                # El contrato de identidad, sobre datos REALES: ``cyc-<x>`` ⇒ ``dec-<x>``.
+                assert row.decision_id == f"dec-{cycle_id[4:]}"
+
+            reading = await build_cycle_regime_reader(session)(cycle_ids)
+
+        assert reading.confirmed == len(set(cycle_ids)), "el lector confirma cada ciclo pedido"
+        assert set(reading.regime_by_cycle.values()) == {"BULL_TREND"}, (
+            "el régimen publicado es el del turno que DECIDIÓ, no uno posterior"
+        )
+        assert reading.gaps == 0, "sin huecos: lo que se escribió se lee"
+    finally:
+        if account_id is not None:
+            from sqlalchemy import delete
+
+            from bolsa_infrastructure.database.models.tables import (
+                DecisionJournalEntryRow,
+                EdgeReportRow,
+                SimAutoPositionRow,
+                SimConsumedSignalRow,
+            )
+
+            async with v2_pg_factory() as session:
+                await session.execute(
+                    delete(DecisionJournalEntryRow).where(
+                        DecisionJournalEntryRow.account_id == account_id
+                    )
+                )
+                await session.execute(
+                    delete(SimAutoPositionRow).where(SimAutoPositionRow.account_id == account_id)
+                )
+                await session.execute(
+                    delete(SimConsumedSignalRow).where(
+                        SimConsumedSignalRow.account_id == account_id
+                    )
+                )
+                if edge_report_id is not None:
+                    await session.execute(
+                        delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
+                    )
+                await session.commit()

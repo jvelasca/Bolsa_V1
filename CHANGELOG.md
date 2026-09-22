@@ -2,6 +2,104 @@
 
 All notable releases of Bolsa V1.
 
+## [1.76.0-beta] — AUTO-10 Journal durable por ciclo (V2.51) — 2026-09-22
+
+**Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,
+sin cambio de contrato de API. El gobernador y su evidencia siguen **intactos**. El invariante que
+instala: **el hueco que `AUTO-9` declaraba (`regime_not_durable`) deja de existir**, porque el ciclo
+abierto publica su régimen en el journal **durable** y el lector lo recupera **confirmándolo** — y lo que
+no se pueda confirmar sigue siendo un hueco **declarado**. Instalado en la apertura: lo que se escribe es
+el régimen del turno que **decidió**, no el de un instante posterior.
+
+### Añadido: escritura durable del régimen por ciclo
+
+- **`auto_cycle_journal.py`** (nuevo, contrato puro): `cycle_decision_id()` deriva `dec-<x>` de
+  `cyc-<x>` por **intercambio de prefijo** (es la misma clave la que acuña ciclo y decisión: no se
+  recalcula digest), y `build_auto_cycle_regime_entry()` arma la entrada append-only con `cycleId` +
+  `marketRegime` + `regimeMeasurement` + `cycleIdDerived`. Tres reglas duras: **sin `cycle_id` no hay
+  entrada** (`None`, no-op declarado, nunca un ciclo vacío); un `cycle_id` sin forma `cyc-` **no finge**
+  derivación (`decision_id` propio + `cycleIdDerived = False`, para que el lector sepa que el índice no
+  lo alcanza); y **régimen ausente = declarado** (`marketRegime = None` **y** `regimeMeasurement =
+  UNKNOWN`, nunca un `UNKNOWN` de relleno que parezca valor).
+- **Puerto de escritura en el worker**: el ciclo publica su traza al nacer su reserva de **entrada**
+  (`_v2_journal_cycle_regime`), **después** del commit del compromiso de capital: primero el dinero,
+  después la traza; si la traza falla, el dinero sigue comprometido y el hueco se declara.
+- **`build_cycle_regime_sink(session)`**: cableado real en `run_tick` sobre la sesión del tick, con
+  `commit` propio (un `flush` sin commit dejaría la fila sin escribir al cerrar la sesión —el hueco
+  volvería a mentir por omisión—) y `rollback` en el fallo para no envenenar la sesión del resto del turno.
+
+### Añadido: lector del journal, con confirmación
+
+- **`auto_cycle_regime_reader.py`** (nuevo, puro sobre el puerto de lectura): pregunta por el
+  `decision_id` **derivado** (campo **con índice**, sin migración) y **confirma** el
+  `payload['cycleId']` antes de creerse un régimen — la forma no prueba origen: el `decision_id` de un
+  ciclo lo comparte su entrada de ventana, y el fallback aleatorio acuña un `cycle_id` con la misma forma.
+- **Los tres huecos se declaran por separado**: `unconfirmed` (hay fila con ese `decision_id`, pero no es
+  usable: otro evento, otro `cycleId` o régimen declarado `None`), `absent` (no hay fila) y
+  `not_derivable` (el `cycle_id` no tiene forma `cyc-`: el índice **no lo alcanza** y no se adivina).
+  Tandas acotadas (`DEFAULT_REGIME_CHUNK = 500`).
+- **`list_by_decision_ids`** en `SqlAlchemyJournalRepository`, por el índice ya existente
+  `decision_journal_entries_decision_id_idx`, ordenado `created_at DESC` (lo que el dedupe necesita).
+- **El hueco de `cycle_risk` se parte en dos**: `regime_not_durable` (no se consultó fuente durable, el
+  comportamiento de `AUTO-9`) y **`regime_not_found`** (la fuente se consultó y el régimen **no está**).
+  Distinguirlos es el punto: «no lo miré» y «no está» no son el mismo hecho.
+
+### Cambiado: dedupe en lectura, declarado
+
+- **`CycleRegimeReading`** gana `duplicates` (por ciclo, las filas **de más**) y `collapsed_rows` (su
+  suma), visibles en `as_dict()` y en el log. Frontera medida y probada: **gana la confirmación más
+  nueva**, no la fila más nueva (la entrada de ventana comparte `decision_id` y es más nueva que la
+  traza; deduplicar por llegada convertiría un ciclo **con** régimen escrito en hueco), y un ciclo **sin**
+  confirmación **no** cuenta como duplicado (sin ganadora no hay nada colapsado; llamarlo duplicado
+  confundiría el motivo del hueco). El worker lo declara sin gritar: con huecos, dentro del `warning`;
+  solo con duplicados, un `info`.
+
+### Medido, no supuesto
+
+- **Coste del lector** (sonda `a9_cycle_regime_read_cost_probe.py`, PostgreSQL 16.14, 1348 filas de
+  journal): por **un** `decision_id` el índice se usa (**0,028–0,042 ms** frente a **0,124–0,146 ms** del
+  recorrido por `payload->>'cycleId'`), pero la **tanda** del lector (15 ciclos) la resuelve el planner
+  recorriendo la tabla a este volumen (**0,082–0,086 ms**, sub-milisegundo). El supuesto «la lectura por
+  `decision_id` cae en el índice» es cierto **por id**, no por tanda: se declara en el código, en la
+  sonda y en el plan, y **a escala no está medido** (si el spine crece, la decisión es un índice parcial
+  o de expresión, nunca cambiar la identidad del ciclo).
+- **Circuito escrito → sobrevivido → leído**, con PG real:
+  `test_auto_cycle_regime_trace_is_durable_and_readable_from_another_session` lee desde **otra sesión**
+  la traza del turno que decidió, con `decision_id` derivado y `payload['cycleId']` confirmado; se
+  comprobó que el test **muerde** al desconectar el sink de `run_tick`.
+
+### Verificación
+
+- **+47 tests, simétrico en los dos bloques offline, medido con la MISMA extracción antes y después**
+  (apartando el trabajo con `git stash -u` para medir la base en `HEAD`): `quality` **2321 → 2368** y
+  job `python` del tag **2329 → 2376**, **0 rojos en ambos**. El delta es la cuenta exacta de la fase:
+  **+10** contrato puro (`test_auto_cycle_journal.py`) **+17** lector (`test_auto_cycle_regime_reader.py`)
+  **+8** costura de escritura **+10** costura de lectura **+2** `test_cycle_risk.py` (hueco
+  `regime_not_found` vs `regime_not_durable`). Las dos costuras entran por el pase de directorio de
+  `apps/api-python/tests`; la durabilidad real se certifica en `durable-pg` (**+1**, `3 passed` con
+  `AUTO_V2_DURABLE_PG_REQUIRED=1`).
+- **Mutaciones `M34…M41`** nuevas (identidad derivada, payload sin `cycleId`, régimen disfrazado, sink sin
+  usar, sink sin commit, sin confirmar, dedupe por llegada, duplicado silencioso): **41/41** muerden,
+  0 no detectadas, 41 restauraciones byte a byte y huella `git status` idéntica antes y después.
+- **Enmienda medida al sello `v2.50`**: al correr la matriz completa se descubrió que **`M25`, `M26` y
+  `M33` ya no aplicaban** desde `df2002e7` (fragmentos derivados por el reformateo) y que la sonda
+  **seguía** en vez de fallar, así que la afirmación `33/33` de `v2.50` era **sobrestimada**: aplicaban
+  **30/33**. En `V2.51` los cuatro fragmentos (`+M30`, roto por el paso 3 de esta fase) se reescribieron
+  contra el código real y **la sonda ya no puede perder cobertura en silencio**: un fragmento ausente
+  **falla** la corrida, con el mismo criterio con el que ya abortaba si aparecía más de una vez. El
+  producto de `v2.50` **no** cambia; se corrige la afirmación (plan, audit-pack, relevo y `PROJECT_STATE`).
+- `ruff check` (config de CI) limpio · `mypy` **0 errores / 494 ficheros** · `import-linter` **4/4** ·
+  `durable-pg` **3 passed** (con `AUTO_V2_DURABLE_PG_REQUIRED=1`).
+
+### Limitado y declarado (no silencioso)
+
+- **Solo ciclos del worker `AUTO`**: ciclos históricos ya cerrados sin entrada durable siguen declarando
+  su hueco; `AUTO-10` **no** reescribe el pasado.
+- **`netExpectancyR` sigue necesitando su propia cadena**: que el régimen sea durable cierra el eje
+  `strategy × regime`, pero la expectativa neta en R depende además de que existan ciclos medidos con
+  coste; esta fase no promete que el número aparezca, promete que el **insumo** deja de faltar.
+- **Cooldown en memoria** (heredado) y **UI de `AUTO-7`/`AUTO-8`/`AUTO-9`** siguen pendientes.
+
 ## [1.75.0-beta] — AUTO-9 Strategy × Regime y net expectancy_R (V2.50) — 2026-09-22
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva.

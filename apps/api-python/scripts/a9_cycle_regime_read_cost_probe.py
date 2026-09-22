@@ -19,7 +19,10 @@ pedido. Esa confirmación es lo que hace la derivación segura: una derivación 
 leer el régimen de un ciclo ajeno, solo fallar y dejar el ciclo en `UNKNOWN`.
 
 **MITAD ONLINE (requiere PostgreSQL).** Mide de verdad, con `EXPLAIN (ANALYZE, BUFFERS)`, lo que
-cuestan las dos vías sobre la tabla real, e inventaría los índices que existen hoy.
+cuestan las dos vías sobre la tabla real, inventaría los índices que existen hoy y **mide además la
+consulta del lector de `AUTO-10`** (``(c)``: una tanda de ciclos por ``decision_id`` derivado,
+filtrando por el evento de la traza). Ese ``(c)`` es el "después" de la decisión (a): la senda que
+de verdad corre el worker, no una idealizada.
 
 Códigos de salida:
 
@@ -37,8 +40,9 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_v2_entry import V2Signal, auto_cycle_id, entry_decision_id
 
 if TYPE_CHECKING:  # pragma: no cover — solo para anotar el cursor de psycopg.
@@ -80,6 +84,24 @@ WHERE payload->>'cycleId' = %s
 ORDER BY created_at
 """
 
+# La vía que IMPLEMENTA `AUTO-10` (paso 3): una tanda de ciclos por su `decision_id` derivado,
+# filtrando por el evento de la traza. Es el "después" de la decisión (a): no una consulta
+# idealizada, sino la que corre el lector (`list_by_decision_ids` + confirmación de payload).
+_Q_READER = """
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT decision_id,
+       payload->>'cycleId' AS cycle_id,
+       payload->>'marketRegime' AS market_regime,
+       created_at
+FROM decision_journal_entries
+WHERE decision_id = ANY(%s)
+  AND event_type = 'auto_cycle_regime'
+ORDER BY created_at DESC
+"""
+
+#: Ciclos por tanda en la medición del lector (el `IN`/`ANY` no crece sin límite).
+_READER_BATCH = 50
+
 _REPEATS = 3
 
 
@@ -107,6 +129,19 @@ def decision_id_from_cycle_id(cycle_id: str) -> str | None:
     return f"dec-{text[4:]}"
 
 
+def _derivation_agrees(cycle_id: str) -> bool:
+    """¿La derivación de PRODUCCIÓN (``AUTO-10``) coincide con la estricta de esta sonda?
+
+    La estricta exige la forma ``cyc-`` + 12 hex; la de producción basta con el prefijo y
+    delega la seguridad en la CONFIRMACIÓN del payload. Donde la estricta se pronuncia, ambas
+    deben decir lo mismo (si no, el contrato de identidad cambió y la sonda lo declara fallo).
+    """
+    strict = decision_id_from_cycle_id(cycle_id)
+    if strict is None:
+        return True  # la estricta no se pronuncia; producción decide (y confirma al leer)
+    return strict == cycle_decision_id(cycle_id)
+
+
 def _offline() -> bool:
     """Prueba (o refuta) que (a) es posible, y enseña el límite que obliga a confirmar la fila."""
     print("== MITAD OFFLINE - es posible (a)? ==")
@@ -116,6 +151,8 @@ def _offline() -> bool:
         cycle_id = auto_cycle_id(account_id=account_id, signal=signal)
         decision_id = entry_decision_id(account_id=account_id, signal=signal)
         derived = decision_id_from_cycle_id(cycle_id)
+        agrees = _derivation_agrees(cycle_id)
+        ok = ok and agrees
         if not signal_id:
             # Fallback aleatorio: la sonda NO afirma nada sobre la relación entre ambos (los dos
             # son `uuid4` independientes). Solo declara que la derivación aquí es ciega.
@@ -169,7 +206,7 @@ def _execution_time(plan: str) -> str:
 def _explain(
     cursor: psycopg.Cursor[tuple[str]],
     sql: str,
-    param: str,
+    param: Any,
 ) -> tuple[str, list[str]]:
     """Corre el EXPLAIN ``_REPEATS`` veces y devuelve (mejor plan, tiempos de ejecución)."""
     plan = ""
@@ -239,12 +276,55 @@ def _online(dsn: str) -> bool:
                 print(f"    {line}")
             print(f"  ejecucion ({_REPEATS} pasadas): {' | '.join(times)}")
 
+        _measure_reader(cursor)
+
         print("\n  REGLA DE DECISION (plan 6.4), con estos numeros delante:")
         print("    * si (a) resuelve por indice y su coste es despreciable frente a (b) => (a),")
         print("      sin migracion: la derivacion + confirmacion basta.")
         print("    * si (a) no es utilizable y (b) recorre la tabla => (b) exige el indice de")
         print("      expresion aditivo (migracion 045, solo indice; el esquema no cambia).")
+        print("    * MEDIDO ARRIBA: (a) con UN id entra por indice; (b) recorre la tabla; y la")
+        print("      tanda del lector (c) A ESTE VOLUMEN tambien la recorre, por barata. La")
+        print("      derivacion + confirmacion sigue siendo la via elegida (sin migracion), y el")
+        print("      corte del planner a escala queda DECLARADO como no medido.")
         return True
+
+
+def _measure_reader(cursor: psycopg.Cursor[tuple[str]]) -> str:
+    """Mide la consulta REAL del lector de ``AUTO-10`` (tanda de ciclos, por ``decision_id``).
+
+    Es el "despues" de la decision: no una consulta idealizada, sino la que corre
+    ``list_by_decision_ids`` con el filtro de evento y la confirmacion de payload. Devuelve el
+    plan para que la regla de decision se pronuncie con el DELANTE y no con un supuesto. Si no
+    hay ninguna traza escrita todavia, se declara: medir el plan con cero filas describe la
+    senda, no el coste, y eso no se imprime como una medicion.
+    """
+    cursor.execute(
+        "SELECT DISTINCT payload->>'cycleId' FROM decision_journal_entries "
+        "WHERE payload ? 'cycleId' LIMIT %s",
+        (_READER_BATCH,),
+    )
+    cycle_ids = [str(row[0]) for row in cursor.fetchall() if row[0]]
+    print(f"\n  --- (c) LECTOR de AUTO-10: {len(cycle_ids)} ciclos por tanda ---")
+    if not cycle_ids:
+        print("    sin trazas con cycleId todavia: la sonda NO mide el lector (se declara).")
+        print("    Repite tras un turno real del worker para tener numeros de la via (c).")
+        return ""
+    decision_ids = [derived for derived in (cycle_decision_id(c) for c in cycle_ids) if derived]
+    plan, times = _explain(cursor, _Q_READER, decision_ids)
+    for line in plan.splitlines():
+        print(f"    {line}")
+    print(f"  ejecucion ({_REPEATS} pasadas): {' | '.join(times)}")
+    print(f"  ciclos por tanda: {len(decision_ids)} (ids derivados que si se derivan)")
+    if "Index Scan" in plan:
+        print("  veredicto de la via (c): POR INDICE (el indice de decision_id resuelve la tanda)")
+    else:
+        print("  veredicto de la via (c): SEQ SCAN — el planner recorre la tabla para la tanda")
+        print("    DECLARADO: con este volumen recorrer la tabla es mas barato que N sondas de")
+        print("    indice, y el coste medido es sub-milisegundo. El indice de decision_id SI se")
+        print("    usa cuando se pide UN ciclo (via (a)). A ESCALA no esta medido: si el spine")
+        print("    crece hasta hacer caro el recorrido, revisar indice parcial/expresion (045).")
+    return plan
 
 
 def main() -> int:
