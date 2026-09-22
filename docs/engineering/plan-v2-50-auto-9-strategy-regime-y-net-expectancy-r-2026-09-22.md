@@ -667,6 +667,14 @@ una vez: **33 detectadas, 0 no detectadas, 0 restauraciones fallidas**, con la h
 `git status --porcelain` de los ficheros tocados **idéntica** antes y después (`intacto: la sonda no
 altero el arbol`). Las seis nuevas de `AUTO-9`:
 
+> **ENMIENDA (2026-09-22, medida en `AUTO-10` paso 5):** el `33/33` era **sobrestimado**. Al correr la
+> matriz en `V2.51` se midió que `M25`, `M26` y `M33` **ya no aplicaban** desde el commit de código
+> `df2002e7` (sus fragmentos habían derivado con el reformateo y la sonda **seguía** en vez de fallar),
+> así que aplicaban **30/33**. En `V2.51` se reescribieron los cuatro fragmentos (`+M30`, roto por el
+> paso 3 de `AUTO-10`) y la sonda pasa a **fallar** si un fragmento no existe, con el mismo criterio con
+> el que ya abortaba si aparecía más de una vez. El producto de `V2.50` **no** cambia por esto: se
+> corrige la afirmación, no el código. Detalle en `plan-v2-51-auto-10-…-2026-09-22.md` §3.3.
+
 | #   | Qué rompe                                          | Rojos | Test que la caza (muestra)                                                       |
 | --- | -------------------------------------------------- | ----- | -------------------------------------------------------------------------------- |
 | M28 | el denominador pasa a ser la reserva **más nueva** | 2     | `test_the_oldest_entry_reservation_wins_and_the_rest_are_declared`               |

@@ -164,6 +164,18 @@ ficheros tocados **idéntica** antes y después (`intacto: la sonda no altero el
 | M32 | el informe **ignora** la evidencia que le llega    | 3     |
 | M33 | el worker **deja de leer** el riesgo por ciclo     | 3     |
 
+> **ENMIENDA (2026-09-22, medida en `AUTO-10` paso 5) — el `33/33` era una afirmación sobrestimada.**
+> Al correr la matriz completa en `V2.51` se midió que **`M25`, `M26` y `M33` ya no aplicaban** desde
+> el commit de código `df2002e7` (este sello): sus fragmentos habían derivado con el reformateo
+> (`ruff format` partió/colapsó las líneas) y la sonda **seguía** en vez de fallar, así que la matriz
+> **perdía cobertura en silencio**. La tabla de arriba es correcta en los rojos que midió, pero el
+> total `33/33` no era reproducible al nivel de *"todos los fragmentos aplican"*: eran **30/33
+> aplicando**. Cierre en `V2.51`: los cuatro fragmentos (`+M30`, roto por el paso 3 de `AUTO-10`) se
+> reescribieron contra el código real y **la sonda ya no puede perder cobertura en silencio** (un
+> fragmento ausente **falla** la corrida). Detalle medido en
+> `plan-v2-51-auto-10-journal-durable-por-ciclo-2026-09-22.md` §3.3. El código de `V2.50` **no
+> cambia** por esto: lo que se corrige es la afirmación, no el producto.
+
 **Registro en CI simétrico:** `test_cycle_risk.py` va **explícito** en los dos jobs (vive en
 `packages/py/application/tests`, que no tiene pase de directorio en ninguno); la costura entra por el pase
 de directorio de `apps/api-python/tests`.

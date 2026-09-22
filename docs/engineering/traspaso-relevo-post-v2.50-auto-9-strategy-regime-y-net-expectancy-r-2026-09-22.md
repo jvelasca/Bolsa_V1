@@ -50,6 +50,13 @@ y el gobernador manda.** Esta fase añade el dato que faltaba para que «estrech
 8. **Verificación**: `quality` **2287/2287** y tag **2298/2298** (delta **+69** simétrico, 0 rojos);
    **33/33** mutaciones muerden con árbol intacto; `mypy` **0/492**; `import-linter` **4/4**.
 
+   > **ENMIENDA (2026-09-22, medida en `AUTO-10` paso 5):** el `33/33` era **sobrestimado**.
+   > `M25`, `M26` y `M33` ya no aplicaban desde `df2002e7` (fragmentos derivados por reformateo) y la
+   > sonda **seguía** en vez de fallar: aplicaban **30/33**, no 33/33. En `V2.51` se reescribieron los
+   > cuatro fragmentos (`+M30`, roto en el paso 3 de `AUTO-10`) y la sonda pasa a **fallar** si un
+   > fragmento no existe. El producto de `V2.50` no cambia; se corrige la afirmación. Detalle en
+   > `plan-v2-51-auto-10-journal-durable-por-ciclo-2026-09-22.md` §3.3.
+
 ---
 
 ## 2. Límites declarados (no silenciosos)
