@@ -217,9 +217,43 @@ documenta el gate, en vez de publicar un cruce o un neto fabricados.
 
 ---
 
-## 12. Sello
+## 12. Sello (HECHO y medido)
 
-Producido localmente (2026-09-21). `package.json` → **`1.74.0-beta`**, `CHANGELOG.md` con la entrada de la fase,
-docs `plan`/`pack`/`traspaso` en `docs/engineering/` y el freeze declarado (§10). El commit de fase y el tag
-anotado **`v2.49-beta`** se producen al integrar el árbol; la **CI real** (Python CI + Release tag CI) se observa
-entonces con `gh` (patrón del repo: el código certificado en el tag y la guía de lectura en el tip de `main`).
+**Commit de fase:** `2f541fc7` — `feat(v2.49): AUTO-8.1 Adaptive correcto, explícito y reproducible
+(1.74.0-beta)`, **14 ficheros**, `+1248/−91`. **Tag anotado:** `v2.49-beta` → objeto `3d0a139b` → commit
+`2f541fc7`. `package.json` → **`1.74.0-beta`**; `CHANGELOG.md` con la entrada de la fase; docs
+`plan`/`pack`/`traspaso` en `docs/engineering/`; freeze declarado en §10. El push a `main` fue
+**fast-forward** (`fae8ec29..2f541fc7`, 1 delante / 0 detrás).
+
+**CI real (observada con `gh` sobre el commit sellado, 2026-09-22).** Diez runs, **todos `success`**, cero rojos:
+
+| Ref                | Workflow           | Run                                                                            |
+| ------------------ | ------------------ | ------------------------------------------------------------------------------ |
+| `v2.49-beta` (tag) | **Release tag CI** | [`35694148660`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148660) |
+| `v2.49-beta` (tag) | Python CI          | [`35694148702`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148702) |
+| `v2.49-beta` (tag) | Frontend CI        | [`35694148679`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148679) |
+| `v2.49-beta` (tag) | Optimize lab       | [`35694148691`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148691) |
+| `v2.49-beta` (tag) | Fase 2 scientific  | [`35694148758`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148758) |
+| `main`             | Python CI          | [`35694063954`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694063954) |
+| `main`             | Frontend CI        | [`35694063893`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694063893) |
+| `main`             | Optimize lab       | [`35694063913`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694063913) |
+| `main`             | Fase 2 scientific  | [`35694063898`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694063898) |
+| `main`             | Gitleaks           | [`35694064028`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694064028) |
+
+---
+
+## 13. Anécdota operativa MEDIDA: el push de 4 tags no disparó la CI del tag
+
+Al empujar con `git push origin main --follow-tags`, `--follow-tags` arrastró **cuatro** tags locales
+(`v1.35-beta`, `v1.57-beta`, `v1.58-beta` y el nuevo `v2.49-beta`). GitHub **no creó ningún evento de tag**:
+salieron los cinco workflows del push a `main` y **ninguno** de los del tag (ni `Release tag CI`). No es un fallo
+del repo ni del workflow: es una limitación documentada de GitHub.
+
+> _Events will not be created for tags when more than three tags are pushed at once._
+> — [Webhook events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads#push)
+> (mismo comportamiento reportado en [actions/runner#3644](https://github.com/actions/runner/issues/3644))
+
+**Mitigación aplicada y medida:** recrear el tag **solo** (`git push origin :refs/tags/v2.49-beta` y después
+`git push origin v2.49-beta`) generó el evento y los cinco workflows del tag arrancaron, con `Release tag CI` en
+**`success`**. **Lección para el próximo sello:** no usar `--follow-tags` en un repositorio con tags locales
+antiguos; empujar el tag de la fase **de uno en uno**.

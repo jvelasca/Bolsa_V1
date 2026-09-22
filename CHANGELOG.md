@@ -54,6 +54,20 @@ auditoría externa de `v2.48-beta` sobre la asignación Adaptive y la frontera d
 - `ruff`, `mypy` (491 ficheros, 0 issues), `import-linter` (4 kept / 0 broken) y los dos bloques offline de CI
   (**2218** y **2229** passed, 0 skipped; delta simétrico **+18/+18**) verdes.
 
+### Sello y CI real
+
+- Commit de fase **`2f541fc7`** (14 ficheros, `+1248/−91`) y tag anotado **`v2.49-beta`** → `3d0a139b` → `2f541fc7`,
+  empujado a `main` en **fast-forward** (`fae8ec29..2f541fc7`).
+- **CI real: 10 runs, 10 `success`, cero rojos** — `Release tag CI`
+  [`35694148660`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148660) y `Python CI`
+  [`35694148702`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148702) en la ref del tag, más los cinco
+  de `main` (`Python CI` [`35694063954`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694063954),
+  `Frontend CI` [`35694063893`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694063893), `Optimize lab`,
+  `Fase 2 scientific` y `Gitleaks`).
+- **Nota operativa medida:** `git push --follow-tags` arrastró 4 tags locales y GitHub **no creó eventos de tag**
+  (limitación documentada: _no events for tags when more than three tags are pushed at once_), así que la CI del
+  tag no arrancó. Recrear el tag en solitario la disparó. Para el próximo sello: empujar el tag **de uno en uno**.
+
 ## [1.73.0-beta] — AUTO-8 Adaptive AUTO · slice 1 (V2.48) — 2026-09-21
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, `governor.json`

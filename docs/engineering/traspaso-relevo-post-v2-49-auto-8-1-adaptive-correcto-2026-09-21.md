@@ -2,6 +2,9 @@
 
 **Fecha:** 2026-09-21 · **Tag:** `v2.49-beta` (`1.74.0-beta`) · **Migración:** **NO** (Alembic head
 `044_auto_cycle_trace`).
+**Commit de fase:** `2f541fc7` · **Tag anotado:** `v2.49-beta` → `3d0a139b` → `2f541fc7` · **CI real:**
+**10/10 `success`**, `Release tag CI` [`35694148660`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148660)
+(2026-09-22).
 **Pack de evidencia:** [`audit-pack-v2.49-auto-8-1-adaptive-correcto-2026-09-21.md`](./audit-pack-v2.49-auto-8-1-adaptive-correcto-2026-09-21.md)
 **Plan de la fase:** [`plan-v2-49-auto-8-1-adaptive-correcto-2026-09-21.md`](./plan-v2-49-auto-8-1-adaptive-correcto-2026-09-21.md)
 

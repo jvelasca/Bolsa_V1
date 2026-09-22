@@ -156,8 +156,14 @@ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py   # M19-
 
 ---
 
-## 8. Sello
+## 8. Sello (HECHO y verificado en CI)
 
-Producido localmente (2026-09-21). `package.json` → **`1.74.0-beta`**, `CHANGELOG.md` con la entrada de la fase y
-docs `plan`/`pack`/`traspaso` en `docs/engineering/`. El commit de fase y el tag anotado **`v2.49-beta`** se
-producen al integrar el árbol; la **CI real** (Python CI + Release tag CI) se observa entonces con `gh`.
+**Commit de fase:** `2f541fc7` (14 ficheros, `+1248/−91`). **Tag anotado:** `v2.49-beta` → objeto `3d0a139b` →
+commit `2f541fc7`. `package.json` → **`1.74.0-beta`**, `CHANGELOG.md` con la entrada de la fase y docs
+`plan`/`pack`/`traspaso` en `docs/engineering/`.
+
+**CI real** (2026-09-22, observada con `gh` sobre el commit sellado): **10 runs, 10 `success`, cero rojos** —
+`Release tag CI` [`35694148660`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148660), `Python CI`
+[`35694148702`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35694148702) y los tres restantes del tag, más
+los cinco de `main`. Detalle y la incidencia medida del push multi-tag en el §12 y §13 del
+[pack](./audit-pack-v2.49-auto-8-1-adaptive-correcto-2026-09-21.md).
