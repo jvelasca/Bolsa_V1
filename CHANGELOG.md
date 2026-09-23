@@ -2,6 +2,113 @@
 
 All notable releases of Bolsa V1.
 
+## [1.80.0-beta] — AUTO-14 Reparto por CELDA de régimen (V2.55) — 2026-09-23
+
+**Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,
+sin cambio de contrato de API ni de DTO y **sin clave nueva en el journal durable** (la entrada
+`adaptive_recommendation` proyecta por lista blanca `riskMultipliers` + `evidenceAxis`, así que la base de
+celda vive en el **plan** y en la **traza del tick**, nunca en la evidencia durable). El gobernador y su
+evidencia siguen **intactos**. El invariante que instala: **el reparto no puede mejorar su peso con una
+celda que no se ha medido** — una celda sin muestra suficiente, una celda ausente, un R neto no medido,
+una celda medida no positiva o un régimen ilegible **no mueven el peso**; esa versión cae al **global** de
+su fila y el hueco se **declara**. Cierra la sexta pregunta del epic: `AUTO-9` *«¿cuánto vale?»* · `AUTO-10`
+*«¿de qué ciclo es?»* · `AUTO-11` *«¿dónde vive su memoria?»* · `AUTO-12` *«¿cuánto puedo creérmelo?»* ·
+`AUTO-13` *«¿están sanos los datos con los que me lo creo, y cómo vuelvo?»* · **`AUTO-14` *«¿el peso que
+reparto se midió en el régimen en el que voy a operar?»***. Adaptive **sigue siendo recomendador
+read-only** y **el flag sigue OFF por defecto**: con OFF el camino de producción es **byte-idéntico** a
+`v2.53`.
+
+### Añadido: la selección de celda, pura y declarativa (`regime_cell_for`)
+
+- **Helper nuevo** en `auto_adaptive.py` (`regime_cell_for`): el **único** sitio donde se elige celda, y
+  devuelve **siempre** el par `(celda | None, motivo | None)`. Una celda es **utilizable** solo si existe,
+  es `decisive` (su muestra alcanza `min_trades` y tiene el R medido en todos sus ciclos), su **R neto**
+  está `COMPLETE` y es **positivo**.
+- **Cinco huecos declarados con vocabulario propio** (`ADAPTIVE_CELL_NOTE_*`): `cell_regime_absent`
+  (régimen `None`/`""`/`UNKNOWN`), `cell_not_found`, `cell_not_decisive`, `cell_net_unmeasured` y
+  `cell_not_positive` — y `cell_axis_without_cell` cuando el eje del grupo es la **moneda**.
+- **Normalización declarada y única** (`strip().upper()`): el plan recibe el régimen **canónico** del tick
+  (el worker ya lo traduce con `to_market_regime`) y aquí **no** se traduce otra vez, porque un segundo
+  mapa de alias podría **divergir** del que usó la rotación. Sin régimen legible no hay juicio de régimen.
+- **Nunca se hereda**: no se elige otra celda, ni la de otra versión, ni la de otro ciclo (la lección del
+  §20/`M81`).
+
+### Modificado: el reparto pesa con la celda del régimen del tick
+
+- `_allocation_weights` devuelve ahora `_AllocationSources` (eje, pesos y **declaración** de celda) y
+  acepta `cells_by_version`/`regime` **keyword-only opcionales**: **sin ellos el reparto es byte-idéntico**
+  al de `v2.54` (el patrón de `AUTO-12` con `confidence=None`).
+- **La celda afina el PESO, nunca la composición**: el eje y el numerador se siguen decidiendo por la
+  **fila** (`decisive` + expectancy positiva; R neto `COMPLETE` cubriendo a **todo** el grupo), y la celda
+  se consulta **solo para quien ya competía**. Ni añade ni quita competidores.
+- **Con el eje de moneda no se aplica celda alguna** (la celda mide R, no moneda: no se fabrica un
+  cociente paralelo) y **todas** las que compiten lo declaran.
+- Sigue **suma-preservado**, acotado a `[0, 1]` y **sin ceros**, y la **rampa de `AUTO-13` sigue siendo el
+  techo** (`m_final = min(m_reparto, escalón)`), aplicada **después** del reparto.
+- **El encogimiento de `AUTO-12` usa la banda de la CELDA** (`StrategyConfidence.by_regime` →
+  `RegimeConfidence`): si el peso salió de la celda, se encoge con **su** `effective_n`/`decay`; si salió
+  del global, con la de la estrategia. Encoger un peso de celda con la muestra **agregada** (que mezcla
+  regímenes que no se parecen) reintroduciría el *winner chasing* que `AUTO-12` cerró.
+
+### Modificado: la base de celda se declara sin tocar nada sellado
+
+- `AllocationPlan` gana `cell_axis`, `cell_used` y `cell_fallback` con lecturas propias (`cell_for`,
+  `cell_note_for`) y **su `as_dict()` NO cambia**: sigue publicando `riskMultipliers` + `evidenceAxis`, el
+  frame que selló `AUTO-13`.
+- La base de celda se publica en el **nivel del plan** (`AdaptivePlan.as_dict()['allocationCells']`), con
+  campo propio, junto a `regimeUndetermined` y `shrinkage`; el **tick la declara** en el log
+  (`auto_sim v2 adaptive allocation cells`), **sin cambio de firma**.
+- **El contrato durable de `AUTO-11` queda byte a byte igual** (`_ALLOCATION_KEYS` proyecta las dos claves
+  selladas) y el test de la costura lo fija con una celda **presente**.
+- **`ADAPTIVE_POLICY_VERSION` → `auto14-v1`** (cambia la regla de asignación), con el test del sello
+  renombrado **con nombre**. **Consecuencia declarada y medida:** el mismatch de política marcará las filas
+  históricas `auto13-v1` como `STALE` **un tick**; se cura con la primera escritura, **no** resetea el
+  contador (continuidad de política) y **no** se ejecuta con el flag OFF. No se relaja nada de `AUTO-11`.
+
+### Verificación
+
+- **Unit**: `test_auto_adaptive.py` **78 → 90** (**+12**: `regime_cell_for` y sus cinco huecos, celda
+  decisiva que **mueve** el peso, celda fina que **no**, régimen ilegible, eje de moneda, composición
+  intacta, ejes sin mezclar, shrink con la banda de la celda, rampa como techo, `allocationCells` en campo
+  propio y reproducibilidad sin celdas).
+- **Costura nueva** `apps/api-python/tests/test_auto_v55_auto14_regime_cell_allocation_seam.py` (**6
+  tests**) por el **camino real del worker** y **con control**: una celda **sin muestra** no mueve el peso
+  y una **decisiva** sí, la composición no cambia y la rampa sigue topando, el tick **declara** la base de
+  celda, la proyección del journal es **byte-idéntica** con una celda presente y el sello declara `STALE`
+  **sin resetear** el contador.
+- **Tramo de la fase**: **`119 passed`** (`test_auto_adaptive.py` 90 + `..._v53_...` 9 + `..._v54_...` 14 +
+  `..._v55_...` 6), `0` rojos.
+- **Delta simétrico fichero a fichero contra `HEAD`** (nunca restando totales): **5 rojos** en la versión de
+  `HEAD` de los tres ficheros modificados, con **2 causas declaradas** —el contrato de celdas
+  (`test_regime_cells_alone_do_not_move_rotation_or_allocation`) y el **sello** `auto13-v1` → `auto14-v1`
+  (que aparecía dentro de tres tests distintos)— y **ninguna** regresión de comportamiento. El plan
+  declaraba «2 rojos»: se publica la **cifra medida** (5 nodos, 2 causas), no la prevista.
+- **Matriz de mutaciones ampliada** (`M99…M107`, **9 etiquetas**: celda fina moviendo peso, fallback sin
+  declarar, versión sin celda cayendo a `0`, ejes mezclados por fila, celda de otra versión, régimen
+  ilegible eligiendo celda, celda `PARTIAL` tratada como medida, shrink con la banda de la fila y rampa
+  `AUTO-13` esquivada con peso de celda): la corrida **completa** da **`107/107` medidas** y **`0`
+  etiquetas en `NADA`**, con restauración **byte a byte** y la huella `git status` **idéntica**
+  (`intacto: la sonda no altero el arbol`).
+- **Compuertas**: `ruff check packages/py apps/api-python --config pyproject.toml` **`All checks passed!`**
+  (el primer `ruff` de la fase mordió un `UP035` de la costura nueva y se corrigió), `mypy` con el comando
+  de CI (`--follow-imports=silent`) **`0` errores en `497` ficheros** e `import-linter`
+  **`4 kept / 0 broken`**.
+- **Lo que no se pudo medir aquí**: la batería offline **completa** de los jobs `quality`/`python` del tag
+  (su recolección incluye suites PG que importan `asyncpg`, ausente, y el teardown de sesión del conftest
+  de `apps/api-python` exige PostgreSQL). **Ese límite lo cierra la CI del tag, medida.**
+
+### Límites declarados
+
+- El reparto por celda **solo** actúa sobre el eje del **R neto medido**; con el eje de moneda el reparto es
+  global y lo **declara** (`cell_axis_without_cell`): no hay moneda medida por régimen y no se inventa.
+- La celda **nunca** cambia quién compite: solo el peso relativo de quien ya competía.
+- Una celda medida pero **no positiva** cae al **global** (el reparto **afina**, no castiga): es una
+  decisión de producto declarada.
+- **Fuera de alcance, sin tocar:** el **Data Gate persistido** (hoy el contador de fallos se pierde al
+  reiniciar) y la **UI** de `AUTO-7`…`AUTO-14`. Quedan declarados para `AUTO-15`.
+- **`governor.json` sigue sin trackear** y **el flag Adaptive sigue OFF por defecto**: el reparto por celda
+  **no se ejecuta** en producción hasta un flag explícito.
+
 ## [1.79.0-beta] — AUTO-13 Adaptive Data Gate + recovery gradual (V2.54) — 2026-09-23
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,
