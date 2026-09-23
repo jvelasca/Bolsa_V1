@@ -29,6 +29,16 @@ podrían venir de ejes distintos. Nunca se MEZCLAN ejes en el mismo reparto (los
 serían incomparables: R es adimensional y la moneda absoluta) y nunca se cambia QUIÉN
 compite por un hueco de medición — con el R no medido, el reparto no cambia en nada.
 
+**Reparto por CELDA de régimen (AUTO-14, §20).** Cuando el grupo compite en el eje del R **neto
+medido**, el peso de cada versión admitida sale de su **celda** ``strategy × regime`` del régimen del
+tick en vez de su fila agregada (que mezcla regímenes que no se parecen). La celda **afina el peso,
+nunca la composición**: quién entra al numerador lo sigue decidiendo la FILA, así que la fase no puede
+añadir ni quitar competidores. Sin muestra suficiente (celda no ``decisive``), sin el neto medido, sin
+celda para ese régimen o con el régimen ilegible, esa versión conserva su número **global** y el hueco
+se **declara** (``cell_fallback`` + ``cell_axis``). Con el eje de **moneda** el reparto queda global y
+lo declara: la celda mide R, no moneda, y no se deriva un cociente paralelo para fabricarla. El
+encogimiento por confianza de ``AUTO-12`` usa la banda de la **celda** cuando el peso salió de ella.
+
 Disciplina de medición (la del repo): todo lo que no se pudo medir se DECLARA, no se
 rellena. Una estrategia sin muestra no es "mala", es desconocida; una pausa exige
 evidencia, no ausencia de evidencia.
@@ -69,6 +79,7 @@ from typing import Any
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     ADAPTIVE_DECAY_SEVERE,
     AdaptiveConfidence,
+    RegimeConfidence,
     StrategyConfidence,
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
@@ -97,6 +108,12 @@ __all__ = [
     "ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT",
     "ADAPTIVE_REGIME_UNKNOWN",
     "ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT",
+    "ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL",
+    "ADAPTIVE_CELL_NOTE_NET_UNMEASURED",
+    "ADAPTIVE_CELL_NOTE_NOT_DECISIVE",
+    "ADAPTIVE_CELL_NOTE_NOT_FOUND",
+    "ADAPTIVE_CELL_NOTE_NOT_POSITIVE",
+    "ADAPTIVE_CELL_NOTE_REGIME_ABSENT",
     "ADAPTIVE_STATE_ACTIVE",
     "ADAPTIVE_STATE_PAUSED",
     "ADAPTIVE_STATE_RECOVERING",
@@ -122,6 +139,7 @@ __all__ = [
     "recommend_allocation",
     "recommend_rotation",
     "recovery_reading",
+    "regime_cell_for",
 ]
 
 ADAPTIVE_KEY = "adaptive"
@@ -140,7 +158,14 @@ ADAPTIVE_KEY = "adaptive"
 #: **techo de la rampa de reincorporación** (``m_final = min(m_reparto, escalón)``) cuando una
 #: versión vuelve de una pausa, de modo que dos planes iguales con la misma evidencia NO son
 #: idénticos si uno viene de una pausa cumplida y el otro no.
-ADAPTIVE_POLICY_VERSION = "auto13-v1"
+#:
+#: ``auto14-v1`` (AUTO-14): el reparto deja de pesar solo con la evidencia **global** de la
+#: estrategia cuando el grupo compite en el eje del R **neto medido**: cada versión admitida pesa con
+#: el R neto de su **celda** ``strategy × regime`` para el régimen del tick, y cae al global —con el
+#: motivo declarado— cuando esa celda no está medida. La composición del numerador NO cambia (la
+#: decide la fila, como en ``v2.50``–``v2.54``), pero los pesos relativos sí: dos planes iguales con
+#: la misma evidencia y el mismo régimen no son idénticos si uno se midió por celda y el otro no.
+ADAPTIVE_POLICY_VERSION = "auto14-v1"
 
 #: Motivos de rotación (vocabulario PROPIO de este módulo; el journal de la capa de
 #: aplicación los lleva en el detalle de ``adaptive_strategy_paused``). La casa única
@@ -193,6 +218,40 @@ ALLOCATION_AXIS_CURRENCY = "expectancy_currency"
 #: SOLO si todo el grupo que compite lo tiene medido (``AUTO-9``, §5.4): así el cambio de
 #: eje puede mover los pesos relativos, nunca la composición del numerador.
 ALLOCATION_AXIS_NET_R = "net_expectancy_r"
+
+# ── AUTO-14 — el reparto por CELDA de régimen (§20) ──────────────────────────────────
+#
+# El cruce ``strategy × regime`` de ``AUTO-9`` ya está MEDIDO y ya llega al plan (rotación y salud),
+# pero el reparto pesaba solo con la evidencia **global** de la fila. ``AUTO-14`` deja que la celda
+# afine el PESO de una versión que ya competía.
+#
+# Dos reglas duras que hacen la fase honesta:
+#
+# * **La celda afina el peso, nunca la composición.** Quién entra al numerador lo decide la FILA
+#   (``decisive`` + expectancy positiva), igual que en ``v2.50``–``v2.54``: la celda solo puede cambiar
+#   el NÚMERO con el que compite una versión ya admitida. Ni añade ni quita competidores.
+# * **El hueco se declara.** Sin muestra, sin medición del eje o sin régimen legible, esa versión
+#   conserva su número **global** y el motivo viaja en el plan.
+
+#: Motivos DECLARADOS de por qué el reparto de una versión **no** usó su celda de régimen y cayó a la
+#: evidencia **global** de su fila. Nunca se elige otra celda, ni la de otra versión, ni la de otro
+#: ciclo. Vocabulario propio del eje del reparto (no se mezcla con los motivos de rotación ni con los
+#: del gate de datos).
+#: El régimen del tick no se pudo leer (``None``, cadena vacía o ``UNKNOWN``): sin régimen no hay juicio.
+ADAPTIVE_CELL_NOTE_REGIME_ABSENT = "cell_regime_absent"
+#: No existe celda para el par ``(versión, régimen)``: el cruce no la midió (o no se aportaron celdas).
+ADAPTIVE_CELL_NOTE_NOT_FOUND = "cell_not_found"
+#: La celda existe pero no es ``decisive``: su muestra no alcanza ``min_trades`` o no tiene el R medido
+#: en todos sus ciclos. Una muestra fina NO mueve el reparto.
+ADAPTIVE_CELL_NOTE_NOT_DECISIVE = "cell_not_decisive"
+#: La celda tiene muestra, pero su R **neto** no está ``COMPLETE``: el coste es estimado, así que un
+#: ``PARTIAL`` no habilita decidir con ella (§6.3 de ``AUTO-9``).
+ADAPTIVE_CELL_NOTE_NET_UNMEASURED = "cell_net_unmeasured"
+#: La celda está medida pero su R neto **no es positivo**: solo una celda medida y positiva afina.
+ADAPTIVE_CELL_NOTE_NOT_POSITIVE = "cell_not_positive"
+#: El eje del grupo es la MONEDA bruta: la celda mide R, no moneda, así que no puede afinar el peso y
+#: el reparto se queda en la evidencia global (no se deriva un cociente paralelo para fabricarla).
+ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL = "cell_axis_without_cell"
 
 #: Régimen por estrategia: el cruce ``strategy × regime`` ya tiene productor (``AUTO-9``),
 #: así que ``StrategyHealth.regime`` se puebla con el régimen **determinado** de la
@@ -454,15 +513,40 @@ class AllocationPlan:
     ``net_expectancy_r``): es parte de la recomendación, no un detalle interno. El default
     es el eje histórico, así que una construcción directa del plan (``AUTO-8``) sigue
     significando exactamente lo que significaba.
+
+    **AUTO-14 — la base de celda, declarada aparte del eje.** ``cell_axis`` es el eje en el que las
+    celdas ``strategy × regime`` afinaron el peso (``net_expectancy_r``), o ``None`` si no se
+    aplicaron (eje de moneda, o sin celdas). ``cell_used`` dice, por versión, el **régimen de la celda
+    que aportó su peso**; ``cell_fallback`` dice, por versión, el **motivo** por el que su peso salió
+    del global (vocabulario ``ADAPTIVE_CELL_NOTE_*``). Son ejes propios: no se mezclan con el eje de
+    evidencia —el eje sigue siendo el mismo y conserva sus dos literales— ni con la calidad medida.
     """
 
     multipliers: dict[str, float]
     evidence_axis: str = ALLOCATION_AXIS_CURRENCY
+    #: AUTO-14 — el eje en el que las celdas afinaron el reparto, o ``None`` (no se aplicaron).
+    cell_axis: str | None = None
+    #: AUTO-14 — versión → régimen de la celda que aportó su peso (solo las que compiten por celda).
+    cell_used: Mapping[str, str] = field(default_factory=dict)
+    #: AUTO-14 — versión → motivo del hueco (su peso salió del global). Nunca vacío "por accidente":
+    #: si el eje no admite celdas, TODAS las que compiten declaran ``cell_axis_without_cell``.
+    cell_fallback: Mapping[str, str] = field(default_factory=dict)
 
     def multiplier_for(self, strategy_version: str) -> float:
         return self.multipliers.get(str(strategy_version or ""), 1.0)
 
+    def cell_for(self, strategy_version: str) -> str | None:
+        """Régimen de la celda que aportó el peso de una versión (``None`` si no se usó celda)."""
+        return self.cell_used.get(str(strategy_version or ""))
+
+    def cell_note_for(self, strategy_version: str) -> str | None:
+        """Motivo declarado del hueco de celda de una versión (``None`` si su celda se usó)."""
+        return self.cell_fallback.get(str(strategy_version or ""))
+
     def as_dict(self) -> dict[str, Any]:
+        # FASE INTACTA: el frame de ``allocation`` sigue siendo ``riskMultipliers`` + ``evidenceAxis``
+        # (lo fijó el sello de ``AUTO-13``). La base de CELDA es un eje propio y se publica en el plan
+        # (``AdaptivePlan.as_dict()['allocationCells']``), no se cuela en el frame sellado.
         return {
             "riskMultipliers": dict(sorted(self.multipliers.items())),
             "evidenceAxis": self.evidence_axis,
@@ -658,6 +742,16 @@ class AdaptivePlan:
             # §29: si el reparto PUDO usar la confianza fina. Campo propio: la calidad medida sigue
             # en ``healthByStrategy[version].confidence`` aunque el encogimiento esté desactivado.
             "shrinkage": self.shrinkage,
+            # AUTO-14 (§20): la base de CELDA del reparto, con campo propio y en el nivel del plan
+            # (el sub-frame de ``allocation`` queda sellado como lo dejó ``AUTO-13``). ``axis`` es el
+            # eje en que las celdas afinaron —``None`` si no se aplicaron—, ``used`` el régimen de la
+            # celda que aportó el peso de cada versión y ``fallback`` el motivo del hueco. Sin esto,
+            # un multiplicador no dice si se midió en el régimen del tick o en el agregado global.
+            "allocationCells": {
+                "axis": self.allocation.cell_axis,
+                "used": dict(sorted(self.allocation.cell_used.items())),
+                "fallback": dict(sorted(self.allocation.cell_fallback.items())),
+            },
         }
 
 
@@ -763,11 +857,77 @@ def recommend_rotation(
     return RotationPlan(tuple(decisions))
 
 
+def _cell_key(value: Any) -> str:
+    """Normalización DECLARADA del régimen para cruzar celdas: caja y espacios, nada más.
+
+    El plan recibe el régimen **canónico** de mercado (el worker ya lo traduce con
+    ``to_market_regime``) y las celdas guardan el régimen del ciclo en ese MISMO eje. Aquí no se
+    traduce otra vez: un segundo mapa de alias podría divergir del que usó la rotación. Solo se
+    normaliza la FORMA (``strip`` + ``upper``).
+    """
+    return str(value or "").strip().upper()
+
+
+def regime_cell_for(
+    cells: Sequence[StrategyRegimeEvaluation],
+    strategy_version: str,
+    regime: str | None,
+) -> tuple[StrategyRegimeEvaluation | None, str | None]:
+    """(PURA) la celda **utilizable** de ``(versión, régimen)``, o ``(None, motivo)``.
+
+    Utilizable = existe, es ``decisive`` (su muestra alcanza ``min_trades`` y tiene el R medido en
+    todos sus ciclos), su **R neto** está ``COMPLETE`` y es **positivo**. Cualquier otro caso devuelve
+    el motivo DECLARADO con el que el reparto caerá a la evidencia global de la fila.
+
+    Nunca se elige otra celda, ni la de otra versión, ni la de otro ciclo, ni se hereda el régimen de
+    otro turno: sin coincidencia, el hueco se declara (la lección del §20/``M81``). Y sin régimen
+    legible (``None``, vacío o ``UNKNOWN``) no hay juicio de régimen en absoluto.
+    """
+    version = str(strategy_version or "")
+    key = _cell_key(regime)
+    if not key or key == ADAPTIVE_REGIME_UNKNOWN:
+        return None, ADAPTIVE_CELL_NOTE_REGIME_ABSENT
+    found = next(
+        (
+            cell
+            for cell in cells
+            if str(cell.strategy_version or "") == version and _cell_key(cell.regime) == key
+        ),
+        None,
+    )
+    if found is None:
+        return None, ADAPTIVE_CELL_NOTE_NOT_FOUND
+    if not found.decisive:
+        return None, ADAPTIVE_CELL_NOTE_NOT_DECISIVE
+    if not is_complete(found.net_r_measurement):
+        return None, ADAPTIVE_CELL_NOTE_NET_UNMEASURED
+    if found.net_expectancy_r is None or found.net_expectancy_r <= 0:
+        return None, ADAPTIVE_CELL_NOTE_NOT_POSITIVE
+    return found, None
+
+
+@dataclass(frozen=True, slots=True)
+class _AllocationSources:
+    """La base del reparto: eje, pesos que compiten y la DECLARACIÓN de la celda (AUTO-14)."""
+
+    axis: str
+    positive: dict[str, float]
+    #: El eje en el que las celdas afinaron el peso, o ``None`` (no se aplicaron).
+    cell_axis: str | None = None
+    #: Versión → régimen de la celda que aportó su peso.
+    cell_used: Mapping[str, str] = field(default_factory=dict)
+    #: Versión → motivo por el que su peso salió del global.
+    cell_fallback: Mapping[str, str] = field(default_factory=dict)
+
+
 def _allocation_weights(
     rows_by_version: Mapping[str, StrategySelfEvaluation],
     active_versions: Sequence[str],
-) -> tuple[str, dict[str, float]]:
-    """(PURA) eje de evidencia del reparto y los pesos que compiten en él.
+    *,
+    cells_by_version: Mapping[str, Sequence[StrategyRegimeEvaluation]] | None = None,
+    regime: str | None = None,
+) -> _AllocationSources:
+    """(PURA) eje del reparto, pesos que compiten en él y de dónde salió cada peso.
 
     Los dos ejes NO son comparables entre sí: ``expectancy_currency`` es absoluta
     (moneda) y ``net_expectancy_r`` es adimensional (múltiplos de R), así que un reparto
@@ -781,9 +941,19 @@ def _allocation_weights(
     su muestra no entra al numerador, aunque otra estrategia del grupo sí sea decisoria.
     El R neto exige además ``net_r_measurement == COMPLETE`` (§6.3: el coste es
     **estimado**, así que un ``PARTIAL`` no habilita decidir contra el agregado).
+
+    **AUTO-14 — la celda afina el PESO, nunca la composición.** Quién compite en el eje del R
+    neto lo decide la FILA (``decisive`` + neto medido y positivo), igual que en ``v2.50``–``v2.54``.
+    Para cada versión que YA competía, su número se toma de su **celda** ``strategy × regime`` del
+    régimen del tick cuando la celda es utilizable; si no, se queda con el **global** y el motivo se
+    declara. Con el eje de **moneda** no se aplica celda alguna (la celda mide R, no moneda: no se
+    fabrica un cociente paralelo) y TODAS las que compiten lo declaran.
     """
     currency: dict[str, float] = {}
     net_r: dict[str, float] = {}
+    cell_used: dict[str, str] = {}
+    cell_fallback: dict[str, str] = {}
+    cells = cells_by_version or {}
     for version in active_versions:
         row = rows_by_version.get(version)
         if row is None or not row.decisive:
@@ -795,10 +965,54 @@ def _allocation_weights(
             and row.net_expectancy_r is not None
             and row.net_expectancy_r > 0
         ):
+            # La versión COMPITE en el eje del R neto (lo decide la FILA, no la celda).
             net_r[version] = float(row.net_expectancy_r)
+            cell, note = regime_cell_for(cells.get(version, ()), version, regime)
+            if cell is not None:
+                # La celda solo puede mover el NÚMERO de quien ya competía.
+                net_r[version] = float(cell.net_expectancy_r)
+                cell_used[version] = cell.regime
+            else:
+                # Nace un motivo por construcción, pero nunca se silencia un ``None``.
+                cell_fallback[version] = note or ADAPTIVE_CELL_NOTE_NOT_FOUND
     if net_r and net_r.keys() == currency.keys():
-        return ALLOCATION_AXIS_NET_R, net_r
-    return ALLOCATION_AXIS_CURRENCY, currency
+        return _AllocationSources(
+            axis=ALLOCATION_AXIS_NET_R,
+            positive=net_r,
+            cell_axis=ALLOCATION_AXIS_NET_R,
+            cell_used=cell_used,
+            cell_fallback=cell_fallback,
+        )
+    # Eje de MONEDA: el reparto sigue siendo el histórico (global) y se declara por qué la celda no
+    # pudo afinar: la celda mide R y R neto, no moneda por régimen.
+    return _AllocationSources(
+        axis=ALLOCATION_AXIS_CURRENCY,
+        positive=currency,
+        cell_axis=None,
+        cell_used={},
+        cell_fallback={
+            version: ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL for version in sorted(currency)
+        },
+    )
+
+
+def _cell_confidence(
+    confidence: StrategyConfidence | None,
+    regime: str | None,
+) -> RegimeConfidence | None:
+    """(PURA) la banda de confianza de UNA celda, o ``None`` (el reparto usa entonces la fila).
+
+    ``AUTO-12`` ya publica la confianza **por celda** (``StrategyConfidence.by_regime``): si el peso
+    de la versión salió de su celda, el encogimiento se mide con la muestra efectiva y el deterioro
+    de ESA celda, no con los agregados de la estrategia (que mezclan regímenes que no se parecen).
+    """
+    if confidence is None or not _cell_key(regime):
+        return None
+    key = _cell_key(regime)
+    for cell in confidence.by_regime:
+        if _cell_key(cell.regime) == key:
+            return cell
+    return None
 
 
 def _confidence_factor(
@@ -830,6 +1044,8 @@ def recommend_allocation(
     policy: AdaptivePolicy | None = None,
     confidence: AdaptiveConfidence | None = None,
     recovery: Mapping[str, RecoveryReading] | None = None,
+    by_regime: Sequence[StrategyRegimeEvaluation] = (),
+    regime: str | None = None,
 ) -> AllocationPlan:
     """(PURA) multiplicador de riesgo por estrategia activa (solo estrecha, ``[0, 1]``).
 
@@ -856,6 +1072,11 @@ def recommend_allocation(
       solo estrecha, nunca ensancha, y el suelo de la política (> 0) impide dejar a nadie en ``0``:
       la reincorporación es gradual, no una pausa encubierta. Se aplica **después** del reparto
       para que el valor publicado sea el aplicado.
+    * **AUTO-14** — con ``by_regime``/``regime``, el peso de una versión que YA competía se toma de su
+      **celda** ``strategy × regime`` del régimen del tick cuando la celda está medida; si no, del
+      global, y el hueco se declara (``cell_used``/``cell_fallback``). La celda afina el **peso**,
+      nunca la composición, y con el eje de moneda no se aplica (se declara). El encogimiento de
+      ``AUTO-12`` usa entonces la banda de la **celda**, no la de la estrategia.
 
     Se materializa una entrada por CADA versión activa: la semántica de "sin evidencia"
     queda en la política, nunca en el default de ``AllocationPlan.multiplier_for``.
@@ -872,14 +1093,29 @@ def recommend_allocation(
         return AllocationPlan({})
 
     rows_by_version = {row.strategy_version: row for row in by_strategy}
-    axis, positive = _allocation_weights(rows_by_version, active_versions)
+    cells_by_version: dict[str, list[StrategyRegimeEvaluation]] = {}
+    for cell in by_regime:
+        cells_by_version.setdefault(str(cell.strategy_version or ""), []).append(cell)
+    sources = _allocation_weights(
+        rows_by_version,
+        active_versions,
+        cells_by_version=cells_by_version,
+        regime=regime,
+    )
+    axis = sources.axis
+    positive = sources.positive
     if positive and confidence is not None:
         prior = max(0.0, float(resolved.confidence_prior))
         adjusted: dict[str, float] = {}
         for version, weight in positive.items():
-            factor = _confidence_factor(
-                confidence.confidence_for(version), prior=prior, policy=resolved
+            # AUTO-14: si el peso salió de la CELDA, el encogimiento se mide con la banda de ESA
+            # celda (su muestra efectiva y su deterioro), no con los agregados de la estrategia.
+            basis: StrategyConfidence | RegimeConfidence | None = _cell_confidence(
+                confidence.confidence_for(version), sources.cell_used.get(version)
             )
+            if basis is None:
+                basis = confidence.confidence_for(version)
+            factor = _confidence_factor(basis, prior=prior, policy=resolved)
             shrunk = weight * factor
             # El encogimiento NUNCA elimina a nadie del reparto: si un factor degenerara a 0
             # se conserva el peso original (quitar a una estrategia es una DECISIÓN, y
@@ -910,7 +1146,13 @@ def recommend_allocation(
             if reading is None:
                 continue
             multipliers[version] = _clamp_unit(min(multipliers[version], float(reading.step)))
-    return AllocationPlan(multipliers, evidence_axis=axis)
+    return AllocationPlan(
+        multipliers,
+        evidence_axis=axis,
+        cell_axis=sources.cell_axis,
+        cell_used=sources.cell_used,
+        cell_fallback=sources.cell_fallback,
+    )
 
 
 def build_adaptive_plan(
@@ -984,6 +1226,12 @@ def build_adaptive_plan(
         # permite (``shrink``). Lo que el gate retira es el uso, nunca el hecho medido.
         confidence=confidence if shrink else None,
         recovery=readings or None,
+        # AUTO-14 (§20): el reparto por CELDA de régimen. Las celdas son MATERIAL del reparto (como
+        # ``by_regime`` en la rotación y la salud), no un uso de la confianza: se pasan siempre, y
+        # sin régimen legible la celda no se elige (el hueco se declara). El gate las gobierna
+        # indirectamente —sin régimen no hay celda— sin mezclar los ejes.
+        by_regime=cells,
+        regime=regime,
     )
     health = build_strategy_health(by_strategy, by_regime=cells, confidence=confidence)
     return AdaptivePlan(

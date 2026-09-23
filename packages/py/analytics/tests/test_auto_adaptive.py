@@ -20,6 +20,12 @@ from decimal import Decimal
 import pytest
 
 from bolsa_analytics.cognitive.auto_adaptive import (
+    ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL,
+    ADAPTIVE_CELL_NOTE_NET_UNMEASURED,
+    ADAPTIVE_CELL_NOTE_NOT_DECISIVE,
+    ADAPTIVE_CELL_NOTE_NOT_FOUND,
+    ADAPTIVE_CELL_NOTE_NOT_POSITIVE,
+    ADAPTIVE_CELL_NOTE_REGIME_ABSENT,
     ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT,
     ADAPTIVE_POLICY_VERSION,
     ADAPTIVE_RECOVERY_NOTE_NOT_POSITIVE,
@@ -46,6 +52,7 @@ from bolsa_analytics.cognitive.auto_adaptive import (
     recommend_allocation,
     recommend_rotation,
     recovery_reading,
+    regime_cell_for,
 )
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     ADAPTIVE_DECAY_NONE,
@@ -53,6 +60,7 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     ADAPTIVE_LONG_WINDOW_DEFAULT,
     ADAPTIVE_RECENT_WINDOW_DEFAULT,
     AdaptiveConfidence,
+    RegimeConfidence,
     StrategyConfidence,
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
@@ -527,6 +535,19 @@ def test_the_plan_payload_declares_the_axis_and_does_not_change_without_net_r() 
         "evidenceAxis": ALLOCATION_AXIS_CURRENCY,
     }
 
+    # AUTO-14: sin R neto medido el grupo pesa con la MONEDA y el reparto queda global —la celda mide
+    # R, no moneda—, así que cada versión que compite declara por qué no hubo celda. El frame sellado
+    # de ``allocation`` NO se toca: la base de celda va en el nivel del plan.
+    cells = build_adaptive_plan(unmeasured, "TREND_UP").as_dict()["allocationCells"]
+    assert cells == {
+        "axis": None,
+        "used": {},
+        "fallback": {
+            "a": ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL,
+            "b": ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL,
+        },
+    }
+
 
 def test_measuring_the_net_r_moves_the_allocation_but_never_the_rotation() -> None:
     """Medir R cambia el REPARTO; la rotación no lee R, así que no puede moverse."""
@@ -705,11 +726,12 @@ def test_the_plan_evidence_carries_the_regime_and_the_net_measurement() -> None:
     assert evidence["regime"] == "trend_up"
 
 
-def test_regime_cells_alone_do_not_move_rotation_or_allocation() -> None:
-    """El paso 5 MAPEA la evidencia; la política sigue ignorando el régimen, como hoy.
+def test_regime_cells_change_the_allocation_declaration_but_never_the_rotation() -> None:
+    """AUTO-14 — la celda afina el PESO del reparto; la rotación sigue sin leer el reparto.
 
-    Quien decide con el R neto es la asignación (paso 6). Aquí se fija que tener celdas de
-    régimen no cambia ni la pausa ni el multiplicador por sí solo.
+    Contrato que CAMBIA respecto a ``v2.54``: tener celdas ya **no** es inocuo para el plan —la celda
+    del régimen del tick aporta el número con el que compite la versión y queda DECLARADA—. Lo que no
+    cambia es QUIÉN compite (lo decide la fila) ni la rotación.
     """
     rows = (
         _row(
@@ -724,23 +746,30 @@ def test_regime_cells_alone_do_not_move_rotation_or_allocation() -> None:
     with_cells = build_adaptive_plan(rows, "TREND_UP", by_regime=_cells("orb-1", "trend_up"))
 
     assert with_cells.rotation == without_cells.rotation
-    assert with_cells.allocation == without_cells.allocation
+    assert with_cells.allocation.multipliers == without_cells.allocation.multipliers, (
+        "la celda mide 1.8, la misma cifra que la fila: el número no cambia aunque la base sí"
+    )
+    assert with_cells.allocation.cell_axis == ALLOCATION_AXIS_NET_R
+    assert with_cells.allocation.cell_for("orb-1") == "trend_up", (
+        "la celda del régimen del tick es la que aportó el peso, y el plan lo declara"
+    )
+    assert with_cells.allocation.cell_note_for("orb-1") is None
     assert with_cells.health_for("orb-1").regime == "trend_up", (
         "lo que sí cambia es la evidencia publicada, no la recomendación"
     )
 
 
-def test_the_policy_version_seals_the_auto13_evidence_contract() -> None:
-    """No es tautología: un merge que devolviera ``auto12-v1`` movería el sello sin avisar.
+def test_the_policy_version_seals_the_auto14_evidence_contract() -> None:
+    """No es tautología: un merge que devolviera ``auto13-v1`` movería el sello sin avisar.
 
-    ``auto12-v1`` selló el encogimiento por muestra efectiva. ``AUTO-13`` vuelve a cambiar la regla
-    de asignación —el multiplicador pasa por el **techo de la rampa de reincorporación** (§24)—, así
-    que la versión sube con ella: es lo que hace reproducible el plan (dos planes iguales no pueden
-    venir de una rampa distinta sin que se note).
+    ``auto13-v1`` selló el techo de la rampa de reincorporación. ``AUTO-14`` vuelve a cambiar la regla
+    de asignación —el peso de una versión que ya competía sale de su celda ``strategy × regime``
+    cuando está medida—, así que la versión sube con ella: es lo que hace reproducible el plan (dos
+    planes iguales no pueden venir de una base de reparto distinta sin que se note).
     """
-    assert ADAPTIVE_POLICY_VERSION == "auto13-v1"
-    assert AdaptivePolicy().policy_version == "auto13-v1"
-    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto13-v1"
+    assert ADAPTIVE_POLICY_VERSION == "auto14-v1"
+    assert AdaptivePolicy().policy_version == "auto14-v1"
+    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto14-v1"
 
 
 # ── AUTO-12 — confianza estadística en el reparto (encogimiento por muestra) ────────
@@ -754,6 +783,7 @@ def _strategy_confidence(
     confidence: str = "HIGH",
     long_r: float | None = 1.0,
     recent_r: float | None = 1.0,
+    cells: tuple[RegimeConfidence, ...] = (),
 ) -> StrategyConfidence:
     """Confianza de UNA estrategia, con solo lo que el reparto lee (el resto, declarado)."""
     return StrategyConfidence(
@@ -768,7 +798,29 @@ def _strategy_confidence(
         recent_expectancy_r=recent_r,
         decay=decay,
         confidence=confidence,
-        by_regime=(),
+        by_regime=cells,
+        notes=(),
+    )
+
+
+def _cell_confidence(
+    regime: str,
+    *,
+    effective_n: int,
+    decay: str = ADAPTIVE_DECAY_NONE,
+) -> RegimeConfidence:
+    """Confianza de UNA celda ``strategy × regime``, con el mismo contrato que la de la fila."""
+    return RegimeConfidence(
+        regime=regime,
+        sample_size=effective_n,
+        effective_n=effective_n,
+        measurement_completeness=MEASUREMENT_COMPLETE,
+        risk_coverage=1.0,
+        cost_coverage=1.0,
+        long_expectancy_r=1.0,
+        recent_expectancy_r=1.0,
+        decay=decay,
+        confidence="HIGH",
         notes=(),
     )
 
@@ -797,6 +849,16 @@ def test_without_confidence_the_allocation_is_byte_identical_to_the_historical_o
     assert historical.as_dict()["allocation"] == {
         "riskMultipliers": {"a": 1.0, "b": 0.5, "c": 1.0},
         "evidenceAxis": ALLOCATION_AXIS_CURRENCY,
+    }
+    # AUTO-14: el reparto por celda solo actúa sobre el eje del R neto medido; aquí el grupo pesa con
+    # la moneda, así que el reparto es global y cada competidor lo declara.
+    assert historical.as_dict()["allocationCells"] == {
+        "axis": None,
+        "used": {},
+        "fallback": {
+            "a": ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL,
+            "b": ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL,
+        },
     }
 
 
@@ -1191,7 +1253,7 @@ def test_the_operational_states_travel_in_their_own_field_without_mixing_axes() 
     assert payload["recovery"]["a"]["step"] == pytest.approx(0.25)
     assert "b" not in payload["recovery"], "una pausada no publica rampa"
     assert payload["readOnly"] is True
-    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto13-v1"
+    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto14-v1"
     assert plan.health_for("a").confidence == "HIGH", "la calidad estadística va en su propio campo"
 
 
@@ -1281,3 +1343,285 @@ def test_without_a_regime_gap_the_declaration_is_empty_and_the_plan_is_unchanged
 
     assert plan.regime_undetermined == ()
     assert plan.as_dict()["regimeUndetermined"] == []
+
+
+# ── AUTO-14 — reparto por CELDA de régimen (pasos 1–3 del plan `v2.55`) ─────────────
+#
+# El invariante: **el reparto no puede mejorar su peso con una celda que no se ha medido**. La celda
+# afina el PESO de una versión que YA competía (la composición la decide la fila) y todo hueco se
+# declara: celda fina, celda sin el neto medido, celda no positiva, celda ausente y régimen ilegible.
+
+
+def _cell(
+    version: str = "orb-1",
+    regime: str = "trend_up",
+    *,
+    pnl: str = "10",
+    risk: str = "5",
+    cost: float | None = 1.0,
+    count: int = 10,
+    min_trades: int = 10,
+):
+    """Celda REAL del cruce con su R neto CONTROLADO (la construye self-evaluation, no el test)."""
+    return aggregate_by_regime(
+        [
+            {
+                "strategyVersion": version,
+                "cycleId": f"{version}-{regime}-{i}",
+                "pnl": pnl,
+                "marketRegime": regime,
+                "riskAmount": risk,
+                **({"cost": {"total": cost, "measurement": "COMPLETE"}} if cost is not None else {}),
+            }
+            for i in range(count)
+        ],
+        min_trades=min_trades,
+    )
+
+
+def _competing_rows() -> tuple[StrategySelfEvaluation, ...]:
+    """Dos versiones que compiten en el eje del R NETO con la misma cifra (reparto plano)."""
+    return (
+        _row(
+            "a",
+            decisive=True,
+            expectancy="3",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+        ),
+        _row(
+            "b",
+            decisive=True,
+            expectancy="1",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+        ),
+    )
+
+
+def test_regime_cell_for_reads_the_measured_cell_of_the_tick_regime() -> None:
+    """La celda se elige por ``(versión, régimen del tick)`` con normalización de CAJA declarada.
+
+    La celda guarda el régimen tal y como lo midió el cruce (``trend_up``) y el plan recibe el
+    canónico del tick (``TREND_UP``): la normalización es de FORMA y única, no un segundo mapa de
+    alias que pudiera divergir del que usó la rotación.
+    """
+    cells = _cell("orb-1", "trend_up", pnl="20")  # R neto = (20 − 1) / 5 = 3.8
+
+    found, note = regime_cell_for(cells, "orb-1", "TREND_UP")
+
+    assert note is None
+    assert found is not None
+    assert found.regime == "trend_up"
+    assert found.net_expectancy_r == pytest.approx(3.8)
+    assert found.decisive is True
+
+
+def test_regime_cell_for_declares_every_gap_without_inventing_a_cell() -> None:
+    """Sin coincidencia no se elige OTRA celda ni se hereda la de otro: el hueco se declara."""
+    cells = _cell("orb-1", "trend_up")
+
+    for unreadable in (None, "", "   ", "UNKNOWN", "unknown"):
+        assert regime_cell_for(cells, "orb-1", unreadable) == (
+            None,
+            ADAPTIVE_CELL_NOTE_REGIME_ABSENT,
+        ), f"{unreadable!r} no es un régimen legible"
+
+    assert regime_cell_for(cells, "orb-2", "TREND_UP") == (
+        None,
+        ADAPTIVE_CELL_NOTE_NOT_FOUND,
+    ), "la celda de OTRA versión no es evidencia de esta"
+    assert regime_cell_for(cells, "orb-1", "RANGE") == (None, ADAPTIVE_CELL_NOTE_NOT_FOUND)
+    assert regime_cell_for((), "orb-1", "TREND_UP") == (None, ADAPTIVE_CELL_NOTE_NOT_FOUND)
+
+
+def test_regime_cell_for_refuses_a_thin_an_unmeasured_or_a_non_positive_cell() -> None:
+    """Los tres huecos que impiden que una celda mueva el peso, cada uno con su motivo."""
+    thin = _cell("orb-1", "trend_up", count=3, min_trades=10)
+    assert regime_cell_for(thin, "orb-1", "TREND_UP") == (None, ADAPTIVE_CELL_NOTE_NOT_DECISIVE)
+
+    unmeasured = _cell("orb-1", "trend_up", cost=None)
+    assert regime_cell_for(unmeasured, "orb-1", "TREND_UP") == (
+        None,
+        ADAPTIVE_CELL_NOTE_NET_UNMEASURED,
+    )
+
+    losing = _cell("orb-1", "trend_up", pnl="-20")
+    assert regime_cell_for(losing, "orb-1", "TREND_UP") == (
+        None,
+        ADAPTIVE_CELL_NOTE_NOT_POSITIVE,
+    )
+
+
+def test_a_measured_cell_moves_the_pool_weight_of_its_version() -> None:
+    """La celda del régimen del tick SUSTITUYE al global en el peso de quien ya competía."""
+    rows = _competing_rows()
+    flat = build_adaptive_plan(rows, "TREND_UP").allocation
+    assert flat.evidence_axis == ALLOCATION_AXIS_NET_R
+    assert flat.multiplier_for("a") == pytest.approx(1.0)
+    assert flat.multiplier_for("b") == pytest.approx(1.0)
+
+    # La celda de "a" mide 3.8 frente al 1.0 global: su peso relativo sube y el de "b" baja.
+    celled = build_adaptive_plan(
+        rows, "TREND_UP", by_regime=_cell("a", "trend_up", pnl="20")
+    ).allocation
+
+    assert celled.evidence_axis == ALLOCATION_AXIS_NET_R
+    assert celled.cell_axis == ALLOCATION_AXIS_NET_R
+    assert celled.cell_for("a") == "trend_up"
+    assert celled.cell_note_for("a") is None
+    assert celled.multiplier_for("a") == pytest.approx(1.0)
+    assert celled.multiplier_for("b") == pytest.approx((1.0 / 4.8) * 2)
+    # "b" no tiene celda para el régimen del tick: conserva su GLOBAL y lo declara.
+    assert celled.cell_note_for("b") == ADAPTIVE_CELL_NOTE_NOT_FOUND
+    assert celled.multipliers["b"] < flat.multipliers["b"]
+
+
+def test_a_thin_cell_never_moves_the_weight_and_the_gap_is_declared() -> None:
+    """Una racha medida sobre pocos ciclos NO puede mejorar el peso: se declara y se cae al global."""
+    rows = _competing_rows()
+    flat = build_adaptive_plan(rows, "TREND_UP").allocation
+
+    thin = _cell("a", "trend_up", pnl="200", count=3, min_trades=10)  # R neto 39.8, sin muestra
+    plan = build_adaptive_plan(rows, "TREND_UP", by_regime=thin).allocation
+
+    assert plan.multipliers == flat.multipliers, "la celda fina no mueve NADA"
+    assert plan.cell_used == {}
+    assert plan.cell_note_for("a") == ADAPTIVE_CELL_NOTE_NOT_DECISIVE
+    assert plan.cell_note_for("b") == ADAPTIVE_CELL_NOTE_NOT_FOUND
+
+
+def test_an_unreadable_tick_regime_never_arms_the_cell_path() -> None:
+    """Sin régimen legible no hay juicio de régimen: la celda se ignora y el motivo se declara."""
+    rows = _competing_rows()
+    flat = build_adaptive_plan(rows, "TREND_UP").allocation
+
+    for unreadable in (None, "", "UNKNOWN"):
+        plan = build_adaptive_plan(
+            rows, unreadable, by_regime=_cell("a", "trend_up", pnl="20")
+        ).allocation
+        assert plan.multipliers == flat.multipliers
+        assert plan.cell_used == {}
+        assert plan.cell_note_for("a") == ADAPTIVE_CELL_NOTE_REGIME_ABSENT
+
+
+def test_the_currency_axis_never_applies_a_cell_and_declares_why() -> None:
+    """La celda mide R, no moneda: con el eje de moneda el reparto queda global y se declara."""
+    rows = (
+        _row("a", decisive=True, expectancy="3"),
+        _row("b", decisive=True, expectancy="1"),
+    )
+    plan = build_adaptive_plan(
+        rows, "TREND_UP", by_regime=_cell("a", "trend_up", pnl="20")
+    ).allocation
+
+    assert plan.evidence_axis == ALLOCATION_AXIS_CURRENCY
+    assert plan.multiplier_for("a") == pytest.approx(1.0)
+    assert plan.multiplier_for("b") == pytest.approx(0.5)
+    assert plan.cell_axis is None
+    assert plan.cell_used == {}
+    assert plan.cell_note_for("a") == ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL
+    assert plan.cell_note_for("b") == ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL
+
+
+def test_the_cell_never_changes_who_competes_nor_mixes_the_axes() -> None:
+    """La celda afina el PESO: la composición del numerador la sigue decidiendo la FILA."""
+    rows = (
+        *_competing_rows(),
+        _row("c", decisive=False, expectancy="9"),  # muestra fina: no compite ni con celda buena
+    )
+    baseline = build_adaptive_plan(rows, "TREND_UP").allocation
+
+    cells = (*_cell("a", "trend_up", pnl="20"), *_cell("c", "trend_up", pnl="90"))
+    celled = build_adaptive_plan(rows, "TREND_UP", by_regime=cells).allocation
+
+    assert celled.evidence_axis == baseline.evidence_axis == ALLOCATION_AXIS_NET_R
+    assert celled.multiplier_for("c") == pytest.approx(1.0), "sigue NEUTRAL: no entra al numerador"
+    assert "c" not in celled.cell_used, "una celda propia no puede admitir a quien la fila no admite"
+    assert celled.cell_note_for("c") is None
+    assert set(celled.multipliers) == set(baseline.multipliers)
+    assert all(0.0 < value <= 1.0 for value in celled.multipliers.values())
+
+
+def test_the_shrinkage_uses_the_confidence_of_the_CELL_not_the_strategy() -> None:
+    """``AUTO-12`` encoge el peso con la banda de la CELDA cuando el peso salió de ella."""
+    rows = _competing_rows()
+    cells = _cell("a", "trend_up", pnl="20")  # R neto 3.8
+
+    # La FILA de "a" declara base amplia (180) y su CELDA es fina (4): si el encogimiento leyera la
+    # fila, "a" conservaría casi todo su 3.8; leyendo la celda, su peso se recorta.
+    by_cell = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        by_regime=cells,
+        confidence=_reading(
+            _strategy_confidence(
+                "a", effective_n=180, cells=(_cell_confidence("trend_up", effective_n=4),)
+            ),
+            _strategy_confidence("b", effective_n=180),
+        ),
+    ).allocation
+
+    share_a = 3.8 * (4.0 / 24.0)  # factor de la celda: n/(n+prior)
+    share_b = 1.0 * (180.0 / 200.0)
+    assert by_cell.multiplier_for("a") == pytest.approx((share_a / (share_a + share_b)) * 2)
+
+    # CONTROL: con la banda de la FILA (base amplia) "a" pesa más y "b" menos. Sin la celda el
+    # encogimiento no cambia, así que la diferencia solo puede venir de leer la banda de la celda.
+    by_row = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        by_regime=cells,
+        confidence=_reading(
+            _strategy_confidence("a", effective_n=180),
+            _strategy_confidence("b", effective_n=180),
+        ),
+    ).allocation
+    assert by_row.multiplier_for("b") < by_cell.multiplier_for("b")
+
+
+def test_the_auto13_ramp_is_still_the_ceiling_of_the_cell_weight() -> None:
+    """La rampa sigue siendo TECHO del peso de celda: se aplica después y solo estrecha."""
+    rows = _competing_rows()
+    plan = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        by_regime=_cell("a", "trend_up", pnl="20"),
+        recovery={"a": _evidence("a", cycles=0)},
+    )
+
+    assert plan.allocation.cell_for("a") == "trend_up", "la rampa no borra la base del reparto"
+    assert plan.risk_multiplier_for("a") == pytest.approx(0.25), "el escalón inicial es el techo"
+    assert plan.state_for("a") == ADAPTIVE_STATE_RECOVERING
+
+
+def test_the_plan_publishes_the_cell_basis_in_its_own_field_without_touching_the_frame() -> None:
+    """La base de celda viaja en el plan con campo propio; el frame sellado de ``allocation`` no."""
+    rows = _competing_rows()
+    payload = build_adaptive_plan(
+        rows, "TREND_UP", by_regime=_cell("a", "trend_up", pnl="20")
+    ).as_dict()
+
+    assert set(payload["allocation"]) == {"riskMultipliers", "evidenceAxis"}
+    assert payload["allocationCells"] == {
+        "axis": ALLOCATION_AXIS_NET_R,
+        "used": {"a": "trend_up"},
+        "fallback": {"b": ADAPTIVE_CELL_NOTE_NOT_FOUND},
+    }
+
+
+def test_without_cells_the_cell_basis_is_declared_empty_and_stays_reproducible() -> None:
+    """Sin celdas no hay base que declarar, y la reproducibilidad del plan no cambia."""
+    rows = _competing_rows()
+    first = build_adaptive_plan(rows, "TREND_UP")
+    second = build_adaptive_plan(tuple(reversed(rows)), "TREND_UP")
+
+    assert first.as_dict() == second.as_dict()
+    assert first.as_dict()["allocationCells"] == {
+        "axis": ALLOCATION_AXIS_NET_R,
+        "used": {},
+        "fallback": {
+            "a": ADAPTIVE_CELL_NOTE_NOT_FOUND,
+            "b": ADAPTIVE_CELL_NOTE_NOT_FOUND,
+        },
+    }

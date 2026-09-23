@@ -3164,6 +3164,22 @@ class AutoSimulationWorker:
                     "fallback": "strategy_evidence",
                 },
             )
+        if plan.allocation.cell_used or plan.allocation.cell_fallback:
+            # AUTO-14 (§20) — la base de CELDA del reparto se DECLARA: un multiplicador no dice por sí
+            # solo si su número se midió en el régimen del tick o en el agregado global de la fila.
+            # Campo propio (``allocationCells``) y separado del eje de evidencia, del estado operativo
+            # y del gate de datos: los ejes no se mezclan. El frame sellado de ``allocation`` no se
+            # toca; esto es la declaración del tick, como la del hueco de régimen.
+            logger.info(
+                "auto_sim v2 adaptive allocation cells %s",
+                {
+                    "allocationCells": {
+                        "axis": plan.allocation.cell_axis,
+                        "used": dict(sorted(plan.allocation.cell_used.items())),
+                        "fallback": dict(sorted(plan.allocation.cell_fallback.items())),
+                    },
+                },
+            )
         self._v2_adaptive_paused_cycles = self._v2_next_paused_cycles(plan)
         return plan
 

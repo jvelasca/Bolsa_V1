@@ -242,6 +242,35 @@ AUTO-13 paso 5 (el fallback del §20 y los tres ejes separados, §29) añade:
   de la confianza (``DEGRADED``/``STALE``): **medir** y **usar** volverían a ser el mismo eje y el
   estado legal ``ACTIVE`` + datos ``DEGRADED`` + calidad ``LOW`` del §29 dejaría de existir.
 
+AUTO-14 (reparto por CELDA de régimen, §20) añade:
+
+* **M99 (celda fina moviendo peso)** — si el guard de decisividad de la celda se cae, una racha de
+  ``3`` ciclos mejora el peso de su versión: el invariante «el reparto no puede mejorar su peso con
+  una celda que no se ha medido» se rompe por la puerta de la celda.
+* **M100 (hueco de celda sin declarar)** — si el fallback deja de publicarse, el reparto cae al
+  global **en silencio** y un multiplicador no dice si se midió en el régimen del tick o en el
+  agregado de la fila.
+* **M101 (versión sin celda a cero)** — si una versión sin celda pierde su global y entra con
+  ``0.0``, "no se midió en este régimen" se convierte en "riesgo cero" dentro del propio reparto
+  (el defecto de ``M22``, ahora por la puerta de la celda).
+* **M102 (ejes mezclados en el grupo)** — si el eje del R neto se adopta sin exigir que TODO el
+  grupo que compite lo tenga medido, moneda absoluta y múltiplos de R se suman en el mismo
+  numerador y el reparto es aritmética sin sentido.
+* **M103 (celda de otra versión)** — si la búsqueda de celda deja de casar la versión, la evidencia
+  de una estrategia mueve el peso de otra: se afirma una medición que no es de quien la usa.
+* **M104 (régimen ilegible eligiendo celda)** — si un régimen que no se pudo leer
+  (``None``/``""``/``UNKNOWN``) tomase la primera celda de la versión, se decidiría con un régimen
+  que nadie midió (la lección de ``M81``/``M94``, ahora en el reparto).
+* **M105 (celda PARTIAL tratada como completa)** — si una celda con el R neto ``PARTIAL`` se
+  acepta, el coste **estimado** habilita decidir contra el agregado, que es justo lo que el §6.3
+  prohíbe.
+* **M106 (encogimiento con la banda de la fila)** — si el shrink de ``AUTO-12`` lee la confianza de
+  la ESTRATEGIA cuando el peso salió de la celda, un edge de celda fina se encoge con una base
+  amplia que no es la suya: la ventana de la celda se declara y no se usa.
+* **M107 (rampa que no topa la celda)** — si la rampa de ``AUTO-13`` deja de aplicarse al peso que
+  salió de una celda, una versión que vuelve de una pausa entra a peso pleno por la puerta nueva:
+  el techo del §24 se esquiva cambiando de dónde vino el número.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -1103,6 +1132,77 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         AUTO_ADAPTIVE,
         "        confidence=confidence if shrink else None,\n",
         "        confidence=confidence,\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M99 (celda fina moviendo peso): el guard de decisividad de la celda se cae",
+        AUTO_ADAPTIVE,
+        "    if not found.decisive:\n",
+        "    if False:\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M100 (hueco de celda sin declarar): el fallback deja de publicarse",
+        AUTO_ADAPTIVE,
+        "                cell_fallback[version] = note or ADAPTIVE_CELL_NOTE_NOT_FOUND\n",
+        "                pass\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M101 (version sin celda a cero): pierde su global y entra con 0.0",
+        AUTO_ADAPTIVE,
+        "                cell_fallback[version] = note or ADAPTIVE_CELL_NOTE_NOT_FOUND\n",
+        "                net_r[version] = 0.0\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M102 (ejes mezclados en el grupo): el R neto se adopta sin cubrir a todo el grupo",
+        AUTO_ADAPTIVE,
+        "    if net_r and net_r.keys() == currency.keys():\n",
+        "    if net_r:\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M103 (celda de otra version): la busqueda deja de casar la version",
+        AUTO_ADAPTIVE,
+        '            if str(cell.strategy_version or "") == version and _cell_key(cell.regime) == key\n',
+        "            if _cell_key(cell.regime) == key\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M104 (regimen ilegible eligiendo celda): toma la primera celda de la version",
+        AUTO_ADAPTIVE,
+        "    if not key or key == ADAPTIVE_REGIME_UNKNOWN:\n"
+        "        return None, ADAPTIVE_CELL_NOTE_REGIME_ABSENT\n",
+        "    if not key or key == ADAPTIVE_REGIME_UNKNOWN:\n"
+        "        return (cells[0] if cells else None), None\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M105 (celda PARTIAL tratada como completa): el net-R sin medir habilita decidir",
+        AUTO_ADAPTIVE,
+        "    if not is_complete(found.net_r_measurement):\n",
+        "    if False:\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M106 (encogimiento con la banda de la fila): el shrink ignora la confianza de la celda",
+        AUTO_ADAPTIVE,
+        "            basis: StrategyConfidence | RegimeConfidence | None = _cell_confidence(\n"
+        "                confidence.confidence_for(version), sources.cell_used.get(version)\n"
+        "            )\n",
+        "            basis: StrategyConfidence | RegimeConfidence | None = _cell_confidence(\n"
+        "                confidence.confidence_for(version), None\n"
+        "            )\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M107 (rampa que no topa la celda): la rampa se esquiva cuando el peso vino de una celda",
+        AUTO_ADAPTIVE,
+        "            multipliers[version] = _clamp_unit(min(multipliers[version], float(reading.step)))\n",
+        "            if version in sources.cell_used:\n"
+        "                continue\n"
+        "            multipliers[version] = _clamp_unit(min(multipliers[version], float(reading.step)))\n",
         (T_ADAPTIVE,),
     ),
 ]
