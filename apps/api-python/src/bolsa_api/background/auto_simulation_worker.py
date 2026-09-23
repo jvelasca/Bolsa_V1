@@ -47,6 +47,10 @@ from bolsa_analytics.cognitive.auto_adaptive import (
     AdaptivePolicy,
     build_adaptive_plan,
 )
+from bolsa_analytics.cognitive.auto_adaptive_data_gate import (
+    DataGatePolicy,
+    journal_age_cycles,
+)
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import UNKNOWN_SECTOR
 from bolsa_analytics.cognitive.data_freshness import (
     FreshnessPolicy,
@@ -729,6 +733,17 @@ class AutoSimulationWorker:
         # pisa con el de SALIDA justo después, y la evidencia durable debe publicar el de entrada:
         # registrar el de salida afirmaría que Adaptive decidió con un estado que aún no existía.
         self._v2_adaptive_paused_cycles_entered: dict[str, int] = {}
+        # AUTO-13: salud de la EVIDENCIA Adaptive. Dos hechos con límites distintos y declarados:
+        # (a) un contador EN MEMORIA de fallos CONSECUTIVOS del sink (detecta el fallo al instante,
+        # pero se pierde al reiniciar) y (b) el ancla DURABLE de antigüedad del journal, medida del
+        # ``asOf`` de la última recomendación publicada (sobrevive al reinicio). El estado del gate
+        # los combina; ninguno se disfraza del otro.
+        self._v2_adaptive_sink_failures: int = 0
+        self._v2_adaptive_sink_last_success_at: str | None = None
+        #: Antigüedad durable (ciclos) de la última publicación, o ``None`` si no se pudo medir.
+        self._v2_adaptive_journal_anchor_age: int | None = None
+        #: La lectura durable del arranque, guardada para poder declarar sus límites al medir el ancla.
+        self._v2_adaptive_state_reading: AdaptiveStateReading | None = None
         # AUTO-11: recuperación del estado Adaptive y reconciliación del rastro de ciclo, una vez
         # por proceso cada una (mismo patrón que ``_v2_kill_state_loaded``).
         self._v2_adaptive_state_recovered = False
@@ -3082,6 +3097,45 @@ class AutoSimulationWorker:
             for version in plan.rotation.paused
         }
 
+    def _v2_data_gate_policy(self) -> DataGatePolicy:
+        """La política del Data Gate en UN solo sitio (la usan el ancla y, en el Paso 3, el plan).
+
+        Mismo patrón que ``_v2_adaptive_policy``: derivar los umbrales de dos construcciones
+        distintas permitiría que divergieran en silencio y el ancla se mediría con reglas que no son
+        las que sella la versión.
+        """
+        return DataGatePolicy()
+
+    def _v2_measure_adaptive_journal_anchor(self, reading: AdaptiveStateReading) -> None:
+        """Mide el ancla durable del journal —ciclos desde la última publicación— y la declara.
+
+        El ancla es lo único de ``AUTO-13`` que **sobrevive a un reinicio**: sale del ``asOf`` de la
+        última fila publicada y de la cadencia declarada, no de un contador de proceso. Un instante
+        ilegible da ``None`` (no se puede juzgar la antigüedad), y eso **no** bloquea: se declara.
+        """
+        self._v2_adaptive_journal_anchor_age = journal_age_cycles(
+            last_published_at=reading.last_published_at,
+            now=self._v2_instant(),
+            policy=self._v2_data_gate_policy(),
+        )
+
+    def _v2_adaptive_gate_journal_age(self) -> int | None:
+        """Antigüedad del journal para el gate, **corroborada** por un fallo de escritura propio.
+
+        El ancla durable sola no puede bloquear. Tras un arranque con Adaptive OFF (o una pausa)
+        más larga que ``journal_gap_blocked`` ciclos, la última fila es antigua aunque el journal
+        esté sano; y como ``BLOCKED`` ⇒ ``adaptive = None`` ⇒ no se escribe, el ancla **nunca** se
+        curaría: un journal sano quedaría bloqueado para siempre. Por eso la antigüedad solo cuenta
+        cuando el propio proceso ha fallado al publicar: así un journal muerto se sigue detectando
+        (el fallo y la antigüedad crecen juntos, incluso tras un reinicio) y uno sano se cura con su
+        primera escritura, que pone el ancla a 0.
+        """
+        failures = int(getattr(self, "_v2_adaptive_sink_failures", 0) or 0)
+        if failures <= 0:
+            return None
+        anchor = int(getattr(self, "_v2_adaptive_journal_anchor_age", 0) or 0)
+        return anchor + failures
+
     async def _v2_journal_adaptive_recommendation(self, adaptive: AdaptivePlan | None) -> None:
         """AUTO-11 — publica la recomendación Adaptive del turno en el journal durable.
 
@@ -3094,6 +3148,11 @@ class AutoSimulationWorker:
         Fail-open **declarado**: sin sink o sin plan no se escribe —y no se finge una fila vacía,
         que afirmaría "Adaptive evaluó y no recomendó nada"—; un fallo del sink no tumba el turno,
         pero se registra, porque un silencio aquí devuelve el cooldown a la memoria del proceso.
+
+        **AUTO-13 (§21).** Un fallo del sink deja de ser solo un renglón de log: se cuenta el fallo
+        CONSECUTIVO y un éxito RESETEA la racha. Ese contador vive en el proceso (su límite se
+        declara); la mitad durable es el ancla de antigüedad del journal que mide
+        ``_v2_recover_adaptive_state``.
         """
         sink = self._adaptive_sink
         if sink is None or adaptive is None:
@@ -3112,7 +3171,20 @@ class AutoSimulationWorker:
         try:
             await sink(entry)
         except Exception:  # noqa: BLE001 — publicar no puede tumbar el turno.
-            logger.exception("auto_sim v2 adaptive recommendation journal failed")
+            # AUTO-13 (§21): el fallo se CUENTA (consecutivo), no solo se loguea. ``getattr``
+            # porque un worker hermético de costura puede no traer el contador; en producción nace
+            # en 0. Un éxito lo resetea justo abajo: un fallo aislado no arrastra.
+            failures = int(getattr(self, "_v2_adaptive_sink_failures", 0) or 0) + 1
+            self._v2_adaptive_sink_failures = failures
+            logger.exception(
+                "auto_sim v2 adaptive recommendation journal failed consecutive=%s", failures
+            )
+            return
+        # Éxito: se RESETEA la racha (un fallo aislado no arrastra) y el ancla durable vuelve a 0
+        # —se acaba de publicar evidencia—, que es lo que cura un journal que estuvo sin escribir.
+        self._v2_adaptive_sink_failures = 0
+        self._v2_adaptive_sink_last_success_at = entry.created_at
+        self._v2_adaptive_journal_anchor_age = 0
 
     async def _v2_recover_adaptive_state(self) -> None:
         """AUTO-11 — reconstruye el estado Adaptive del journal durable, UNA vez por proceso.
@@ -3135,8 +3207,11 @@ class AutoSimulationWorker:
             return
         reader = self._adaptive_reader
         if reader is None:
+            # Sin lector no hay ni racha ni ancla: los DOS límites se declaran (no se finge salud).
+            self._v2_adaptive_journal_anchor_age = None
             logger.warning(
-                "auto_sim v2 adaptive state NOT durable: no reader; el cooldown arranca a 0"
+                "auto_sim v2 adaptive state NOT durable: no reader; el cooldown arranca a 0 "
+                "(journalAgeCycles=None)"
             )
             return
         window = ADAPTIVE_STATE_WINDOW_DEFAULT
@@ -3145,14 +3220,22 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — un lector roto NO puede reiniciar el cooldown.
             logger.exception("auto_sim v2 adaptive state read failed")
             reading = adaptive_state_unread("reader_failed", window=window)
+        self._v2_adaptive_state_reading = reading
         if not reading.read_ok:
             # Contador vacío + hueco DECLARADO: "no se pudo leer" nunca se disfraza de "no había
-            # pausas". El límite sigue existiendo y el log lo dice con nombre propio.
+            # pausas". El ancla durable tampoco se puede medir: ``None``, no juventud.
             self._v2_adaptive_paused_cycles = {}
-            logger.warning("auto_sim v2 adaptive state UNREAD %s", reading.as_dict())
+            self._v2_adaptive_journal_anchor_age = None
+            summary = reading.as_dict()
+            summary["journalAgeCycles"] = None
+            logger.warning("auto_sim v2 adaptive state UNREAD %s", summary)
             return
         self._v2_adaptive_paused_cycles = dict(reading.paused_cycles)
+        # AUTO-13: el ancla durable del journal se mide con la cadencia declarada (``None`` si el
+        # instante no se pudo leer: se declara y no bloquea). Es la mitad que sobrevive al reinicio.
+        self._v2_measure_adaptive_journal_anchor(reading)
         summary = reading.as_dict()
+        summary["journalAgeCycles"] = self._v2_adaptive_journal_anchor_age
         if reading.policy_version_mismatch:
             logger.warning("auto_sim v2 adaptive policy version mismatch %s", summary)
         if reading.insufficient_history or reading.saturated or reading.unreadable:

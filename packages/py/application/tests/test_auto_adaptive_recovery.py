@@ -287,3 +287,40 @@ def test_the_summary_publishes_every_declared_limit() -> None:
     assert summary["insufficientHistory"] is True
     assert summary["policyVersions"] == [_POLICY]
     assert summary["policyVersionMismatch"] is False
+
+
+# ── El ancla durable del journal (AUTO-13, paso 2) ──────────────────────────────────
+
+
+def test_the_newest_row_declares_the_durable_anchor() -> None:
+    """El ancla es el instante de la evidencia MÁS NUEVA, no el de la primera de la lista."""
+    reading = _read([_row(_at(5)), _row(_at(9)), _row(_at(2))])
+
+    assert reading.last_published_at == "2026-09-22T10:09:00+00:00"
+    assert reading.as_dict()["lastPublishedAt"] == "2026-09-22T10:09:00+00:00"
+
+
+def test_an_empty_journal_has_no_anchor() -> None:
+    """Leído y vacío no es un ancla: ``None`` (no se supone una publicación que no existe)."""
+    assert _read([]).last_published_at is None
+
+
+def test_a_row_without_a_readable_instant_does_not_become_the_anchor() -> None:
+    """Una fila sin instante legible se ordena al final: no puede fechar la evidencia."""
+    dated = _row(_at(9))
+    undated = replace(
+        dated, id="JNL-sin-fecha", decision_id="dec-adap-sin-fecha", created_at=None
+    )
+
+    reading = _read([undated, dated])
+
+    assert reading.last_published_at == "2026-09-22T10:09:00+00:00"
+    assert reading.evaluated == 2, "las dos filas son de turnos distintos: ninguna se colapsa"
+
+
+def test_an_unreadable_source_declares_no_anchor() -> None:
+    """``read_ok=False`` no puede fingir una antigüedad: el ancla es ``None``, como el contador."""
+    reading = adaptive_state_unread("reader_failed", window=ADAPTIVE_STATE_WINDOW_DEFAULT)
+
+    assert reading.last_published_at is None
+    assert reading.as_dict()["lastPublishedAt"] is None

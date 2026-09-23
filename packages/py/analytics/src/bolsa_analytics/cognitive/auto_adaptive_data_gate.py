@@ -42,6 +42,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.measurement import is_complete
@@ -73,6 +74,11 @@ DATA_GATE_SINK_FAILURES_STALE_DEFAULT = 3
 #: Ciclos sin evidencia durable publicada a partir de los cuales el estado es ``BLOCKED`` (§21:
 #: «sin journal durante X ciclos»). ``None`` como antigüedad significa "no se pudo medir".
 DATA_GATE_JOURNAL_GAP_BLOCKED_DEFAULT = 10
+#: Cadencia DECLARADA de un ciclo de evaluación Adaptive, en segundos: el tick del worker
+#: (``AUTO_ENGINE_SIM`` corre a ``60s`` por defecto). Es lo que convierte una antigüedad medida
+#: (segundos) en ``journal_age_cycles`` sin inventar un contador de proceso — y por eso el ancla
+#: **sobrevive a un reinicio**: solo depende del journal durable y de esta regla declarada.
+DATA_GATE_EVALUATION_CYCLE_SECONDS_DEFAULT = 60.0
 
 #: Tabla estado → efecto. Es la ÚNICA fuente del efecto: así no puede publicarse un estado con un
 #: efecto incoherente (el bug clásico de dos campos que se actualizan por caminos distintos).
@@ -107,12 +113,17 @@ class DataGatePolicy:
     sink_failures_stale: int = DATA_GATE_SINK_FAILURES_STALE_DEFAULT
     #: Ciclos sin publicar evidencia durable a partir de los cuales el estado pasa a ``BLOCKED``.
     journal_gap_blocked: int = DATA_GATE_JOURNAL_GAP_BLOCKED_DEFAULT
+    #: Segundos que dura un ciclo de evaluación Adaptive (cadencia declarada del tick).
+    evaluation_cycle_seconds: float = DATA_GATE_EVALUATION_CYCLE_SECONDS_DEFAULT
 
     def __post_init__(self) -> None:
         for field_name in ("sink_failures_stale", "journal_gap_blocked"):
             value = int(getattr(self, field_name))
             if value < 1:
                 raise ValueError(f"{field_name} must be >= 1")
+        # El float se valida aparte: ``int()`` truncaría una cadencia fraccionaria válida.
+        if float(self.evaluation_cycle_seconds) <= 0:
+            raise ValueError("evaluation_cycle_seconds must be > 0")
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +188,50 @@ class DataGateReading:
 
 def _reading(status: DataGateStatus, *, notes: list[str], **facts: Any) -> DataGateReading:
     return DataGateReading(status=status, notes=tuple(sorted(notes)), **facts)
+
+
+def _instant(value: str | None) -> datetime | None:
+    """Instante ISO-8601 (``Z`` o ``+hh:mm``) a ``datetime`` con zona; ``None`` si no se lee."""
+    text = str(value).strip() if isinstance(value, str) else ""
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def journal_age_cycles(
+    *,
+    last_published_at: str | None,
+    now: str,
+    policy: DataGatePolicy | None = None,
+) -> int | None:
+    """(PURA) ciclos de evaluación transcurridos desde la última evidencia durable publicada.
+
+    Un **ciclo** es un tick de evaluación Adaptive, y su duración es un dato **declarado** de la
+    política (``evaluation_cycle_seconds``), no una medida del reloj: así la antigüedad se puede
+    juzgar contra el umbral de ``journal_gap_blocked`` (§21, «sin journal durante X ciclos») sin
+    mantener ningún contador de proceso. Esa es la mitad que **sobrevive a un reinicio**: solo
+    depende de la evidencia durable (``last_published_at``, el ``asOf`` de la fila más nueva) y de
+    una regla versionada.
+
+    Devuelve ``None`` —"no se pudo medir", que **no** bloquea, igual que en ``assess_data_gate``—
+    cuando falta el instante, cuando no es legible o cuando es **posterior** a ``now`` (un reloj
+    que va hacia atrás no puede fabricar una antigüedad). No se supone juventud ni se inventa
+    antigüedad: las dos serían una medición que no se hizo.
+    """
+    resolved = policy or DataGatePolicy()
+    published = _instant(last_published_at)
+    current = _instant(now)
+    if published is None or current is None:
+        return None
+    elapsed = (current - published).total_seconds()
+    if elapsed < 0:
+        return None
+    cycle = float(resolved.evaluation_cycle_seconds)
+    return int(elapsed // cycle)
 
 
 def assess_data_gate(
@@ -273,6 +328,7 @@ __all__ = [
     "DATA_GATE_ADAPTS",
     "DATA_GATE_BLOCKED",
     "DATA_GATE_DEGRADED",
+    "DATA_GATE_EVALUATION_CYCLE_SECONDS_DEFAULT",
     "DATA_GATE_FREEZES",
     "DATA_GATE_JOURNAL_GAP_BLOCKED_DEFAULT",
     "DATA_GATE_LIMITS",
@@ -286,4 +342,5 @@ __all__ = [
     "DataGateReading",
     "DataGateStatus",
     "assess_data_gate",
+    "journal_age_cycles",
 ]

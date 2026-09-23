@@ -21,6 +21,7 @@ from bolsa_analytics.cognitive.auto_adaptive_data_gate import (
     DATA_GATE_ADAPTS,
     DATA_GATE_BLOCKED,
     DATA_GATE_DEGRADED,
+    DATA_GATE_EVALUATION_CYCLE_SECONDS_DEFAULT,
     DATA_GATE_FREEZES,
     DATA_GATE_LIMITS,
     DATA_GATE_NO_ADAPT,
@@ -40,6 +41,7 @@ from bolsa_analytics.cognitive.auto_adaptive_data_gate import (
     DATA_GATE_STALE,
     DataGatePolicy,
     assess_data_gate,
+    journal_age_cycles,
 )
 
 
@@ -248,3 +250,98 @@ def test_the_journal_gap_is_measured_against_the_cycle_count() -> None:
     """Frontera exacta del umbral: ``gap - 1`` no bloquea, ``gap`` sí."""
     assert assess_data_gate(journal_age_cycles=9).status == DATA_GATE_OK
     assert assess_data_gate(journal_age_cycles=10).status == DATA_GATE_BLOCKED
+
+
+# ── El ancla durable: antigüedad (segundos) → ciclos declarados (AUTO-13, paso 2) ───────
+
+
+def test_the_journal_age_converts_seconds_into_declared_cycles() -> None:
+    """600s a la cadencia declarada (60s) son 10 ciclos; 599s son 9 (no se redondea al alza)."""
+    assert (
+        journal_age_cycles(
+            last_published_at="2026-09-23T10:00:00Z", now="2026-09-23T10:10:00Z"
+        )
+        == 10
+    )
+    assert (
+        journal_age_cycles(
+            last_published_at="2026-09-23T10:00:00Z", now="2026-09-23T10:09:59Z"
+        )
+        == 9
+    )
+    assert (
+        journal_age_cycles(
+            last_published_at="2026-09-23T10:00:00Z", now="2026-09-23T10:01:30Z"
+        )
+        == 1
+    )
+
+
+def test_the_age_feeds_the_gate_the_same_way_as_a_measured_count() -> None:
+    """El ancla del journal ES el ``journal_age_cycles`` del gate: mismo umbral, mismo bloqueo."""
+    age = journal_age_cycles(
+        last_published_at="2026-09-23T10:00:00Z", now="2026-09-23T10:10:00Z"
+    )
+    assert assess_data_gate(journal_age_cycles=age).status == DATA_GATE_BLOCKED
+    just_under = journal_age_cycles(
+        last_published_at="2026-09-23T10:00:00Z", now="2026-09-23T10:09:00Z"
+    )
+    assert assess_data_gate(journal_age_cycles=just_under).status == DATA_GATE_OK
+
+
+def test_the_cycle_cadence_is_declared_by_the_policy() -> None:
+    """La cadencia es un dato DECLARADO: con 120s/ciclo la misma antigüedad vale la mitad."""
+    slow = DataGatePolicy(evaluation_cycle_seconds=120.0)
+    arguments: dict[str, str] = {
+        "last_published_at": "2026-09-23T10:00:00Z",
+        "now": "2026-09-23T10:10:00Z",
+    }
+    assert journal_age_cycles(**arguments, policy=slow) == 5
+    assert journal_age_cycles(**arguments) == 10
+    assert DATA_GATE_EVALUATION_CYCLE_SECONDS_DEFAULT == 60.0
+
+
+def test_the_parse_accepts_offsets_and_naive_instants_as_utc() -> None:
+    assert (
+        journal_age_cycles(
+            last_published_at="2026-09-23T12:00:00+02:00", now="2026-09-23T10:10:00Z"
+        )
+        == 10
+    )
+    assert (
+        journal_age_cycles(
+            last_published_at="2026-09-23T10:00:00", now="2026-09-23T10:10:00Z"
+        )
+        == 10
+    )
+
+
+def test_a_missing_or_unreadable_instant_does_not_invent_an_age() -> None:
+    """Sin instante legible el ancla es ``None`` (no bloquea): no se supone juventud ni vejez."""
+    assert journal_age_cycles(last_published_at=None, now="2026-09-23T10:00:00Z") is None
+    assert (
+        journal_age_cycles(last_published_at="no-es-una-fecha", now="2026-09-23T10:00:00Z")
+        is None
+    )
+    assert (
+        journal_age_cycles(last_published_at="2026-09-23T10:00:00Z", now="no-es-una-fecha")
+        is None
+    )
+    assert journal_age_cycles(last_published_at="", now="") is None
+
+
+def test_an_instant_in_the_future_does_not_invent_an_age() -> None:
+    """Un reloj que va hacia atrás no fabrica una antigüedad: se declara ``None``."""
+    assert (
+        journal_age_cycles(
+            last_published_at="2026-09-23T10:10:00Z", now="2026-09-23T10:00:00Z"
+        )
+        is None
+    )
+
+
+def test_the_cadence_must_be_positive() -> None:
+    with pytest.raises(ValueError):
+        DataGatePolicy(evaluation_cycle_seconds=0.0)
+    with pytest.raises(ValueError):
+        DataGatePolicy(evaluation_cycle_seconds=-1.0)

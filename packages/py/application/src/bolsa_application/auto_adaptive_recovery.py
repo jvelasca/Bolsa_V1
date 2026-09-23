@@ -274,6 +274,11 @@ class AdaptiveStateReading:
     unreadable: int = 0
     #: Filas de más del MISMO turno (reintento del sink) colapsadas antes de contar.
     collapsed: int = 0
+    #: ``asOf`` de la evidencia durable MÁS NUEVA leída (la primera de la historia ordenada), o
+    #: ``None`` si no hay filas o la más nueva no declara un instante legible. Es el ancla que deja
+    #: juzgar la antigüedad del journal sin un contador de proceso (``AUTO-13``): la medición es un
+    #: hecho de la fila, no del turno que la lee, así que **sobrevive a un reinicio**.
+    last_published_at: str | None = None
 
     @property
     def saturated(self) -> bool:
@@ -298,6 +303,7 @@ class AdaptiveStateReading:
             "insufficientHistory": self.insufficient_history,
             "unreadableRows": self.unreadable,
             "collapsedRows": self.collapsed,
+            "lastPublishedAt": self.last_published_at,
         }
 
 
@@ -332,6 +338,9 @@ def read_adaptive_state(
         mismatch = len(versions) > 1
     unreadable = sum(1 for payload in payloads if _paused_set(payload) is None)
     size = max(0, int(window))
+    # La evidencia MÁS NUEVA de la historia (``ordered`` va de más nueva a más vieja): su instante
+    # es el ancla durable de ``AUTO-13``. Sin instante legible no se supone juventud: queda ``None``.
+    newest = _instant_of(ordered[0]) if ordered else None
     return AdaptiveStateReading(
         paused_cycles=counts,
         read_ok=read_ok,
@@ -343,6 +352,7 @@ def read_adaptive_state(
         insufficient_history=len(ordered) < size,
         unreadable=unreadable,
         collapsed=collapsed,
+        last_published_at=newest.isoformat() if newest is not None else None,
     )
 
 

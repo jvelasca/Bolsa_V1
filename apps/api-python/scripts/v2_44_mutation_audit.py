@@ -166,6 +166,21 @@ AUTO-12 (confianza estadística: muestra efectiva, ventanas, decay y encogimient
 * **M71 (confianza no cableada)** — si el worker construye la confianza y no la pasa al plan, el
   cálculo se paga y el reparto publica el histórico.
 
+AUTO-13 (Adaptive Data Gate: salud de la EVIDENCIA separada de la salud de la estrategia) añade:
+
+* **M72 (efecto invertido)** — si la tabla estado→efecto deja de mapear ``OK`` a ``ADAPTS``, un
+  gate sano limita el reparto que debía permitir.
+* **M73 (OK por defecto)** — si un fallo del sink deja de producir ``DEGRADED``, el hecho se mide
+  pero el gate lo publica como salud completa.
+* **M74 (antigüedad que no bloquea)** — si la antigüedad del journal deja de bloquear al pasar el
+  umbral, el journal muerto del §21 vuelve a ser invisible.
+* **M75 (contador sin reset)** — si un éxito de publicación no resetea la racha, un fallo aislado
+  arrastra y el estado se congela sin motivo.
+* **M76 (ancla sin corroborar)** — si la antigüedad bloquea sin un fallo propio, un journal sano
+  tras un hueco largo queda ``BLOCKED`` para siempre (``adaptive = None`` ⇒ no escribe ⇒ deadlock).
+* **M77 (cadencia ignorada)** — si la antigüedad medida en segundos no se convierte a ciclos con la
+  cadencia declarada, ``journal_age_cycles`` afirma una antigüedad que no es la de la regla.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -216,6 +231,9 @@ AUTO_ADAPTIVE = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adapti
 AUTO_ADAPTIVE_CONFIDENCE = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_confidence.py"
 )
+AUTO_ADAPTIVE_DATA_GATE = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_data_gate.py"
+)
 CYCLE_RISK = "packages/py/application/src/bolsa_application/cycle_risk.py"
 FEED = "packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py"
 AUTO_CYCLE_JOURNAL = "packages/py/application/src/bolsa_application/auto_cycle_journal.py"
@@ -240,6 +258,8 @@ T_ADAPTIVE = "packages/py/analytics/tests/test_auto_adaptive.py"
 T_CONFIDENCE = "packages/py/analytics/tests/test_auto_adaptive_confidence.py"
 T_FEED = "packages/py/application/tests/test_auto_self_evaluation_feed.py"
 T_CONFIDENCE_SEAM = "apps/api-python/tests/test_auto_v53_auto12_confidence_seam.py"
+T_DATA_GATE = "packages/py/analytics/tests/test_auto_adaptive_data_gate.py"
+T_DATA_GATE_SEAM = "apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py"
 T_ADAPTIVE_ENTRY = "packages/py/application/tests/test_auto_adaptive_entry.py"
 T_CYCLE_RISK = "packages/py/application/tests/test_cycle_risk.py"
 T_CYCLE_RISK_SEAM = "apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py"
@@ -814,6 +834,50 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "            confidence=confidence,\n",
         "            confidence=None,\n",
         (T_CONFIDENCE_SEAM,),
+    ),
+    (
+        "M72 (efecto invertido): la tabla estado->efecto deja de mapear OK a ADAPTS",
+        AUTO_ADAPTIVE_DATA_GATE,
+        "    DATA_GATE_OK: DATA_GATE_ADAPTS,\n",
+        "    DATA_GATE_OK: DATA_GATE_LIMITS,\n",
+        (T_DATA_GATE,),
+    ),
+    (
+        "M73 (OK por defecto): un fallo del sink deja de producir DEGRADED",
+        AUTO_ADAPTIVE_DATA_GATE,
+        "    if degraded_notes:\n"
+        "        return _reading(DATA_GATE_DEGRADED, notes=degraded_notes, **facts)\n",
+        "    if False:\n"
+        "        return _reading(DATA_GATE_DEGRADED, notes=degraded_notes, **facts)\n",
+        (T_DATA_GATE,),
+    ),
+    (
+        "M74 (antiguedad que no bloquea): el journal muerto deja de bloquear al pasar el umbral",
+        AUTO_ADAPTIVE_DATA_GATE,
+        "    if age is not None and age >= int(resolved.journal_gap_blocked):\n",
+        "    if False:\n",
+        (T_DATA_GATE,),
+    ),
+    (
+        "M75 (contador sin reset): un exito de publicacion no resetea la racha",
+        WORKER,
+        "        self._v2_adaptive_sink_failures = 0\n",
+        "        self._v2_adaptive_sink_failures = self._v2_adaptive_sink_failures\n",
+        (T_DATA_GATE_SEAM,),
+    ),
+    (
+        "M76 (ancla sin corroborar): la antiguedad bloquea sin un fallo de escritura propio",
+        WORKER,
+        "        if failures <= 0:\n            return None\n",
+        "        if False:\n            return None\n",
+        (T_DATA_GATE_SEAM,),
+    ),
+    (
+        "M77 (cadencia ignorada): la antiguedad en segundos no se convierte a ciclos",
+        AUTO_ADAPTIVE_DATA_GATE,
+        "    return int(elapsed // cycle)\n",
+        "    return int(elapsed)\n",
+        (T_DATA_GATE,),
     ),
 ]
 
