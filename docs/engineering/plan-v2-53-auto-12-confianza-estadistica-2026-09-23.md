@@ -1,6 +1,8 @@
 # Plan `AUTO-12` — Confidence + calidad estadística — `V2.53` / `1.78.0-beta`
 
-**Estado:** cerrado (pasos 1–5 **cerrados** y verificados) · **Fecha:** 2026-09-23 · **Fase anterior:**
+**Estado:** cerrado (pasos 1–5 **cerrados** y verificados) · **Fecha:** 2026-09-23 · **Sello:** tag
+`v2.53-beta` → `a6655e6e` con `Release tag CI` `35836248169` **GREEN** (`10 success` + `1 skipped`,
+job `python` del tag `2459 passed / 35 skipped`) · **Fase anterior:**
 `V2.52` / `AUTO-11` (sellada: tag `v2.52-beta` → `71c97880`, `Release tag CI` `35827266670` **GREEN**,
 `1.77.0-beta`).
 
@@ -214,6 +216,10 @@ capital, como en `AUTO-10`/`AUTO-11` (**primero el dinero, después la traza**).
 - **Compuertas:** `ruff check packages/py apps/api-python --config pyproject.toml` (el de CI, no rutas
   sueltas), `mypy` con el comando de CI (`--follow-imports=silent`) e `import-linter` **4/4**; bloques
   offline **sin PostgreSQL**, con la extracción de targets del propio YAML (§4 del audit-pack).
+- **Sello:** tag `v2.53-beta` → `a6655e6e` con `Release tag CI` `35836248169` **GREEN** (`10 success` +
+  `1 skipped`, `check-runs` `27 success` + `1 skipped`, job `python` del tag **`2459 passed / 35 skipped`**
+  frente a los `2409` de `v2.52-beta`: **+50**, el delta declarado) y los otros cuatro workflows del tag en
+  verde.
 
 ## 5. Límites declarados (no silenciosos)
 

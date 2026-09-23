@@ -1,9 +1,13 @@
 # Audit-pack `AUTO-12` Confidence + calidad estadística — `1.78.0-beta` (2026-09-23)
 
 **Fase:** `V2.53` · **Rótulo:** `AUTO-12` · **Bump:** `1.77.0-beta` → **`1.78.0-beta`** · **Tag:**
-`v2.53-beta` · **Fase anterior:** `V2.52` / `AUTO-11` (tag `v2.52-beta` → `71c97880`, `Release tag CI`
-`35827266670` **GREEN**, `check-runs` `27 success` + `1 skipped`, job `python` del tag
-**`2409 passed / 35 skipped`**, `quality` de `main` **`2398 passed / 38 skipped`**).
+`v2.53-beta` → `a6655e6e` · **Release tag CI** `35836248169` **GREEN** (`10 success` + `1 skipped`
+—`playwright` opt-in—, `check-runs` `27 success` + `1 skipped`, job `python` del tag
+**`2459 passed / 35 skipped`** con `ruff` `All checks passed!`, `import-linter` `4 kept, 0 broken` y
+`mypy` `0` errores en `497` ficheros; los otros cuatro workflows del tag —`Python CI`, `Frontend CI`,
+`Optimize lab`, `Fase 2 scientific`— también en **verde**). **Fase anterior:** `V2.52` / `AUTO-11`
+(tag `v2.52-beta` → `71c97880`, `Release tag CI` `35827266670` **GREEN**, `check-runs` `27 success` +
+`1 skipped`, job `python` del tag **`2409 passed / 35 skipped`**: la fase suma **+50** exactos).
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,
 sin cambio de contrato de API ni de DTO, **sin clave nueva en el nivel superior del payload del journal**
@@ -225,13 +229,21 @@ fallo que el gate de `M39` existe para impedir.
   packages/py/application/src apps/api-python/src --follow-imports=silent` ⇒ **`Success: no issues found
   in 497 source files`**; `uv run lint-imports --config packages/py/.importlinter` ⇒ **`4 kept, 0 broken`**.
 - **La matriz de mutaciones completa** (§7) con el árbol **intacto**.
+- **La CI del tag, medida y no supuesta.** `v2.53-beta` → `a6655e6e`: `Release tag CI`
+  [`35836248169`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35836248169) **GREEN** con **`10
+  success` + `1 skipped`** (`playwright` opt-in) en `8m31s`, `check-runs` **`27 success` + `1 skipped`** —
+  la **misma forma** que `v2.52-beta`—, y el job `python (ruff/imports/mypy/pytest offline)` con
+  **`2459 passed / 35 skipped`** en `1m45s` (frente a los `2409 passed / 35 skipped` del tag anterior:
+  **+50**, exactamente el delta declarado en la tabla de arriba). Los otros cuatro workflows del tag
+  (`Python CI`, `Frontend CI`, `Optimize lab`, `Fase 2 scientific`) también en **verde**, igual que sus
+  homólogos en `main`.
 - **Límite declarado de la verificación local:** el bloque offline **completo** de `quality` / `python`
   del tag **no se pudo reproducir** en esta máquina porque su recolección incluye suites PG que
   importan `asyncpg` (ausente) y porque el teardown de sesión de `apps/api-python/tests/conftest.py`
   (`purge_all_residuals`) exige PostgreSQL; el script de extracción del YAML
   (`%TEMP%\run_offline_ci.py`, fuera del repo) sí se usó para correr la selección offline, y los únicos
-  errores fueron los de `asyncpg`. **Los totales de CI del tag se dejan a CI**: este documento **no**
-  afirma una cifra que no haya medido.
+  errores fueron los de `asyncpg`. Ese límite **lo cierra CI**, que es donde se midió el bloque completo:
+  las cifras de la CI del tag de arriba son las **suyas**, no una extrapolación de las locales.
 
 ## 9. Límites declarados (no silenciosos)
 

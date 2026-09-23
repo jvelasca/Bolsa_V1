@@ -87,13 +87,25 @@ recomendación cuando la evidencia es fina.
   rojo nombrado** (el sello de versión, actualizado con nombre): sin regresiones ocultas.
 - **Matriz de mutaciones ampliada** (`M60…M71`, 12 etiquetas por `effective_n`, encogimiento, bandas de
   `decay`, techo por `decay UNKNOWN`, `recent_undated`, orden por instante, cobertura de coste, completitud
-  compuesta, cierre por el primer fill y cableado del worker): **12/12 muerden** y la matriz **completa** no
-  deja **ninguna** etiqueta en `NADA` (la trampa de `M39` de `V2.52`, usada aquí como gate explícito).
-- **Compuertas**: `ruff` con el comando de CI, `mypy` (`--follow-imports=silent`) e `import-linter` 4/4.
-  Suites del área con la fase: `analytics` **1010 passed**, `application` **1876 passed** (5 errores
+  compuesta, cierre por el primer fill y cableado del worker): **12/12 muerden** y la corrida **completa** da
+  **`71/71` medidas y `0` etiquetas en `NADA`** con el árbol **intacto** (la trampa de `M39` de `V2.52`,
+  usada aquí como gate explícito). La fase **realineó** la sonda heredada `M33` —su fragmento, la llamada
+  *inline* al riesgo por ciclo, dejó de existir al medirlo **una sola vez** en una local compartida por
+  informe y confianza— sin cambiar su intención: vuelve a morder con **3 rojos**. Se declara porque una
+  sonda desalineada **afirma** cobertura que no tiene.
+- **Compuertas**: `ruff` con el comando de CI (`All checks passed!`), `mypy` (`--follow-imports=silent`)
+  **0 errores en 497 ficheros** e `import-linter` **4 kept / 0 broken**.
+  Suites del área con la fase: `analytics` **1011 passed**, `application` **1876 passed** (5 errores
   **pre-existentes** de suites PG por `asyncpg` ausente en la máquina) y el bloque AUTO completo
-  **1178 passed / 0 rojos**. La verificación offline **completa** de `quality`/`python` no se pudo
-  reproducir localmente (misma causa); los totales de CI del tag quedan **a CI**.
+  **1178 passed / 0 rojos**.
+- **CI real del tag** (`v2.53-beta` → `a6655e6e`): `Release tag CI`
+  [`35836248169`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35836248169) **GREEN** con **`10
+  success` + `1 skipped`** (`playwright` opt-in) y `check-runs` **`27 success` + `1 skipped`** —la misma
+  forma que `v2.52-beta`—; job `python` offline **`2459 passed / 35 skipped`** frente a los **`2409`** del
+  tag anterior: **+50**, exactamente el delta de tests declarado arriba. `Python CI`, `Frontend CI`,
+  `Optimize lab` y `Fase 2 scientific` del tag, también en **verde**. La verificación offline **completa**
+  no se pudo reproducir en la máquina (suites PG que importan `asyncpg`); **ese límite lo cierra CI**, que
+  es donde se midió.
 
 ### Límites declarados
 

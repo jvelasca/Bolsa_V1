@@ -104,9 +104,12 @@ deterioro) rompe el suyo, y el test de rotación fija que la confianza **no** cr
 4. **El `bounded` de `AUTO-11` sigue existiendo** para el cooldown (ventana finita, saturación declarada);
    `AUTO-12` no lo cambia.
 5. **`governor.json` sigue sin trackear.**
-6. **La verificación offline completa del bloque `quality`/`python` del tag no se pudo reproducir en esta
-   máquina** por `asyncpg` ausente y por el teardown PG del conftest de `apps/api-python`; los totales de
-   CI del tag quedan **a CI** y el audit-pack **no** afirma cifras no medidas.
+6. **La verificación offline completa del bloque `quality`/`python` no se pudo reproducir en esta
+   máquina** por `asyncpg` ausente y por el teardown PG del conftest de `apps/api-python`. **Pero la CI
+   del tag sí se midió**: `v2.53-beta` → `a6655e6e`, `Release tag CI` `35836248169` **GREEN** (`10 success`
+   + `1 skipped`, `check-runs` `27 success` + `1 skipped`) con el job `python` del tag en **`2459 passed /
+   35 skipped`** (`ruff` limpio, `import-linter` `4 kept, 0 broken`, `mypy` `0` en `497` ficheros), y los
+   otros cuatro workflows del tag en verde. Es la cifra que el audit-pack publica.
 
 ## 5. Punto de entrada para el siguiente chat
 
