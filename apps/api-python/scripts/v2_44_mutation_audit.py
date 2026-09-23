@@ -180,6 +180,17 @@ AUTO-13 (Adaptive Data Gate: salud de la EVIDENCIA separada de la salud de la es
   tras un hueco largo queda ``BLOCKED`` para siempre (``adaptive = None`` ⇒ no escribe ⇒ deadlock).
 * **M77 (cadencia ignorada)** — si la antigüedad medida en segundos no se convierte a ciclos con la
   cadencia declarada, ``journal_age_cycles`` afirma una antigüedad que no es la de la regla.
+* **M78 (``BLOCKED`` adaptando)** — si el tick con evidencia durable muerta sigue construyendo el
+  plan, el único caso en que no se debe adaptar vuelve a adaptar.
+* **M79 (``STALE`` reactivando)** — si una pausa viva levanta su cooldown con la evidencia ilegible,
+  la reactivación se decide justo contra el dato que no se pudo leer.
+* **M80 (``DEGRADED`` repartiendo con la confianza)** — si el gate limita y el plan recibe igual la
+  confianza, se estrecha por la evidencia fina que el gate acababa de declarar no fiable.
+* **M81 (régimen siempre disponible)** — si ``regime_available`` deja de declarar el hueco de
+  régimen, el §20 se mide pero nunca limita.
+* **M82 (completitud por el eje opcional)** — si la completitud del gate se compone con el net-R
+  **opcional** (cuyo hueco cae por diseño al eje moneda) en vez de con los ejes que Adaptive exige,
+  cualquier despliegue sin coste medido queda ``DEGRADED`` y apaga la confianza de AUTO-12.
 
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
@@ -260,6 +271,7 @@ T_FEED = "packages/py/application/tests/test_auto_self_evaluation_feed.py"
 T_CONFIDENCE_SEAM = "apps/api-python/tests/test_auto_v53_auto12_confidence_seam.py"
 T_DATA_GATE = "packages/py/analytics/tests/test_auto_adaptive_data_gate.py"
 T_DATA_GATE_SEAM = "apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py"
+T_DATA_GATE_WIRE = "apps/api-python/tests/test_auto_v54_auto13_data_gate_wiring_seam.py"
 T_ADAPTIVE_ENTRY = "packages/py/application/tests/test_auto_adaptive_entry.py"
 T_CYCLE_RISK = "packages/py/application/tests/test_cycle_risk.py"
 T_CYCLE_RISK_SEAM = "apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py"
@@ -878,6 +890,51 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    return int(elapsed // cycle)\n",
         "    return int(elapsed)\n",
         (T_DATA_GATE,),
+    ),
+    (
+        "M78 (BLOCKED adaptando): el tick con evidencia durable muerta sigue construyendo plan",
+        WORKER,
+        "        if reading.blocks_adaptation:\n",
+        "        if False:\n",
+        (T_DATA_GATE_WIRE,),
+    ),
+    (
+        "M79 (STALE reactivando): una pausa viva levanta su cooldown con la evidencia ilegible",
+        WORKER,
+        "        if reading.effect != DATA_GATE_FREEZES or not live:\n            return live\n",
+        "        if True:\n            return live\n",
+        (T_DATA_GATE_WIRE,),
+    ),
+    (
+        "M80 (DEGRADED repartiendo): el plan recibe la confianza que el gate declaro no fiable",
+        WORKER,
+        "            confidence=None if reading.limits_adaptation else confidence,\n",
+        "            confidence=confidence,\n",
+        (T_DATA_GATE_WIRE,),
+    ),
+    (
+        "M81 (regimen siempre disponible): el hueco de regimen se mide y nunca limita",
+        WORKER,
+        "        return (\n"
+        "            coerce_market_regime(regime) != ADAPTIVE_REGIME_UNKNOWN\n"
+        "            or to_market_regime(regime) != ADAPTIVE_REGIME_UNKNOWN\n"
+        "        )\n",
+        "        return True\n",
+        (T_DATA_GATE_WIRE,),
+    ),
+    (
+        "M82 (completitud por el eje opcional): el net-R sin medir apaga la confianza",
+        WORKER,
+        "            completeness = combine_measurements(\n"
+        "                *(\n"
+        "                    combine_measurements(row.risk_measurement, row.results_measurement)\n"
+        "                    for row in rows\n"
+        "                )\n"
+        "            )\n",
+        "            completeness = combine_measurements(\n"
+        "                *(row.net_r_measurement for row in rows)\n"
+        "            )\n",
+        (T_DATA_GATE_WIRE,),
     ),
 ]
 

@@ -43,12 +43,16 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.auto_adaptive import (
+    ADAPTIVE_REGIME_UNKNOWN,
     AdaptivePlan,
     AdaptivePolicy,
     build_adaptive_plan,
 )
 from bolsa_analytics.cognitive.auto_adaptive_data_gate import (
+    DATA_GATE_FREEZES,
     DataGatePolicy,
+    DataGateReading,
+    assess_data_gate,
     journal_age_cycles,
 )
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import UNKNOWN_SECTOR
@@ -81,6 +85,7 @@ from bolsa_analytics.cognitive.open_order import (
 )
 from bolsa_analytics.cognitive.operational_governor import (
     assess_from_measurements,
+    coerce_market_regime,
     to_market_regime,
 )
 from bolsa_analytics.cognitive.portfolio_reservation import (
@@ -3021,7 +3026,11 @@ class AutoSimulationWorker:
         return dict(reading.regime_by_cycle), True
 
     async def _v2_build_adaptive_plan(
-        self, versions: set[str], regime: str | None
+        self,
+        versions: set[str],
+        regime: str | None,
+        *,
+        gate: DataGateReading | None = None,
     ) -> AdaptivePlan | None:
         """V2.48/AUTO-8 — recomendación Adaptive desde los fills durables observados.
 
@@ -3034,6 +3043,12 @@ class AutoSimulationWorker:
         (``build_adaptive_confidence_from_fills``) y se pasa al plan: el reparto encoge el peso
         de un edge medido sobre pocos ciclos en vez de tratarlo como una base de 180. Es pura
         (sin I/O nuevo); sin material la confianza queda vacía y el plan es el histórico.
+
+        **AUTO-13.** Antes de repartir, el plan pasa por el gate de EVIDENCIA (§21/§22): la
+        confianza se mide igual, pero solo se **usa para repartir** si la evidencia está sana.
+        ``gate=None`` (el caso normal) lo compone el tick de sus hechos ya medidos; un llamante
+        puede aportar una lectura ya graduada. Con el gate ``OK`` los argumentos y el plan son
+        **byte-idénticos** al histórico de ``v2.53``.
         """
         adaptive_versions = {v for v in versions if v and v != "unversioned"}
         if not adaptive_versions or self._context_store is None:
@@ -3059,6 +3074,26 @@ class AutoSimulationWorker:
             logger.warning(
                 "auto_sim v2 adaptive confidence gaps %s", confidence.as_dict()["notes"]
             )
+        # AUTO-13 (§21/§22) — el gate de EVIDENCIA, entre medir y decidir. Se compone DESPUÉS de
+        # la confianza porque la usa como insumo, y ANTES de repartir porque puede desactivarla
+        # (``LIMITS``/``FREEZES``) o declarar el tick sin plan (``NO_ADAPT``). No añade I/O: son
+        # hechos que el tick ya midió.
+        reading = (
+            gate
+            if gate is not None
+            else self._v2_adaptive_data_gate(report=report, confidence=confidence, regime=regime)
+        )
+        if reading.blocks_adaptation:
+            # §21: evidencia durable muerta ⇒ el tick no adapta. El motor determinista decide sin
+            # plan, y el journal de recomendación no escribe fila: el hueco se DECLARA, no se finge.
+            logger.warning("auto_sim v2 adaptive data gate BLOCKED %s", reading.as_dict())
+            return None
+        if reading.limits_adaptation:
+            # ``DEGRADED`` (deja de estrechar por evidencia fina) y ``STALE`` (además congela
+            # reactivaciones): los dos conservan la protección y se declaran con nombre propio.
+            logger.warning(
+                "auto_sim v2 adaptive data gate %s %s", reading.status, reading.as_dict()
+            )
         # V2.49/AUTO-8.1 — política versionada + estado de pausa previo (hysteresis y cooldown).
         # AUTO-11: el estado ya NO nace vacío en cada proceso — ``_v2_recover_adaptive_state`` lo
         # reconstruyó del journal durable en el arranque y ``_v2_next_paused_cycles`` lo encadena
@@ -3070,9 +3105,12 @@ class AutoSimulationWorker:
             report.by_strategy,
             to_market_regime(regime),
             policy=policy,
-            paused_cycles=self._v2_adaptive_paused_cycles,
+            paused_cycles=self._v2_adaptive_decision_cycles(reading, policy),
             by_regime=report.by_regime,
-            confidence=confidence,
+            # La protección NUNCA se apaga: la rotación recibe el mismo material. Lo que el gate
+            # retira es el encogimiento por confianza —"no se estrecha por evidencia que no es de
+            # fiar"— y, en ``STALE``, las reactivaciones nuevas (vía los ciclos de decisión).
+            confidence=None if reading.limits_adaptation else confidence,
         )
         self._v2_adaptive_paused_cycles = self._v2_next_paused_cycles(plan)
         return plan
@@ -3105,6 +3143,104 @@ class AutoSimulationWorker:
         las que sella la versión.
         """
         return DataGatePolicy()
+
+    @staticmethod
+    def _v2_regime_available(regime: str | None) -> bool:
+        """¿Declaró el tick un régimen **juzgable**? (insumo ``regime_available`` del gate).
+
+        Se acepta cualquiera de los dos ejes —el de mercado ya canónico (``TREND_UP``) o el
+        operativo que el plan traduce (``BULL_TREND``)— porque el llamante puede aportar
+        cualquiera de los dos y los dos declaran un régimen. Lo que NO declara régimen es
+        ``None``, la cadena vacía, ``UNKNOWN`` y ``RISK_OFF`` (el macro es un hecho de RIESGO,
+        no un régimen de mercado: el plan lo traduce a ``UNKNOWN`` por diseño).
+        """
+        return (
+            coerce_market_regime(regime) != ADAPTIVE_REGIME_UNKNOWN
+            or to_market_regime(regime) != ADAPTIVE_REGIME_UNKNOWN
+        )
+
+    def _v2_adaptive_data_gate(
+        self, *, report: Any, confidence: Any, regime: str | None
+    ) -> DataGateReading:
+        """(AUTO-13) compone los HECHOS ya medidos del tick y gradúa la EVIDENCIA.
+
+        No inventa insumos ni paga I/O: une lo que el tick ya midió —la completitud de la
+        medición, la ventana reciente, la salud de la memoria durable, el contador del sink y la
+        antigüedad del journal— y lo pasa a ``assess_data_gate`` (la ÚNICA casa de la gradación).
+
+        La completitud que entra es la de los ejes que Adaptive **exige** para juzgar (resultados
+        y riesgo), compuesta sobre las versiones del tick. NO se usa el ``measurement_completeness``
+        de la confianza tal cual: ese combina también el eje **net-R opcional**, cuyo hueco cae por
+        diseño al eje moneda (AUTO-9) y no es una deuda de datos — hacerlo degradaría el gate en
+        cualquier despliegue sin coste medido y apagaría la confianza de AUTO-12 casi siempre.
+        """
+        reading = getattr(self, "_v2_adaptive_state_reading", None)
+        rows = tuple(getattr(report, "by_strategy", ()) or ())
+        completeness: MeasurementStatus | None = None
+        if rows:
+            completeness = combine_measurements(
+                *(
+                    combine_measurements(row.risk_measurement, row.results_measurement)
+                    for row in rows
+                )
+            )
+        recent_available = (
+            bool(confidence.recent_available)
+            if getattr(confidence, "by_strategy", None)
+            else None
+        )
+        return assess_data_gate(
+            sink_failures=int(getattr(self, "_v2_adaptive_sink_failures", 0) or 0),
+            journal_age_cycles=self._v2_adaptive_gate_journal_age(),
+            # Sin lectura durable registrada NO se declara un fallo de lectura: no se observó
+            # ninguno (el hueco de "sin lector" lo declara AUTO-11 en el arranque, no el gate).
+            read_ok=True if reading is None else bool(reading.read_ok),
+            measurement_completeness=completeness,
+            recent_available=recent_available,
+            regime_available=self._v2_regime_available(regime),
+            unreadable_rows=0 if reading is None else int(reading.unreadable),
+            policy_version_mismatch=(
+                False if reading is None else bool(reading.policy_version_mismatch)
+            ),
+            insufficient_history=(
+                False if reading is None else bool(reading.insufficient_history)
+            ),
+            policy=self._v2_data_gate_policy(),
+        )
+
+    def _v2_adaptive_decision_cycles(
+        self, reading: DataGateReading, policy: AdaptivePolicy
+    ) -> dict[str, int]:
+        """Los ciclos de pausa que ENTRAN en la decisión, según el efecto declarado del gate.
+
+        Con ``ADAPTS``/``LIMITS`` son los reales (comportamiento histórico). Con ``FREEZES``
+        (``STALE``) una pausa viva **no levanta** su cooldown: la evidencia con la que se
+        confirmaría que ya cumplió su mínimo es justo la que no se pudo leer, así que no se
+        confirma y la versión sigue pausada con el motivo declarado ``cooldown``. Las pausas
+        NUEVAS por salud no se tocan: el material que entra en ``recommend_rotation`` es el mismo.
+
+        El contador REAL sigue creciendo (``_v2_next_paused_cycles`` lee el mapa verdadero), de
+        modo que al volver la evidencia la reactivación se juzga con la antigüedad verdadera, no
+        con el valor retenido para la decisión.
+        """
+        live = dict(getattr(self, "_v2_adaptive_paused_cycles", {}) or {})
+        if reading.effect != DATA_GATE_FREEZES or not live:
+            return live
+        ceiling = max(0, int(policy.min_pause_cycles) - 1)
+        if ceiling <= 0:
+            # ``min_pause_cycles <= 1`` no deja margen para retener por cooldown: no hay mecanismo,
+            # y se DECLARA el hueco en vez de fingir una retención. Inalcanzable con la política de
+            # la casa (``min_pause_cycles`` = 3); queda visible si alguien la cambia.
+            logger.warning(
+                "auto_sim v2 adaptive data gate STALE cannot hold pauses min_pause_cycles=%s",
+                policy.min_pause_cycles,
+            )
+            return live
+        return {
+            version: min(int(count), ceiling)
+            for version, count in live.items()
+            if int(count) > 0
+        }
 
     def _v2_measure_adaptive_journal_anchor(self, reading: AdaptiveStateReading) -> None:
         """Mide el ancla durable del journal —ciclos desde la última publicación— y la declara.
