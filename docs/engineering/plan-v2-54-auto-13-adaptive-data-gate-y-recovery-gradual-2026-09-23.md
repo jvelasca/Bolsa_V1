@@ -1,7 +1,9 @@
 # Plan `AUTO-13` — Adaptive Data Gate + recovery gradual — `V2.54` / `1.79.0-beta`
 
-**Estado:** propuesto (a ratificar) · **Fecha:** 2026-09-23 · **Fase anterior:** `V2.53` / `AUTO-12`
-(sellada: tag `v2.53-beta` → `a6655e6e`, `Release tag CI` `35836248169` **GREEN**, `1.78.0-beta`).
+**Estado:** **ratificado por el propietario (2026-09-23)** — rótulo `AUTO-13` sobre `V2.54` /
+`1.79.0-beta`; implementación en curso · **Fecha:** 2026-09-23 · **Fase anterior:** `V2.53` /
+`AUTO-12` (sellada: tag `v2.53-beta` → `a6655e6e`, `Release tag CI` `35836248169` **GREEN**,
+`1.78.0-beta`).
 
 **Punto de partida — el audit, §21/§22/§23/§24/§29 de la revisión de `v2.52-beta` (texto literal):**
 
@@ -239,7 +241,7 @@ de la forma existente** (aditivo y declarado, nunca silencioso). `readOnly` se c
   packages/py/.importlinter` **4/4**; bloques offline **sin PostgreSQL**, con la extracción de
   targets del propio YAML para que los `skipped` cuadren.
 
-## 5. Decisiones a ratificar por el propietario (4)
+## 5. Decisiones ratificadas por el propietario (4, 2026-09-23)
 
 1. **De dónde sale el estado del gate.** Propuesta: **combinar** la salud **durable** derivada del
    journal (antigüedad de la evidencia, sobrevive a reinicios) con un contador de fallos **en
@@ -258,6 +260,13 @@ de la forma existente** (aditivo y declarado, nunca silencioso). `readOnly` se c
    global, nunca heredar, régimen ausente ⇒ `DEGRADED`) porque es pequeño y cierra un punto del
    audit; la **matriz de régimen avanzada** (reparto *por celda* de régimen) se deja **fuera** y se
    declara para `AUTO-14`.
+
+**Resolución (2026-09-23) — ratificadas las cuatro propuestas:** (1) el estado del gate se decide
+**combinando** la salud durable derivada del journal con un contador de fallos consecutivos **en
+memoria** (límite declarado); (2) `BLOCKED` ⇒ **no adaptar** ese tick (`adaptive = None` declarado,
+motor intacto); (3) la memoria de la rampa se **deriva** de la racha durable de `AUTO-11`
+(`reactivated_at`) + los fills posteriores con su `closedAt` (**sin migración** y sin clave nueva);
+(4) el **§20 entra** en la fase, con la matriz avanzada declarada para `AUTO-14`.
 
 ## 6. Límites declarados (no silenciosos)
 
