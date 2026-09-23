@@ -271,6 +271,33 @@ AUTO-14 (reparto por CELDA de régimen, §20) añade:
   salió de una celda, una versión que vuelve de una pausa entra a peso pleno por la puerta nueva:
   el techo del §24 se esquiva cambiando de dónde vino el número.
 
+AUTO-15 (racha de fallos del Data Gate PERSISTIDA: el reinicio no la olvida) anade:
+
+* **M108 (racha que se resetea al reiniciar)** — si el arranque deja de sembrar la racha durable,
+  el proceso nuevo vuelve a ``OK`` con un journal que llevaba fallando: la ventana que ``AUTO-13``
+  declaró como límite suyo se reabre en silencio.
+* **M109 (fallo que no persiste)** — si el fallo se cuenta y NO se escribe, la racha solo vive en
+  el proceso y el reinicio la pierde: persistencia aparente.
+* **M110 (racha durable leída pero ignorada)** — si la fila se lee y el valor se descarta, se paga
+  la I/O para nada y el gate arranca a 0 con la constancia durable disponible.
+* **M111 (reset amplificando)** — si el reset escribe aunque no haya racha viva, el camino sano
+  paga una escritura por tick y crea filas que afirman una racha que no existió.
+* **M112 (racha de otra cuenta)** — si el ``load`` deja de casar la cuenta, la racha de una se lee
+  como la de otra: se juzga la evidencia con la medida ajena.
+* **M113 (ilegible tratado como sano)** — si el estado durable que no se pudo leer se declara
+  durable, un ``0`` sin constancia se publica como hecho probado.
+* **M114 (ilegible tratado como fallo)** — si el estado durable que no se pudo leer se cuenta como
+  fallo, se inventa una racha que nadie midió (el gate se degrada por un hueco de lectura).
+* **M115 (sello sin subir)** — si la PROCEDENCIA de la racha cambia y la versión de política no,
+  dos lecturas con el mismo estado vienen de dos formas de medir sin declararlo.
+* **M116 (durable sin store)** — si el hecho ``sinkFailuresDurable`` se publica sin store detrás,
+  la lectura afirma una constancia durable que no existe.
+* **M117 (sesión envenenada por el fallo)** — si la escritura fallida de la racha no limpia la
+  sesión del tick (``rollback``), el siguiente store del MISMO turno muere con
+  ``PendingRollbackError``: una traza rota por un fallo ya declarado.
+* **M118 (sesión envenenada por el reset)** — lo mismo por la puerta del reset: un ``record_success``
+  que no se puede escribir tampoco puede dejar la sesión del turno inservible.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -331,6 +358,7 @@ REGIME_READER = "packages/py/application/src/bolsa_application/auto_cycle_regime
 ADAPTIVE_JOURNAL = "packages/py/application/src/bolsa_application/auto_adaptive_journal.py"
 ADAPTIVE_RECOVERY = "packages/py/application/src/bolsa_application/auto_adaptive_recovery.py"
 CYCLE_TRACE = "packages/py/application/src/bolsa_application/auto_cycle_reconciliation.py"
+ADAPTIVE_GATE_STORE = "packages/py/application/src/bolsa_application/adaptive_gate_store.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 
 # --- suites que deben morder ----------------------------------------------------------------
@@ -364,6 +392,8 @@ T_ADAPTIVE_JOURNAL = "packages/py/application/tests/test_auto_adaptive_journal.p
 T_ADAPTIVE_RECOVERY = "packages/py/application/tests/test_auto_adaptive_recovery.py"
 T_CYCLE_TRACE = "packages/py/application/tests/test_auto_cycle_reconciliation.py"
 T_ADAPTIVE_SEAM = "apps/api-python/tests/test_auto_v52_auto11_adaptive_state_seam.py"
+T_GATE_STORE = "packages/py/application/tests/test_adaptive_gate_store.py"
+T_GATE_DURABLE_SEAM = "apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py"
 T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
@@ -1204,6 +1234,105 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "                continue\n"
         "            multipliers[version] = _clamp_unit(min(multipliers[version], float(reading.step)))\n",
         (T_ADAPTIVE,),
+    ),
+    (
+        "M108 (racha que se resetea al reiniciar): el arranque deja de sembrar la racha durable",
+        WORKER,
+        # El fragmento del seed va solo (la definición es ``async def``): si se mutara la llamada
+        # de otro método, la matriz mediría otra cosa.
+        "        await self._v2_recover_adaptive_gate_streak()\n",
+        "        pass\n",
+        (T_GATE_DURABLE_SEAM,),
+    ),
+    (
+        "M109 (fallo que no persiste): el fallo se cuenta en el proceso y no se escribe",
+        WORKER,
+        "            persisted = await store.record_failure(\n"
+        "                self._account_id or \"\", self._engine_id, at=self._v2_instant()\n"
+        "            )\n",
+        "            persisted = local\n",
+        (T_GATE_DURABLE_SEAM,),
+    ),
+    (
+        "M110 (racha durable leida pero ignorada): la fila se lee y el valor se descarta",
+        WORKER,
+        "        self._v2_adaptive_sink_failures_durable = True\n"
+        "        self._v2_adaptive_sink_failures = sink_failures_from_state(state)\n",
+        "        self._v2_adaptive_sink_failures_durable = True\n"
+        "        self._v2_adaptive_sink_failures = 0\n",
+        (T_GATE_DURABLE_SEAM,),
+    ),
+    (
+        "M111 (reset amplificando): el reset escribe aunque no haya racha viva",
+        ADAPTIVE_GATE_STORE,
+        "        if previous is None or sink_failures_from_state(previous) <= 0:\n",
+        "        if previous is None:\n",
+        (T_GATE_STORE, T_GATE_DURABLE_SEAM),
+    ),
+    (
+        "M112 (racha de otra cuenta): el load deja de casar la cuenta",
+        ADAPTIVE_GATE_STORE,
+        '        return self._rows.get((str(account_id or ""), str(engine_id or "")))\n',
+        '        return self._rows.get(("", str(engine_id or "")))\n',
+        (T_GATE_STORE,),
+    ),
+    (
+        "M113 (ilegible tratado como sano): el estado durable ilegible se declara durable",
+        WORKER,
+        "            self._v2_adaptive_sink_failures_durable = False\n"
+        "            logger.exception(\n"
+        '                "auto_sim v2 adaptive gate streak UNREAD; arranca a 0 (sin constancia durable)"\n',
+        "            self._v2_adaptive_sink_failures_durable = True\n"
+        "            logger.exception(\n"
+        '                "auto_sim v2 adaptive gate streak UNREAD; arranca a 0 (sin constancia durable)"\n',
+        (T_GATE_DURABLE_SEAM,),
+    ),
+    (
+        "M114 (ilegible tratado como fallo): el estado durable ilegible se cuenta como fallo",
+        WORKER,
+        "            self._v2_adaptive_sink_failures_durable = False\n"
+        "            logger.exception(\n"
+        '                "auto_sim v2 adaptive gate streak UNREAD; arranca a 0 (sin constancia durable)"\n',
+        "            self._v2_adaptive_sink_failures = 1\n"
+        "            logger.exception(\n"
+        '                "auto_sim v2 adaptive gate streak UNREAD; arranca a 0 (sin constancia durable)"\n',
+        (T_GATE_DURABLE_SEAM,),
+    ),
+    (
+        "M115 (sello sin subir): la procedencia cambia y la version de politica no",
+        AUTO_ADAPTIVE_DATA_GATE,
+        'DATA_GATE_POLICY_VERSION = "auto15-v1"',
+        'DATA_GATE_POLICY_VERSION = "auto13-v1"',
+        (T_DATA_GATE,),
+    ),
+    (
+        "M116 (durable sin store): el hecho sinkFailuresDurable se publica sin store",
+        WORKER,
+        "            sink_failures_durable=bool(\n"
+        '                getattr(self, "_v2_adaptive_sink_failures_durable", False)\n'
+        "            ),\n",
+        "            sink_failures_durable=True,\n",
+        (T_GATE_DURABLE_SEAM,),
+    ),
+    (
+        "M117 (sesion envenenada por el fallo): la escritura fallida no limpia la sesion del tick",
+        ADAPTIVE_GATE_STORE,
+        "            await self._session.rollback()\n"
+        "            raise\n"
+        "        return failures\n",
+        "            raise\n"
+        "        return failures\n",
+        (T_GATE_STORE,),
+    ),
+    (
+        "M118 (sesion envenenada por el reset): el reset fallido no limpia la sesion del tick",
+        ADAPTIVE_GATE_STORE,
+        "            await self._session.rollback()\n"
+        "            raise\n"
+        "        return reset\n",
+        "            raise\n"
+        "        return reset\n",
+        (T_GATE_STORE,),
     ),
 ]
 

@@ -198,6 +198,14 @@ jobs:
         # revés). Su costura en el worker
         # (``apps/api-python/tests/test_auto_v52_auto11_adaptive_state_seam.py``) entra por
         # el pase de directorio de ``apps/api-python/tests`` de abajo.
+        # V2.56/AUTO-15 (racha durable del Data Gate): la certificación contra PG REAL
+        # (``test_auto_v56_auto15_data_gate_pg.py``) vive en el job ``auto-v2-durable-pg``,
+        # así que aquí va en ``--ignore`` —sin PG skipearía en mudo y aparentaría cubrirla—.
+        # Los puros del store (``packages/py/application/tests/test_adaptive_gate_store.py``,
+        # entrada explícita más arriba) y la declaración del gate (``test_auto_adaptive_data_gate.py``,
+        # pase de directorio de analytics) corren aquí; la costura del reinicio
+        # (``apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py``) entra por
+        # el pase de directorio de ``apps/api-python/tests``.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -236,6 +244,7 @@ jobs:
           packages/py/application/tests/test_auto_adaptive_journal.py
           packages/py/application/tests/test_auto_adaptive_recovery.py
           packages/py/application/tests/test_auto_cycle_reconciliation.py
+          packages/py/application/tests/test_adaptive_gate_store.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
@@ -283,6 +292,7 @@ jobs:
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
+          --ignore=apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -478,7 +488,7 @@ jobs:
     # el worker nuevo rehidrata el mismo PositionState (no lo reconstruye por ATR) y
     # sigue vetando el re-emitir la misma señal. Gate fail-if-skipped: sin PG real un
     # skip silencioso sería una certificación fantasma.
-    name: auto-v2-durable-pg (Alembic 040-043 + reinicio real, per-commit)
+    name: auto-v2-durable-pg (Alembic 040-045 + reinicio real, per-commit)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -517,6 +527,12 @@ jobs:
       # HALT durable (``auto_kill_state``) de la 043: un reinicio real no puede olvidar la
       # parada ni reutilizar una identidad histórica, y eso solo se mide contra PG real.
       AUTO_RESERVATION_PG_REQUIRED: '1'
+      # V2.56/AUTO-15 (racha durable del Data Gate): la racha de fallos consecutivos del
+      # sink se persiste en ``adaptive_gate_state`` (migración 045) para que un reinicio
+      # NO devuelva el gate a "sano" ni pierda una racha a punto de ser ``STALE``. Solo se
+      # certifica contra PG real (roundtrip de la 045 + otra sesión leyendo la racha); sin
+      # PG el test skipearía en mudo e invalidaría la certificación.
+      ADAPTIVE_GATE_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -534,7 +550,7 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Alembic upgrade head (hasta 043 incluida)
+      - name: Alembic upgrade head (hasta 045 incluida)
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
       # V2.40.2: ``pipefail`` es obligatorio. Con ``... | tee log`` el step devuelve el
@@ -548,7 +564,10 @@ jobs:
       # (identidad de salida) más la columna ``exit_order_id`` de la reserva: se certifica el
       # roundtrip, que el INTENT y el HALT SOBREVIVEN al reinicio real (otra sesión) y que un
       # fill parcial actualiza el INTENT sin mintear una segunda identidad.
-      # Gate fail-if-skipped: AUTO_RESERVATION_PG_REQUIRED=1.
+      # V2.56/AUTO-15: la racha durable del Data Gate (migración 045) — roundtrip, la racha
+      # que SOBREVIVE al reinicio (otra sesión) y el gate que sigue en ``STALE``, el
+      # incremento atómico por clave y el reset que no amplifica.
+      # Gate fail-if-skipped: ADAPTIVE_GATE_PG_REQUIRED=1.
       - name: Pytest AUTO 2.0 durable PG (fail if skipped)
         run: |
           set -o pipefail
@@ -559,6 +578,7 @@ jobs:
             apps/api-python/tests/test_unique_natural_keys_pg.py \
             apps/api-python/tests/test_portfolio_reservation_pg.py \
             apps/api-python/tests/test_auto_v44_exit_identity_pg.py \
+            apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py \
             apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 

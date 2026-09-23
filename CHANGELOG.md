@@ -2,6 +2,126 @@
 
 All notable releases of Bolsa V1.
 
+## [1.81.0-beta] — AUTO-15 Data Gate persistido (V2.56) — 2026-09-23
+
+**Migración nueva** `045_adaptive_gate_state`: Alembic head `044_auto_cycle_trace` → **`045_adaptive_gate_state`**
+(aditiva, **sin backfill**, `upgrade`/`downgrade` **simétricos e idempotentes**). Sin SHORT, sin UI nueva,
+sin cambio de contrato de API ni de DTO y **sin clave nueva en el journal durable** (la proyección por
+lista blanca `riskMultipliers` + `evidenceAxis` de `auto_adaptive_journal.py:58` queda **byte a byte
+igual**). El gobernador y su evidencia siguen **intactos** (diff vacío, script `exit 0`). El invariante que
+instala: **«no acusar sin prueba» sobrevive a un reinicio** — la racha de fallos **consecutivos** del sink
+del gate de `AUTO-13` vivía **solo en la memoria del proceso**, así que
+
+```
+WORKER 1 → 2 fallos del sink (DEGRADED) → CRASH → WORKER 2 → 0 fallos → OK
+```
+
+y **no era reconstruible**: un fallo de escritura no dejó fila en `decision_journal_entries` y el ancla de
+antigüedad mide *publicación*, no *error*. Cierra la **séptima pregunta del epic**: `AUTO-9` *«¿cuánto
+vale?»* · `AUTO-10` *«¿de qué ciclo es?»* · `AUTO-11` *«¿dónde vive su memoria?»* · `AUTO-12` *«¿cuánto
+puedo creérmelo?»* · `AUTO-13` *«¿están sanos los datos con los que me lo creo, y cómo vuelvo?»* ·
+`AUTO-14` *«¿el peso que reparto se midió en el régimen en el que voy a operar?»* · **`AUTO-15`
+*«¿sobrevive esa prueba a un reinicio?»***. Adaptive **sigue siendo recomendador read-only** y **el flag
+sigue OFF por defecto**: con OFF esta fase **no ejecuta ni un I/O nuevo** y el runtime publicado es, en
+comportamiento, el de `v2.53`.
+
+### Añadido: la tabla del estado durable y su store (`adaptive_gate_state`)
+
+- **Migración `045_adaptive_gate_state`** (`packages/py/infrastructure/alembic/versions/045_adaptive_gate_state.py`):
+  tabla `adaptive_gate_state` con **PK `(account_id, engine_id)`** (misma clave con la que se identifica el
+  motor Adaptive: con `(account_id)` a secas, dos motores de la misma cuenta compartirían racha y uno
+  **curaría** el fallo del otro), `sink_failures` (consecutivos, `server_default='0'`), `last_failure_at`,
+  `last_success_at` y `updated_at`, más el índice `adaptive_gate_state_account_failures_idx`
+  `(account_id, sink_failures)` («¿qué motores de esta cuenta arrastran racha?»). Idempotente y simétrico
+  (helpers `_table_exists`/`_index_exists`; `downgrade` retira el índice y después la tabla).
+- **Fila ORM** `AdaptiveGateStateRow` (`tables.py`), espejo de `AutoKillStateRow`.
+- **Store nuevo** `packages/py/application/src/bolsa_application/adaptive_gate_store.py`: contrato puro
+  (`AdaptiveGateState` + `sink_failures_from_state` con clamp defensivo), **gemelo in-memory** con la misma
+  semántica y `PostgresAdaptiveGateStore`. **Dos operaciones, y ninguna guarda la fila entera**:
+  - `record_failure` — **incremento atómico** (`INSERT … ON CONFLICT (account_id, engine_id) DO UPDATE SET
+    sink_failures = sink_failures + 1`): un `load`+`save` perdería fallos concurrentes, y la racha es justo
+    el dato que no puede perderse.
+  - `record_success` — **reset sin amplificación** (`UPDATE … WHERE sink_failures > 0`): sin racha viva no
+    escribe **nada** (ni crea fila), así que un despliegue sano **no paga una escritura por tick**.
+  - `commit` propio (patrón `kill_switch_store.py`) y **`rollback` + `raise`** en el fallo de escritura
+    (contrato del sink de `AUTO-10`): el store escribe en la **misma sesión del tick**, así que una
+    escritura fallida no puede dejar la sesión envenenada para el siguiente store del turno.
+- **Sin backfill:** una fila ausente significa «no hay constancia durable de fallos» (racha `0`
+  **declarada**), nunca un cero fabricado.
+
+### Añadido: el contador durable en el worker (siembra, incremento y reset)
+
+- **Siembra al arrancar** (`_v2_recover_adaptive_gate_streak`, `auto_simulation_worker.py`), **una vez por
+  proceso** y **antes** del primer plan y de los atajos del lector del journal: el escenario en que más
+  importa —journal **roto**, `read_ok = False`— es justo el que se perdía; sembrar después habría
+  reiniciado la racha a `0` precisamente cuando hacía falta.
+- **Gateado por `adaptive_enabled`**: con el flag OFF no hay lectura ni escritura nuevas (cero I/O).
+- **Incremento** al fallar el sink y **reset** al publicar, ambos **fail-open declarados**: sin store o con
+  lectura rota, la racha cae al proceso con `sinkFailuresDurable = false` y el motivo en el log — **nunca**
+  se finge salud ni fallo.
+- La racha durable **manda** cuando el store contesta: el número persistido sustituye al del proceso y se
+  publica en el log del tick.
+
+### Modificado: el gate declara la PROCEDENCIA de la racha y sella `auto15-v1`
+
+- `DATA_GATE_POLICY_VERSION` → **`auto15-v1`**: cambia la **procedencia** de uno de los hechos.
+- **No** cambia nada sellado del gate: umbrales (`sink_failures_stale = 3`, `journal_gap_blocked = 10`,
+  `evaluation_cycle_seconds = 60.0`), tabla estado→efecto y precedencia `BLOCKED > STALE > DEGRADED > OK`
+  quedan **byte a byte iguales**; tampoco se toca `ADAPTIVE_POLICY_VERSION` (sigue `auto14-v1`: la regla de
+  **reparto** no cambia y subirla sería mentir sobre ella).
+- **Hecho nuevo `sinkFailuresDurable`** en `DataGateReading.as_dict()`, **por defecto `false`**: sin
+  declaración del llamante **no** se afirma durable, y el gate da el **mismo** estado con la racha durable
+  que con la de proceso (la procedencia se **declara**, no graduía).
+- **Sin consecuencia de mismatch:** `policy_version_mismatch` que recibe el gate sale del **estado
+  Adaptive**, no de `DATA_GATE_POLICY_VERSION`, así que este sello **no** marca un tick `STALE` en filas
+  históricas (a diferencia de `auto14-v1`, que sí se compara sobre el journal).
+
+### Verificación
+
+- **Unit del gate** (`test_auto_adaptive_data_gate.py`) **29 → 32** y **unit nuevo del store**
+  (`test_adaptive_gate_store.py`, **10 tests**); **costura nueva**
+  `apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py` (**9 tests**) por el camino real
+  del worker y **con control negativo** (sin store, el reinicio lee `0` y el gate vuelve a `OK`); **PG real
+  nuevo** `apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py` (**6 tests**, job
+  `auto-v2-durable-pg` con `ADAPTIVE_GATE_PG_REQUIRED=1`: roundtrip de la `045`, racha que **sobrevive a la
+  sesión nueva**, incremento atómico por clave, reset sin amplificación y sesión del tick **usable** tras
+  un fallo de escritura). **Tramo de la fase: `51 passed`** (+ `6` de PG), `0` rojos.
+- **Delta simétrico fichero a fichero contra `HEAD`** (nunca restando totales): **`0` rojos**. Un solo
+  fichero de test modificado (`test_auto_adaptive_data_gate.py`: su versión de `HEAD` da **`29 passed`**
+  contra el código nuevo) y tres **nuevos**. **Desviación medida y declarada:** el plan preveía «rojos
+  declarados» (el sello y el campo nuevo) y la medida dice **cero** — el literal `auto13-v1` no estaba
+  fijado por ningún test de `HEAD` y `sinkFailuresDurable` es **aditivo** en `as_dict()`. Restauración
+  verificada por `sha256`.
+- **Matriz de mutaciones ampliada** (`M108…M118`, **11 etiquetas**: racha que se resetea al reiniciar,
+  fallo que no persiste, racha durable leída pero ignorada, reset amplificando, store leyendo la fila de
+  **otra** cuenta, estado ilegible tratado como **sano** y como **fallo**, sello sin subir,
+  `sinkFailuresDurable` afirmado sin store y —añadidas al implementar el contrato de sesión— escritura y
+  reset fallidos que **no** limpian la sesión del tick): la corrida **completa** da **`118/118` medidas** y
+  **`0` etiquetas en `NADA`**, con restauración **byte a byte** y la huella `git status` **idéntica**
+  (`intacto: la sonda no altero el arbol`).
+- **Compuertas**: `ruff check packages/py apps/api-python --config pyproject.toml` **`All checks passed!`**,
+  `mypy` con el comando de CI **`0` errores en `498` ficheros`** e `import-linter` **`4 kept / 0 broken`**.
+  *(Trampa medida: `ruff check <rutas>` **sin** `--config pyproject.toml` resuelve el `pyproject` del
+  paquete y devuelve falsos `I001` —también sobre `kill_switch_store.py`, ya certificado—.)*
+- **Lo que no se pudo medir aquí**: la batería offline **completa** de los jobs `quality`/`python` del tag
+  (su recolección incluye suites PG que importan `asyncpg`, ausente, y el teardown de sesión del conftest
+  de `apps/api-python` exige PostgreSQL). **Ese límite lo cierra la CI del tag, medida.**
+
+### Límites declarados
+
+- **Solo se persiste la racha**, no el estado del gate ni el plan: el gate sigue siendo una **lectura** del
+  tick.
+- **Sin TTL ni decadencia:** una racha durable de un proceso muerto mantiene el gate degradado hasta la
+  **primera publicación**, que la resetea («se cura en un tick»). Un TTL sería una heurística no declarada;
+  una racha vieja es prueba **real** de que hubo fallos.
+- **Granularidad `(account_id, engine_id)`**, no por venue ni por sink.
+- **Peor caso declarado:** si el **reset** falla tras publicar, la racha durable se queda viva —el proceso
+  pierde la memoria de la curación— hasta el siguiente reinicio, que la vuelve a sembrar.
+- **Fuera de alcance, sin tocar:** la **UI** de `AUTO-7`…`AUTO-15` y el **coste REAL** por ciclo (hoy
+  estimado, así que el R neto cae a `PARTIAL`). Quedan declarados para `AUTO-16`.
+- **`governor.json` sigue sin trackear** y **el flag Adaptive sigue OFF por defecto**: esta fase **no se
+  ejecuta** en producción hasta un flag explícito.
+
 ## [1.80.0-beta] — AUTO-14 Reparto por CELDA de régimen (V2.55) — 2026-09-23
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,

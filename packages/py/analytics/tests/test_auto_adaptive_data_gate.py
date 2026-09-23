@@ -11,6 +11,10 @@ adaptación, nunca se convierten en un juicio sobre la estrategia.** De ahí los
   mantiene byte-idéntico el comportamiento cuando el gate no se pasa;
 * que un hueco **explícito** (sink caído, lectura durable rota, régimen ausente, medición
   parcial) sí module el estado, y que el régimen ausente **nunca** se lea como adverso.
+
+**AUTO-15** añade aquí el bloque de la **procedencia** de la racha de fallos: el sello
+(``auto15-v1``) y el hecho ``sinkFailuresDurable``, con el control de que declarar durable **no**
+mueve el estado (misma racha, mismo efecto) y de que sin declaración **no** se afirma durable.
 """
 
 from __future__ import annotations
@@ -230,6 +234,49 @@ def test_the_reading_publishes_the_facts_for_audit() -> None:
     assert payload["measurementCompleteness"] == "PARTIAL"
     assert payload["policyVersionMismatch"] is True
     assert isinstance(payload["notes"], list)
+
+
+def test_the_policy_version_seals_the_auto15_durable_streak_contract() -> None:
+    """No es tautología: un merge que devolviera ``auto13-v1`` movería el sello sin avisar.
+
+    ``auto15-v1`` sella que la PROCEDENCIA de la racha de fallos del sink cambia (de proceso a
+    durable). Los umbrales y la tabla estado→efecto NO cambian; si cambiasen, este test seguiría
+    pasando y el sello sería el que mintiera, así que se afirma el literal.
+    """
+    assert DATA_GATE_POLICY_VERSION == "auto15-v1"
+
+
+def test_the_provenance_of_the_streak_is_declared_and_never_grades() -> None:
+    """La procedencia se declara con su campo propio y NO mueve el estado: misma racha, mismo efecto.
+
+    Un ``0`` procedente del estado durable y un ``0`` nacido en el proceso valen lo mismo para el
+    gate; lo que cambia es lo que un lector del log puede afirmar sobre él.
+    """
+    durable = assess_data_gate(sink_failures=1, sink_failures_durable=True)
+    in_process = assess_data_gate(sink_failures=1, sink_failures_durable=False)
+
+    assert durable.status == in_process.status == DATA_GATE_DEGRADED
+    assert durable.effect == in_process.effect == DATA_GATE_LIMITS
+    assert durable.as_dict()["sinkFailuresDurable"] is True
+    assert in_process.as_dict()["sinkFailuresDurable"] is False
+    # El resto de la lectura es idéntica: la procedencia no es un criterio encubierto.
+    assert {
+        key: value
+        for key, value in durable.as_dict().items()
+        if key != "sinkFailuresDurable"
+    } == {
+        key: value
+        for key, value in in_process.as_dict().items()
+        if key != "sinkFailuresDurable"
+    }
+
+
+def test_the_provenance_defaults_to_not_durable_when_the_caller_does_not_declare_it() -> None:
+    """Sin declaración, NO se afirma durable: la ausencia de prueba no se convierte en prueba."""
+    payload = assess_data_gate(sink_failures=3).as_dict()
+
+    assert payload["status"] == DATA_GATE_STALE
+    assert payload["sinkFailuresDurable"] is False
 
 
 def test_the_gate_never_blocks_on_missing_evidence() -> None:
