@@ -96,6 +96,15 @@ read-only** y **el flag sigue OFF por defecto**: con OFF el camino de producció
 - **Lo que no se pudo medir aquí**: la batería offline **completa** de los jobs `quality`/`python` del tag
   (su recolección incluye suites PG que importan `asyncpg`, ausente, y el teardown de sesión del conftest
   de `apps/api-python` exige PostgreSQL). **Ese límite lo cierra la CI del tag, medida.**
+- **CI del tag `v2.55-beta`** ([run `35889751810`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751810)):
+  **GREEN** con **`10 success` + `1 skipped`** (`playwright (integrated E2E, opt-in)`) y `certify
+  (aggregate + artifact)` en `success`; job `quality` del tag `ruff` **`All checks passed!`** y `pytest`
+  **`2575 passed / 38 skipped`** (**+7** passed y **+3** skipped sobre los `2568 / 35` del sello
+  `v2.54-beta`; la causa de los `+3` skipped **no se atribuye**: delta medido y declarado), los **4 jobs
+  PG** (`grammar-discovery-pg`, `auto-v2-durable-pg`, `lifecycle-pg`, `paper-forward-pg`) **verdes** y
+  `check-runs` del commit sellado (`e29e6227`) **`26 success` + `1 skipped`**. `main` en **fast-forward**
+  (`6fad572d..e29e6227`) con `Python CI`, `Frontend CI`, `Optimize lab` y `Gitleaks` **verdes**. El tag se
+  empujó **suelto** (`git push origin v2.55-beta`, sin `--follow-tags`).
 
 ### Límites declarados
 

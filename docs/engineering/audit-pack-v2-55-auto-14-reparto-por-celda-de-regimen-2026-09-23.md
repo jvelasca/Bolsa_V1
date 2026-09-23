@@ -270,5 +270,42 @@ el esquema. **Sin migración** (Alembic head `044_auto_cycle_trace`), sin SHORT,
 El paquete de cierre (este pack, el [relevo](./traspaso-relevo-post-v2.55-auto-14-reparto-por-celda-de-regimen-2026-09-23.md),
 el [arranque del auditor](./arranque-auditor-v2.55-auto-14-reparto-por-celda-de-regimen-2026-09-23.md) y el
 [del agente siguiente](./arranque-agente-post-v2.55-auto-14-2026-09-23.md), `CHANGELOG.md`,
-`PROJECT_STATE.md` y el índice) viaja **dentro** del tag. La tabla de runs de CI se escribe en §12 con las
-cifras **medidas**.
+`PROJECT_STATE.md` y el índice) viaja **dentro** del tag. **Excepción declarada:** esta §12 con los runs
+de CI **medidos** se añade en el commit de docs **posterior** al sello (mismo patrón que `AUTO-13`): el run
+del tag no existe hasta que el tag se empuja, así que la tabla se **mide** en lugar de predecirse.
+
+---
+
+## 12. CI del sello `v2.55-beta` (medida, no predicha)
+
+`main` en **fast-forward**: `6fad572d..e29e6227`. Tag anotado `v2.55-beta` empujado **suelto**
+(`git push origin v2.55-beta`, **sin** `--follow-tags`) sobre `e29e6227`.
+
+| Workflow (tag `v2.55-beta`) | Run | Resultado |
+| --- | --- | --- |
+| `Release tag CI` | [35889751810](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751810) | **GREEN**: `10 success` + `1 skipped` |
+| `Python CI` | [35889751749](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751749) | **success** (`quality` + los 4 jobs PG) |
+| `Frontend CI` | [35889751788](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751788) | **success** |
+| `Fase 2 scientific` | [35889751748](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751748) | **success** |
+| `Optimize lab` | [35889751772](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751772) | **success** |
+
+| Workflow (`main` @ `e29e6227`) | Run | Resultado |
+| --- | --- | --- |
+| `Python CI` | [35889720890](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889720890) | **success** |
+| `Frontend CI` | [35889720941](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889720941) | **success** |
+| `Optimize lab` | [35889720951](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889720951) | **success** |
+| `Gitleaks` | [35889720789](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889720789) | **success** |
+
+- `check-runs` del commit sellado `e29e6227`: **`27` totales → `26 success` + `1 skipped`** (el `skipped`
+  es `playwright (integrated E2E, opt-in)`, el mismo que en `v2.54`).
+- Job `quality` del tag (el que re-ejecuta las compuertas §5 en CI): `Ruff` → **`All checks passed!`**;
+  `Pytest` → **`2575 passed, 38 skipped, 6 warnings in 107.89s`**.
+- **Delta medido contra el sello anterior** (`v2.54-beta`, job `python` del tag): `2568 passed` / `35
+  skipped` → **`2575 passed` / `38 skipped`** (`+7` passed, `+3` skipped). **Lo que no está medido aquí:**
+  la causa de los `+3` skipped **no** se ha atribuido en esta pasada ⇒ se declara como **delta medido sin
+  atribuir** (no se silencia ni se le supone un motivo).
+- Los **4 jobs PG** del tag (`grammar-discovery-pg`, `auto-v2-durable-pg`, `lifecycle-pg`,
+  `paper-forward-pg`) siguen **verdes**: el límite offline declarado en §8 (`asyncpg` + PostgreSQL real)
+  queda **cerrado por la CI del tag**, medida.
+- La **matriz de mutaciones** se midió **antes** de sellar (`107/107`, `0` en `NADA`, árbol intacto) y las
+  compuertas §5 se midieron **dos veces**: en local (§8) y en la CI del tag (§12).

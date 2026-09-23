@@ -209,9 +209,14 @@ arranque anterior, con alcance **core backend**, **sin UI**, **sin migración** 
 - **Matriz de mutaciones COMPLETA:** **`107/107` muerden**, **`0`** en `NADA`, **`0`** fragmentos
   ausentes, restauración **byte a byte** y huella `git status` **idéntica** (`intacto: la sonda no
   altero el arbol`).
-- **Sello:** tag anotado **`v2.55-beta`** sobre el commit del paquete de cierre, empujado **de uno en
-  uno** (sin `--follow-tags`), y `main` en **fast-forward**. Cifras de CI del tag en el audit-pack (§12)
-  y en la cabecera de `PROJECT_STATE.md`.
+- **Sello:** tag anotado **`v2.55-beta`** sobre el commit del paquete de cierre (`e29e6227`), empujado
+  **de uno en uno** (sin `--follow-tags`), y `main` en **fast-forward** (`6fad572d..e29e6227`). Tabla de
+  runs en el audit-pack (§12). **Medido:** `Release tag CI`
+  [35889751810](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751810) **GREEN** (`10 success` +
+  `1 skipped`), job `quality` del tag **`2575 passed / 38 skipped`** con `Ruff: All checks passed!`, los
+  **4 jobs PG verdes** y `check-runs` del commit sellado **`26 success + 1 skipped`**. **Delta contra el
+  sello anterior:** `2568/35` → `2575/38` (la causa de los `+3` skipped **no** se atribuye: delta medido
+  sin atribuir).
 - **Lo que no se pudo medir aquí:** la batería offline **completa** de los jobs `quality`/`python` del
   tag (su recolección incluye suites PG que importan `asyncpg`, ausente, y el teardown de sesión exige
   PostgreSQL). **Ese límite lo cierra la CI del tag, medida.**
