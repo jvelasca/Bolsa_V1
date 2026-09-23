@@ -66,7 +66,8 @@ mide *publicación*, no *error*.
 
 - **Rama:** `main` (la fase **viajó** en fast-forward lineal, **sin merge commit y sin rama de fase en el
   sello**). **Superficie de auditoría abierta POST-sello** (declarada, no silenciosa): la rama
-  `auto-15-data-gate-persistido` con su **PR draft** sobre una base anclada en `e29e6227`, abierto
+  `auto-15-data-gate-persistido` con su **PR draft** sobre una base anclada en `b96ae624` (el commit
+  justo anterior a la fase: el plan ratificado), abierto
   **después** del sello **solo** para que el auditor externo revise el delta con comentarios en línea; su
   **diff medido** y el enlace del PR se declaran en el commit de docs **posterior** al sello (mismo patrón
   que `AUTO-14`). **No** es vehículo de merge: `main` ya la recibió. Árbol limpio **salvo `governor.json`**
@@ -173,10 +174,11 @@ nueva) + costura (`test_auto_v56_auto15_data_gate_durable_seam.py`, **9**, nueva
    paquete y reporta falsos `I001` en ficheros ya certificados (le pasó a esta fase, y también a
    `kill_switch_store.py`): usa **el comando de CI**.
 2. **Delta simétrico fichero a fichero contra `HEAD`** (nunca restando totales): los tests
-   **modificados** se corren también en su versión de `HEAD` contra el código nuevo. Los rojos
-   admisibles son los **declarados** (el sello del gate y el campo nuevo); cualquier otro rojo es
-   regresión. `git show HEAD:<f>` **fabrica bytes nulos** en PowerShell: lee y reescribe **bytes** con
-   Python y **verifica la restauración**.
+   **modificados** se corren también en su versión de `HEAD` contra el código nuevo. El **único rojo
+   admisible** es un contrato que la fase **declara** como cambiado (un sello de política, una regla que
+   se mueve): cualquier otro rojo es regresión. En esta fase se midió **`0` rojos** (§6), porque el sello
+   no tenía literal en `HEAD` y el campo nuevo es aditivo. `git show HEAD:<f>` **fabrica bytes nulos** en
+   PowerShell: lee y reescribe **bytes** con Python y **verifica la restauración**.
 3. **Mutaciones**: `uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py` (filtro por
    rótulo: `… M108 M109`). Gate: la matriz **completa** (`M1…M118`) sin ninguna etiqueta en `NADA`, sin
    fragmentos ausentes y con el árbol **intacto** al terminar. **El `stdout` de Python bufferiza por

@@ -12,7 +12,9 @@ Las `ruta:línea` de este documento están **verificadas en el árbol el 2026-09
 ya medido.
 
 **Contexto del sello:** la fase entera viaja en **fast-forward** sobre `e29e6227` (el commit sellado de
-`AUTO-14`), **sin merge commit** y sin rama de fase. **Superficie de auditoría:** el **PR draft** de la
+`AUTO-14`), **sin merge commit** y sin rama de fase: el padre inmediato del commit sellado es
+`b96ae624` (el plan ratificado, tras los dos commits de docs del sello de `AUTO-14`). **Superficie de
+auditoría:** el **PR draft** de la
 rama `auto-15-data-gate-persistido` se abre **después** del sello **solo** para revisar con comentarios en
 línea; su diff medido es el de la fase y **no** es vehículo de merge. **SÍ hay migración:** Alembic head
 `044_auto_cycle_trace` → **`045_adaptive_gate_state`**.

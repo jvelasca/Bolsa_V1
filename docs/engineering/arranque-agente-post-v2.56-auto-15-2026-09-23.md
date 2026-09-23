@@ -42,9 +42,9 @@ declara; nunca se silencia.
 | Corte | Estado | Ref |
 | --- | --- | --- |
 | `AUTO-15` (Data Gate persistido) | **cerrada y sellada** | tag **`v2.56-beta`**, `1.81.0-beta` |
-| `main` | **recibió la fase** (fast-forward, sin merge) | `e29e6227..<commit sellado>` |
+| `main` | **recibió la fase** (fast-forward, sin merge) | `b96ae624..c62ac459` (el commit sellado) |
 | Tag | **`v2.56-beta`** empujado **suelto** (sin `--follow-tags`) | `Release tag CI` **GREEN**, run y cifras **medidos** y citados en el §11 del [audit-pack](./audit-pack-v2-56-auto-15-data-gate-persistido-2026-09-23.md) (commit post-sello) |
-| Rama de auditoría | `auto-15-data-gate-persistido` · **PR draft** (abierto **post-sello**, no es vehículo de merge) | delta completo sobre `v2.55`: base `e29e6227` → commit sellado (cifras y enlace del PR en el commit post-sello) |
+| Rama de auditoría | `auto-15-data-gate-persistido` · **PR draft** (abierto **post-sello**, no es vehículo de merge) | delta completo sobre `v2.55`: `audit-base-v2.55-beta` @ `b96ae624` → `c62ac459` (cifras y enlace del PR en el commit post-sello) |
 | Runtime | **el de `v2.53-beta`**: flag Adaptive **OFF** | sin racha que leer ni que escribir: **cero I/O nuevo** |
 | Migración | **SÍ**: head `044_auto_cycle_trace` → **`045_adaptive_gate_state`** | aditiva, sin backfill, downgrade simétrico |
 | Árbol | limpio **salvo `governor.json`** (sin trackear) | — |
@@ -123,6 +123,11 @@ costura `apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py` (
 ---
 
 ## 5. Candidatos para `AUTO-16` (declarados, **no decididos**)
+
+**Rótulos:** se conserva la numeración del arranque anterior (`A` = Data Gate persistido, que quedó
+**ratificado y ejecutado** como `AUTO-15`, y por eso ya no está en la tabla) para **no renumerar** las
+referencias cruzadas del arranque del auditor (§9: el coste es **C**, la caducidad de la racha es **D**).
+La propuesta que se espere de ti usa rótulos **nuevos** (A/B/C): esta tabla es solo el punto de partida.
 
 | # | Candidato | Invariante que protege | Migración |
 | --- | --- | --- | --- |
