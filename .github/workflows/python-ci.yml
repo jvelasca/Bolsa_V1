@@ -188,6 +188,16 @@ jobs:
         # consumo en el worker (``test_auto_v51_auto10_cycle_regime_seam.py``) entra por el
         # pase de directorio, y la durabilidad real (escritor + lector desde OTRA sesión)
         # se certifica con PG en el job ``auto-v2-durable-pg``.
+        # V2.52/AUTO-11 (estado Adaptive durable): los TRES módulos puros nuevos viven en
+        # ``packages/py/application/tests``, que NO tiene pase de directorio aquí, así que
+        # van EXPLÍCITOS o no correrían en ninguna parte:
+        # ``test_auto_adaptive_journal.py`` (evento, builder y ``decision_id`` determinista
+        # por turno), ``test_auto_adaptive_recovery.py`` (racha trailing por versión,
+        # saturación del contador, política que cambia y huecos declarados) y
+        # ``test_auto_cycle_reconciliation.py`` (ciclo con capital y sin traza, y al
+        # revés). Su costura en el worker
+        # (``apps/api-python/tests/test_auto_v52_auto11_adaptive_state_seam.py``) entra por
+        # el pase de directorio de ``apps/api-python/tests`` de abajo.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -223,6 +233,9 @@ jobs:
           packages/py/application/tests/test_cycle_risk.py
           packages/py/application/tests/test_auto_cycle_journal.py
           packages/py/application/tests/test_auto_cycle_regime_reader.py
+          packages/py/application/tests/test_auto_adaptive_journal.py
+          packages/py/application/tests/test_auto_adaptive_recovery.py
+          packages/py/application/tests/test_auto_cycle_reconciliation.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py

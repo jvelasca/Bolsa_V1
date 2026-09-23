@@ -9,8 +9,10 @@ Lo que se prueba es la DISCIPLINA de la lectura, no el acceso a datos (ese puert
   derivable), porque un solo contador mentiría en alguno;
 * que el ``decision_id`` se pida al puerto ya derivado y en tandas acotadas;
 * que un régimen declarado ``None`` (``UNKNOWN`` en la traza) no se convierta en un valor;
-* que el reintento del tick (varias filas del mismo ciclo) no rompa nada y **se declare**: gana
-  la confirmación más nueva y las filas de más se cuentan en ``duplicates`` (paso 4).
+* que el reintento del tick (varias filas del mismo ciclo) no rompa nada y **se declare**: gana la
+  confirmación más nueva; ``duplicates`` cuenta las TRAZAS de más y ``extra_rows`` todas las filas
+  de más (incluida la entrada de ventana del mismo ``decision_id``, que es normal, no un duplicado)
+  —paso 4, separación de AUTO-11—.
 """
 
 from __future__ import annotations
@@ -160,6 +162,9 @@ async def test_a_retry_declares_the_rows_it_collapsed() -> None:
     assert reading.collapsed_rows == 1
     assert summary["duplicates"] == {"cyc-aaa": 1}
     assert summary["collapsedRows"] == 1
+    # La cuenta de FILAS de más coincide aquí con la de trazas: las dos filas son trazas.
+    assert reading.extra_rows == {"cyc-aaa": 1}
+    assert reading.discarded_rows == 1
     assert reading.gaps == 0, "un reintento no es un hueco: es una lectura con nota"
 
 
@@ -177,6 +182,8 @@ async def test_every_extra_row_is_counted_not_just_the_second_one() -> None:
     assert reading.regime_by_cycle == {"cyc-aaa": "C"}, "gana la primera servida (la más nueva)"
     assert reading.duplicates == {"cyc-aaa": 2}
     assert reading.collapsed_rows == 2
+    assert reading.extra_rows == {"cyc-aaa": 2}
+    assert reading.discarded_rows == 2
 
 
 @pytest.mark.asyncio
@@ -188,6 +195,8 @@ async def test_a_single_trace_declares_no_duplicates() -> None:
 
     assert reading.duplicates == {}
     assert reading.collapsed_rows == 0
+    assert reading.extra_rows == {}
+    assert reading.discarded_rows == 0
 
 
 @pytest.mark.asyncio
@@ -203,6 +212,7 @@ async def test_an_unusable_row_of_more_is_declared_as_gap_not_as_duplicate() -> 
     assert reading.unconfirmed == ("cyc-aaa",)
     assert reading.duplicates == {}, "no hay régimen publicado: llamarlo duplicado confundiría"
     assert reading.collapsed_rows == 0
+    assert reading.extra_rows == {}, "sin ganadora tampoco hay 'filas de más' que declarar"
 
 
 @pytest.mark.asyncio
@@ -231,8 +241,29 @@ async def test_the_newest_CONFIRMING_row_wins_over_a_newer_window_entry() -> Non
     reading = await read_cycle_regimes(fetch, ["cyc-aaa"])
 
     assert reading.regime_by_cycle == {"cyc-aaa": "TREND_UP"}
-    assert reading.duplicates == {"cyc-aaa": 1}, "la fila no confirmante también se cuenta"
+    assert reading.duplicates == {}, "la entrada de ventana NO es una traza duplicada"
+    assert reading.extra_rows == {"cyc-aaa": 1}, "pero la fila de más SÍ se declara"
+    assert reading.discarded_rows == 1
     assert reading.unconfirmed == ()
+
+
+@pytest.mark.asyncio
+async def test_two_traces_collapse_even_when_one_declares_unknown() -> None:
+    """Una traza con ``marketRegime = None`` SIGUE siendo traza: dos trazas son un reintento.
+
+    Es la frontera de ``_is_trace``: si "no usable" se confundiera con "no es traza", el segundo
+    intento del tick (que puede publicar un régimen que el primero no tuvo) quedaría sin declarar.
+    """
+    fetch = _Fetch(
+        _entry(decision_id="dec-aaa", cycle_id="cyc-aaa", regime=None, created_at="2"),
+        _entry(decision_id="dec-aaa", cycle_id="cyc-aaa", regime="RANGE", created_at="1"),
+    )
+
+    reading = await read_cycle_regimes(fetch, ["cyc-aaa"])
+
+    assert reading.regime_by_cycle == {"cyc-aaa": "RANGE"}, "el valor de la más nueva usable gana"
+    assert reading.duplicates == {"cyc-aaa": 1}
+    assert reading.extra_rows == {"cyc-aaa": 1}
 
 
 # ── La confirmación: la forma NO prueba origen ──────────────────────────────────────

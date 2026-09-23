@@ -29,6 +29,7 @@ from bolsa_application.cycle_risk import (
     CYCLE_RISK_MULTIPLE_RESERVATIONS,
     CYCLE_RISK_REGIME_NOT_DURABLE,
     CYCLE_RISK_REGIME_NOT_FOUND,
+    CYCLE_RISK_UNDATED_RESERVATION,
     CYCLE_RISK_WITHOUT_RISK,
     CycleRisk,
     apply_cycle_risk,
@@ -153,6 +154,68 @@ def test_the_oldest_entry_reservation_wins_and_the_rest_are_declared() -> None:
     assert evidence.risk_amount == Decimal("250.0")
     assert evidence.entry_reservations == 2
     assert CYCLE_RISK_MULTIPLE_RESERVATIONS in evidence.notes
+
+
+# ── AUTO-11: el desempate se mide en INSTANTES, no en texto ─────────────────────────
+
+
+def test_the_oldest_entry_reservation_is_measured_in_instants_not_in_text() -> None:
+    """Dos formatos ISO distintos: el texto miente, el instante no.
+
+    ``"08:00+02:00"`` es ANTERIOR a ``"07:00+00:00"`` (06:00 vs 07:00 UTC) aunque como cadena
+    ordene después. Con la clave de texto anterior ganaba la fila equivocada en cuanto un origen
+    serializara con offset distinto.
+    """
+    evidence = cycle_risk_from_reservations(
+        ["cyc-1"],
+        [
+            _reservation(
+                reservation_id="res-offset",
+                risk=250.0,
+                created_at="2026-09-22T08:00:00+02:00",
+            ),
+            _reservation(
+                reservation_id="res-utc",
+                risk=999.0,
+                created_at="2026-09-22T07:00:00+00:00",
+            ),
+        ],
+    )["cyc-1"]
+
+    assert evidence.reservation_id == "res-offset", "06:00Z es anterior a 07:00Z"
+    assert evidence.risk_amount == Decimal("250.0")
+    assert CYCLE_RISK_MULTIPLE_RESERVATIONS in evidence.notes
+    assert CYCLE_RISK_UNDATED_RESERVATION not in evidence.notes, "las dos filas se fechan"
+
+
+def test_a_candidate_without_a_readable_instant_is_declared_not_silently_ordered() -> None:
+    """Sin instante legible la fila va AL FINAL y el desempate se declara sin probar."""
+    evidence = cycle_risk_from_reservations(
+        ["cyc-1"],
+        [
+            _reservation(reservation_id="res-undated", risk=999.0, created_at=None),
+            _reservation(
+                reservation_id="res-dated",
+                risk=250.0,
+                created_at="2026-09-22T10:00:00+00:00",
+            ),
+        ],
+    )["cyc-1"]
+
+    assert evidence.reservation_id == "res-dated", "una fila sin fecha no puede ser 'la más vieja'"
+    assert CYCLE_RISK_UNDATED_RESERVATION in evidence.notes
+
+
+def test_an_undated_candidate_alone_does_not_declare_a_tie_break() -> None:
+    """Con UNA sola candidata no hubo desempate: una nota que no cambia nada sería ruido."""
+    evidence = cycle_risk_from_reservations(
+        ["cyc-1"],
+        [_reservation(reservation_id="res-undated", risk=250.0, created_at=None)],
+    )["cyc-1"]
+
+    assert evidence.reservation_id == "res-undated"
+    assert evidence.risk_amount == Decimal("250.0")
+    assert CYCLE_RISK_UNDATED_RESERVATION not in evidence.notes
 
 
 def test_a_cycle_without_entry_reservation_declares_the_gap() -> None:

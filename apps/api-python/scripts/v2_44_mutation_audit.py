@@ -100,11 +100,57 @@ AUTO-9 (evidencia por ciclo) y AUTO-10 (journal durable del régimen) añaden:
 * **M41 (duplicado silencioso)** — si la lectura deja de declarar las filas de más, una tormenta
   de reintentos se vuelve invisible.
 
+AUTO-11 (estado Adaptive durable: cooldown reconstruido del journal) añade:
+
+* **M42 (identidad sin cuenta)** — si el turno se identifica sin la cuenta, dos cuentas distintas
+  comparten `decision_id` y la historia de una se lee como la de la otra.
+* **M43 (fila sin plan)** — si sin plan se escribe una entrada vacía, el journal afirma "Adaptive
+  evaluó y no recomendó nada" donde el hecho es "Adaptive no evaluó".
+* **M44 (régimen disfrazado)** — si el régimen ausente de la recomendación se publica `UNKNOWN`,
+  "no medido" se lee como medido.
+* **M45 (contador normalizado)** — si un `0` entra al mapa de pausas, un contador apagado se
+  reconstruye como una pausa viva.
+* **M46 (racha sin corte)** — si la versión sigue contando después de reactivarse, el cooldown se
+  alarga y una pausa ya cerrada revive al reiniciar.
+* **M47 (saturación sin techo)** — si el contador deja de recortarse al umbral, un valor gigante
+  afirma una antigüedad que la historia no prueba.
+* **M48 (dedupe caído)** — si un reintento del sink cuenta dos veces el mismo turno, la racha se
+  infla y se afirma un turno que no ocurrió.
+* **M49 (historia corta silenciada)** — si no se declara que la ventana no se llenó, un suelo se
+  lee como una cuenta completa.
+* **M50 (hueco aprobado)** — si un ciclo **con** traza confirmada se declara además `missing`, la
+  reconciliación grita huecos que no existen y deja de ser creíble.
+* **M51 (no preguntado disfrazado)** — si el ciclo que nunca se consultó pasa a `missing`, un
+  hueco operativo se disfraza de journal roto.
+* **M52 (trazas contadas como filas)** — si el duplicado cuenta la entrada de decisión del mismo
+  `decision_id`, todo ciclo normal reporta una traza doble.
+* **M53 (filas de más silenciadas)** — si la lectura deja de declarar `extra_rows`, un reintento
+  real y una fila de decisión se vuelven indistinguibles.
+* **M54 (antigüedad por texto)** — si el denominador de R se elige comparando `created_at` como
+  cadena, un formato con otro offset elige la reserva equivocada.
+* **M55 (fecha ilegible silenciada)** — si el desempate sin fecha legible deja de declararse, el
+  orden se decide por una fecha que se supone.
+* **M56 (contador de salida)** — si la evidencia durable publica el estado POSTERIOR a decidir,
+  la reconstrucción siembra un cooldown que el turno no usó.
+* **M57 (recuperación que no siembra)** — si el journal se lee y el contador se descarta, la
+  lectura paga I/O para nada y el reinicio vuelve a levantar la pausa.
+* **M58 (reconciliación muda)** — si los huecos del rastro de ciclo se declaran limpios, la
+  ventana `RESERVATION COMMITTED → CRASH → NO JOURNAL` vuelve a ser invisible.
+* **M59 (flag OFF ignorado)** — si con Adaptive apagado el arranque paga la lectura igual, el
+  flag deja de ser una frontera de comportamiento.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
 ``connect`` falla al instante y el ``except`` del teardown lo traga, de modo que la sonda devuelve
 los rojos con NOMBRE en vez de un ``TIMEOUT`` mudo.
+
+**Matiz medido en V2.52**: "puerto local cerrado" **no** basta en toda máquina. En este entorno un
+firewall **descarta** el paquete en vez de rechazarlo (medido: `psycopg.connect` a
+`127.0.0.1:9` sin timeout no termina nunca; con `PGCONNECT_TIMEOUT=2` tarda 2.03 s y falla), y
+psycopg **no** trae timeout por defecto, así que la corrida se comía los 600 s del ``timeout`` de
+la sonda y devolvía ``<TIMEOUT>`` en vez del nombre del test. Ahora se exporta además
+``PGCONNECT_TIMEOUT``: el teardown falla en segundos y el rojo llega con nombre.
 
 Bytecode (V2.46.1, defecto REAL de la sonda): un ``.pyc`` solo se considera vigente si coinciden
 el mtime del fuente truncado a SEGUNDOS y su tamaño, y las mutaciones de esta matriz sustituyen
@@ -144,6 +190,9 @@ CYCLE_RISK = "packages/py/application/src/bolsa_application/cycle_risk.py"
 FEED = "packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py"
 AUTO_CYCLE_JOURNAL = "packages/py/application/src/bolsa_application/auto_cycle_journal.py"
 REGIME_READER = "packages/py/application/src/bolsa_application/auto_cycle_regime_reader.py"
+ADAPTIVE_JOURNAL = "packages/py/application/src/bolsa_application/auto_adaptive_journal.py"
+ADAPTIVE_RECOVERY = "packages/py/application/src/bolsa_application/auto_adaptive_recovery.py"
+CYCLE_TRACE = "packages/py/application/src/bolsa_application/auto_cycle_reconciliation.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 
 # --- suites que deben morder ----------------------------------------------------------------
@@ -165,6 +214,10 @@ T_CYCLE_JOURNAL = "packages/py/application/tests/test_auto_cycle_journal.py"
 T_REGIME_READER = "packages/py/application/tests/test_auto_cycle_regime_reader.py"
 T_CYCLE_JOURNAL_SEAM = "apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py"
 T_REGIME_SEAM = "apps/api-python/tests/test_auto_v51_auto10_cycle_regime_seam.py"
+T_ADAPTIVE_JOURNAL = "packages/py/application/tests/test_auto_adaptive_journal.py"
+T_ADAPTIVE_RECOVERY = "packages/py/application/tests/test_auto_adaptive_recovery.py"
+T_CYCLE_TRACE = "packages/py/application/tests/test_auto_cycle_reconciliation.py"
+T_ADAPTIVE_SEAM = "apps/api-python/tests/test_auto_v52_auto11_adaptive_state_seam.py"
 T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
@@ -459,22 +512,35 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M38 (sink sin commit): la traza se hace flush y se pierde al cerrar la sesion",
         WORKER,
-        "            await repository.append(entry)\n            await session.commit()\n",
-        "            await repository.append(entry)\n            if False:\n                await session.commit()\n",
+        # El cuerpo del sink de AUTO-10 y el de AUTO-11 son calcados: el fragmento lleva la
+        # cola del ``except`` (unica de este sink) para que ``.replace(..., 1)`` no mute en
+        # silencio el sink de la recomendacion Adaptive en vez de la traza del ciclo.
+        "            await repository.append(entry)\n"
+        "            await session.commit()\n"
+        "        except Exception:\n"
+        "            # Fail-open DE VERDAD: una escritura fallida deja la sesión envenenada y sin\n",
+        "            await repository.append(entry)\n"
+        "            if False:\n"
+        "                await session.commit()\n"
+        "        except Exception:\n"
+        "            # Fail-open DE VERDAD: una escritura fallida deja la sesión envenenada y sin\n",
         (T_CYCLE_JOURNAL_SEAM,),
     ),
     (
         "M39 (sin confirmar): una fila con ese decision_id se cree sin mirar el payload",
         REGIME_READER,
-        '    if _clean(payload.get("cycleId")) != cycle_id:\n        return None\n',
-        "    if False:\n        return None\n",
+        # La identidad de la traza vive en un solo sitio (``_is_trace``) desde V2.52: si se
+        # comprobara otra vez en el camino de lectura, la copia seria inobservable y la sonda
+        # afirmaria una cobertura que no tiene (la leccion del 33/33). Muta la guarda COMPARTIDA.
+        '    return _clean(_payload_of(entry).get("cycleId")) == cycle_id\n',
+        "    return True\n",
         (T_REGIME_READER, T_REGIME_SEAM),
     ),
     (
         "M40 (dedupe por llegada): gana la fila mas nueva aunque no confirme el ciclo",
         REGIME_READER,
         "        regime = next(\n"
-        "            (found for entry in candidates if (found := _confirmed_regime(entry, cycle_id))),\n"
+        "            (found for entry in traces if (found := _confirmed_regime(entry, cycle_id))),\n"
         "            None,\n"
         "        )\n",
         "        regime = _confirmed_regime(candidates[0], cycle_id)\n",
@@ -483,9 +549,145 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M41 (duplicado silencioso): la lectura deja de declarar las filas de mas",
         REGIME_READER,
-        "            if len(candidates) > 1:\n",
+        "            if len(traces) > 1:\n",
         "            if False:\n",
         (T_REGIME_READER, T_REGIME_SEAM),
+    ),
+    (
+        "M42 (identidad sin cuenta): el turno se identifica sin la cuenta, dos cuentas colisionan",
+        ADAPTIVE_JOURNAL,
+        '    key = f"{_clean(account_id)}\\x1f{stamp}"\n',
+        '    key = f"{stamp}"\n',
+        (T_ADAPTIVE_JOURNAL,),
+    ),
+    (
+        "M43 (fila sin plan): sin recomendacion se escribe una entrada vacia en vez de no-op",
+        ADAPTIVE_JOURNAL,
+        "    if plan is None:\n        return None\n",
+        "    if False:\n        return None\n",
+        (T_ADAPTIVE_JOURNAL,),
+    ),
+    (
+        "M44 (regimen disfrazado): el regimen ausente de la recomendacion se publica UNKNOWN",
+        ADAPTIVE_JOURNAL,
+        '        "regime": regime or None,\n',
+        '        "regime": regime or "UNKNOWN",\n',
+        (T_ADAPTIVE_JOURNAL,),
+    ),
+    (
+        "M45 (contador normalizado): un 0 entra al mapa de pausas como si fuera una pausa",
+        ADAPTIVE_JOURNAL,
+        "        if count > 0:\n",
+        "        if count >= 0:\n",
+        (T_ADAPTIVE_JOURNAL,),
+    ),
+    (
+        "M46 (racha sin corte): la version sigue contando despues de reactivarse",
+        ADAPTIVE_RECOVERY,
+        "            if paused is None or version not in paused:\n",
+        "            if paused is None:\n",
+        (T_ADAPTIVE_RECOVERY,),
+    ),
+    (
+        "M47 (saturacion sin techo): el contador publicado deja de recortarse al umbral",
+        ADAPTIVE_RECOVERY,
+        "        counts[version] = min(streak, cap)\n",
+        "        counts[version] = streak\n",
+        (T_ADAPTIVE_RECOVERY,),
+    ),
+    (
+        "M48 (dedupe caido): un reintento del sink cuenta dos veces el mismo turno",
+        ADAPTIVE_RECOVERY,
+        "        if key in seen:\n",
+        "        if False:\n",
+        (T_ADAPTIVE_RECOVERY,),
+    ),
+    (
+        "M49 (historia corta silenciada): no se declara que la racha es un suelo",
+        ADAPTIVE_RECOVERY,
+        "        insufficient_history=len(ordered) < size,\n",
+        "        insufficient_history=False,\n",
+        (T_ADAPTIVE_RECOVERY,),
+    ),
+    (
+        "M50 (hueco aprobado): un ciclo CON traza confirmada se declara ademas como missing",
+        CYCLE_TRACE,
+        "        if cycle_id in confirmed:\n            continue\n",
+        "        if False:\n            continue\n",
+        (T_CYCLE_TRACE, T_ADAPTIVE_SEAM),
+    ),
+    (
+        "M51 (no preguntado disfrazado): el ciclo que nunca se consulto pasa a ser un hueco",
+        CYCLE_TRACE,
+        "        if cycle_id not in asked:\n            unrequested.append(cycle_id)\n            continue\n",
+        "        if False:\n            unrequested.append(cycle_id)\n            continue\n",
+        (T_CYCLE_TRACE,),
+    ),
+    (
+        "M52 (trazas contadas como filas): el duplicado cuenta la entrada de decision del ciclo",
+        REGIME_READER,
+        "            if len(traces) > 1:\n",
+        "            if len(candidates) > 1:\n",
+        (T_REGIME_READER, T_REGIME_SEAM),
+    ),
+    (
+        "M53 (filas de mas silenciadas): la lectura deja de declarar extra_rows",
+        REGIME_READER,
+        "            if extra > 0:\n",
+        "            if False:\n",
+        (T_REGIME_READER, T_REGIME_SEAM),
+    ),
+    (
+        "M54 (antiguedad por texto): el denominador de R se elige comparando created_at como cadena",
+        CYCLE_RISK,
+        "    instant = _instant(row.created_at)\n"
+        "    return (\n"
+        "        0 if instant is not None else 1,\n"
+        "        instant.timestamp() if instant else 0.0,\n"
+        "        _clean(row.reservation_id),\n"
+        "    )\n",
+        "    instant = _instant(row.created_at)\n"
+        "    return (\n"
+        "        0,\n"
+        "        0.0,\n"
+        "        _clean(row.created_at),\n"
+        "    )\n",
+        (T_CYCLE_RISK,),
+    ),
+    (
+        "M55 (fecha ilegible silenciada): el desempate sin fecha legible deja de declararse",
+        CYCLE_RISK,
+        "        notes.append(CYCLE_RISK_MULTIPLE_RESERVATIONS)\n        if undated:\n",
+        "        notes.append(CYCLE_RISK_MULTIPLE_RESERVATIONS)\n        if False:\n",
+        (T_CYCLE_RISK,),
+    ),
+    (
+        "M56 (contador de salida): la evidencia durable publica el estado POSTERIOR a decidir",
+        WORKER,
+        "            paused_cycles=self._v2_adaptive_paused_cycles_entered,\n",
+        "            paused_cycles=self._v2_adaptive_paused_cycles,\n",
+        (T_ADAPTIVE_SEAM,),
+    ),
+    (
+        "M57 (recuperacion que no siembra): el journal se lee y el contador se descarta",
+        WORKER,
+        "        self._v2_adaptive_paused_cycles = dict(reading.paused_cycles)\n",
+        "        self._v2_adaptive_paused_cycles = {}\n",
+        (T_ADAPTIVE_SEAM,),
+    ),
+    (
+        "M58 (reconciliacion muda): los huecos del rastro de ciclo se declaran limpios",
+        WORKER,
+        "        if report.clean:\n",
+        "        if True:\n",
+        (T_ADAPTIVE_SEAM,),
+    ),
+    (
+        "M59 (flag OFF ignorado): con Adaptive apagado el arranque paga la lectura igual",
+        WORKER,
+        "        if not self._v2_tunables.adaptive_enabled:\n            return\n",
+        "        if False:\n            return\n",
+        (T_ADAPTIVE_SEAM,),
     ),
 ]
 
@@ -522,6 +724,10 @@ def _run(tests: tuple[str, ...], sources: tuple[str, ...]) -> set[str]:
     _drop_bytecode(sources)
     if any(t.startswith("apps/api-python") for t in tests):
         env["DATABASE_URL"] = FAST_FAIL_DSN
+        # V2.52: el puerto cerrado NO basta donde un firewall DESCARTA el paquete (medido: sin
+        # timeout, el connect no termina nunca y la sonda devolvía ``<TIMEOUT>`` en vez del nombre
+        # del test). psycopg no trae timeout por defecto; con él, el teardown falla en segundos.
+        env["PGCONNECT_TIMEOUT"] = "5"
     try:
         out = subprocess.run(
             [sys.executable, "-m", "pytest", *tests, "-q", "--tb=no", "-rf"],

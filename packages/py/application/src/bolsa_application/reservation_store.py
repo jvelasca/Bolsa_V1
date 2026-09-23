@@ -163,6 +163,23 @@ class ReservationStore(Protocol):
         """
         ...
 
+    async def list_recent_with_cycle(
+        self,
+        account_id: str | None,
+        *,
+        limit: int = 500,
+    ) -> list[PortfolioReservation]:
+        """AUTO-11 — las reservas **con ciclo** más recientes, de nueva a vieja.
+
+        Es la ventana que alimenta la reconciliación del rastro de ciclo
+        (``auto_cycle_reconciliation``): qué ciclos tienen capital comprometido. Se pide por la
+        columna ``cycle_id`` (con índice desde ``044``) y solo filas que la declaren —una
+        reserva anterior a ``2.47`` no inventa un ciclo—. El orden es DESC porque la ventana es
+        de lo reciente: un ciclo viejo fuera del límite queda **declarado** por el llamante
+        (``unrequested``), no disfrazado de traza ausente.
+        """
+        ...
+
     async def release(
         self,
         reservation_id: str,
@@ -448,6 +465,25 @@ class InMemoryReservationStore:
         rows.sort(key=_order_key)
         return rows[:limit]
 
+    async def list_recent_with_cycle(
+        self,
+        account_id: str | None,
+        *,
+        limit: int = 500,
+    ) -> list[PortfolioReservation]:
+        """Espeja la ventana DESC del PG: solo filas con ciclo, de la más nueva a la más vieja."""
+        if limit <= 0:
+            return []
+        rows = [
+            row
+            for row in self._rows.values()
+            if row.cycle_id
+            and str(row.cycle_id).strip()
+            and (account_id is None or row.account_id == account_id)
+        ]
+        rows.sort(key=_order_key, reverse=True)
+        return rows[:limit]
+
     async def release(
         self,
         reservation_id: str,
@@ -647,6 +683,39 @@ class PostgresReservationStore:
             .order_by(
                 PortfolioReservationRow.created_at.asc().nulls_first(),
                 PortfolioReservationRow.reservation_id.asc(),
+            )
+            .limit(limit)
+        )
+        if account_id is not None:
+            query = query.where(PortfolioReservationRow.account_id == account_id)
+        rows = (await self._session.execute(query)).scalars().all()
+        return [_row_to_reservation(row) for row in rows]
+
+    async def list_recent_with_cycle(
+        self,
+        account_id: str | None,
+        *,
+        limit: int = 500,
+    ) -> list[PortfolioReservation]:
+        """AUTO-11 — ventana de reservas con ciclo, DESC (ver ``ReservationStore``).
+
+        ``cycle_id IS NOT NULL`` es el filtro duro: una reserva anterior a ``2.47`` no aporta un
+        ciclo inventado. Se ordena DESC por ``created_at`` (los ``NULL`` al final) para que el
+        límite corte por lo VIEJO: un ciclo antiguo fuera de la ventana queda declarado por el
+        llamante (``unrequested``), nunca disfrazado de "journal sin traza".
+        """
+        import sqlalchemy as sa
+
+        from bolsa_infrastructure.database.models.tables import PortfolioReservationRow
+
+        if limit <= 0:
+            return []
+        query = (
+            sa.select(PortfolioReservationRow)
+            .where(PortfolioReservationRow.cycle_id.is_not(None))
+            .order_by(
+                PortfolioReservationRow.created_at.desc().nulls_last(),
+                PortfolioReservationRow.reservation_id.desc(),
             )
             .limit(limit)
         )

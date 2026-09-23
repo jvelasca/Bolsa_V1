@@ -10,7 +10,12 @@ Tres reglas duras, declaradas en vez de asumidas:
   SALIDA). El denominador es la reserva de entrada (``side='buy'``) **más antigua** con
   ``reserved_risk > 0``. Con varias candidatas se elige la más antigua y se **declaran**
   (``entry_reservations``): se prohíbe repartir el riesgo entre varias, porque R es una
-  razón contra UN denominador, no una media de denominadores.
+  razón contra UN denominador, no una media de denominadores. La antigüedad se compara como
+  **instante**, no como texto, y una candidata sin instante legible se declara
+  (``cycle_with_undated_reservation``) en vez de dejar que el desempate lo decida una
+  comparación de cadenas: esa comparación solo coincide con el orden cronológico mientras
+  TODOS los orígenes serialicen ``created_at`` con el mismo ancho fijo, que es una propiedad
+  del repositorio y no del contrato de este módulo.
 * **Ausencia declarada.** Un ciclo sin reserva de entrada —o con ``reserved_risk <= 0``,
   que es lo que declara una reserva de venta— queda con ``risk_amount = None`` y su motivo.
   Nunca un ``0``: el R de un riesgo cero es ``inf``, no ``0``.
@@ -32,6 +37,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -49,6 +55,7 @@ __all__ = [
     "CYCLE_RISK_MULTIPLE_RESERVATIONS",
     "CYCLE_RISK_REGIME_NOT_DURABLE",
     "CYCLE_RISK_REGIME_NOT_FOUND",
+    "CYCLE_RISK_UNDATED_RESERVATION",
     "CYCLE_RISK_WITHOUT_RISK",
     "CycleRisk",
     "apply_cycle_risk",
@@ -63,6 +70,9 @@ CYCLE_RISK_MULTIPLE_RESERVATIONS = "cycle_with_multiple_reservations"
 CYCLE_RISK_REGIME_NOT_DURABLE = "regime_not_durable"
 #: Se SÍ consultó la fuente durable y ese ciclo no trae régimen confirmado (hueco distinto).
 CYCLE_RISK_REGIME_NOT_FOUND = "regime_not_found"
+#: El ciclo tiene varias candidatas y al menos una no declara un instante legible: el desempate
+#: por antigüedad no está probado para esas filas (se coloca al final, nunca se le supone fecha).
+CYCLE_RISK_UNDATED_RESERVATION = "cycle_with_undated_reservation"
 
 
 def _clean(value: Any) -> str:
@@ -133,17 +143,48 @@ class CycleRisk:
         }
 
 
-def _entry_candidates(rows: Iterable[PortfolioReservation]) -> list[PortfolioReservation]:
-    """Reservas de ENTRADA con riesgo positivo, de la más antigua a la más nueva."""
+def _instant(value: Any) -> datetime | None:
+    """Instante de un ``created_at`` ISO-8601, o ``None`` si no es legible (nunca se supone)."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _antiquity_key(row: PortfolioReservation) -> tuple[int, float, str]:
+    """Clave de antigüedad: instante legible primero (cronológico), sin fecha al FINAL.
+
+    El primer componente separa las filas con instante de las que no lo tienen, y el
+    desempate por ``reservation_id`` mantiene el resultado determinista e independiente del
+    orden de entrada. Antes se comparaba el texto de ``created_at``: correcto solo mientras
+    TODO origen use el mismo ancho fijo (lo garantiza el repositorio, no este contrato).
+    """
+    instant = _instant(row.created_at)
+    return (
+        0 if instant is not None else 1,
+        instant.timestamp() if instant else 0.0,
+        _clean(row.reservation_id),
+    )
+
+
+def _entry_candidates(
+    rows: Iterable[PortfolioReservation],
+) -> tuple[list[PortfolioReservation], bool]:
+    """Reservas de ENTRADA con riesgo positivo, de la más antigua a la más nueva.
+
+    Devuelve además si alguna candidata **no** declara un instante legible: ese hecho solo
+    importa cuando hay varias candidatas (es el desempate el que queda sin probar).
+    """
     candidates = [
         row
         for row in rows
         if row.is_buy and (risk := _dec(row.reserved_risk)) is not None and risk > 0
     ]
-    return sorted(
-        candidates,
-        key=lambda row: (_clean(row.created_at), _clean(row.reservation_id)),
-    )
+    undated = any(_instant(row.created_at) is None for row in candidates)
+    return sorted(candidates, key=_antiquity_key), undated
 
 
 def _cycle_risk(
@@ -153,13 +194,17 @@ def _cycle_risk(
     *,
     regime_source_durable: bool,
 ) -> CycleRisk:
-    candidates = _entry_candidates(rows)
+    candidates, undated = _entry_candidates(rows)
     entry = candidates[0] if candidates else None
     notes: list[str] = []
     if entry is None:
         notes.append(CYCLE_RISK_WITHOUT_RISK)
     elif len(candidates) > 1:
         notes.append(CYCLE_RISK_MULTIPLE_RESERVATIONS)
+        if undated:
+            # Solo se declara cuando hubo que DESEMPATAR: con una sola candidata la fecha de
+            # la otra no cambia nada, y una nota que no cambia nada es ruido en la evidencia.
+            notes.append(CYCLE_RISK_UNDATED_RESERVATION)
     regime = _clean(regimes.get(cycle_id))
     if not regime:
         notes.append(

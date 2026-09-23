@@ -115,7 +115,21 @@ from bolsa_api.background.paper_auto_engine_worker import (
 )
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.applied_fills import read_applied_fill_facts
+from bolsa_application.auto_adaptive_journal import (
+    AUTO_ADAPTIVE_RECOMMENDATION_EVENT,
+    build_adaptive_recommendation_entry,
+)
+from bolsa_application.auto_adaptive_recovery import (
+    ADAPTIVE_STATE_WINDOW_DEFAULT,
+    AdaptiveStateReading,
+    adaptive_state_unread,
+    read_adaptive_state,
+)
 from bolsa_application.auto_cycle_journal import build_auto_cycle_regime_entry
+from bolsa_application.auto_cycle_reconciliation import (
+    cycle_ids_with_reservations,
+    reconcile_cycle_trace,
+)
 from bolsa_application.auto_cycle_regime_reader import CycleRegimeReading, read_cycle_regimes
 from bolsa_application.auto_daily_journal import OperationMeasurement, OpportunityRow, SimJournalRow
 from bolsa_application.auto_engine_state_store import (
@@ -587,6 +601,15 @@ class AutoSimulationWorker:
         # y devuelve la lectura con sus huecos declarados. Sin él, el productor de R conserva el
         # comportamiento de AUTO-9 (``regime_not_durable``): no se finge que se leyó.
         cycle_regime_reader: Callable[[Sequence[str]], Awaitable[CycleRegimeReading]] | None = None,
+        # AUTO-11: la recomendación Adaptive DURABLE (``decision_journal_entries``). Con él, la
+        # memoria de la rotación (cooldown/hysteresis) deja de vivir solo en la lista del proceso
+        # y una pausa SOBREVIVE al reinicio. Sin él (hermético/test) no se escribe nada: no se
+        # finge una evidencia que no se puede leer.
+        adaptive_sink: Callable[[Any], Awaitable[None]] | None = None,
+        # AUTO-11: LECTOR de ese mismo journal (la otra mitad). Recibe la cuenta del tick y
+        # devuelve el estado reconstruido con TODOS sus límites declarados. Sin él, el arranque no
+        # recupera nada y el contador arranca como en ``V2.51`` (se declara en el log).
+        adaptive_reader: Callable[[str | None], Awaitable[AdaptiveStateReading]] | None = None,
         # V2.43.3 (P0-1): espejo durable del latch de la parada dura (``auto_kill_state``).
         # Sin él la parada es solo del proceso y un reinicio la olvida. Con él, el arranque
         # la LEE antes de readoptar posición y el motor no puede reabrirse solo.
@@ -694,9 +717,19 @@ class AutoSimulationWorker:
         self._v2_plan: Any = None
         self._v2_journal: list[Any] = []
         # V2.49/AUTO-8.1 — ciclos consecutivos que cada versión lleva PAUSADA por la
-        # rotación Adaptive. Es el DATO de estado que habilita hysteresis y cooldown; vive
-        # en memoria y se reconstruye del plan anterior (tras un reinicio arranca vacío).
+        # rotación Adaptive. Es el DATO de estado que habilita hysteresis y cooldown. Desde
+        # AUTO-11 se **reconstruye del journal durable** en el arranque (una vez por proceso):
+        # sin lector sigue arrancando vacío —el límite que declaraba ``V2.51``—, pero con lector
+        # una pausa ya no se levanta antes de su ventana mínima por un reinicio.
         self._v2_adaptive_paused_cycles: dict[str, int] = {}
+        # AUTO-11: copia del contador que ENTRÓ a decidir en el turno. ``build_adaptive_plan`` lo
+        # pisa con el de SALIDA justo después, y la evidencia durable debe publicar el de entrada:
+        # registrar el de salida afirmaría que Adaptive decidió con un estado que aún no existía.
+        self._v2_adaptive_paused_cycles_entered: dict[str, int] = {}
+        # AUTO-11: recuperación del estado Adaptive y reconciliación del rastro de ciclo, una vez
+        # por proceso cada una (mismo patrón que ``_v2_kill_state_loaded``).
+        self._v2_adaptive_state_recovered = False
+        self._v2_cycle_trace_reconciled = False
         # V2.45/AUTO-5 — embudo del día (Golden Day 2.0): filas de oportunidad con su
         # estado FINAL y su motivo, más el contador INDEPENDIENTE de candidatas vistas
         # (así "faltó una oportunidad por explicar" es detectable, no silencioso).
@@ -740,6 +773,12 @@ class AutoSimulationWorker:
         # override de env, el régimen es UNKNOWN ⇒ exit-only (fail-closed: sin régimen
         # no se abren entradas nuevas).
         self._v2_regime_source = regime_source
+        # AUTO-11: lo que se publica DURABLEMENTE con cada evaluación Adaptive. Sin sink no hay
+        # escritura (ni se finge): el cooldown sigue siendo solo del proceso, como en ``V2.51``.
+        self._adaptive_sink = adaptive_sink
+        # AUTO-11: lo que se LEE de vuelta en el arranque para reconstruir el cooldown. Sin lector
+        # no se recupera nada (se declara en el log) y el contador arranca a 0.
+        self._adaptive_reader = adaptive_reader
         # AUTO-10: lo que se publica DURABLEMENTE cuando un ciclo abre. Sin sink no hay
         # escritura (ni se finge): el hueco de régimen por ciclo sigue declarado.
         self._cycle_regime_sink = cycle_regime_sink
@@ -2267,6 +2306,10 @@ class AutoSimulationWorker:
         ``marketRegime = None`` y ``regimeMeasurement = UNKNOWN`` **declarados**, para que el
         lector pueda distinguir "no medido" de "medido".
 
+        El régimen y el sello del turno se leen UNA vez, fuera del bucle: todos los ciclos de un
+        mismo turno publican así el régimen que de verdad **decidió** (no uno releído por ciclo,
+        que podría diferir si la fuente no fuera pura) y el mismo ``asOf``.
+
         Fail-open **declarado**: sin sink no se escribe (no hay nada que fingir) y un fallo del
         sink no tumba el turno —el compromiso de capital ya es durable—, pero se registra: un
         silencio aquí volvería a convertir el hueco en mentira por omisión. Un ciclo que ya se
@@ -2275,6 +2318,8 @@ class AutoSimulationWorker:
         sink = self._cycle_regime_sink
         if sink is None:
             return
+        regime = self._v2_regime()
+        as_of = self._v2_instant()
         published: set[str] = set()
         for reservation in reservations:
             cycle_id = str(getattr(reservation, "cycle_id", None) or "").strip()
@@ -2282,9 +2327,9 @@ class AutoSimulationWorker:
                 continue
             entry = build_auto_cycle_regime_entry(
                 cycle_id=cycle_id,
-                market_regime=self._v2_regime(),
+                market_regime=regime,
                 actor=self._engine_id,
-                as_of=self._v2_instant(),
+                as_of=as_of,
                 account_id=self._account_id,
                 instrument_id=getattr(reservation, "instrument_id", None),
                 strategy_version=getattr(reservation, "strategy_version_id", None),
@@ -2860,6 +2905,10 @@ class AutoSimulationWorker:
         # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
         await self._v2_persist_tick_reservations(plan)
+        # AUTO-11: la recomendación Adaptive se publica DESPUÉS de que el motor determinista la
+        # consumió (mismo orden que AUTO-10: primero el dinero, después la traza). Así el journal
+        # nunca registra una recomendación que no llegó a aplicarse.
+        await self._v2_journal_adaptive_recommendation(adaptive)
         self._v2_journal.extend(plan.journal_entries)
         # V2.45/AUTO-5 — embudo del día. El precio posterior de las rechazadas de ticks
         # ANTERIORES se mide con el tick corriente (es su primer precio DESPUÉS del
@@ -2980,11 +3029,13 @@ class AutoSimulationWorker:
         report = build_auto_self_evaluation(
             fills=fills, cycle_risk=await self._v2_cycle_risk(fills)
         )
-        # V2.49/AUTO-8.1 — política versionada + estado de pausa previo (hysteresis y
-        # cooldown). El estado es EN MEMORIA y derivado del plan anterior: se declara como
-        # límite (tras un reinicio la cuenta vuelve a 0, así que una pausa puede levantarse
-        # antes de su ventana mínima). No añade tabla ni migración.
-        policy = AdaptivePolicy(win_rate_floor=self._v2_tunables.adaptive_win_rate_floor)
+        # V2.49/AUTO-8.1 — política versionada + estado de pausa previo (hysteresis y cooldown).
+        # AUTO-11: el estado ya NO nace vacío en cada proceso — ``_v2_recover_adaptive_state`` lo
+        # reconstruyó del journal durable en el arranque y ``_v2_next_paused_cycles`` lo encadena
+        # turno a turno. Se copia ANTES de decidir porque la evidencia durable publica el contador
+        # que ENTRÓ, no el de salida.
+        self._v2_adaptive_paused_cycles_entered = dict(self._v2_adaptive_paused_cycles)
+        policy = self._v2_adaptive_policy()
         plan = build_adaptive_plan(
             report.by_strategy,
             to_market_regime(regime),
@@ -2994,6 +3045,15 @@ class AutoSimulationWorker:
         )
         self._v2_adaptive_paused_cycles = self._v2_next_paused_cycles(plan)
         return plan
+
+    def _v2_adaptive_policy(self) -> AdaptivePolicy:
+        """La política Adaptive en curso, en UN solo sitio (la usan el plan y el lector).
+
+        El lector de recuperación necesita sus dos datos de identidad —``policy_version`` y
+        ``min_pause_cycles``— para juzgar la historia durable con los umbrales de HOY. Derivarlos
+        de una segunda construcción de la política permitiría que divergieran en silencio.
+        """
+        return AdaptivePolicy(win_rate_floor=self._v2_tunables.adaptive_win_rate_floor)
 
     def _v2_next_paused_cycles(self, plan: AdaptivePlan) -> dict[str, int]:
         """Ciclos consecutivos de pausa por versión, para hysteresis/cooldown del próximo tick.
@@ -3005,6 +3065,123 @@ class AutoSimulationWorker:
             version: int(self._v2_adaptive_paused_cycles.get(version, 0)) + 1
             for version in plan.rotation.paused
         }
+
+    async def _v2_journal_adaptive_recommendation(self, adaptive: AdaptivePlan | None) -> None:
+        """AUTO-11 — publica la recomendación Adaptive del turno en el journal durable.
+
+        Es la pieza que hace DURABLE la memoria de la rotación: lo que antes solo existía como
+        ``AdaptivePlan`` en RAM (y se perdía al volver del turno) queda como fila append-only, y el
+        arranque puede reconstruir de ahí el cooldown. Se llama **después** de ``plan_v2_tick`` y
+        del compromiso de capital, replicando el orden de AUTO-10: el journal nunca registra una
+        recomendación que el motor determinista no llegó a consumir.
+
+        Fail-open **declarado**: sin sink o sin plan no se escribe —y no se finge una fila vacía,
+        que afirmaría "Adaptive evaluó y no recomendó nada"—; un fallo del sink no tumba el turno,
+        pero se registra, porque un silencio aquí devuelve el cooldown a la memoria del proceso.
+        """
+        sink = self._adaptive_sink
+        if sink is None or adaptive is None:
+            return
+        entry = build_adaptive_recommendation_entry(
+            plan=adaptive,
+            actor=self._engine_id,
+            as_of=self._v2_instant(),
+            account_id=self._account_id,
+            # El contador que ENTRÓ a decidir (no el de salida): es el dato con el que se
+            # reconstruye la racha, y publicar el de salida afirmaría una decisión imposible.
+            paused_cycles=self._v2_adaptive_paused_cycles_entered,
+        )
+        if entry is None:
+            return
+        try:
+            await sink(entry)
+        except Exception:  # noqa: BLE001 — publicar no puede tumbar el turno.
+            logger.exception("auto_sim v2 adaptive recommendation journal failed")
+
+    async def _v2_recover_adaptive_state(self) -> None:
+        """AUTO-11 — reconstruye el estado Adaptive del journal durable, UNA vez por proceso.
+
+        Cierra el P1 de la auditoría de ``V2.51``: una estrategia pausada podía retirar su pausa
+        antes de cumplir la ventana mínima porque el contador se reconstruía de la memoria y un
+        reinicio lo devolvía a 0. Ahora la racha se rehace de las evaluaciones durables
+        (``rebuild_paused_cycles``) y se siembra ``_v2_adaptive_paused_cycles`` antes del primer
+        plan del proceso.
+
+        Gateado por ``adaptive_enabled``: con el flag OFF no hay I/O y el comportamiento es
+        byte-idéntico al de ``V2.51``. Fail-open **declarado** en tres casos, todos SIN fingir una
+        reactivación: sin lector, con lector roto (``read_ok = False``) o con lectura incompleta, el
+        contador arranca vacío —el límite que sigue existiendo— y se registra el motivo.
+        """
+        if self._v2_adaptive_state_recovered:
+            return
+        self._v2_adaptive_state_recovered = True
+        if not self._v2_tunables.adaptive_enabled:
+            return
+        reader = self._adaptive_reader
+        if reader is None:
+            logger.warning(
+                "auto_sim v2 adaptive state NOT durable: no reader; el cooldown arranca a 0"
+            )
+            return
+        window = ADAPTIVE_STATE_WINDOW_DEFAULT
+        try:
+            reading = await reader(self._account_id)
+        except Exception:  # noqa: BLE001 — un lector roto NO puede reiniciar el cooldown.
+            logger.exception("auto_sim v2 adaptive state read failed")
+            reading = adaptive_state_unread("reader_failed", window=window)
+        if not reading.read_ok:
+            # Contador vacío + hueco DECLARADO: "no se pudo leer" nunca se disfraza de "no había
+            # pausas". El límite sigue existiendo y el log lo dice con nombre propio.
+            self._v2_adaptive_paused_cycles = {}
+            logger.warning("auto_sim v2 adaptive state UNREAD %s", reading.as_dict())
+            return
+        self._v2_adaptive_paused_cycles = dict(reading.paused_cycles)
+        summary = reading.as_dict()
+        if reading.policy_version_mismatch:
+            logger.warning("auto_sim v2 adaptive policy version mismatch %s", summary)
+        if reading.insufficient_history or reading.saturated or reading.unreadable:
+            logger.warning("auto_sim v2 adaptive state recovered (bounded) %s", summary)
+        else:
+            logger.info("auto_sim v2 adaptive state recovered %s", summary)
+
+    async def _v2_reconcile_cycle_traces(self) -> None:
+        """AUTO-11 — cruza capital reservado con traza de régimen, UNA vez por proceso.
+
+        La ventana ``RESERVATION COMMITTED → CRASH → NO JOURNAL`` que AUTO-10 aceptó y declaró
+        dejaba un ciclo con dinero comprometido y sin régimen, de forma **invisible**. Aquí se
+        comprueba al arrancar y se declara por motivo (``auto_cycle_reconciliation``). Read-only:
+        no corrige ni rescribe nada.
+
+        Fail-open declarado: sin libro de reservas o sin lector de régimen no hay nada que cruzar
+        (camino hermético) y una lectura rota se registra sin afirmar que todo está limpio.
+        """
+        if self._v2_cycle_trace_reconciled:
+            return
+        self._v2_cycle_trace_reconciled = True
+        reader = self._cycle_regime_reader
+        store = self._reservation_store
+        window = getattr(store, "list_recent_with_cycle", None)
+        if reader is None or not callable(window):
+            return
+        try:
+            reservations = await window(self._account_id, limit=ADAPTIVE_STATE_WINDOW_DEFAULT)
+        except Exception:  # noqa: BLE001 — sin ventana no se afirma nada.
+            logger.exception("auto_sim v2 cycle trace reconciliation: reservations read failed")
+            return
+        cycle_ids = cycle_ids_with_reservations(list(reservations))
+        if not cycle_ids:
+            logger.info("auto_sim v2 cycle trace reconciliation: no reserved cycles in the window")
+            return
+        try:
+            reading = await reader(cycle_ids)
+        except Exception:  # noqa: BLE001 — el lector declara su hueco; no se inventa.
+            logger.exception("auto_sim v2 cycle trace reconciliation: regime read failed")
+            return
+        report = reconcile_cycle_trace(reservation_cycle_ids=cycle_ids, reading=reading)
+        if report.clean:
+            logger.info("auto_sim v2 cycle trace reconciliation clean %s", report.as_dict())
+        else:
+            logger.warning("auto_sim v2 cycle trace reconciliation GAPS %s", report.as_dict())
 
     def _v2_measure_opportunity_costs(self) -> None:
         """V2.45/AUTO-5 — coste de oportunidad: precio POSTERIOR de las rechazadas.
@@ -4131,6 +4308,10 @@ class AutoSimulationWorker:
         cycle_regime_sink: Callable[[Any], Awaitable[None]] | None = None,
         # AUTO-10: lector de ese journal, también sobre la sesión del tick.
         cycle_regime_reader: Callable[[Sequence[str]], Awaitable[CycleRegimeReading]] | None = None,
+        # AUTO-11: sink de la recomendación Adaptive durable, atado a la MISMA sesión del tick.
+        adaptive_sink: Callable[[Any], Awaitable[None]] | None = None,
+        # AUTO-11: lector del estado Adaptive reconstruible, también sobre la sesión del tick.
+        adaptive_reader: Callable[[str | None], Awaitable[AdaptiveStateReading]] | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -4166,6 +4347,8 @@ class AutoSimulationWorker:
         prev_exit_store = self._exit_order_store
         prev_cycle_sink = self._cycle_regime_sink
         prev_cycle_reader = self._cycle_regime_reader
+        prev_adaptive_sink = self._adaptive_sink
+        prev_adaptive_reader = self._adaptive_reader
         try:
             self._exec_store = exec_store
             self._auto_store = auto_store
@@ -4211,6 +4394,11 @@ class AutoSimulationWorker:
             self._cycle_regime_reader = (
                 cycle_regime_reader if cycle_regime_reader is not None else prev_cycle_reader
             )
+            # AUTO-11: la recomendación Adaptive durable y su lector, con la misma regla de sesión.
+            self._adaptive_sink = adaptive_sink if adaptive_sink is not None else prev_adaptive_sink
+            self._adaptive_reader = (
+                adaptive_reader if adaptive_reader is not None else prev_adaptive_reader
+            )
             # V2.43.3 (P0-1) — BOOT SAFETY GATE: la parada dura se LEE de su espejo durable
             # ANTES de readoptar posición y de reconciliar. Un reinicio NO puede reabrir el
             # motor: si el HALT estaba activo, sigue activo (el in-memory lo olvidaba).
@@ -4227,6 +4415,14 @@ class AutoSimulationWorker:
             if not self._v2_reservations_reconciled:
                 self._v2_reservations_reconciled = True
                 await self._v2_reconcile_reservations(startup=True)
+            # AUTO-11: el estado Adaptive se reconstruye del journal durable ANTES del primer
+            # plan del proceso (si no, el primer turno decidiría con un cooldown a 0 y podría
+            # levantar una pausa que aún no cumplió su ventana mínima). Una vez por proceso.
+            await self._v2_recover_adaptive_state()
+            # AUTO-11: y se cruza el rastro de ciclo —capital comprometido vs traza de régimen—
+            # para que la ventana ``RESERVATION COMMITTED → CRASH → NO JOURNAL`` de AUTO-10 deje
+            # de ser invisible. Read-only: solo declara, no corrige.
+            await self._v2_reconcile_cycle_traces()
             report = await self.auto_turn()
             if auto_store is not None:
                 snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
@@ -4263,6 +4459,8 @@ class AutoSimulationWorker:
             self._exit_order_store = prev_exit_store
             self._cycle_regime_sink = prev_cycle_sink
             self._cycle_regime_reader = prev_cycle_reader
+            self._adaptive_sink = prev_adaptive_sink
+            self._adaptive_reader = prev_adaptive_reader
 
 
 # V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.
@@ -4394,6 +4592,77 @@ def build_cycle_regime_reader(
 
     async def reader(cycle_ids: Sequence[str]) -> CycleRegimeReading:
         return await read_cycle_regimes(repository.list_by_decision_ids, cycle_ids)
+
+    return reader
+
+
+def build_adaptive_recommendation_sink(session: Any) -> Callable[[Any], Awaitable[None]]:
+    """AUTO-11: sink durable de la recomendación Adaptive, atado a la sesión del tick.
+
+    Mismo repositorio del spine que AUTO-10 y mismo patrón que ``build_cycle_regime_sink``: va por
+    sesión (una por tick) y **commitea él mismo**, porque la sesión del turno se cierra con
+    ``close()`` y un ``flush`` sin commit dejaría la recomendación sin escribir —el cooldown
+    volvería a depender de la memoria—. El ``rollback`` en el fallo no es cosmético: sin él la
+    sesión queda envenenada y el siguiente store del MISMO turno fallaría con
+    ``PendingRollbackError``, con lo que un fallo de observabilidad tumbaría el compromiso de
+    capital.
+    """
+    from bolsa_infrastructure.database.repositories.journal_repository import (  # noqa: PLC0415
+        SqlAlchemyJournalRepository,
+    )
+
+    repository = SqlAlchemyJournalRepository(session)
+
+    async def sink(entry: Any) -> None:
+        try:
+            await repository.append(entry)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+    return sink
+
+
+def build_adaptive_state_reader(
+    session: Any,
+    *,
+    policy: AdaptivePolicy,
+) -> Callable[[str | None], Awaitable[AdaptiveStateReading]]:
+    """AUTO-11: lector del estado Adaptive (cooldown/rotación) desde el journal durable.
+
+    Lee las últimas evaluaciones (``adaptive_recommendation``) de la cuenta por índice de
+    ``event_type``, no por el ``payload``, y las reconstruye con ``read_adaptive_state``. La
+    política EN CURSO entra por parámetro porque la historia se juzga con los umbrales de hoy —y
+    se declara la mezcla de versiones en vez de reescribir el pasado—.
+
+    Fail-open DECLARADO: una cuenta ausente devuelve ``adaptive_state_unread`` (contador vacío +
+    ``read_ok = False``) en vez de consultar sin filtro; si la lectura revienta, el error sube al
+    worker, que lo registra y arranca con el contador vacío declarado.
+    """
+    from bolsa_infrastructure.database.repositories.journal_repository import (  # noqa: PLC0415
+        SqlAlchemyJournalRepository,
+    )
+
+    repository = SqlAlchemyJournalRepository(session)
+
+    async def reader(account_id: str | None) -> AdaptiveStateReading:
+        account = str(account_id or "").strip()
+        if not account:
+            # Sin cuenta no hay ``WHERE`` posible: ``list_entries`` exige una y consultar sin
+            # filtro traería la historia de OTRA cuenta. Se declara el hueco en vez de arriesgarlo.
+            return adaptive_state_unread("no_account", window=ADAPTIVE_STATE_WINDOW_DEFAULT)
+        rows, _total = await repository.list_entries(
+            account_id=account,
+            event_type=AUTO_ADAPTIVE_RECOMMENDATION_EVENT,
+            limit=ADAPTIVE_STATE_WINDOW_DEFAULT,
+        )
+        return read_adaptive_state(
+            rows,
+            min_pause_cycles=policy.min_pause_cycles,
+            running_policy_version=policy.policy_version,
+            window=ADAPTIVE_STATE_WINDOW_DEFAULT,
+        )
 
     return reader
 
@@ -4829,6 +5098,13 @@ class AutoSimRuntime:
             # AUTO-10: la traza DURABLE del régimen por ciclo, sobre la misma sesión del tick.
             cycle_regime_sink = build_cycle_regime_sink(session)
             cycle_regime_reader = build_cycle_regime_reader(session)
+            # AUTO-11: la recomendación Adaptive durable y su lector, también sobre la MISMA
+            # sesión. Con el flag Adaptive OFF el worker no los usa: cero I/O nuevo.
+            adaptive_sink = build_adaptive_recommendation_sink(session)
+            adaptive_reader = build_adaptive_state_reader(
+                session,
+                policy=self._worker._v2_adaptive_policy(),  # noqa: SLF001 — seam interno.
+            )
             # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
             # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
             # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor
@@ -4846,6 +5122,8 @@ class AutoSimRuntime:
                 exit_order_store=exit_order_store,
                 cycle_regime_sink=cycle_regime_sink,
                 cycle_regime_reader=cycle_regime_reader,
+                adaptive_sink=adaptive_sink,
+                adaptive_reader=adaptive_reader,
                 canonical_positions_reader=self._canonical_reader
                 or _compose_canonical_reader(session),
                 regime_source=self._regime_source

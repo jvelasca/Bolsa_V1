@@ -25,11 +25,20 @@ una fila solo se cree si su ``event_type`` es el de la traza Y su ``payload['cyc
 
 **Dedupe en lectura, declarado (paso 4).** El journal es *append-only* y el tick puede reintentar,
 así que un mismo ciclo puede tener varias filas. La lectura no rompe por eso: el mapa se queda con
-la **confirmación más nueva** (``fetch`` sirve de nueva a vieja) y las filas de más se cuentan en
-``duplicates`` —``collapsed_rows`` es su suma— para que un duplicado anómalo (o una tormenta de
-reintentos) sea **observable** en vez de silencioso. Ojo a la frontera: "más nueva" se mide solo
-entre las filas que **confirman**, porque la entrada de ventana del mismo ciclo comparte
-``decision_id`` y es más nueva que la traza.
+la **confirmación más nueva** (``fetch`` sirve de nueva a vieja) y lo descartado se declara en DOS
+cuentas que no significan lo mismo:
+
+* ``duplicates`` — **trazas** del mismo ciclo de más (``_is_trace``): un reintento real de la traza
+  de régimen. ``collapsed_rows`` es su suma.
+* ``extra_rows`` — filas de más de cualquier clase, incluida la **entrada de la decisión aprobada**
+  del mismo ``decision_id`` (``collapsed_rows`` no la cuenta): ``discarded_rows`` es su suma.
+
+Separarlas es lo que hace útil la señal. La entrada de decisión y la traza de régimen comparten
+``decision_id`` **por diseño** (misma clave, mismo digest), así que en el camino durable el grupo
+tiene dos filas en TODO ciclo normal: contar todas como "duplicado" daría un baseline distinto de
+cero y ahogaría el único caso que interesa vigilar (una traza escrita dos veces). Ojo también a la
+frontera de "más nueva": se mide solo entre las filas que **confirman**, porque la entrada de
+ventana del mismo ciclo es más nueva que la traza y no puede robarle el régimen.
 
 **Triple declaración del hueco.** El resultado no es un mapa pelado sino un ``CycleRegimeReading``
 que separa tres motivos distintos, porque un solo contador mentiría en alguno de los casos:
@@ -85,14 +94,30 @@ def _payload_of(entry: Any) -> Mapping[str, Any]:
     return payload if isinstance(payload, Mapping) else {}
 
 
+def _is_trace(entry: Any, cycle_id: str) -> bool:
+    """True si la fila es la TRAZA de ese ciclo, declare régimen o lo declare ``UNKNOWN``.
+
+    Es la ÚNICA puerta de identidad de una traza y exige las dos cosas: el ``event_type`` de la
+    traza Y que ``payload['cycleId']`` sea **exactamente** el ciclo pedido. Una traza con
+    ``marketRegime = None`` **sigue siendo una traza** (declaró su hueco), y dos trazas del mismo
+    ciclo sí son un reintento aunque una de ellas no aporte valor: confundir "no usable" con "no
+    es traza" haría que el reintento real pasara desapercibido.
+
+    Vive en un solo sitio a propósito. La usan el recuento de trazas (``duplicates``) y la lectura
+    del régimen (``_confirmed_regime``); con la comprobación de ``cycleId`` repetida en el camino
+    de lectura —donde ``traces`` ya filtró— la segunda copia sería **inobservable**: la sonda de
+    mutaciones no podría morderla y afirmaría una cobertura que no tiene.
+    """
+    if _clean(getattr(entry, "event_type", None)) != AUTO_CYCLE_REGIME_EVENT:
+        return False
+    return _clean(_payload_of(entry).get("cycleId")) == cycle_id
+
+
 def _confirmed_regime(entry: Any, cycle_id: str) -> str | None:
     """Régimen de la fila **solo** si la fila confirma ser la traza de ESE ciclo."""
-    if _clean(getattr(entry, "event_type", None)) != AUTO_CYCLE_REGIME_EVENT:
+    if not _is_trace(entry, cycle_id):
         return None
-    payload = _payload_of(entry)
-    if _clean(payload.get("cycleId")) != cycle_id:
-        return None
-    return _clean(payload.get("marketRegime")) or None
+    return _clean(_payload_of(entry).get("marketRegime")) or None
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +133,14 @@ class CycleRegimeReading:
     absent: tuple[str, ...] = ()
     not_derivable: tuple[str, ...] = ()
     requested: int = 0
+    #: TRAZAS del mismo ciclo de más (reintento de la traza): la única señal de escritura doble.
     duplicates: Mapping[str, int] = field(default_factory=dict)
+    #: Filas de más de cualquier clase (incluida la entrada de ventana del mismo ``decision_id``).
+    #: Es el tamaño REAL del grupo que comparte identidad; ``duplicates`` es el subconjunto que
+    #: de verdad significa "esta traza se escribió dos veces". Separarlos importa: un ciclo normal
+    #: comparte ``decision_id`` con su decisión aprobada, así que contar todas las filas como
+    #: duplicado daría un baseline distinto de cero y ahogaría la señal que se quiere vigilar.
+    extra_rows: Mapping[str, int] = field(default_factory=dict)
 
     @property
     def confirmed(self) -> int:
@@ -120,8 +152,13 @@ class CycleRegimeReading:
 
     @property
     def collapsed_rows(self) -> int:
-        """Filas de más que la lectura descartó al quedarse con la confirmación más nueva."""
+        """Trazas de más que la lectura descartó al quedarse con la confirmación más nueva."""
         return sum(self.duplicates.values())
+
+    @property
+    def discarded_rows(self) -> int:
+        """Todas las filas de más del grupo (trazas duplicadas + filas de otra clase)."""
+        return sum(self.extra_rows.values())
 
     def as_dict(self) -> dict[str, Any]:
         """Resumen para el log del llamante: cuenta lo medido y DECLARA cada hueco y duplicado."""
@@ -133,6 +170,8 @@ class CycleRegimeReading:
             "notDerivable": list(self.not_derivable),
             "duplicates": dict(self.duplicates),
             "collapsedRows": self.collapsed_rows,
+            "extraRows": dict(self.extra_rows),
+            "discardedRows": self.discarded_rows,
         }
 
 
@@ -149,8 +188,10 @@ async def read_cycle_regimes(
     de ``chunk_size`` y, si un ciclo tiene varias filas (reintento del tick), gana la **más
     nueva**: ``fetch`` devuelve las filas de más nueva a más vieja, así que se respeta el
     primer acierto. Pero "más nueva" se mide solo entre las que **confirman** el ciclo (la
-    entrada de ventana comparte ``decision_id`` y es más nueva que la traza), y las filas de
-    más se declaran en ``duplicates`` para que el reintento sea observable.
+    entrada de ventana comparte ``decision_id`` y es más nueva que la traza). Lo descartado se
+    declara en dos cuentas distintas —``duplicates`` (trazas de más) y ``extra_rows`` (filas de
+    cualquier clase, incluida la entrada de decisión del mismo ``decision_id``)— para que un
+    reintento sea observable sin que el baseline normal lo enmascare.
     """
     keys: list[str] = []
     seen: set[str] = set()
@@ -185,13 +226,15 @@ async def read_cycle_regimes(
     unconfirmed: list[str] = []
     absent: list[str] = []
     duplicates: dict[str, int] = {}
+    extra_rows: dict[str, int] = {}
     for derived, cycle_id in derivable.items():
         candidates = by_decision.get(derived, [])
         if not candidates:
             absent.append(cycle_id)
             continue
+        traces = [entry for entry in candidates if _is_trace(entry, cycle_id)]
         regime = next(
-            (found for entry in candidates if (found := _confirmed_regime(entry, cycle_id))),
+            (found for entry in traces if (found := _confirmed_regime(entry, cycle_id))),
             None,
         )
         if regime is None:
@@ -200,10 +243,16 @@ async def read_cycle_regimes(
             unconfirmed.append(cycle_id)
         else:
             regime_by_cycle[cycle_id] = regime
-            if len(candidates) > 1:
+            if len(traces) > 1:
                 # Reintento del tick (o traza duplicada): el mapa no crece, pero la lectura lo
                 # declara. Solo se cuenta aquí: sin confirmación no hay "ganadora" que elegir.
-                duplicates[cycle_id] = len(candidates) - 1
+                duplicates[cycle_id] = len(traces) - 1
+            extra = len(candidates) - 1
+            if extra > 0:
+                # Filas de más de cualquier clase (p.ej. la entrada de la decisión aprobada, que
+                # comparte ``decision_id`` por diseño). Se declaran aparte para que el baseline no
+                # se confunda con un reintento real.
+                extra_rows[cycle_id] = extra
 
     return CycleRegimeReading(
         regime_by_cycle=regime_by_cycle,
@@ -212,4 +261,5 @@ async def read_cycle_regimes(
         not_derivable=tuple(not_derivable),
         requested=len(keys),
         duplicates=duplicates,
+        extra_rows=extra_rows,
     )
