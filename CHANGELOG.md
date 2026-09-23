@@ -153,10 +153,19 @@ quedaría `DEGRADED` y apagaría `AUTO-12` (**M82**); y **`regime_available` ace
   `import-linter` **`4 kept / 0 broken`**. Tramo `AUTO-13` (analytics + application + costuras)
   **`202 passed`** (4 unit: 78 + 29 + 26 + 29; 4 costuras: 9 + 10 + 14 + 7) y el bloque `auto-*` offline de `apps/api-python` (25 ficheros `test_auto_*`, sin los que exigen PostgreSQL) **`288 passed`**.
 - **PR de auditoría externa [#63](https://github.com/jvelasca/Bolsa_V1/pull/63)**: la fase entera viaja en
-  la rama `auto-13-adaptive-data-gate` con **14/14 checks en `SUCCESS`**. La verificación offline
+  la rama `auto-13-adaptive-data-gate` con **`28 success` + `1 skipped`** sobre el commit sellado
+  (`54a3b86a`), todos en verde (`playwright (integrated E2E, opt-in)` es el skip declarado). La verificación offline
   **completa** de `quality`/`python` **no se pudo reproducir en la máquina** (su recolección incluye suites
   PG que importan `asyncpg`, ausente, y el teardown de sesión del conftest de `apps/api-python` exige
-  PostgreSQL); **los totales de CI del tag quedan a CI**, que es donde se miden.
+  PostgreSQL); **ese límite lo cierra la CI del tag, medido**.
+- **CI del tag `v2.54-beta`** ([run `35857892968`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857892968)):
+  **`10 success` + `1 skipped`** (`playwright (integrated E2E, opt-in)`) con **`certify (aggregate + artifact)`**
+  en `success`; job `python` (offline) **`2568 passed / 35 skipped`** (**+109** sobre los `2459 passed / 35 skipped`
+  de `v2.53-beta`), `ruff` `All checks passed!`, `import-linter` `4 kept, 0 broken` y `mypy` `0` errores en `497`
+  ficheros; los otros cuatro workflows del tag (`Python CI`, `Frontend CI`, `Fase 2 scientific`, `Optimize lab`)
+  **GREEN**; `check-runs` del commit sellado **`38 success` + `1 skipped`**; y `main` (`54a3b86a`, en
+  **fast-forward** desde `d08e66e5`) con `quality` **`2557 passed / 38 skipped`** y los cuatro jobs PG en verde.
+- **Sello:** tag anotado **`v2.54-beta`** sobre **`54a3b86a`** (empujado **de uno en uno**, sin `--follow-tags`).
 
 ### Límites declarados
 

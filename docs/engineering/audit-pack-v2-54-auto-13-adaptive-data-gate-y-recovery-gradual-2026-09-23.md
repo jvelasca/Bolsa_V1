@@ -1,7 +1,9 @@
 # Audit-pack `AUTO-13` Adaptive Data Gate + recovery gradual — `1.79.0-beta` (2026-09-23)
 
 **Fase:** `V2.54` · **Rótulo:** `AUTO-13` · **Bump:** `1.78.0-beta` → **`1.79.0-beta`** · **Tag:**
-`v2.54-beta` · **Fase anterior:** `V2.53` / `AUTO-12` (tag `v2.53-beta` → `a6655e6e`, `Release tag CI`
+`v2.54-beta` → **`54a3b86a`** (`Release tag CI` `35857892968` **GREEN**: `10 success` + `1 skipped`,
+`check-runs` `38 success` + `1 skipped`, job `python` del tag **`2568 passed / 35 skipped`** = **+109**
+sobre los `2459 passed / 35 skipped` de `v2.53-beta`) · **Fase anterior:** `V2.53` / `AUTO-12` (tag `v2.53-beta` → `a6655e6e`, `Release tag CI`
 `35836248169` **GREEN**, `check-runs` `27 success` + `1 skipped`, job `python` del tag
 **`2459 passed / 35 skipped`**).
 
@@ -236,7 +238,7 @@ fichero**: la restauración nunca puede fallar antes de haber mutado.
 | Costura del fallback de régimen (`..._regime_fallback_seam.py`, nueva) | 7 casos |
 | Matriz de mutaciones **completa** (`M1…M98`) | **`98/98`** muerden; `0` en `NADA`; árbol intacto |
 | Delta simétrico (tests de `HEAD` contra el código de la fase) | **1 rojo declarado** (ver abajo) |
-| CI del PR de auditoría (ref de la rama, 6 runs) | **14/14 `SUCCESS`** |
+| CI del PR de auditoría (branch `54a3b86a`, `gh pr checks 63`) | **`28 success` + `1 skipped`** |
 
 **Delta simétrico, declarado.** Se corrieron las versiones de `HEAD` (paso 4) de los ficheros de test
 **modificados** contra el código de la fase: **1 rojo**, y es exactamente el cambio de contrato de este
@@ -251,8 +253,9 @@ subió a `auto13-v1`.)
 se pudo reproducir en esta máquina (su recolección incluye suites PG que importan `asyncpg` —ausente— y
 el teardown de sesión del conftest de `apps/api-python` exige PostgreSQL): se corrió la selección offline
 con la extracción de targets del propio YAML y los únicos errores fueron los de `asyncpg`. **Ese límite
-lo cierra la CI del tag, que se mide al sellar** (§ de sellado de este pack, actualizado en el commit de
-sello). El PR de auditoría, con los cinco pasos dentro, cerró **14/14 checks en `SUCCESS`**.
+lo cierra la CI del tag, medida:** ver el **§12** (job `python` del tag **`2568 passed / 35 skipped`** =
+**+109** sobre `v2.53-beta`, `check-runs` `38 success` + `1 skipped`). El PR de auditoría, con la fase
+entera dentro, tiene sus checks en **`SUCCESS`** sobre el commit sellado.
 
 ## 10. Límites declarados (no silenciosos)
 
@@ -279,3 +282,30 @@ sello). El PR de auditoría, con los cinco pasos dentro, cerró **14/14 checks e
   esquema. Sin SHORT. Sin `prettier` para `*.md`.
 - **El flag Adaptive sigue OFF por defecto**: con OFF el camino de producción es byte-idéntico y esta
   fase **no se ejecuta** hasta un flag explícito.
+
+## 12. Sellado (docs-only, con la CI del tag medida)
+
+- **Commit sellado:** `54a3b86a` (`docs(v2.54): pack y relevo de AUTO-13 + CHANGELOG/PROJECT_STATE/indice`),
+  a `main` en **fast-forward** desde `d08e66e5` (sello de `v2.53`): **10 commits** de fase, sin merge
+  commit. El commit anterior a este paquete es `c6aec527` (relevo con el paso 5).
+- **Tag anotado `v2.54-beta`** sobre `54a3b86a`, empujado **de uno en uno** (sin `--follow-tags`, lección
+  medida de `v2.49`).
+- **`Release tag CI`** ([run `35857892968`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857892968))
+  **GREEN**: **`10 success` + `1 skipped`** (`playwright (integrated E2E, opt-in)`) con
+  **`certify (aggregate + artifact)`** en `success`; job `python` (offline) **`2568 passed / 35 skipped`**
+  (**+109** sobre los `2459 passed / 35 skipped` de `v2.53-beta`, con los **mismos** `35` skips), `ruff`
+  `All checks passed!`, `import-linter` `4 kept, 0 broken` y `mypy` `0` errores en `497` ficheros. Los otros
+  cuatro workflows del tag (`Python CI` `35857893065`, `Frontend CI`, `Fase 2 scientific`, `Optimize lab`)
+  **GREEN**.
+- **`check-runs` del commit sellado:** **`38 success` + `1 skipped`**.
+- **`Python CI` de `main`** ([run `35857846836`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857846836))
+  **GREEN** con `quality` **`2557 passed / 38 skipped`** y los cuatro jobs PG (`auto-v2-durable-pg`,
+  `paper-forward-pg`, `lifecycle-pg`, `grammar-discovery-pg`) en verde; **`Gitleaks`** de `main`
+  (`35857846687`) **GREEN**.
+- **Límite que cierra esta CI:** la verificación offline **completa** de `quality`/`python` no se pudo
+  reproducir en la máquina (su recolección incluye suites PG que importan `asyncpg`, ausente, y el teardown
+  de sesión del conftest de `apps/api-python` exige PostgreSQL). Las cifras del §9 son la selección offline
+  **medida en local**; la CI del tag es la que mide **todo**.
+- **La fase entra en `main` y se sella sin cambios de código** respecto al commit `c6aec527`: el paquete es
+  **solo documentación** (`CHANGELOG`, `PROJECT_STATE`, índice, relevo y este pack) más el bump del
+  `package.json` a `1.79.0-beta`.

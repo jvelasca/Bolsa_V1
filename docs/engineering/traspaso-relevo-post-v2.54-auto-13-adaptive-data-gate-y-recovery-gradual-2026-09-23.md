@@ -7,7 +7,7 @@ anterior:** `V2.53` / `AUTO-12` (sellada: tag `v2.53-beta` → `a6655e6e`, `Rele
 [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) (ratificado) ·
 [audit-pack](./audit-pack-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) · este
 relevo.
-**Estado:** **fase CERRADA** — Pasos 1–6 hechos y verificados, tag **`v2.54-beta`** con su CI (cifras
+**Estado:** **fase CERRADA** — Pasos 1–6 hechos y verificados, tag **`v2.54-beta`** → **`54a3b86a`** con su CI (cifras
 medidas en §7). **El runtime sigue siendo el de `v2.53-beta`** con el flag Adaptive **OFF**: el Data
 Gate y la rampa **no se ejecutan** en producción hasta un flag explícito. La rama de auditoría externa
 `auto-13-adaptive-data-gate` viaja entera en el **PR draft #63** contra `main`, y `main` recibe la fase
@@ -54,13 +54,15 @@ umbrales de rotación no se tocan), y la decisión 3 se resolvió **en contra** 
 
 - **Rama de la fase:** `auto-13-adaptive-data-gate` (empujada; los commits anteriores —plan,
   ratificación, Paso 1 y primer relevo— viajaron con ella, así que el PR muestra el delta completo
-  sobre `v2.53`). **`main` recibe la fase al sellar** en fast-forward lineal: `origin/main` estaba en
-  `d08e66e5` (sello de `v2.53`) y pasa al **commit del paquete de docs + bump** (el que lleva el tag).
+  sobre `v2.53`). **`main` recibió la fase al sellar** en fast-forward lineal: `origin/main` estaba en
+  `d08e66e5` (sello de `v2.53`) y pasó al **commit del paquete de docs + bump**, `54a3b86a`, que es el
+  que lleva el **tag `v2.54-beta`**.
   Árbol limpio **salvo `governor.json`** (sin trackear, como estaba).
 - **Commits de la fase:** `009e8965` (plan) · `d9242970` (ratificación) · `f45ac604` (**Paso 1**) ·
   `28b5ac5f` (**Paso 2**) · `30b2e5b3` (**Paso 3**) · `435530eb` (**Paso 4**) · `dcc0d64b` (**Paso 5**) ·
   `c6aec527` (relevo con el Paso 5) · y el **paquete de cierre** (audit-pack nuevo, este relevo,
-  `CHANGELOG`, `PROJECT_STATE`, `engineering-index` y bump a `1.79.0-beta`), que es el commit sellado.
+  `CHANGELOG`, `PROJECT_STATE`, `engineering-index` y bump a `1.79.0-beta`): **`54a3b86a`**, el commit
+  sellado, **10 commits** de fase sobre `d08e66e5` y sin merge commit.
 - **Tag anterior `v2.53-beta` → `a6655e6e`**: **no se reabre**. Sus cifras de CI (`10 success` +
   `1 skipped`, `check-runs` `27 success` + `1 skipped`, job `python` `2459 passed / 35 skipped`)
   son el **delta de referencia** de esta fase.
@@ -439,14 +441,31 @@ El paquete de cierre, el tag y las cifras **medidas** de CI: ver §7.
 
 **Bump:** `1.78.0-beta` → **`1.79.0-beta`** en el `package.json` de la raíz.
 
-**Sello:** commit del paquete → `main` en **fast-forward** (de `d08e66e5`, el sello de `v2.53`, al commit
-del paquete) → tag anotado **`v2.54-beta`** empujado **de uno en uno**, sin `--follow-tags` (lección
-medida de `v2.49`: con más de tres tags a la vez GitHub **no** crea el evento de tag) → CI del tag →
-**commit de sellado** con las cifras **medidas**.
+**Sello:** commit del paquete `54a3b86a` → `main` en **fast-forward** (de `d08e66e5`, el sello de
+`v2.53`, a `54a3b86a`: **10 commits**, sin merge commit) → tag anotado **`v2.54-beta`** sobre `54a3b86a`
+empujado **de uno en uno**, sin `--follow-tags` (lección medida de `v2.49`: con más de tres tags a la vez
+GitHub **no** crea el evento de tag) → CI del tag → **este commit de sellado** con las cifras **medidas**.
 
-**Cifras de CI del tag (medidas, no supuestas):** *se completan en el commit de sellado, con el run de
-`Release tag CI` sobre la ref del tag, el job `python` offline frente a los `2459 passed / 35 skipped` de
-`v2.53-beta`, el `quality` de `main` y los `check-runs` del commit.*
+**Cifras de CI del tag (medidas, no supuestas):**
+
+- **`Release tag CI`** [`35857892968`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857892968)
+  **GREEN**: **`10 success` + `1 skipped`** (`playwright (integrated E2E, opt-in)`) con
+  **`certify (aggregate + artifact)`** en `success`; job `python` (offline) **`2568 passed / 35 skipped`**
+  = **+109** sobre los `2459 passed / 35 skipped` de `v2.53-beta` (**mismos** `35` skips), con `ruff`
+  `All checks passed!`, `import-linter` `4 kept, 0 broken` y `mypy` `0` errores en `497` ficheros.
+  Los otros cuatro workflows del tag (`Python CI`
+  [`35857893065`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857893065), `Frontend CI`,
+  `Fase 2 scientific`, `Optimize lab`) **GREEN**.
+- **`check-runs` del commit sellado (`54a3b86a`):** **`38 success` + `1 skipped`** (el `+12` respecto a
+  los `27 success` de `v2.53` son las refs de `main` y del tag de la fase).
+- **`Python CI` de `main`** [`35857846836`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857846836)
+  **GREEN**: `quality` **`2557 passed / 38 skipped`** y los cuatro jobs PG (`auto-v2-durable-pg`,
+  `paper-forward-pg`, `lifecycle-pg`, `grammar-discovery-pg`) en verde; **`Gitleaks` de `main`**
+  ([`35857846687`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857846687)) **GREEN**.
+- **Límite que cierra esta CI:** las cifras del §5 (tramo `202 passed`, bloque offline `288 passed`) son la
+  selección **medida en local**; la verificación offline **completa** de `quality`/`python` no se pudo
+  reproducir en la máquina (suites PG que importan `asyncpg`, ausente, y el teardown de sesión del conftest
+  de `apps/api-python` exige PostgreSQL) y la CI del tag es la que mide **todo**.
 
 ## 8. Límites declarados y freeze
 
