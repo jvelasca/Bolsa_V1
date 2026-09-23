@@ -2,6 +2,178 @@
 
 All notable releases of Bolsa V1.
 
+## [1.79.0-beta] — AUTO-13 Adaptive Data Gate + recovery gradual (V2.54) — 2026-09-23
+
+**Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,
+sin cambio de contrato de API ni de DTO y **sin clave nueva en el journal durable** (la entrada
+`adaptive_recommendation` proyecta claves explícitas: el hueco de régimen y el encogimiento viven en el
+plan y en la traza del tick, nunca en la evidencia durable). El gobernador y su evidencia siguen
+**intactos**. El invariante que instala: **ninguna estrategia puede ser castigada por una deuda de los
+datos** — un dato incompleto se **declara** y **limita la adaptación**, nunca se convierte en «esta
+estrategia es mala»; una vuelta de pausa se **gana** con evidencia medida, nunca por el paso del tiempo;
+y un régimen que no se pudo leer **no** acusa a nadie. Cierra la quinta pregunta del epic: `AUTO-9`
+*«¿cuánto vale?»* · `AUTO-10` *«¿de qué ciclo es?»* · `AUTO-11` *«¿dónde vive su memoria?»* · `AUTO-12`
+*«¿cuánto puedo creérmelo?»* · **`AUTO-13` *«¿están sanos los datos con los que me lo creo, y cómo
+vuelvo?»***. Adaptive **sigue siendo recomendador read-only** y **el flag sigue OFF por defecto**: con
+OFF el camino de producción es **byte-idéntico** a `v2.53`.
+
+### Añadido: el Data Gate, puro (`auto_adaptive_data_gate.py`)
+
+- **Módulo nuevo** (`packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_data_gate.py`):
+  sin I/O, sin estado y **orden-invariante**. Es un gate de **EVIDENCIA**, no de riesgo: gradúa la salud
+  de lo que Adaptive sabe de sí mismo y **nunca** sustituye al gobernador, al kill switch ni a los gates
+  duros — solo decide **cuánto puede adaptar** Adaptive con la evidencia que tiene (audit §21).
+- **Cuatro estados con su efecto DERIVADO** (`_EFFECT_BY_STATUS`, única fuente: no puede publicarse un
+  estado con un efecto incoherente): `OK → ADAPTS`, `DEGRADED → LIMITS`, `STALE → FREEZES`,
+  `BLOCKED → NO_ADAPT`. La **precedencia** `BLOCKED > STALE > DEGRADED > OK` hace que el estado grave
+  **absorba** los motivos menores (`notes` los acumula y ordena) en vez de esconderlos.
+- **Cadencia declarada** y antigüedad en **ciclos**: `DataGatePolicy.evaluation_cycle_seconds = 60.0`
+  (validado) y el helper puro `journal_age_cycles(...)`. Un instante ausente, ilegible o **posterior a
+  `now`** devuelve `None` («no se pudo medir»), que **no** bloquea: no se supone juventud ni se inventa
+  antigüedad.
+- **Sin dato no se degrada ni se premia**: que el llamante no aporte un hecho (`None`) se declara
+  (`evidence_not_provided`) y **no** cambia el estado — es lo que mantiene **byte-idéntico** el
+  comportamiento cuando el gate no se aporta, el mismo patrón que dejó `AUTO-12` con `confidence=None`.
+- **Política versionada** (`DATA_GATE_POLICY_VERSION = "auto13-v1"`, `sink_failures_stale = 3`,
+  `journal_gap_blocked = 10`): cambiar los umbrales o la tabla estado→efecto **exige** subir la versión.
+
+### Añadido: las dos fuentes de verdad del gate, con su límite declarado (§21)
+
+- **Contador en memoria** de fallos **consecutivos** de `_v2_journal_adaptive_recommendation`: se
+  incrementa en el `except` y **un éxito RESETEA** la racha (una publicación sana no arrastra el fallo
+  aislado). Detecta el fallo al instante, pero se pierde al reiniciar.
+- **Ancla durable**: `AdaptiveStateReading.last_published_at` (el `asOf` de la evidencia **más nueva** del
+  journal) alimenta `journal_age_cycles`. **Sobrevive a un reinicio**, pero un journal sano y antiguo no
+  prueba que esté roto — de ahí la regla que cierra el diseño:
+- **Regla de corroboración**: el ancla **solo bloquea si hay un fallo de escritura propio**
+  (`_v2_adaptive_gate_journal_age` devuelve `None` sin fallos). Sin ella, un Adaptive OFF o una pausa larga
+  quedarían `BLOCKED` para siempre: `BLOCKED ⇒ adaptive = None ⇒ no se escribe ⇒ journal más viejo`, un
+  bloqueo **permanente** que se habría cerrado a sí mismo.
+
+### Modificado: el cableado del gate en el plan Adaptive
+
+`_v2_build_adaptive_plan` acepta `gate: DataGateReading | None = None` (opcional: `None` ⇒ comportamiento
+histórico) y lo **compone** con hechos que el tick **ya midió** (`_v2_adaptive_data_gate`): **cero I/O
+nuevo**. Los cuatro efectos:
+
+- **`OK` (`ADAPTS`)**: mismos argumentos y plan **byte-idéntico** a `v2.53`.
+- **`DEGRADED` (`LIMITS`)**: `shrink=False` — el reparto **deja de usar** la confianza estadística de
+  `AUTO-12` y cae a su eje histórico, pero la banda **medida** se sigue publicando en
+  `healthByStrategy`/`evidence_for`. La **protección** se conserva entera (pausas vivas, cooldowns y las
+  pausas **nuevas** por salud).
+- **`STALE` (`FREEZES`)**: además, **ninguna reactivación nueva** (decisión ratificada: **solo en el
+  worker**, recortando el contador que **entra** a `recommend_rotation` por debajo de `min_pause_cycles`
+  —el contador **real** sigue creciendo y los **umbrales de rotación no se tocan**—, así la pausa se
+  mantiene con el motivo mecánicamente cierto `cooldown` mientras el gate se declara en el log).
+- **`BLOCKED` (`NO_ADAPT`)**: `adaptive = None` declarado, **sin fila de journal**; el contador de
+  cooldown **no avanza** ese tick, así que nada se reactiva por olvido.
+
+Dos decisiones finas medidas: la **completitud del gate son los ejes que Adaptive EXIGE** (resultados y
+riesgo), **no** el `measurement_completeness` de la confianza —que combina el net-R **opcional**, cuyo
+hueco cae por diseño al eje moneda de `AUTO-9`—, porque con aquel cualquier despliegue sin coste medido
+quedaría `DEGRADED` y apagaría `AUTO-12` (**M82**); y **`regime_available` acepta los dos ejes** (canónico
+`TREND_UP` y operativo `BULL_TREND`), declarando ausencia solo con `None`, `""`, `UNKNOWN` y `RISK_OFF`
+(**M81**).
+
+### Añadido: `RECOVERING` y la rampa de reincorporación por evidencia (§23/§24)
+
+- **Estado operativo derivado** (`ADAPTIVE_STATE_ACTIVE`/`PAUSED`/`RECOVERING`) en
+  `AdaptivePlan.operational_states` con `state_for(...)`. **No es un modo de la rotación**: quien pausa y
+  reactiva sigue siendo `recommend_rotation` con su hysteresis y su cooldown.
+- **Rampa declarada**: `ADAPTIVE_RECOVERY_STEPS_DEFAULT = (0.25, 0.50, 0.75, 1.00)` y
+  `ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT = 3`, campos de política validados (escalones en `(0, 1]`,
+  estrictamente crecientes, paso `>= 1`). `recovery_reading(...)` sube **solo con evidencia medida
+  positiva posterior al corte** y vuelve al **suelo** declarándolo con deterioro (`decay == SEVERE` o
+  expectancy reciente `<= 0`) o con hueco de fechas.
+- **Se aplica como techo**: `m_final = min(m_reparto, escalón)`, después del reparto y antes de publicar,
+  así que la evidencia durable lleva el valor **realmente aplicado**. **Solo estrecha**, nunca ensancha y
+  **nunca** deja a nadie en `0` (el escalón máximo devuelve la versión a peso pleno = recuperación
+  cumplida).
+- **Memoria derivada, sin estado propio**: el lector durable **siembra** `reactivated_at` (corte
+  **probado**: la fila anterior de la racha tiene que estar **pausada**; un turno ilegible corta la
+  búsqueda y **no** se inventa una reincorporación) y el proceso **fecha la transición en el tick en que
+  ocurre** (`_v2_adaptive_reactivated_at`), recalculando el plan si la observa con el proceso vivo —sin
+  eso, la versión correría un tick a peso pleno antes de que la rampa entrase.
+- **Evidencia medida con un solo cociente**: `recovery_evidence_from_fills(...)` reusa los **mismos**
+  fills del tick y el **`cycle_r`** del informe (nada de un segundo cociente paralelo); una pausa viva
+  **descarta** su escalón (la protección manda sobre la rampa).
+- **`ADAPTIVE_POLICY_VERSION` sube a `auto13-v1`**: cambia la regla de asignación ⇒ sello nuevo, con el
+  test del sello actualizado **con nombre**.
+
+### Modificado: el fallback declarado del §20 y los tres ejes separados (§29)
+
+- **Un régimen que no se pudo leer no decide nada**: `None`, `""`, `UNKNOWN` y `RISK_OFF` son **huecos
+  declarados**, nunca un régimen adverso ni favorable. El tick lo publica como evidencia incompleta
+  (`regime_absent` ⇒ `DEGRADED`) y la rama adversa de `recommend_rotation` **no** puede dispararse.
+  **Control medido**: el régimen adverso **real** del tick (`market_regime_gate`, p. ej. `BEAR_TREND`, que
+  el plan traduce al de mercado `TREND_DOWN`) **sí** la arma — sin ese control, «no se pausa» también
+  pasaría con una rotación muerta.
+- **El hueco del cruce se declara**: `StrategyHealth.regime_undetermined` conserva el par
+  `(régimen, motivo)` que publica `declared_regime` —un `UNKNOWN` legítimo (sin celda decisiva) deja de ser
+  indistinguible de un régimen mal medido—; `AdaptivePlan.regime_undetermined` lo publica en **campo
+  propio**, **ordenado por versión** (la reproducibilidad no puede depender del orden de las filas) y
+  **derivado** de la salud, no recalculado, para que no pueda divergir del cruce que usó la rotación; y el
+  tick lo declara (`regimeUndetermined` + `fallback: strategy_evidence`). **Nunca** se asume `RANGE` ni se
+  hereda el régimen de otro ciclo: la rotación decide con la evidencia **global** de la estrategia.
+- **Medir ≠ usar** (`shrink`/`shrinkage`): `build_adaptive_plan(..., shrink=)` permite que el reparto
+  vuelva a su eje histórico **sin** borrar el hecho medido. `ACTIVE` + datos `DEGRADED` + calidad `LOW` es
+  un estado **legal** y legible entero, y los tres ejes —operativo, datos y calidad— viajan en campos
+  propios: **ninguno se disfraza de otro**.
+
+### Verificación
+
+- **Costura nueva** `apps/api-python/tests/test_auto_v54_auto13_regime_fallback_seam.py` (**7 tests**:
+  hueco del tick, `UNKNOWN` explícito, **control adverso real**, fallback declarado sin lector, cruce
+  determinado y los tres ejes sin compartir campo) más las de los pasos anteriores
+  (`..._data_gate_seam.py` **9**, `..._data_gate_wiring_seam.py` **10**, `..._recovery_seam.py` **14**) y
+  ampliación de `test_auto_adaptive.py`, `test_auto_adaptive_data_gate.py`,
+  `test_auto_adaptive_recovery.py` y `test_auto_self_evaluation_feed.py`.
+- **Delta simétrico**: las versiones de `HEAD` de los ficheros de test tocados dan **1 rojo NOMBRADO**
+  (`test_degraded_stops_using_the_confidence_but_keeps_the_protection`, que afirmaba el contrato viejo de
+  `DEGRADED` —`confidence=None`—): es **exactamente** el cambio declarado del §29 (la fase entrega la
+  confianza como evidencia medida y retira solo su **uso**; el reparto resultante es el mismo).
+  **Ninguna otra regresión oculta.**
+- **Matriz de mutaciones ampliada** (`M72…M98`, **27 etiquetas**: estado→efecto invertido, `OK` por
+  defecto, contador sin reset, ancla sin corroborar, cadencia ignorada, `BLOCKED` adaptando, `STALE`
+  reactivando, completitud por el eje opcional, rampa por tiempo, rampa que ensancha, rampa que llega a
+  `0`, evidencia anterior al corte, memoria no sembrada, transición sin fechar, régimen ilegible tratado
+  como adverso, hueco no publicado, fallback no declarado y encogimiento inapagable, entre otras): la
+  corrida **completa** da **`98/98` medidas y `0` etiquetas en `NADA`**, con **98** restauraciones
+  **byte a byte** y la huella `git status` de los ficheros tocados **idéntica** antes y después
+  (`intacto: la sonda no altero el arbol`).
+- **Dos realineos declarados** (una sonda desalineada **afirma** cobertura que no tiene): `M21` se quedó
+  sin fragmento cuando el renombrado `weight → share` del paso 4 (exigido por `mypy`) y **vuelve a morder
+  en 10 tests**; `M71` quedó **ambigua** al aparecer `confidence=confidence` dos veces en el worker y se
+  ancló al par `confidence` + `shrink` de la llamada al plan.
+- **Sonda endurecida para Windows**: con ~98 reescrituras seguidas de los mismos ficheros, `open('wb')`
+  devolvía `OSError [Errno 22]`; ahora escribe a un temporal y **reemplaza atómicamente** (`os.replace`)
+  con reintentos y, si no entra, **aborta sin tocar el fichero** (nunca deja el mutante dentro).
+- **Compuertas**: `ruff check packages/py apps/api-python --config pyproject.toml` **`All checks passed!`**,
+  `mypy` con el comando de CI (`--follow-imports=silent`) **`0` errores en `497` ficheros** e
+  `import-linter` **`4 kept / 0 broken`**. Tramo `AUTO-13` (analytics + application + costuras)
+  **`202 passed`** (4 unit: 78 + 29 + 26 + 29; 4 costuras: 9 + 10 + 14 + 7) y el bloque `auto-*` offline de `apps/api-python` (25 ficheros `test_auto_*`, sin los que exigen PostgreSQL) **`288 passed`**.
+- **PR de auditoría externa [#63](https://github.com/jvelasca/Bolsa_V1/pull/63)**: la fase entera viaja en
+  la rama `auto-13-adaptive-data-gate` con **14/14 checks en `SUCCESS`**. La verificación offline
+  **completa** de `quality`/`python` **no se pudo reproducir en la máquina** (su recolección incluye suites
+  PG que importan `asyncpg`, ausente, y el teardown de sesión del conftest de `apps/api-python` exige
+  PostgreSQL); **los totales de CI del tag quedan a CI**, que es donde se miden.
+
+### Límites declarados
+
+- **El gate no es un permiso**: limita la adaptación; no ejecuta, no pausa dinero y no toca al gobernador
+  (audit §21: «Risk Engine continúa funcionando»).
+- **El contador de fallos es de proceso** (se pierde al reiniciar); el ancla durable es el journal y su
+  antigüedad **solo bloquea corroborada** por un fallo propio.
+- **La retención de `STALE` usa el cooldown**: con `min_pause_cycles <= 1` no habría mecanismo y el hueco
+  se declararía en el log (inalcanzable con la política de la casa, `= 3`).
+- **La rampa nunca ensancha ni inventa**: `min` con el reparto, suelo `0.25`, subida **solo** por evidencia
+  medida; sin fechas legibles no sube y lo declara.
+- **El gate no se persiste** (es una lectura del tick): persistirlo, junto al reparto por celda de régimen,
+  queda declarado para **`AUTO-14`**.
+- **Sin UI** para `AUTO-7`…`AUTO-13`, **sin backfill**, **sin migración** (head `044_auto_cycle_trace`) y
+  **`governor.json` sin trackear**. **El flag Adaptive sigue OFF por defecto**: el Data Gate y la rampa
+  **no se ejecutan** en producción hasta un flag explícito.
+
 ## [1.78.0-beta] — AUTO-12 Confidence + calidad estadística (V2.53) — 2026-09-23
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,

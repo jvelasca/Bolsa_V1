@@ -1,29 +1,32 @@
-# Traspaso de relevo — `AUTO-13` **EN CURSO** (`V2.54` / `1.79.0-beta`)
+# Traspaso de relevo — `AUTO-13` **CERRADA** (`V2.54` / `1.79.0-beta`)
 
 **Fase:** `AUTO-13` (Adaptive Data Gate + recovery gradual) · **Fecha:** 2026-09-23 · **Fase
 anterior:** `V2.53` / `AUTO-12` (sellada: tag `v2.53-beta` → `a6655e6e`, `Release tag CI`
 `35836248169` **GREEN**, `1.78.0-beta`).
-**Documentos de la fase:** [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md)
-(ratificado) · este relevo.
-**Estado:** **fase CASI COMPLETA** — Pasos 1–5 hechos y verificados; **Paso 6 pendiente** (el
-runtime sigue siendo el de `v2.53-beta` con el flag Adaptive **OFF**: nada de esto se ejecuta en
-producción hasta el sello). Rama de auditoría externa: `auto-13-adaptive-data-gate` + **PR draft
-#63** contra `main`, que crece con la fase.
+**Documentos de la fase:**
+[plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) (ratificado) ·
+[audit-pack](./audit-pack-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) · este
+relevo.
+**Estado:** **fase CERRADA** — Pasos 1–6 hechos y verificados, tag **`v2.54-beta`** con su CI (cifras
+medidas en §7). **El runtime sigue siendo el de `v2.53-beta`** con el flag Adaptive **OFF**: el Data
+Gate y la rampa **no se ejecutan** en producción hasta un flag explícito. La rama de auditoría externa
+`auto-13-adaptive-data-gate` viaja entera en el **PR draft #63** contra `main`, y `main` recibe la fase
+**al sellar** (fast-forward lineal, como en `v2.50`–`v2.53`).
 
-> **Este documento es la fuente de verdad del estado EN CURSO.** Se lee **antes** que
-> [`PROJECT_STATE.md`](./PROJECT_STATE.md), que sigue describiendo la última fase **cerrada**
-> (`AUTO-12`) y apunta aquí como relevo vivo.
+> **Este documento es la fuente de verdad de la fase CERRADA.** Se lee **antes** que
+> [`PROJECT_STATE.md`](./PROJECT_STATE.md), que ya publica esta fase como la última cerrada y apunta
+> aquí como relevo vivo.
 
 ---
 
-## 0. Qué está ratificado y qué queda
+## 0. Qué está ratificado y qué se ejecutó
 
 **Rótulo ratificado por el propietario:** `AUTO-13` sobre **`V2.54` / `1.79.0-beta`**, con alcance
 **core backend** (§22 + §24 del audit **y** el fallback del §20), **sin UI**, **sin migración**
 (Alembic head sigue en `044_auto_cycle_trace`), **sin tocar el gobernador** y **sin estado propio
 persistido** (la memoria de la rampa se **deriva**).
 
-**Las cuatro decisiones, ratificadas (2026-09-23), con su porqué:**
+**Las cuatro decisiones, ratificadas (2026-09-23) y ejecutadas tal cual:**
 
 1. **De dónde sale el estado del gate** → **combinar** salud **durable** derivada del journal
    (antigüedad de la evidencia: sobrevive a reinicios) + un contador de fallos consecutivos **en
@@ -40,15 +43,24 @@ persistido** (la memoria de la rampa se **deriva**).
 4. **Alcance del §20** → **entra** el fallback declarado del hueco de régimen; la **matriz de
    régimen avanzada** (reparto *por celda*) queda **fuera** y se declara para `AUTO-14`.
 
+Dos consecuencias que la ejecución confirmó y conviene no perder: el `STALE` se implementó **solo en
+el worker** (el contador que entra a `recommend_rotation` se recorta, el real sigue creciendo, y los
+umbrales de rotación no se tocan), y la decisión 3 se resolvió **en contra** de tocar
+`auto_adaptive_journal.py`: el contrato durable de `AUTO-11` queda byte a byte igual.
+
 ---
 
 ## 1. Estado medido del repo (2026-09-23)
 
-- **HEAD `dcc0d64b`** (rama `auto-13-adaptive-data-gate`; el **Paso 5** ya commiteado y el relevo se
-  actualiza en el commit inmediatamente posterior); `main` local sigue en `v2.53-beta`. Árbol limpio
-  **salvo `governor.json`** (sin trackear, como estaba).
+- **Rama de la fase:** `auto-13-adaptive-data-gate` (empujada; los commits anteriores —plan,
+  ratificación, Paso 1 y primer relevo— viajaron con ella, así que el PR muestra el delta completo
+  sobre `v2.53`). **`main` recibe la fase al sellar** en fast-forward lineal: `origin/main` estaba en
+  `d08e66e5` (sello de `v2.53`) y pasa al **commit del paquete de docs + bump** (el que lleva el tag).
+  Árbol limpio **salvo `governor.json`** (sin trackear, como estaba).
 - **Commits de la fase:** `009e8965` (plan) · `d9242970` (ratificación) · `f45ac604` (**Paso 1**) ·
-  `28b5ac5f` (**Paso 2**) · `30b2e5b3` (**Paso 3**) · `435530eb` (**Paso 4**) · `dcc0d64b` (**Paso 5**).
+  `28b5ac5f` (**Paso 2**) · `30b2e5b3` (**Paso 3**) · `435530eb` (**Paso 4**) · `dcc0d64b` (**Paso 5**) ·
+  `c6aec527` (relevo con el Paso 5) · y el **paquete de cierre** (audit-pack nuevo, este relevo,
+  `CHANGELOG`, `PROJECT_STATE`, `engineering-index` y bump a `1.79.0-beta`), que es el commit sellado.
 - **Tag anterior `v2.53-beta` → `a6655e6e`**: **no se reabre**. Sus cifras de CI (`10 success` +
   `1 skipped`, `check-runs` `27 success` + `1 skipped`, job `python` `2459 passed / 35 skipped`)
   son el **delta de referencia** de esta fase.
@@ -198,12 +210,21 @@ el eje **operativo** (`market_regime_gate`: `BEAR_TREND`) y el plan lo traduce a
   `test_degraded_stops_using_the_confidence_but_keeps_the_protection`, que afirmaba el contrato viejo
   (`confidence=None` en `DEGRADED`): es exactamente el cambio declarado de §29.
 
-## 3. Anclas de código para los Pasos 2–6 (medidas)
+## 3. Anclas de código
+
+> **Nota:** las anclas de los Pasos 2–6 se midieron sobre el plan y se conservan como histórico; las
+> de esta lista están re-medidas sobre el **árbol final** sellado.
 
 **Adaptive (analytics):** [`auto_adaptive.py`](packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py)
-`ADAPTIVE_POLICY_VERSION = "auto12-v1"` (**127** — sube a `auto13-v1`) · `AdaptivePolicy` (**201**) ·
-`StrategyHealth` (**227**) · `recommend_rotation` (**510**) · `_allocation_weights` (**568**) ·
-`_confidence_factor` (**606**) · `recommend_allocation` (**628**) · `build_adaptive_plan` (**703**).
+`ADAPTIVE_POLICY_VERSION = "auto13-v1"` (**143**, sellado) · `AdaptivePolicy` (**201**) ·
+`ADAPTIVE_STATE_ACTIVE`/`PAUSED`/`RECOVERING` (**208-211**) ·
+`ADAPTIVE_RECOVERY_STEPS_DEFAULT`/`_STEP_CYCLES_DEFAULT` (**216/219**), notas de la rampa
+(**222-224**) · `StrategyHealth` (**227**, con `regime_undetermined` en **323**) · `recovery_reading`
+(**527**) · `recommend_rotation` (**510**) · `_allocation_weights` (**568**) ·
+`_confidence_factor` (**606**) · `recommend_allocation` (**628**) · `AdaptivePlan` (**560**;
+`operational_states` **573**, `recovery` **577**, `regime_undetermined` **582**, `shrinkage` **588**,
+`state_for` **593**) · `build_adaptive_plan` (**916**, `shrink` **925**, el `if shrink else None` del
+reparto **985**, la derivación del hueco **1002-1004**).
 
 **Confianza (insumos del gate):** [`auto_adaptive_confidence.py`](packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_confidence.py)
 `StrategyConfidence.effective_n`/`measurement_completeness`/`regime_coverage` (**313-342**) ·
@@ -245,9 +266,9 @@ del cruce, control adverso real y los tres ejes).
 
 ## 4. Lo que falta, paso a paso, con su gate
 
-> **Pasos 2, 3, 4 y 5: HECHOS** (ver §2b). Lo que sigue se conserva como el **diseño ratificado** de
-> cada uno; léase como histórico, no como trabajo pendiente. Pendiente real: **Paso 6**
-> (verificación y sello).
+> **Pasos 2–6: HECHOS** (ver §2b y §7). Lo que sigue se conserva como el **diseño ratificado** de
+> cada uno: léase como histórico y como la especificación contra la que se verificó, no como trabajo
+> pendiente.
 
 ### Paso 2 — Contador de fallos del sink + ancla durable (§21)
 
@@ -324,9 +345,9 @@ Dentro de `_v2_build_adaptive_plan` (**3008**), tras construir `confidence`:
 - **Los tres ejes separados** (§29): operativo (`ACTIVE`/`PAUSED`/`RECOVERING`), datos
   (`OK`/`DEGRADED`/`STALE`/`BLOCKED`) y calidad (`LOW`/`MEDIUM`/`HIGH`) no comparten campo.
 
-### Paso 6 — Verificación y sello
+### Paso 6 — Verificación y sello (**HECHO**)
 
-Ver §5 (método) y §7 (trámites de cierre).
+El paquete de cierre, el tag y las cifras **medidas** de CI: ver §7.
 
 ## 5. El método de verificación del repo (no improvisar)
 
@@ -402,16 +423,30 @@ Ver §5 (método) y §7 (trámites de cierre).
    una línea (`    10|texto`) si se copia la selección con los números. Revisar con
    `rg "^\s*\d+\|"` antes de commitear código nuevo (pasó en la costura del Paso 5 y se corrigió).
 
-## 7. Trámites de cierre (Paso 6)
+## 7. El cierre, hecho y medido (Paso 6)
 
-- Docs de fase: **plan** (ya), **audit-pack** nuevo
-  `audit-pack-v2-54-auto-13-...-2026-09-23.md`, **este relevo** (actualizar a cerrado) y
-  `CHANGELOG.md`, `PROJECT_STATE.md`, `engineering-index-2026-08-03.md` (entrada nueva).
-- Bump `1.78.0-beta` → **`1.79.0-beta`** en `package.json`.
-- Commit de código (`feat(v2.54): …`) + commit de docs, **tag `v2.54-beta`**, esperar la CI del tag
-  y **sellar** con las cifras medidas (job `python` del tag vs los `2459` de `v2.53`).
-- Convenciones de mensaje observadas: `feat(v2.54): …` / `docs(v2.54): …` con trailer
-  `Co-authored-by: Cursor <cursoragent@cursor.com>`.
+**Documentos del paquete** (viajan **dentro** del tag, como en `v2.47`–`v2.53`):
+
+- **audit-pack nuevo**
+  [`audit-pack-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md`](./audit-pack-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md):
+  el invariante de la fase, los cuatro estados con su efecto **derivado**, el contador + el ancla con la
+  regla de corroboración, el cableado, la rampa, el fallback del §20, los tres ejes del §29, la matriz
+  `M72…M98`, los límites declarados y el freeze.
+- **este relevo**, renombrado de `traspaso-relevo-v2-54-auto-13-en-curso-...` a
+  `traspaso-relevo-post-v2.54-auto-13-adaptive-data-gate-y-recovery-gradual-...` (la fase **cierra**).
+- `CHANGELOG.md` (**`1.79.0-beta`**), `PROJECT_STATE.md` (asOf, relevo vivo, línea de la fase y
+  siguiente) y la **entrada 138** del `engineering-index-2026-08-03.md`.
+
+**Bump:** `1.78.0-beta` → **`1.79.0-beta`** en el `package.json` de la raíz.
+
+**Sello:** commit del paquete → `main` en **fast-forward** (de `d08e66e5`, el sello de `v2.53`, al commit
+del paquete) → tag anotado **`v2.54-beta`** empujado **de uno en uno**, sin `--follow-tags` (lección
+medida de `v2.49`: con más de tres tags a la vez GitHub **no** crea el evento de tag) → CI del tag →
+**commit de sellado** con las cifras **medidas**.
+
+**Cifras de CI del tag (medidas, no supuestas):** *se completan en el commit de sellado, con el run de
+`Release tag CI` sobre la ref del tag, el job `python` offline frente a los `2459 passed / 35 skipped` de
+`v2.53-beta`, el `quality` de `main` y los `check-runs` del commit.*
 
 ## 8. Límites declarados y freeze
 
@@ -439,13 +474,22 @@ Ver §5 (método) y §7 (trámites de cierre).
 
 ## 9. Punto de entrada para el siguiente agente
 
-1. Leer **este relevo** entero (es el estado en curso).
-2. Leer el [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md)
-   (§2 diseño, §3 pasos, §4 verificación, §5 decisiones ya ratificadas).
-3. `git log --oneline -3` → confirmar los commits del **Paso 5** (`dcc0d64b`) y del relevo en HEAD
-   (rama `auto-13-adaptive-data-gate`) y `git status` limpio salvo `governor.json`.
-4. **Primera acción concreta:** **Paso 6** — verificación y sello (§7): audit-pack nuevo, `CHANGELOG`,
-   `PROJECT_STATE`, índice, bump a **`1.79.0-beta`**, tag **`v2.54-beta`**, esperar la CI del tag y
-   sellar con las cifras medidas frente a los `2459` de `v2.53-beta`. El runtime seguirá siendo el de
-   `v2.53-beta` con el flag Adaptive **OFF**: el Data Gate y la rampa **no se ejecutan** en producción
-   hasta un flag explícito.
+1. Leer **este relevo** entero (es el estado de la fase **cerrada**: las cuatro decisiones, lo medido y
+   los límites declarados).
+2. Leer el [audit-pack](./audit-pack-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md)
+   (el invariante, la matriz de mutaciones y los límites) y el
+   [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) (§2 diseño,
+   §3 pasos, §4 verificación, §5 decisiones ratificadas).
+3. `git log --oneline -6` y `git tag --points-at <commit del paquete>` → confirmar el commit sellado y
+   `v2.54-beta`; `git status` limpio salvo `governor.json`.
+4. **Por dónde sigue la línea** (declarado, no decidido aquí): **`AUTO-14`** — el **reparto por celda de
+   régimen** (la matriz avanzada que el §20 dejó explícitamente fuera) y/o el **Data Gate persistido**
+   *si el Paso 3 demuestra que hace falta* (hoy el gate es una lectura del tick: el contador de fallos se
+   pierde al reiniciar y eso está declarado) y/o la **UI de `AUTO-7`…`AUTO-13`** (el cruce
+   `strategy × regime`, la evidencia Adaptativa, `confidence`/`recent`/`decay`, el estado del gate y la
+   rampa ya existen y **no se ven**).
+5. **El flag Adaptive sigue OFF por defecto**: el Data Gate y la rampa **no se ejecutan** en producción
+   hasta un flag explícito. El runtime publicado es, en comportamiento, el de `v2.53-beta`.
+6. **Si hay que auditar la fase**: el §10 del audit-pack lista los límites declarados (lo que la fase
+   **no** afirma) y el §5 de este relevo, el método de verificación del repo (compuertas, delta
+   simétrico fichero a fichero y matriz de mutaciones **completa** sin etiquetas en `NADA`).
