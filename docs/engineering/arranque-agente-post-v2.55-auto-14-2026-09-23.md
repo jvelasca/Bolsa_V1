@@ -45,6 +45,7 @@ nunca se silencia.
 | `AUTO-14` (Reparto por CELDA de régimen) | **cerrada y sellada** | tag **`v2.55-beta`**, `1.80.0-beta` |
 | `main` | **recibió la fase** (fast-forward, sin merge) | `6fad572d..e29e6227` |
 | Tag | **`v2.55-beta`** empujado **suelto** (sin `--follow-tags`) | `Release tag CI` [`35889751810`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751810) **GREEN** (`10 success` + `1 skipped`); job `quality` del tag **`2575 passed / 38 skipped`** |
+| Rama de auditoría | `auto-14-reparto-por-celda` · **PR draft [#64](https://github.com/jvelasca/Bolsa_V1/pull/64)** (abierto **post-sello**, no es vehículo de merge) | delta completo sobre `v2.54`: `audit-base-v2.54-beta` @ `6fad572d` → `e29e6227` (**16 ficheros, `+2321/−33`**) |
 | Runtime | **el de `v2.53-beta`**: flag Adaptive **OFF** | el reparto por celda **no se ejecuta** |
 | Migración | **ninguna** | Alembic head `044_auto_cycle_trace` |
 | Árbol | limpio **salvo `governor.json`** (sin trackear) | — |

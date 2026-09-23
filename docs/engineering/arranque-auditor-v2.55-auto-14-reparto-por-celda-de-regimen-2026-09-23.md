@@ -13,7 +13,11 @@ ya medido.
 
 **Contexto del sello:** la fase entera viaja en **fast-forward** sobre `6fad572d` (los arranques de
 `v2.54` en `main`, que contiene `54a3b86a` —el commit sellado de `AUTO-13`—), **sin merge commit** y sin
-rama de fase. **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`).
+rama de fase. **Superficie de auditoría:** el **PR draft
+[#64](https://github.com/jvelasca/Bolsa_V1/pull/64)** (`auto-14-reparto-por-celda` @ `e29e6227` →
+`audit-base-v2.54-beta` @ `6fad572d`) se abrió **después** del sello **solo** para revisar con
+comentarios en línea: su diff medido es el de la fase (**16 ficheros, `+2321/−33`**) y **no** es vehículo
+de merge. **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`).
 
 ---
 

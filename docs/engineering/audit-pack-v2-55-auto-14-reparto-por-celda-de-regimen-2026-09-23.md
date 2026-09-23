@@ -274,6 +274,12 @@ el [arranque del auditor](./arranque-auditor-v2.55-auto-14-reparto-por-celda-de-
 de CI **medidos** se añade en el commit de docs **posterior** al sello (mismo patrón que `AUTO-13`): el run
 del tag no existe hasta que el tag se empuja, así que la tabla se **mide** en lugar de predecirse.
 
+**Superficie de auditoría (post-sello, declarada):** el **PR draft
+[#64](https://github.com/jvelasca/Bolsa_V1/pull/64)** (`auto-14-reparto-por-celda` @ `e29e6227` →
+`audit-base-v2.54-beta` @ `6fad572d`) se abre **después** del sello para que el auditor externo revise el
+delta con comentarios en línea. Su diff medido es el de la fase (**16 ficheros, `+2321/−33`**) y **no** es
+vehículo de merge: `main` ya la recibió en **fast-forward** (`6fad572d..e29e6227`).
+
 ---
 
 ## 12. CI del sello `v2.55-beta` (medida, no predicha)

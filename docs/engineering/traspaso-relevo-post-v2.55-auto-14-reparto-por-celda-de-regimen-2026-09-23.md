@@ -53,8 +53,12 @@ arranque anterior, con alcance **core backend**, **sin UI**, **sin migración** 
 
 ## 1. Estado medido del repo (2026-09-23)
 
-- **Rama:** `main` (la fase viaja en fast-forward lineal; sin rama de fase y sin PR de fase —el
-  [PR draft #63](https://github.com/jvelasca/Bolsa_V1/pull/63) de `AUTO-13` se queda como está—).
+- **Rama:** `main` (la fase **viajó** en fast-forward lineal, **sin merge commit y sin rama de fase en el
+  sello** —el [PR draft #63](https://github.com/jvelasca/Bolsa_V1/pull/63) de `AUTO-13` se queda como
+  está—). **Superficie de auditoría abierta POST-sello** (declarado, no silencioso): el **PR draft
+  [#64](https://github.com/jvelasca/Bolsa_V1/pull/64)** `auto-14-reparto-por-celda` (`e29e6227`, el commit
+  **sellado**) → `audit-base-v2.54-beta` (`6fad572d`), de modo que su **diff es exactamente el delta de
+  la fase** (16 ficheros, `+2321/−33`, medido) y **no** es vehículo de merge: `main` ya la recibió.
   Árbol limpio **salvo `governor.json`** (sin trackear, como estaba).
 - **Base:** `6fad572d` (los arranques de `v2.54` en `main`), que incluye `54a3b86a` —el commit sellado de
   `AUTO-13`— y los dos commits de documentación de su sello.
