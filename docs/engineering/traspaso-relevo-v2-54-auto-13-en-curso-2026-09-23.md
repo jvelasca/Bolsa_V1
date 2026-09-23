@@ -5,7 +5,7 @@ anterior:** `V2.53` / `AUTO-12` (sellada: tag `v2.53-beta` → `a6655e6e`, `Rele
 `35836248169` **GREEN**, `1.78.0-beta`).
 **Documentos de la fase:** [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md)
 (ratificado) · este relevo.
-**Estado:** **fase CASI COMPLETA** — Pasos 1–4 hechos y verificados; **Pasos 5–6 pendientes** (el
+**Estado:** **fase CASI COMPLETA** — Pasos 1–5 hechos y verificados; **Paso 6 pendiente** (el
 runtime sigue siendo el de `v2.53-beta` con el flag Adaptive **OFF**: nada de esto se ejecuta en
 producción hasta el sello). Rama de auditoría externa: `auto-13-adaptive-data-gate` + **PR draft
 #63** contra `main`, que crece con la fase.
@@ -44,11 +44,11 @@ persistido** (la memoria de la rampa se **deriva**).
 
 ## 1. Estado medido del repo (2026-09-23)
 
-- **HEAD `30b2e5b3`** (rama `auto-13-adaptive-data-gate`; el Paso 4 va en el árbol sin commitear
-  mientras se verifica); `main` local sigue en `v2.53-beta`. Árbol limpio **salvo `governor.json`**
-  (sin trackear, como estaba) y los ficheros del Paso 4.
+- **HEAD `dcc0d64b`** (rama `auto-13-adaptive-data-gate`; el **Paso 5** ya commiteado y el relevo se
+  actualiza en el commit inmediatamente posterior); `main` local sigue en `v2.53-beta`. Árbol limpio
+  **salvo `governor.json`** (sin trackear, como estaba).
 - **Commits de la fase:** `009e8965` (plan) · `d9242970` (ratificación) · `f45ac604` (**Paso 1**) ·
-  `28b5ac5f` (**Paso 2**) · `30b2e5b3` (**Paso 3**).
+  `28b5ac5f` (**Paso 2**) · `30b2e5b3` (**Paso 3**) · `435530eb` (**Paso 4**) · `dcc0d64b` (**Paso 5**).
 - **Tag anterior `v2.53-beta` → `a6655e6e`**: **no se reabre**. Sus cifras de CI (`10 success` +
   `1 skipped`, `check-runs` `27 success` + `1 skipped`, job `python` `2459 passed / 35 skipped`)
   son el **delta de referencia** de esta fase.
@@ -86,7 +86,7 @@ Contrato ya implementado (lo que el cableado puede dar por hecho):
 3. **`journal_age_cycles = None` no bloquea** (no se puede juzgar la antigüedad); si además se
    congela por otro motivo, se declara `journal_age_unknown` en vez de suponer juventud.
 
-## 2b. Lo ya HECHO y verificado (Pasos 2, 3 y 4)
+## 2b. Lo ya HECHO y verificado (Pasos 2 a 5)
 
 > **Nota de lectura.** Las anclas de línea de §3 y las descripciones de §4 son las del **plan
 > original**: se conservan como histórico. Lo que sigue es lo **ejecutado**, con la decisión fina
@@ -155,7 +155,48 @@ Contrato ya implementado (lo que el cableado puede dar por hecho):
   nombre** (en `test_auto_adaptive.py` y en la costura de `AUTO-12`).
 - **Verificación:** `test_auto_v54_auto13_recovery_seam.py` (nueva) + ampliación de
   `test_auto_adaptive.py` (rampa y `min`), `test_auto_adaptive_recovery.py` (`reactivated_at`) y
-  `test_auto_self_evaluation_feed.py` (evidencia medida); **M83–M91** (9 mutaciones).
+  `test_auto_self_evaluation_feed.py` (evidencia medida); **M83–M93** (11 mutaciones).
+
+### Paso 5 — Fallback declarado del §20 y los tres ejes separados (commit `dcc0d64b`)
+
+**Mitad de la rotación (§20).** Un régimen que **no se pudo leer** no puede decidir nada:
+
+- `StrategyHealth.regime_undetermined` (**auto_adaptive.py:323**) conserva el **motivo** con el que
+  `declared_regime` declara el cruce no determinado: el par `(régimen, motivo)` viaja con la fila
+  (**334** `from_evaluation`), así que un `UNKNOWN` legítimo (sin celda decisiva) deja de ser
+  indistinguible de un régimen mal medido. La rotación decide con la evidencia **global** de la
+  estrategia —la propia fila—, que es el fallback declarado.
+- `AdaptivePlan.regime_undetermined` (**582**) publica el hueco en **campo propio**, ordenado por
+  versión y **derivado** de la salud (**1002-1004**), no recalculado: un segundo cálculo del cruce
+  podría divergir del que usó la rotación. Se publica en `as_dict()` (**657**).
+- El tick lo **declara** (`regimeUndetermined` + `fallback: strategy_evidence`, worker **3155-3165**):
+  sin él, "no había régimen" y "se decidió con la evidencia global" eran indistinguibles en la traza.
+
+**Mitad del gate (§20).** La degradación por régimen ausente ya la daba el Paso 3 (`assess_data_gate`
+con `regime_available=False` ⇒ `DEGRADED`, `regime_absent`); este paso la **verifica de punta a punta**
+y añade el **control** que faltaba: el régimen adverso **real** del tick. El tick sirve el régimen en
+el eje **operativo** (`market_regime_gate`: `BEAR_TREND`) y el plan lo traduce al de mercado
+(`TREND_DOWN`); probar la rama adversa con un canónico crudo (`TREND_DOWN` en la entrada) medía un
+`UNKNOWN` y el control habría sido **mudo** —de ahí que el test use la entrada real.
+
+**Los tres ejes (§29): medir la confianza no es usarla para repartir.**
+
+- `build_adaptive_plan(..., shrink=)` (**916/925**): con `shrink=False` (efecto `LIMITS`/`FREEZES`)
+  el reparto cae a su eje histórico (**985**, `confidence=confidence if shrink else None`) pero la
+  banda **MEDIDA** sigue publicándose en `health.confidence`/`evidence_for`. Ocultarla habría sido
+  mezclar los ejes: `ACTIVE` + datos `DEGRADED` + calidad `LOW` es un estado **legal** y readable.
+- `AdaptivePlan.shrinkage` (**588**) declara si el reparto pudo usar la confianza. El worker pasa
+  `shrink=not reading.limits_adaptation` (**3130**).
+- **Lo que NO cambia:** la protección (pausas, cooldowns, pausas de salud) sigue recibiendo el mismo
+  material, y el **journal durable sigue intacto**: `build_adaptive_recommendation_entry` proyecta
+  claves explícitas, así que el contrato de `AUTO-11` no gana ninguna clave. `plan.as_dict()` solo
+  alimenta la traza del tick (`auto_v2_entry.py:1134`).
+- **Verificación:** costura nueva `test_auto_v54_auto13_regime_fallback_seam.py` (**7 tests**) + unit
+  (`test_auto_adaptive.py`: health/cruce/rotación/plan/encogimiento) + `..._data_gate_wiring_seam.py`
+  (el `shrink` del cableado y el reparto histórico); **M94–M98**. Delta simétrico: la versión de
+  `HEAD` de los tests tocados cae **solo** en
+  `test_degraded_stops_using_the_confidence_but_keeps_the_protection`, que afirmaba el contrato viejo
+  (`confidence=None` en `DEGRADED`): es exactamente el cambio declarado de §29.
 
 ## 3. Anclas de código para los Pasos 2–6 (medidas)
 
@@ -192,11 +233,21 @@ inyecta y restaura sink/reader (**4366-4479**).
 (**282**) · `tunables_from_env` (**398**) · `AUTO_ENGINE_SIM_V2_ADAPTIVE` (**464-466**) ·
 `_adaptive_env_overrides` (**528-541**).
 
+**Anclas del Paso 5 (medidas sobre `dcc0d64b`):** `auto_adaptive.py` →
+`StrategyHealth.regime_undetermined` (**323**) · `from_evaluation` (**334**) ·
+`AdaptivePlan.regime_undetermined` (**582**) · `AdaptivePlan.shrinkage` (**588**) ·
+`"regimeUndetermined"`/`"shrinkage"` en `as_dict()` (**657-661**) · `build_adaptive_plan` (**916**,
+`shrink` en **925**, el `if shrink else None` del reparto en **985**, la derivación del hueco en
+**1002-1004**). `auto_simulation_worker.py` → `shrink=not reading.limits_adaptation` (**3130**) y la
+declaración del hueco (**3155-3165**). Costura:
+`apps/api-python/tests/test_auto_v54_auto13_regime_fallback_seam.py` (7 tests: hueco del tick, hueco
+del cruce, control adverso real y los tres ejes).
+
 ## 4. Lo que falta, paso a paso, con su gate
 
-> **Pasos 2, 3 y 4: HECHOS** (ver §2b). Lo que sigue se conserva como el **diseño ratificado** de
-> cada uno; léase como histórico, no como trabajo pendiente. Pendiente real: **Paso 5** (fallback
-> declarado del §20 + tres ejes separados) y **Paso 6** (verificación y sello).
+> **Pasos 2, 3, 4 y 5: HECHOS** (ver §2b). Lo que sigue se conserva como el **diseño ratificado** de
+> cada uno; léase como histórico, no como trabajo pendiente. Pendiente real: **Paso 6**
+> (verificación y sello).
 
 ### Paso 2 — Contador de fallos del sink + ancla durable (§21)
 
@@ -286,25 +337,46 @@ Ver §5 (método) y §7 (trámites de cierre).
 - **Delta SIMÉTRICO**, siempre **fichero a fichero contra `HEAD`** (nunca restando totales de fases
   previas). Los ficheros de test **modificados** se corren además en su versión de `HEAD` contra el
   código de la fase. El **único rojo admisible** es el test del sello de política, actualizado **con
-  nombre** (en `AUTO-12` fue `test_the_policy_version_seals_the_auto12_evidence_contract`; aquí será
-  el de `auto13`).
+  nombre** (en `AUTO-13` el sello pasó a `auto13-v1` en el **Paso 4**: `test_the_policy_version_
+  seals_the_auto13_evidence_contract`). **Medido en el Paso 5:** las versiones de `HEAD` de
+  `test_auto_adaptive.py` y `..._data_gate_wiring_seam.py` dan **1 rojo** —
+  `test_degraded_stops_using_the_confidence_but_keeps_the_protection`, que afirmaba el contrato
+  viejo de `DEGRADED` (`confidence=None`) — y ese rojo **es** el cambio declarado del §29 (la banda
+  medida deja de ocultarse; el reparto sigue sin usarla). Ningún otro test de `HEAD` se rompe.
 - **Mutaciones:** el script es [`apps/api-python/scripts/v2_44_mutation_audit.py`](apps/api-python/scripts/v2_44_mutation_audit.py).
-  La matriz iba por **`M71`** (`AUTO-12` añadió `M60…M71`); `AUTO-13` ha añadido **`M72…M91`**
-  (Paso 2: `M72…M77`; Paso 3: `M78…M82`; Paso 4: `M83…M91`). Al menos: estado→efecto invertido,
+  La matriz iba por **`M71`** (`AUTO-12` añadió `M60…M71`); `AUTO-13` ha añadido **`M72…M98`**
+  (Paso 2: `M72…M77`; Paso 3: `M78…M82`; Paso 4: `M83…M93`; Paso 5: `M94…M98`: régimen ilegible
+  tratado como adverso —con el adverso real de control—, motivo del hueco perdido, hueco no
+  publicado, fallback no declarado y encogimiento inapagable). Al menos: estado→efecto invertido,
   `OK` por defecto, contador sin reset, `STALE` reactivando, `BLOCKED` adaptando, rampa que sube por
   tiempo, rampa que ensancha, rampa que llega a `0`, régimen ausente tratado como adverso,
-  `journal_age` que no bloquea. **Gate de la lista: la matriz COMPLETA (`91` etiquetas) no puede
+  `journal_age` que no bloquea. **Gate de la lista: la matriz COMPLETA (`98` etiquetas) no puede
   dejar ninguna en `NADA`** (la trampa de `M39`), y el árbol debe quedar intacto al terminar.
+  **Cierre medido del paso 5: `98/98` medidas, `0` en `NADA`, `98` restauradas byte a byte y la
+  huella de git intacta.**
+- **Realineo de fragmentos (declarado):** el renombrado `weight` → `share` del Paso 4 (exigido por
+  `mypy` en `recommend_allocation`) dejó **`M21`** sin fragmento, y el cableado del gate del Paso 5
+  hizo que `confidence=confidence` apareciese **dos veces** en el worker, dejando **`M71`**
+  ambiguo. Ambas se re-anclaron sobre la MISMA invariante (el acotado a `[0,1]` del multiplicador y
+  la confianza que llega al plan) y se re-midieron: `M21` muerde en **10** tests y `M71` en el test
+  de la evidencia publicada. Una sonda desalineada **afirma** cobertura que no tiene; por eso el
+  anclaje se declara aquí en vez de silenciarse.
+- **Escritura de los mutantes (hardening del Paso 5):** con ~98 reescrituras seguidas de los mismos
+  ficheros, Windows devolvió `OSError [Errno 22]` en el `open('wb')` del worker a mitad de matriz.
+  La sonda ahora escribe a un temporal y **reemplaza atómicamente** (`os.replace`) con reintentos, y
+  si no entra **aborta sin tocar el fichero** (el original sigue intacto: la restauración nunca
+  puede fallar antes de haber mutado).
   **Aviso:** la sonda heredada **`M33`** apunta al local `cycle_risk` dentro de
   `_v2_build_adaptive_plan` (se realineó en `AUTO-12` al desaparecer la llamada *inline*). **No**
   reintroducir una llamada *inline* a `build_auto_self_evaluation` en el worker sin realinear `M33`:
   una sonda desalineada **afirma** cobertura que no tiene.
 - **Tests a añadir/ampliar:** `packages/py/analytics/tests/test_auto_adaptive.py` (rampa, `min` con el
-  reparto, sello), `packages/py/application/tests/test_auto_adaptive_recovery.py` (`reactivated_at`),
+  reparto, sello, hueco del cruce y encogimiento), `packages/py/application/tests/test_auto_adaptive_recovery.py` (`reactivated_at`),
   `packages/py/application/tests/test_auto_self_evaluation_feed.py` (evidencia medida de la rampa), y
   las **costuras nuevas** `apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py` (contador de
-  fallos, ancla durable), `..._data_gate_wiring_seam.py` (los tres efectos del gate en el plan) y
-  `..._recovery_seam.py` (`RECOVERING` con la rampa, ceros I/O).
+  fallos, ancla durable), `..._data_gate_wiring_seam.py` (los tres efectos del gate en el plan),
+  `..._recovery_seam.py` (`RECOVERING` con la rampa, cero I/O) y `..._regime_fallback_seam.py`
+  (hueco del régimen §20 —tick y cruce—, control adverso real y los tres ejes separados).
 - **Bloques offline sin PostgreSQL**, con la extracción de targets del propio YAML, para que los
   `skipped` cuadren con la CI.
 
@@ -323,6 +395,12 @@ Ver §5 (método) y §7 (trámites de cierre).
    `git commit -F`.
 6. `python -c` con salida no-ASCII revienta en `cp1252`: **escribir a fichero UTF-8** en vez de
    imprimir.
+7. **Bloqueo transitorio de fichero al mutar:** con decenas de reescrituras seguidas, Windows puede
+   devolver `OSError [Errno 22]` en el `open('wb')`. La sonda de mutaciones ya escribe a un temporal y
+   reemplaza atómicamente con reintentos (ver §5); **no** volver a `path.write_bytes` directo.
+8. Leer un fichero con el visor del editor puede dejar el **prefijo del número de línea** dentro de
+   una línea (`    10|texto`) si se copia la selección con los números. Revisar con
+   `rg "^\s*\d+\|"` antes de commitear código nuevo (pasó en la costura del Paso 5 y se corrigió).
 
 ## 7. Trámites de cierre (Paso 6)
 
@@ -344,6 +422,14 @@ Ver §5 (método) y §7 (trámites de cierre).
   evidencia medida.
 - **`RECOVERING` no es un modo de la rotación**: es estado **operativo** derivado; quien pausa y
   reactiva sigue siendo `recommend_rotation` con su hysteresis y su cooldown.
+- **Sin régimen no hay juicio de régimen (§20):** un régimen ilegible (`None`/`""`/`UNKNOWN`/
+  `RISK_OFF`) o un cruce sin celda decisiva **no pausa ni favorece**: degrada el gate y la rotación
+  decide con la evidencia **global** de la estrategia, y ese fallback se **declara**
+  (`regimeUndetermined` + `fallback: strategy_evidence`). Nunca se asume `RANGE` ni se hereda el
+  régimen de otro ciclo.
+- **Medir ≠ usar (§29):** el gate puede apagar el **uso** de la confianza (el encogimiento del
+  reparto) sin borrar el **hecho medido**: la banda sigue publicándose y `shrinkage` declara si el
+  reparto la usó. Los tres ejes —operativo, datos y calidad— viajan en campos propios.
 - **`AUTO-14` fuera:** reparto por celda de régimen (matriz avanzada), Data Gate **persistido** (si el
   Paso 3 demuestra que hace falta) y la **UI de explicación**.
 - **No se toca:** el sello de `V2.53`, `auto_adaptive_journal.py` (salvo la decisión 3 —ya
@@ -356,10 +442,10 @@ Ver §5 (método) y §7 (trámites de cierre).
 1. Leer **este relevo** entero (es el estado en curso).
 2. Leer el [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md)
    (§2 diseño, §3 pasos, §4 verificación, §5 decisiones ya ratificadas).
-3. `git log --oneline -3` → confirmar el commit del **Paso 4** en HEAD (rama
-   `auto-13-adaptive-data-gate`) y `git status` limpio salvo `governor.json`.
-4. **Primera acción concreta:** **Paso 5** — declarar el fallback del §20 (régimen del cruce no
-   determinado ⇒ `regime_undetermined` con la evidencia global; régimen del tick ausente ⇒ `DEGRADED`
-   y **nunca** rama adversa) y verificar que los tres ejes viajan sin mezclarse, y cubrirlo con tests
-   y mutaciones (`M94…`, los rótulos `M92`/`M93` ya los consume la memoria de la rampa del Paso 4)
-   antes del sello.
+3. `git log --oneline -3` → confirmar los commits del **Paso 5** (`dcc0d64b`) y del relevo en HEAD
+   (rama `auto-13-adaptive-data-gate`) y `git status` limpio salvo `governor.json`.
+4. **Primera acción concreta:** **Paso 6** — verificación y sello (§7): audit-pack nuevo, `CHANGELOG`,
+   `PROJECT_STATE`, índice, bump a **`1.79.0-beta`**, tag **`v2.54-beta`**, esperar la CI del tag y
+   sellar con las cifras medidas frente a los `2459` de `v2.53-beta`. El runtime seguirá siendo el de
+   `v2.53-beta` con el flag Adaptive **OFF**: el Data Gate y la rampa **no se ejecutan** en producción
+   hasta un flag explícito.
