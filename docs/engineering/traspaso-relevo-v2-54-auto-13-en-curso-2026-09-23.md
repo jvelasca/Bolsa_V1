@@ -5,8 +5,10 @@ anterior:** `V2.53` / `AUTO-12` (sellada: tag `v2.53-beta` → `a6655e6e`, `Rele
 `35836248169` **GREEN**, `1.78.0-beta`).
 **Documentos de la fase:** [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md)
 (ratificado) · este relevo.
-**Estado:** **fase a MITAD** — Paso 1 hecho y verificado; **Pasos 2–6 pendientes**. El runtime sigue
-siendo el de `v2.53-beta`: el módulo del gate **no está cableado** todavía.
+**Estado:** **fase CASI COMPLETA** — Pasos 1–4 hechos y verificados; **Pasos 5–6 pendientes** (el
+runtime sigue siendo el de `v2.53-beta` con el flag Adaptive **OFF**: nada de esto se ejecuta en
+producción hasta el sello). Rama de auditoría externa: `auto-13-adaptive-data-gate` + **PR draft
+#63** contra `main`, que crece con la fase.
 
 > **Este documento es la fuente de verdad del estado EN CURSO.** Se lee **antes** que
 > [`PROJECT_STATE.md`](./PROJECT_STATE.md), que sigue describiendo la última fase **cerrada**
@@ -42,8 +44,11 @@ persistido** (la memoria de la rampa se **deriva**).
 
 ## 1. Estado medido del repo (2026-09-23)
 
-- **HEAD `f45ac604`**; árbol limpio **salvo `governor.json`** (sin trackear, como estaba).
-- **Commits de la fase:** `009e8965` (plan) · `d9242970` (ratificación) · `f45ac604` (**Paso 1**).
+- **HEAD `30b2e5b3`** (rama `auto-13-adaptive-data-gate`; el Paso 4 va en el árbol sin commitear
+  mientras se verifica); `main` local sigue en `v2.53-beta`. Árbol limpio **salvo `governor.json`**
+  (sin trackear, como estaba) y los ficheros del Paso 4.
+- **Commits de la fase:** `009e8965` (plan) · `d9242970` (ratificación) · `f45ac604` (**Paso 1**) ·
+  `28b5ac5f` (**Paso 2**) · `30b2e5b3` (**Paso 3**).
 - **Tag anterior `v2.53-beta` → `a6655e6e`**: **no se reabre**. Sus cifras de CI (`10 success` +
   `1 skipped`, `check-runs` `27 success` + `1 skipped`, job `python` `2459 passed / 35 skipped`)
   son el **delta de referencia** de esta fase.
@@ -81,6 +86,77 @@ Contrato ya implementado (lo que el cableado puede dar por hecho):
 3. **`journal_age_cycles = None` no bloquea** (no se puede juzgar la antigüedad); si además se
    congela por otro motivo, se declara `journal_age_unknown` en vez de suponer juventud.
 
+## 2b. Lo ya HECHO y verificado (Pasos 2, 3 y 4)
+
+> **Nota de lectura.** Las anclas de línea de §3 y las descripciones de §4 son las del **plan
+> original**: se conservan como histórico. Lo que sigue es lo **ejecutado**, con la decisión fina
+> que se tomó en cada punto cuando el plan dejaba margen.
+
+### Paso 2 — Contador de fallos del sink + ancla durable (commit `28b5ac5f`)
+
+- **Cadencia declarada:** `DATA_GATE_EVALUATION_CYCLE_SECONDS_DEFAULT = 60.0` y
+  `DataGatePolicy.evaluation_cycle_seconds` (validado `> 0`) + helper puro `journal_age_cycles(...)`
+  en `auto_adaptive_data_gate.py`. La conversión segundos→ciclos se **declara**, no se deja implícita.
+- **`last_published_at`** en `AdaptiveStateReading`/`read_adaptive_state`: el `asOf` de la evidencia
+  MÁS NUEVA (la primera de la historia ordenada); un instante ilegible da `None` (no se supone
+  juventud). Es el ancla que **sobrevive a un reinicio**.
+- **Contador de fallos consecutivos** de `_v2_journal_adaptive_recommendation` en el worker: se
+  incrementa en el `except` y un **éxito RESETEA** la racha y pone el ancla a `0`.
+- **Regla de corroboración (decisión fina, ratificada):** el ancla durable **solo** bloquea si hay
+  un fallo de escritura **propio** (`_v2_adaptive_gate_journal_age` devuelve `None` sin fallos). Sin
+  ella, un journal sano pero antiguo (Adaptive OFF o pausa larga) quedaría `BLOCKED` para siempre:
+  `BLOCKED` ⇒ `adaptive = None` ⇒ no escribe ⇒ **deadlock**.
+- **Verificación:** `test_auto_v54_auto13_data_gate_seam.py` (nueva) + ampliación de
+  `test_auto_adaptive_data_gate.py` y `test_auto_adaptive_recovery.py`; **M72–M77** (6 mutaciones).
+
+### Paso 3 — Cableado del gate en `_v2_build_adaptive_plan` (commit `30b2e5b3`)
+
+- `gate: DataGateReading | None = None` (opcional: `None` ⇒ comportamiento histórico). El gate se
+  **compone** de hechos que el tick ya midió (`_v2_adaptive_data_gate`): cero I/O nuevo.
+- **`OK`** ⇒ plan byte-idéntico; **`DEGRADED`** ⇒ `confidence=None` al plan (deja de estrechar por
+  evidencia fina) **conservando la protección**; **`STALE`** ⇒ además no admite reactivaciones
+  nuevas, vía `_v2_adaptive_decision_cycles` (recorta el contador por debajo de `min_pause_cycles`;
+  el contador **real** sigue creciendo); **`BLOCKED`** ⇒ `adaptive = None` declarado, sin fila de
+  journal.
+- **Dos decisiones finas, ratificadas:**
+  1. **Completitud del gate = ejes que Adaptive EXIGE** (resultados + riesgo), **no** el net-R
+     **opcional** (cuyo hueco cae por diseño al eje moneda). Usar el de la confianza degradaría el
+     gate en cualquier despliegue sin coste medido y apagaría `AUTO-12` casi siempre (**M82**).
+  2. **`regime_available` acepta los dos ejes** (canónico `TREND_UP` y operativo `BULL_TREND`) y solo
+     declara ausencia con `None`, cadena vacía, `UNKNOWN` y `RISK_OFF` (`_v2_regime_available`).
+     Traducir por una sola vía degradaba el gate en el caso normal (**M81**).
+- **Verificación:** `test_auto_v54_auto13_data_gate_wiring_seam.py` (nueva) + **M78–M82**.
+
+### Paso 4 — `RECOVERING` y la rampa por evidencia (§24)
+
+- **Estado operativo derivado** (`ADAPTIVE_STATE_ACTIVE` / `PAUSED` / `RECOVERING`): vive en
+  `AdaptivePlan.operational_states`, con `state_for(...)`. No es un modo de la rotación: quien pausa
+  y reactiva sigue siendo `recommend_rotation`.
+- **Rampa declarada:** `ADAPTIVE_RECOVERY_STEPS_DEFAULT = (0.25, 0.50, 0.75, 1.00)` y
+  `ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT = 3`, ambos **campos de política** validados en
+  `AdaptivePolicy.__post_init__` (escalones en `(0, 1]`, estrictamente crecientes, paso `>= 1`).
+- **`RecoveryEvidence` / `RecoveryReading` / `recovery_reading(...)`** (puros): el escalón es
+  `escalones[min(último, ciclos_positivos // paso)]` y **avanza solo con evidencia medida positiva**;
+  el deterioro (`decay == SEVERE` o expectancy reciente `<= 0`) o un hueco de fechas lo **reinician al
+  suelo** y lo **declaran** (`recovery_severe_decay` / `recovery_not_positive` / `recovery_unmeasured`).
+- **Aplicación: `m_final = min(m_reparto, escalón)`** dentro de `recommend_allocation(..., recovery=)`
+  — después del reparto y antes de publicar. **Solo estrecha**, nunca ensancha, y nunca deja a nadie
+  en `0` (suelo `> 0`). Un escalón `1.00` es recuperación **cumplida**: la versión vuelve a `ACTIVE`
+  a peso pleno.
+- **Memoria derivada:** `reactivated_at` **declarado** por el lector durable (`_reactivations`):
+  con las filas de nueva a vieja, el corte es la fila más vieja de la racha **activa** actual, y solo
+  se publica si la fila anterior la tiene **pausada** (corte PROBADO). Un turno ilegible o sin fecha
+  corta la búsqueda: no se inventa una reincorporación (**M88**).
+- **Evidencia medida:** `recovery_evidence_from_fills(...)` en el feed reusa los MISMOS fills del
+  tick (`cycles_from_fills` + `apply_cycle_risk`) y calcula el R con **`cycle_r`** (la regla del
+  informe, sin un segundo cociente paralelo): cuenta los ciclos **posteriores** al corte con R medido
+  positivo. Una pausa viva **descarta** su escalón (la rotación manda).
+- **Sello:** `ADAPTIVE_POLICY_VERSION` → **`auto13-v1`**, con el test del sello actualizado **con
+  nombre** (en `test_auto_adaptive.py` y en la costura de `AUTO-12`).
+- **Verificación:** `test_auto_v54_auto13_recovery_seam.py` (nueva) + ampliación de
+  `test_auto_adaptive.py` (rampa y `min`), `test_auto_adaptive_recovery.py` (`reactivated_at`) y
+  `test_auto_self_evaluation_feed.py` (evidencia medida); **M83–M91** (9 mutaciones).
+
 ## 3. Anclas de código para los Pasos 2–6 (medidas)
 
 **Adaptive (analytics):** [`auto_adaptive.py`](packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py)
@@ -117,6 +193,10 @@ inyecta y restaura sink/reader (**4366-4479**).
 `_adaptive_env_overrides` (**528-541**).
 
 ## 4. Lo que falta, paso a paso, con su gate
+
+> **Pasos 2, 3 y 4: HECHOS** (ver §2b). Lo que sigue se conserva como el **diseño ratificado** de
+> cada uno; léase como histórico, no como trabajo pendiente. Pendiente real: **Paso 5** (fallback
+> declarado del §20 + tres ejes separados) y **Paso 6** (verificación y sello).
 
 ### Paso 2 — Contador de fallos del sink + ancla durable (§21)
 
@@ -209,21 +289,22 @@ Ver §5 (método) y §7 (trámites de cierre).
   nombre** (en `AUTO-12` fue `test_the_policy_version_seals_the_auto12_evidence_contract`; aquí será
   el de `auto13`).
 - **Mutaciones:** el script es [`apps/api-python/scripts/v2_44_mutation_audit.py`](apps/api-python/scripts/v2_44_mutation_audit.py).
-  La matriz va por **`M71`** (`AUTO-12` añadió `M60…M71`): las nuevas empiezan en **`M72…`**. Al
-  menos: estado→efecto invertido, `OK` por defecto, contador sin reset, `STALE` reactivando,
-  `BLOCKED` adaptando, rampa que sube por tiempo, rampa que ensancha, rampa que llega a `0`, régimen
-  ausente tratado como adverso, `journal_age` que no bloquea. **Gate de la lista: la matriz
-  COMPLETA (`71 + nuevas`) no puede dejar ninguna etiqueta en `NADA`** (la trampa de `M39`), y el
-  árbol debe quedar intacto al terminar.
+  La matriz iba por **`M71`** (`AUTO-12` añadió `M60…M71`); `AUTO-13` ha añadido **`M72…M91`**
+  (Paso 2: `M72…M77`; Paso 3: `M78…M82`; Paso 4: `M83…M91`). Al menos: estado→efecto invertido,
+  `OK` por defecto, contador sin reset, `STALE` reactivando, `BLOCKED` adaptando, rampa que sube por
+  tiempo, rampa que ensancha, rampa que llega a `0`, régimen ausente tratado como adverso,
+  `journal_age` que no bloquea. **Gate de la lista: la matriz COMPLETA (`91` etiquetas) no puede
+  dejar ninguna en `NADA`** (la trampa de `M39`), y el árbol debe quedar intacto al terminar.
   **Aviso:** la sonda heredada **`M33`** apunta al local `cycle_risk` dentro de
   `_v2_build_adaptive_plan` (se realineó en `AUTO-12` al desaparecer la llamada *inline*). **No**
   reintroducir una llamada *inline* a `build_auto_self_evaluation` en el worker sin realinear `M33`:
   una sonda desalineada **afirma** cobertura que no tiene.
 - **Tests a añadir/ampliar:** `packages/py/analytics/tests/test_auto_adaptive.py` (rampa, `min` con el
   reparto, sello), `packages/py/application/tests/test_auto_adaptive_recovery.py` (`reactivated_at`),
-  `packages/py/application/tests/test_auto_self_evaluation_feed.py` (si la rampa toca el feed), y una
-  **costura nueva** `apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py` (contador de
-  fallos, ancla durable, `BLOCKED` ⇒ `None` declarado, `RECOVERING` con la rampa, ceros I/O con flag OFF).
+  `packages/py/application/tests/test_auto_self_evaluation_feed.py` (evidencia medida de la rampa), y
+  las **costuras nuevas** `apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py` (contador de
+  fallos, ancla durable), `..._data_gate_wiring_seam.py` (los tres efectos del gate en el plan) y
+  `..._recovery_seam.py` (`RECOVERING` con la rampa, ceros I/O).
 - **Bloques offline sin PostgreSQL**, con la extracción de targets del propio YAML, para que los
   `skipped` cuadren con la CI.
 
@@ -275,6 +356,10 @@ Ver §5 (método) y §7 (trámites de cierre).
 1. Leer **este relevo** entero (es el estado en curso).
 2. Leer el [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md)
    (§2 diseño, §3 pasos, §4 verificación, §5 decisiones ya ratificadas).
-3. `git log --oneline -3` → confirmar `f45ac604` en HEAD y `git status` limpio salvo `governor.json`.
-4. **Primera acción concreta:** Paso 2 — añadir el **contador de fallos consecutivos del sink** y el
-   **ancla durable de antigüedad** del journal, y cubrirlo con tests antes de cablear nada.
+3. `git log --oneline -3` → confirmar el commit del **Paso 4** en HEAD (rama
+   `auto-13-adaptive-data-gate`) y `git status` limpio salvo `governor.json`.
+4. **Primera acción concreta:** **Paso 5** — declarar el fallback del §20 (régimen del cruce no
+   determinado ⇒ `regime_undetermined` con la evidencia global; régimen del tick ausente ⇒ `DEGRADED`
+   y **nunca** rama adversa) y verificar que los tres ejes viajan sin mezclarse, y cubrirlo con tests
+   y mutaciones (`M94…`, los rótulos `M92`/`M93` ya los consume la memoria de la rampa del Paso 4)
+   antes del sello.

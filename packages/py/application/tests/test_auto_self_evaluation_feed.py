@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 
+from bolsa_analytics.cognitive.auto_adaptive import recovery_reading
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     ADAPTIVE_CONFIDENCE_RECENT_UNAVAILABLE,
     ADAPTIVE_DECAY_SEVERE,
@@ -30,6 +31,7 @@ from bolsa_application.auto_self_evaluation_feed import (
     build_auto_self_evaluation,
     cycles_from_fills,
     make_auto_self_evaluation_provider,
+    recovery_evidence_from_fills,
 )
 from bolsa_application.cycle_risk import cycle_risk_from_reservations
 from bolsa_application.sim_durable_store import (
@@ -543,3 +545,151 @@ def test_the_pure_feeds_module_does_not_touch_the_analytics_input_contract() -> 
     """El informe de los fills y el informe puro comparten contrato (mismo ``as_dict``)."""
     report = build_auto_self_evaluation()
     assert report.as_dict() == evaluate_auto_self_evaluation().as_dict()
+
+
+# ── Evidencia de la rampa de reincorporación (AUTO-13, §24) ─────────────────────────
+
+
+def _closed_cycle(
+    cycle_id: str,
+    *,
+    version: str = "orb-1",
+    at: datetime,
+    profitable: bool = True,
+) -> list[SimFillFinanceContext]:
+    """Un ciclo cerrado medido: ``pnl`` de ±5 sobre un riesgo reservado de 5 ⇒ ``R`` de ±1."""
+    return [
+        _fill(
+            "buy",
+            "10",
+            "100",
+            execution_id=f"{cycle_id}-b",
+            version=version,
+            cycle_id=cycle_id,
+            created_at=at,
+        ),
+        _fill(
+            "sell",
+            "10",
+            "100.5" if profitable else "99.5",
+            execution_id=f"{cycle_id}-s",
+            version=version,
+            cycle_id=cycle_id,
+            created_at=at,
+        ),
+    ]
+
+
+def _evidence_for(fills: list[Any], **overrides: Any):
+    cycle_ids = sorted({fill.cycle_id for fill in fills if fill.cycle_id})
+    base: dict[str, Any] = {
+        "fills": fills,
+        "cycle_risk": _cycle_risk(cycle_ids),
+        "reactivated_at": {"orb-1": "2026-09-10T00:00:00+00:00"},
+    }
+    base.update(overrides)
+    return recovery_evidence_from_fills(**base).get("orb-1")
+
+
+def test_the_recovery_evidence_counts_only_the_cycles_after_the_cut() -> None:
+    """La rampa cuenta la evidencia POSTERIOR al corte: la anterior a la reactivación no suma."""
+    before = datetime(2026, 9, 5, 10, 0, tzinfo=UTC)
+    after = datetime(2026, 9, 12, 10, 0, tzinfo=UTC)
+    fills = [
+        *_closed_cycle("old-1", at=before),
+        *_closed_cycle("old-2", at=before),
+        *_closed_cycle("new-1", at=after),
+        *_closed_cycle("new-2", at=after),
+    ]
+    evidence = _evidence_for(fills)
+
+    assert evidence is not None
+    assert evidence.measured_cycles == 2
+    assert evidence.window_available is True
+    assert evidence.measured_positive is True
+    assert evidence.note is None
+
+
+def test_a_patiently_recovered_version_climbs_one_step_per_three_positive_cycles() -> None:
+    """Con la evidencia real de los fills, la rampa sube 0.25 → 0.50 a los tres ciclos."""
+    at = datetime(2026, 9, 12, 10, 0, tzinfo=UTC)
+    fills = [fill for index in range(3) for fill in _closed_cycle(f"new-{index}", at=at)]
+    evidence = _evidence_for(fills)
+
+    assert evidence is not None and evidence.measured_cycles == 3
+    assert recovery_reading(evidence).step == pytest.approx(0.50)
+
+
+def test_without_a_fechado_cut_there_is_no_ramp() -> None:
+    """Sin corte durable no se emite evidencia: no se inventa una reincorporación."""
+    at = datetime(2026, 9, 12, 10, 0, tzinfo=UTC)
+    fills = _closed_cycle("new-1", at=at)
+
+    assert recovery_evidence_from_fills(fills=fills, reactivated_at={}) == {}
+    assert recovery_evidence_from_fills(fills=fills, reactivated_at={"orb-1": "   "}) == {}
+    assert recovery_evidence_from_fills(fills=fills, reactivated_at={"orb-1": "ayer"}) == {}
+
+
+def test_a_version_without_legible_dates_declares_the_window_unavailable() -> None:
+    """Sin ``closedAt`` legible la rampa no puede subir; el hueco se DECLARA, no se rellena."""
+    undated = [
+        _fill("buy", "10", "100", execution_id="ub", cycle_id="new-1"),
+        _fill("sell", "10", "100.5", execution_id="us", cycle_id="new-1"),
+    ]
+    evidence = _evidence_for(undated)
+
+    assert evidence is not None
+    assert evidence.window_available is False
+    assert evidence.note == "recovery_unmeasured"
+
+
+def test_a_negative_recent_window_resets_the_ramp() -> None:
+    """El deterioro medido manda: la rampa se reinicia en vez de seguir subiendo."""
+    at = datetime(2026, 9, 12, 10, 0, tzinfo=UTC)
+    fills = _closed_cycle("new-1", at=at, profitable=False)
+    cycle_ids = ["new-1"]
+    reading = build_adaptive_confidence_from_fills(
+        fills=fills, cycle_risk=_cycle_risk(cycle_ids), recent_window=1, long_window=1, min_trades=1
+    )
+    evidence = _evidence_for(fills, confidence=reading)
+
+    assert evidence is not None
+    assert evidence.measured_positive is False
+    assert recovery_reading(evidence).step == pytest.approx(0.25)
+    assert recovery_reading(evidence).note == "recovery_not_positive"
+
+
+def test_a_severe_decay_is_declared_in_the_recovery_evidence() -> None:
+    """``decay == SEVERE`` viaja a la evidencia para que la rampa se reinicie por el motivo real."""
+    early = [
+        fill
+        for index in range(12)
+        for fill in _closed_cycle(f"old-{index}", at=datetime(2026, 9, 1, 9, 0, tzinfo=UTC))
+    ]
+    late = [
+        fill
+        for index in range(6)
+        for fill in _closed_cycle(
+            f"new-{index}", at=datetime(2026, 9, 20, 9, 0, tzinfo=UTC), profitable=False
+        )
+    ]
+    cycle_ids = [f"old-{index}" for index in range(12)] + [f"new-{index}" for index in range(6)]
+    reading = build_adaptive_confidence_from_fills(
+        fills=[*early, *late],
+        cycle_risk=_cycle_risk(cycle_ids),
+        recent_window=6,
+        long_window=200,
+        min_trades=1,
+    )
+    evidence = _evidence_for([*early, *late], confidence=reading)
+
+    assert evidence is not None
+    assert evidence.severe_decay is True
+    assert recovery_reading(evidence).note == "recovery_severe_decay"
+
+
+def test_a_version_that_was_never_paused_gets_no_evidence_row() -> None:
+    at = datetime(2026, 9, 12, 10, 0, tzinfo=UTC)
+    fills = _closed_cycle("new-1", at=at)
+
+    assert _evidence_for(fills, reactivated_at={"otra": "2026-09-10T00:00:00+00:00"}) is None

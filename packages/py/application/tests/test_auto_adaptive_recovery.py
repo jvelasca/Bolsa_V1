@@ -324,3 +324,76 @@ def test_an_unreadable_source_declares_no_anchor() -> None:
 
     assert reading.last_published_at is None
     assert reading.as_dict()["lastPublishedAt"] is None
+    assert reading.as_dict()["reactivatedAt"] == {}
+
+
+# ── ``reactivated_at``: el corte durable de la rampa (AUTO-13, paso 4) ──────────────
+
+
+def test_the_journal_declares_when_a_version_left_its_pause() -> None:
+    """El corte es el turno MÁS VIEJO de la racha activa actual: ahí empezó la reincorporación."""
+    reading = _read(
+        [
+            _row(_at(5)),
+            _row(_at(4)),
+            _row(_at(3)),
+            _row(_at(2), paused=("v42",)),
+            _row(_at(1), paused=("v42",)),
+        ],
+        window=5,
+    )
+
+    assert reading.paused_cycles == {}, "ya no está pausada: la racha es 0"
+    assert reading.reactivated_at == {"v42": "2026-09-22T10:03:00+00:00"}
+
+
+def test_a_version_that_never_paused_declares_no_reactivation() -> None:
+    """Una versión que no estuvo pausada dentro de la ventana NO tiene corte: no se inventa."""
+    reading = _read([_row(_at(3)), _row(_at(2)), _row(_at(1))], window=3)
+
+    assert reading.reactivated_at == {}
+
+
+def test_a_version_still_paused_declares_no_reactivation() -> None:
+    reading = _read([_row(_at(3), paused=("v42",)), _row(_at(2), paused=("v42",))])
+
+    assert reading.reactivated_at == {}
+
+
+def test_the_reactivation_does_not_confuse_a_pause_before_it_with_a_later_one() -> None:
+    """La reincorporación es el corte MÁS RECIENTE: la racha activa es la de arriba."""
+    reading = _read(
+        [
+            _row(_at(7)),
+            _row(_at(6)),
+            _row(_at(5), paused=("v42",)),
+            _row(_at(4), paused=("v42",)),
+            _row(_at(3)),
+            _row(_at(2)),
+            _row(_at(1)),
+        ],
+        window=7,
+    )
+
+    assert reading.reactivated_at == {"v42": "2026-09-22T10:06:00+00:00"}
+
+
+def test_an_unreadable_row_cuts_the_reactivation_instead_of_faking_it() -> None:
+    """Fail-closed: no se fecha el corte a través de un turno ilegible (sería inventar la fecha)."""
+    broken = replace(_row(_at(4)), payload={"event": "adaptive_recommendation"})
+    reading = _read([_row(_at(5)), broken, _row(_at(3), paused=("v42",))], window=3)
+
+    assert reading.reactivated_at == {}
+
+
+def test_a_recovered_version_is_the_one_that_appears_in_the_reactivation_map() -> None:
+    reading = _read(
+        [
+            _row(_at(4), versions=("v42", "v99"), paused=("v99",)),
+            _row(_at(3), versions=("v42", "v99"), paused=("v42", "v99")),
+            _row(_at(2), versions=("v42", "v99")),
+        ],
+        window=3,
+    )
+
+    assert reading.reactivated_at == {"v42": "2026-09-22T10:04:00+00:00"}

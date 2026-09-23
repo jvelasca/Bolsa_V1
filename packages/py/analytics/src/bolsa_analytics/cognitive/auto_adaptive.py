@@ -62,7 +62,7 @@ origen NO es un permiso (lo decide el motor determinista).
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
@@ -90,8 +90,16 @@ __all__ = [
     "ADAPTIVE_POLICY_VERSION",
     "ADAPTIVE_PROFIT_FACTOR_PAUSE_DEFAULT",
     "ADAPTIVE_PROFIT_FACTOR_REACTIVATE_DEFAULT",
+    "ADAPTIVE_RECOVERY_NOTE_NOT_POSITIVE",
+    "ADAPTIVE_RECOVERY_NOTE_SEVERE",
+    "ADAPTIVE_RECOVERY_NOTE_UNMEASURED",
+    "ADAPTIVE_RECOVERY_STEPS_DEFAULT",
+    "ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT",
     "ADAPTIVE_REGIME_UNKNOWN",
     "ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT",
+    "ADAPTIVE_STATE_ACTIVE",
+    "ADAPTIVE_STATE_PAUSED",
+    "ADAPTIVE_STATE_RECOVERING",
     "ADAPTIVE_STRATEGY_COOLDOWN",
     "ADAPTIVE_STRATEGY_PAUSED",
     "ADAPTIVE_STRATEGY_REGIME_RISK",
@@ -104,6 +112,8 @@ __all__ = [
     "AdaptivePlan",
     "AdaptivePolicy",
     "AllocationPlan",
+    "RecoveryEvidence",
+    "RecoveryReading",
     "RotationDecision",
     "RotationPlan",
     "StrategyHealth",
@@ -111,6 +121,7 @@ __all__ = [
     "build_strategy_health",
     "recommend_allocation",
     "recommend_rotation",
+    "recovery_reading",
 ]
 
 ADAPTIVE_KEY = "adaptive"
@@ -124,7 +135,12 @@ ADAPTIVE_KEY = "adaptive"
 #:
 #: ``auto12-v1`` (AUTO-12): la regla de asignación cambia al encogerse por muestra efectiva
 #: cuando el llamante aporta la confianza estadística.
-ADAPTIVE_POLICY_VERSION = "auto12-v1"
+#:
+#: ``auto13-v1`` (AUTO-13): la regla de asignación cambia otra vez — el multiplicador pasa por el
+#: **techo de la rampa de reincorporación** (``m_final = min(m_reparto, escalón)``) cuando una
+#: versión vuelve de una pausa, de modo que dos planes iguales con la misma evidencia NO son
+#: idénticos si uno viene de una pausa cumplida y el otro no.
+ADAPTIVE_POLICY_VERSION = "auto13-v1"
 
 #: Motivos de rotación (vocabulario PROPIO de este módulo; el journal de la capa de
 #: aplicación los lleva en el detalle de ``adaptive_strategy_paused``). La casa única
@@ -185,6 +201,28 @@ ALLOCATION_AXIS_NET_R = "net_expectancy_r"
 #: hoy. El detalle por régimen vive en ``by_regime``.
 ADAPTIVE_REGIME_UNKNOWN = "UNKNOWN"
 
+#: Estados operativos por estrategia (§23/§29). Eje PROPIO: no es el estado de los DATOS
+#: (``auto_adaptive_data_gate``) ni la calidad estadística (``auto_adaptive_confidence``), y los
+#: tres no comparten campo. El estado se **deriva** de la rotación + la rampa; no es un modo nuevo
+#: de la rotación — quien pausa y reactiva sigue siendo ``recommend_rotation``.
+ADAPTIVE_STATE_ACTIVE = "active"
+ADAPTIVE_STATE_PAUSED = "paused"
+#: Dejó de estar pausada y vuelve **por la rampa**: no recupera el peso pleno de golpe (§24).
+ADAPTIVE_STATE_RECOVERING = "recovering"
+
+#: Escalones DECLARADOS de la rampa de reincorporación (§24: ``0.25 → 0.50 → 0.75 → 1.00``). El
+#: primero es el SUELO: la rampa nunca deja a nadie en ``0`` (no es una pausa encubierta) y, como
+#: es un TECHO del reparto, nunca ensancha.
+ADAPTIVE_RECOVERY_STEPS_DEFAULT: tuple[float, ...] = (0.25, 0.50, 0.75, 1.00)
+#: Ciclos de evaluación CON EVIDENCIA MEDIDA POSITIVA que hacen subir un escalón. La rampa sube
+#: por **evidencia, nunca por reloj**: sin un ciclo positivo que lo confirme, no sube.
+ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT = 3
+
+#: Motivos DECLARADOS del hueco de la rampa (viajan en la lectura, no solo en el log).
+ADAPTIVE_RECOVERY_NOTE_NOT_POSITIVE = "recovery_not_positive"
+ADAPTIVE_RECOVERY_NOTE_SEVERE = "recovery_severe_decay"
+ADAPTIVE_RECOVERY_NOTE_UNMEASURED = "recovery_unmeasured"
+
 
 def _clamp_unit(value: float) -> float:
     """Multiplicador acotado a ``[0, 1]`` (un no-número o no-finito colapsa a ``0.0``)."""
@@ -221,6 +259,31 @@ class AdaptivePolicy:
     # versión de política selle la regla de asignación completa.
     confidence_prior: float = ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT
     severe_decay_factor: float = ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT
+    # AUTO-13: escalones de la RAMPA de reincorporación (§24) y ciclos de evidencia medida
+    # positiva que hacen subir un escalón. Declarados para que la versión selle también la regla
+    # de reincorporación: dos planes iguales no pueden venir de rampas distintas sin que se note.
+    recovery_steps: tuple[float, ...] = ADAPTIVE_RECOVERY_STEPS_DEFAULT
+    recovery_step_cycles: int = ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT
+
+    def __post_init__(self) -> None:
+        """Valida la rampa: escalones en ``(0, 1]``, estrictamente crecientes y paso ``>= 1``.
+
+        Un escalón fuera de ``(0, 1]`` rompería el invariante del reparto (solo estrecha, y nunca
+        a ``0``); uno no creciente haría que la rampa no subiera o bajara sola; un paso ``< 1``
+        afirmaría una subida por ciclo que la regla no declara.
+        """
+        previous = 0.0
+        steps = tuple(float(step) for step in self.recovery_steps)
+        if not steps:
+            raise ValueError("recovery_steps must not be empty")
+        for step in steps:
+            if not 0.0 < step <= 1.0:
+                raise ValueError("recovery_steps must be within (0, 1]")
+            if step <= previous:
+                raise ValueError("recovery_steps must be strictly increasing")
+            previous = step
+        if int(self.recovery_step_cycles) < 1:
+            raise ValueError("recovery_step_cycles must be >= 1")
 
 
 @dataclass(frozen=True, slots=True)
@@ -398,6 +461,93 @@ class AllocationPlan:
 
 
 @dataclass(frozen=True, slots=True)
+class RecoveryEvidence:
+    """Evidencia medida con la que se juzga la RAMPA de una versión que dejó de estar pausada.
+
+    La rampa **sube por evidencia, no por reloj**: ``measured_cycles`` cuenta los ciclos CERRADOS
+    con resultado medido **positivo** posteriores a ``reactivated_at``. ``measured_positive`` y
+    ``severe_decay`` son los dos hechos que **reinician** la rampa (el deterioro manda), y
+    ``window_available`` declara el hueco de fechas: sin instantes legibles no se puede contar
+    —la misma ausencia que ``AUTO-12`` declara como ``recent_unavailable``— y la rampa no sube.
+    Nunca se inventa una recuperación que no se pudo medir.
+    """
+
+    strategy_version: str
+    measured_cycles: int = 0
+    window_available: bool = True
+    measured_positive: bool = True
+    severe_decay: bool = False
+
+    @property
+    def note(self) -> str | None:
+        """Motivo declarado de que la rampa no avance (``None`` si no hay hueco que declarar)."""
+        if self.severe_decay:
+            return ADAPTIVE_RECOVERY_NOTE_SEVERE
+        if not self.measured_positive:
+            return ADAPTIVE_RECOVERY_NOTE_NOT_POSITIVE
+        if not self.window_available:
+            return ADAPTIVE_RECOVERY_NOTE_UNMEASURED
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryReading:
+    """El escalón de la rampa de UNA versión ``RECOVERING`` + los hechos que lo motivaron.
+
+    ``step`` es el valor **aplicado** como techo del reparto, y ``note`` declara por qué no subió
+    cuando el hueco existe: sin esa declaración, un ``0.25`` congelado no se distinguiría de una
+    rampa que avanza despacio.
+    """
+
+    strategy_version: str
+    step: float
+    step_index: int
+    evidence_cycles: int = 0
+    note: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "strategyVersion": self.strategy_version,
+            "step": self.step,
+            "stepIndex": self.step_index,
+            "evidenceCycles": self.evidence_cycles,
+            "note": self.note,
+        }
+
+
+def recovery_reading(
+    evidence: RecoveryEvidence, policy: AdaptivePolicy | None = None
+) -> RecoveryReading:
+    """(PURA) escalón de la rampa: avanza SOLO con evidencia positiva medida; el deterioro la reinicia.
+
+    ``escalón = escalones[min(último, ciclos_positivos // recovery_step_cycles)]``. Con deterioro
+    declarado (``decay == SEVERE``), con evidencia reciente no positiva, o sin fechas legibles, el
+    escalón es el **inicial** (el suelo): la rampa no sube por tiempo ni por ausencia de datos.
+    """
+    resolved = policy or AdaptivePolicy()
+    steps = tuple(float(step) for step in resolved.recovery_steps)
+    cycles = max(0, int(evidence.measured_cycles))
+    note = evidence.note
+    if note is not None:
+        return RecoveryReading(
+            strategy_version=evidence.strategy_version,
+            step=steps[0],
+            step_index=0,
+            evidence_cycles=cycles,
+            note=note,
+        )
+    per = max(1, int(resolved.recovery_step_cycles))
+    index = min(len(steps) - 1, cycles // per)
+    return RecoveryReading(
+        strategy_version=evidence.strategy_version,
+        step=steps[index],
+        step_index=index,
+        evidence_cycles=cycles,
+        note=None,
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class AdaptivePlan:
     """Recomendación Adaptive completa del tick (rotación + asignación + régimen)."""
 
@@ -409,9 +559,26 @@ class AdaptivePlan:
     policy_version: str = ADAPTIVE_POLICY_VERSION
     #: Salud por estrategia que sustentó la recomendación (evidencia del journal).
     health: tuple[StrategyHealth, ...] = ()
+    #: AUTO-13 — estado OPERATIVO por estrategia (§23/§29): ``active`` / ``paused`` /
+    #: ``recovering``. Es un eje propio y se **deriva**; no vive en la rotación.
+    operational_states: Mapping[str, str] = field(default_factory=dict)
+    #: AUTO-13 — la rampa por versión ``RECOVERING`` (escalón aplicado + hechos + motivo). Vacía
+    #: cuando el llamante no aportó evidencia de recuperación: entonces no hay rampa (§24) y el
+    #: plan es el histórico.
+    recovery: Mapping[str, RecoveryReading] = field(default_factory=dict)
 
     def is_paused(self, strategy_version: str) -> bool:
         return self.rotation.is_paused(strategy_version)
+
+    def state_for(self, strategy_version: str) -> str:
+        """Estado operativo derivado de una versión (``PAUSED`` si no se declaró otra cosa)."""
+        key = str(strategy_version or "")
+        if key in self.operational_states:
+            return self.operational_states[key]
+        return ADAPTIVE_STATE_PAUSED if self.rotation.is_paused(key) else ADAPTIVE_STATE_ACTIVE
+
+    def recovery_for(self, strategy_version: str) -> RecoveryReading | None:
+        return self.recovery.get(str(strategy_version or ""))
 
     def risk_multiplier_for(self, strategy_version: str) -> float:
         return self.allocation.multiplier_for(strategy_version)
@@ -460,6 +627,11 @@ class AdaptivePlan:
             "regime": self.regime,
             "rotation": self.rotation.as_dict(),
             "allocation": self.allocation.as_dict(),
+            "operationalStates": dict(sorted(self.operational_states.items())),
+            "recovery": {
+                version: reading.as_dict()
+                for version, reading in sorted(self.recovery.items())
+            },
         }
 
 
@@ -631,6 +803,7 @@ def recommend_allocation(
     *,
     policy: AdaptivePolicy | None = None,
     confidence: AdaptiveConfidence | None = None,
+    recovery: Mapping[str, RecoveryReading] | None = None,
 ) -> AllocationPlan:
     """(PURA) multiplicador de riesgo por estrategia activa (solo estrecha, ``[0, 1]``).
 
@@ -652,6 +825,11 @@ def recommend_allocation(
       muestra efectiva antes de normalizar, de modo que un edge medido sobre pocos ciclos no
       desplace a otro con base amplia (*winner chasing*). El encogimiento solo redistribuye:
       el reparto sigue sumando-preservando, acotado a ``[0, 1]`` y sin eliminar a nadie.
+    * **AUTO-13** — con ``recovery``, el multiplicador de una versión que vuelve de una pausa pasa
+      por el **techo de la rampa** (``m_final = min(m_reparto, escalón)``, §24). Es un techo, así que
+      solo estrecha, nunca ensancha, y el suelo de la política (> 0) impide dejar a nadie en ``0``:
+      la reincorporación es gradual, no una pausa encubierta. Se aplica **después** del reparto
+      para que el valor publicado sea el aplicado.
 
     Se materializa una entrada por CADA versión activa: la semántica de "sin evidencia"
     queda en la política, nunca en el default de ``AllocationPlan.multiplier_for``.
@@ -689,14 +867,23 @@ def recommend_allocation(
         count = len(positive)
         total = sum(positive.values())
         for version in active_versions:
-            weight = positive.get(version)
-            if weight is None:
+            share = positive.get(version)
+            if share is None:
                 multipliers[version] = neutral
             else:
-                multipliers[version] = _clamp_unit((weight / total) * count)
+                multipliers[version] = _clamp_unit((share / total) * count)
     else:
         for version in active_versions:
             multipliers[version] = neutral
+    if recovery:
+        # AUTO-13: la rampa es un TECHO del reparto (§24). ``min`` con el escalón declarado, que ya
+        # vive en ``(0, 1]``: nunca ensancha y nunca deja a nadie en 0. Aplicado después del reparto
+        # y antes de publicar, para que la evidencia durable lleve el valor que de verdad se aplicó.
+        for version in active_versions:
+            reading = recovery.get(version)
+            if reading is None:
+                continue
+            multipliers[version] = _clamp_unit(min(multipliers[version], float(reading.step)))
     return AllocationPlan(multipliers, evidence_axis=axis)
 
 
@@ -708,6 +895,7 @@ def build_adaptive_plan(
     paused_cycles: Mapping[str, int] | None = None,
     by_regime: Sequence[StrategyRegimeEvaluation] = (),
     confidence: AdaptiveConfidence | None = None,
+    recovery: Mapping[str, RecoveryEvidence] | None = None,
 ) -> AdaptivePlan:
     """(PURA) plan Adaptive completo: rotación + asignación sobre las mismas filas.
 
@@ -715,6 +903,12 @@ def build_adaptive_plan(
     ``RANGE``/``HIGH_VOL``/``LOW_VOL``/``UNKNOWN``), no el eje operativo. ``confidence``
     (AUTO-12) es OPCIONAL: sin ella el plan es byte-idéntico al histórico y la rotación no
     cambia (la confianza solo modula el reparto, nunca quién compite).
+
+    ``recovery`` (AUTO-13) es OPCIONAL y **declarado**: solo debe traer las versiones que
+    vuelven de una pausa cumplida (§24). Sin él no hay rampa y el plan es el histórico — la
+    trampa de ``AUTO-12`` con ``confidence=None``, repetida. Quien pausa y reactiva sigue
+    siendo ``recommend_rotation``: el estado operativo (``RECOVERING``) es **derivado**, no un
+    cuarto modo de la rotación.
     """
     resolved = policy or AdaptivePolicy()
     cells = tuple(by_regime)
@@ -725,11 +919,36 @@ def build_adaptive_plan(
         paused_cycles=paused_cycles,
         by_regime=cells,
     )
+    # La rampa se materializa por versión, pero solo COMPITE la que no está pausada: si el
+    # deterioro devuelve a pausa, la rotación manda y el escalón se DESCARTA (§24) — no se
+    # publica una rampa que no se aplicó.
+    readings: dict[str, RecoveryReading] = {}
+    if recovery:
+        for raw_version, evidence in recovery.items():
+            version = str(raw_version or "")
+            if version and not rotation.is_paused(version):
+                readings[version] = recovery_reading(evidence, resolved)
+    operational: dict[str, str] = {}
+    for row in by_strategy:
+        version = row.strategy_version
+        if rotation.is_paused(version):
+            operational[version] = ADAPTIVE_STATE_PAUSED
+        else:
+            reading = readings.get(version)
+            # El escalón tope (1.00) es la recuperación CUMPLIDA: vuelve a ``ACTIVE``.
+            if reading is not None and reading.step < 1.0:
+                operational[version] = ADAPTIVE_STATE_RECOVERING
+            else:
+                operational[version] = ADAPTIVE_STATE_ACTIVE
     active_versions = [
         row.strategy_version for row in by_strategy if not rotation.is_paused(row.strategy_version)
     ]
     allocation = recommend_allocation(
-        active_versions, by_strategy, policy=resolved, confidence=confidence
+        active_versions,
+        by_strategy,
+        policy=resolved,
+        confidence=confidence,
+        recovery=readings or None,
     )
     return AdaptivePlan(
         rotation=rotation,
@@ -737,4 +956,6 @@ def build_adaptive_plan(
         regime=regime,
         policy_version=resolved.policy_version,
         health=build_strategy_health(by_strategy, by_regime=cells, confidence=confidence),
+        operational_states=operational,
+        recovery=readings,
     )

@@ -192,6 +192,33 @@ AUTO-13 (Adaptive Data Gate: salud de la EVIDENCIA separada de la salud de la es
   **opcional** (cuyo hueco cae por diseño al eje moneda) en vez de con los ejes que Adaptive exige,
   cualquier despliegue sin coste medido queda ``DEGRADED`` y apaga la confianza de AUTO-12.
 
+AUTO-13 paso 4 (``RECOVERING`` y la rampa de reincorporación, §23/§24) añade:
+
+* **M83 (rampa que sube por tiempo)** — si el escalón deja de depender de los ciclos de evidencia
+  medidos, una versión vuelve al peso pleno por el mero paso del reloj: exactamente el salto que
+  §24 prohíbe.
+* **M84 (rampa que ensancha)** — si el ``min`` con el reparto pasa a ``max``, el techo se convierte
+  en suelo y la reincorporación **premia**: lo contrario de lo que una vuelta gradual significa.
+* **M85 (rampa que llega a 0)** — si el escalón inicial de una evidencia deteriorada es ``0``, la
+  rampa deja de ser reincorporación y se vuelve una pausa encubierta sin pasar por la rotación.
+* **M86 (pausa que publica su rampa)** — si la rotación devuelve a pausa y el escalón no se
+  descarta, se publica una reincorporación que NO se aplicó (§24: la protección manda).
+* **M87 (recuperación no derivada)** — si el estado operativo deja de derivarse del escalón, una
+  versión que vuelve por la rampa se publica como ``active`` a peso pleno.
+* **M88 (reincorporación sin corte probado)** — si el corte se fecha sin haber visto la pausa que
+  lo precede (a través de un turno ilegible), se afirma una reincorporación que no se midió.
+* **M89 (ventana ilegible declarada disponible)** — si el hueco de fechas deja de declararse, la
+  rampa sube sobre evidencia que no se pudo ordenar (``recent_unavailable`` de AUTO-12, ignorado).
+* **M90 (evidencia anterior al corte)** — si la cuenta no descarta los ciclos previos a la
+  reactivación, la rampa sube con el edge que la estrategia tenía ANTES de ser pausada.
+* **M91 (rampa no cableada)** — si el worker construye la evidencia de recuperación y no la pasa al
+  plan, el cálculo se paga y la evidencia durable publica un plan sin rampa.
+* **M92 (memoria de la rampa no sembrada)** — si el arranque ignora ``reactivated_at`` del journal,
+  la reincorporación ocurrida ANTES del reinicio se olvida y la versión vuelve a peso pleno.
+* **M93 (transición no fechada en el tick)** — si la pausa → activa observada por el proceso no se
+  fecha, la versión corre un tick con peso pleno antes de que la rampa entre en el siguiente: el
+  salto que §24 prohíbe se cuela por la mitad que no sobrevive al reinicio (la del proceso vivo).
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -272,6 +299,7 @@ T_CONFIDENCE_SEAM = "apps/api-python/tests/test_auto_v53_auto12_confidence_seam.
 T_DATA_GATE = "packages/py/analytics/tests/test_auto_adaptive_data_gate.py"
 T_DATA_GATE_SEAM = "apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py"
 T_DATA_GATE_WIRE = "apps/api-python/tests/test_auto_v54_auto13_data_gate_wiring_seam.py"
+T_RECOVERY_SEAM = "apps/api-python/tests/test_auto_v54_auto13_recovery_seam.py"
 T_ADAPTIVE_ENTRY = "packages/py/application/tests/test_auto_adaptive_entry.py"
 T_CYCLE_RISK = "packages/py/application/tests/test_cycle_risk.py"
 T_CYCLE_RISK_SEAM = "apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py"
@@ -935,6 +963,83 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "                *(row.net_r_measurement for row in rows)\n"
         "            )\n",
         (T_DATA_GATE_WIRE,),
+    ),
+    (
+        "M83 (rampa que sube por tiempo): el escalon deja de depender de la evidencia medida",
+        AUTO_ADAPTIVE,
+        "    index = min(len(steps) - 1, cycles // per)\n",
+        "    index = len(steps) - 1\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M84 (rampa que ensancha): el TECHO del reparto se convierte en suelo",
+        AUTO_ADAPTIVE,
+        "            multipliers[version] = _clamp_unit(min(multipliers[version], float(reading.step)))\n",
+        "            multipliers[version] = _clamp_unit(max(multipliers[version], float(reading.step)))\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M85 (rampa que llega a 0): el escalon inicial de una evidencia deteriorada es 0",
+        AUTO_ADAPTIVE,
+        "            step=steps[0],\n            step_index=0,\n",
+        "            step=0.0,\n            step_index=0,\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M86 (pausa que publica su rampa): el escalon de una version pausada no se descarta",
+        AUTO_ADAPTIVE,
+        "            if version and not rotation.is_paused(version):\n",
+        "            if version:\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M87 (recuperacion no derivada): una version que vuelve por la rampa se publica active",
+        AUTO_ADAPTIVE,
+        "            if reading is not None and reading.step < 1.0:\n",
+        "            if False:\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M88 (reincorporacion sin corte probado): se fecha a traves de un turno ilegible",
+        ADAPTIVE_RECOVERY,
+        "        if proven and started_at is not None:\n",
+        "        if started_at is not None:\n",
+        (T_ADAPTIVE_RECOVERY,),
+    ),
+    (
+        "M89 (ventana ilegible declarada disponible): la rampa sube sobre fechas no ordenables",
+        FEED,
+        "            window_available=dated and recent_available,\n",
+        "            window_available=True,\n",
+        (T_FEED,),
+    ),
+    (
+        "M90 (evidencia anterior al corte): la cuenta no descarta los ciclos previos a la pausa",
+        FEED,
+        "        if instant is None or instant <= since:\n",
+        "        if instant is None:\n",
+        (T_FEED,),
+    ),
+    (
+        "M91 (rampa no cableada): el worker la construye y no la pasa al plan",
+        WORKER,
+        "                recovery=evidence or None,\n",
+        "                recovery=None,\n",
+        (T_RECOVERY_SEAM,),
+    ),
+    (
+        "M92 (memoria de la rampa no sembrada): el corte durable del journal no llega a la rampa",
+        WORKER,
+        "        self._v2_adaptive_reactivated_at = dict(reading.reactivated_at)\n",
+        "        self._v2_adaptive_reactivated_at = {}\n",
+        (T_RECOVERY_SEAM,),
+    ),
+    (
+        "M93 (transicion no fechada en el tick): la reincorporacion observada no se fecha",
+        WORKER,
+        "        if fresh:\n            stamp = self._v2_instant()\n",
+        "        if False:\n            stamp = self._v2_instant()\n",
+        (T_RECOVERY_SEAM,),
     ),
 ]
 

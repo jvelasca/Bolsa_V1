@@ -99,6 +99,8 @@ def _worker(
     worker._reservation_store = reservation_store
     worker._v2_tunables = SimpleNamespace(adaptive_win_rate_floor=0.35)
     worker._v2_adaptive_paused_cycles = {}
+    # AUTO-13 paso 4: la memoria de la rampa arranca vacia (el lector durable la siembra).
+    worker._v2_adaptive_reactivated_at = {}
     # AUTO-10: sin lector de régimen inyectado, la fuente durable NO se consulta y el hueco se
     # declara como en AUTO-9 (`regime_not_durable`). Ese es justo el comportamiento que esta
     # costura certifica: medir el R no depende de que exista la vía del régimen.

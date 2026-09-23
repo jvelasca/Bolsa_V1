@@ -145,6 +145,8 @@ def _worker(
     worker._adaptive_reader = reader
     worker._adaptive_sink = sink
     worker._v2_adaptive_paused_cycles = {}
+    # AUTO-13 paso 4: la memoria de la rampa arranca vacia (el lector durable la siembra).
+    worker._v2_adaptive_reactivated_at = {}
     worker._v2_adaptive_paused_cycles_entered = {}
     worker._v2_adaptive_state_recovered = False
     worker._v2_cycle_trace_reconciled = False

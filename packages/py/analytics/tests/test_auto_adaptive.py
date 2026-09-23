@@ -22,8 +22,16 @@ import pytest
 from bolsa_analytics.cognitive.auto_adaptive import (
     ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT,
     ADAPTIVE_POLICY_VERSION,
+    ADAPTIVE_RECOVERY_NOTE_NOT_POSITIVE,
+    ADAPTIVE_RECOVERY_NOTE_SEVERE,
+    ADAPTIVE_RECOVERY_NOTE_UNMEASURED,
+    ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT,
+    ADAPTIVE_RECOVERY_STEPS_DEFAULT,
     ADAPTIVE_REGIME_UNKNOWN,
     ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT,
+    ADAPTIVE_STATE_ACTIVE,
+    ADAPTIVE_STATE_PAUSED,
+    ADAPTIVE_STATE_RECOVERING,
     ADAPTIVE_STRATEGY_COOLDOWN,
     ADAPTIVE_STRATEGY_PAUSED,
     ADAPTIVE_STRATEGY_REGIME_RISK,
@@ -31,11 +39,13 @@ from bolsa_analytics.cognitive.auto_adaptive import (
     ALLOCATION_AXIS_CURRENCY,
     ALLOCATION_AXIS_NET_R,
     AdaptivePolicy,
+    RecoveryEvidence,
     StrategyHealth,
     build_adaptive_plan,
     build_strategy_health,
     recommend_allocation,
     recommend_rotation,
+    recovery_reading,
 )
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     ADAPTIVE_DECAY_NONE,
@@ -720,16 +730,17 @@ def test_regime_cells_alone_do_not_move_rotation_or_allocation() -> None:
     )
 
 
-def test_the_policy_version_seals_the_auto12_evidence_contract() -> None:
-    """No es tautología: un merge que devolviera ``auto9-v1`` movería el sello sin avisar.
+def test_the_policy_version_seals_the_auto13_evidence_contract() -> None:
+    """No es tautología: un merge que devolviera ``auto12-v1`` movería el sello sin avisar.
 
-    La regla de asignación cambió al encogerse por muestra efectiva cuando el llamante aporta
-    la confianza estadística (``AUTO-12``), así que la versión de la política cambia con ella;
-    es lo que hace reproducible el plan.
+    ``auto12-v1`` selló el encogimiento por muestra efectiva. ``AUTO-13`` vuelve a cambiar la regla
+    de asignación —el multiplicador pasa por el **techo de la rampa de reincorporación** (§24)—, así
+    que la versión sube con ella: es lo que hace reproducible el plan (dos planes iguales no pueden
+    venir de una rampa distinta sin que se note).
     """
-    assert ADAPTIVE_POLICY_VERSION == "auto12-v1"
-    assert AdaptivePolicy().policy_version == "auto12-v1"
-    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto12-v1"
+    assert ADAPTIVE_POLICY_VERSION == "auto13-v1"
+    assert AdaptivePolicy().policy_version == "auto13-v1"
+    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto13-v1"
 
 
 # ── AUTO-12 — confianza estadística en el reparto (encogimiento por muestra) ────────
@@ -977,5 +988,184 @@ def test_the_plan_stays_reproducible_with_a_confidence_reading() -> None:
     )
     first = build_adaptive_plan(rows, "HIGH_VOL", confidence=reading)
     second = build_adaptive_plan(tuple(reversed(rows)), "HIGH_VOL", confidence=reading)
+
+    assert first.as_dict() == second.as_dict()
+
+
+# ── AUTO-13 — RECOVERING y la rampa de reincorporación (§23/§24) ────────────────────
+
+
+def _evidence(
+    version: str = "a",
+    *,
+    cycles: int = 0,
+    window: bool = True,
+    positive: bool = True,
+    severe: bool = False,
+) -> RecoveryEvidence:
+    return RecoveryEvidence(
+        strategy_version=version,
+        measured_cycles=cycles,
+        window_available=window,
+        measured_positive=positive,
+        severe_decay=severe,
+    )
+
+
+def test_the_ramp_steps_are_declared_policy_with_a_positive_floor() -> None:
+    """Los escalones son POLÍTICA versionada y su suelo es > 0: la rampa no es una pausa encubierta."""
+    policy = AdaptivePolicy()
+    assert policy.recovery_steps == ADAPTIVE_RECOVERY_STEPS_DEFAULT
+    assert policy.recovery_step_cycles == ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT
+    assert policy.recovery_steps[0] > 0.0, "suelo: nunca deja a nadie en 0"
+    assert policy.recovery_steps[-1] == 1.0, "el techo es el peso pleno"
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [(0.0, 1.0), (0.25, 0.25), (1.0, 0.5), (0.25, 1.5)],
+)
+def test_a_broken_ramp_is_rejected_instead_of_silently_applied(steps: tuple[float, ...]) -> None:
+    with pytest.raises(ValueError):
+        AdaptivePolicy(recovery_steps=steps)
+
+
+def test_a_broken_recovery_step_is_rejected() -> None:
+    with pytest.raises(ValueError):
+        AdaptivePolicy(recovery_step_cycles=0)
+
+
+def test_the_ramp_climbs_one_step_per_evidence_cycles() -> None:
+    """Sube por EVIDENCIA: 3 ciclos positivos por escalón, con el paso declarado en la política."""
+    per = ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT
+    assert recovery_reading(_evidence(cycles=0)).step == pytest.approx(0.25)
+    assert recovery_reading(_evidence(cycles=per - 1)).step == pytest.approx(0.25)
+    assert recovery_reading(_evidence(cycles=per)).step == pytest.approx(0.50)
+    assert recovery_reading(_evidence(cycles=2 * per)).step == pytest.approx(0.75)
+    assert recovery_reading(_evidence(cycles=3 * per)).step == pytest.approx(1.00)
+    assert recovery_reading(_evidence(cycles=1000)).step == pytest.approx(1.00), "techo estable"
+
+
+def test_the_ramp_does_not_climb_by_time_alone() -> None:
+    """Sin ciclos positivos medidos no sube: es el caso §24 que la rampa NO debe inventar."""
+    flat = recovery_reading(_evidence(cycles=0))
+    assert flat.step_index == 0
+    assert flat.step == pytest.approx(ADAPTIVE_RECOVERY_STEPS_DEFAULT[0])
+    assert flat.note is None, "evidencia plana medida no es un hueco: no se declara motivo"
+
+
+def test_a_deteriorating_evidence_resets_the_ramp_and_declares_why() -> None:
+    severe = recovery_reading(_evidence(cycles=99, severe=True))
+    not_positive = recovery_reading(_evidence(cycles=99, positive=False))
+    unmeasured = recovery_reading(_evidence(cycles=99, window=False))
+
+    assert severe.step == pytest.approx(0.25)
+    assert severe.note == ADAPTIVE_RECOVERY_NOTE_SEVERE
+    assert not_positive.step == pytest.approx(0.25)
+    assert not_positive.note == ADAPTIVE_RECOVERY_NOTE_NOT_POSITIVE
+    assert unmeasured.step == pytest.approx(0.25)
+    assert unmeasured.note == ADAPTIVE_RECOVERY_NOTE_UNMEASURED
+
+
+def test_the_unreadable_window_wins_over_an_optimistic_count() -> None:
+    """Sin fechas legibles la rampa NO sube aunque el contador traiga ciclos: hueco declarado."""
+    reading = recovery_reading(_evidence(cycles=30, window=False))
+
+    assert reading.step == pytest.approx(0.25)
+    assert reading.evidence_cycles == 30, "los ciclos medidos se declaran; el escalón no los usa"
+
+
+def test_without_recovery_evidence_the_plan_is_byte_identical() -> None:
+    """La rampa es OPCIONAL: sin ella el plan es el histórico de ``auto12``/``auto13``."""
+    rows = (_row("a", decisive=True, expectancy="3"), _row("b", decisive=True, expectancy="1"))
+    historical = build_adaptive_plan(rows, "TREND_UP")
+    explicit_empty = build_adaptive_plan(rows, "TREND_UP", recovery={})
+
+    assert explicit_empty.as_dict() == historical.as_dict()
+    assert historical.recovery == {}
+    assert historical.state_for("a") == ADAPTIVE_STATE_ACTIVE
+
+
+def test_the_ramp_is_a_ceiling_of_the_allocation_and_never_widens() -> None:
+    """``m_final = min(m_reparto, escalón)``: estrecha, nunca ensancha, y nunca llega a 0."""
+    rows = (_row("a", decisive=True, expectancy="3"), _row("b", decisive=True, expectancy="1"))
+    base = build_adaptive_plan(rows, "TREND_UP")
+    ramped = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        recovery={"a": _evidence("a", cycles=0), "b": _evidence("b", cycles=3)},
+    )
+
+    assert base.risk_multiplier_for("a") == pytest.approx(1.0)
+    assert ramped.risk_multiplier_for("a") == pytest.approx(0.25), "el techo manda"
+    assert ramped.risk_multiplier_for("b") == base.risk_multiplier_for("b"), (
+        "un escalón por encima del reparto no lo ensancha"
+    )
+    assert ramped.risk_multiplier_for("b") == pytest.approx(0.5)
+    for version in ("a", "b"):
+        assert 0.0 < ramped.risk_multiplier_for(version) <= 1.0
+
+
+def test_the_ramp_does_not_touch_the_rotation() -> None:
+    """La rampa es una modulación del reparto: quien pausa sigue siendo ``recommend_rotation``."""
+    rows = (_row("a", decisive=True, expectancy="-2"), _row("b", decisive=True, expectancy="3"))
+    base = build_adaptive_plan(rows, "TREND_UP")
+    ramped = build_adaptive_plan(
+        rows, "TREND_UP", recovery={"a": _evidence("a"), "b": _evidence("b")}
+    )
+
+    assert ramped.rotation.as_dict() == base.rotation.as_dict()
+    assert ramped.state_for("a") == ADAPTIVE_STATE_PAUSED
+
+
+def test_a_paused_version_discards_its_ramp_instead_of_publishing_it() -> None:
+    """Si el deterioro devuelve a pausa, la rotación manda y el escalón se DESCARTA (§24)."""
+    rows = (_row("a", decisive=True, expectancy="-2"),)
+    plan = build_adaptive_plan(rows, "TREND_UP", recovery={"a": _evidence("a", cycles=3)})
+
+    assert plan.recovery_for("a") is None
+    assert plan.recovery == {}
+    assert plan.state_for("a") == ADAPTIVE_STATE_PAUSED
+
+
+def test_recovering_is_derived_and_the_ceiling_step_returns_the_version_to_active() -> None:
+    rows = (_row("a", decisive=True, expectancy="3"),)
+    recovering = build_adaptive_plan(rows, "TREND_UP", recovery={"a": _evidence("a", cycles=3)})
+    recovered = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        recovery={"a": _evidence("a", cycles=3 * ADAPTIVE_RECOVERY_STEP_CYCLES_DEFAULT)},
+    )
+
+    assert recovering.state_for("a") == ADAPTIVE_STATE_RECOVERING
+    assert recovering.recovery_for("a") is not None
+    assert recovered.state_for("a") == ADAPTIVE_STATE_ACTIVE, "el techo (1.00) es recuperación cumplida"
+    assert recovered.risk_multiplier_for("a") == pytest.approx(1.0)
+
+
+def test_the_operational_states_travel_in_their_own_field_without_mixing_axes() -> None:
+    """§29: el estado operativo viaja declarado y NO se mezcla con la confianza ni con el gate."""
+    rows = (_row("a", decisive=True, expectancy="3"), _row("b", decisive=True, expectancy="-1"))
+    plan = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(_strategy_confidence("a", effective_n=180, recent_r=0.5)),
+        recovery={"a": _evidence("a", cycles=0), "b": _evidence("b", cycles=0)},
+    )
+    payload = plan.as_dict()
+
+    assert payload["operationalStates"] == {"a": ADAPTIVE_STATE_RECOVERING, "b": ADAPTIVE_STATE_PAUSED}
+    assert payload["recovery"]["a"]["step"] == pytest.approx(0.25)
+    assert "b" not in payload["recovery"], "una pausada no publica rampa"
+    assert payload["readOnly"] is True
+    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto13-v1"
+    assert plan.health_for("a").confidence == "HIGH", "la calidad estadística va en su propio campo"
+
+
+def test_the_ramp_is_reproducible_regardless_of_row_order() -> None:
+    rows = (_row("a", decisive=True, expectancy="3"), _row("b", decisive=True, expectancy="1"))
+    evidence = {"a": _evidence("a", cycles=4), "b": _evidence("b", cycles=0)}
+    first = build_adaptive_plan(rows, "TREND_UP", recovery=evidence)
+    second = build_adaptive_plan(tuple(reversed(rows)), "TREND_UP", recovery=evidence)
 
     assert first.as_dict() == second.as_dict()

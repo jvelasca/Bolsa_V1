@@ -255,6 +255,48 @@ def _streaks(
     return counts, reasons
 
 
+def _reactivations(ordered: Sequence[Any]) -> dict[str, str]:
+    """(PURA) por versión, el instante en que **dejó de estar pausada** por última vez.
+
+    ``AUTO-13`` (§24) necesita saber *cuándo* una versión dejó de estar pausada para poder contar
+    la evidencia posterior con la que sube la rampa. Ese hecho ya vive implícito en la racha que
+    ``AUTO-11`` reconstruye; aquí se **declara** en vez de solo contarse.
+
+    Con las filas de nueva a vieja, para cada versión que alguna vez estuvo pausada se busca el
+    corte: la fila más vieja de la **racha activa actual**. Si la fila inmediatamente anterior a esa
+    racha la tiene pausada, el corte es PROBADO y su instante es el de reincorporación. Si la racha
+    se agota contra una fila **ilegible** o sin fecha, o la ventana no alcanza a ver la pausa, NO se
+    declara nada: es la misma disciplina que «el desconocido no es un defecto» — no se inventa una
+    reincorporación que no se pudo fechar.
+    """
+    versions: set[str] = set()
+    for entry in ordered:
+        paused = _paused_set(_payload_of(entry))
+        if paused:
+            versions.update(paused)
+
+    reactivated: dict[str, str] = {}
+    for version in sorted(versions):
+        started_at: datetime | None = None
+        proven = False
+        for entry in ordered:
+            paused = _paused_set(_payload_of(entry))
+            if paused is None:
+                # Hueco ilegible: no se puede fechar el corte (fail-closed).
+                break
+            if version in paused:
+                proven = True
+                break
+            instant = _instant_of(entry)
+            if instant is None:
+                # Turno activo sin fecha legible: no hay instante que declarar.
+                break
+            started_at = instant
+        if proven and started_at is not None:
+            reactivated[version] = started_at.isoformat()
+    return reactivated
+
+
 @dataclass(frozen=True, slots=True)
 class AdaptiveStateReading:
     """El estado Adaptive reconstruido + el motivo declarado de cada límite de la lectura.
@@ -279,6 +321,10 @@ class AdaptiveStateReading:
     #: juzgar la antigüedad del journal sin un contador de proceso (``AUTO-13``): la medición es un
     #: hecho de la fila, no del turno que la lee, así que **sobrevive a un reinicio**.
     last_published_at: str | None = None
+    #: ``AUTO-13`` — por versión, el instante en que **dejó de estar pausada** por última vez
+    #: (``reactivated_at``). Solo trae cortes PROBADOS: una versión que no llegó a pausarse dentro
+    #: de la ventana no aparece, y sin él no hay rampa (no se inventa una reincorporación).
+    reactivated_at: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def saturated(self) -> bool:
@@ -304,6 +350,7 @@ class AdaptiveStateReading:
             "unreadableRows": self.unreadable,
             "collapsedRows": self.collapsed,
             "lastPublishedAt": self.last_published_at,
+            "reactivatedAt": dict(sorted(self.reactivated_at.items())),
         }
 
 
@@ -353,6 +400,7 @@ def read_adaptive_state(
         unreadable=unreadable,
         collapsed=collapsed,
         last_published_at=newest.isoformat() if newest is not None else None,
+        reactivated_at=_reactivations(ordered),
     )
 
 

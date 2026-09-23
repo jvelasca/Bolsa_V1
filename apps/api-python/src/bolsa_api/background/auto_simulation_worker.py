@@ -46,6 +46,7 @@ from bolsa_analytics.cognitive.auto_adaptive import (
     ADAPTIVE_REGIME_UNKNOWN,
     AdaptivePlan,
     AdaptivePolicy,
+    RecoveryEvidence,
     build_adaptive_plan,
 )
 from bolsa_analytics.cognitive.auto_adaptive_data_gate import (
@@ -170,6 +171,7 @@ from bolsa_application.auto_reason_codes import (
 from bolsa_application.auto_self_evaluation_feed import (
     build_adaptive_confidence_from_fills,
     build_auto_self_evaluation,
+    recovery_evidence_from_fills,
 )
 from bolsa_application.auto_v2_entry import (
     AtrSource,
@@ -749,6 +751,12 @@ class AutoSimulationWorker:
         self._v2_adaptive_journal_anchor_age: int | None = None
         #: La lectura durable del arranque, guardada para poder declarar sus límites al medir el ancla.
         self._v2_adaptive_state_reading: AdaptiveStateReading | None = None
+        #: AUTO-13 (§24) — memoria DERIVADA de la rampa: por versión, el instante en que dejó de
+        #: estar pausada. Se **siembra** del lector durable (``reactivated_at``) y el propio
+        #: proceso la mantiene al día con las transiciones que ve (pausada → activa). Sin ella,
+        #: una versión que cumple su cooldown a mitad de proceso no entraría en la rampa hasta el
+        #: siguiente reinicio: la mitad viva de una memoria que no se persiste.
+        self._v2_adaptive_reactivated_at: dict[str, str] = {}
         # AUTO-11: recuperación del estado Adaptive y reconciliación del rastro de ciclo, una vez
         # por proceso cada una (mismo patrón que ``_v2_kill_state_loaded``).
         self._v2_adaptive_state_recovered = False
@@ -3101,19 +3109,107 @@ class AutoSimulationWorker:
         # que ENTRÓ, no el de salida.
         self._v2_adaptive_paused_cycles_entered = dict(self._v2_adaptive_paused_cycles)
         policy = self._v2_adaptive_policy()
-        plan = build_adaptive_plan(
-            report.by_strategy,
-            to_market_regime(regime),
-            policy=policy,
-            paused_cycles=self._v2_adaptive_decision_cycles(reading, policy),
-            by_regime=report.by_regime,
-            # La protección NUNCA se apaga: la rotación recibe el mismo material. Lo que el gate
-            # retira es el encogimiento por confianza —"no se estrecha por evidencia que no es de
-            # fiar"— y, en ``STALE``, las reactivaciones nuevas (vía los ciclos de decisión).
-            confidence=None if reading.limits_adaptation else confidence,
-        )
+        # AUTO-13 (§24) — la RAMPA de reincorporación. Solo se aporta a las versiones que el lector
+        # durable (o la transición observada en el proceso) declara RECUPERADAS (``reactivated_at``):
+        # una que nunca estuvo pausada no tiene rampa y el plan sigue siendo el histórico. Se mide
+        # con el MISMO material que la confianza (los fills del tick), así que no hay segundo
+        # productor que pueda divergir.
+        def _plan_with_recovery(evidence: dict[str, RecoveryEvidence]) -> AdaptivePlan:
+            return build_adaptive_plan(
+                report.by_strategy,
+                to_market_regime(regime),
+                policy=policy,
+                paused_cycles=self._v2_adaptive_decision_cycles(reading, policy),
+                by_regime=report.by_regime,
+                # La protección NUNCA se apaga: la rotación recibe el mismo material. Lo que el gate
+                # retira es el encogimiento por confianza —"no se estrecha por evidencia que no es de
+                # fiar"— y, en ``STALE``, las reactivaciones nuevas (vía los ciclos de decisión).
+                confidence=None if reading.limits_adaptation else confidence,
+                recovery=evidence or None,
+            )
+
+        recovery = self._v2_adaptive_recovery_evidence(fills, cycle_risk, confidence)
+        plan = _plan_with_recovery(recovery)
+        # La transición pausa → activa se fecha en el tick en que OCURRE: si el plan acaba de
+        # reactivar una versión, su rampa entra ya en ESTE tick con el escalón inicial. Sin esto la
+        # versión correría un tick a peso pleno, que es justo el salto que §24 prohíbe. El recálculo
+        # solo ocurre en ese tick (no paga I/O: es puro sobre el material ya leído).
+        if self._v2_adaptive_observe_reactivations(plan):
+            recovery = self._v2_adaptive_recovery_evidence(fills, cycle_risk, confidence)
+            plan = _plan_with_recovery(recovery)
+        if plan.recovery:
+            # El estado operativo y el escalón se DECLARAN: un ``0.25`` congelado no se distinguiría
+            # de una rampa que avanza si no viajara el motivo (``note``).
+            logger.info(
+                "auto_sim v2 adaptive recovery states %s",
+                {
+                    "operationalStates": dict(sorted(plan.operational_states.items())),
+                    "recovery": {
+                        version: value.as_dict() for version, value in sorted(plan.recovery.items())
+                    },
+                },
+            )
         self._v2_adaptive_paused_cycles = self._v2_next_paused_cycles(plan)
         return plan
+
+    def _v2_adaptive_recovery_evidence(
+        self, fills: Any, cycle_risk: Any, confidence: Any
+    ) -> dict[str, RecoveryEvidence]:
+        """La evidencia de la rampa del tick, medida con los fills y la confianza ya construidos."""
+        return recovery_evidence_from_fills(
+            fills=fills,
+            cycle_risk=cycle_risk,
+            reactivated_at=self._v2_adaptive_reactivated_at or None,
+            confidence=confidence,
+        )
+
+    def _v2_adaptive_observe_reactivations(self, plan: AdaptivePlan) -> bool:
+        """(AUTO-13 §24) fechas de reincorporación OBSERVADAS en el proceso; ``True`` si cambió.
+
+        La memoria de la rampa es **derivada**, no persistida: el lector durable la **siembra** en el
+        arranque (``reactivated_at``) y este seguimiento la completa con las transiciones que el
+        propio proceso ve. Sin él, una versión que cumple su cooldown a mitad de proceso no entraría
+        nunca en la rampa hasta el siguiente reinicio —y el proceso largo es el caso normal—, así que
+        la mitad viva no es un adorno: es lo que hace que la rampa exista entre reinicios.
+
+        Reglas, todas declaradas:
+
+        * **Solo se fecha una reincorporación OBSERVADA**: la versión estaba pausada en el tick
+          anterior (``_v2_adaptive_paused_cycles_entered``) y ya no lo está. Una versión que nunca
+          estuvo pausada NO entra: no tiene reincorporación que fechar.
+        * **Al volver a pausa se OLVIDA**: el escalón se descarta (§24) y el siguiente corte se
+          fechará de nuevo cuando la rotación la reactive. Sin esto, la rampa reanudaría a mitad de
+          camino con la evidencia de la etapa anterior.
+        * **El instante es el del tick** (``_v2_instant``), el mismo reloj con el que se fechan las
+          filas del journal: la evidencia que confirma la subida es la POSTERIOR a ese instante.
+        """
+        tracked = dict(self._v2_adaptive_reactivated_at)
+        was_paused = {
+            version
+            for version, count in self._v2_adaptive_paused_cycles_entered.items()
+            if int(count) > 0
+        }
+        paused = set(plan.rotation.paused)
+        # Se fecha SOLO lo que cambia: si no hay ninguna reincorporación que fechar, el reloj no se
+        # toca (una lectura de reloj por tick que no se usa sería un coste y un dato de más).
+        fresh = [
+            row.strategy_version
+            for row in plan.health
+            if row.strategy_version not in paused
+            and row.strategy_version in was_paused
+            and row.strategy_version not in tracked
+        ]
+        for row in plan.health:
+            if row.strategy_version in paused:
+                tracked.pop(row.strategy_version, None)
+        if fresh:
+            stamp = self._v2_instant()
+            for version in fresh:
+                tracked[version] = stamp
+        if tracked == self._v2_adaptive_reactivated_at:
+            return False
+        self._v2_adaptive_reactivated_at = tracked
+        return True
 
     def _v2_adaptive_policy(self) -> AdaptivePolicy:
         """La política Adaptive en curso, en UN solo sitio (la usan el plan y el lector).
@@ -3367,6 +3463,9 @@ class AutoSimulationWorker:
             logger.warning("auto_sim v2 adaptive state UNREAD %s", summary)
             return
         self._v2_adaptive_paused_cycles = dict(reading.paused_cycles)
+        # AUTO-13 (§24): se SIEMBRA la memoria de la rampa con los cortes durables. Es la mitad que
+        # sobrevive al reinicio; el seguimiento de transiciones del proceso la completa después.
+        self._v2_adaptive_reactivated_at = dict(reading.reactivated_at)
         # AUTO-13: el ancla durable del journal se mide con la cadencia declarada (``None`` si el
         # instante no se pudo leer: se declara y no bloquea). Es la mitad que sobrevive al reinicio.
         self._v2_measure_adaptive_journal_anchor(reading)

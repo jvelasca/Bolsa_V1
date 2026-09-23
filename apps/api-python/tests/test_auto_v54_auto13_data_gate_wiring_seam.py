@@ -130,6 +130,8 @@ def _worker(
     worker._v2_adaptive_paused_cycles_entered = {}
     worker._v2_adaptive_sink_failures = failures
     worker._v2_adaptive_journal_anchor_age = anchor
+    # AUTO-13 paso 4: la memoria derivada de la rampa arranca vacía (el lector durable la siembra).
+    worker._v2_adaptive_reactivated_at = {}
     worker._v2_tunables = SimpleNamespace(
         adaptive_enabled=True,
         adaptive_win_rate_floor=_FLOOR,

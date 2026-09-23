@@ -118,6 +118,8 @@ def _worker(
     worker._cycle_regime_reader = reader
     worker._v2_tunables = SimpleNamespace(adaptive_win_rate_floor=0.35)
     worker._v2_adaptive_paused_cycles = {}
+    # AUTO-13 paso 4: la memoria de la rampa arranca vacia (el lector durable la siembra).
+    worker._v2_adaptive_reactivated_at = {}
     return worker
 
 

@@ -36,7 +36,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from bolsa_analytics.cognitive.auto_adaptive import (
+    RecoveryEvidence,
+)
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_DECAY_SEVERE,
     ADAPTIVE_LONG_WINDOW_DEFAULT,
     ADAPTIVE_RECENT_WINDOW_DEFAULT,
     AdaptiveConfidence,
@@ -45,6 +49,7 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_MIN_TRADES_DEFAULT,
     AutoSelfEvaluation,
+    cycle_r,
     evaluate_auto_self_evaluation,
 )
 from bolsa_application.cycle_risk import CycleRisk, apply_cycle_risk
@@ -58,6 +63,7 @@ __all__ = [
     "build_auto_self_evaluation",
     "cycles_from_fills",
     "make_auto_self_evaluation_provider",
+    "recovery_evidence_from_fills",
 ]
 
 logger = logging.getLogger(__name__)
@@ -246,6 +252,116 @@ def build_adaptive_confidence_from_fills(
         long_window=long_window,
         min_trades=min_trades,
     )
+
+
+def _positive_cycles_after(
+    rows: Sequence[Any], version: str, since: datetime
+) -> tuple[int, bool, bool]:
+    """Ciclos POSITIVOS medidos de una versión posteriores a ``since``.
+
+    Devuelve ``(positivos, hay_alguna_fecha, hay_alguna_medida)``. Solo cuenta un ciclo si declara
+    ``closedAt`` legible **y** un R medido positivo: la evidencia que confirma la recuperación es
+    la medida, no la posición en la lista. Un ciclo sin R medido no es evidencia a favor (no suma)
+    pero **tampoco en contra** (no reinicia): el desconocido no es un defecto.
+
+    El R se lee si la fila ya lo declara y, si no, se calcula con ``cycle_r`` —la MISMA regla que
+    el informe ``AUTO-9``— a partir del ``riskAmount`` que ``apply_cycle_risk`` acaba de enriquecer:
+    un segundo cociente paralelo podría divergir en silencio del que publica el informe.
+    """
+    positives = 0
+    dated = False
+    measured = False
+    for row in rows:
+        if str(_field_any(row, "strategyVersion", "strategy_version") or "") != version:
+            continue
+        instant = _parse_instant(_field_any(row, "closedAt", "closed_at"))
+        if instant is None or instant <= since:
+            continue
+        dated = True
+        value = _field_any(row, "r_multiple", "rMultiple", "r")
+        if value is None:
+            value = cycle_r(
+                pnl=_field_any(row, "pnl", "realizedPnl"),
+                risk_amount=_field_any(row, "riskAmount", "risk_amount"),
+                cost=_field_any(row, "cost", "costEstimate"),
+            ).r_multiple
+        if value is None:
+            continue
+        measured = True
+        if float(value) > 0.0:
+            positives += 1
+    return positives, dated, measured
+
+
+def _field_any(row: Any, *names: str) -> Any:
+    """Primer campo presente de ``names`` en la fila (dict u objeto), o ``None``."""
+    for name in names:
+        value = getattr(row, name, None)
+        if value is not None:
+            return value
+        if isinstance(row, Mapping) and row.get(name) is not None:
+            return row.get(name)
+    return None
+
+
+def _parse_instant(raw: Any) -> datetime | None:
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo is not None else raw.replace(tzinfo=UTC)
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def recovery_evidence_from_fills(
+    *,
+    fills: Iterable[Any] | None = None,
+    cycle_risk: Mapping[str, CycleRisk] | None = None,
+    reactivated_at: Mapping[str, str] | None = None,
+    confidence: AdaptiveConfidence | None = None,
+) -> dict[str, RecoveryEvidence]:
+    """(PURA) evidencia de la RAMPA de reincorporación (``AUTO-13`` §24) desde los mismos fills.
+
+    ``reactivated_at`` es el corte durable que declara el lector de ``AUTO-11``: por versión, el
+    instante en que dejó de estar pausada. Solo se emite evidencia para esas versiones —una que
+    nunca estuvo pausada no tiene rampa— y sin corte fechado NO se emite nada: no se inventa una
+    reincorporación que no se pudo fechar.
+
+    La cuenta son los ciclos **cerrados después** del corte con R medido positivo. El deterioro
+    (``decay == SEVERE`` de la confianza ``AUTO-12``, o una expectancy reciente ``<= 0``) se
+    declara para que la rampa se **reinicie**: la protección manda, la rampa nunca compite con ella.
+    """
+    reactivated = {
+        str(version).strip(): str(instant).strip()
+        for version, instant in (reactivated_at or {}).items()
+        if str(version).strip() and str(instant).strip()
+    }
+    if not reactivated:
+        return {}
+    rows = apply_cycle_risk(cycles_from_fills(fills or ()), cycle_risk)
+    recent_available = True if confidence is None else bool(confidence.recent_available)
+    evidence: dict[str, RecoveryEvidence] = {}
+    for version, raw_since in sorted(reactivated.items()):
+        since = _parse_instant(raw_since)
+        if since is None:
+            # Corte sin instante legible: la rampa no puede contar desde ninguna parte.
+            continue
+        positives, dated, _measured = _positive_cycles_after(rows, version, since)
+        cell = confidence.confidence_for(version) if confidence is not None else None
+        recent = cell.recent_expectancy_r if cell is not None else None
+        decay = cell.decay if cell is not None else None
+        positive = recent is None or float(recent) > 0.0
+        evidence[version] = RecoveryEvidence(
+            strategy_version=version,
+            measured_cycles=positives,
+            window_available=dated and recent_available,
+            measured_positive=positive,
+            severe_decay=decay == ADAPTIVE_DECAY_SEVERE,
+        )
+    return evidence
 
 
 def make_auto_self_evaluation_provider(
