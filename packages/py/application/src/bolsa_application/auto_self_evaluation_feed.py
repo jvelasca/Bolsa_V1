@@ -32,9 +32,16 @@ from __future__ import annotations
 import logging
 from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_LONG_WINDOW_DEFAULT,
+    ADAPTIVE_RECENT_WINDOW_DEFAULT,
+    AdaptiveConfidence,
+    build_adaptive_confidence,
+)
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_MIN_TRADES_DEFAULT,
     AutoSelfEvaluation,
@@ -47,6 +54,7 @@ from bolsa_application.sim_durable_store import (
 )
 
 __all__ = [
+    "build_adaptive_confidence_from_fills",
     "build_auto_self_evaluation",
     "cycles_from_fills",
     "make_auto_self_evaluation_provider",
@@ -58,6 +66,33 @@ logger = logging.getLogger(__name__)
 def _version_of(fill: Any) -> str:
     value = getattr(fill, "strategy_version_id", None)
     return str(value).strip() if isinstance(value, str) and value.strip() else ""
+
+
+def _fill_instant(fill: Any) -> datetime | None:
+    """Instante durable del fill (``created_at``), o ``None`` si no lo declara."""
+    value = getattr(fill, "created_at", None)
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+    return None
+
+
+def _closed_at(rows: Sequence[Any]) -> str | None:
+    """``closedAt`` del ciclo: el instante del ÚLTIMO fill del grupo, o ``None``.
+
+    Es lo que permite la ventana RECIENTE del Adaptive (``AUTO-12``) ordenar por instante
+    real en vez de por posición de lista. Sin instante legible NO se inventa uno: la clave se
+    OMITE y el lector de confianza declara la ausencia (``recent_unavailable``).
+    """
+    instants = [value for value in (_fill_instant(fill) for fill in rows) if value is not None]
+    if not instants:
+        return None
+    return max(instants).isoformat()
 
 
 def _realize(rows: Sequence[Any]) -> tuple[Decimal, Decimal, int]:
@@ -120,8 +155,11 @@ def _realize_pairs(rows: Sequence[Any]) -> tuple[Decimal, ...]:
 def cycles_from_fills(fills: Iterable[Any]) -> tuple[dict[str, Any], ...]:
     """(PURA) ciclos financieros reconstruidos de los fills durables, en orden estable.
 
-    Devuelve filas con ``cycleId``, ``strategyVersion`` y ``pnl`` — y NADA más: lo que no
-    se puede derivar de los fills se queda ausente para que el informe lo declare.
+    Devuelve filas con ``cycleId``, ``strategyVersion``, ``pnl`` y —cuando se pudo medir— su
+    ``closedAt`` (instante del último fill del grupo). Lo que no se puede derivar de los fills
+    se queda ausente para que el informe lo declare; en particular, los ciclos **sin
+    ``cycle_id``** (legacy) no reclaman un instante de cierre, porque sin identidad de ciclo
+    tampoco hay una frontera de cierre que afirmar.
     """
     ordered: list[Any] = list(fills)
     grouped: dict[str, list[Any]] = {}
@@ -143,7 +181,13 @@ def cycles_from_fills(fills: Iterable[Any]) -> tuple[dict[str, Any], ...]:
         # Un ciclo = una señal = una estrategia. Si el grupo declara dos, es un defecto de
         # atribución y el ciclo va SIN versión (lo declara el informe, no lo reparto).
         version = versions.pop() if len(versions) == 1 else ""
-        cycles.append({"cycleId": key, "strategyVersion": version, "pnl": realized})
+        row: dict[str, Any] = {"cycleId": key, "strategyVersion": version, "pnl": realized}
+        closed_at = _closed_at(rows)
+        if closed_at is not None:
+            # Se AÑADE solo cuando se midió: sin fecha la clave se omite y el lector de
+            # confianza declara el hueco. Así el informe de AUTO-7 no cambia de forma.
+            row["closedAt"] = closed_at
+        cycles.append(row)
 
     by_version: dict[str, list[Any]] = {}
     for fill in anonymous:
@@ -178,6 +222,28 @@ def build_auto_self_evaluation(
         opportunities=opportunities,
         seen=seen,
         durable_seen=durable_seen,
+        min_trades=min_trades,
+    )
+
+
+def build_adaptive_confidence_from_fills(
+    *,
+    fills: Iterable[Any] | None = None,
+    cycle_risk: Mapping[str, CycleRisk] | None = None,
+    recent_window: int = ADAPTIVE_RECENT_WINDOW_DEFAULT,
+    long_window: int = ADAPTIVE_LONG_WINDOW_DEFAULT,
+    min_trades: int = SELF_EVAL_MIN_TRADES_DEFAULT,
+) -> AdaptiveConfidence:
+    """(PURA) confianza estadística de ``AUTO-12`` desde los MISMOS fills que el informe.
+
+    Reutiliza las dos piezas ya existentes —``cycles_from_fills`` (con su ``closedAt``) y
+    ``apply_cycle_risk``— para que la confianza y el informe de ``AUTO-7``/``AUTO-9`` hablen
+    exactamente del mismo material: sin un segundo productor que pueda divergir en silencio.
+    """
+    return build_adaptive_confidence(
+        apply_cycle_risk(cycles_from_fills(fills or ()), cycle_risk),
+        recent_window=recent_window,
+        long_window=long_window,
         min_trades=min_trades,
     )
 

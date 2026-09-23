@@ -45,6 +45,16 @@ DISTINTOS (zona muerta) y una pausa mínima en ciclos: una métrica que oscila a
 del umbral no debe producir un sistema nervioso (pausa/activa/pausa). El estado previo
 entra como DATO (``paused_cycles``), nunca como estado interno del módulo.
 
+**Confianza estadística (AUTO-12).** El reparto deja de pesar igual una muestra de ``N = 12``
+y una de ``N = 180``: cuando el llamante aporta la lectura de confianza
+(``auto_adaptive_confidence``), el peso de cada estrategia **decisoria positiva** se encoge
+por su muestra efectiva (``n / (n + confidence_prior)``) y, si el deterioro reciente es
+``SEVERE``, por un factor adicional declarado. El encogimiento solo **redistribuye** dentro
+del presupuesto: sigue acotado a ``[0, 1]``, nunca elimina a nadie del reparto y **no**
+actúa sobre las estrategias sin edge decisorio (el desconocido no es un defecto). Sin
+``confidence`` el comportamiento es **byte-idéntico** al histórico: la confianza es un
+**eje de evidencia opcional**, nunca un requisito para recomendar.
+
 **Read-only por contrato**: ``AdaptivePlan.read_only`` es ``True`` y su ``decisive`` de
 origen NO es un permiso (lo decide el motor determinista).
 """
@@ -56,6 +66,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_DECAY_SEVERE,
+    AdaptiveConfidence,
+    StrategyConfidence,
+)
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     StrategyRegimeEvaluation,
     StrategySelfEvaluation,
@@ -69,12 +84,14 @@ from bolsa_analytics.cognitive.measurement import (
 
 __all__ = [
     "ADAPTIVE_ADVERSE_REGIMES",
+    "ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT",
     "ADAPTIVE_KEY",
     "ADAPTIVE_MIN_PAUSE_CYCLES_DEFAULT",
     "ADAPTIVE_POLICY_VERSION",
     "ADAPTIVE_PROFIT_FACTOR_PAUSE_DEFAULT",
     "ADAPTIVE_PROFIT_FACTOR_REACTIVATE_DEFAULT",
     "ADAPTIVE_REGIME_UNKNOWN",
+    "ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT",
     "ADAPTIVE_STRATEGY_COOLDOWN",
     "ADAPTIVE_STRATEGY_PAUSED",
     "ADAPTIVE_STRATEGY_REGIME_RISK",
@@ -104,7 +121,10 @@ ADAPTIVE_KEY = "adaptive"
 #: asignación o el suelo de régimen EXIGE subir esta versión (dentro de seis meses, dos
 #: operaciones aparentemente iguales no pueden haber sido decididas por reglas distintas
 #: sin que se note).
-ADAPTIVE_POLICY_VERSION = "auto9-v1"
+#:
+#: ``auto12-v1`` (AUTO-12): la regla de asignación cambia al encogerse por muestra efectiva
+#: cuando el llamante aporta la confianza estadística.
+ADAPTIVE_POLICY_VERSION = "auto12-v1"
 
 #: Motivos de rotación (vocabulario PROPIO de este módulo; el journal de la capa de
 #: aplicación los lleva en el detalle de ``adaptive_strategy_paused``). La casa única
@@ -139,6 +159,16 @@ ADAPTIVE_MIN_PAUSE_CYCLES_DEFAULT = 3
 #: Multiplicador de asignación para una estrategia SIN evidencia decisoria. Neutral por
 #: defecto ("sin dato no penalizo"); es una POLÍTICA declarada, no un accidente.
 ADAPTIVE_UNKNOWN_MULTIPLIER_DEFAULT = 1.0
+
+#: Prior del encogimiento por muestra (AUTO-12): ``shrink = n / (n + prior)``. Con un prior
+#: de 20, una muestra efectiva de 20 conserva la mitad del peso, 180 conserva el 90 % y una
+#: racha de 12 conserva el 37,5 % frente a la misma expectancy con historia larga. Es la
+#: protección contra el *winner chasing*: un edge medido pero fino NO pesa como uno medido
+#: con base amplia.
+ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT = 20.0
+#: Factor adicional de reparto cuando la ventana reciente se deterioró (``decay == SEVERE``).
+#: Es una modulación DECLARADA, no una pausa: la pausa sigue siendo de la rotación.
+ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT = 0.5
 
 #: Eje de evidencia del reparto: la MONEDA bruta (``expectancy_currency``). Es el
 #: comportamiento histórico y el fallback DECLARADO cuando el R neto no está medido.
@@ -186,6 +216,11 @@ class AdaptivePolicy:
     profit_factor_reactivate: float = ADAPTIVE_PROFIT_FACTOR_REACTIVATE_DEFAULT
     # Cooldown: ciclos mínimos que una pausa permanece antes de poder reactivarse.
     min_pause_cycles: int = ADAPTIVE_MIN_PAUSE_CYCLES_DEFAULT
+    # AUTO-12: encogimiento por muestra efectiva (protección contra el *winner chasing*) y
+    # factor adicional cuando el deterioro reciente es ``SEVERE``. Declarados para que la
+    # versión de política selle la regla de asignación completa.
+    confidence_prior: float = ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT
+    severe_decay_factor: float = ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,6 +251,14 @@ class StrategyHealth:
     # exactamente una celda decisiva con régimen. Con dos regímenes decisivos —o con solo
     # el cubo ``UNKNOWN``— queda ``UNKNOWN``: nunca uno elegido a dedo.
     regime: str = ADAPTIVE_REGIME_UNKNOWN
+    # AUTO-12 — confianza estadística de la evidencia (``auto_adaptive_confidence``). ``None``
+    # cuando el llamante no aportó la lectura: la AUSENCIA se declara, nunca se disfraza de
+    # confianza alta. La banda es evidencia publicada; el encogimiento del reparto vive en
+    # ``recommend_allocation`` y sale de ``effective_n``/``decay``.
+    confidence: str | None = None
+    recent_expectancy_r: float | None = None
+    long_expectancy_r: float | None = None
+    decay: str | None = None
 
     @classmethod
     def from_evaluation(
@@ -223,11 +266,13 @@ class StrategyHealth:
         row: StrategySelfEvaluation,
         *,
         regime_cells: Sequence[StrategyRegimeEvaluation] = (),
+        confidence: StrategyConfidence | None = None,
     ) -> StrategyHealth:
-        """Proyecta la fila de self-evaluation y, si se aportan, sus celdas por régimen.
+        """Proyecta la fila de self-evaluation y, si se aportan, sus celdas y su confianza.
 
         El régimen sale del cruce ``strategy × regime`` del mismo informe: la fila sola no
-        lo sabe. Sin celdas (o con el régimen no determinado) queda ``UNKNOWN``.
+        lo sabe. Sin celdas (o con el régimen no determinado) queda ``UNKNOWN``. La confianza
+        (AUTO-12) se adjunta por ``strategyVersion``; sin ella los campos quedan ``None``.
         """
         regime, _undetermined = declared_regime(regime_cells, row.strategy_version)
         return cls(
@@ -241,6 +286,14 @@ class StrategyHealth:
             net_expectancy_r=row.net_expectancy_r,
             net_r_measurement=row.net_r_measurement,
             regime=regime or ADAPTIVE_REGIME_UNKNOWN,
+            confidence=confidence.confidence if confidence is not None else None,
+            recent_expectancy_r=(
+                confidence.recent_expectancy_r if confidence is not None else None
+            ),
+            long_expectancy_r=(
+                confidence.long_expectancy_r if confidence is not None else None
+            ),
+            decay=confidence.decay if confidence is not None else None,
         )
 
 
@@ -248,14 +301,28 @@ def build_strategy_health(
     by_strategy: Sequence[StrategySelfEvaluation],
     *,
     by_regime: Sequence[StrategyRegimeEvaluation] = (),
+    confidence: AdaptiveConfidence | None = None,
 ) -> tuple[StrategyHealth, ...]:
     """Proyección read-only de las filas de self-evaluation al contrato de Adaptive.
 
     ``by_regime`` son las celdas del cruce ``strategy × regime`` del MISMO informe: son la
-    única fuente del régimen determinado (la fila de estrategia no lo lleva).
+    única fuente del régimen determinado (la fila de estrategia no lo lleva). ``confidence``
+    (AUTO-12) adjunta la confianza estadística por versión; sin ella el plan es idéntico al
+    histórico.
     """
     cells = tuple(by_regime)
-    return tuple(StrategyHealth.from_evaluation(row, regime_cells=cells) for row in by_strategy)
+    return tuple(
+        StrategyHealth.from_evaluation(
+            row,
+            regime_cells=cells,
+            confidence=(
+                confidence.confidence_for(row.strategy_version)
+                if confidence is not None
+                else None
+            ),
+        )
+        for row in by_strategy
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -377,6 +444,12 @@ class AdaptivePlan:
             "profitFactor": row.profit_factor,
             "winRate": row.win_rate,
             "regime": row.regime,
+            # AUTO-12 — la confianza estadística viaja con la evidencia: sin ella, el
+            # operador no puede distinguir un edge medido sobre 12 ciclos de uno sobre 180.
+            "confidence": row.confidence,
+            "recentExpectancyR": row.recent_expectancy_r,
+            "longExpectancyR": row.long_expectancy_r,
+            "decay": row.decay,
         }
 
     def as_dict(self) -> dict[str, Any]:
@@ -530,11 +603,34 @@ def _allocation_weights(
     return ALLOCATION_AXIS_CURRENCY, currency
 
 
+def _confidence_factor(
+    confidence: StrategyConfidence | None,
+    *,
+    prior: float,
+    policy: AdaptivePolicy,
+) -> float:
+    """(PURA) factor de encogimiento por muestra efectiva (y deterioro severo), o ``1.0``.
+
+    ``shrink = effective_n / (effective_n + prior)``. Sin lectura de confianza el factor es
+    ``1.0``: el comportamiento histórico se conserva. Con ``decay == SEVERE`` se aplica el
+    factor declarado por la política — nunca una pausa, solo menos peso.
+    """
+    if confidence is None:
+        return 1.0
+    effective_n = max(0, int(getattr(confidence, "effective_n", 0) or 0))
+    denominator = effective_n + max(0.0, prior)
+    shrink = (effective_n / denominator) if denominator > 0 else 1.0
+    if getattr(confidence, "decay", None) == ADAPTIVE_DECAY_SEVERE:
+        shrink *= max(0.0, float(policy.severe_decay_factor))
+    return shrink
+
+
 def recommend_allocation(
     active: Iterable[str],
     by_strategy: Sequence[StrategySelfEvaluation],
     *,
     policy: AdaptivePolicy | None = None,
+    confidence: AdaptiveConfidence | None = None,
 ) -> AllocationPlan:
     """(PURA) multiplicador de riesgo por estrategia activa (solo estrecha, ``[0, 1]``).
 
@@ -552,6 +648,10 @@ def recommend_allocation(
     * El **eje** de esos pesos es el R neto MEDIDO cuando está medido para todo el grupo
       que compite; si no, la moneda bruta, que es el comportamiento histórico. El eje se
       declara en ``AllocationPlan.evidence_axis`` y nunca se mezclan los dos.
+    * **AUTO-12** — con ``confidence``, el peso de cada decisoria positiva se encoge por su
+      muestra efectiva antes de normalizar, de modo que un edge medido sobre pocos ciclos no
+      desplace a otro con base amplia (*winner chasing*). El encogimiento solo redistribuye:
+      el reparto sigue sumando-preservando, acotado a ``[0, 1]`` y sin eliminar a nadie.
 
     Se materializa una entrada por CADA versión activa: la semántica de "sin evidencia"
     queda en la política, nunca en el default de ``AllocationPlan.multiplier_for``.
@@ -569,6 +669,19 @@ def recommend_allocation(
 
     rows_by_version = {row.strategy_version: row for row in by_strategy}
     axis, positive = _allocation_weights(rows_by_version, active_versions)
+    if positive and confidence is not None:
+        prior = max(0.0, float(resolved.confidence_prior))
+        adjusted: dict[str, float] = {}
+        for version, weight in positive.items():
+            factor = _confidence_factor(
+                confidence.confidence_for(version), prior=prior, policy=resolved
+            )
+            shrunk = weight * factor
+            # El encogimiento NUNCA elimina a nadie del reparto: si un factor degenerara a 0
+            # se conserva el peso original (quitar a una estrategia es una DECISIÓN, y
+            # Adaptive solo recomienda).
+            adjusted[version] = shrunk if shrunk > 0.0 else weight
+        positive = adjusted
 
     neutral = _clamp_unit(resolved.unknown_multiplier)
     multipliers: dict[str, float] = {}
@@ -594,11 +707,14 @@ def build_adaptive_plan(
     policy: AdaptivePolicy | None = None,
     paused_cycles: Mapping[str, int] | None = None,
     by_regime: Sequence[StrategyRegimeEvaluation] = (),
+    confidence: AdaptiveConfidence | None = None,
 ) -> AdaptivePlan:
     """(PURA) plan Adaptive completo: rotación + asignación sobre las mismas filas.
 
     ``regime`` es el ``MarketRegime`` del gobernador (``TREND_UP``/``TREND_DOWN``/
-    ``RANGE``/``HIGH_VOL``/``LOW_VOL``/``UNKNOWN``), no el eje operativo.
+    ``RANGE``/``HIGH_VOL``/``LOW_VOL``/``UNKNOWN``), no el eje operativo. ``confidence``
+    (AUTO-12) es OPCIONAL: sin ella el plan es byte-idéntico al histórico y la rotación no
+    cambia (la confianza solo modula el reparto, nunca quién compite).
     """
     resolved = policy or AdaptivePolicy()
     cells = tuple(by_regime)
@@ -612,11 +728,13 @@ def build_adaptive_plan(
     active_versions = [
         row.strategy_version for row in by_strategy if not rotation.is_paused(row.strategy_version)
     ]
-    allocation = recommend_allocation(active_versions, by_strategy, policy=resolved)
+    allocation = recommend_allocation(
+        active_versions, by_strategy, policy=resolved, confidence=confidence
+    )
     return AdaptivePlan(
         rotation=rotation,
         allocation=allocation,
         regime=regime,
         policy_version=resolved.policy_version,
-        health=build_strategy_health(by_strategy, by_regime=cells),
+        health=build_strategy_health(by_strategy, by_regime=cells, confidence=confidence),
     )

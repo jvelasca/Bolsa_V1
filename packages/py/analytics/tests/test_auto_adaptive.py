@@ -20,8 +20,10 @@ from decimal import Decimal
 import pytest
 
 from bolsa_analytics.cognitive.auto_adaptive import (
+    ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT,
     ADAPTIVE_POLICY_VERSION,
     ADAPTIVE_REGIME_UNKNOWN,
+    ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT,
     ADAPTIVE_STRATEGY_COOLDOWN,
     ADAPTIVE_STRATEGY_PAUSED,
     ADAPTIVE_STRATEGY_REGIME_RISK,
@@ -34,6 +36,14 @@ from bolsa_analytics.cognitive.auto_adaptive import (
     build_strategy_health,
     recommend_allocation,
     recommend_rotation,
+)
+from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_DECAY_NONE,
+    ADAPTIVE_DECAY_SEVERE,
+    ADAPTIVE_LONG_WINDOW_DEFAULT,
+    ADAPTIVE_RECENT_WINDOW_DEFAULT,
+    AdaptiveConfidence,
+    StrategyConfidence,
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     StrategySelfEvaluation,
@@ -710,12 +720,262 @@ def test_regime_cells_alone_do_not_move_rotation_or_allocation() -> None:
     )
 
 
-def test_the_policy_version_seals_the_auto9_evidence_contract() -> None:
-    """No es tautología: un merge que devolviera ``auto8-v2`` movería el sello sin avisar.
+def test_the_policy_version_seals_the_auto12_evidence_contract() -> None:
+    """No es tautología: un merge que devolviera ``auto9-v1`` movería el sello sin avisar.
 
-    El contrato de evidencia cambió (régimen determinado + R neto con su medición), así que
-    la versión de la política cambia con él; es lo que hace reproducible el plan.
+    La regla de asignación cambió al encogerse por muestra efectiva cuando el llamante aporta
+    la confianza estadística (``AUTO-12``), así que la versión de la política cambia con ella;
+    es lo que hace reproducible el plan.
     """
-    assert ADAPTIVE_POLICY_VERSION == "auto9-v1"
-    assert AdaptivePolicy().policy_version == "auto9-v1"
-    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto9-v1"
+    assert ADAPTIVE_POLICY_VERSION == "auto12-v1"
+    assert AdaptivePolicy().policy_version == "auto12-v1"
+    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto12-v1"
+
+
+# ── AUTO-12 — confianza estadística en el reparto (encogimiento por muestra) ────────
+
+
+def _strategy_confidence(
+    version: str,
+    *,
+    effective_n: int,
+    decay: str = ADAPTIVE_DECAY_NONE,
+    confidence: str = "HIGH",
+    long_r: float | None = 1.0,
+    recent_r: float | None = 1.0,
+) -> StrategyConfidence:
+    """Confianza de UNA estrategia, con solo lo que el reparto lee (el resto, declarado)."""
+    return StrategyConfidence(
+        strategy_version=version,
+        sample_size=effective_n,
+        effective_n=effective_n,
+        measurement_completeness=MEASUREMENT_COMPLETE,
+        risk_coverage=1.0,
+        cost_coverage=1.0,
+        regime_coverage=1.0,
+        long_expectancy_r=long_r,
+        recent_expectancy_r=recent_r,
+        decay=decay,
+        confidence=confidence,
+        by_regime=(),
+        notes=(),
+    )
+
+
+def _reading(*rows: StrategyConfidence) -> AdaptiveConfidence:
+    return AdaptiveConfidence(
+        by_strategy=tuple(rows),
+        recent_window=ADAPTIVE_RECENT_WINDOW_DEFAULT,
+        long_window=ADAPTIVE_LONG_WINDOW_DEFAULT,
+        recent_available=True,
+        notes=(),
+    )
+
+
+def test_without_confidence_the_allocation_is_byte_identical_to_the_historical_one() -> None:
+    """El eje de confianza es OPCIONAL: sin él, el plan es el de ``AUTO-9`` sin tocar."""
+    rows = (
+        _row("a", decisive=True, expectancy="3"),
+        _row("b", decisive=True, expectancy="1"),
+        _row("c", decisive=False),
+    )
+    historical = build_adaptive_plan(rows, "TREND_UP")
+    explicit_none = build_adaptive_plan(rows, "TREND_UP", confidence=None)
+
+    assert explicit_none.as_dict() == historical.as_dict()
+    assert historical.as_dict()["allocation"] == {
+        "riskMultipliers": {"a": 1.0, "b": 0.5, "c": 1.0},
+        "evidenceAxis": ALLOCATION_AXIS_CURRENCY,
+    }
+
+
+def test_a_thin_positive_edge_cannot_outweigh_a_broad_one() -> None:
+    """El caso §25 del audit: A ``+2R/N=12`` no puede llevarse el peso pleno frente a B.
+
+    Sin confianza, A empata en el techo (1.0) con la muestra ancha; con confianza, su peso se
+    encoge por muestra efectiva y B —misma medición, historia amplia— pasa por delante.
+    """
+    rows = (
+        _row("c", decisive=True, expectancy="3"),
+        _row("a", decisive=True, expectancy="2"),
+        _row("b", decisive=True, expectancy="1"),
+    )
+    without = build_adaptive_plan(rows, "TREND_UP")
+    with_confidence = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(
+            _strategy_confidence("c", effective_n=180),
+            _strategy_confidence("a", effective_n=12),
+            _strategy_confidence("b", effective_n=180),
+        ),
+    )
+
+    assert without.risk_multiplier_for("a") == pytest.approx(1.0)
+    assert with_confidence.risk_multiplier_for("a") < 1.0, "el edge fino pierde el peso pleno"
+    assert with_confidence.risk_multiplier_for("b") >= with_confidence.risk_multiplier_for("a")
+    for version in ("a", "b", "c"):
+        assert 0.0 < with_confidence.risk_multiplier_for(version) <= 1.0
+
+
+def test_the_shrinkage_redistributes_and_never_empties_a_strategy() -> None:
+    """Encoger es redistribuir, no eliminar: ninguna activa queda con multiplicador 0."""
+    rows = (
+        _row("a", decisive=True, expectancy="10"),
+        _row("b", decisive=True, expectancy="1"),
+    )
+    plan = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(
+            _strategy_confidence("a", effective_n=1, confidence="LOW"),
+            _strategy_confidence("b", effective_n=500),
+        ),
+    )
+
+    assert plan.risk_multiplier_for("a") > 0.0
+    assert plan.risk_multiplier_for("b") > 0.0
+    assert plan.risk_multiplier_for("b") > build_adaptive_plan(rows, "TREND_UP").risk_multiplier_for("b")
+
+
+def test_a_severe_decay_gets_an_additional_declared_discount() -> None:
+    """``decay == SEVERE`` modula el reparto; NO pausa (la pausa sigue siendo de la rotación)."""
+    rows = (
+        _row("c", decisive=True, expectancy="4"),
+        _row("a", decisive=True, expectancy="2"),
+        _row("b", decisive=True, expectancy="1"),
+    )
+    healthy = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(
+            _strategy_confidence("c", effective_n=180),
+            _strategy_confidence("a", effective_n=180),
+            _strategy_confidence("b", effective_n=180),
+        ),
+    )
+    decaying = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(
+            _strategy_confidence("c", effective_n=180),
+            _strategy_confidence("a", effective_n=180, decay=ADAPTIVE_DECAY_SEVERE),
+            _strategy_confidence("b", effective_n=180),
+        ),
+    )
+
+    assert decaying.rotation == healthy.rotation, "el decay no crea un motivo de pausa nuevo"
+    assert decaying.risk_multiplier_for("a") < healthy.risk_multiplier_for("a")
+
+
+def test_a_strategy_without_a_decisive_edge_keeps_the_neutral_multiplier() -> None:
+    """La confianza fina solo actúa sobre un edge MEDIDO: el desconocido no se castiga."""
+    rows = (
+        _row("a", decisive=True, expectancy="2"),
+        _row("z", decisive=False),
+    )
+    plan = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(_strategy_confidence("a", effective_n=12, confidence="LOW")),
+    )
+
+    assert plan.risk_multiplier_for("z") == pytest.approx(1.0), "sin evidencia decisoria no hay castigo"
+
+
+def test_confidence_alone_never_moves_the_rotation() -> None:
+    rows = (
+        _row("a", decisive=True, expectancy="-2"),
+        _row("b", decisive=True, expectancy="3"),
+    )
+    without = build_adaptive_plan(rows, "TREND_UP")
+    with_confidence = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(
+            _strategy_confidence("a", effective_n=12),
+            _strategy_confidence("b", effective_n=180, decay=ADAPTIVE_DECAY_SEVERE),
+        ),
+    )
+
+    assert with_confidence.rotation.as_dict() == without.rotation.as_dict()
+
+
+def test_the_policy_carries_the_shrinkage_knobs() -> None:
+    """Los parámetros del encogimiento son POLÍTICA versionada, no constantes sueltas."""
+    policy = AdaptivePolicy()
+    assert policy.confidence_prior == ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT
+    assert policy.severe_decay_factor == ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT
+    # Un prior distinto cambia el reparto sin tocar la evidencia: es la política quien lo manda.
+    lazy = AdaptivePolicy(confidence_prior=0.0)
+    rows = (_row("a", decisive=True, expectancy="1"), _row("b", decisive=True, expectancy="1"))
+    reading = _reading(
+        _strategy_confidence("a", effective_n=5), _strategy_confidence("b", effective_n=500)
+    )
+    with_prior = build_adaptive_plan(rows, "TREND_UP", policy=policy, confidence=reading)
+    without_prior = build_adaptive_plan(rows, "TREND_UP", policy=lazy, confidence=reading)
+
+    assert with_prior.risk_multiplier_for("a") < without_prior.risk_multiplier_for("a")
+
+
+def test_health_carries_the_confidence_and_the_two_windows() -> None:
+    row = _row("orb-1", decisive=True, expectancy="3")
+    health = build_strategy_health(
+        (row,),
+        confidence=_reading(
+            _strategy_confidence(
+                "orb-1", effective_n=180, long_r=0.21, recent_r=-0.15, decay=ADAPTIVE_DECAY_SEVERE
+            )
+        ),
+    )[0]
+
+    assert health.confidence == "HIGH"
+    assert health.long_expectancy_r == pytest.approx(0.21)
+    assert health.recent_expectancy_r == pytest.approx(-0.15)
+    assert health.decay == ADAPTIVE_DECAY_SEVERE
+
+
+def test_without_a_confidence_reading_the_health_fields_are_declared_absent() -> None:
+    health = StrategyHealth.from_evaluation(_row("orb-1", decisive=True))
+
+    assert health.confidence is None
+    assert health.decay is None
+    assert health.long_expectancy_r is None and health.recent_expectancy_r is None
+
+
+def test_the_plan_evidence_publishes_the_confidence_axis() -> None:
+    """La confianza viaja en el payload durable DENTRO de la forma existente (sin migración)."""
+    rows = (_row("orb-1", decisive=True, expectancy="3"),)
+    plan = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(_strategy_confidence("orb-1", effective_n=12, long_r=0.4, recent_r=0.4)),
+    )
+    evidence = plan.evidence_for("orb-1")
+
+    assert evidence is not None
+    assert evidence["confidence"] == "HIGH"
+    assert evidence["longExpectancyR"] == pytest.approx(0.4)
+    assert evidence["recentExpectancyR"] == pytest.approx(0.4)
+    assert evidence["decay"] == ADAPTIVE_DECAY_NONE
+    assert plan.as_dict()["readOnly"] is True, "la confianza no toca la autoridad de ejecución"
+    assert set(evidence) >= {
+        "confidence",
+        "recentExpectancyR",
+        "longExpectancyR",
+        "decay",
+    }
+
+
+def test_the_plan_stays_reproducible_with_a_confidence_reading() -> None:
+    rows = (
+        _row("a", decisive=True, expectancy="3"),
+        _row("b", decisive=True, expectancy="1"),
+    )
+    reading = _reading(
+        _strategy_confidence("a", effective_n=12), _strategy_confidence("b", effective_n=180)
+    )
+    first = build_adaptive_plan(rows, "HIGH_VOL", confidence=reading)
+    second = build_adaptive_plan(tuple(reversed(rows)), "HIGH_VOL", confidence=reading)
+
+    assert first.as_dict() == second.as_dict()

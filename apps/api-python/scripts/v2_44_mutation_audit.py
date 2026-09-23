@@ -139,6 +139,33 @@ AUTO-11 (estado Adaptive durable: cooldown reconstruido del journal) añade:
 * **M59 (flag OFF ignorado)** — si con Adaptive apagado el arranque paga la lectura igual, el
   flag deja de ser una frontera de comportamiento.
 
+AUTO-12 (confianza estadística: muestra efectiva, ventanas, decay y encogimiento) añade:
+
+* **M60 (muestra bruta por medida)** — si ``effective_n`` cuenta los ciclos sin R, una celda de
+  40 ciclos con 4 medidos declara una muestra que no sostiene su número.
+* **M61 (deterioro severo rebajado)** — si la ventana reciente en negativo deja de declararse
+  ``SEVERE``, la estrategia que ha dejado de funcionar vuelve a leerse como sana.
+* **M62 (techo sin poner)** — si ``decay = UNKNOWN`` deja de poner techo a la confianza, una
+  muestra que no se pudo leer se premia como una que sí.
+* **M63 (fila sin instante silenciada)** — si las filas sin instante legible dejan de declararse,
+  la ventana reciente se calcula sobre un orden que nadie probó.
+* **M64 (medición compuesta disuelta)** — si la completitud se declara ``COMPLETE`` sin combinar
+  R, R neto y PnL, un cubo no medido pasa por medido.
+* **M65 (cobertura fingida)** — si la cobertura de coste se afirma sobre la muestra bruta, se
+  declara cubierto lo que no se midió.
+* **M66 (orden por llegada)** — si las ventanas se recortan en el orden de ENTRADA en vez de por
+  instante, la ventana reciente es la que el llamante puso la última.
+* **M67 (recencia inventada)** — si sin instantes legibles se construye igualmente la ventana
+  reciente, se finge una cronología que no existe.
+* **M68 (encogimiento neutralizado)** — si el prior del encogimiento cae a ``0``, el reparto
+  vuelve a pesar igual una muestra de 12 que una de 180 (*winner chasing*).
+* **M69 (descuento por deterioro neutralizado)** — si el factor de ``decay SEVERE`` deja de
+  aplicarse, el deterioro se declara pero el reparto lo ignora.
+* **M70 (cierre por el primer fill)** — si el instante de cierre toma el PRIMER fill del ciclo,
+  la ventana reciente se ordena con la fecha de entrada y no con la del resultado.
+* **M71 (confianza no cableada)** — si el worker construye la confianza y no la pasa al plan, el
+  cálculo se paga y el reparto publica el histórico.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -186,6 +213,9 @@ ENTRY = "packages/py/application/src/bolsa_application/auto_v2_entry.py"
 EXPECTED_VALUE = "packages/py/analytics/src/bolsa_analytics/cognitive/expected_value.py"
 AUTO_SELF_EVAL = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_self_evaluation.py"
 AUTO_ADAPTIVE = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py"
+AUTO_ADAPTIVE_CONFIDENCE = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_confidence.py"
+)
 CYCLE_RISK = "packages/py/application/src/bolsa_application/cycle_risk.py"
 FEED = "packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py"
 AUTO_CYCLE_JOURNAL = "packages/py/application/src/bolsa_application/auto_cycle_journal.py"
@@ -207,6 +237,9 @@ T_SELF = (
     "packages/py/application/tests/test_auto_self_evaluation_feed.py",
 )
 T_ADAPTIVE = "packages/py/analytics/tests/test_auto_adaptive.py"
+T_CONFIDENCE = "packages/py/analytics/tests/test_auto_adaptive_confidence.py"
+T_FEED = "packages/py/application/tests/test_auto_self_evaluation_feed.py"
+T_CONFIDENCE_SEAM = "apps/api-python/tests/test_auto_v53_auto12_confidence_seam.py"
 T_ADAPTIVE_ENTRY = "packages/py/application/tests/test_auto_adaptive_entry.py"
 T_CYCLE_RISK = "packages/py/application/tests/test_cycle_risk.py"
 T_CYCLE_RISK_SEAM = "apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py"
@@ -475,10 +508,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M33 (worker sin denominador): el camino Adaptive deja de leer el riesgo por ciclo",
         WORKER,
-        "        report = build_auto_self_evaluation(\n"
-        "            fills=fills, cycle_risk=await self._v2_cycle_risk(fills)\n"
-        "        )\n",
-        "        report = build_auto_self_evaluation(\n            fills=fills\n        )\n",
+        # AUTO-12: el riesgo por ciclo se mide UNA sola vez en una local (la leen el informe y la
+        # confianza). La sonda apunta a esa local en vez de a la llamada inline, que ya no existe.
+        "        cycle_risk = await self._v2_cycle_risk(fills)\n",
+        "        cycle_risk = None\n",
         (T_CYCLE_RISK_SEAM,),
     ),
     (
@@ -688,6 +721,99 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        if not self._v2_tunables.adaptive_enabled:\n            return\n",
         "        if False:\n            return\n",
         (T_ADAPTIVE_SEAM,),
+    ),
+    (
+        "M60 (muestra bruta por medida): effective_n cuenta los ciclos sin R",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    sample_size = sum(cell.cycles for cell in cells)\n"
+        "    effective_n = sum(cell.cycles - cell.cycles_without_risk for cell in cells)\n",
+        "    sample_size = sum(cell.cycles for cell in cells)\n"
+        "    effective_n = sum(cell.cycles for cell in cells)\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M61 (deterioro severo rebajado): la ventana reciente en negativo deja de ser SEVERE",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    if recent_r < 0:\n        return ADAPTIVE_DECAY_SEVERE\n",
+        "    if False:\n        return ADAPTIVE_DECAY_SEVERE\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M62 (techo sin poner): decay UNKNOWN deja de limitar la confianza",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    if decay == ADAPTIVE_DECAY_UNKNOWN:\n"
+        "        level = _ceiling(level, ADAPTIVE_CONFIDENCE_MEDIUM)\n",
+        "    if False:\n        level = _ceiling(level, ADAPTIVE_CONFIDENCE_MEDIUM)\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M63 (fila sin instante silenciada): el orden sin fecha legible deja de declararse",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "        if undated:\n"
+        "            # Hay filas sin instante: van al final y la ventana reciente puede contenerlas.\n",
+        "        if False:\n"
+        "            # Hay filas sin instante: van al final y la ventana reciente puede contenerlas.\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M64 (medicion compuesta disuelta): la completitud se declara COMPLETE sin combinar",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    completeness = combine_measurements(\n"
+        "        row.risk_measurement,\n"
+        "        row.net_r_measurement,\n"
+        "        row.results_measurement,\n"
+        "    )\n",
+        "    completeness = MEASUREMENT_COMPLETE\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M65 (cobertura fingida): la cobertura de coste se afirma sobre la muestra bruta",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "        cost_coverage=_coverage(long_facts.cost_n, sample_size),\n",
+        "        cost_coverage=_coverage(sample_size, sample_size),\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M66 (orden por llegada): las ventanas se recortan en el orden de ENTRADA",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    dated.sort(key=lambda item: (item[0], item[1], item[2]))\n",
+        "    dated.sort(key=lambda item: item[2])\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M67 (recencia inventada): sin instantes legibles se construye la ventana reciente",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    if undated >= len(ordered):\n",
+        "    if False:\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M68 (encogimiento neutralizado): el prior del encogimiento cae a 0",
+        AUTO_ADAPTIVE,
+        "        prior = max(0.0, float(resolved.confidence_prior))\n",
+        "        prior = 0.0\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M69 (descuento neutralizado): el factor de decay SEVERE deja de aplicarse",
+        AUTO_ADAPTIVE,
+        "        shrink *= max(0.0, float(policy.severe_decay_factor))\n",
+        "        shrink *= 1.0\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M70 (cierre por el primer fill): el instante de cierre toma el PRIMER fill del ciclo",
+        FEED,
+        "    return max(instants).isoformat()\n",
+        "    return min(instants).isoformat()\n",
+        (T_FEED,),
+    ),
+    (
+        "M71 (confianza no cableada): el worker la construye y no la pasa al plan",
+        WORKER,
+        "            confidence=confidence,\n",
+        "            confidence=None,\n",
+        (T_CONFIDENCE_SEAM,),
     ),
 ]
 

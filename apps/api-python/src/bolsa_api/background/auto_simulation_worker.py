@@ -158,7 +158,10 @@ from bolsa_application.auto_reason_codes import (
     TIME_EXIT,
     day_exit_reason,
 )
-from bolsa_application.auto_self_evaluation_feed import build_auto_self_evaluation
+from bolsa_application.auto_self_evaluation_feed import (
+    build_adaptive_confidence_from_fills,
+    build_auto_self_evaluation,
+)
 from bolsa_application.auto_v2_entry import (
     AtrSource,
     CatalogTradeContextSource,
@@ -3011,6 +3014,11 @@ class AutoSimulationWorker:
         rota ni se asigna: el módulo puro la declara ``unknown``). Ante un fallo de
         lectura devuelve ``None`` (fail-closed): sin salud medible no se rota ni se
         estrecha nada — nunca se pausa a ciegas.
+
+        **AUTO-12.** Con el mismo material se construye la lectura de CONFIANZA estadística
+        (``build_adaptive_confidence_from_fills``) y se pasa al plan: el reparto encoge el peso
+        de un edge medido sobre pocos ciclos en vez de tratarlo como una base de 180. Es pura
+        (sin I/O nuevo); sin material la confianza queda vacía y el plan es el histórico.
         """
         adaptive_versions = {v for v in versions if v and v != "unversioned"}
         if not adaptive_versions or self._context_store is None:
@@ -3026,9 +3034,16 @@ class AutoSimulationWorker:
             except Exception:  # noqa: BLE001 — sin lectura no hay salud; no se inventa.
                 logger.exception("auto_sim v2 adaptive fill read failed version=%s", version)
                 return None
-        report = build_auto_self_evaluation(
-            fills=fills, cycle_risk=await self._v2_cycle_risk(fills)
-        )
+        # El riesgo por ciclo se mide UNA vez y alimenta las dos lecturas (informe y confianza):
+        # dos llamadas podrían divergir en silencio si la fuente se moviera entre ambas.
+        cycle_risk = await self._v2_cycle_risk(fills)
+        report = build_auto_self_evaluation(fills=fills, cycle_risk=cycle_risk)
+        confidence = build_adaptive_confidence_from_fills(fills=fills, cycle_risk=cycle_risk)
+        if confidence.by_strategy and not confidence.recent_available:
+            # Hueco DECLARADO (no hay instantes legibles): la ventana reciente no se inventa.
+            logger.warning(
+                "auto_sim v2 adaptive confidence gaps %s", confidence.as_dict()["notes"]
+            )
         # V2.49/AUTO-8.1 — política versionada + estado de pausa previo (hysteresis y cooldown).
         # AUTO-11: el estado ya NO nace vacío en cada proceso — ``_v2_recover_adaptive_state`` lo
         # reconstruyó del journal durable en el arranque y ``_v2_next_paused_cycles`` lo encadena
@@ -3042,6 +3057,7 @@ class AutoSimulationWorker:
             policy=policy,
             paused_cycles=self._v2_adaptive_paused_cycles,
             by_regime=report.by_regime,
+            confidence=confidence,
         )
         self._v2_adaptive_paused_cycles = self._v2_next_paused_cycles(plan)
         return plan

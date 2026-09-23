@@ -94,6 +94,12 @@ class SimFillFinanceContext:
     # V2.47 — ciclo financiero (señal→…→PnL) al que pertenece el fill. ``None`` cuando no
     # se conoce (filas previas a 2.47 / fill sin decisión AUTO) — desconocido ≠ fabricado.
     cycle_id: str | None = None
+    # V2.53 / AUTO-12 — instante durable del fill (la columna ``created_at`` de la tabla,
+    # que YA existía: sin migración). Lo necesita la ventana RECIENTE del Adaptive para
+    # ordenar por instante real y no por posición de lista. ``None`` en los dobles
+    # herméticos que no conocen fechas: la ausencia se DECLARA (``recent_unavailable``),
+    # nunca se finge cronología.
+    created_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not self.execution_id:
@@ -412,6 +418,7 @@ class PostgresSimFillFinanceContextStore:
             idempotency_key=row.idempotency_key,
             strategy_version_id=row.strategy_version_id,
             cycle_id=getattr(row, "cycle_id", None),
+            created_at=getattr(row, "created_at", None),
         )
 
     async def get_many(
@@ -450,6 +457,7 @@ class PostgresSimFillFinanceContextStore:
                 idempotency_key=row.idempotency_key,
                 strategy_version_id=row.strategy_version_id,
                 cycle_id=getattr(row, "cycle_id", None),
+                created_at=getattr(row, "created_at", None),
             )
             for row in rows
         }
@@ -496,6 +504,7 @@ class PostgresSimFillFinanceContextStore:
                 idempotency_key=row.idempotency_key,
                 strategy_version_id=row.strategy_version_id,
                 cycle_id=getattr(row, "cycle_id", None),
+                created_at=getattr(row, "created_at", None),
             )
             for row in rows
         ]
