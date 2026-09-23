@@ -456,8 +456,8 @@ GitHub **no** crea el evento de tag) → CI del tag → **este commit de sellado
   Los otros cuatro workflows del tag (`Python CI`
   [`35857893065`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857893065), `Frontend CI`,
   `Fase 2 scientific`, `Optimize lab`) **GREEN**.
-- **`check-runs` del commit sellado (`54a3b86a`):** **`38 success` + `1 skipped`** (el `+12` respecto a
-  los `27 success` de `v2.53` son las refs de `main` y del tag de la fase).
+- **`check-runs` del commit sellado (`54a3b86a`):** **`38 success` + `1 skipped`** (frente a los
+  `27 success` + `1 skipped` del commit del tag de `v2.53`).
 - **`Python CI` de `main`** [`35857846836`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35857846836)
   **GREEN**: `quality` **`2557 passed / 38 skipped`** y los cuatro jobs PG (`auto-v2-durable-pg`,
   `paper-forward-pg`, `lifecycle-pg`, `grammar-discovery-pg`) en verde; **`Gitleaks` de `main`**
