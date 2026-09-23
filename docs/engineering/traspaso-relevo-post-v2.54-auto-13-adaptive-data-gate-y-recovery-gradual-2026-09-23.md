@@ -5,7 +5,9 @@ anterior:** `V2.53` / `AUTO-12` (sellada: tag `v2.53-beta` → `a6655e6e`, `Rele
 `35836248169` **GREEN**, `1.78.0-beta`).
 **Documentos de la fase:**
 [plan](./plan-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) (ratificado) ·
-[audit-pack](./audit-pack-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) · este
+[audit-pack](./audit-pack-v2-54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) ·
+[arranque del auditor](./arranque-auditor-v2.54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md) ·
+[arranque del agente siguiente](./arranque-agente-post-v2.54-auto-13-2026-09-23.md) · este
 relevo.
 **Estado:** **fase CERRADA** — Pasos 1–6 hechos y verificados, tag **`v2.54-beta`** → **`54a3b86a`** con su CI (cifras
 medidas en §7). **El runtime sigue siendo el de `v2.53-beta`** con el flag Adaptive **OFF**: el Data
@@ -509,6 +511,12 @@ GitHub **no** crea el evento de tag) → CI del tag → **este commit de sellado
    rampa ya existen y **no se ven**).
 5. **El flag Adaptive sigue OFF por defecto**: el Data Gate y la rampa **no se ejecutan** en producción
    hasta un flag explícito. El runtime publicado es, en comportamiento, el de `v2.53-beta`.
-6. **Si hay que auditar la fase**: el §10 del audit-pack lista los límites declarados (lo que la fase
-   **no** afirma) y el §5 de este relevo, el método de verificación del repo (compuertas, delta
-   simétrico fichero a fichero y matriz de mutaciones **completa** sin etiquetas en `NADA`).
+6. **Si hay que auditar la fase**: el [arranque del auditor](./arranque-auditor-v2.54-auto-13-adaptive-data-gate-y-recovery-gradual-2026-09-23.md)
+   ordena el ataque por coste/beneficio con las `ruta:línea` re-medidas y los comandos exactos; el §10 del
+   audit-pack lista los límites declarados (lo que la fase **no** afirma) y el §5 de este relevo, el método
+   de verificación del repo (compuertas, delta simétrico fichero a fichero y matriz de mutaciones
+   **completa** sin etiquetas en `NADA`).
+7. **El agente siguiente arranca por** [`arranque-agente-post-v2.54-auto-13-2026-09-23.md`](./arranque-agente-post-v2.54-auto-13-2026-09-23.md):
+   trae el **prompt listo para pegar**, el estado en una tabla, el mapa de anclas, el método, el freeze y
+   las trampas del entorno. Exige **proponer el alcance de `AUTO-14` y esperar ratificación** antes de
+   escribir código.
