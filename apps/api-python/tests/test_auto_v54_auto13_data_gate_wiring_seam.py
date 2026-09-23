@@ -238,6 +238,7 @@ async def test_with_a_healthy_gate_the_plan_arguments_are_the_historical_ones(
 
     assert plan is not None
     assert captured[0]["confidence"] is not None, "OK no puede apagar la confianza de AUTO-12"
+    assert captured[0]["shrink"] is True, "OK reparte con la evidencia fina"
     assert captured[0]["paused_cycles"] == {"orb-1": 5}, "las pausas entran sin recortar"
     assert _health_of(plan, "orb-1").confidence is not None
 
@@ -293,12 +294,20 @@ async def test_degraded_stops_using_the_confidence_but_keeps_the_protection(
     )
 
     assert healthy is not None and degraded is not None
-    # OK: la confianza viaja como evidencia.
+    # OK: la confianza viaja como evidencia y el reparto la USA.
     assert _health_of(healthy, "thin").confidence is not None
-    # DEGRADED: no se reparte con ella (``confidence=None`` entrante) y no se publica.
-    assert captured[0]["confidence"] is None
-    assert all(row.confidence is None for row in degraded.health)
-    # …pero la PROTECCIÓN no se toca: la versión probadamente negativa sigue pausada.
+    assert healthy.shrinkage is True
+    # DEGRADED: deja de repartir con ella (``shrink=False``)…
+    assert captured[0]["shrink"] is False
+    assert degraded.shrinkage is False
+    assert degraded.as_dict()["shrinkage"] is False
+    # …pero la banda MEDIDA sigue publicándose: esconderla sería mezclar los ejes (§29), y el
+    # estado legal del audit (``ACTIVE`` + datos ``DEGRADED`` + calidad ``LOW``) tiene que poder
+    # leerse entero. Lo que el gate retira es el USO, no el hecho medido.
+    assert _health_of(degraded, "thin").confidence is not None
+    # …y sin encogimiento el reparto cae a su eje histórico: la fina deja de estar recortada.
+    assert degraded.risk_multiplier_for("thin") > healthy.risk_multiplier_for("thin")
+    # …y la PROTECCIÓN no se toca: la versión probadamente negativa sigue pausada.
     assert healthy.rotation.is_paused("bad") and degraded.rotation.is_paused("bad")
     assert degraded.rotation.reason_for("bad") == ADAPTIVE_STRATEGY_UNHEALTHY
 

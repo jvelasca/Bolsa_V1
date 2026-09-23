@@ -800,6 +800,39 @@ def test_without_confidence_the_allocation_is_byte_identical_to_the_historical_o
     }
 
 
+def test_the_shrinkage_can_be_switched_off_without_hiding_the_measured_band() -> None:
+    """§29: **medir** la confianza y **usarla para repartir** son dos cosas distintas.
+
+    Con ``shrink=False`` (el efecto ``LIMITS``/``FREEZES`` del gate) el reparto cae a su eje
+    histórico —no se estrecha por evidencia fina que no es de fiar— pero la banda MEDIDA sigue
+    publicándose en la evidencia. Ocultarla sería mezclar los ejes: ``shrinkage=False`` con
+    ``health.confidence = LOW`` es el estado legal ``ACTIVE`` + datos ``DEGRADED`` + calidad ``LOW``
+    del audit, y tiene que poder leerse entero.
+    """
+    rows = (
+        _row("a", decisive=True, expectancy="2"),
+        _row("b", decisive=True, expectancy="1"),
+    )
+    reading = _reading(
+        _strategy_confidence("a", effective_n=12, confidence="LOW"),
+        _strategy_confidence("b", effective_n=180, confidence="HIGH"),
+    )
+
+    shrunk = build_adaptive_plan(rows, "TREND_UP", confidence=reading)
+    plain = build_adaptive_plan(rows, "TREND_UP", confidence=reading, shrink=False)
+    historical = build_adaptive_plan(rows, "TREND_UP")
+
+    assert shrunk.shrinkage is True
+    assert plain.shrinkage is False
+    assert plain.as_dict()["shrinkage"] is False
+    assert plain.allocation.as_dict() == historical.allocation.as_dict(), (
+        "sin encogimiento el reparto es el histórico, aunque la banda esté medida"
+    )
+    assert shrunk.risk_multiplier_for("a") < plain.risk_multiplier_for("a")
+    assert plain.health_for("a").confidence == "LOW", "el hecho medido no se apaga con el uso"
+    assert plain.evidence_for("a")["confidence"] == "LOW"
+
+
 def test_a_thin_positive_edge_cannot_outweigh_a_broad_one() -> None:
     """El caso §25 del audit: A ``+2R/N=12`` no puede llevarse el peso pleno frente a B.
 
@@ -1169,3 +1202,82 @@ def test_the_ramp_is_reproducible_regardless_of_row_order() -> None:
     second = build_adaptive_plan(tuple(reversed(rows)), "TREND_UP", recovery=evidence)
 
     assert first.as_dict() == second.as_dict()
+
+
+# ── AUTO-13 (§20): el hueco del cruce se declara y NUNCA se vuelve adverso ──────────
+
+
+def test_the_health_row_keeps_the_undetermined_regime_with_its_reason() -> None:
+    """El par ``(régimen, motivo)`` no se separa: un ``UNKNOWN`` legítimo lo dice."""
+    row = _row("orb-1", decisive=True)
+
+    determined = StrategyHealth.from_evaluation(row, regime_cells=_cells("orb-1", "trend_up"))
+    assert determined.regime == "trend_up"
+    assert determined.regime_undetermined is False
+
+    # Dos regímenes decisivos: no se elige uno a dedo y el hueco se DECLARA.
+    two = StrategyHealth.from_evaluation(
+        row,
+        regime_cells=(*_cells("orb-1", "trend_up"), *_cells("orb-1", "range")),
+    )
+    assert two.regime == ADAPTIVE_REGIME_UNKNOWN
+    assert two.regime_undetermined is True
+
+    # Sin celdas tampoco hay régimen: mismo motivo declarado, nunca un régimen implícito.
+    empty = StrategyHealth.from_evaluation(row)
+    assert empty.regime == ADAPTIVE_REGIME_UNKNOWN
+    assert empty.regime_undetermined is True
+
+
+def test_an_undetermined_cross_regime_falls_back_to_the_global_evidence() -> None:
+    """§20: sin régimen del cruce manda la fila GLOBAL — pausa por salud, nunca por régimen."""
+    thin = _row("thin", win_rate=0.1, trades=3)
+    bad = _row("bad", decisive=True, expectancy="-1", trades=20)
+    undetermined = (*_cells("thin", "trend_up"), *_cells("thin", "range"))
+
+    plan = recommend_rotation((thin, bad), "TREND_UP", by_regime=undetermined)
+
+    assert plan.is_paused("bad"), "la evidencia global sí pausa una estrategia probadamente mala"
+    assert plan.reason_for("bad") == ADAPTIVE_STRATEGY_UNHEALTHY
+    assert not plan.is_paused("thin"), "sin cruce determinado no se pausa por régimen"
+    assert plan.reason_for("thin") is None
+
+
+def test_a_regime_that_could_not_be_read_never_arms_the_adverse_branch() -> None:
+    """§20: ``None``/``UNKNOWN`` ⇒ nunca adverso. La rama adversa solo se arma con un régimen REAL."""
+    thin = _row("thin", win_rate=0.1, trades=3)
+
+    for unreadable in (None, "", "UNKNOWN", "RISK_OFF"):
+        plan = recommend_rotation((thin,), unreadable)
+        assert not plan.is_paused("thin"), f"{unreadable!r} no es un régimen adverso"
+        assert plan.reason_for("thin") is None
+
+    # Control: con el régimen adverso de verdad (y la muestra fina) la rama SÍ se arma.
+    adverse = recommend_rotation((thin,), "TREND_DOWN")
+    assert adverse.reason_for("thin") == ADAPTIVE_STRATEGY_REGIME_RISK
+
+
+def test_the_plan_publishes_the_undetermined_regimes_in_their_own_field() -> None:
+    """La declaración viaja en el plan, con campo propio y ordenada (no es un régimen)."""
+    rows = (_row("orb-1", decisive=True), _row("orb-2", decisive=True))
+    plan = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        by_regime=(*_cells("orb-1", "trend_up"), *_cells("orb-2", "trend_up"), *_cells("orb-2", "range")),
+    )
+
+    payload = plan.as_dict()
+
+    assert payload["regimeUndetermined"] == ["orb-2"]
+    assert payload["regime"] == "TREND_UP", "el régimen del tick es otra cosa y va en su campo"
+    assert plan.health_for("orb-1").regime == "trend_up"
+
+
+def test_without_a_regime_gap_the_declaration_is_empty_and_the_plan_is_unchanged() -> None:
+    """Sin hueco no hay nada que declarar: el campo viaja vacío, no se inventa."""
+    plan = build_adaptive_plan(
+        (_row("orb-1", decisive=True),), "TREND_UP", by_regime=_cells("orb-1", "trend_up")
+    )
+
+    assert plan.regime_undetermined == ()
+    assert plan.as_dict()["regimeUndetermined"] == []

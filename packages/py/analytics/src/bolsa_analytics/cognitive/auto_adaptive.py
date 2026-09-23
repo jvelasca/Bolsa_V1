@@ -314,6 +314,13 @@ class StrategyHealth:
     # exactamente una celda decisiva con régimen. Con dos regímenes decisivos —o con solo
     # el cubo ``UNKNOWN``— queda ``UNKNOWN``: nunca uno elegido a dedo.
     regime: str = ADAPTIVE_REGIME_UNKNOWN
+    # AUTO-13 (§20) — el MOTIVO por el que ``regime`` no se pudo determinar (``regime_undetermined``)
+    # viaja CON la fila, no se pierde en el cruce: el par ``(regime, motivo)`` que publica
+    # ``declared_regime`` se conserva entero. Sin él, un ``UNKNOWN`` legítimo (el cruce no tiene una
+    # celda decisiva) sería indistinguible de un régimen mal medido. La rotación NO usa el cruce
+    # cuando no está determinado: decide con la evidencia **global** de la estrategia (esta fila), y
+    # eso es exactamente lo que este campo permite declarar.
+    regime_undetermined: bool = False
     # AUTO-12 — confianza estadística de la evidencia (``auto_adaptive_confidence``). ``None``
     # cuando el llamante no aportó la lectura: la AUSENCIA se declara, nunca se disfraza de
     # confianza alta. La banda es evidencia publicada; el encogimiento del reparto vive en
@@ -337,7 +344,7 @@ class StrategyHealth:
         lo sabe. Sin celdas (o con el régimen no determinado) queda ``UNKNOWN``. La confianza
         (AUTO-12) se adjunta por ``strategyVersion``; sin ella los campos quedan ``None``.
         """
-        regime, _undetermined = declared_regime(regime_cells, row.strategy_version)
+        regime, undetermined = declared_regime(regime_cells, row.strategy_version)
         return cls(
             strategy_version=row.strategy_version,
             trades=row.trades,
@@ -349,6 +356,8 @@ class StrategyHealth:
             net_expectancy_r=row.net_expectancy_r,
             net_r_measurement=row.net_r_measurement,
             regime=regime or ADAPTIVE_REGIME_UNKNOWN,
+            # AUTO-13 (§20): el motivo del hueco se conserva junto al régimen (el par completo).
+            regime_undetermined=undetermined is not None,
             confidence=confidence.confidence if confidence is not None else None,
             recent_expectancy_r=(
                 confidence.recent_expectancy_r if confidence is not None else None
@@ -566,6 +575,17 @@ class AdaptivePlan:
     #: cuando el llamante no aportó evidencia de recuperación: entonces no hay rampa (§24) y el
     #: plan es el histórico.
     recovery: Mapping[str, RecoveryReading] = field(default_factory=dict)
+    #: AUTO-13 (§20) — versiones cuyo régimen del cruce **no se pudo determinar**. Con el cruce
+    #: indeterminado la rotación por régimen NO aplica y decide la evidencia **global** (la fila de
+    #: la estrategia); esta tupla es la DECLARACIÓN de ese hueco, con campo propio para que nadie
+    #: la lea como un régimen ni se mezcle con el eje operativo o el de datos.
+    regime_undetermined: tuple[str, ...] = ()
+    #: AUTO-13 (§29) — si el reparto USÓ la confianza estadística. ``False`` cuando el gate limitó la
+    #: adaptación (``DEGRADED``/``STALE``): el encogimiento por evidencia fina queda desactivado. Es
+    #: un eje propio y **no** se mezcla con la calidad MEDIDA: ``shrinkage=False`` con
+    #: ``health.confidence = LOW`` es un estado legal y perfectamente legible
+    #: (``ACTIVE`` + datos ``DEGRADED`` + calidad ``LOW``, el ejemplo del §29).
+    shrinkage: bool = True
 
     def is_paused(self, strategy_version: str) -> bool:
         return self.rotation.is_paused(strategy_version)
@@ -632,6 +652,12 @@ class AdaptivePlan:
                 version: reading.as_dict()
                 for version, reading in sorted(self.recovery.items())
             },
+            # §20: el hueco del cruce se publica con campo PROPIO (no se mezcla con el régimen del
+            # tick, ni con el estado operativo, ni con el estado de datos del gate).
+            "regimeUndetermined": list(self.regime_undetermined),
+            # §29: si el reparto PUDO usar la confianza fina. Campo propio: la calidad medida sigue
+            # en ``healthByStrategy[version].confidence`` aunque el encogimiento esté desactivado.
+            "shrinkage": self.shrinkage,
         }
 
 
@@ -896,6 +922,7 @@ def build_adaptive_plan(
     by_regime: Sequence[StrategyRegimeEvaluation] = (),
     confidence: AdaptiveConfidence | None = None,
     recovery: Mapping[str, RecoveryEvidence] | None = None,
+    shrink: bool = True,
 ) -> AdaptivePlan:
     """(PURA) plan Adaptive completo: rotación + asignación sobre las mismas filas.
 
@@ -903,6 +930,12 @@ def build_adaptive_plan(
     ``RANGE``/``HIGH_VOL``/``LOW_VOL``/``UNKNOWN``), no el eje operativo. ``confidence``
     (AUTO-12) es OPCIONAL: sin ella el plan es byte-idéntico al histórico y la rotación no
     cambia (la confianza solo modula el reparto, nunca quién compite).
+
+    ``shrink`` (AUTO-13 §29) separa **medir** la confianza de **usarla para repartir**: con
+    ``shrink=False`` (el efecto ``LIMITS``/``FREEZES`` del gate) el reparto cae a su eje histórico
+    —no se estrecha por evidencia fina que no es de fiar— pero la banda MEDIDA sigue publicándose
+    en la evidencia. Ocultarla sería mezclar los ejes: la calidad estadística es un hecho medido,
+    no un permiso de uso.
 
     ``recovery`` (AUTO-13) es OPCIONAL y **declarado**: solo debe traer las versiones que
     vuelven de una pausa cumplida (§24). Sin él no hay rampa y el plan es el histórico — la
@@ -947,15 +980,26 @@ def build_adaptive_plan(
         active_versions,
         by_strategy,
         policy=resolved,
-        confidence=confidence,
+        # §29: la confianza se ENCUENTRA medida, pero solo se usa para repartir si el llamante lo
+        # permite (``shrink``). Lo que el gate retira es el uso, nunca el hecho medido.
+        confidence=confidence if shrink else None,
         recovery=readings or None,
     )
+    health = build_strategy_health(by_strategy, by_regime=cells, confidence=confidence)
     return AdaptivePlan(
         rotation=rotation,
         allocation=allocation,
         regime=regime,
         policy_version=resolved.policy_version,
-        health=build_strategy_health(by_strategy, by_regime=cells, confidence=confidence),
+        health=health,
         operational_states=operational,
         recovery=readings,
+        shrinkage=shrink,
+        # §20: quién NO tiene régimen de cruce determinado. Se DERIVA de la salud —el par
+        # ``(regime, motivo)`` se conserva en ``StrategyHealth``— en vez de recalcular el cruce
+        # aquí: un segundo cálculo podría divergir del que usó la rotación. Ordenada por versión:
+        # la reproducibilidad del plan no puede depender del orden de entrada de las filas.
+        regime_undetermined=tuple(
+            sorted(row.strategy_version for row in health if row.regime_undetermined)
+        ),
     )

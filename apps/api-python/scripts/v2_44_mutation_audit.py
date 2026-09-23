@@ -184,8 +184,10 @@ AUTO-13 (Adaptive Data Gate: salud de la EVIDENCIA separada de la salud de la es
   plan, el único caso en que no se debe adaptar vuelve a adaptar.
 * **M79 (``STALE`` reactivando)** — si una pausa viva levanta su cooldown con la evidencia ilegible,
   la reactivación se decide justo contra el dato que no se pudo leer.
-* **M80 (``DEGRADED`` repartiendo con la confianza)** — si el gate limita y el plan recibe igual la
-  confianza, se estrecha por la evidencia fina que el gate acababa de declarar no fiable.
+* **M80 (``DEGRADED`` repartiendo con la confianza)** — si el gate limita y el plan encoge igual
+  con la confianza, se estrecha por la evidencia fina que el gate acababa de declarar no fiable.
+  El lever es ``shrink``: **medir** la banda y **usarla para repartir** son dos cosas distintas
+  (§29), así que apagar el encogimiento no puede apagar la publicación de la banda medida.
 * **M81 (régimen siempre disponible)** — si ``regime_available`` deja de declarar el hueco de
   régimen, el §20 se mide pero nunca limita.
 * **M82 (completitud por el eje opcional)** — si la completitud del gate se compone con el net-R
@@ -218,6 +220,27 @@ AUTO-13 paso 4 (``RECOVERING`` y la rampa de reincorporación, §23/§24) añade
 * **M93 (transición no fechada en el tick)** — si la pausa → activa observada por el proceso no se
   fecha, la versión corre un tick con peso pleno antes de que la rampa entre en el siguiente: el
   salto que §24 prohíbe se cuela por la mitad que no sobrevive al reinicio (la del proceso vivo).
+
+AUTO-13 paso 5 (el fallback del §20 y los tres ejes separados, §29) añade:
+
+* **M94 (régimen ilegible tratado como adverso)** — si un régimen que **no se pudo leer**
+  (``None``/``""``/``UNKNOWN``/``RISK_OFF``) armase la rama adversa de la rotación, una estrategia
+  de muestra fina se pausaría por un mercado que nadie midió: exactamente lo que el §20 prohíbe
+  («nunca asumir ``RANGE``… ni el último régimen conocido»). El control del test es el régimen
+  adverso REAL, que sí debe armarla.
+* **M95 (el motivo del hueco del cruce se pierde)** — si ``StrategyHealth`` deja de conservar el
+  par ``(régimen, motivo)`` que publica ``declared_regime``, un ``UNKNOWN`` legítimo se vuelve
+  indistinguible de un régimen mal medido y el hueco deja de declararse.
+* **M96 (el hueco no viaja al plan)** — si el plan no publica las versiones con el cruce
+  indeterminado, la rotación sigue cayendo a la evidencia global pero NADIE lo declara: el
+  fallback del §20 se vuelve invisible en la evidencia del tick.
+* **M97 (el fallback no se declara)** — si el tick deja de publicar ``regimeUndetermined`` con su
+  salida declarada (``strategy_evidence``), el operador no puede distinguir "no había régimen" de
+  "se usó el régimen global porque el cruce no estaba determinado".
+* **M98 (el encogimiento no se puede apagar)** — si ``build_adaptive_plan`` ignorase su parámetro
+  ``shrink``, el reparto se estrecharía por evidencia fina aunque el gate hubiese retirado el uso
+  de la confianza (``DEGRADED``/``STALE``): **medir** y **usar** volverían a ser el mismo eje y el
+  estado legal ``ACTIVE`` + datos ``DEGRADED`` + calidad ``LOW`` del §29 dejaría de existir.
 
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
@@ -300,6 +323,7 @@ T_DATA_GATE = "packages/py/analytics/tests/test_auto_adaptive_data_gate.py"
 T_DATA_GATE_SEAM = "apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py"
 T_DATA_GATE_WIRE = "apps/api-python/tests/test_auto_v54_auto13_data_gate_wiring_seam.py"
 T_RECOVERY_SEAM = "apps/api-python/tests/test_auto_v54_auto13_recovery_seam.py"
+T_FALLBACK_SEAM = "apps/api-python/tests/test_auto_v54_auto13_regime_fallback_seam.py"
 T_ADAPTIVE_ENTRY = "packages/py/application/tests/test_auto_adaptive_entry.py"
 T_CYCLE_RISK = "packages/py/application/tests/test_cycle_risk.py"
 T_CYCLE_RISK_SEAM = "apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py"
@@ -484,8 +508,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M21 (asignacion monotona): el multiplicador deja de acotarse a [0, 1]",
         AUTO_ADAPTIVE,
-        "                multipliers[version] = _clamp_unit((weight / total) * count)\n",
-        "                multipliers[version] = (weight / total) * count\n",
+        "                multipliers[version] = _clamp_unit((share / total) * count)\n",
+        "                multipliers[version] = (share / total) * count\n",
         (T_ADAPTIVE,),
     ),
     (
@@ -871,8 +895,9 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M71 (confianza no cableada): el worker la construye y no la pasa al plan",
         WORKER,
-        "            confidence=confidence,\n",
-        "            confidence=None,\n",
+        "                confidence=confidence,\n"
+        "                shrink=not reading.limits_adaptation,\n",
+        "                confidence=None,\n                shrink=not reading.limits_adaptation,\n",
         (T_CONFIDENCE_SEAM,),
     ),
     (
@@ -934,10 +959,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         (T_DATA_GATE_WIRE,),
     ),
     (
-        "M80 (DEGRADED repartiendo): el plan recibe la confianza que el gate declaro no fiable",
+        "M80 (DEGRADED repartiendo): el plan encoge con la confianza que el gate declaro no fiable",
         WORKER,
-        "            confidence=None if reading.limits_adaptation else confidence,\n",
-        "            confidence=confidence,\n",
+        "                shrink=not reading.limits_adaptation,\n",
+        "                shrink=True,\n",
         (T_DATA_GATE_WIRE,),
     ),
     (
@@ -1040,6 +1065,45 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        if fresh:\n            stamp = self._v2_instant()\n",
         "        if False:\n            stamp = self._v2_instant()\n",
         (T_RECOVERY_SEAM,),
+    ),
+    (
+        "M94 (regimen ilegible tratado como adverso): la rama adversa se arma sin regimen",
+        AUTO_ADAPTIVE,
+        '    adverse = str(regime or "").strip().upper() in ADAPTIVE_ADVERSE_REGIMES\n',
+        '    adverse = str(regime or "").strip().upper() in (\n'
+        '        ADAPTIVE_ADVERSE_REGIMES | {"", "UNKNOWN"}\n'
+        "    )\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M95 (el motivo del hueco del cruce se pierde): la fila no conserva el par",
+        AUTO_ADAPTIVE,
+        "            regime_undetermined=undetermined is not None,\n",
+        "            regime_undetermined=False,\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M96 (el hueco no viaja al plan): la declaracion se construye y se descarta",
+        AUTO_ADAPTIVE,
+        "        regime_undetermined=tuple(\n"
+        "            sorted(row.strategy_version for row in health if row.regime_undetermined)\n"
+        "        ),\n",
+        "        regime_undetermined=(),\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M97 (el fallback no se declara): el tick no publica el hueco del cruce",
+        WORKER,
+        "        if plan.regime_undetermined:\n",
+        "        if False:\n",
+        (T_FALLBACK_SEAM,),
+    ),
+    (
+        "M98 (el encogimiento no se puede apagar): el reparto encoge aunque el gate lo prohiba",
+        AUTO_ADAPTIVE,
+        "        confidence=confidence if shrink else None,\n",
+        "        confidence=confidence,\n",
+        (T_ADAPTIVE,),
     ),
 ]
 
@@ -1167,6 +1231,28 @@ def _restore(path: pathlib.Path, rel: str, original: str) -> bool:
     return path.read_text(encoding="utf-8") == original
 
 
+def _apply(path: pathlib.Path, payload: bytes) -> bool:
+    """Escribe el MUTANTE con reintentos: el fichero puede estar bloqueado un instante.
+
+    Medido en la fase V2.54/AUTO-13 (paso 5): con ~95 reescrituras seguidas de los mismos
+    ficheros, Windows devolvió ``OSError [Errno 22]`` en el ``open('wb')`` de
+    ``auto_simulation_worker.py`` a mitad de la matriz (mismo fichero que ya exigió
+    reintentos en la restauración, V2.49). Un fallo **transitorio** de escritura no puede
+    invalidar la matriz ni, peor, dejarla a medias: se escribe a un temporal y se reemplaza
+    de forma atómica, con pausa creciente. Si aun así no entra, la sonda aborta SIN haber
+    tocado el fichero (el original sigue en su sitio).
+    """
+    tmp = path.with_suffix(path.suffix + ".mutating")
+    for attempt in range(5):
+        try:
+            tmp.write_bytes(payload)
+            os.replace(tmp, path)
+            return True
+        except OSError:
+            time.sleep(0.5 * (attempt + 1))
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
     # Filtro opcional por etiqueta (``M28``, ``M29``…): permite verificar un tramo de la
     # matriz sin arrastrar las 30 corridas anteriores (útil cuando una sola mutación se
@@ -1224,12 +1310,17 @@ def main(argv: list[str] | None = None) -> int:
                 f"`.replace(..., 1)` mutaria la PRIMERA y la sonda mentiria. ABORTO."
             )
             return 1
-        # Escritura binaria con LF explícito: en Windows el modo texto convierte
+        # Escritura binaria con LF explícito y reintentos: en Windows el modo texto convierte
         # ``\n`` → ``\r\n`` y la huella ``git status --porcelain`` marcaría el fichero
         # como modificado aunque el contenido lógico sea idéntico
         # (``attr/text=auto eol=lf``). ``newline="\n"`` no basta en todos los
         # intérpretes/versiones; ``write_bytes`` es inequívoco.
-        path.write_bytes(current.replace(old, new, 1).encode("utf-8"))
+        if not _apply(path, current.replace(old, new, 1).encode("utf-8")):
+            print(
+                f"\n### {label}\n  !! no se pudo ESCRIBIR la mutacion en {rel} tras 5 "
+                "intentos (fichero bloqueado); el original sigue intacto. Sonda abortada."
+            )
+            return 1
         try:
             failed = _run(tests, (rel,))
         finally:

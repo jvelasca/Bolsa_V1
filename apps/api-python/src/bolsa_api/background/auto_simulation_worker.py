@@ -3122,9 +3122,12 @@ class AutoSimulationWorker:
                 paused_cycles=self._v2_adaptive_decision_cycles(reading, policy),
                 by_regime=report.by_regime,
                 # La protección NUNCA se apaga: la rotación recibe el mismo material. Lo que el gate
-                # retira es el encogimiento por confianza —"no se estrecha por evidencia que no es de
-                # fiar"— y, en ``STALE``, las reactivaciones nuevas (vía los ciclos de decisión).
-                confidence=None if reading.limits_adaptation else confidence,
+                # retira es el **uso** de la confianza para encoger el reparto —"no se estrecha por
+                # evidencia que no es de fiar"— y, en ``STALE``, las reactivaciones nuevas (vía los
+                # ciclos de decisión). La banda MEDIDA sigue publicándose en la evidencia (§29): lo
+                # que se apaga es el encogimiento, no el hecho medido.
+                confidence=confidence,
+                shrink=not reading.limits_adaptation,
                 recovery=evidence or None,
             )
 
@@ -3147,6 +3150,18 @@ class AutoSimulationWorker:
                     "recovery": {
                         version: value.as_dict() for version, value in sorted(plan.recovery.items())
                     },
+                },
+            )
+        if plan.regime_undetermined:
+            # §20 — el hueco del cruce ``strategy × regime`` se DECLARA con la salida declarada: sin
+            # régimen determinado la rotación por régimen no aplica y decide la evidencia GLOBAL de
+            # la estrategia. Campo propio (``regimeUndetermined``), separado del régimen del tick,
+            # del estado operativo y del estado de datos del gate: los ejes no se mezclan (§29).
+            logger.info(
+                "auto_sim v2 adaptive regime undetermined %s",
+                {
+                    "regimeUndetermined": list(plan.regime_undetermined),
+                    "fallback": "strategy_evidence",
                 },
             )
         self._v2_adaptive_paused_cycles = self._v2_next_paused_cycles(plan)
