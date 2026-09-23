@@ -2,6 +2,142 @@
 
 All notable releases of Bolsa V1.
 
+## [1.77.0-beta] — AUTO-11 Estado Adaptive durable y recuperación (V2.52) — 2026-09-23
+
+**Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI
+nueva, sin cambio de contrato de API. El gobernador y su evidencia siguen **intactos**. El invariante
+que instala: **el estado Adaptive, o es durable, o se declara** — el **cooldown** (`min_pause_cycles`)
+deja de vivir en la lista del proceso y se **reconstruye** del journal durable al arrancar, la
+recomendación Adaptive queda **publicada** como evidencia (con el contador que **entró** a decidir) y el
+rastro de ciclo se **reconcilia** al arrancar. Adaptive **sigue siendo recomendador read-only**: su
+multiplicador sigue en `[0, 1]` y el motor determinista sigue decidiendo; lo único que cambia es **dónde
+vive su memoria**.
+
+### Añadido: la recomendación Adaptive, durable
+
+- **`auto_adaptive_journal.py`** (nuevo, contrato puro): evento `adaptive_recommendation` e identidad
+  **del turno** `dec-adap-<hash(cuenta, asOf)>` — un reintento del mismo turno **no duplica** evidencia
+  y dos cuentas del mismo instante no colisionan; **sin sello de turno** se conserva el fallback
+  aleatorio (identidad **única**, nunca compartida por accidente). `cycle_decision_id()` devuelve `None`
+  sobre una identidad `dec-adap-*`: las dos historias (`AUTO-10` y `AUTO-11`) **no pueden compartir
+  fila**.
+- **El payload se proyecta por lista blanca** (`asOf`, `readOnly`, `policyVersion`, `regime`,
+  `rotation`, `allocation`, `pausedCycles`, `healthByStrategy`): una clave nueva del plan **no** se cuela
+  en la historia sin decidirlo. Cuatro reglas duras con test: **sin plan no hay fila** (`None`, no-op
+  declarado, nunca una fila vacía que afirme una evaluación que no hubo); **régimen ausente = declarado**
+  (`None`, nunca un `UNKNOWN` de relleno); **salud ausente = declarada** (`healthByStrategy` vacío);
+  **`readOnly: true`** viaja en la fila como constancia durable del reparto de autoridad.
+- **`pausedCycles` es el contador que ENTRÓ a decidir** (normalizado: `> 0`, sin `bool` s, sin claves en
+  blanco, ordenado). Publicar el de salida afirmaría una decisión que el plan no consumió. El worker lo
+  copia **antes** de `build_adaptive_plan` (`_v2_adaptive_paused_cycles_entered`).
+- **Puerto de escritura**: `build_adaptive_recommendation_sink(session)` commitea él mismo (`append` +
+  `commit`, porque la sesión del turno se cierra con `close()`) y hace `rollback` en el fallo —sin él, la
+  sesión envenenada tumbaría el compromiso de capital del mismo turno—. La recomendación se publica
+  **después** de `plan_v2_tick` y del compromiso de capital: **primero el dinero, después la traza**, así
+  que el journal nunca registra una recomendación que el motor no llegó a consumir.
+
+### Añadido: el cooldown, reconstruido del journal
+
+- **`auto_adaptive_recovery.py`** (nuevo, puro sobre las filas): `rebuild_paused_cycles` rehace la racha
+  **trailing** por versión con la MISMA regla del proceso vivo (una versión que no está pausada en un
+  turno cuenta a 0 y corta su racha; aparece o no en el plan). Recorre las evaluaciones de **nueva a
+  vieja** y **satura** en `min_pause_cycles + 1`: el único consumo del contador es `< min_pause_cycles` y
+  `<= 0`, así que el valor exacto por encima del umbral da igual.
+- **Una evaluación por TURNO**: dos filas con el mismo `decision_id` son la **misma** evaluación escrita
+  dos veces (reintento del sink), no dos turnos. Se colapsan antes de contar (`collapsed` lo declara):
+  contarlas dos veces **alargaría** el cooldown afirmando un turno que no ocurrió.
+- **Cuatro huecos declarados y distintos**: `read_ok=False` (la fuente durable **no se pudo leer**: «no
+  leí» nunca se disfraza de «no hay pausas»), `insufficient_history` (la ventana **no** se llenó: la racha
+  es un **suelo**), `unreadable` (filas sin el contrato de rotación usable: corta la racha y se cuenta,
+  fail-closed) y `policy_version_mismatch` (la historia mezcla versiones; **no se reescribe**, se declara).
+- **Continuidad de política**: el contador **se conserva** a través de un cambio de `policyVersion`
+  —resetearlo sería exactamente el bug que esta fase cierra— y desde el turno siguiente mandan los
+  umbrales de la política en curso, que entra al lector **por parámetro** (`build_adaptive_state_reader`,
+  no por copia). `insufficient_history` distingue «leí y no había» de «no pude leer», y la lectura es
+  **invariante al orden de las filas** (orden por instante, con el ilegible al final).
+
+### Añadido: reconciliación del rastro de ciclo
+
+- **`auto_cycle_reconciliation.py`** (nuevo, read-only) + **`list_recent_with_cycle`** en
+  `reservation_store` (Protocol + `InMemory` + `Postgres`, por la columna `cycle_id` con índice desde
+  `044`): cruza los ciclos con **capital comprometido** con los que el lector de `AUTO-10` **confirma** y
+  declara **cuatro desajustes que no son el mismo hecho** — `missing` (con motivo: `regime_absent` o
+  `regime_unconfirmed`), `unrequested` (un hueco **operativo**, no un journal roto), `not_derivable` (la
+  ausencia es estructural) y `orphan` (traza sin reserva). Cierra la ventana
+  `RESERVATION COMMITTED → CRASH → NO JOURNAL` que `AUTO-10` aceptó y declaró pero **nadie comprobaba**.
+- **El worker lo declara al arrancar**, una vez por proceso y gateado por `adaptive_enabled` (con el flag
+  **OFF**, cero I/O y comportamiento byte-idéntico a `V2.51`): `warning` con recuento e ids si hay
+  desajustes, `info` si el cruce está limpio, `error` si una lectura revienta (sin afirmar que todo está
+  limpio).
+
+### Cambiado: higiene de la auditoría de `v2.51-beta` (los tres hallazgos)
+
+- **`duplicates` vs `extra_rows` en el lector de régimen.** La traza de régimen y la entrada de decisión
+  del ciclo **comparten `decision_id` por diseño**, así que en el camino durable el grupo tiene dos filas
+  en **todo** ciclo normal: contar todas como «duplicado» daba un **baseline distinto de cero** y ahogaba
+  la única señal que interesa vigilar. Ahora `duplicates` cuenta **solo trazas confirmantes** de más
+  (`collapsed_rows` su suma) y `extra_rows` cuenta **todas** las filas de más (`discarded_rows` su suma).
+- **Orden de `created_at` en `cycle_risk`.** El denominador de `R` se elegía ordenando `created_at` como
+  **texto**: correcto solo mientras todo origen use el mismo ancho fijo. Ahora se parsea a **instante** y
+  se ordena por `(instante, reservation_id)`, con el no-parseable **al final** y **declarado**
+  (`CYCLE_RISK_UNDATED_RESERVATION`, y solo cuando hubo que **desempatar**). El camino de escritura no se
+  toca.
+- **Régimen releído por ciclo.** `_v2_regime()` y `_v2_instant()` se llamaban **dentro** del bucle de
+  reservas, así que un turno con varios ciclos podía publicar regímenes distintos. Se **hojean fuera**:
+  todos los ciclos del turno publican el régimen que decidió y el mismo `asOf`.
+
+### Medido, no supuesto
+
+- **Un cuarto hallazgo, de cobertura, y se declaró en vez de esconderse**: `M39` había dejado de morder
+  porque la comprobación de `payload['cycleId']` quedó **duplicada e inobservable** en el camino de
+  lectura (el filtro por identidad ya la hacía). La identidad de la traza pasa a vivir en **un solo
+  sitio** (`_is_trace`, compartida por el recuento de trazas y la lectura del régimen) y `M39` muerde
+  otra vez. Es la lección del `33/33` de `V2.51` en su forma pura: la matriz no mentía en lo que medía,
+  pero **afirmaba cobertura que no tenía**.
+- **Circuitos de crash probados con el módulo real** (no con un valor a mano): la costura usa
+  `read_adaptive_state` de verdad, así que el crash durante el cooldown, el cambio de política, el
+  arranque que siembra el contador y la recomputación del mismo turno con la misma evidencia e identidad
+  se prueban **end-to-end** dentro de la costura.
+
+### Verificación
+
+- **+64 tests, simétricos en los dos bloques offline**: `quality` **2398 passed / 38 skipped** y job
+  `python` del tag **2409 passed / 35 skipped**, **0 rojos** en ambos. La base de CI de `v2.51` era
+  **2334 / 38 skipped** y `2334 + 64 = 2398`: los `skipped` cuadran uno a uno (la estructura de
+  `--ignore` es idéntica), así que la comparación significa algo.
+- **El delta se midió fichero a fichero contra `HEAD`** (no restando totales de fases anteriores, cuyos
+  targets y entorno no son los mismos): **+13** `test_auto_adaptive_journal.py` (nuevo) **+16**
+  `test_auto_adaptive_recovery.py` (nuevo) **+10** `test_auto_cycle_reconciliation.py` (nuevo) **+21**
+  `test_auto_v52_auto11_adaptive_state_seam.py` (nuevo) **+3** `test_cycle_risk.py` (`HEAD` 23 → 26)
+  **+1** `test_auto_cycle_regime_reader.py` (`HEAD` 17 → 18).
+- **Los dos ficheros de test modificados se corrieron en su versión de `HEAD` contra el código de la
+  fase**: `test_cycle_risk.py` pasa **23/23** (el orden por instante es **retrocompatible**) y del lector
+  de régimen falla **exactamente 1** (`test_the_newest_CONFIRMING_row_wins_over_a_newer_window_entry`),
+  que es la expectativa que la fase actualiza: el rojo está **nombrado y justificado**, no es una
+  regresión oculta.
+- **Mutaciones `M42…M59`** nuevas (identidad sin cuenta, fila sin plan, régimen disfrazado, contador
+  normalizado, racha sin corte, saturación sin techo, dedupe caído, historia corta silenciada, hueco
+  aprobado, no preguntado disfrazado, trazas contadas como filas, filas de más silenciadas, antigüedad
+  por texto, fecha ilegible silenciada, contador de salida, recuperación que no siembra, reconciliación
+  muda, flag OFF ignorado): la **matriz completa** da **`59/59` muerden**, **0** `NADA (la mutacion NO se
+  detecta)`, 0 fragmentos ausentes, 59 restauraciones byte a byte y huella `git status` **idéntica** antes
+  y después. Tres fragmentos derivados por la fase (`M38`, `M40`, `M41`) se reescribieron contra el
+  código real: `M38` porque el sink Adaptive es calcado del de `AUTO-10` (el fragmento pasó a aparecer
+  **dos** veces y la sonda **abortaba**, que es lo correcto).
+- `ruff check` (config de CI) limpio · `mypy` (gate real, `--follow-imports=silent`) **0 errores / 497
+  ficheros** · `import-linter` **4/4** contratos `KEPT`.
+
+### Limitado y declarado (no silencioso)
+
+- **La ventana de lectura es finita** (`ADAPTIVE_STATE_WINDOW_DEFAULT = 50`): con menos filas que la
+  ventana, `insufficient_history` queda **declarado** y la racha es un **suelo**.
+- **`bounded` no es el número exacto**: el contador se satura en `min_pause_cycles + 1`.
+- **El pasado no se reescribe**: sin evidencia durable de una pausa anterior, el contador arranca
+  **vacío y declarado** (no hay backfill).
+- **`confidence` y la ventana recent/long/decay** quedan para `AUTO-12`/`AUTO-13`.
+- **La tabla de estado dedicada no existe**: el cooldown vive **derivado** del journal.
+- **Sin UI** para `AUTO-7`…`AUTO-11` (deuda heredada). **`governor.json` sigue sin trackear.**
+
 ## [1.76.0-beta] — AUTO-10 Journal durable por ciclo (V2.51) — 2026-09-22
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,

@@ -240,6 +240,24 @@ exactamente el mecanismo por el que el rojo local declarado en §6 **no** existe
 la enmienda del sello movido de `v2.50`), porque la tabla necesita runs reales: el pack y el relevo sí
 viajan **dentro** de `v2.51-beta`, y el commit de enmienda lo declara.
 
+**Addendum `V2.52` — los *check-runs* del commit del tag, uno por uno (medido, no supuesto).** La
+verificación anterior se hizo sobre los **workflow runs**; queda declarado el otro contador, porque
+los dos **no** coinciden y la diferencia se lee como un `pending` fantasma en la UI:
+
+```text
+gh api repos/jvelasca/Bolsa_V1/commits/dba3d4f8/check-runs --paginate | Group conclusions
+  27 success · 1 skipped
+gh api repos/jvelasca/Bolsa_V1/commits/dba3d4f8/status
+  {"state":"pending","total":0}
+```
+
+Los **28 *check-runs*** son `success` (27) + `skipped` (1, el E2E integrado **opt-in** que el
+`Release tag CI` omite a propósito) ⇒ **cero rojos y cero pendientes en Actions**. El
+`{"state":"pending","total":0}` viene de la **Status API** (el mecanismo *legacy* que publica
+estados por commit), no de Actions: con **0** statuses publicados, GitHub la deja en `pending`
+eternamente. Es decir, el commit del tag está **verificado**: la `pending` que se ve en la UI no
+es un job sin terminar, es un contador distinto que nadie alimenta.
+
 ---
 
 ## 8. Freeze (no tocar sin motivo)
