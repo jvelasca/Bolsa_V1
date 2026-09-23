@@ -2,6 +2,112 @@
 
 All notable releases of Bolsa V1.
 
+## [1.78.0-beta] — AUTO-12 Confidence + calidad estadística (V2.53) — 2026-09-23
+
+**Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI nueva,
+sin cambio de contrato de API ni de DTO, **sin clave nueva en el nivel superior del payload del journal**
+(la confianza añade cuatro campos dentro de las filas de `healthByStrategy`). El gobernador y su
+evidencia siguen **intactos**. El invariante que instala: **ninguna recomendación Adaptive pesa más de lo
+que su evidencia estadística sostiene** — una muestra fina se **declara** (`confidence`), no se castiga a
+ciegas; una mejora reciente que contradice el histórico se **declara** (`decay`), no se convierte en pausa
+automática. Adaptive **sigue siendo recomendador read-only**: lo único que cambia es **cuánto pesa** su
+recomendación cuando la evidencia es fina.
+
+### Añadido: la lectura de confianza, pura (`auto_adaptive_confidence.py`)
+
+- **Módulo nuevo** (`packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_confidence.py`):
+  sin I/O y sin estado, **orden-invariante**. Reutiliza lo que ya existía en vez de reinventarlo —
+  `aggregate_by_regime` (`AUTO-9`) sobre **dos rebanadas** de los ciclos ordenados, `sample_quality_from_n`
+  como base de banda y `combine_measurements` para la completitud **compuesta**.
+- **`sample_size` frente a `effective_n`**: `trades` cuenta ciclos, pero `expectancy_r` promedia solo los
+  ciclos **con R medido**. Publicar la muestra bruta **afirma** una base que el número no tiene; `effective_n`
+  es el denominador real. El caso medido: **40 ciclos con 4 medidos ⇒ muestra de 4**, `risk_coverage = 0.1`
+  y banda `LOW` con su nota.
+- **Completitud compuesta**: `combine(r_measurement, net_r_measurement, pnl_coverage)`. Sin coste medido el
+  R neto es `UNKNOWN` y la completitud **no** puede ser `COMPLETE`. `risk_coverage`, `cost_coverage` y
+  `regime_coverage` viajan **por separado** porque no medir el denominador de R, no medir el coste y no
+  declarar el régimen son tres huecos distintos.
+- **`decay` declarado** (`NONE`/`MILD`/`SEVERE`/`UNKNOWN`): `recent ≥ long·0.75` ⇒ `NONE`;
+  `recent < long·0.75` y `recent ≥ 0` ⇒ `MILD`; `recent < 0` ⇒ `SEVERE`. Si alguna ventana no está medida,
+  la reciente no llega al mínimo o no hay instantes legibles ⇒ `UNKNOWN` (se declara, no castiga por sí
+  solo). **No añade motivo de pausa**: la rotación queda `byte-idéntica` con y sin confianza.
+- **`confidence` con bandas declaradas** (`LOW`/`MEDIUM`/`HIGH`): base por banda de muestra y tres ajustes
+  en orden — completitud no `COMPLETE` baja un nivel, `decay SEVERE` baja un nivel y **`decay UNKNOWN` pone
+  TECHO `MEDIUM`**: no se premia lo que no se pudo leer.
+- **Lectura vacía declarada**: sin ciclos no hay ceros mudos — `ADAPTIVE_CONFIDENCE_NO_CYCLES` y
+  `confidence_for(...)` devuelve `None`.
+
+### Añadido: el eje de recencia honesto (aditivo, sin migración)
+
+- **`SimFillFinanceContext.created_at`** (aditivo; la columna PG ya existía, así que **no hay migración**):
+  el store PG lo proyecta en `get`, `get_many` y `list_for_strategy_version`; el doble `InMemory` lo acepta
+  y **declara** que su orden es por `execution_id`, en vez de fingir cronología.
+- **`closedAt` en el ciclo** (`cycles_from_fills`): el instante del **último** fill del ciclo —la fecha del
+  **resultado**, no la de la entrada—. Un **ciclo anónimo** (sin `cycle_id`) no reclama instante; un fill
+  sin fecha legible no borra el cierre medible de los demás. **AUTO-7 queda byte-idéntico**: sin
+  `created_at`, la tupla de ciclos es exactamente la histórica y ninguna fila lleva `closedAt`.
+- **Orden por instante parseado** (patrón de `cycle_risk.py`), con el no-parseable al final y **declarado**
+  (`recent_undated`). Sin fechas legibles, la ventana reciente **no se inventa**: `recent_available = False`
+  y `decay = UNKNOWN`. La ventana **long** se sigue midiendo, porque no necesita fechas.
+- **Costura del feed** `build_adaptive_confidence_from_fills(...)`: confianza e informe salen del **mismo**
+  material (los mismos `fills` + `cycle_risk`), sin segundo productor y **sin I/O nuevo**.
+
+### Modificado: el reparto encoge por muestra (protege del *winner chasing*)
+
+- **`recommend_allocation(..., confidence=None)`** y **`build_adaptive_plan(..., confidence=None)`**: sin
+  la lectura, el plan es **byte-idéntico** al histórico (mismo patrón que `by_regime` en `AUTO-9`). Con ella,
+  el peso de cada estrategia **decisoria positiva** se encoge `w' = w · n/(n + k)` **antes** de normalizar,
+  con `k = ADAPTIVE_CONFIDENCE_PRIOR_DEFAULT = 20.0` (campo nuevo de `AdaptivePolicy`); con
+  `decay == SEVERE`, un factor adicional declarado (`ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT = 0.5`).
+  Se normaliza **como siempre** (`(w'/Σw')·count`) y se acota a `[0, 1]`, así que el reparto sigue
+  sumando-preservando y **ninguna activa queda en 0**: encoger es **redistribuir**, no eliminar.
+- **Una estrategia sin edge decisorio conserva el multiplicador neutral (1.0)**: la confianza fina **solo**
+  actúa sobre un edge **medido** — ausencia de dato ≠ dato malo. Es el caso exacto del audit: `+2R/N=12` no
+  puede llevarse el peso pleno frente a `+1R/N=180`.
+- **`ADAPTIVE_POLICY_VERSION` sube a `auto12-v1`**: la regla de asignación cambió ⇒ sello nuevo, y el test
+  del sello se actualiza **con nombre**.
+- **`StrategyHealth`** gana `confidence`, `recent_expectancy_r`, `long_expectancy_r` y `decay`, y
+  `AdaptivePlan.evidence_for()` los publica ⇒ la confianza viaja en el journal durable de `AUTO-11`
+  **dentro de `healthByStrategy`**, sin clave nueva y sin tocar el contrato (que queda **byte a byte
+  igual**, igual que `auto_adaptive_recovery.py`).
+
+### Cableado: una lectura por tick, cero I/O nuevo
+
+- `_v2_build_adaptive_plan` construye la confianza desde los `fills` que **ya leyó** para el informe:
+  **una** lectura por versión (medido con un store que cuenta llamadas). Si la ventana reciente no está
+  disponible, se registra un `warning` con los huecos en vez de fingirla; si la lectura de fills revienta,
+  el plan es `None` (**fail-closed declarado**, comportamiento histórico) y el `error` queda con nombre.
+
+### Verificación
+
+- **+50 tests** medidos **fichero a fichero contra `HEAD`**: +21
+  `test_auto_adaptive_confidence.py` (nuevo) · +9 `test_auto_v53_auto12_confidence_seam.py` (nuevo) · +11
+  `test_auto_adaptive.py` (`HEAD` 44 → 55) · +9 `test_auto_self_evaluation_feed.py` (`HEAD` 13 → 22). Los
+  dos ficheros **modificados**, en su versión de `HEAD` contra el código de la fase, dan **56 pasan / 1
+  rojo nombrado** (el sello de versión, actualizado con nombre): sin regresiones ocultas.
+- **Matriz de mutaciones ampliada** (`M60…M71`, 12 etiquetas por `effective_n`, encogimiento, bandas de
+  `decay`, techo por `decay UNKNOWN`, `recent_undated`, orden por instante, cobertura de coste, completitud
+  compuesta, cierre por el primer fill y cableado del worker): **12/12 muerden** y la matriz **completa** no
+  deja **ninguna** etiqueta en `NADA` (la trampa de `M39` de `V2.52`, usada aquí como gate explícito).
+- **Compuertas**: `ruff` con el comando de CI, `mypy` (`--follow-imports=silent`) e `import-linter` 4/4.
+  Suites del área con la fase: `analytics` **1010 passed**, `application` **1876 passed** (5 errores
+  **pre-existentes** de suites PG por `asyncpg` ausente en la máquina) y el bloque AUTO completo
+  **1178 passed / 0 rojos**. La verificación offline **completa** de `quality`/`python` no se pudo
+  reproducir localmente (misma causa); los totales de CI del tag quedan **a CI**.
+
+### Límites declarados
+
+- **`confidence` no es un permiso**: sigue siendo evidencia read-only; la autoridad es el motor determinista
+  y el gobernador.
+- **Ventanas finitas** (`recent = 30`, `long = 200`): con menos filas el número es un **suelo**
+  (`recent_insufficient`), no una medida.
+- **Sin fechas legibles no hay `decay`** (`recent_unavailable`): no se inventa cronología.
+- **El `decay` se mide sobre `R` bruto**; el neto sigue siendo el eje **alternativo** de `AUTO-9` y exige
+  `net_r_measurement == COMPLETE`, que un coste estimado no garantiza.
+- **`AUTO-12` no toca la rotación** (el `decay` no genera pausas): el Data Gate
+  (`OK/DEGRADED/STALE/BLOCKED`) y el recovery gradual (`RECOVERING`, `0.25→1.0`) son **`AUTO-13`**.
+- **Sin UI** para `AUTO-7`…`AUTO-12` (deuda declarada), **sin migración**, **`governor.json` sin trackear**.
+
 ## [1.77.0-beta] — AUTO-11 Estado Adaptive durable y recuperación (V2.52) — 2026-09-23
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI
