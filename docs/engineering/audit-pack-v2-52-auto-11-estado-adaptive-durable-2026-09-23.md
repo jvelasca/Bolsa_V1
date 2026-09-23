@@ -1,8 +1,9 @@
 # Audit-pack `AUTO-11` Estado Adaptive durable y recuperación — `1.77.0-beta` (2026-09-23)
 
-**Fase:** `V2.52` · **Rótulo:** `AUTO-11` · **Bump:** `1.76.0-beta` → **`1.77.0-beta`** · **Fase
-anterior:** `V2.51` / `AUTO-10` (tag `v2.51-beta` → `dba3d4f8`, `Release tag CI` `35787648126`
-**GREEN**).
+**Fase:** `V2.52` · **Rótulo:** `AUTO-11` · **Bump:** `1.76.0-beta` → **`1.77.0-beta`** · **Tag:**
+`v2.52-beta` → `71c97880` (`Release tag CI` `35827266670` **GREEN**; `check-runs` `27 success` +
+`1 skipped`) · **Fase anterior:** `V2.51` / `AUTO-10` (tag `v2.51-beta` → `dba3d4f8`,
+`Release tag CI` `35787648126` **GREEN**).
 
 **Sin migración** (Alembic head sigue en `044_auto_cycle_trace`). Sin SHORT, sin backfill, sin UI
 nueva, sin cambio de contrato de API ni de DTO. El gobernador y su evidencia quedan **intactos**.
@@ -110,7 +111,7 @@ duras, cada una con test:
   sin decidirlo aquí. `readOnly: true` viaja en la fila como constancia durable del reparto de
   autoridad.
 
-`pausedCycles` publica el contador que **entró** a decidir, normalizado (`> 0`, sin `bool`s, sin
+`pausedCycles` publica el contador que **entró** a decidir, normalizado (`> 0`, sin `bool` s, sin
 claves en blanco, ordenado). El worker lo copia **antes** de `build_adaptive_plan`
 (`_v2_adaptive_paused_cycles_entered`) precisamente para que la evidencia explique la decisión y no
 el estado posterior.
@@ -260,11 +261,11 @@ ficheros** · `import-linter` **4/4** contratos `KEPT` (`Domain no importa…`, 
 
 ## 8. Sello y CI
 
-**Este §8 se escribe antes del tag**, y por eso **no** afirma una CI que todavía no existe: declara
-la evidencia local medida (§6–§7) y qué se va a observar. La tabla de runs —con los `workflow runs`
-y los `check-runs` del commit del tag— se añade en el **commit de enmienda inmediatamente posterior**
-al tag (precedente: el §7 de `v2.51` y la enmienda del sello movido de `v2.50`), porque necesita
-runs **reales**.
+**Este §8 se escribió antes del tag** y, por eso, **no** afirmaba una CI que todavía no existía:
+declaraba la evidencia local medida (§6–§7) y qué había que observar. La tabla de runs —con los
+`workflow runs` y los `check-runs` del commit del tag— se añade aquí, en el **commit de enmienda
+inmediatamente posterior** al tag (precedente: el §7 de `v2.51` y la enmienda del sello movido de
+`v2.50`), porque necesita runs **reales**.
 
 Lo que el sello debe cumplir, declarado de antemano:
 
@@ -279,6 +280,31 @@ Lo que el sello debe cumplir, declarado de antemano:
    extracción local; el `38 skipped` debe cuadrar, porque son las suites PG que ese job ignora por
    diseño).
 5. **Sin migración**: Alembic head sigue en `044_auto_cycle_trace`.
+
+### Sello medido (enmienda post-tag)
+
+Los cinco criterios, **comprobados contra runs reales**:
+
+| # | Criterio declarado | Medido |
+|---|--------------------|--------|
+| 1 | Tag anotado `v2.52-beta` al commit de docs de fase | objeto **`e2337b7f`** → commit **`71c97880`** (pack + relevo + índice); plan en `c8376b1e` y código en `b981c980`, **antes** |
+| 2 | `main` en fast-forward y tag empujado de uno en uno | `8af3a3ee..71c97880  main -> main` y `* [new tag]  v2.52-beta -> v2.52-beta` |
+| 3 | `Release tag CI` GREEN (10 jobs de decisión + `certify`; E2E integrado omitido) | run **`35827266670`** → `completed / success`; **10 `success`** + `certify (aggregate + artifact)` `success` + `playwright (integrated E2E, opt-in)` **`skipped`** como está diseñado |
+| 4 | `quality` con `2398 + k` passed, 0 fallos y `38 skipped` | run **`35827246615`** (job `quality`) → **`2398 passed, 38 skipped`** en 105,88 s ⇒ **`k = 0`**, cuadra exacto con la extracción local |
+| 5 | Sin migración | head sigue en `044_auto_cycle_trace` (los jobs `auto-v2-durable-pg` y `lifecycle-pg` de `main` migran a ese head y pasan) |
+
+**El job `python` del tag, con su cuenta**: **`2409 passed, 35 skipped`** (62,04 s), con `ruff`
+(`All checks passed!`), `import-linter` y `mypy` en verde en el mismo job. Es la cifra declarada en
+§6 y `2409 − 2398 = 11`, que es exactamente lo que el job del tag añade por su lista de targets.
+
+**`check-runs` del commit del tag** (`71c97880`, la fuente que alimenta la *branch protection*):
+**27 `success` + 1 `skipped`** — el mismo patrón `27/1` de `v2.51-beta` (`dba3d4f8`).
+
+**Los demás workflows del tag**, todos `success`: `Python CI` (`35827266550`), `Frontend CI`
+(`35827266612`), `Optimize lab` (`35827266572`), `Fase 2 scientific` (`35827266560`).
+
+**Y los jobs PG por commit de `main`**, todos `success`: `paper-forward-pg`, `lifecycle-pg`,
+`auto-v2-durable-pg` (Alembic 040-043 + reinicio real) y `grammar-discovery-pg`.
 
 ## 9. Freeze (no tocar sin motivo)
 

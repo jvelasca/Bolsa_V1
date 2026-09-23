@@ -62,6 +62,12 @@ recomendación Adaptive queda publicada como evidencia y el rastro de ciclo se r
    los dos ficheros **modificados** se corrieron en su versión de `HEAD` contra el código de la fase:
    `test_cycle_risk.py` pasa **23/23** (el cambio de orden es retrocompatible) y del lector de régimen
    falla **exactamente 1**, que es la expectativa que la fase actualiza (rojo **nombrado**).
+9. **Sello (medido en CI, no declarado)**: tag anotado **`v2.52-beta`** (objeto `e2337b7f`) → commit
+   **`71c97880`** con los cuatro documentos de fase dentro; `main` en fast-forward
+   (`8af3a3ee..71c97880`) y el tag empujado **de uno en uno**; `Release tag CI` run
+   **`35827266670`** `completed / success` (10 jobs de decisión + `certify` verdes, E2E integrado
+   `skipped` como está diseñado); job `python` del tag **`2409 passed / 35 skipped`** en 62,04 s; y
+   `check-runs` del commit del tag **27 `success` + 1 `skipped`** (mismo patrón `27/1` de `v2.51`).
 
 ---
 

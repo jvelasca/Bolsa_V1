@@ -127,6 +127,28 @@ vive su memoria**.
 - `ruff check` (config de CI) limpio · `mypy` (gate real, `--follow-imports=silent`) **0 errores / 497
   ficheros** · `import-linter` **4/4** contratos `KEPT`.
 
+### Sello y CI real (medido)
+
+- **Tag anotado `v2.52-beta`** (objeto `e2337b7f`) → commit **`71c97880`**, el de los **documentos de
+  fase**: el plan (`c8376b1e`) y el código (`b981c980`) van **antes**, así que los cuatro documentos
+  viajan **dentro** del tag. `main` en **fast-forward** (`8af3a3ee..71c97880`) y el tag empujado **de
+  uno en uno** (lección de `v2.49`: con `--follow-tags` y tags locales antiguos, más de tres tags en
+  un push **no** disparan los workflows de tag).
+- **`Release tag CI` run `35827266670` → `completed / success`**: los **10 jobs de decisión**
+  (`frontend`, `python`, `security`, `a7-gate`, `playwright (mock E2E)`, `decision-spine`, `shared`,
+  `lifecycle-pg`, `dr-verify` y el `playwright (integrated E2E)` **`skipped`** opt-in) **+ `certify
+  (aggregate + artifact)`** en `success`.
+- **Job `python` del tag: `2409 passed, 35 skipped`** (62,04 s), con `ruff` (`All checks passed!`),
+  `import-linter` y `mypy` verdes en el mismo job.
+- **`Python CI` de `main` run `35827246615` → `success`**: job `quality` **`2398 passed, 38 skipped`**
+  (105,88 s) ⇒ **`k = 0`**: la extracción local del §6 cuadra **exacto** con CI (los `38 skipped` son
+  las suites PG que ese job ignora por diseño). Y los cuatro jobs PG **por commit** en verde
+  (`paper-forward-pg`, `lifecycle-pg`, `auto-v2-durable-pg` con Alembic 040-043 y reinicio real, y
+  `grammar-discovery-pg`).
+- **`check-runs` del commit del tag: `27 success` + `1 skipped`** — el mismo patrón `27/1` de
+  `v2.51-beta`. Y `Frontend CI`, `Optimize lab`, `Fase 2 scientific` y `Gitleaks` en verde.
+- **Sin migración**: el head sigue en `044_auto_cycle_trace`.
+
 ### Limitado y declarado (no silencioso)
 
 - **La ventana de lectura es finita** (`ADAPTIVE_STATE_WINDOW_DEFAULT = 50`): con menos filas que la
