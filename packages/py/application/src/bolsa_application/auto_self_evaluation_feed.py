@@ -214,8 +214,9 @@ def cycles_from_fills(fills: Iterable[Any]) -> tuple[dict[str, Any], ...]:
 def _risk_with_applied_cost(
     fills: Iterable[Any] | None,
     cycle_risk: Mapping[str, CycleRisk] | None,
+    closed_cycle_ids: Iterable[str] | None = None,
 ) -> Mapping[str, CycleRisk] | None:
-    """(PURA, AUTO-16) la evidencia de riesgo CON la fricción APLICADA de cada ciclo pegada.
+    """(PURA, AUTO-16/17) la evidencia de riesgo CON la fricción APLICADA de cada ciclo pegada.
 
     Los fills ya están en la mano —son la fuente de los propios ciclos—, así que la fricción que
     el simulador aplicó se recompone **sin una lectura nueva**: la referencia cruda viaja en la
@@ -226,10 +227,35 @@ def _risk_with_applied_cost(
     Es el ÚNICO punto donde se pega el aplicado: las tres lecturas que lo consumen —informe
     AUTO-7, confianza ``AUTO-12`` y rampa ``AUTO-13``— pasan por aquí, así que no puede haber un
     segundo productor que mida un coste distinto en silencio.
+
+    ``AUTO-17``: ``closed_cycle_ids`` es la autoridad de cierre (los ciclos que
+    ``cycles_from_fills`` declaró terminados). Un ciclo sin cierre probado **no** recibe fricción
+    aplicada aunque tenga fills: presencia de lados no es round-trip. El llamante lo calcula del
+    MISMO ``cycles_from_fills`` que alimenta el informe, sin un segundo FIFO.
     """
     if not cycle_risk:
         return cycle_risk
-    return attach_applied_cost(cycle_risk, applied_cost_from_fills(cycle_risk.keys(), fills or ()))
+    return attach_applied_cost(
+        cycle_risk,
+        applied_cost_from_fills(
+            cycle_risk.keys(), fills or (), closed_cycle_ids=closed_cycle_ids
+        ),
+    )
+
+
+def _cycles_with_risk(
+    fills: Iterable[Any] | None,
+    cycle_risk: Mapping[str, CycleRisk] | None,
+) -> tuple[Mapping[str, Any], ...]:
+    """(PURA, AUTO-17) los ciclos del informe CON la evidencia de riesgo ya pegada.
+
+    Calcula ``cycles_from_fills`` **una sola vez** y usa sus ``cycleId`` como autoridad de cierre
+    para la fricción aplicada: así el informe, la confianza y la rampa cuelgan del MISMO material
+    —los mismos ciclos, la misma noción de cierre— sin un segundo FIFO que pueda divergir.
+    """
+    cycles = cycles_from_fills(fills or ())
+    closed_ids = [row["cycleId"] for row in cycles if row.get("cycleId")]
+    return apply_cycle_risk(cycles, _risk_with_applied_cost(fills, cycle_risk, closed_ids))
 
 
 def build_auto_self_evaluation(
@@ -256,9 +282,7 @@ def build_auto_self_evaluation(
     —el estimado— y lo declara.
     """
     return evaluate_auto_self_evaluation(
-        cycles=apply_cycle_risk(
-            cycles_from_fills(fills or ()), _risk_with_applied_cost(fills, cycle_risk)
-        ),
+        cycles=_cycles_with_risk(fills, cycle_risk),
         opportunities=opportunities,
         seen=seen,
         durable_seen=durable_seen,
@@ -283,9 +307,7 @@ def build_adaptive_confidence_from_fills(
     que la confianza y el informe siguen midiendo el mismo neto.
     """
     return build_adaptive_confidence(
-        apply_cycle_risk(
-            cycles_from_fills(fills or ()), _risk_with_applied_cost(fills, cycle_risk)
-        ),
+        _cycles_with_risk(fills, cycle_risk),
         recent_window=recent_window,
         long_window=long_window,
         min_trades=min_trades,
@@ -379,9 +401,7 @@ def recovery_evidence_from_fills(
     }
     if not reactivated:
         return {}
-    rows = apply_cycle_risk(
-        cycles_from_fills(fills or ()), _risk_with_applied_cost(fills, cycle_risk)
-    )
+    rows = _cycles_with_risk(fills, cycle_risk)
     recent_available = True if confidence is None else bool(confidence.recent_available)
     evidence: dict[str, RecoveryEvidence] = {}
     for version, raw_since in sorted(reactivated.items()):

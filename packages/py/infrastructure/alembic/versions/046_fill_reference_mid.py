@@ -28,6 +28,16 @@ No se añade índice: la lectura es por ``cycle_id``, que ya está indexado desd
 devuelve. ``upgrade`` y ``downgrade`` son simétricos e idempotentes (patrón 028–045) y la cadena es
 lineal (``down_revision = "045_adaptive_gate_state"``). El contrato de ``decision_journal_entries`` y
 ``auto_adaptive_journal.py`` no se toca.
+
+.. warning::
+
+   **DESTRUCTIVE DATA DOWNGRADE — simetría de esquema ≠ reversibilidad de datos.** El ``downgrade``
+   deja el esquema EXACTAMENTE como estaba (dropea la misma columna que creó el ``upgrade``), pero
+   los DATOS no vuelven: los ``reference_mid`` que el settlement persistió mientras la ``046`` estuvo
+   aplicada se PIERDEN, y con ellos la posibilidad de recomponer la fricción aplicada de esos fills
+   (``AUTO-16``/``AUTO-17``). No hay backfill ni recuperación posible: la referencia no se puede
+   reconstruir desde el precio (el precio ya lleva la fricción dentro). La simetría del esquema es
+   correcta para un roundtrip de migración, pero **no** es una promesa de reversibilidad de datos.
 """
 
 from __future__ import annotations
@@ -78,6 +88,11 @@ def downgrade() -> None:
 
     Simétrico por construcción: la columna no está respaldada por ninguna constraint del baseline,
     así que el ``DROP`` es seguro e idempotente.
+
+    **DESTRUCTIVE DATA DOWNGRADE (declarado):** simetría de esquema NO es reversibilidad de datos.
+    Dropear la columna borra para siempre las referencias que el settlement persistió (y con ellas
+    la fricción aplicada recomponible de esos fills). Antes de correr un ``downgrade`` en un entorno
+    con datos hay que asumir esa pérdida; no existe backfill.
     """
     bind = op.get_bind()
 

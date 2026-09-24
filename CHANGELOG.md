@@ -2,6 +2,67 @@
 
 All notable releases of Bolsa V1.
 
+## [1.83.0-beta] — AUTO-17 Integridad de la población de medida (V2.58) — 2026-09-24
+
+**Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI nueva, sin cambio de
+contrato de API ni de DTO y **sin clave nueva en el journal durable** (la proyección por lista blanca
+`riskMultipliers` + `evidenceAxis` de `auto_adaptive_journal.py:58` queda **byte a byte igual**). El
+gobernador y su evidencia siguen **intactos** (diff vacío). El invariante que instala:
+
+> **Ningún número con el que Adaptive decide promedia dos bases de coste distintas: la base del R neto
+> viaja con la evidencia, y una población mixta se declara y se abstiene, nunca se interpreta como mejora
+> o deterioro.**
+
+`AUTO-16` hizo que el R neto **declarara su base** (`estimated` / `applied_friction+modelled_commission`),
+pero dejó dos huecos que esta pasada cierra:
+
+1. **El round-trip del coste aplicado no era cuantitativo.** `applied_cost.py` declaraba `COMPLETE` un
+   ciclo con solo ver los dos lados; un `BUY 100 / SELL 10` (ciclo abierto) medía la fricción de una
+   operación que no terminó. Ahora `COMPLETE` exige **balance de cantidades** (`Σ buy qty == Σ sell qty`,
+   tolerancia declarada) y el mapa aplicado se restringe a los ciclos que `cycles_from_fills` declaró
+   **cerrados** (autoridad de cierre, sin segundo FIFO ni I/O nuevo).
+2. **La base del neto no viajaba de extremo a extremo.** El agregado **declaraba** `mixed` pero seguía
+   **promediando** poblaciones de base distinta, y ni la confianza ni el reparto veían la base. Ahora el
+   agregado publica **dos series separadas** (`NetRBasisSeries`), con base homogénea el pooled sale **byte
+   a byte** como antes y con `MIXED` el pooled **no se publica** (`None`); la confianza gana
+   `net_r_basis` + `basis_transition`; el `decay` devuelve `UNKNOWN` si la base cambia entre ventanas (un
+   salto de medida no es deterioro ni mejora); y el **reparto solo adopta el eje del R neto si todas las
+   versiones que compiten comparten una base estable**, cayendo al eje histórico con nota declarada si no.
+   El sello del reparto sube a **`auto17-v1`** (cambia la **regla**, no solo la procedencia).
+
+**Opción A ratificada (dos series separadas):** pre-2.57 = `estimated`, post-2.57 = `applied`; **nunca**
+se promedian. El detector puro `basis_transition` (`STABLE_ESTIMATED` / `STABLE_APPLIED` / `TRANSITION` /
+`MIXED` / `UNKNOWN`) evita leer el cambio de base como señal. **Sin backfill:** el histórico pre-2.57 queda
+`STABLE_ESTIMATED`, el post-2.57 `STABLE_APPLIED` y el periodo con ambos `TRANSITION`/`MIXED`. La base es
+**recomputable** (`reference_mid` presente/ausente + comisión), así que no se persiste por ciclo.
+
+### Añadido
+
+- **`applied_cost.py`** — `AppliedLeg.quantity`, `_quantity_balanced`, notas
+  `APPLIED_COST_UNBALANCED_ROUND_TRIP` y `APPLIED_COST_WITHOUT_CYCLE_CLOSURE`, y
+  `applied_cost_from_fills(..., closed_cycle_ids=...)`.
+- **`auto_self_evaluation_feed.py`** — `_cycles_with_risk` calcula el ciclo **una sola vez** (sin segundo
+  FIFO) y pasa los `closed_cycle_ids` a `applied_cost_from_fills`.
+- **`auto_self_evaluation.py`** — `NetRBasisSeries`, `_net_r_series`, `_basis_of` y
+  `_pooled_net_expectancy` (pooled **ausente** si `MIXED`); `net_r_series` en `StrategySelfEvaluation` y
+  `StrategyRegimeEvaluation`.
+- **`auto_adaptive_confidence.py`** — `net_r_basis` + `net_r_series` en `RegimeConfidence` /
+  `StrategyConfidence`, detector `basis_transition` y `decay` **gated** por la transición de base.
+- **`auto_adaptive.py`** — `StrategyHealth.net_r_basis` / `basis_transition`, guardia
+  `_net_basis_comparable`, nota `ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE` y `evidence_for` publicando
+  `netRBasis` / `basisTransition`; sello `ADAPTIVE_POLICY_VERSION = "auto17-v1"`
+  (`DATA_GATE_POLICY_VERSION` sigue `auto15-v1`).
+- **Mutaciones `M129…M138`** (10 nuevas) en la sonda, con el bloque de `AUTO-16` realineado.
+
+### Compatibilidad
+
+- Con base homogénea, el `net_expectancy_r` pooled y todo lo demás salen **byte a byte** como en `v2.57`.
+- El camino sin `reference_mid` sigue publicando **el número de `v2.56`** y lo declara.
+- `costEstimate`, `costApplied`, `costBasis` y `netRBasis` **siguen publicándose igual**: esta fase
+  **añade** la dimensión `net_r_series` / `basis_transition`, no cambia contratos existentes.
+- El flag Adaptive sigue **OFF por defecto**: con OFF el plan, el journal y la API son **byte a byte
+  iguales** a `v2.57`.
+
 ## [1.82.0-beta] — AUTO-16 Coste REAL por ciclo (V2.57) — 2026-09-24
 
 **Migración nueva** `046_fill_reference_mid`: Alembic head `045_adaptive_gate_state` → **`046_fill_reference_mid`**

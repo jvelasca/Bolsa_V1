@@ -19,6 +19,11 @@ from __future__ import annotations
 import pytest
 
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_BASIS_MIXED,
+    ADAPTIVE_BASIS_STABLE_APPLIED,
+    ADAPTIVE_BASIS_STABLE_ESTIMATED,
+    ADAPTIVE_BASIS_TRANSITION,
+    ADAPTIVE_BASIS_UNKNOWN,
     ADAPTIVE_CONFIDENCE_HIGH,
     ADAPTIVE_CONFIDENCE_LOW,
     ADAPTIVE_CONFIDENCE_MEASUREMENT_INCOMPLETE,
@@ -32,7 +37,13 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     ADAPTIVE_DECAY_NONE,
     ADAPTIVE_DECAY_SEVERE,
     ADAPTIVE_DECAY_UNKNOWN,
+    _basis_transition,
     build_adaptive_confidence,
+)
+from bolsa_analytics.cognitive.auto_self_evaluation import (
+    SELF_EVAL_COST_BASIS_APPLIED,
+    SELF_EVAL_COST_BASIS_ESTIMATED,
+    SELF_EVAL_COST_BASIS_MIXED,
 )
 
 
@@ -370,3 +381,121 @@ def test_a_whole_window_of_unmeasured_risk_is_declared_unknown_not_zero() -> Non
     assert row.long_expectancy_r is None, "sin riesgo no hay R; jamás un cero"
     assert row.risk_coverage == 0.0
     assert row.decay == ADAPTIVE_DECAY_UNKNOWN
+
+
+# ── AUTO-17 — la base del R neto como dimensión estadística ─────────────────────────
+
+
+def _cycle_with_basis(
+    version: str,
+    *,
+    index: int,
+    basis: str,
+    closed_at: str,
+    pnl: str = "10",
+    regime: str = "TREND_UP",
+) -> dict[str, object]:
+    """Ciclo del que sale un R neto con la base pedida (``estimated`` o ``applied``).
+
+    La base ``applied`` exige que la comisión del MODELO sea cuantificable: sin ella el neto
+    aplicado no se compone y vuelve al estimado (la regla de ``AUTO-16``).
+    """
+    row = _cycle(version, index=index, pnl=pnl, regime=regime, closed_at=closed_at)
+    if basis == "applied":
+        row["cost"] = {"total": 1.0, "commission": 0.5, "measurement": "COMPLETE"}
+        row["costApplied"] = {"friction": "0.5", "measurement": "COMPLETE"}
+    return row
+
+
+def test_the_basis_transition_states_are_declared() -> None:
+    """El detector es puro y declara sus cinco estados, incluida la transición real."""
+    assert (
+        _basis_transition(SELF_EVAL_COST_BASIS_ESTIMATED, SELF_EVAL_COST_BASIS_ESTIMATED)
+        == ADAPTIVE_BASIS_STABLE_ESTIMATED
+    )
+    assert (
+        _basis_transition(SELF_EVAL_COST_BASIS_APPLIED, SELF_EVAL_COST_BASIS_APPLIED)
+        == ADAPTIVE_BASIS_STABLE_APPLIED
+    )
+    assert (
+        _basis_transition(SELF_EVAL_COST_BASIS_ESTIMATED, SELF_EVAL_COST_BASIS_APPLIED)
+        == ADAPTIVE_BASIS_TRANSITION
+    )
+    assert _basis_transition("mixed", SELF_EVAL_COST_BASIS_APPLIED) == ADAPTIVE_BASIS_MIXED
+    assert _basis_transition(None, SELF_EVAL_COST_BASIS_APPLIED) == ADAPTIVE_BASIS_UNKNOWN
+    assert _basis_transition("undeclared", SELF_EVAL_COST_BASIS_ESTIMATED) == ADAPTIVE_BASIS_UNKNOWN
+
+
+def test_a_homogeneous_window_is_stable_and_keeps_the_historic_decay() -> None:
+    """CONTROL de compatibilidad: una sola base ⇒ ``STABLE_ESTIMATED`` y el decay de siempre."""
+    cycles = _dated(count=30, pnl="10") + _dated(count=10, first_day=1, month=10, pnl="-10")
+    reading = build_adaptive_confidence(cycles, recent_window=10, long_window=200, min_trades=5)
+    row = reading.confidence_for("orb-1")
+
+    assert row is not None
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_ESTIMATED
+    assert row.basis_transition == ADAPTIVE_BASIS_STABLE_ESTIMATED
+    assert row.decay == ADAPTIVE_DECAY_SEVERE
+
+
+def test_a_window_that_spans_two_bases_declares_mixed_and_refuses_to_decay() -> None:
+    """AUTO-17: una ventana que mezcla ``estimated`` (viejo) con ``applied`` (nuevo) ⇒ ``MIXED``.
+
+    Es el escenario de la transición real: el neto reciente sale más alto porque cambió el metro,
+    no porque la estrategia mejore. La lectura lo declara (``mixed``), no publica pooled y NO
+    interpreta el salto como deterioro ni mejora (``decay = UNKNOWN``).
+    """
+    old = [
+        _cycle_with_basis(
+            "orb-1", index=i, basis="estimated", closed_at=f"2026-09-{i:02d}T10:00:00+00:00"
+        )
+        for i in range(1, 31)
+    ]
+    new = [
+        _cycle_with_basis(
+            "orb-1",
+            index=100 + i,
+            basis="applied",
+            closed_at=f"2026-10-{i:02d}T10:00:00+00:00",
+            pnl="14",
+        )
+        for i in range(1, 11)
+    ]
+    reading = build_adaptive_confidence(old + new, recent_window=10, long_window=200, min_trades=5)
+    row = reading.confidence_for("orb-1")
+
+    assert row is not None
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_MIXED
+    assert row.basis_transition == ADAPTIVE_BASIS_MIXED
+    assert row.decay == ADAPTIVE_DECAY_UNKNOWN, "un cambio de base no es deterioro"
+    assert len(row.net_r_series) == 2, "el desglose conserva las dos series"
+    assert {series.basis for series in row.net_r_series} == {
+        SELF_EVAL_COST_BASIS_ESTIMATED,
+        SELF_EVAL_COST_BASIS_APPLIED,
+    }
+
+
+def test_a_stable_applied_window_is_declared_and_keeps_the_historic_decay() -> None:
+    """CONTROL del otro extremo: todo medido contra el aplicado ⇒ ``STABLE_APPLIED``."""
+    cycles = [
+        _cycle_with_basis(
+            "orb-1", index=i, basis="applied", closed_at=f"2026-09-{i:02d}T10:00:00+00:00"
+        )
+        for i in range(1, 31)
+    ] + [
+        _cycle_with_basis(
+            "orb-1",
+            index=100 + i,
+            basis="applied",
+            closed_at=f"2026-10-{i:02d}T10:00:00+00:00",
+            pnl="-10",
+        )
+        for i in range(1, 11)
+    ]
+    reading = build_adaptive_confidence(cycles, recent_window=10, long_window=200, min_trades=5)
+    row = reading.confidence_for("orb-1")
+
+    assert row is not None
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_APPLIED
+    assert row.basis_transition == ADAPTIVE_BASIS_STABLE_APPLIED
+    assert row.decay == ADAPTIVE_DECAY_SEVERE

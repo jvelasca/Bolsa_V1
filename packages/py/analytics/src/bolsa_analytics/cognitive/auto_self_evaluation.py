@@ -70,6 +70,7 @@ __all__ = [
     "SELF_EVAL_REGIME_UNKNOWN",
     "AutoSelfEvaluation",
     "CycleR",
+    "NetRBasisSeries",
     "StrategyRegimeEvaluation",
     "StrategySelfEvaluation",
     "aggregate_by_regime",
@@ -685,6 +686,28 @@ def _max_drawdown(pnls: Sequence[Decimal]) -> Decimal:
 
 
 @dataclass(frozen=True, slots=True)
+class NetRBasisSeries:
+    """(AUTO-17) el R neto de UNA base de coste: su número y su muestra, SIN promediar con otra.
+
+    La base del R neto es una dimensión estadística, no una etiqueta: dos netos medidos contra
+    modelos de coste distintos (``estimated`` vs ``applied``) no son comparables. Cuando un
+    agregado convive con las dos, el pooled **no se publica** (``net_expectancy_r = None``,
+    ``net_r_basis = mixed``) y los números viven aquí, cada uno con su muestra y su base. Es la
+    regla que impide que un cambio de base se lea como un cambio de rendimiento.
+
+    ``n`` es el número de ciclos con R neto medido de esa base (el denominador de su media): sin
+    él, la media de una serie no es auditable.
+    """
+
+    basis: str
+    n: int
+    expectancy_r: float | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"basis": self.basis, "n": self.n, "expectancyR": self.expectancy_r}
+
+
+@dataclass(frozen=True, slots=True)
 class StrategySelfEvaluation:
     """Lectura read-only de UNA ``strategyVersion`` sobre el periodo aportado."""
 
@@ -726,6 +749,10 @@ class StrategySelfEvaluation:
     #: hay ningún neto que declarar, y también por defecto: una fila construida sin declararla NO
     #: afirma una base (el mismo trato que ``sinkFailuresDurable``: sin declaración, no se afirma).
     net_r_basis: str | None = None
+    #: AUTO-17: el desglose del R neto POR BASE (``NetRBasisSeries``). Con una sola base tiene una
+    #: entrada (idéntica al pooled); con bases distintas, una por base y el pooled queda ``None``.
+    #: Defecto ``()``: una fila construida sin el campo NO afirma series (compatibilidad).
+    net_r_series: tuple[NetRBasisSeries, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -766,6 +793,7 @@ class StrategySelfEvaluation:
             "riskMeasurement": self.risk_measurement,
             "netRMeasurement": self.net_r_measurement,
             "netRBasis": self.net_r_basis,
+            "netRBasisSeries": [series.as_dict() for series in self.net_r_series],
             "cyclesWithoutCost": self.cycles_without_cost,
             "excursionsMeasurement": self.excursions_measurement,
             "slippageMeasurement": self.slippage_measurement,
@@ -820,6 +848,9 @@ class StrategyRegimeEvaluation:
     #: ``undeclared``), o ``None`` sin netos —y por defecto: sin declaración no se afirma base—.
     #: Es la mitad que impide leer como comparables dos netos medidos contra modelos distintos.
     net_r_basis: str | None = None
+    #: AUTO-17: el desglose del R neto POR BASE de la celda (mismo contrato que
+    #: ``StrategySelfEvaluation.net_r_series``).
+    net_r_series: tuple[NetRBasisSeries, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -837,6 +868,7 @@ class StrategyRegimeEvaluation:
             "rMeasurement": self.r_measurement,
             "netRMeasurement": self.net_r_measurement,
             "netRBasis": self.net_r_basis,
+            "netRBasisSeries": [series.as_dict() for series in self.net_r_series],
             "sampleQuality": self.sample_quality,
             "decisive": self.decisive,
             "notes": list(self.notes),
@@ -1121,23 +1153,55 @@ def _profit_factor(pnls: Sequence[Decimal]) -> float | None:
     return _round4(float(gross_profit / gross_loss))
 
 
-def _net_r_basis(cycles: Sequence[_Cycle]) -> str | None:
-    """(PURA, AUTO-16) la base DECLARADA del R neto de un agregado.
+def _net_r_series(cycles: Sequence[_Cycle]) -> tuple[NetRBasisSeries, ...]:
+    """(PURA, AUTO-17) el R neto desglosado POR BASE, sin promediar entre bases.
 
-    ``None`` = el agregado no tiene ningún neto que declarar (no hay cociente). Con netos, la
-    base es la única declarada por sus filas; ``undeclared`` si ninguna lo dice (el R vino
-    calculado fuera y no se sabe contra qué coste) y ``mixed`` si conviven bases distintas
-    —incluida la ausencia de base—. Declarar la mezcla es lo único que impide leer como un solo
-    modelo un número que promedia dos.
+    Agrupa los ciclos con R neto medido por la base de su coste (``estimated``/``applied``, o
+    ``undeclared`` si la fila no la declara) y devuelve, por base, su muestra ``n`` y su
+    expectativa. El orden es determinista (por nombre de base) para que el desglose no dependa
+    del orden de llegada de los ciclos.
     """
-    declared = [cycle.cost_basis for cycle in cycles if cycle.net_r_multiple is not None]
-    if not declared:
+    grouped: dict[str, list[float]] = {}
+    for cycle in cycles:
+        if cycle.net_r_multiple is None:
+            continue
+        basis = cycle.cost_basis or SELF_EVAL_COST_BASIS_UNDECLARED
+        grouped.setdefault(basis, []).append(cycle.net_r_multiple)
+    return tuple(
+        NetRBasisSeries(
+            basis=basis,
+            n=len(values),
+            expectancy_r=_round4(sum(values) / len(values)),
+        )
+        for basis, values in sorted(grouped.items())
+    )
+
+
+def _basis_of(series: Sequence[NetRBasisSeries]) -> str | None:
+    """(PURA) la base DECLARADA de un agregado a partir de su desglose.
+
+    ``None`` = no hay ningún neto que declarar. Una sola serie ⇒ su base; varias ⇒ ``mixed``.
+    """
+    if not series:
         return None
-    unique = set(declared)
-    if len(unique) > 1:
+    if len(series) > 1:
         return SELF_EVAL_COST_BASIS_MIXED
-    only = next(iter(unique))
-    return only if only is not None else SELF_EVAL_COST_BASIS_UNDECLARED
+    return series[0].basis
+
+
+def _pooled_net_expectancy(
+    series: Sequence[NetRBasisSeries], basis: str | None
+) -> float | None:
+    """(PURA, AUTO-17) la expectativa pooled del R neto, o ``None`` si las bases son mixtas.
+
+    Con una sola base (o ninguna) el número es el de siempre —la fila es byte a byte la de
+    ``v2.56``—. Con bases distintas el pooled **no se publica**: promediar dos modelos de coste
+    como si fueran uno es exactamente el sesgo que ``AUTO-17`` existe para impedir. Los números
+    siguen disponibles, uno por base, en ``net_r_series``.
+    """
+    if basis == SELF_EVAL_COST_BASIS_MIXED:
+        return None
+    return series[0].expectancy_r if series else None
 
 
 def _strategy_row(
@@ -1206,7 +1270,8 @@ def _strategy_row(
         )
 
     notes: list[str] = []
-    net_r_basis = _net_r_basis(cycles)
+    net_r_series = _net_r_series(cycles)
+    net_r_basis = _basis_of(net_r_series)
     if cycles:
         # Los huecos se declaran SOLO cuando hay resultado que medir: en una versión sin
         # ningún ciclo, "R no medido" no aporta nada que "0 ciclos" no diga ya.
@@ -1237,7 +1302,7 @@ def _strategy_row(
         realized_pnl=realized.quantize(_MONEY),
         expectancy_currency=((realized / len(with_pnl)).quantize(_MONEY) if with_pnl else None),
         expectancy_r=(_round4(sum(r_values) / len(r_values)) if r_values else None),
-        net_expectancy_r=(_round4(sum(net_values) / len(net_values)) if net_values else None),
+        net_expectancy_r=_pooled_net_expectancy(net_r_series, net_r_basis),
         win_rate=_round4(wins / len(with_pnl)) if with_pnl else None,
         profit_factor=_profit_factor(pnls),
         avg_win_currency=((gross_profit / wins).quantize(_MONEY) if wins else None),
@@ -1257,6 +1322,7 @@ def _strategy_row(
         risk_measurement=risk_measurement,
         net_r_measurement=net_r_measurement,
         net_r_basis=net_r_basis,
+        net_r_series=net_r_series,
         cycles_without_cost=trades - len(net_values),
         excursions_measurement=excursions_measurement,
         slippage_measurement=slippage_measurement,
@@ -1366,6 +1432,8 @@ def _regime_row(
     net_measurement = measurement_from_counts(
         valued=len(net_values), unvalued=trades - len(net_values)
     )
+    net_r_series = _net_r_series(cycles)
+    net_r_basis = _basis_of(net_r_series)
     return StrategyRegimeEvaluation(
         strategy_version=version,
         regime=regime,
@@ -1374,13 +1442,14 @@ def _regime_row(
         losses=losses,
         realized_pnl=sum(pnls, Decimal("0")).quantize(_MONEY),
         expectancy_r=(_round4(sum(r_values) / len(r_values)) if r_values else None),
-        net_expectancy_r=(_round4(sum(net_values) / len(net_values)) if net_values else None),
+        net_expectancy_r=_pooled_net_expectancy(net_r_series, net_r_basis),
         win_rate=_round4(wins / len(pnls)) if pnls else None,
         cycles_without_risk=trades - len(r_values),
         cycles_without_cost=trades - len(net_values),
         r_measurement=r_measurement,
         net_r_measurement=net_measurement,
-        net_r_basis=_net_r_basis(cycles),
+        net_r_basis=net_r_basis,
+        net_r_series=net_r_series,
         sample_quality=sample_quality_from_n(trades),
         decisive=(trades >= max(1, min_trades) and r_measurement == MEASUREMENT_COMPLETE),
         notes=((SELF_EVAL_COST_UNMEASURED,) if net_measurement != MEASUREMENT_COMPLETE else ()),
