@@ -326,6 +326,7 @@ en **verde**, con los **cuatro** jobs PG del per-commit en `success`. **No hubo 
 | `Python CI` del tag (per-commit) | [`35976693477`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976693477) | **`5/5` jobs `success`**: `quality`, `auto-v2-durable-pg`, `grammar-discovery-pg`, `paper-forward-pg` y `lifecycle-pg` |
 | `Python CI` de `main` (per-commit) | [`35976683023`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976683023) | **`5/5` jobs `success`**; job `quality` **`2657 passed / 38 skipped`** |
 | `check-runs` del commit sellado `72f6084a` | API de checks | **`total_count = 37`** ⇒ **`36 success` + `1 skipped`** |
+| `status` (Commit Status **legacy**) de `72f6084a` | `/commits/{sha}/status` | **`pending`** con **`0` statuses**, *a la vez* que los **`37` check-runs están `completed`** ⇒ **cruce de API reproducido en vivo**: la ruta legacy **no ve** los check-runs, por eso leerla «parece rojo/ausente» aunque el sello esté verde |
 
 ### 11.3 El límite declarado del §7, cerrado por la CI del tag
 
