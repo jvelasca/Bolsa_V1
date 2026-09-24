@@ -15,6 +15,7 @@ import pytest
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_COST_BASIS_APPLIED,
     SELF_EVAL_COST_BASIS_ESTIMATED,
+    SELF_EVAL_COST_MODEL_UNDECLARED,
     cycle_r,
 )
 from bolsa_analytics.cognitive.measurement import (
@@ -29,6 +30,9 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     SIDE_SELL,
     PortfolioReservation,
     TradingCost,
+    TradingCostModel,
+    coerce_trading_cost,
+    estimate_trading_cost,
 )
 from bolsa_application.applied_cost import applied_cost_from_fills
 from bolsa_application.auto_self_evaluation_feed import build_auto_self_evaluation
@@ -611,3 +615,38 @@ def test_without_reference_the_net_is_the_estimated_number_of_v2_56() -> None:
     assert row.net_expectancy_r == legacy.net_r_multiple, "byte a byte: el estimado de siempre"
     assert row.net_expectancy_r == pytest.approx(-0.11)
     assert row.net_r_basis == SELF_EVAL_COST_BASIS_ESTIMATED, "la base viaja en la lectura"
+
+
+def test_the_cost_model_version_travels_from_the_model_to_the_cycle_row() -> None:
+    """``AUTO-18``: el METRO con el que se estimó el coste viaja CON él, sin migración.
+
+    ``estimate_trading_cost`` firma su modelo (``cm:<preset|bps>:c/s/l/g``); la firma entra en el
+    ``to_dict`` del coste como clave ADITIVA (la columna JSON ya la absorbe, así que no hay
+    migración) y el informe la **lee** de la fila. Un coste sin firma —el histórico anterior a la
+    fase— queda ``undeclared``: el metro no se reconstruye desde los bps de hoy.
+    """
+    model = TradingCostModel(commission_bps=10.0, spread_bps=2.0, slippage_bps=5.0, gap_bps=0.0)
+    cost = estimate_trading_cost(quantity=10, entry=100.0, stop=95.0, model=model)
+
+    assert cost.cost_model_version == "cm:bps:10/2/5/0"
+    assert cost.to_dict()["costModelVersion"] == "cm:bps:10/2/5/0"
+    assert coerce_trading_cost(cost.to_dict()).cost_model_version == "cm:bps:10/2/5/0"
+    # El MODELO también publica su firma: es el metro con el que se estimará cualquier coste
+    # futuro, y sin ella el ``costModelVersion`` de la fila quedaría sin casa que lo sostenga.
+    assert model.to_dict()["costModelVersion"] == model.cost_model_signature()
+
+    declared = build_auto_self_evaluation(
+        fills=_round_trip_with_reference(reference=None),
+        min_trades=1,
+        cycle_risk=_evidence_for_cycles(["cyc-1"], [_reservation(risk=250.0, cost=cost)]),
+    ).by_strategy[0]
+    assert declared.cost_model_version == "cm:bps:10/2/5/0"
+
+    undeclared = build_auto_self_evaluation(
+        fills=_round_trip_with_reference(reference=None),
+        min_trades=1,
+        cycle_risk=_evidence_for_cycles(
+            ["cyc-1"], [_reservation(risk=250.0, cost=_cost(total=25.0))]
+        ),
+    ).by_strategy[0]
+    assert undeclared.cost_model_version == SELF_EVAL_COST_MODEL_UNDECLARED

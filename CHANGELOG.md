@@ -2,6 +2,67 @@
 
 All notable releases of Bolsa V1.
 
+## [1.84.0-beta] — AUTO-18 Confianza estadística (V2.59) — 2026-09-24
+
+**Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI nueva, sin cambio de
+contrato de API ni de DTO y **sin clave nueva en el journal durable** (la proyección por lista blanca
+`riskMultipliers` + `evidenceAxis` de `auto_adaptive_journal.py` queda **byte a byte igual**). El
+gobernador y su evidencia siguen **intactos** (diff vacío). El invariante que instala:
+
+> **Ninguna recomendación Adaptive puede pesar más de lo que su población independiente, homogénea,
+> comparable y calibrada sostiene.** La evidencia se mide con `effective_N` **estadístico** (no con el
+> bruto), se publica con su **cobertura por régimen** y su **fiabilidad por banda**, y solo compite en un
+> eje cuando comparte `(net_r_basis, cost_model_version)`.
+
+`AUTO-12` publicaba una confianza estadística, pero su `effective_n` era **la muestra bruta** (ciclos con R
+medido): **100 ciclos dentro de una sola fase de mercado pesaban como 100 observaciones independientes**,
+que es precisamente lo que no son. Y el metro con el que se midió el neto **no viajaba**, así que dos
+versiones con modelos de coste distintos podían competir en el eje del R neto como si fueran comparables.
+Esta pasada cierra los dos huecos:
+
+1. **`effective_N` estadístico por episodios.** `effective_n = min(measured_n, episodes)`, donde
+   `episodes` son las **rachas de régimen** de los ciclos medidos ordenados (un ciclo `UNKNOWN` forma su
+   **propia** racha). Se publica el descuento declarado (`episode_discount`) y la cobertura por régimen
+   como **eje propio** (`HIGH`/`MEDIUM`/`LOW`/`UNCOVERED`). La **calibración es descriptiva**
+   (`ConfidenceCalibration`: banda → `n`/`mean_r`/`win_rate`/rango prometido/fiabilidad observada) y **no**
+   mueve banda ni reparto; `shrunk_expectancy_r` se publica en cada fila/celda.
+2. **El metro del coste viaja** (`costModelVersion` **aditivo** en `TradingCost.to_dict()`, recomputado de
+   la firma del modelo) y un cambio de metro **separa series** (`_net_r_series` agrupa por
+   `(basis, cost_model_version)`) y **bloquea** `decay`/eje (`COST_MODEL_TRANSITION`), en la misma línea
+   que `AUTO-17` hizo con la base del neto.
+   El sello del reparto sube a **`auto18-v1`**: aquí **sí** cambia la **regla** (la `n` del encogimiento).
+
+**Deudas P2 cerradas en el mismo sello:** enums cerrados `NetRBasis` / `BasisTransition` con los **mismos
+valores** de string (JSON byte-idéntico); invariante de dominio **un neto publicado declara su base**
+(`affirms_declared_net_r_basis` + guarda en `_strategy_row`); estado declarado **`DATA_DEGRADED`** para «neto
+sin base» (baja la banda, distinto del `UNKNOWN` inocuo); y documentado que **`MIXED` (heterogeneidad
+interna) y `TRANSITION` (cambio temporal de base) son dos ejes distintos**.
+
+### Añadido
+
+- **`auto_adaptive_confidence.py`** — `measured_n`/`episodes`/`effective_n` (`_episodes`), cobertura por
+  celda (`_coverage_band`), calibración descriptiva (`ConfidenceCalibration`, `_regime_calibration`),
+  `shrunk_expectancy_r` (`_shrunk`), `COST_MODEL_TRANSITION` y `DATA_DEGRADED`, enums `NetRBasis`/
+  `BasisTransition`.
+- **`auto_self_evaluation.py`** — `cost_model_version` en `CycleR`/`NetRBasisSeries`, series por
+  `(basis, cost_model_version)` (`_net_r_series`, `_cost_model_key`, `_cost_model_of`), `NetRBasis`,
+  `affirms_declared_net_r_basis`.
+- **`auto_adaptive.py`** — `_confidence_factor` con `effective_n` estadístico, `shrink_factors` publicado,
+  evidencia con `measuredN`/`episodes`/`effectiveN`/`coverage`/`shrunkExpectancyR`/`shrinkFactor`; sello
+  `ADAPTIVE_POLICY_VERSION = "auto18-v1"` (`DATA_GATE_POLICY_VERSION` sigue `auto15-v1`).
+- **`portfolio_reservation.py`** — `TradingCostModel.cost_model_signature()`, `TradingCost.cost_model_version`
+  y su clave aditiva `costModelVersion` en los dos `to_dict()`.
+- **Mutaciones `M139…M148`** (10 nuevas) en la sonda, con realineos declarados de `M60`, `M125`, `M128`,
+  `M131`, `M134`.
+- **Costura nueva** `test_auto_v59_auto18_confidence_seam.py`.
+
+### Compatibilidad
+
+- Sin `confidence` el plan sale **byte a byte** como en `v2.58`; los campos nuevos tienen defecto seguro
+  (`measured_n = effective_n` histórico, `cost_model_version=None`, `episodes=0`).
+- Sin `costModelVersion` el informe es **byte-idéntico** a `v2.58`: el metro entra como clave **aditiva**.
+- Los históricos quedan `None`/`undeclared` (declarado), nunca un metro inventado. **Sin backfill.**
+
 ## [1.83.0-beta] — AUTO-17 Integridad de la población de medida (V2.58) — 2026-09-24
 
 **Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI nueva, sin cambio de

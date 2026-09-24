@@ -13,6 +13,7 @@ cero) y un resultado plano medido (``pnl = 0``) **sí** es una medida.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -24,6 +25,8 @@ from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_COST_BASIS_ESTIMATED,
     SELF_EVAL_COST_BASIS_MIXED,
     SELF_EVAL_COST_BASIS_UNDECLARED,
+    SELF_EVAL_COST_MODEL_MIXED,
+    SELF_EVAL_COST_MODEL_UNDECLARED,
     SELF_EVAL_COST_UNMEASURED,
     SELF_EVAL_CYCLE_WITHOUT_IDENTITY,
     SELF_EVAL_DRAWDOWN_SHARE_PROXY,
@@ -44,11 +47,17 @@ from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_SLIPPAGE_UNMEASURED,
     SELF_EVAL_THIN_SAMPLE,
     SELF_EVAL_UNVERSIONED_CYCLE,
+    NetRBasis,
+    affirms_declared_net_r_basis,
     aggregate_by_regime,
     cycle_r,
     declared_regime,
     evaluate_auto_self_evaluation,
     single_decisive_regime,
+)
+from bolsa_analytics.cognitive.measurement import (
+    MEASUREMENT_COMPLETE,
+    MEASUREMENT_PARTIAL,
 )
 
 
@@ -403,17 +412,28 @@ def test_as_dict_is_serializable_and_declares_read_only() -> None:
 # ── AUTO-9 — el R de un ciclo (paso 3 del plan `v2.50`) ─────────────────────────────
 
 
-def _cost(total: float | None = 12.5, *, commission: float | None = 5.0) -> dict[str, object]:
+def _cost(
+    total: float | None = 12.5,
+    *,
+    commission: float | None = 5.0,
+    model: str | None = None,
+) -> dict[str, object]:
     """Un ``TradingCost.to_dict()`` mínimo: solo lo que el cálculo del R necesita.
 
     ``commission`` va aparte de ``total`` porque el neto aplicado se compone con ELLA (el
     schedule del simulador no cobra comisión): sin este campo no se puede formar la base mixta.
+
+    ``model`` (``AUTO-18``) es la clave ADITIVA ``costModelVersion``: sin ella la fila queda
+    ``undeclared``, que es exactamente lo que declara un histórico anterior a la fase.
     """
-    return {
+    row: dict[str, object] = {
         "total": total,
         "commission": commission,
         "measurement": "COMPLETE" if total is not None else "PARTIAL",
     }
+    if model is not None:
+        row["costModelVersion"] = model
+    return row
 
 
 def test_cycle_r_is_the_pnl_over_the_committed_risk_and_net_discounts_the_cost() -> None:
@@ -837,6 +857,49 @@ def test_a_row_without_a_declared_base_is_undeclared_not_completed() -> None:
     assert row.net_r_basis == SELF_EVAL_COST_BASIS_UNDECLARED
 
 
+def test_the_net_basis_enum_closes_the_vocabulary_without_moving_the_json() -> None:
+    """AUTO-18 (§16): ``NetRBasis`` cierra las bases sin cambiar un byte del JSON.
+
+    ``str, Enum`` ⇒ ``json.dumps`` serializa el VALOR (no ``NetRBasis.APPLIED``), así que el
+    vocabulario queda cerrado sin romper a ningún consumidor del payload.
+    """
+    assert NetRBasis.ESTIMATED.value == SELF_EVAL_COST_BASIS_ESTIMATED == "estimated"
+    assert NetRBasis.APPLIED.value == SELF_EVAL_COST_BASIS_APPLIED
+    assert NetRBasis.MIXED.value == SELF_EVAL_COST_BASIS_MIXED == "mixed"
+    assert NetRBasis.UNDECLARED.value == SELF_EVAL_COST_BASIS_UNDECLARED == "undeclared"
+    assert json.dumps(NetRBasis.APPLIED) == json.dumps(SELF_EVAL_COST_BASIS_APPLIED)
+
+
+def test_a_published_net_always_declares_its_basis() -> None:
+    """AUTO-18 (§18): invariant — un neto PUBLICADO no sale del productor sin base.
+
+    El predicado lo comprueba sin reinterpretar: con la medición ``COMPLETE`` y un
+    ``net_expectancy_r`` no nulo, la base tiene que estar declarada (``True``). Una construcción
+    MANUAL con neto y sin base rompe el invariante (``False``): esa fila no afirma estabilidad.
+    """
+    row = evaluate_auto_self_evaluation(
+        cycles=[_cycle(pnl="200", cycle_id="c1", net_r=1.9)], min_trades=1
+    ).by_strategy[0]
+
+    assert row.net_expectancy_r is not None
+    assert affirms_declared_net_r_basis(
+        net_r_measurement=row.net_r_measurement,
+        net_expectancy_r=row.net_expectancy_r,
+        net_r_basis=row.net_r_basis,
+    )
+    # Manual y sin base: NO afirma base (es el ``DATA_DEGRADED`` que lee la confianza).
+    assert not affirms_declared_net_r_basis(
+        net_r_measurement=MEASUREMENT_COMPLETE, net_expectancy_r=1.9, net_r_basis=None
+    )
+    # Vacuously ``True`` cuando no se afirma un neto: no hay invariante que romper.
+    assert affirms_declared_net_r_basis(
+        net_r_measurement=MEASUREMENT_PARTIAL, net_expectancy_r=1.9, net_r_basis=None
+    )
+    assert affirms_declared_net_r_basis(
+        net_r_measurement=MEASUREMENT_COMPLETE, net_expectancy_r=None, net_r_basis=None
+    )
+
+
 def test_a_mixed_basis_is_declared_and_never_silently_averaged() -> None:
     """AUTO-17: dos netos de modelos de coste distintos NO se promedian, ni siquiera en silencio.
 
@@ -940,3 +1003,70 @@ def test_a_report_without_any_net_declares_no_basis_at_all() -> None:
     assert row.net_expectancy_r is None
     assert row.net_r_basis is None
     assert SELF_EVAL_COST_BASIS_MIXED not in row.notes
+
+
+# ── AUTO-18 — el METRO del neto (``cost_model_version``) ────────────────────────────
+
+
+def test_two_cost_models_in_the_same_basis_are_two_series_not_one_average() -> None:
+    """``AUTO-18``: la población comparable es ``(base, versión del modelo)``.
+
+    Con la MISMA base (``estimated``) pero dos metros, el pooled **no se publica** —no hay un
+    número único, y elegir uno de los dos sería afirmar un promedio que nadie midió— y cada metro
+    viaja en SU serie con su muestra. La base sigue siendo única: lo que se declara ``mixed`` es
+    la versión del modelo, que es un eje distinto.
+    """
+    row = evaluate_auto_self_evaluation(
+        cycles=[
+            _cycle(pnl="200", cycle_id="c1", risk="100", cost=_cost(12.5, model="cm:bps:10/2/5/0")),
+            _cycle(pnl="150", cycle_id="c2", risk="100", cost=_cost(12.5, model="cm:bps:10/2/5/0")),
+            _cycle(pnl="300", cycle_id="c3", risk="100", cost=_cost(12.5, model="cm:preset:10/2/5/0")),
+        ],
+        min_trades=1,
+    ).by_strategy[0]
+
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_ESTIMATED, "la base NO mezcla: el metro sí"
+    assert row.net_expectancy_r is None, "dos metros ⇒ no hay pooled que publicar"
+    assert row.cost_model_version == SELF_EVAL_COST_MODEL_MIXED
+    series = {entry.cost_model_version: entry for entry in row.net_r_series}
+    assert set(series) == {"cm:bps:10/2/5/0", "cm:preset:10/2/5/0"}
+    assert series["cm:bps:10/2/5/0"].n == 2
+    assert series["cm:preset:10/2/5/0"].n == 1
+    assert all(entry.basis == SELF_EVAL_COST_BASIS_ESTIMATED for entry in series.values())
+    payload = row.as_dict()
+    assert payload["costModelVersion"] == SELF_EVAL_COST_MODEL_MIXED
+    assert len(payload["netRBasisSeries"]) == 2
+
+
+def test_one_cost_model_keeps_the_pooled_number_and_one_series() -> None:
+    """CONTROL de compatibilidad: un único metro ⇒ misma partición y mismo número que AUTO-17."""
+    row = evaluate_auto_self_evaluation(
+        cycles=[
+            _cycle(pnl="200", cycle_id="c1", risk="100", cost=_cost(12.5, model="cm:bps:10/2/5/0")),
+            _cycle(pnl="150", cycle_id="c2", risk="100", cost=_cost(12.5, model="cm:bps:10/2/5/0")),
+        ],
+        min_trades=1,
+    ).by_strategy[0]
+
+    assert row.cost_model_version == "cm:bps:10/2/5/0"
+    assert len(row.net_r_series) == 1
+    assert row.net_r_series[0].cost_model_version == "cm:bps:10/2/5/0"
+    assert row.net_expectancy_r == pytest.approx(
+        ((200.0 - 12.5) / 100.0 + (150.0 - 12.5) / 100.0) / 2
+    )
+
+
+def test_a_row_without_a_declared_model_is_undeclared_and_not_rebuilt() -> None:
+    """Un histórico sin ``costModelVersion`` se declara ``undeclared``: no se reconstruye el metro.
+
+    Los bps de hoy podrían no ser los que midieron la operación, así que afirmarlos sería inventar
+    el instrumento. La serie se publica con su ausencia declarada.
+    """
+    row = evaluate_auto_self_evaluation(
+        cycles=[_cycle(pnl="200", cycle_id="c1", risk="100", cost=_cost(12.5))],
+        min_trades=1,
+    ).by_strategy[0]
+
+    assert row.cost_model_version == SELF_EVAL_COST_MODEL_UNDECLARED
+    assert len(row.net_r_series) == 1
+    assert row.net_r_series[0].cost_model_version == SELF_EVAL_COST_MODEL_UNDECLARED

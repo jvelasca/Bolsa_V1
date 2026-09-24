@@ -44,6 +44,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
+from enum import StrEnum
 from typing import Any
 
 from bolsa_analytics.cognitive.expectancy import sample_quality_from_n
@@ -66,14 +67,18 @@ __all__ = [
     "SELF_EVAL_COST_BASIS_ESTIMATED",
     "SELF_EVAL_COST_BASIS_MIXED",
     "SELF_EVAL_COST_BASIS_UNDECLARED",
+    "SELF_EVAL_COST_MODEL_MIXED",
+    "SELF_EVAL_COST_MODEL_UNDECLARED",
     "SELF_EVAL_REGIME_UNDETERMINED",
     "SELF_EVAL_REGIME_UNKNOWN",
     "AutoSelfEvaluation",
     "CycleR",
+    "NetRBasis",
     "NetRBasisSeries",
     "StrategyRegimeEvaluation",
     "StrategySelfEvaluation",
     "aggregate_by_regime",
+    "affirms_declared_net_r_basis",
     "cycle_r",
     "declared_regime",
     "evaluate_auto_self_evaluation",
@@ -123,17 +128,41 @@ SELF_EVAL_COST_UNMEASURED = "cost_unmeasured"
 # coste, y ese coste puede venir de DOS modelos distintos (el aplicado por el simulador y el
 # supuesto por el decisor): sin declarar la base, dos netos con el mismo aspecto podrían no ser
 # comparables. ``MIXED`` no es un error: es la declaración de que un agregado mezcla las dos.
-#: El neto descontó la fricción que el simulador **aplicó** (medida contra su mid de referencia)
-#: **más** la comisión del MODELO: el schedule no cobra comisión (en SIM es 0), así que dejarla
-#: fuera del neto lo haría parecer mejor por un motivo que no es una mejora de ejecución. El
-#: nombre de la base publica la composición para que nadie lea el número como un coste realizado
-#: completo.
-SELF_EVAL_COST_BASIS_APPLIED = "applied_friction+modelled_commission"
-SELF_EVAL_COST_BASIS_ESTIMATED = "estimated"
-SELF_EVAL_COST_BASIS_MIXED = "mixed"
+class NetRBasis(StrEnum):
+    """(AUTO-18, §16) vocabulario CERRADO de las bases declarables del R neto.
+
+    El enum cierra el conjunto sin mover un byte del JSON: sus valores son EXACTAMENTE los
+    strings que ya viajan en ``netRBasis``/``net_r_basis`` (y ``str`` ⇒ ``json.dumps`` los
+    serializa idénticos). Las constantes ``SELF_EVAL_COST_BASIS_*`` siguen siendo la casa del
+    literal para los consumidores; el enum existe para que un agregado no pueda declarar una base
+    que no esté en el conjunto.
+
+    * :attr:`APPLIED` — el neto descontó la fricción que el simulador **aplicó** (más la comisión
+      del modelo; el schedule no la cobra, así que dejarla fuera lo haría parecer mejor).
+    * :attr:`ESTIMATED` — el neto descontó el coste que el decisor **supuso**.
+    * :attr:`MIXED` — el agregado mezcla bases (heterogeneidad INTERNA de una población).
+    * :attr:`UNDECLARED` — hay netos pero las filas no declaran de dónde salió el coste.
+    """
+
+    ESTIMATED = "estimated"
+    APPLIED = "applied_friction+modelled_commission"
+    MIXED = "mixed"
+    UNDECLARED = "undeclared"
+
+
+SELF_EVAL_COST_BASIS_APPLIED = NetRBasis.APPLIED.value
+SELF_EVAL_COST_BASIS_ESTIMATED = NetRBasis.ESTIMATED.value
+SELF_EVAL_COST_BASIS_MIXED = NetRBasis.MIXED.value
 #: El agregado tiene netos pero sus filas no declaran de dónde salió el coste (p.ej. un informe
 #: AUTO-7 cuyos ciclos ya traían el R neto calculado fuera). Se declara, no se supone.
-SELF_EVAL_COST_BASIS_UNDECLARED = "undeclared"
+SELF_EVAL_COST_BASIS_UNDECLARED = NetRBasis.UNDECLARED.value
+# AUTO-18 — la VERSIÓN del modelo de coste (``cm:<preset|bps>:c/s/l/g``). Es el METRO del neto:
+# dos netos medidos con modelos distintos no son comparables aunque los dos se llamen "coste".
+#: Distintas versiones de modelo conviven en un agregado: no se promedian como si fueran una.
+SELF_EVAL_COST_MODEL_MIXED = "mixed"
+#: Hay netos pero sus filas no declaran la versión del modelo (histórico anterior a la fase):
+#: el metro NO se puede reconstruir, así que se declara en vez de afirmarlo.
+SELF_EVAL_COST_MODEL_UNDECLARED = "undeclared"
 # AUTO-9 — el cruce ``strategy × regime``. El régimen **ausente** no se reparte ni se suma al
 # de otro ciclo: tiene cubo PROPIO. ``UNKNOWN`` es aquí un valor de agrupación, no un hueco
 # por rellenar.
@@ -256,6 +285,9 @@ class _Cycle:
     #: ``None`` cuando el neto no se calculó aquí o su fila no declara de dónde salió el coste:
     #: la ausencia de base NO se hereda de otro ciclo ni se supone.
     cost_basis: str | None = None
+    #: AUTO-18: la VERSIÓN del modelo de coste del ciclo (``cm:<preset|bps>:...``), o ``None`` si
+    #: su fila no la declara. La ausencia del metro NO se reconstruye ni se hereda: se declara.
+    cost_model_version: str | None = None
 
 
 def _regime(value: Any) -> str:
@@ -301,12 +333,18 @@ def _read_cycle(raw: Any) -> _Cycle:
             # AUTO-16: la fricción que el simulador APLICÓ (``costApplied``), si el productor
             # la midió. Entra al cociente SOLO si está COMPLETE; el estimado queda de respaldo.
             cost_applied=_field(raw, "cost_applied", "costApplied"),
+            # AUTO-18: la versión del modelo de coste, si la fila la declara (o el propio coste).
+            cost_model_version=_field(raw, "cost_model_version", "costModelVersion"),
         )
     # La base se DECLARA, no se hereda: si el neto vino calculado de fuera, solo se cree si la
     # fila la declara; si no, queda sin base (``None``) y el agregado lo dirá.
     declared_basis = _explicit(_field(raw, "cost_basis", "costBasis"))
     basis = computed.cost_basis if computed is not None else None
     basis = basis or declared_basis
+    # AUTO-18: el metro se declara o se lee del coste; nunca se reconstruye desde los bps de hoy.
+    declared_version = _explicit(_field(raw, "cost_model_version", "costModelVersion"))
+    version = computed.cost_model_version if computed is not None else None
+    version = version or declared_version
     measured_r = declared_r if declared_r is not None else _computed_r(computed, net=False)
     measured_net = declared_net if declared_net is not None else _computed_r(computed, net=True)
     return _Cycle(
@@ -332,6 +370,7 @@ def _read_cycle(raw: Any) -> _Cycle:
         slippage=_dec(_field(raw, "slippage", "slippage_currency", "slippageCurrency")),
         closed_at=_explicit(_field(raw, "closed_at", "closedAt")),
         cost_basis=basis,
+        cost_model_version=version,
     )
 
 
@@ -419,6 +458,11 @@ class CycleR:
     #: o ``None`` si no hubo neto. Es la mitad que impide que dos netos no comparables se lean
     #: como uno solo.
     cost_basis: str | None = None
+    #: AUTO-18: la VERSIÓN del modelo de coste con que se midió el neto (``cm:<preset|bps>:...``),
+    #: o ``None`` si la fila no la declara (histórico anterior a la fase). Es la otra mitad: con
+    #: la base sola, dos netos ``estimated`` calculados con bps distintos seguirían pareciendo
+    #: comparables y no lo son.
+    cost_model_version: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -428,6 +472,7 @@ class CycleR:
             "costEstimate": None if self.cost_estimate is None else str(self.cost_estimate),
             "costApplied": None if self.cost_applied is None else str(self.cost_applied),
             "costBasis": self.cost_basis,
+            "costModelVersion": self.cost_model_version,
             "measurement": self.measurement,
             "notes": list(self.notes),
         }
@@ -439,6 +484,7 @@ def cycle_r(
     risk_amount: Any,
     cost: Any = None,
     cost_applied: Any = None,
+    cost_model_version: Any = None,
 ) -> CycleR:
     """(PURA) el R de un ciclo desde su PnL, su riesgo comprometido y su coste.
 
@@ -468,6 +514,12 @@ def cycle_r(
     y ``cost_basis = "estimated"``. Un aplicado ``PARTIAL`` **no** se usa: es un suelo, y restar
     un suelo sobrestimaría el neto. Los dos números se publican por separado para que la resta
     sea auditable, y la base evita que dos netos no comparables se lean como uno.
+
+    **AUTO-18 — la VERSIÓN del modelo.** ``cost_model_version`` es el METRO del neto: la firma
+    determinista del modelo de coste (``cm:<preset|bps>:c/s/l/g``). Se toma de la fila si la
+    declara y, si no, del propio coste (``TradingCost.cost_model_version``); nunca se reconstruye
+    desde los bps actuales, que podrían no ser los que midieron esta operación. Sin ella, dos
+    netos ``estimated`` calculados con modelos distintos seguirían pareciendo comparables.
     """
     amount = _dec(pnl)
     risk = _dec(risk_amount)
@@ -499,6 +551,10 @@ def cycle_r(
             net_r_multiple = _ratio(amount - deducted, risk)
 
     valued = sum(1 for value in (r_multiple, net_r_multiple) if value is not None)
+    # AUTO-18: la versión del modelo se DECLARA (fila) o se LEE del coste; nunca se inventa.
+    version = _explicit(cost_model_version)
+    if version is None and cost_row is not None:
+        version = _explicit(cost_row.cost_model_version)
     return CycleR(
         r_multiple=r_multiple,
         net_r_multiple=net_r_multiple,
@@ -506,6 +562,7 @@ def cycle_r(
         cost_estimate=friction,
         cost_applied=applied,
         cost_basis=cost_basis,
+        cost_model_version=version,
         measurement=measurement_from_counts(valued=valued, unvalued=2 - valued),
         notes=tuple(notes),
     )
@@ -702,9 +759,19 @@ class NetRBasisSeries:
     basis: str
     n: int
     expectancy_r: float | None
+    #: AUTO-18: la VERSIÓN del modelo de coste de esta serie (``cm:<preset|bps>:...``), o
+    #: ``undeclared`` si sus filas no la declaran. La agrupación es por ``(basis,
+    #: cost_model_version)``, así que cada serie tiene **una sola** versión: un cambio de modelo
+    #: **separa** series en vez de promediarlas, y por eso aquí ya no aparece ``mixed``.
+    cost_model_version: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {"basis": self.basis, "n": self.n, "expectancyR": self.expectancy_r}
+        return {
+            "basis": self.basis,
+            "n": self.n,
+            "expectancyR": self.expectancy_r,
+            "costModelVersion": self.cost_model_version,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -749,10 +816,15 @@ class StrategySelfEvaluation:
     #: hay ningún neto que declarar, y también por defecto: una fila construida sin declararla NO
     #: afirma una base (el mismo trato que ``sinkFailuresDurable``: sin declaración, no se afirma).
     net_r_basis: str | None = None
-    #: AUTO-17: el desglose del R neto POR BASE (``NetRBasisSeries``). Con una sola base tiene una
-    #: entrada (idéntica al pooled); con bases distintas, una por base y el pooled queda ``None``.
-    #: Defecto ``()``: una fila construida sin el campo NO afirma series (compatibilidad).
+    #: AUTO-17: el desglose del R neto POR POBLACIÓN (``NetRBasisSeries``), hoy ``(base,
+    #: versión del modelo)``. Con una sola población tiene una entrada (idéntica al pooled); con
+    #: bases distintas —o con metros distintos dentro de la misma base— una por población y el
+    #: pooled queda ``None``. Defecto ``()``: una fila construida sin el campo NO afirma series.
     net_r_series: tuple[NetRBasisSeries, ...] = ()
+    #: AUTO-18: la VERSIÓN del modelo de coste del neto agregado (``cm:<preset|bps>:...``),
+    #: ``mixed`` si conviven metros distintos y ``undeclared`` si ninguna fila la declara. ``None``
+    #: sin netos que declarar. Defecto ``None``: sin declaración no se afirma un metro.
+    cost_model_version: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -794,6 +866,7 @@ class StrategySelfEvaluation:
             "netRMeasurement": self.net_r_measurement,
             "netRBasis": self.net_r_basis,
             "netRBasisSeries": [series.as_dict() for series in self.net_r_series],
+            "costModelVersion": self.cost_model_version,
             "cyclesWithoutCost": self.cycles_without_cost,
             "excursionsMeasurement": self.excursions_measurement,
             "slippageMeasurement": self.slippage_measurement,
@@ -848,9 +921,12 @@ class StrategyRegimeEvaluation:
     #: ``undeclared``), o ``None`` sin netos —y por defecto: sin declaración no se afirma base—.
     #: Es la mitad que impide leer como comparables dos netos medidos contra modelos distintos.
     net_r_basis: str | None = None
-    #: AUTO-17: el desglose del R neto POR BASE de la celda (mismo contrato que
+    #: AUTO-17: el desglose del R neto POR POBLACIÓN de la celda (mismo contrato que
     #: ``StrategySelfEvaluation.net_r_series``).
     net_r_series: tuple[NetRBasisSeries, ...] = ()
+    #: AUTO-18: la VERSIÓN del modelo de coste del neto de la celda (mismo contrato que
+    #: ``StrategySelfEvaluation.cost_model_version``: ``mixed``/``undeclared``/``None``).
+    cost_model_version: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -869,6 +945,7 @@ class StrategyRegimeEvaluation:
             "netRMeasurement": self.net_r_measurement,
             "netRBasis": self.net_r_basis,
             "netRBasisSeries": [series.as_dict() for series in self.net_r_series],
+            "costModelVersion": self.cost_model_version,
             "sampleQuality": self.sample_quality,
             "decisive": self.decisive,
             "notes": list(self.notes),
@@ -1154,54 +1231,121 @@ def _profit_factor(pnls: Sequence[Decimal]) -> float | None:
 
 
 def _net_r_series(cycles: Sequence[_Cycle]) -> tuple[NetRBasisSeries, ...]:
-    """(PURA, AUTO-17) el R neto desglosado POR BASE, sin promediar entre bases.
+    """(PURA, AUTO-17/18) el R neto desglosado por POBLACIÓN, sin promediar entre poblaciones.
 
-    Agrupa los ciclos con R neto medido por la base de su coste (``estimated``/``applied``, o
-    ``undeclared`` si la fila no la declara) y devuelve, por base, su muestra ``n`` y su
-    expectativa. El orden es determinista (por nombre de base) para que el desglose no dependa
-    del orden de llegada de los ciclos.
+    Agrupa los ciclos con R neto medido por ``(base del coste, versión del modelo)`` —la base es
+    ``estimated``/``applied``/``undeclared``— y devuelve, por población, su muestra ``n`` y su
+    expectativa. El orden es determinista (por ``(base, versión)``) para que el desglose no
+    dependa del orden de llegada de los ciclos.
+
+    ``AUTO-18`` hizo la clave ``(basis, cost_model_version)``: la población es homogénea en los
+    DOS ejes, así que un cambio de modelo **separa series** en vez de fundirlas en una media que
+    ningún metro midió. Con un solo modelo por base —el caso normal— la partición es exactamente
+    la de ``AUTO-17`` (mismo número, mismas series), y por eso las filas que no declaran el metro
+    se agrupan en su propia serie ``undeclared``.
+
+    La **suma publicada** (``_pooled_net_expectancy``) solo existe cuando hay UNA población: con
+    dos metros conviviendo, promediar sus expectativas sería comparar peras con manzanas.
     """
-    grouped: dict[str, list[float]] = {}
+    grouped: dict[tuple[str, str], list[_Cycle]] = {}
     for cycle in cycles:
         if cycle.net_r_multiple is None:
             continue
         basis = cycle.cost_basis or SELF_EVAL_COST_BASIS_UNDECLARED
-        grouped.setdefault(basis, []).append(cycle.net_r_multiple)
+        grouped.setdefault((basis, _cost_model_key(cycle)), []).append(cycle)
     return tuple(
         NetRBasisSeries(
             basis=basis,
             n=len(values),
-            expectancy_r=_round4(sum(values) / len(values)),
+            expectancy_r=_round4(
+                sum(cycle.net_r_multiple for cycle in values if cycle.net_r_multiple is not None)
+                / len(values)
+            ),
+            cost_model_version=model,
         )
-        for basis, values in sorted(grouped.items())
+        for (basis, model), values in sorted(grouped.items())
     )
+
+
+def _cost_model_key(cycle: _Cycle) -> str:
+    """(PURA, AUTO-18) la versión del modelo de un ciclo, con ``undeclared`` por ausencia."""
+    return cycle.cost_model_version or SELF_EVAL_COST_MODEL_UNDECLARED
+
+
+def _cost_model_of(versions: Sequence[str]) -> str | None:
+    """(PURA, AUTO-18) la versión DECLARADA de un agregado a partir de sus versiones.
+
+    ``None`` = no hay ningún neto que declarar. Una sola versión ⇒ esa; varias ⇒ ``mixed``
+    (conviven metros distintos y promediarlos sería comparar peras con manzanas).
+    """
+    if not versions:
+        return None
+    unique = set(versions)
+    if len(unique) == 1:
+        return next(iter(unique))
+    return SELF_EVAL_COST_MODEL_MIXED
 
 
 def _basis_of(series: Sequence[NetRBasisSeries]) -> str | None:
     """(PURA) la base DECLARADA de un agregado a partir de su desglose.
 
-    ``None`` = no hay ningún neto que declarar. Una sola serie ⇒ su base; varias ⇒ ``mixed``.
+    ``None`` = no hay ningún neto que declarar. Una sola base ⇒ esa; varias ⇒ ``mixed``.
+
+    ``AUTO-18``: la cuenta es sobre las **bases distintas**, no sobre el número de series. Desde
+    que la clave de agrupación es ``(basis, cost_model_version)``, varias series pueden compartir
+    base y diferir en el modelo: la base sigue siendo única (no es ``mixed``) y lo que se declara
+    como heterogéneo es la VERSIÓN del modelo (``costModelVersion = mixed`` en la fila).
     """
     if not series:
         return None
-    if len(series) > 1:
+    bases = {row.basis for row in series}
+    if len(bases) > 1:
         return SELF_EVAL_COST_BASIS_MIXED
     return series[0].basis
+
+
+def affirms_declared_net_r_basis(
+    *,
+    net_r_measurement: MeasurementStatus,
+    net_expectancy_r: float | None,
+    net_r_basis: str | None,
+) -> bool:
+    """(PURA, ``AUTO-18``) invariante de dominio: un neto PUBLICADO declara su base (§18).
+
+    ``net_r_measurement == COMPLETE`` con un ``net_expectancy_r`` no nulo solo es legible si la
+    fila dice contra qué modelo de coste se midió. Un neto sin base es un número sin metro: si el
+    predicado es ``False``, la confianza lo lee como ``DATA_DEGRADED`` (baja confianza declarada),
+    NUNCA como estabilidad.
+
+    Es vacuously ``True`` cuando no aplica (medición no completa, o sin neto publicado): el
+    invariante habla de lo que se AFIRMA, no de lo que se calla. Construcciones manuales sin base
+    no afirman base — este predicado es la forma en que un consumidor lo comprueba.
+    """
+    if net_r_measurement != MEASUREMENT_COMPLETE:
+        return True
+    if net_expectancy_r is None:
+        return True
+    return net_r_basis is not None
 
 
 def _pooled_net_expectancy(
     series: Sequence[NetRBasisSeries], basis: str | None
 ) -> float | None:
-    """(PURA, AUTO-17) la expectativa pooled del R neto, o ``None`` si las bases son mixtas.
+    """(PURA, AUTO-17/18) la expectativa pooled del R neto, o ``None`` si la población no es una.
 
-    Con una sola base (o ninguna) el número es el de siempre —la fila es byte a byte la de
-    ``v2.56``—. Con bases distintas el pooled **no se publica**: promediar dos modelos de coste
-    como si fueran uno es exactamente el sesgo que ``AUTO-17`` existe para impedir. Los números
-    siguen disponibles, uno por base, en ``net_r_series``.
+    Con UNA población (o ninguna) el número es el de siempre —la fila es byte a byte la de
+    ``v2.56``—. Con bases distintas, o con **metros distintos dentro de la misma base**, el pooled
+    **no se publica**: promediar dos modelos de coste como si fueran uno es exactamente el sesgo
+    que ``AUTO-17``/``AUTO-18`` existen para impedir. Los números siguen disponibles, uno por
+    población, en ``net_r_series``.
     """
     if basis == SELF_EVAL_COST_BASIS_MIXED:
         return None
-    return series[0].expectancy_r if series else None
+    if len(series) != 1:
+        # AUTO-18: dos series con la MISMA base pero distinto metro. La base no es mixta, la
+        # población sí: no hay un número único que publicar (y no se elige uno de los dos).
+        return None
+    return series[0].expectancy_r
 
 
 def _strategy_row(
@@ -1272,6 +1416,12 @@ def _strategy_row(
     notes: list[str] = []
     net_r_series = _net_r_series(cycles)
     net_r_basis = _basis_of(net_r_series)
+    pooled_net_expectancy_r = _pooled_net_expectancy(net_r_series, net_r_basis)
+    if pooled_net_expectancy_r is not None and net_r_basis is None:
+        # Guarda del invariante (§18): un neto PUBLICADO no sale sin base. La base NO se
+        # reconstruye desde los ciclos (no la declararon): se declara ``undeclared``, que es la
+        # verdad, en vez de afirmar estabilidad que nadie firmó.
+        net_r_basis = SELF_EVAL_COST_BASIS_UNDECLARED
     if cycles:
         # Los huecos se declaran SOLO cuando hay resultado que medir: en una versión sin
         # ningún ciclo, "R no medido" no aporta nada que "0 ciclos" no diga ya.
@@ -1302,7 +1452,7 @@ def _strategy_row(
         realized_pnl=realized.quantize(_MONEY),
         expectancy_currency=((realized / len(with_pnl)).quantize(_MONEY) if with_pnl else None),
         expectancy_r=(_round4(sum(r_values) / len(r_values)) if r_values else None),
-        net_expectancy_r=_pooled_net_expectancy(net_r_series, net_r_basis),
+        net_expectancy_r=pooled_net_expectancy_r,
         win_rate=_round4(wins / len(with_pnl)) if with_pnl else None,
         profit_factor=_profit_factor(pnls),
         avg_win_currency=((gross_profit / wins).quantize(_MONEY) if wins else None),
@@ -1323,6 +1473,9 @@ def _strategy_row(
         net_r_measurement=net_r_measurement,
         net_r_basis=net_r_basis,
         net_r_series=net_r_series,
+        cost_model_version=_cost_model_of(
+            [row.cost_model_version for row in net_r_series if row.cost_model_version is not None]
+        ),
         cycles_without_cost=trades - len(net_values),
         excursions_measurement=excursions_measurement,
         slippage_measurement=slippage_measurement,
@@ -1450,6 +1603,9 @@ def _regime_row(
         net_r_measurement=net_measurement,
         net_r_basis=net_r_basis,
         net_r_series=net_r_series,
+        cost_model_version=_cost_model_of(
+            [row.cost_model_version for row in net_r_series if row.cost_model_version is not None]
+        ),
         sample_quality=sample_quality_from_n(trades),
         decisive=(trades >= max(1, min_trades) and r_measurement == MEASUREMENT_COMPLETE),
         notes=((SELF_EVAL_COST_UNMEASURED,) if net_measurement != MEASUREMENT_COMPLETE else ()),

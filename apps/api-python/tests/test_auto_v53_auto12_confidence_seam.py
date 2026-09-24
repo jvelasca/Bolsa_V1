@@ -254,18 +254,20 @@ async def test_without_instants_the_gap_is_declared_at_tick_level(
     assert "confidence gaps" in caplog.text
 
 
-def test_the_policy_used_by_the_worker_seals_the_auto17_rule() -> None:
+def test_the_policy_used_by_the_worker_seals_the_auto18_rule() -> None:
     """La política del tick es la MISMA que sella el plan: no hay una copia paralela.
 
     ``auto14-v1`` selló el reparto por la celda ``strategy × regime``, ``auto16-v1`` la procedencia
-    del coste del neto; ``AUTO-17`` la sube a ``auto17-v1`` al exigir que el eje del R neto solo se
-    adopte con una base de coste ÚNICA y estable, así que el sello se actualiza con nombre (es el
-    único rojo admisible del delta simétrico).
+    del coste del neto; ``AUTO-17`` la subió a ``auto17-v1`` al exigir que el eje del R neto solo se
+    adopte con una base de coste ÚNICA y estable. ``AUTO-18`` la sube a ``auto18-v1`` porque el
+    encogimiento del peso pasa a usar la muestra EFECTIVA estadística (``min(measured_n, episodes)``)
+    y publica el factor aplicado, así que dos planes con la misma evidencia pueden diferir en los
+    pesos: el sello se actualiza con nombre (es el único rojo admisible del delta simétrico).
     """
     worker = _worker(store=None, reservations=None)
     policy = worker._v2_adaptive_policy()
 
-    assert policy.policy_version == "auto17-v1"
+    assert policy.policy_version == "auto18-v1"
     assert policy.confidence_prior > 0
     assert policy.recovery_steps[0] > 0
 

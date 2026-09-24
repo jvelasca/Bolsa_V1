@@ -58,6 +58,8 @@ from bolsa_analytics.cognitive.auto_adaptive import (
 )
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     ADAPTIVE_BASIS_UNKNOWN,
+    ADAPTIVE_COVERAGE_MEDIUM,
+    ADAPTIVE_COVERAGE_UNCOVERED,
     ADAPTIVE_DECAY_NONE,
     ADAPTIVE_DECAY_SEVERE,
     ADAPTIVE_LONG_WINDOW_DEFAULT,
@@ -92,6 +94,7 @@ def _row(
     net_r_measurement: str = MEASUREMENT_UNKNOWN,
     net_r_basis: str | None = None,
     net_r_series: tuple[Any, ...] = (),
+    cost_model_version: str | None = None,
 ) -> StrategySelfEvaluation:
     """Fila de self-evaluation mínima con SOLO lo que Adaptive lee (el resto, ausente)."""
     return StrategySelfEvaluation(
@@ -130,6 +133,7 @@ def _row(
         notes=(),
         net_r_basis=net_r_basis,
         net_r_series=net_r_series,
+        cost_model_version=cost_model_version,
     )
 
 
@@ -662,6 +666,58 @@ def test_allocation_refuses_a_group_with_an_explicitly_mixed_basis() -> None:
     assert plan.multipliers == {"a": 1.0, "b": 0.5}
 
 
+def test_allocation_refuses_a_group_measured_with_two_cost_models() -> None:
+    """``AUTO-18``: la población comparable es ``(base, metro)``; dos metros no se promedian.
+
+    La base es LA MISMA (``estimated``) en las dos filas: lo único que cambia es la versión del
+    modelo de coste. Aun así el eje del R neto NO se adopta —dos netos medidos con metros
+    distintos no son comparables aunque se llamen igual—, cae al histórico y cada peso lo declara.
+    El CONTROL positivo (mismo metro) sí adopta el eje, que es lo que prueba que el gate es el
+    METRO y no cualquier otra cosa.
+    """
+    one_model = (
+        _row(
+            "a",
+            decisive=True,
+            expectancy="3",
+            net_expectancy_r=2.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_ESTIMATED,
+            cost_model_version="cm:bps:10/2/5/0",
+        ),
+        _row(
+            "b",
+            decisive=True,
+            expectancy="1",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_ESTIMATED,
+            cost_model_version="cm:bps:10/2/5/0",
+        ),
+    )
+    two_models = (
+        one_model[0],
+        _row(
+            "b",
+            decisive=True,
+            expectancy="1",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_ESTIMATED,
+            cost_model_version="cm:preset:10/2/5/0",
+        ),
+    )
+
+    same = recommend_allocation(["a", "b"], one_model)
+    crossed = recommend_allocation(["a", "b"], two_models)
+
+    assert same.evidence_axis == ALLOCATION_AXIS_NET_R
+    assert crossed.evidence_axis == ALLOCATION_AXIS_CURRENCY, "no se promedian METROS"
+    assert set(crossed.multipliers) == {"a", "b"}, "el cambio de metro no saca a nadie"
+    assert crossed.cell_note_for("a") == ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE
+    assert crossed.cell_note_for("b") == ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE
+
+
 # ── build_adaptive_plan ──────────────────────────────────────────────────────────
 
 
@@ -926,18 +982,23 @@ def test_regime_cells_change_the_allocation_declaration_but_never_the_rotation()
     )
 
 
-def test_the_policy_version_seals_the_auto17_evidence_contract() -> None:
-    """No es tautología: un merge que devolviera ``auto16-v1`` movería el sello sin avisar.
+def test_the_policy_version_seals_the_auto18_evidence_contract() -> None:
+    """No es tautología: un merge que devolviera ``auto17-v1`` movería el sello sin avisar.
 
     ``auto14-v1`` selló el peso por celda y ``auto16-v1`` la procedencia del coste del neto.
     ``AUTO-17`` **sí cambia la regla**: el eje del R neto solo se adopta si el grupo comparte una
     única base de coste estable; si conviven bases, el reparto cae al eje histórico
     (``cell_basis_unstable``) en vez de promediar modelos. Dos planes con la misma evidencia pueden
     diferir en el eje por eso, y sin subir el sello esa diferencia sería invisible.
+
+    ``AUTO-18`` vuelve a mover el reparto: el encogimiento del peso ya no usa la muestra medida,
+    sino la **estadística** (``min(measured_n, episodes)``), y publica el factor aplicado. Dos
+    versiones con los MISMOS ciclos medidos pesan distinto si una los midió en una sola racha de
+    régimen; sin subir el sello, ese cambio de número sería invisible al auditor.
     """
-    assert ADAPTIVE_POLICY_VERSION == "auto17-v1"
-    assert AdaptivePolicy().policy_version == "auto17-v1"
-    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto17-v1"
+    assert ADAPTIVE_POLICY_VERSION == "auto18-v1"
+    assert AdaptivePolicy().policy_version == "auto18-v1"
+    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto18-v1"
 
 
 # ── AUTO-12 — confianza estadística en el reparto (encogimiento por muestra) ────────
@@ -947,17 +1008,29 @@ def _strategy_confidence(
     version: str,
     *,
     effective_n: int,
+    measured_n: int | None = None,
+    episodes: int | None = None,
+    coverage: str = ADAPTIVE_COVERAGE_UNCOVERED,
+    shrunk_r: float | None = None,
     decay: str = ADAPTIVE_DECAY_NONE,
     confidence: str = "HIGH",
     long_r: float | None = 1.0,
     recent_r: float | None = 1.0,
     cells: tuple[RegimeConfidence, ...] = (),
 ) -> StrategyConfidence:
-    """Confianza de UNA estrategia, con solo lo que el reparto lee (el resto, declarado)."""
+    """Confianza de UNA estrategia, con solo lo que el reparto lee (el resto, declarado).
+
+    ``effective_n`` es la muestra EFECTIVA estadística (``min(measured_n, episodes)``): el reparto
+    solo lee ese número. ``measured_n``/``episodes``/``coverage`` se publican como evidencia.
+    """
     return StrategyConfidence(
         strategy_version=version,
         sample_size=effective_n,
         effective_n=effective_n,
+        measured_n=effective_n if measured_n is None else measured_n,
+        episodes=effective_n if episodes is None else episodes,
+        coverage=coverage,
+        shrunk_expectancy_r=shrunk_r,
         measurement_completeness=MEASUREMENT_COMPLETE,
         risk_coverage=1.0,
         cost_coverage=1.0,
@@ -1255,6 +1328,68 @@ def test_the_plan_stays_reproducible_with_a_confidence_reading() -> None:
     assert first.as_dict() == second.as_dict()
 
 
+def test_the_published_shrink_factor_is_the_one_actually_applied() -> None:
+    """AUTO-18: el factor de la evidencia es el del REPARTO, no una constante de política.
+
+    Publicar ``effectiveN`` sin el factor aplicado dejaría al auditor sin saber si la muestra se
+    USÓ; publicar el factor sin la muestra dejaría sin saber de dónde salió. Viajan juntos.
+    """
+    rows = (
+        _row("a", decisive=True, expectancy="1"),
+        _row("b", decisive=True, expectancy="1"),
+    )
+    plan = build_adaptive_plan(
+        rows,
+        "TREND_UP",
+        confidence=_reading(
+            _strategy_confidence(
+                "a", effective_n=1, measured_n=120, episodes=1, coverage=ADAPTIVE_COVERAGE_MEDIUM
+            ),
+            _strategy_confidence("b", effective_n=500, measured_n=500, episodes=500),
+        ),
+    )
+    evidence = plan.evidence_for("a")
+
+    assert evidence is not None
+    assert evidence["measuredN"] == 120
+    assert evidence["episodes"] == 1
+    assert evidence["effectiveN"] == 1
+    assert evidence["coverage"] == ADAPTIVE_COVERAGE_MEDIUM
+    assert plan.shrink_factors["a"] == pytest.approx(evidence["shrinkFactor"])
+    assert 0.0 < plan.shrink_factors["a"] < 1.0
+    assert plan.shrink_factors["b"] > plan.shrink_factors["a"]
+
+
+def test_the_shrinkage_reads_the_statistical_n_not_the_measured_n() -> None:
+    """AUTO-18: con los MISMOS ciclos medidos, la independencia decide el peso.
+
+    ``a`` mide 120 ciclos pero todos en UNA racha de régimen (``effectiveN=1``); ``b`` mide los
+    mismos 120 repartidos en 120 rachas. El encogimiento debe separarlos aunque ``measuredN`` sea
+    idéntico: eso es justo lo que la muestra bruta no puede afirmar.
+    """
+    rows = (
+        _row("a", decisive=True, expectancy="1"),
+        _row("b", decisive=True, expectancy="1"),
+    )
+    reading = _reading(
+        _strategy_confidence("a", effective_n=1, measured_n=120, episodes=1),
+        _strategy_confidence("b", effective_n=120, measured_n=120, episodes=120),
+    )
+    plan = build_adaptive_plan(rows, "TREND_UP", confidence=reading)
+
+    assert plan.evidence_for("a")["measuredN"] == plan.evidence_for("b")["measuredN"] == 120
+    assert plan.shrink_factors["b"] > plan.shrink_factors["a"]
+
+
+def test_without_confidence_no_shrink_factor_is_invented() -> None:
+    """Sin lectura no hay factor: el reparto es el histórico y el hueco se declara ``None``."""
+    rows = (_row("a", decisive=True, expectancy="2"), _row("b", decisive=True, expectancy="1"))
+    plan = build_adaptive_plan(rows, "TREND_UP")
+
+    assert plan.shrink_factors == {}
+    assert plan.evidence_for("a")["shrinkFactor"] is None
+
+
 # ── AUTO-13 — RECOVERING y la rampa de reincorporación (§23/§24) ────────────────────
 
 
@@ -1421,7 +1556,7 @@ def test_the_operational_states_travel_in_their_own_field_without_mixing_axes() 
     assert payload["recovery"]["a"]["step"] == pytest.approx(0.25)
     assert "b" not in payload["recovery"], "una pausada no publica rampa"
     assert payload["readOnly"] is True
-    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto17-v1"
+    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto18-v1"
     assert plan.health_for("a").confidence == "HIGH", "la calidad estadística va en su propio campo"
 
 
