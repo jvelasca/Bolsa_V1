@@ -354,4 +354,44 @@ recibió en **fast-forward**.
 
 ## 11. CI del sello `v2.57-beta` (medida, no predicha)
 
-*(Se añade en el commit de docs posterior al sello, citando cada run que la produjo.)*
+**Se mide, no se predice:** el run del tag no existe hasta que el tag se empuja, así que estas cifras se
+añaden en el **commit de docs posterior al sello** (mismo patrón que `AUTO-13`/`AUTO-14`/`AUTO-15`),
+citando cada una el run que la produjo.
+
+### 11.1 El CI del tag salió VERDE **a la primera** (la guardia se bumpeó en el paso 1)
+
+**Contraste medido con el sello anterior:** el tag `v2.56-beta` obligó a un **fix + re-sello** porque la
+guardia `_ALEMBIC_HEAD` (`apps/api-python/tests/test_discovery_evidence_snapshot_pg.py:43`, **5**
+aserciones) no se bumpeó con la migración `045`, y esos 5 rojos **solo** aparecen en los jobs PG, que la
+matriz offline ignora. En `AUTO-16` la guardia se bumpeó `045` → `046` **en el MISMO paso 1**, su delta
+simétrico se midió **antes** de empujar (`HEAD` ⇒ `5 failed, 14 passed`; fase ⇒ `19 passed`, §7) y el
+primer —y único— empuje del tag salió **verde**: los **tres** jobs PG (`auto-v2-durable-pg`,
+`grammar-discovery-pg`, `lifecycle-pg`) cerraron en `success`. **No hubo re-sello.**
+
+### 11.2 Cifras medidas del sello
+
+| Corte | Run | Resultado |
+| --- | --- | --- |
+| `Release tag CI` (`c5e14ae1`) | [`35968175990`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35968175990) | **GREEN a la primera**: **`10 success` + `1 skipped`** (`playwright (integrated E2E, opt-in)`) y `certify (aggregate + artifact)` en `success` |
+| `python` del tag | job del run anterior | ruff **`All checks passed!`** · mypy **`Success: no issues found in 499 source files`** · pytest **`2649 passed / 35 skipped`** (**+41** passed y **0** skips nuevos sobre los `2608 / 35` de `v2.56`) |
+| `Python CI` del tag (per-commit) | [`35968176009`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35968176009) | **`5/5` jobs `success`**: `quality` (**`2638 passed / 38 skipped`**), `auto-v2-durable-pg` (la `046` + la guardia + el test PG nuevo de la fase), `grammar-discovery-pg`, `paper-forward-pg` y `lifecycle-pg` |
+| `Python CI` de `main` (per-commit) | [`35968177267`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35968177267) | **`5/5` jobs `success`** |
+| `check-runs` del commit sellado `c5e14ae1` | API de checks | **`27 success` + `1 skipped`** |
+
+### 11.3 El límite declarado del §7, cerrado por la CI del tag
+
+El §7 declaró dos cosas que **no** se podían medir en esta máquina: (a) los runs de CI —«no existen hasta
+empujar»— y (b) la batería offline **completa** de los jobs `quality`/`python` del tag, cuya recolección
+incluye suites PG que importan `asyncpg` (ausente aquí). **El tag las cierra las dos**: `2649 passed / 35
+skipped` en el job `python` del tag y `2638 passed / 38 skipped` en `quality` del per-commit, con **`5/5`**
+jobs verdes en los dos `Python CI` (los cuatro de PG incluidos, que son justo los que la matriz offline
+**no** puede correr). **Cero rojos y cero skips nuevos** respecto de `v2.56`.
+
+### 11.4 El intermitente conocido **no** se reprodujo en este sello (declarado)
+
+`AUTO-15` dejó declarado un **test PG intermitente preexistente y ajeno a la fase**
+(`apps/api-python/tests/test_concurrent_auto_pg.py`, `UniqueViolation` en `auto_engine_ticks_pkey`; medido
+entonces **`1` rojo en `5`** corridas locales) y un teardown de vitest que envenenaba el exit code con los
+tests en verde. **En este sello ninguno de los dos apareció**: los dos `Python CI` y el `Release tag CI`
+cerraron sin rojos. Se deja **declarado** el hueco por si el auditor lo reproduce: ninguno de los dos
+ficheros está en el diff de esta fase, así que la existencia del intermitente **no** cambia con ella.

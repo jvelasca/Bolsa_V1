@@ -96,10 +96,14 @@ se encienda la lectura. Queda escrito en el audit-pack §3.
 
 ### Paso 5 — Cierre: mutaciones, compuertas, delta, docs, bump y sello
 
-- `M119…M128` en la sonda (`v2_44_mutation_audit.py`): diez mutaciones nuevas con su bloque de
-  cabecera, cada una mordiendo sobre un test con nombre; **matriz COMPLETA `M1…M128`** en §5.
-- Compuertas §3, delta simétrico fichero a fichero (audit-pack §7), paquete de docs, bump
-  `1.82.0-beta` y tag `v2.57-beta`.
+- **Paso 5 — Cierre: mutaciones, compuertas, delta, docs, bump y sello.** Compuertas §3 verdes; delta
+  simétrico con **9 rojos declarados** y solo ésos; `M119…M128` muerden y la **matriz completa** da
+  **`128/128`** (con un **realineo declarado** de `M32`); paquete de docs, bump `1.82.0-beta` y tag
+  `v2.57-beta` (`c5e14ae1`). **El CI del tag salió GREEN a la primera**
+  ([`35968175990`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35968175990), `10 success` + `1
+  skipped`, job `python` del tag **`2649 passed / 35 skipped`**) y el `Python CI` per-commit cerró
+  **`5/5`** jobs (los cuatro de PG incluidos) — **no hubo re-sello**, porque la guardia de head se
+  bumpeó en el paso 1 (§11 del audit-pack).
 
 ---
 

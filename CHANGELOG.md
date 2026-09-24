@@ -115,9 +115,16 @@ OFF por defecto**: con OFF el plan, el journal y la API son **byte a byte iguale
 - **Límites declarados**: la comisión **aplicada** no existe en SIM (el neto se completa con la del modelo y la
   base lo nombra); **sin backfill**; **solo se persiste la referencia**, no la fricción; la referencia se mide
   contra el mid **del simulador**; **sin UI** y **sin SHORT**; `governor.json` sin trackear.
-- **Sello**: tag anotado **`v2.57-beta`** sobre el commit del paquete de cierre, `main` en **fast-forward**; las
-  cifras de su `Release tag CI` se citan en el commit de sello inmediatamente posterior (tabla en el §11 del
-  [audit-pack](./docs/engineering/audit-pack-v2-57-auto-16-coste-real-por-ciclo-2026-09-24.md)) y **PR de
+- **Sello**: tag anotado **`v2.57-beta`** sobre el commit del paquete de cierre (`c5e14ae1`), `main` en
+  **fast-forward** (`3081ed78..c5e14ae1`); **`Release tag CI`**
+  [`35968175990`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35968175990) **GREEN a la primera**
+  (`10 success` + `1 skipped`, `certify` en `success`), job `python` del tag **`2649 passed / 35 skipped`**
+  (**+41** passed y **0** skips nuevos sobre `v2.56`) y `Python CI` per-commit del tag
+  [`35968176009`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35968176009) **`5/5` jobs verdes**
+  (los cuatro de PG incluidos: cierra el límite offline declarado); `check-runs` del commit sellado
+  **`27 success` + `1 skipped`**. **No hubo re-sello** (la guardia de head se bumpeó en el paso 1, la
+  lección de `v2.56`). Cifras en el §11 del
+  [audit-pack](./docs/engineering/audit-pack-v2-57-auto-16-coste-real-por-ciclo-2026-09-24.md) y **PR de
   auditoría [#66](https://github.com/jvelasca/Bolsa_V1/pull/66)** abierto post-sello.
 
 ## [1.81.0-beta] — AUTO-15 Data Gate persistido (V2.56) — 2026-09-23
