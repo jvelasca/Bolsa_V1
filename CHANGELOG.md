@@ -2,6 +2,75 @@
 
 All notable releases of Bolsa V1.
 
+## [1.86.0-beta] — AUTO-19B Calibración del intervalo y Walk-Forward (V2.61) — 2026-09-24
+
+**Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI, sin backfill y
+**sin clave nueva en el journal durable**. **El sello del reparto NO se mueve: sigue en `auto18-v1`**
+(`DATA_GATE_POLICY_VERSION` sigue `auto15-v1`). Fase **solo medición**: el instrumento es puro y
+read-only. El invariante que instala:
+
+> **La incertidumbre no se declara calibrada: se mide.** Toda lectura de calibración viaja con su
+> `sample`, su nivel declarado y su tolerancia declarada; sin muestra suficiente el veredicto es
+> `inconclusive`, nunca `supported`. Ninguna métrica de calibración mueve el reparto.
+
+`AUTO-19A` construyó el instrumento (intervalo por episodios + confianza de EDGE) y una batería con
+**una** partición IS/OOS. Quedaba la pregunta que ahora se responde: **¿está bien calibrada esa
+incertidumbre?** `AUTO-19B` añade:
+
+1. **Walk-forward de ventanas CRECIENTES.** En vez de un split, cada estrategia se parte en `n_folds+1`
+   segmentos cronológicos y se miden `n_folds` pares IS/OOS: el pliegue `i` entrena con todo lo
+   anterior y testea con el segmento inmediatamente posterior (el último absorbe el resto). El IS jamás
+   contiene su OOS, y los pliegues que no alcanzan los mínimos declarados **no se forman** (se
+   declaran `skipped_strategy` / `insufficient_folds`).
+2. **Calibración del intervalo.** `interval_coverage` compara la fracción observada contra el nivel
+   declarado (`0.90` por defecto) con tolerancia declarada; publica `meanIntervalWidth` como
+   diagnóstico. Una celda **sin** intervalo no cuenta como cubierta ni como descubierta.
+3. **Calibración del signo del EDGE.** `edge_sign_calibration` mide el acierto de `edgeConfidence`
+   (solo `HIGH`/`LOW`; `MEDIUM`/`UNKNOWN` quedan fuera) sobre el signo realizado, con muestra mínima.
+4. **Calibración de la banda de medición.** `confidence_calibration` publica OOS por banda y decide con
+   la comparación declarada (menor dispersión OOS en `HIGH`).
+5. **Agregados del walk-forward** en R (`meanOosExpectancyR`, `stdOosExpectancyR`,
+   `positiveOosFoldShare`, `oosCv`, `walkForwardEfficiency`), espejo de `aggregate_walk_forward_metrics`
+   de `optimize`.
+6. **Reutilización, no reimplementación.** Las tres preguntas de `AUTO-19A` (shrinkage, `effective_N`,
+   cobertura) se reutilizan sobre los pliegues vía `measure_is_oos_row`, extraído de `_build_cell`: una
+   sola aritmética de celda para las dos particiones.
+
+### Añadido
+
+- **`auto_adaptive_calibration.py`** (nuevo, puro) — `split_walk_forward_folds`, `CalibrationFold`,
+  `CalibrationQuestion`, `CalibrationReport`, las seis preguntas y `aggregate`; config declarada
+  (`CALIBRATION_METHOD = "walk_forward_calibration_v1"`, `CALIBRATION_FOLDS_*`,
+  `CALIBRATION_COVERAGE_TOLERANCE_DEFAULT`, `CALIBRATION_EDGE_SIGN_FLOOR_DEFAULT`).
+- **`auto_adaptive_replay.py`** — extracción aditiva de `measure_is_oos_row` (público) sin renombrar
+  `_compare`/`_question_*` ni mover el split de `_build_cell`.
+- **`scripts/research/auto_replay_battery.py`** — `--walk-forward` y `--folds`. **Sin el flag la salida
+  es byte-idéntica** a la de `AUTO-19A`.
+- **Fixture** `auto_calibration_cycles.json` (126 ciclos, 3 estrategias con 3 pliegues + una fina
+  declarada como hueco); nota **SYNTHETIC** explícita. No se toca el fixture de `AUTO-19A`.
+- **Tests** `test_auto_adaptive_calibration.py` (19): sin muestra, split cronológico/creciente,
+  cobertura (cubierto/descubierto/sin intervalo), signo del EDGE, banda de medición, reutilización,
+  determinismo/orden-invariancia, fixture medido de punta a punta y no-regresión de `AUTO-19A`.
+- **Mutaciones `M159…M164`** (6 nuevas): walk-forward contaminado, cobertura fabricada, cobertura
+  invertida, signo del EDGE sin muestra, un pliegue llamado walk-forward y ventana que no crece.
+  Matriz completa `M1…M164` corrida con restauración byte a byte y huella `git status` idéntica.
+- **CI** — el puro entra por el pase de directorio de `packages/py/analytics/tests` en
+  `python-ci.yml` y `release-tag-ci.yml` (no hay costura nueva: el instrumento no se cablea al worker).
+
+### Compatibilidad
+
+- **Sin migración:** `_ALEMBIC_HEAD` sigue en `046_fill_reference_mid`.
+- **Read-only:** no se tocan `auto_adaptive.py`, `auto_self_evaluation_feed.py`,
+  `auto_simulation_worker.py`, `auto_adaptive_journal.py` (byte a byte), el gobernador ni la tabla
+  estado→efecto. Sin UI, sin SHORT, sin backfill.
+- La salida de `AUTO-19A` no cambia: sin `--walk-forward`, el CLI emite el mismo `ReplayReport`.
+
+### Límites declarados
+
+El fixture por defecto es **sintético y declarado**: mide el **instrumento**, no la estrategia real.
+`P(R > 0)`, la correlación entre estrategias y el current-regime gating quedan **fuera** de v2.61. La
+ejecución sobre ciclos PAPER reales es el paso operativo posterior.
+
 ## [1.85.0-beta] — AUTO-19A Incertidumbre del edge + Replay OOS (V2.60) — 2026-09-24
 
 **Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI nueva y **sin clave

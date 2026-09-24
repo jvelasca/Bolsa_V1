@@ -310,7 +310,35 @@ def _build_cell(
         return None
     is_rows = tuple(measured_rows[: total - oos_n])
     oos_rows = tuple(measured_rows[total - oos_n :])
+    return measure_is_oos_row(
+        version,
+        is_rows,
+        oos_rows,
+        min_episodes=min_episodes,
+        interval_level=interval_level,
+        resamples=resamples,
+        seed=seed,
+    )
 
+
+def measure_is_oos_row(
+    version: str,
+    is_rows: Sequence[Any],
+    oos_rows: Sequence[Any],
+    *,
+    min_episodes: int,
+    interval_level: float,
+    resamples: int,
+    seed: int,
+) -> ReplayCell:
+    """(PURA, ``AUTO-19B``) mide un par IS/OOS **ya partido** y devuelve la celda del replay.
+
+    ``AUTO-19A`` partía y medía en el MISMO sitio (``_build_cell``); ``AUTO-19B`` necesita medir
+    MUCHOS pares IS/OOS de la misma estrategia (walk-forward), así que el núcleo de medición se
+    separa del split y se reutiliza tal cual: **una sola aritmética de la celda**, dos particiones
+    (el split único del replay y los pliegues crecientes de la calibración). La partición del
+    replay NO cambia: ``_build_cell`` conserva su split y delega aquí la medición.
+    """
     confidence: AdaptiveConfidence = build_adaptive_confidence(is_rows)
     strategy = confidence.confidence_for(version)
     uncertainty: AdaptiveUncertainty = build_adaptive_uncertainty(
