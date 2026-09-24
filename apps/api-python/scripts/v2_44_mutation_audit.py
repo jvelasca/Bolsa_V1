@@ -414,6 +414,22 @@ propio y una batería out-of-sample que no inventa veredictos) añade:
 * **M158 (sello del reparto movido por la lectura)** — si la incertidumbre (evidencia read-only)
   arrastra un cambio de sello, dos planes con la misma regla dejan de ser el mismo plan.
 
+AUTO-19B (calibración del intervalo y walk-forward: ventanas CRECIENTES, cobertura medida contra el
+nivel declarado y reutilización de las preguntas de la fase anterior) añade:
+
+* **M159 (walk-forward contaminado)** — si el IS de un pliegue se mide sobre el material con el OOS
+  dentro, la "predicción" ya vio el futuro y el error OOS se hunde sin que nada lo declare.
+* **M160 (cobertura fabricada)** — si la pregunta de cobertura cuenta celdas SIN intervalo, un
+  hueco que no se pudo medir entra en la muestra como si se hubiera encuadrado.
+* **M161 (cobertura invertida)** — si se cuenta como cubierto lo que cayó FUERA del intervalo, el
+  instrumento afirma lo contrario de lo que midió.
+* **M162 (signo del edge sin muestra mínima)** — si la calibración del signo no exige muestra, un
+  solo acierto (o ninguno) se publica como ``not_supported`` sin haber medido nada.
+* **M163 (un solo pliegue llamado walk-forward)** — si se anula la acotación de pliegues, un split
+  único se presenta como una repetición que nunca se midió.
+* **M164 (ventana que no crece)** — si el IS deja de ser creciente (ventana fija), el walk-forward
+  deja de parecerse a la operativa real y cada pliegue mide menos de lo que dice.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -470,6 +486,9 @@ AUTO_ADAPTIVE_UNCERTAINTY = (
 AUTO_ADAPTIVE_REPLAY = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_replay.py"
 )
+AUTO_ADAPTIVE_CALIBRATION = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_calibration.py"
+)
 AUTO_ADAPTIVE_DATA_GATE = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_data_gate.py"
 )
@@ -504,6 +523,7 @@ T_CONFIDENCE = "packages/py/analytics/tests/test_auto_adaptive_confidence.py"
 T_FEED = "packages/py/application/tests/test_auto_self_evaluation_feed.py"
 T_UNCERTAINTY = "packages/py/analytics/tests/test_auto_adaptive_uncertainty.py"
 T_REPLAY = "packages/py/analytics/tests/test_auto_adaptive_replay.py"
+T_CALIBRATION = "packages/py/analytics/tests/test_auto_adaptive_calibration.py"
 T_UNCERTAINTY_SEAM = "apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py"
 T_CONFIDENCE_SEAM = "apps/api-python/tests/test_auto_v53_auto12_confidence_seam.py"
 T_DATA_GATE = "packages/py/analytics/tests/test_auto_adaptive_data_gate.py"
@@ -1827,6 +1847,55 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "ADAPTIVE_POLICY_VERSION = \"auto18-v1\"\n",
         "ADAPTIVE_POLICY_VERSION = \"auto19a-v1\"\n",
         (T_ADAPTIVE, T_UNCERTAINTY_SEAM),
+    ),
+    # ── AUTO-19B (V2.61): la calibración del intervalo y el walk-forward ─────────────────────
+    (
+        "M159 (walk-forward contaminado): el IS de un pliegue incluye su propio OOS",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "        train = ordered[:train_end]\n",
+        "        train = ordered[:test_end]\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M160 (cobertura fabricada): la cobertura cuenta celdas SIN intervalo",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "        if cell.is_interval_lower is not None\n"
+        "        and cell.is_interval_upper is not None\n"
+        "        and cell.oos_expectancy_r is not None\n",
+        "        if cell.oos_expectancy_r is not None\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M161 (cobertura invertida): cuenta como cubierto lo que cayo FUERA del intervalo",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "        if float(cell.is_interval_lower)\n"
+        "        <= float(cell.oos_expectancy_r)\n"
+        "        <= float(cell.is_interval_upper)\n",
+        "        if not (float(cell.is_interval_lower)\n"
+        "        <= float(cell.oos_expectancy_r)\n"
+        "        <= float(cell.is_interval_upper))\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M162 (signo del edge sin muestra): la calibracion del signo no exige muestra minima",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "    if sample < max(1, int(min_cells)):\n",
+        "    if False:\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M163 (un pliegue llamado walk-forward): se anula la acotacion de pliegues",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "    return max(CALIBRATION_FOLDS_MIN, min(CALIBRATION_FOLDS_MAX, value))\n",
+        "    return max(1, min(CALIBRATION_FOLDS_MAX, value))\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M164 (ventana que no crece): el IS deja de ser creciente",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "        train_end = segment_size * (index + 1)\n",
+        "        train_end = segment_size\n",
+        (T_CALIBRATION,),
     ),
 ]
 

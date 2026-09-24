@@ -420,6 +420,10 @@ jobs:
         # pide el plan de la fase— para certificar con nombre propio el frame ``uncertainty`` y las
         # dos claves nuevas de la evidencia; los puros entran por el pase de
         # ``packages/py/analytics/tests``. pytest deduplica la doble mención (no corre dos veces).
+        # V2.61/AUTO-19B (calibración del intervalo + walk-forward): el puro
+        # ``packages/py/analytics/tests/test_auto_adaptive_calibration.py`` entra por el pase de
+        # ``packages/py/analytics/tests``. No hay costura nueva (el instrumento es puro y
+        # read-only: no se cablea al worker, al plan ni al journal).
         run: >
           uv run pytest
           packages/py/domain/tests

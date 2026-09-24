@@ -217,6 +217,11 @@ jobs:
         # claves nuevas de la evidencia queden certificados con nombre propio, no solo por el
         # pase de directorio de abajo (pytest deduplica la doble mención: no corre dos veces).
         # Los puros entran por el pase de ``packages/py/analytics/tests``.
+        # V2.61/AUTO-19B (calibración del intervalo + walk-forward): el puro
+        # ``packages/py/analytics/tests/test_auto_adaptive_calibration.py`` entra por el pase de
+        # directorio de abajo. No hay costura nueva que listar: el instrumento es PURO y read-only
+        # (no se cablea al worker, ni al plan, ni al journal), así que no hay fichero de
+        # ``apps/api-python/tests`` que certificar con nombre propio en esta fase.
         run: >
           uv run pytest
           packages/py/domain/tests

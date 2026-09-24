@@ -1,0 +1,1643 @@
+{
+  "note": "SYNTHETIC deterministic fixture for AUTO-19B walk-forward/calibration: mide el instrumento, not durable production material",
+  "cycles": [
+    {
+      "cycleId": "wf-trend-000",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-001",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-002",
+      "strategyVersion": "wf-trend",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-003",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-004",
+      "strategyVersion": "wf-trend",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-005",
+      "strategyVersion": "wf-trend",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-006",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-007",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-008",
+      "strategyVersion": "wf-trend",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-009",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-010",
+      "strategyVersion": "wf-trend",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-011",
+      "strategyVersion": "wf-trend",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-012",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-013",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-014",
+      "strategyVersion": "wf-trend",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-015",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-016",
+      "strategyVersion": "wf-trend",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-017",
+      "strategyVersion": "wf-trend",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-018",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-019",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-020",
+      "strategyVersion": "wf-trend",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-021",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-022",
+      "strategyVersion": "wf-trend",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-023",
+      "strategyVersion": "wf-trend",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-024",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-025",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-026",
+      "strategyVersion": "wf-trend",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-027",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-028",
+      "strategyVersion": "wf-trend",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-029",
+      "strategyVersion": "wf-trend",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-030",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-031",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-032",
+      "strategyVersion": "wf-trend",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-033",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-034",
+      "strategyVersion": "wf-trend",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-035",
+      "strategyVersion": "wf-trend",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-036",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-02-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-037",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-02-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-038",
+      "strategyVersion": "wf-trend",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-02-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-trend-039",
+      "strategyVersion": "wf-trend",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-02-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-000",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-001",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-002",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-003",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-004",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-005",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-006",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-007",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-008",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-009",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-010",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-011",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-012",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-013",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-014",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-015",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-016",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-017",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-018",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-019",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-020",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-021",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-022",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-023",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-024",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-025",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-026",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-027",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-028",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-029",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-030",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-031",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-032",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-033",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-034",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-035",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-036",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-037",
+      "strategyVersion": "wf-range",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-038",
+      "strategyVersion": "wf-range",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-range-039",
+      "strategyVersion": "wf-range",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-000",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-001",
+      "strategyVersion": "wf-chop",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-002",
+      "strategyVersion": "wf-chop",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-003",
+      "strategyVersion": "wf-chop",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-004",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-005",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-006",
+      "strategyVersion": "wf-chop",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-007",
+      "strategyVersion": "wf-chop",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-008",
+      "strategyVersion": "wf-chop",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-009",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-010",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-011",
+      "strategyVersion": "wf-chop",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-012",
+      "strategyVersion": "wf-chop",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-013",
+      "strategyVersion": "wf-chop",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-014",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-015",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-016",
+      "strategyVersion": "wf-chop",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-017",
+      "strategyVersion": "wf-chop",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-018",
+      "strategyVersion": "wf-chop",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-019",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-020",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-021",
+      "strategyVersion": "wf-chop",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-022",
+      "strategyVersion": "wf-chop",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-023",
+      "strategyVersion": "wf-chop",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-024",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-025",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-026",
+      "strategyVersion": "wf-chop",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-027",
+      "strategyVersion": "wf-chop",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-028",
+      "strategyVersion": "wf-chop",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-029",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-030",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-031",
+      "strategyVersion": "wf-chop",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-032",
+      "strategyVersion": "wf-chop",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-033",
+      "strategyVersion": "wf-chop",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-034",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-02-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-035",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-036",
+      "strategyVersion": "wf-chop",
+      "pnl": "2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-037",
+      "strategyVersion": "wf-chop",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-038",
+      "strategyVersion": "wf-chop",
+      "pnl": "-2.5",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-chop-039",
+      "strategyVersion": "wf-chop",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "BREAKDOWN",
+      "closedAt": "2026-02-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-thin-000",
+      "strategyVersion": "wf-thin",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-thin-001",
+      "strategyVersion": "wf-thin",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-thin-002",
+      "strategyVersion": "wf-thin",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2026-01-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-thin-003",
+      "strategyVersion": "wf-thin",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-thin-004",
+      "strategyVersion": "wf-thin",
+      "pnl": "5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    },
+    {
+      "cycleId": "wf-thin-005",
+      "strategyVersion": "wf-thin",
+      "pnl": "-5.0",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2026-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.0,
+        "measurement": "COMPLETE",
+        "costModelVersion": "cm1"
+      }
+    }
+  ]
+}
