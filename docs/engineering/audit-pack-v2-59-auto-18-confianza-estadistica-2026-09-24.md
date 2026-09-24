@@ -316,10 +316,19 @@ guardia `_ALEMBIC_HEAD` sigue en `046_fill_reference_mid` y no hay ese rojo posi
 
 ### 11.2 Cifras medidas del sello
 
-Ver la tabla de runs (se rellena con la medición del tag; el patrón es el de `AUTO-17` §11.2): `Release tag
-CI` (verde a la primera o con el re-sello declarado), job `python` del tag (ruff + mypy + pytest con sus
-`passed / skipped`), `Python CI` per-commit del tag y de `main` (`5/5` jobs) y `check-runs` del commit
-sellado.
+| Corte | Run | Resultado |
+| --- | --- | --- |
+| `Release tag CI` (`97763093`) | [`35991289733`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35991289733) | **GREEN**: `10 success` + `1 skipped` (`playwright (integrated E2E, opt-in)`), `certify` en `success` (**tras el re-run declarado de §11.6**) |
+| job `python` del tag | run anterior | ruff `All checks passed!` · mypy `Success: no issues found in 499 source files` · pytest **`2701 passed / 35 skipped`** (**+33** passed, **0** skips nuevos sobre `v2.58`) |
+| `Python CI` per-commit del tag | [`35991289795`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35991289795) | **`5/5` jobs `success`** (`quality`, `auto-v2-durable-pg`, `grammar-discovery-pg`, `paper-forward-pg`, `lifecycle-pg`); job `quality` **`2690 passed / 38 skipped`** |
+| `Python CI` per-commit de `main` | [`35991292329`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35991292329) | **`5/5` jobs `success`**; job `quality` **`2690 passed / 38 skipped`** (mismo corte que el tag) |
+| `check-runs` del commit sellado `97763093` | API de checks | `total_count = 45` ⇒ **`44` success** + **`1` skipped** |
+| `status` (Commit Status **legacy**) de `97763093` | `/commits/{sha}/status` | **`pending`** con **`0` statuses** *a la vez* que los `45` check-runs están `completed` ⇒ **cruce de API reproducido en vivo** (no es un hallazgo; §8 del arranque) |
+| PR de auditoría [#68](https://github.com/jvelasca/Bolsa_V1/pull/68) | checks del PR | **`29` checks `SUCCESS`** + `1` `SKIPPED` (el playwright opt-in), `certify` incluido |
+
+**+33 tests** sobre `v2.58` en los dos cortes (job `python` del tag `2668` → `2701`; job `quality` `2657` →
+`2690`), que es **exactamente** la cuenta del tramo de la fase (§7): **0** skips nuevos.
+
 
 ### 11.3 El límite declarado del §7, cerrado por la CI del tag
 
@@ -337,3 +346,29 @@ El §7 declaró que los runs de CI y la batería **completa con PG real** no se 
 
 El PR de auditoría se abrió **después** del sello; su diff es **exactamente** el commit de la fase y **no**
 es vehículo de merge (`main` ya lo recibió).
+
+### 11.6 El único rojo del tag: un flake **ajeno a la fase**, cerrado por re-run declarado
+
+El **primer** intento del `Release tag CI` (`35991289733`) trajo **un** rojo en el job
+`lifecycle-pg (Alembic + auth + golden restart)`:
+
+- `apps/api-python/tests/test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once`
+  ⇒ `AssertionError: RETRY` (la fila de `execution_events` quedó `RETRY` en vez de `APPLIED`),
+  **`1 failed, 160 passed`**.
+
+**Por qué no es de `AUTO-18`** (declarado, medido, no supuesto):
+
+1. **El camino no toca la fase.** `test_simulated_finance_pg.py` conduce por
+   `bolsa_application.simulated_finance` / `simulated_settlement` / `execution_event`, y **ninguno** importa
+   `auto_adaptive.py`, `auto_adaptive_confidence.py`, `auto_self_evaluation.py` ni `portfolio_reservation.py`
+   (los cuatro ficheros que la fase toca): el síntoma es un **estado de lease/reintento** de
+   `execution_events`, no un número de confianza, reparto, base o modelo de coste.
+2. **El gemelo per-commit pasó.** En el `Python CI` del **mismo** commit (`35991289795`) los `5/5` jobs
+   —incluido `lifecycle-pg`— salieron `success`.
+3. **Se reproduce como flake, no como regresión.** El **re-run de los jobs fallidos** (`gh run rerun
+   --failed`) dejó el `Release tag CI` **`success`** con los `10` jobs en verde y `certify` en `success`;
+   un rojo determinista de la fase **no** se apaga con un re-run.
+
+Queda **declarado** aquí (no escondido): el flake es de **temporización de lease** en la ruta de finanzas
+simuladas, **preexistente** y **fuera del alcance** de `AUTO-18`. La **corrida de cierre** del tag es la
+**verde**; los `45` check-runs y las cifras de §11.2 son de esa corrida.

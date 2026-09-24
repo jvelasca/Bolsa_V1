@@ -129,9 +129,13 @@ tienen **defecto seguro** (`measured_n = effective_n` histórico, `cost_model_ve
 - **Freeze byte a byte**: `auto_adaptive_journal.py` y `v2_43_governor_evidence.py` con diff **vacío**.
 - **Batería pre-tag medida con la selección EXACTA del CI** (la lista literal de `python-ci.yml`, que
   incluye `apps/api-python/tests` con sus `--ignore`): **`2728 passed`**, `0` rojos, **`94.07 s`**.
-- **Lo que NO se pudo medir aquí:** los runs de CI (no existen hasta empujar el tag) y las suites que
-  exigen **PostgreSQL real** (las PG `--ignore`adas, `apps/api-python/tests/integration` y
-  `chaos/live_a7`; importan `asyncpg`, ausente en esta máquina). Ese límite lo cierra la CI del tag.
+- **CI del sello ya medido** (pack §11): `Release tag CI` **`success`**, job `python` del tag
+  **`2701 passed / 35 skipped`**, `Python CI` per-commit del tag y de `main` **`5/5`**, `check-runs` del
+  sello `45` = `44` success + `1` skipped, PR [#68](https://github.com/jvelasca/Bolsa_V1/pull/68)
+  `29` checks `SUCCESS`.
+- **Lo que sigue sin poder medirse aquí:** las suites que exigen **PostgreSQL real** en local (las PG
+  `--ignore`adas, `apps/api-python/tests/integration` y `chaos/live_a7`; importan `asyncpg`, ausente en
+  esta máquina). Las **cierra** la CI del tag, que ya las corrió en verde.
 
 ---
 
@@ -188,6 +192,10 @@ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py
 - **El CI del sello se mide DESPUÉS de sellar, no antes.** El run del tag **no existe** hasta empujar el
   tag, así que las cifras viven en el `audit-pack` **§11** —añadido en el **commit de docs posterior al
   sello**, el mismo patrón declarado que `AUTO-13`…`AUTO-17`.
+- **El flake `test_finance_auto_day_materializes_executetrade_exactly_once` NO es un hallazgo de la fase.**
+  Su primer intento en el `Release tag CI` cayó en `RETRY` (estado de **lease** de `execution_events`), se
+  cerró con el **re-run declarado** y su camino (`simulated_finance`/`simulated_settlement`/`execution_event`)
+  **no importa** ninguno de los cuatro ficheros que `AUTO-18` toca. El detalle medido está en pack §11.6.
 - **`/commits/{sha}/status` en `pending` con `0` statuses NO es un rojo.** Es la API **legacy de Commit
   Status**; el repo publica **check-runs**. No lo reabras sin una medición nueva.
 - **El flag Adaptive sigue OFF.** Sin él no hay plan ni lectura.

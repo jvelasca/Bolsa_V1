@@ -151,7 +151,13 @@ la sonda (`M60`, `M125`, `M128`, `M131`, `M134`), todos publicados (§5).
 - **Matriz COMPLETA `M1…M148`:** corrida entera (`148/148` muerden, `0` fragmentos ausentes, restauración
   byte a byte, huella idéntica). **Cinco realineos declarados** (`M60`, `M125`, `M128`, `M131`, `M134`).
 - **Sello `v2.59-beta`:** ver pack §11 (se mide **después** de sellar; el PR de auditoría se abre
-  post-sello, mismo patrón que `AUTO-13`…`AUTO-17`).
+  post-sello, mismo patrón que `AUTO-13`…`AUTO-17`). **Medido:** `Release tag CI` (`35991289733`)
+  **`success`** (`10` jobs en verde + `1` skipped opt-in, `certify` en `success`) **tras el re-run
+  declarado** de un flake **ajeno a la fase** (`test_finance_auto_day_materializes_executetrade_exactly_once`,
+  lease/finanzas simuladas, pack §11.6); job `python` del tag **`2701 passed / 35 skipped`** (**+33** sobre
+  `v2.58`, `0` skips nuevos); `Python CI` per-commit del tag **`5/5`** y de `main` **`5/5`** (both
+  `2690 passed / 38 skipped`); `check-runs` del sello **`45`** = `44` success + `1` skipped; PR
+  [#68](https://github.com/jvelasca/Bolsa_V1/pull/68) **`29` checks `SUCCESS`**.
 
 ---
 
