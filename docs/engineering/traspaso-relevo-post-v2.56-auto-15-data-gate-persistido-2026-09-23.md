@@ -66,12 +66,12 @@ mide *publicación*, no *error*.
 
 - **Rama:** `main` (la fase **viajó** en fast-forward lineal, **sin merge commit y sin rama de fase en el
   sello**). **Superficie de auditoría abierta POST-sello** (declarada, no silenciosa): la rama
-  `auto-15-data-gate-persistido` con su **PR draft** sobre una base anclada en `b96ae624` (el commit
+  `auto-15-data-gate-persistido` con su **PR draft [#65](https://github.com/jvelasca/Bolsa_V1/pull/65)**
+  sobre una base anclada en `b96ae624` (el commit
   justo anterior a la fase: el plan ratificado), abierto
   **después** del sello **solo** para que el auditor externo revise el delta con comentarios en línea; su
-  **diff medido** y el enlace del PR se declaran en el commit de docs **posterior** al sello (mismo patrón
-  que `AUTO-14`). **No** es vehículo de merge: `main` ya la recibió. Árbol limpio **salvo `governor.json`**
-  (sin trackear, como estaba).
+  **diff medido** es el de la fase (**22 ficheros, `+2994/−24`**) y **no** es vehículo de merge: `main` ya
+  la recibió. Árbol limpio **salvo `governor.json`** (sin trackear, como estaba).
 - **Base:** `e29e6227` (el commit sellado de `AUTO-14`) más sus dos commits de documentación de sello.
 - **RE-SELLO declarado (no silencioso):** el **primer** CI del tag apuntó a `c62ac459` y salió **ROJO** —
   causa raíz única, repetida en los tres jobs PG afectados:

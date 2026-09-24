@@ -305,6 +305,12 @@ esta §11 con los runs de CI **medidos** se añade en el commit de docs **poster
 patrón que `AUTO-13`/`AUTO-14`): el run del tag no existe hasta que el tag se empuja, así que la tabla se
 **mide** en lugar de predecirse.
 
+**Superficie de auditoría (post-sello, declarada):** el **PR draft
+[#65](https://github.com/jvelasca/Bolsa_V1/pull/65)** (`auto-15-data-gate-persistido` @ `8ad54416` →
+`audit-base-v2.55-beta` @ `b96ae624`) se abre **después** del sello para que el auditor externo revise el
+delta con comentarios en línea. Su diff medido es el de la fase (**22 ficheros, `+2994/−24`**) y **no** es
+vehículo de merge: `main` ya la recibió en **fast-forward** (`b96ae624..8ad54416`).
+
 ---
 
 ## 11. CI del sello `v2.56-beta` (medida, no predicha)

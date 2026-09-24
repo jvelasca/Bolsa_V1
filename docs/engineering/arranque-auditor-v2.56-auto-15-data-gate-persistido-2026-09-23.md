@@ -18,9 +18,10 @@ declarado**: el primer CI del tag (sobre `c62ac459`) salió **rojo** porque
 `apps/api-python/tests/test_discovery_evidence_snapshot_pg.py:43` ancla la head de Alembic en
 `_ALEMBIC_HEAD` y la fase la subió a `045` sin bumpear esa constante (**5** aserciones que solo corren en
 los jobs PG); el fix es de una línea y el tag apunta ahora a **`8ad54416`**, con `c62ac459` conservado en
-la historia y su rojo **declarado** (§11.1 del pack). **Superficie de auditoría:** el **PR draft** de la
-rama `auto-15-data-gate-persistido` se abre **después** del sello **solo** para revisar con comentarios en
-línea; su diff medido es el de la fase (**22 ficheros, `+2994/−24`**) y **no** es vehículo de merge. **SÍ
+la historia y su rojo **declarado** (§11.1 del pack). **Superficie de auditoría:** el **PR draft
+[#65](https://github.com/jvelasca/Bolsa_V1/pull/65)** (`auto-15-data-gate-persistido` @ `8ad54416` →
+`audit-base-v2.55-beta` @ `b96ae624`) se abre **después** del sello **solo** para revisar con comentarios
+en línea; su diff medido es el de la fase (**22 ficheros, `+2994/−24`**) y **no** es vehículo de merge. **SÍ
 hay migración:** Alembic head `044_auto_cycle_trace` → **`045_adaptive_gate_state`**.
 
 ---
