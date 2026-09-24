@@ -51,6 +51,14 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     AdaptiveConfidence,
     build_adaptive_confidence,
 )
+from bolsa_analytics.cognitive.auto_adaptive_uncertainty import (
+    ADAPTIVE_INTERVAL_LEVEL_DEFAULT,
+    ADAPTIVE_INTERVAL_MIN_EPISODES_DEFAULT,
+    ADAPTIVE_INTERVAL_RESAMPLES_DEFAULT,
+    ADAPTIVE_INTERVAL_SEED_DEFAULT,
+    AdaptiveUncertainty,
+    build_adaptive_uncertainty,
+)
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_MIN_TRADES_DEFAULT,
     AutoSelfEvaluation,
@@ -66,6 +74,7 @@ from bolsa_application.sim_durable_store import (
 
 __all__ = [
     "build_adaptive_confidence_from_fills",
+    "build_adaptive_uncertainty_from_fills",
     "build_auto_self_evaluation",
     "cycles_from_fills",
     "make_auto_self_evaluation_provider",
@@ -311,6 +320,45 @@ def build_adaptive_confidence_from_fills(
         recent_window=recent_window,
         long_window=long_window,
         min_trades=min_trades,
+    )
+
+
+def build_adaptive_uncertainty_from_fills(
+    *,
+    fills: Iterable[Any] | None = None,
+    cycle_risk: Mapping[str, CycleRisk] | None = None,
+    confidence: AdaptiveConfidence | None = None,
+    level: float = ADAPTIVE_INTERVAL_LEVEL_DEFAULT,
+    resamples: int = ADAPTIVE_INTERVAL_RESAMPLES_DEFAULT,
+    seed: int = ADAPTIVE_INTERVAL_SEED_DEFAULT,
+    min_episodes: int = ADAPTIVE_INTERVAL_MIN_EPISODES_DEFAULT,
+) -> AdaptiveUncertainty:
+    """(PURA, ``AUTO-19A``) incertidumbre del edge desde los MISMOS fills que el informe.
+
+    Reutiliza ``_cycles_with_risk``: el intervalo y la confianza de EDGE hablan del mismo material
+    que el informe ``AUTO-7``/``AUTO-9`` y que la confianza ``AUTO-12`` —mismos ciclos, misma
+    noción de cierre, misma fricción aplicada—, sin un segundo FIFO que pueda divergir en silencio.
+
+    ``confidence`` es OPCIONAL: cuando el llamante YA construyó la lectura de ``AUTO-12`` sobre este
+    material, se pasa para que la cobertura/el deterioro/la base salgan de ESA medición y no se
+    recalculen. Sin ella, esta función la construye de los mismos ciclos (no añade I/O: el material
+    ya está en la mano).
+    """
+    cycles = _cycles_with_risk(fills, cycle_risk)
+    resolved = confidence
+    if resolved is None:
+        resolved = build_adaptive_confidence(
+            cycles,
+            recent_window=ADAPTIVE_RECENT_WINDOW_DEFAULT,
+            long_window=ADAPTIVE_LONG_WINDOW_DEFAULT,
+        )
+    return build_adaptive_uncertainty(
+        cycles,
+        confidence=resolved,
+        level=level,
+        resamples=resamples,
+        seed=seed,
+        min_episodes=min_episodes,
     )
 
 

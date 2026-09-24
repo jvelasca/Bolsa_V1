@@ -137,6 +137,12 @@ __all__ = [
     "RegimeConfidence",
     "StrategyConfidence",
     "build_adaptive_confidence",
+    "coverage_band",
+    "cycle_field",
+    "measured_r",
+    "order_cycles_by_instant",
+    "regime_episodes",
+    "regime_of",
 ]
 
 #: Ventana LARGA por defecto (últimos ciclos): el histórico contra el que se compara.
@@ -388,28 +394,91 @@ def _measured_r(raw: Any) -> float | None:
     ).r_multiple
 
 
-def _episodes(rows: Sequence[Any]) -> dict[str, dict[str, int]]:
-    """(PURA, ``AUTO-18``) rachas de régimen por versión, sobre los ciclos MEDIDOS ordenados.
+def cycle_field(row: Any, *names: str) -> Any:
+    """(PURA, ``AUTO-19A``) superficie pública del lector de campos de UNA fila de ciclo.
 
-    Devuelve ``{version: {regimen: nº de rachas}}``. Una racha se corta cuando cambia el régimen
-    (``UNKNOWN`` es un valor de racha PROPIO: nunca se funde con un régimen conocido). Los ciclos
-    de una misma fase de mercado cuentan como **una** observación independiente, no como N. Solo
-    entran los ciclos con R medido: un ciclo sin medida no aporta al denominador del número.
-
-    El orden de ``rows`` es responsabilidad del llamante (las ventanas ya vienen ordenadas por
-    instante): la racha se define sobre el orden cronológico, no sobre el de llegada.
+    El replay parte IS/OOS leyendo la versión de la fila con la MISMA tolerancia que el informe
+    (``Mapping`` u objeto, camelCase o snake_case): un lector paralelo podría no ver un campo que
+    el informe sí ve y partir la muestra por un dato que estaba.
     """
-    runs: dict[str, dict[str, int]] = {}
+    return _field(row, *names)
+
+
+def measured_r(row: Any) -> float | None:
+    """(PURA, ``AUTO-19A``) superficie pública del R medido de UNA fila de ciclo.
+
+    Es el MISMO cociente que sostiene ``expectancy_r`` y ``measured_n`` (``_measured_r``): la
+    incertidumbre y el replay no pueden derivar el R con una regla paralela que divergiera en
+    silencio del número que publica el informe.
+    """
+    return _measured_r(row)
+
+
+def regime_of(row: Any) -> str:
+    """(PURA, ``AUTO-19A``) superficie pública del régimen de UNA fila de ciclo (o ``UNKNOWN``)."""
+    return _regime_of(row)
+
+
+def order_cycles_by_instant(rows: Sequence[Any]) -> tuple[tuple[Any, ...], int]:
+    """(PURA, ``AUTO-19A``) las filas ordenadas de VIEJA a NUEVA, y cuántas no declaran instante.
+
+    Es la superficie pública del orden que ``AUTO-18`` ya usaba por dentro (``_order_by_instant``):
+    la incertidumbre y el replay miden sobre el MISMO orden cronológico que el informe y la
+    confianza, así que no puede nacer un segundo orden que diverja en silencio. Las filas sin
+    instante legible van **al final** y se cuentan —nunca se les supone una fecha—.
+    """
+    ordered, undated = _order_by_instant(rows)
+    return tuple(ordered), undated
+
+
+def regime_episodes(
+    rows: Sequence[Any],
+) -> dict[str, tuple[tuple[str, tuple[float, ...]], ...]]:
+    """(PURA, ``AUTO-19A``) rachas de régimen como GRUPOS de R medidos, por versión.
+
+    Devuelve ``{version: ((regimen, (r1, r2, ...)), ...)}`` sobre los ciclos MEDIDOS y en el orden
+    recibido (el llamante ordena por instante). Una racha se corta cuando cambia el régimen
+    (``UNKNOWN`` es un valor de racha PROPIO: nunca se funde con un régimen conocido) y los ciclos
+    de una misma fase de mercado van **juntos**, no como observaciones sueltas.
+
+    Es el productor ÚNICO de la semántica de episodios: ``_episodes`` (los conteos que ``AUTO-18``
+    publica) y el bootstrap por episodios de ``AUTO-19A`` cuelgan de aquí, de modo que la
+    independencia se mide una sola vez y no hay dos definiciones de "racha" que puedan divergir.
+    """
+    runs: dict[str, list[tuple[str, list[float]]]] = {}
     previous: dict[str, str] = {}
     for row in rows:
         version = str(_field(row, "strategyVersion", "strategy_version") or "")
-        if not version or _measured_r(row) is None:
+        if not version:
+            continue
+        measured = _measured_r(row)
+        if measured is None:
             continue
         regime = _regime_of(row)
-        counts = runs.setdefault(version, {})
-        if previous.get(version) != regime:
-            counts[regime] = counts.get(regime, 0) + 1
+        episodes = runs.setdefault(version, [])
+        if not episodes or previous.get(version) != regime:
+            episodes.append((regime, []))
+        episodes[-1][1].append(float(measured))
         previous[version] = regime
+    return {
+        version: tuple((regime, tuple(values)) for regime, values in episodes)
+        for version, episodes in runs.items()
+    }
+
+
+def _episodes(rows: Sequence[Any]) -> dict[str, dict[str, int]]:
+    """(PURA, ``AUTO-18``) rachas de régimen por versión, sobre los ciclos MEDIDOS ordenados.
+
+    Devuelve ``{version: {regimen: nº de rachas}}``. Es una proyección de ``regime_episodes``
+    (grafía de ``AUTO-19A``): los conteos no pueden diferir de los episodios que sostienen la
+    muestra efectiva porque salen del MISMO recorrido. El orden de ``rows`` es responsabilidad del
+    llamante (las ventanas ya vienen ordenadas por instante).
+    """
+    runs: dict[str, dict[str, int]] = {}
+    for version, episodes in regime_episodes(rows).items():
+        counts = runs.setdefault(version, {})
+        for regime, _values in episodes:
+            counts[regime] = counts.get(regime, 0) + 1
     return runs
 
 
@@ -429,6 +498,16 @@ def _coverage_band(measured_n: int, effective_n: int) -> str:
     if quality == "preliminary":
         return ADAPTIVE_COVERAGE_MEDIUM
     return ADAPTIVE_COVERAGE_LOW
+
+
+def coverage_band(measured_n: int, effective_n: int) -> str:
+    """(PURA, ``AUTO-19A``) superficie pública de la banda de cobertura de ``AUTO-18``.
+
+    La incertidumbre necesita clasificar la cobertura de su propia lectura sin reimplementar la
+    convención: delega en ``_coverage_band``, que sigue siendo la ÚNICA casa de las bandas de
+    ``HIGH``/``MEDIUM``/``LOW``/``UNCOVERED``.
+    """
+    return _coverage_band(measured_n, effective_n)
 
 
 def _shrunk(expectancy_r: float | None, effective_n: int, prior: float) -> float | None:

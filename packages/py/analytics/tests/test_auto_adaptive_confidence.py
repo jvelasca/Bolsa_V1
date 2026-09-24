@@ -58,6 +58,11 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     _episodes,
     _shrunk,
     build_adaptive_confidence,
+    coverage_band,
+    measured_r,
+    order_cycles_by_instant,
+    regime_episodes,
+    regime_of,
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_COST_BASIS_APPLIED,
@@ -1017,3 +1022,50 @@ def test_no_cycles_publishes_an_empty_calibration_with_the_empty_reading() -> No
 
     assert reading.calibration == ()
     assert reading.as_dict()["calibration"] == []
+
+
+# ── AUTO-19A — la superficie pública del orden, del R y de las rachas ────────────────
+
+
+def test_regime_episodes_groups_the_runs_and_matches_the_counts() -> None:
+    """Las rachas viajan con sus valores: el bootstrap por episodios no reimplementa la semántica."""
+    rows = (
+        _dated(count=2, regime="TREND_UP")
+        + _dated(count=2, regime="RANGE", first_day=4, index_offset=100)
+        + _dated(count=1, regime="TREND_UP", first_day=7, index_offset=200)
+    )
+    ordered, undated = order_cycles_by_instant(rows)
+
+    assert undated == 0
+    episodes = regime_episodes(ordered)["orb-1"]
+    assert [regime for regime, _values in episodes] == ["TREND_UP", "RANGE", "TREND_UP"]
+    assert [len(values) for _regime, values in episodes] == [2, 2, 1]
+    # La proyección de conteos (``_episodes``) sale del MISMO recorrido: no pueden divergir.
+    counts = _episodes(ordered)["orb-1"]
+    assert counts == {"TREND_UP": 2, "RANGE": 1}
+    assert sum(counts.values()) == len(episodes)
+
+
+def test_the_public_readers_expose_the_same_r_and_regime_the_report_uses() -> None:
+    row = _cycle(index=0, pnl="10", risk="5", regime="TREND_UP")
+
+    assert measured_r(row) == pytest.approx(2.0)
+    assert regime_of(row) == "TREND_UP"
+    assert measured_r({"pnl": "10"}) is None, "sin denominador no hay R que medir"
+
+
+def test_order_by_instant_declares_the_rows_without_a_readable_instant() -> None:
+    dated = _dated(count=2)
+    undated_row = _cycle(index=99, pnl="10", regime="RANGE", closed_at=None)
+
+    ordered, undated = order_cycles_by_instant(dated + [undated_row])
+
+    assert undated == 1
+    assert ordered[-1] is undated_row, "las filas sin fecha van al final, no se les supone una"
+
+
+def test_coverage_band_is_the_public_surface_of_the_auto18_convention() -> None:
+    assert coverage_band(60, 60) == ADAPTIVE_COVERAGE_HIGH
+    assert coverage_band(24, 24) == ADAPTIVE_COVERAGE_MEDIUM
+    assert coverage_band(4, 4) == ADAPTIVE_COVERAGE_LOW
+    assert coverage_band(0, 0) == ADAPTIVE_COVERAGE_UNCOVERED

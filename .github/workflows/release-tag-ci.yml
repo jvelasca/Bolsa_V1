@@ -415,6 +415,11 @@ jobs:
         # ``.../test_applied_cost.py``) van EXPLÍCITOS por el mismo motivo. La certificación PG
         # (migración 046 + la referencia sobresaliendo a una sesión nueva) va en el paso PG de
         # más abajo con gate fail-if-skipped.
+        # V2.60/AUTO-19A (incertidumbre del edge + replay OOS): la costura del worker
+        # (``apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py``) va EXPLÍCITA —como
+        # pide el plan de la fase— para certificar con nombre propio el frame ``uncertainty`` y las
+        # dos claves nuevas de la evidencia; los puros entran por el pase de
+        # ``packages/py/analytics/tests``. pytest deduplica la doble mención (no corre dos veces).
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -483,6 +488,7 @@ jobs:
           packages/py/application/tests/test_idempotency_key_budget.py
           packages/py/application/tests/test_strategy_shadow_phase.py
           packages/py/infrastructure/tests/test_verify_financial_invariants.py
+          apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py
           apps/api-python/tests
           --ignore=apps/api-python/tests/integration
           --ignore=apps/api-python/tests/test_lists.py

@@ -387,6 +387,33 @@ añade:
 * **M148 (sello sin moverse)** — si el reparto cambia de regla (muestra estadística) y el sello se
   queda en ``auto17``, dos planes con la misma evidencia difieren sin que nada lo declare.
 
+AUTO-19A (incertidumbre del edge y replay OOS: intervalo por EPISODIOS, ``edgeConfidence`` como eje
+propio y una batería out-of-sample que no inventa veredictos) añade:
+
+* **M149 (episodios aplanados)** — si el bootstrap remuestrea CICLOS sueltos en vez de rachas de
+  régimen, 100 ciclos de una sola fase se leen como 100 observaciones y el intervalo se estrecha
+  hasta mentir (la independencia que ``AUTO-18`` fijó se pierde justo al medir su error).
+* **M150 (azar sin semilla)** — si el bootstrap deja de usar la semilla declarada, el mismo
+  material produce intervalos distintos en cada corrida: la evidencia deja de ser reproducible.
+* **M151 (edge deducida de la medición)** — si ``edgeConfidence`` se deriva de la banda de
+  MEDICIÓN en vez del signo del intervalo frente a cero, "medido con holgura" se confunde con
+  "hay edge", que son dos ejes distintos.
+* **M152 (UNKNOWN disfrazado de LOW)** — si la ausencia de medición (o de rachas) se publica como
+  ``LOW``, "no sabemos" se lee como "sabemos que no hay edge".
+* **M153 (rachas insuficientes calladas)** — si con menos de ``min_episodes`` rachas se publica
+  igual el percentil, un intervalo fabricado con una sola racha se presenta como incertidumbre
+  medida.
+* **M154 (replay sin partir)** — si el IS se mide sobre el material COMPLETO (OOS incluido), la
+  "predicción" ya vio el futuro y el error OOS se hunde sin que nada lo declare.
+* **M155 (veredicto sin muestra)** — si la guarda de muestra mínima desaparece, una anécdota de
+  un solo par se publica como ``supported``.
+* **M156 (refutado leído como soportado)** — si la comparación no distingue el grupo peor, toda
+  pregunta responde ``supported`` y la batería deja de poder refutar.
+* **M157 (cobertura invertida)** — si la pregunta de cobertura compara cubierto y no cubierto al
+  revés, el instrumento afirma lo contrario de lo que midió.
+* **M158 (sello del reparto movido por la lectura)** — si la incertidumbre (evidencia read-only)
+  arrastra un cambio de sello, dos planes con la misma regla dejan de ser el mismo plan.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -437,6 +464,12 @@ AUTO_ADAPTIVE = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adapti
 AUTO_ADAPTIVE_CONFIDENCE = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_confidence.py"
 )
+AUTO_ADAPTIVE_UNCERTAINTY = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_uncertainty.py"
+)
+AUTO_ADAPTIVE_REPLAY = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_replay.py"
+)
 AUTO_ADAPTIVE_DATA_GATE = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_data_gate.py"
 )
@@ -469,6 +502,9 @@ T_SELF = (
 T_ADAPTIVE = "packages/py/analytics/tests/test_auto_adaptive.py"
 T_CONFIDENCE = "packages/py/analytics/tests/test_auto_adaptive_confidence.py"
 T_FEED = "packages/py/application/tests/test_auto_self_evaluation_feed.py"
+T_UNCERTAINTY = "packages/py/analytics/tests/test_auto_adaptive_uncertainty.py"
+T_REPLAY = "packages/py/analytics/tests/test_auto_adaptive_replay.py"
+T_UNCERTAINTY_SEAM = "apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py"
 T_CONFIDENCE_SEAM = "apps/api-python/tests/test_auto_v53_auto12_confidence_seam.py"
 T_DATA_GATE = "packages/py/analytics/tests/test_auto_adaptive_data_gate.py"
 T_DATA_GATE_SEAM = "apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py"
@@ -1698,6 +1734,99 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "ADAPTIVE_POLICY_VERSION = \"auto18-v1\"\n",
         "ADAPTIVE_POLICY_VERSION = \"auto17-v1\"\n",
         (T_ADAPTIVE,),
+    ),
+    # ── AUTO-19A (V2.60): la incertidumbre del edge y el replay OOS ──────────────────────────
+    (
+        "M149 (episodios aplanados): el bootstrap remuestrea ciclos sueltos, no rachas",
+        AUTO_ADAPTIVE_UNCERTAINTY,
+        "    bursts = [tuple(float(v) for v in episode) for episode in episodes if episode]\n",
+        "    bursts = [(float(v),) for episode in episodes for v in episode]\n",
+        (T_UNCERTAINTY,),
+    ),
+    (
+        "M150 (azar sin semilla): el bootstrap deja de usar la semilla declarada",
+        AUTO_ADAPTIVE_UNCERTAINTY,
+        "    generator = random.Random(seed)\n",
+        "    generator = random.Random()\n",
+        (T_UNCERTAINTY,),
+    ),
+    (
+        "M151 (edge deducida de la medicion): el edge sale de la banda, no del intervalo",
+        AUTO_ADAPTIVE_UNCERTAINTY,
+        "    if interval.lower > 0.0:\n"
+        "        level = ADAPTIVE_EDGE_HIGH\n"
+        "    elif interval.point > 0.0:\n"
+        "        level = ADAPTIVE_EDGE_MEDIUM\n"
+        "        notes.append(ADAPTIVE_EDGE_NOTE_CROSSES_ZERO)\n"
+        "    else:\n"
+        "        level = ADAPTIVE_EDGE_LOW\n"
+        "        notes.append(ADAPTIVE_EDGE_NOTE_NEGATIVE)\n",
+        "    if coverage == ADAPTIVE_COVERAGE_HIGH:\n"
+        "        level = ADAPTIVE_EDGE_HIGH\n"
+        "    elif coverage is not None:\n"
+        "        level = ADAPTIVE_EDGE_MEDIUM\n"
+        "        notes.append(ADAPTIVE_EDGE_NOTE_CROSSES_ZERO)\n"
+        "    else:\n"
+        "        level = ADAPTIVE_EDGE_LOW\n"
+        "        notes.append(ADAPTIVE_EDGE_NOTE_NEGATIVE)\n",
+        (T_UNCERTAINTY,),
+    ),
+    (
+        "M152 (UNKNOWN disfrazado de LOW): la falta de medicion se publica como edge bajo",
+        AUTO_ADAPTIVE_UNCERTAINTY,
+        "    if interval.point is None or interval.lower is None or interval.upper is None:\n"
+        "        return ADAPTIVE_EDGE_UNKNOWN, (ADAPTIVE_EDGE_NOTE_NO_MEASUREMENT,)\n"
+        "    if interval.effective_n < max(1, int(min_episodes)):\n"
+        "        return ADAPTIVE_EDGE_UNKNOWN, (ADAPTIVE_EDGE_NOTE_NO_MEASUREMENT,)\n",
+        "    if interval.point is None or interval.lower is None or interval.upper is None:\n"
+        "        return ADAPTIVE_EDGE_LOW, (ADAPTIVE_EDGE_NOTE_NO_MEASUREMENT,)\n"
+        "    if interval.effective_n < max(1, int(min_episodes)):\n"
+        "        return ADAPTIVE_EDGE_LOW, (ADAPTIVE_EDGE_NOTE_NO_MEASUREMENT,)\n",
+        (T_UNCERTAINTY, T_UNCERTAINTY_SEAM),
+    ),
+    (
+        "M153 (rachas insuficientes calladas): se publica percentil con una sola racha",
+        AUTO_ADAPTIVE_UNCERTAINTY,
+        "    if effective_n < max(1, int(min_episodes)):\n",
+        "    if False:\n",
+        (T_UNCERTAINTY,),
+    ),
+    (
+        "M154 (replay sin partir): el IS se mide sobre el material con el OOS dentro",
+        AUTO_ADAPTIVE_REPLAY,
+        "    is_rows = tuple(measured_rows[: total - oos_n])\n",
+        "    is_rows = tuple(measured_rows)\n",
+        (T_REPLAY,),
+    ),
+    (
+        "M155 (veredicto sin muestra): la guarda de muestra minima desaparece",
+        AUTO_ADAPTIVE_REPLAY,
+        "    if len(pairs) < max(1, min_cells):\n",
+        "    if False:\n",
+        (T_REPLAY,),
+    ),
+    (
+        "M156 (refutado leido como soportado): la comparacion no distingue el grupo peor",
+        AUTO_ADAPTIVE_REPLAY,
+        "    if candidate > baseline + epsilon:\n"
+        "        return REPLAY_VERDICT_NOT_SUPPORTED\n",
+        "    if candidate > baseline + epsilon:\n"
+        "        return REPLAY_VERDICT_SUPPORTED\n",
+        (T_REPLAY,),
+    ),
+    (
+        "M157 (cobertura invertida): la pregunta compara cubierto y no cubierto al reves",
+        AUTO_ADAPTIVE_REPLAY,
+        "        verdict=_compare(covered_mean, uncovered_mean),\n",
+        "        verdict=_compare(uncovered_mean, covered_mean),\n",
+        (T_REPLAY,),
+    ),
+    (
+        "M158 (sello movido por la lectura): la incertidumbre arrastra otro sello de reparto",
+        AUTO_ADAPTIVE,
+        "ADAPTIVE_POLICY_VERSION = \"auto18-v1\"\n",
+        "ADAPTIVE_POLICY_VERSION = \"auto19a-v1\"\n",
+        (T_ADAPTIVE, T_UNCERTAINTY_SEAM),
     ),
 ]
 

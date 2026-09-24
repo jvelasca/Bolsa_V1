@@ -171,6 +171,7 @@ from bolsa_application.auto_reason_codes import (
 )
 from bolsa_application.auto_self_evaluation_feed import (
     build_adaptive_confidence_from_fills,
+    build_adaptive_uncertainty_from_fills,
     build_auto_self_evaluation,
     recovery_evidence_from_fills,
 )
@@ -3096,6 +3097,21 @@ class AutoSimulationWorker:
             logger.warning(
                 "auto_sim v2 adaptive confidence gaps %s", confidence.as_dict()["notes"]
             )
+        # AUTO-19A — la INCERTIDUMBRE del edge (intervalo por episodios + ``edgeConfidence``) desde
+        # el MISMO material ya leído: no añade I/O ni un segundo FIFO. Es un hecho MEDIDO, así que se
+        # publica aunque el gate limite el encogimiento (igual que la banda): lo que el gate apaga es
+        # el USO para repartir, no la evidencia. No mueve la regla ni el sello (``auto18-v1``).
+        uncertainty = build_adaptive_uncertainty_from_fills(
+            fills=fills, cycle_risk=cycle_risk, confidence=confidence
+        )
+        if uncertainty.by_strategy:
+            gaps = sorted(
+                {note for row in uncertainty.by_strategy for note in row.notes}
+            )
+            if gaps:
+                # Huecos DECLARADOS del intervalo (sin ciclos o sin rachas suficientes). Un
+                # intervalo que no se pudo medir no se disfraza de estrecho: se nombra.
+                logger.info("auto_sim v2 adaptive uncertainty gaps %s", gaps)
         # AUTO-13 (§21/§22) — el gate de EVIDENCIA, entre medir y decidir. Se compone DESPUÉS de
         # la confianza porque la usa como insumo, y ANTES de repartir porque puede desactivarla
         # (``LIMITS``/``FREEZES``) o declarar el tick sin plan (``NO_ADAPT``). No añade I/O: son
@@ -3143,6 +3159,10 @@ class AutoSimulationWorker:
                 confidence=confidence,
                 shrink=not reading.limits_adaptation,
                 recovery=evidence or None,
+                # AUTO-19A — la incertidumbre es evidencia publicada: viaja aunque el gate límite el
+                # encogimiento (lo medido no se oculta). No toca multiplicadores ni rotación: sin
+                # ella el plan sería byte-idéntico al de ``AUTO-18``.
+                uncertainty=uncertainty,
             )
 
         recovery = self._v2_adaptive_recovery_evidence(fills, cycle_risk, confidence)
