@@ -344,8 +344,11 @@ El §7 declaró que los runs de CI y la batería **completa con PG real** no se 
 
 ### 11.5 La superficie de auditoría post-sello
 
-El PR de auditoría se abrió **después** del sello; su diff es **exactamente** el commit de la fase y **no**
-es vehículo de merge (`main` ya lo recibió).
+El PR de auditoría [#68](https://github.com/jvelasca/Bolsa_V1/pull/68) se abrió **después** del sello;
+su diff es **exactamente** el delta de la fase — `audit-base-v2.58-beta` @ **`75913f0c`** (el **último**
+commit de `v2.58`, docs incluidas: el mismo patrón que `audit-base-v2.57-beta` @ `7b664fb6`) → head
+`2cc323fb` —, **22 ficheros, `+3173/−171`**, y **no** es vehículo de merge (`main` ya recibió la fase en
+**fast-forward**).
 
 ### 11.6 El único rojo del tag: un flake **ajeno a la fase**, cerrado por re-run declarado
 

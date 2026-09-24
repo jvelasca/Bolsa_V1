@@ -2,8 +2,10 @@
 
 **Qué se te pide:** revisar el delta de `V2.59`/`AUTO-18` **contra su invariante**, no contra el estilo.
 Todo lo que sigue está **medido sobre el árbol sellado**; lo que **no** se pudo medir aquí está declarado
-como tal (y se dice qué lo cierra). Superficie de revisión: el PR de auditoría (rama
-`auto-18-confianza-estadistica` → la base de `v2.58-beta`).
+como tal (y se dice qué lo cierra). Superficie de revisión: el PR de auditoría
+[#68](https://github.com/jvelasca/Bolsa_V1/pull/68) (rama `auto-18-confianza-estadistica`, head
+`2cc323fb` → `audit-base-v2.58-beta` @ **`75913f0c`**, el **último** commit de `v2.58`: **22 ficheros,
+`+3173/−171`**), abierto **después** del sello y **no** vehículo de merge (`main` ya recibió la fase).
 
 Antes de empezar: `git status`, `git log --oneline -5`, la head de Alembic
 (`046_fill_reference_mid`) y la guardia de head
