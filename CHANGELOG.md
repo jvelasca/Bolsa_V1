@@ -64,6 +64,26 @@ validación:
   sello `auto18-v1` quedan intactos. La lectura es **evidencia publicada**, nunca un permiso.
 - El fixture del replay es **sintético y declarado**: mide el instrumento, no la estrategia real.
 
+### Sello (v2.60-beta) — CI real medida
+
+- **Tag anotado `v2.60-beta`** sobre el commit de fase **`cbd96bbe`**, `main` en **fast-forward**
+  (`9898c51a..cbd96bbe`), tag empujado **de uno en uno** (sin `--follow-tags`). **Sin migración**: la
+  guardia `_ALEMBIC_HEAD` sigue en `046_fill_reference_mid`, así que el tag cubre el paquete **a la
+  primera**, **sin rojos y sin flakes**.
+- **`Release tag CI`**
+  [`35999631671`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631671) **GREEN a la primera**
+  (`10 success` + `1 skipped`, `certify` en `success`); job `python` del tag **`2747 passed / 35 skipped`**
+  (**+46** passed y **0** skips nuevos sobre `v2.59`), ruff `All checks passed!`, import-linter
+  `4 kept, 0 broken` y mypy `Success: no issues found in 499 source files`.
+- **`Python CI` per-commit del tag**
+  [`35999631556`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631556) **`5/5` jobs verdes**
+  (`quality` **`2736 passed / 38 skipped`**; los cuatro de PG incluidos: cierra el límite offline
+  declarado). `Python CI` de `main`
+  [`35999579254`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999579254) **`5/5` verdes** con el
+  mismo corte. `check-runs` del commit sellado: **`27` success + `1` skipped**.
+- **Delta testeado:** **+46** tests sobre `v2.59` en los dos cortes (job `python` `2701` → `2747`; `quality`
+  `2690` → `2736`), la cuenta exacta del tramo de la fase.
+
 ## [1.84.0-beta] — AUTO-18 Confianza estadística (V2.59) — 2026-09-24
 
 **Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI nueva, sin cambio de

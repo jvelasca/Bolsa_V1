@@ -142,8 +142,13 @@ Los cinco pasos del plan se ejecutaron en orden, cada uno con su gate. **Cero re
   de la fase ⇒ **`144 passed`, `0` rojos**: **no hay un solo rojo que declarar** (fase aditiva).
 - **Matriz COMPLETA `M1…M158`:** corrida entera (`158/158` muerden, `0` en `NADA`, `0` fragmentos ausentes,
   restauración byte a byte, huella idéntica). **Cero realineos.**
-- **Sello `v2.60-beta`:** se mide **después** de sellar (el PR de auditoría se abre post-sello, mismo patrón
-  que `AUTO-13`…`AUTO-18`); las cifras del tag viven en el pack §11.
+- **Sello `v2.60-beta`:** medido. El `Release tag CI`
+  [`35999631671`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631671) salió **GREEN a la
+  primera** (`10 success` + `1 skipped`, `certify` en `success`) **sin rojos y sin flakes** — nada que
+  declarar ni que re-ejecutar (contraste con el flake ajeno que obligó a un re-run en `v2.59`) —, con el job
+  `python` del tag en **`2747 passed / 35 skipped`** (**+46** sobre `v2.59`, `0` skips nuevos) y los dos
+  `Python CI` per-commit (tag y `main`) **`5/5` verdes**. El PR de auditoría se abre post-sello, mismo
+  patrón que `AUTO-13`…`AUTO-18`; las cifras completas viven en el pack §11.
 
 ---
 

@@ -114,7 +114,12 @@ con lectura; el journal durable queda byte a byte igual.
 - **Batería pre-tag medida con la selección EXACTA del CI**: **`2774 passed`**, `0` rojos, **`94.98 s`**.
 - **Lo que sigue sin poder medirse aquí:** las suites que exigen **PostgreSQL real** en local (las PG
   `--ignore`adas, `apps/api-python/tests/integration` y `chaos/live_a7`; importan `asyncpg`, ausente en
-  esta máquina). Las **cierra** la CI del tag. Esta fase **no** añade tests PG.
+  esta máquina). Las **cerró** la CI del tag: el `Release tag CI`
+  [`35999631671`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631671) salió **GREEN a la
+  primera** (`10 success` + `1 skipped`, `certify` en `success`, **sin flakes**) y los `Python CI`
+  per-commit del tag y de `main` quedaron **`5/5` verdes** (los cuatro jobs PG incluidos). Esta fase **no**
+  añade tests PG (sin migración), así que esos jobs corren el **mismo** material que `v2.59` y certifican
+  que `AUTO-19A` no rompió ninguno.
 
 ---
 

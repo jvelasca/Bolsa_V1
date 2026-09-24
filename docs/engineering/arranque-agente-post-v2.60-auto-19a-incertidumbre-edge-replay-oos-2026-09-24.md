@@ -36,6 +36,7 @@
 | Sello del gate | `DATA_GATE_POLICY_VERSION = "auto15-v1"` (intacto) |
 | Tramo de la fase | `271 passed` |
 | Batería pre-tag (CI exacto) | `2774 passed`, `0` rojos, `94.98 s` |
+| CI del sello `v2.60-beta` | `Release tag CI` [`35999631671`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631671) **GREEN a la primera** (`10 success` + `1 skipped`, `certify` en `success`); job `python` **`2747 passed / 35 skipped`**; `Python CI` de tag y `main` **`5/5`** |
 | Delta simétrico | `144 passed`, `0` rojos (aditiva) |
 | Matriz | `M1…M158` (audit-pack §6) |
 | Flag Adaptive | **OFF** |

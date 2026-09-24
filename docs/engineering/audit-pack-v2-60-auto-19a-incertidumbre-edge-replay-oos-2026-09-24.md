@@ -233,11 +233,37 @@ uv run --no-sync python scripts/research/auto_replay_battery.py
 ## 11. CI del sello `v2.60-beta` (medida, no predicha)
 
 > Sección completada en el commit de docs **posterior al sello** (el run del tag no existe hasta empujarlo),
-> mismo patrón declarado que `AUTO-13`…`AUTO-18`.
+> mismo patrón declarado que `AUTO-13`…`AUTO-18`. **Cifras medidas**, cada una con el run que las produjo.
 
 - **Head de Alembic:** la guardia no se movió (`046_fill_reference_mid`), así que **no hay re-sello** por
-  migración: el tag cubre el paquete completo a la primera.
-- **`Release tag CI` del tag `v2.60-beta`:** `<pendiente de medir>`.
-- **Job `python` del tag:** `<pendiente de medir>`.
-- **`Python CI` per-commit del tag y de `main`:** `<pendiente de medir>`.
-- **PR de auditoría:** `<pendiente de medir>`.
+  migración: el tag cubre el paquete completo **a la primera**, sin rojos y **sin flakes**.
+
+### 11.1 El CI del tag: verde a la primera, sin re-run
+
+| Corte | Run | Resultado |
+| --- | --- | --- |
+| `Release tag CI` (`cbd96bbe`) | [`35999631671`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631671) | **GREEN a la primera**: `10 success` + `1 skipped` (`playwright (integrated E2E, opt-in)`), `certify` en `success`. **Sin re-run**: no hubo ningún flake que declarar (contraste con el flake ajeno de lease que obligó a un re-run en `v2.59`) |
+| job `python` del tag | run anterior | ruff `All checks passed!` · import-linter `4 kept, 0 broken` · mypy `Success: no issues found in 499 source files` · pytest **`2747 passed / 35 skipped`** (**+46** passed, **0** skips nuevos sobre `v2.59`) |
+| `Python CI` per-commit del tag | [`35999631556`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631556) | **`5/5` jobs `success`** (`quality`, `auto-v2-durable-pg`, `grammar-discovery-pg`, `paper-forward-pg`, `lifecycle-pg`); job `quality` **`2736 passed / 38 skipped`** (125.36 s) |
+| `Python CI` per-commit de `main` | [`35999579254`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999579254) | **`5/5` jobs `success`**; job `quality` **`2736 passed / 38 skipped`** (mismo corte que el tag) |
+| `check-runs` del commit sellado `cbd96bbe` | API de checks | `total_count = 28` ⇒ **`27` success** + **`1` skipped** |
+| `status` (Commit Status **legacy**) de `cbd96bbe` | `/commits/{sha}/status` | **`pending`** con **`0` statuses** *a la vez* que los `28` check-runs están `completed` ⇒ **cruce de API reproducido en vivo** (no es un hallazgo; §8 del arranque) |
+| PR de auditoría | checks del PR | se rellena al abrir el PR (mismo patrón que `AUTO-18`) |
+
+**+46 tests** sobre `v2.59` en los dos cortes (job `python` del tag `2701` → `2747`; job `quality` `2690` →
+`2736`), que es **exactamente** la cuenta del tramo de la fase (§7): **0** skips nuevos.
+
+### 11.2 El límite declarado del §7, cerrado por la CI del tag
+
+El §7 declaró que los runs de CI y la batería **completa con PG real** no se pueden medir en esta máquina
+(las suites PG importan `asyncpg`, ausente). **El tag las cierra**: los jobs `lifecycle-pg`, `a7-gate` y
+`dr-verify` del `Release tag CI` y los cuatro jobs PG del `Python CI` per-commit salieron **verdes**. Esta
+fase **no** añade tests PG (sin migración), así que los jobs PG corren **el mismo** material que `v2.59` y
+verifican que `AUTO-19A` **no rompió** ninguno.
+
+### 11.3 La ruta sin migración: qué NO se movió (medido)
+
+- `_ALEMBIC_HEAD` (`test_discovery_evidence_snapshot_pg.py:43`) = **`046_fill_reference_mid`** (idéntico).
+- `git diff` del gobernador (`v2_43_governor_evidence.py`) y del contrato durable
+  (`auto_adaptive_journal.py`) ⇒ **vacíos**.
+- `ADAPTIVE_POLICY_VERSION` = **`auto18-v1`** y `DATA_GATE_POLICY_VERSION` = **`auto15-v1`** (los dos intactos).
