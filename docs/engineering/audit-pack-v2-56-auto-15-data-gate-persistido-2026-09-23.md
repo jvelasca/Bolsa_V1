@@ -346,7 +346,7 @@ destapó y se corrigió.
   fix, `8ad54416` (borrado + re-tag, mismo patrón que `v2.40.2-beta`/`v2.16-beta`, y **no** un tag nuevo
   `+1`: el `1.81.0-beta` no cambia). Un CI de tag ROJO **no certifica nada**, así que no se podía dejar el
   tag en `c62ac459`. **`c62ac459` no se borra**: sigue en la historia de `main` con su rojo **declarado**
-  aquí.
+  aquí (su `Python CI` fue [`35927122596`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35927122596)).
 
 ### 11.2 Cifras medidas del sello
 
@@ -367,8 +367,9 @@ nuevo). El `Release tag CI` del tag anterior (`v2.55-beta`, run `35889751810`) f
 
 ### 11.3 Dos rojos iniciales por **tests preexistentes ajenos a la fase** (declarados, no silenciados)
 
-El primer intento del tag a `8ad54416` no fue verde del todo: además del fix de la guardia, aparecieron
-**dos rojos aislados en tests que esta fase NO toca**, y se resolvieron con un **re-run del job**:
+El **primer intento** del CI del tag **re-sellado** (a `8ad54416`) salió rojo **también** por **dos rojos
+aislados en tests que esta fase NO toca** (independientes del fix de la guardia de arriba: ese rojo era del
+empuje anterior, sobre `c62ac459`), y se resolvieron con un **re-run del job** (attempt 2):
 
 1. **`lifecycle-pg`** (`test_concurrent_auto_pg.py`, de `V2.46`/`V2.47` — último cambio `0ce3ab81`, ajeno a
    `AUTO-15`): `UniqueViolation` en `auto_engine_ticks_pkey` con la parametrización de **2** sesiones
