@@ -84,9 +84,9 @@ validación:
 - **Delta testeado:** **+46** tests sobre `v2.59` en los dos cortes (job `python` `2701` → `2747`; `quality`
   `2690` → `2736`), la cuenta exacta del tramo de la fase.
 - **PR de auditoría** [#69](https://github.com/jvelasca/Bolsa_V1/pull/69): `audit-base-v2.59-beta` @
-  `9898c51a` → `auto-19a-incertidumbre-edge-replay` @ `057ab924` (**25 ficheros, `+10775/−21`**),
-  **`10/10` checks `SUCCESS`** (job `quality` **`2736 passed / 38 skipped`**), abierto **después** del
-  sello y **no** vehículo de merge (`main` ya recibió la fase en fast-forward).
+  `9898c51a` → `auto-19a-incertidumbre-edge-replay` @ `7d3c3f23` (**25 ficheros, `+10780/−21`**, 4 commits,
+  los tres últimos docs-only), **`10/10` checks `SUCCESS`** (job `quality` **`2736 passed / 38 skipped`**),
+  abierto **después** del sello y **no** vehículo de merge (`main` ya recibió la fase en fast-forward).
 
 ## [1.84.0-beta] — AUTO-18 Confianza estadística (V2.59) — 2026-09-24
 
