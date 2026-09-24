@@ -73,6 +73,7 @@ from bolsa_application.sim_durable_store import (
 )
 
 __all__ = [
+    "adaptive_instrument_cycles",
     "build_adaptive_confidence_from_fills",
     "build_adaptive_uncertainty_from_fills",
     "build_auto_self_evaluation",
@@ -265,6 +266,26 @@ def _cycles_with_risk(
     cycles = cycles_from_fills(fills or ())
     closed_ids = [row["cycleId"] for row in cycles if row.get("cycleId")]
     return apply_cycle_risk(cycles, _risk_with_applied_cost(fills, cycle_risk, closed_ids))
+
+
+def adaptive_instrument_cycles(
+    fills: Iterable[Any] | None,
+    cycle_risk: Mapping[str, CycleRisk] | None,
+) -> tuple[Mapping[str, Any], ...]:
+    """(PURA, ``AUTO-20``) los ciclos que consume el INSTRUMENTO de calibración, ya con su riesgo.
+
+    Acceso **público** a ``_cycles_with_risk``: el MISMO material que alimenta el informe
+    ``AUTO-7``/``AUTO-9``, la confianza ``AUTO-12`` y la incertidumbre ``AUTO-19A`` —mismos
+    ciclos, misma noción de cierre, misma fricción aplicada—, pero con las claves que el
+    instrumento lee (``riskAmount``/``cost``/``costApplied``/``regime``). Existe para que un
+    exportador vuelque a JSON el material REAL del que sale la calibración **sin** reimplementar
+    el pegado del riesgo: con un segundo camino, la calibración y el informe podrían medir ciclos
+    distintos y nadie lo vería.
+
+    Sin ``cycle_risk`` devuelve las filas sin R (el hueco lo declara el instrumento), igual que
+    ``AUTO-7``: no se inventa un denominador.
+    """
+    return _cycles_with_risk(fills, cycle_risk)
 
 
 def build_auto_self_evaluation(

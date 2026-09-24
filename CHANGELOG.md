@@ -2,6 +2,64 @@
 
 All notable releases of Bolsa V1.
 
+## [1.87.0-beta] — AUTO-20 Material PAPER real + cierre de O1/O2 (V2.62) — 2026-09-24
+
+**Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI, sin backfill y
+**sin clave nueva en el journal durable**. **El sello del reparto NO se mueve: sigue en `auto18-v1`**
+(`DATA_GATE_POLICY_VERSION` sigue `auto15-v1`). Fase de **material + honestidad**: pone el material
+PAPER real al alcance del instrumento de calibración y cierra las dos observaciones P3 de la
+auditoría de `v2.61-beta`. El invariante que mantiene:
+
+> **El instrumento mide el MISMO material que el informe durable, y lo que no se pudo medir se
+> declara.** Nada de esta fase mueve el reparto, el worker, el plan ni el journal.
+
+1. **O1 cerrado — el material no medible se DECLARA.** Una `strategyVersion` cuyos ciclos existen pero
+   **ninguno** tiene R medible ya no desaparece en silencio: el informe publica
+   `unmeasured_r:<version>`. Las filas **sin versión** (que también se descartaban mudas) salen como
+   `unversioned_cycles`. Solo se nombra el hueco: ninguna estrategia entra por declararla.
+2. **O2 cerrado — la ratio NO mezcla muestras distintas.** `walkForwardEfficiency` se calcula **solo
+   sobre pliegues emparejados** (con IS y OOS a la vez), como exige el espejo de `optimize`. Se
+   publican **cuatro conteos** (`foldCount`, `isFoldCount`, `oosFoldCount`, `pairedFoldCount`) para
+   que un pliegue que no aporta a la media no se cuente como si aportara.
+3. **Sello del instrumento subido.** `CALIBRATION_METHOD` pasa de `walk_forward_calibration_v1` a
+   **`walk_forward_calibration_v2`**: la lectura cambió y el sello lo declara (dos informes con el
+   mismo aspecto no pueden venir de instrumentos distintos).
+4. **Costura pública del material con riesgo.** `adaptive_instrument_cycles` (`auto_self_evaluation_feed`)
+   expone el material CON riesgo por la **MISMA** costura que el informe durable
+   (`_cycles_with_risk`, `AUTO-16/17`): mismos ciclos, mismo cierre, misma fricción aplicada. Un
+   segundo camino habría podido medir ciclos distintos en silencio.
+5. **Exportador PAPER real.** `apps/api-python/scripts/paper_cycles_export.py` lee fills durables +
+   reservas (`AUTO-9`) + régimen (`AUTO-10`) y vuelca el JSON del instrumento. **Sin PostgreSQL sale
+   `2` (BLOQUEADO)**, nunca un JSON vacío leído como "sin edge".
+
+**Por qué importa:** el material que produce `cycles_from_fills` **no trae base de riesgo**; sin
+denominador el R no es medible y la calibración sobre ciclos reales saldría **vacía** — y ahí era
+justo **O1** el que mordía (la estrategia desaparecía sin explicación).
+
+**Declarado:** el camino durable del exportador está cableado y verificado por trozos, pero **no se
+ejercita end-to-end** en esta fase (no hay fixture PG que siembre fills + reservas para él). El
+fixture del instrumento sigue siendo **sintético**: la calibración publicada mide el instrumento, no
+la estrategia.
+
+### Añadido
+
+- **`auto_adaptive_calibration.py`** — cierre de O1 (`unmeasured_r:<version>`, `unversioned_cycles`) y
+  de O2 (`_aggregate` con WFE emparejado y cuatro conteos); `CALIBRATION_METHOD` → `…_v2`.
+- **`auto_self_evaluation_feed.py`** — `adaptive_instrument_cycles` (público, aditivo; no cambia
+  ninguna salida existente).
+- **`apps/api-python/scripts/paper_cycles_export.py`** (nuevo) — exportador del material PAPER real.
+- **Mutaciones M165–M168** — matan el silencio de O1, la ratio que mezcla, el conteo inflado y el
+  material sin denominador.
+- **Tests** — O1 (declarado / parcial no marcado / sin versión), O2 (emparejado y sin par), costura
+  pública del material con y sin riesgo.
+
+### Notas de compatibilidad
+
+- **`AUTO-19A` intacto**: `auto_adaptive_replay.py` no se toca; su contrato `statistical_oos_v1`
+  sigue igual, incluida su política de notas (el hueco heredado de O1 se **declara en la calibración**,
+  no se cambia a escondidas en el replay).
+- Un informe de calibración `v2` **no** es comparable campo a campo con uno `v1`.
+
 ## [1.86.0-beta] — AUTO-19B Calibración del intervalo y Walk-Forward (V2.61) — 2026-09-24
 
 **Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI, sin backfill y

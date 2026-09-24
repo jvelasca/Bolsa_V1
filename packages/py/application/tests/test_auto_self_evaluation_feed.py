@@ -20,6 +20,7 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     ADAPTIVE_CONFIDENCE_RECENT_UNAVAILABLE,
     ADAPTIVE_DECAY_SEVERE,
     build_adaptive_confidence,
+    measured_r,
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_CYCLE_WITHOUT_IDENTITY,
@@ -27,13 +28,14 @@ from bolsa_analytics.cognitive.auto_self_evaluation import (
     evaluate_auto_self_evaluation,
 )
 from bolsa_application.auto_self_evaluation_feed import (
+    adaptive_instrument_cycles,
     build_adaptive_confidence_from_fills,
     build_auto_self_evaluation,
     cycles_from_fills,
     make_auto_self_evaluation_provider,
     recovery_evidence_from_fills,
 )
-from bolsa_application.cycle_risk import cycle_risk_from_reservations
+from bolsa_application.cycle_risk import CycleRisk, cycle_risk_from_reservations
 from bolsa_application.sim_durable_store import (
     InMemorySimFillFinanceContextStore,
     SimFillFinanceContext,
@@ -693,3 +695,27 @@ def test_a_version_that_was_never_paused_gets_no_evidence_row() -> None:
     fills = _closed_cycle("new-1", at=at)
 
     assert _evidence_for(fills, reactivated_at={"otra": "2026-09-10T00:00:00+00:00"}) is None
+
+
+# ── AUTO-20 · la costura pública del material del instrumento ───────────────────────
+
+
+def test_instrument_cycles_is_the_public_seam_that_carries_the_risk_basis() -> None:
+    """El material del instrumento DEBE llevar el riesgo: sin él, el R no es medible y la
+    calibración sobre ciclos reales saldría vacía (el punto de ``AUTO-20``)."""
+    at = datetime(2026, 9, 12, 10, 0, tzinfo=UTC)
+    fills = [
+        _fill("buy", "10", "100", execution_id="f1", cycle_id="c1", created_at=at),
+        _fill("sell", "10", "110", execution_id="f2", cycle_id="c1", created_at=at),
+    ]
+
+    without = adaptive_instrument_cycles(fills, None)
+    with_risk = adaptive_instrument_cycles(
+        fills, {"c1": CycleRisk(cycle_id="c1", risk_amount=Decimal("50"))}
+    )
+
+    assert len(without) == len(with_risk) == 1
+    assert "riskAmount" not in without[0], "sin evidencia no se inventa el denominador"
+    assert measured_r(without[0]) is None, "sin base de riesgo el R no es medible"
+    assert Decimal(str(with_risk[0]["riskAmount"])) == Decimal("50")
+    assert measured_r(with_risk[0]) is not None, "con la base de riesgo el R sí se mide"

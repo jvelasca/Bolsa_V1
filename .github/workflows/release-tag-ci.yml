@@ -424,6 +424,10 @@ jobs:
         # ``packages/py/analytics/tests/test_auto_adaptive_calibration.py`` entra por el pase de
         # ``packages/py/analytics/tests``. No hay costura nueva (el instrumento es puro y
         # read-only: no se cablea al worker, al plan ni al journal).
+        # V2.62/AUTO-20 (material PAPER real + cierre de O1/O2): el puro de la calibración (O1/O2)
+        # entra por ``packages/py/analytics/tests`` y el de la costura pública del material por el
+        # pase de ``packages/py/application/tests``. El exportador ``paper_cycles_export.py`` es I/O
+        # y NO se ejercita end-to-end aquí (declarado en el plan de la fase, §9).
         run: >
           uv run pytest
           packages/py/domain/tests

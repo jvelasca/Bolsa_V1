@@ -31,6 +31,8 @@ from bolsa_analytics.cognitive.auto_adaptive_calibration import (
     CALIBRATION_QUESTION_EFFECTIVE_N,
     CALIBRATION_QUESTION_INTERVAL_COVERAGE,
     CALIBRATION_QUESTION_SHRINKAGE,
+    CalibrationFold,
+    _aggregate,
     _calibration_questions,
     _question_confidence_band,
     _question_edge_sign,
@@ -72,13 +74,14 @@ def _cell(
     raw_error: float | None = None,
     shrunk_error: float | None = None,
     effective_n: int = 10,
+    is_r: float | None = 1.0,
 ) -> ReplayCell:
     return ReplayCell(
         strategy_version=version,
         is_measured_n=10,
         is_episodes=10,
         is_effective_n=effective_n,
-        is_expectancy_r=1.0,
+        is_expectancy_r=is_r,
         is_shrunk_expectancy_r=0.5,
         is_interval_lower=lower,
         is_interval_upper=upper,
@@ -411,6 +414,9 @@ def test_the_report_payload_is_json_shaped() -> None:
     assert payload["cells"] == [fold["cell"] for fold in payload["folds"]]
     assert set(payload["aggregate"]) == {
         "foldCount",
+        "isFoldCount",
+        "oosFoldCount",
+        "pairedFoldCount",
         "meanIsExpectancyR",
         "meanOosExpectancyR",
         "stdOosExpectancyR",
@@ -418,6 +424,10 @@ def test_the_report_payload_is_json_shaped() -> None:
         "oosCv",
         "walkForwardEfficiency",
     }
+    counts = payload["aggregate"]
+    assert counts["foldCount"] == counts["oosFoldCount"] == counts["pairedFoldCount"] == 9, (
+        "en el fixture todo pliegue tiene IS y OOS: los tres conteos coinciden"
+    )
 
 
 # ── AUTO-19A no se rompe ────────────────────────────────────────────────────────────
@@ -429,3 +439,65 @@ def test_the_auto19a_replay_fixture_is_unchanged() -> None:
 
     assert len(report.cells) == 6
     assert "skipped_strategy:thin-edge" in report.notes
+
+
+# ── AUTO-20 · cierre de O1: el material no medible se DECLARA ───────────────────────
+
+
+def _without_risk(rows: list[dict[str, object]], indexes: range) -> list[dict[str, object]]:
+    for index in indexes:
+        rows[index].pop("riskAmount", None)
+    return rows
+
+
+def test_a_strategy_without_any_measurable_r_is_declared_not_silently_dropped() -> None:
+    """O1: una estrategia cuyos ciclos NO tienen R medible desaparecía sin dejar rastro."""
+    report = build_calibration_report(_without_risk(_cycles("ghost", 30), range(30)))
+
+    assert report.folds == (), "sin R medible no hay pliegues"
+    assert "unmeasured_r:ghost" in report.notes, "el hueco se nombra, no se silencia"
+
+
+def test_a_partially_measured_strategy_is_not_flagged_as_unmeasured() -> None:
+    """Solo se declara la versión SIN ninguna fila medible: el hueco parcial no es un hueco."""
+    report = build_calibration_report(_without_risk(_cycles("mixed", 30), range(3)))
+
+    assert not any(note.startswith("unmeasured_r:") for note in report.notes)
+    assert report.folds, "las filas medidas siguen midiéndose"
+
+
+def test_cycles_without_a_version_are_declared() -> None:
+    rows = _cycles("orb-1", 30)
+    rows.append({"cycleId": "anon-1", "pnl": "4", "riskAmount": "5"})
+    report = build_calibration_report(rows)
+
+    assert "unversioned_cycles" in report.notes
+
+
+# ── AUTO-20 · cierre de O2: la ratio NO mezcla muestras distintas ───────────────────
+
+
+def test_walk_forward_efficiency_is_computed_on_paired_folds_only() -> None:
+    """O2: la ratio usaba la media OOS de unos pliegues con la media IS de otros."""
+    folds = (
+        CalibrationFold(index=1, cell=_cell(oos=2.0, is_r=1.0)),
+        CalibrationFold(index=2, cell=_cell(oos=None, is_r=3.0)),
+    )
+    aggregate = _aggregate(folds)
+
+    assert aggregate["foldCount"] == 2
+    assert aggregate["oosFoldCount"] == 1
+    assert aggregate["isFoldCount"] == 2
+    assert aggregate["pairedFoldCount"] == 1
+    assert aggregate["meanIsExpectancyR"] == 2.0, "la media IS publicada ve los dos pliegues"
+    # Emparejado: OOS 2.0 / IS 1.0 = 2.0. Mezclando sería 2.0 / 2.0 = 1.0 — la ratio mentiría.
+    assert aggregate["walkForwardEfficiency"] == 2.0
+
+
+def test_the_walk_forward_efficiency_is_none_without_a_paired_fold() -> None:
+    folds = (CalibrationFold(index=1, cell=_cell(oos=None, is_r=1.0)),)
+    aggregate = _aggregate(folds)
+
+    assert aggregate["pairedFoldCount"] == 0
+    assert aggregate["walkForwardEfficiency"] is None
+    assert aggregate["meanOosExpectancyR"] is None
