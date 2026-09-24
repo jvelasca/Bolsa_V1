@@ -26,6 +26,11 @@ instrumento puro, fixture declarado, tests, `M159…M164`, CI y sello `1.86.0-be
 - **Mutaciones:** `M159…M164` `6/6`; **matriz completa `164/164`**, árbol intacto, cero fragmentos
   ausentes.
 - **Byte-identidad:** sin `--walk-forward` el CLI de `AUTO-19A` emite el mismo JSON.
+- **Sello (CI remoto):** tag `v2.61-beta` (objeto `2f64dc1c` → `f9f64799`), `main` en fast-forward
+  (`63a02e34..f9f64799`). `Release tag CI` **GREEN** (job `python` **`2766 passed / 35 skipped`**,
+  `certify` en `success`) tras re-ejecutar los jobs fallidos: **flake ajeno PG declarado**
+  (`test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once`,
+  `AssertionError: RETRY`, verde al reintentar). PR de auditoría **#70**.
 
 ## Huecos declarados (el siguiente turno)
 

@@ -97,5 +97,13 @@ Confirmado **sin cambios** (byte a byte, no aparecen en el diff de fase):
   tampoco.
 - El walk-forward es **expanding** con segmentos de igual tamaño (patrón de `optimize`); otra
   partición puede dar otro número.
-- **CI remoto del tag:** las cifras de este pack son la medición **local** de la fase. El resultado de
-  `Python CI` / `Release tag CI` del tag `v2.61-beta` se registra en el commit de cierre del sello.
+- **CI del sello:** `Release tag CI`
+  [`36039143456`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36039143456) **GREEN** (job
+  `python` del tag **`2766 passed / 35 skipped`**, `certify` en `success`); el resto de workflows del
+  tag (`Python CI`, `Frontend CI`, `Optimize lab`, `Gitleaks`, `Fase 2 scientific`) **verdes** y los
+  `check-runs` del commit sellado **`34 success` + `1 skipped`** (35).
+- **Flake ajeno declarado:** `test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once`
+  falló con `AssertionError: RETRY` en la **primera** pasada del `Release tag CI` y **pasó al
+  re-ejecutar los jobs fallidos**. Es un test de integración **PG** (el `RETRY` es un timeout de un
+  bucle de concurrencia), **ajeno** a los puros de esta fase: la fase solo añade un módulo read-only,
+  su test, el fixture, el CLI y las mutaciones.
