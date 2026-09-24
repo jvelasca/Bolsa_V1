@@ -434,3 +434,22 @@ entonces **`1` rojo en `5`** corridas locales) y un teardown de vitest que enven
 tests en verde. **En este sello ninguno de los dos apareció**: los dos `Python CI` y el `Release tag CI`
 cerraron sin rojos. Se deja **declarado** el hueco por si el auditor lo reproduce: ninguno de los dos
 ficheros está en el diff de esta fase, así que la existencia del intermitente **no** cambia con ella.
+
+### 11.7 Commit Status (legacy) vs check-runs: el «hueco» del P0 era un cruce de API (medido)
+
+La auditoría de `v2.57-beta` reportó un `statuses: []` sobre el commit sellado `c5e14ae1`. **Ese vacío es
+un artefacto del endpoint LEGACY de Commit Status**, no una ausencia de CI:
+
+- `GET /repos/{owner}/{repo}/statuses/{sha}` (Commit Status, deprecado por GitHub Actions) ⇒ **`[]`**:
+  el repo **no publica** Commit Statuses, publica check-runs.
+- `GET /repos/{owner}/{repo}/commits/{ref}/check-runs` ⇒ **`total_count = 37`** para `c5e14ae1`, con
+  **`27 success` + `1 skipped`** y el resto neutrales; `GET …/commits/{sha}/status` (el agregado moderno,
+  que sí lee check-runs) ⇒ **`state = success`**.
+- `Release tag CI` run [`35968175990`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35968175990)
+  (`event = push`, `headSha = c5e14ae1`) ⇒ **`success`**, `headSha` coincidente con el tag anotado
+  `5354d278…` → `c5e14ae1…`.
+
+Conclusión: **no hubo re-sello ni rojo; el check existe**. La lección (queda escrita para el auditor y el
+agente siguiente) es que **«statuses vacío» no es «CI ausente»**: hay que medir `check-runs`, que es la
+API que este repo usa. La medición de `AUTO-16` (`2649 passed / 35 skipped`, `5/5` jobs PG verdes) se
+apoya en esa misma fuente y sigue en pie.

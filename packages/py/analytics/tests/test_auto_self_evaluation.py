@@ -838,7 +838,12 @@ def test_a_row_without_a_declared_base_is_undeclared_not_completed() -> None:
 
 
 def test_a_mixed_basis_is_declared_and_never_silently_averaged() -> None:
-    """Dos netos medidos contra modelos de coste distintos no se promedian en silencio."""
+    """AUTO-17: dos netos de modelos de coste distintos NO se promedian, ni siquiera en silencio.
+
+    El pooled queda ``None`` (promediar ``estimated`` con ``applied`` sería el sesgo que la fase
+    existe para impedir) y los números siguen disponibles, uno por base, en ``net_r_series``. El
+    hecho se declara con ``net_r_basis = mixed`` y su nota.
+    """
     row = evaluate_auto_self_evaluation(
         cycles=[
             _cycle(pnl="200", cycle_id="c1", risk="100", cost=_cost(12.5)),
@@ -853,11 +858,77 @@ def test_a_mixed_basis_is_declared_and_never_silently_averaged() -> None:
         min_trades=1,
     ).by_strategy[0]
 
-    assert row.net_expectancy_r is not None, "el número sigue siendo útil: no se tira"
+    assert row.net_expectancy_r is None, "el pooled NO se publica con bases distintas"
     assert row.net_r_basis == SELF_EVAL_COST_BASIS_MIXED
     assert SELF_EVAL_COST_BASIS_MIXED in row.notes, "la mezcla se declara"
+    # Los números NO se tiran: viajan por base, cada uno con su muestra.
+    series = {entry.basis: entry for entry in row.net_r_series}
+    assert set(series) == {SELF_EVAL_COST_BASIS_APPLIED, SELF_EVAL_COST_BASIS_ESTIMATED}
+    assert series[SELF_EVAL_COST_BASIS_ESTIMATED].n == 1
+    assert series[SELF_EVAL_COST_BASIS_ESTIMATED].expectancy_r == pytest.approx((200.0 - 12.5) / 100.0)
+    assert series[SELF_EVAL_COST_BASIS_APPLIED].n == 1
     payload = row.as_dict()
     assert payload["netRBasis"] == SELF_EVAL_COST_BASIS_MIXED
+    assert len(payload["netRBasisSeries"]) == 2
+
+
+def test_a_historical_transition_is_declared_by_regime_without_splitting_the_cell() -> None:
+    """AUTO-17: el histórico pre-2.57 (estimado) y post-2.57 (aplicado) conviven por REGIMEN.
+
+    La dimensión ``strategy × regime × basis`` se representa con las DOS series de la MISMA celda:
+    la celda decisiva NO se parte —partirla rompería ``min_trades`` y dejaría de decidir— y la
+    mezcla se declara con el pooled ausente. El R bruto (que sí es comparable) sigue decidiendo.
+    """
+    report = evaluate_auto_self_evaluation(
+        cycles=[
+            _cycle(cycle_id="pre-1", risk="100", cost=_cost(12.5), regime="TREND_UP"),
+            _cycle(cycle_id="pre-2", risk="100", cost=_cost(12.5), regime="TREND_UP"),
+            _cycle(
+                cycle_id="post-1",
+                risk="100",
+                cost=_cost(50.0),
+                cost_applied=_applied("30.0"),
+                regime="TREND_UP",
+            ),
+            _cycle(
+                cycle_id="post-2",
+                risk="100",
+                cost=_cost(50.0),
+                cost_applied=_applied("30.0"),
+                regime="TREND_UP",
+            ),
+        ],
+        min_trades=1,
+    )
+
+    row = report.by_strategy[0]
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_MIXED
+    assert row.net_expectancy_r is None
+    cell = next(c for c in report.by_regime if c.regime == "TREND_UP")
+    assert cell.net_r_basis == SELF_EVAL_COST_BASIS_MIXED
+    assert cell.net_expectancy_r is None
+    series = {entry.basis: entry for entry in cell.net_r_series}
+    assert series[SELF_EVAL_COST_BASIS_ESTIMATED].n == 2
+    assert series[SELF_EVAL_COST_BASIS_APPLIED].n == 2
+    assert cell.decisive is True, "la celda NO se parte: sigue decidiendo con el R bruto"
+
+
+def test_a_homogeneous_basis_keeps_the_pooled_number_and_one_series() -> None:
+    """CONTROL de compatibilidad: con UNA sola base el número pooled es el de siempre y hay una serie."""
+    row = evaluate_auto_self_evaluation(
+        cycles=[
+            _cycle(pnl="200", cycle_id="c1", risk="100", cost=_cost(12.5)),
+            _cycle(pnl="150", cycle_id="c2", risk="100", cost=_cost(12.5)),
+        ],
+        min_trades=1,
+    ).by_strategy[0]
+
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_ESTIMATED
+    assert row.net_expectancy_r == pytest.approx(((200.0 - 12.5) / 100.0 + (150.0 - 12.5) / 100.0) / 2)
+    assert len(row.net_r_series) == 1
+    assert row.net_r_series[0].basis == SELF_EVAL_COST_BASIS_ESTIMATED
+    assert row.net_r_series[0].n == 2
+    assert row.net_r_series[0].expectancy_r == pytest.approx(row.net_expectancy_r)
 
 
 def test_a_report_without_any_net_declares_no_basis_at_all() -> None:

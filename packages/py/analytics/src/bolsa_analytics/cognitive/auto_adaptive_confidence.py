@@ -50,9 +50,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.cognitive.auto_self_evaluation import (
+    SELF_EVAL_COST_BASIS_APPLIED,
+    SELF_EVAL_COST_BASIS_ESTIMATED,
+    SELF_EVAL_COST_BASIS_MIXED,
     SELF_EVAL_MIN_TRADES_DEFAULT,
     SELF_EVAL_REGIME_UNKNOWN,
     AutoSelfEvaluation,
+    NetRBasisSeries,
     StrategyRegimeEvaluation,
     StrategySelfEvaluation,
     evaluate_auto_self_evaluation,
@@ -76,6 +80,11 @@ __all__ = [
     "ADAPTIVE_CONFIDENCE_RECENT_UNAVAILABLE",
     "ADAPTIVE_CONFIDENCE_RECENT_UNDATED",
     "ADAPTIVE_CONFIDENCE_THIN_SAMPLE",
+    "ADAPTIVE_BASIS_MIXED",
+    "ADAPTIVE_BASIS_STABLE_APPLIED",
+    "ADAPTIVE_BASIS_STABLE_ESTIMATED",
+    "ADAPTIVE_BASIS_TRANSITION",
+    "ADAPTIVE_BASIS_UNKNOWN",
     "ADAPTIVE_DECAY_MILD",
     "ADAPTIVE_DECAY_NONE",
     "ADAPTIVE_DECAY_SEVERE",
@@ -112,6 +121,24 @@ ADAPTIVE_DECAY_NONE = "NONE"
 ADAPTIVE_DECAY_MILD = "MILD"
 ADAPTIVE_DECAY_SEVERE = "SEVERE"
 ADAPTIVE_DECAY_UNKNOWN = "UNKNOWN"
+
+# ── AUTO-17 — la TRANSICIÓN de base del R neto (``estimated`` ↔ ``applied``) ─────────
+#
+# La base del R neto es una dimensión estadística: si la ventana LARGA y la RECIENTE no se
+# midieron contra el mismo modelo de coste, comparar sus expectativas no mide deterioro ni
+# mejora —mide el cambio de metro—. Estos estados lo declaran, y solo ``TRANSITION``/``MIXED``
+# bloquean la comparación (un ``UNKNOWN`` significa "no hay net con el que decidirlo": se deja el
+# comportamiento histórico intacto, porque el desconocido no es un defecto).
+#: La ventana larga mide contra el coste que el decisor SUPUSO.
+ADAPTIVE_BASIS_STABLE_ESTIMATED = "STABLE_ESTIMATED"
+#: La ventana larga mide contra la fricción que el simulador APLICÓ.
+ADAPTIVE_BASIS_STABLE_APPLIED = "STABLE_APPLIED"
+#: La base cambió entre ventanas: la comparación NO es deterioro ni mejora.
+ADAPTIVE_BASIS_TRANSITION = "TRANSITION"
+#: El agregado mezcla bases (no hay un único modelo que comparar).
+ADAPTIVE_BASIS_MIXED = "MIXED"
+#: No hay base declarada con la que decidir la transición (net ausente o sin declarar).
+ADAPTIVE_BASIS_UNKNOWN = "UNKNOWN"
 
 # ── Huecos declarados (vocabulario propio: nunca se rellenan, se nombran) ───────────
 ADAPTIVE_CONFIDENCE_NO_CYCLES = "no_cycles"
@@ -238,12 +265,35 @@ def _band(
     return level
 
 
+def _basis_transition(long_basis: str | None, recent_basis: str | None) -> str:
+    """(PURA, AUTO-17) ¿comparten base la ventana LARGA y la RECIENTE?
+
+    La regla dura de la fase: si la base del R neto cambió entre las dos ventanas, comparar sus
+    expectativas mide **el métro**, no el rendimiento. Solo ``TRANSITION`` y ``MIXED`` marcan la
+    lectura como no comparable; ``UNKNOWN`` (sin net o sin base declarada) NO bloquea nada, porque
+    el desconocido no es un defecto y el comportamiento histórico debe conservarse intacto.
+    """
+    if long_basis == SELF_EVAL_COST_BASIS_MIXED or recent_basis == SELF_EVAL_COST_BASIS_MIXED:
+        return ADAPTIVE_BASIS_MIXED
+    stable = {SELF_EVAL_COST_BASIS_APPLIED, SELF_EVAL_COST_BASIS_ESTIMATED}
+    if long_basis in stable and recent_basis in stable:
+        if long_basis != recent_basis:
+            return ADAPTIVE_BASIS_TRANSITION
+        return (
+            ADAPTIVE_BASIS_STABLE_APPLIED
+            if long_basis == SELF_EVAL_COST_BASIS_APPLIED
+            else ADAPTIVE_BASIS_STABLE_ESTIMATED
+        )
+    return ADAPTIVE_BASIS_UNKNOWN
+
+
 def _decay(
     long_r: float | None,
     recent_r: float | None,
     *,
     recent_effective_n: int,
     min_trades: int,
+    basis_transition: str = ADAPTIVE_BASIS_UNKNOWN,
 ) -> str:
     """Deterioro reciente frente al histórico, o ``UNKNOWN`` si no se pudo comparar.
 
@@ -251,10 +301,17 @@ def _decay(
     alguna ventana no medida, o muestra reciente por debajo del mínimo. En los tres, la
     ausencia se declara y NO se lee como "sin deterioro".
 
+    **AUTO-17** añade un cuarto: si la base del R neto **cambió** entre las ventanas
+    (``TRANSITION``) o el agregado mezcla bases (``MIXED``), comparar las expectativas mide el
+    metro, no el rendimiento, así que el deterioro se declara ``UNKNOWN``. Un ``UNKNOWN`` de base
+    NO bloquea: sin net con el que decidir la transición se conserva el comportamiento histórico.
+
     Con el histórico en positivo: ``recent < 0`` es ``SEVERE`` y por debajo de
     ``long * ADAPTIVE_DECAY_THRESHOLD`` es ``MILD``. Con el histórico no positivo el
     deterioro no es el eje (la rotación ya lo atiende), así que solo se distingue mejor/peor.
     """
+    if basis_transition in (ADAPTIVE_BASIS_TRANSITION, ADAPTIVE_BASIS_MIXED):
+        return ADAPTIVE_DECAY_UNKNOWN
     if long_r is None or recent_r is None:
         return ADAPTIVE_DECAY_UNKNOWN
     if recent_effective_n < max(1, min_trades):
@@ -292,6 +349,13 @@ class RegimeConfidence:
     decay: str
     confidence: str
     notes: tuple[str, ...]
+    #: AUTO-17 — la base del R neto de la celda (``estimated``/``applied``/``mixed``/
+    #: ``undeclared``/``None``) y su desglose por base. Sin ellos, la confianza no puede decir si
+    #: su expectativa se midió contra un solo modelo de coste.
+    net_r_basis: str | None = None
+    net_r_series: tuple[NetRBasisSeries, ...] = ()
+    #: AUTO-17 — ``STABLE_ESTIMATED``/``STABLE_APPLIED``/``TRANSITION``/``MIXED``/``UNKNOWN``.
+    basis_transition: str = ADAPTIVE_BASIS_UNKNOWN
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -305,6 +369,9 @@ class RegimeConfidence:
             "recentExpectancyR": self.recent_expectancy_r,
             "decay": self.decay,
             "confidence": self.confidence,
+            "netRBasis": self.net_r_basis,
+            "netRBasisSeries": [series.as_dict() for series in self.net_r_series],
+            "basisTransition": self.basis_transition,
             "notes": list(self.notes),
         }
 
@@ -330,6 +397,14 @@ class StrategyConfidence:
     confidence: str
     by_regime: tuple[RegimeConfidence, ...]
     notes: tuple[str, ...]
+    #: AUTO-17 — la base del R neto de la estrategia y su desglose por base (``mixed`` cuando
+    #: conviven, con el pooled sin publicar). La base viaja con la banda para que un neto medido
+    #: contra otro modelo de coste no se lea como comparable.
+    net_r_basis: str | None = None
+    net_r_series: tuple[NetRBasisSeries, ...] = ()
+    #: AUTO-17 — ``STABLE_ESTIMATED``/``STABLE_APPLIED``/``TRANSITION``/``MIXED``/``UNKNOWN``: si
+    #: la base cambió entre la ventana larga y la reciente, el deterioro no se mide (``UNKNOWN``).
+    basis_transition: str = ADAPTIVE_BASIS_UNKNOWN
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -344,6 +419,9 @@ class StrategyConfidence:
             "recentExpectancyR": self.recent_expectancy_r,
             "decay": self.decay,
             "confidence": self.confidence,
+            "netRBasis": self.net_r_basis,
+            "netRBasisSeries": [series.as_dict() for series in self.net_r_series],
+            "basisTransition": self.basis_transition,
             "byRegime": [cell.as_dict() for cell in self.by_regime],
             "notes": list(self.notes),
         }
@@ -388,6 +466,8 @@ class _WindowFacts:
     cost_n: int
     expectancy_r: float | None
     completeness: MeasurementStatus
+    net_r_basis: str | None = None
+    net_r_series: tuple[NetRBasisSeries, ...] = ()
 
 
 def _cells_of(report: AutoSelfEvaluation, version: str) -> tuple[StrategyRegimeEvaluation, ...]:
@@ -428,6 +508,8 @@ def _facts(report: AutoSelfEvaluation, version: str) -> _WindowFacts:
         cost_n=cost_n,
         expectancy_r=row.expectancy_r,
         completeness=completeness,
+        net_r_basis=row.net_r_basis,
+        net_r_series=row.net_r_series,
     )
 
 
@@ -469,11 +551,15 @@ def _regime_cells(
         recent_effective_n = (
             recent.cycles - recent.cycles_without_risk if recent is not None else 0
         )
+        basis_transition = _basis_transition(
+            cell.net_r_basis, recent.net_r_basis if recent is not None else None
+        )
         decay = _decay(
             cell.expectancy_r,
             recent_r,
             recent_effective_n=recent_effective_n,
             min_trades=min_trades,
+            basis_transition=basis_transition,
         )
         completeness = combine_measurements(cell.r_measurement, cell.net_r_measurement)
         cells.append(
@@ -497,6 +583,9 @@ def _regime_cells(
                     completeness=completeness,
                     min_trades=min_trades,
                 ),
+                net_r_basis=cell.net_r_basis,
+                net_r_series=cell.net_r_series,
+                basis_transition=basis_transition,
             )
         )
     return tuple(cells)
@@ -528,11 +617,15 @@ def _strategy_confidence(
     )
     recent_r = recent_facts.expectancy_r if recent_facts is not None else None
     recent_effective_n = recent_facts.effective_n if recent_facts is not None else 0
+    basis_transition = _basis_transition(
+        long_facts.net_r_basis, recent_facts.net_r_basis if recent_facts is not None else None
+    )
     decay = _decay(
         long_facts.expectancy_r,
         recent_r,
         recent_effective_n=recent_effective_n,
         min_trades=min_trades,
+        basis_transition=basis_transition,
     )
     completeness = long_facts.completeness
 
@@ -565,6 +658,9 @@ def _strategy_confidence(
         ),
         by_regime=cells,
         notes=tuple(dict.fromkeys(notes)),
+        net_r_basis=long_facts.net_r_basis,
+        net_r_series=long_facts.net_r_series,
+        basis_transition=basis_transition,
     )
 
 

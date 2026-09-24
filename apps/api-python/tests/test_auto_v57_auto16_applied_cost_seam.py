@@ -24,6 +24,10 @@ from typing import Any
 
 import pytest
 
+from bolsa_analytics.cognitive.auto_adaptive import (
+    ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE,
+    ALLOCATION_AXIS_CURRENCY,
+)
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_COST_BASIS_APPLIED,
     SELF_EVAL_COST_BASIS_ESTIMATED,
@@ -36,7 +40,10 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     TradingCost,
 )
 from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
-from bolsa_application.applied_cost import applied_cost_from_fills
+from bolsa_application.applied_cost import (
+    APPLIED_COST_UNBALANCED_ROUND_TRIP,
+    applied_cost_from_fills,
+)
 from bolsa_application.auto_self_evaluation_feed import build_auto_self_evaluation
 from bolsa_application.reservation_store import InMemoryReservationStore
 from bolsa_application.sim_durable_store import (
@@ -368,34 +375,27 @@ async def test_the_average_leg_without_reference_declares_the_gap_and_never_a_ze
 
 
 @pytest.mark.asyncio
-async def test_the_applied_cost_moves_the_allocation_weights() -> None:
-    """Dos corridas que solo difieren en la referencia persistida reparten distinto.
+async def test_a_group_that_mixes_cost_bases_does_not_move_weights_by_the_net_axis() -> None:
+    """AUTO-17: con una pata ``applied`` y otra ``estimated`` el reparto NO mezcla modelos.
 
-    Es la consecuencia que justifica subir el sello del reparto (``auto16-v1``): la evidencia es
-    la misma y el peso relativo NO, así que sin sello dos planes iguales parecerían equivalentes.
+    ``AUTO-16`` probó que el aplicado llega al neto y mueve los pesos; ``AUTO-17`` añade que eso
+    solo ocurre cuando la base de coste es ÚNICA. Aquí conviven las dos (``orb-applied`` medida
+    contra el mid, ``orb-legacy`` sin referencia), así que el eje del R neto se ABSTIENE y el
+    reparto cae al histórico declarándolo: un cambio de base no se lee como señal. El control
+    positivo (base única ⇒ eje del R neto) vive en ``test_auto_adaptive``.
     """
-    with_reference, reservations_a = _material(
-        measured_reference=(_BUY_REFERENCE, _SELL_REFERENCE)
-    )
-    without, reservations_b = _material(measured_reference=None)
+    fills, reservations = _material(measured_reference=(_BUY_REFERENCE, _SELL_REFERENCE))
+    plan = await _worker(fills, reservations)._v2_build_adaptive_plan({_MEASURED, _LEGACY}, _REGIME)
 
-    applied = await _worker(with_reference, reservations_a)._v2_build_adaptive_plan(
-        {_MEASURED, _LEGACY}, _REGIME
-    )
-    estimated = await _worker(without, reservations_b)._v2_build_adaptive_plan(
-        {_MEASURED, _LEGACY}, _REGIME
-    )
-
-    assert applied is not None and estimated is not None
-    applied_multipliers = applied.as_dict()["allocation"]["riskMultipliers"]
-    estimated_multipliers = estimated.as_dict()["allocation"]["riskMultipliers"]
-
-    assert applied_multipliers[_MEASURED] > estimated_multipliers[_MEASURED], (
-        "el coste medido es MENOR que el estimado (fricción + comisión): ese ciclo pesa más"
-    )
-    assert applied_multipliers[_LEGACY] < estimated_multipliers[_LEGACY], (
-        "y el otro, con la misma evidencia, pesa relativamente menos"
-    )
+    assert plan is not None
+    allocation = plan.as_dict()["allocation"]
+    assert allocation["evidenceAxis"] == ALLOCATION_AXIS_CURRENCY, "no se promedian modelos de coste"
+    assert plan.allocation.cell_note_for(_MEASURED) == ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE
+    # La base del neto SIGUE viajando en la evidencia, incluso cuando el reparto se abstiene.
+    applied_health = plan.health_for(_MEASURED)
+    legacy_health = plan.health_for(_LEGACY)
+    assert applied_health is not None and applied_health.net_r_basis == SELF_EVAL_COST_BASIS_APPLIED
+    assert legacy_health is not None and legacy_health.net_r_basis == SELF_EVAL_COST_BASIS_ESTIMATED
 
 
 # ── No hay I/O nuevo: la referencia viaja con los fills que YA se leían ─────────────
@@ -471,3 +471,43 @@ async def test_the_entry_leg_measured_in_another_tick_is_read_with_the_exit_leg(
     row = _row_of(report, _MEASURED)
     assert row.net_r_basis == SELF_EVAL_COST_BASIS_APPLIED
     assert row.cycles_without_cost == 0, "las dos patas de los 10 ciclos entraron al neto"
+
+
+@pytest.mark.asyncio
+async def test_a_cycle_with_a_partial_exit_never_gets_an_applied_cost() -> None:
+    """AUTO-17: los dos lados NO bastan; sin cantidades que cierren, no hay round-trip medido.
+
+    Media salida (``BUY 10 / SELL 4``) deja 6 unidades abiertas. Presencia de direcciones no es
+    cierre: el ciclo no entra al informe (que solo mide ciclos cerrados) y, preguntado el módulo
+    puro, declara el desbalanceo en vez de publicar una fricción de medio viaje.
+    """
+    cycle_id = f"cyc-{_MEASURED}-00"
+    fills = [
+        _fill(
+            "buy",
+            "10",
+            _BUY_PRICE,
+            reference_mid=_BUY_REFERENCE,
+            execution_id=f"e1-{cycle_id}",
+            version=_MEASURED,
+            cycle_id=cycle_id,
+        ),
+        _fill(
+            "sell",
+            "4",
+            _SELL_PRICE,
+            reference_mid=_SELL_REFERENCE,
+            execution_id=f"e2-{cycle_id}",
+            version=_MEASURED,
+            cycle_id=cycle_id,
+        ),
+    ]
+    worker = _worker(fills, [_reservation(_MEASURED, 0)])
+
+    evidence = await worker._v2_cycle_risk(fills)
+    report = build_auto_self_evaluation(fills=fills, cycle_risk=evidence)
+
+    assert report.trades == 0, "el ciclo abierto no se publica como un round-trip"
+    applied = applied_cost_from_fills([cycle_id], fills)[cycle_id]
+    assert applied.measurement != MEASUREMENT_COMPLETE
+    assert APPLIED_COST_UNBALANCED_ROUND_TRIP in applied.notes

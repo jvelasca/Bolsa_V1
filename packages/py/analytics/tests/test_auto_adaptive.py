@@ -16,11 +16,13 @@ rotación y sello de ``policy_version``.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
 from bolsa_analytics.cognitive.auto_adaptive import (
     ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL,
+    ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE,
     ADAPTIVE_CELL_NOTE_NET_UNMEASURED,
     ADAPTIVE_CELL_NOTE_NOT_DECISIVE,
     ADAPTIVE_CELL_NOTE_NOT_FOUND,
@@ -55,6 +57,7 @@ from bolsa_analytics.cognitive.auto_adaptive import (
     regime_cell_for,
 )
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_BASIS_UNKNOWN,
     ADAPTIVE_DECAY_NONE,
     ADAPTIVE_DECAY_SEVERE,
     ADAPTIVE_LONG_WINDOW_DEFAULT,
@@ -64,6 +67,9 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     StrategyConfidence,
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
+    SELF_EVAL_COST_BASIS_APPLIED,
+    SELF_EVAL_COST_BASIS_ESTIMATED,
+    SELF_EVAL_COST_BASIS_MIXED,
     StrategySelfEvaluation,
     aggregate_by_regime,
 )
@@ -84,6 +90,8 @@ def _row(
     trades: int = 0,
     net_expectancy_r: float | None = None,
     net_r_measurement: str = MEASUREMENT_UNKNOWN,
+    net_r_basis: str | None = None,
+    net_r_series: tuple[Any, ...] = (),
 ) -> StrategySelfEvaluation:
     """Fila de self-evaluation mínima con SOLO lo que Adaptive lee (el resto, ausente)."""
     return StrategySelfEvaluation(
@@ -120,6 +128,8 @@ def _row(
         drawdown_measurement=MEASUREMENT_UNKNOWN,
         decisive=decisive,
         notes=(),
+        net_r_basis=net_r_basis,
+        net_r_series=net_r_series,
     )
 
 
@@ -137,6 +147,30 @@ def test_build_strategy_health_projects_only_adaptive_fields() -> None:
     assert health[0].regime == "UNKNOWN"
     assert health[1].strategy_version == "v2"
     assert health[1].decisive is False
+
+
+def test_strategy_health_publishes_the_net_basis_and_its_transition() -> None:
+    """AUTO-17: la base del neto y su transición viajan con la salud (y con su evidencia)."""
+    rows = (
+        _row(
+            "v1",
+            decisive=True,
+            expectancy="3",
+            net_expectancy_r=2.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_APPLIED,
+        ),
+    )
+    health = build_strategy_health(rows)[0]
+
+    assert health.net_r_basis == SELF_EVAL_COST_BASIS_APPLIED
+    assert health.basis_transition == ADAPTIVE_BASIS_UNKNOWN, "sin confianza no se afirma estabilidad"
+
+    plan = build_adaptive_plan(rows, "TREND_UP")
+    evidence = plan.evidence_for("v1")
+    assert evidence is not None
+    assert evidence["netRBasis"] == SELF_EVAL_COST_BASIS_APPLIED
+    assert evidence["basisTransition"] == ADAPTIVE_BASIS_UNKNOWN
 
 
 # ── recommend_rotation ───────────────────────────────────────────────────────────
@@ -495,6 +529,139 @@ def test_allocation_falls_back_to_the_historical_axis_when_the_two_axes_disagree
     assert plan.multiplier_for("a") == pytest.approx(1.0)
 
 
+# ── AUTO-17 — el eje del R neto exige una base de coste comparable ──────────────────
+
+
+def test_allocation_refuses_to_mix_two_cost_bases_in_the_net_axis() -> None:
+    """AUTO-17: un grupo con una pata ``estimated`` y otra ``applied`` NO promedia bases.
+
+    La moneda bruta es la misma en el control y aquí; solo cambia la base del R neto. Con bases
+    distintas el eje cae al histórico —declarado— y los pesos NO se mueven por el delta de base.
+    """
+    mixed = (
+        _row(
+            "a",
+            decisive=True,
+            expectancy="3",
+            net_expectancy_r=2.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_ESTIMATED,
+        ),
+        _row(
+            "b",
+            decisive=True,
+            expectancy="1",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_APPLIED,
+        ),
+    )
+    plan = recommend_allocation(["a", "b"], mixed)
+
+    assert plan.evidence_axis == ALLOCATION_AXIS_CURRENCY, "no se promedian modelos de coste"
+    assert plan.multipliers == {"a": 1.0, "b": 0.5}
+    assert plan.cell_note_for("a") == ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE
+    assert plan.cell_note_for("b") == ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE
+
+
+def test_allocation_adopts_the_net_axis_when_the_group_shares_one_basis() -> None:
+    """CONTROL positivo: el MISMO grupo con una única base sí compite en el eje del R neto."""
+    homogeneous = (
+        _row(
+            "a",
+            decisive=True,
+            expectancy="3",
+            net_expectancy_r=2.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_ESTIMATED,
+        ),
+        _row(
+            "b",
+            decisive=True,
+            expectancy="1",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_ESTIMATED,
+        ),
+    )
+    plan = recommend_allocation(["a", "b"], homogeneous)
+
+    assert plan.evidence_axis == ALLOCATION_AXIS_NET_R
+    assert plan.multiplier_for("a") == pytest.approx(1.0)
+    assert plan.multiplier_for("b") == pytest.approx(2 / 3)
+
+
+def test_the_historical_basis_jump_does_not_change_who_competes() -> None:
+    """AUTO-17: el salto de base del histórico no saca ni mete a nadie en el reparto.
+
+    Con base homogénea el eje es el R neto; con la mezcla cae al histórico. En los dos casos los
+    MISMOS activos compiten: el salto cambia el EJE, nunca la composición del numerador.
+    """
+    homogeneous = (
+        _row(
+            "a",
+            decisive=True,
+            expectancy="3",
+            net_expectancy_r=2.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_ESTIMATED,
+        ),
+        _row(
+            "b",
+            decisive=True,
+            expectancy="1",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_ESTIMATED,
+        ),
+    )
+    mixed = (
+        homogeneous[0],
+        _row(
+            "b",
+            decisive=True,
+            expectancy="1",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_APPLIED,
+        ),
+    )
+    net = recommend_allocation(["a", "b"], homogeneous)
+    fallback = recommend_allocation(["a", "b"], mixed)
+
+    assert net.evidence_axis == ALLOCATION_AXIS_NET_R
+    assert fallback.evidence_axis == ALLOCATION_AXIS_CURRENCY
+    assert set(net.multipliers) == set(fallback.multipliers) == {"a", "b"}
+    assert net.multiplier_for("b") < 1.0, "con base única 'b' compite y pesa menos"
+    assert fallback.multiplier_for("b") < 1.0, "con la mezcla 'b' SIGUE compitiendo (eje histórico)"
+
+
+def test_allocation_refuses_a_group_with_an_explicitly_mixed_basis() -> None:
+    """Una fila con ``net_r_basis = mixed`` bloquea el eje del neto aunque el grupo «coincida»."""
+    rows = (
+        _row(
+            "a",
+            decisive=True,
+            expectancy="3",
+            net_expectancy_r=2.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_MIXED,
+        ),
+        _row(
+            "b",
+            decisive=True,
+            expectancy="1",
+            net_expectancy_r=1.0,
+            net_r_measurement=MEASUREMENT_COMPLETE,
+            net_r_basis=SELF_EVAL_COST_BASIS_MIXED,
+        ),
+    )
+    plan = recommend_allocation(["a", "b"], rows)
+
+    assert plan.evidence_axis == ALLOCATION_AXIS_CURRENCY
+    assert plan.multipliers == {"a": 1.0, "b": 0.5}
+
+
 # ── build_adaptive_plan ──────────────────────────────────────────────────────────
 
 
@@ -759,18 +926,18 @@ def test_regime_cells_change_the_allocation_declaration_but_never_the_rotation()
     )
 
 
-def test_the_policy_version_seals_the_auto16_evidence_contract() -> None:
-    """No es tautología: un merge que devolviera ``auto14-v1`` movería el sello sin avisar.
+def test_the_policy_version_seals_the_auto17_evidence_contract() -> None:
+    """No es tautología: un merge que devolviera ``auto16-v1`` movería el sello sin avisar.
 
-    ``auto14-v1`` selló el peso por celda. ``AUTO-16`` **no cambia la regla** —ninguna condición de
-    la asignación se toca—, pero sí la procedencia de un input del eje del R neto: el coste que el
-    neto descuenta deja de ser siempre el estimado y pasa a ser, cuando está medido, el que el
-    simulador aplicó (``costApplied``/``costBasis``). Dos planes con la misma evidencia pueden
-    diferir en los pesos por eso, y sin subir el sello esa diferencia sería invisible.
+    ``auto14-v1`` selló el peso por celda y ``auto16-v1`` la procedencia del coste del neto.
+    ``AUTO-17`` **sí cambia la regla**: el eje del R neto solo se adopta si el grupo comparte una
+    única base de coste estable; si conviven bases, el reparto cae al eje histórico
+    (``cell_basis_unstable``) en vez de promediar modelos. Dos planes con la misma evidencia pueden
+    diferir en el eje por eso, y sin subir el sello esa diferencia sería invisible.
     """
-    assert ADAPTIVE_POLICY_VERSION == "auto16-v1"
-    assert AdaptivePolicy().policy_version == "auto16-v1"
-    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto16-v1"
+    assert ADAPTIVE_POLICY_VERSION == "auto17-v1"
+    assert AdaptivePolicy().policy_version == "auto17-v1"
+    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto17-v1"
 
 
 # ── AUTO-12 — confianza estadística en el reparto (encogimiento por muestra) ────────
@@ -1254,7 +1421,7 @@ def test_the_operational_states_travel_in_their_own_field_without_mixing_axes() 
     assert payload["recovery"]["a"]["step"] == pytest.approx(0.25)
     assert "b" not in payload["recovery"], "una pausada no publica rampa"
     assert payload["readOnly"] is True
-    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto16-v1"
+    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto17-v1"
     assert plan.health_for("a").confidence == "HIGH", "la calidad estadística va en su propio campo"
 
 

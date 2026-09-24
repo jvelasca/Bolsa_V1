@@ -80,12 +80,12 @@ AUTO-9 (evidencia por ciclo) y AUTO-10 (journal durable del régimen) añaden:
 * **M31 (dato no medido)** — si el coste ausente se publica como clave nula, `null` pasa a leerse
   como una medición.
 * **M32 (costura muda)** — si el informe ignora la evidencia de riesgo que se le pasa, el
-  productor deja de entrar en la evaluación. **Realineada en `V2.57`/`AUTO-16`:** la sonda apuntaba a
-  la llamada de `AUTO-9` (`apply_cycle_risk(cycles_from_fills(...), cycle_risk)`) y esa llamada
-  dejó de existir tal cual al entrar la fricción aplicada en el **mismo** sitio
-  (`_risk_with_applied_cost`, que es justo la pieza puente entre el productor de riesgo y el
-  informe); la sonda vuelve a apuntar a la llamada **del informe**, que es donde su invariante vive.
-  Una sonda desalineada **afirma** cobertura que no tiene: se realinea, no se borra.
+  productor deja de entrar en la evaluación. **Realineada en `V2.57`/`AUTO-16`** (la sonda apuntaba
+  a la llamada de `AUTO-9`, que dejó de existir al entrar la fricción aplicada en el **mismo**
+  sitio) y **re-alineada en `V2.58`/`AUTO-17`**: el informe pasó a llamar a `_cycles_with_risk`,
+  que calcula los ciclos una sola vez y aporta los `closed_cycle_ids` al coste aplicado. La sonda
+  apunta a la llamada **del informe** —donde su invariante vive— y la muta a `cycles_from_fills`
+  **crudo**. Una sonda desalineada **afirma** cobertura que no tiene: se realinea, no se borra.
 * **M33 (worker sin denominador)** — si el camino Adaptive deja de leer el riesgo por ciclo, la
   evidencia existe pero nadie la consume.
 * **M34 (identidad derivada)** — si un `cycle_id` ajeno al prefijo también se deriva, se afirma
@@ -322,7 +322,7 @@ AUTO-16 (coste REAL por ciclo: el neto declara su base) anade:
   "fricción gratis" y regalaría R en todo el histórico.
 * **M124 (fila de otra cuenta en el ciclo)** — si el lector por ciclo deja de casar la cuenta, la
   fricción de otra cuenta entra en el neto de esta: se decide con una medición ajena.
-* **M125 (sello del reparto sin subir)** — si la PROCEDENCIA del coste cambia (estimado → aplicado)
+* **M125 (sello del reparto sin subir)** — si la BASE del R neto cambia la regla (estimated → applied)
   y la versión de política no, dos planes con la misma evidencia difieren en los pesos sin que nada
   lo declare.
 * **M126 (la referencia no sobrevive al contexto)** — si el contexto del fill no conserva el mid, la
@@ -332,6 +332,32 @@ AUTO-16 (coste REAL por ciclo: el neto declara su base) anade:
   aplicada, el neto del histórico publica la etiqueta del coste medido llevando el supuesto dentro.
 * **M128 (agregado que mezcla bases sin declararlo)** — si el agregado deja de declarar la mezcla,
   un neto que promedia dos modelos de coste se lee como si midiera uno solo.
+
+AUTO-17 (integridad de la población de medida: el round-trip CUANTITATIVO y la base del R neto
+de extremo a extremo, sin promediar poblaciones mixtas) añade:
+
+* **M129 (balance de cantidades ignorado)** — si el agregado acepta el ciclo sin cuadrar cantidades,
+  un ``BUY 100 / SELL 10`` se declara ``COMPLETE`` y el suelo vuelve a entrar al neto como si fuera
+  el coste de una ida y vuelta entera.
+* **M130 (cierre ignorado)** — si el mapa aplicado deja de restringirse a los ciclos que el ciclo de
+  vida declaró cerrados, un ciclo **abierto** (recomprado) recibe fricción y entra al neto como si
+  el simulador ya hubiera terminado de pagarlo.
+* **M131 (pooled mixto publicado)** — si con dos bases el agregado promedia y publica el pooled, el
+  número con el que decide Adaptive mezcla dos modelos de coste y lo presenta como uno solo.
+* **M132 (series colapsadas)** — si el desglose agrupa todas las bases como una, dos poblaciones de
+  coste distinto se funden en una serie y la mezcla deja de existir antes de declararse.
+* **M133 (transición no declarada)** — si el detector nunca marca ``TRANSITION``, el salto de base
+  entre la ventana larga y la reciente se lee como un cambio de expectativa, no de medida.
+* **M134 (decay cruzando bases)** — si el ``decay`` se calcula aunque la base cambie entre ventanas,
+  comparar expectativas sobre bases distintas se interpreta como deterioro o mejora.
+* **M135 (reparto mezclando bases)** — si el eje del R neto se adopta sin exigir una base comparable
+  para todo el grupo, versiones con bases distintas compiten en un eje que no comparten.
+* **M136 (mixed no bloquea)** — si una fila con base explícitamente mezclada no impide adoptar el eje
+  del neto, una población declarada mixta entra igualmente al reparto por ese eje.
+* **M137 (base no publicada)** — si la salud pierde la base del neto, la evidencia del reparto no
+  puede declarar sobre qué bases se decidió.
+* **M138 (base no leída)** — si la confianza no lee la base de la fila, nunca ve la transición y
+  vuelve a tratar el salto de medida como una señal de deterioro.
 
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
@@ -684,13 +710,12 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M32 (costura muda): el informe ignora la evidencia de riesgo que le llega",
         FEED,
-        # AUTO-16: el fragmento se realinea (el plan lo declara). La llamada de AUTO-9 cambio al
-        # entrar la friccion aplicada en el mismo sitio: `_risk_with_applied_cost` es la pieza
-        # puente entre el productor de riesgo y el informe, asi que la sonda apunta a la llamada
-        # del INFORME (la que su invariante describe), no a la del productor.
-        "        cycles=apply_cycle_risk(\n"
-        "            cycles_from_fills(fills or ()), _risk_with_applied_cost(fills, cycle_risk)\n"
-        "        ),\n",
+        # AUTO-17: el fragmento se realinea OTRA VEZ (el plan lo declara). El informe ya no llama a
+        # `apply_cycle_risk` en linea: pasa por `_cycles_with_risk`, que calcula los ciclos una sola
+        # vez y aporta los `closed_cycle_ids` al coste aplicado. La sonda apunta a la llamada del
+        # INFORME (la que su invariante describe) y la muta para que use `cycles_from_fills` CRUDO,
+        # sin el riesgo que se le pasa.
+        "        cycles=_cycles_with_risk(fills, cycle_risk),\n",
         "        cycles=cycles_from_fills(fills or ()),\n",
         (T_CYCLE_RISK,),
     ),
@@ -1405,10 +1430,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         (T_SELF[0], T_CYCLE_RISK, T_APPLIED_SEAM),
     ),
     (
-        "M122 (una sola pata): el agregado no exige ida y vuelta y el suelo entra al neto",
+        "M122 (una sola pata): el agregado no exige las dos direcciones y el suelo entra al neto",
         APPLIED_COST,
-        '    round_trip = {"buy", "sell"} <= sides\n',
-        "    round_trip = True\n",
+        '    both_sides = {"buy", "sell"} <= {leg.side for leg in legs}\n',
+        "    both_sides = True\n",
         (T_APPLIED, T_CYCLE_RISK),
     ),
     (
@@ -1428,10 +1453,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         (T_SIM_REF,),
     ),
     (
-        "M125 (sello sin subir): la procedencia del coste cambia y la version de politica no",
+        "M125 (sello sin subir): la base del neto cambia la regla y la version de politica no",
         AUTO_ADAPTIVE,
+        'ADAPTIVE_POLICY_VERSION = "auto17-v1"',
         'ADAPTIVE_POLICY_VERSION = "auto16-v1"',
-        'ADAPTIVE_POLICY_VERSION = "auto14-v1"',
         (T_ADAPTIVE,),
     ),
     (
@@ -1453,11 +1478,92 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M128 (bases mezcladas sin declarar): el agregado deja de publicar la mezcla",
         AUTO_SELF_EVAL,
-        "    if len(unique) > 1:\n"
+        "    if len(series) > 1:\n"
         "        return SELF_EVAL_COST_BASIS_MIXED\n",
         "    if False:\n"
         "        return SELF_EVAL_COST_BASIS_MIXED\n",
         (T_SELF[0],),
+    ),
+    # ── AUTO-17 (V2.58): la integridad de la poblacion de medida ─────────────────────────────
+    (
+        "M129 (balance de cantidades ignorado): un ciclo abierto se lee como ida y vuelta",
+        APPLIED_COST,
+        "    balanced = _quantity_balanced(legs)\n",
+        "    balanced = True\n",
+        (T_APPLIED, T_APPLIED_SEAM),
+    ),
+    (
+        "M130 (cierre ignorado): un ciclo que el ciclo de vida no declaro cerrado recibe friccion",
+        APPLIED_COST,
+        "        if closed is not None and key not in closed:\n",
+        "        if False:\n",
+        (T_APPLIED,),
+    ),
+    (
+        "M131 (pooled mixto publicado): con dos bases el agregado SI promedia y publica el pooled",
+        AUTO_SELF_EVAL,
+        "    if basis == SELF_EVAL_COST_BASIS_MIXED:\n"
+        "        return None\n",
+        "    if False:\n"
+        "        return None\n",
+        (T_SELF[0], T_CONFIDENCE),
+    ),
+    (
+        "M132 (series colapsadas): el desglose agrupa todas las bases como si fueran una",
+        AUTO_SELF_EVAL,
+        "        basis = cycle.cost_basis or SELF_EVAL_COST_BASIS_UNDECLARED\n",
+        "        basis = SELF_EVAL_COST_BASIS_ESTIMATED\n",
+        (T_SELF[0],),
+    ),
+    (
+        "M133 (transicion no declarada): el detector nunca marca TRANSITION entre bases",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "        if long_basis != recent_basis:\n"
+        "            return ADAPTIVE_BASIS_TRANSITION\n",
+        "        if False:\n"
+        "            return ADAPTIVE_BASIS_TRANSITION\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M134 (decay cruzando bases): el deterioro se mide aunque la base cambie entre ventanas",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    if basis_transition in (ADAPTIVE_BASIS_TRANSITION, ADAPTIVE_BASIS_MIXED):\n"
+        "        return ADAPTIVE_DECAY_UNKNOWN\n",
+        "    if False:\n"
+        "        return ADAPTIVE_DECAY_UNKNOWN\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M135 (reparto mezclando bases): el eje del R neto se adopta sin exigir base comparable",
+        AUTO_ADAPTIVE,
+        "        if _net_basis_comparable(net_r, rows_by_version, confidence):\n",
+        "        if True:\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M136 (mixed no bloquea): una fila con base mezclada no impide adoptar el eje del neto",
+        AUTO_ADAPTIVE,
+        "        if basis == SELF_EVAL_COST_BASIS_MIXED:\n"
+        "            return False\n",
+        "        if False:\n"
+        "            return False\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M137 (base no publicada): la salud pierde la base del neto y la evidencia la calla",
+        AUTO_ADAPTIVE,
+        "            net_r_basis=row.net_r_basis,\n",
+        "            net_r_basis=None,\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M138 (base no leida): la confianza no lee la base de la fila y nunca ve la transicion",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "        net_r_basis=row.net_r_basis,\n"
+        "        net_r_series=row.net_r_series,\n",
+        "        net_r_basis=None,\n"
+        "        net_r_series=(),\n",
+        (T_CONFIDENCE,),
     ),
 ]
 

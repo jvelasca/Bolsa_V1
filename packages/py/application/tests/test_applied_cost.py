@@ -24,7 +24,9 @@ from bolsa_analytics.cognitive.measurement import (
 )
 from bolsa_application.applied_cost import (
     APPLIED_COST_FAVOURABLE_LEG,
+    APPLIED_COST_UNBALANCED_ROUND_TRIP,
     APPLIED_COST_UNUSABLE_LEG,
+    APPLIED_COST_WITHOUT_CYCLE_CLOSURE,
     APPLIED_COST_WITHOUT_LEG,
     APPLIED_COST_WITHOUT_REFERENCE,
     APPLIED_COST_WITHOUT_ROUND_TRIP,
@@ -191,3 +193,93 @@ def test_the_sum_keeps_the_trace_of_how_many_legs_it_could_value() -> None:
     assert payload["measurement"] == MEASUREMENT_PARTIAL
     assert payload["friction"] == "2.500000"
     assert payload["cycleId"] == _CYCLE
+
+
+# ── AUTO-17: la ida y vuelta se PRUEBA con las cantidades, no con la presencia de lados ──
+
+
+def test_a_round_trip_with_unbalanced_quantities_is_not_complete() -> None:
+    """``BUY 100 / SELL 10`` tiene los dos lados y NO es un ciclo cerrado: quedan 90 abiertas.
+
+    Presencia de direcciones no es round-trip. Declararlo ``COMPLETE`` mediría la fricción de
+    una operación que no terminó y sobrestimaría el R con un coste de medio viaje.
+    """
+    cost = applied_cost_from_fills([_CYCLE], [_buy("100.15", qty="100"), _sell("99.90", qty="10")])[
+        _CYCLE
+    ]
+
+    assert cost.measurement == MEASUREMENT_PARTIAL
+    assert APPLIED_COST_UNBALANCED_ROUND_TRIP in cost.notes
+    assert applied_cost_is_complete(cost) is False
+
+
+def test_a_round_trip_that_balances_with_several_legs_is_complete() -> None:
+    """``3 BUY + 2 SELL`` que cuadran SÍ es un ciclo cerrado: el balance manda, no el número de patas."""
+    fills = [
+        _buy("100.15", qty="50"),
+        _buy("100.20", qty="50"),
+        _sell("99.90", qty="60"),
+        _sell("99.85", qty="40"),
+    ]
+    cost = applied_cost_from_fills([_CYCLE], fills)[_CYCLE]
+
+    assert cost.measurement == MEASUREMENT_COMPLETE
+    assert cost.legs == 4
+    assert APPLIED_COST_UNBALANCED_ROUND_TRIP not in cost.notes
+
+
+def test_a_reopened_cycle_is_not_complete_even_with_a_prior_round_trip() -> None:
+    """``BUY 100 / SELL 100 / BUY 20`` no es un ciclo cerrado: el último BUY lo deja abierto."""
+    fills = [_buy("100.15", qty="100"), _sell("99.90", qty="100"), _buy("100.05", qty="20")]
+    cost = applied_cost_from_fills([_CYCLE], fills)[_CYCLE]
+
+    assert cost.measurement == MEASUREMENT_PARTIAL
+    assert APPLIED_COST_UNBALANCED_ROUND_TRIP in cost.notes
+
+
+def test_a_leg_without_a_reference_still_counts_for_the_quantity_balance() -> None:
+    """Cierre y medición son ejes independientes: una pata sin mid no aporta fricción pero SÍ cierra.
+
+    El ciclo queda ``PARTIAL`` (le falta la referencia de una pata), pero por la MEDICIÓN, no por
+    el balance: si el balance no se probara, el motivo declarado sería otro.
+    """
+    cost = applied_cost_from_fills([_CYCLE], [_buy("100.15", mid=None, qty="10"), _sell("99.90", qty="10")])[
+        _CYCLE
+    ]
+
+    assert cost.measurement == MEASUREMENT_PARTIAL
+    assert APPLIED_COST_WITHOUT_REFERENCE in cost.notes
+    assert APPLIED_COST_UNBALANCED_ROUND_TRIP not in cost.notes
+    assert APPLIED_COST_WITHOUT_ROUND_TRIP not in cost.notes
+
+
+def test_an_unreadable_quantity_cannot_prove_the_balance() -> None:
+    """Sin todas las cantidades legibles el balance NO se puede probar: no se afirma el cierre."""
+    cost = applied_cost_from_fills(
+        [_CYCLE], [_buy("100.15", qty="10"), _sell("99.90", qty="10"), _sell("99.80", qty="0")]
+    )[_CYCLE]
+
+    assert cost.measurement == MEASUREMENT_PARTIAL
+    assert applied_cost_is_complete(cost) is False
+
+
+def test_a_cycle_outside_the_closed_set_declares_its_gap_and_never_a_friction() -> None:
+    """La autoridad de cierre manda: un ciclo que no está cerrado no recibe fricción aplicada."""
+    costs = applied_cost_from_fills(
+        [_CYCLE], [_buy("100.15"), _sell("99.90")], closed_cycle_ids=["otro-ciclo"]
+    )
+
+    assert costs[_CYCLE].measurement == MEASUREMENT_UNKNOWN
+    assert costs[_CYCLE].friction is None
+    assert costs[_CYCLE].notes == (APPLIED_COST_WITHOUT_CYCLE_CLOSURE,)
+    assert applied_cost_is_complete(costs[_CYCLE]) is False
+
+
+def test_a_cycle_inside_the_closed_set_is_measured_as_usual() -> None:
+    """El control positivo: con el ciclo en el conjunto cerrado, la medición no cambia."""
+    costs = applied_cost_from_fills(
+        [_CYCLE], [_buy("100.15"), _sell("99.90")], closed_cycle_ids=[_CYCLE]
+    )
+
+    assert costs[_CYCLE].measurement == MEASUREMENT_COMPLETE
+    assert costs[_CYCLE].friction == Decimal("2.500000")

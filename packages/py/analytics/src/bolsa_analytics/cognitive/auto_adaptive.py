@@ -77,12 +77,16 @@ from decimal import Decimal
 from typing import Any
 
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_BASIS_MIXED,
+    ADAPTIVE_BASIS_TRANSITION,
+    ADAPTIVE_BASIS_UNKNOWN,
     ADAPTIVE_DECAY_SEVERE,
     AdaptiveConfidence,
     RegimeConfidence,
     StrategyConfidence,
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
+    SELF_EVAL_COST_BASIS_MIXED,
     StrategyRegimeEvaluation,
     StrategySelfEvaluation,
     declared_regime,
@@ -109,6 +113,7 @@ __all__ = [
     "ADAPTIVE_REGIME_UNKNOWN",
     "ADAPTIVE_SEVERE_DECAY_FACTOR_DEFAULT",
     "ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL",
+    "ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE",
     "ADAPTIVE_CELL_NOTE_NET_UNMEASURED",
     "ADAPTIVE_CELL_NOTE_NOT_DECISIVE",
     "ADAPTIVE_CELL_NOTE_NOT_FOUND",
@@ -172,7 +177,15 @@ ADAPTIVE_KEY = "adaptive"
 #: ser, cuando está medido, el que el **simulador aplicó** (``costApplied``, sello por ciclo en
 #: ``costBasis``). Dos planes con la misma evidencia pueden entonces diferir en los pesos porque el
 #: neto se midió contra otro modelo de coste; sin subir el sello, esa diferencia sería invisible.
-ADAPTIVE_POLICY_VERSION = "auto16-v1"
+#:
+#: ``auto17-v1`` (AUTO-17): la REGLA del reparto no cambia en su aritmética, pero gana una
+#: **precondición de comparabilidad** sobre el eje del R neto: el grupo solo compite en ese eje si
+#: TODOS sus miembros comparten una única base de coste estable (``estimated``/``applied``). Si
+#: conviven bases (o una versión está en ``TRANSITION``/``MIXED``), el reparto cae al eje histórico
+#: con el motivo declarado (``cell_basis_unstable``) en vez de promediar modelos de coste. Es un
+#: cambio de REGLA (a diferencia de ``auto16-v1``, que solo cambiaba la procedencia de un input),
+#: así que el sello sube. ``DATA_GATE_POLICY_VERSION`` NO se toca.
+ADAPTIVE_POLICY_VERSION = "auto17-v1"
 
 #: Motivos de rotación (vocabulario PROPIO de este módulo; el journal de la capa de
 #: aplicación los lleva en el detalle de ``adaptive_strategy_paused``). La casa única
@@ -261,6 +274,11 @@ ADAPTIVE_CELL_NOTE_NOT_POSITIVE = "cell_not_positive"
 #: El eje del grupo es la MONEDA bruta: la celda mide R, no moneda, así que no puede afinar el peso y
 #: el reparto se queda en la evidencia global (no se deriva un cociente paralelo para fabricarla).
 ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL = "cell_axis_without_cell"
+#: AUTO-17 — el grupo competía en el eje del R neto pero su base de coste NO es una única base
+#: estable (conviven ``estimated``/``applied``, o es ``mixed``, o la versión está en
+#: ``TRANSITION``): mezclar modelos de coste en el numerador sería aritmética sin sentido, así
+#: que el reparto cae al eje histórico y lo declara.
+ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE = "cell_basis_unstable"
 
 #: Régimen por estrategia: el cruce ``strategy × regime`` ya tiene productor (``AUTO-9``),
 #: así que ``StrategyHealth.regime`` se puebla con el régimen **determinado** de la
@@ -397,6 +415,12 @@ class StrategyHealth:
     recent_expectancy_r: float | None = None
     long_expectancy_r: float | None = None
     decay: str | None = None
+    #: AUTO-17 — la BASE del R neto que Adaptive lee (``estimated``/``applied``/``mixed``/
+    #: ``undeclared``/``None``) y si esa base es estable entre ventanas
+    #: (``STABLE_ESTIMATED``/``STABLE_APPLIED``/``TRANSITION``/``MIXED``/``UNKNOWN``). Viajan con
+    #: la evidencia para que el reparto no promedie dos modelos de coste como si fueran uno.
+    net_r_basis: str | None = None
+    basis_transition: str = ADAPTIVE_BASIS_UNKNOWN
 
     @classmethod
     def from_evaluation(
@@ -434,6 +458,13 @@ class StrategyHealth:
                 confidence.long_expectancy_r if confidence is not None else None
             ),
             decay=confidence.decay if confidence is not None else None,
+            # AUTO-17: la base del neto sale de la FILA (siempre la declara); la transición, de la
+            # confianza (compara long vs recent). Sin confianza, la transición queda ``UNKNOWN``:
+            # no se afirma una estabilidad que nadie midió.
+            net_r_basis=row.net_r_basis,
+            basis_transition=(
+                confidence.basis_transition if confidence is not None else ADAPTIVE_BASIS_UNKNOWN
+            ),
         )
 
 
@@ -721,6 +752,10 @@ class AdaptivePlan:
             "expectancyR": row.expectancy_r,
             "netExpectancyR": row.net_expectancy_r,
             "netRMeasurement": row.net_r_measurement,
+            # AUTO-17: la base del neto viaja con la evidencia. Sin ella, dos netos medidos contra
+            # modelos de coste distintos se leerían como comparables.
+            "netRBasis": row.net_r_basis,
+            "basisTransition": row.basis_transition,
             "profitFactor": row.profit_factor,
             "winRate": row.win_rate,
             "regime": row.regime,
@@ -929,12 +964,45 @@ class _AllocationSources:
     cell_fallback: Mapping[str, str] = field(default_factory=dict)
 
 
+def _net_basis_comparable(
+    net_r_versions: Iterable[str],
+    rows_by_version: Mapping[str, StrategySelfEvaluation],
+    confidence: AdaptiveConfidence | None,
+) -> bool:
+    """(PURA, AUTO-17) ¿comparte el grupo que compite una ÚNICA base de coste ESTABLE?
+
+    El eje del R neto solo se adopta si todos los que compiten midieron su neto contra el MISMO
+    modelo de coste: un grupo con una pata ``estimated`` y otra ``applied`` no puede promediar
+    bases, porque dos netos con el mismo aspecto no son comparables. ``mixed`` explícito bloquea
+    siempre; con la confianza aportada, una versión en ``TRANSITION``/``MIXED`` (su neto cambió
+    de base entre la ventana larga y la reciente) bloquea igual. Una base **ausente** (``None``)
+    NO bloquea por sí sola: si TODAS comparten esa misma ausencia, no hay mezcla demostrada y se
+    conserva el comportamiento histórico.
+    """
+    bases: set[str | None] = set()
+    for version in net_r_versions:
+        row = rows_by_version.get(version)
+        basis = None if row is None else row.net_r_basis
+        if basis == SELF_EVAL_COST_BASIS_MIXED:
+            return False
+        bases.add(basis)
+        if confidence is not None:
+            cell = confidence.confidence_for(version)
+            if cell is not None and cell.basis_transition in (
+                ADAPTIVE_BASIS_TRANSITION,
+                ADAPTIVE_BASIS_MIXED,
+            ):
+                return False
+    return len(bases) <= 1
+
+
 def _allocation_weights(
     rows_by_version: Mapping[str, StrategySelfEvaluation],
     active_versions: Sequence[str],
     *,
     cells_by_version: Mapping[str, Sequence[StrategyRegimeEvaluation]] | None = None,
     regime: str | None = None,
+    confidence: AdaptiveConfidence | None = None,
 ) -> _AllocationSources:
     """(PURA) eje del reparto, pesos que compiten en él y de dónde salió cada peso.
 
@@ -951,6 +1019,12 @@ def _allocation_weights(
     El R neto exige además ``net_r_measurement == COMPLETE`` (§6.3: un ``PARTIAL`` —algún ciclo sin
     coste— no habilita decidir contra el agregado). AUTO-16 no cambia la condición: cambia de dónde
     sale el coste que el neto descuenta (``netRBasis``, ``applied`` o ``estimated``).
+
+    **AUTO-17 — el eje del R neto exige una base de coste COMPARABLE.** ``net_expectancy_r`` es un
+    número adimensional pero NO neutro: dos netos medidos contra modelos de coste distintos no se
+    promedian (``_net_basis_comparable``). Si el grupo que compite no comparte una única base
+    estable, el eje cae al histórico y cada peso lo declara (``cell_basis_unstable``): el delta de
+    base nunca se lee como señal.
 
     **AUTO-14 — la celda afina el PESO, nunca la composición.** Quién compite en el eje del R
     neto lo decide la FILA (``decisive`` + neto medido y positivo), igual que en ``v2.50``–``v2.54``.
@@ -986,12 +1060,25 @@ def _allocation_weights(
                 # Nace un motivo por construcción, pero nunca se silencia un ``None``.
                 cell_fallback[version] = note or ADAPTIVE_CELL_NOTE_NOT_FOUND
     if net_r and net_r.keys() == currency.keys():
+        if _net_basis_comparable(net_r, rows_by_version, confidence):
+            return _AllocationSources(
+                axis=ALLOCATION_AXIS_NET_R,
+                positive=net_r,
+                cell_axis=ALLOCATION_AXIS_NET_R,
+                cell_used=cell_used,
+                cell_fallback=cell_fallback,
+            )
+        # AUTO-17: el grupo competía en el eje del R neto pero su base de coste NO es única y
+        # estable. Promediar modelos distintos sería aritmética sin sentido: se cae al eje
+        # histórico y cada peso declara por qué.
         return _AllocationSources(
-            axis=ALLOCATION_AXIS_NET_R,
-            positive=net_r,
-            cell_axis=ALLOCATION_AXIS_NET_R,
-            cell_used=cell_used,
-            cell_fallback=cell_fallback,
+            axis=ALLOCATION_AXIS_CURRENCY,
+            positive=currency,
+            cell_axis=None,
+            cell_used={},
+            cell_fallback={
+                version: ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE for version in sorted(currency)
+            },
         )
     # Eje de MONEDA: el reparto sigue siendo el histórico (global) y se declara por qué la celda no
     # pudo afinar: la celda mide R y R neto, no moneda por régimen.
@@ -1111,6 +1198,7 @@ def recommend_allocation(
         active_versions,
         cells_by_version=cells_by_version,
         regime=regime,
+        confidence=confidence,
     )
     axis = sources.axis
     positive = sources.positive
