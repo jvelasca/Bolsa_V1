@@ -307,9 +307,74 @@ patrón que `AUTO-13`/`AUTO-14`): el run del tag no existe hasta que el tag se e
 
 ---
 
-## 11. CI del sello `v2.56-beta`
+## 11. CI del sello `v2.56-beta` (medida, no predicha)
 
 **Se mide, no se predice:** el run del tag no existe hasta que el tag se empuja, así que estas cifras se
 añaden en el **commit de docs posterior al sello** (mismo patrón que `AUTO-13`/`AUTO-14`), citando cada una
-el run que la produjo. Este pack se lee **con** ese commit: si la tabla no está, la CI del tag **no está
-medida todavía**.
+el run que la produjo.
+
+### 11.1 El primer CI del tag salió ROJO (una sola causa raíz) y obligó a un fix + re-sello
+
+El primer empuje del tag apuntó a `c62ac459` (el commit del paquete de cierre) y su `Release tag CI` y su
+`Python CI` **quedaron rojos**, con **la misma causa raíz** repetida en los tres jobs PG afectados:
+
+```
+AssertionError: assert '045_adaptive_gate_state' == '044_auto_cycle_trace'
+```
+
+`apps/api-python/tests/test_discovery_evidence_snapshot_pg.py:43` ancla la head de Alembic en la constante
+`_ALEMBIC_HEAD` (**5** aserciones, `:618`…`:1079`), y esta fase subió la head a `045_adaptive_gate_state`
+sin bumpearla. **La laguna no era visible en local ni en el job `quality`**: esas 5 aserciones solo corren
+en los jobs PG de `test_discovery_evidence_snapshot_pg.py` (`auto-v2-durable-pg` y `grammar-discovery-pg`),
+que la matriz offline **ignora** (`--ignore` + `asyncpg` ausente). **Es exactamente el límite que el §7
+declaró** («lo que no se pudo medir aquí… ese límite lo cierra la CI del tag»): la CI del tag lo cerró, lo
+destapó y se corrigió.
+
+- **Rojos medidos en el primer intento:** `auto-v2-durable-pg` **`5 failed, 46 passed`** y
+  `grammar-discovery-pg` **`5 failed, 16 passed`** (los 5 rojos, las 5 aserciones de la guardia).
+- **Fix de una línea:** `_ALEMBIC_HEAD` `044_auto_cycle_trace` → **`045_adaptive_gate_state`**.
+- **Verificación replicando los DOS jobs de CI** contra el PostgreSQL real del compose, con los mismos
+  comandos y los mismos flags: `auto-v2-durable-pg` (8 ficheros + `ADAPTIVE_GATE_PG_REQUIRED=1` y cia)
+  ⇒ **`51 passed`**, y `grammar-discovery-pg` (`A14_GRAMMAR_PG_REQUIRED=1`) ⇒ **`21 passed`**.
+- **Re-sello declarado (no silencioso):** el tag `v2.56-beta` se **borra y se re-crea** en el commit del
+  fix, `8ad54416` (borrado + re-tag, mismo patrón que `v2.40.2-beta`/`v2.16-beta`, y **no** un tag nuevo
+  `+1`: el `1.81.0-beta` no cambia). Un CI de tag ROJO **no certifica nada**, así que no se podía dejar el
+  tag en `c62ac459`. **`c62ac459` no se borra**: sigue en la historia de `main` con su rojo **declarado**
+  aquí.
+
+### 11.2 Cifras medidas del sello
+
+| Corte | Run | Resultado |
+| --- | --- | --- |
+| `Release tag CI` (`8ad54416`) | [`35928080874`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080874) | **GREEN (attempt 2)**: **`10 success` + `1 skipped`** (`playwright (integrated E2E, opt-in)`) y `certify (aggregate + artifact)` en `success` |
+| `python` del tag | job del run anterior | ruff **`All checks passed!`** · mypy **`Success: no issues found in 498 source files`** · pytest **`2608 passed / 35 skipped`** |
+| `Python CI` (`8ad54416`, per-commit) | [`35928080842`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080842) | **`5/5` jobs `success`**: `quality`, `auto-v2-durable-pg`, `grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg` (los **4 jobs PG** verdes: cierran el límite offline declarado) |
+| `quality` (per-commit) | job del run anterior | ruff **`All checks passed!`** · mypy **`498` ficheros** · pytest **`2597 passed / 38 skipped`** |
+| `Frontend CI` · `Optimize lab` · `Fase 2 scientific` (`8ad54416`) | [`35928080940`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080940) · [`35928080912`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080912) · [`35928080869`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080869) | los tres **GREEN** |
+| `check-runs` del commit sellado `8ad54416` | — | **`23 success` + `1 skipped`** |
+| `main` (`c62ac459` → `f3cfc326`) | [`35927122596`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35927122596) (rojo) → [`35928064501`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928064501) (**GREEN**) | la fase viajó en **fast-forward** (`b96ae624..8ad54416` en la historia lineal), **sin merge commit** |
+
+**Delta medido frente al sello anterior:** `python` del tag **`2586` → `2608`** passed y **`35` → `35`**
+skipped (**+22** passed, **0** skips nuevos); ficheros de `mypy` **`497` → `498`** (`+1`: el store
+nuevo). El `Release tag CI` del tag anterior (`v2.55-beta`, run `35889751810`) fue **`10 success` +
+`1 skipped`**: misma forma.
+
+### 11.3 Dos rojos iniciales por **tests preexistentes ajenos a la fase** (declarados, no silenciados)
+
+El primer intento del tag a `8ad54416` no fue verde del todo: además del fix de la guardia, aparecieron
+**dos rojos aislados en tests que esta fase NO toca**, y se resolvieron con un **re-run del job**:
+
+1. **`lifecycle-pg`** (`test_concurrent_auto_pg.py`, de `V2.46`/`V2.47` — último cambio `0ce3ab81`, ajeno a
+   `AUTO-15`): `UniqueViolation` en `auto_engine_ticks_pkey` con la parametrización de **2** sesiones
+   concurrentes. **Es intermitente y se midió**: la suite corrida **`5`** veces en local da **`1` roja /
+   `4` verdes**. El re-run del job pasó.
+2. **`Frontend CI`** (`src/features/platform/mandate-tenure-pnl.test.ts`, ajeno a la fase): **`1290
+   passed / 229` ficheros** y **`3` errores no manejados** (`ReferenceError: window is not defined`,
+   capturados **después** del teardown del entorno) ⇒ el runner sale `1` aunque todos los tests pasen. El
+   **mismo job había pasado** en `c62ac459`. El re-run pasó.
+
+**Ninguno de los dos es un hallazgo de `AUTO-15`** (ficheros y suites intactos por la fase: `git diff
+b96ae624..8ad54416` no incluye ninguno de los dos) y **ninguno se silencia**: quedan aquí como **deuda
+declarada** (un test PG intermitente al `20 %` y un teardown de vitest que envenena el exit code), porque
+un rojo re-ejecutado sin declarar es una certificación a medias.
+

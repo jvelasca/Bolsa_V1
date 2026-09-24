@@ -73,6 +73,16 @@ mide *publicación*, no *error*.
   que `AUTO-14`). **No** es vehículo de merge: `main` ya la recibió. Árbol limpio **salvo `governor.json`**
   (sin trackear, como estaba).
 - **Base:** `e29e6227` (el commit sellado de `AUTO-14`) más sus dos commits de documentación de sello.
+- **RE-SELLO declarado (no silencioso):** el **primer** CI del tag apuntó a `c62ac459` y salió **ROJO** —
+  causa raíz única, repetida en los tres jobs PG afectados:
+  `assert '045_adaptive_gate_state' == '044_auto_cycle_trace'`, porque
+  `apps/api-python/tests/test_discovery_evidence_snapshot_pg.py:43` ancla la head de Alembic en
+  `_ALEMBIC_HEAD` (**5** aserciones que solo corren en los jobs PG, que la matriz offline **ignora**) y la
+  fase subió la head a `045` sin bumpearla. Fix de **una línea** verificado **replicando los dos jobs de CI**
+  contra el PostgreSQL real del compose: `auto-v2-durable-pg` **`51 passed`** y `grammar-discovery-pg`
+  **`21 passed`**. El tag `v2.56-beta` se **borra y se re-crea** en el commit del fix, **`8ad54416`**
+  (patrón `v2.40.2-beta`/`v2.16-beta`), porque un CI de tag rojo **no certifica nada**:
+  `c62ac459` queda en la historia con su rojo **declarado** en el §11 del [audit-pack](./audit-pack-v2-56-auto-15-data-gate-persistido-2026-09-23.md).
 - **Migración SÍ:** head `044_auto_cycle_trace` → **`045_adaptive_gate_state`** (aditiva, sin backfill,
   `upgrade`/`downgrade` **simétricos** y certificados en el roundtrip del test PG).
 - **Tag anterior `v2.55-beta` → `e29e6227`:** **no se reabre**. Sus cifras de CI (job `python` del tag
@@ -224,12 +234,26 @@ nueva) + costura (`test_auto_v56_auto15_data_gate_durable_seam.py`, **9**, nueva
   ausentes, restauración **byte a byte** y huella `git status` **idéntica** (`intacto: la sonda no
   altero el arbol`). Las **11** nuevas (`M108…M118`) matan, como mínimo, un test **con nombre**.
 - **Gobernador y contrato durable intactos** (medido): diffs **vacíos** y script del gobernador **`exit 0`**.
-- **Sello:** tag anotado **`v2.56-beta`** sobre el commit del paquete de cierre, empujado **de uno en uno**
-  (sin `--follow-tags`), y `main` en **fast-forward**. Las cifras del `Release tag CI` se **miden y se
-  citan por su run** en el commit de docs posterior al sello (patrón `AUTO-13`/`AUTO-14`).
+- **Sello y RE-SELLO:** el tag apunta al commit del fix de la guardia de Alembic, **`8ad54416`** —el CI del
+  primer empuje (`c62ac459`) salió **rojo** por esa guardia y un tag rojo no certifica nada—, empujado **de
+  uno en uno** (sin `--follow-tags`) con `main` en **fast-forward**. Verificación replicando los dos jobs PG
+  contra el PostgreSQL real: **`51 passed`** + **`21 passed`**.
+- **CI del tag, MEDIDA (no predicha):** `Release tag CI` [`35928080874`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080874)
+  **GREEN (attempt 2)** — `10 success` + `1 skipped` (`playwright (integrated E2E, opt-in)`) y `certify` en
+  `success`—; job `python` del tag: ruff `All checks passed!`, mypy **`498` ficheros**, pytest **`2608
+  passed / 35 skipped`** (**+22** passed y **0** skips nuevos sobre los `2586 / 35` de `v2.55`);
+  `Python CI` per-commit [`35928080842`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080842)
+  **`5/5` jobs verdes** (los **4 jobs PG** incluidos: cierra el límite offline declarado) con `quality`
+  **`2597 passed / 38 skipped`**; `check-runs` del commit sellado: **`23 success` + `1 skipped`**.
+- **Dos rojos iniciales por tests PREEXISTENTES ajenos a la fase, declarados y re-ejecutados:** el test PG
+  intermitente de `V2.46` (`test_concurrent_auto_pg.py`, `UniqueViolation` en `auto_engine_ticks_pkey`, con
+  **`1` roja en `5` corridas** medidas en local) y el teardown de vitest que envenena el exit code con los
+  **`1290`** tests en verde (`mandate-tenure-pnl.test.ts`). Ninguno de los dos ficheros está en el diff de
+  la fase: **no** son hallazgos de `AUTO-15` y **no** se silencian (deuda declarada).
 - **Lo que no se pudo medir aquí:** la batería offline **completa** de los jobs `quality`/`python` del
   tag (su recolección incluye suites PG que importan `asyncpg`, ausente, y el teardown de sesión exige
-  PostgreSQL). **Ese límite lo cierra la CI del tag, medida.**
+  PostgreSQL). **Ese límite lo cerró la CI del tag** — y fue justo ahí donde apareció la guardia de head
+  sin bumpear (§11.1 del audit-pack), que ya está corregida y re-verificada.
 
 ---
 

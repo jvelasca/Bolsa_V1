@@ -42,11 +42,12 @@ declara; nunca se silencia.
 | Corte | Estado | Ref |
 | --- | --- | --- |
 | `AUTO-15` (Data Gate persistido) | **cerrada y sellada** | tag **`v2.56-beta`**, `1.81.0-beta` |
-| `main` | **recibió la fase** (fast-forward, sin merge) | `b96ae624..c62ac459` (el commit sellado) |
-| Tag | **`v2.56-beta`** empujado **suelto** (sin `--follow-tags`) | `Release tag CI` **GREEN**, run y cifras **medidos** y citados en el §11 del [audit-pack](./audit-pack-v2-56-auto-15-data-gate-persistido-2026-09-23.md) (commit post-sello) |
-| Rama de auditoría | `auto-15-data-gate-persistido` · **PR draft** (abierto **post-sello**, no es vehículo de merge) | delta completo sobre `v2.55`: `audit-base-v2.55-beta` @ `b96ae624` → `c62ac459` (cifras y enlace del PR en el commit post-sello) |
+| `main` | **recibió la fase** (fast-forward, sin merge) | `b96ae624..8ad54416` (el commit sellado) |
+| Tag | **`v2.56-beta`** empujado **suelto** (sin `--follow-tags`) | `Release tag CI` [`35928080874`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080874) **GREEN (attempt 2)**: `10 success` + `1 skipped`, job `python` del tag **`2608 passed / 35 skipped`**, `check-runs` **`23 success` + `1 skipped`** |
+| Rama de auditoría | `auto-15-data-gate-persistido` · **PR draft** (abierto **post-sello**, no es vehículo de merge) | delta completo sobre `v2.55`: `audit-base-v2.55-beta` @ `b96ae624` → `8ad54416` (**22 ficheros, `+2994/−24`**) |
 | Runtime | **el de `v2.53-beta`**: flag Adaptive **OFF** | sin racha que leer ni que escribir: **cero I/O nuevo** |
 | Migración | **SÍ**: head `044_auto_cycle_trace` → **`045_adaptive_gate_state`** | aditiva, sin backfill, downgrade simétrico |
+| Re-sello | el tag se **movió** de `c62ac459` a **`8ad54416`** | el primer CI del tag salió **rojo** por la guardia `_ALEMBIC_HEAD` (`044`→`045`) sin bumpear: `c62ac459` queda con su rojo **declarado** (§11.1 del [audit-pack](./audit-pack-v2-56-auto-15-data-gate-persistido-2026-09-23.md)) |
 | Árbol | limpio **salvo `governor.json`** (sin trackear) | — |
 | Siguiente | **`AUTO-16`** (alcance **por ratificar**, no decidido) | §5 de este documento |
 

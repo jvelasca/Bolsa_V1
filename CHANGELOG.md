@@ -103,9 +103,23 @@ comportamiento, el de `v2.53`.
   `mypy` con el comando de CI **`0` errores en `498` ficheros`** e `import-linter` **`4 kept / 0 broken`**.
   *(Trampa medida: `ruff check <rutas>` **sin** `--config pyproject.toml` resuelve el `pyproject` del
   paquete y devuelve falsos `I001` —también sobre `kill_switch_store.py`, ya certificado—.)*
+- **Guardia de head de Alembic bumpeada en el CI del tag** (`test_discovery_evidence_snapshot_pg.py:43`:
+  `_ALEMBIC_HEAD` `044_auto_cycle_trace` → `045_adaptive_gate_state`): el primer CI del tag salió **rojo**
+  por esa constante (**5** aserciones, solo en los jobs PG) y obligó a un **fix + re-sello** del tag a
+  `8ad54416`; se verificó **replicando los dos jobs PG** contra PostgreSQL real: `51 passed` y `21 passed`.
 - **Lo que no se pudo medir aquí**: la batería offline **completa** de los jobs `quality`/`python` del tag
   (su recolección incluye suites PG que importan `asyncpg`, ausente, y el teardown de sesión del conftest
-  de `apps/api-python` exige PostgreSQL). **Ese límite lo cierra la CI del tag, medida.**
+  de `apps/api-python` exige PostgreSQL). **Ese límite lo cerró la CI del tag** — y fue justo ahí donde
+  apareció la guardia de head sin bumpear (ver arriba), ya corregida: `Release tag CI`
+  [`35928080874`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35928080874) **GREEN** (`10 success` +
+  `1 skipped`), job `python` del tag **`2608 passed / 35 skipped`** (**+22** passed, **0** skips nuevos
+  sobre los `2586 / 35` de `v2.55`) y `check-runs` del commit sellado **`23 success` + `1 skipped`**.
+- **Re-sello declarado (no silencioso):** el tag `v2.56-beta` se **borra y se re-crea** en el commit del fix
+  (`8ad54416`), no en el del paquete de cierre (`c62ac459`), porque **un CI de tag rojo no certifica nada**;
+  `c62ac459` permanece en la historia con su rojo **declarado** y el `1.81.0-beta` **no** cambia (sin `+1`
+  de parche). Dos rojos iniciales más, en **tests preexistentes ajenos a la fase**, se declararon y se
+  re-ejecutaron: el test PG intermitente de `V2.46` (`test_concurrent_auto_pg.py`, `1` rojo en `5` corridas
+  medidas) y el teardown de vitest que envenena el exit code con los **`1290`** tests en verde.
 
 ### Límites declarados
 

@@ -204,3 +204,12 @@ umbrales de rotación, el **gobernador** (`v2_43_governor_evidence.py`, diff vac
 abiertas: PK **`(account_id, engine_id)`** y **reset sin amplificación** (`WHERE sink_failures > 0`).
 La fase se ejecutó en cinco pasos con sus gates y se selló en `v2.56-beta`; el resultado **medido** (y lo
 que no se pudo medir aquí) está en el [audit-pack `v2.56`](./audit-pack-v2-56-auto-15-data-gate-persistido-2026-09-23.md).
+
+**Cierre del sello (post-ejecución, declarado).** El primer CI del tag apuntó a `c62ac459` y salió **rojo**
+por **una** causa raíz: `apps/api-python/tests/test_discovery_evidence_snapshot_pg.py:43` ancla la head de
+Alembic en `_ALEMBIC_HEAD` (**5** aserciones que solo corren en los jobs PG, que la matriz offline ignora) y
+la fase subió la head a `045_adaptive_gate_state` sin bumpear esa constante. Fix de **una línea**,
+verificado replicando los dos jobs PG de CI contra el PostgreSQL real del compose (**`51 passed`** +
+**`21 passed`**), y **re-sello**: el tag `v2.56-beta` se borra y se re-crea en `8ad54416`, dejando
+`c62ac459` en la historia con su rojo **declarado** (§11.1 del audit-pack). Las cifras del CI del tag están
+en el **§11 del audit-pack** (medidas, con su run); el diff de la fase es **22 ficheros, `+2994/−24`**.

@@ -13,11 +13,15 @@ ya medido.
 
 **Contexto del sello:** la fase entera viaja en **fast-forward** sobre `e29e6227` (el commit sellado de
 `AUTO-14`), **sin merge commit** y sin rama de fase: el padre inmediato del commit sellado es
-`b96ae624` (el plan ratificado, tras los dos commits de docs del sello de `AUTO-14`). **Superficie de
-auditoría:** el **PR draft** de la
+`b96ae624` (el plan ratificado, tras los dos commits de docs del sello de `AUTO-14`). **Hay un RE-SELLO
+declarado**: el primer CI del tag (sobre `c62ac459`) salió **rojo** porque
+`apps/api-python/tests/test_discovery_evidence_snapshot_pg.py:43` ancla la head de Alembic en
+`_ALEMBIC_HEAD` y la fase la subió a `045` sin bumpear esa constante (**5** aserciones que solo corren en
+los jobs PG); el fix es de una línea y el tag apunta ahora a **`8ad54416`**, con `c62ac459` conservado en
+la historia y su rojo **declarado** (§11.1 del pack). **Superficie de auditoría:** el **PR draft** de la
 rama `auto-15-data-gate-persistido` se abre **después** del sello **solo** para revisar con comentarios en
-línea; su diff medido es el de la fase y **no** es vehículo de merge. **SÍ hay migración:** Alembic head
-`044_auto_cycle_trace` → **`045_adaptive_gate_state`**.
+línea; su diff medido es el de la fase (**22 ficheros, `+2994/−24`**) y **no** es vehículo de merge. **SÍ
+hay migración:** Alembic head `044_auto_cycle_trace` → **`045_adaptive_gate_state`**.
 
 ---
 
@@ -206,6 +210,10 @@ git diff -- packages/py/application/src/bolsa_application/auto_adaptive_journal.
 # La migración SÍ se movió: head = 045_adaptive_gate_state
 uv run alembic -c packages/py/infrastructure/alembic.ini heads
 
+# La GUARDIA de head también (esto fue el rojo del primer tag, §11.1 del pack):
+# ``_ALEMBIC_HEAD`` debe casar con la head real, y solo lo comprueban los jobs PG.
+rg -n "_ALEMBIC_HEAD" apps/api-python/tests/test_discovery_evidence_snapshot_pg.py
+
 # La suite PG del gate, contra el PostgreSQL del compose (~2 s)
 uv run pytest apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py -q --tb=short -rs
 
@@ -242,6 +250,11 @@ procesos y `git status` **antes** de dar la corrida por cerrada; si queda un mut
   **declarado** de la fase (§3), y no hay camino que lo silencie.
 - Los rojos de las suites **PG** en local sin PostgreSQL: la CI las mide con
   `ADAPTIVE_GATE_PG_REQUIRED=1` (fail-if-skipped).
+- **Los dos rojos iniciales del tag por tests PREEXISTENTES** (§11.3 del pack): el test PG intermitente
+  `test_concurrent_auto_pg.py` (de `V2.46`, `1` rojo en `5` corridas medidas) y el teardown de vitest que
+  envenena el exit code con los **`1290`** tests en verde (`mandate-tenure-pnl.test.ts`). **No** están en el
+  diff de la fase y se re-ejecutaron: son **deuda declarada**, no hallazgos de `AUTO-15`. **Sí** es
+  hallazgo legítimo si demuestras que el fallo depende de algo que esta fase cambió.
 - **Sin UI** para `AUTO-7`…`AUTO-15`: todo esto es observable por el journal y los logs del tick.
 
 ---
