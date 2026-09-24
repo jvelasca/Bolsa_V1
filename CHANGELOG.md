@@ -2,6 +2,92 @@
 
 All notable releases of Bolsa V1.
 
+## [1.85.0-beta] — AUTO-19A Incertidumbre del edge + Replay OOS (V2.60) — 2026-09-24
+
+**Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI nueva y **sin clave
+nueva en el journal durable** (la proyección por lista blanca `riskMultipliers` + `evidenceAxis` de
+`auto_adaptive_journal.py` queda **byte a byte igual**). El gobernador y su evidencia siguen **intactos**
+(diff vacío). **El sello del reparto NO se mueve: sigue en `auto18-v1`** (`DATA_GATE_POLICY_VERSION` sigue
+`auto15-v1`). El invariante que instala:
+
+> **Ninguna lectura de edge se publica como certeza ni como permiso.** La expectancy se publica con su
+> **intervalo de incertidumbre**; la **confianza de medición** (`confidence`, ya existente) se separa de la
+> **confianza de edge** (`edgeConfidence`); y ninguna de las dos mueve el reparto.
+
+`AUTO-18` publicaba **cuánto** se había medido (`confidence`/`coverage`/`effective_N`) y una expectancy
+encogida, pero **no** el **intervalo de incertidumbre** del número ni la **confianza de que haya edge**: un
+punto sin intervalo es una certeza disfrazada. Esta pasada cierra los dos huecos y añade una batería de
+validación:
+
+1. **Intervalo de incertidumbre (`bootstrap_episodes_v1`).** Bootstrap de **percentil** que remuestrea
+   **rachas de régimen** (episodios) **con reemplazo**, con **semilla declarada**: la incertidumbre respeta
+   la MISMA noción de independencia que `AUTO-18` fijó en la muestra efectiva (100 ciclos de una sola fase
+   no son 100 observaciones). El intervalo **contiene siempre a su punto**; sin ciclos medidos se declara
+   `no_cycles` y con menos de `min_episodes` rachas **no se fabrica intervalo** (`insufficient_episodes`).
+   `dispersion_r` (desviación de las medias bootstrap) da una lectura mínima de estabilidad.
+2. **`edgeConfidence` — un eje PROPIO.** `HIGH`/`MEDIUM`/`LOW`/`UNKNOWN` derivados del **signo del
+   intervalo frente a cero**, degradados un escalón (con suelo `LOW`) por cobertura baja, deterioro severo
+   o base del neto degradada, cada uno con su nota. `UNKNOWN` = no-medición, **nunca** un `LOW` por
+   defecto; `measurement=HIGH` con `edge=LOW` significa «sabemos bien que ahora mismo no hay edge».
+3. **Replay OOS estadístico (`statistical_oos_v1`).** Instrumento **puro y read-only** que parte cada
+   estrategia en tramo IS/OOS **cronológico**, re-aplica las estadísticas de decisión (shrinkage,
+   `effective_N`, banda, cobertura) sobre el IS y las compara con la expectancy **realizada** del OOS.
+   Responde con números y `sample` a las cuatro preguntas del auditor (**shrinkage**, **`effective_N`**,
+   **banda HIGH vs LOW** y **cobertura del régimen**) con veredicto
+   `supported`/`not_supported`/`inconclusive`; **nunca** emite veredicto sin muestra.
+
+### Añadido
+
+- **`auto_adaptive_uncertainty.py`** (nuevo, puro) — `ExpectancyInterval` (`bootstrap_episodes_v1`),
+  `edgeConfidence`, `AdaptiveUncertainty` por `strategyVersion` **y por celda `strategy × regime`**,
+  `percentile` determinista.
+- **`auto_adaptive_replay.py`** (nuevo, puro) — split IS/OOS cronológico, `ReplayCell`/`ReplayQuestion`/
+  `ReplayReport`, las cuatro preguntas y sus umbrales declarados (`REPLAY_*`).
+- **`scripts/research/auto_replay_battery.py`** (nuevo, sin PG) — CLI que emite el `ReplayReport` JSON por
+  stdout desde un JSON de ciclos (fixture determinista `auto_replay_cycles.json` por defecto).
+- **`auto_adaptive_confidence.py`** — promoción a **público** de `regime_episodes`, `coverage_band`,
+  `measured_r`, `regime_of` y `order_cycles_by_instant` (sin cambiar la semántica ni el resultado de
+  `AUTO-18`): un solo productor de la semántica de episodios.
+- **`auto_adaptive.py`** — `StrategyHealth.expectancy_interval`/`edge_confidence`, frame `uncertainty` en
+  el plan y claves nuevas `expectancyInterval`/`edgeConfidence` en `evidence_for` (**aditivas**).
+- **`auto_self_evaluation_feed.py`** — `build_adaptive_uncertainty_from_fills` (mismo material que
+  `AUTO-18`, sin segundo FIFO) y su consumo en `auto_simulation_worker.py`.
+- **Mutaciones `M149…M158`** (10 nuevas) en la sonda, con la matriz completa `M1…M158` corrida.
+- **Tests nuevos** `test_auto_adaptive_uncertainty.py` (20) y `test_auto_adaptive_replay.py` (16), más la
+  costura `test_auto_v60_auto19_uncertainty_seam.py` (lista explícita en los dos workflows de CI).
+
+### Compatibilidad
+
+- **Sin `uncertainty` el plan es byte-idéntico** a `AUTO-18`: el frame y las dos claves nuevas solo
+  aparecen cuando hay lectura, y los campos nuevos tienen defecto `None`.
+- La incertidumbre y el replay **no tocan la regla**: `recommend_allocation`/`_confidence_factor` y el
+  sello `auto18-v1` quedan intactos. La lectura es **evidencia publicada**, nunca un permiso.
+- El fixture del replay es **sintético y declarado**: mide el instrumento, no la estrategia real.
+
+### Sello (v2.60-beta) — CI real medida
+
+- **Tag anotado `v2.60-beta`** sobre el commit de fase **`cbd96bbe`**, `main` en **fast-forward**
+  (`9898c51a..cbd96bbe`), tag empujado **de uno en uno** (sin `--follow-tags`). **Sin migración**: la
+  guardia `_ALEMBIC_HEAD` sigue en `046_fill_reference_mid`, así que el tag cubre el paquete **a la
+  primera**, **sin rojos y sin flakes**.
+- **`Release tag CI`**
+  [`35999631671`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631671) **GREEN a la primera**
+  (`10 success` + `1 skipped`, `certify` en `success`); job `python` del tag **`2747 passed / 35 skipped`**
+  (**+46** passed y **0** skips nuevos sobre `v2.59`), ruff `All checks passed!`, import-linter
+  `4 kept, 0 broken` y mypy `Success: no issues found in 499 source files`.
+- **`Python CI` per-commit del tag**
+  [`35999631556`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999631556) **`5/5` jobs verdes**
+  (`quality` **`2736 passed / 38 skipped`**; los cuatro de PG incluidos: cierra el límite offline
+  declarado). `Python CI` de `main`
+  [`35999579254`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999579254) **`5/5` verdes** con el
+  mismo corte. `check-runs` del commit sellado: **`27` success + `1` skipped**.
+- **Delta testeado:** **+46** tests sobre `v2.59` en los dos cortes (job `python` `2701` → `2747`; `quality`
+  `2690` → `2736`), la cuenta exacta del tramo de la fase.
+- **PR de auditoría** [#69](https://github.com/jvelasca/Bolsa_V1/pull/69): `audit-base-v2.59-beta` @
+  `9898c51a` → `auto-19a-incertidumbre-edge-replay` @ `7d3c3f23` (**25 ficheros, `+10780/−21`**, 4 commits,
+  los tres últimos docs-only), **`10/10` checks `SUCCESS`** (job `quality` **`2736 passed / 38 skipped`**),
+  abierto **después** del sello y **no** vehículo de merge (`main` ya recibió la fase en fast-forward).
+
 ## [1.84.0-beta] — AUTO-18 Confianza estadística (V2.59) — 2026-09-24
 
 **Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI nueva, sin cambio de

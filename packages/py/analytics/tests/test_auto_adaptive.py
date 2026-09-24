@@ -15,6 +15,7 @@ rotación y sello de ``policy_version``.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -67,6 +68,9 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     AdaptiveConfidence,
     RegimeConfidence,
     StrategyConfidence,
+)
+from bolsa_analytics.cognitive.auto_adaptive_uncertainty import (
+    build_adaptive_uncertainty,
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_COST_BASIS_APPLIED,
@@ -1928,3 +1932,73 @@ def test_without_cells_the_cell_basis_is_declared_empty_and_stays_reproducible()
             "b": ADAPTIVE_CELL_NOTE_NOT_FOUND,
         },
     }
+
+
+# ── AUTO-19A — la incertidumbre es ADITIVA: no mueve la regla ni el sello ───────────
+
+
+def _uncertainty_cycles(version: str = "orb-1", count: int = 8) -> list[dict[str, object]]:
+    base = date(2026, 1, 1)
+    return [
+        {
+            "cycleId": f"{version}-{index}",
+            "strategyVersion": version,
+            "pnl": "5",
+            "riskAmount": "5",
+            "marketRegime": "TREND_UP" if index % 2 else "RANGE",
+            "closedAt": (base + timedelta(days=index)).isoformat() + "T15:30:00+00:00",
+            "cost": {"total": 0.0, "measurement": "COMPLETE", "costModelVersion": "cm1"},
+        }
+        for index in range(count)
+    ]
+
+
+def test_without_uncertainty_the_plan_is_byte_identical_to_auto18() -> None:
+    """La incertidumbre es evidencia ADITIVA: sin ella no cambia una sola clave del plan.
+
+    Es el invariante del ``AUTO-19A``: el sello del reparto sigue en ``auto18-v1`` y la lectura
+    nueva entra en un frame PROPIO y en dos claves nuevas de la evidencia, sin tocar la rotación,
+    los multiplicadores ni ninguna clave histórica.
+    """
+    rows = (_row("orb-1", decisive=True, expectancy="10", profit_factor=2.0),)
+    reading = _reading(_strategy_confidence("orb-1", effective_n=30))
+    uncertainty = build_adaptive_uncertainty(_uncertainty_cycles())
+
+    without = build_adaptive_plan(rows, "TREND_UP", confidence=reading)
+    with_uncertainty = build_adaptive_plan(
+        rows, "TREND_UP", confidence=reading, uncertainty=uncertainty
+    )
+
+    assert "uncertainty" not in without.as_dict(), "sin lectura, no nace la clave"
+    assert with_uncertainty.as_dict() == {
+        **without.as_dict(),
+        "uncertainty": uncertainty.as_dict(),
+    }
+    assert without.as_dict()["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto18-v1"
+    # El reparto y la rotación son EXACTAMENTE los mismos: la incertidumbre no es un permiso.
+    assert with_uncertainty.allocation.as_dict() == without.allocation.as_dict()
+    assert with_uncertainty.rotation.as_dict() == without.rotation.as_dict()
+
+
+def test_the_new_evidence_keys_appear_only_with_uncertainty_and_are_additive() -> None:
+    rows = (_row("orb-1", decisive=True, expectancy="10", profit_factor=2.0),)
+    reading = _reading(_strategy_confidence("orb-1", effective_n=30))
+    uncertainty = build_adaptive_uncertainty(_uncertainty_cycles())
+
+    without = build_adaptive_plan(rows, "TREND_UP", confidence=reading)
+    with_uncertainty = build_adaptive_plan(
+        rows, "TREND_UP", confidence=reading, uncertainty=uncertainty
+    )
+    base = without.evidence_for("orb-1")
+    enriched = with_uncertainty.evidence_for("orb-1")
+    row = uncertainty.uncertainty_for("orb-1")
+
+    assert base is not None and enriched is not None and row is not None
+    assert "expectancyInterval" not in base and "edgeConfidence" not in base
+    assert enriched["edgeConfidence"] == row.edge_confidence
+    assert enriched["expectancyInterval"] == row.interval.as_dict()
+    assert {
+        key: value
+        for key, value in enriched.items()
+        if key not in ("expectancyInterval", "edgeConfidence")
+    } == base

@@ -1,0 +1,6934 @@
+{
+  "note": "SYNTHETIC deterministic fixture for the AUTO-19A replay instrument; not durable production material.",
+  "cycles": [
+    {
+      "cycleId": "orb-trend-0000",
+      "strategyVersion": "orb-trend",
+      "pnl": "12.5151",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0001",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.4638",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0002",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.0398",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0003",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.1989",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0004",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.8723",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0005",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.8592",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0006",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.6987",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0007",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.5438",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0008",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.1451",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0009",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.3088",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0010",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.2244",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0011",
+      "strategyVersion": "orb-trend",
+      "pnl": "-4.8691",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0012",
+      "strategyVersion": "orb-trend",
+      "pnl": "11.6552",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0013",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.6807",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0014",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.068",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0015",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.0429",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0016",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.1957",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0017",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.5343",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0018",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.8706",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0019",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.6253",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0020",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.7701",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0021",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.0017",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0022",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.9709",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0023",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.7826",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0024",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.3905",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0025",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.6327",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0026",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.8103",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0027",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.0825",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0028",
+      "strategyVersion": "orb-trend",
+      "pnl": "-7.9417",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0029",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.699",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0030",
+      "strategyVersion": "orb-trend",
+      "pnl": "-11.6492",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0031",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.306",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0032",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.1774",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0033",
+      "strategyVersion": "orb-trend",
+      "pnl": "10.2136",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0034",
+      "strategyVersion": "orb-trend",
+      "pnl": "-4.1102",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0035",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.019",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0036",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.7316",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0037",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.3003",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0038",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.4052",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0039",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.1944",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0040",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.1051",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0041",
+      "strategyVersion": "orb-trend",
+      "pnl": "9.3056",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0042",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.5935",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0043",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.4237",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0044",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.398",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0045",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.2285",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0046",
+      "strategyVersion": "orb-trend",
+      "pnl": "-6.5349",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0047",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.4915",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0048",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.5801",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0049",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.8549",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0050",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.5129",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0051",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.5643",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0052",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.8358",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0053",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.871",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0054",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.4259",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0055",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.0701",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0056",
+      "strategyVersion": "orb-trend",
+      "pnl": "11.4241",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0057",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.1695",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0058",
+      "strategyVersion": "orb-trend",
+      "pnl": "-7.0717",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0059",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.6416",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0060",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.877",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0061",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.3714",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0062",
+      "strategyVersion": "orb-trend",
+      "pnl": "7.6017",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0063",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.3715",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0064",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.7025",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0065",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.1146",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0066",
+      "strategyVersion": "orb-trend",
+      "pnl": "8.434",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0067",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.8775",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0068",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.7192",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0069",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.6136",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0070",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.7023",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0071",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.9364",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0072",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.9639",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0073",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.2953",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0074",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.4607",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0075",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.9016",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0076",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.4043",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0077",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.4996",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0078",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.3128",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0079",
+      "strategyVersion": "orb-trend",
+      "pnl": "10.4349",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0080",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.2357",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0081",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.4488",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0082",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.8032",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0083",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.2094",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0084",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.8196",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0085",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.7829",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0086",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.0304",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0087",
+      "strategyVersion": "orb-trend",
+      "pnl": "-5.5699",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0088",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.1757",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0089",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.9434",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0090",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.197",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0091",
+      "strategyVersion": "orb-trend",
+      "pnl": "7.0847",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0092",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.6583",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0093",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.753",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0094",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.3733",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0095",
+      "strategyVersion": "orb-trend",
+      "pnl": "-8.7566",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0096",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.0671",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0097",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.2485",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0098",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.7468",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0099",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.5117",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0100",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.708",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0101",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.6494",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0102",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.4305",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0103",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.2434",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0104",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.7193",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0105",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.2009",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0106",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.8845",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0107",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.9305",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0108",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.4961",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0109",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.7856",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0110",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.9999",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0111",
+      "strategyVersion": "orb-trend",
+      "pnl": "14.3579",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0112",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.3378",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0113",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.3525",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0114",
+      "strategyVersion": "orb-trend",
+      "pnl": "-8.1901",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0115",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.2947",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0116",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.602",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0117",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.2323",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0118",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.5665",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0119",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.1722",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0120",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.2717",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0121",
+      "strategyVersion": "orb-trend",
+      "pnl": "10.6319",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0122",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.2833",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0123",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.3514",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0124",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.6125",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0125",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.517",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0126",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.4377",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0127",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.4104",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0128",
+      "strategyVersion": "orb-trend",
+      "pnl": "8.5075",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0129",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.0067",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0130",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.1867",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0131",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.933",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0132",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.0953",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0133",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.4147",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0134",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.5262",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0135",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.1438",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0136",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.1304",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0137",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.5733",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0138",
+      "strategyVersion": "orb-trend",
+      "pnl": "-5.9213",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0139",
+      "strategyVersion": "orb-trend",
+      "pnl": "9.0371",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0140",
+      "strategyVersion": "orb-trend",
+      "pnl": "10.1917",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0141",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.9179",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0142",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.5307",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0143",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.1705",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0144",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.7457",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0145",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.2219",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0146",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.6254",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0147",
+      "strategyVersion": "orb-trend",
+      "pnl": "7.203",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0148",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.4609",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0149",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.4269",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0150",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.1612",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0151",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.0657",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0152",
+      "strategyVersion": "orb-trend",
+      "pnl": "11.4851",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0153",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.8906",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0154",
+      "strategyVersion": "orb-trend",
+      "pnl": "-7.5903",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0155",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.6957",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0156",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.2476",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0157",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.1192",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0158",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.285",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0159",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.165",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0160",
+      "strategyVersion": "orb-trend",
+      "pnl": "7.1245",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0161",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.9867",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0162",
+      "strategyVersion": "orb-trend",
+      "pnl": "-4.1023",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0163",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.2389",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0164",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.3478",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0165",
+      "strategyVersion": "orb-trend",
+      "pnl": "-11.1664",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0166",
+      "strategyVersion": "orb-trend",
+      "pnl": "-4.7391",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0167",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.1212",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0168",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.0594",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0169",
+      "strategyVersion": "orb-trend",
+      "pnl": "-6.0682",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0170",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.7333",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0171",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.0471",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0172",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.5935",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0173",
+      "strategyVersion": "orb-trend",
+      "pnl": "7.7363",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0174",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.8023",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0175",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.7425",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0176",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.4588",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0177",
+      "strategyVersion": "orb-trend",
+      "pnl": "1.893",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0178",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.453",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0179",
+      "strategyVersion": "orb-trend",
+      "pnl": "-6.4619",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0180",
+      "strategyVersion": "orb-trend",
+      "pnl": "4.2561",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0181",
+      "strategyVersion": "orb-trend",
+      "pnl": "3.4293",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0182",
+      "strategyVersion": "orb-trend",
+      "pnl": "-3.5651",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0183",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.1932",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0184",
+      "strategyVersion": "orb-trend",
+      "pnl": "9.9608",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0185",
+      "strategyVersion": "orb-trend",
+      "pnl": "8.0885",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0186",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.6933",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0187",
+      "strategyVersion": "orb-trend",
+      "pnl": "-4.0515",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0188",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.1898",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0189",
+      "strategyVersion": "orb-trend",
+      "pnl": "2.5152",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0190",
+      "strategyVersion": "orb-trend",
+      "pnl": "-8.0013",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0191",
+      "strategyVersion": "orb-trend",
+      "pnl": "6.5851",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0192",
+      "strategyVersion": "orb-trend",
+      "pnl": "5.4354",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0193",
+      "strategyVersion": "orb-trend",
+      "pnl": "8.3921",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0194",
+      "strategyVersion": "orb-trend",
+      "pnl": "-0.2369",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0195",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.3037",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0196",
+      "strategyVersion": "orb-trend",
+      "pnl": "0.4514",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0197",
+      "strategyVersion": "orb-trend",
+      "pnl": "-1.1567",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0198",
+      "strategyVersion": "orb-trend",
+      "pnl": "-2.0411",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-trend-0199",
+      "strategyVersion": "orb-trend",
+      "pnl": "8.2359",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0000",
+      "strategyVersion": "orb-range",
+      "pnl": "0.5146",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0001",
+      "strategyVersion": "orb-range",
+      "pnl": "2.8497",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0002",
+      "strategyVersion": "orb-range",
+      "pnl": "5.6716",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0003",
+      "strategyVersion": "orb-range",
+      "pnl": "0.9141",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0004",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.6524",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0005",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.14",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0006",
+      "strategyVersion": "orb-range",
+      "pnl": "4.6256",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0007",
+      "strategyVersion": "orb-range",
+      "pnl": "3.1941",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0008",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.6913",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0009",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.0949",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0010",
+      "strategyVersion": "orb-range",
+      "pnl": "2.0678",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0011",
+      "strategyVersion": "orb-range",
+      "pnl": "5.1367",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0012",
+      "strategyVersion": "orb-range",
+      "pnl": "0.5188",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0013",
+      "strategyVersion": "orb-range",
+      "pnl": "2.7118",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0014",
+      "strategyVersion": "orb-range",
+      "pnl": "2.525",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0015",
+      "strategyVersion": "orb-range",
+      "pnl": "0.7162",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0016",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.4629",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0017",
+      "strategyVersion": "orb-range",
+      "pnl": "0.9124",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0018",
+      "strategyVersion": "orb-range",
+      "pnl": "0.0477",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0019",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.0572",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0020",
+      "strategyVersion": "orb-range",
+      "pnl": "4.2838",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0021",
+      "strategyVersion": "orb-range",
+      "pnl": "1.7398",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0022",
+      "strategyVersion": "orb-range",
+      "pnl": "3.308",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0023",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.5189",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0024",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.7842",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0025",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.6139",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0026",
+      "strategyVersion": "orb-range",
+      "pnl": "1.0462",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0027",
+      "strategyVersion": "orb-range",
+      "pnl": "1.8088",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0028",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.3141",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0029",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.713",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0030",
+      "strategyVersion": "orb-range",
+      "pnl": "3.7223",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0031",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.9574",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0032",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.1421",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0033",
+      "strategyVersion": "orb-range",
+      "pnl": "2.2984",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0034",
+      "strategyVersion": "orb-range",
+      "pnl": "5.6833",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0035",
+      "strategyVersion": "orb-range",
+      "pnl": "3.0161",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0036",
+      "strategyVersion": "orb-range",
+      "pnl": "-6.9996",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0037",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.5968",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0038",
+      "strategyVersion": "orb-range",
+      "pnl": "3.683",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0039",
+      "strategyVersion": "orb-range",
+      "pnl": "7.6103",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0040",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.6886",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0041",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.6193",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0042",
+      "strategyVersion": "orb-range",
+      "pnl": "3.7003",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0043",
+      "strategyVersion": "orb-range",
+      "pnl": "0.345",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0044",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.1041",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0045",
+      "strategyVersion": "orb-range",
+      "pnl": "0.8244",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0046",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.1289",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0047",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.6576",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0048",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.7396",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0049",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.8325",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0050",
+      "strategyVersion": "orb-range",
+      "pnl": "5.2114",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0051",
+      "strategyVersion": "orb-range",
+      "pnl": "1.6087",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0052",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.5115",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0053",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.8477",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0054",
+      "strategyVersion": "orb-range",
+      "pnl": "-6.2196",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0055",
+      "strategyVersion": "orb-range",
+      "pnl": "2.6818",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0056",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.115",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0057",
+      "strategyVersion": "orb-range",
+      "pnl": "6.3778",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0058",
+      "strategyVersion": "orb-range",
+      "pnl": "2.6463",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0059",
+      "strategyVersion": "orb-range",
+      "pnl": "4.461",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0060",
+      "strategyVersion": "orb-range",
+      "pnl": "0.3781",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0061",
+      "strategyVersion": "orb-range",
+      "pnl": "0.1052",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0062",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.3287",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0063",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.2327",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0064",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.3815",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0065",
+      "strategyVersion": "orb-range",
+      "pnl": "0.4746",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0066",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.7325",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0067",
+      "strategyVersion": "orb-range",
+      "pnl": "1.5043",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0068",
+      "strategyVersion": "orb-range",
+      "pnl": "3.7396",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0069",
+      "strategyVersion": "orb-range",
+      "pnl": "1.5203",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0070",
+      "strategyVersion": "orb-range",
+      "pnl": "3.48",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0071",
+      "strategyVersion": "orb-range",
+      "pnl": "10.6699",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0072",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.7741",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0073",
+      "strategyVersion": "orb-range",
+      "pnl": "2.3781",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0074",
+      "strategyVersion": "orb-range",
+      "pnl": "7.3181",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0075",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.5768",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0076",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.0742",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0077",
+      "strategyVersion": "orb-range",
+      "pnl": "0.5414",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0078",
+      "strategyVersion": "orb-range",
+      "pnl": "2.9049",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0079",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.5065",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0080",
+      "strategyVersion": "orb-range",
+      "pnl": "1.4119",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0081",
+      "strategyVersion": "orb-range",
+      "pnl": "1.7483",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0082",
+      "strategyVersion": "orb-range",
+      "pnl": "3.5217",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0083",
+      "strategyVersion": "orb-range",
+      "pnl": "1.7238",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-03-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0084",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.6895",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-03-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0085",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.8253",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0086",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.5456",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0087",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.9408",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0088",
+      "strategyVersion": "orb-range",
+      "pnl": "-7.145",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0089",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.6305",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0090",
+      "strategyVersion": "orb-range",
+      "pnl": "2.504",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0091",
+      "strategyVersion": "orb-range",
+      "pnl": "0.3983",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0092",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.8241",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0093",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.9927",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0094",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.9235",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0095",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.9678",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0096",
+      "strategyVersion": "orb-range",
+      "pnl": "3.2417",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0097",
+      "strategyVersion": "orb-range",
+      "pnl": "5.8791",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0098",
+      "strategyVersion": "orb-range",
+      "pnl": "2.212",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0099",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.8149",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0100",
+      "strategyVersion": "orb-range",
+      "pnl": "2.6496",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0101",
+      "strategyVersion": "orb-range",
+      "pnl": "9.4354",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0102",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.8732",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0103",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.6911",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0104",
+      "strategyVersion": "orb-range",
+      "pnl": "5.629",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0105",
+      "strategyVersion": "orb-range",
+      "pnl": "0.0398",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0106",
+      "strategyVersion": "orb-range",
+      "pnl": "2.3612",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0107",
+      "strategyVersion": "orb-range",
+      "pnl": "1.6764",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0108",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.2864",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0109",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.5086",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0110",
+      "strategyVersion": "orb-range",
+      "pnl": "4.5643",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0111",
+      "strategyVersion": "orb-range",
+      "pnl": "3.1148",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0112",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.0733",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0113",
+      "strategyVersion": "orb-range",
+      "pnl": "-7.5757",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-04-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0114",
+      "strategyVersion": "orb-range",
+      "pnl": "2.4616",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-04-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0115",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.7109",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0116",
+      "strategyVersion": "orb-range",
+      "pnl": "1.4416",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0117",
+      "strategyVersion": "orb-range",
+      "pnl": "4.7552",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0118",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.8034",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0119",
+      "strategyVersion": "orb-range",
+      "pnl": "10.2574",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0120",
+      "strategyVersion": "orb-range",
+      "pnl": "-6.0778",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0121",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.4838",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0122",
+      "strategyVersion": "orb-range",
+      "pnl": "11.4195",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0123",
+      "strategyVersion": "orb-range",
+      "pnl": "6.1723",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0124",
+      "strategyVersion": "orb-range",
+      "pnl": "0.3945",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0125",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.4884",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0126",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.826",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0127",
+      "strategyVersion": "orb-range",
+      "pnl": "2.3373",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0128",
+      "strategyVersion": "orb-range",
+      "pnl": "2.7895",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0129",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.0513",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0130",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.1021",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0131",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.977",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0132",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.7506",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0133",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.9965",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0134",
+      "strategyVersion": "orb-range",
+      "pnl": "4.2939",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0135",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.5075",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0136",
+      "strategyVersion": "orb-range",
+      "pnl": "4.4915",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0137",
+      "strategyVersion": "orb-range",
+      "pnl": "3.7405",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0138",
+      "strategyVersion": "orb-range",
+      "pnl": "1.8569",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0139",
+      "strategyVersion": "orb-range",
+      "pnl": "-6.6016",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0140",
+      "strategyVersion": "orb-range",
+      "pnl": "1.7636",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0141",
+      "strategyVersion": "orb-range",
+      "pnl": "3.2487",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0142",
+      "strategyVersion": "orb-range",
+      "pnl": "15.6363",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0143",
+      "strategyVersion": "orb-range",
+      "pnl": "3.5435",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-05-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0144",
+      "strategyVersion": "orb-range",
+      "pnl": "3.793",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0145",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.3563",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-05-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0146",
+      "strategyVersion": "orb-range",
+      "pnl": "3.9536",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0147",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.2268",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0148",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.7648",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0149",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.6593",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0150",
+      "strategyVersion": "orb-range",
+      "pnl": "0.141",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0151",
+      "strategyVersion": "orb-range",
+      "pnl": "7.2073",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0152",
+      "strategyVersion": "orb-range",
+      "pnl": "0.1746",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0153",
+      "strategyVersion": "orb-range",
+      "pnl": "4.5459",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0154",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.066",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0155",
+      "strategyVersion": "orb-range",
+      "pnl": "5.6866",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0156",
+      "strategyVersion": "orb-range",
+      "pnl": "3.4549",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0157",
+      "strategyVersion": "orb-range",
+      "pnl": "3.8559",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0158",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.315",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0159",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.1882",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0160",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.3703",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0161",
+      "strategyVersion": "orb-range",
+      "pnl": "6.3504",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0162",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.5062",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0163",
+      "strategyVersion": "orb-range",
+      "pnl": "8.6594",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0164",
+      "strategyVersion": "orb-range",
+      "pnl": "7.2516",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0165",
+      "strategyVersion": "orb-range",
+      "pnl": "2.3459",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0166",
+      "strategyVersion": "orb-range",
+      "pnl": "0.2599",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0167",
+      "strategyVersion": "orb-range",
+      "pnl": "2.4582",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0168",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.8337",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0169",
+      "strategyVersion": "orb-range",
+      "pnl": "4.1358",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0170",
+      "strategyVersion": "orb-range",
+      "pnl": "-10.2214",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0171",
+      "strategyVersion": "orb-range",
+      "pnl": "1.3771",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0172",
+      "strategyVersion": "orb-range",
+      "pnl": "-1.4862",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0173",
+      "strategyVersion": "orb-range",
+      "pnl": "6.3639",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-06-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0174",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.8088",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0175",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.4712",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-06-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0176",
+      "strategyVersion": "orb-range",
+      "pnl": "2.8419",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0177",
+      "strategyVersion": "orb-range",
+      "pnl": "4.7147",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0178",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.353",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0179",
+      "strategyVersion": "orb-range",
+      "pnl": "2.6966",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0180",
+      "strategyVersion": "orb-range",
+      "pnl": "2.7017",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0181",
+      "strategyVersion": "orb-range",
+      "pnl": "8.2399",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0182",
+      "strategyVersion": "orb-range",
+      "pnl": "3.7064",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0183",
+      "strategyVersion": "orb-range",
+      "pnl": "1.4948",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0184",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.5934",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0185",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.2069",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0186",
+      "strategyVersion": "orb-range",
+      "pnl": "4.1131",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0187",
+      "strategyVersion": "orb-range",
+      "pnl": "1.0785",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0188",
+      "strategyVersion": "orb-range",
+      "pnl": "-2.3124",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0189",
+      "strategyVersion": "orb-range",
+      "pnl": "5.047",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0190",
+      "strategyVersion": "orb-range",
+      "pnl": "-5.185",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0191",
+      "strategyVersion": "orb-range",
+      "pnl": "1.6699",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0192",
+      "strategyVersion": "orb-range",
+      "pnl": "3.4016",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0193",
+      "strategyVersion": "orb-range",
+      "pnl": "-3.5078",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0194",
+      "strategyVersion": "orb-range",
+      "pnl": "8.7026",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0195",
+      "strategyVersion": "orb-range",
+      "pnl": "2.6239",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0196",
+      "strategyVersion": "orb-range",
+      "pnl": "-4.0271",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0197",
+      "strategyVersion": "orb-range",
+      "pnl": "-7.3855",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-07-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0198",
+      "strategyVersion": "orb-range",
+      "pnl": "2.1882",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "orb-range-0199",
+      "strategyVersion": "orb-range",
+      "pnl": "-0.5461",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-07-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0000",
+      "strategyVersion": "mr-mean",
+      "pnl": "2.7628",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0001",
+      "strategyVersion": "mr-mean",
+      "pnl": "-1.1401",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0002",
+      "strategyVersion": "mr-mean",
+      "pnl": "0.3319",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0003",
+      "strategyVersion": "mr-mean",
+      "pnl": "-2.2367",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0004",
+      "strategyVersion": "mr-mean",
+      "pnl": "-0.0017",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0005",
+      "strategyVersion": "mr-mean",
+      "pnl": "-0.2005",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0006",
+      "strategyVersion": "mr-mean",
+      "pnl": "0.5049",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0007",
+      "strategyVersion": "mr-mean",
+      "pnl": "-4.3987",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0008",
+      "strategyVersion": "mr-mean",
+      "pnl": "-8.4722",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0009",
+      "strategyVersion": "mr-mean",
+      "pnl": "-1.4391",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0010",
+      "strategyVersion": "mr-mean",
+      "pnl": "-0.6748",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0011",
+      "strategyVersion": "mr-mean",
+      "pnl": "-3.9175",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0012",
+      "strategyVersion": "mr-mean",
+      "pnl": "-8.2083",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0013",
+      "strategyVersion": "mr-mean",
+      "pnl": "1.5116",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0014",
+      "strategyVersion": "mr-mean",
+      "pnl": "5.3318",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0015",
+      "strategyVersion": "mr-mean",
+      "pnl": "-1.4058",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0016",
+      "strategyVersion": "mr-mean",
+      "pnl": "-1.5624",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0017",
+      "strategyVersion": "mr-mean",
+      "pnl": "2.2417",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0018",
+      "strategyVersion": "mr-mean",
+      "pnl": "6.1421",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0019",
+      "strategyVersion": "mr-mean",
+      "pnl": "0.0731",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0020",
+      "strategyVersion": "mr-mean",
+      "pnl": "6.8103",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0021",
+      "strategyVersion": "mr-mean",
+      "pnl": "0.4608",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0022",
+      "strategyVersion": "mr-mean",
+      "pnl": "-6.1135",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0023",
+      "strategyVersion": "mr-mean",
+      "pnl": "-3.9811",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0024",
+      "strategyVersion": "mr-mean",
+      "pnl": "0.535",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0025",
+      "strategyVersion": "mr-mean",
+      "pnl": "-2.7391",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0026",
+      "strategyVersion": "mr-mean",
+      "pnl": "-3.6362",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0027",
+      "strategyVersion": "mr-mean",
+      "pnl": "-4.6688",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0028",
+      "strategyVersion": "mr-mean",
+      "pnl": "6.5304",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0029",
+      "strategyVersion": "mr-mean",
+      "pnl": "-0.606",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0030",
+      "strategyVersion": "mr-mean",
+      "pnl": "0.0011",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0031",
+      "strategyVersion": "mr-mean",
+      "pnl": "-1.255",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0032",
+      "strategyVersion": "mr-mean",
+      "pnl": "-8.0101",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0033",
+      "strategyVersion": "mr-mean",
+      "pnl": "-2.9535",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0034",
+      "strategyVersion": "mr-mean",
+      "pnl": "3.1164",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0035",
+      "strategyVersion": "mr-mean",
+      "pnl": "1.2335",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0036",
+      "strategyVersion": "mr-mean",
+      "pnl": "-0.8063",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0037",
+      "strategyVersion": "mr-mean",
+      "pnl": "2.1541",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0038",
+      "strategyVersion": "mr-mean",
+      "pnl": "1.8836",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0039",
+      "strategyVersion": "mr-mean",
+      "pnl": "3.4122",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0040",
+      "strategyVersion": "mr-mean",
+      "pnl": "-0.6901",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0041",
+      "strategyVersion": "mr-mean",
+      "pnl": "5.7147",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0042",
+      "strategyVersion": "mr-mean",
+      "pnl": "7.0293",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0043",
+      "strategyVersion": "mr-mean",
+      "pnl": "-2.4501",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-mean-0044",
+      "strategyVersion": "mr-mean",
+      "pnl": "-5.4243",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0000",
+      "strategyVersion": "mr-vol",
+      "pnl": "-4.5901",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0001",
+      "strategyVersion": "mr-vol",
+      "pnl": "5.1554",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0002",
+      "strategyVersion": "mr-vol",
+      "pnl": "6.5935",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0003",
+      "strategyVersion": "mr-vol",
+      "pnl": "0.1646",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0004",
+      "strategyVersion": "mr-vol",
+      "pnl": "-5.5156",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0005",
+      "strategyVersion": "mr-vol",
+      "pnl": "1.3383",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0006",
+      "strategyVersion": "mr-vol",
+      "pnl": "0.248",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0007",
+      "strategyVersion": "mr-vol",
+      "pnl": "8.1852",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0008",
+      "strategyVersion": "mr-vol",
+      "pnl": "-0.6292",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0009",
+      "strategyVersion": "mr-vol",
+      "pnl": "-0.2347",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0010",
+      "strategyVersion": "mr-vol",
+      "pnl": "3.6527",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0011",
+      "strategyVersion": "mr-vol",
+      "pnl": "2.0877",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0012",
+      "strategyVersion": "mr-vol",
+      "pnl": "9.3945",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0013",
+      "strategyVersion": "mr-vol",
+      "pnl": "0.8485",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0014",
+      "strategyVersion": "mr-vol",
+      "pnl": "6.739",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0015",
+      "strategyVersion": "mr-vol",
+      "pnl": "7.5742",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0016",
+      "strategyVersion": "mr-vol",
+      "pnl": "-5.0605",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0017",
+      "strategyVersion": "mr-vol",
+      "pnl": "7.0622",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0018",
+      "strategyVersion": "mr-vol",
+      "pnl": "-3.6319",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-24T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0019",
+      "strategyVersion": "mr-vol",
+      "pnl": "4.5006",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-25T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0020",
+      "strategyVersion": "mr-vol",
+      "pnl": "4.3912",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-26T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0021",
+      "strategyVersion": "mr-vol",
+      "pnl": "2.2843",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-27T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0022",
+      "strategyVersion": "mr-vol",
+      "pnl": "-6.4455",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-28T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0023",
+      "strategyVersion": "mr-vol",
+      "pnl": "6.1246",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-29T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0024",
+      "strategyVersion": "mr-vol",
+      "pnl": "-2.4849",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-30T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0025",
+      "strategyVersion": "mr-vol",
+      "pnl": "2.2896",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-31T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0026",
+      "strategyVersion": "mr-vol",
+      "pnl": "0.0905",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-01T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0027",
+      "strategyVersion": "mr-vol",
+      "pnl": "2.448",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-02T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0028",
+      "strategyVersion": "mr-vol",
+      "pnl": "7.5045",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-03T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0029",
+      "strategyVersion": "mr-vol",
+      "pnl": "1.7395",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-04T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0030",
+      "strategyVersion": "mr-vol",
+      "pnl": "0.4552",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-05T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0031",
+      "strategyVersion": "mr-vol",
+      "pnl": "-6.1811",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0032",
+      "strategyVersion": "mr-vol",
+      "pnl": "-0.9379",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0033",
+      "strategyVersion": "mr-vol",
+      "pnl": "-0.8677",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0034",
+      "strategyVersion": "mr-vol",
+      "pnl": "-5.3298",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0035",
+      "strategyVersion": "mr-vol",
+      "pnl": "-2.7186",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0036",
+      "strategyVersion": "mr-vol",
+      "pnl": "3.6686",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0037",
+      "strategyVersion": "mr-vol",
+      "pnl": "-3.4949",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0038",
+      "strategyVersion": "mr-vol",
+      "pnl": "0.8535",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0039",
+      "strategyVersion": "mr-vol",
+      "pnl": "4.2944",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0040",
+      "strategyVersion": "mr-vol",
+      "pnl": "9.1718",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0041",
+      "strategyVersion": "mr-vol",
+      "pnl": "1.2723",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-02-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0042",
+      "strategyVersion": "mr-vol",
+      "pnl": "5.6071",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0043",
+      "strategyVersion": "mr-vol",
+      "pnl": "-8.5234",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "mr-vol-0044",
+      "strategyVersion": "mr-vol",
+      "pnl": "-7.804",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-02-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0000",
+      "strategyVersion": "brk-scalp",
+      "pnl": "5.7892",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0001",
+      "strategyVersion": "brk-scalp",
+      "pnl": "0.5712",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0002",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-1.2648",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0003",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-4.493",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0004",
+      "strategyVersion": "brk-scalp",
+      "pnl": "4.0339",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0005",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-1.9351",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0006",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-8.5233",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0007",
+      "strategyVersion": "brk-scalp",
+      "pnl": "8.043",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0008",
+      "strategyVersion": "brk-scalp",
+      "pnl": "0.3689",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0009",
+      "strategyVersion": "brk-scalp",
+      "pnl": "5.311",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0010",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-3.5795",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0011",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-6.4521",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0012",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-6.3773",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0013",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-0.8247",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0014",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-0.849",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0015",
+      "strategyVersion": "brk-scalp",
+      "pnl": "-3.255",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0016",
+      "strategyVersion": "brk-scalp",
+      "pnl": "3.929",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-scalp-0017",
+      "strategyVersion": "brk-scalp",
+      "pnl": "3.562",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0000",
+      "strategyVersion": "brk-fade",
+      "pnl": "-2.3094",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0001",
+      "strategyVersion": "brk-fade",
+      "pnl": "6.172",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0002",
+      "strategyVersion": "brk-fade",
+      "pnl": "-5.8335",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0003",
+      "strategyVersion": "brk-fade",
+      "pnl": "0.5554",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0004",
+      "strategyVersion": "brk-fade",
+      "pnl": "-10.6699",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0005",
+      "strategyVersion": "brk-fade",
+      "pnl": "0.3432",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0006",
+      "strategyVersion": "brk-fade",
+      "pnl": "2.3159",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0007",
+      "strategyVersion": "brk-fade",
+      "pnl": "4.9981",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-13T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0008",
+      "strategyVersion": "brk-fade",
+      "pnl": "0.0038",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-14T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0009",
+      "strategyVersion": "brk-fade",
+      "pnl": "1.2483",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-15T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0010",
+      "strategyVersion": "brk-fade",
+      "pnl": "-1.6671",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-16T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0011",
+      "strategyVersion": "brk-fade",
+      "pnl": "3.5259",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-17T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0012",
+      "strategyVersion": "brk-fade",
+      "pnl": "-6.3823",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-18T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0013",
+      "strategyVersion": "brk-fade",
+      "pnl": "-0.3294",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-19T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0014",
+      "strategyVersion": "brk-fade",
+      "pnl": "-0.6309",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-20T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0015",
+      "strategyVersion": "brk-fade",
+      "pnl": "2.2575",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-21T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0016",
+      "strategyVersion": "brk-fade",
+      "pnl": "-5.3694",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-22T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "brk-fade-0017",
+      "strategyVersion": "brk-fade",
+      "pnl": "-4.4466",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-23T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "thin-edge-0000",
+      "strategyVersion": "thin-edge",
+      "pnl": "6.5531",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-06T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "thin-edge-0001",
+      "strategyVersion": "thin-edge",
+      "pnl": "0.2193",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-07T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "thin-edge-0002",
+      "strategyVersion": "thin-edge",
+      "pnl": "-1.2856",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-08T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "thin-edge-0003",
+      "strategyVersion": "thin-edge",
+      "pnl": "-0.3082",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-09T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "thin-edge-0004",
+      "strategyVersion": "thin-edge",
+      "pnl": "4.7783",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-10T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "thin-edge-0005",
+      "strategyVersion": "thin-edge",
+      "pnl": "-1.7918",
+      "riskAmount": "5",
+      "marketRegime": "TREND_UP",
+      "closedAt": "2025-01-11T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    },
+    {
+      "cycleId": "thin-edge-0006",
+      "strategyVersion": "thin-edge",
+      "pnl": "5.9538",
+      "riskAmount": "5",
+      "marketRegime": "RANGE",
+      "closedAt": "2025-01-12T15:30:00+00:00",
+      "cost": {
+        "total": 0.2,
+        "measurement": "COMPLETE",
+        "costModelVersion": "v1"
+      }
+    }
+  ]
+}

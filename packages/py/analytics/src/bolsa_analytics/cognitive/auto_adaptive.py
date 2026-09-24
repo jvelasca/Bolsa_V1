@@ -86,6 +86,11 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
     RegimeConfidence,
     StrategyConfidence,
 )
+from bolsa_analytics.cognitive.auto_adaptive_uncertainty import (
+    AdaptiveUncertainty,
+    ExpectancyInterval,
+    StrategyUncertainty,
+)
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_COST_BASIS_MIXED,
     SELF_EVAL_COST_MODEL_MIXED,
@@ -448,6 +453,15 @@ class StrategyHealth:
     #: motor de confianza (read-only). Es la MEDIDA del encogimiento; el factor **aplicado** al peso
     #: vive en el reparto (``AllocationPlan.shrink_factors``), que es otro hecho.
     shrunk_expectancy_r: float | None = None
+    #: AUTO-19A — el INTERVALO de incertidumbre de la expectancy (bootstrap por EPISODIOS) tal como
+    #: lo publica ``auto_adaptive_uncertainty``. ``None`` cuando el llamante no aportó la lectura:
+    #: la ausencia se declara, nunca se disfraza de intervalo estrecho. Es evidencia publicada: no
+    #: mueve la rotación ni el reparto.
+    expectancy_interval: ExpectancyInterval | None = None
+    #: AUTO-19A — la confianza de EDGE (``HIGH``/``MEDIUM``/``LOW``/``UNKNOWN``): eje PROPIO y
+    #: distinto de ``confidence`` (que mide cuán bien se MIDIÓ). ``UNKNOWN`` = no hay medición
+    #: bastante, que NO es lo mismo que un edge bajo. ``None`` sin lectura de incertidumbre.
+    edge_confidence: str | None = None
 
     @classmethod
     def from_evaluation(
@@ -456,12 +470,15 @@ class StrategyHealth:
         *,
         regime_cells: Sequence[StrategyRegimeEvaluation] = (),
         confidence: StrategyConfidence | None = None,
+        uncertainty: StrategyUncertainty | None = None,
     ) -> StrategyHealth:
-        """Proyecta la fila de self-evaluation y, si se aportan, sus celdas y su confianza.
+        """Proyecta la fila de self-evaluation y, si se aportan, sus celdas, su confianza e incertidumbre.
 
         El régimen sale del cruce ``strategy × regime`` del mismo informe: la fila sola no
         lo sabe. Sin celdas (o con el régimen no determinado) queda ``UNKNOWN``. La confianza
-        (AUTO-12) se adjunta por ``strategyVersion``; sin ella los campos quedan ``None``.
+        (AUTO-12) se adjunta por ``strategyVersion``; sin ella los campos quedan ``None``. La
+        incertidumbre (``AUTO-19A``) trae el intervalo y la confianza de EDGE: sin ella, los dos
+        campos quedan ``None`` y la evidencia es byte-idéntica a la de ``AUTO-18``.
         """
         regime, undetermined = declared_regime(regime_cells, row.strategy_version)
         return cls(
@@ -501,6 +518,14 @@ class StrategyHealth:
             shrunk_expectancy_r=(
                 confidence.shrunk_expectancy_r if confidence is not None else None
             ),
+            # AUTO-19A: el intervalo y la confianza de EDGE del mismo material. Sin lectura de
+            # incertidumbre quedan ``None`` y ni la evidencia ni el plan publican sus claves.
+            expectancy_interval=(
+                uncertainty.interval if uncertainty is not None else None
+            ),
+            edge_confidence=(
+                uncertainty.edge_confidence if uncertainty is not None else None
+            ),
         )
 
 
@@ -509,13 +534,15 @@ def build_strategy_health(
     *,
     by_regime: Sequence[StrategyRegimeEvaluation] = (),
     confidence: AdaptiveConfidence | None = None,
+    uncertainty: AdaptiveUncertainty | None = None,
 ) -> tuple[StrategyHealth, ...]:
     """Proyección read-only de las filas de self-evaluation al contrato de Adaptive.
 
     ``by_regime`` son las celdas del cruce ``strategy × regime`` del MISMO informe: son la
     única fuente del régimen determinado (la fila de estrategia no lo lleva). ``confidence``
-    (AUTO-12) adjunta la confianza estadística por versión; sin ella el plan es idéntico al
-    histórico.
+    (AUTO-12) adjunta la confianza estadística por versión; ``uncertainty`` (``AUTO-19A``)
+    adjunta el intervalo y la confianza de EDGE del mismo material. Sin ellas el plan es
+    idéntico al histórico.
     """
     cells = tuple(by_regime)
     return tuple(
@@ -525,6 +552,11 @@ def build_strategy_health(
             confidence=(
                 confidence.confidence_for(row.strategy_version)
                 if confidence is not None
+                else None
+            ),
+            uncertainty=(
+                uncertainty.uncertainty_for(row.strategy_version)
+                if uncertainty is not None
                 else None
             ),
         )
@@ -752,6 +784,11 @@ class AdaptivePlan:
     #: ``health.confidence = LOW`` es un estado legal y perfectamente legible
     #: (``ACTIVE`` + datos ``DEGRADED`` + calidad ``LOW``, el ejemplo del §29).
     shrinkage: bool = True
+    #: AUTO-19A — la lectura de INCERTIDUMBRE del mismo material (intervalo por EPISODIOS +
+    #: ``edgeConfidence`` por estrategia y celda). ``None`` cuando el llamante no la aportó:
+    #: entonces ni ``evidence_for`` ni ``as_dict()`` publican sus claves y el plan es byte-idéntico
+    #: al de ``AUTO-18``. Es evidencia publicada, nunca un permiso: no mueve la regla.
+    uncertainty: AdaptiveUncertainty | None = None
 
     def is_paused(self, strategy_version: str) -> bool:
         return self.rotation.is_paused(strategy_version)
@@ -795,7 +832,7 @@ class AdaptivePlan:
         row = self.health_for(strategy_version)
         if row is None:
             return None
-        return {
+        evidence: dict[str, Any] = {
             "decisive": row.decisive,
             "trades": row.trades,
             "expectancyCurrency": (
@@ -829,9 +866,18 @@ class AdaptivePlan:
             "shrunkExpectancyR": row.shrunk_expectancy_r,
             "shrinkFactor": self.allocation.shrink_factors.get(row.strategy_version),
         }
+        if row.expectancy_interval is not None or row.edge_confidence is not None:
+            # AUTO-19A: el intervalo y la confianza de EDGE son claves NUEVAS y solo viajan cuando
+            # hay lectura de incertidumbre: sin ella la evidencia (y el journal durable que la
+            # proyecta) queda byte-idéntica a la de ``AUTO-18``.
+            evidence["expectancyInterval"] = (
+                None if row.expectancy_interval is None else row.expectancy_interval.as_dict()
+            )
+            evidence["edgeConfidence"] = row.edge_confidence
+        return evidence
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "key": ADAPTIVE_KEY,
             "readOnly": self.read_only,
             "policyVersion": self.policy_version,
@@ -860,6 +906,12 @@ class AdaptivePlan:
                 "fallback": dict(sorted(self.allocation.cell_fallback.items())),
             },
         }
+        if self.uncertainty is not None:
+            # AUTO-19A: frame PROPIO de incertidumbre (intervalo por episodios + ``edgeConfidence``),
+            # con campo nuevo y en el nivel del plan. Solo aparece con lectura: sin ella el plan es
+            # byte-idéntico al de ``AUTO-18``.
+            payload["uncertainty"] = self.uncertainty.as_dict()
+        return payload
 
 
 def _pause_reason(health: StrategyHealth, adverse: bool, policy: AdaptivePolicy) -> str | None:
@@ -1351,6 +1403,7 @@ def build_adaptive_plan(
     confidence: AdaptiveConfidence | None = None,
     recovery: Mapping[str, RecoveryEvidence] | None = None,
     shrink: bool = True,
+    uncertainty: AdaptiveUncertainty | None = None,
 ) -> AdaptivePlan:
     """(PURA) plan Adaptive completo: rotación + asignación sobre las mismas filas.
 
@@ -1370,6 +1423,12 @@ def build_adaptive_plan(
     trampa de ``AUTO-12`` con ``confidence=None``, repetida. Quien pausa y reactiva sigue
     siendo ``recommend_rotation``: el estado operativo (``RECOVERING``) es **derivado**, no un
     cuarto modo de la rotación.
+
+    ``uncertainty`` (``AUTO-19A``) es OPCIONAL por el MISMO contrato: aporta el intervalo de
+    incertidumbre y la confianza de EDGE del material ya medido y los publica en la evidencia y en
+    el frame ``uncertainty`` del plan. **No toca la regla**: sin él, el plan es byte-idéntico al de
+    ``AUTO-18``, y con él los multiplicadores y la rotación son los mismos (la incertidumbre no
+    mueve el reparto; solo lo documenta).
     """
     resolved = policy or AdaptivePolicy()
     cells = tuple(by_regime)
@@ -1419,7 +1478,9 @@ def build_adaptive_plan(
         by_regime=cells,
         regime=regime,
     )
-    health = build_strategy_health(by_strategy, by_regime=cells, confidence=confidence)
+    health = build_strategy_health(
+        by_strategy, by_regime=cells, confidence=confidence, uncertainty=uncertainty
+    )
     return AdaptivePlan(
         rotation=rotation,
         allocation=allocation,
@@ -1429,6 +1490,9 @@ def build_adaptive_plan(
         operational_states=operational,
         recovery=readings,
         shrinkage=shrink,
+        # AUTO-19A: la lectura de incertidumbre viaja en el plan (frame propio). Sin ella queda
+        # ``None`` y ni ``as_dict()`` ni ``evidence_for`` cambian una sola clave.
+        uncertainty=uncertainty,
         # §20: quién NO tiene régimen de cruce determinado. Se DERIVA de la salud —el par
         # ``(regime, motivo)`` se conserva en ``StrategyHealth``— en vez de recalcular el cruce
         # aquí: un segundo cálculo podría divergir del que usó la rotación. Ordenada por versión:
