@@ -307,4 +307,44 @@ vehículo de merge: `main` ya la recibió en **fast-forward**.
 
 **Se mide, no se predice:** el run del tag no existe hasta que el tag se empuja, así que estas cifras se
 añaden en el **commit de docs posterior al sello** (mismo patrón que `AUTO-13`…`AUTO-16`), citando cada
-una el run que la produjo.
+una el run que la produjo. **Commit sellado:** `72f6084a` (tag anotado `v2.58-beta`); `main` recibió la
+fase en **fast-forward** (`7b664fb6..72f6084a`).
+
+### 11.1 El CI del tag salió VERDE **a la primera** (la head no se movió: sin migración)
+
+**Contraste medido con `v2.56`:** aquel sello obligó a un **fix + re-sello** porque la guardia
+`_ALEMBIC_HEAD` no se bumpeó con la migración `045`. **`AUTO-17` no migra**, así que la guardia **no**
+cambió (`046_fill_reference_mid`) y no había ese rojo posible: el primer —y único— empuje del tag cerró
+en **verde**, con los **cuatro** jobs PG del per-commit en `success`. **No hubo re-sello.**
+
+### 11.2 Cifras medidas del sello
+
+| Corte | Run | Resultado |
+| --- | --- | --- |
+| `Release tag CI` (`72f6084a`) | [`35976693458`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976693458) | **GREEN a la primera**: **`10 success` + `1 skipped`** (`playwright (integrated E2E, opt-in)`) y `certify (aggregate + artifact)` en `success` |
+| `python` del tag | job del run anterior | ruff **`All checks passed!`** · mypy **`Success: no issues found in 499 source files`** · pytest **`2668 passed / 35 skipped`** (**+19** passed y **0** skips nuevos sobre los `2649 / 35` de `v2.57`; los **+19** son exactamente los tests nuevos de la fase) |
+| `Python CI` del tag (per-commit) | [`35976693477`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976693477) | **`5/5` jobs `success`**: `quality`, `auto-v2-durable-pg`, `grammar-discovery-pg`, `paper-forward-pg` y `lifecycle-pg` |
+| `Python CI` de `main` (per-commit) | [`35976683023`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976683023) | **`5/5` jobs `success`**; job `quality` **`2657 passed / 38 skipped`** |
+| `check-runs` del commit sellado `72f6084a` | API de checks | **`total_count = 37`** ⇒ **`36 success` + `1 skipped`** |
+
+### 11.3 El límite declarado del §7, cerrado por la CI del tag
+
+El §7 declaró dos cosas que **no** se podían medir en esta máquina: (a) los runs de CI —«no existen hasta
+empujar»— y (b) la batería **completa con PG real** del tag, cuyas suites PG necesitan PostgreSQL. **El tag
+las cierra las dos**: `2668 passed / 35 skipped` en el job `python` del tag, `2657 passed / 38 skipped` en
+el `quality` del per-commit y **`5/5`** jobs verdes en los dos `Python CI` (los cuatro de PG incluidos,
+que son justo los que la batería offline del §7 **no** puede correr). **Cero rojos y cero skips nuevos**
+respecto de `v2.57`.
+
+### 11.4 La ruta sin migración: qué NO se movió (medido)
+
+- `_ALEMBIC_HEAD` (`test_discovery_evidence_snapshot_pg.py:43`) = **`046_fill_reference_mid`** (idéntico).
+- `git diff` del gobernador (`v2_43_governor_evidence.py`) y del contrato durable
+  (`auto_adaptive_journal.py`) ⇒ **vacíos**.
+- `DATA_GATE_POLICY_VERSION` = **`auto15-v1`** (intacto).
+
+### 11.5 La superficie de auditoría post-sello
+
+El PR draft [#67](https://github.com/jvelasca/Bolsa_V1/pull/67)
+(`auto-17-integridad-poblacion-medida` → `audit-base-v2.57-beta`) se abrió **después** del sello; su diff
+es **exactamente** el commit de la fase y **no** es vehículo de merge (`main` ya lo recibió).

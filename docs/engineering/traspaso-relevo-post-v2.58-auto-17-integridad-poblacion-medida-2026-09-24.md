@@ -33,6 +33,7 @@ sonda (`M32`, `M122`, `M125`) y **un realineo adicional** de `M128`, todos publi
 | Compuertas | ruff **`All checks passed!`** · mypy **`0` errores** · import-linter **`4 kept, 0 broken`** |
 | Tramo de la fase | **`245 passed`** en las ocho suites tocadas, `0` rojos |
 | Matriz de mutaciones | **`M1…M138`** (`138/138` muerden) — ver §5 |
+| Sello | **`v2.58-beta`** = `72f6084a` (`Release tag CI` `35976693458` **GREEN**; `main` en fast-forward `7b664fb6..72f6084a`) |
 | Freeze | `auto_adaptive_journal.py` y `v2_43_governor_evidence.py`: **diff vacío**; `governor.json` sin trackear |
 | Flag Adaptive | **OFF** (sin plan, sin lectura, sin encogimiento) |
 
@@ -138,6 +139,15 @@ sonda (`M32`, `M122`, `M125`) y **un realineo adicional** de `M128`, todos publi
 - **Delta simétrico:** ver pack §7 (fichero a fichero, con los rojos declarados de antemano y solo ésos).
 - **Matriz COMPLETA `M1…M138`:** corrida entera (`138/138` muerden, `0` fragmentos ausentes, restauración
   byte a byte, huella idéntica). **Cuatro realineos declarados** (`M32`, `M122`, `M125`, `M128`).
+- **Sello `v2.58-beta` (`72f6084a`):** `Release tag CI`
+  [`35976693458`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976693458) **GREEN a la primera**
+  (`10 success` + `1 skipped`, `certify` en `success`), job `python` del tag **`2668 passed / 35 skipped`**
+  (**+19** sobre `v2.57`, **0** skips nuevos), `Python CI` per-commit del tag
+  [`35976693477`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976693477) y de `main`
+  [`35976683023`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976683023) **`5/5`** jobs verdes (los
+  cuatro de PG incluidos), `check-runs` del commit sellado **`36 success` + `1 skipped`** (`total_count = 37`).
+  **No hubo re-sello** (sin migración, la guardia de head no se movió). PR de auditoría
+  [#67](https://github.com/jvelasca/Bolsa_V1/pull/67) abierto post-sello.
 
 ---
 
