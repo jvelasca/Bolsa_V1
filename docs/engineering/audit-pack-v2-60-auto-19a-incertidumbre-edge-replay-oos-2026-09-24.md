@@ -199,6 +199,26 @@ uv run --no-sync python scripts/research/auto_replay_battery.py
   esta máquina). Las **cierra** la CI del tag (ver §11). Esta fase **no** añade tests PG: no hay migración
   ni lectura durable nueva.
 
+### 7.1 Re-verificación post-sello, sobre el árbol sellado (2026-09-24, 17:5x)
+
+Las cifras de arriba **no** son de la corrida pre-sello: se **re-midieron después de sellar**, sobre el
+mismo árbol que ve el auditor, y salieron **idénticas**. Es la prueba de que el paquete de docs y el
+realineo de anclas (docs-only) no tocaron ni una medida:
+
+| Comprobación | Resultado re-medido |
+| --- | --- |
+| Freeze: `git diff` del gobernador y de `auto_adaptive_journal.py` | **vacío** (los dos) |
+| Ficheros congelados **dentro** del diff del PR (`audit-base-v2.59-beta..` head) | **ninguno** (lista vacía) |
+| `ADAPTIVE_POLICY_VERSION` / `DATA_GATE_POLICY_VERSION` | **`auto18-v1`** / **`auto15-v1`** (`auto_adaptive_data_gate.py:76`) |
+| `_ALEMBIC_HEAD` | **`046_fill_reference_mid`** |
+| ruff / import-linter / mypy | **`All checks passed!`** / **`4 kept, 0 broken`** / **`0/499`** |
+| Tramo de la fase | **`271 passed`** (4.45 s), `0` rojos |
+| Verdes del replay sobre el fixture | **6 celdas**, `notes=['skipped_strategy:thin-edge']`, veredictos **`supported` / `supported` / `not_supported` / `inconclusive`** (muestras `6/6/4/6`) |
+
+Los **cuatro veredictos** salen **distintos entre sí**: que una pregunta **refute** y otra se declare
+**inconclusa** es la prueba de que el instrumento **no** es un sello de goma. El orden de la corrida es
+**el declarado** en §5: el **instrumento** se mide; la estrategia **no** (el fixture es sintético).
+
 ## 8. Límites declarados (no silenciosos)
 
 - **El intervalo es un bootstrap por EPISODIOS: una cota conservadora declarada**, no una varianza
