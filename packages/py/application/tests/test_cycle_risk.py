@@ -12,8 +12,14 @@ from decimal import Decimal
 
 import pytest
 
+from bolsa_analytics.cognitive.auto_self_evaluation import (
+    SELF_EVAL_COST_BASIS_APPLIED,
+    SELF_EVAL_COST_BASIS_ESTIMATED,
+    cycle_r,
+)
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
+    MEASUREMENT_PARTIAL,
     MEASUREMENT_UNKNOWN,
 )
 from bolsa_analytics.cognitive.portfolio_reservation import (
@@ -24,6 +30,7 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     PortfolioReservation,
     TradingCost,
 )
+from bolsa_application.applied_cost import applied_cost_from_fills
 from bolsa_application.auto_self_evaluation_feed import build_auto_self_evaluation
 from bolsa_application.cycle_risk import (
     CYCLE_RISK_MULTIPLE_RESERVATIONS,
@@ -33,6 +40,7 @@ from bolsa_application.cycle_risk import (
     CYCLE_RISK_WITHOUT_RISK,
     CycleRisk,
     apply_cycle_risk,
+    attach_applied_cost,
     cycle_risk_from_reservations,
 )
 from bolsa_application.sim_durable_store import SimFillFinanceContext
@@ -84,6 +92,7 @@ def _fill(
     *,
     execution_id: str,
     cycle_id: str | None = "cyc-1",
+    reference_mid: str | None = None,
 ) -> SimFillFinanceContext:
     return SimFillFinanceContext(
         execution_id=execution_id,
@@ -91,6 +100,7 @@ def _fill(
         side=side,
         quantity=Decimal(qty),
         price=Decimal(price),
+        reference_mid=reference_mid,
         strategy_version_id="orb-1",
         cycle_id=cycle_id,
     )
@@ -497,3 +507,107 @@ def test_a_cycle_without_measurement_does_not_become_a_zero_r_in_the_report() ->
 
     assert row.expectancy_r is None
     assert row.expectancy_currency is not None, "lo que sí se midió sigue publicado"
+
+
+# ── AUTO-16 — la fricción APLICADA por el simulador ─────────────────────────────────
+
+
+def _round_trip_with_reference(*, reference: str | None = "100") -> list[SimFillFinanceContext]:
+    """Ida y vuelta de 10 unidades con (o sin) el mid de referencia persistido."""
+    return [
+        _fill("buy", "10", "100.15", execution_id="e1", reference_mid=reference),
+        _fill("sell", "10", "99.90", execution_id="e2", reference_mid=reference),
+    ]
+
+
+def test_attach_applied_cost_is_the_identity_without_applied_evidence() -> None:
+    """Sin evidencia aplicada, el mapa queda TAL CUAL (misma disciplina que ``AUTO-9``)."""
+    evidence = cycle_risk_from_reservations(["cyc-1"], [_reservation(risk=250.0)])
+
+    assert attach_applied_cost(evidence, None) == evidence
+    assert attach_applied_cost(evidence, {}) == evidence
+
+
+def test_only_a_complete_round_trip_is_attached_to_the_cycle() -> None:
+    """Un ``PARTIAL`` es un SUELO: se declara su medición y NO se pega como número."""
+    evidence = cycle_risk_from_reservations(["cyc-1"], [_reservation(risk=250.0)])
+    half = applied_cost_from_fills(["cyc-1"], [_fill("buy", "10", "100.15", execution_id="e1",
+                                                    reference_mid="100")])
+
+    attached = attach_applied_cost(evidence, half)["cyc-1"]
+
+    assert half["cyc-1"].measurement == MEASUREMENT_PARTIAL
+    assert attached.cost_applied is None, "medio viaje no es el coste del ciclo"
+    assert attached.cost_applied_measurement == MEASUREMENT_PARTIAL, "el hueco se declara"
+    assert attached.to_cycle_fields() == {"riskAmount": Decimal("250.0")}
+
+
+def test_a_leg_without_reference_leaves_the_applied_cost_unmeasured() -> None:
+    """Sin referencia persistida no hay fricción que afirmar — jamás un ``0``."""
+    evidence = cycle_risk_from_reservations(["cyc-1"], [_reservation(risk=250.0)])
+    applied = applied_cost_from_fills(["cyc-1"], _round_trip_with_reference(reference=None))
+
+    attached = attach_applied_cost(evidence, applied)["cyc-1"]
+
+    assert applied["cyc-1"].friction is None
+    assert attached.cost_applied is None
+    assert attached.cost_applied_measurement == MEASUREMENT_UNKNOWN
+    assert attached.cost_applied != 0, "una referencia ausente nunca vale fricción cero"
+
+
+def test_the_cycle_row_carries_the_applied_friction_with_its_measurement() -> None:
+    """La fila publica el número Y su medición: sin la segunda, un suelo pasaría por total."""
+    evidence = cycle_risk_from_reservations(["cyc-1"], [_reservation(risk=250.0)])
+    applied = applied_cost_from_fills(["cyc-1"], _round_trip_with_reference())
+    attached = attach_applied_cost(evidence, applied)["cyc-1"]
+
+    fields = attached.to_cycle_fields()
+
+    assert attached.cost_applied == Decimal("2.500000")  # 1.5 de la compra + 1.0 de la venta
+    assert fields["costApplied"] == {
+        "friction": "2.500000",
+        "measurement": MEASUREMENT_COMPLETE,
+    }
+    assert attached.as_dict()["costAppliedMeasurement"] == MEASUREMENT_COMPLETE
+
+
+def test_an_applied_cost_of_another_cycle_is_ignored() -> None:
+    """No se fabrica evidencia de un ciclo que no se pidió medir."""
+    evidence = cycle_risk_from_reservations(["cyc-1"], [_reservation(risk=250.0)])
+    applied = applied_cost_from_fills(["cyc-2"], _round_trip_with_reference())
+
+    attached = attach_applied_cost(evidence, applied)
+
+    assert attached["cyc-1"].cost_applied is None
+
+
+def test_the_net_comes_from_the_applied_friction_and_declares_its_basis() -> None:
+    """El neto deja de salir de la SUPOSICIÓN del decisor cuando hay fricción medida."""
+    evidence = _evidence_for_cycles(["cyc-1"], [_reservation(risk=250.0, cost=_cost(total=25.0))])
+
+    report = build_auto_self_evaluation(
+        fills=_round_trip_with_reference(), min_trades=1, cycle_risk=evidence
+    )
+    row = report.by_strategy[0]
+
+    # pnl = 10 × (99.90 − 100.15) = −2.5; aplicado = 2.5 + comisión del modelo 5.0 ⇒ −10 / 250
+    assert row.net_expectancy_r == pytest.approx(-0.04)
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_APPLIED
+    assert report.by_regime[0].net_r_basis == SELF_EVAL_COST_BASIS_APPLIED
+    assert report.as_dict()["byStrategy"][0]["netRBasis"] == SELF_EVAL_COST_BASIS_APPLIED
+
+
+def test_without_reference_the_net_is_the_estimated_number_of_v2_56() -> None:
+    """El camino sin aplicado publica el MISMO número que ``v2.56`` y lo DECLARA."""
+    evidence = _evidence_for_cycles(["cyc-1"], [_reservation(risk=250.0, cost=_cost(total=25.0))])
+
+    row = build_auto_self_evaluation(
+        fills=_round_trip_with_reference(reference=None), min_trades=1, cycle_risk=evidence
+    ).by_strategy[0]
+    legacy = cycle_r(
+        pnl=Decimal("-2.5"), risk_amount=Decimal("250.0"), cost=_cost(total=25.0)
+    )
+
+    assert row.net_expectancy_r == legacy.net_r_multiple, "byte a byte: el estimado de siempre"
+    assert row.net_expectancy_r == pytest.approx(-0.11)
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_ESTIMATED, "la base viaja en la lectura"

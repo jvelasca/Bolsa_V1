@@ -272,7 +272,7 @@ async def test_the_published_evidence_keeps_its_declared_frame() -> None:
     assert set(payload["allocation"]) == {"riskMultipliers", "evidenceAxis"}
     assert payload["operationalStates"] == {"orb-1": ADAPTIVE_STATE_RECOVERING}
     assert payload["recovery"]["orb-1"]["step"] == pytest.approx(0.25)
-    assert payload["policyVersion"] == "auto14-v1"
+    assert payload["policyVersion"] == "auto16-v1"
 
 
 @pytest.mark.asyncio

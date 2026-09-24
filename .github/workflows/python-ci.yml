@@ -206,6 +206,11 @@ jobs:
         # pase de directorio de analytics) corren aquí; la costura del reinicio
         # (``apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py``) entra por
         # el pase de directorio de ``apps/api-python/tests``.
+        # V2.57/AUTO-16 (referencia del fill): los puros del espejo durable y del coste
+        # aplicado (``packages/py/application/tests/test_sim_fill_reference.py`` y
+        # ``.../test_applied_cost.py``) van EXPLÍCITOS por el mismo motivo (ese directorio no
+        # tiene pase aquí). La certificación PG (migración 046 + la referencia sobresaliendo a
+        # una sesión nueva) vive en el job ``auto-v2-durable-pg`` con gate fail-if-skipped.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -245,6 +250,8 @@ jobs:
           packages/py/application/tests/test_auto_adaptive_recovery.py
           packages/py/application/tests/test_auto_cycle_reconciliation.py
           packages/py/application/tests/test_adaptive_gate_store.py
+          packages/py/application/tests/test_sim_fill_reference.py
+          packages/py/application/tests/test_applied_cost.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
@@ -293,6 +300,7 @@ jobs:
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           --ignore=apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
+          --ignore=apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -533,6 +541,11 @@ jobs:
       # certifica contra PG real (roundtrip de la 045 + otra sesión leyendo la racha); sin
       # PG el test skipearía en mudo e invalidaría la certificación.
       ADAPTIVE_GATE_PG_REQUIRED: '1'
+      # V2.57/AUTO-16 (referencia del fill): la fricción que el SIMULADOR aplicó se mide con
+      # el ``reference_mid`` que el settlement persiste (migración 046). Solo se certifica
+      # contra PG real (roundtrip de la 046 + otra sesión recomponiendo la fricción de las
+      # dos patas del ciclo); sin PG el test skipearía en mudo e invalidaría la medición.
+      APPLIED_COST_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -550,7 +563,7 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Alembic upgrade head (hasta 045 incluida)
+      - name: Alembic upgrade head (hasta 046 incluida)
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
       # V2.40.2: ``pipefail`` es obligatorio. Con ``... | tee log`` el step devuelve el
@@ -568,6 +581,10 @@ jobs:
       # que SOBREVIVE al reinicio (otra sesión) y el gate que sigue en ``STALE``, el
       # incremento atómico por clave y el reset que no amplifica.
       # Gate fail-if-skipped: ADAPTIVE_GATE_PG_REQUIRED=1.
+      # V2.57/AUTO-16: la referencia del fill (migración 046) — roundtrip, la referencia que
+      # SOBREVIVE al reinicio (otra sesión) y la fricción aplicada recompuesta de las DOS
+      # patas del ciclo, más la lectura por ciclo que no cruza cuentas.
+      # Gate fail-if-skipped: APPLIED_COST_PG_REQUIRED=1.
       - name: Pytest AUTO 2.0 durable PG (fail if skipped)
         run: |
           set -o pipefail
@@ -579,6 +596,7 @@ jobs:
             apps/api-python/tests/test_portfolio_reservation_pg.py \
             apps/api-python/tests/test_auto_v44_exit_identity_pg.py \
             apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py \
+            apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py \
             apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 

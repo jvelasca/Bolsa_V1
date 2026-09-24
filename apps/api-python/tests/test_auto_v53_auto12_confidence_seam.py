@@ -254,17 +254,18 @@ async def test_without_instants_the_gap_is_declared_at_tick_level(
     assert "confidence gaps" in caplog.text
 
 
-def test_the_policy_used_by_the_worker_seals_the_auto14_rule() -> None:
+def test_the_policy_used_by_the_worker_seals_the_auto16_rule() -> None:
     """La política del tick es la MISMA que sella el plan: no hay una copia paralela.
 
-    ``auto13-v1`` selló el techo de la rampa de reincorporación; ``AUTO-14`` la sube a ``auto14-v1``
-    al repartir por la celda ``strategy × regime`` del tick, así que el sello se actualiza con nombre
-    (es el único rojo admisible del delta simétrico).
+    ``auto14-v1`` selló el reparto por la celda ``strategy × regime``; ``AUTO-16`` la sube a
+    ``auto16-v1`` al cambiar la procedencia del coste que descuenta el R neto (aplicado vs.
+    estimado), así que el sello se actualiza con nombre (es el único rojo admisible del delta
+    simétrico).
     """
     worker = _worker(store=None, reservations=None)
     policy = worker._v2_adaptive_policy()
 
-    assert policy.policy_version == "auto14-v1"
+    assert policy.policy_version == "auto16-v1"
     assert policy.confidence_prior > 0
     assert policy.recovery_steps[0] > 0
 

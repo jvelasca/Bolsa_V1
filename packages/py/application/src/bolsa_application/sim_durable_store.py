@@ -61,6 +61,21 @@ def _to_decimal(raw: object) -> Decimal | None:
         return None
 
 
+def usable_reference_mid(raw: object) -> Decimal | None:
+    """(PURA, AUTO-16) el mid de referencia UTILIZABLE, o ``None`` si no describe un precio.
+
+    El mid de referencia es un PRECIO: un ``0`` o un negativo no describen ninguno, y
+    aceptarlos convertiría la fricción aplicada en un número inventado (``|price − 0|``
+    sería el precio entero). Un valor inservible se declara como "no hay referencia",
+    jamás como una referencia de cero. Devuelve ``Decimal`` para que el mismo hecho no
+    viaje con dos tipos distintos.
+    """
+    value = _to_decimal(raw)
+    if value is None or not value.is_finite() or value <= 0:
+        return None
+    return value
+
+
 async def _commit_if(session: Any, autocommit: bool) -> None:
     """V2.24.2 (P2-B) — commit condicional.
 
@@ -85,6 +100,10 @@ class SimFillFinanceContext:
     side: str  # "buy" | "sell" (minúsculas)
     quantity: Decimal
     price: Decimal
+    # V2.57 / AUTO-16 — mid de REFERENCIA con el que el simulador construyó ``price``
+    # (migración 046). ``None`` = no se midió (fila anterior a 2.57, o un mid inválido):
+    # la fricción aplicada NO se puede afirmar. Nunca un ``0``: diría "fricción gratis".
+    reference_mid: Decimal | None = None
     account_id: str | None = None
     venue: str = "simulated"
     idempotency_key: str | None = None
@@ -110,6 +129,12 @@ class SimFillFinanceContext:
             raise ValueError("quantity debe ser > 0")
         if self.price <= 0:
             raise ValueError("price debe ser > 0")
+        # AUTO-16: un mid de referencia que no es un precio (ausente, ``NaN``, ``≤ 0``) NO
+        # se convierte en un ``0`` —diría "fricción gratis"— ni tumba el settlement del
+        # fill (que sí es un hecho). Se DECLARA sin referencia: la fricción aplicada de ese
+        # fill pasa a ser un hueco, que es exactamente lo que se sabe de él. Y se normaliza
+        # a ``Decimal`` para que el mismo hecho no viaje con dos tipos distintos.
+        object.__setattr__(self, "reference_mid", usable_reference_mid(self.reference_mid))
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +187,19 @@ class SimFillFinanceContextStore(Protocol):
         *,
         account_id: str | None = None,
         limit: int | None = None,
+    ) -> list[SimFillFinanceContext]: ...
+
+    # AUTO-16: los fills de un CICLO financiero (``cycle_id``, migración 044). Es la costura
+    # con la que la fricción APLICADA se recompone ciclo a ciclo —incluida la pata de ENTRADA,
+    # liquidada en otro tick y por tanto invisible para la memoria del turno—. Un ciclo sin
+    # filas NO aparece: el hueco lo declara el llamante, no se rellena con una fricción de
+    # ceros. Con ``account_id`` se acota la lectura (una fila de otra cuenta no casa nunca).
+    async def list_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Sequence[str],
+        *,
+        limit: int = 500,
     ) -> list[SimFillFinanceContext]: ...
 
 
@@ -255,6 +293,33 @@ class InMemorySimFillFinanceContextStore:
             and (account_id is None or row.account_id == account_id)
         ]
         rows.sort(key=lambda r: r.execution_id)
+        if limit is not None and limit > 0:
+            rows = rows[:limit]
+        return rows
+
+    async def list_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Sequence[str],
+        *,
+        limit: int = 500,
+    ) -> list[SimFillFinanceContext]:
+        """Fills de esos ciclos (AUTO-16), con el mismo contrato que el store PG.
+
+        ``cycle_ids`` vacío ⇒ ``[]`` sin recorrer nada. Solo filas que declaran el ciclo —una
+        fila sin ``cycle_id`` (anterior a ``2.47``) no casa nunca— y, con ``account_id``, solo
+        las de esa cuenta: un fill de otra cuenta no puede aportar la fricción de este ciclo.
+        """
+        wanted = {str(c).strip() for c in cycle_ids if str(c).strip()}
+        if not wanted:
+            return []
+        rows = [
+            row
+            for row in self._rows.values()
+            if str(row.cycle_id or "").strip() in wanted
+            and (account_id is None or row.account_id == account_id)
+        ]
+        rows.sort(key=lambda r: (str(r.cycle_id), r.execution_id))
         if limit is not None and limit > 0:
             rows = rows[:limit]
         return rows
@@ -379,6 +444,7 @@ class PostgresSimFillFinanceContextStore:
                 side=context.side,
                 quantity=context.quantity,
                 price=context.price,
+                reference_mid=context.reference_mid,
                 account_id=context.account_id,
                 venue=context.venue,
                 strategy_version_id=context.strategy_version_id,
@@ -413,6 +479,7 @@ class PostgresSimFillFinanceContextStore:
             side=row.side,
             quantity=row.quantity,
             price=row.price,
+            reference_mid=getattr(row, "reference_mid", None),
             account_id=row.account_id,
             venue=row.venue,
             idempotency_key=row.idempotency_key,
@@ -452,6 +519,7 @@ class PostgresSimFillFinanceContextStore:
                 side=row.side,
                 quantity=row.quantity,
                 price=row.price,
+                reference_mid=getattr(row, "reference_mid", None),
                 account_id=row.account_id,
                 venue=row.venue,
                 idempotency_key=row.idempotency_key,
@@ -499,6 +567,63 @@ class PostgresSimFillFinanceContextStore:
                 side=row.side,
                 quantity=row.quantity,
                 price=row.price,
+                reference_mid=getattr(row, "reference_mid", None),
+                account_id=row.account_id,
+                venue=row.venue,
+                idempotency_key=row.idempotency_key,
+                strategy_version_id=row.strategy_version_id,
+                cycle_id=getattr(row, "cycle_id", None),
+                created_at=getattr(row, "created_at", None),
+            )
+            for row in rows
+        ]
+
+    async def list_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Sequence[str],
+        *,
+        limit: int = 500,
+    ) -> list[SimFillFinanceContext]:
+        """Fills de esos ciclos financieros (AUTO-16), en orden de ejecución.
+
+        La costura que ata el fill a su ciclo (``cycle_id``, migración ``044``) y devuelve el
+        material completo de la fricción APLICADA: la pata de ENTRADA y la de SALIDA. Cuál
+        agregue el llamante es su decisión, no del store.
+
+        ``cycle_ids`` vacío ⇒ ``[]`` sin consultar la base. Las filas sin ciclo (``NULL``,
+        anteriores a ``2.47``) no casan nunca: "anterior a 2.47" no es un ciclo. Con
+        ``account_id`` se acota en SQL (una fila de otra cuenta no puede aportar la fricción
+        de este ciclo); sin él se lee sin filtro de cuenta —el llamante declara ese alcance—.
+        """
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+
+        wanted = [str(c).strip() for c in cycle_ids if str(c).strip()]
+        if not wanted:
+            return []
+        stmt = (
+            select(SimFillFinanceContextRow)
+            .where(SimFillFinanceContextRow.cycle_id.in_(wanted))
+            .order_by(
+                SimFillFinanceContextRow.created_at.asc(),
+                SimFillFinanceContextRow.execution_id.asc(),
+            )
+        )
+        if account_id is not None:
+            stmt = stmt.where(SimFillFinanceContextRow.account_id == account_id)
+        if limit is not None and limit > 0:
+            stmt = stmt.limit(limit)
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [
+            SimFillFinanceContext(
+                execution_id=row.execution_id,
+                instrument_id=row.instrument_id,
+                side=row.side,
+                quantity=row.quantity,
+                price=row.price,
+                reference_mid=getattr(row, "reference_mid", None),
                 account_id=row.account_id,
                 venue=row.venue,
                 idempotency_key=row.idempotency_key,

@@ -2,6 +2,124 @@
 
 All notable releases of Bolsa V1.
 
+## [1.82.0-beta] — AUTO-16 Coste REAL por ciclo (V2.57) — 2026-09-24
+
+**Migración nueva** `046_fill_reference_mid`: Alembic head `045_adaptive_gate_state` → **`046_fill_reference_mid`**
+(aditiva, **una columna `NULL`able, sin backfill**, `upgrade`/`downgrade` **simétricos e idempotentes**). Sin
+SHORT, sin UI nueva, sin cambio de contrato de API ni de DTO y **sin clave nueva en el journal durable** (la
+proyección por lista blanca `riskMultipliers` + `evidenceAxis` de `auto_adaptive_journal.py:58` queda **byte a
+byte igual**). El gobernador y su evidencia siguen **intactos** (diff vacío). El invariante que instala: **el R
+neto declara su BASE** — el coste que descuenta el cociente puede venir del **decisor** (estimado) o del
+**simulador** (fricción **APLICADA**, medida contra el mid con el que construyó el precio), y dos netos con el
+mismo aspecto y distinta base **no son comparables**:
+
+```
+reserva (coste ESTIMADO 25.0) ─┐
+fills SIM (fricción APLICADA 2.5, con su mid de referencia) ─┴─► R neto = pnl − ¿cuál de los dos?
+```
+
+`AUTO-9` medía el R con el coste que el **decisor supuso**, y el que el **simulador aplicó** no entraba nunca…
+y **no era reconstruible**: el mid de referencia vivía en la memoria del tick que construyó el precio y se
+tiraba, así que la pata de **entrada** de un ciclo (liquidada en otro tick) habría quedado fuera de cualquier
+cálculo en memoria. Si la base no viaja con el número, un cambio de procedencia se lee como un cambio de
+rendimiento **justo en el eje con el que `AUTO-12`/`AUTO-13`/`AUTO-14` encogen, rampean y reparten capital**.
+Cierra la **octava pregunta del epic**: `AUTO-9` *«¿cuánto vale?»* · `AUTO-10` *«¿de qué ciclo es?»* · `AUTO-11`
+*«¿dónde vive su memoria?»* · `AUTO-12` *«¿cuánto puedo creérmelo?»* · `AUTO-13` *«¿están sanos los datos con
+los que me lo creo, y cómo vuelvo?»* · `AUTO-14` *«¿el peso que reparto se midió en el régimen en el que voy a
+operar?»* · `AUTO-15` *«¿sobrevive esa prueba a un reinicio?»* · **`AUTO-16` *«el coste que descuenta el neto,
+¿es el que se pagó o el que se supuso?»***. Adaptive **sigue siendo recomendador read-only** y **el flag sigue
+OFF por defecto**: con OFF el plan, el journal y la API son **byte a byte iguales** a `v2.56`.
+
+### Añadido: la referencia cruda del fill (migración `046`) y el lector por ciclo
+
+- **Migración `046_fill_reference_mid`** (`packages/py/infrastructure/alembic/versions/046_fill_reference_mid.py`):
+  una columna `reference_mid` `Numeric(18,6)` `NULL`able en `sim_fill_finance_context`, **idempotente** (el
+  patrón `_column_exists` de las `028`–`045`) y con `downgrade` **simétrico**. **Sin backfill:** no hay valor
+  que inventar para las filas anteriores — la ausencia de referencia **es** el hecho, y un `0` de relleno
+  diría «fricción gratis» en todo el histórico.
+- **Fila ORM** `SimFillFinanceContextRow.reference_mid` (`tables.py:2248`).
+- **Campo en el contexto** `SimFillFinanceContext.reference_mid` (`sim_durable_store.py:106`) con
+  **normalización única** (`usable_reference_mid`, `:64`): un valor que no describe un precio (`None`, `NaN`,
+  `≤ 0`) se guarda como **ausencia**, **nunca** como un `0`, y uno usable se normaliza a `Decimal` para que el
+  mismo hecho no viaje con dos tipos. Y **no** tumba el settlement del fill (el fill es un hecho; su
+  referencia puede faltar).
+- **Escritura**: `simulated_settlement.py:331` pasa el `base_mid` del schedule y
+  `sim_finance_context.persist_fill_finance_context(reference_mid=...)` (`:45`/`:61`/`:78`) lo persiste en la
+  **misma** escritura del settlement que ya existía (**cero I/O nuevo**, **cero filas nuevas**).
+- **Lector por ciclo** `list_by_cycle_ids` en los dos stores (`sim_durable_store.py:300` memoria, `:581` PG):
+  **lector de verificación** del reinicio, **no** del turno (el tick nunca lo llama).
+- **Guardia de head**: `_ALEMBIC_HEAD` se bumpea `045` → `046` **en el mismo paso**
+  (`apps/api-python/tests/test_discovery_evidence_snapshot_pg.py:43`), que es exactamente el rojo que obligó a
+  **re-sellar** `v2.56`.
+
+### Añadido: el módulo puro `applied_cost` (la fricción que el simulador APLICÓ)
+
+- `packages/py/application/src/bolsa_application/applied_cost.py`: `applied_leg` (`:157`) mide la fricción de
+  **una** pata desde su precio y su mid de referencia —el signo se **mide** por dirección (comprar por encima
+  del mid cuesta; vender por debajo también), el monto es una **magnitud** (un **coste**, nunca una rebaja) y
+  una pata favorable se **declara** (`applied_cost_favourable_leg`) en vez de restar—; `_cycle_applied_cost`
+  (`:200`) agrega el ciclo **exigiendo ida y vuelta** (media ida y vuelta es un **SUELO**: restarlo
+  sobrestimaría el R del ciclo, así que se declara `PARTIAL` y no entra al neto); `applied_cost_from_fills`
+  (`:244`) devuelve **una entrada por ciclo pedido**, con sus huecos declarados, y `applied_cost_is_complete`
+  (`:274`) es el predicado del `COMPLETE`.
+- **Sin `0` fabricado:** una pata sin referencia queda **sin medir** (y su motivo en la nota), jamás con
+  fricción cero.
+
+### Añadido: la base declarada (`costApplied`/`costBasis`/`netRBasis`) y el sello `auto16-v1`
+
+- **`cycle_risk.py`**: `CycleRisk.cost_applied` + `cost_applied_measurement` (`:145`/`:157`), publicados por
+  `to_cycle_fields` (`:161`, `costApplied` **con su medición**) y el pegador **puro** `attach_applied_cost`
+  (`:348`): **solo un aplicado `COMPLETE` se pega**; sin evidencia aplicada el mapa se devuelve **tal cual**
+  (la ruta sin productor queda intacta).
+- **Un solo punto de cableado, sin I/O nuevo** (`auto_self_evaluation_feed.py:214`,
+  `_risk_with_applied_cost`): los fills que el tick **ya** leía llevan su `reference_mid`, así que la fricción
+  aplicada se recompone con **aritmética pura**. Por ese punto pasan las tres lecturas que lo consumen
+  —informe `AUTO-7`, confianza `AUTO-12` y rampa `AUTO-13`—: un segundo productor podría medir un coste
+  distinto en silencio.
+- **`auto_self_evaluation.py`**: `CycleR.cost_applied`/`cost_basis` (`:416`/`:420`), `cycle_r` (`:435`) que
+  compone el neto **con la comisión del MODELO** (`:195`: el schedule del simulador **no cobra comisión** —en
+  SIM la comisión realizada es `0`—, así que restar solo la fricción dejaría el neto **más alto** por un motivo
+  que no es una mejor ejecución, sino una parte del coste que se dejó fuera; **sin comisión cuantificada no se
+  compone a medias** y el neto vuelve al estimado completo), `_net_r_basis` (`:1124`) y `netRBasis` en las dos
+  filas del informe (`:768`/`:839`, con **defecto seguro** `None` = «no declarada»).
+- **Sello**: `ADAPTIVE_POLICY_VERSION` → **`auto16-v1`** (`auto_adaptive.py:175`). **No** cambia la regla
+  —ninguna condición de `_allocation_weights` se toca— pero **sí la procedencia de un input** del eje del R
+  neto. El sello **sí se compara** sobre el journal (las filas históricas quedan declaradas como de otra
+  política); el sello del **gate no se toca** (`DATA_GATE_POLICY_VERSION` sigue `auto15-v1`).
+- **Desviación declarada respecto al plan** (y más estricta): el plan decía «persistencia… gateado por el
+  flag»; la implementación **persiste siempre** —es la MISMA escritura del settlement, sin I/O nuevo— y lo que
+  el flag gatea es su **uso**. Gatear la escritura dejaría un hueco **permanente** en el histórico el día que se
+  encienda la lectura.
+
+### Verificación y sello
+
+- **Unit nuevos**: `test_applied_cost.py` (**9**) y `test_sim_fill_reference.py` (**9**).
+- **Costura nueva con CONTROL** `apps/api-python/tests/test_auto_v57_auto16_applied_cost_seam.py` (**9**): la
+  fricción de las **dos** patas llega al neto que lee el plan (`1.16` vs el `1.09` del estimado), **sin
+  `reference_mid`** el neto es **el número de `v2.56` byte a byte** y su hueco queda declarado, **sin comisión**
+  no se compone a medias, la pata de **otro tick** se compone, el aplicado **mueve los pesos** del reparto
+  (la consecuencia que justifica el sello), y **cero I/O nuevo** (una lectura de fills por versión y **cero**
+  por ciclo).
+- **PG real nuevo** `apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py` (**5**, job
+  `auto-v2-durable-pg` con `APPLIED_COST_PG_REQUIRED=1`): roundtrip de la `046` (`upgrade`/`downgrade`), la
+  `reference_mid` **sobrevive a una sesión nueva**, la fricción **se recompone fuera del proceso** que la midió,
+  una fila sin referencia se declara sin fricción (jamás `0`) y la lectura por ciclo **no cruza cuentas**.
+- **Tramo de la fase**: **`105 passed`** (`+5` PG), **0** rojos. **Delta simétrico fichero a fichero** contra
+  `HEAD`: **9 rojos declarados y solo ésos** — **4** por el **sello** y **5** por la **guardia de head**—, más
+  **un defecto medido y corregido dentro de la fase** (el campo `netRBasis` se añadió **sin defecto** y produjo
+  **76 rojos** `TypeError`; se corrigió a defecto `None` = «no declarada», el trato de `sinkFailuresDurable`).
+- **Mutaciones**: **10 etiquetas nuevas `M119…M128`** y la corrida **COMPLETA** da **`128/128` medidas**, **`0`**
+  en `NADA`, **`0`** fragmentos ausentes, restauración **byte a byte** y huella `git status` **idéntica**.
+- **Compuertas**: `ruff` **`All checks passed!`**, `mypy` **`0` errores / `499` ficheros** (el módulo puro
+  nuevo), `lint-imports` **`4 kept, 0 broken`**.
+- **Límites declarados**: la comisión **aplicada** no existe en SIM (el neto se completa con la del modelo y la
+  base lo nombra); **sin backfill**; **solo se persiste la referencia**, no la fricción; la referencia se mide
+  contra el mid **del simulador**; **sin UI** y **sin SHORT**; `governor.json` sin trackear.
+- **Sello**: tag anotado **`v2.57-beta`** sobre el commit del paquete de cierre, `main` en **fast-forward**; las
+  cifras de su `Release tag CI` se citan en el commit de sello inmediatamente posterior (tabla en el §11 del
+  [audit-pack](./docs/engineering/audit-pack-v2-57-auto-16-coste-real-por-ciclo-2026-09-24.md)) y **PR de
+  auditoría [#66](https://github.com/jvelasca/Bolsa_V1/pull/66)** abierto post-sello.
+
 ## [1.81.0-beta] — AUTO-15 Data Gate persistido (V2.56) — 2026-09-23
 
 **Migración nueva** `045_adaptive_gate_state`: Alembic head `044_auto_cycle_trace` → **`045_adaptive_gate_state`**

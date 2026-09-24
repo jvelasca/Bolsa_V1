@@ -759,17 +759,18 @@ def test_regime_cells_change_the_allocation_declaration_but_never_the_rotation()
     )
 
 
-def test_the_policy_version_seals_the_auto14_evidence_contract() -> None:
-    """No es tautología: un merge que devolviera ``auto13-v1`` movería el sello sin avisar.
+def test_the_policy_version_seals_the_auto16_evidence_contract() -> None:
+    """No es tautología: un merge que devolviera ``auto14-v1`` movería el sello sin avisar.
 
-    ``auto13-v1`` selló el techo de la rampa de reincorporación. ``AUTO-14`` vuelve a cambiar la regla
-    de asignación —el peso de una versión que ya competía sale de su celda ``strategy × regime``
-    cuando está medida—, así que la versión sube con ella: es lo que hace reproducible el plan (dos
-    planes iguales no pueden venir de una base de reparto distinta sin que se note).
+    ``auto14-v1`` selló el peso por celda. ``AUTO-16`` **no cambia la regla** —ninguna condición de
+    la asignación se toca—, pero sí la procedencia de un input del eje del R neto: el coste que el
+    neto descuenta deja de ser siempre el estimado y pasa a ser, cuando está medido, el que el
+    simulador aplicó (``costApplied``/``costBasis``). Dos planes con la misma evidencia pueden
+    diferir en los pesos por eso, y sin subir el sello esa diferencia sería invisible.
     """
-    assert ADAPTIVE_POLICY_VERSION == "auto14-v1"
-    assert AdaptivePolicy().policy_version == "auto14-v1"
-    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto14-v1"
+    assert ADAPTIVE_POLICY_VERSION == "auto16-v1"
+    assert AdaptivePolicy().policy_version == "auto16-v1"
+    assert build_adaptive_plan((_row("v1"),), "TREND_UP").as_dict()["policyVersion"] == "auto16-v1"
 
 
 # ── AUTO-12 — confianza estadística en el reparto (encogimiento por muestra) ────────
@@ -1253,7 +1254,7 @@ def test_the_operational_states_travel_in_their_own_field_without_mixing_axes() 
     assert payload["recovery"]["a"]["step"] == pytest.approx(0.25)
     assert "b" not in payload["recovery"], "una pausada no publica rampa"
     assert payload["readOnly"] is True
-    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto14-v1"
+    assert payload["policyVersion"] == ADAPTIVE_POLICY_VERSION == "auto16-v1"
     assert plan.health_for("a").confidence == "HIGH", "la calidad estadística va en su propio campo"
 
 

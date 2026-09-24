@@ -333,11 +333,12 @@ async def test_the_journal_projection_is_byte_identical_with_a_cell_present() ->
 
 
 def test_the_seal_bump_declares_a_stale_gate_and_never_resets_the_failure_counter() -> None:
-    """El sello ``auto14-v1`` marca la evidencia histórica como de otra política: se DECLARA.
+    """Cada subida del sello marca la evidencia histórica como de otra política: se DECLARA.
 
-    Es la consecuencia medida de subir la versión de política, no una relajación del contrato de
-    ``AUTO-11``: el gate la declara ``STALE`` (una política distinta rigió esas filas), y por eso
-    **no** se apagan las protecciones ni se resetea el contador de fallos del proceso.
+    Es la consecuencia medida de subir la versión de política (``auto14-v1`` → ``auto16-v1`` en
+    ``AUTO-16``), no una relajación del contrato de ``AUTO-11``: el gate la declara ``STALE`` (una
+    política distinta rigió esas filas), y por eso **no** se apagan las protecciones ni se resetea el
+    contador de fallos del proceso.
     """
     worker = _worker(store=None)
     worker._v2_adaptive_state_reading = AdaptiveStateReading(policy_version_mismatch=True)

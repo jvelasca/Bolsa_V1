@@ -20,6 +20,10 @@ import pytest
 
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     AUTO_SELF_EVALUATION_KEY,
+    SELF_EVAL_COST_BASIS_APPLIED,
+    SELF_EVAL_COST_BASIS_ESTIMATED,
+    SELF_EVAL_COST_BASIS_MIXED,
+    SELF_EVAL_COST_BASIS_UNDECLARED,
     SELF_EVAL_COST_UNMEASURED,
     SELF_EVAL_CYCLE_WITHOUT_IDENTITY,
     SELF_EVAL_DRAWDOWN_SHARE_PROXY,
@@ -61,6 +65,9 @@ def _cycle(
     regime: str | None = None,
     risk: str | None = None,
     cost: object | None = None,
+    cost_applied: object | None = None,
+    cost_basis: str | None = None,
+    net_r: float | None = None,
 ) -> dict[str, object]:
     """Ciclo mínimo con SOLO lo que el test declara (el resto queda ausente)."""
     row: dict[str, object] = {"strategyVersion": version}
@@ -72,6 +79,8 @@ def _cycle(
         row["closedAt"] = closed_at
     if r is not None:
         row["rMultiple"] = r
+    if net_r is not None:
+        row["netRMultiple"] = net_r
     if mfe is not None or mae is not None:
         row["mfeMae"] = {"mfeR": mfe, "maeR": mae}
     if slippage is not None:
@@ -82,6 +91,10 @@ def _cycle(
         row["reservedRisk"] = risk
     if cost is not None:
         row["cost"] = cost
+    if cost_applied is not None:
+        row["costApplied"] = cost_applied
+    if cost_basis is not None:
+        row["costBasis"] = cost_basis
     return row
 
 
@@ -390,9 +403,17 @@ def test_as_dict_is_serializable_and_declares_read_only() -> None:
 # ── AUTO-9 — el R de un ciclo (paso 3 del plan `v2.50`) ─────────────────────────────
 
 
-def _cost(total: float | None = 12.5) -> dict[str, object]:
-    """Un ``TradingCost.to_dict()`` mínimo: solo lo que el cálculo del R necesita."""
-    return {"total": total, "measurement": "COMPLETE" if total is not None else "PARTIAL"}
+def _cost(total: float | None = 12.5, *, commission: float | None = 5.0) -> dict[str, object]:
+    """Un ``TradingCost.to_dict()`` mínimo: solo lo que el cálculo del R necesita.
+
+    ``commission`` va aparte de ``total`` porque el neto aplicado se compone con ELLA (el
+    schedule del simulador no cobra comisión): sin este campo no se puede formar la base mixta.
+    """
+    return {
+        "total": total,
+        "commission": commission,
+        "measurement": "COMPLETE" if total is not None else "PARTIAL",
+    }
 
 
 def test_cycle_r_is_the_pnl_over_the_committed_risk_and_net_discounts_the_cost() -> None:
@@ -741,3 +762,110 @@ def test_the_strategy_row_publishes_the_net_expectancy_with_its_own_measurement(
     assert payload["netExpectancyR"] == pytest.approx(1.875)
     assert payload["netRMeasurement"] == "PARTIAL"
     assert payload["cyclesWithoutCost"] == 1
+
+
+# ── AUTO-16 — la BASE del R neto (aplicado vs. estimado), declarada ────────────────
+
+
+def _applied(friction: str, measurement: str = "COMPLETE") -> dict[str, object]:
+    """El contrato que emite ``applied_cost`` por ciclo (``costApplied`` en la fila)."""
+    return {"friction": friction, "measurement": measurement}
+
+
+def test_cycle_r_prefers_the_applied_friction_and_declares_its_base() -> None:
+    """Con fricción medida, el neto sale del coste que el SIMULADOR aplicó, no del supuesto.
+
+    Y se completa con la comisión del MODELO (el schedule no la cobra): sin ella el neto
+    aplicado saldría más alto que el estimado sin que la ejecución haya mejorado.
+    """
+    row = cycle_r(pnl="200", risk_amount="100", cost=_cost(12.5), cost_applied=_applied("30.0"))
+
+    assert row.net_r_multiple == pytest.approx((200.0 - 30.0 - 5.0) / 100.0)
+    assert row.net_r_multiple != pytest.approx((200.0 - 12.5) / 100.0), "no es el estimado"
+    assert row.cost_applied == pytest.approx(30.0), "el número aplicado se publica SIN comisión"
+    assert row.cost_estimate == pytest.approx(12.5), "el supuesto se sigue publicando aparte"
+    assert row.cost_basis == SELF_EVAL_COST_BASIS_APPLIED
+    assert row.as_dict()["costBasis"] == SELF_EVAL_COST_BASIS_APPLIED
+    assert row.notes == (), "medido y completo: no hay hueco que declarar"
+
+
+def test_without_the_modelled_commission_the_applied_cannot_be_composed() -> None:
+    """Sin comisión cuantificada NO se publica un neto al que le falta una parte del coste.
+
+    El aplicado se midió y se publica, pero el cociente vuelve al estimado completo y lo declara:
+    la alternativa (restar solo la fricción) regalaría la comisión entera en cada ciclo.
+    """
+    row = cycle_r(
+        pnl="200",
+        risk_amount="100",
+        cost=_cost(12.5, commission=None),
+        cost_applied=_applied("30.0"),
+    )
+
+    assert row.cost_applied == pytest.approx(30.0), "la medición no se tira"
+    assert row.cost_basis == SELF_EVAL_COST_BASIS_ESTIMATED
+    assert row.net_r_multiple == pytest.approx((200.0 - 12.5) / 100.0)
+
+
+def test_cycle_r_falls_back_to_the_estimate_and_declares_the_other_base() -> None:
+    """Sin aplicado, el neto es el de ``v2.56`` y lo dice: la diferencia no viaja en silencio."""
+    row = cycle_r(pnl="200", risk_amount="100", cost=_cost(12.5))
+
+    assert row.net_r_multiple == pytest.approx((200.0 - 12.5) / 100.0)
+    assert row.cost_applied is None
+    assert row.cost_basis == SELF_EVAL_COST_BASIS_ESTIMATED
+
+
+def test_a_partial_applied_cost_is_a_floor_and_never_enters_the_net() -> None:
+    """Un aplicado ``PARTIAL`` (media ida y vuelta) restaría de menos y sobrestimaría el R."""
+    row = cycle_r(
+        pnl="200", risk_amount="100", cost=_cost(12.5), cost_applied=_applied("30.0", "PARTIAL")
+    )
+
+    assert row.net_r_multiple == pytest.approx((200.0 - 12.5) / 100.0), "vuelve al estimado"
+    assert row.cost_applied is None
+    assert row.cost_basis == SELF_EVAL_COST_BASIS_ESTIMATED
+
+
+def test_a_row_without_a_declared_base_is_undeclared_not_completed() -> None:
+    """Un neto declarado de fuera y sin base no se supone ``estimated`` ni ``applied``."""
+    row = evaluate_auto_self_evaluation(
+        cycles=[_cycle(pnl="200", cycle_id="c1", net_r=1.9)], min_trades=1
+    ).by_strategy[0]
+
+    assert row.net_expectancy_r == pytest.approx(1.9)
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_UNDECLARED
+
+
+def test_a_mixed_basis_is_declared_and_never_silently_averaged() -> None:
+    """Dos netos medidos contra modelos de coste distintos no se promedian en silencio."""
+    row = evaluate_auto_self_evaluation(
+        cycles=[
+            _cycle(pnl="200", cycle_id="c1", risk="100", cost=_cost(12.5)),
+            _cycle(
+                pnl="200",
+                cycle_id="c2",
+                risk="100",
+                cost=_cost(50.0),
+                cost_applied=_applied("30.0"),
+            ),
+        ],
+        min_trades=1,
+    ).by_strategy[0]
+
+    assert row.net_expectancy_r is not None, "el número sigue siendo útil: no se tira"
+    assert row.net_r_basis == SELF_EVAL_COST_BASIS_MIXED
+    assert SELF_EVAL_COST_BASIS_MIXED in row.notes, "la mezcla se declara"
+    payload = row.as_dict()
+    assert payload["netRBasis"] == SELF_EVAL_COST_BASIS_MIXED
+
+
+def test_a_report_without_any_net_declares_no_basis_at_all() -> None:
+    """Sin neto no hay base que declarar: ``None``, no un ``undeclared`` de relleno."""
+    row = evaluate_auto_self_evaluation(
+        cycles=[_cycle(pnl="200", cycle_id="c1", risk="100")], min_trades=1
+    ).by_strategy[0]
+
+    assert row.net_expectancy_r is None
+    assert row.net_r_basis is None
+    assert SELF_EVAL_COST_BASIS_MIXED not in row.notes

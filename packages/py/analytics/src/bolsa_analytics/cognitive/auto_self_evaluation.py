@@ -62,6 +62,10 @@ __all__ = [
     "SELF_EVAL_FUNNEL_NOT_DIMENSIONED",
     "SELF_EVAL_MIN_TRADES_DEFAULT",
     "SELF_EVAL_OPPORTUNITY_STATUSES",
+    "SELF_EVAL_COST_BASIS_APPLIED",
+    "SELF_EVAL_COST_BASIS_ESTIMATED",
+    "SELF_EVAL_COST_BASIS_MIXED",
+    "SELF_EVAL_COST_BASIS_UNDECLARED",
     "SELF_EVAL_REGIME_UNDETERMINED",
     "SELF_EVAL_REGIME_UNKNOWN",
     "AutoSelfEvaluation",
@@ -114,6 +118,21 @@ SELF_EVAL_THIN_SAMPLE = "thin_sample"
 SELF_EVAL_MISSING_INPUTS = "missing_inputs"
 SELF_EVAL_PNL_UNMEASURED = "pnl_unmeasured"
 SELF_EVAL_COST_UNMEASURED = "cost_unmeasured"
+# AUTO-16 — la BASE del coste con la que se calculó el R neto. El neto es un cociente contra un
+# coste, y ese coste puede venir de DOS modelos distintos (el aplicado por el simulador y el
+# supuesto por el decisor): sin declarar la base, dos netos con el mismo aspecto podrían no ser
+# comparables. ``MIXED`` no es un error: es la declaración de que un agregado mezcla las dos.
+#: El neto descontó la fricción que el simulador **aplicó** (medida contra su mid de referencia)
+#: **más** la comisión del MODELO: el schedule no cobra comisión (en SIM es 0), así que dejarla
+#: fuera del neto lo haría parecer mejor por un motivo que no es una mejora de ejecución. El
+#: nombre de la base publica la composición para que nadie lea el número como un coste realizado
+#: completo.
+SELF_EVAL_COST_BASIS_APPLIED = "applied_friction+modelled_commission"
+SELF_EVAL_COST_BASIS_ESTIMATED = "estimated"
+SELF_EVAL_COST_BASIS_MIXED = "mixed"
+#: El agregado tiene netos pero sus filas no declaran de dónde salió el coste (p.ej. un informe
+#: AUTO-7 cuyos ciclos ya traían el R neto calculado fuera). Se declara, no se supone.
+SELF_EVAL_COST_BASIS_UNDECLARED = "undeclared"
 # AUTO-9 — el cruce ``strategy × regime``. El régimen **ausente** no se reparte ni se suma al
 # de otro ciclo: tiene cubo PROPIO. ``UNKNOWN`` es aquí un valor de agrupación, no un hueco
 # por rellenar.
@@ -173,6 +192,38 @@ def _round4(value: float) -> float:
     return round(value, 4)
 
 
+def _modelled_commission(cost: Any) -> Decimal | None:
+    """(PURA, AUTO-16) la comisión del MODELO que completa el neto aplicado, o ``None``.
+
+    El schedule del simulador **no cobra comisión** (en SIM la comisión realizada es ``0``:
+    ``lifecycle_from_auto`` la declara así en los fills con ``fill_id``), así que un neto que
+    descontara solo la fricción aplicada saldría más alto que el estimado por un motivo que no
+    es una mejor ejecución, sino una parte del coste que se dejó fuera. Se completa con la
+    comisión **estimada** del decisor —la única que existe— y la base lo declara.
+
+    ``None`` cuando no se puede cuantificar: sin comisión no se puede componer el número y el
+    neto vuelve al estimado completo (declarado), en vez de publicar un neto al que le falta
+    una parte del coste.
+    """
+    return None if cost is None else _dec(_field(cost, "commission"))
+
+
+def _applied_friction(applied: Any) -> Decimal | None:
+    """(PURA, AUTO-16) la fricción aplicada **COMPLETA** de un ciclo, o ``None``.
+
+    Lee el contrato de ``applied_cost.AppliedCost`` por sus dos hechos —``measurement`` y
+    ``friction``—, sin acoplarse al dataclass (el mismo módulo sirve al worker, al journal y a
+    un test). Regla dura: un aplicado ``PARTIAL`` es un SUELO (le faltan patas o referencias),
+    así que **no** entra al cociente —restarlo sobrestimaría el neto—; y sin ``friction`` no hay
+    número que restar. En los dos casos el hueco lo declara quien lee la base, no este helper.
+    """
+    if applied is None:
+        return None
+    if _field(applied, "measurement") != MEASUREMENT_COMPLETE:
+        return None
+    return _dec(_field(applied, "friction"))
+
+
 def _explicit(value: Any) -> str | None:
     """Texto no vacío (y no ``"none"``) o ``None``: la ausencia no se rellena."""
     if not isinstance(value, str):
@@ -200,6 +251,10 @@ class _Cycle:
     mae_r: float | None
     slippage: Decimal | None
     closed_at: str | None
+    #: AUTO-16: la base del coste con la que salió ``net_r_multiple`` (``applied``/``estimated``).
+    #: ``None`` cuando el neto no se calculó aquí o su fila no declara de dónde salió el coste:
+    #: la ausencia de base NO se hereda de otro ciclo ni se supone.
+    cost_basis: str | None = None
 
 
 def _regime(value: Any) -> str:
@@ -242,7 +297,15 @@ def _read_cycle(raw: Any) -> _Cycle:
             pnl=pnl,
             risk_amount=_field(raw, "risk_amount", "riskAmount", "reserved_risk", "reservedRisk"),
             cost=_field(raw, "cost", "trading_cost", "tradingCost"),
+            # AUTO-16: la fricción que el simulador APLICÓ (``costApplied``), si el productor
+            # la midió. Entra al cociente SOLO si está COMPLETE; el estimado queda de respaldo.
+            cost_applied=_field(raw, "cost_applied", "costApplied"),
         )
+    # La base se DECLARA, no se hereda: si el neto vino calculado de fuera, solo se cree si la
+    # fila la declara; si no, queda sin base (``None``) y el agregado lo dirá.
+    declared_basis = _explicit(_field(raw, "cost_basis", "costBasis"))
+    basis = computed.cost_basis if computed is not None else None
+    basis = basis or declared_basis
     measured_r = declared_r if declared_r is not None else _computed_r(computed, net=False)
     measured_net = declared_net if declared_net is not None else _computed_r(computed, net=True)
     return _Cycle(
@@ -267,6 +330,7 @@ def _read_cycle(raw: Any) -> _Cycle:
         mae_r=mae,
         slippage=_dec(_field(raw, "slippage", "slippage_currency", "slippageCurrency")),
         closed_at=_explicit(_field(raw, "closed_at", "closedAt")),
+        cost_basis=basis,
     )
 
 
@@ -327,9 +391,17 @@ class CycleR:
     """AUTO-9 — el R de UN ciclo: lo medido y lo que no se pudo medir, con su motivo.
 
     ``r_multiple`` es ``pnl / risk_amount`` y ``net_r_multiple`` es
-    ``(pnl − coste_estimado) / risk_amount``. ``risk_amount`` y ``cost_estimate`` se
-    publican junto al resultado porque son el **rastro de la división**: sin ellos, un R
-    no es auditable.
+    ``(pnl − coste) / risk_amount``. ``risk_amount`` y el coste usado se publican junto al
+    resultado porque son el **rastro de la división**: sin ellos, un R no es auditable.
+
+    # AUTO-16 — el neto declara su BASE. El coste que descuenta el neto puede venir de dos
+    # modelos distintos, y los dos se publican por separado para que la resta sea auditable:
+    # ``cost_estimate`` es el que el **decisor supuso** (``TradingCost``) y ``cost_applied`` el
+    # que el **simulador aplicó** (fricción medida contra el mid de referencia, sin comisión:
+    # el schedule no la cobra). ``cost_basis`` dice qué entró en el cociente —nunca se adivina—
+    # y, cuando el aplicado manda, **nombra su composición**: la fricción medida más la comisión
+    # del modelo, porque un neto al que le falta esa parte parecería mejor sin serlo. Una base
+    # sin número o un número sin base no se publican: son el mismo hueco declarado.
     """
 
     r_multiple: float | None
@@ -338,6 +410,14 @@ class CycleR:
     cost_estimate: Decimal | None
     measurement: MeasurementStatus
     notes: tuple[str, ...]
+    #: AUTO-16: la fricción que el simulador APLICÓ, medida contra su mid de referencia. ``None``
+    #: cuando no se midió (fila anterior a 2.57, o una pata sin referencia): nunca un ``0``. NO
+    #: lleva la comisión dentro (el schedule no la cobra); la composición la declara ``cost_basis``.
+    cost_applied: Decimal | None = None
+    #: AUTO-16: la BASE del cociente —``applied_friction+modelled_commission`` / ``estimated``—,
+    #: o ``None`` si no hubo neto. Es la mitad que impide que dos netos no comparables se lean
+    #: como uno solo.
+    cost_basis: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -345,13 +425,21 @@ class CycleR:
             "netRMultiple": self.net_r_multiple,
             "riskAmount": None if self.risk_amount is None else str(self.risk_amount),
             "costEstimate": None if self.cost_estimate is None else str(self.cost_estimate),
+            "costApplied": None if self.cost_applied is None else str(self.cost_applied),
+            "costBasis": self.cost_basis,
             "measurement": self.measurement,
             "notes": list(self.notes),
         }
 
 
-def cycle_r(*, pnl: Any, risk_amount: Any, cost: Any = None) -> CycleR:
-    """(PURA) el R de un ciclo desde su PnL, su riesgo comprometido y su coste estimado.
+def cycle_r(
+    *,
+    pnl: Any,
+    risk_amount: Any,
+    cost: Any = None,
+    cost_applied: Any = None,
+) -> CycleR:
+    """(PURA) el R de un ciclo desde su PnL, su riesgo comprometido y su coste.
 
     ``pnl`` es el PnL **realizado** del ciclo, ``risk_amount`` el riesgo que se comprometió
     en la reserva (``reserved_risk``: el denominador que hace adimensional la medida) y
@@ -370,14 +458,22 @@ def cycle_r(*, pnl: Any, risk_amount: Any, cost: Any = None) -> CycleR:
     * ``pnl == 0`` **sí** es una medida (``r_multiple = 0.0``, ``COMPLETE``): un resultado
       plano medido no es un hueco, y confundirlos es la mitad de este módulo.
 
-    El coste es el **estimado en el instante de la decisión**, no el realizado (la
-    atribución por fill exigiría el spine de settlement, fuera de esta fase). Quien publique
-    ``net_r_multiple`` debe etiquetarlo como estimado, nunca como "R neto realizado".
+    **AUTO-16 — dos costes, y la BASE declarada.** ``cost`` es el que el decisor **supuso**
+    (estimado en el instante de la decisión); ``cost_applied`` es la fricción que el simulador
+    **aplicó** (medida contra su mid de referencia, ``applied_cost``). Cuando el aplicado entra
+    ``COMPLETE``, el cociente se hace contra ÉL **más la comisión del modelo** —el schedule no
+    cobra comisión, y dejarla fuera sobrestimaría el neto— y
+    ``cost_basis = "applied_friction+modelled_commission"``; si no, se hace contra el estimado
+    y ``cost_basis = "estimated"``. Un aplicado ``PARTIAL`` **no** se usa: es un suelo, y restar
+    un suelo sobrestimaría el neto. Los dos números se publican por separado para que la resta
+    sea auditable, y la base evita que dos netos no comparables se lean como uno.
     """
     amount = _dec(pnl)
     risk = _dec(risk_amount)
     cost_row = coerce_trading_cost(cost)
     friction = None if cost_row is None else _dec(cost_row.total)
+    applied = _applied_friction(cost_applied)
+    commission = _modelled_commission(cost_row)
 
     notes: list[str] = []
     if risk is None or risk <= 0:
@@ -387,12 +483,19 @@ def cycle_r(*, pnl: Any, risk_amount: Any, cost: Any = None) -> CycleR:
 
     r_multiple: float | None = None
     net_r_multiple: float | None = None
+    cost_basis: str | None = None
     if amount is not None and risk is not None and risk > 0:
         r_multiple = _ratio(amount, risk)
-        if friction is None:
+        deducted: Decimal | None = None
+        if applied is not None and commission is not None:
+            # El aplicado entra CON la comisión del modelo, y la base lo declara en su nombre.
+            deducted, cost_basis = applied + commission, SELF_EVAL_COST_BASIS_APPLIED
+        elif friction is not None:
+            deducted, cost_basis = friction, SELF_EVAL_COST_BASIS_ESTIMATED
+        if deducted is None:
             notes.append(SELF_EVAL_COST_UNMEASURED)
         else:
-            net_r_multiple = _ratio(amount - friction, risk)
+            net_r_multiple = _ratio(amount - deducted, risk)
 
     valued = sum(1 for value in (r_multiple, net_r_multiple) if value is not None)
     return CycleR(
@@ -400,6 +503,8 @@ def cycle_r(*, pnl: Any, risk_amount: Any, cost: Any = None) -> CycleR:
         net_r_multiple=net_r_multiple,
         risk_amount=risk,
         cost_estimate=friction,
+        cost_applied=applied,
+        cost_basis=cost_basis,
         measurement=measurement_from_counts(valued=valued, unvalued=2 - valued),
         notes=tuple(notes),
     )
@@ -616,6 +721,11 @@ class StrategySelfEvaluation:
     drawdown_measurement: MeasurementStatus
     decisive: bool
     notes: tuple[str, ...]
+    #: AUTO-16: la base del coste del R neto declarada por sus ciclos (``applied``/``estimated``),
+    #: ``mixed`` si conviven las dos y ``undeclared`` si ninguna fila lo dice. ``None`` cuando no
+    #: hay ningún neto que declarar, y también por defecto: una fila construida sin declararla NO
+    #: afirma una base (el mismo trato que ``sinkFailuresDurable``: sin declaración, no se afirma).
+    net_r_basis: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -655,6 +765,7 @@ class StrategySelfEvaluation:
             "resultsMeasurement": self.results_measurement,
             "riskMeasurement": self.risk_measurement,
             "netRMeasurement": self.net_r_measurement,
+            "netRBasis": self.net_r_basis,
             "cyclesWithoutCost": self.cycles_without_cost,
             "excursionsMeasurement": self.excursions_measurement,
             "slippageMeasurement": self.slippage_measurement,
@@ -683,10 +794,10 @@ class StrategyRegimeEvaluation:
 
     ``decisive`` exige que el R **bruto** esté medido en TODOS los ciclos de la celda y que
     la celda alcance ``min_trades``. **No** cubre el R neto: ``net_expectancy_r`` se publica
-    con su propia medida (``net_r_measurement``) porque depende de un coste *estimado*, así
-    que quien decida con el neto **tiene que exigir** ``net_r_measurement == COMPLETE``.
-    Mirar solo ``decisive`` leería como comparable un neto medido sobre la mitad de la celda.
-    Es una bandera de lectura, nunca un permiso.
+    con su propia medida (``net_r_measurement``) y su propia **base** (``net_r_basis``:
+    ``applied``/``estimated``), así que quien decida con el neto **tiene que exigir**
+    ``net_r_measurement == COMPLETE``. Mirar solo ``decisive`` leería como comparable un neto
+    medido sobre la mitad de la celda. Es una bandera de lectura, nunca un permiso.
     """
 
     strategy_version: str
@@ -705,6 +816,10 @@ class StrategyRegimeEvaluation:
     sample_quality: str
     decisive: bool
     notes: tuple[str, ...]
+    #: AUTO-16: la base del coste del neto de ESTA celda (``applied``/``estimated``/``mixed``/
+    #: ``undeclared``), o ``None`` sin netos —y por defecto: sin declaración no se afirma base—.
+    #: Es la mitad que impide leer como comparables dos netos medidos contra modelos distintos.
+    net_r_basis: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -721,6 +836,7 @@ class StrategyRegimeEvaluation:
             "cyclesWithoutCost": self.cycles_without_cost,
             "rMeasurement": self.r_measurement,
             "netRMeasurement": self.net_r_measurement,
+            "netRBasis": self.net_r_basis,
             "sampleQuality": self.sample_quality,
             "decisive": self.decisive,
             "notes": list(self.notes),
@@ -1005,6 +1121,25 @@ def _profit_factor(pnls: Sequence[Decimal]) -> float | None:
     return _round4(float(gross_profit / gross_loss))
 
 
+def _net_r_basis(cycles: Sequence[_Cycle]) -> str | None:
+    """(PURA, AUTO-16) la base DECLARADA del R neto de un agregado.
+
+    ``None`` = el agregado no tiene ningún neto que declarar (no hay cociente). Con netos, la
+    base es la única declarada por sus filas; ``undeclared`` si ninguna lo dice (el R vino
+    calculado fuera y no se sabe contra qué coste) y ``mixed`` si conviven bases distintas
+    —incluida la ausencia de base—. Declarar la mezcla es lo único que impide leer como un solo
+    modelo un número que promedia dos.
+    """
+    declared = [cycle.cost_basis for cycle in cycles if cycle.net_r_multiple is not None]
+    if not declared:
+        return None
+    unique = set(declared)
+    if len(unique) > 1:
+        return SELF_EVAL_COST_BASIS_MIXED
+    only = next(iter(unique))
+    return only if only is not None else SELF_EVAL_COST_BASIS_UNDECLARED
+
+
 def _strategy_row(
     version: str,
     cycles: Sequence[_Cycle],
@@ -1071,6 +1206,7 @@ def _strategy_row(
         )
 
     notes: list[str] = []
+    net_r_basis = _net_r_basis(cycles)
     if cycles:
         # Los huecos se declaran SOLO cuando hay resultado que medir: en una versión sin
         # ningún ciclo, "R no medido" no aporta nada que "0 ciclos" no diga ya.
@@ -1084,6 +1220,10 @@ def _strategy_row(
             notes.append(SELF_EVAL_SLIPPAGE_UNMEASURED)
         if drawdown_measurement != MEASUREMENT_COMPLETE:
             notes.append(SELF_EVAL_DRAWDOWN_FLOOR)
+        if net_r_basis == SELF_EVAL_COST_BASIS_MIXED:
+            # El neto promedia bases distintas: el número sigue siendo útil, pero declararlo es
+            # lo que evita que se lea como si viniera de un solo modelo de coste.
+            notes.append(SELF_EVAL_COST_BASIS_MIXED)
     if rejection_cost_measurement != MEASUREMENT_COMPLETE and rejected_total:
         notes.append(SELF_EVAL_REJECTION_COST_UNMEASURED)
     if trades < max(1, min_trades):
@@ -1116,6 +1256,7 @@ def _strategy_row(
         results_measurement=results_measurement,
         risk_measurement=risk_measurement,
         net_r_measurement=net_r_measurement,
+        net_r_basis=net_r_basis,
         cycles_without_cost=trades - len(net_values),
         excursions_measurement=excursions_measurement,
         slippage_measurement=slippage_measurement,
@@ -1239,6 +1380,7 @@ def _regime_row(
         cycles_without_cost=trades - len(net_values),
         r_measurement=r_measurement,
         net_r_measurement=net_measurement,
+        net_r_basis=_net_r_basis(cycles),
         sample_quality=sample_quality_from_n(trades),
         decisive=(trades >= max(1, min_trades) and r_measurement == MEASUREMENT_COMPLETE),
         notes=((SELF_EVAL_COST_UNMEASURED,) if net_measurement != MEASUREMENT_COMPLETE else ()),
