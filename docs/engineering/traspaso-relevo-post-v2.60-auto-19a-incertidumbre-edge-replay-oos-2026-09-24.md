@@ -77,7 +77,7 @@ Los cinco pasos del plan se ejecutaron en orden, cada uno con su gate. **Cero re
 
 - `auto_adaptive.py`: `StrategyHealth.expectancy_interval`/`edge_confidence` (`:460`/`:464`),
   `uncertainty` en `StrategyHealth`/`AdaptivePlan` (`:537`/`:791`), claves nuevas en `evidence_for`
-  (`:869`) y frame `uncertainty` en `as_dict()` (`:909`). **Sin `uncertainty` el plan es byte-idéntico.**
+  (`:873`) y frame `uncertainty` en `as_dict()` (`:913`). **Sin `uncertainty` el plan es byte-idéntico.**
 - `auto_self_evaluation_feed.py`: `build_adaptive_uncertainty_from_fills` (`:326`, mismo material, sin
   segundo FIFO).
 - `auto_simulation_worker.py`: `_v2_build_adaptive_plan` construye la incertidumbre (`:3104`), registra los
@@ -102,7 +102,7 @@ Los cinco pasos del plan se ejecutaron en orden, cada uno con su gate. **Cero re
 | `_build_cell` / las cuatro preguntas / fachada | `.../auto_adaptive_replay.py:290` / `:401`…`:501` / `:539` |
 | Lectores promovidos a público (AUTO-18) | `.../auto_adaptive_confidence.py:407` / `:417` / `:422` / `:434` / `:503` |
 | `StrategyHealth.expectancy_interval` / `edge_confidence` | `.../auto_adaptive.py:460` / `:464` |
-| `evidence_for` (dos claves nuevas) / frame `uncertainty` | `.../auto_adaptive.py:869` / `:909` |
+| `evidence_for` (dos claves nuevas) / frame `uncertainty` | `.../auto_adaptive.py:873` / `:913` |
 | Sello del reparto | `.../auto_adaptive.py:203` |
 | `build_adaptive_uncertainty_from_fills` | `packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py:326` |
 | Consumo en el worker | `apps/api-python/src/bolsa_api/background/auto_simulation_worker.py:3104` / `:3165` |

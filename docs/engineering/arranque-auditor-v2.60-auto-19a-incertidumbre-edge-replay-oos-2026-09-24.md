@@ -46,7 +46,7 @@ Seis corolarios, con test y con mutación que los mata:
    degradaciones a la baja (suelo `LOW`) y notas declaradas; `M151`, `M152`.
 5. **El replay no inventa veredictos** (`REPLAY_*`, `auto_adaptive_replay.py:91-107`): `sample` declarado y
    `inconclusive` sin los dos grupos; `M155`, `M156`, `M157`.
-6. **La lectura es ADITIVA** (`auto_adaptive.py:869`, `:909`): sin `uncertainty` nada cambia; `M158`.
+6. **La lectura es ADITIVA** (`auto_adaptive.py:873`, `:913`): sin `uncertainty` nada cambia; `M158`.
 
 **La compatibilidad es parte del invariante:** `StrategyHealth.expectancy_interval`/`edge_confidence`
 tienen defecto `None`; el frame `uncertainty` del plan y las dos claves de la evidencia **solo** aparecen
