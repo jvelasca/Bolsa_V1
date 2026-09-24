@@ -22,6 +22,7 @@ from typing import Any
 from bolsa_application.sim_durable_store import (
     SimFillFinanceContext,
     SimFillFinanceContextStore,
+    usable_reference_mid,
 )
 from bolsa_application.simulated_finance import SimulatedFillFinance, sim_fill_finances
 
@@ -41,6 +42,7 @@ async def persist_fill_finance_context(
     venue: str,
     strategy_version_id: str | None = None,
     cycle_id: str | None = None,
+    reference_mid: Any = None,
 ) -> int:
     """Persiste el contexto durable de cada fill del order. Devuelve nº de filas.
 
@@ -50,7 +52,13 @@ async def persist_fill_finance_context(
 
     V2.28 / A10 (P1-02 real): ``strategy_version_id`` atribuye el fill a la versión de
     estrategia ACTIVE que lo originó (``None`` = sin atribución; nunca se inventa).
+
+    V2.57 / AUTO-16: ``reference_mid`` es el mid con el que el simulador construyó ESE precio.
+    Es el único hecho que la fricción APLICADA necesita y que el precio no lleva dentro; sin
+    él la fricción del fill es un hueco declarado (nunca un ``0``). Se normaliza aquí para
+    que un valor inservible no llegue nunca a la fila.
     """
+    reference = usable_reference_mid(reference_mid)
     finances: tuple[SimulatedFillFinance, ...] = sim_fill_finances(
         result,
         instrument_id=instrument_id,
@@ -67,6 +75,7 @@ async def persist_fill_finance_context(
                 side=fin.side,
                 quantity=Decimal(fin.quantity),
                 price=Decimal(fin.price),
+                reference_mid=reference,
                 account_id=fin.account_id,
                 venue=fin.venue,
                 idempotency_key=fin.idempotency_key,

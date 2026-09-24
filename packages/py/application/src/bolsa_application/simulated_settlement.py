@@ -183,6 +183,7 @@ async def apply_simulated_order_once(
     retryable_on_ineffective: bool = True,
     strategy_version_id: str | None = None,
     cycle_id: str | None = None,
+    reference_mid: Any = None,
 ) -> dict[str, str]:
     """Liquida un order simulado (buy o sell) en trazas idempotentes una sola vez.
 
@@ -218,6 +219,10 @@ async def apply_simulated_order_once(
             venue=venue,
             strategy_version_id=strategy_version_id,
             cycle_id=cycle_id,
+            # AUTO-16: la referencia con la que el schedule construyó el precio. Sin ella la
+            # fricción aplicada del fill no se puede recomponer NUNCA (el precio ya la lleva
+            # dentro), y es la pata que un reinicio perdería.
+            reference_mid=reference_mid,
         )
     outcomes: dict[str, str] = {}
     for ev in events:
@@ -320,5 +325,9 @@ async def submit_simulated_order(
         owner=owner,
         strategy_version_id=strategy_version_id,
         cycle_id=cycle_id,
+        # AUTO-16: el mid con el que se construyó este schedule viaja hasta el contexto durable
+        # del fill (columna ``reference_mid``, migración 046). Es lo que permite medir la
+        # fricción APLICADA después, incluso en otro proceso.
+        reference_mid=base_mid,
     )
     return result, outcomes

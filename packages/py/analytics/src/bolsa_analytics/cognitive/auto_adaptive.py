@@ -165,7 +165,14 @@ ADAPTIVE_KEY = "adaptive"
 #: motivo declarado— cuando esa celda no está medida. La composición del numerador NO cambia (la
 #: decide la fila, como en ``v2.50``–``v2.54``), pero los pesos relativos sí: dos planes iguales con
 #: la misma evidencia y el mismo régimen no son idénticos si uno se midió por celda y el otro no.
-ADAPTIVE_POLICY_VERSION = "auto14-v1"
+#:
+#: ``auto16-v1`` (AUTO-16): la REGLA no cambia —sigue siendo la de ``AUTO-14``, y ninguna condición
+#: de ``_allocation_weights`` se toca—, pero cambia la **procedencia de un input** del eje del R
+#: neto: el coste que descuenta ese neto deja de ser siempre el **supuesto** por el decisor y pasa a
+#: ser, cuando está medido, el que el **simulador aplicó** (``costApplied``, sello por ciclo en
+#: ``costBasis``). Dos planes con la misma evidencia pueden entonces diferir en los pesos porque el
+#: neto se midió contra otro modelo de coste; sin subir el sello, esa diferencia sería invisible.
+ADAPTIVE_POLICY_VERSION = "auto16-v1"
 
 #: Motivos de rotación (vocabulario PROPIO de este módulo; el journal de la capa de
 #: aplicación los lleva en el detalle de ``adaptive_strategy_paused``). La casa única
@@ -244,8 +251,10 @@ ADAPTIVE_CELL_NOTE_NOT_FOUND = "cell_not_found"
 #: La celda existe pero no es ``decisive``: su muestra no alcanza ``min_trades`` o no tiene el R medido
 #: en todos sus ciclos. Una muestra fina NO mueve el reparto.
 ADAPTIVE_CELL_NOTE_NOT_DECISIVE = "cell_not_decisive"
-#: La celda tiene muestra, pero su R **neto** no está ``COMPLETE``: el coste es estimado, así que un
-#: ``PARTIAL`` no habilita decidir con ella (§6.3 de ``AUTO-9``).
+#: La celda tiene muestra, pero su R **neto** no está ``COMPLETE``: falta el coste de alguno de sus
+#: ciclos, así que un ``PARTIAL`` no habilita decidir con ella (§6.3 de ``AUTO-9``). AUTO-16 no
+#: cambia la condición —sigue siendo ``net_r_measurement == COMPLETE``—, solo de qué coste sale el
+#: número cuando sí lo está (``netRBasis``).
 ADAPTIVE_CELL_NOTE_NET_UNMEASURED = "cell_net_unmeasured"
 #: La celda está medida pero su R neto **no es positivo**: solo una celda medida y positiva afina.
 ADAPTIVE_CELL_NOTE_NOT_POSITIVE = "cell_not_positive"
@@ -939,8 +948,9 @@ def _allocation_weights(
 
     El gate de decisividad es POR FILA en los dos ejes: una expectativa no validada por
     su muestra no entra al numerador, aunque otra estrategia del grupo sí sea decisoria.
-    El R neto exige además ``net_r_measurement == COMPLETE`` (§6.3: el coste es
-    **estimado**, así que un ``PARTIAL`` no habilita decidir contra el agregado).
+    El R neto exige además ``net_r_measurement == COMPLETE`` (§6.3: un ``PARTIAL`` —algún ciclo sin
+    coste— no habilita decidir contra el agregado). AUTO-16 no cambia la condición: cambia de dónde
+    sale el coste que el neto descuenta (``netRBasis``, ``applied`` o ``estimated``).
 
     **AUTO-14 — la celda afina el PESO, nunca la composición.** Quién compite en el eje del R
     neto lo decide la FILA (``decisive`` + neto medido y positivo), igual que en ``v2.50``–``v2.54``.

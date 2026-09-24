@@ -2241,6 +2241,13 @@ class SimFillFinanceContextRow(Base):
     side: Mapped[str] = mapped_column("side", String(8), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    # V2.57 / AUTO-16 — mid de REFERENCIA con el que el simulador construyó ``price``
+    # (migración 046). Nullable y sin default: ``NULL`` = fila anterior a 2.57, la
+    # referencia no se midió (nunca un ``0``, que diría "fricción gratis"). Es el único
+    # hecho que la fricción APLICADA necesita y que el precio no lleva dentro.
+    reference_mid: Mapped[Decimal | None] = mapped_column(
+        "reference_mid", Numeric(18, 6), nullable=True
+    )
     account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
     venue: Mapped[str] = mapped_column("venue", String, nullable=False)
     # V2.28 / A10 (P1-02 real): procedencia del fill. ``NULL`` = sin atribución

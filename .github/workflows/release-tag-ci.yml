@@ -410,6 +410,11 @@ jobs:
         # el pase de ``packages/py/analytics/tests``, la costura del reinicio por el de
         # ``apps/api-python/tests``, y la certificación PG (migración 045 + otra sesión
         # leyendo la racha) va en el paso PG de más abajo con gate fail-if-skipped.
+        # V2.57/AUTO-16 (referencia del fill): los puros del espejo durable y del coste aplicado
+        # (``packages/py/application/tests/test_sim_fill_reference.py`` y
+        # ``.../test_applied_cost.py``) van EXPLÍCITOS por el mismo motivo. La certificación PG
+        # (migración 046 + la referencia sobresaliendo a una sesión nueva) va en el paso PG de
+        # más abajo con gate fail-if-skipped.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -457,6 +462,8 @@ jobs:
           packages/py/application/tests/test_auto_adaptive_recovery.py
           packages/py/application/tests/test_auto_cycle_reconciliation.py
           packages/py/application/tests/test_adaptive_gate_store.py
+          packages/py/application/tests/test_sim_fill_reference.py
+          packages/py/application/tests/test_applied_cost.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
@@ -507,6 +514,7 @@ jobs:
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           --ignore=apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
+          --ignore=apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -578,6 +586,11 @@ jobs:
       # ``STALE``), y eso solo se mide contra PG real: un skip mudo invalidaría la
       # certificación del tag.
       ADAPTIVE_GATE_PG_REQUIRED: '1'
+      # V2.57/AUTO-16 (referencia del fill): la fricción que el SIMULADOR aplicó se mide con
+      # el ``reference_mid`` que el settlement persiste (migración 046). Solo se certifica
+      # contra PG real (roundtrip de la 046 + otra sesión recomponiendo la fricción de las
+      # dos patas del ciclo): un skip mudo invalidaría la medición del tag.
+      APPLIED_COST_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -667,6 +680,10 @@ jobs:
         # que SOBREVIVE al reinicio (otra sesión) con el gate todavía en ``STALE``, el
         # incremento atómico por (cuenta, motor) y el reset que no amplifica.
         # Gate fail-if-skipped: ADAPTIVE_GATE_PG_REQUIRED=1.
+        # V2.57/AUTO-16: la referencia del fill (migración 046) — roundtrip, la referencia que
+        # SOBREVIVE al reinicio (otra sesión) con la fricción aplicada recompuesta de las DOS
+        # patas del ciclo, y la lectura por ciclo que no cruza cuentas.
+        # Gate fail-if-skipped: APPLIED_COST_PG_REQUIRED=1.
         # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs (deuda:
         # drift silencioso). Ahora se ejecutan aquí con gate fail-if-skipped.
         run: >
@@ -695,6 +712,7 @@ jobs:
           apps/api-python/tests/test_portfolio_reservation_pg.py
           apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
+          apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py

@@ -23,6 +23,11 @@ Qué hace, exactamente:
 * Un ciclo que declare DOS versiones de estrategia distintas es un defecto de atribución:
   se emite SIN versión (el módulo lo declara en el cajón ``unattributed``) en vez de
   repartirlo entre las dos.
+* **La fricción APLICADA se recompone aquí, sin I/O nuevo.** Los fills que ya se leen para
+  reconstruir el ciclo llevan su mid de referencia (``reference_mid``, migración ``046``), así
+  que ``AUTO-16`` pega a cada ciclo el coste que el simulador **aplicó** con aritmética pura.
+  El neto sale entonces del coste medido y declara su base; sin referencia persistida se queda
+  con el estimado —el número de ``v2.56``— y lo declara igual.
 
 Read-only: este módulo no escribe ni modifica nada; solo lee y agrega.
 """
@@ -52,7 +57,8 @@ from bolsa_analytics.cognitive.auto_self_evaluation import (
     cycle_r,
     evaluate_auto_self_evaluation,
 )
-from bolsa_application.cycle_risk import CycleRisk, apply_cycle_risk
+from bolsa_application.applied_cost import applied_cost_from_fills
+from bolsa_application.cycle_risk import CycleRisk, apply_cycle_risk, attach_applied_cost
 from bolsa_application.sim_durable_store import (
     PostgresSimFillFinanceContextStore,
     SimFillFinanceContextStore,
@@ -205,6 +211,27 @@ def cycles_from_fills(fills: Iterable[Any]) -> tuple[dict[str, Any], ...]:
     return tuple(cycles)
 
 
+def _risk_with_applied_cost(
+    fills: Iterable[Any] | None,
+    cycle_risk: Mapping[str, CycleRisk] | None,
+) -> Mapping[str, CycleRisk] | None:
+    """(PURA, AUTO-16) la evidencia de riesgo CON la fricción APLICADA de cada ciclo pegada.
+
+    Los fills ya están en la mano —son la fuente de los propios ciclos—, así que la fricción que
+    el simulador aplicó se recompone **sin una lectura nueva**: la referencia cruda viaja en la
+    fila del fill (``reference_mid``, migración 046) y el agregado por ciclo es aritmética pura.
+    De ahí que el flag OFF no añada ni un I/O: sin ``cycle_risk`` no hay evidencia que completar y
+    el mapa se devuelve tal cual (``None``), con la ruta byte-idéntica a la de ``AUTO-9``.
+
+    Es el ÚNICO punto donde se pega el aplicado: las tres lecturas que lo consumen —informe
+    AUTO-7, confianza ``AUTO-12`` y rampa ``AUTO-13``— pasan por aquí, así que no puede haber un
+    segundo productor que mida un coste distinto en silencio.
+    """
+    if not cycle_risk:
+        return cycle_risk
+    return attach_applied_cost(cycle_risk, applied_cost_from_fills(cycle_risk.keys(), fills or ()))
+
+
 def build_auto_self_evaluation(
     *,
     fills: Iterable[Any] | None = None,
@@ -222,9 +249,16 @@ def build_auto_self_evaluation(
     ``cycle_risk`` es la evidencia de riesgo por ciclo del productor ``AUTO-9`` (denominador
     y coste estimado, atados por ``cycle_id``). Sin ella el informe es **byte-idéntico** al
     de ``AUTO-7``: los ciclos quedan sin R, que es el hueco que el módulo ya declaraba.
+
+    Con ella, ``AUTO-16`` completa cada ciclo con la fricción que el simulador **aplicó**
+    (recompuesta de los MISMOS fills, sin lectura nueva): el neto sale entonces del coste medido
+    y su base se publica. Un ciclo sin referencia persistida conserva el número de ``v2.56``
+    —el estimado— y lo declara.
     """
     return evaluate_auto_self_evaluation(
-        cycles=apply_cycle_risk(cycles_from_fills(fills or ()), cycle_risk),
+        cycles=apply_cycle_risk(
+            cycles_from_fills(fills or ()), _risk_with_applied_cost(fills, cycle_risk)
+        ),
         opportunities=opportunities,
         seen=seen,
         durable_seen=durable_seen,
@@ -245,9 +279,13 @@ def build_adaptive_confidence_from_fills(
     Reutiliza las dos piezas ya existentes —``cycles_from_fills`` (con su ``closedAt``) y
     ``apply_cycle_risk``— para que la confianza y el informe de ``AUTO-7``/``AUTO-9`` hablen
     exactamente del mismo material: sin un segundo productor que pueda divergir en silencio.
+    ``AUTO-16`` añade la fricción aplicada por el mismo camino (``_risk_with_applied_cost``), así
+    que la confianza y el informe siguen midiendo el mismo neto.
     """
     return build_adaptive_confidence(
-        apply_cycle_risk(cycles_from_fills(fills or ()), cycle_risk),
+        apply_cycle_risk(
+            cycles_from_fills(fills or ()), _risk_with_applied_cost(fills, cycle_risk)
+        ),
         recent_window=recent_window,
         long_window=long_window,
         min_trades=min_trades,
@@ -341,7 +379,9 @@ def recovery_evidence_from_fills(
     }
     if not reactivated:
         return {}
-    rows = apply_cycle_risk(cycles_from_fills(fills or ()), cycle_risk)
+    rows = apply_cycle_risk(
+        cycles_from_fills(fills or ()), _risk_with_applied_cost(fills, cycle_risk)
+    )
     recent_available = True if confidence is None else bool(confidence.recent_available)
     evidence: dict[str, RecoveryEvidence] = {}
     for version, raw_since in sorted(reactivated.items()):

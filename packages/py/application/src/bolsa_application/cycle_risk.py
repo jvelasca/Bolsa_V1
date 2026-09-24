@@ -1,8 +1,9 @@
 """AUTO-9 — evidencia de RIESGO por ciclo financiero (READ-ONLY, PURA en el ensamblado).
 
-Qué resuelve, exactamente: el **denominador** de R (``pnl / reserved_risk``) y el coste
-**estimado** de cada ciclo, atados por ``cycle_id``. Son los dos datos que el informe
-AUTO-7 no podía medir y que convertían ``expectancy_r`` en un ``None`` permanente.
+Qué resuelve, exactamente: el **denominador** de R (``pnl / reserved_risk``), el coste
+**estimado** y —desde ``AUTO-16``— la fricción que el simulador **APLICÓ**, atados por
+``cycle_id``. Son los datos que el informe AUTO-7 no podía medir y que convertían
+``expectancy_r`` en un ``None`` permanente.
 
 Tres reglas duras, declaradas en vez de asumidas:
 
@@ -36,13 +37,14 @@ Read-only: este módulo no escribe nada; solo lee y agrega.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
+    MEASUREMENT_PARTIAL,
     MEASUREMENT_UNKNOWN,
     MeasurementStatus,
 )
@@ -59,6 +61,7 @@ __all__ = [
     "CYCLE_RISK_WITHOUT_RISK",
     "CycleRisk",
     "apply_cycle_risk",
+    "attach_applied_cost",
     "cycle_risk_from_reservations",
 ]
 
@@ -90,6 +93,38 @@ def _dec(value: Any) -> Decimal | None:
     return result if result.is_finite() else None
 
 
+def _field_of(raw: Any, name: str) -> Any:
+    """Campo ``name`` de un ``Mapping`` o de un objeto, o ``None`` (mismo contrato que el lector)."""
+    if isinstance(raw, Mapping):
+        return raw.get(name)
+    return getattr(raw, name, None)
+
+
+def _measurement(value: Any) -> MeasurementStatus:
+    """Estado de medición válido, o ``UNKNOWN`` (nunca se asciende a ``COMPLETE``).
+
+    Un estado ilegible no puede entrar como "medido": el hueco se declara ``UNKNOWN`` —que es
+    lo que de verdad se sabe— en vez de dejar que un ``None``/``""`` pase por una medición.
+    """
+    text = _clean(value)
+    if text == MEASUREMENT_COMPLETE:
+        return MEASUREMENT_COMPLETE
+    if text == MEASUREMENT_PARTIAL:
+        return MEASUREMENT_PARTIAL
+    return MEASUREMENT_UNKNOWN
+
+
+def _applied_friction(cost: Any) -> Decimal | None:
+    """(AUTO-16) la fricción aplicada de un ciclo, o ``None`` si no está medida COMPLETA.
+
+    Un ``PARTIAL`` es un SUELO (falta una pata o su referencia): restarlo sobrestimaría el R
+    del ciclo, así que no entra. El hueco lo declara ``cost_applied_measurement``.
+    """
+    if cost is None or _measurement(_field_of(cost, "measurement")) != MEASUREMENT_COMPLETE:
+        return None
+    return _dec(_field_of(cost, "friction"))
+
+
 @dataclass(frozen=True, slots=True)
 class CycleRisk:
     """El material de riesgo de UN ciclo, con el estado de medición de cada dimensión.
@@ -103,6 +138,11 @@ class CycleRisk:
     cycle_id: str
     risk_amount: Decimal | None = None
     cost: TradingCost | None = None
+    #: AUTO-16: la fricción que el **simulador aplicó** en las patas de este ciclo
+    #: (``|price − reference_mid| × qty``, sumada de sus fills). ``None`` = no medida (fila
+    #: anterior a 2.57, pata sin referencia, o ida y vuelta incompleta): nunca un ``0``, que
+    #: diría "fricción gratis". Es un **coste**, no una rebaja.
+    cost_applied: Decimal | None = None
     regime: str | None = None
     #: Reserva que aportó el denominador (la de entrada más antigua), o ``None``.
     reservation_id: str | None = None
@@ -110,6 +150,11 @@ class CycleRisk:
     entry_reservations: int = 0
     risk_measurement: MeasurementStatus = MEASUREMENT_UNKNOWN
     cost_measurement: MeasurementStatus = MEASUREMENT_UNKNOWN
+    #: AUTO-16: la medición de la fricción APLICADA (``COMPLETE``/``PARTIAL``/``UNKNOWN``). Se
+    #: publica junto al número porque un ``PARTIAL`` es un **suelo**: sin declararlo, medio viaje
+    #: se leería como el coste del ciclo entero. ``UNKNOWN`` con ``cost_applied = None`` es el
+    #: hueco honesto (no se midió), que NO es lo mismo que una fricción de cero.
+    cost_applied_measurement: MeasurementStatus = MEASUREMENT_UNKNOWN
     regime_measurement: MeasurementStatus = MEASUREMENT_UNKNOWN
     notes: tuple[str, ...] = ()
 
@@ -124,6 +169,13 @@ class CycleRisk:
             fields["riskAmount"] = self.risk_amount
         if self.cost is not None:
             fields["cost"] = self.cost
+        if self.cost_applied is not None:
+            # La fricción aplicada viaja CON su medición: el lector exige ``COMPLETE`` para
+            # entrar al neto, así que un suelo no puede colarse como si fuera el total.
+            fields["costApplied"] = {
+                "friction": str(self.cost_applied),
+                "measurement": self.cost_applied_measurement,
+            }
         if self.regime is not None:
             fields["regime"] = self.regime
         return fields
@@ -133,6 +185,8 @@ class CycleRisk:
             "cycleId": self.cycle_id,
             "riskAmount": None if self.risk_amount is None else str(self.risk_amount),
             "costEstimate": None if self.cost is None else self.cost.to_dict(),
+            "costApplied": None if self.cost_applied is None else str(self.cost_applied),
+            "costAppliedMeasurement": self.cost_applied_measurement,
             "regime": self.regime,
             "reservationId": self.reservation_id,
             "entryReservations": self.entry_reservations,
@@ -289,3 +343,40 @@ def apply_cycle_risk(
             row.update(evidence.to_cycle_fields())
         enriched.append(row)
     return tuple(enriched)
+
+
+def attach_applied_cost(
+    cycle_risk: Mapping[str, CycleRisk],
+    applied: Mapping[str, Any] | None,
+) -> dict[str, CycleRisk]:
+    """(PURA, AUTO-16) pega la fricción **aplicada** de cada ciclo a su evidencia de riesgo.
+
+    El mapa ``applied`` es el de ``applied_cost.applied_cost_from_fills`` (una entrada por
+    ciclo pedido, con su medición). Se lee por atributo/clave —``friction``/``measurement``—
+    para no acoplar este módulo al dataclass: lo mismo sirve al worker, a la alimentación del
+    informe y a un test.
+
+    Dos reglas duras:
+
+    * **Solo un aplicado ``COMPLETE`` se pega.** Un ``PARTIAL`` (falta una pata o su
+      referencia) es un SUELO: restarlo del PnL sobrestimaría el R del ciclo, así que el ciclo
+      queda con ``cost_applied = None`` y su hueco **declarado** en la medición —no en
+      silencio—. Su R neto seguirá saliendo del estimado, como en ``v2.56``.
+    * **Sin evidencia aplicada se devuelve el mapa TAL CUAL** (``None`` o vacío): la ruta sin
+      productor —flag OFF, histórico anterior a la migración 046— queda intacta, con el mismo
+      contrato que ``apply_cycle_risk``.
+
+    Una entrada aplicada que no corresponda a ningún ciclo de ``cycle_risk`` se ignora: no se
+    fabrica evidencia de un ciclo que nadie pidió medir.
+    """
+    if not applied:
+        return dict(cycle_risk)
+    merged: dict[str, CycleRisk] = {}
+    for key, evidence in cycle_risk.items():
+        cost = applied.get(key)
+        merged[key] = replace(
+            evidence,
+            cost_applied=_applied_friction(cost),
+            cost_applied_measurement=_measurement(_field_of(cost, "measurement")),
+        )
+    return merged

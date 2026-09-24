@@ -80,7 +80,12 @@ AUTO-9 (evidencia por ciclo) y AUTO-10 (journal durable del régimen) añaden:
 * **M31 (dato no medido)** — si el coste ausente se publica como clave nula, `null` pasa a leerse
   como una medición.
 * **M32 (costura muda)** — si el informe ignora la evidencia de riesgo que se le pasa, el
-  productor deja de entrar en la evaluación.
+  productor deja de entrar en la evaluación. **Realineada en `V2.57`/`AUTO-16`:** la sonda apuntaba a
+  la llamada de `AUTO-9` (`apply_cycle_risk(cycles_from_fills(...), cycle_risk)`) y esa llamada
+  dejó de existir tal cual al entrar la fricción aplicada en el **mismo** sitio
+  (`_risk_with_applied_cost`, que es justo la pieza puente entre el productor de riesgo y el
+  informe); la sonda vuelve a apuntar a la llamada **del informe**, que es donde su invariante vive.
+  Una sonda desalineada **afirma** cobertura que no tiene: se realinea, no se borra.
 * **M33 (worker sin denominador)** — si el camino Adaptive deja de leer el riesgo por ciclo, la
   evidencia existe pero nadie la consume.
 * **M34 (identidad derivada)** — si un `cycle_id` ajeno al prefijo también se deriva, se afirma
@@ -298,6 +303,36 @@ AUTO-15 (racha de fallos del Data Gate PERSISTIDA: el reinicio no la olvida) ana
 * **M118 (sesión envenenada por el reset)** — lo mismo por la puerta del reset: un ``record_success``
   que no se puede escribir tampoco puede dejar la sesión del turno inservible.
 
+AUTO-16 (coste REAL por ciclo: el neto declara su base) anade:
+
+* **M119 (coste aplicado ignorado)** — si el pegador devuelve la evidencia intacta, la fricción que
+  el simulador midió no llega al neto y el R vuelve al supuesto del decisor como si no se hubiera
+  medido nada: el trabajo de medir se paga y se tira.
+* **M120 (signo invertido: la fricción se lee como rebaja)** — si el neto suma el coste en vez de
+  restarlo, un ciclo con fricción medida **mejora** su R por haber pagado más: exactamente lo que la
+  convención de signo del módulo puro existe para impedir.
+* **M121 (comisión omitida sin declararlo)** — si el neto aplicado se compone solo con la fricción
+  (sin la comisión del modelo) pero la base sigue afirmando que la lleva, cada ciclo gana el importe
+  de su comisión en el cociente y la etiqueta lo calla.
+* **M122 (una sola pata leída como ida y vuelta)** — si el agregado deja de exigir las dos
+  direcciones, medio viaje se lee como el coste del ciclo entero: el SUELO entra al neto como si
+  fuera el total (y `AUTO-16` hereda el defecto del §6.3 por la puerta nueva).
+* **M123 (referencia ausente tratada como fricción 0)** — si un fill sin ``reference_mid`` se mide
+  contra su propio precio, la fila anterior a la migración ``046`` publica fricción **cero**: diría
+  "fricción gratis" y regalaría R en todo el histórico.
+* **M124 (fila de otra cuenta en el ciclo)** — si el lector por ciclo deja de casar la cuenta, la
+  fricción de otra cuenta entra en el neto de esta: se decide con una medición ajena.
+* **M125 (sello del reparto sin subir)** — si la PROCEDENCIA del coste cambia (estimado → aplicado)
+  y la versión de política no, dos planes con la misma evidencia difieren en los pesos sin que nada
+  lo declare.
+* **M126 (la referencia no sobrevive al contexto)** — si el contexto del fill no conserva el mid, la
+  migración ``046`` se escribe vacía y la fricción aplicada no se puede recomponer jamás: persistencia
+  aparente.
+* **M127 (base ``applied`` sin medición detrás)** — si el camino sin fricción medida declara la base
+  aplicada, el neto del histórico publica la etiqueta del coste medido llevando el supuesto dentro.
+* **M128 (agregado que mezcla bases sin declararlo)** — si el agregado deja de declarar la mezcla,
+  un neto que promedia dos modelos de coste se lee como si midiera uno solo.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -359,6 +394,8 @@ ADAPTIVE_JOURNAL = "packages/py/application/src/bolsa_application/auto_adaptive_
 ADAPTIVE_RECOVERY = "packages/py/application/src/bolsa_application/auto_adaptive_recovery.py"
 CYCLE_TRACE = "packages/py/application/src/bolsa_application/auto_cycle_reconciliation.py"
 ADAPTIVE_GATE_STORE = "packages/py/application/src/bolsa_application/adaptive_gate_store.py"
+APPLIED_COST = "packages/py/application/src/bolsa_application/applied_cost.py"
+SIM_FILL_STORE = "packages/py/application/src/bolsa_application/sim_durable_store.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 
 # --- suites que deben morder ----------------------------------------------------------------
@@ -394,6 +431,9 @@ T_CYCLE_TRACE = "packages/py/application/tests/test_auto_cycle_reconciliation.py
 T_ADAPTIVE_SEAM = "apps/api-python/tests/test_auto_v52_auto11_adaptive_state_seam.py"
 T_GATE_STORE = "packages/py/application/tests/test_adaptive_gate_store.py"
 T_GATE_DURABLE_SEAM = "apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py"
+T_SIM_REF = "packages/py/application/tests/test_sim_fill_reference.py"
+T_APPLIED = "packages/py/application/tests/test_applied_cost.py"
+T_APPLIED_SEAM = "apps/api-python/tests/test_auto_v57_auto16_applied_cost_seam.py"
 T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
@@ -644,7 +684,13 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M32 (costura muda): el informe ignora la evidencia de riesgo que le llega",
         FEED,
-        "        cycles=apply_cycle_risk(cycles_from_fills(fills or ()), cycle_risk),\n",
+        # AUTO-16: el fragmento se realinea (el plan lo declara). La llamada de AUTO-9 cambio al
+        # entrar la friccion aplicada en el mismo sitio: `_risk_with_applied_cost` es la pieza
+        # puente entre el productor de riesgo y el informe, asi que la sonda apunta a la llamada
+        # del INFORME (la que su invariante describe), no a la del productor.
+        "        cycles=apply_cycle_risk(\n"
+        "            cycles_from_fills(fills or ()), _risk_with_applied_cost(fills, cycle_risk)\n"
+        "        ),\n",
         "        cycles=cycles_from_fills(fills or ()),\n",
         (T_CYCLE_RISK,),
     ),
@@ -1333,6 +1379,85 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "            raise\n"
         "        return reset\n",
         (T_GATE_STORE,),
+    ),
+    # ── AUTO-16 (V2.57): el coste REAL por ciclo y la base declarada del R neto ──────────────
+    (
+        "M119 (coste aplicado ignorado): el pegador devuelve la evidencia intacta",
+        CYCLE_RISK,
+        "    if not applied:\n"
+        "        return dict(cycle_risk)\n",
+        "    if True:\n"
+        "        return dict(cycle_risk)\n",
+        (T_CYCLE_RISK, T_APPLIED_SEAM),
+    ),
+    (
+        "M120 (friccion como rebaja): el neto SUMA el coste en vez de restarlo",
+        AUTO_SELF_EVAL,
+        "            net_r_multiple = _ratio(amount - deducted, risk)\n",
+        "            net_r_multiple = _ratio(amount + deducted, risk)\n",
+        (T_SELF[0], T_CYCLE_RISK),
+    ),
+    (
+        "M121 (comision omitida sin declararlo): el neto aplicado no lleva la comision del modelo",
+        AUTO_SELF_EVAL,
+        "            deducted, cost_basis = applied + commission, SELF_EVAL_COST_BASIS_APPLIED\n",
+        "            deducted, cost_basis = applied, SELF_EVAL_COST_BASIS_APPLIED\n",
+        (T_SELF[0], T_CYCLE_RISK, T_APPLIED_SEAM),
+    ),
+    (
+        "M122 (una sola pata): el agregado no exige ida y vuelta y el suelo entra al neto",
+        APPLIED_COST,
+        '    round_trip = {"buy", "sell"} <= sides\n',
+        "    round_trip = True\n",
+        (T_APPLIED, T_CYCLE_RISK),
+    ),
+    (
+        "M123 (referencia ausente = friccion 0): un fill sin mid se mide contra su precio",
+        APPLIED_COST,
+        '    reference = _positive(getattr(fill, "reference_mid", None))\n',
+        '    reference = _positive(getattr(fill, "reference_mid", None)) or price\n',
+        (T_APPLIED, T_APPLIED_SEAM),
+    ),
+    (
+        "M124 (fila de otra cuenta): el lector por ciclo deja de casar la cuenta",
+        SIM_FILL_STORE,
+        '            if str(row.cycle_id or "").strip() in wanted\n'
+        "            and (account_id is None or row.account_id == account_id)\n",
+        '            if str(row.cycle_id or "").strip() in wanted\n'
+        "            and True\n",
+        (T_SIM_REF,),
+    ),
+    (
+        "M125 (sello sin subir): la procedencia del coste cambia y la version de politica no",
+        AUTO_ADAPTIVE,
+        'ADAPTIVE_POLICY_VERSION = "auto16-v1"',
+        'ADAPTIVE_POLICY_VERSION = "auto14-v1"',
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M126 (referencia no conservada): el contexto del fill pierde su mid al construirse",
+        SIM_FILL_STORE,
+        '        object.__setattr__(self, "reference_mid", usable_reference_mid(self.reference_mid))\n',
+        '        object.__setattr__(self, "reference_mid", None)\n',
+        (T_SIM_REF,),
+    ),
+    (
+        "M127 (base aplicada sin medicion): el camino sin aplicado declara la base del aplicado",
+        AUTO_SELF_EVAL,
+        "        elif friction is not None:\n"
+        "            deducted, cost_basis = friction, SELF_EVAL_COST_BASIS_ESTIMATED\n",
+        "        elif friction is not None:\n"
+        "            deducted, cost_basis = friction, SELF_EVAL_COST_BASIS_APPLIED\n",
+        (T_SELF[0], T_CYCLE_RISK, T_APPLIED_SEAM),
+    ),
+    (
+        "M128 (bases mezcladas sin declarar): el agregado deja de publicar la mezcla",
+        AUTO_SELF_EVAL,
+        "    if len(unique) > 1:\n"
+        "        return SELF_EVAL_COST_BASIS_MIXED\n",
+        "    if False:\n"
+        "        return SELF_EVAL_COST_BASIS_MIXED\n",
+        (T_SELF[0],),
     ),
 ]
 
