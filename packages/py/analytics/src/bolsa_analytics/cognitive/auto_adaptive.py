@@ -77,6 +77,7 @@ from decimal import Decimal
 from typing import Any
 
 from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_BASIS_COST_MODEL_TRANSITION,
     ADAPTIVE_BASIS_MIXED,
     ADAPTIVE_BASIS_TRANSITION,
     ADAPTIVE_BASIS_UNKNOWN,
@@ -87,6 +88,7 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
 )
 from bolsa_analytics.cognitive.auto_self_evaluation import (
     SELF_EVAL_COST_BASIS_MIXED,
+    SELF_EVAL_COST_MODEL_MIXED,
     StrategyRegimeEvaluation,
     StrategySelfEvaluation,
     declared_regime,
@@ -185,7 +187,15 @@ ADAPTIVE_KEY = "adaptive"
 #: con el motivo declarado (``cell_basis_unstable``) en vez de promediar modelos de coste. Es un
 #: cambio de REGLA (a diferencia de ``auto16-v1``, que solo cambiaba la procedencia de un input),
 #: así que el sello sube. ``DATA_GATE_POLICY_VERSION`` NO se toca.
-ADAPTIVE_POLICY_VERSION = "auto17-v1"
+#:
+#: ``auto18-v1`` (AUTO-18): la aritmética del encogimiento sigue siendo ``n/(n+k)``, pero la ``n``
+#: deja de ser la muestra **medida** y pasa a ser la muestra **EFECTIVA ESTADÍSTICA**
+#: (``min(measured_n, episodes)``: rachas de régimen), así que dos edges con la misma cantidad de
+#: ciclos pesan distinto si uno los midió en una sola fase de mercado y el otro en varias. La
+#: precondición de comparabilidad se completa por el OTRO eje de la población (``(base,
+#: cost_model_version)``) y el factor aplicado se **publica** (``shrink_factors``). Son cambios de
+#: REGLA ⇒ el sello sube. ``DATA_GATE_POLICY_VERSION`` NO se toca.
+ADAPTIVE_POLICY_VERSION = "auto18-v1"
 
 #: Motivos de rotación (vocabulario PROPIO de este módulo; el journal de la capa de
 #: aplicación los lleva en el detalle de ``adaptive_strategy_paused``). La casa única
@@ -274,10 +284,11 @@ ADAPTIVE_CELL_NOTE_NOT_POSITIVE = "cell_not_positive"
 #: El eje del grupo es la MONEDA bruta: la celda mide R, no moneda, así que no puede afinar el peso y
 #: el reparto se queda en la evidencia global (no se deriva un cociente paralelo para fabricarla).
 ADAPTIVE_CELL_NOTE_AXIS_WITHOUT_CELL = "cell_axis_without_cell"
-#: AUTO-17 — el grupo competía en el eje del R neto pero su base de coste NO es una única base
-#: estable (conviven ``estimated``/``applied``, o es ``mixed``, o la versión está en
-#: ``TRANSITION``): mezclar modelos de coste en el numerador sería aritmética sin sentido, así
-#: que el reparto cae al eje histórico y lo declara.
+#: AUTO-17 — el grupo competía en el eje del R neto pero su POBLACIÓN de coste NO es una única
+#: población estable (conviven ``estimated``/``applied``, o es ``mixed``, o la versión está en
+#: ``TRANSITION`` —o, desde AUTO-18, en ``COST_MODEL_TRANSITION``: misma base, distinto METRO—):
+#: mezclar modelos de coste en el numerador sería aritmética sin sentido, así que el reparto cae
+#: al eje histórico y lo declara.
 ADAPTIVE_CELL_NOTE_BASIS_UNSTABLE = "cell_basis_unstable"
 
 #: Régimen por estrategia: el cruce ``strategy × regime`` ya tiene productor (``AUTO-9``),
@@ -415,12 +426,28 @@ class StrategyHealth:
     recent_expectancy_r: float | None = None
     long_expectancy_r: float | None = None
     decay: str | None = None
-    #: AUTO-17 — la BASE del R neto que Adaptive lee (``estimated``/``applied``/``mixed``/
-    #: ``undeclared``/``None``) y si esa base es estable entre ventanas
-    #: (``STABLE_ESTIMATED``/``STABLE_APPLIED``/``TRANSITION``/``MIXED``/``UNKNOWN``). Viajan con
-    #: la evidencia para que el reparto no promedie dos modelos de coste como si fueran uno.
+    #: AUTO-17/18 — la BASE del R neto que Adaptive lee (``estimated``/``applied``/``mixed``/
+    #: ``undeclared``/``None``) y si esa POBLACIÓN es estable entre ventanas
+    #: (``STABLE_ESTIMATED``/``STABLE_APPLIED``/``TRANSITION``/``MIXED``/
+    #: ``COST_MODEL_TRANSITION``/``DATA_DEGRADED``/``UNKNOWN``). Viajan con la evidencia para que
+    #: el reparto no promedie dos modelos de coste como si fueran uno.
     net_r_basis: str | None = None
     basis_transition: str = ADAPTIVE_BASIS_UNKNOWN
+    #: AUTO-18 — la muestra con la que la confianza MIDIÓ esta estrategia: los ciclos con R medido
+    #: (``measured_n``), las rachas de régimen que esos ciclos cubren (``episodes``) y la muestra
+    #: EFECTIVA (``effective_n = min(measured_n, episodes)``) que la independencia permite afirmar.
+    #: Es la ``n`` del encogimiento del reparto. Ceros sin lectura de confianza (no hay muestra
+    #: medida que declarar), nunca un cero de relleno.
+    measured_n: int = 0
+    episodes: int = 0
+    effective_n: int = 0
+    #: AUTO-18 — la COBERTURA por independencia (``HIGH``/``MEDIUM``/``LOW``/``UNCOVERED``): eje
+    #: PROPIO, distinto de ``confidence`` (bien medido ≠ generalizable). ``None`` sin lectura.
+    coverage: str | None = None
+    #: AUTO-18 — la expectancy agregada **encogida por muestra efectiva**, tal como la publica el
+    #: motor de confianza (read-only). Es la MEDIDA del encogimiento; el factor **aplicado** al peso
+    #: vive en el reparto (``AllocationPlan.shrink_factors``), que es otro hecho.
+    shrunk_expectancy_r: float | None = None
 
     @classmethod
     def from_evaluation(
@@ -458,12 +485,21 @@ class StrategyHealth:
                 confidence.long_expectancy_r if confidence is not None else None
             ),
             decay=confidence.decay if confidence is not None else None,
-            # AUTO-17: la base del neto sale de la FILA (siempre la declara); la transición, de la
-            # confianza (compara long vs recent). Sin confianza, la transición queda ``UNKNOWN``:
-            # no se afirma una estabilidad que nadie midió.
+            # AUTO-17/18 — la base del neto sale de la FILA (siempre la declara); la transición, de la
+            # confianza (compara long vs recent, en los dos ejes). Sin confianza, la transición queda
+            # ``UNKNOWN``: no se afirma una estabilidad que nadie midió.
             net_r_basis=row.net_r_basis,
             basis_transition=(
                 confidence.basis_transition if confidence is not None else ADAPTIVE_BASIS_UNKNOWN
+            ),
+            # AUTO-18: la muestra EFECTIVA con la que se encogió el peso y la medida del
+            # encogimiento. Sin lectura quedan en cero/``None``: la ausencia se declara.
+            measured_n=confidence.measured_n if confidence is not None else 0,
+            episodes=confidence.episodes if confidence is not None else 0,
+            effective_n=confidence.effective_n if confidence is not None else 0,
+            coverage=confidence.coverage if confidence is not None else None,
+            shrunk_expectancy_r=(
+                confidence.shrunk_expectancy_r if confidence is not None else None
             ),
         )
 
@@ -571,6 +607,12 @@ class AllocationPlan:
     #: AUTO-14 — versión → motivo del hueco (su peso salió del global). Nunca vacío "por accidente":
     #: si el eje no admite celdas, TODAS las que compiten declaran ``cell_axis_without_cell``.
     cell_fallback: Mapping[str, str] = field(default_factory=dict)
+    #: AUTO-18 — versión → FACTOR de encogimiento **realmente aplicado** al peso (``1.0`` cuando no
+    #: se aplicó ninguno, incluido el caso límite en que el encogimiento degeneraba a ``0`` y se
+    #: conservó el peso original). Solo trae las versiones que compitieron con confianza aportada:
+    #: un factor que no se aplicó no se publica como si se hubiera aplicado. Sin esto, un
+    #: multiplicador no dice si su peso se encogió por muestra efectiva —ni cuánto—.
+    shrink_factors: Mapping[str, float] = field(default_factory=dict)
 
     def multiplier_for(self, strategy_version: str) -> float:
         return self.multipliers.get(str(strategy_version or ""), 1.0)
@@ -724,6 +766,16 @@ class AdaptivePlan:
     def recovery_for(self, strategy_version: str) -> RecoveryReading | None:
         return self.recovery.get(str(strategy_version or ""))
 
+    @property
+    def shrink_factors(self) -> Mapping[str, float]:
+        """AUTO-18 — factor de encogimiento REALMENTE aplicado por versión (delegado al reparto).
+
+        Se expone en el plan —no solo en ``allocation``— porque ``evidence_for`` lo publica por
+        versión: la evidencia y el reparto tienen que leer el MISMO hecho, no dos copias que
+        podrían divergir.
+        """
+        return self.allocation.shrink_factors
+
     def risk_multiplier_for(self, strategy_version: str) -> float:
         return self.allocation.multiplier_for(strategy_version)
 
@@ -765,6 +817,17 @@ class AdaptivePlan:
             "recentExpectancyR": row.recent_expectancy_r,
             "longExpectancyR": row.long_expectancy_r,
             "decay": row.decay,
+            # AUTO-18 — la muestra EFECTIVA con la que se encogió el peso (ciclos medidos acotados
+            # por rachas de régimen), su cobertura por independencia, la medida del encogimiento y
+            # el FACTOR realmente aplicado al peso. Los cuatro juntos le dicen al auditor cuánto
+            # pesó de verdad cada edge y por qué: ``effectiveN`` sin ``shrinkFactor`` no diría si se
+            # USÓ, y ``shrinkFactor`` sin ``effectiveN`` no diría de dónde salió.
+            "measuredN": row.measured_n,
+            "episodes": row.episodes,
+            "effectiveN": row.effective_n,
+            "coverage": row.coverage,
+            "shrunkExpectancyR": row.shrunk_expectancy_r,
+            "shrinkFactor": self.allocation.shrink_factors.get(row.strategy_version),
         }
 
     def as_dict(self) -> dict[str, Any]:
@@ -969,31 +1032,41 @@ def _net_basis_comparable(
     rows_by_version: Mapping[str, StrategySelfEvaluation],
     confidence: AdaptiveConfidence | None,
 ) -> bool:
-    """(PURA, AUTO-17) ¿comparte el grupo que compite una ÚNICA base de coste ESTABLE?
+    """(PURA, AUTO-17/18) ¿comparte el grupo que compite una ÚNICA POBLACIÓN de coste ESTABLE?
 
     El eje del R neto solo se adopta si todos los que compiten midieron su neto contra el MISMO
     modelo de coste: un grupo con una pata ``estimated`` y otra ``applied`` no puede promediar
     bases, porque dos netos con el mismo aspecto no son comparables. ``mixed`` explícito bloquea
-    siempre; con la confianza aportada, una versión en ``TRANSITION``/``MIXED`` (su neto cambió
-    de base entre la ventana larga y la reciente) bloquea igual. Una base **ausente** (``None``)
-    NO bloquea por sí sola: si TODAS comparten esa misma ausencia, no hay mezcla demostrada y se
-    conserva el comportamiento histórico.
+    siempre; con la confianza aportada, una versión en ``TRANSITION``/``MIXED`` (su neto cambió de
+    base entre la ventana larga y la reciente) o en ``COST_MODEL_TRANSITION`` (``AUTO-18``: misma
+    base, distinto METRO) bloquea igual. Una base **ausente** (``None``) NO bloquea por sí sola:
+    si TODAS comparten esa misma ausencia, no hay mezcla demostrada y se conserva el
+    comportamiento histórico.
     """
     bases: set[str | None] = set()
+    models: set[str | None] = set()
     for version in net_r_versions:
         row = rows_by_version.get(version)
         basis = None if row is None else row.net_r_basis
         if basis == SELF_EVAL_COST_BASIS_MIXED:
             return False
         bases.add(basis)
+        model = None if row is None else row.cost_model_version
+        if model == SELF_EVAL_COST_MODEL_MIXED:
+            return False
+        models.add(model)
         if confidence is not None:
             cell = confidence.confidence_for(version)
             if cell is not None and cell.basis_transition in (
                 ADAPTIVE_BASIS_TRANSITION,
                 ADAPTIVE_BASIS_MIXED,
+                ADAPTIVE_BASIS_COST_MODEL_TRANSITION,
             ):
                 return False
-    return len(bases) <= 1
+    # AUTO-18: la población homogénea es ``(base, versión del modelo)``, así que el grupo tiene
+    # que compartir TAMBIÉN el metro. Dos estrategias medidas contra modelos distintos no son
+    # comparables aunque las dos se llamen ``estimated``, igual que dos bases distintas no lo son.
+    return len(bases) <= 1 and len(models) <= 1
 
 
 def _allocation_weights(
@@ -1020,11 +1093,11 @@ def _allocation_weights(
     coste— no habilita decidir contra el agregado). AUTO-16 no cambia la condición: cambia de dónde
     sale el coste que el neto descuenta (``netRBasis``, ``applied`` o ``estimated``).
 
-    **AUTO-17 — el eje del R neto exige una base de coste COMPARABLE.** ``net_expectancy_r`` es un
-    número adimensional pero NO neutro: dos netos medidos contra modelos de coste distintos no se
-    promedian (``_net_basis_comparable``). Si el grupo que compite no comparte una única base
-    estable, el eje cae al histórico y cada peso lo declara (``cell_basis_unstable``): el delta de
-    base nunca se lee como señal.
+    **AUTO-17/18 — el eje del R neto exige una POBLACIÓN de coste COMPARABLE.** ``net_expectancy_r``
+    es un número adimensional pero NO neutro: dos netos medidos contra modelos de coste distintos no
+    se promedian (``_net_basis_comparable``). Si el grupo que compite no comparte una única
+    población estable —``(base, versión del modelo)``—, el eje cae al histórico y cada peso lo
+    declara (``cell_basis_unstable``): el delta de base o de metro nunca se lee como señal.
 
     **AUTO-14 — la celda afina el PESO, nunca la composición.** Quién compite en el eje del R
     neto lo decide la FILA (``decisive`` + neto medido y positivo), igual que en ``v2.50``–``v2.54``.
@@ -1052,7 +1125,7 @@ def _allocation_weights(
             # La versión COMPITE en el eje del R neto (lo decide la FILA, no la celda).
             net_r[version] = float(row.net_expectancy_r)
             cell, note = regime_cell_for(cells.get(version, ()), version, regime)
-            if cell is not None:
+            if cell is not None and cell.net_expectancy_r is not None:
                 # La celda solo puede mover el NÚMERO de quien ya competía.
                 net_r[version] = float(cell.net_expectancy_r)
                 cell_used[version] = cell.regime
@@ -1113,16 +1186,20 @@ def _cell_confidence(
 
 
 def _confidence_factor(
-    confidence: StrategyConfidence | None,
+    confidence: StrategyConfidence | RegimeConfidence | None,
     *,
     prior: float,
     policy: AdaptivePolicy,
 ) -> float:
     """(PURA) factor de encogimiento por muestra efectiva (y deterioro severo), o ``1.0``.
 
-    ``shrink = effective_n / (effective_n + prior)``. Sin lectura de confianza el factor es
-    ``1.0``: el comportamiento histórico se conserva. Con ``decay == SEVERE`` se aplica el
-    factor declarado por la política — nunca una pausa, solo menos peso.
+    ``shrink = effective_n / (effective_n + prior)``. La ``n`` es la **estadística**: la que el
+    motor de confianza publica como ``effective_n``, que desde ``AUTO-18`` es
+    ``min(measured_n, episodes)`` — ciclos con R medido, acotados por las RACHAS de régimen que
+    cubren. Es decir: 100 ciclos dentro de una sola fase de mercado encogen como 1, porque eso es
+    lo que la independencia permite afirmar. Sin lectura de confianza el factor es ``1.0``: el
+    comportamiento histórico se conserva. Con ``decay == SEVERE`` se aplica el factor declarado por
+    la política — nunca una pausa, solo menos peso.
     """
     if confidence is None:
         return 1.0
@@ -1174,6 +1251,11 @@ def recommend_allocation(
       global, y el hueco se declara (``cell_used``/``cell_fallback``). La celda afina el **peso**,
       nunca la composición, y con el eje de moneda no se aplica (se declara). El encogimiento de
       ``AUTO-12`` usa entonces la banda de la **celda**, no la de la estrategia.
+    * **AUTO-18** — la ``n`` del encogimiento es la muestra **efectiva estadística**
+      (``min(measured_n, episodes)``: los ciclos medidos acotados por las RACHAS de régimen que
+      cubren), no la muestra medida. La aritmética es la misma que ``AUTO-12``, el denominador no:
+      dos edges con los mismos ciclos pesan distinto si uno los midió en una sola fase de mercado.
+      El factor que de VERDAD se aplicó se publica por versión en ``AllocationPlan.shrink_factors``.
 
     Se materializa una entrada por CADA versión activa: la semántica de "sin evidencia"
     queda en la política, nunca en el default de ``AllocationPlan.multiplier_for``.
@@ -1202,6 +1284,7 @@ def recommend_allocation(
     )
     axis = sources.axis
     positive = sources.positive
+    shrink_factors: dict[str, float] = {}
     if positive and confidence is not None:
         prior = max(0.0, float(resolved.confidence_prior))
         adjusted: dict[str, float] = {}
@@ -1218,7 +1301,11 @@ def recommend_allocation(
             # El encogimiento NUNCA elimina a nadie del reparto: si un factor degenerara a 0
             # se conserva el peso original (quitar a una estrategia es una DECISIÓN, y
             # Adaptive solo recomienda).
-            adjusted[version] = shrunk if shrunk > 0.0 else weight
+            applied = shrunk if shrunk > 0.0 else weight
+            adjusted[version] = applied
+            # AUTO-18: se publica el factor que de VERDAD se aplicó —``1.0`` cuando el suelo
+            # del párrafo anterior conservó el peso—, no el que se calculó y no se usó.
+            shrink_factors[version] = (applied / weight) if weight > 0.0 else 1.0
         positive = adjusted
 
     neutral = _clamp_unit(resolved.unknown_multiplier)
@@ -1250,6 +1337,7 @@ def recommend_allocation(
         cell_axis=sources.cell_axis,
         cell_used=sources.cell_used,
         cell_fallback=sources.cell_fallback,
+        shrink_factors=shrink_factors,
     )
 
 

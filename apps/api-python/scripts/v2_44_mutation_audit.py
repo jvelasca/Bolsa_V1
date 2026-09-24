@@ -342,8 +342,11 @@ de extremo a extremo, sin promediar poblaciones mixtas) añade:
 * **M130 (cierre ignorado)** — si el mapa aplicado deja de restringirse a los ciclos que el ciclo de
   vida declaró cerrados, un ciclo **abierto** (recomprado) recibe fricción y entra al neto como si
   el simulador ya hubiera terminado de pagarlo.
-* **M131 (pooled mixto publicado)** — si con dos bases el agregado promedia y publica el pooled, el
-  número con el que decide Adaptive mezcla dos modelos de coste y lo presenta como uno solo.
+* **M131 (pooled publicado)** — si con una población NO homogénea (dos bases, o dos metros dentro de
+  una base) el agregado promedia y publica el pooled, el número con el que decide Adaptive mezcla dos
+  modelos de coste y lo presenta como uno solo. (Realineada en ``AUTO-18``: la guarda de ``MIXED`` dejó
+  de ser la única que frena el promedio, así que la mutación desactiva las DOS guardas de
+  ``_pooled_net_expectancy``.)
 * **M132 (series colapsadas)** — si el desglose agrupa todas las bases como una, dos poblaciones de
   coste distinto se funden en una serie y la mezcla deja de existir antes de declararse.
 * **M133 (transición no declarada)** — si el detector nunca marca ``TRANSITION``, el salto de base
@@ -358,6 +361,31 @@ de extremo a extremo, sin promediar poblaciones mixtas) añade:
   puede declarar sobre qué bases se decidió.
 * **M138 (base no leída)** — si la confianza no lee la base de la fila, nunca ve la transición y
   vuelve a tratar el salto de medida como una señal de deterioro.
+
+AUTO-18 (confianza ESTADÍSTICA: la muestra efectiva por episodios de régimen, la cobertura como
+eje propio, la expectancy encogida publicada y el METRO del coste como segundo eje de la población)
+añade:
+
+* **M139 (independencia ignorada)** — si la muestra efectiva vuelve a ser la bruta, 100 ciclos de
+  una sola fase de mercado pesan como 100 observaciones independientes.
+* **M140 (cobertura colapsada)** — si toda celda con muestra se declara cubierta al máximo,
+  ``coverage`` deja de distinguir un edge medido en varias fases de uno medido en una.
+* **M141 (calibración inventada)** — si se publican bandas sin celdas que las respalden, la tabla
+  descriptiva afirma sobre poblaciones que no existen.
+* **M142 (expectancy sin encoger)** — si la expectancy publicada es la bruta, la evidencia muestra
+  un número que la muestra no sostiene.
+* **M143 (medido en vez de efectivo)** — si el reparto encoge por la muestra bruta, la
+  independencia deja de acotar el peso.
+* **M144 (metro perdido)** — si el modelo de coste no publica su versión, el informe no puede
+  declarar con qué instrumento se midió el neto.
+* **M145 (series fundidas)** — si dos metros dentro de una base se agrupan en una serie, dos
+  poblaciones de coste distintas se funden en una media que ningún metro midió.
+* **M146 (transición de metro no declarada)** — si el detector nunca ve cambiar el instrumento,
+  un cambio de modelo de coste se lee como cambio de rendimiento.
+* **M147 (decay cross-modelo)** — si el ``decay`` se calcula aunque el metro cambie entre
+  ventanas, el cambio de instrumento encoge el peso como si el edge se hubiera roto.
+* **M148 (sello sin moverse)** — si el reparto cambia de regla (muestra estadística) y el sello se
+  queda en ``auto17``, dos planes con la misma evidencia difieren sin que nada lo declare.
 
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
@@ -421,6 +449,9 @@ ADAPTIVE_RECOVERY = "packages/py/application/src/bolsa_application/auto_adaptive
 CYCLE_TRACE = "packages/py/application/src/bolsa_application/auto_cycle_reconciliation.py"
 ADAPTIVE_GATE_STORE = "packages/py/application/src/bolsa_application/adaptive_gate_store.py"
 APPLIED_COST = "packages/py/application/src/bolsa_application/applied_cost.py"
+PORTFOLIO_RESERVATION = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/portfolio_reservation.py"
+)
 SIM_FILL_STORE = "packages/py/application/src/bolsa_application/sim_durable_store.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 
@@ -940,9 +971,9 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "M60 (muestra bruta por medida): effective_n cuenta los ciclos sin R",
         AUTO_ADAPTIVE_CONFIDENCE,
         "    sample_size = sum(cell.cycles for cell in cells)\n"
-        "    effective_n = sum(cell.cycles - cell.cycles_without_risk for cell in cells)\n",
+        "    measured_n = sum(cell.cycles - cell.cycles_without_risk for cell in cells)\n",
         "    sample_size = sum(cell.cycles for cell in cells)\n"
-        "    effective_n = sum(cell.cycles for cell in cells)\n",
+        "    measured_n = sum(cell.cycles for cell in cells)\n",
         (T_CONFIDENCE,),
     ),
     (
@@ -1455,7 +1486,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M125 (sello sin subir): la base del neto cambia la regla y la version de politica no",
         AUTO_ADAPTIVE,
-        'ADAPTIVE_POLICY_VERSION = "auto17-v1"',
+        'ADAPTIVE_POLICY_VERSION = "auto18-v1"',
         'ADAPTIVE_POLICY_VERSION = "auto16-v1"',
         (T_ADAPTIVE,),
     ),
@@ -1478,8 +1509,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M128 (bases mezcladas sin declarar): el agregado deja de publicar la mezcla",
         AUTO_SELF_EVAL,
-        "    if len(series) > 1:\n"
+        "    bases = {row.basis for row in series}\n"
+        "    if len(bases) > 1:\n"
         "        return SELF_EVAL_COST_BASIS_MIXED\n",
+        "    bases = {row.basis for row in series}\n"
         "    if False:\n"
         "        return SELF_EVAL_COST_BASIS_MIXED\n",
         (T_SELF[0],),
@@ -1500,12 +1533,14 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         (T_APPLIED,),
     ),
     (
-        "M131 (pooled mixto publicado): con dos bases el agregado SI promedia y publica el pooled",
+        "M131 (pooled publicado): con poblacion NO homogenea el agregado SI promedia y publica el pooled",
         AUTO_SELF_EVAL,
         "    if basis == SELF_EVAL_COST_BASIS_MIXED:\n"
-        "        return None\n",
-        "    if False:\n"
-        "        return None\n",
+        "        return None\n"
+        "    if len(series) != 1:\n",
+        "    if not series:\n"
+        "        return None\n"
+        "    if False:\n",
         (T_SELF[0], T_CONFIDENCE),
     ),
     (
@@ -1527,9 +1562,16 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M134 (decay cruzando bases): el deterioro se mide aunque la base cambie entre ventanas",
         AUTO_ADAPTIVE_CONFIDENCE,
-        "    if basis_transition in (ADAPTIVE_BASIS_TRANSITION, ADAPTIVE_BASIS_MIXED):\n"
+        "    if basis_transition in (\n"
+        "        ADAPTIVE_BASIS_TRANSITION,\n"
+        "        ADAPTIVE_BASIS_MIXED,\n"
+        "        ADAPTIVE_BASIS_COST_MODEL_TRANSITION,\n"
+        "    ):\n"
         "        return ADAPTIVE_DECAY_UNKNOWN\n",
-        "    if False:\n"
+        "    if basis_transition in (\n"
+        "        ADAPTIVE_BASIS_TRANSITION,\n"
+        "        ADAPTIVE_BASIS_COST_MODEL_TRANSITION,\n"
+        "    ):\n"
         "        return ADAPTIVE_DECAY_UNKNOWN\n",
         (T_CONFIDENCE,),
     ),
@@ -1564,6 +1606,98 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        net_r_basis=None,\n"
         "        net_r_series=(),\n",
         (T_CONFIDENCE,),
+    ),
+    # ── AUTO-18 (V2.59): la confianza estadistica y el metro del coste ────────────────────────
+    (
+        "M139 (independencia ignorada): la muestra efectiva es la bruta y las rachas no acotan",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "        return min(max(0, self.measured_n), max(0, self.episodes))\n",
+        "        return max(0, self.measured_n)\n",
+        (T_CONFIDENCE, T_ADAPTIVE),
+    ),
+    (
+        "M140 (cobertura colapsada): toda celda con muestra se declara cubierta al maximo",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    quality = sample_quality_from_n(effective_n)\n"
+        "    if quality in (\"developing\", \"useful\"):\n"
+        "        return ADAPTIVE_COVERAGE_HIGH\n"
+        "    if quality == \"preliminary\":\n"
+        "        return ADAPTIVE_COVERAGE_MEDIUM\n"
+        "    return ADAPTIVE_COVERAGE_LOW\n",
+        "    quality = sample_quality_from_n(effective_n)\n"
+        "    if quality in (\"developing\", \"useful\"):\n"
+        "        return ADAPTIVE_COVERAGE_HIGH\n"
+        "    return ADAPTIVE_COVERAGE_HIGH\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M141 (calibracion inventada): se publican bandas sin celdas que las respalden",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "        entries = grouped.get(level)\n"
+        "        if not entries:\n"
+        "            continue\n",
+        "        entries = grouped.get(level) or []\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M142 (expectancy sin encoger): la expectancy publicada es la bruta, sin muestra",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    return _round4(expectancy_r * (n / denominator))\n",
+        "    return _round4(expectancy_r)\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M143 (medido en vez de efectivo): el reparto encoge por la muestra bruta",
+        AUTO_ADAPTIVE,
+        "    effective_n = max(0, int(getattr(confidence, \"effective_n\", 0) or 0))\n",
+        "    effective_n = max(0, int(getattr(confidence, \"measured_n\", 0) or 0))\n",
+        (T_ADAPTIVE,),
+    ),
+    (
+        "M144 (metro perdido): el modelo de coste no publica su version y nadie la propaga",
+        PORTFOLIO_RESERVATION,
+        "            \"costModelVersion\": self.cost_model_signature(),\n",
+        "            \"costModelVersion\": None,\n",
+        (T_CYCLE_RISK,),
+    ),
+    (
+        "M145 (series fundidas): dos metros dentro de una base se agrupan como una sola serie",
+        AUTO_SELF_EVAL,
+        "        grouped.setdefault((basis, _cost_model_key(cycle)), []).append(cycle)\n",
+        "        grouped.setdefault((basis, SELF_EVAL_COST_MODEL_UNDECLARED), []).append(cycle)\n",
+        T_SELF,
+    ),
+    (
+        "M146 (transicion de metro no declarada): el detector nunca ve cambiar el instrumento",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "            if model != recent_model:\n"
+        "                return ADAPTIVE_BASIS_COST_MODEL_TRANSITION\n",
+        "            if False:\n"
+        "                return ADAPTIVE_BASIS_COST_MODEL_TRANSITION\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M147 (decay cross-modelo): el deterioro se mide aunque el metro cambie entre ventanas",
+        AUTO_ADAPTIVE_CONFIDENCE,
+        "    if basis_transition in (\n"
+        "        ADAPTIVE_BASIS_TRANSITION,\n"
+        "        ADAPTIVE_BASIS_MIXED,\n"
+        "        ADAPTIVE_BASIS_COST_MODEL_TRANSITION,\n"
+        "    ):\n"
+        "        return ADAPTIVE_DECAY_UNKNOWN\n",
+        "    if basis_transition in (\n"
+        "        ADAPTIVE_BASIS_TRANSITION,\n"
+        "        ADAPTIVE_BASIS_MIXED,\n"
+        "    ):\n"
+        "        return ADAPTIVE_DECAY_UNKNOWN\n",
+        (T_CONFIDENCE,),
+    ),
+    (
+        "M148 (sello sin moverse): el reparto cambia de regla y el sello se queda en auto17",
+        AUTO_ADAPTIVE,
+        "ADAPTIVE_POLICY_VERSION = \"auto18-v1\"\n",
+        "ADAPTIVE_POLICY_VERSION = \"auto17-v1\"\n",
+        (T_ADAPTIVE,),
     ),
 ]
 

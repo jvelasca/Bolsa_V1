@@ -182,9 +182,11 @@ def _material() -> dict[str, list[SimFillFinanceContext]]:
 def _regime_reader(*, c_cell: bool = True) -> _Reader:
     """El régimen REAL de cada ciclo, por índice: el cruce gana sus celdas por versión.
 
-    ``c_cell=False`` mueve TODOS los ciclos de ``c`` a ``RANGE``: la fila global es la misma (el
-    régimen no cambia el agregado de la estrategia), pero su celda de ``TREND_UP`` deja de existir.
-    Es el control de la celda fina: misma base, distinta NOTA.
+    ``c_cell=False`` quita la celda ``TREND_UP`` de ``c`` moviendo sus dos primeros ciclos a
+    ``BEAR_TREND`` (y el resto a ``RANGE``). **AUTO-18**: se mueven a un régimen DISTINTO, no a
+    ``RANGE``, para que el número de RACHAS del global no cambie (``TREND_UP``+``RANGE`` → 2
+    rachas; ``BEAR_TREND``+``RANGE`` → 2 rachas). La independencia es un eje propio que también
+    encoge el global, así que el control de la celda FINA tiene que aislar la celda, no la racha.
     """
     by_cycle: dict[str, str] = {}
     for index in range(0, 12):
@@ -193,10 +195,10 @@ def _regime_reader(*, c_cell: bool = True) -> _Reader:
         by_cycle[f"cyc-a-{index}"] = "RANGE"
     for index in range(0, 24):
         by_cycle[f"cyc-b-{index}"] = "TREND_UP"
-    if c_cell:
-        for index in range(0, 2):
-            by_cycle[f"cyc-c-{index}"] = "TREND_UP"
-    for index in range(0 if not c_cell else 2, 12):
+    first_regime = "TREND_UP" if c_cell else "BEAR_TREND"
+    for index in range(0, 2):
+        by_cycle[f"cyc-c-{index}"] = first_regime
+    for index in range(2, 12):
         by_cycle[f"cyc-c-{index}"] = "RANGE"
     return _Reader(by_cycle, default="RANGE")
 

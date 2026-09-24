@@ -133,6 +133,19 @@ def _round4(value: float) -> float:
     return round(value * 10000) / 10000
 
 
+def _sig_bps(value: Any) -> str:
+    """(PURA, AUTO-18) un bps como texto determinista (``10.0`` → ``"10"``); ``"?"`` si ilegible.
+
+    La firma de un modelo de coste tiene que ser **estable** entre procesos y plataformas: se
+    serializa sin ``repr`` de coma flotante para que ``10`` y ``10.0`` no produzcan dos versiones
+    distintas del mismo modelo.
+    """
+    number = _finite(value)
+    if number is None:
+        return "?"
+    return str(int(number)) if number == int(number) else repr(number)
+
+
 def _scale(value: float | None, factor: float) -> float | None:
     """Escala proporcional de una dimensión reservada (``None`` sigue siendo ``None``)."""
     if value is None:
@@ -189,6 +202,23 @@ class TradingCostModel:
             return None
         return _round4(notional * bps / 10000.0 * 2.0)
 
+    def cost_model_signature(self) -> str:
+        """(PURA, AUTO-18) la versión determinista del modelo: ``cm:<preset|bps>:c/s/l/g``.
+
+        Es el METRO con el que se midió el coste de una operación: dos netos calculados con
+        modelos distintos no son comparables aunque los dos se llamen "coste". La firma incluye
+        la comisión (preset real de la cuenta, o los bps) y los cuatro bps del modelo, en un
+        texto estable entre procesos y plataformas (``10.0`` y ``10`` dan la MISMA firma). NO
+        incluye ``settings``: solo su preset, que es lo que cambia la tarifa.
+        """
+        preset = self.settings.commission.preset_id if self.settings is not None else None
+        source = str(preset).strip() if isinstance(preset, str) and preset.strip() else "bps"
+        return (
+            f"cm:{source}:"
+            f"{_sig_bps(self.commission_bps)}/{_sig_bps(self.spread_bps)}"
+            f"/{_sig_bps(self.slippage_bps)}/{_sig_bps(self.gap_bps)}"
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "commissionBps": self.commission_bps,
@@ -198,6 +228,8 @@ class TradingCostModel:
             "commissionPresetId": (
                 self.settings.commission.preset_id if self.settings is not None else None
             ),
+            # AUTO-18: la VERSIÓN del metro viaja con el modelo (aditivo; sin migración).
+            "costModelVersion": self.cost_model_signature(),
         }
 
 
@@ -224,6 +256,11 @@ class TradingCost:
     gap_adjusted_loss: float | None = None
     worst_case_loss: float | None = None
     measurement: MeasurementStatus = MEASUREMENT_UNKNOWN
+    #: AUTO-18: la VERSIÓN del modelo de coste con la que se calculó este coste
+    #: (``cm:<preset|bps>:c/s/l/g``). ``None`` = fila anterior a esta fase: no se puede
+    #: reconstruir el metro, y se declara en vez de afirmarlo. Es la mitad que impide comparar
+    #: dos netos medidos con metros distintos como si fueran el mismo.
+    cost_model_version: str | None = None
 
     @property
     def is_complete(self) -> bool:
@@ -242,6 +279,8 @@ class TradingCost:
             "gapAdjustedLoss": self.gap_adjusted_loss,
             "worstCaseLoss": self.worst_case_loss,
             "measurement": self.measurement,
+            # AUTO-18: clave ADITIVA (``null`` en las filas anteriores a la fase).
+            "costModelVersion": self.cost_model_version,
         }
 
 
@@ -327,6 +366,8 @@ def estimate_trading_cost(
         measurement=measurement_from_counts(
             valued=valued, unvalued=len(components) - valued
         ),
+        # AUTO-18: el metro de este coste viaja con él (la firma del modelo, no una etiqueta).
+        cost_model_version=cfg.cost_model_signature(),
     )
 
 
@@ -351,6 +392,7 @@ def coerce_trading_cost(raw: Any) -> TradingCost | None:
     if not isinstance(raw, Mapping):
         return None
     measurement = coerce_measurement(raw.get("measurement")) or MEASUREMENT_UNKNOWN
+    version = raw.get("costModelVersion", raw.get("cost_model_version"))
     return TradingCost(
         notional=_first(raw, "notional"),
         commission=_first(raw, "commission"),
@@ -363,6 +405,12 @@ def coerce_trading_cost(raw: Any) -> TradingCost | None:
         gap_adjusted_loss=_first(raw, "gapAdjustedLoss", "gap_adjusted_loss"),
         worst_case_loss=_first(raw, "worstCaseLoss", "worst_case_loss"),
         measurement=measurement,
+        # AUTO-18: la versión del modelo se LEE si la fila la declara; una fila anterior a la
+        # fase no la tiene y queda ``None`` (nunca se reconstruye a partir de los bps actuales,
+        # que podrían no ser los que la midieron).
+        cost_model_version=(
+            str(version).strip() if isinstance(version, str) and version.strip() else None
+        ),
     )
 
 

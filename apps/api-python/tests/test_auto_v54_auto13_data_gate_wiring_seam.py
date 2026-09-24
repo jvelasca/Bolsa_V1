@@ -15,6 +15,7 @@ costura de ``AUTO-12`` y el byte-idéntico del payload de ``AUTO-8`` con el flag
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
@@ -30,6 +31,7 @@ from bolsa_analytics.cognitive.auto_adaptive import (
 )
 from bolsa_analytics.cognitive.auto_adaptive_data_gate import assess_data_gate
 from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
+from bolsa_application.auto_cycle_regime_reader import CycleRegimeReading
 from bolsa_application.sim_durable_store import SimFillFinanceContext
 
 _ACCOUNT = "acc-1"
@@ -113,19 +115,52 @@ class _Journal:
         self.entries.append(entry)
 
 
+class _Reader:
+    """Lector del régimen por ciclo, por índice declarado (la mitad de lectura de ``AUTO-10``)."""
+
+    def __init__(self, by_cycle: dict[str, str], *, default: str) -> None:
+        self._by_cycle = by_cycle
+        self._default = default
+
+    async def __call__(self, cycle_ids: Sequence[str]) -> CycleRegimeReading:
+        return CycleRegimeReading(
+            regime_by_cycle={
+                cycle_id: self._by_cycle.get(cycle_id, self._default) for cycle_id in cycle_ids
+            }
+        )
+
+
+def _regime_reader() -> _Reader:
+    """RACHAS distintas por versión: ``thin`` una sola fase, ``broad`` muchas (``AUTO-18``).
+
+    ``AUTO-18`` mide la independencia con las rachas de régimen, y el encogimiento del peso usa
+    esa muestra EFECTIVA. Si ``thin`` y ``broad`` compartieran el mismo número de rachas, sus
+    factores de encogimiento coincidirían y al normalizar los pesos la costura ``DEGRADED``
+    dejaría de ser observable. Con rachas distintas el control sigue midiendo lo que medía.
+    """
+    by_cycle: dict[str, str] = {}
+    for index in range(0, 12):
+        by_cycle[f"cyc-thin-{index}"] = "TREND_UP"
+        by_cycle[f"cyc-bad-{index}"] = "TREND_UP"
+    for index in range(0, 180):
+        by_cycle[f"cyc-broad-{index}"] = "TREND_UP" if index % 2 == 0 else "RANGE"
+    return _Reader(by_cycle, default="TREND_UP")
+
+
 def _worker(
     *,
     store: Any | None = None,
     paused: dict[str, int] | None = None,
     failures: int = 0,
     anchor: int | None = None,
+    regimes: _Reader | None = None,
 ) -> AutoSimulationWorker:
     worker = object.__new__(AutoSimulationWorker)
     worker._account_id = _ACCOUNT
     worker._engine_id = "auto-sim"
     worker._context_store = store
     worker._reservation_store = _Reservations()
-    worker._cycle_regime_reader = None
+    worker._cycle_regime_reader = regimes
     worker._v2_adaptive_paused_cycles = dict(paused or {})
     worker._v2_adaptive_paused_cycles_entered = {}
     worker._v2_adaptive_sink_failures = failures
@@ -285,13 +320,13 @@ async def test_degraded_stops_using_the_confidence_but_keeps_the_protection(
         "broad": _profitable("broad", 180),
         "bad": _losing("bad", 12),
     }
-    healthy = await _worker(store=_FillStore(fills))._v2_build_adaptive_plan(
-        {"thin", "broad", "bad"}, "TREND_UP"
-    )
+    healthy = await _worker(
+        store=_FillStore(fills), regimes=_regime_reader()
+    )._v2_build_adaptive_plan({"thin", "broad", "bad"}, "TREND_UP")
     captured = _spy_plan(monkeypatch)
-    degraded = await _worker(store=_FillStore(fills), failures=1)._v2_build_adaptive_plan(
-        {"thin", "broad", "bad"}, "TREND_UP"
-    )
+    degraded = await _worker(
+        store=_FillStore(fills), regimes=_regime_reader(), failures=1
+    )._v2_build_adaptive_plan({"thin", "broad", "bad"}, "TREND_UP")
 
     assert healthy is not None and degraded is not None
     # OK: la confianza viaja como evidencia y el reparto la USA.
