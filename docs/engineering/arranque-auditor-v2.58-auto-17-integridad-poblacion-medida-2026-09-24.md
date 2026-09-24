@@ -18,8 +18,9 @@ Antes de empezar: `git status`, `git log --oneline -5`, la head de Alembic
 2. **Sin migración** (§2): la base es **recomputable**; `_ALEMBIC_HEAD` **no** se movió.
 3. **La costura con CONTROL** (§5): con base homogénea el pooled es **el número de `v2.57` byte a byte**;
    con `MIXED`/`TRANSITION` el reparto **no** cambia de composición.
-4. **El delta simétrico** (pack §7): rojos **declarados de antemano** — el **sello** (`auto17-v1`) y la
-   guardia de head **no** cambia —, y **ningún** rojo residual.
+4. **El delta simétrico** (pack §7) y el **CI del sello** (pack §11): el delta lleva sus rojos
+   **declarados de antemano** — el **sello** (`auto17-v1`) y la guardia de head **no** cambian —, y
+   **ningún** rojo residual; el CI del sello se **mide después de sellar** (§8, no es un hallazgo).
 
 ---
 
@@ -163,6 +164,15 @@ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py
   **nombra**, así que no finge un coste completo.
 - **No hay backfill.** El histórico anterior a `2.57` no tiene referencia y se mide con el estimado
   **declarado**.
+- **El CI del sello se mide DESPUÉS de sellar, no antes.** El run del tag **no existe** hasta empujar el
+  tag, así que las cifras viven en el `audit-pack` **§11** —añadido en el **commit de docs posterior al
+  sello**, el mismo patrón declarado que `AUTO-13`…`AUTO-16`—: `Release tag CI`
+  [`35976693458`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35976693458) **verde a la primera**
+  (`10 success` + `1 skipped`), `2668 passed / 35 skipped` y `37` `check-runs`. **No hubo re-sello.**
+- **`/commits/{sha}/status` en `pending` con `0` statuses NO es un rojo.** Es la API **legacy de Commit
+  Status**; el repo publica **check-runs** —los `37` de `72f6084a` están `completed`—. Medido **en vivo
+  sobre el propio sello**: es el **cruce de API**, no un check ausente (es el P0 del acta de `v2.57`,
+  cerrado documentalmente en esta fase; no lo reabras sin una medición nueva).
 - **La base no se persiste por ciclo**: se recomputa. No hay migración.
 - **El flag Adaptive sigue OFF.** Sin él no hay plan ni lectura.
 - **Sin UI, sin SHORT, sin backfill.**
