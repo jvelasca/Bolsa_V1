@@ -124,6 +124,7 @@ from bolsa_api.background.paper_auto_engine_worker import (
     _watch_symbols,
 )
 from bolsa_application.account_drawdown import EquityMarkBook
+from bolsa_application.adaptive_gate_store import AdaptiveGateStore, sink_failures_from_state
 from bolsa_application.applied_fills import read_applied_fill_facts
 from bolsa_application.auto_adaptive_journal import (
     AUTO_ADAPTIVE_RECOMMENDATION_EVENT,
@@ -624,6 +625,10 @@ class AutoSimulationWorker:
         # devuelve el estado reconstruido con TODOS sus límites declarados. Sin él, el arranque no
         # recupera nada y el contador arranca como en ``V2.51`` (se declara en el log).
         adaptive_reader: Callable[[str | None], Awaitable[AdaptiveStateReading]] | None = None,
+        # AUTO-15: la racha de fallos CONSECUTIVOS del sink como estado DURABLE
+        # (``adaptive_gate_state``). Sin él la racha sigue siendo solo del proceso y un reinicio la
+        # olvida (el límite que AUTO-13 declaró); con él, el arranque la LEE antes del primer plan.
+        adaptive_gate_store: AdaptiveGateStore | None = None,
         # V2.43.3 (P0-1): espejo durable del latch de la parada dura (``auto_kill_state``).
         # Sin él la parada es solo del proceso y un reinicio la olvida. Con él, el arranque
         # la LEE antes de readoptar posición y el motor no puede reabrirse solo.
@@ -746,6 +751,10 @@ class AutoSimulationWorker:
         # ``asOf`` de la última recomendación publicada (sobrevive al reinicio). El estado del gate
         # los combina; ninguno se disfraza del otro.
         self._v2_adaptive_sink_failures: int = 0
+        #: AUTO-15: ¿la racha que entró al gate viene del estado DURABLE? Empieza en ``False`` (no
+        #: se ha consultado nada) y lo pone quien puede afirmarlo: la siembra de arranque, el
+        #: incremento o el reset. Un ``True`` sin store detrás sería una mentira sobre la prueba.
+        self._v2_adaptive_sink_failures_durable: bool = False
         self._v2_adaptive_sink_last_success_at: str | None = None
         #: Antigüedad durable (ciclos) de la última publicación, o ``None`` si no se pudo medir.
         self._v2_adaptive_journal_anchor_age: int | None = None
@@ -810,6 +819,11 @@ class AutoSimulationWorker:
         # AUTO-11: lo que se LEE de vuelta en el arranque para reconstruir el cooldown. Sin lector
         # no se recupera nada (se declara en el log) y el contador arranca a 0.
         self._adaptive_reader = adaptive_reader
+        # AUTO-15: el espejo DURABLE de la racha de fallos del sink del gate. Sin él la racha
+        # vive solo en el proceso (``_v2_adaptive_sink_failures``) y un reinicio la devuelve a 0:
+        # el gate volvería a creerse sano con un journal que lleva fallando. Con él, el arranque
+        # la siembra de ``adaptive_gate_state`` y la racha no se olvida.
+        self._adaptive_gate_store = adaptive_gate_store
         # AUTO-10: lo que se publica DURABLEMENTE cuando un ciclo abre. Sin sink no hay
         # escritura (ni se finge): el hueco de régimen por ciclo sigue declarado.
         self._cycle_regime_sink = cycle_regime_sink
@@ -3318,6 +3332,11 @@ class AutoSimulationWorker:
         )
         return assess_data_gate(
             sink_failures=int(getattr(self, "_v2_adaptive_sink_failures", 0) or 0),
+            # AUTO-15: se DECLARA la procedencia de la racha (no cambia el estado): un 0 no puede
+            # leerse como "el sink está sano" si en realidad no hay constancia durable.
+            sink_failures_durable=bool(
+                getattr(self, "_v2_adaptive_sink_failures_durable", False)
+            ),
             journal_age_cycles=self._v2_adaptive_gate_journal_age(),
             # Sin lectura durable registrada NO se declara un fallo de lectura: no se observó
             # ninguno (el hueco de "sin lector" lo declara AUTO-11 en el arranque, no el gate).
@@ -3413,9 +3432,16 @@ class AutoSimulationWorker:
         pero se registra, porque un silencio aquí devuelve el cooldown a la memoria del proceso.
 
         **AUTO-13 (§21).** Un fallo del sink deja de ser solo un renglón de log: se cuenta el fallo
-        CONSECUTIVO y un éxito RESETEA la racha. Ese contador vive en el proceso (su límite se
-        declara); la mitad durable es el ancla de antigüedad del journal que mide
-        ``_v2_recover_adaptive_state``.
+        CONSECUTIVO y un éxito RESETEA la racha. Ese contador vivía **solo** en el proceso (su
+        límite, declarado); el ancla durable de antigüedad mide *publicación*, no *error*.
+
+        **AUTO-15.** El contador deja de nacer en el proceso: el fallo se **persiste** en
+        ``adaptive_gate_state`` (incremento atómico) y el arranque lo **lee** para sembrar la racha
+        (``_v2_recover_adaptive_gate_streak``), de modo que un reinicio no devuelve el gate a
+        «sano» ni pierde una racha a punto de ser ``STALE``. El reset en el éxito no amplifica (sin
+        racha viva no escribe) y la procedencia de la racha se publica en el gate
+        (``sinkFailuresDurable``): un ``0`` no se lee igual si es durable que si nació en el
+        proceso.
         """
         sink = self._adaptive_sink
         if sink is None or adaptive is None:
@@ -3437,7 +3463,10 @@ class AutoSimulationWorker:
             # AUTO-13 (§21): el fallo se CUENTA (consecutivo), no solo se loguea. ``getattr``
             # porque un worker hermético de costura puede no traer el contador; en producción nace
             # en 0. Un éxito lo resetea justo abajo: un fallo aislado no arrastra.
-            failures = int(getattr(self, "_v2_adaptive_sink_failures", 0) or 0) + 1
+            local = int(getattr(self, "_v2_adaptive_sink_failures", 0) or 0) + 1
+            # AUTO-15: y se PERSISTE. La racha durable manda (puede venir de un proceso anterior);
+            # si el store falta o falla, la de proceso es la que queda, declarada.
+            failures = await self._v2_record_adaptive_sink_failure(local=local)
             self._v2_adaptive_sink_failures = failures
             logger.exception(
                 "auto_sim v2 adaptive recommendation journal failed consecutive=%s", failures
@@ -3447,7 +3476,91 @@ class AutoSimulationWorker:
         # —se acaba de publicar evidencia—, que es lo que cura un journal que estuvo sin escribir.
         self._v2_adaptive_sink_failures = 0
         self._v2_adaptive_sink_last_success_at = entry.created_at
+        # AUTO-15: el reset durable NO amplifica —sin racha viva no escribe—, para que un
+        # despliegue sano no pague una escritura por tick.
+        await self._v2_record_adaptive_sink_success(at=entry.created_at)
         self._v2_adaptive_journal_anchor_age = 0
+
+    async def _v2_recover_adaptive_gate_streak(self) -> None:
+        """(AUTO-15) siembra la racha DURABLE de fallos del sink, UNA vez por proceso.
+
+        Cierra la ventana que ``AUTO-13`` declaró como límite suyo: el contador de fallos
+        consecutivos del sink era **de proceso**, así que un reinicio lo devolvía a 0 y el gate
+        volvía a creerse sano con un journal que llevaba fallando (o, al revés, olvidaba la racha
+        que lo iba a llevar a ``STALE``). El journal **no** puede reconstruirla —una escritura que
+        falló no dejó fila— y el ancla de antigüedad mide *publicación*, no *error*: de ahí la
+        tabla propia.
+
+        Fail-open **declarado**, sin fingir en ningún caso: sin store, con fila ausente o con una
+        lectura rota, la racha arranca en 0 —el límite que sigue existiendo— y se registra el
+        motivo. Un 0 aquí **no** afirma «el sink está sano»: afirma «no hay constancia durable de
+        fallos», que es lo que se pudo medir.
+        """
+        store = getattr(self, "_adaptive_gate_store", None)
+        if store is None:
+            self._v2_adaptive_sink_failures_durable = False
+            return
+        try:
+            state = await store.load(self._account_id or "", self._engine_id)
+        except Exception:  # noqa: BLE001 — un store roto no puede reiniciar la racha en silencio.
+            self._v2_adaptive_sink_failures_durable = False
+            logger.exception(
+                "auto_sim v2 adaptive gate streak UNREAD; arranca a 0 (sin constancia durable)"
+            )
+            return
+        # La lectura durable CONTESTÓ (con fila o con su ausencia): la racha que entra al gate es
+        # un hecho durable, aunque sea 0. Sin esto, un ``0`` restaurado no se distinguiría de uno
+        # que nació en el proceso.
+        self._v2_adaptive_sink_failures_durable = True
+        self._v2_adaptive_sink_failures = sink_failures_from_state(state)
+        if state is None:
+            logger.info(
+                "auto_sim v2 adaptive gate streak recovered none (%s)",
+                {"sinkFailures": self._v2_adaptive_sink_failures, "durableRow": False},
+            )
+        else:
+            logger.info("auto_sim v2 adaptive gate streak recovered %s", state.to_dict())
+
+    async def _v2_record_adaptive_sink_failure(self, *, local: int) -> int:
+        """(AUTO-15) persiste el fallo consecutivo y devuelve la racha que ENTRARÁ al gate.
+
+        La racha durable es la fuente de verdad: si el store contesta, su valor manda (puede traer
+        los fallos de un proceso anterior, que es justo lo que se quiere conservar). Si el store
+        falta (camino hermético) o falla —probable: se acaba de caer una escritura—, la racha vive
+        en el proceso y **se declara**: no se finge ni un éxito ni una persistencia que no ocurrió.
+        """
+        store = getattr(self, "_adaptive_gate_store", None)
+        if store is None:
+            self._v2_adaptive_sink_failures_durable = False
+            return local
+        try:
+            persisted = await store.record_failure(
+                self._account_id or "", self._engine_id, at=self._v2_instant()
+            )
+        except Exception:  # noqa: BLE001 — un store roto no puede tumbar el turno.
+            self._v2_adaptive_sink_failures_durable = False
+            logger.exception(
+                "auto_sim v2 adaptive gate streak NOT durable consecutive=%s", local
+            )
+            return local
+        self._v2_adaptive_sink_failures_durable = True
+        return int(persisted)
+
+    async def _v2_record_adaptive_sink_success(self, *, at: str | None) -> None:
+        """(AUTO-15) resetea la racha durable SIN amplificar: sin racha viva no escribe nada."""
+        store = getattr(self, "_adaptive_gate_store", None)
+        if store is None:
+            self._v2_adaptive_sink_failures_durable = False
+            return
+        try:
+            await store.record_success(self._account_id or "", self._engine_id, at=at)
+        except Exception:  # noqa: BLE001 — la publicación ya ocurrió; el reset no la tumba.
+            self._v2_adaptive_sink_failures_durable = False
+            logger.exception("auto_sim v2 adaptive gate streak reset failed")
+            return
+        # El store contestó (escribiendo o declarando que no había racha que resetear): la racha
+        # que entra al gate es un hecho durable.
+        self._v2_adaptive_sink_failures_durable = True
 
     async def _v2_recover_adaptive_state(self) -> None:
         """AUTO-11 — reconstruye el estado Adaptive del journal durable, UNA vez por proceso.
@@ -3468,6 +3581,11 @@ class AutoSimulationWorker:
         self._v2_adaptive_state_recovered = True
         if not self._v2_tunables.adaptive_enabled:
             return
+        # AUTO-15: la racha DURABLE de fallos del sink se siembra ANTES del primer plan y ANTES de
+        # los atajos del lector del journal: es un hecho de otro eje (el sink que escribe), y el
+        # caso en que más importa —el journal fallando— es justo el que deja ``read_ok=False``. Si
+        # se sembrara después de ese atajo, el reinicio durante un journal roto arrancaría a 0.
+        await self._v2_recover_adaptive_gate_streak()
         reader = self._adaptive_reader
         if reader is None:
             # Sin lector no hay ni racha ni ancla: los DOS límites se declaran (no se finge salud).
@@ -4677,6 +4795,8 @@ class AutoSimulationWorker:
         adaptive_sink: Callable[[Any], Awaitable[None]] | None = None,
         # AUTO-11: lector del estado Adaptive reconstruible, también sobre la sesión del tick.
         adaptive_reader: Callable[[str | None], Awaitable[AdaptiveStateReading]] | None = None,
+        # AUTO-15: la racha durable de fallos del sink, sobre la MISMA sesión del tick.
+        adaptive_gate_store: AdaptiveGateStore | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -4714,6 +4834,7 @@ class AutoSimulationWorker:
         prev_cycle_reader = self._cycle_regime_reader
         prev_adaptive_sink = self._adaptive_sink
         prev_adaptive_reader = self._adaptive_reader
+        prev_adaptive_gate_store = self._adaptive_gate_store
         try:
             self._exec_store = exec_store
             self._auto_store = auto_store
@@ -4763,6 +4884,10 @@ class AutoSimulationWorker:
             self._adaptive_sink = adaptive_sink if adaptive_sink is not None else prev_adaptive_sink
             self._adaptive_reader = (
                 adaptive_reader if adaptive_reader is not None else prev_adaptive_reader
+            )
+            # AUTO-15: la racha durable de fallos del sink, con la misma regla de sesión.
+            self._adaptive_gate_store = (
+                adaptive_gate_store if adaptive_gate_store is not None else prev_adaptive_gate_store
             )
             # V2.43.3 (P0-1) — BOOT SAFETY GATE: la parada dura se LEE de su espejo durable
             # ANTES de readoptar posición y de reconciliar. Un reinicio NO puede reabrir el
@@ -4826,6 +4951,7 @@ class AutoSimulationWorker:
             self._cycle_regime_reader = prev_cycle_reader
             self._adaptive_sink = prev_adaptive_sink
             self._adaptive_reader = prev_adaptive_reader
+            self._adaptive_gate_store = prev_adaptive_gate_store
 
 
 # V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.
@@ -5470,6 +5596,13 @@ class AutoSimRuntime:
                 session,
                 policy=self._worker._v2_adaptive_policy(),  # noqa: SLF001 — seam interno.
             )
+            # AUTO-15: la racha de fallos del sink como estado DURABLE, sobre la MISMA sesión.
+            # Con el flag Adaptive OFF nadie la escribe ni la lee: cero I/O nuevo.
+            from bolsa_application.adaptive_gate_store import (  # noqa: PLC0415
+                PostgresAdaptiveGateStore,
+            )
+
+            adaptive_gate_store = PostgresAdaptiveGateStore(session)
             # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
             # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
             # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor
@@ -5489,6 +5622,7 @@ class AutoSimRuntime:
                 cycle_regime_reader=cycle_regime_reader,
                 adaptive_sink=adaptive_sink,
                 adaptive_reader=adaptive_reader,
+                adaptive_gate_store=adaptive_gate_store,
                 canonical_positions_reader=self._canonical_reader
                 or _compose_canonical_reader(session),
                 regime_source=self._regime_source

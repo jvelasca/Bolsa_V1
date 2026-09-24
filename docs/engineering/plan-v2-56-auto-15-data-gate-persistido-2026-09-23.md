@@ -1,8 +1,10 @@
 # AUTO-15 — Data Gate PERSISTIDO (`V2.56` / `1.81.0-beta`)
 
-**Estado:** **propuesta de alcance ratificada por el propietario** (Opción A de la tabla de candidatos
-del §5 del [arranque del agente post-v2.55](./arranque-agente-post-v2.55-auto-14-2026-09-23.md)) ·
-**plan de fase EN RATIFICACIÓN** — **no se escribe código hasta el visto bueno explícito**.
+**Estado:** **alcance ratificado por el propietario** (Opción A de la tabla de candidatos del §5 del
+[arranque del agente post-v2.55](./arranque-agente-post-v2.55-auto-14-2026-09-23.md)) y **plan
+ratificado «tal cual»** — las dos decisiones abiertas del final se cerraron a favor de lo propuesto
+(PK `(account_id, engine_id)` y reset con `WHERE sink_failures > 0`). **Fase EJECUTADA y sellada**:
+el paquete de cierre es el [audit-pack `v2.56`](./audit-pack-v2-56-auto-15-data-gate-persistido-2026-09-23.md).
 **Fase anterior:** `AUTO-14` / `V2.55` (tag `v2.55-beta` → `e29e6227`, `Release tag CI` `35889751810`
 **GREEN**, `1.80.0-beta`, PR de auditoría [#64](https://github.com/jvelasca/Bolsa_V1/pull/64)).
 **Producto:** BETA / no producción · **el flag Adaptive sigue OFF por defecto**.
@@ -117,8 +119,10 @@ flowchart LR
 - **Nueva fila ORM** en `packages/py/infrastructure/src/bolsa_infrastructure/database/models/tables.py`
   (espejo de `AutoKillStateRow`, `:2708`).
 - **Nuevo store** `packages/py/application/src/bolsa_application/adaptive_gate_store.py`: contrato puro
-  (`AdaptiveGateState` + el store in-memory que espeja el contrato) y `PostgresAdaptiveGateStore`
-  (`load`/`save`, espejo de `kill_switch_store.py:172-210`).
+  (`AdaptiveGateState` + el store in-memory que espeja el contrato) y `PostgresAdaptiveGateStore` con
+  **dos** operaciones y **ninguna** que guarde la fila entera (`load`, `record_failure` con incremento
+  atómico `ON CONFLICT DO UPDATE`, `record_success` con `WHERE sink_failures > 0` y `commit` explícito;
+  espejo de `kill_switch_store.py:172-210`, más el `rollback`+`raise` del sink de `AUTO-10`).
 - **Gate (analytics)** `packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_data_gate.py`:
   sello (`:69`) y el campo de procedencia en `as_dict()` (`:170`). **Ni un umbral ni la tabla
   estado→efecto** (`:84-90`) se tocan.
@@ -131,7 +135,9 @@ flowchart LR
 - **Tests**: unit del gate (`packages/py/analytics/tests/test_auto_adaptive_data_gate.py`), unit del
   store, costura nueva `apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py` (con
   **control**) y PG `apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py` (reinicio real).
-- **Sonda** `apps/api-python/scripts/v2_44_mutation_audit.py`: `M108…M116`.
+- **Sonda** `apps/api-python/scripts/v2_44_mutation_audit.py`: `M108…M118` (once: las nueve previstas más
+  `M117`/`M118`, que cubren el contrato de **sesión limpia** del store —`rollback` + `raise`—, añadido al
+  implementar el paso 1 con la firma del sink de `AUTO-10`).
 - **Paquete de cierre**: audit-pack `v2.55`→`v2.56`, relevo `post-v2.56`, arranques, `CHANGELOG.md`
   (`1.81.0-beta`), `PROJECT_STATE.md`, entrada del `engineering-index`; bump
   `package.json` `1.80.0-beta` → `1.81.0-beta`; tag `v2.56-beta` y `main` en fast-forward; **PR de
@@ -163,11 +169,12 @@ a `045_adaptive_gate_state`.
 - **PG real (reinicio de verdad)** en el job `auto-v2-durable-pg` con `ADAPTIVE_GATE_PG_REQUIRED=1`:
   roundtrip de la migración (`upgrade`/`downgrade`), la racha **sobrevive a una sesión nueva** y el
   reset no amplifica escrituras.
-- **Mutaciones `M108…M116`**: racha que se resetea al reiniciar · fallo que no persiste · racha durable
+- **Mutaciones `M108…M118`**: racha que se resetea al reiniciar · fallo que no persiste · racha durable
   leída pero ignorada · reset amplificando (escribir en cada éxito) · store leyendo la fila de **otra**
   cuenta/engine · estado durable ilegible tratado como **sano** · estado durable ilegible tratado como
-  **fallo** · sello del gate sin subir · `sinkFailuresDurable` afirmando durable sin store.
-- **Matriz COMPLETA** (`M1…M116`): `0` etiquetas en `NADA`, `0` fragmentos ausentes, restauración
+  **fallo** · sello del gate sin subir · `sinkFailuresDurable` afirmando durable sin store · escritura
+  fallida que **no** limpia la sesión del tick · reset fallido que **no** la limpia.
+- **Matriz COMPLETA** (`M1…M118`): `0` etiquetas en `NADA`, `0` fragmentos ausentes, restauración
   **byte a byte** y huella `git status` **idéntica** antes y después.
 - **Delta simétrico FICHERO A FICHERO contra `HEAD`** (nunca restando totales), con los rojos
   declarados de antemano (contratos que esta fase cambia: sello del gate y el campo nuevo).
@@ -189,9 +196,11 @@ umbrales de rotación, el **gobernador** (`v2_43_governor_evidence.py`, diff vac
 | 2 | Contador durable en el worker (siembra al arrancar + escritura sin amplificación, gateado por el flag) | costura con control + flag OFF sin I/O |
 | 3 | Declaración: sello `auto15-v1` + `sinkFailuresDurable` (sin tocar umbrales ni el reparto) | unit del gate |
 | 4 | Costura de reinicio real + test PG en el job `auto-v2-durable-pg` | `ADAPTIVE_GATE_PG_REQUIRED=1` sin skips |
-| 5 | `M108…M116`, matriz completa, compuertas, delta simétrico, paquete de docs, bump y sello `v2.56-beta` | §5 + CI del tag medida + PR de auditoría |
+| 5 | `M108…M118`, matriz completa, compuertas, delta simétrico, paquete de docs, bump y sello `v2.56-beta` | §5 + CI del tag medida + PR de auditoría |
 
 ---
 
-**Ratificación pendiente.** Sin el visto bueno explícito **no se toca código**; en particular, las dos
-decisiones abiertas (granularidad de la PK y reset sin amplificación) se cierran en esta ratificación.
+**Ratificación cerrada.** El propietario ratificó el plan **«tal cual»**, incluidas las dos decisiones
+abiertas: PK **`(account_id, engine_id)`** y **reset sin amplificación** (`WHERE sink_failures > 0`).
+La fase se ejecutó en cinco pasos con sus gates y se selló en `v2.56-beta`; el resultado **medido** (y lo
+que no se pudo medir aquí) está en el [audit-pack `v2.56`](./audit-pack-v2-56-auto-15-data-gate-persistido-2026-09-23.md).

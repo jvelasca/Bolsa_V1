@@ -404,6 +404,12 @@ jobs:
         # registro no correrían en ninguna parte. Su costura en el worker
         # (``test_auto_v52_auto11_adaptive_state_seam.py``) entra por el pase de directorio
         # de ``apps/api-python/tests``, que este job ya recolecta entero.
+        # V2.56/AUTO-15 (racha durable del Data Gate): el puro del store
+        # (``packages/py/application/tests/test_adaptive_gate_store.py``) va EXPLÍCITO por el
+        # mismo motivo (ese directorio no tiene pase aquí). La declaración del gate entra por
+        # el pase de ``packages/py/analytics/tests``, la costura del reinicio por el de
+        # ``apps/api-python/tests``, y la certificación PG (migración 045 + otra sesión
+        # leyendo la racha) va en el paso PG de más abajo con gate fail-if-skipped.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -450,6 +456,7 @@ jobs:
           packages/py/application/tests/test_auto_adaptive_journal.py
           packages/py/application/tests/test_auto_adaptive_recovery.py
           packages/py/application/tests/test_auto_cycle_reconciliation.py
+          packages/py/application/tests/test_adaptive_gate_store.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
@@ -499,6 +506,7 @@ jobs:
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
           --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
+          --ignore=apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -564,6 +572,12 @@ jobs:
       # SOBREVIVIR a un reinicio de proceso y liberarse cuando el fill se materializa;
       # sin PG real el test skipearía en mudo e invalidaría la certificación del tag.
       AUTO_RESERVATION_PG_REQUIRED: '1'
+      # V2.56/AUTO-15 (racha durable del Data Gate): la racha de fallos consecutivos del
+      # sink se persiste en ``adaptive_gate_state`` (migración 045). Un reinicio del proceso
+      # no puede olvidarla (ni devolver el gate a "sano" ni perder una racha a punto de ser
+      # ``STALE``), y eso solo se mide contra PG real: un skip mudo invalidaría la
+      # certificación del tag.
+      ADAPTIVE_GATE_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -649,6 +663,10 @@ jobs:
         # migración, supervivencia al reinicio, liberación por fill (parcial incluida) y
         # capital reservado de una orden en vuelo (``RETRY``).
         # Gate fail-if-skipped: AUTO_RESERVATION_PG_REQUIRED=1.
+        # V2.56/AUTO-15: la racha durable del Data Gate (migración 045) — roundtrip, la racha
+        # que SOBREVIVE al reinicio (otra sesión) con el gate todavía en ``STALE``, el
+        # incremento atómico por (cuenta, motor) y el reset que no amplifica.
+        # Gate fail-if-skipped: ADAPTIVE_GATE_PG_REQUIRED=1.
         # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs (deuda:
         # drift silencioso). Ahora se ejecutan aquí con gate fail-if-skipped.
         run: >
@@ -676,6 +694,7 @@ jobs:
           apps/api-python/tests/test_unique_natural_keys_pg.py
           apps/api-python/tests/test_portfolio_reservation_pg.py
           apps/api-python/tests/test_auto_v44_exit_identity_pg.py
+          apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py

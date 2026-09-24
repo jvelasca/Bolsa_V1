@@ -2733,6 +2733,42 @@ class AutoKillStateRow(Base):
     )
 
 
+class AdaptiveGateStateRow(Base):
+    """AUTO-15 (V2.56) — la racha de fallos del sink del gate Adaptive, durable.
+
+    El gate de evidencia de ``AUTO-13`` juzga su propia salud con un contador de fallos
+    consecutivos del sink y un ancla de antigüedad del journal. El ancla era durable; el
+    contador vivía en la MEMORIA del proceso, así que un reinicio devolvía la racha a ``0`` y
+    el sistema volvía a creerse sano (o al revés: olvidaba que iba a ``STALE``).
+
+    Una fila por ``(account_id, engine_id)`` con ``sink_failures`` (CONSECUTIVOS: un éxito lo
+    resetea), ``last_failure_at``, ``last_success_at`` y ``updated_at``. Sin fila ⇒ no hay
+    constancia durable de fallos (racha 0): la ausencia es información, nunca un cero
+    fabricado. El reset del éxito solo escribe ``WHERE sink_failures > 0``, de modo que un
+    despliegue sano no paga una escritura por tick.
+    """
+
+    __tablename__ = "adaptive_gate_state"
+    __table_args__ = (
+        Index("adaptive_gate_state_account_failures_idx", "account_id", "sink_failures"),
+    )
+
+    account_id: Mapped[str] = mapped_column("account_id", String, primary_key=True)
+    engine_id: Mapped[str] = mapped_column("engine_id", String, primary_key=True)
+    sink_failures: Mapped[int] = mapped_column(
+        "sink_failures", Integer, nullable=False, default=0, server_default="0"
+    )
+    last_failure_at: Mapped[datetime | None] = mapped_column(
+        "last_failure_at", DateTime(timezone=True), nullable=True
+    )
+    last_success_at: Mapped[datetime | None] = mapped_column(
+        "last_success_at", DateTime(timezone=True), nullable=True
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=True
+    )
+
+
 class AutoExitOrderRow(Base):
     """V2.43.3 — INTENT de salida con identidad duradera (``exit_order_id``).
 

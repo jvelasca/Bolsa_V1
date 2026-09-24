@@ -66,7 +66,14 @@ DATA_GATE_NO_ADAPT: DataGateEffect = "NO_ADAPT"
 
 #: Versión de la POLÍTICA del gate. Cambiar los umbrales (o la tabla estado→efecto) EXIGE subir
 #: esta versión: sin ella, dos lecturas iguales podrían venir de reglas distintas sin que se note.
-DATA_GATE_POLICY_VERSION = "auto13-v1"
+#:
+#: ``auto15-v1`` (AUTO-15): los umbrales y la tabla estado→efecto NO cambian; lo que cambia es la
+#: **procedencia** de uno de los hechos. La racha de fallos consecutivos del sink deja de nacer en
+#: el proceso y se **lee/persiste** en estado durable (``adaptive_gate_state``), así que un `0` deja
+#: de significar lo mismo ("no se observó" frente a "se olvidó al reiniciar"). Se sella aquí para
+#: que dos lecturas con el mismo estado no puedan venir de dos formas de medir sin declararlo, y se
+#: publica en el hecho ``sinkFailuresDurable``.
+DATA_GATE_POLICY_VERSION = "auto15-v1"
 
 #: Fallos CONSECUTIVOS del sink del journal a partir de los cuales el estado es ``STALE`` (§21:
 #: «N fallos consecutivos»). Un único fallo ya deja el estado en ``DEGRADED``.
@@ -138,6 +145,11 @@ class DataGateReading:
     notes: tuple[str, ...] = ()
     # --- hechos medidos (los que el llamante pudo aportar) --------------------------------
     sink_failures: int = 0
+    #: AUTO-15: ¿la racha vino del estado DURABLE (``adaptive_gate_state``) o nació en el proceso?
+    #: Un ``0`` a secas no distingue "no se observó un fallo" de "se olvidó al reiniciar": este
+    #: campo evita que un lector del log confunda una racha no restaurada con una racha curada. Es
+    #: un hecho **declarado** por el llamante, no una inferencia del gate.
+    sink_failures_durable: bool = False
     journal_age_cycles: int | None = None
     read_ok: bool = True
     measurement_completeness: str | None = None
@@ -174,6 +186,7 @@ class DataGateReading:
             "effect": self.effect,
             "notes": list(self.notes),
             "sinkFailures": self.sink_failures,
+            "sinkFailuresDurable": self.sink_failures_durable,
             "journalAgeCycles": self.journal_age_cycles,
             "readOk": self.read_ok,
             "measurementCompleteness": self.measurement_completeness,
@@ -237,6 +250,7 @@ def journal_age_cycles(
 def assess_data_gate(
     *,
     sink_failures: int = 0,
+    sink_failures_durable: bool = False,
     journal_age_cycles: int | None = None,
     read_ok: bool = True,
     measurement_completeness: str | None = None,
@@ -267,6 +281,11 @@ def assess_data_gate(
     ``measurement_completeness``/``recent_available``/``regime_available`` en ``None`` significan
     "no se pidió medir" y **no** degradan: solo se declaran. ``journal_age_cycles`` en ``None``
     tampoco bloquea (no se puede juzgar la antigüedad), pero se declara.
+
+    ``sink_failures_durable`` (AUTO-15) es la **procedencia** de la racha, no un criterio: dice si
+    el contador se leyó/persistió en estado durable o si nació en el proceso. **No** cambia el
+    estado —la racha vale lo mismo venga de donde venga— y existe para que un ``0`` no se lea como
+    "el sink está sano" cuando en realidad es "no hay constancia durable".
     """
     resolved = policy or DataGatePolicy()
     failures = max(0, int(sink_failures or 0))
@@ -274,6 +293,7 @@ def assess_data_gate(
     age = None if journal_age_cycles is None else max(0, int(journal_age_cycles))
     facts: dict[str, Any] = {
         "sink_failures": failures,
+        "sink_failures_durable": bool(sink_failures_durable),
         "journal_age_cycles": age,
         "read_ok": bool(read_ok),
         "measurement_completeness": measurement_completeness,
