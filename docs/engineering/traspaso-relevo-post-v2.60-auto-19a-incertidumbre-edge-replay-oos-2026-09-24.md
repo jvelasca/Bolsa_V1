@@ -1,6 +1,7 @@
 # Traspaso de relevo — `AUTO-19A` **CERRADA** (`V2.60` / `1.85.0-beta`)
 
 **Fecha:** 2026-09-24 · **Rama:** `main` en **fast-forward** · **Tag:** `v2.60-beta` ·
+**PR de auditoría de la fase:** [#69](https://github.com/jvelasca/Bolsa_V1/pull/69) ·
 **Fase anterior:** `AUTO-18` (tag `v2.59-beta` → `1.84.0-beta`, PR de auditoría
 [#68](https://github.com/jvelasca/Bolsa_V1/pull/68)).
 

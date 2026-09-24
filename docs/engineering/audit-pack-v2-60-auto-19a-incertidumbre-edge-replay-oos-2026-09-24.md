@@ -248,7 +248,7 @@ uv run --no-sync python scripts/research/auto_replay_battery.py
 | `Python CI` per-commit de `main` | [`35999579254`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35999579254) | **`5/5` jobs `success`**; job `quality` **`2736 passed / 38 skipped`** (mismo corte que el tag) |
 | `check-runs` del commit sellado `cbd96bbe` | API de checks | `total_count = 28` ⇒ **`27` success** + **`1` skipped** |
 | `status` (Commit Status **legacy**) de `cbd96bbe` | `/commits/{sha}/status` | **`pending`** con **`0` statuses** *a la vez* que los `28` check-runs están `completed` ⇒ **cruce de API reproducido en vivo** (no es un hallazgo; §8 del arranque) |
-| PR de auditoría | checks del PR | se rellena al abrir el PR (mismo patrón que `AUTO-18`) |
+| PR de auditoría [#69](https://github.com/jvelasca/Bolsa_V1/pull/69) | checks del PR | `audit-base-v2.59-beta` @ `9898c51a` → `auto-19a-incertidumbre-edge-replay` @ `057ab924`: **25 ficheros, `+10775/−21`**, **2 commits**; **`10/10` checks `SUCCESS`** (`quality` **`2736 passed / 38 skipped`**, los cuatro PG y la fase 2 incluidas); superficie de auditoría, **no** vehículo de merge |
 
 **+46 tests** sobre `v2.59` en los dos cortes (job `python` del tag `2701` → `2747`; job `quality` `2690` →
 `2736`), que es **exactamente** la cuenta del tramo de la fase (§7): **0** skips nuevos.
