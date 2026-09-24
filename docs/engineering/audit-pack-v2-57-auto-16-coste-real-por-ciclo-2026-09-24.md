@@ -302,7 +302,9 @@ La corrida **completa** de la matriz está en §7.
   y `git diff -- packages/py/application/src/bolsa_application/auto_adaptive_journal.py` ⇒ **vacíos**.
 - **Lo que no se pudo medir aquí:** la batería offline **completa** de los jobs `quality`/`python` del
   tag (su recolección incluye suites PG que importan `asyncpg`, ausente en esta máquina) y los runs de
-  CI (no existen hasta empujar). **Ese límite lo cierra la CI del tag** (§11), medida.
+  CI (no existen hasta empujar). **Ese límite lo cierra la CI del tag** (§11), medida — y además, con el
+  PostgreSQL del **compose** levantado, la batería entera se re-corrió en local: **`4024 passed / 1
+  xfailed / 0` rojos** (§11.4).
 
 ---
 
@@ -387,7 +389,44 @@ skipped` en el job `python` del tag y `2638 passed / 38 skipped` en `quality` de
 jobs verdes en los dos `Python CI` (los cuatro de PG incluidos, que son justo los que la matriz offline
 **no** puede correr). **Cero rojos y cero skips nuevos** respecto de `v2.56`.
 
-### 11.4 El intermitente conocido **no** se reprodujo en este sello (declarado)
+### 11.4 Cierre local del límite del §7 (medido, no CI)
+
+El §7 declaró que la **batería offline completa** no se podía medir aquí porque su recolección incluye
+suites PG que importan `asyncpg`. Con el **PostgreSQL del compose levantado** (verificado: `localhost:5432`
+aceptando conexiones) se re-corrió la batería **entera** con el entorno de CI (`DB_HOST=localhost`,
+`DB_PASSWORD=bolsa_dev`, sin `DATABASE_URL`) y **todas las suites PG corrieron de verdad** (no se
+saltaron):
+
+```
+4024 passed, 1 xfailed, 29 warnings in 574.20s (0:09:34)   ·   0 FAILED · 0 ERROR · 0 collection errors
+```
+
+Es un dato **local**, no de CI: el job `python` del tag mide **`2649 passed / 35 skipped`** porque allí las
+suites PG de este job van por otros jobs dedicados (§11.2). Se publica porque **cierra el límite del §7**
+con una corrida real: **cero rojos y cero errores de colección** sobre el árbol sellado, con la `046`
+aplicada y el PG de verdad detrás.
+
+### 11.5 Los tres rojos de una corrida local ANTERIOR: causa declarada, no regresión
+
+La primera corrida local de la batería (pre-sello, `06:48`) dio **`3 failed, 3859 passed, 1 xfailed`**, con
+los tres rojos **en el mismo fichero y por la misma causa**:
+
+```
+test_database_url_se_compone_desde_db_vars_vacio
+test_database_url_incluye_password_si_se_provee
+test_repr_redacta_credenciales_db
+AssertionError: assert 'postgresql+psycopg://bolsa@127.0.0.1:5432/bolsa_v1'
+                     == 'postgresql+psycopg://bolsa@localhost:5432/bolsa_v1'
+```
+
+**Causa medida:** el shell de esa corrida tenía **`DB_HOST=127.0.0.1`** exportado (residuo de las
+certificaciones PG contra el compose) y el test espera el **defecto** `localhost`. **No es una regresión
+de la fase:** (a) el fichero pasa **`17 passed`** en aislamiento, (b) `test_config.py` **no** está en el
+diff de `AUTO-16`, y (c) la CI fija **`DB_HOST: localhost`** y sale verde (`2649 passed / 35 skipped` con
+**0** rojos). La corrida limpia de §11.6, con el mismo entorno que la CI, da **`0` rojos**. Se publica la
+cifra medida y su causa, en vez de la que habría sido cómoda.
+
+### 11.6 El intermitente conocido **no** se reprodujo en este sello (declarado)
 
 `AUTO-15` dejó declarado un **test PG intermitente preexistente y ajeno a la fase**
 (`apps/api-python/tests/test_concurrent_auto_pg.py`, `UniqueViolation` en `auto_engine_ticks_pkey`; medido
