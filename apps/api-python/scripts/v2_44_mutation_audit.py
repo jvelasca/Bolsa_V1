@@ -429,6 +429,15 @@ nivel declarado y reutilización de las preguntas de la fase anterior) añade:
   único se presenta como una repetición que nunca se midió.
 * **M164 (ventana que no crece)** — si el IS deja de ser creciente (ventana fija), el walk-forward
   deja de parecerse a la operativa real y cada pliegue mide menos de lo que dice.
+* **M165 (hueco silenciado, O1)** — si la estrategia sin R medible vuelve a desaparecer sin nota, el
+  material real que existe pero no es medible se lee como "no había nada", que es justo lo que el
+  cierre de O1 prohíbe (``AUTO-20``).
+* **M166 (ratio que mezcla, O2)** — si el WFE vuelve a dividir la media OOS de unos pliegues entre la
+  media IS de otros, publica un cociente de dos muestras distintas disfrazado de uno (``AUTO-20``).
+* **M167 (conteo inflado, O2)** — si los pliegues emparejados se cuentan como si todos lo estuvieran,
+  un pliegue que no aporta a la media se cuenta como si aportara (``AUTO-20``).
+* **M168 (material sin riesgo)** — si el instrumento vuelve a leer ciclos sin denominador, la
+  calibración sobre datos reales sale vacía y el informe lo lee como "sin edge" (``AUTO-20``).
 
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
@@ -1896,6 +1905,37 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        train_end = segment_size * (index + 1)\n",
         "        train_end = segment_size\n",
         (T_CALIBRATION,),
+    ),
+    # ── AUTO-20 (V2.62): material con riesgo y cierres de O1/O2 ──────────────────────────────
+    (
+        "M165 (hueco silenciado, O1): la estrategia sin R medible vuelve a desaparecer sin nota",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "    notes.extend(\n"
+        '        f"unmeasured_r:{version}" for version in sorted(seen_versions - set(by_version))\n'
+        "    )\n",
+        "    notes.extend(())\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M166 (ratio que mezcla, O2): el WFE vuelve a cruzar la media OOS con la IS de otros pliegues",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "            _round4(mean_paired_oos / mean_paired_is)\n",
+        "            _round4(mean_oos / mean_is)\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M167 (conteo inflado, O2): los pliegues emparejados se cuentan como si TODOS lo estuvieran",
+        AUTO_ADAPTIVE_CALIBRATION,
+        '        "pairedFoldCount": len(paired),\n',
+        '        "pairedFoldCount": len(folds),\n',
+        (T_CALIBRATION,),
+    ),
+    (
+        "M168 (material sin riesgo): el instrumento vuelve a leer ciclos sin denominador",
+        FEED,
+        "    return _cycles_with_risk(fills, cycle_risk)\n",
+        "    return cycles_from_fills(fills or ())\n",
+        (T_FEED,),
     ),
 ]
 

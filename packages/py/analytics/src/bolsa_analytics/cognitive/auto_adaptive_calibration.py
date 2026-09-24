@@ -95,7 +95,7 @@ __all__ = [
 
 #: Método declarado de la lectura. Ampliarla (p. ej. validar ``P(R > 0)``) obliga a subir este
 #: sello: dos informes con el mismo aspecto no pueden venir de instrumentos distintos.
-CALIBRATION_METHOD = "walk_forward_calibration_v1"
+CALIBRATION_METHOD = "walk_forward_calibration_v2"
 
 #: Pliegues del walk-forward: por defecto 3, acotado a ``[2, 5]`` (el mismo rango que el walk-forward
 #: de barras de ``optimize``). Con menos de 2 no hay walk-forward —hay un split—, y por encima de 5
@@ -482,6 +482,13 @@ def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
 
     ``walkForwardEfficiency`` es la media OOS sobre la media IS cuando la IS es positiva; sin IS
     positiva no hay cociente honesto (``None``, no un ``0`` que diría "no rindió").
+
+    ``AUTO-20`` — **cierre de O2**. El cociente se calcula SOLO sobre los pliegues *emparejados*
+    (con IS y OOS a la vez): mezclar la media OOS de unos pliegues con la media IS de otros daba un
+    WFE de dos muestras distintas disfrazado de uno (y el espejo de ``optimize`` exige por su
+    cuenta ``len(is) == len(oos)``). Los conteos se publican por separado —``foldCount`` total,
+    ``isFoldCount``, ``oosFoldCount``, ``pairedFoldCount``— para que un pliegue que no aporta a la
+    media no se cuente como si aportara.
     """
     oos = [
         float(fold.cell.oos_expectancy_r)
@@ -493,9 +500,20 @@ def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
         for fold in folds
         if fold.cell.is_expectancy_r is not None
     ]
+    paired = [
+        (float(fold.cell.is_expectancy_r), float(fold.cell.oos_expectancy_r))
+        for fold in folds
+        if fold.cell.is_expectancy_r is not None and fold.cell.oos_expectancy_r is not None
+    ]
+    counts: dict[str, Any] = {
+        "foldCount": len(folds),
+        "isFoldCount": len(is_values),
+        "oosFoldCount": len(oos),
+        "pairedFoldCount": len(paired),
+    }
     if not oos:
         return {
-            "foldCount": len(folds),
+            **counts,
             "meanIsExpectancyR": _round4(mean(is_values)) if is_values else None,
             "meanOosExpectancyR": None,
             "stdOosExpectancyR": None,
@@ -506,8 +524,10 @@ def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
     mean_oos = float(mean(oos))
     std_oos = float(pstdev(oos)) if len(oos) > 1 else 0.0
     mean_is = float(mean(is_values)) if is_values else None
+    mean_paired_is = float(mean([row[0] for row in paired])) if paired else None
+    mean_paired_oos = float(mean([row[1] for row in paired])) if paired else None
     return {
-        "foldCount": len(folds),
+        **counts,
         "meanIsExpectancyR": _round4(mean_is),
         "meanOosExpectancyR": _round4(mean_oos),
         "stdOosExpectancyR": _round4(std_oos),
@@ -518,8 +538,8 @@ def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
             _round4(std_oos / abs(mean_oos)) if abs(mean_oos) > _EPSILON else None
         ),
         "walkForwardEfficiency": (
-            _round4(mean_oos / mean_is)
-            if mean_is is not None and mean_is > _EPSILON
+            _round4(mean_paired_oos / mean_paired_is)
+            if mean_paired_is is not None and mean_paired_is > _EPSILON
             else None
         ),
     }
@@ -575,10 +595,20 @@ def build_calibration_report(
 
     ordered, undated = order_cycles_by_instant(rows)
     by_version: dict[str, list[Any]] = {}
+    # ``AUTO-20`` — cierre de O1. ``AUTO-19B`` (heredado de ``AUTO-19A``) descartaba en silencio
+    # los ciclos cuya versión no tiene NINGÚN R medible: la estrategia desaparecía del informe sin
+    # dejar rastro, justo en el caso en que el material real existe pero no es medible (p. ej. sin
+    # base de riesgo). Aquí se declara: ``unmeasured_r:<version>`` para la versión que se quedó sin
+    # ninguna fila medible y ``unversioned_cycles`` para las filas sin versión. Solo se nombra el
+    # hueco — ninguna estrategia entra por declararla— y el material con R medible no cambia.
+    seen_versions: set[str] = set()
+    unversioned = 0
     for row in ordered:
         version = str(cycle_field(row, "strategyVersion", "strategy_version") or "")
         if not version:
+            unversioned += 1
             continue
+        seen_versions.add(version)
         if measured_r(row) is None:
             continue
         by_version.setdefault(version, []).append(row)
@@ -586,6 +616,11 @@ def build_calibration_report(
     notes: list[str] = []
     if undated:
         notes.append("undated_cycles")
+    if unversioned:
+        notes.append("unversioned_cycles")
+    notes.extend(
+        f"unmeasured_r:{version}" for version in sorted(seen_versions - set(by_version))
+    )
     measured_folds: list[CalibrationFold] = []
     skipped: list[str] = []
     for version in sorted(by_version):

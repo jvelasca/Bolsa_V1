@@ -222,6 +222,13 @@ jobs:
         # directorio de abajo. No hay costura nueva que listar: el instrumento es PURO y read-only
         # (no se cablea al worker, ni al plan, ni al journal), así que no hay fichero de
         # ``apps/api-python/tests`` que certificar con nombre propio en esta fase.
+        # V2.62/AUTO-20 (material PAPER real + cierre de O1/O2): los puros
+        # ``packages/py/analytics/tests/test_auto_adaptive_calibration.py`` (O1: ``unmeasured_r``;
+        # O2: WFE emparejado) y ``packages/py/application/tests/test_auto_self_evaluation_feed.py``
+        # (costura pública del material con riesgo) entran por los pases de directorio de abajo. El
+        # exportador ``apps/api-python/scripts/paper_cycles_export.py`` es I/O y NO lo invoca ningún
+        # workflow (mismo criterio que las sondas de ``scripts/``): su camino durable queda DECLARADO
+        # como no ejercitado end-to-end en esta fase.
         run: >
           uv run pytest
           packages/py/domain/tests
