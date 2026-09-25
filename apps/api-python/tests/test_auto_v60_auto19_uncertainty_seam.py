@@ -147,7 +147,7 @@ async def test_the_plan_carries_the_interval_and_the_edge_confidence() -> None:
     payload = plan.as_dict()["uncertainty"]
     row = payload["byStrategy"]["orb-1"]
 
-    assert payload["method"] == "bootstrap_episodes_v1"
+    assert payload["method"] == "bootstrap_episodes_v2"
     assert row["expectancyInterval"]["episodes"] == 12, "12 ciclos alternando = 12 rachas"
     assert row["expectancyInterval"]["lower"] is not None
     assert row["expectancyInterval"]["lower"] <= row["expectancyInterval"]["point"]

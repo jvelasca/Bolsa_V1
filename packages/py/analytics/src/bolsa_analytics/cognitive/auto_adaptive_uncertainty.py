@@ -91,7 +91,11 @@ __all__ = [
 #: Método declarado del intervalo: bootstrap de percentil sobre RACHAS de régimen (episodios),
 #: no sobre ciclos sueltos. Cambiar el método obliga a declararlo aquí (y a subir el sello de la
 #: lectura), porque dos intervalos con el mismo aspecto podrían venir de supuestos distintos.
-ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v1"
+#:
+#: ``AUTO-21`` sube el sello a ``v2``: la MISMA distribución bootstrap que ya encuadraba el
+#: intervalo publica ahora ``probability_positive`` (la fracción de medias bootstrap > 0). No cambia
+#: el intervalo ni su semántica, pero sí la lectura, así que el sello lo declara.
+ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v2"
 
 #: Nivel de confianza del intervalo (90 % por defecto). Se acota a ``[0.5, 0.99]``: por debajo de
 #: 0.5 el "intervalo" no afirma nada y por encima de 0.99 el percentil depende de colas que pocas
@@ -191,6 +195,10 @@ class ExpectancyInterval:
     measured_n: int
     resamples: int
     dispersion_r: float | None = None
+    #: ``AUTO-21`` — P(R > 0): fracción de las medias bootstrap estrictamente positivas. Es la
+    #: probabilidad de que el edge sea positivo **según esta muestra**, no un permiso. ``None``
+    #: cuando no hubo bootstrap (sin ciclos o sin rachas suficientes): el hueco se declara.
+    probability_positive: float | None = None
     notes: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
@@ -205,6 +213,7 @@ class ExpectancyInterval:
             "measuredN": self.measured_n,
             "resamples": self.resamples,
             "dispersionR": self.dispersion_r,
+            "probabilityPositive": self.probability_positive,
             "notes": list(self.notes),
         }
 
@@ -358,6 +367,9 @@ def _interval_from_episodes(
     lower_value = _round4(min(lower, point))
     upper_value = _round4(max(upper, point))
     dispersion = _round4(pstdev(means)) if len(means) > 1 else 0.0
+    # AUTO-21 — P(R > 0): la MISMA distribución que encuadra el intervalo. Estrictamente ``> 0``
+    # (un empate a cero no es un resultado positivo); sin bootstrap no hay probabilidad.
+    probability_positive = _round4(sum(1 for value in means if value > 0.0) / len(means))
     return ExpectancyInterval(
         point=point,
         lower=lower_value,
@@ -369,6 +381,7 @@ def _interval_from_episodes(
         measured_n=len(values),
         resamples=max(1, int(resamples)),
         dispersion_r=dispersion,
+        probability_positive=probability_positive,
     )
 
 

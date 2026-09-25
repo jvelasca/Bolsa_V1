@@ -22,7 +22,8 @@ export const EXECUTION_REALITY_VIRTUAL_PAPER = "virtual_paper_only";
 export const INCONCLUSIVE = "INCONCLUSIVE";
 export const SUPPORTED = "SUPPORTED";
 export const NOT_SUPPORTED = "NOT_SUPPORTED";
-export const OUT_OF_SCOPE_AUTO21 = "AUTO-21 (fuera de alcance)";
+/** Etiqueta de lo no medido: espejo de `NOT_MEASURED` en `auto_evidence_report.py`. */
+export const NOT_MEASURED = "NO MEDIDO";
 export const ALLOCATION_CHANGE_NONE = "none";
 
 export const EVIDENCE_ARTIFACT_DISCLAIMER =
@@ -35,20 +36,22 @@ export type EvidenceVerdict =
 
 /** Claves de pregunta del informe de calibración (mismo productor que `auto_adaptive_calibration`). */
 export const AUTO_EVIDENCE_CALIBRATION_KEYS = [
-  "shrinkage_calibration",
-  "effective_n_calibration",
   "interval_coverage",
   "edge_sign_calibration",
+  "probability_positive_calibration",
   "confidence_calibration",
+  "shrinkage_calibration",
+  "effective_n_calibration",
   "coverage_calibration",
 ] as const;
 
 const CALIBRATION_LABELS: ReadonlyArray<readonly [string, string]> = [
-  ["shrinkage_calibration", "Shrinkage"],
-  ["effective_n_calibration", "Effective-N"],
   ["interval_coverage", "Interval coverage"],
   ["edge_sign_calibration", "Edge sign"],
+  ["probability_positive_calibration", "P(R>0)"],
   ["confidence_calibration", "Confidence calibration"],
+  ["shrinkage_calibration", "Shrinkage"],
+  ["effective_n_calibration", "Effective-N"],
   ["coverage_calibration", "Coverage (regime)"],
 ];
 
@@ -78,6 +81,45 @@ export type AutoEvidenceMaterial = {
   [key: string]: unknown;
 };
 
+export type AutoEvidenceCorrelationPair = {
+  left: string;
+  right: string;
+  correlation: number | null;
+  sharedBuckets: number | null;
+  notes: string[];
+};
+
+/** AUTO-21 — matriz de correlación por cubo temporal publicada por el artefacto (opcional). */
+export type AutoEvidenceCorrelation = {
+  method: string | null;
+  bucket: string | null;
+  minBuckets: number | null;
+  strategies: string[];
+  pairs: AutoEvidenceCorrelationPair[];
+  notes: string[];
+};
+
+/** AUTO-21 — evidencia de UNA estrategia para el régimen actual (opcional). */
+export type AutoEvidenceRegimeRow = {
+  strategyVersion: string;
+  regime: string;
+  measuredN: number | null;
+  episodes: number | null;
+  expectancyR: number | null;
+  probabilityPositive: number | null;
+  edgeConfidence: string | null;
+  notes: string[];
+};
+
+/** AUTO-21 — evidencia del régimen actual publicada por el artefacto (opcional). */
+export type AutoEvidenceCurrentEvidence = {
+  method: string | null;
+  regime: string | null;
+  adverse: boolean | null;
+  byStrategy: Record<string, AutoEvidenceRegimeRow>;
+  notes: string[];
+};
+
 export type AutoEvidenceArtifact = {
   schema: string;
   executionReality: string | null;
@@ -87,6 +129,10 @@ export type AutoEvidenceArtifact = {
   note: string | null;
   material: AutoEvidenceMaterial | null;
   report: Record<string, unknown>;
+  /** AUTO-21 — opcionales: ausentes ⇒ el artefacto es el mismo que auditó `v2.67`. */
+  correlation?: AutoEvidenceCorrelation | null;
+  currentRegime?: string | null;
+  currentEvidence?: AutoEvidenceCurrentEvidence | null;
 };
 
 export type ParseAutoEvidenceResult =
@@ -136,6 +182,60 @@ function asMaterial(value: unknown): AutoEvidenceMaterial | null {
   };
 }
 
+function asNumberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** AUTO-21 — normaliza el bloque `correlation`; ausente o mal formado ⇒ `null` (no se inventa). */
+function asCorrelation(value: unknown): AutoEvidenceCorrelation | null {
+  if (!isRecord(value)) return null;
+  const rawPairs = Array.isArray(value.pairs) ? value.pairs : [];
+  const pairs: AutoEvidenceCorrelationPair[] = rawPairs
+    .filter(isRecord)
+    .map((pair) => ({
+      left: asStringOrNull(pair.left) ?? "",
+      right: asStringOrNull(pair.right) ?? "",
+      correlation: asNumberOrNull(pair.correlation),
+      sharedBuckets: asNumberOrNull(pair.sharedBuckets),
+      notes: asStringArray(pair.notes),
+    }));
+  return {
+    method: asStringOrNull(value.method),
+    bucket: asStringOrNull(value.bucket),
+    minBuckets: asNumberOrNull(value.minBuckets),
+    strategies: asStringArray(value.strategies),
+    pairs,
+    notes: asStringArray(value.notes),
+  };
+}
+
+/** AUTO-21 — normaliza el bloque `currentEvidence`; ausente o mal formado ⇒ `null` (no se inventa). */
+function asCurrentEvidence(value: unknown): AutoEvidenceCurrentEvidence | null {
+  if (!isRecord(value)) return null;
+  const byStrategy: Record<string, AutoEvidenceRegimeRow> = {};
+  const raw = isRecord(value.byStrategy) ? value.byStrategy : {};
+  for (const [version, row] of Object.entries(raw)) {
+    if (!isRecord(row)) continue;
+    byStrategy[version] = {
+      strategyVersion: asStringOrNull(row.strategyVersion) ?? version,
+      regime: asStringOrNull(row.regime) ?? "",
+      measuredN: asNumberOrNull(row.measuredN),
+      episodes: asNumberOrNull(row.episodes),
+      expectancyR: asNumberOrNull(row.expectancyR),
+      probabilityPositive: asNumberOrNull(row.probabilityPositive),
+      edgeConfidence: asStringOrNull(row.edgeConfidence),
+      notes: asStringArray(row.notes),
+    };
+  }
+  return {
+    method: asStringOrNull(value.method),
+    regime: asStringOrNull(value.regime),
+    adverse: asBooleanOrNull(value.adverse),
+    byStrategy,
+    notes: asStringArray(value.notes),
+  };
+}
+
 /**
  * Valida y normaliza un artefacto AUTO-20C. El esquema es obligatorio: importar un JSON ajeno
  * como evidencia AUTO sería una mentira de procedencia, así que se rechaza con motivo declarado.
@@ -174,6 +274,13 @@ export function parseAutoEvidenceArtifact(
       note: asStringOrNull(root.note),
       material,
       report: root.report,
+      correlation:
+        root.correlation == null ? null : asCorrelation(root.correlation),
+      currentRegime: asStringOrNull(root.currentRegime),
+      currentEvidence:
+        root.currentEvidence == null
+          ? null
+          : asCurrentEvidence(root.currentEvidence),
     },
   };
 }
@@ -277,6 +384,7 @@ export type EvidenceView = {
   material: EvidenceRow[];
   calibration: EvidenceRow[];
   declared: EvidenceRow[];
+  correlation: EvidenceRow[];
   perimeter: EvidenceRow[];
   warnings: string[];
 };
@@ -513,6 +621,57 @@ export function integrityWarnings(
   return warnings;
 }
 
+/** Número a 4 decimales; ausente/no finito ⇒ `NO MEDIDO` (a diferencia del veredicto). */
+function measureLabel(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toFixed(4);
+  }
+  return NOT_MEASURED;
+}
+
+/**
+ * AUTO-21 — fila(s) de evidencia del régimen actual. Sin artefacto, sin bloque o sin estrategias ⇒
+ * `NO MEDIDO`; con lectura, una línea por estrategia con su `P(R>0)` y su banda. Nunca se inventa.
+ */
+function currentEvidenceLabel(
+  artifact: AutoEvidenceArtifact | null | undefined,
+): EvidenceRow[] {
+  const evidence = artifact?.currentEvidence ?? null;
+  const versions =
+    evidence == null ? [] : Object.keys(evidence.byStrategy).sort();
+  if (evidence == null || versions.length === 0) {
+    return [
+      { label: "Current evidence", value: NOT_MEASURED, inconclusive: true },
+    ];
+  }
+  const parts = versions.map((version) => {
+    const row = evidence.byStrategy[version];
+    const edge = row?.edgeConfidence ?? "UNKNOWN";
+    return `${version}: P(R>0) ${measureLabel(row?.probabilityPositive)} (${edge})`;
+  });
+  return [
+    { label: "Current evidence", value: parts.join("; "), inconclusive: false },
+  ];
+}
+
+/** AUTO-21 — filas del bloque de correlación (una por par); sin lectura ⇒ `[]`. */
+function correlationRows(
+  artifact: AutoEvidenceArtifact | null | undefined,
+): EvidenceRow[] {
+  const correlation = artifact?.correlation ?? null;
+  if (!correlation || correlation.pairs.length === 0) return [];
+  return correlation.pairs.map((pair) => {
+    const notes = pair.notes.length > 0 ? ` [${pair.notes.join(", ")}]` : "";
+    return {
+      label: `${pair.left} vs ${pair.right}`,
+      value: `${measureLabel(pair.correlation)} (cubos=${countLabel(
+        pair.sharedBuckets,
+      )})${notes}`,
+      inconclusive: pair.correlation == null,
+    };
+  });
+}
+
 /** Vista determinista para el render: procedencia + bloques verbatim (sin recalcular nada). */
 export function buildEvidenceView(
   artifact: AutoEvidenceArtifact | null | undefined,
@@ -531,6 +690,8 @@ export function buildEvidenceView(
     value: wfeValue,
     inconclusive: wfeValue === INCONCLUSIVE,
   });
+  const currentRegime = artifact?.currentRegime ?? null;
+  const currentEvidence = currentEvidenceLabel(artifact);
   return {
     source: classifyEvidenceSource(artifact),
     material: materialRows(artifact?.material ?? null),
@@ -538,20 +699,17 @@ export function buildEvidenceView(
     declared: [
       {
         label: "Current regime",
-        value: OUT_OF_SCOPE_AUTO21,
-        inconclusive: true,
+        value: currentRegime ?? NOT_MEASURED,
+        inconclusive: currentRegime == null,
       },
-      {
-        label: "Current evidence",
-        value: OUT_OF_SCOPE_AUTO21,
-        inconclusive: true,
-      },
+      ...currentEvidence,
       {
         label: "Allocation change",
         value: `${ALLOCATION_CHANGE_NONE} (auto18-v1 congelado: la evidencia no mueve el reparto)`,
         inconclusive: false,
       },
     ],
+    correlation: correlationRows(artifact),
     perimeter: perimeterRows(artifact?.material ?? null),
     warnings: integrityWarnings(artifact),
   };

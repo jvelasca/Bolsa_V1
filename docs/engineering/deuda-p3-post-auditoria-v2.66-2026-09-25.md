@@ -77,3 +77,8 @@ dejó los ficheros **byte a byte**. `v2.66-beta` (**`6fe7faa8`**) permanece inta
 > **RESUELTA en `v2.67-beta` (`AUTO-20F`).** Ver
 > [`plan`](./plan-v2-67-auto-20f-cierre-p3-v2.66-2026-09-25.md) · [`audit-pack`](./audit-pack-v2-67-auto-20f-cierre-p3-v2.66-2026-09-25.md).
 > Este documento se conserva como **registro histórico**.
+
+> **Residuo detectado y cerrado (`v2.67`, P3-1 de la auditoría de `v2.67`):** la corrección inicial cubrió
+> `plan`/`audit-pack` de `v2.66`, pero **subsistía** el texto original en la entrada histórica de
+> `PROJECT_STATE.md` (`AUTO-20E`) y en `arranque-auditor-v2.66` («fiarse de M180»). Corregidos en `main` con la
+> misma precisión (`v2.67`). Con eso, **ningún documento** atribuye a M180 el contrato TS-vs-Python.

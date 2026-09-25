@@ -172,6 +172,13 @@ class ReplayCell:
     raw_sign_ok: bool | None
     shrunk_sign_ok: bool | None
     edge_sign_ok: bool | None
+    #: ``AUTO-21`` — P(R > 0) DECLARADA por el IS (bootstrap de episodios). ``None`` sin medición.
+    is_probability_positive: float | None = None
+    #: ``AUTO-21`` — fracción positiva REALIZADA del OOS (ciclos con R > 0 sobre medidos).
+    oos_positive_share: float | None = None
+    #: ``AUTO-21`` — nº de ciclos OOS positivos: el numerador exacto de ``oos_positive_share``, sin
+    #: depender del redondeo. Es lo que permite agregar la probabilidad realizada sin mezclar ratios.
+    oos_positive_n: int = 0
     notes: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
@@ -187,11 +194,14 @@ class ReplayCell:
             "isConfidence": self.is_confidence,
             "isCoverage": self.is_coverage,
             "isEdgeConfidence": self.is_edge_confidence,
+            "isProbabilityPositive": _round4(self.is_probability_positive),
             "oosMeasuredN": self.oos_measured_n,
             "oosExpectancyR": _round4(self.oos_expectancy_r),
             "oosDispersionR": _round4(self.oos_dispersion_r),
             "oosRegime": self.oos_regime,
             "regimeCoverage": self.regime_coverage,
+            "oosPositiveN": self.oos_positive_n,
+            "oosPositiveShare": _round4(self.oos_positive_share),
             "rawError": _round4(self.raw_error),
             "shrunkError": _round4(self.shrunk_error),
             "rawSignOk": self.raw_sign_ok,
@@ -369,6 +379,11 @@ def measure_is_oos_row(
         oos_dispersion = 0.0
     else:
         oos_dispersion = None
+    # AUTO-21 — la probabilidad REALIZADA del OOS: qué fracción de ciclos cerró en positivo.
+    oos_positive_n = sum(1 for value in oos_values if value > 0.0)
+    oos_positive_share = (
+        _round4(oos_positive_n / len(oos_values)) if oos_values else None
+    )
     oos_regime = _majority_regime(oos_rows)
 
     raw_error = (
@@ -412,11 +427,14 @@ def measure_is_oos_row(
         is_confidence=is_band,
         is_coverage=is_coverage,
         is_edge_confidence=edge,
+        is_probability_positive=interval.probability_positive if interval is not None else None,
         oos_measured_n=len(oos_values),
         oos_expectancy_r=oos_expectancy,
         oos_dispersion_r=oos_dispersion,
         oos_regime=oos_regime,
         regime_coverage=_regime_coverage(strategy, oos_regime),
+        oos_positive_n=oos_positive_n,
+        oos_positive_share=oos_positive_share,
         raw_error=raw_error,
         shrunk_error=shrunk_error,
         raw_sign_ok=raw_sign_ok,

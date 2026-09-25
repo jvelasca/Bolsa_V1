@@ -25,11 +25,13 @@ from bolsa_analytics.cognitive.auto_adaptive_calibration import (
     CALIBRATION_EDGE_SIGN_FLOOR_DEFAULT,
     CALIBRATION_FOLDS_DEFAULT,
     CALIBRATION_METHOD,
+    CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
     CALIBRATION_QUESTION_CONFIDENCE,
     CALIBRATION_QUESTION_COVERAGE,
     CALIBRATION_QUESTION_EDGE_SIGN,
     CALIBRATION_QUESTION_EFFECTIVE_N,
     CALIBRATION_QUESTION_INTERVAL_COVERAGE,
+    CALIBRATION_QUESTION_PROBABILITY,
     CALIBRATION_QUESTION_SHRINKAGE,
     CalibrationFold,
     _aggregate,
@@ -37,6 +39,7 @@ from bolsa_analytics.cognitive.auto_adaptive_calibration import (
     _question_confidence_band,
     _question_edge_sign,
     _question_interval_coverage,
+    _question_probability_positive,
     build_calibration_report,
     resolve_calibration_folds,
     split_walk_forward_folds,
@@ -75,6 +78,9 @@ def _cell(
     shrunk_error: float | None = None,
     effective_n: int = 10,
     is_r: float | None = 1.0,
+    is_probability_positive: float | None = None,
+    oos_positive_share: float | None = None,
+    oos_positive_n: int = 0,
 ) -> ReplayCell:
     return ReplayCell(
         strategy_version=version,
@@ -88,11 +94,14 @@ def _cell(
         is_confidence=band,
         is_coverage=coverage,
         is_edge_confidence=edge,
+        is_probability_positive=is_probability_positive,
         oos_measured_n=oos_n,
         oos_expectancy_r=oos,
         oos_dispersion_r=dispersion,
         oos_regime="TREND_UP",
         regime_coverage=coverage,
+        oos_positive_n=oos_positive_n,
+        oos_positive_share=oos_positive_share,
         raw_error=raw_error,
         shrunk_error=shrunk_error,
         raw_sign_ok=True,
@@ -120,7 +129,7 @@ def _cycles(version: str, count: int, *, pnl: float = 4.0) -> list[dict[str, obj
 # ── Sin material no hay veredicto ───────────────────────────────────────────────────
 
 
-def test_no_cycles_returns_six_declared_inconclusive_questions() -> None:
+def test_no_cycles_returns_seven_declared_inconclusive_questions() -> None:
     report = build_calibration_report([])
     payload = report.as_dict()
 
@@ -130,6 +139,7 @@ def test_no_cycles_returns_six_declared_inconclusive_questions() -> None:
     assert [row["question"] for row in payload["questions"]] == [
         CALIBRATION_QUESTION_INTERVAL_COVERAGE,
         CALIBRATION_QUESTION_EDGE_SIGN,
+        CALIBRATION_QUESTION_PROBABILITY,
         CALIBRATION_QUESTION_CONFIDENCE,
         CALIBRATION_QUESTION_SHRINKAGE,
         CALIBRATION_QUESTION_EFFECTIVE_N,
@@ -140,6 +150,7 @@ def test_no_cycles_returns_six_declared_inconclusive_questions() -> None:
     assert payload["method"] == CALIBRATION_METHOD
     assert payload["foldsRequested"] == CALIBRATION_FOLDS_DEFAULT
     assert payload["aggregate"]["foldCount"] == 0
+    assert payload["aggregate"]["probabilityPositiveOos"] is None
 
 
 def test_the_folds_are_clamped_to_the_declared_range() -> None:
@@ -347,6 +358,7 @@ def test_the_replay_questions_are_reused_under_calibration_keys() -> None:
     assert set(by_key) == {
         CALIBRATION_QUESTION_INTERVAL_COVERAGE,
         CALIBRATION_QUESTION_EDGE_SIGN,
+        CALIBRATION_QUESTION_PROBABILITY,
         CALIBRATION_QUESTION_CONFIDENCE,
         CALIBRATION_QUESTION_SHRINKAGE,
         CALIBRATION_QUESTION_EFFECTIVE_N,
@@ -354,6 +366,67 @@ def test_the_replay_questions_are_reused_under_calibration_keys() -> None:
     }
     assert by_key[CALIBRATION_QUESTION_SHRINKAGE].verdict == REPLAY_VERDICT_NOT_SUPPORTED
     assert by_key[CALIBRATION_QUESTION_SHRINKAGE].sample == 2
+
+
+# ── AUTO-21 · la P(R>0) declarada contra la frecuencia positiva realizada ───────────
+
+
+def test_probability_positive_calibration_supports_a_declared_probability_that_holds() -> None:
+    question = _question_probability_positive(
+        [
+            _cell(is_probability_positive=0.6, oos_positive_share=0.7),
+            _cell(is_probability_positive=0.4, oos_positive_share=0.3),
+        ],
+        min_cells=2,
+        tolerance=CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
+    )
+
+    assert question.verdict == REPLAY_VERDICT_SUPPORTED
+    assert question.sample == 2
+    assert question.metrics["meanAbsoluteCalibrationError"] == 0.1
+    assert question.metrics["meanDeclaredProbability"] == 0.5
+    assert question.metrics["meanRealizedPositiveShare"] == 0.5
+
+
+def test_probability_positive_calibration_refutes_a_declared_probability_the_oos_denies() -> None:
+    question = _question_probability_positive(
+        [
+            _cell(is_probability_positive=0.9, oos_positive_share=0.2),
+            _cell(is_probability_positive=0.8, oos_positive_share=0.1),
+        ],
+        min_cells=2,
+        tolerance=CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
+    )
+
+    assert question.verdict == REPLAY_VERDICT_NOT_SUPPORTED
+    assert question.metrics["meanAbsoluteCalibrationError"] == 0.7
+
+
+def test_probability_positive_calibration_is_inconclusive_without_both_terms() -> None:
+    thin = _question_probability_positive(
+        [
+            _cell(is_probability_positive=None, oos_positive_share=0.5),
+            _cell(is_probability_positive=0.5, oos_positive_share=None),
+            _cell(is_probability_positive=0.5, oos_positive_share=0.5),
+        ],
+        min_cells=2,
+        tolerance=CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
+    )
+
+    assert thin.verdict == REPLAY_VERDICT_INCONCLUSIVE
+    assert thin.sample == 1, "solo la celda con los dos términos cuenta como muestra"
+
+
+def test_the_aggregate_pools_the_realized_positive_share_by_cycles() -> None:
+    """La probabilidad realizada se agrega por ciclos, no como media de ratios."""
+    folds = (
+        CalibrationFold(index=1, cell=_cell(oos_n=2, oos_positive_n=2)),
+        CalibrationFold(index=2, cell=_cell(oos_n=8, oos_positive_n=0)),
+    )
+    aggregate = _aggregate(folds)
+
+    assert aggregate["probabilityPositiveOos"] == 0.2, "2/10, no (1.0 + 0.0)/2 = 0.5"
+    assert aggregate["probabilityPositiveOos"] != aggregate["positiveOosFoldShare"]
 
 
 # ── El fixture sintético: el instrumento se mide a sí mismo ─────────────────────────
@@ -421,6 +494,7 @@ def test_the_report_payload_is_json_shaped() -> None:
         "meanOosExpectancyR",
         "stdOosExpectancyR",
         "positiveOosFoldShare",
+        "probabilityPositiveOos",
         "oosCv",
         "walkForwardEfficiency",
     }

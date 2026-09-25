@@ -219,8 +219,42 @@ def test_the_reading_is_a_json_shaped_payload() -> None:
         "measuredN",
         "resamples",
         "dispersionR",
+        "probabilityPositive",
         "notes",
     }
+
+
+def test_probability_positive_is_the_share_of_positive_bootstrap_means() -> None:
+    """AUTO-21: P(R>0) es la fracción de medias bootstrap > 0, con el mismo material que el intervalo."""
+    regimes = ["TREND_UP", "RANGE"] * 10
+    values = [-1.0, -2.0] * 10
+    cycles = _cycles("orb-1", regimes, values)
+    reading = build_adaptive_uncertainty(cycles, resamples=400, seed=5)
+    row = reading.uncertainty_for("orb-1")
+
+    assert row is not None
+    assert row.interval.probability_positive == 0.0, "ninguna media bootstrap supera cero"
+    assert row.interval.as_dict()["probabilityPositive"] == 0.0
+
+
+def test_probability_positive_is_none_without_a_bootstrap() -> None:
+    """Sin rachas suficientes no hay bootstrap: la probabilidad se declara ``None``, no un 0 falso."""
+    cycles = _cycles("orb-1", ["TREND_UP"] * 6, [1.0] * 6)
+    reading = build_adaptive_uncertainty(cycles)
+
+    row = reading.uncertainty_for("orb-1")
+    assert row is not None
+    assert row.interval.probability_positive is None
+
+
+def test_a_fully_positive_sample_declares_probability_one() -> None:
+    regimes = ["TREND_UP", "RANGE"] * 15
+    cycles = _cycles("orb-1", regimes, [0.5] * 30)
+    reading = build_adaptive_uncertainty(cycles, resamples=300, seed=3)
+
+    row = reading.uncertainty_for("orb-1")
+    assert row is not None
+    assert row.interval.probability_positive == 1.0
 
 
 # ── La banda de EDGE: un eje PROPIO, derivado del intervalo ─────────────────────────

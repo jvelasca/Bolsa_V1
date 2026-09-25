@@ -79,11 +79,13 @@ __all__ = [
     "CALIBRATION_FOLDS_MAX",
     "CALIBRATION_FOLDS_MIN",
     "CALIBRATION_METHOD",
+    "CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT",
     "CALIBRATION_QUESTION_CONFIDENCE",
     "CALIBRATION_QUESTION_COVERAGE",
     "CALIBRATION_QUESTION_EDGE_SIGN",
     "CALIBRATION_QUESTION_EFFECTIVE_N",
     "CALIBRATION_QUESTION_INTERVAL_COVERAGE",
+    "CALIBRATION_QUESTION_PROBABILITY",
     "CALIBRATION_QUESTION_SHRINKAGE",
     "CalibrationFold",
     "CalibrationQuestion",
@@ -95,7 +97,11 @@ __all__ = [
 
 #: Método declarado de la lectura. Ampliarla (p. ej. validar ``P(R > 0)``) obliga a subir este
 #: sello: dos informes con el mismo aspecto no pueden venir de instrumentos distintos.
-CALIBRATION_METHOD = "walk_forward_calibration_v2"
+#:
+#: ``AUTO-21`` sube el sello a ``v3``: la lectura gana la pregunta
+#: ``probability_positive_calibration`` (¿la P(R > 0) declarada acierta la frecuencia positiva
+#: realizada del OOS?) y el agregado publica ``probabilityPositiveOos``.
+CALIBRATION_METHOD = "walk_forward_calibration_v3"
 
 #: Pliegues del walk-forward: por defecto 3, acotado a ``[2, 5]`` (el mismo rango que el walk-forward
 #: de barras de ``optimize``). Con menos de 2 no hay walk-forward —hay un split—, y por encima de 5
@@ -113,8 +119,15 @@ CALIBRATION_COVERAGE_TOLERANCE_DEFAULT = 0.10
 #: instrumento afirmaría lo contrario de lo que midió.
 CALIBRATION_EDGE_SIGN_FLOOR_DEFAULT = 0.5
 
+#: Error absoluto medio máximo tolerado entre la P(R > 0) DECLARADA y la frecuencia positiva
+#: REALIZADA del OOS para declarar la probabilidad calibrada. ``0.20`` sobre una probabilidad en
+#: ``[0, 1]`` es un listón honesto para muestras pequeñas: declarar 0.7 y observar 0.4 se declara
+#: ``not_supported``, pero el ruido de un puñado de ciclos no enrojece la lectura.
+CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT = 0.20
+
 CALIBRATION_QUESTION_INTERVAL_COVERAGE = "interval_coverage"
 CALIBRATION_QUESTION_EDGE_SIGN = "edge_sign_calibration"
+CALIBRATION_QUESTION_PROBABILITY = "probability_positive_calibration"
 CALIBRATION_QUESTION_CONFIDENCE = "confidence_calibration"
 CALIBRATION_QUESTION_SHRINKAGE = "shrinkage_calibration"
 CALIBRATION_QUESTION_EFFECTIVE_N = "effective_n_calibration"
@@ -123,6 +136,7 @@ CALIBRATION_QUESTION_COVERAGE = "coverage_calibration"
 _CALIBRATION_QUESTIONS: tuple[str, ...] = (
     CALIBRATION_QUESTION_INTERVAL_COVERAGE,
     CALIBRATION_QUESTION_EDGE_SIGN,
+    CALIBRATION_QUESTION_PROBABILITY,
     CALIBRATION_QUESTION_CONFIDENCE,
     CALIBRATION_QUESTION_SHRINKAGE,
     CALIBRATION_QUESTION_EFFECTIVE_N,
@@ -244,8 +258,9 @@ class CalibrationReport:
     seed: int = ADAPTIVE_INTERVAL_SEED_DEFAULT
     notes: tuple[str, ...] = ()
     #: AUTO-20B — metadata de ENTRADA declarada (huella + conteos del material exportado), o
-    #: ``None``. Es OPcional: sin ella el informe queda byte-idéntico al ya auditado, y el
-    #: ``method`` (``walk_forward_calibration_v2``) NO cambia porque no cambia ninguna medición.
+    #: ``None``. Es OPCIONAL: sin ella el informe no gana la clave ``material`` (la ausencia no se
+    #: disfraza de bloque vacío) y aportarla NO cambia ninguna medición — solo el sello de método
+    #: (``CALIBRATION_METHOD``) declara las lecturas que sí cambiaron.
     material: Mapping[str, Any] | None = None
 
     @property
@@ -400,6 +415,60 @@ def _question_edge_sign(
     )
 
 
+def _question_probability_positive(
+    cells: Sequence[ReplayCell],
+    *,
+    min_cells: int,
+    tolerance: float,
+) -> CalibrationQuestion:
+    """(PURA) ¿la ``P(R > 0)`` DECLARADA acierta la frecuencia positiva REALIZADA del OOS?
+
+    Por celda se compara la probabilidad que el bootstrap publicó sobre el IS con la fracción de
+    ciclos OOS que cerraron en positivo. El veredicto mira el **error absoluto medio**: declarar una
+    probabilidad que el OOS desmiente se declara ``not_supported``. Sin celdas con ambos términos no
+    hay comparación: ``inconclusive`` (una probabilidad sin su frecuencia no se puede calibrar).
+    """
+    usable = [
+        cell
+        for cell in cells
+        if cell.is_probability_positive is not None and cell.oos_positive_share is not None
+    ]
+    errors = [
+        abs(float(cell.is_probability_positive) - float(cell.oos_positive_share))
+        for cell in usable
+    ]
+    metrics: dict[str, Any] = {
+        "meanAbsoluteCalibrationError": _round4(mean(errors)) if errors else None,
+        "meanDeclaredProbability": _round4(
+            mean([float(cell.is_probability_positive) for cell in usable])
+        )
+        if usable
+        else None,
+        "meanRealizedPositiveShare": _round4(
+            mean([float(cell.oos_positive_share) for cell in usable])
+        )
+        if usable
+        else None,
+        "cells": len(usable),
+    }
+    if len(usable) < max(1, int(min_cells)):
+        return _inconclusive(
+            CALIBRATION_QUESTION_PROBABILITY, metrics=metrics, sample=len(usable)
+        )
+    mean_error = float(mean(errors))
+    verdict = (
+        REPLAY_VERDICT_SUPPORTED
+        if mean_error <= tolerance
+        else REPLAY_VERDICT_NOT_SUPPORTED
+    )
+    return CalibrationQuestion(
+        question=CALIBRATION_QUESTION_PROBABILITY,
+        verdict=verdict,
+        sample=len(usable),
+        metrics=metrics,
+    )
+
+
 def _band_summary(cells: Sequence[ReplayCell], band: str) -> dict[str, Any]:
     rows = [cell for cell in cells if cell.is_confidence == band]
     oos = [cell.oos_expectancy_r for cell in rows if cell.oos_expectancy_r is not None]
@@ -469,12 +538,16 @@ def _calibration_questions(
     level: float,
     tolerance: float,
     edge_sign_floor: float,
+    probability_tolerance: float = CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
 ) -> tuple[CalibrationQuestion, ...]:
     return (
         _question_interval_coverage(
             cells, min_cells=min_cells, level=level, tolerance=tolerance
         ),
         _question_edge_sign(cells, min_cells=min_cells, floor=edge_sign_floor),
+        _question_probability_positive(
+            cells, min_cells=min_cells, tolerance=probability_tolerance
+        ),
         _question_confidence_band(cells, min_cells=min_cells),
         _as_calibration(
             _question_shrinkage(cells, min_cells), CALIBRATION_QUESTION_SHRINKAGE
@@ -484,6 +557,18 @@ def _calibration_questions(
         ),
         _as_calibration(_question_coverage(cells, min_cells), CALIBRATION_QUESTION_COVERAGE),
     )
+
+
+def _pooled_positive_share(folds: Sequence[CalibrationFold]) -> float | None:
+    """(PURA) fracción positiva OOS AGREGADA por ciclos (no media de ratios).
+
+    ``AUTO-21``: la probabilidad realizada se agrega sobre el numerador y el denominador reales
+    (ciclos positivos / ciclos medidos) para que un pliegue con muchos ciclos pese lo que mide. Sin
+    ciclos medidos no hay probabilidad: ``None``, nunca un ``0`` que diría "no acertó ninguno".
+    """
+    positives = sum(int(fold.cell.oos_positive_n) for fold in folds)
+    measured = sum(int(fold.cell.oos_measured_n) for fold in folds)
+    return _round4(positives / measured) if measured > 0 else None
 
 
 def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
@@ -520,6 +605,7 @@ def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
         "oosFoldCount": len(oos),
         "pairedFoldCount": len(paired),
     }
+    probability_oos = _pooled_positive_share(folds)
     if not oos:
         return {
             **counts,
@@ -527,6 +613,7 @@ def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
             "meanOosExpectancyR": None,
             "stdOosExpectancyR": None,
             "positiveOosFoldShare": None,
+            "probabilityPositiveOos": probability_oos,
             "oosCv": None,
             "walkForwardEfficiency": None,
         }
@@ -543,6 +630,7 @@ def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
         "positiveOosFoldShare": _round4(
             sum(1 for value in oos if value >= 0.0) / len(oos)
         ),
+        "probabilityPositiveOos": probability_oos,
         "oosCv": (
             _round4(std_oos / abs(mean_oos)) if abs(mean_oos) > _EPSILON else None
         ),
@@ -565,13 +653,14 @@ def build_calibration_report(
     level: float = ADAPTIVE_INTERVAL_LEVEL_DEFAULT,
     tolerance: float = CALIBRATION_COVERAGE_TOLERANCE_DEFAULT,
     edge_sign_floor: float = CALIBRATION_EDGE_SIGN_FLOOR_DEFAULT,
+    probability_tolerance: float = CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
     resamples: int = ADAPTIVE_INTERVAL_RESAMPLES_DEFAULT,
     seed: int = ADAPTIVE_INTERVAL_SEED_DEFAULT,
     material: Mapping[str, Any] | None = None,
 ) -> CalibrationReport:
     """(PURA) walk-forward + calibración sobre los ciclos dados (mismo material que el informe).
 
-    Sin ciclos devuelve un informe vacío DECLARADO: las seis preguntas quedan ``inconclusive`` con
+    Sin ciclos devuelve un informe vacío DECLARADO: las siete preguntas quedan ``inconclusive`` con
     ``sample = 0``, que es la respuesta honesta a "¿está calibrada mi incertidumbre?" cuando no hay
     nada que medir. Con material, cada estrategia se parte en pliegues crecientes y se mide con la
     MISMA aritmética de celda que ``AUTO-19A`` (``measure_is_oos_row``).
@@ -599,6 +688,7 @@ def build_calibration_report(
                 level=resolved_level,
                 tolerance=tolerance,
                 edge_sign_floor=edge_sign_floor,
+                probability_tolerance=probability_tolerance,
             ),
             aggregate=_aggregate(()),
             folds_requested=resolved_folds,
@@ -673,6 +763,7 @@ def build_calibration_report(
             level=resolved_level,
             tolerance=tolerance,
             edge_sign_floor=edge_sign_floor,
+            probability_tolerance=probability_tolerance,
         ),
         aggregate=_aggregate(folds_tuple),
         folds_requested=resolved_folds,

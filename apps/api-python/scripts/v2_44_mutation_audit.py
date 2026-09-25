@@ -439,6 +439,21 @@ nivel declarado y reutilización de las preguntas de la fase anterior) añade:
 * **M168 (material sin riesgo)** — si el instrumento vuelve a leer ciclos sin denominador, la
   calibración sobre datos reales sale vacía y el informe lo lee como "sin edge" (``AUTO-20``).
 
+AUTO-21 (V2.68: ``P(R>0)``, correlación por cubo y evidencia del régimen actual) añade:
+
+* **M182 (sello sin subir)** — si la lectura de incertidumbre publica ``P(R>0)`` pero deja el sello
+  en ``bootstrap_episodes_v1``, dos lecturas distintas se vuelven indistinguibles por su método.
+* **M183 (probabilidad fabricada)** — si la ``P(R>0)`` deja de ser la fracción de medias bootstrap
+  positivas y pasa a ser una constante, la evidencia afirma una probabilidad que la muestra no dio.
+* **M184 (sello de calibración sin subir)** — si la pregunta nueva entra sin subir
+  ``CALIBRATION_METHOD``, el informe sella ``v2`` una lectura que ya no es la auditada.
+* **M185 (pregunta sin muestra mínima)** — si la pregunta de probabilidad deja de exigir celdas con
+  ambos términos, una probabilidad sin frecuencia OOS se sella ``supported``/``not_supported``.
+* **M186 (correlación sin cubos)** — si un par SIN cubos compartidos publica ``0.0`` en vez de
+  ``None``, "no correlacionadas" sustituye a "no medido" (el mismo defecto que el ``0`` fabricado).
+* **M187 (régimen inventado)** — si una estrategia sin celda del régimen actual publica la lectura
+  agregada, la evidencia de ese régimen se atribuye a una muestra que no es la suya.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -500,6 +515,13 @@ AUTO_ADAPTIVE_CALIBRATION = (
 )
 AUTO_ADAPTIVE_DATA_GATE = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_data_gate.py"
+)
+# AUTO-21 (V2.68): correlación entre estrategias por cubo temporal + evidencia del régimen actual.
+AUTO_ADAPTIVE_CORRELATION = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_correlation.py"
+)
+AUTO_ADAPTIVE_REGIME_EVIDENCE = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_regime_evidence.py"
 )
 CYCLE_RISK = "packages/py/application/src/bolsa_application/cycle_risk.py"
 FEED = "packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py"
@@ -584,6 +606,9 @@ T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
 )
+# AUTO-21 (V2.68): pruebas puras de la correlación por cubo y de la evidencia del régimen actual.
+T_CORRELATION = "packages/py/analytics/tests/test_auto_adaptive_correlation.py"
+T_REGIME_EVIDENCE = "packages/py/analytics/tests/test_auto_adaptive_regime_evidence.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2063,6 +2088,61 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    if not isinstance(raw, (list, tuple)):\n",
         "    if raw is None:\n",
         (T_EVIDENCE_REPORT,),
+    ),
+    # ── AUTO-21 (V2.68): P(R>0) por bootstrap, correlación por cubo temporal y régimen actual ───
+    (
+        "M182 (sello sin subir): la lectura con P(R>0) conserva el sello bootstrap_episodes_v1",
+        AUTO_ADAPTIVE_UNCERTAINTY,
+        'ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v2"\n',
+        'ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v1"\n',
+        (T_UNCERTAINTY_SEAM,),
+    ),
+    (
+        "M183 (probabilidad fabricada): la P(R>0) deja de ser la fraccion de medias positivas",
+        AUTO_ADAPTIVE_UNCERTAINTY,
+        "    probability_positive = _round4(sum(1 for value in means if value > 0.0) / len(means))\n",
+        "    probability_positive = 1.0\n",
+        (T_UNCERTAINTY,),
+    ),
+    (
+        "M184 (sello de calibracion sin subir): el informe sella v2 una lectura ya distinta",
+        AUTO_ADAPTIVE_CALIBRATION,
+        'CALIBRATION_METHOD = "walk_forward_calibration_v3"\n',
+        'CALIBRATION_METHOD = "walk_forward_calibration_v2"\n',
+        (T_A20C_ARTIFACT,),
+    ),
+    (
+        "M185 (pregunta sin muestra minima): la probabilidad se sella sin su frecuencia OOS",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "    if len(usable) < max(1, int(min_cells)):\n"
+        "        return _inconclusive(\n"
+        "            CALIBRATION_QUESTION_PROBABILITY, metrics=metrics, sample=len(usable)\n"
+        "        )\n",
+        "    if False:\n"
+        "        return _inconclusive(\n"
+        "            CALIBRATION_QUESTION_PROBABILITY, metrics=metrics, sample=len(usable)\n"
+        "        )\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M186 (correlacion sin cubos): un par sin cubos compartidos publica 0.0 en vez de None",
+        AUTO_ADAPTIVE_CORRELATION,
+        "                        correlation=None,\n                        shared_buckets=0,\n",
+        "                        correlation=0.0,\n                        shared_buckets=0,\n",
+        (T_CORRELATION,),
+    ),
+    (
+        "M187 (regimen inventado): la estrategia sin celda publica la lectura agregada",
+        AUTO_ADAPTIVE_REGIME_EVIDENCE,
+        "                    measured_n=0,\n"
+        "                    episodes=0,\n"
+        "                    expectancy_r=None,\n"
+        "                    probability_positive=None,\n",
+        "                    measured_n=strategy.interval.measured_n,\n"
+        "                    episodes=strategy.interval.episodes,\n"
+        "                    expectancy_r=strategy.interval.point,\n"
+        "                    probability_positive=strategy.interval.probability_positive,\n",
+        (T_REGIME_EVIDENCE,),
     ),
 ]
 

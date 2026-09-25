@@ -269,11 +269,14 @@ def test_the_cell_payload_is_json_shaped_and_rounded() -> None:
         "isConfidence",
         "isCoverage",
         "isEdgeConfidence",
+        "isProbabilityPositive",
         "oosMeasuredN",
         "oosExpectancyR",
         "oosDispersionR",
         "oosRegime",
         "regimeCoverage",
+        "oosPositiveN",
+        "oosPositiveShare",
         "rawError",
         "shrunkError",
         "rawSignOk",
@@ -368,6 +371,31 @@ def test_a_cycle_without_an_instant_is_declared() -> None:
     report = build_replay_report(cycles)
 
     assert "undated_cycles" in report.notes
+
+
+def test_the_cell_publishes_the_declared_and_realized_positive_probabilities() -> None:
+    """AUTO-21: la celda lleva la P(R>0) declarada del IS y la frecuencia positiva REALIZADA del OOS."""
+    cycles = _cycles("orb-1", 40, pnl=4.0)  # R = 0.8 en TODOS los ciclos
+    cell = build_replay_report(cycles).cells[0]
+
+    assert cell.is_probability_positive == 1.0
+    assert cell.oos_positive_share == 1.0
+    assert cell.oos_positive_n == cell.oos_measured_n
+    assert cell.as_dict()["isProbabilityPositive"] == 1.0
+    assert cell.as_dict()["oosPositiveShare"] == 1.0
+
+
+def test_a_mixed_oos_declares_its_realized_positive_share() -> None:
+    """La fracción positiva contada es sobre los ciclos OOS MEDIDOS, no sobre el total."""
+    cycles = _cycles("orb-1", 40, pnl=4.0)
+    for index in range(28, 40):  # los 12 ciclos del tramo OOS (30 %) cierran en negativo
+        cycles[index]["pnl"] = "-4.0"
+    cell = build_replay_report(cycles).cells[0]
+
+    assert cell.oos_measured_n == 12
+    assert cell.oos_positive_n == 0
+    assert cell.oos_positive_share == 0.0
+    assert cell.is_probability_positive == 1.0, "el IS sigue siendo todo positivo"
 
 
 @pytest.mark.parametrize("bad", [0.0, -1.0])

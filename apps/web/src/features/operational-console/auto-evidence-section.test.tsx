@@ -147,4 +147,36 @@ describe("OpsAutoEvidenceSection", () => {
     fireEvent.click(screen.getByTestId("ops-auto-evidence-clear"));
     expect(useAutoEvidenceArchiveStore.getState().items).toHaveLength(0);
   });
+
+  it("shows no correlation block when the artifact brings no matrix", () => {
+    paste(artifactJson());
+    expect(screen.queryByTestId("ops-auto-evidence-correlation")).toBeNull();
+  });
+
+  it("renders the correlation block when the artifact brings a matrix", () => {
+    paste(
+      artifactJson({
+        correlation: {
+          method: "bucket_correlation_v1",
+          bucket: "day",
+          minBuckets: 4,
+          strategies: ["a", "b"],
+          pairs: [
+            {
+              left: "a",
+              right: "b",
+              correlation: 0.5,
+              sharedBuckets: 6,
+              notes: [],
+            },
+          ],
+          notes: [],
+        },
+      }),
+    );
+    const block = screen.getByTestId("ops-auto-evidence-correlation");
+    expect(block.textContent).toContain("a vs b");
+    expect(block.textContent).toContain("0.5000");
+    expect(block.textContent).toContain("cubos=6");
+  });
 });
