@@ -140,3 +140,26 @@ def test_the_render_declares_the_perimeter_and_the_frozen_allocation() -> None:
     assert OUT_OF_SCOPE_AUTO21 in text
     assert ALLOCATION_CHANGE_NONE in _row_for(text, "Allocation change")
     assert EXECUTION_REALITY_VIRTUAL_PAPER in text
+
+
+def test_the_render_distinguishes_an_absent_perimeter_list_from_an_empty_one() -> None:
+    """Ausente y vacío NO son lo mismo: ausente ⇒ ``NO MEDIDO``; lista vacía ⇒ ``(ninguna)``."""
+    material: dict[str, Any] = {
+        "materialOrigin": MATERIAL_ORIGIN_PAPER_REAL,
+        "requestedStrategyVersions": [],
+        # `observedStrategyVersions` ausente a propósito.
+    }
+    text = render_evidence_report(
+        build_evidence_artifact({"questions": [], "aggregate": {}}, material=material)
+    )
+
+    assert "requested versions:   (ninguna)" in text
+    assert "observed versions:    NO MEDIDO" in text
+
+
+def test_the_render_rows_use_the_canonical_calibration_keys() -> None:
+    """El render no puede desalinearse del instrumento: sus filas son las preguntas canónicas."""
+    from bolsa_analytics.cognitive.auto_adaptive_calibration import _CALIBRATION_QUESTIONS
+    from bolsa_analytics.cognitive.auto_evidence_report import _CALIBRATION_ROWS
+
+    assert {key for key, _ in _CALIBRATION_ROWS} == set(_CALIBRATION_QUESTIONS)

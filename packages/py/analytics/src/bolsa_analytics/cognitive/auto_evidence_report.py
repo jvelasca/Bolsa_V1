@@ -136,16 +136,27 @@ def _material_lines(material: Mapping[str, Any] | None) -> list[str]:
     return lines
 
 
+def _version_list(material: Mapping[str, Any], key: str) -> str:
+    """Lista de versiones del perímetro: ausente ⇒ ``NO MEDIDO``; vacía ⇒ ``(ninguna)``.
+
+    Ausente y vacío NO son lo mismo: un campo ausente no se midió; una lista vacía se midió y
+    estaba vacía. El render declara la diferencia en vez de colapsarla.
+    """
+    raw = material.get(key)
+    if raw is None:
+        return "NO MEDIDO"
+    items = [str(item) for item in raw]
+    return ", ".join(items) if items else "(ninguna)"
+
+
 def _perimeter_lines(material: Mapping[str, Any] | None) -> list[str]:
     """Bloque ``perimeter``: el contorno del volcado, separado del universo realmente medido."""
     if material is None:
         return []
-    requested = ", ".join(str(item) for item in (material.get("requestedStrategyVersions") or ()))
-    observed = ", ".join(str(item) for item in (material.get("observedStrategyVersions") or ()))
     lines = [
         "perimeter",
-        f"  requested versions:   {requested or '(ninguna)'}",
-        f"  observed versions:    {observed or '(ninguna)'}",
+        f"  requested versions:   {_version_list(material, 'requestedStrategyVersions')}",
+        f"  observed versions:    {_version_list(material, 'observedStrategyVersions')}",
         f"  fills total:          {material.get('fillsTotalForAccount')}",
         f"  fills selected:       {material.get('fillsSelected')}",
         f"  excluded (no version):{material.get('fillsExcludedNoVersion')}",

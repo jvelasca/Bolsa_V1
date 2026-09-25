@@ -15,15 +15,24 @@ import {
 } from "@/stores/auto-evidence-archive-store";
 
 function artifactJson(overrides: Record<string, unknown> = {}): string {
+  const origin =
+    (overrides.materialOrigin as string | undefined) ?? "paper_real";
+  const materialOverride =
+    (overrides.material as Record<string, unknown> | undefined) ?? {};
+  // `material` y `materialOrigin` se gestionan aparte para que la procedencia sea COHERENTE
+  // entre raíz y material (P3-2): un override de `materialOrigin` manda en ambos sitios.
+  const rest = { ...overrides };
+  delete rest.material;
+  delete rest.materialOrigin;
   return JSON.stringify({
     schema: AUTO_EVIDENCE_ARTIFACT_SCHEMA,
     executionReality: "virtual_paper_only",
     realMoneyAtRisk: false,
     brokerVenue: "paper",
-    materialOrigin: "paper_real",
+    materialOrigin: origin,
     note: "PAPER VIRTUAL",
     material: {
-      materialOrigin: "paper_real",
+      materialOrigin: origin,
       closedCycles: 184,
       cyclesWithRisk: 161,
       cyclesWithoutRisk: 23,
@@ -35,6 +44,7 @@ function artifactJson(overrides: Record<string, unknown> = {}): string {
       fillsSelected: 420,
       fillsExcludedNoVersion: 80,
       fillsExcludedOtherVersion: 0,
+      ...materialOverride,
     },
     report: {
       questions: AUTO_EVIDENCE_CALIBRATION_KEYS.map((key) => ({
@@ -43,7 +53,7 @@ function artifactJson(overrides: Record<string, unknown> = {}): string {
       })),
       aggregate: { walkForwardEfficiency: 0.4213 },
     },
-    ...overrides,
+    ...rest,
   });
 }
 

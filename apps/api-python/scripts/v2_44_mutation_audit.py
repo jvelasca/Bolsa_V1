@@ -2041,6 +2041,21 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         '            _write(args.out, json.dumps(artifact, indent=2, ensure_ascii=False) + "\\n")\n',
         (T_A20C_ARTIFACT,),
     ),
+    # ── AUTO-20E (V2.66): hardening de procedencia del AUTO EVIDENCE REPORT (deuda P3 v2.65) ───
+    (
+        "M179 (perimetro colapsado): el render vuelve a confundir ausente con lista vacia",
+        EVIDENCE_REPORT,
+        '    if raw is None:\n        return "NO MEDIDO"\n',
+        '    if raw is None:\n        return "(ninguna)"\n',
+        (T_EVIDENCE_REPORT,),
+    ),
+    (
+        "M180 (claves del render desalineadas): una fila deja de ser la pregunta canonica",
+        EVIDENCE_REPORT,
+        '    ("shrinkage_calibration", "Shrinkage"),\n',
+        '    ("shrinkage_calibrationX", "Shrinkage"),\n',
+        (T_EVIDENCE_REPORT,),
+    ),
 ]
 
 # DSN a un puerto local cerrado: el connect falla al instante (en vez de colgar el teardown de PG).

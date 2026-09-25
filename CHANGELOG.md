@@ -2,6 +2,39 @@
 
 All notable releases of Bolsa V1.
 
+## [1.91.0-beta] — AUTO-20E · hardening de procedencia del AUTO EVIDENCE REPORT (deuda P3 de v2.65) — 2026-09-25
+
+**Frontend + un fichero Python de render; SIN migración** (Alembic head sigue en `046_fill_reference_mid`)
+y **sin tocar ningún fichero del freeze** (`auto_adaptive.py`, `auto_adaptive_data_gate.py`,
+`auto_simulation_worker.py`, `auto_adaptive_journal.py`, `auto_adaptive_replay.py`,
+`v2_43_governor_evidence.py`, `governor.json`). El reparto **no se mueve**: `auto18-v1` / `auto15-v1`.
+
+**Cierra las 3 observaciones P3** no bloqueantes de la auditoría de `v2.65-beta` (ver
+`docs/engineering/deuda-p3-post-auditoria-v2.65-2026-09-25.md`).
+
+- **P3-1 — el «contrato de claves» ya es real.** El test del frontend deja de comparar la constante TS
+  contra un literal propio y **lee el instrumento Python** (`auto_adaptive_calibration.py`), extrayendo las
+  seis `CALIBRATION_QUESTION_*`. Se ha verificado que **cae de verdad**: renombrar una clave en Python pone
+  el test rojo. Además, `frontend-ci.yml` incorpora ese fichero a sus filtros de ruta (si no, un cambio solo
+  de Python no dispararía el workflow) y el render Python gana un test que ata sus filas a las claves
+  canónicas.
+- **P3-2 — la procedencia no puede contradecirse en silencio.** Si el `materialOrigin` de la raíz y el de
+  `material` discrepan, la clasificación pasa a **`PROCEDENCIA DESCONOCIDA`** (nunca `PAPER REAL`) y se
+  emite un aviso de integridad.
+- **P3-3 — ausente ≠ vacío en el perímetro.** Un listado de versiones **ausente** se muestra `NO MEDIDO`
+  (marcado como no concluyente); uno **vacío medido** se muestra `(ninguna)`. Cambiado **a la vez** en el
+  módulo TS y en el render Python para no reintroducir divergencia; para artefactos reales (que siempre
+  traen las listas) la salida es **byte-idéntica**.
+
+**Tests y compuertas.** Frontend **1323 passed** (232 ficheros; +3), `typecheck` OK, `lint` **0 errores**
+(23 warnings preexistentes), `build` OK y `contract:check` OK. Python analytics **1208 passed**, `ruff` OK y
+`import-linter` **4 kept / 0 broken**. Matriz de mutaciones ampliada con **M179** (perímetro colapsado) y
+**M180** (claves del render desalineadas).
+
+**Alcance del render.** El único cambio de comportamiento en la salida de `render_evidence_report` es el de
+las listas de perímetro **ausentes** (antes `(ninguna)`, ahora `NO MEDIDO`); ningún artefacto producido por
+la cadena real cambia, porque siempre declara esas listas.
+
 ## [1.90.0-beta] — AUTO-20D · UI de procedencia del AUTO EVIDENCE REPORT — 2026-09-25
 
 **Solo frontend, `+3` ficheros de producción y `+3` de test; SIN migración** (Alembic head sigue en

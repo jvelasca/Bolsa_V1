@@ -2,6 +2,9 @@
  * Tests — AUTO-20D lectura/presentación del artefacto AUTO EVIDENCE REPORT.
  */
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   ALLOCATION_CHANGE_NONE,
@@ -30,30 +33,37 @@ function questions(
 function artifact(
   overrides: Partial<AutoEvidenceArtifact> = {},
 ): AutoEvidenceArtifact {
+  const origin = overrides.materialOrigin ?? MATERIAL_ORIGIN_PAPER_REAL;
+  // La procedencia por defecto es COHERENTE entre raíz y material (P3-2); un override de
+  // `materialOrigin` la mantiene coherente salvo que se sobreescriba `material` a mano.
+  const material: AutoEvidenceArtifact["material"] =
+    overrides.material !== undefined
+      ? overrides.material
+      : {
+          materialOrigin: origin,
+          account: "acc-1",
+          closedCycles: 184,
+          cyclesWithRisk: 161,
+          cyclesWithoutRisk: 23,
+          regimesPresent: ["bull", "bear", "range"],
+          fingerprint: "sha256:abc",
+          requestedStrategyVersions: ["orb-trend"],
+          observedStrategyVersions: ["orb-trend"],
+          fillsTotalForAccount: 500,
+          fillsSelected: 420,
+          fillsExcludedNoVersion: 80,
+          fillsExcludedOtherVersion: 0,
+          reservationsRead: 184,
+          riskReadSaturated: false,
+        };
   return {
     schema: AUTO_EVIDENCE_ARTIFACT_SCHEMA,
     executionReality: EXECUTION_REALITY_VIRTUAL_PAPER,
     realMoneyAtRisk: false,
     brokerVenue: "paper",
-    materialOrigin: MATERIAL_ORIGIN_PAPER_REAL,
+    materialOrigin: origin,
     note: "PAPER VIRTUAL",
-    material: {
-      materialOrigin: MATERIAL_ORIGIN_PAPER_REAL,
-      account: "acc-1",
-      closedCycles: 184,
-      cyclesWithRisk: 161,
-      cyclesWithoutRisk: 23,
-      regimesPresent: ["bull", "bear", "range"],
-      fingerprint: "sha256:abc",
-      requestedStrategyVersions: ["orb-trend"],
-      observedStrategyVersions: ["orb-trend"],
-      fillsTotalForAccount: 500,
-      fillsSelected: 420,
-      fillsExcludedNoVersion: 80,
-      fillsExcludedOtherVersion: 0,
-      reservationsRead: 184,
-      riskReadSaturated: false,
-    },
+    material,
     report: {
       questions: questions(),
       aggregate: { walkForwardEfficiency: 0.4213 },
@@ -140,6 +150,20 @@ describe("classifyEvidenceSource", () => {
     expect(view.kind).toBe("desconocido");
     expect(view.decisionSafe).toBe(false);
   });
+
+  it("a contradictory materialOrigin is declared, never resolved to paper_real", () => {
+    const conflicting = artifact({
+      materialOrigin: MATERIAL_ORIGIN_PAPER_REAL,
+      material: { materialOrigin: MATERIAL_ORIGIN_SYNTHETIC_FIXTURE },
+    });
+    const view = classifyEvidenceSource(conflicting);
+    expect(view.kind).toBe("desconocido");
+    expect(view.decisionSafe).toBe(false);
+    expect(view.caveat).toContain("Contradicción");
+    expect(
+      integrityWarnings(conflicting).some((w) => w.includes("incoherente")),
+    ).toBe(true);
+  });
 });
 
 describe("buildEvidenceView", () => {
@@ -217,6 +241,23 @@ describe("buildEvidenceView", () => {
     ).toBe("184");
   });
 
+  it("distinguishes an absent perimeter list from an empty one", () => {
+    const view = buildEvidenceView(
+      artifact({
+        material: {
+          materialOrigin: MATERIAL_ORIGIN_PAPER_REAL,
+          requestedStrategyVersions: [],
+          // observedStrategyVersions ausente a propósito
+        },
+      }),
+    );
+    const perimeter = new Map(view.perimeter.map((row) => [row.label, row]));
+    expect(perimeter.get("Versiones pedidas")?.value).toBe("(ninguna)");
+    expect(perimeter.get("Versiones pedidas")?.inconclusive).toBe(false);
+    expect(perimeter.get("Versiones observadas")?.value).toBe("NO MEDIDO");
+    expect(perimeter.get("Versiones observadas")?.inconclusive).toBe(true);
+  });
+
   it("only lists perimeter rows for a measured material", () => {
     expect(
       buildEvidenceView(artifact({ material: null })).perimeter,
@@ -250,16 +291,41 @@ describe("integrityWarnings", () => {
   });
 });
 
+/**
+ * Lee las claves de calibración del **instrumento Python real** (no de un literal espejo).
+ * Falla ruidosamente si cambia la forma del instrumento: un contrato que no puede fallar no es
+ * un contrato. Ruta relativa a este fichero: 5 niveles hasta la raíz del repo.
+ */
+function pythonCalibrationKeys(): string[] {
+  const source = readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../../..",
+      "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_calibration.py",
+    ),
+    "utf8",
+  );
+  const matches = [
+    ...source.matchAll(/^CALIBRATION_QUESTION_[A-Z0-9_]+\s*=\s*"([^"]+)"/gm),
+  ];
+  if (matches.length === 0) {
+    throw new Error(
+      "No se pudo extraer ninguna CALIBRATION_QUESTION_* del instrumento Python: " +
+        "revisa auto_adaptive_calibration.py (¿cambió el formato?).",
+    );
+  }
+  return [...new Set(matches.map((match) => match[1]!))].sort();
+}
+
 describe("schema contract", () => {
-  it("pins the calibration keys emitted by the Python instrument", () => {
-    expect([...AUTO_EVIDENCE_CALIBRATION_KEYS]).toEqual([
-      "shrinkage_calibration",
-      "effective_n_calibration",
-      "interval_coverage",
-      "edge_sign_calibration",
-      "confidence_calibration",
-      "coverage_calibration",
-    ]);
+  it("matches the calibration keys the Python instrument actually emits", () => {
+    const pythonKeys = pythonCalibrationKeys();
+    // Las seis preguntas del instrumento; si Python añade o renombra una, este test cae.
+    expect(pythonKeys).toHaveLength(6);
+    expect([...AUTO_EVIDENCE_CALIBRATION_KEYS].sort()).toEqual(pythonKeys);
+  });
+
+  it("pins the artifact schema", () => {
     expect(AUTO_EVIDENCE_ARTIFACT_SCHEMA).toBe("auto20c_evidence_artifact_v1");
   });
 });

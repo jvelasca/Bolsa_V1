@@ -5,6 +5,9 @@ on:
     paths:
       - 'apps/web/**'
       - 'packages/shared/**'
+      # El contrato de claves del AUTO EVIDENCE REPORT lee el instrumento Python real:
+      # si cambia, el test debe correr (y caer) en este workflow.
+      - 'packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_calibration.py'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -15,6 +18,7 @@ on:
     paths:
       - 'apps/web/**'
       - 'packages/shared/**'
+      - 'packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_calibration.py'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'

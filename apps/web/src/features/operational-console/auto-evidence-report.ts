@@ -55,8 +55,8 @@ const CALIBRATION_LABELS: ReadonlyArray<readonly [string, string]> = [
 export type AutoEvidenceMaterial = {
   materialOrigin?: string | null;
   account?: string | null;
-  requestedStrategyVersions?: string[];
-  observedStrategyVersions?: string[];
+  requestedStrategyVersions?: string[] | null;
+  observedStrategyVersions?: string[] | null;
   versionsRequestedWithoutMaterial?: string[];
   versionsObservedNotRequested?: string[];
   executionReality?: string | null;
@@ -110,12 +110,22 @@ function asStringArray(value: unknown): string[] {
   return value.map((item) => String(item));
 }
 
+/** Lista de strings preservando la AUSENCIA (`null`): ausente ≠ `[]` (ver P3-3). */
+function asStringArrayOrNull(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.map((item) => String(item));
+}
+
 function asMaterial(value: unknown): AutoEvidenceMaterial | null {
   if (!isRecord(value)) return null;
   return {
     ...value,
-    requestedStrategyVersions: asStringArray(value.requestedStrategyVersions),
-    observedStrategyVersions: asStringArray(value.observedStrategyVersions),
+    requestedStrategyVersions: asStringArrayOrNull(
+      value.requestedStrategyVersions,
+    ),
+    observedStrategyVersions: asStringArrayOrNull(
+      value.observedStrategyVersions,
+    ),
     versionsRequestedWithoutMaterial: asStringArray(
       value.versionsRequestedWithoutMaterial,
     ),
@@ -201,8 +211,8 @@ export function classifyEvidenceSource(
       caveat: "No hay artefacto importado: no se ha medido nada.",
     };
   }
-  const origin =
-    artifact.materialOrigin ?? artifact.material?.materialOrigin ?? null;
+  const rootOrigin = artifact.materialOrigin;
+  const materialOrigin = artifact.material?.materialOrigin ?? null;
   if (artifact.material === null) {
     return {
       kind: "sin_material",
@@ -213,6 +223,21 @@ export function classifyEvidenceSource(
         "El artefacto no declara material: el informe no se apoya en ningún universo medido.",
     };
   }
+  // P3-2: dos orígenes autodeclarados que se contradicen NO se resuelven a favor de `paper_real`.
+  if (
+    rootOrigin != null &&
+    materialOrigin != null &&
+    rootOrigin !== materialOrigin
+  ) {
+    return {
+      kind: "desconocido",
+      label: "PROCEDENCIA DESCONOCIDA",
+      tone: "danger",
+      decisionSafe: false,
+      caveat: `Contradicción de procedencia autodeclarada: raíz='${rootOrigin}' vs material='${materialOrigin}'; no se asume PAPER real.`,
+    };
+  }
+  const origin = rootOrigin ?? materialOrigin;
   if (origin === MATERIAL_ORIGIN_PAPER_REAL) {
     return {
       kind: "paper_real",
@@ -295,8 +320,10 @@ function countLabel(value: unknown): string {
   return "NO MEDIDO";
 }
 
-function joinList(items: string[] | undefined, empty = "(ninguna)"): string {
-  return items && items.length > 0 ? items.join(", ") : empty;
+/** Lista del perímetro: ausente ⇒ `NO MEDIDO`; vacía ⇒ `(ninguna)`. Ausente ≠ `[]` (P3-3). */
+function listLabel(items: string[] | null | undefined): string {
+  if (items == null) return "NO MEDIDO";
+  return items.length > 0 ? items.join(", ") : "(ninguna)";
 }
 
 function walkForwardEfficiency(report: Record<string, unknown>): unknown {
@@ -368,13 +395,13 @@ function perimeterRows(material: AutoEvidenceMaterial | null): EvidenceRow[] {
   const rows: EvidenceRow[] = [
     {
       label: "Versiones pedidas",
-      value: joinList(asStringArray(material.requestedStrategyVersions)),
-      inconclusive: false,
+      value: listLabel(material.requestedStrategyVersions),
+      inconclusive: material.requestedStrategyVersions == null,
     },
     {
       label: "Versiones observadas",
-      value: joinList(asStringArray(material.observedStrategyVersions)),
-      inconclusive: false,
+      value: listLabel(material.observedStrategyVersions),
+      inconclusive: material.observedStrategyVersions == null,
     },
     {
       label: "Fills totales (cuenta)",
@@ -462,6 +489,18 @@ export function integrityWarnings(
   if (artifact.material?.riskReadSaturated === true) {
     warnings.push(
       "riskReadSaturated=true: la lectura de reservas no garantizó completitud.",
+    );
+  }
+  // P3-2: la procedencia autodeclarada en dos sitios no puede contradecirse en silencio.
+  const rootOrigin = artifact.materialOrigin;
+  const materialOrigin = artifact.material?.materialOrigin ?? null;
+  if (
+    rootOrigin != null &&
+    materialOrigin != null &&
+    rootOrigin !== materialOrigin
+  ) {
+    warnings.push(
+      `materialOrigin incoherente: raíz='${rootOrigin}' vs material='${materialOrigin}'.`,
     );
   }
   return warnings;
