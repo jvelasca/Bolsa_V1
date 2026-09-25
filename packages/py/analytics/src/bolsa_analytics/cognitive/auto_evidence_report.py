@@ -141,9 +141,13 @@ def _version_list(material: Mapping[str, Any], key: str) -> str:
 
     Ausente y vacío NO son lo mismo: un campo ausente no se midió; una lista vacía se midió y
     estaba vacía. El render declara la diferencia en vez de colapsarla.
+
+    Un valor que **no es una lista** (escalar, objeto, cadena suelta) se trata como **ausente**
+    (``NO MEDIDO``), espejo exacto de ``asStringArrayOrNull`` en el frontend: iterar una cadena
+    daría ``"o, r, b, -, a"``, que afirmaría haber medido algo que no se midió.
     """
     raw = material.get(key)
-    if raw is None:
+    if not isinstance(raw, (list, tuple)):
         return "NO MEDIDO"
     items = [str(item) for item in raw]
     return ", ".join(items) if items else "(ninguna)"

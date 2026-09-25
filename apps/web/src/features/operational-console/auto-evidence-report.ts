@@ -320,10 +320,17 @@ function countLabel(value: unknown): string {
   return "NO MEDIDO";
 }
 
-/** Lista del perímetro: ausente ⇒ `NO MEDIDO`; vacía ⇒ `(ninguna)`. Ausente ≠ `[]` (P3-3). */
-function listLabel(items: string[] | null | undefined): string {
-  if (items == null) return "NO MEDIDO";
-  return items.length > 0 ? items.join(", ") : "(ninguna)";
+/** Lista del perímetro: ausente/no-array ⇒ `NO MEDIDO`; vacía ⇒ `(ninguna)`. Ausente ≠ `[]` (P3-3). */
+function listLabel(value: unknown): string {
+  if (!Array.isArray(value)) return "NO MEDIDO";
+  return value.length > 0
+    ? value.map((item) => String(item)).join(", ")
+    : "(ninguna)";
+}
+
+/** ¿El valor es una lista medible? (no ausente y no escalar) — espejo de `isinstance(raw, (list, tuple))`. */
+function isMeasuredList(value: unknown): value is string[] {
+  return Array.isArray(value);
 }
 
 function walkForwardEfficiency(report: Record<string, unknown>): unknown {
@@ -396,12 +403,12 @@ function perimeterRows(material: AutoEvidenceMaterial | null): EvidenceRow[] {
     {
       label: "Versiones pedidas",
       value: listLabel(material.requestedStrategyVersions),
-      inconclusive: material.requestedStrategyVersions == null,
+      inconclusive: !isMeasuredList(material.requestedStrategyVersions),
     },
     {
       label: "Versiones observadas",
       value: listLabel(material.observedStrategyVersions),
-      inconclusive: material.observedStrategyVersions == null,
+      inconclusive: !isMeasuredList(material.observedStrategyVersions),
     },
     {
       label: "Fills totales (cuenta)",

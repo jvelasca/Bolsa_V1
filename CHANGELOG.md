@@ -2,6 +2,25 @@
 
 All notable releases of Bolsa V1.
 
+## [1.92.0-beta] — AUTO-20F · cierre de las 2 P3 de la auditoría de v2.66 — 2026-09-25
+
+**Frontend + un fichero Python de render; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y
+**sin tocar ningún fichero del freeze**. El reparto **no se mueve**: `auto18-v1` / `auto15-v1`. Fase corta de
+**precisión**, no de producto.
+
+- **(P3-1) Corrección documental.** El `plan`/`audit-pack` de `v2.66` afirmaban que la matriz «formaliza como
+  **M180**» el contrato TS-vs-Python. **No se sostenía**: M180 mutila el **render**
+  (`auto_evidence_report.py`), no el instrumento (`auto_adaptive_calibration.py`); ese contrato es **vitest** y
+  no entra en la matriz pytest. Redacción corregida con nota explícita (misma clase de sobre-afirmación que la
+  fase anterior decía corregir).
+- **(P3-2) Espejo exacto en el perímetro.** `_version_list` trata un valor **que no es lista** (escalar, objeto,
+  cadena suelta) como **ausente** (`NO MEDIDO`), en vez de iterarlo — iterar `"orb-a"` producía
+  `"o, r, b, -, a"`, que afirmaba haber medido algo que no se midió. Coincide con `asStringArrayOrNull` (TS).
+  Tests en **ambos** lados y mutación **M181**.
+
+**Compuertas** (a re-medir y sellar): frontend `test`/`typecheck`/`lint`/`build`/`contract:check`; python
+analytics `pytest`/`ruff`/`import-linter`; matriz `M179`/`M180`/`M181`.
+
 ## [1.91.0-beta] — AUTO-20E · hardening de procedencia del AUTO EVIDENCE REPORT (deuda P3 de v2.65) — 2026-09-25
 
 **Frontend + un fichero Python de render; SIN migración** (Alembic head sigue en `046_fill_reference_mid`)

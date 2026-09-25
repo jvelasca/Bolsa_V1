@@ -2056,6 +2056,14 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         '    ("shrinkage_calibrationX", "Shrinkage"),\n',
         (T_EVIDENCE_REPORT,),
     ),
+    # ── AUTO-20F (V2.67): cierre de las 2 P3 de la auditoria de v2.66 ────────────────────────────
+    (
+        "M181 (perimetro no-lista iterado): el render vuelve a iterar un escalar como si fuera lista",
+        EVIDENCE_REPORT,
+        "    if not isinstance(raw, (list, tuple)):\n",
+        "    if raw is None:\n",
+        (T_EVIDENCE_REPORT,),
+    ),
 ]
 
 # DSN a un puerto local cerrado: el connect falla al instante (en vez de colgar el teardown de PG).

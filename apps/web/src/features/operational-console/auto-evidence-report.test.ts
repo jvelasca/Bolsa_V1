@@ -258,6 +258,21 @@ describe("buildEvidenceView", () => {
     expect(perimeter.get("Versiones observadas")?.inconclusive).toBe(true);
   });
 
+  it("treats a non-list perimeter value as not measured (mirror of Python)", () => {
+    const view = buildEvidenceView(
+      artifact({
+        material: {
+          materialOrigin: MATERIAL_ORIGIN_PAPER_REAL,
+          // escalar donde se espera una lista: no se itera
+          requestedStrategyVersions: "orb-a" as unknown as string[],
+        },
+      }),
+    );
+    const perimeter = new Map(view.perimeter.map((row) => [row.label, row]));
+    expect(perimeter.get("Versiones pedidas")?.value).toBe("NO MEDIDO");
+    expect(perimeter.get("Versiones pedidas")?.inconclusive).toBe(true);
+  });
+
   it("only lists perimeter rows for a measured material", () => {
     expect(
       buildEvidenceView(artifact({ material: null })).perimeter,
