@@ -44,8 +44,15 @@ Fase de **instrumentación de la corrida real**, no de decisión. El invariante 
 
 ## Estado del sello
 
-- **Tag:** `v2.69-beta` **a sellar por el propietario** sobre el commit del paquete de fase (misma
-  mecánica que `v2.68-beta` → `2b5ea246`). El `Release tag CI` queda **pendiente** de ese sello.
+- **Tag:** `v2.69-beta` → **`0457827a`** (commit del paquete de fase; `80860ebf` es el `feat` del
+  código y el `docs` va encima) = `origin/main`; ver `arranque-auditor`.
+- **CI del tag:** `Release tag CI` run `36174421860` **GREEN** en la **primera** pasada (7m59s;
+  **11/11 jobs** en success —`lifecycle-pg`, `frontend`, `python`, `a7-gate`, `dr-verify`,
+  `decision-spine`, `playwright (mock E2E)`, `shared`, `security (gitleaks)`,
+  `certify (aggregate + artifact)`— más `playwright (integrated E2E, opt-in)` **skipped** por diseño;
+  **sin flakes** ni re-ejecuciones). Sobre el mismo commit y tag: `Python CI` `36174421886`,
+  `Frontend CI` `36174421903`, `Optimize lab` `36174421864` y `Fase 2 scientific` `36174421895` en
+  **success**.
 - **Base del diff:** `v2.68-beta`.
 - **`v2.68-beta` permanece intacta** (tag inmutable).
 
