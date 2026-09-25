@@ -2,6 +2,32 @@
 
 All notable releases of Bolsa V1.
 
+## [1.88.1-beta] — AUTO-20B.1 · el extra `[asyncio]` de SQLAlchemy se declara (re-sello) — 2026-09-25
+
+**Re-sello de INFRAESTRUCTURA, sin cambios de producto.** El tag **`v2.63-beta` no se mueve**; el sello
+vigente pasa a **`v2.63.1-beta`** (mismo árbol de `AUTO-20B` + este arreglo). Sin migración y sin tocar
+el reparto (`auto18-v1` / `auto15-v1`).
+
+**El defecto (preexistente, ajeno a `AUTO-20B`).** `packages/py/infrastructure` declaraba
+`sqlalchemy>=2.0` **sin el extra `[asyncio]`**, y solo el lock (`uv.lock` → 2.0.51) garantizaba
+`greenlet` (el shim que necesita `sqlalchemy.ext.asyncio`). El job **`Optimize lab` instala con pip
+crudo, sin lock**: al publicarse **SQLAlchemy 2.1.0** —que movió `greenlet` al extra— la resolución
+dejó de traerlo y el import murió con `ModuleNotFoundError: No module named 'greenlet'`. Las corridas
+de `v2.62` (2026-09-24 19:52) estaban **verdes** porque aún resolvían 2.0.x: el fallo es del
+**entorno**, no del material, y habría tumbado cualquier push de esa superficie.
+
+**El arreglo.** `sqlalchemy[asyncio]>=2.0,<2.1` + `uv lock`: el extra viaja en el **metadato** del
+paquete (ya no depende de que el lock lo traiga por suerte) y el techo mantiene la resolución de pip
+alineada con la serie que el lock valida (2.1 **no** está evaluada en este repositorio, y se declara).
+
+**Evidencia en frío** (venv limpio, `pip install -e` de los paquetes como hace el workflow):
+`sqlalchemy 2.0.54` + `greenlet 3.5.6` + `sqlalchemy.ext.asyncio` importa **OK**; el lock sigue en
+2.0.51 con `greenlet` 3.5.4.
+
+**Compuertas re-medidas tras el cambio:** `ruff` ✅ · `lint-imports` 4 kept / 0 broken (626 ficheros) ·
+`mypy` 500 ficheros / 0 errores · **3147 puros** ✅ · suites de `AUTO-20B` (E2E PG + completitud +
+manifest) **18 passed** con `AUTO20B_EXPORT_PG_REQUIRED=1` ✅.
+
 ## [1.88.0-beta] — AUTO-20B Export E2E + oráculo same-material (V2.63) — 2026-09-25
 
 **Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI, sin backfill y

@@ -79,3 +79,25 @@ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py M169 M17
 * **Un solo productor por medida** — sin segundos caminos que puedan divergir en silencio.
 * **Nada de evidencia mueve el reparto** — el sello `auto18-v1` no se toca sin fase propia.
 * **Una cadena end-to-end no está certificada hasta que se recorre con PG real** — la estática no basta.
+* **Lo que el trabajo real ejercita es lo que hay que fijar** — un `pip install` sin lock es una
+  medición de PyPI, no del repo: si el metadato del paquete no basta por sí solo, el CI miente tarde.
+
+## 8. Re-sello `v2.63.1-beta` (2026-09-25, INFRAESTRUCTURA)
+
+* **Qué pasó:** el push del sello encendió `Optimize lab` en rojo (main, tag y rama) con
+  `ModuleNotFoundError: No module named 'greenlet'`. **No era de `AUTO-20B`** (la fase no toca JS ni
+  el laboratorio): `packages/py/infrastructure` declaraba `sqlalchemy>=2.0` **sin el extra
+  `[asyncio]`** y ese job instala con **pip crudo, sin lock**; al publicarse **SQLAlchemy 2.1.0**
+  (que movió `greenlet` al extra) la resolución dejó de traerlo. Las corridas de `v2.62`
+  (2026-09-24 19:52) estaban verdes porque aún resolvían 2.0.x: era una bomba de relojería de PyPI.
+* **Qué se hizo:** `sqlalchemy[asyncio]>=2.0,<2.1` en `packages/py/infrastructure/pyproject.toml` +
+  `uv lock` (el extra entra en el **metadato**; el techo declara que 2.1 no está evaluada). Cero
+  cambios de producto, cero migración, reparto intacto.
+* **Evidencia:** venv limpio con el `pip install -e` del workflow → `sqlalchemy 2.0.54` +
+  `greenlet 3.5.6` + `sqlalchemy.ext.asyncio` importa **OK**; lock en 2.0.51. Y tras el cambio:
+  `ruff`, `lint-imports` (4 kept/0 broken), `mypy` (500/0), **3147 puros** y las suites de `AUTO-20B`
+  (**18 passed** con `AUTO20B_EXPORT_PG_REQUIRED=1`).
+* **Sellos:** `v2.63-beta` **no se mueve** (queda con su rojo de infra en el historial); el sello
+  vigente para auditar es **`v2.63.1-beta`**. El `Release tag CI` de `v2.63-beta` ya estaba **GREEN
+  9/9** (incluido `lifecycle-pg` con el E2E real de AUTO-20B): lo que faltaba en verde era solo el
+  laboratorio.

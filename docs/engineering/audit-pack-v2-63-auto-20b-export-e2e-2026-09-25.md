@@ -100,3 +100,20 @@ Cada afirmación tiene su **mutación** (§4) que la mata.
    (AUTO-21).
 4. **El E2E cubre el camino del exportador con `strategy_version_id` no nulo**: los fills con versión
    `NULL` **no** los lee el exportador *por diseño* (declarado en el plan y en el docstring del script).
+
+## §7 — Re-sello `v2.63.1-beta` (`1.88.1-beta`, 2026-09-25)
+
+El push del sello encendió **`Optimize lab` en rojo** (main, tag y rama) con
+`ModuleNotFoundError: No module named 'greenlet'`. **No lo causa `AUTO-20B`** (la fase no toca JS ni el
+laboratorio): `packages/py/infrastructure` declaraba `sqlalchemy>=2.0` **sin el extra `[asyncio]`** y
+ese job instala con **pip crudo, sin lock**, así que al publicarse **SQLAlchemy 2.1.0** (que movió
+`greenlet` al extra) la resolución dejó de traerlo. Las corridas de `v2.62` (2026-09-24 19:52) estaban
+verdes porque aún resolvían 2.0.x: era una bomba de relojería de PyPI que este push **destapó**.
+
+| Qué | Detalle |
+|---|---|
+| Arreglo | `sqlalchemy[asyncio]>=2.0,<2.1` + `uv lock` (el extra entra en el **metadato**; el techo declara que 2.1 **no está evaluada**) |
+| Evidencia en frío | venv limpio con el `pip install -e` del workflow → `sqlalchemy 2.0.54` + `greenlet 3.5.6` + `sqlalchemy.ext.asyncio` importa **OK**; lock en 2.0.51 |
+| Compuertas re-medidas | `ruff` ✅ · `lint-imports` 4 kept/0 broken (626) · `mypy` 500/0 · **3147 puros** ✅ · suites `AUTO-20B` **18 passed** con `AUTO20B_EXPORT_PG_REQUIRED=1` ✅ |
+| Sellos | **`v2.63-beta` NO se mueve** (mantiene su rojo de infra en el historial); el sello vigente es **`v2.63.1-beta`** |
+| Sin cambios | producto, reparto (`auto18-v1`/`auto15-v1`), migración (`046_fill_reference_mid`) y journal |

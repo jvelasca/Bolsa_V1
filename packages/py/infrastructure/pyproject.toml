@@ -7,7 +7,12 @@ dependencies = [
   "bolsa-domain",
   "bolsa-market",
   "pydantic-settings>=2.7",
-  "sqlalchemy>=2.0",
+  # El extra `[asyncio]` es OBLIGATORIO y no cosmético: SQLAlchemy 2.1 movió `greenlet` (el shim
+  # que necesita `sqlalchemy.ext.asyncio`) al extra, así que sin él un `pip install` limpio (sin
+  # lock) rompe el import con `ModuleNotFoundError: No module named 'greenlet'` — exactamente lo
+  # que tumbó `Optimize lab` el 2026-09-25. El techo `<2.1` mantiene la resolución de pip alineada
+  # con la versión que el lock valida (2.0.x): 2.1 no está evaluada en este repositorio.
+  "sqlalchemy[asyncio]>=2.0,<2.1",
   "psycopg[binary]>=3.2",
   "redis>=5.2",
   "httpx>=0.28",
