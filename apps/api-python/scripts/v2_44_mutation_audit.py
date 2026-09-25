@@ -2045,8 +2045,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M179 (perimetro colapsado): el render vuelve a confundir ausente con lista vacia",
         EVIDENCE_REPORT,
-        '    if raw is None:\n        return "NO MEDIDO"\n',
-        '    if raw is None:\n        return "(ninguna)"\n',
+        '        return "NO MEDIDO"\n',
+        '        return "(ninguna)"\n',
         (T_EVIDENCE_REPORT,),
     ),
     (
