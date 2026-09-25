@@ -91,7 +91,7 @@ describe("OpsAutoEvidenceSection", () => {
       screen.getByTestId("ops-auto-evidence-origin").textContent,
     ).toContain("PAPER real");
     expect(
-      screen.getByTestId("ops-auto-evidence-calibration").textContent,
+      screen.getByTestId("ops-auto-evidence-global").textContent,
     ).toContain("0.4213");
   });
 
@@ -148,19 +148,39 @@ describe("OpsAutoEvidenceSection", () => {
     expect(useAutoEvidenceArchiveStore.getState().items).toHaveLength(0);
   });
 
-  it("shows no correlation block when the artifact brings no matrix", () => {
+  it("always renders the three evidence levels, with NO MEDIDO where nothing was measured", () => {
     paste(artifactJson());
-    expect(screen.queryByTestId("ops-auto-evidence-correlation")).toBeNull();
+    const global = screen.getByTestId("ops-auto-evidence-global");
+    expect(global.textContent).toContain("WFE");
+    expect(global.textContent).toContain("0.4213");
+    expect(global.textContent).toContain("NO MEDIDO");
+    expect(
+      screen.getByTestId("ops-auto-evidence-current-regime").textContent,
+    ).toContain("NO MEDIDO");
+    expect(
+      screen.getByTestId("ops-auto-evidence-regime-evidence").textContent,
+    ).toContain("NO MEDIDO");
+    expect(
+      screen.getByTestId("ops-auto-evidence-allocation").textContent,
+    ).toContain("auto18-v1");
   });
 
-  it("renders the correlation block when the artifact brings a matrix", () => {
+  it("shows the cross-strategy block as NOT MEASURED when the artifact brings no matrix", () => {
+    paste(artifactJson());
+    // No se OCULTA el bloque: la ausencia de correlación se declara, nunca se interpreta como 0.
+    const block = screen.getByTestId("ops-auto-evidence-cross-strategy");
+    expect(block.textContent).toContain("NO MEDIDO");
+    expect(block.textContent).not.toContain("0.0000");
+  });
+
+  it("renders the correlation matrix and never a 0 for an unmeasured pair", () => {
     paste(
       artifactJson({
         correlation: {
           method: "bucket_correlation_v1",
           bucket: "day",
           minBuckets: 4,
-          strategies: ["a", "b"],
+          strategies: ["a", "b", "c"],
           pairs: [
             {
               left: "a",
@@ -169,14 +189,69 @@ describe("OpsAutoEvidenceSection", () => {
               sharedBuckets: 6,
               notes: [],
             },
+            {
+              left: "a",
+              right: "c",
+              correlation: null,
+              sharedBuckets: 0,
+              notes: ["no_shared_buckets"],
+            },
           ],
           notes: [],
         },
       }),
     );
-    const block = screen.getByTestId("ops-auto-evidence-correlation");
+    const block = screen.getByTestId("ops-auto-evidence-cross-strategy");
     expect(block.textContent).toContain("a vs b");
     expect(block.textContent).toContain("0.5000");
     expect(block.textContent).toContain("cubos=6");
+    expect(block.textContent).toContain("a vs c");
+    expect(block.textContent).toContain("NO MEDIDO");
+    expect(block.textContent).not.toContain("0.0000");
+  });
+
+  it("shows the regime verdict per strategy, with INCONCLUSIVE for a missing cell", () => {
+    paste(
+      artifactJson({
+        currentRegime: "RANGE",
+        currentEvidence: {
+          method: "current_regime_evidence_v1",
+          regime: "RANGE",
+          adverse: false,
+          byStrategy: {
+            "orb-a": {
+              strategyVersion: "orb-a",
+              regime: "RANGE",
+              measuredN: 12,
+              episodes: 4,
+              expectancyR: 0.4,
+              probabilityPositive: 0.75,
+              edgeConfidence: "HIGH",
+              notes: [],
+            },
+            "orb-b": {
+              strategyVersion: "orb-b",
+              regime: "RANGE",
+              measuredN: 0,
+              episodes: 0,
+              expectancyR: null,
+              probabilityPositive: null,
+              edgeConfidence: "UNKNOWN",
+              notes: ["no_evidence_for_regime"],
+            },
+          },
+          notes: [],
+        },
+      }),
+    );
+    expect(
+      screen.getByTestId("ops-auto-evidence-current-regime").textContent,
+    ).toContain("RANGE");
+    const regime = screen.getByTestId("ops-auto-evidence-regime-evidence");
+    expect(regime.textContent).toContain("orb-a");
+    expect(regime.textContent).toContain("SUPPORTED");
+    expect(regime.textContent).toContain("orb-b");
+    expect(regime.textContent).toContain("INCONCLUSIVE");
+    expect(regime.textContent).toContain("no_evidence_for_regime");
   });
 });

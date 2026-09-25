@@ -1,10 +1,13 @@
 /**
- * AUTO-20D — sección de cabina con la PROCEDENCIA del AUTO EVIDENCE REPORT.
+ * AUTO-20D/AUTO-22 — sección de cabina con la PROCEDENCIA y los TRES NIVELES de evidencia AUTO.
  *
- * Presenta el artefacto `auto20c_evidence_artifact_v1` importado a mano, con un badge de
- * procedencia imposible de malinterpretar (PAPER REAL / FIXTURE SINTÉTICO / SIN MATERIAL /
- * DESCONOCIDA). No recalcula ninguna métrica: lee el `report` verbatim y muestra "NO MEDIDO"
- * donde el instrumento no midió (nunca un cero inventado).
+ * Presenta el artefacto `auto20c_evidence_artifact_v1` (el que guarda `auto_evidence_run.py`)
+ * importado a mano, con un badge de procedencia imposible de malinterpretar (PAPER REAL / FIXTURE
+ * SINTÉTICO / SIN MATERIAL / DESCONOCIDA) y los niveles que pide la cabina: **1) MATERIAL**,
+ * **2) GLOBAL EVIDENCE + CALIBRATION** y **3) CONTEXTO** (régimen actual, evidencia por estrategia
+ * y correlación entre pares), cerrando con **ALLOCATION congelado**. No recalcula ninguna métrica:
+ * lee el `report` verbatim y muestra "NO MEDIDO" donde el instrumento no midió (nunca un cero
+ * inventado), también para una correlación no medida.
  *
  * @see features/operational-console/auto-evidence-report.ts
  */
@@ -202,7 +205,7 @@ export function OpsAutoEvidenceSection() {
   return (
     <Card data-testid="ops-auto-evidence-section">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Evidencia AUTO (AUTO-20D)</CardTitle>
+        <CardTitle className="text-base">AUTO EVIDENCE (AUTO-22)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <div
@@ -259,7 +262,7 @@ export function OpsAutoEvidenceSection() {
 
             <div>
               <h4 className="text-xs font-semibold uppercase text-muted-foreground">
-                Material
+                Nivel 1 — Material
               </h4>
               <EvidenceTable
                 rows={view.material}
@@ -269,7 +272,17 @@ export function OpsAutoEvidenceSection() {
 
             <div>
               <h4 className="text-xs font-semibold uppercase text-muted-foreground">
-                Calibration
+                Nivel 2 — Global evidence
+              </h4>
+              <EvidenceTable
+                rows={view.global}
+                testId="ops-auto-evidence-global"
+              />
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                Nivel 2 — Calibration
               </h4>
               <EvidenceTable
                 rows={view.calibration}
@@ -277,25 +290,43 @@ export function OpsAutoEvidenceSection() {
               />
             </div>
 
-            {view.correlation.length > 0 ? (
-              <div>
-                <h4 className="text-xs font-semibold uppercase text-muted-foreground">
-                  Correlación
-                </h4>
-                <EvidenceTable
-                  rows={view.correlation}
-                  testId="ops-auto-evidence-correlation"
-                />
-              </div>
-            ) : null}
+            <div>
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                Nivel 3 — Current regime
+              </h4>
+              <EvidenceTable
+                rows={view.currentRegime}
+                testId="ops-auto-evidence-current-regime"
+              />
+            </div>
 
             <div>
               <h4 className="text-xs font-semibold uppercase text-muted-foreground">
-                Declared
+                Nivel 3 — Regime evidence
               </h4>
               <EvidenceTable
-                rows={view.declared}
-                testId="ops-auto-evidence-declared"
+                rows={view.regimeEvidence}
+                testId="ops-auto-evidence-regime-evidence"
+              />
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                Nivel 3 — Cross-strategy
+              </h4>
+              <EvidenceTable
+                rows={view.crossStrategy}
+                testId="ops-auto-evidence-cross-strategy"
+              />
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                Allocation
+              </h4>
+              <EvidenceTable
+                rows={view.allocation}
+                testId="ops-auto-evidence-allocation"
               />
             </div>
 
@@ -313,11 +344,14 @@ export function OpsAutoEvidenceSection() {
           </>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Sin artefacto importado: la corrida PAPER real (AUTO-20D) sigue
-            siendo un paso operativo. Con ≥32 ciclos medidos por estrategia,
-            exporta y corre el walk-forward con{" "}
-            <code className="text-[0.7rem]">--out</code>; después importa el
-            JSON aquí.
+            Sin artefacto importado: la corrida PAPER real (AUTO-22) sigue
+            siendo un paso operativo. Ejecuta{" "}
+            <code className="text-[0.7rem]">
+              auto_evidence_run.py --account-id &lt;uuid&gt; --strategy-version
+              &lt;v&gt;
+            </code>{" "}
+            y después importa{" "}
+            <code className="text-[0.7rem]">artifact.json</code> aquí.
           </p>
         )}
 

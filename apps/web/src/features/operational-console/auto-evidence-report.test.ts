@@ -198,7 +198,7 @@ describe("buildEvidenceView", () => {
     }
   });
 
-  it("maps supported/not_supported and formats the WFE", () => {
+  it("maps supported/not_supported and formats the WFE in GLOBAL EVIDENCE", () => {
     const view = buildEvidenceView(
       artifact({
         report: {
@@ -215,22 +215,57 @@ describe("buildEvidenceView", () => {
     expect(byLabel("Edge sign")?.value).toBe("NOT_SUPPORTED");
     expect(byLabel("Coverage (regime)")?.value).toBe("SUPPORTED");
     expect(byLabel("Interval coverage")?.value).toBe(INCONCLUSIVE);
-    expect(byLabel("Walk-forward efficiency")?.value).toBe("0.4213");
+    const global = new Map(view.global.map((row) => [row.label, row]));
+    expect(global.get("WFE")?.value).toBe("0.4213");
+    expect(global.get("WFE")?.inconclusive).toBe(false);
   });
 
-  it("declares NO MEDIDO for the current regime/evidence without a reading, and the freeze", () => {
-    const view = buildEvidenceView(artifact());
-    const declared = new Map(
-      view.declared.map((row) => [row.label, row.value]),
+  it("keeps the DECLARED P(R>0) apart from the REALIZED OOS share", () => {
+    const view = buildEvidenceView(
+      artifact({
+        report: {
+          questions: [
+            {
+              question: "probability_positive_calibration",
+              verdict: "not_supported",
+              metrics: { meanDeclaredProbability: 0.2857 },
+            },
+          ],
+          aggregate: { probabilityPositiveOos: 0.5222 },
+        },
+      }),
     );
-    expect(declared.get("Current regime")).toBe(NOT_MEASURED);
-    expect(declared.get("Current evidence")).toBe(NOT_MEASURED);
-    expect(declared.get("Allocation change")).toContain(ALLOCATION_CHANGE_NONE);
-    expect(declared.get("Allocation change")).toContain("auto18-v1");
-    expect(view.correlation).toHaveLength(0);
+    const global = new Map(view.global.map((row) => [row.label, row.value]));
+    expect(global.get("P(R>0)")).toBe("0.2857");
+    expect(global.get("P(R>0) OOS")).toBe("0.5222");
   });
 
-  it("fills the current regime, the evidence and the correlation when the artifact brings them", () => {
+  it("declares NO MEDIDO for the three context levels without a reading, and the freeze", () => {
+    const view = buildEvidenceView(artifact());
+    expect(view.currentRegime.map((row) => row.value)).toEqual([NOT_MEASURED]);
+    expect(view.currentRegime[0]?.inconclusive).toBe(true);
+    expect(view.regimeEvidence.map((row) => row.value)).toEqual([NOT_MEASURED]);
+    expect(view.regimeEvidence[0]?.inconclusive).toBe(true);
+    expect(view.crossStrategy.map((row) => row.value)).toEqual([NOT_MEASURED]);
+    expect(view.crossStrategy[0]?.inconclusive).toBe(true);
+    const allocation = new Map(
+      view.allocation.map((row) => [row.label, row.value]),
+    );
+    expect(allocation.get("Allocation change")).toContain(
+      ALLOCATION_CHANGE_NONE,
+    );
+    expect(allocation.get("Allocation change")).toContain("auto18-v1");
+    // El WFE ausente del agregado es NO MEDIDO, nunca un 0 de relleno.
+    const empty = buildEvidenceView(
+      artifact({ report: { questions: [], aggregate: {} } }),
+    );
+    const global = new Map(empty.global.map((row) => [row.label, row.value]));
+    expect(global.get("P(R>0)")).toBe(NOT_MEASURED);
+    expect(global.get("P(R>0) OOS")).toBe(NOT_MEASURED);
+    expect(global.get("WFE")).toBe(NOT_MEASURED);
+  });
+
+  it("maps the edge band to the verdict the backend declares, never inventing one", () => {
     const view = buildEvidenceView(
       artifact({
         currentRegime: "TREND_UP",
@@ -239,14 +274,34 @@ describe("buildEvidenceView", () => {
           regime: "TREND_UP",
           adverse: false,
           byStrategy: {
-            "orb-a": {
-              strategyVersion: "orb-a",
+            "orb-high": {
+              strategyVersion: "orb-high",
               regime: "TREND_UP",
               measuredN: 12,
               episodes: 4,
               expectancyR: 0.4,
               probabilityPositive: 0.7012,
               edgeConfidence: "HIGH",
+              notes: [],
+            },
+            "orb-medium": {
+              strategyVersion: "orb-medium",
+              regime: "TREND_UP",
+              measuredN: 10,
+              episodes: 3,
+              expectancyR: 0.1,
+              probabilityPositive: 0.55,
+              edgeConfidence: "MEDIUM",
+              notes: ["interval_crosses_zero"],
+            },
+            "orb-low": {
+              strategyVersion: "orb-low",
+              regime: "TREND_UP",
+              measuredN: 9,
+              episodes: 3,
+              expectancyR: -0.2,
+              probabilityPositive: 0.2,
+              edgeConfidence: "LOW",
               notes: [],
             },
             "orb-b": {
@@ -262,11 +317,30 @@ describe("buildEvidenceView", () => {
           },
           notes: [],
         },
+      }),
+    );
+    const rows = new Map(view.regimeEvidence.map((row) => [row.label, row]));
+    expect(rows.get("orb-high")?.value).toBe(
+      "SUPPORTED · HIGH · P(R>0) 0.7012",
+    );
+    expect(rows.get("orb-high")?.inconclusive).toBe(false);
+    expect(rows.get("orb-medium")?.value).toContain("INCONCLUSIVE");
+    expect(rows.get("orb-medium")?.value).toContain("P(R>0) 0.5500");
+    expect(rows.get("orb-low")?.value).toContain("NOT_SUPPORTED");
+    // Sin celda del régimen: INCONCLUSIVE con su nota, jamás un SUPPORTED fingido.
+    expect(rows.get("orb-b")?.value).toContain(INCONCLUSIVE);
+    expect(rows.get("orb-b")?.value).toContain("no_evidence_for_regime");
+    expect(rows.get("orb-b")?.inconclusive).toBe(true);
+  });
+
+  it("never publishes a 0.0000 correlation for a pair that could not be measured", () => {
+    const view = buildEvidenceView(
+      artifact({
         correlation: {
           method: "bucket_correlation_v1",
           bucket: "day",
           minBuckets: 4,
-          strategies: ["orb-a", "orb-b"],
+          strategies: ["orb-a", "orb-b", "orb-c"],
           pairs: [
             {
               left: "orb-a",
@@ -287,26 +361,14 @@ describe("buildEvidenceView", () => {
         },
       }),
     );
-    const declared = new Map(
-      view.declared.map((row) => [row.label, row.value]),
-    );
-    expect(declared.get("Current regime")).toBe("TREND_UP");
-    expect(declared.get("Current evidence")).toContain(
-      "orb-a: P(R>0) 0.7012 (HIGH)",
-    );
-    expect(declared.get("Current evidence")).toContain(
-      "orb-b: P(R>0) NO MEDIDO (UNKNOWN)",
-    );
-    const correlation = new Map(
-      view.correlation.map((row) => [row.label, row]),
-    );
-    expect(correlation.get("orb-a vs orb-b")?.value).toBe("0.4200 (cubos=6)");
-    expect(correlation.get("orb-a vs orb-b")?.inconclusive).toBe(false);
-    expect(correlation.get("orb-a vs orb-c")?.value).toContain("NO MEDIDO");
-    expect(correlation.get("orb-a vs orb-c")?.value).toContain(
-      "no_shared_buckets",
-    );
-    expect(correlation.get("orb-a vs orb-c")?.inconclusive).toBe(true);
+    const byLabel = new Map(view.crossStrategy.map((row) => [row.label, row]));
+    expect(byLabel.get("orb-a vs orb-b")?.value).toBe("0.4200 (cubos=6)");
+    expect(byLabel.get("orb-a vs orb-b")?.inconclusive).toBe(false);
+    const unmeasured = byLabel.get("orb-a vs orb-c");
+    expect(unmeasured?.value).toContain(NOT_MEASURED);
+    expect(unmeasured?.value).toContain("no_shared_buckets");
+    expect(unmeasured?.value).not.toContain("0.0000");
+    expect(unmeasured?.inconclusive).toBe(true);
   });
 
   it("exposes the perimeter without touching the measured universe", () => {

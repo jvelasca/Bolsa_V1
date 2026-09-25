@@ -91,3 +91,7 @@ desktop.ini
 # Artefacto generado por la evidencia del gobernador (huérfano, nunca versionado;
 # ver deuda P3 post-auditoría v2.65). No es un fixture: ningún código lo referencia.
 /governor.json
+
+# Corridas de evidencia de AUTO-22 (`auto_evidence_run.py --out-root`). Artefactos GENERADOS con
+# la huella de su material: se reproducen con el comando, no se versionan.
+/evidence_runs/

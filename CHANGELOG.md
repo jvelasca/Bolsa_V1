@@ -2,6 +2,47 @@
 
 All notable releases of Bolsa V1.
 
+## [1.94.0-beta] — AUTO-22 · RUN de evidencia PAPER reproducible + UI de evidencia en 3 niveles — 2026-09-25
+
+**Fase de instrumentación de la corrida; SIN migración** (Alembic head sigue en `046_fill_reference_mid`)
+y **sin tocar ningún fichero del freeze**. El reparto **no se mueve**: `auto18-v1` / `auto15-v1` — la
+evidencia **se publica, no reparte**. El esquema del artefacto **se mantiene**
+(`auto20c_evidence_artifact_v1`): el run **no** añade claves. **La corrida PAPER real no se ejecuta**
+(bloqueo por **material**): esta fase deja el RUN listo y probado.
+
+- **Lector único PG.** Nuevo `bolsa_application/auto_paper_material.py` (`read_paper_material`,
+  `read_all_reservations`, `MaterialIncompleteError`, `NonPaperVenueError`): guarda de **venue PAPER**,
+  paginación hasta **completitud**, manifest y **huella**. `paper_cycles_export.py` pasa a **envoltorio
+  fino** que lo llama (contrato stdout JSON + `exit 2` intacto, alias `_read_all_reservations`): export y
+  run comparten **una sola** ruta de lectura.
+- **Composición pura.** Nuevo `bolsa_analytics/cognitive/auto_evidence_run.py`
+  (`EVIDENCE_RUN_SCHEMA = "auto22_evidence_run_bundle_v1"`, `EvidenceRunBlockedError`,
+  `build_evidence_run_bundle`, `summarize_evidence_levels`): **encadena** `AUTO-19B` + `AUTO-21` +
+  `AUTO-20C` sin segunda aritmética; sin ciclos con **R medible** se declara **BLOQUEADO**. El origen por
+  defecto es el **fixture declarado**, nunca `paper_real`.
+- **Runner.** Nuevo `apps/api-python/scripts/auto_evidence_run.py`: lee PG (o `--cycles FILE`) y escribe
+  un **bundle autónomo** por corrida en `evidence_runs/<UTC>-<huella8>/` (`cycles.json`, `artifact.json`,
+  `render.txt`, `run.json` con schema, args, **huella** y los tres niveles). `exit 2` **BLOQUEADO** sin PG
+  / sin material / sin R medible / venue ≠ PAPER / corrida ya existente, **sin escribir ningún fichero**
+  (una corrida es **inmutable**). Publica los **tres niveles** a stderr.
+- **UI en 3 niveles.** `auto-evidence-report.ts` (+ test) y `auto-evidence-section.tsx` (+ test):
+  **Nivel 1 Material**, **Nivel 2 Global evidence** (`P(R>0)`, `P(R>0) OOS`, `WFE`) + **Calibration**,
+  **Nivel 3 Contexto** (régimen actual, evidencia por estrategia con veredicto, correlación entre pares) y
+  cierre **ALLOCATION** `none` (congelado). `null` ⇒ `NO MEDIDO`; **jamás `0.0000`** para una correlación
+  no medida. La UI **lee**, no recalcula.
+- **Mutaciones `M188…M190`** (huella perdida, origen fabricado, bundle vacío en vez de BLOQUEADO) +
+  **M169 re-apuntada** al lector único tras el refactor.
+- **P3-1 cerrado.** `backtests/core-r-scheduler.test.ts` declara su presupuesto por fichero
+  (`vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 })`): la suite completa queda verde **sin** el
+  flag global `--testTimeout`.
+
+**Compuertas.** Frontend **1331 passed** (232 ficheros; **sin** flag de timeout), `typecheck` OK, `lint`
+**0 errores** (23 warnings preexistentes), `build` OK, `contract:check` OK. Python `packages/py/application`
++ `packages/py/analytics` **3196 passed**; runner api-python **8 passed**; `ruff` **All checks passed!**,
+`import-linter` **4 kept / 0 broken**. Matriz de mutaciones **190/190** medidas, 0 sin fragmento,
+restauración **byte a byte**. **Límite declarado:** el material PAPER real no existe todavía (la corrida
+real es paso operativo del propietario).
+
 ## [1.93.0-beta] — AUTO-21 · `P(R>0)`, correlación entre estrategias y evidencia del régimen actual — 2026-09-25
 
 **Fase estrictamente de medición/evidencia; SIN migración** (Alembic head sigue en `046_fill_reference_mid`)

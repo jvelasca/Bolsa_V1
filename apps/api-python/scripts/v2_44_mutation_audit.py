@@ -454,6 +454,15 @@ AUTO-21 (V2.68: ``P(R>0)``, correlación por cubo y evidencia del régimen actua
 * **M187 (régimen inventado)** — si una estrategia sin celda del régimen actual publica la lectura
   agregada, la evidencia de ese régimen se atribuye a una muestra que no es la suya.
 
+AUTO-22 (V2.69: run de evidencia end-to-end, un solo comando con bundle) añade:
+
+* **M188 (huella perdida)** — si el bundle deja de viajar con la huella del material, la evidencia
+  pierde su sello de procedencia: dos corridas distintas se vuelven indistinguibles.
+* **M189 (origen fabricado)** — si el defecto del run proclama ``paper_real`` sin material, un
+  llamante que olvide declararlo publica fixture sintético etiquetado como evidencia de mercado.
+* **M190 (bundle vacío)** — si sin ciclos con R medible se publica un bundle en vez de BLOQUEAR, el
+  artefacto ``INCONCLUSIVE`` se guarda como una medición que nunca midió nada.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -538,7 +547,7 @@ PORTFOLIO_RESERVATION = (
 SIM_FILL_STORE = "packages/py/application/src/bolsa_application/sim_durable_store.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 # AUTO-20B (V2.63): completitud del volcado de material + manifest/huella de la investigacion.
-EXPORT_SCRIPT = "apps/api-python/scripts/paper_cycles_export.py"
+# (AUTO-22 movió la paginación al lector único: la sonda de M169 apunta a ``AUTO_PAPER_MATERIAL``.)
 RESERVATION_STORE = "packages/py/application/src/bolsa_application/reservation_store.py"
 MATERIAL_MANIFEST_APP = (
     "packages/py/application/src/bolsa_application/auto_material_manifest.py"
@@ -551,6 +560,14 @@ REPLAY_BATTERY = "scripts/research/auto_replay_battery.py"
 EVIDENCE_REPORT = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_report.py"
 )
+# AUTO-22 (V2.69): run de evidencia end-to-end (lectura unica + composicion pura + bundle).
+AUTO_PAPER_MATERIAL = (
+    "packages/py/application/src/bolsa_application/auto_paper_material.py"
+)
+AUTO_EVIDENCE_RUN = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_run.py"
+)
+EVIDENCE_RUN_SCRIPT = "apps/api-python/scripts/auto_evidence_run.py"
 
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
@@ -609,6 +626,9 @@ T_WORKER = (
 # AUTO-21 (V2.68): pruebas puras de la correlación por cubo y de la evidencia del régimen actual.
 T_CORRELATION = "packages/py/analytics/tests/test_auto_adaptive_correlation.py"
 T_REGIME_EVIDENCE = "packages/py/analytics/tests/test_auto_adaptive_regime_evidence.py"
+# AUTO-22 (V2.69): composición pura del bundle + CLI del run de evidencia (bundle/en el disco).
+T_EVIDENCE_RUN = "packages/py/analytics/tests/test_auto_evidence_run.py"
+T_EVIDENCE_RUN_CLI = "apps/api-python/tests/test_auto_v69_auto22_evidence_run.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -1988,8 +2008,11 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     ),
     # ── AUTO-20B (V2.63): completitud del export + manifest/huella del material ──────────────
     (
-        "M169 (paginacion desactivada): el exportador vuelve a leer una sola pagina de reservas",
-        EXPORT_SCRIPT,
+        # AUTO-22 (V2.69): el paginador se movió al lector ÚNICO de la aplicación; la sonda apunta
+        # al código real (el exportador solo re-exporta el alias). El test puro del exportador lo
+        # sigue mordiendo porque llama al alias, que ES esta función.
+        "M169 (paginacion desactivada): el lector vuelve a leer una sola pagina de reservas",
+        AUTO_PAPER_MATERIAL,
         "        if len(page) < page_size:\n            return list(collected.values()), False\n",
         "        if True:\n            return list(collected.values()), False\n",
         (T_EXPORT_COMPLETENESS,),
@@ -2143,6 +2166,28 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "                    expectancy_r=strategy.interval.point,\n"
         "                    probability_positive=strategy.interval.probability_positive,\n",
         (T_REGIME_EVIDENCE,),
+    ),
+    # ── AUTO-22 (V2.69): run de evidencia (huella, procedencia y fail-closed del bundle) ────────
+    (
+        "M188 (huella perdida): el bundle deja de viajar con la huella del material",
+        AUTO_EVIDENCE_RUN,
+        '        "fingerprint": (material or {}).get("fingerprint"),\n',
+        '        "fingerprint": None,\n',
+        (T_EVIDENCE_RUN, T_EVIDENCE_RUN_CLI),
+    ),
+    (
+        "M189 (origen fabricado): el defecto del run proclama PAPER real sin material",
+        AUTO_EVIDENCE_RUN,
+        "    material_origin: str = MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,\n",
+        '    material_origin: str = "paper_real",\n',
+        (T_EVIDENCE_RUN,),
+    ),
+    (
+        "M190 (bundle vacio): sin R medible se publica un bundle en vez de BLOQUEAR",
+        AUTO_EVIDENCE_RUN,
+        "    if not _measured_cycles(rows):\n",
+        "    if False:\n",
+        (T_EVIDENCE_RUN, T_EVIDENCE_RUN_CLI),
     ),
 ]
 

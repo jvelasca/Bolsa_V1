@@ -1,18 +1,28 @@
 /**
- * AUTO-20D — lectura y presentación del artefacto `auto20c_evidence_artifact_v1`.
+ * AUTO-20D/AUTO-22 — lectura y presentación del artefacto `auto20c_evidence_artifact_v1`.
  *
- * Este módulo NO mide ni recalcula nada: recibe el artefacto que produce
- * `auto_replay_battery.py --out` (envelope determinista + `report` verbatim) y lo prepara para
- * que un humano lo lea sin poder confundir su PROCEDENCIA. Dos reglas duras:
+ * Este módulo NO mide ni recalcula nada: recibe el artefacto que produce `auto_evidence_run.py`
+ * (o el `auto_replay_battery.py --out`, mismo esquema) y lo prepara para que un humano lo lea sin
+ * poder confundir su PROCEDENCIA. Dos reglas duras:
  *
  * 1. **Nunca se inventa un cero.** Un conteo ausente (`null`) se muestra como "NO MEDIDO"; es
- *    distinto de `0`, que significa "hemos medido y no hay". Igual que el render Python.
+ *    distinto de `0`, que significa "hemos medido y no hay". Igual que el render Python. Vale
+ *    también para la correlación: `null` ⇒ `NO MEDIDO`, JAMÁS `0.0000`.
  * 2. **Nunca se asume PAPER real.** Un `materialOrigin` desconocido —o un artefacto sin material—
  *    no se degrada a "PAPER REAL": se declara su procedencia (o su ausencia) tal cual.
+ *
+ * `AUTO-22` organiza la vista en los TRES niveles de evidencia que pide la cabina:
+ *
+ * - **NIVEL 1 — MATERIAL**: el universo medido, sus huecos y su huella.
+ * - **NIVEL 2 — GLOBAL EVIDENCE**: `P(R>0)`, `P(R>0)` OOS y WFE, con la tabla de calibración.
+ * - **NIVEL 3 — CONTEXTO**: régimen actual, evidencia por estrategia y correlación entre pares.
+ *
+ * Y CIERRA con el reparto: `ALLOCATION` congelado (`auto18-v1`). La evidencia se publica, no reparte.
  *
  * Módulo puro y determinista: sin I/O, sin reloj, sin estado.
  *
  * @see packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_report.py
+ * @see packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_run.py
  */
 
 export const AUTO_EVIDENCE_ARTIFACT_SCHEMA = "auto20c_evidence_artifact_v1";
@@ -381,10 +391,20 @@ export type EvidenceRow = {
 
 export type EvidenceView = {
   source: EvidenceSourceView;
+  /** NIVEL 1 — MATERIAL: el universo medido, sus huecos declarados y su huella. */
   material: EvidenceRow[];
+  /** NIVEL 2 — GLOBAL EVIDENCE: `P(R>0)`, `P(R>0)` OOS y WFE (lo que mide el instrumento). */
+  global: EvidenceRow[];
+  /** NIVEL 2 — CALIBRATION: un veredicto por pregunta (lo que el instrumento responde). */
   calibration: EvidenceRow[];
-  declared: EvidenceRow[];
-  correlation: EvidenceRow[];
+  /** NIVEL 3 — CURRENT REGIME: el régimen que manda ahora, o `NO MEDIDO`. */
+  currentRegime: EvidenceRow[];
+  /** NIVEL 3 — REGIME EVIDENCE: una fila por estrategia con su veredicto en ese régimen. */
+  regimeEvidence: EvidenceRow[];
+  /** NIVEL 3 — CROSS-STRATEGY: una fila por par; `null` ⇒ `NO MEDIDO`, nunca `0`. */
+  crossStrategy: EvidenceRow[];
+  /** ALLOCATION: el reparto sigue congelado; la evidencia no lo mueve. */
+  allocation: EvidenceRow[];
   perimeter: EvidenceRow[];
   warnings: string[];
 };
@@ -412,14 +432,6 @@ function questionVerdict(
   return INCONCLUSIVE;
 }
 
-/** Número → texto; `null`/no finito ⇒ INCONCLUSIVE (nunca un 0 de relleno). */
-function numberLabel(value: unknown): EvidenceRow["value"] {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value.toFixed(4);
-  }
-  return INCONCLUSIVE;
-}
-
 /** Conteo → texto; `null` ⇒ "NO MEDIDO" (distinto del 0 legítimo). */
 function countLabel(value: unknown): string {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -439,11 +451,6 @@ function listLabel(value: unknown): string {
 /** ¿El valor es una lista medible? (no ausente y no escalar) — espejo de `isinstance(raw, (list, tuple))`. */
 function isMeasuredList(value: unknown): value is string[] {
   return Array.isArray(value);
-}
-
-function walkForwardEfficiency(report: Record<string, unknown>): unknown {
-  const aggregate = report.aggregate;
-  return isRecord(aggregate) ? aggregate.walkForwardEfficiency : undefined;
 }
 
 function materialRows(material: AutoEvidenceMaterial | null): EvidenceRow[] {
@@ -623,17 +630,103 @@ export function integrityWarnings(
 
 /** Número a 4 decimales; ausente/no finito ⇒ `NO MEDIDO` (a diferencia del veredicto). */
 function measureLabel(value: unknown): string {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value.toFixed(4);
-  }
-  return NOT_MEASURED;
+  return isFiniteNumber(value) ? value.toFixed(4) : NOT_MEASURED;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 /**
- * AUTO-21 — fila(s) de evidencia del régimen actual. Sin artefacto, sin bloque o sin estrategias ⇒
- * `NO MEDIDO`; con lectura, una línea por estrategia con su `P(R>0)` y su banda. Nunca se inventa.
+ * AUTO-22 — veredicto que el PROPIO backend declara para cada banda de EDGE.
+ *
+ * Es una LECTURA de `ADAPTIVE_EDGE_*` (`auto_adaptive_uncertainty.py`), no un cálculo nuevo: el
+ * frontend no recalcula el intervalo ni decide nada. `HIGH` = "el intervalo es positivo y estrecho
+ * de sobra: hay edge demostrado"; `MEDIUM` = "el punto es positivo pero el intervalo cruza el
+ * cero: indicio, no prueba" ⇒ `INCONCLUSIVE`; `LOW` = "sabemos que no hay edge" ⇒ `NOT_SUPPORTED`;
+ * `UNKNOWN` = "sin medición" ⇒ `INCONCLUSIVE` (NO es "edge bajo").
  */
-function currentEvidenceLabel(
+export const EDGE_VERDICTS: Readonly<Record<string, EvidenceVerdict>> = {
+  HIGH: SUPPORTED,
+  MEDIUM: INCONCLUSIVE,
+  LOW: NOT_SUPPORTED,
+  UNKNOWN: INCONCLUSIVE,
+};
+
+/** Métricas de una pregunta del informe; sin pregunta o sin métricas ⇒ `undefined` (no se inventa). */
+function questionMetrics(
+  report: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> | undefined {
+  const questions = report.questions;
+  if (!Array.isArray(questions)) return undefined;
+  for (const row of questions) {
+    if (isRecord(row) && row.question === key) {
+      return isRecord(row.metrics) ? row.metrics : undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * NIVEL 2 — GLOBAL EVIDENCE: las tres cifras de cabecera.
+ *
+ * `P(R>0)` es la probabilidad **declarada** por el bootstrap sobre el IS (métrica de la pregunta de
+ * calibración) y `P(R>0) OOS` la fracción positiva **realizada** fuera de muestra: son cosas
+ * distintas y se muestran por separado. Confundirlas sería leer una promesa como un resultado.
+ */
+function globalRows(
+  artifact: AutoEvidenceArtifact | null | undefined,
+): EvidenceRow[] {
+  const report = artifact?.report ?? {};
+  const aggregate = isRecord(report.aggregate) ? report.aggregate : {};
+  const declared = questionMetrics(
+    report,
+    "probability_positive_calibration",
+  )?.["meanDeclaredProbability"];
+  const oos = aggregate.probabilityPositiveOos;
+  const wfe = aggregate.walkForwardEfficiency;
+  return [
+    {
+      label: "P(R>0)",
+      value: measureLabel(declared),
+      inconclusive: !isFiniteNumber(declared),
+    },
+    {
+      label: "P(R>0) OOS",
+      value: measureLabel(oos),
+      inconclusive: !isFiniteNumber(oos),
+    },
+    {
+      label: "WFE",
+      value: measureLabel(wfe),
+      inconclusive: !isFiniteNumber(wfe),
+    },
+  ];
+}
+
+/** NIVEL 3 — CURRENT REGIME: el régimen actual; sin lectura declarable ⇒ `NO MEDIDO`. */
+function currentRegimeRows(
+  artifact: AutoEvidenceArtifact | null | undefined,
+): EvidenceRow[] {
+  const regime = artifact?.currentRegime ?? null;
+  return [
+    {
+      label: "Current regime",
+      value: regime ?? NOT_MEASURED,
+      inconclusive: regime == null,
+    },
+  ];
+}
+
+/**
+ * NIVEL 3 — REGIME EVIDENCE: una fila por estrategia con su veredicto en el régimen actual.
+ *
+ * El veredicto sale de la banda de EDGE declarada por el backend (`EDGE_VERDICTS`) y la banda
+ * viaja a la vista para que la lectura no se aplane. Sin celda del régimen ⇒ `INCONCLUSIVE` con
+ * su nota: una estrategia sin evidencia NO puede fingir `SUPPORTED`.
+ */
+function regimeEvidenceRows(
   artifact: AutoEvidenceArtifact | null | undefined,
 ): EvidenceRow[] {
   const evidence = artifact?.currentEvidence ?? null;
@@ -641,25 +734,63 @@ function currentEvidenceLabel(
     evidence == null ? [] : Object.keys(evidence.byStrategy).sort();
   if (evidence == null || versions.length === 0) {
     return [
-      { label: "Current evidence", value: NOT_MEASURED, inconclusive: true },
+      { label: "Regime evidence", value: NOT_MEASURED, inconclusive: true },
     ];
   }
-  const parts = versions.map((version) => {
+  return versions.map((version) => {
     const row = evidence.byStrategy[version];
-    const edge = row?.edgeConfidence ?? "UNKNOWN";
-    return `${version}: P(R>0) ${measureLabel(row?.probabilityPositive)} (${edge})`;
+    const band = row?.edgeConfidence ?? null;
+    const verdict =
+      EDGE_VERDICTS[
+        String(band ?? "")
+          .trim()
+          .toUpperCase()
+      ] ?? INCONCLUSIVE;
+    const probability = row?.probabilityPositive;
+    const bandText =
+      band != null && band.trim() !== "" && band !== verdict
+        ? ` · ${band}`
+        : "";
+    const detail = isFiniteNumber(probability)
+      ? ` · P(R>0) ${measureLabel(probability)}`
+      : "";
+    const notes =
+      row && row.notes.length > 0 ? ` [${row.notes.join(", ")}]` : "";
+    return {
+      label: version,
+      value: `${verdict}${bandText}${detail}${notes}`,
+      // El apagado marca "sin medición", igual que en el resto de la vista: un veredicto
+      // INCONCLUSIVE con celda medida (banda MEDIUM) se lee con su `P(R>0)` a la vista.
+      inconclusive: !isFiniteNumber(probability),
+    };
   });
-  return [
-    { label: "Current evidence", value: parts.join("; "), inconclusive: false },
-  ];
 }
 
-/** AUTO-21 — filas del bloque de correlación (una por par); sin lectura ⇒ `[]`. */
-function correlationRows(
+/**
+ * NIVEL 3 — CROSS-STRATEGY: una fila por par.
+ *
+ * Regla dura (punto 23): un par SIN cubos compartidos se muestra `NO MEDIDO`, **jamás** `0.0000`.
+ * Un `0` publicado significaría "hemos medido independencia lineal"; `null` significa "no se pudo
+ * medir la correlación" — y son cosas distintas.
+ */
+function crossStrategyRows(
   artifact: AutoEvidenceArtifact | null | undefined,
 ): EvidenceRow[] {
   const correlation = artifact?.correlation ?? null;
-  if (!correlation || correlation.pairs.length === 0) return [];
+  if (!correlation) {
+    return [
+      { label: "Cross-strategy", value: NOT_MEASURED, inconclusive: true },
+    ];
+  }
+  if (correlation.pairs.length === 0) {
+    return [
+      {
+        label: "Cross-strategy",
+        value: `${NOT_MEASURED} (la matriz no trae pares)`,
+        inconclusive: true,
+      },
+    ];
+  }
   return correlation.pairs.map((pair) => {
     const notes = pair.notes.length > 0 ? ` [${pair.notes.join(", ")}]` : "";
     return {
@@ -672,7 +803,18 @@ function correlationRows(
   });
 }
 
-/** Vista determinista para el render: procedencia + bloques verbatim (sin recalcular nada). */
+/** ALLOCATION: el reparto sigue congelado; la evidencia se publica, no reparte. */
+function allocationRows(): EvidenceRow[] {
+  return [
+    {
+      label: "Allocation change",
+      value: `${ALLOCATION_CHANGE_NONE} (auto18-v1 congelado: la evidencia no mueve el reparto)`,
+      inconclusive: false,
+    },
+  ];
+}
+
+/** Vista determinista para el render: procedencia + los TRES niveles (sin recalcular nada). */
 export function buildEvidenceView(
   artifact: AutoEvidenceArtifact | null | undefined,
 ): EvidenceView {
@@ -684,32 +826,15 @@ export function buildEvidenceView(
       inconclusive: verdict === INCONCLUSIVE,
     };
   });
-  const wfeValue = numberLabel(walkForwardEfficiency(artifact?.report ?? {}));
-  calibration.push({
-    label: "Walk-forward efficiency",
-    value: wfeValue,
-    inconclusive: wfeValue === INCONCLUSIVE,
-  });
-  const currentRegime = artifact?.currentRegime ?? null;
-  const currentEvidence = currentEvidenceLabel(artifact);
   return {
     source: classifyEvidenceSource(artifact),
     material: materialRows(artifact?.material ?? null),
+    global: globalRows(artifact),
     calibration,
-    declared: [
-      {
-        label: "Current regime",
-        value: currentRegime ?? NOT_MEASURED,
-        inconclusive: currentRegime == null,
-      },
-      ...currentEvidence,
-      {
-        label: "Allocation change",
-        value: `${ALLOCATION_CHANGE_NONE} (auto18-v1 congelado: la evidencia no mueve el reparto)`,
-        inconclusive: false,
-      },
-    ],
-    correlation: correlationRows(artifact),
+    currentRegime: currentRegimeRows(artifact),
+    regimeEvidence: regimeEvidenceRows(artifact),
+    crossStrategy: crossStrategyRows(artifact),
+    allocation: allocationRows(),
     perimeter: perimeterRows(artifact?.material ?? null),
     warnings: integrityWarnings(artifact),
   };

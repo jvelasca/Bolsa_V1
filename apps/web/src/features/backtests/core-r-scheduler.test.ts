@@ -1,5 +1,12 @@
 /**
  * Tests — CORE-R scheduler prefs + due + shell scope.
+ *
+ * P3-1 (deuda registrada en la auditoría de `v2.68`): bajo la suite COMPLETA (decenas de ficheros
+ * en paralelo, con `import()` dinámicos y jsdom) este fichero se acercaba al timeout por defecto de
+ * Vitest (5 s) y tumbaba la corrida entera — un rojo de INFRAESTRUCTURA, no del scheduler. El
+ * scheduler no hace nada pesado: el margen se declara AQUÍ, por fichero, para que el resto de la
+ * suite siga con su presupuesto estricto. No se toca `vitest.config.ts` (el flake es de este
+ * fichero, no de la suite) ni el aserto de ningún test.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +19,10 @@ import {
   resolveCoreRSchedulerListId,
   saveCoreRSchedulerPrefs,
 } from "@/features/backtests/core-r-scheduler";
+
+// Presupuesto declarado del fichero (P3-1): 20 s por test, holgado para la carga de la suite
+// completa sin enmascarar un cuelgue real (un deadlock seguiría superando este margen).
+vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 });
 
 describe("core-r-scheduler", () => {
   beforeEach(() => {
