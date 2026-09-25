@@ -229,6 +229,17 @@ jobs:
         # exportador ``apps/api-python/scripts/paper_cycles_export.py`` es I/O y NO lo invoca ningún
         # workflow (mismo criterio que las sondas de ``scripts/``): su camino durable queda DECLARADO
         # como no ejercitado end-to-end en esta fase.
+        # V2.63/AUTO-20B (completitud del volcado de material + manifest/huella): el E2E REAL del
+        # exportador (``apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py``) va en
+        # ``--ignore`` aquí —sin PG skipearía en mudo y aparentaría certificar la cadena— y se
+        # certifica en ``auto-v2-durable-pg`` con ``AUTO20B_EXPORT_PG_REQUIRED=1`` (gate
+        # fail-if-skipped). Sus casos PUROS (paginación fail-closed + passthrough del manifest en el
+        # battery) viven en ``.../test_auto_v63_auto20b_export_completeness.py`` y entran por el pase
+        # de directorio de abajo; la huella de material
+        # (``packages/py/analytics/tests/test_auto_material_manifest.py``) entra por el pase de
+        # analytics; y el manifest de aplicación
+        # (``packages/py/application/tests/test_auto_v63_auto20b_material_manifest.py``) va EXPLÍCITO
+        # en la lista, porque ese directorio NO tiene pase de directorio en este job.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -270,6 +281,7 @@ jobs:
           packages/py/application/tests/test_adaptive_gate_store.py
           packages/py/application/tests/test_sim_fill_reference.py
           packages/py/application/tests/test_applied_cost.py
+          packages/py/application/tests/test_auto_v63_auto20b_material_manifest.py
           packages/py/application/tests/test_decision_journal_studies.py
           packages/py/application/tests/test_auto_investment_system.py
           packages/py/application/tests/test_portfolio_decision_engine.py
@@ -320,6 +332,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           --ignore=apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
           --ignore=apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
+          --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -565,6 +578,11 @@ jobs:
       # contra PG real (roundtrip de la 046 + otra sesión recomponiendo la fricción de las
       # dos patas del ciclo); sin PG el test skipearía en mudo e invalidaría la medición.
       APPLIED_COST_PG_REQUIRED: '1'
+      # V2.63/AUTO-20B (completitud del volcado de material): el E2E del exportador recorre la
+      # cadena entera (fills + reservas + régimen → JSON → calibración walk-forward) contra PG
+      # real, con oráculo independiente y test same-material AUTO-7 vs AUTO-20. Sin PG el test
+      # skipearía en mudo y la certificación de la deuda nº 1 de ``v2.62`` sería fantasma.
+      AUTO20B_EXPORT_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -604,6 +622,11 @@ jobs:
       # SOBREVIVE al reinicio (otra sesión) y la fricción aplicada recompuesta de las DOS
       # patas del ciclo, más la lectura por ciclo que no cruza cuentas.
       # Gate fail-if-skipped: APPLIED_COST_PG_REQUIRED=1.
+      # V2.63/AUTO-20B: el E2E del exportador de material PAPER —fills + reservas + régimen del
+      # journal → volcado real (``main`` sin mocks) → JSON → calibración walk-forward— con
+      # cardinalidad contra un oráculo independiente, completitud de la paginación (``--limit``
+      # pequeño) y test same-material AUTO-7 vs AUTO-20 sobre las MISMAS lecturas.
+      # Gate fail-if-skipped: AUTO20B_EXPORT_PG_REQUIRED=1.
       - name: Pytest AUTO 2.0 durable PG (fail if skipped)
         run: |
           set -o pipefail
@@ -616,6 +639,7 @@ jobs:
             apps/api-python/tests/test_auto_v44_exit_identity_pg.py \
             apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py \
             apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py \
+            apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py \
             apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 

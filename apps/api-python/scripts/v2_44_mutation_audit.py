@@ -515,6 +515,16 @@ PORTFOLIO_RESERVATION = (
 )
 SIM_FILL_STORE = "packages/py/application/src/bolsa_application/sim_durable_store.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
+# AUTO-20B (V2.63): completitud del volcado de material + manifest/huella de la investigacion.
+EXPORT_SCRIPT = "apps/api-python/scripts/paper_cycles_export.py"
+RESERVATION_STORE = "packages/py/application/src/bolsa_application/reservation_store.py"
+MATERIAL_MANIFEST_APP = (
+    "packages/py/application/src/bolsa_application/auto_material_manifest.py"
+)
+MATERIAL_FINGERPRINT = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_material_manifest.py"
+)
+REPLAY_BATTERY = "scripts/research/auto_replay_battery.py"
 
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
@@ -556,6 +566,13 @@ T_GATE_DURABLE_SEAM = "apps/api-python/tests/test_auto_v56_auto15_data_gate_dura
 T_SIM_REF = "packages/py/application/tests/test_sim_fill_reference.py"
 T_APPLIED = "packages/py/application/tests/test_applied_cost.py"
 T_APPLIED_SEAM = "apps/api-python/tests/test_auto_v57_auto16_applied_cost_seam.py"
+# AUTO-20B (V2.63): los casos PUROS del contrato del exportador (fail-closed de la paginación y
+# passthrough del manifest en el battery) viven en la suite hermética; el E2E contra PG real no
+# puede morder en esta sonda (sin PG se salta), así que las mutaciones apuntan a la pura.
+T_EXPORT_COMPLETENESS = "apps/api-python/tests/test_auto_v63_auto20b_export_completeness.py"
+T_EXPORT_E2E = "apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py"
+T_MATERIAL_MANIFEST = "packages/py/application/tests/test_auto_v63_auto20b_material_manifest.py"
+T_MATERIAL_FINGERPRINT = "packages/py/analytics/tests/test_auto_material_manifest.py"
 T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
@@ -1936,6 +1953,55 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    return _cycles_with_risk(fills, cycle_risk)\n",
         "    return cycles_from_fills(fills or ())\n",
         (T_FEED,),
+    ),
+    # ── AUTO-20B (V2.63): completitud del export + manifest/huella del material ──────────────
+    (
+        "M169 (paginacion desactivada): el exportador vuelve a leer una sola pagina de reservas",
+        EXPORT_SCRIPT,
+        "        if len(page) < page_size:\n            return list(collected.values()), False\n",
+        "        if True:\n            return list(collected.values()), False\n",
+        (T_EXPORT_COMPLETENESS,),
+    ),
+    (
+        "M170 (offset ignorado): la lectura paginada repite la primera pagina sin avanzar",
+        RESERVATION_STORE,
+        "        start = max(0, int(offset))\n        return rows[start : start + limit]\n",
+        "        start = max(0, int(offset))\n        return rows[:limit]\n",
+        (T_CYCLE,),
+    ),
+    (
+        "M171 (cyclesWithoutRisk falseado): todo el material se declara con denominador",
+        MATERIAL_MANIFEST_APP,
+        "    with_risk = sum(1 for row in rows if _has_risk(row))\n",
+        "    with_risk = sum(1 for row in rows if True)\n",
+        (T_MATERIAL_MANIFEST,),
+    ),
+    (
+        "M172 (huella ciega al universo): la huella deja de ver version y regimen",
+        MATERIAL_FINGERPRINT,
+        "    payload = {name: _canonical(_read(row, name), name) for name in FINGERPRINT_FIELDS}\n",
+        "    payload = {name: _canonical(_read(row, name), name) for name in FINGERPRINT_FIELDS\n"
+        '               if name not in {"strategyVersion", "regime"}}\n',
+        (T_MATERIAL_FINGERPRINT,),
+    ),
+    (
+        "M173 (bloque material inventado): el informe publica material aunque no se aporte",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "        if self.material is not None:\n"
+        "            # La clave se AÑADE solo cuando hay manifest: sin él, el informe es "
+        "byte-idéntico al\n"
+        "            # de AUTO-19B/20 (la ausencia de material declarado NO se disfraza de "
+        "bloque vacío).\n"
+        '            payload["material"] = dict(self.material)\n',
+        '        payload["material"] = dict(self.material or {})\n',
+        (T_CALIBRATION,),
+    ),
+    (
+        "M174 (manifest no propagado): el battery deja de pasar el material a la calibracion",
+        REPLAY_BATTERY,
+        "            material=manifest,\n",
+        "            material=None,\n",
+        (T_EXPORT_COMPLETENESS,),
     ),
 ]
 

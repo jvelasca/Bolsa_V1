@@ -2,6 +2,77 @@
 
 All notable releases of Bolsa V1.
 
+## [1.88.0-beta] — AUTO-20B Export E2E + oráculo same-material (V2.63) — 2026-09-25
+
+**Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI, sin backfill y
+**sin clave nueva en el journal durable**. **El sello del reparto NO se mueve: sigue en `auto18-v1`**
+(`DATA_GATE_POLICY_VERSION` sigue `auto15-v1`). Fase de **certificación de material**: cierra la deuda
+nº 1 de la [auditoría de `v2.62-beta`](./docs/engineering/auditoria-v2-62-auto-20-material-paper-real-2026-09-24.md).
+El invariante que instala:
+
+> **Una cadena de material no está certificada hasta que se recorre con PostgreSQL real, y lo que la
+> lectura no pudo completar se declara (BLOQUEADO) en vez de publicarse sesgado.** Nada de esta fase
+> mueve el reparto, el worker, el plan ni el journal.
+
+1. **Completitud del volcado — el truncamiento silencioso desaparece.** `list_by_cycle_ids` gana
+   `offset` (keyword-only) en el `Protocol`, en `InMemoryReservationStore` y en
+   `PostgresReservationStore` (`.offset()` tras el `ORDER BY` total ya existente). El exportador recorre
+   páginas hasta agotar el material: `--limit` pasa a ser **tamaño de página**. Si una página llena no
+   aporta ids nuevos (el `offset` no avanza), **no puede afirmar completitud** y sale **`2`
+   (BLOQUEADO)** sin imprimir JSON. El worker de `AUTO-9` no pasa `offset` ⇒ su lectura es
+   **byte-idéntica**.
+2. **Manifest de material.** El JSON del exportador lleva `material_manifest` (hermano de `note` y
+   `cycles`, **nunca dentro**): conteos del MISMO material que mide el instrumento (`closedCycles`,
+   `cyclesWithRisk`/`WithoutRisk`, `cyclesWithVersion`/`WithoutVersion`, `cyclesWithoutIdentity`,
+   `costAppliedCycles`, `perVersion`, `regimeRead`, `cyclesWithoutRegime`, `reservationsRead`,
+   `riskReadSaturated`), la base de riesgo declarada (`reservation_reserved_risk`) y la huella.
+3. **Huella `material_fingerprint_v1`** (pura, determinista): sella el **universo medido** para poder
+   comparar dos corridas sin abrir el JSON a mano. Normaliza los números por **valor**
+   (`Decimal("100.000000")` ≡ `100` ≡ `"100.000000"`, que es lo que trae el JSON) y **no** toca los
+   identificadores; el **instante de exportación no entra** a la huella.
+4. **Propagación opcional al informe.** `auto_replay_battery.py` pasa el manifest como `material=` y
+   `CalibrationReport.as_dict()` publica la clave **solo si se aporta**: sin manifest el informe queda
+   **byte-idéntico** al ya auditado y `CALIBRATION_METHOD` sigue `walk_forward_calibration_v2` (es
+   metadata de ENTRADA declarada, no cambia ninguna medición).
+5. **E2E con PostgreSQL real + oráculo.** Fixture determinista (26 ciclos: A 12/9/3, B 8/8, C 5/0, un
+   ciclo con dos versiones, dos regímenes, coste aplicado en 17) → exportador REAL (`main`, sin mocks)
+   → JSON → calibración walk-forward, con cardinalidad contra un **oráculo independiente**, caso de
+   `--limit` pequeño que demuestra la recuperación completa y test **same-material** (el informe
+   durable `AUTO-7` y el material `AUTO-20` describen el MISMO universo, y el informe recalculado
+   desde el JSON exportado sale **idéntico** al durable).
+
+### Añadido
+
+- **`auto_material_manifest.py`** (analytics, nuevo, puro) — `material_fingerprint`,
+  `MATERIAL_FINGERPRINT_METHOD = "material_fingerprint_v1"`, `FINGERPRINT_FIELDS`.
+- **`auto_material_manifest.py`** (application, nuevo) — `build_material_manifest`,
+  `MATERIAL_RISK_BASIS = "reservation_reserved_risk"`.
+- **`reservation_store.py`** — `offset` keyword-only en el `Protocol` y en los dos stores (aditivo).
+- **`paper_cycles_export.py`** — paginación completa, `MaterialIncompleteError` → `exit 2` y
+  `material_manifest` en el JSON.
+- **`scripts/research/auto_replay_battery.py`** — lee el manifest y lo propaga (`material=`) + nota y
+  huella por stderr.
+- **`auto_adaptive_calibration.py`** — bloque `material` **opcional** (`as_dict()` solo lo emite si se
+  aporta).
+- **Tests** — `test_auto_material_manifest.py` (huella), `test_auto_v63_auto20b_material_manifest.py`
+  (conteos/particiones), `test_auto_v63_auto20b_export_completeness.py` (fail-closed + battery) y
+  `test_auto_v63_auto20b_export_e2e_pg.py` (E2E PG con gate fail-if-skipped), más los casos de
+  paginación en `test_auto_v47_cycle_trace.py` y `test_portfolio_reservation_pg.py`.
+- **Mutaciones `M169…M174`** — paginación desactivada, `offset` ignorado, `cyclesWithoutRisk` falseado,
+  huella ciega al universo, bloque `material` inventado y manifest no propagado.
+- **CI** — el E2E `_pg.py` entra en `--ignore` del job offline y se certifica en `auto-v2-durable-pg`
+  (y en el paso PG del tag) con `AUTO20B_EXPORT_PG_REQUIRED=1`; los puros entran por los pases de
+  directorio (el manifest de aplicación, **explícito**: ese directorio no tiene pase).
+
+### Notas de compatibilidad
+
+- **`AUTO-19A`/`AUTO-19B`/`AUTO-20` intactos**: `auto_adaptive_replay.py` (`statistical_oos_v1`) y el
+  sello `walk_forward_calibration_v2` no cambian. Un informe **sin** manifest es byte-idéntico al ya
+  auditado; con manifest cambia **solo** la clave `material`.
+- `--limit` del exportador cambia de **tope** a **tamaño de página**: un valor pequeño ya **no** trunca
+  el universo.
+- **Sin migración:** `_ALEMBIC_HEAD` sigue en `046_fill_reference_mid`.
+
 ## [1.87.0-beta] — AUTO-20 Material PAPER real + cierre de O1/O2 (V2.62) — 2026-09-24
 
 **Sin migración** (Alembic head sigue en `046_fill_reference_mid`). Sin SHORT, sin UI, sin backfill y

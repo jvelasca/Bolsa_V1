@@ -525,13 +525,31 @@ async def test_cycle_reader_returns_the_whole_cycle_and_declares_the_untraceable
             await session.commit()
 
         async with reservation_pg_factory() as session:
-            rows = await _store(session).list_by_cycle_ids(account_id, [cycle_id])
+            store = _store(session)
+            rows = await store.list_by_cycle_ids(account_id, [cycle_id])
             assert [row.reservation_id for row in rows] == [
                 entry.reservation_id,
                 exit_row.reservation_id,
             ]
             assert {row.side for row in rows} == {"buy", "sell"}
             assert rows[0].reserved_risk == pytest.approx(600.0)
+
+            # AUTO-20B — la lectura se puede PAGINAR sin saltos ni repeticiones: el orden es
+            # total, así que concatenar páginas de 1== el universo completo (es la costura que
+            # usa el exportador para no truncar reservas en silencio).
+            paged = [
+                row
+                for offset in range(len(rows))
+                for row in await store.list_by_cycle_ids(
+                    account_id, [cycle_id], limit=1, offset=offset
+                )
+            ]
+            assert [row.reservation_id for row in paged] == [row.reservation_id for row in rows]
+            # ``offset`` más allá del material no repite las últimas páginas.
+            assert (
+                await store.list_by_cycle_ids(account_id, [cycle_id], limit=1, offset=99)
+                == []
+            )
 
         async with reservation_pg_factory() as session:
             store = _store(session)

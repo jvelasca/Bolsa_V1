@@ -33,7 +33,7 @@ Disciplina de medición (la del repo, y aquí es el punto entero del módulo):
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from statistics import mean, pstdev
 from typing import Any
@@ -243,6 +243,10 @@ class CalibrationReport:
     level: float = ADAPTIVE_INTERVAL_LEVEL_DEFAULT
     seed: int = ADAPTIVE_INTERVAL_SEED_DEFAULT
     notes: tuple[str, ...] = ()
+    #: AUTO-20B — metadata de ENTRADA declarada (huella + conteos del material exportado), o
+    #: ``None``. Es OPcional: sin ella el informe queda byte-idéntico al ya auditado, y el
+    #: ``method`` (``walk_forward_calibration_v2``) NO cambia porque no cambia ninguna medición.
+    material: Mapping[str, Any] | None = None
 
     @property
     def cells(self) -> tuple[ReplayCell, ...]:
@@ -256,7 +260,7 @@ class CalibrationReport:
         return None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "method": self.method,
             "foldsRequested": self.folds_requested,
             "level": self.level,
@@ -267,6 +271,11 @@ class CalibrationReport:
             "aggregate": dict(self.aggregate),
             "notes": list(self.notes),
         }
+        if self.material is not None:
+            # La clave se AÑADE solo cuando hay manifest: sin él, el informe es byte-idéntico al
+            # de AUTO-19B/20 (la ausencia de material declarado NO se disfraza de bloque vacío).
+            payload["material"] = dict(self.material)
+        return payload
 
 
 def _inconclusive(
@@ -558,6 +567,7 @@ def build_calibration_report(
     edge_sign_floor: float = CALIBRATION_EDGE_SIGN_FLOOR_DEFAULT,
     resamples: int = ADAPTIVE_INTERVAL_RESAMPLES_DEFAULT,
     seed: int = ADAPTIVE_INTERVAL_SEED_DEFAULT,
+    material: Mapping[str, Any] | None = None,
 ) -> CalibrationReport:
     """(PURA) walk-forward + calibración sobre los ciclos dados (mismo material que el informe).
 
@@ -565,6 +575,10 @@ def build_calibration_report(
     ``sample = 0``, que es la respuesta honesta a "¿está calibrada mi incertidumbre?" cuando no hay
     nada que medir. Con material, cada estrategia se parte en pliegues crecientes y se mide con la
     MISMA aritmética de celda que ``AUTO-19A`` (``measure_is_oos_row``).
+
+    ``material`` (``AUTO-20B``) es el manifest de la exportación (huella + conteos), OPCIONAL: se
+    publica tal cual como metadata de ENTRADA para poder comparar dos corridas sin dudar del
+    universo, y NO altera ninguna medición. Sin él, el informe no cambia de forma.
     """
     rows = list(cycles or ())
     resolved_folds = resolve_calibration_folds(folds)
@@ -591,6 +605,7 @@ def build_calibration_report(
             level=resolved_level,
             seed=int(seed),
             notes=("no_cycles",),
+            material=material,
         )
 
     ordered, undated = order_cycles_by_instant(rows)
@@ -664,4 +679,5 @@ def build_calibration_report(
         level=resolved_level,
         seed=int(seed),
         notes=tuple(notes),
+        material=material,
     )

@@ -18,8 +18,11 @@ Uso:
   python scripts/research/auto_replay_battery.py --walk-forward
   python scripts/research/auto_replay_battery.py --walk-forward --cycles ciclos.json --folds 4
 
-El JSON de entrada puede ser una LISTA de ciclos o un OBJETO ``{"cycles": [...], "note": "..."}``:
-la nota del fixture (si la trae) se copia a stderr, nunca al JSON de stdout.
+El JSON de entrada puede ser una LISTA de ciclos o un OBJETO
+``{"cycles": [...], "note": "...", "material_manifest": {...}}``: la nota y la huella del material
+(si las trae) se copian a stderr, nunca al JSON de stdout. Cuando el objeto trae
+``material_manifest`` (AUTO-20B), se propaga al informe de calibración como bloque ``material``
+(metadata de ENTRADA declarada); sin él, el informe queda byte-idéntico.
 """
 
 from __future__ import annotations
@@ -50,18 +53,27 @@ CALIBRATION_FIXTURE = (
 )
 
 
-def _load(path: Path) -> tuple[list[Any], str]:
-    """Ciclos y nota del JSON, con el contrato declarado (lista u objeto ``{"cycles": [...]}``)."""
+def _load(path: Path) -> tuple[list[Any], str, dict[str, Any] | None]:
+    """Ciclos, nota y manifest del JSON, con el contrato declarado.
+
+    Acepta una LISTA de ciclos o un OBJETO ``{"cycles": [...], "note": ..., "material_manifest": ...}``.
+    El ``material_manifest`` (AUTO-20B) es OPCIONAL: el fixture sintético no lo trae, y entonces el
+    informe de calibración queda byte-idéntico al que ya se auditó. Cuando lo trae, se propaga como
+    metadata de ENTRADA (huella + conteos) sin que cambie ninguna medición.
+    """
     raw = json.loads(path.read_text(encoding="utf-8"))
+    manifest: dict[str, Any] | None = None
     if isinstance(raw, dict):
         cycles = raw.get("cycles", [])
         note = str(raw.get("note", "") or "")
+        candidate = raw.get("material_manifest")
+        manifest = candidate if isinstance(candidate, dict) else None
     else:
         cycles = raw
         note = ""
     if not isinstance(cycles, list):
         raise SystemExit(f"{path}: se esperaba una lista de ciclos o {{'cycles': [...]}}")
-    return cycles, note
+    return cycles, note, manifest
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -97,9 +109,18 @@ def main(argv: list[str] | None = None) -> int:
     path = args.cycles if args.cycles is not None else default_fixture
     if not path.exists():
         raise SystemExit(f"no existe el JSON de ciclos: {path}")
-    cycles, note = _load(path)
+    cycles, note, manifest = _load(path)
     if note:
         print(f"# nota del material: {note}", file=sys.stderr)
+    if manifest is not None:
+        # La huella del material REAL va a stderr (nunca dentro del informe): permite comparar
+        # dos corridas y saber si midieron el MISMO universo sin abrir el JSON a mano.
+        print(
+            f"# material_manifest: huella {manifest.get('fingerprint')} "
+            f"({manifest.get('fingerprintMethod')}); ciclos={manifest.get('closedCycles')} "
+            f"conR={manifest.get('cyclesWithRisk')} sinR={manifest.get('cyclesWithoutRisk')}",
+            file=sys.stderr,
+        )
     if path == default_fixture:
         print(
             "# material SINTÉTICO por defecto: mide el instrumento, no la estrategia", file=sys.stderr
@@ -112,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
             seed=args.seed,
             level=args.level,
             resamples=args.resamples,
+            material=manifest,
         )
     else:
         report = build_replay_report(

@@ -501,3 +501,37 @@ def test_the_walk_forward_efficiency_is_none_without_a_paired_fold() -> None:
     assert aggregate["pairedFoldCount"] == 0
     assert aggregate["walkForwardEfficiency"] is None
     assert aggregate["meanOosExpectancyR"] is None
+
+
+# ── AUTO-20B · el manifest de material viaja como metadata de ENTRADA ───────────────
+
+
+def test_the_report_without_material_is_byte_identical_to_the_audited_one() -> None:
+    """Sin manifest, el informe NO cambia de forma: la clave ``material`` no se inventa."""
+    payload = build_calibration_report(_fixture_cycles()).as_dict()
+
+    assert "material" not in payload
+    assert payload == build_calibration_report(_fixture_cycles(), material=None).as_dict()
+
+
+def test_the_material_manifest_is_published_verbatim_and_does_not_change_the_reading() -> None:
+    """El manifest es metadata de ENTRADA: se publica tal cual y ninguna medición cambia."""
+    material = {
+        "account": "acc-1",
+        "fingerprint": "sha256:abc",
+        "fingerprintMethod": "material_fingerprint_v1",
+        "closedCycles": 430,
+        "cyclesWithRisk": 417,
+        "cyclesWithoutRisk": 13,
+    }
+
+    with_material = build_calibration_report(_fixture_cycles(), material=material)
+    without_material = build_calibration_report(_fixture_cycles())
+    payload = with_material.as_dict()
+
+    assert payload["material"] == material
+    assert payload["method"] == CALIBRATION_METHOD, "el sello del instrumento no cambia"
+    # La medición es idéntica: mismo material ⇒ mismas celdas, agregados y notas.
+    assert {key: value for key, value in payload.items() if key != "material"} == (
+        without_material.as_dict()
+    )

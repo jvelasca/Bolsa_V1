@@ -149,17 +149,25 @@ class ReservationStore(Protocol):
         cycle_ids: Iterable[str],
         *,
         limit: int = 500,
+        offset: int = 0,
     ) -> list[PortfolioReservation]:
         """AUTO-9 — todas las reservas de esos **ciclos** financieros (vivas y liberadas).
 
         Es la costura que ata la reserva a su ciclo (``cycle_id``, migración ``044``) y
-        devuelve el material **completo** del ciclo: la reserva de ENTRADA y las de salida.
-        Cuál de ellas es el denominador de R es una decisión del llamante, no del store.
+        devuelve el material del ciclo: la reserva de ENTRADA y las de salida. Cuál de ellas
+        es el denominador de R es una decisión del llamante, no del store.
 
         ``cycle_ids`` vacío ⇒ ``[]`` sin consultar la base. Un ciclo **sin** reserva no
         aparece: el hueco lo declara el llamante (``cycles_without_risk``), no se rellena
         con una reserva de ceros. Las filas sin ciclo (``cycle_id IS NULL``, anteriores a
         ``2.47``) no casan nunca: "anterior a 2.47" no es un ciclo.
+
+        **Paginación (AUTO-20B).** ``limit``/``offset`` son la ventana declarada del suelo:
+        recibir exactamente ``limit`` filas **no** prueba haberlo visto todo. Un llamante que
+        necesite el universo completo (el exportador de material de la calibración) pagina con
+        ``offset`` creciente y solo declara completitud cuando una página trae menos de
+        ``limit``. ``offset <= 0`` es "desde el principio"; el worker de ``AUTO-9`` no lo pasa,
+        así que su lectura queda byte-idéntica.
         """
         ...
 
@@ -451,6 +459,7 @@ class InMemoryReservationStore:
         cycle_ids: Iterable[str],
         *,
         limit: int = 500,
+        offset: int = 0,
     ) -> list[PortfolioReservation]:
         wanted = set(_clean_cycle_ids(cycle_ids))
         if not wanted or limit <= 0:
@@ -463,7 +472,8 @@ class InMemoryReservationStore:
             if row.cycle_id in wanted and (account_id is None or row.account_id == account_id)
         ]
         rows.sort(key=_order_key)
-        return rows[:limit]
+        start = max(0, int(offset))
+        return rows[start : start + limit]
 
     async def list_recent_with_cycle(
         self,
@@ -661,6 +671,7 @@ class PostgresReservationStore:
         cycle_ids: Iterable[str],
         *,
         limit: int = 500,
+        offset: int = 0,
     ) -> list[PortfolioReservation]:
         """AUTO-9 — reservas del ciclo, por el índice ``portfolio_reservations_cycle_id_idx``.
 
@@ -669,6 +680,11 @@ class PostgresReservationStore:
         una lista no nula nunca es cierto para ``NULL`` (en SQL, ``NULL IN (…)`` es
         ``UNKNOWN``, que filtra). Eso es justo lo que se quiere: "anterior a 2.47" no es un
         ciclo y no debe colarse en un informe de R.
+
+        **AUTO-20B — paginación.** El ``ORDER BY`` es total (``created_at`` + ``reservation_id``,
+        ambos con desempate determinista), así que ``OFFSET`` no puede saltar ni repetir filas
+        entre páginas. El llamante que quiera el universo completo avanza ``offset`` por páginas
+        de ``limit`` y solo declara completitud al ver una página corta.
         """
         import sqlalchemy as sa
 
@@ -688,6 +704,9 @@ class PostgresReservationStore:
         )
         if account_id is not None:
             query = query.where(PortfolioReservationRow.account_id == account_id)
+        start = max(0, int(offset))
+        if start:
+            query = query.offset(start)
         rows = (await self._session.execute(query)).scalars().all()
         return [_row_to_reservation(row) for row in rows]
 

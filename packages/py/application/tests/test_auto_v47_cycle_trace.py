@@ -315,6 +315,53 @@ def test_a_cycle_query_respects_the_limit_it_declares() -> None:
     assert len(asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"], limit=1))) == 1
 
 
+def test_a_cycle_query_can_be_paginated_without_gaps_or_repeats() -> None:
+    """AUTO-20B — ``offset`` avanza por páginas de ``limit`` sin saltar ni repetir filas.
+
+    Es el suelo que hace posible leer el universo COMPLETO de reservas de un ciclo: una sola
+    lectura con ``limit`` no puede afirmar haberlo visto todo (fail-closed), así que el
+    llamante pagina. El orden es total (``created_at`` + ``reservation_id``), de modo que la
+    concatenación de páginas es exactamente la lectura sin paginar.
+    """
+    import asyncio
+
+    def _row(index: int) -> PortfolioReservation:
+        moment = f"2026-09-15T09:{index:02d}:00Z"
+        return build_reservation(
+            reservation_id=f"RES-{index:02d}",
+            account_id="acc-1",
+            tick_id=moment,
+            instrument_id="AAA",
+            side="buy",
+            quantity=10.0,
+            entry=100.0,
+            stop=98.0,
+            cycle_id="cyc-abc",
+            created_at=moment,
+        )
+
+    store = InMemoryReservationStore([_row(index) for index in range(5)])
+
+    full = asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"]))
+    paged = [
+        row
+        for offset in range(0, 5, 2)
+        for row in asyncio.run(
+            store.list_by_cycle_ids("acc-1", ["cyc-abc"], limit=2, offset=offset)
+        )
+    ]
+
+    assert [row.reservation_id for row in full] == [f"RES-{i:02d}" for i in range(5)]
+    assert [row.reservation_id for row in paged] == [row.reservation_id for row in full]
+    # ``offset`` más allá del material no inventa filas (ni repite las últimas por wrap).
+    assert asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"], offset=99)) == []
+    # ``offset`` negativo es "desde el principio", nunca un índice invertido de Python.
+    assert [
+        row.reservation_id
+        for row in asyncio.run(store.list_by_cycle_ids("acc-1", ["cyc-abc"], limit=1, offset=-3))
+    ] == ["RES-00"]
+
+
 def test_an_exit_order_persists_and_round_trips_its_cycle() -> None:
     order = build_exit_order(
         exit_order_id="exi-1",
