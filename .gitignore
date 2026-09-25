@@ -87,3 +87,7 @@ allure-results/
 # Sistema operativo (Windows junto a .DS_Store)
 Thumbs.db
 desktop.ini
+
+# Artefacto generado por la evidencia del gobernador (huérfano, nunca versionado;
+# ver deuda P3 post-auditoría v2.65). No es un fixture: ningún código lo referencia.
+/governor.json
