@@ -14,7 +14,10 @@ Fase **corta de precisión**, sin producto nuevo: cerrar las dos P3 que la audit
 
 ## Estado del sello
 
-- **Tag:** `v2.67-beta` → commit del paquete de fase (ver `arranque-auditor`).
+- **Tag:** `v2.67-beta` → `70d8331e` (commit del paquete de fase = `origin/main` al sellar; ver `arranque-auditor`).
+- **CI del tag:** `Release tag CI` run `36143996100` **GREEN** (11/11 jobs, `certify` incluido); sobre el mismo
+  commit, `Python CI` `36143996237`, `Frontend CI` `36143996014`, `Optimize lab` `36143996020` y `Gitleaks`
+  `36143994060` en **success**.
 - **Base del diff:** `v2.66-beta` = `6fe7faa8`.
 - **`v2.66-beta` permanece intacta**; sus documentos de fase conservan el texto original (tag inmutable) y la
   corrección vive en `main`.
