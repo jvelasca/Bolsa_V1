@@ -39,7 +39,12 @@ lecturas se **publican** (artefacto + render + UI), nunca gatean.
 
 ## Estado del sello
 
-- **Tag:** `v2.68-beta` → commit del paquete de fase (ver `arranque-auditor`).
+- **Tag:** `v2.68-beta` → `2b5ea246` (commit del paquete de fase = `origin/main`; ver `arranque-auditor`).
+- **CI del tag:** `Release tag CI` run `36161054494` **GREEN** (11/11 jobs, `certify` incluido). La
+  **primera** pasada falló en `test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once`
+  (`AssertionError: RETRY`, **flake ajeno preexistente** declarado desde `v2.61`) y quedó verde al
+  **re-ejecutar los jobs fallidos**; sobre el mismo commit, `Python CI` `36161169262`, `Frontend CI`
+  `36161169092`, `Optimize lab` `36161169188` y `Gitleaks` `36161169098` en **success**.
 - **Base del diff:** `v2.67-beta`.
 - **`v2.67-beta` permanece intacta** (tag inmutable).
 
