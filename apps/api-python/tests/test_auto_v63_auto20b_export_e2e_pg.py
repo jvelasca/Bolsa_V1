@@ -17,6 +17,8 @@ Fixture (26 ciclos cerrados):
 * **U** — 1 ciclo cuyos fills declaran DOS versiones ⇒ **``unversioned_cycles``**.
 * **≥2 regímenes** — trazas ``TREND_UP``/``RANGE`` en el journal; 6 ciclos sin traza (se declaran).
 * **coste aplicado** — ``reference_mid`` en los 17 ciclos con riesgo ⇒ ``costApplied`` COMPLETE.
+* **perímetro (AUTO-20C)** — 2 fills SIN versión (``strategy_version_id`` NULL) y 2 de una versión
+  NO solicitada: el exportador no los lee, pero el manifest los CUANTIFICA como excluidos.
 
 GOBIERNO DE HONESTIDAD (patrón del repo): sin PostgreSQL real hace ``pytest.skip``; con
 ``AUTO20B_EXPORT_PG_REQUIRED=1`` un skip silencioso es un FALLO duro. NUNCA abre el bridge LIVE.
@@ -103,6 +105,11 @@ def _specs() -> list[_CycleSpec]:
 _SPECS = _specs()
 _RISK_CYCLES = tuple(spec.cycle_id for spec in _SPECS if spec.with_risk)
 _CONFIRMED_REGIMES = sum(1 for spec in _SPECS if spec.regime is not None)
+#: AUTO-20C — perímetro: fills de la cuenta que quedan FUERA del universo pedido.
+_NULL_VERSION_CYCLE = "cyc-a20b-null-00"
+_OTHER_VERSION_CYCLE = "cyc-a20b-x-00"
+_OTHER_VERSION = "orb-a20b-OTHER"
+_EXCLUDED_FILLS = 2 + 2
 
 
 def _expected_report_spec() -> dict[str, Any]:
@@ -117,6 +124,12 @@ def _expected_report_spec() -> dict[str, Any]:
         "regimeConfirmed": _CONFIRMED_REGIMES,
         "regimeAbsent": len(_SPECS) - _CONFIRMED_REGIMES,
         "reservationsRead": len(_RISK_CYCLES),
+        "fillsTotalForAccount": 2 * len(_SPECS) + _EXCLUDED_FILLS,
+        "fillsSelected": 2 * len(_SPECS),
+        "fillsExcludedNoVersion": 2,
+        "fillsExcludedOtherVersion": 2,
+        "observedVersions": sorted({_A, _B, _C}),
+        "regimesPresent": ["RANGE", "TREND_UP"],
     }
 
 
@@ -211,6 +224,28 @@ async def _seed(account_id: str) -> None:
                     )
                     assert entry is not None
                     await journal.append(entry)
+            # AUTO-20C — PERÍMETRO: fills que quedan FUERA del universo pedido. Uno sin versión
+            # (``strategy_version_id`` NULL) y otro de una versión NO solicitada. El exportador no
+            # los lee (no pertenecen a las versiones pedidas), pero el manifest debe CUANTIFICARLOS.
+            for execution_id, cycle_id, version in (
+                (f"{_NULL_VERSION_CYCLE}-buy", _NULL_VERSION_CYCLE, None),
+                (f"{_NULL_VERSION_CYCLE}-sell", _NULL_VERSION_CYCLE, None),
+                (f"{_OTHER_VERSION_CYCLE}-buy", _OTHER_VERSION_CYCLE, _OTHER_VERSION),
+                (f"{_OTHER_VERSION_CYCLE}-sell", _OTHER_VERSION_CYCLE, _OTHER_VERSION),
+            ):
+                side = "buy" if execution_id.endswith("-buy") else "sell"
+                await fills.save(
+                    SimFillFinanceContext(
+                        execution_id=execution_id,
+                        instrument_id=_INSTRUMENT,
+                        side=side,
+                        quantity=_QTY,
+                        price=_BUY_PRICE if side == "buy" else _SELL_PRICE,
+                        account_id=account_id,
+                        strategy_version_id=version,
+                        cycle_id=cycle_id,
+                    )
+                )
             await session.commit()
     finally:
         await engine.dispose()
@@ -391,6 +426,21 @@ def test_the_export_is_certified_end_to_end_against_real_postgres(a20b_pg: None)
         assert manifest["reservationsRead"] == expected["reservationsRead"]
         assert manifest["riskReadSaturated"] is False
         assert manifest["riskBasis"] == "reservation_reserved_risk"
+
+        # (2b) AUTO-20C — PERÍMETRO declarado: el manifest cuantifica los fills que quedan FUERA
+        # del universo pedido (sin versión / de otra versión) sin incluirlos, y declara la
+        # procedencia virtual. El universo medido NO cambia.
+        assert manifest["fillsTotalForAccount"] == expected["fillsTotalForAccount"]
+        assert manifest["fillsSelected"] == expected["fillsSelected"]
+        assert manifest["fillsExcludedNoVersion"] == expected["fillsExcludedNoVersion"]
+        assert manifest["fillsExcludedOtherVersion"] == expected["fillsExcludedOtherVersion"]
+        assert manifest["observedStrategyVersions"] == expected["observedVersions"]
+        assert manifest["versionsRequestedWithoutMaterial"] == []
+        assert manifest["versionsObservedNotRequested"] == []
+        assert manifest["regimesPresent"] == expected["regimesPresent"]
+        assert manifest["materialOrigin"] == "paper_real"
+        assert manifest["executionReality"] == "virtual_paper_only"
+        assert manifest["brokerVenue"] == "paper"
 
         # (3) Oráculo de igualdad por ciclo: cada ciclo del JSON es el que se sembró.
         by_id = {row["cycleId"]: row for row in cycles}

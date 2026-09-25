@@ -26,6 +26,16 @@ un segundo camino que pueda divergir en silencio.
   el que se cree y para comparar dos corridas sin dudar del material. Sin PG, sin material o sin
   completitud, se DECLARA y se sale con ``2``.
 
+``AUTO-20C`` añade dos DECLARACIONES que NO cambian el material:
+
+* **Perímetro.** Además de las versiones PEDIDAS (``requestedStrategyVersions``), el manifest
+  publica las OBSERVADAS (``observedStrategyVersions``) y cuantifica los fills que quedan FUERA del
+  universo solicitado —``fillsExcludedNoVersion``/``fillsExcludedOtherVersion``—. No los incluye:
+  hace visible el contorno para que "orb-trend puro" no se lea sin ver qué se dejó fuera.
+* **Procedencia virtual.** El material es PAPER con **dinero VIRTUAL**: el manifest declara
+  ``executionReality`` (``virtual_paper_only``) y ``brokerVenue``, y si la venue NO es ``paper`` el
+  volcado se BLOQUEA (``exit 2``): un artefacto PAPER no se sella con material de otra venue.
+
 Uso::
 
   uv run --no-sync python apps/api-python/scripts/paper_cycles_export.py \\
@@ -39,8 +49,9 @@ Códigos de salida:
 
 * ``0`` — volcado (el JSON va por stdout; la nota y el recuento, por stderr).
 * ``1`` — uso incorrecto (falta ``--account-id``/``--strategy-version``): lo decide ``argparse``.
-* ``2`` — **BLOQUEADO**: sin PostgreSQL, sin material, o sin completitud probada, NO se imprime un
-  JSON vacío o truncado como si fuera una medición; "no medido" se declara en stderr.
+* ``2`` — **BLOQUEADO**: sin PostgreSQL, sin material, sin completitud probada, o con la venue
+  distinta de ``paper``, NO se imprime un JSON vacío o truncado como si fuera una medición; "no
+  medido" se declara en stderr.
 """
 
 from __future__ import annotations
@@ -54,10 +65,12 @@ from decimal import Decimal
 from typing import Any
 
 #: Nota que viaja en el JSON y que ``auto_replay_battery.py`` copia a stderr: deja escrito que este
-#: material es REAL (no el fixture sintético), para que nadie lea sus veredictos como si midieran
-#: una estrategia de laboratorio.
+#: material es REAL (no el fixture sintético) para que nadie lea sus veredictos como si midieran una
+#: estrategia de laboratorio, y que es PAPER **VIRTUAL** — dineros simulados, jamás una plataforma
+#: real—. La realidad de ejecución es la constante única de ``auto_evidence_report``.
 MATERIAL_NOTE = (
-    "material PAPER REAL: fills durables + riesgo de reserva + régimen AUTO-10 "
+    "material PAPER REAL sobre cuenta PAPER VIRTUAL (dinero VIRTUAL: nunca XTB ni ninguna "
+    "plataforma real): fills durables + riesgo de reserva + régimen AUTO-10 "
     "(mismo camino que el informe, vía adaptive_instrument_cycles)"
 )
 
@@ -69,6 +82,15 @@ class MaterialIncompleteError(RuntimeError):
     el store lo ignora): seguir leyendo daría vueltas sobre el mismo material y declarar el
     JSON como "el universo" sería un sesgo de selección silencioso. El llamante lo traduce a
     ``exit 2`` (BLOQUEADO), no a un informe.
+    """
+
+
+class NonPaperVenueError(RuntimeError):
+    """AUTO-20C — el exportador solo sella material de la venue PAPER (dinero VIRTUAL).
+
+    Con ``broker_venue`` distinta de ``paper`` (p. ej. un carril LIVE) NO se publica un artefacto
+    etiquetado como PAPER: sellar material de otra venue como evidencia PAPER sería una mentira de
+    procedencia. Se traduce a ``exit 2`` (BLOQUEADO) con el motivo declarado.
     """
 
 
@@ -120,6 +142,10 @@ async def _read_all_reservations(
 
 async def _export(account_id: str, versions: list[str], *, limit: int) -> dict[str, Any]:
     """(I/O) lee el material durable y lo devuelve en la forma del instrumento. Sin escribir nada."""
+    from bolsa_analytics.cognitive.auto_evidence_report import (
+        EXECUTION_REALITY_VIRTUAL_PAPER,
+        MATERIAL_ORIGIN_PAPER_REAL,
+    )
     from bolsa_application.auto_cycle_regime_reader import read_cycle_regimes
     from bolsa_application.auto_material_manifest import build_material_manifest
     from bolsa_application.auto_self_evaluation_feed import adaptive_instrument_cycles
@@ -132,7 +158,15 @@ async def _export(account_id: str, versions: list[str], *, limit: int) -> dict[s
     )
     from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
-    engine = create_engine(get_settings())
+    settings = get_settings()
+    # AUTO-20C — la venue del artefacto es PAPER (virtual). Sellar material de otro carril como
+    # evidencia PAPER sería una mentira de procedencia: se DECLARA y se bloquea (exit 2).
+    if str(settings.broker_venue).strip().lower() != "paper":
+        raise NonPaperVenueError(
+            f"venue '{settings.broker_venue}' no es PAPER: un artefacto PAPER no se sella con "
+            "material de otra venue"
+        )
+    engine = create_engine(settings)
     try:
         factory = create_session_factory(engine)
         async with factory() as session:
@@ -149,6 +183,12 @@ async def _export(account_id: str, versions: list[str], *, limit: int) -> dict[s
                 )
             cycle_ids = sorted(
                 {str(fill.cycle_id).strip() for fill in fills if str(fill.cycle_id or "").strip()}
+            )
+            # AUTO-20C — PERÍMETRO: cuántos fills tiene la cuenta por versión, para DECLARAR los
+            # que quedan FUERA del universo pedido (sin versión / de otra versión). Solo cuenta
+            # (agregado del store): no añade material ni cambia la huella del universo medido.
+            fills_by_version = await context_store.count_by_strategy_version(
+                account_id=account_id
             )
             # Las MISMAS lecturas que el turno (``_v2_cycle_risk``): reservas de los ciclos que
             # aparecen en los fills y régimen durable por ``decision_id`` derivado, confirmando el
@@ -187,6 +227,10 @@ async def _export(account_id: str, versions: list[str], *, limit: int) -> dict[s
                 reservations_read=len(reservations),
                 risk_read_saturated=saturated,
                 export_timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                material_origin=MATERIAL_ORIGIN_PAPER_REAL,
+                fills_by_version=fills_by_version,
+                execution_reality=EXECUTION_REALITY_VIRTUAL_PAPER,
+                broker_venue=str(settings.broker_venue),
                 regime_confirmed=reading.confirmed,
                 regime_absent=len(reading.absent),
                 regime_unconfirmed=len(reading.unconfirmed),
@@ -241,6 +285,10 @@ def main(argv: list[str] | None = None) -> int:
         # selección disfrazado de medición. Se declara y se bloquea.
         print(f"# BLOQUEADO: {error}", file=sys.stderr)
         return 2
+    except NonPaperVenueError as error:
+        # AUTO-20C — la venue no es PAPER: un artefacto PAPER no se sella con material ajeno.
+        print(f"# BLOQUEADO: {error}", file=sys.stderr)
+        return 2
     except Exception as error:  # noqa: BLE001 — sin lectura no hay material: se DECLARA.
         print(
             f"# BLOQUEADO: no se pudo leer el material durable ({type(error).__name__}: {error})",
@@ -259,6 +307,13 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"# {len(payload['cycles'])} ciclos de {len(args.versions)} versiones "
         f"(cuenta {args.account_id}); huella {manifest['fingerprint']}",
+        file=sys.stderr,
+    )
+    print(
+        f"# perímetro: fills total={manifest['fillsTotalForAccount']} "
+        f"seleccionados={manifest['fillsSelected']} "
+        f"sinVersión={manifest['fillsExcludedNoVersion']} "
+        f"otraVersión={manifest['fillsExcludedOtherVersion']}",
         file=sys.stderr,
     )
     json.dump(payload, sys.stdout, indent=2, ensure_ascii=False, default=_json_default)

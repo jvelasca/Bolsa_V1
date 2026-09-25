@@ -437,6 +437,13 @@ jobs:
         # el pase de analytics; y el manifest de aplicación
         # (``packages/py/application/tests/test_auto_v63_auto20b_material_manifest.py``) va EXPLÍCITO
         # en la lista, porque ese directorio NO tiene pase de directorio en este job.
+        # V2.64/AUTO-20C (perimetro declarado + artefacto reproducible + PAPER VIRTUAL): el
+        # render/artefacto (``packages/py/analytics/tests/test_auto_evidence_report.py``) y
+        # ``--out``/``--render`` + bloqueo de venue no-PAPER
+        # (``apps/api-python/tests/test_auto_v64_auto20c_artifact.py``) entran por los pases de
+        # directorio; el perimetro muerde tambien en ``test_auto_v63_auto20b_material_manifest.py``
+        # (ya en la lista) y en el E2E PG de abajo. El invariante «PAPER = dinero VIRTUAL, nunca
+        # XTB» no anade camino LIVE: solo lo DECLARA.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -718,6 +725,9 @@ jobs:
         # del journal → volcado real (``main`` sin mocks) → JSON → calibración walk-forward—
         # con cardinalidad contra un oráculo independiente, completitud de la paginación
         # (``--limit`` pequeño) y test same-material AUTO-7 vs AUTO-20.
+        # V2.64/AUTO-20C: ademas, el PERIMETRO declarado —fills sin version y de otra version
+        # cuantificados como excluidos, versiones observadas frente a las pedidas, y procedencia
+        # PAPER virtual— con el universo medido invariante.
         # Gate fail-if-skipped: AUTO20B_EXPORT_PG_REQUIRED=1.
         # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs (deuda:
         # drift silencioso). Ahora se ejecutan aquí con gate fail-if-skipped.

@@ -189,6 +189,14 @@ class SimFillFinanceContextStore(Protocol):
         limit: int | None = None,
     ) -> list[SimFillFinanceContext]: ...
 
+    # AUTO-20C: perímetro del volcado. Cuenta los fills por versión SIN traer sus filas
+    # (agregado). La clave ``None`` es la versión ausente (filas sin atribución): existe
+    # justamente porque ``list_for_strategy_version`` NO las lee y el hueco hay que declararlo,
+    # no esconderlo. No altera ninguna lectura; solo hace visible el contorno.
+    async def count_by_strategy_version(
+        self, *, account_id: str | None = None
+    ) -> Mapping[str | None, int]: ...
+
     # AUTO-16: los fills de un CICLO financiero (``cycle_id``, migración 044). Es la costura
     # con la que la fricción APLICADA se recompone ciclo a ciclo —incluida la pata de ENTRADA,
     # liquidada en otro tick y por tanto invisible para la memoria del turno—. Un ciclo sin
@@ -296,6 +304,18 @@ class InMemorySimFillFinanceContextStore:
         if limit is not None and limit > 0:
             rows = rows[:limit]
         return rows
+
+    async def count_by_strategy_version(
+        self, *, account_id: str | None = None
+    ) -> Mapping[str | None, int]:
+        """(AUTO-20C) conteo de fills por versión, versión ausente incluida (clave ``None``)."""
+        counts: dict[str | None, int] = {}
+        for row in self._rows.values():
+            if account_id is not None and row.account_id != account_id:
+                continue
+            key = row.strategy_version_id or None
+            counts[key] = counts.get(key, 0) + 1
+        return counts
 
     async def list_by_cycle_ids(
         self,
@@ -577,6 +597,28 @@ class PostgresSimFillFinanceContextStore:
             )
             for row in rows
         ]
+
+    async def count_by_strategy_version(
+        self, *, account_id: str | None = None
+    ) -> Mapping[str | None, int]:
+        """(AUTO-20C) agregado de fills por versión para declarar el PERÍMETRO del volcado.
+
+        Solo agrupa y cuenta: no trae filas ni reinterpreta nada. La clave ``None`` recoge los
+        fills sin atribución (``strategy_version_id`` NULL), que ``list_for_strategy_version`` no
+        puede devolver: el exportador los mide aquí para declararlos excluidos, no para incluirlos.
+        """
+        from sqlalchemy import func, select
+
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+
+        stmt = select(
+            SimFillFinanceContextRow.strategy_version_id,
+            func.count(),
+        ).group_by(SimFillFinanceContextRow.strategy_version_id)
+        if account_id is not None:
+            stmt = stmt.where(SimFillFinanceContextRow.account_id == account_id)
+        rows = (await self._session.execute(stmt)).all()
+        return {row[0]: int(row[1]) for row in rows}
 
     async def list_by_cycle_ids(
         self,

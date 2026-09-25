@@ -2,6 +2,49 @@
 
 All notable releases of Bolsa V1.
 
+## [1.89.0-beta] — AUTO-20C · primera calibración PAPER (virtual) + perímetro + invariante — 2026-09-25
+
+**Frontera declarada, sin nueva arquitectura de motor y SIN migración** (Alembic head sigue en
+`046_fill_reference_mid`). El veredicto real (`SUPPORTED` / `NOT_SUPPORTED` / `INCONCLUSIVE`) es un
+**resultado**, no un error de software. El reparto **no se mueve**: `auto18-v1` / `auto15-v1`.
+
+**El invariante que se instala: PAPER = dinero VIRTUAL.** Toda la cadena declara que el material y sus
+veredictos proceden de una cuenta PAPER con **dinero virtual** y que **ninguna operación se ejecuta jamás
+sobre XTB ni ninguna plataforma real** (AUTO permanece SIM-only). La fuente única es el nuevo módulo puro
+`auto_evidence_report.py` (`EXECUTION_REALITY_VIRTUAL_PAPER`, `REAL_MONEY_AT_RISK = False`,
+`EVIDENCE_ARTIFACT_SCHEMA = "auto20c_evidence_artifact_v1"`), que se propaga al manifest, a la nota del
+exportador, al artefacto y al render. El exportador además **se bloquea con `exit 2`** (sin JSON) si
+`settings.broker_venue != "paper"` (`NonPaperVenueError`): un artefacto PAPER no se sella con material de
+otro carril.
+
+**Perímetro declarado (deudas 21-24), sin tocar el universo medido.** `sim_durable_store.py` gana
+`count_by_strategy_version` (agregado **aditivo**: `Protocol` + InMemory + Postgres, el worker intacto). El
+manifest declara `observedStrategyVersions`, `versionsRequestedWithoutMaterial`,
+`versionsObservedNotRequested`, `fillsTotalForAccount`/`fillsSelected`/`fillsExcludedNoVersion`/
+`fillsExcludedOtherVersion`, `regimesPresent` y `materialOrigin` (**obligatorio**: `paper_real` vs
+`synthetic_fixture`). La huella `material_fingerprint_v1` **no** incluye excluidos: sigue sellando el
+universo medido. `riskReadSaturated = false` se documenta como "la lectura terminó de forma completa",
+**no** "todas las reservas existen".
+
+**Artefacto reproducible + render.** `auto_replay_battery.py` gana `--out PATH` y `--render PATH`
+**opcionales** (sin ellos, stdout queda **byte-idéntico** al informe auditado). `build_evidence_artifact`
+envuelve el informe **verbatim**; `render_evidence_report` imprime la tabla del punto 30 (Material /
+Shrinkage / Effective-N / Interval coverage / Edge sign / Confidence / Coverage / Walk-forward efficiency),
+declara `Current regime`/`Current evidence` como `AUTO-21 (fuera de alcance)`, `Allocation change = none`, y
+recuerda la **regla de oro**: *`INCONCLUSIVE` por muestra insuficiente NO se arregla bajando
+`min_is`/`min_oos`/`folds`*.
+
+**Tests y mutaciones.** Puros nuevos `test_auto_evidence_report.py` y `test_auto_v64_auto20c_artifact.py`;
+ampliación de `test_auto_v63_auto20b_material_manifest.py` (perímetro) y del E2E PG
+`test_auto_v63_auto20b_export_e2e_pg.py` (2 fills sin versión y 2 de otra versión, cuantificados y no
+medidos). Mutaciones nuevas **M175–M178** (excluidos falseados, observadas eliminadas, procedencia borrada,
+artefacto no escrito).
+
+**Paso operativo del propietario** (no lo fabrica la fase): con ≥32 ciclos medidos por estrategia, correr
+export → `--walk-forward --out` sobre la cuenta PAPER **virtual** y conservar
+`AUTO20C_REAL_PAPER_REPORT.json` + el render como artefacto reproducible, aceptando honestamente cualquiera
+de los tres veredictos.
+
 ## [1.88.1-beta] — AUTO-20B.1 · el extra `[asyncio]` de SQLAlchemy se declara (re-sello) — 2026-09-25
 
 **Re-sello de INFRAESTRUCTURA, sin cambios de producto.** El tag **`v2.63-beta` no se mueve**; el sello

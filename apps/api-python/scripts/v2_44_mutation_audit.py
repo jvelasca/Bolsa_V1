@@ -525,6 +525,10 @@ MATERIAL_FINGERPRINT = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_material_manifest.py"
 )
 REPLAY_BATTERY = "scripts/research/auto_replay_battery.py"
+# AUTO-20C (V2.64): artefacto reproducible + render + invariante PAPER virtual.
+EVIDENCE_REPORT = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_report.py"
+)
 
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
@@ -573,6 +577,9 @@ T_EXPORT_COMPLETENESS = "apps/api-python/tests/test_auto_v63_auto20b_export_comp
 T_EXPORT_E2E = "apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py"
 T_MATERIAL_MANIFEST = "packages/py/application/tests/test_auto_v63_auto20b_material_manifest.py"
 T_MATERIAL_FINGERPRINT = "packages/py/analytics/tests/test_auto_material_manifest.py"
+# AUTO-20C (V2.64): el render/artefacto y el invariante virtual, en suites puras.
+T_EVIDENCE_REPORT = "packages/py/analytics/tests/test_auto_evidence_report.py"
+T_A20C_ARTIFACT = "apps/api-python/tests/test_auto_v64_auto20c_artifact.py"
 T_WORKER = (
     "apps/api-python/tests/test_auto_v2_worker_integration.py"
     "::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed"
@@ -1999,9 +2006,40 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M174 (manifest no propagado): el battery deja de pasar el material a la calibracion",
         REPLAY_BATTERY,
-        "            material=manifest,\n",
-        "            material=None,\n",
+        "            resamples=args.resamples,\n            material=manifest,\n",
+        "            resamples=args.resamples,\n            material=None,\n",
         (T_EXPORT_COMPLETENESS,),
+    ),
+    # ── AUTO-20C (V2.64): perimetro declarado + artefacto reproducible + realidad virtual ────
+    (
+        "M175 (excluidos falseados): el perimetro declara que no hay fills sin version",
+        MATERIAL_MANIFEST_APP,
+        "    total = sum(counts.values())\n    no_version = counts.get(None, 0)\n",
+        "    total = sum(counts.values())\n    no_version = 0\n",
+        (T_MATERIAL_MANIFEST,),
+    ),
+    (
+        "M176 (observadas eliminadas): el manifest deja de declarar las versiones observadas",
+        MATERIAL_MANIFEST_APP,
+        '        "observedStrategyVersions": observed,\n',
+        '        "observedStrategyVersions": [],\n',
+        (T_MATERIAL_MANIFEST,),
+    ),
+    (
+        "M177 (procedencia borrada): el artefacto deja de declarar la realidad PAPER virtual",
+        EVIDENCE_REPORT,
+        '        "executionReality": execution_reality,\n',
+        '        "executionReality": None,\n',
+        (T_EVIDENCE_REPORT, T_A20C_ARTIFACT),
+    ),
+    (
+        "M178 (artefacto no escrito): el battery no vuelca el artefacto reproducible",
+        REPLAY_BATTERY,
+        "        if args.out is not None:\n"
+        '            _write(args.out, json.dumps(artifact, indent=2, ensure_ascii=False) + "\\n")\n',
+        "        if False:\n"
+        '            _write(args.out, json.dumps(artifact, indent=2, ensure_ascii=False) + "\\n")\n',
+        (T_A20C_ARTIFACT,),
     ),
 ]
 

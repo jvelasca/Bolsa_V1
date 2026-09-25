@@ -18,6 +18,10 @@ Uso:
   python scripts/research/auto_replay_battery.py --walk-forward
   python scripts/research/auto_replay_battery.py --walk-forward --cycles ciclos.json --folds 4
 
+  # AUTO-20C: además, guardar el artefacto reproducible y el render legible
+  python scripts/research/auto_replay_battery.py --walk-forward --cycles ciclos.json \\
+      --out AUTO20C_REAL_PAPER_REPORT.json --render AUTO20C_REAL_PAPER_REPORT.txt
+
 El JSON de entrada puede ser una LISTA de ciclos o un OBJETO
 ``{"cycles": [...], "note": "...", "material_manifest": {...}}``: la nota y la huella del material
 (si las trae) se copian a stderr, nunca al JSON de stdout. Cuando el objeto trae
@@ -43,6 +47,11 @@ from bolsa_analytics.cognitive.auto_adaptive_calibration import (  # noqa: E402
 from bolsa_analytics.cognitive.auto_adaptive_replay import (  # noqa: E402
     REPLAY_OOS_PCT_DEFAULT,
     build_replay_report,
+)
+from bolsa_analytics.cognitive.auto_evidence_report import (  # noqa: E402
+    MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
+    build_evidence_artifact,
+    render_evidence_report,
 )
 
 DEFAULT_FIXTURE = (
@@ -101,6 +110,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=42, help="semilla del bootstrap declarada")
     parser.add_argument("--level", type=float, default=0.90, help="nivel del intervalo (0.5–0.99)")
     parser.add_argument("--resamples", type=int, default=2000, help="remuestreos del bootstrap")
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="AUTO-20C: escribe el artefacto reproducible (envelope + informe) en esta ruta",
+    )
+    parser.add_argument(
+        "--render",
+        type=Path,
+        default=None,
+        help="AUTO-20C: escribe el render legible AUTO EVIDENCE REPORT en esta ruta",
+    )
     args = parser.parse_args(argv)
 
     # Sin ``--cycles`` el defecto depende del instrumento: el replay sigue byte-idéntico a AUTO-19A
@@ -143,9 +164,42 @@ def main(argv: list[str] | None = None) -> int:
             interval_level=args.level,
             resamples=args.resamples,
         )
-    json.dump(report.as_dict(), sys.stdout, indent=2, ensure_ascii=False)
+    payload = report.as_dict()
+    json.dump(payload, sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
+
+    if args.out is not None or args.render is not None:
+        # AUTO-20C — artefacto reproducible: envuelve el informe (verbatim) con el manifest del
+        # material. El origen se toma del manifest (el exportador lo declara); sin manifest, el
+        # material es el fixture sintético y se declara como tal. Nunca se inventa la procedencia.
+        material_origin = MATERIAL_ORIGIN_SYNTHETIC_FIXTURE
+        broker_venue: str | None = None
+        if manifest is not None:
+            material_origin = str(
+                manifest.get("materialOrigin") or MATERIAL_ORIGIN_SYNTHETIC_FIXTURE
+            )
+            broker_venue = (
+                str(manifest["brokerVenue"]) if manifest.get("brokerVenue") else None
+            )
+        artifact = build_evidence_artifact(
+            payload,
+            material=manifest,
+            broker_venue=broker_venue,
+            material_origin=material_origin,
+        )
+        if args.out is not None:
+            _write(args.out, json.dumps(artifact, indent=2, ensure_ascii=False) + "\n")
+            print(f"# artefacto AUTO-20C escrito en {args.out}", file=sys.stderr)
+        if args.render is not None:
+            _write(args.render, render_evidence_report(artifact))
+            print(f"# render AUTO EVIDENCE REPORT escrito en {args.render}", file=sys.stderr)
     return 0
+
+
+def _write(path: Path, text: str) -> None:
+    """Escribe ``text`` en ``path`` creando el directorio padre (artefacto de investigación)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
 
 if __name__ == "__main__":

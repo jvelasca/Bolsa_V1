@@ -11,6 +11,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from bolsa_analytics.cognitive.auto_evidence_report import (
+    EXECUTION_REALITY_VIRTUAL_PAPER,
+    MATERIAL_ORIGIN_PAPER_REAL,
+    MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
+)
 from bolsa_analytics.cognitive.auto_material_manifest import material_fingerprint
 from bolsa_application.auto_material_manifest import (
     MATERIAL_RISK_BASIS,
@@ -109,6 +114,7 @@ def test_the_manifest_counts_the_same_material_the_instrument_carries() -> None:
         reservations_read=10,
         risk_read_saturated=False,
         export_timestamp="2026-09-24T10:00:00Z",
+        material_origin=MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
         regime_confirmed=5,
         regime_absent=3,
     )
@@ -143,6 +149,7 @@ def test_the_manifest_partitions_by_version_without_contaminating() -> None:
         reservations_read=0,
         risk_read_saturated=False,
         export_timestamp="2026-09-24T10:00:00Z",
+        material_origin=MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
     )
 
     assert manifest["perVersion"]["orb-a"] == {"cycles": 4, "withRisk": 3, "withoutRisk": 1}
@@ -164,6 +171,7 @@ def test_the_manifest_fingerprint_is_the_instrument_material_fingerprint() -> No
         reservations_read=0,
         risk_read_saturated=False,
         export_timestamp="2026-09-24T10:00:00Z",
+        material_origin=MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
     )
 
     assert manifest["fingerprint"] == material_fingerprint(cycles)
@@ -190,7 +198,92 @@ def test_the_manifest_declares_the_identity_gap() -> None:
         reservations_read=0,
         risk_read_saturated=False,
         export_timestamp="2026-09-24T10:00:00Z",
+        material_origin=MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
     )
 
     assert manifest["closedCycles"] == 1
     assert manifest["cyclesWithoutIdentity"] == 1
+
+
+def test_the_manifest_declares_the_perimeter_of_the_dump() -> None:
+    """AUTO-20C: el manifest declara qué quedó FUERA del universo pedido, sin incluirlo.
+
+    ``observed`` son las versiones que de verdad aparecen en el material; ``fillsExcluded*``
+    cuantifica el contorno (fills sin atribución y de otras versiones). Nada de esto altera el
+    universo medido ni la huella: solo hace visible el perímetro del volcado.
+    """
+    fills, risk = _fixture()
+    cycles = adaptive_instrument_cycles(fills, risk)
+    fills_by_version: dict[str | None, int] = {
+        "orb-a": 12,
+        "orb-b": 4,
+        "orb-c": 2,
+        None: 8,
+        "orb-legacy": 3,
+    }
+
+    manifest = build_material_manifest(
+        account_id="acc-1",
+        requested_versions=["orb-a", "orb-b", "orb-c"],
+        fills=fills,
+        cycles=cycles,
+        reservations_read=0,
+        risk_read_saturated=False,
+        export_timestamp="2026-09-24T10:00:00Z",
+        material_origin=MATERIAL_ORIGIN_PAPER_REAL,
+        fills_by_version=fills_by_version,
+        broker_venue="paper",
+    )
+
+    assert manifest["fillsTotalForAccount"] == 29
+    assert manifest["fillsSelected"] == 18
+    assert manifest["fillsExcludedNoVersion"] == 8
+    assert manifest["fillsExcludedOtherVersion"] == 3
+    assert manifest["observedStrategyVersions"] == ["orb-a", "orb-b", "orb-c"]
+    assert manifest["versionsRequestedWithoutMaterial"] == []
+    assert manifest["versionsObservedNotRequested"] == []
+    assert manifest["materialOrigin"] == MATERIAL_ORIGIN_PAPER_REAL
+    assert manifest["executionReality"] == EXECUTION_REALITY_VIRTUAL_PAPER
+    assert manifest["brokerVenue"] == "paper"
+    assert manifest["regimesPresent"] == [], "el fixture no declara régimen en sus ciclos"
+
+
+def test_the_manifest_names_a_requested_version_without_material() -> None:
+    """Una versión pedida que no aparece en el material se nombra, no se disimula."""
+    fills, risk = _fixture()
+    manifest = build_material_manifest(
+        account_id="acc-1",
+        requested_versions=["orb-a", "orb-ghost"],
+        fills=fills,
+        cycles=adaptive_instrument_cycles(fills, risk),
+        reservations_read=0,
+        risk_read_saturated=False,
+        export_timestamp="2026-09-24T10:00:00Z",
+        material_origin=MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
+    )
+
+    assert manifest["versionsRequestedWithoutMaterial"] == ["orb-ghost"]
+    # Y una versión que aparece en el material sin haberla pedido también se declara.
+    assert manifest["versionsObservedNotRequested"] == ["orb-b", "orb-c"]
+
+
+def test_the_manifest_does_not_invent_the_perimeter_without_the_aggregate() -> None:
+    """Sin el agregado del store, el perímetro es "no medido" (``None``), nunca un cero."""
+    fills, risk = _fixture()
+    manifest = build_material_manifest(
+        account_id="acc-1",
+        requested_versions=["orb-a"],
+        fills=fills,
+        cycles=adaptive_instrument_cycles(fills, risk),
+        reservations_read=0,
+        risk_read_saturated=False,
+        export_timestamp="2026-09-24T10:00:00Z",
+        material_origin=MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
+    )
+
+    assert manifest["fillsTotalForAccount"] is None
+    assert manifest["fillsSelected"] is None
+    assert manifest["fillsExcludedNoVersion"] is None
+    assert manifest["fillsExcludedOtherVersion"] is None
+    # ``False`` solo significa "la lectura terminó", no "todas las reservas existen".
+    assert manifest["riskReadSaturated"] is False
