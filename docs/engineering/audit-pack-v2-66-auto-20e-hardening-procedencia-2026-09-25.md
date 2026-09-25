@@ -9,7 +9,7 @@
 | # | Tesis | Dónde se sostiene | Test / sonda |
 |---|---|---|---|
 | 1 | El contrato de claves **lee Python de verdad** (no un literal espejo) | `auto-evidence-report.test.ts` → `pythonCalibrationKeys()` | `matches the calibration keys the Python instrument actually emits` |
-| 2 | Ese contrato **puede fallar**: renombrar una clave en Python lo pone rojo | `auto_adaptive_calibration.py:116-121` | prueba manual documentada + mutación **M180** |
+| 2 | Ese contrato **puede fallar**: renombrar una clave en Python lo pone rojo | `auto_adaptive_calibration.py:116-121` | prueba manual reproducida por el auditor (es **vitest**; **no** la cubre la matriz pytest) |
 | 3 | La compuerta **corre** ante un cambio solo de Python | `.github/workflows/frontend-ci.yml` (`paths`) | revisión del `on:` |
 | 4 | El render no se desalinea del instrumento | `auto_evidence_report.py` `_CALIBRATION_ROWS` | `test_the_render_rows_use_the_canonical_calibration_keys` |
 | 5 | Una procedencia **contradictoria** no se resuelve a `PAPER REAL` | `auto-evidence-report.ts` `classifyEvidenceSource` | `a contradictory materialOrigin is declared…` |
@@ -58,7 +58,12 @@ en `auto_adaptive_calibration.py` y se corrió el test del frontend:
 Tests  1 failed | 21 passed (22)
 ```
 
-Restaurado el fichero (diff **vacío**), el test vuelve a verde. La matriz lo formaliza como **M180**.
+Restaurado el fichero (diff **vacío**), el test vuelve a verde.
+
+> **Corrección (`v2.67`, P3-1 de la auditoría de `v2.66`).** Este contrato es **vitest**: **no** lo cubre la
+> matriz de mutaciones (pytest). La mutación **M180** formaliza **otra** propiedad —el atado
+> `_CALIBRATION_ROWS`↔`_CALIBRATION_QUESTIONS` **dentro del render Python**—, no el contrato TS-vs-Python.
+> La frase original («la matriz lo formaliza como M180») era una **sobre-afirmación**.
 
 ## 5. Límite declarado (no es fallo de la fase)
 

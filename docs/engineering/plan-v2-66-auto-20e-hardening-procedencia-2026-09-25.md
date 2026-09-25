@@ -35,8 +35,10 @@ levantó tres P3 que no bloqueaban el sello y que conviene cerrar antes de que s
 
 **Prueba de que el contrato puede fallar (no se afirma, se mide):** renombrando temporalmente
 `CALIBRATION_QUESTION_INTERVAL_COVERAGE` en Python, el test `matches the calibration keys the Python instrument
-actually emits` pasa a **ROJO**; restaurado el fichero, vuelve a verde. La misma propiedad se cubre con la
-mutación **M180** (Python).
+actually emits` pasa a **ROJO**; restaurado el fichero, vuelve a verde. Es un contrato **vitest**: **no** lo
+cubre la matriz de mutaciones (pytest) — esa cubre el atado del render Python (**M180**), que es **otra**
+propiedad. *(Precisión corregida en `v2.67`: la redacción original decía «la misma propiedad se cubre con
+M180», que era una sobre-afirmación.)*
 
 ### P3-2 — Procedencia sin contradicción silenciosa
 

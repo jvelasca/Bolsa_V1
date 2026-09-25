@@ -71,5 +71,9 @@ dejó los ficheros **byte a byte**. `v2.66-beta` (**`6fe7faa8`**) permanece inta
 
 ## Checklist para la fase siguiente
 
-1. [ ] P3-1 — corregir la redacción de `plan`/`audit-pack` sobre el alcance de M180.
-2. [ ] P3-2 — `_version_list` (Python): no-array ⇒ `NO MEDIDO` (espejo de TS) + tests en ambos lados.
+1. [x] P3-1 — corregir la redacción de `plan`/`audit-pack` sobre el alcance de M180 (hecho en `v2.67`).
+2. [x] P3-2 — `_version_list` (Python): no-array ⇒ `NO MEDIDO` (espejo de TS) + tests en ambos lados (hecho en `v2.67`, mutación **M181**).
+
+> **RESUELTA en `v2.67-beta` (`AUTO-20F`).** Ver
+> [`plan`](./plan-v2-67-auto-20f-cierre-p3-v2.66-2026-09-25.md) · [`audit-pack`](./audit-pack-v2-67-auto-20f-cierre-p3-v2.66-2026-09-25.md).
+> Este documento se conserva como **registro histórico**.
