@@ -115,6 +115,10 @@ vi.mock("@/features/operational-console/ops-incidents-and-links", () => ({
   OpsQuickLinksSection: () => <div data-testid="ops-quick-links" />,
 }));
 
+vi.mock("@/features/operational-console/auto-evidence-section", () => ({
+  OpsAutoEvidenceSection: () => <div data-testid="ops-auto-evidence" />,
+}));
+
 describe("OperationalConsolePage V1.55", () => {
   it("surfaces exceptions first; technical sections in details", () => {
     render(
@@ -125,6 +129,7 @@ describe("OperationalConsolePage V1.55", () => {
     expect(screen.getByTestId("operational-console")).toBeTruthy();
     expect(screen.getByTestId("ops-recon")).toBeTruthy();
     expect(screen.getByTestId("ops-incidents")).toBeTruthy();
+    expect(screen.getByTestId("ops-auto-evidence")).toBeTruthy();
     expect(screen.getByText(/Resolver excepciones/i)).toBeTruthy();
     expect(screen.getByText(/Ver detalles técnicos/i)).toBeTruthy();
   });

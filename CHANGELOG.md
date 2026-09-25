@@ -2,6 +2,40 @@
 
 All notable releases of Bolsa V1.
 
+## [1.90.0-beta] — AUTO-20D · UI de procedencia del AUTO EVIDENCE REPORT — 2026-09-25
+
+**Solo frontend, `+3` ficheros de producción y `+3` de test; SIN migración** (Alembic head sigue en
+`046_fill_reference_mid`) y **sin tocar `packages/py` ni ningún fichero del freeze**. El reparto **no se
+mueve**: `auto18-v1` / `auto15-v1`.
+
+**El hueco que cierra.** `v2.64` selló el artefacto `auto20c_evidence_artifact_v1` y el render, pero el
+resultado solo se leía en el JSON, el `.txt` y `stderr`: **no existía superficie de cabina** y un humano
+podía mirar `Walk-forward efficiency 0.4213` y asumir que era su cuenta PAPER. Esta fase instala el **badge de
+procedencia** del punto 14 de la auditoría de `v2.64`.
+
+**La sección `Evidencia AUTO (AUTO-20D)`** (Consola operacional, primer nivel) muestra un badge SOURCE
+imposible de malinterpretar: `PAPER REAL` (verde, única base de decisión), `FIXTURE SINTÉTICO` (ámbar, con
+`NO UTILIZAR PARA DECISIONES`), `SIN MATERIAL · NO MEDIDO` (sin artefacto o sin material) y
+`PROCEDENCIA DESCONOCIDA` (nunca se asume PAPER real). Separa los tres ejes (punto 11) sin renombrar
+`materialOrigin`: origen / ejecución (`virtual / sin dinero real`) / dinero real en riesgo.
+
+**La UI lee, no recalcula.** El módulo puro `auto-evidence-report.ts` valida el esquema (rechaza uno ajeno
+con motivo), clasifica la procedencia, arma la vista con el `report` **verbatim** y avisa de una procedencia
+incoherente (`realMoneyAtRisk=true`, ejecución no virtual, venue no `paper`, lectura saturada). Dos reglas
+duras: **un conteo `null` se muestra `NO MEDIDO`** (nunca un `0` de relleno) y **un veredicto ausente es
+`INCONCLUSIVE`**. El artefacto se **importa a mano** (fichero o pegado) y se archiva en local
+(`bolsa-auto-evidence-archive-v1`, cap 10, dedupe por huella); sin endpoint ni migración.
+
+**Tests.** 30 nuevos (report 19 · sección 7 · store 4) + el de la Consola actualizado; **1320 passed** (232
+ficheros), `typecheck` OK y `lint` 0 errores. El contraste de claves de calibración queda **pinneado**: si
+Python cambia la forma del esquema, el test cae.
+
+**Hallazgo declarado.** La **corrida PAPER real (AUTO-20D) NO se ejecuta** en esta fase: el PostgreSQL local
+tiene `sim_fill_finance_context` con `cycle_id` NULL en **todos** los fills (628) ⇒ el exportador bloquearía
+con `exit 2`. El estado real es **`SIN MATERIAL · NO MEDIDO`**, que la UI declara; el bloqueo es por
+**material, no por código**, y la corrida sigue siendo paso operativo del propietario (≥32 ciclos medidos por
+estrategia).
+
 ## [1.89.0-beta] — AUTO-20C · primera calibración PAPER (virtual) + perímetro + invariante — 2026-09-25
 
 **Frontera declarada, sin nueva arquitectura de motor y SIN migración** (Alembic head sigue en

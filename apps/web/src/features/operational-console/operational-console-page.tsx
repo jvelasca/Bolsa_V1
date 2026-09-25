@@ -21,6 +21,7 @@ import {
   OpsRuntimeSection,
   OpsSelfEvalSection,
 } from "@/features/operational-console/operational-console-sections";
+import { OpsAutoEvidenceSection } from "@/features/operational-console/auto-evidence-section";
 import {
   OpsIncidentsSection,
   OpsQuickLinksSection,
@@ -129,6 +130,7 @@ export function OperationalConsolePage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <OpsAutoEvidenceSection />
         <OpsReconSection report={report} />
         {effectiveAccountId ? (
           <OpsIncidentsSection
