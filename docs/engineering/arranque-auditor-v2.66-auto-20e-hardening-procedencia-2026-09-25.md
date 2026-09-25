@@ -19,7 +19,7 @@ movido nada que no debía (freeze, reparto, migración, esquema del artefacto). 
 ## Tesis a verificar
 
 1. **P3-1 real.** El test del frontend **lee** `auto_adaptive_calibration.py` (no un literal). Comprobar que
-   **cae** si se renombra una clave (reproducir la rotura o fiarse de **M180**).
+   **cae** si se renombra una clave (reproducir la rotura por sonda manual — es **vitest**; **M180** cubre el atado del render Python, **no** este contrato).
 2. **La compuerta corre.** `frontend-ci.yml` incluye el fichero Python en `paths` de `push` y `pull_request`.
    Sin esto, el «contrato» no se ejecutaría ante un cambio solo de Python.
 3. **Render alineado.** El test Python ata `_CALIBRATION_ROWS` a `_CALIBRATION_QUESTIONS`.
