@@ -3,6 +3,11 @@
 > **AsOf:** 2026-09-25 · **Fase auditada:** `v2.65-beta` / `AUTO-20D` (`1.90.0-beta`) · **Tag:** `v2.65-beta` → `a077c1c6` · **Base:** `v2.64-beta` → `e605f475`
 > **Veredicto del auditor:** `APROBADO CON OBSERVACIONES` — **0 bloqueantes**.
 > **Estado:** v2.65 queda **certificada**. Este documento registra **solo** deuda no bloqueante (P3) para que entre en la fase siguiente (`v2.66`). **No modifica el sello**: el tag `v2.65-beta` permanece en `a077c1c6`.
+>
+> **Actualización 2026-09-25 — RESUELTA en `v2.66-beta` (`AUTO-20E`).** Las 3 P3 y los dos puntos de higiene
+> quedan cerrados en la fase siguiente: ver [`plan`](./plan-v2-66-auto-20e-hardening-procedencia-2026-09-25.md) ·
+> [`audit-pack`](./audit-pack-v2-66-auto-20e-hardening-procedencia-2026-09-25.md). Este documento se conserva
+> como **registro histórico** de la deuda tal y como se levantó.
 
 ## Por qué existe este documento
 
@@ -67,7 +72,7 @@ Comprobado durante el cierre de la auditoría:
 
 ## Checklist para `v2.66` (entrada sugerida)
 
-1. [ ] P3-1 — hacer que el test de claves **lea Python** de verdad; corregir la redacción de plan/audit-pack.
-2. [ ] P3-2 — decidir política ante `materialOrigin` raíz ≠ `material.materialOrigin` y avisar.
-3. [ ] P3-3 — distinguir `ausente` de `[]` en perímetro, **en TS y en Python a la vez**.
-4. [ ] Higiene — `git add --renormalize` de los 3 Python y decidir el destino de `governor.json` (`.gitignore` o borrado).
+1. [x] P3-1 — hacer que el test de claves **lea Python** de verdad; corregir la redacción de plan/audit-pack.
+2. [x] P3-2 — decidir política ante `materialOrigin` raíz ≠ `material.materialOrigin` y avisar.
+3. [x] P3-3 — distinguir `ausente` de `[]` en perímetro, **en TS y en Python a la vez**.
+4. [x] Higiene — `git add --renormalize` de los 3 Python y decidir el destino de `governor.json` (`.gitignore`).
