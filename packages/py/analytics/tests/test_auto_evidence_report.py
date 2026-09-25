@@ -19,7 +19,7 @@ from bolsa_analytics.cognitive.auto_evidence_report import (
     EXECUTION_REALITY_NOTE,
     EXECUTION_REALITY_VIRTUAL_PAPER,
     MATERIAL_ORIGIN_PAPER_REAL,
-    OUT_OF_SCOPE_AUTO21,
+    NOT_MEASURED,
     REAL_MONEY_AT_RISK,
     build_evidence_artifact,
     render_evidence_report,
@@ -80,6 +80,7 @@ def test_the_render_labels_every_calibration_question() -> None:
             {"question": "effective_n_calibration", "verdict": "supported"},
             {"question": "interval_coverage", "verdict": "inconclusive"},
             {"question": "edge_sign_calibration", "verdict": "not_supported"},
+            {"question": "probability_positive_calibration", "verdict": "supported"},
             {"question": "confidence_calibration", "verdict": "not_supported"},
             {"question": "coverage_calibration", "verdict": "supported"},
         ],
@@ -93,6 +94,7 @@ def test_the_render_labels_every_calibration_question() -> None:
     assert _row_for(text, "Effective-N").rstrip().endswith("SUPPORTED")
     assert _row_for(text, "Interval coverage").rstrip().endswith("INCONCLUSIVE")
     assert _row_for(text, "Edge sign").rstrip().endswith("NOT_SUPPORTED")
+    assert _row_for(text, "P(R>0)").rstrip().endswith("SUPPORTED")
     assert _row_for(text, "Confidence calibration").rstrip().endswith("NOT_SUPPORTED")
     assert _row_for(text, "Coverage (regime)").rstrip().endswith("SUPPORTED")
     # Sin cociente honesto, el WFE no se inventa.
@@ -119,6 +121,7 @@ def test_the_render_marks_missing_evidence_inconclusive() -> None:
         "Effective-N",
         "Interval coverage",
         "Edge sign",
+        "P(R>0)",
         "Confidence calibration",
         "Coverage (regime)",
         "Walk-forward efficiency",
@@ -137,9 +140,66 @@ def test_the_render_declares_the_perimeter_and_the_frozen_allocation() -> None:
     assert "excluded (no version):80" in text
     assert "excluded (other):     0" in text
     assert "regimes:              RANGE, TREND_UP (2)" in text
-    assert OUT_OF_SCOPE_AUTO21 in text
+    assert _row_for(text, "Current regime").rstrip().endswith(NOT_MEASURED)
+    assert _row_for(text, "Current evidence").rstrip().endswith(NOT_MEASURED)
     assert ALLOCATION_CHANGE_NONE in _row_for(text, "Allocation change")
     assert EXECUTION_REALITY_VIRTUAL_PAPER in text
+
+
+def test_the_render_fills_the_current_regime_and_evidence_when_the_artifact_brings_them() -> None:
+    """AUTO-21: con lectura, el render imprime el régimen y la P(R>0) por estrategia, no un stub."""
+    artifact = build_evidence_artifact(
+        {"questions": [], "aggregate": {}},
+        material=dict(_MATERIAL),
+        current_regime="TREND_UP",
+        current_evidence={
+            "regime": "TREND_UP",
+            "byStrategy": {
+                "orb-a": {
+                    "probabilityPositive": 0.7012,
+                    "edgeConfidence": "HIGH",
+                },
+                "orb-b": {"probabilityPositive": None, "edgeConfidence": "UNKNOWN"},
+            },
+        },
+        correlation={
+            "bucket": "day",
+            "pairs": [
+                {
+                    "left": "orb-a",
+                    "right": "orb-b",
+                    "correlation": 0.42,
+                    "sharedBuckets": 6,
+                    "notes": [],
+                },
+                {
+                    "left": "orb-a",
+                    "right": "orb-c",
+                    "correlation": None,
+                    "sharedBuckets": 0,
+                    "notes": ["no_shared_buckets"],
+                },
+            ],
+        },
+    )
+    text = render_evidence_report(artifact)
+
+    assert _row_for(text, "Current regime").rstrip().endswith("TREND_UP")
+    evidence_line = _row_for(text, "Current evidence")
+    assert "orb-a: P(R>0) 0.7012 (HIGH)" in evidence_line
+    assert "orb-b: P(R>0) NO MEDIDO (UNKNOWN)" in evidence_line
+    assert "correlation (bucket=day)" in text
+    assert "orb-a vs orb-b: 0.4200 (cubos=6)" in text
+    assert "orb-a vs orb-c: NO MEDIDO (cubos=0) [no_shared_buckets]" in text
+
+
+def test_the_artifact_omits_the_auto21_keys_when_there_is_no_reading() -> None:
+    """Sin lectura, las claves aditivas NO se inventan: el artefacto sigue siendo el auditado."""
+    artifact = build_evidence_artifact({"questions": [], "aggregate": {}}, material=None)
+
+    assert "correlation" not in artifact
+    assert "currentRegime" not in artifact
+    assert "currentEvidence" not in artifact
 
 
 def test_the_render_distinguishes_an_absent_perimeter_list_from_an_empty_one() -> None:

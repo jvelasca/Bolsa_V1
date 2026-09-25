@@ -44,6 +44,14 @@ from bolsa_analytics.cognitive.auto_adaptive_calibration import (  # noqa: E402
     CALIBRATION_FOLDS_DEFAULT,
     build_calibration_report,
 )
+from bolsa_analytics.cognitive.auto_adaptive_correlation import (  # noqa: E402
+    CORRELATION_BUCKET_DEFAULT,
+    CORRELATION_BUCKETS,
+    build_strategy_correlation_report,
+)
+from bolsa_analytics.cognitive.auto_adaptive_regime_evidence import (  # noqa: E402
+    build_current_regime_evidence,
+)
 from bolsa_analytics.cognitive.auto_adaptive_replay import (  # noqa: E402
     REPLAY_OOS_PCT_DEFAULT,
     build_replay_report,
@@ -103,6 +111,17 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=CALIBRATION_FOLDS_DEFAULT,
         help="pliegues del walk-forward (se acotan a 2–5)",
+    )
+    parser.add_argument(
+        "--bucket",
+        choices=list(CORRELATION_BUCKETS),
+        default=CORRELATION_BUCKET_DEFAULT,
+        help="AUTO-21: cubo temporal de la correlación entre estrategias (day/week/month)",
+    )
+    parser.add_argument(
+        "--current-regime",
+        default=None,
+        help="AUTO-21: régimen actual para la evidencia (por defecto, el del ciclo más reciente)",
     )
     parser.add_argument(
         "--oos-pct", type=float, default=REPLAY_OOS_PCT_DEFAULT, help="fracción OOS (0.1–0.4)"
@@ -181,11 +200,22 @@ def main(argv: list[str] | None = None) -> int:
             broker_venue = (
                 str(manifest["brokerVenue"]) if manifest.get("brokerVenue") else None
             )
+        correlation = build_strategy_correlation_report(cycles, bucket=args.bucket)
+        current_evidence = build_current_regime_evidence(
+            cycles,
+            current_regime=args.current_regime,
+            level=args.level,
+            resamples=args.resamples,
+            seed=args.seed,
+        )
         artifact = build_evidence_artifact(
             payload,
             material=manifest,
             broker_venue=broker_venue,
             material_origin=material_origin,
+            correlation=correlation.as_dict(),
+            current_regime=current_evidence.regime,
+            current_evidence=current_evidence.as_dict(),
         )
         if args.out is not None:
             _write(args.out, json.dumps(artifact, indent=2, ensure_ascii=False) + "\n")

@@ -2,6 +2,45 @@
 
 All notable releases of Bolsa V1.
 
+## [1.93.0-beta] — AUTO-21 · `P(R>0)`, correlación entre estrategias y evidencia del régimen actual — 2026-09-25
+
+**Fase estrictamente de medición/evidencia; SIN migración** (Alembic head sigue en `046_fill_reference_mid`)
+y **sin tocar ningún fichero del freeze**. El reparto **no se mueve**: `auto18-v1` / `auto15-v1` — la
+probabilidad y el co-movimiento **se publican, no reparten**. El esquema del artefacto **se mantiene**
+(`auto20c_evidence_artifact_v1`) con claves **aditivas y opcionales**.
+
+- **`P(R>0)`.** `ExpectancyInterval` gana `probabilityPositive` = fracción de las medias bootstrap
+  **estrictamente `> 0`** de la **misma** distribución que ya encuadra el intervalo (un solo productor);
+  sin bootstrap el valor es `None` y el hueco se declara (`no_cycles` / `insufficient_episodes`), **nunca un
+  `0`**. Sello `ADAPTIVE_UNCERTAINTY_METHOD` → **`bootstrap_episodes_v2`**.
+- **Calibración de la probabilidad.** Nueva pregunta `probability_positive_calibration`: compara la
+  probabilidad **declarada** sobre el IS con la fracción positiva **realizada** del OOS por el error
+  absoluto **medio** frente a tolerancia declarada (`0.20`); sin celdas con ambos términos ⇒
+  `inconclusive`. `_aggregate` publica `probabilityPositiveOos` (por **ciclos**). Sello
+  `CALIBRATION_METHOD` → **`walk_forward_calibration_v3`**.
+- **Correlación entre estrategias** (módulo puro nuevo `auto_adaptive_correlation.py`). Alineación por
+  **cubo temporal declarado** (`day` por defecto; `week`/`month`), Pearson sobre las medias de R de los
+  cubos **compartidos** (`min_buckets = 4`); sin solape ⇒ `None` + `no_shared_buckets`, pocos cubos ⇒
+  `insufficient_buckets`, serie constante ⇒ `constant_series`; orden-invariante. **No** se conecta al
+  optimizador ni a la reserva.
+- **Evidencia del régimen actual** (módulo puro nuevo `auto_adaptive_regime_evidence.py`). Para el régimen
+  actual (flag `--current-regime` o el del ciclo más reciente **con régimen declarable**; `UNKNOWN` no fija
+  el actual) publica, por estrategia, la celda `strategy × regime` **reutilizando el bootstrap de
+  `AUTO-19A`**, o el hueco declarado (`no_evidence_for_regime`, `measuredN = 0`) — nunca el agregado.
+- **Render y UI.** El stub `AUTO-21 (fuera de alcance)` **desaparece**: `Current regime` / `Current
+  evidence` y el bloque `correlation (bucket=...)` publican lo medido (o `NO MEDIDO`), con espejo TS que
+  **lee** (no recalcula) y bloque de correlación en la sección de evidencia.
+- **Mutaciones `M182…M187`** (una por invariante): sello sin subir, probabilidad fabricada, sello de
+  calibración sin subir, pregunta sin muestra mínima, correlación sin cubos publicando `0.0` y régimen
+  inventado.
+
+**Compuertas.** Frontend **1327 passed** (232 ficheros; con `--testTimeout=30000`), `typecheck` OK, `lint`
+**0 errores** (23 warnings preexistentes), `build` OK, `contract:check` OK. Python analytics **1238
+passed**, `ruff` **All checks passed!**, `import-linter` **4 kept / 0 broken**. Matriz de mutaciones
+**187/187** medidas, 0 sin fragmento, restauración **byte a byte**. **Flake ajeno declarado**:
+`backtests/core-r-scheduler.test.ts` agota su timeout de 5 s bajo la carga de la suite completa (fichero
+sin tocar; aislado pasa).
+
 ## [1.92.0-beta] — AUTO-20F · cierre de las 2 P3 de la auditoría de v2.66 — 2026-09-25
 
 **Frontend + un fichero Python de render; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

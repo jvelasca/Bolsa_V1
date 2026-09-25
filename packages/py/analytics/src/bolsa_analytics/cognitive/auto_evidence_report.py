@@ -37,7 +37,7 @@ __all__ = [
     "GOLDEN_RULE_INSUFFICIENT_EVIDENCE",
     "MATERIAL_ORIGIN_PAPER_REAL",
     "MATERIAL_ORIGIN_SYNTHETIC_FIXTURE",
-    "OUT_OF_SCOPE_AUTO21",
+    "NOT_MEASURED",
     "REAL_MONEY_AT_RISK",
     "build_evidence_artifact",
     "render_evidence_report",
@@ -60,8 +60,9 @@ MATERIAL_ORIGIN_SYNTHETIC_FIXTURE = "synthetic_fixture"
 #: El reparto NO cambia por evidencia (``auto18-v1`` congelado): es un hecho declarado, no medido.
 ALLOCATION_CHANGE_NONE = "none"
 
-#: Huecos que este instrumento NO cubre todavía (``AUTO-21``): se declaran, no se inventan.
-OUT_OF_SCOPE_AUTO21 = "AUTO-21 (fuera de alcance)"
+#: Etiqueta de lo que no se pudo medir. ``AUTO-21`` la usa para el régimen y la correlación: un dato
+#: ausente se imprime ``NO MEDIDO``, nunca un ``0`` ni una etiqueta de "fuera de alcance".
+NOT_MEASURED = "NO MEDIDO"
 
 #: La regla de oro de la fase, impresa en cada render para que nadie la olvide.
 GOLDEN_RULE_INSUFFICIENT_EVIDENCE = (
@@ -89,6 +90,7 @@ _CALIBRATION_ROWS: tuple[tuple[str, str], ...] = (
     ("effective_n_calibration", "Effective-N"),
     ("interval_coverage", "Interval coverage"),
     ("edge_sign_calibration", "Edge sign"),
+    ("probability_positive_calibration", "P(R>0)"),
     ("confidence_calibration", "Confidence calibration"),
     ("coverage_calibration", "Coverage (regime)"),
 )
@@ -190,15 +192,22 @@ def build_evidence_artifact(
     execution_reality: str = EXECUTION_REALITY_VIRTUAL_PAPER,
     broker_venue: str | None = None,
     material_origin: str = MATERIAL_ORIGIN_PAPER_REAL,
+    correlation: Mapping[str, Any] | None = None,
+    current_regime: str | None = None,
+    current_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """(PURA) envuelve un informe de calibración en el artefacto reproducible ``AUTO-20C``.
 
     ``report`` es un ``CalibrationReport`` (o su ``as_dict``) y viaja **verbatim** bajo la clave
     ``report``: el artefacto no reinterpreta ninguna medición. El envoltorio añade el sello de
     esquema, la realidad de ejecución (PAPER **virtual**), la venue y el origen del material.
+
+    ``AUTO-21`` añade tres bloques OPCIONALES (``correlation``, ``currentRegime``,
+    ``currentEvidence``): se publican tal cual y la clave se AÑADE solo cuando hay lectura, de modo
+    que un artefacto sin ellos sigue siendo byte-idéntico al auditado en ``v2.67``.
     """
     report_payload = report.as_dict() if hasattr(report, "as_dict") else dict(report)
-    return {
+    payload: dict[str, Any] = {
         "schema": EVIDENCE_ARTIFACT_SCHEMA,
         "executionReality": execution_reality,
         "realMoneyAtRisk": REAL_MONEY_AT_RISK,
@@ -208,14 +217,89 @@ def build_evidence_artifact(
         "material": dict(material) if material is not None else None,
         "report": report_payload,
     }
+    if correlation is not None:
+        payload["correlation"] = dict(correlation)
+    if current_regime is not None:
+        payload["currentRegime"] = current_regime
+    if current_evidence is not None:
+        payload["currentEvidence"] = dict(current_evidence)
+    return payload
+
+
+def _current_regime_label(artifact: Mapping[str, Any]) -> str:
+    """Régimen actual declarado por el artefacto; ausente o vacío ⇒ ``NO MEDIDO``."""
+    regime = artifact.get("currentRegime")
+    if isinstance(regime, str) and regime.strip():
+        return regime
+    return NOT_MEASURED
+
+
+def _probability_label(value: Any) -> str:
+    """P(R > 0) → texto a 4 decimales; ausente o no numérico ⇒ ``NO MEDIDO`` (nunca un 0)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return NOT_MEASURED
+    return f"{float(value):.4f}"
+
+
+def _current_evidence_label(artifact: Mapping[str, Any]) -> str:
+    """Resumen por estrategia de la evidencia del régimen actual; sin lectura ⇒ ``NO MEDIDO``."""
+    evidence = artifact.get("currentEvidence")
+    if not isinstance(evidence, Mapping):
+        return NOT_MEASURED
+    by_strategy = evidence.get("byStrategy")
+    if not isinstance(by_strategy, Mapping) or not by_strategy:
+        return NOT_MEASURED
+    parts: list[str] = []
+    for version in sorted(str(key) for key in by_strategy):
+        row = by_strategy.get(version)
+        if not isinstance(row, Mapping):
+            parts.append(f"{version}: {NOT_MEASURED}")
+            continue
+        edge = str(row.get("edgeConfidence") or "UNKNOWN")
+        parts.append(
+            f"{version}: P(R>0) {_probability_label(row.get('probabilityPositive'))} ({edge})"
+        )
+    return "; ".join(parts)
+
+
+def _correlation_lines(artifact: Mapping[str, Any]) -> list[str]:
+    """Bloque ``correlation`` del render: una línea por par, o su hueco declarado. Sin lectura, ``[]``."""
+    correlation = artifact.get("correlation")
+    if not isinstance(correlation, Mapping):
+        return []
+    pairs = correlation.get("pairs")
+    if not isinstance(pairs, (list, tuple)):
+        return []
+    header = f"correlation (bucket={correlation.get('bucket')})"
+    lines = [header]
+    if not pairs:
+        lines.append("  (sin pares declarados)")
+        return lines
+    for pair in pairs:
+        if not isinstance(pair, Mapping):
+            continue
+        value = pair.get("correlation")
+        text = (
+            f"{float(value):.4f}"
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+            else NOT_MEASURED
+        )
+        notes = ", ".join(str(note) for note in (pair.get("notes") or ()))
+        suffix = f" [{notes}]" if notes else ""
+        lines.append(
+            f"  {pair.get('left')} vs {pair.get('right')}: {text} "
+            f"(cubos={pair.get('sharedBuckets')}){suffix}"
+        )
+    return lines
 
 
 def render_evidence_report(artifact: Mapping[str, Any]) -> str:
     """(PURA) render legible del artefacto, en texto plano determinista.
 
     Imprime el bloque de Material, la tabla de calibración (un veredicto por pregunta, más el WFE),
-    los huecos declarados fuera de alcance y la procedencia virtual. Un veredicto ausente se imprime
-    ``INCONCLUSIVE``: el render no fabrica lo que el informe no midió.
+    el bloque de correlación y la evidencia del régimen ACTUAL (``AUTO-21``), más la procedencia
+    virtual. Un veredicto o un dato ausente se imprime ``NO MEDIDO``/``INCONCLUSIVE``: el render no
+    fabrica lo que el informe no midió.
     """
     report = artifact.get("report") or {}
     material = artifact.get("material")
@@ -240,12 +324,16 @@ def render_evidence_report(artifact: Mapping[str, Any]) -> str:
         "Calibration",
     ]
     lines.extend(f"  {label.ljust(width)}{verdict}" for label, verdict in rows)
+    correlation_lines = _correlation_lines(artifact)
+    if correlation_lines:
+        lines.append("")
+        lines.extend(correlation_lines)
     lines.extend(
         [
             "",
             "Declared",
-            f"  {'Current regime'.ljust(width)}{OUT_OF_SCOPE_AUTO21}",
-            f"  {'Current evidence'.ljust(width)}{OUT_OF_SCOPE_AUTO21}",
+            f"  {'Current regime'.ljust(width)}{_current_regime_label(artifact)}",
+            f"  {'Current evidence'.ljust(width)}{_current_evidence_label(artifact)}",
             (
                 f"  {'Allocation change'.ljust(width)}"
                 f"{ALLOCATION_CHANGE_NONE} (auto18-v1 congelado: la evidencia no mueve el reparto)"

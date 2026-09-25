@@ -117,13 +117,23 @@ def test_the_battery_writes_the_artifact_and_render_without_changing_stdout(
 
     artifact = json.loads(out.read_text(encoding="utf-8"))
     assert artifact["schema"] == "auto20c_evidence_artifact_v1"
-    assert artifact["report"]["method"] == "walk_forward_calibration_v2"
+    assert artifact["report"]["method"] == "walk_forward_calibration_v3"
     assert artifact["material"] == _manifest(_cycles())
+    # AUTO-21: el battery embebe los bloques aditivos medidos. El fixture NO declara
+    # ``marketRegime``, así que el régimen actual se declara NO MEDIDO en vez de inventarse.
+    assert artifact["correlation"]["bucket"] == "day"
+    assert "currentRegime" not in artifact
+    assert artifact["currentEvidence"]["regime"] is None
 
     text = render.read_text(encoding="utf-8")
     assert "AUTO EVIDENCE REPORT" in text
     assert "excluded (no version):8" in text
-    assert "AUTO-21 (fuera de alcance)" in text
+    # AUTO-21: la evidencia medida sustituye al stub "fuera de alcance".
+    assert "correlation (bucket=day)" in text
+    assert "(sin pares declarados)" in text
+    assert "Current regime" in text
+    assert "NO MEDIDO" in text
+    assert "AUTO-21 (fuera de alcance)" not in text
 
 
 def test_the_artifact_declares_virtual_paper_and_no_real_money(tmp_path: Path) -> None:

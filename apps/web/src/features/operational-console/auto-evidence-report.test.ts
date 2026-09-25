@@ -14,6 +14,7 @@ import {
   INCONCLUSIVE,
   MATERIAL_ORIGIN_PAPER_REAL,
   MATERIAL_ORIGIN_SYNTHETIC_FIXTURE,
+  NOT_MEASURED,
   buildEvidenceView,
   classifyEvidenceSource,
   integrityWarnings,
@@ -217,15 +218,95 @@ describe("buildEvidenceView", () => {
     expect(byLabel("Walk-forward efficiency")?.value).toBe("0.4213");
   });
 
-  it("declares AUTO-21 out of scope and the allocation freeze", () => {
+  it("declares NO MEDIDO for the current regime/evidence without a reading, and the freeze", () => {
     const view = buildEvidenceView(artifact());
     const declared = new Map(
       view.declared.map((row) => [row.label, row.value]),
     );
-    expect(declared.get("Current regime")).toContain("AUTO-21");
-    expect(declared.get("Current evidence")).toContain("AUTO-21");
+    expect(declared.get("Current regime")).toBe(NOT_MEASURED);
+    expect(declared.get("Current evidence")).toBe(NOT_MEASURED);
     expect(declared.get("Allocation change")).toContain(ALLOCATION_CHANGE_NONE);
     expect(declared.get("Allocation change")).toContain("auto18-v1");
+    expect(view.correlation).toHaveLength(0);
+  });
+
+  it("fills the current regime, the evidence and the correlation when the artifact brings them", () => {
+    const view = buildEvidenceView(
+      artifact({
+        currentRegime: "TREND_UP",
+        currentEvidence: {
+          method: "current_regime_evidence_v1",
+          regime: "TREND_UP",
+          adverse: false,
+          byStrategy: {
+            "orb-a": {
+              strategyVersion: "orb-a",
+              regime: "TREND_UP",
+              measuredN: 12,
+              episodes: 4,
+              expectancyR: 0.4,
+              probabilityPositive: 0.7012,
+              edgeConfidence: "HIGH",
+              notes: [],
+            },
+            "orb-b": {
+              strategyVersion: "orb-b",
+              regime: "TREND_UP",
+              measuredN: 0,
+              episodes: 0,
+              expectancyR: null,
+              probabilityPositive: null,
+              edgeConfidence: "UNKNOWN",
+              notes: ["no_evidence_for_regime"],
+            },
+          },
+          notes: [],
+        },
+        correlation: {
+          method: "bucket_correlation_v1",
+          bucket: "day",
+          minBuckets: 4,
+          strategies: ["orb-a", "orb-b"],
+          pairs: [
+            {
+              left: "orb-a",
+              right: "orb-b",
+              correlation: 0.42,
+              sharedBuckets: 6,
+              notes: [],
+            },
+            {
+              left: "orb-a",
+              right: "orb-c",
+              correlation: null,
+              sharedBuckets: 0,
+              notes: ["no_shared_buckets"],
+            },
+          ],
+          notes: [],
+        },
+      }),
+    );
+    const declared = new Map(
+      view.declared.map((row) => [row.label, row.value]),
+    );
+    expect(declared.get("Current regime")).toBe("TREND_UP");
+    expect(declared.get("Current evidence")).toContain(
+      "orb-a: P(R>0) 0.7012 (HIGH)",
+    );
+    expect(declared.get("Current evidence")).toContain(
+      "orb-b: P(R>0) NO MEDIDO (UNKNOWN)",
+    );
+    const correlation = new Map(
+      view.correlation.map((row) => [row.label, row]),
+    );
+    expect(correlation.get("orb-a vs orb-b")?.value).toBe("0.4200 (cubos=6)");
+    expect(correlation.get("orb-a vs orb-b")?.inconclusive).toBe(false);
+    expect(correlation.get("orb-a vs orb-c")?.value).toContain("NO MEDIDO");
+    expect(correlation.get("orb-a vs orb-c")?.value).toContain(
+      "no_shared_buckets",
+    );
+    expect(correlation.get("orb-a vs orb-c")?.inconclusive).toBe(true);
   });
 
   it("exposes the perimeter without touching the measured universe", () => {
@@ -335,8 +416,8 @@ function pythonCalibrationKeys(): string[] {
 describe("schema contract", () => {
   it("matches the calibration keys the Python instrument actually emits", () => {
     const pythonKeys = pythonCalibrationKeys();
-    // Las seis preguntas del instrumento; si Python añade o renombra una, este test cae.
-    expect(pythonKeys).toHaveLength(6);
+    // Las siete preguntas del instrumento; si Python añade o renombra una, este test cae.
+    expect(pythonKeys).toHaveLength(7);
     expect([...AUTO_EVIDENCE_CALIBRATION_KEYS].sort()).toEqual(pythonKeys);
   });
 

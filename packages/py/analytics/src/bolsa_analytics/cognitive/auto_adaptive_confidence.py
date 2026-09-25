@@ -137,6 +137,7 @@ __all__ = [
     "RegimeConfidence",
     "StrategyConfidence",
     "build_adaptive_confidence",
+    "closed_instant",
     "coverage_band",
     "cycle_field",
     "measured_r",
@@ -417,6 +418,16 @@ def measured_r(row: Any) -> float | None:
 def regime_of(row: Any) -> str:
     """(PURA, ``AUTO-19A``) superficie pública del régimen de UNA fila de ciclo (o ``UNKNOWN``)."""
     return _regime_of(row)
+
+
+def closed_instant(row: Any) -> datetime | None:
+    """(PURA, ``AUTO-21``) superficie pública del instante de cierre de UNA fila (o ``None``).
+
+    Es el MISMO lector que ordenó la muestra (``_closed_instant``): la correlación por cubo temporal
+    no puede derivar la fecha con una regla paralela que divergiera del orden que ya se usa. Una
+    fila sin instante legible devuelve ``None`` y ese hueco se declara, no se supone.
+    """
+    return _closed_instant(row)
 
 
 def order_cycles_by_instant(rows: Sequence[Any]) -> tuple[tuple[Any, ...], int]:

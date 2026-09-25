@@ -277,6 +277,18 @@ export function OpsAutoEvidenceSection() {
               />
             </div>
 
+            {view.correlation.length > 0 ? (
+              <div>
+                <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                  Correlación
+                </h4>
+                <EvidenceTable
+                  rows={view.correlation}
+                  testId="ops-auto-evidence-correlation"
+                />
+              </div>
+            ) : null}
+
             <div>
               <h4 className="text-xs font-semibold uppercase text-muted-foreground">
                 Declared
