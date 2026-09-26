@@ -18,6 +18,10 @@ from bolsa_analytics.cognitive.auto_adaptive_regime_evidence import (
     build_current_regime_evidence,
     current_regime_from_cycles,
 )
+from bolsa_analytics.cognitive.auto_adaptive_uncertainty import (
+    ADAPTIVE_INTERVAL_LEVEL_MAX,
+    ADAPTIVE_INTERVAL_LEVEL_MIN,
+)
 
 _BASE = date(2026, 1, 1)
 
@@ -113,6 +117,44 @@ def test_an_unknown_regime_is_not_a_current_regime() -> None:
     assert evidence.as_dict()["byStrategy"]["orb-1"]["notes"] == [
         REGIME_EVIDENCE_NOTE_NO_EVIDENCE_FOR_REGIME
     ]
+
+
+def test_the_interval_level_is_clamped_and_published() -> None:
+    """``P3-4`` (v2.72): el ``level`` publicado es el CLAMPEADO que usó el bootstrap.
+
+    Antes, un ``level=0.0`` se publicaba ``0.0`` mientras el bootstrap lo clampeaba a ``0.5``: la
+    lectura contradecía al número que encuadraba. Con la corrección, el nivel publicado es el
+    efectivo y la celda es la MISMA que con ese nivel explícito — no hay segunda aritmética.
+    """
+    cycles = _cycles("orb-1", ["TREND_UP"] * 12, [1.0, -1.0] * 6)
+
+    low = build_current_regime_evidence(cycles, level=0.0, resamples=200, seed=5)
+    high = build_current_regime_evidence(cycles, level=5.0, resamples=200, seed=5)
+    baseline_low = build_current_regime_evidence(
+        cycles, level=ADAPTIVE_INTERVAL_LEVEL_MIN, resamples=200, seed=5
+    )
+    baseline_high = build_current_regime_evidence(
+        cycles, level=ADAPTIVE_INTERVAL_LEVEL_MAX, resamples=200, seed=5
+    )
+
+    assert low.level == ADAPTIVE_INTERVAL_LEVEL_MIN
+    assert high.level == ADAPTIVE_INTERVAL_LEVEL_MAX
+    assert low.evidence_for("orb-1") == baseline_low.evidence_for("orb-1")
+    assert high.evidence_for("orb-1") == baseline_high.evidence_for("orb-1")
+
+
+def test_the_clamped_level_travels_even_without_cycles() -> None:
+    """El hueco declarado (sin ciclos) también publica el nivel clampeado, no el crudo."""
+    evidence = build_current_regime_evidence([], level=0.0, resamples=200, seed=5)
+
+    assert evidence.notes == (REGIME_EVIDENCE_NOTE_NO_CYCLES,)
+    assert evidence.level == ADAPTIVE_INTERVAL_LEVEL_MIN
+    assert evidence.as_dict()["level"] == ADAPTIVE_INTERVAL_LEVEL_MIN
+
+
+def test_the_regime_evidence_seal_is_v3() -> None:
+    """El sello es un contrato: si cambia la lectura, cambia el sello (y este test lo dice)."""
+    assert CURRENT_REGIME_EVIDENCE_METHOD == "current_regime_evidence_v3"
 
 
 def test_each_strategy_is_reported_independently() -> None:

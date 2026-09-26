@@ -36,6 +36,8 @@ from bolsa_analytics.cognitive.auto_adaptive_confidence import (
 from bolsa_analytics.cognitive.auto_adaptive_uncertainty import (
     ADAPTIVE_EDGE_UNKNOWN,
     ADAPTIVE_INTERVAL_LEVEL_DEFAULT,
+    ADAPTIVE_INTERVAL_LEVEL_MAX,
+    ADAPTIVE_INTERVAL_LEVEL_MIN,
     ADAPTIVE_INTERVAL_MIN_EPISODES_DEFAULT,
     ADAPTIVE_INTERVAL_RESAMPLES_DEFAULT,
     ADAPTIVE_INTERVAL_SEED_DEFAULT,
@@ -57,10 +59,15 @@ __all__ = [
 #: Método declarado de la lectura. No es un bootstrap propio: reutiliza el de ``AUTO-19A``, pero la
 #: SELECCIÓN del régimen actual es una lectura nueva y por eso viaja con su propio sello.
 #:
-#: La corrección de ``v2.71`` sube el sello a ``v2``: ``probability_positive`` pasa a ser la
+#: La corrección de ``v2.71`` subió el sello a ``v2``: ``probability_positive`` pasa a ser la
 #: ``P(R>0)`` por CICLOS (``cycle_positive_share``), no la ``P(edge>0)`` del bootstrap; y se publica
 #: además ``edgePositiveProbability`` de forma aditiva.
-CURRENT_REGIME_EVIDENCE_METHOD = "current_regime_evidence_v2"
+#:
+#: La corrección de ``v2.72`` sube el sello a ``v3``: el ``level`` que se PUBLICA es el **clampeado**
+#: (el mismo que el bootstrap usa), no el crudo del llamante. Antes, un ``level=0.0`` se publicaba
+#: ``0.0`` mientras el bootstrap lo clampeaba a ``0.5``: la lectura contradecía al número. Es la misma
+#: clase de defecto que ``H3`` cerró en ``build_replay_report``.
+CURRENT_REGIME_EVIDENCE_METHOD = "current_regime_evidence_v3"
 
 REGIME_EVIDENCE_NOTE_NO_CYCLES = "no_cycles"
 REGIME_EVIDENCE_NOTE_NO_CURRENT_REGIME = "no_current_regime"
@@ -170,10 +177,15 @@ def build_current_regime_evidence(
     Sin ciclos devuelve una lectura VACÍA declarada. ``current_regime`` es OPCIONAL: sin él se toma el
     del ciclo más reciente con régimen declarable y, si no hay, el hueco queda ``no_current_regime``.
     Cada estrategia publica la celda de ese régimen o ``no_evidence_for_regime`` —nunca la lectura
-    agregada disfrazada de régimen—.
+    agregada disfrazada de régimen—. El ``level`` que se publica es el **clampeado** (el que usó el
+    bootstrap), igual que en ``build_replay_report`` y ``CalibrationReport``.
     """
     rows = list(cycles or ())
-    resolved_level = level
+    # El NIVEL efectivo es el clampeado: es el que el bootstrap usa, así que es el que se publica
+    # (un ``0.0`` publicado junto a un bootstrap hecho con ``0.5`` sería una contradicción silenciosa).
+    resolved_level = min(
+        max(float(level), ADAPTIVE_INTERVAL_LEVEL_MIN), ADAPTIVE_INTERVAL_LEVEL_MAX
+    )
     resolved_resamples = max(1, int(resamples))
     resolved_min = max(1, int(min_episodes))
     provided = _regime_key(current_regime)

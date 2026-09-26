@@ -485,6 +485,12 @@ Corrección del instrumento v2.71 (``P(R>0)`` por ciclos vs ``P(edge>0)`` por me
 * **M197 (clave colisionada)** — si la celda reusa ``regimeCoverage`` para su banda, el mismo nombre
   es un ``float`` en ``StrategyConfidence`` y una banda en ``ReplayCell``: dos formas, un nombre.
 
+Cierre de ``P3-4`` en v2.72 (el ``level`` publicado por la lectura del régimen es el clampeado):
+
+* **M198 (nivel crudo en la lectura del régimen)** — si ``build_current_regime_evidence`` publica el
+  ``level`` sin clampar, la lectura contradice al bootstrap que la produjo (publica ``0.0`` mientras
+  midió con ``0.5``): misma clase que ``H3``, que ``v2.71`` cerró solo en ``build_replay_report``.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -2288,6 +2294,16 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         '            "dominantRegimeCoverage": self.dominant_regime_coverage,\n',
         '            "regimeCoverage": self.dominant_regime_coverage,\n',
         (T_REPLAY,),
+    ),
+    # ── v2.72 (cierre de P3-4): el level publicado por la lectura del régimen es el clampeado ────
+    (
+        "M198 (nivel crudo): la lectura del regimen publica el level sin clampar",
+        AUTO_ADAPTIVE_REGIME_EVIDENCE,
+        "    resolved_level = min(\n"
+        "        max(float(level), ADAPTIVE_INTERVAL_LEVEL_MIN), ADAPTIVE_INTERVAL_LEVEL_MAX\n"
+        "    )\n",
+        "    resolved_level = float(level)\n",
+        (T_REGIME_EVIDENCE,),
     ),
 ]
 
