@@ -2,6 +2,45 @@
 
 All notable releases of Bolsa V1.
 
+## [1.97.0-beta] — Cierre de `P3-4` (el `level` de la lectura del régimen es el clampeado) — 2026-09-26
+
+**Fase corta y quirúrgica de corrección del instrumento; SIN migración** (Alembic head sigue en
+`046_fill_reference_mid`) y **sin tocar ningún fichero del freeze**. El reparto **no se mueve**:
+`auto18-v1` / `auto15-v1`. No se toca `evidence_runs`/`evidence_validations` ni el runbook.
+
+Cierra **`P3-4`**, la **única** observación de la auditoría externa de `v2.71-beta`: la lectura del
+régimen publicaba un `level` **crudo** mientras el bootstrap medía con el **clampeado**. El invariante
+que instala: **el nivel que se publica es el que se usó** — vale para el informe de replay (`H3`,
+`v2.71`) **y** para la lectura del régimen actual.
+
+- **Clamp en el productor.** `auto_adaptive_regime_evidence.py`: `build_current_regime_evidence`
+  calcula `resolved_level = min(max(float(level), ADAPTIVE_INTERVAL_LEVEL_MIN),
+  ADAPTIVE_INTERVAL_LEVEL_MAX)` **antes** de publicarlo, igual que `build_replay_report` y
+  `CalibrationReport`. Antes, con `level=0.0` publicaba `0.0` mientras el bootstrap medía con `0.5`.
+- **Sello subido.** `CURRENT_REGIME_EVIDENCE_METHOD` `current_regime_evidence_v2` →
+  **`current_regime_evidence_v3`** (la lectura cambió). Sin consumidor desalineado.
+- **Sin cambio de payload con el default.** Con el `level` default (`0.90`, ya dentro del rango) el
+  `byStrategy`, la `P(R>0)` por ciclos, la `P(edge>0)`, los `notes` y el régimen seleccionado son
+  **byte-idénticos** a `v2.71`.
+- **Tests + mutación.** `test_the_interval_level_is_clamped_and_published` (comprueba además que la
+  celda publicada es la MISMA que con el nivel clampeado explícito: no hay segunda aritmética),
+  `test_the_clamped_level_travels_even_without_cycles` y `test_the_regime_evidence_seal_is_v3`; **`M198`**
+  nueva. Matriz completa **198/198** con restauración **byte a byte**.
+
+**El primer RUN PAPER real sigue BLOQUEADO por MATERIAL** (medido contra `bolsa-postgres`, 2026-09-26):
+**761** fills durables, **0** con `cycle_id`, **751 `buy` / 10 `sell`** (casi todo entradas abiertas) y
+**0 filas** en `portfolio_reservations` (sin `reserved_risk` ⇒ sin R medible). El instrumento devolvió
+`exit 2` en el exportador (`no hay ciclos cerrados con fill durable`) y en el run (`sin ciclos con R
+medible`), **sin crear** `evidence_runs/`. **No se bajó ningún umbral** para forzarlo: dos causas
+independientes (faltan cierres **y** faltan reservas), cada una suficiente para bloquear. El primer RUN
+sigue siendo el **paso operativo del propietario**.
+
+**Compuertas.** Python `analytics` **1265 passed** (1262 + 3 nuevos) · costuras `api-python`
+**13 passed / 1 skipped** (PG por DSN fast-fail, ajeno) · `ruff` **All checks passed** ·
+`import-linter` **4 kept / 0 broken** · `mypy` **0 issues (501 files)** · matriz **198/198** byte a byte.
+
+**CI del tag `v2.72-beta`:** se cita en el commit de sello inmediatamente posterior.
+
 ## [1.96.0-beta] — Corrección de la semántica de `P(R>0)` y cierre de P3 (AUTO-19A/19B) — 2026-09-26
 
 **Fase de corrección del instrumento; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

@@ -5,8 +5,8 @@
 > **Naturaleza:** hallazgos **P2/P3** sobre **la lectura** de la incertidumbre; ninguno publica un
 > número falso nuevo, pero H1 **sí** mezcla dos funcionales en el mismo nombre.
 > **Estado:** **H1 y H2/H3/H4 cerrados en `v2.71`**; **P3-4** (hallazgo de la auditoría de `v2.71`,
-> preexistente y read-only) **abierta**; P3-2 y P3-3 siguen **abiertas** (requieren el primer dataset
-> PAPER real). **El bloqueante central es MATERIAL, no código.**
+> preexistente y read-only) **cerrada en `v2.72`**; P3-2 y P3-3 siguen **abiertas** (requieren el
+> primer dataset PAPER real). **El bloqueante central es MATERIAL, no código.**
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -72,7 +72,7 @@ declarar, **antes** de tocar la métrica, si la frecuencia/exposición sesga el 
 **Nota `v2.71`:** el barrido ya publica la `P(R>0)` por **ciclos** (antes publicaba una mezcla por la
 ambigüedad de H1).
 
-## P3-4 — `build_current_regime_evidence` publica el `level` sin clampar (P3) — 🔴 ABIERTA
+## P3-4 — `build_current_regime_evidence` publica el `level` sin clampar (P3) — 🟢 CERRADA en `v2.72`
 
 **Origen:** auditoría externa de `v2.71-beta` (2026-09-26). **Preexistente** (idéntico en `v2.70-beta`;
 el diff `v2.70 → v2.71` **no** lo toca) y **ajena a las 15 tesis** de la fase.
@@ -89,7 +89,15 @@ reserva); solo observable con un `level` **no default**.
 
 **Criterio de cierre.** Clampar `resolved_level` en `build_current_regime_evidence` y publicar el nivel
 **efectivo**, subir el sello `current_regime_evidence_v2` → **`v3`**, y añadir la mutación + test
-correspondientes. **No se aborda en `v2.71`** (fase cerrada y elevada).
+correspondientes.
+
+**Cierre (`v2.72`).** `resolved_level = min(max(float(level), ADAPTIVE_INTERVAL_LEVEL_MIN),
+ADAPTIVE_INTERVAL_LEVEL_MAX)` **antes** de publicarlo, igual que `build_replay_report` (`H3`, `v2.71`) y
+`CalibrationReport`; sello subido a **`current_regime_evidence_v3`**. Protegido por **`M198`** y por
+`test_the_interval_level_is_clamped_and_published` (que además comprueba que la celda publicada es la
+**misma** que con el nivel clampeado explícito: no hay segunda aritmética) y
+`test_the_clamped_level_travels_even_without_cycles`. Con el `level` default (`0.90`) el payload es
+**byte-idéntico** al de `v2.71`.
 
 ## Bloqueante central — material PAPER real
 

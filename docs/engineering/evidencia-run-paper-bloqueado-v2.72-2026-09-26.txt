@@ -1,0 +1,96 @@
+EVIDENCIA CRUDA — primer RUN PAPER real: BLOQUEADO POR MATERIAL
+Fase: v2.72-beta (1.97.0-beta) · Fecha: 2026-09-26 · Entorno: PostgreSQL local (docker compose, bolsa-postgres)
+Objetivo: intentar el primer RUN de evidencia PAPER real (AUTO-22) y declarar su resultado.
+REGLA DURA respetada: NO se bajo ningun umbral (min cycles / min R / folds / min_episodes).
+
+--------------------------------------------------------------------------------
+1) MATERIAL MEDIDO (sin publicar nada; perimetro)
+--------------------------------------------------------------------------------
+
+$ docker exec bolsa-postgres psql -U bolsa -d bolsa_v1 -c "select count(*) as fills_total, count(cycle_id) as fills_with_cycle from sim_fill_finance_context;"
+ fills_total | fills_with_cycle
+-------------+------------------
+         761 |                0
+
+$ docker exec bolsa-postgres psql -U bolsa -d bolsa_v1 -c "select side, count(*) from sim_fill_finance_context group by side;"
+ side | count
+------+-------
+ sell |    10
+ buy  |   751
+
+$ docker exec bolsa-postgres psql -U bolsa -d bolsa_v1 -c "select count(*) as reservations from portfolio_reservations;"
+ reservations
+--------------
+            0
+
+$ docker exec bolsa-postgres psql -U bolsa -d bolsa_v1 -c "select venue, count(*) from sim_fill_finance_context group by venue;"
+   venue   | count
+-----------+-------
+ simulated |   761
+
+$ docker exec bolsa-postgres psql -U bolsa -d bolsa_v1 -c "select count(distinct strategy_version_id) as versions from sim_fill_finance_context where strategy_version_id is not null;"
+ versions
+----------
+       53
+
+$ docker exec bolsa-postgres psql -U bolsa -d bolsa_v1 -c "select strategy_version_id, account_id, count(*) from sim_fill_finance_context where strategy_version_id is not null group by 1,2 order by 3 desc limit 3;"
+               strategy_version_id               |        account_id         | count
+-------------------------------------------------+---------------------------+-------
+ ver-disc-inst-a11-b724bd7df2-sma-0-e5048f4d47d3 | 181e7e07d27d4cdebc342ff83 |     4
+ ver-disc-inst-a11-e81544d6ff-sma-0-7b9dfd689a07 | 89249387b17343d5824df511b |     4
+
+LECTURA:
+- 761 fills durables y 0 con cycle_id (migracion 044 sin poblar en este material).
+- 751 buy frente a 10 sell: casi todo son ENTRADAS ABIERTAS. Sin salida no hay ciclo cerrado
+  ni resultado que medir.
+- portfolio_reservations VACIA: sin reserved_risk no hay R medible AUNQUE hubiera cierre.
+- Maximo 4 fills por version, muy por debajo de los >=32 ciclos medidos del walk-forward
+  (folds=3, min_is=8, min_oos=4).
+- DOS CAUSAS INDEPENDIENTES, cada una suficiente para bloquear: faltan CIERRES y faltan RESERVAS.
+- venue de las filas = 'simulated'; la guarda app-level (BROKER_VENUE=paper) si paso.
+
+--------------------------------------------------------------------------------
+2) PASO 0 DEL RUNBOOK — exportador (cuenta CON fills)
+--------------------------------------------------------------------------------
+
+$ $env:BROKER_VENUE="paper"
+$ uv run --no-sync python apps/api-python/scripts/paper_cycles_export.py \
+      --account-id 181e7e07d27d4cdebc342ff83 \
+      --strategy-version ver-disc-inst-a11-b724bd7df2-sma-0-e5048f4d47d3
+
+# BLOQUEADO: no hay ciclos cerrados con fill durable para esas versiones/cuenta
+EXIT=2
+
+(Se repitio con la cuenta `meas-acc`: identico bloqueo.
+ `meas-acc` no tiene fills, asi que la prueba fuerte es la de arriba: cuenta CON fills.)
+
+--------------------------------------------------------------------------------
+3) EL RUN — fail-closed y sin carpeta
+--------------------------------------------------------------------------------
+
+$ uv run --no-sync python apps/api-python/scripts/auto_evidence_run.py \
+      --account-id 181e7e07d27d4cdebc342ff83 \
+      --strategy-version ver-disc-inst-a11-b724bd7df2-sma-0-e5048f4d47d3 \
+      --bucket day --folds 3
+
+# nota del material: material PAPER REAL sobre cuenta PAPER VIRTUAL (dinero VIRTUAL: nunca XTB
+  ni ninguna plataforma real): fills durables + riesgo de reserva + regimen AUTO-10 (mismo camino
+  que el informe, via adaptive_instrument_cycles)
+# BLOQUEADO: sin ciclos con R medible: no se publica un bundle vacio como si fuera una medicion
+EXIT=2
+
+$ if (Test-Path evidence_runs) { ... } else { "NO existe" }
+NO existe
+
+CONFIRMADO: fail-closed. El RUN bloqueado NO crea `evidence_runs/` (exist_ok=False): no hay
+bundle parcial, no hay numero copiado a mano, no hay medicion fabricada.
+
+--------------------------------------------------------------------------------
+4) CONCLUSION DECLARADA
+--------------------------------------------------------------------------------
+
+El instrumento esta listo y se comporta como debe. Lo que falta es MATERIAL, y no en un sentido
+vago: faltan CIERRES (751 compras / 10 ventas) y faltan RESERVAS (portfolio_reservations = 0).
+El primer RUN PAPER real sigue siendo el PASO OPERATIVO DEL PROPIETARIO.
+
+NO se bajo ningun umbral. Sin material, el resultado correcto es BLOQUEADO.
