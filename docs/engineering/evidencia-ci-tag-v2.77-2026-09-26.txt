@@ -1,0 +1,85 @@
+# V2.77 / AUTO-MATERIAL-5 - MARKET OPERABILITY: evidencia cruda del CI del tag `v2.77-beta`
+#
+# Fecha de captura: 2026-09-26
+#
+# OBJETO SELLADO (lo que audita el auditor externo):
+#   tag ANOTADO `v2.77-beta` -> objeto 22da1bb0 -> commit ade1df58
+#   sello en DOS commits: 233ef8cc (feat v2.77) + ade1df58 (docs v2.77)
+#   version `2.02.0-beta` - SIN migracion (Alembic head `046_fill_reference_mid`)
+#   reparto congelado `auto18-v1` / `auto15-v1` (`ALLOCATION = none`) - freeze intacto
+#
+# RANGO `v2.76-beta..v2.77-beta` = 4 commits (NO todos de esta fase, se DECLARA):
+#   05b5fa85  fix(v2.76)   POSTERIOR al tag v2.76: registra sus 2 puros en release-tag-ci.yml
+#   40d3d9dc  docs(v2.76)  POSTERIOR al tag v2.76: cita su CI y declara el hueco de registro
+#   233ef8cc  feat(v2.77)  implementacion de esta fase
+#   ade1df58  docs(v2.77)  paquete de docs, evidencia y bump de esta fase
+#   -> las dos entradas `M` de docs de v2.76 en el diff tag->tag vienen de `40d3d9dc`, y el
+#      cambio de `release-tag-ci.yml` combina `05b5fa85` (v2.76) con `233ef8cc` (v2.77).
+#
+# Comandos:
+#   gh run list --commit ade1df588b463c1d5ebfc1677da3c9fee7d5f39d --limit 20
+#   gh run view 36279417767 --json databaseId,name,status,conclusion,headSha,jobs
+#   gh run view 36279417767 --log
+#   gh run view 36279416502 --log
+#
+# ---------------------------------------------------------------------------------------------
+# 1) TODOS los runs del commit sellado (10/10 en success)
+# ---------------------------------------------------------------------------------------------
+Optimize lab        [v2.77-beta]  completed/success  id=36279417797  1m36s
+Fase 2 scientific   [v2.77-beta]  completed/success  id=36279417742  1m22s
+Python CI           [v2.77-beta]  completed/success  id=36279417814  2m5s
+Frontend CI         [v2.77-beta]  completed/success  id=36279417738  3m32s
+Release tag CI      [v2.77-beta]  completed/success  id=36279417767  9m6s
+Frontend CI         [main]        completed/success  id=36279416554  3m27s
+Gitleaks            [main]        completed/success  id=36279416453  13s
+Fase 2 scientific   [main]        completed/success  id=36279416393  1m16s
+Optimize lab        [main]        completed/success  id=36279416392  1m38s
+Python CI           [main]        completed/success  id=36279416502  2m51s
+#
+# ---------------------------------------------------------------------------------------------
+# 2) `Release tag CI` 36279417767 - conclusiones por job
+# ---------------------------------------------------------------------------------------------
+RUN 36279417767 Release tag CI completed/success sha=ade1df58
+  shared (build/typecheck/test)                            completed/success
+  security (gitleaks)                                      completed/success
+  python (ruff/imports/mypy/pytest offline)                completed/success
+  frontend (typecheck/lint/test/build + contract:check)    completed/success
+  a7-gate (A7 C3 chaos live_a7 - dedicated real-PG)        completed/success
+  decision-spine                                           completed/success
+  dr-verify (battery DB_DR / TCP CI)                       completed/success
+  playwright (mock E2E)                                    completed/success
+  lifecycle-pg (Alembic + auth + golden restart)           completed/success
+  playwright (integrated E2E, opt-in)                      completed/skipped
+  certify (aggregate + artifact)                           completed/success
+#
+# ---------------------------------------------------------------------------------------------
+# 3) Compuertas y conteos medidos (extraidos del log crudo)
+# ---------------------------------------------------------------------------------------------
+#   job `python` del TAG (ruff / import-linter / mypy / pytest offline):
+#     ruff            -> All checks passed!
+#     import-linter   -> Contracts: 4 kept, 0 broken.
+#     mypy            -> Success: no issues found in 505 source files
+#     pytest offline  -> 2948 passed, 37 skipped, 6 warnings in 68.90s
+#                        = 2898 (job del tag en v2.76) + 25 (puros de v2.76, registro corregido
+#                          en 05b5fa85) + 25 (puros nuevos de v2.77)
+#   job `shared`           -> 786 passed (95 ficheros)
+#   job `a7-gate`          -> 7 passed
+#   job `decision-spine`   -> 604 passed
+#   job `frontend`         -> 1339 passed (232 ficheros)
+#   job `playwright` mock  -> 76 passed
+#   job `lifecycle-pg`     -> 165 passed + gates fail-if-skipped
+#
+#   `quality` de `main` (Python CI 36279416502) -> 2937 passed, 40 skipped = 2912 + 25
+#
+# ---------------------------------------------------------------------------------------------
+# LECTURA (declarada)
+# ---------------------------------------------------------------------------------------------
+#   - `Release tag CI` GREEN en la PRIMERA pasada (attempt 1), sin flakes ni re-ejecuciones.
+#   - `playwright (integrated E2E, opt-in)` skipped POR DISENO: no es un fallo.
+#   - HUECO DE REGISTRO DE v2.76 EJERCITADO Y CERRADO: el job `python` del tag pasa de
+#     `2898 passed / 37 skipped` a `2948 passed / 37 skipped`; los 25 puros de v2.76 (que al
+#     sellar solo estaban en python-ci.yml) YA corren en el tag, junto con los 25 de v2.77.
+#     La correccion `05b5fa85` queda probada por el CI, sin haber movido el tag `v2.76-beta`.
+#   - `certify (aggregate + artifact)` en success: la agregacion no tiene compuerta retirada.
+#   - El sello NO incluye este fichero: el tag apunta a `ade1df58`; esta evidencia se anade
+#     DESPUES y queda declarada como cita del CI (mismo patron que v2.74/v2.75/v2.76).

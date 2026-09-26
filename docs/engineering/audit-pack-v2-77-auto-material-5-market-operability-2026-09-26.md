@@ -26,6 +26,26 @@
 `aggregate_trial_regime`, `TOP_N`, `DATA_GATE_POLICY_VERSION`, `AUTO_ENGINE_SIM_V2_*`,
 `evidence_runs/`, `evidence_validations/`, `governor.json`, la UI.
 
+### 1.b Rango del diff tag → tag (**declarado al auditor**)
+
+El diff `v2.76-beta..v2.77-beta` tiene **4 commits**, y **dos NO son de esta fase**: son posteriores
+al tag `v2.76-beta` y los introduce la cita de su CI.
+
+| Commit | Fase | Qué es |
+|---|---|---|
+| `05b5fa85` | **`v2.76` (post-tag)** | `fix(v2.76)`: registra sus 2 puros en `release-tag-ci.yml` (hueco declarado en su §10) |
+| `40d3d9dc` | **`v2.76` (post-tag)** | `docs(v2.76)`: cita su CI y declara el hueco de registro |
+| `233ef8cc` | `v2.77` | `feat(v2.77)`: implementación |
+| `ade1df58` | `v2.77` | `docs(v2.77)`: docs + evidencia + bump (**commit del tag**) |
+
+Consecuencias que el auditor debe tener presentes:
+
+- Las **dos entradas `M`** de docs de `v2.76` en el diff (`arranque-auditor-v2-76-…`,
+  `audit-pack-v2-76-…`) vienen de `40d3d9dc`, **no** de esta fase.
+- El cambio de `.github/workflows/release-tag-ci.yml` **combina** `05b5fa85` (v2.76) con
+  `233ef8cc` (v2.77): el registro de los puros de `v2.77` se **añade encima** de aquel arreglo.
+- El hueco de `v2.76` queda **ejercitado y cerrado** por el CI del tag de esta fase (§9).
+
 ## 2. El puro, pieza a pieza (qué se puede romper y qué lo muerde)
 
 - **`classify_veto_reasons`** reparte por familia. Las siete familias **siempre** salen (aunque
@@ -113,6 +133,9 @@ con el puro y **acumula** un JSONL no versionado. Propiedades:
   Vetos: `regime=40`, `top_n=24` (`regime_invalid=40`, `top_n_excluded=24`). `NO SIGNAL` **no
   aplicable** (hubo vetos).
 - `evidencia-matriz-mutaciones-v2.77-210-2026-09-26.txt`: matriz completa **210/210**.
+- `evidencia-ci-tag-v2.77-2026-09-26.txt`: CI del tag medido (`Release tag CI` `36279417767` GREEN a
+  la primera; `python` del tag **`2948/37`**; 10/10 runs del commit `ade1df58`), el rango declarado y
+  el cierre del hueco de registro de `v2.76`.
 
 ## 8. Declarado, NO hecho
 
@@ -135,8 +158,47 @@ con el puro y **acumula** un JSONL no versionado. Propiedades:
   §10: un puro nuevo registrado solo en un workflow).
 - La sonda `v2_77_market_operability.py` **no** se invoca desde ningún workflow (es I/O de
   `scripts/`): su camino real queda **declarado como operación**, no como test de CI.
-- **CI del tag**: se citará en el commit de sello de `v2.77-beta` (el workflow de tag solo corre al
-  empujar el tag).
+
+### 9.a CI del tag `v2.77-beta` (medido)
+
+**Objeto sellado:** tag **anotado** `v2.77-beta` → objeto `22da1bb0` → commit **`ade1df58`**
+(versión `2.02.0-beta`). Evidencia cruda: `evidencia-ci-tag-v2.77-2026-09-26.txt`.
+
+`Release tag CI` run **`36279417767`** → **GREEN en la primera pasada** (`attempt: 1`, **9m6s**),
+**10 jobs en `success` + `certify` en `success`**; `playwright (integrated E2E, opt-in)`
+**skipped por diseño**.
+
+| Job del tag | Medición |
+|---|---|
+| `python` (ruff/imports/mypy/pytest offline) | **`2948 passed / 37 skipped`**; `ruff` `All checks passed!`; `Contracts: 4 kept, 0 broken`; `mypy` `0 issues (505 files)` |
+| `lifecycle-pg` | `165 passed` + gates fail-if-skipped |
+| `decision-spine` | `604 passed` |
+| `a7-gate` (chaos live_a7, real-PG) | `7 passed` |
+| `shared` | `786 passed` (95 ficheros) |
+| `frontend` | `1339 passed` (232 ficheros) |
+| `playwright (mock E2E)` | `76 passed` |
+| `security (gitleaks)`, `dr-verify`, `certify` | `success` |
+
+Sobre el mismo commit y tag: `Python CI` `36279417814`, `Frontend CI` `36279417738`,
+`Optimize lab` `36279417797` y `Fase 2 scientific` `36279417742` en **success**. En `main`:
+`Python CI` `36279416502` (job `quality` **`2937 passed / 40 skipped`** = `2912 + 25`),
+`Frontend CI` `36279416554`, `Optimize lab` `36279416392`, `Fase 2 scientific` `36279416393` y
+`Gitleaks` `36279416453`, en **success** (**10/10** runs del commit sellado).
+
+### 9.b Hueco de `v2.76` ejercitado y cerrado
+
+El job `python` del **tag** pasa de **`2898 passed / 37 skipped`** (valor de `v2.76`) a
+**`2948 passed / 37 skipped`** = `2898` + **25** (los puros de `v2.76`, cuyo registro en
+`release-tag-ci.yml` se corrigió en `05b5fa85` **después** de sellar) + **25** (los puros nuevos de
+`v2.77`). Es decir: la corrección de `v2.76` **queda probada por el CI** sin haber movido el tag
+`v2.76-beta`, y el registro de `v2.77` **no repite** el hueco. Los `37 skipped` del tag son los
+**mismos** que en `v2.75`/`v2.76` (ningún skip nuevo de esta fase).
+
+### 9.c Sello y cita del CI
+
+El tag apunta a `ade1df58`; esta sección y la evidencia del CI se añaden **después**, en un commit
+de docs **posterior al tag** (mismo patrón que `v2.74`/`v2.75`/`v2.76`): el **código** auditado es
+el del tag y el diff tag→HEAD es **solo docs**.
 
 ## 10. Veredicto esperado
 

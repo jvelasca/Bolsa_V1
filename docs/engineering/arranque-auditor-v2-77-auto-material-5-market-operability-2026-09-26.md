@@ -1,8 +1,9 @@
 # Arranque del auditor — `v2.77-beta` (`AUTO-MATERIAL-5`: MARKET OPERABILITY)
 
-> **AsOf:** 2026-09-26 · **Objeto:** `v2.77-beta` (tag anotado) · **Versión:** `2.02.0-beta` ·
-> **Base (diff):** `v2.76-beta` (`2.01.0-beta`) · **Alembic head:** `046_fill_reference_mid`
-> (**SIN migración**)
+> **AsOf:** 2026-09-26 · **Objeto:** tag **anotado** `v2.77-beta` → objeto `22da1bb0` → commit
+> **`ade1df58`** (sello en dos commits: `233ef8cc` feat + `ade1df58` docs) · **Versión:**
+> `2.02.0-beta` · **Base (diff):** `v2.76-beta` (`2.01.0-beta`) · **Alembic head:**
+> `046_fill_reference_mid` (**SIN migración**)
 > **Freeze:** `auto_simulation_worker.py` **intacto** · **Reparto:** `auto18-v1` / `auto15-v1`
 > (`ALLOCATION = none`).
 > **Regla de lectura:** esta fase **no** pretende acreditar un cierre estadístico ni atribuir la
@@ -10,7 +11,7 @@
 > operabilidad + nomenclatura CAPABLE/ACTIVE) que **declara la causa** de cada no-operación y deja
 > la ventana de ≥4 días como operación del propietario.
 
-## Qué auditar (12 puntos)
+## Qué auditar (13 puntos)
 
 1. **El freeze no se toca**: `auto_simulation_worker.py` **idéntico** a `v2.76-beta`. El único cambio
    en `v2_76_forward_market_material.py` es **aditivo** (nuevos campos `pairCapable`/`pairActive` +
@@ -43,6 +44,12 @@
     `DATA_GATE_POLICY_VERSION` sigue `auto15-v1`.
 12. **Mutaciones**: `M206`–`M210` deben **morder** y restaurar **byte a byte**; la matriz pasa de
     **205/205** a **210/210**. Reejecuta la matriz **completa** y comprueba el árbol al final.
+13. **Rango del diff (declarado, no es un hallazgo)**: `v2.76-beta..v2.77-beta` tiene **4** commits y
+    **dos son post-tag de `v2.76`** (`05b5fa85` fix de registro + `40d3d9dc` cita de su CI). Las dos
+    entradas `M` de docs de `v2.76` en el diff **no** son de esta fase, y el cambio de
+    `release-tag-ci.yml` combina las dos fases. Verifica además que el job `python` del tag mide
+    **`2948/37`** = `2898` + `25` (puros de `v2.76`, ya ejercitados) + `25` (puros de `v2.77`): el
+    **hueco de registro de `v2.76` queda cerrado** sin haber movido su tag.
 
 ## Evidencia que debes mirar (cruda, en `docs/engineering/`)
 
@@ -50,6 +57,7 @@
 |---|---|
 | `evidencia-operabilidad-v2.77-2026-09-26.txt` | tabla diaria sobre el forward smoke real: `BEAR_TREND`, `4/8`, `regime=40`, `top_n=24`, 0 fills, `CAPAZ` |
 | `evidencia-matriz-mutaciones-v2.77-210-2026-09-26.txt` | 210/210, restauración byte a byte, árbol intacto |
+| `evidencia-ci-tag-v2.77-2026-09-26.txt` | CI del tag: `Release tag CI` `36279417767` GREEN a la primera (10 jobs + `certify`), `python` del tag **`2948/37`**, 10/10 runs del commit `ade1df58` |
 | `evidencia-forward-smoke-v2.76-2026-09-26.txt` | el JSON de origen (fuente del fixture del puro) |
 
 ## Comandos

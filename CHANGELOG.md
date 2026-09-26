@@ -48,6 +48,18 @@ la operación real (`pairActive`)**.
   (`assert 17 == 26`) sigue **declarada** (pre-existente, ajena al diff, se salta en CI sin Postgres).
 - **Evidencia cruda**: `evidencia-operabilidad-v2.77-2026-09-26.txt` (tabla diaria sobre el forward
   smoke real) y `evidencia-matriz-mutaciones-v2.77-210-2026-09-26.txt`.
+- **CI del tag `v2.77-beta`** (tag anotado `22da1bb0` → commit `ade1df58`): `Release tag CI`
+  `36279417767` **GREEN en la primera pasada** (`attempt: 1`, 9m6s, **10 jobs en `success` + `certify`**;
+  `playwright (integrated E2E, opt-in)` **skipped** por diseño), con el job `python` del tag en
+  **`2948 passed / 37 skipped`** (`ruff` `All checks passed!`, `Contracts: 4 kept, 0 broken`,
+  `mypy` `0 issues (505 files)`); `lifecycle-pg` `165 passed` + gates y `decision-spine` `604`,
+  `a7-gate` `7`, `shared` `786`, `frontend` `1339`, `playwright (mock E2E)` `76`. **10/10** runs del
+  commit sellado en `success` (`Python CI` `36279416502` de `main` con `quality`
+  **`2937 passed / 40 skipped`**). **El hueco de registro de `v2.76` queda ejercitado y cerrado**: el
+  job `python` del tag pasa de `2898/37` a `2948/37` = `2898` + `25` (puros de `v2.76`) + `25` (puros
+  de `v2.77`), sin haber movido el tag `v2.76-beta`. Evidencia en
+  `evidencia-ci-tag-v2.77-2026-09-26.txt`. **Rango `v2.76-beta..v2.77-beta` = 4 commits, declarado**:
+  `05b5fa85` y `40d3d9dc` son **post-tag de `v2.76`**, no de esta fase.
 
 ## [2.01.0-beta] — `AUTO-MATERIAL-4`: MARKET MATERIAL (forward PAPER con precio real) — 2026-09-26
 

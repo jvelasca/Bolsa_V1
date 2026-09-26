@@ -1,8 +1,12 @@
 # Traspaso / relevo — tras `v2.77-beta` (`AUTO-MATERIAL-5`: MARKET OPERABILITY)
 
-> **AsOf:** 2026-09-26 · **Etiqueta:** `v2.77-beta` · **Versión:** `2.02.0-beta` · **Base:** `v2.76-beta`
+> **AsOf:** 2026-09-26 · **Etiqueta:** `v2.77-beta` (tag **anotado** `22da1bb0` → commit `ade1df58`)
+> · **Versión:** `2.02.0-beta` · **Base:** `v2.76-beta`
 > **Alembic head:** `046_fill_reference_mid` (**SIN migración**) · **Freeze intacto** · **Reparto
 > congelado** (`auto18-v1` / `auto15-v1`) · **`ALLOCATION = none`**.
+> **CI del tag:** `Release tag CI` `36279417767` **GREEN a la primera** (10 jobs + `certify`; job
+> `python` del tag **`2948 passed / 37 skipped`**), y **10/10** runs del commit `ade1df58` en
+> `success`. Detalle en [`evidencia-ci-tag-v2.77-2026-09-26.txt`](./evidencia-ci-tag-v2.77-2026-09-26.txt).
 
 ## Qué quedó hecho
 
@@ -115,6 +119,11 @@ Notas de operación:
   [Auditor](./arranque-auditor-v2-77-auto-material-5-market-operability-2026-09-26.md) ·
   [Agente](./arranque-agente-v2-77-auto-material-5-market-operability-2026-09-26.md)
 - Evidencia: `evidencia-operabilidad-v2.77-2026-09-26.txt` ·
-  `evidencia-matriz-mutaciones-v2.77-210-2026-09-26.txt`
+  `evidencia-matriz-mutaciones-v2.77-210-2026-09-26.txt` ·
+  `evidencia-ci-tag-v2.77-2026-09-26.txt`
+- **Rango `v2.76-beta..v2.77-beta` = 4 commits:** dos son **post-tag de `v2.76`** (`05b5fa85` fix de
+  registro en `release-tag-ci.yml` + `40d3d9dc` cita de su CI) y dos son de esta fase (`233ef8cc`
+  feat + `ade1df58` docs). El hueco de registro de `v2.76` queda **ejercitado y cerrado** por el CI
+  del tag: `python` pasa de `2898/37` a **`2948/37`** = `2898` + `25` + `25`.
 - Contexto previo: [relevo v2.76](./traspaso-relevo-post-v2-76-auto-material-4-2026-09-26.md) ·
   [deuda P3](./deuda-p3-post-auditoria-v2.70-2026-09-26.md)
