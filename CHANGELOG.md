@@ -2,6 +2,53 @@
 
 All notable releases of Bolsa V1.
 
+## [2.02.0-beta] — `AUTO-MATERIAL-5`: MARKET OPERABILITY (journal de operabilidad del forward) — 2026-09-26
+
+**Fase de INSTRUMENTO de medición, no de decisión; SIN migración** (Alembic head sigue en
+`046_fill_reference_mid`) y **sin tocar el freeze** (`auto_simulation_worker.py` intacto). El reparto
+**no se mueve**: `auto18-v1` / `auto15-v1` (`ALLOCATION = none`). **No** se toca el gobernador
+(`aggregate_trial_regime`), ni `TOP_N`, ni un solo umbral; no se repara material y no se crea ni
+sobrescribe nada en `evidence_runs/`/`evidence_validations/`.
+
+`v2.76` dejó el forward PAPER operando con **precio y régimen de MERCADO** y el bloqueo localizado,
+pero el veredicto diario (¿por qué no hubo material?) vivía **disperso** en el JSON de cada corrida.
+Esta fase lo convierte en una **serie diaria** y reparte cada veto en su familia declarada, para
+responder **sin sesgo** a la pregunta que decide el siguiente paso: *¿la falta de material es
+estadística o la causa estructuralmente el gobernador / TOP_N?* El invariante que instala: **el no
+operar se declara por su CAUSA (familia) y la arquitectura lista (`pairCapable`) no se confunde con
+la operación real (`pairActive`)**.
+
+- **Journal de operabilidad** (nuevo, puro)
+  `packages/py/application/src/bolsa_application/market_operability.py`: `classify_veto_reasons`
+  reparte cada código de motivo en `regime` / `governor` / `liquidity` / `risk` / `top_n` / `data` /
+  `other` (las siete familias salen **siempre**, aunque estén vacías). Un código sin familia conocida
+  va a `other` y **no se descarta** (fail-closed de la contabilidad). `symbols_operable` mide cuántos
+  símbolos del watch admitirían LONG **por sí mismos** (la métrica que expone la tensión del agregado
+  conservador: el smoke real da `4/8` con el eje en `BEAR_TREND`), `operability_state` separa
+  `operated` / `vetoed` / `no_signal` (con la regla fail-closed: **`no_signal` sólo si no hubo ni
+  propuestas ni vetos**), y `pair_capable`/`pair_active` mantienen **separados** "arquitectura lista"
+  de "dos versiones operando". La tabla es `render_operability_table`. **25** puros herméticos.
+- **Nomenclatura PAIR CAPABLE vs PAIR ACTIVE** (aditivo)
+  `apps/api-python/scripts/v2_76_forward_market_material.py` publica ahora `pairCapable` (hay universo
+  para repartir y enrutar) y `pairActive` (las dos versiones operan), conservando `pairAvailable` como
+  **alias** de `pairActive` para no romper lecturas previas. En el smoke real: `pairCapable=true`,
+  `pairActive=false`, `versionB=""`.
+- **Sonda I/O** (nuevo) `apps/api-python/scripts/v2_77_market_operability.py`: lee los JSON del runner
+  forward (`--forward`, admite glob), los traduce a filas diarias y **acumula un journal JSONL** no
+  versionado (`operability_runs/journal.jsonl`); `--render` publica la tabla y el desglose de vetos.
+  **No** abre PostgreSQL, **no** toca el material durable, **no** recalcula el gate. `exit 2` sin
+  registros.
+- **CI y mutaciones**: el puro nuevo entra **explícito** en el job `quality` de `python-ci.yml` **y** en
+  el job `python` de `release-tag-ci.yml` (para no repetir el hueco de registro de `v2.76`).
+  **`M206`–`M210`** nuevas (familia única; código perdido; `CAPABLE` como `ACTIVE`; `no_signal` falso;
+  contabilidad que pierde `other`) ⇒ matriz **205 → 210**, con restauración **byte a byte**.
+- **Declarado, no hecho**: la ventana de **≥4 días** de calendario sigue siendo **operación del
+  propietario** (los cubos salen de `created_at = datetime.now(UTC)`); **`P3-2`/`P3-3` siguen
+  ABIERTAS** y `AUTO-22`/`AUTO-23` no se corren sin material. La deuda de la sonda PG de `AUTO-23`
+  (`assert 17 == 26`) sigue **declarada** (pre-existente, ajena al diff, se salta en CI sin Postgres).
+- **Evidencia cruda**: `evidencia-operabilidad-v2.77-2026-09-26.txt` (tabla diaria sobre el forward
+  smoke real) y `evidencia-matriz-mutaciones-v2.77-210-2026-09-26.txt`.
+
 ## [2.01.0-beta] — `AUTO-MATERIAL-4`: MARKET MATERIAL (forward PAPER con precio real) — 2026-09-26
 
 **Fase de material de MERCADO; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

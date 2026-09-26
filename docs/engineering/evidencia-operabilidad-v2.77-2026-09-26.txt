@@ -1,0 +1,115 @@
+# V2.77 / AUTO-MATERIAL-5 - MARKET OPERABILITY: evidencia cruda (journal diario del forward PAPER)
+#
+# Fecha de captura: 2026-09-26
+# Fase: `2.02.0-beta` - SIN migracion (Alembic head `046_fill_reference_mid`)
+#       reparto congelado `auto18-v1` / `auto15-v1` - `ALLOCATION = none` - freeze intacto
+#
+# Fuente (JSON REAL, sin recalculo del gate): docs/engineering/evidencia-forward-smoke-v2.76-2026-09-26.txt
+#   -> extraido verbatim a `operability_runs/forward-2026-09-26.json` (directorio NO versionado)
+#
+# Comando 1 (traduce el forward a UNA fila diaria + acumula el journal JSONL no versionado + tabla):
+#   uv run --no-sync python apps/api-python/scripts/v2_77_market_operability.py \
+#       --forward operability_runs/forward-2026-09-26.json \
+#       --journal operability_runs/journal-evidence.jsonl --render
+#
+# Comando 2 (la MISMA fila, maquina-legible, leida del journal acumulado):
+#   uv run --no-sync python apps/api-python/scripts/v2_77_market_operability.py \
+#       --journal operability_runs/journal-evidence.jsonl --json
+#
+# Exit del comando 1: 0  (0 = se leyo >=1 registro; 2 = sin registros)
+# Exit del comando 2: 0
+#
+# ---------------------------------------------------------------------------------------------
+# SALIDA 1 (tabla de operabilidad + desglose por familia)
+# ---------------------------------------------------------------------------------------------
+AUTO MARKET OPERABILITY (V2.77 · AUTO-MATERIAL-5) — read-only, sin PostgreSQL
+============================================================================================
+Dia         Regimen     Long  SimbOper  Decid  Prop  Veto  Fills  Ciclos  Par
+----------  ----------  ----  --------  -----  ----  ----  -----  ------  -----
+2026-09-26  BEAR_TREND  NO    4/8       64     0     64    0      0       CAPAZ
+
+Vetos por familia (por dia):
+  2026-09-26  regime=40 top_n=24
+    codigos: regime_invalid=40 top_n_excluded=24
+
+Nota: un dia con vetos NO se lee como 'sin senal'; el PORQUE vive en las familias.
+      pairCapable = arquitectura lista; pairActive = dos versiones operando.
+# journal: 1 fila(s) nueva(s), 0 ya presente(s) — c:\Users\josea\Documents\Informatica\Typescript\Bolsa_V1\operability_runs\journal-evidence.jsonl
+
+# ---------------------------------------------------------------------------------------------
+# SALIDA 2 (fila diaria del journal, JSON)
+# ---------------------------------------------------------------------------------------------
+[
+  {
+    "closed": 0,
+    "day": "2026-09-26",
+    "daySource": "mtime",
+    "decided": 64,
+    "entriesAllowedLong": false,
+    "fills": 0,
+    "measurableCycles": 0,
+    "opened": 0,
+    "operationalRegime": "BEAR_TREND",
+    "orders": 0,
+    "pairActive": false,
+    "pairCapable": true,
+    "priceSources": {
+      "close": 8,
+      "live": 0,
+      "missing": 0
+    },
+    "proposals": 0,
+    "regime": "trend_down",
+    "secondaryActive": false,
+    "source": "operability_runs\\forward-2026-09-26.json",
+    "state": "vetoed",
+    "symbolsOperable": 4,
+    "topVetoCodes": [
+      [
+        "regime_invalid",
+        40
+      ],
+      [
+        "top_n_excluded",
+        24
+      ]
+    ],
+    "versions": [
+      "v76-forward-c3d8"
+    ],
+    "vetoByBucket": {
+      "data": {},
+      "governor": {},
+      "liquidity": {},
+      "other": {},
+      "regime": {
+        "regime_invalid": 40
+      },
+      "risk": {},
+      "top_n": {
+        "top_n_excluded": 24
+      }
+    },
+    "vetoCounted": 64,
+    "vetoes": 64,
+    "watchSize": 8
+  }
+]
+
+# ---------------------------------------------------------------------------------------------
+# LECTURA (declarada, sin sesgo)
+# ---------------------------------------------------------------------------------------------
+#   - Hubo 64 VETOS => el estado es `vetoed`, NO `no_signal` (regla fail-closed: `no_signal`
+#     solo cuando NO hubo ni propuestas ni vetos).
+#   - Familia REGIME=40 (`regime_invalid`) + familia TOP_N=24 (`top_n_excluded`). Las familias
+#     governor / liquidity / risk / data / other salen DECLARADAS y VACIAS: no se pierde ninguna.
+#   - `Long=NO` (entriesAllowedLong=false) PERO `SimbOper=4/8`: 4 de los 8 simbolos del watch
+#     admitirian LONG por SI MISMOS; es el AGREGADO conservador (BEAR_TREND) el que veta las
+#     entradas. El instrumento lo MIDE; NO concluye que sea la causa (hace falta la serie >=4 dias).
+#   - Fills=0 / Ciclos=0: ese dia no hay material nuevo (mercado cerrado; 2026-09-26 es sabado).
+#   - Par=CAPAZ (`pairCapable=true`) pero `pairActive=false`: la arquitectura del par esta lista,
+#     la segunda version (ACTIVE + EdgeReport) NO opera. Se declara, no se disfraza.
+#   - Procedencia del precio: close=8, live=0, missing=0 (bridge XTB caido => los 8/8 por cierre
+#     diario durable: respaldo DECLARADO, no fallo silencioso).
+#   - La suma de familias (`vetoCounted=64`) CUADRA con `vetoes=64`: la contabilidad no pierde
+#     ninguna entrada.

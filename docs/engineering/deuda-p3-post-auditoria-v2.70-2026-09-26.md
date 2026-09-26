@@ -91,6 +91,15 @@ conservador** presente, de modo que **un solo** `trend_down` en un watch amplio 
 con **0 fills**). **No se fuerza** el régimen ni se elige un watch «que pase»: se **declara**. Cerrarla
 sigue exigiendo la **ventana de acumulación operativa** (≥4 días) con el mercado dando **≥2 episodios**.
 
+**Actualización `v2.77` (2026-09-26):** el bloqueo deja de ser **opaco**: el **journal de operabilidad**
+(`market_operability.py` + `v2_77_market_operability.py`) traduce cada forward a una fila diaria y
+reparte el veto por **familia** (`regime`/`governor`/`liquidity`/`risk`/`top_n`/`data`/`other`), con la
+regla fail-closed `no_signal` **sólo** si no hubo ni propuestas ni vetos. Sobre el smoke real la fila es
+`2026-09-26 · BEAR_TREND · Long=NO · SimbOper=4/8 · Veto=64 · Fills=0 · CAPAZ` con `regime=40` +
+`top_n=24`. La deuda **no se cierra** (no hubo ventana), pero ahora la causa de cada día **se mide en
+una línea** y `pairCapable`/`pairActive` separan «arquitectura lista» de «dos versiones operando».
+Comandos en el [relevo de `v2.77`](./traspaso-relevo-post-v2-77-auto-material-5-2026-09-26.md).
+
 ## P3-3 — `P(R>0)` frente al tamaño muestral
 
 **Estado: 🔴 ABIERTA** (requiere el primer dataset PAPER real). Regla que se mantiene: `P(R>0)` es
@@ -111,6 +120,13 @@ medición del 2026-09-26 el universe no produjo **ningún** ciclo válido (agreg
 `regime_invalid` veta las entradas LONG; 0 fills en 8 ticks), y la ventana ≥4 días **no se ha corrido**.
 Cerrarla exige la **acumulación operativa real** con el watch pudiendo entrar (tendencia alcista/rango)
 y, después, `AUTO-22`/`AUTO-23` sin bajar `folds`/`min_is`/`min_oos` ni `min_episodes`.
+
+**Actualización `v2.77` (2026-09-26):** el **journal de operabilidad** deja el diagnóstico de cada día
+en una fila y **declara la familia** del veto (`regime`, `governor`, `top_n`…). El smoke real da 0
+fills con `regime=40` + `top_n=24` y **4/8** símbolos operables por sí mismos: el instrumento
+**cuantifica** la tensión del agregado conservador sin concluir. El barrido (`P(R>0)` por ciclos,
+`Effective-N`) sigue **sin poder cerrarse** porque no hay ciclos válidos: **ABIERTA** por falta de
+ventana real de mercado.
 
 ## P3-4 — `build_current_regime_evidence` publica el `level` sin clampar (P3) — 🟢 CERRADA en `v2.72`
 
@@ -229,6 +245,15 @@ trend_up: 1}`, 0 fills). Por eso la ventana de **≥4 días** es la operación p
 correcto mientras el material siga degenerado es **`INCONCLUSIVE` / `NO MEDIDO`**, nunca forzar ni
 rebajar umbrales. Comandos exactos en el
 [relevo de `v2.76`](./traspaso-relevo-post-v2-76-auto-material-4-2026-09-26.md).
+
+**Actualización `v2.77` (2026-09-26).** El bloqueante deja de ser **opaco**: el forward ya se lee como
+**serie diaria** y cada no-operación se declara por su **familia** (`regime`/`governor`/`liquidity`/
+`risk`/`top_n`/`data`/`other`). El smoke real queda en **`regime=40` + `top_n=24`, 0 fills, 4/8
+símbolos operables, `CAPAZ` sin `ACTIVE`**. El instrumento **mide** el impacto del gobernador y de
+`TOP_N`; **no** concluye. Sigue faltando **tiempo real**: la ventana de **≥4 días** (≥2 episodios) es la
+operación pendiente del propietario; mientras no exista, el veredicto correcto es **`INCONCLUSIVE` /
+`NO MEDIDO`**. Comandos exactos en el
+[relevo de `v2.77`](./traspaso-relevo-post-v2-77-auto-material-5-2026-09-26.md).
 
 ## Fuera de alcance de esta deuda
 
