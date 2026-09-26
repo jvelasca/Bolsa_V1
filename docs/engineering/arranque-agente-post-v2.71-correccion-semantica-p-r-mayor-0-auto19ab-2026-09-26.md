@@ -1,6 +1,9 @@
 # Arranque del agente — post `v2.71-beta` (`AUTO-19A`+`AUTO-19B`)
 
-> **AsOf:** 2026-09-26 · **Tag vigente:** `v2.71-beta` (`1.96.0-beta`) · **Base:** `v2.70-beta`
+> **AsOf:** 2026-09-26 · **Tag vigente:** `v2.71-beta` (`1.96.0-beta`), commit `a310fbc5` · **Base:** `v2.70-beta`
+> **CI del tag:** `Release tag CI` `36236375738` **GREEN** (1ª pasada, 8m13s, 10 jobs + `certify`);
+> `Python CI` `36236375798` · `Frontend CI` `36236375770` · `Optimize lab` `36236375716` ·
+> `Fase 2 scientific` `36236375788`, todos **success**.
 
 ## Contexto en una frase
 

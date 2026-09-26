@@ -1,6 +1,11 @@
 # Arranque del auditor — `v2.71-beta` (`AUTO-19A`+`AUTO-19B`)
 
 > **AsOf:** 2026-09-26 · **Tag a auditar:** `v2.71-beta` (`1.96.0-beta`) · **Base:** `v2.70-beta`
+> **Commit sellado:** `a310fbc5` (feat `0c2f5014` + docs encima) · **Publicado** en `origin/main`
+> **`Release tag CI`:** run `36236375738` **GREEN en la primera pasada** (8m13s, `intento=1`, 10 jobs +
+> `certify`; `playwright (integrated E2E, opt-in)` skipped). Sobre el mismo commit y tag: `Python CI`
+> `36236375798`, `Frontend CI` `36236375770`, `Optimize lab` `36236375716` y `Fase 2 scientific`
+> `36236375788`, todos **success**.
 > **Naturaleza:** **corrección del instrumento**, no estadística nueva. **SIN migración**
 > (head `046_fill_reference_mid`). **El freeze no se toca** (`auto18-v1` / `auto15-v1`).
 

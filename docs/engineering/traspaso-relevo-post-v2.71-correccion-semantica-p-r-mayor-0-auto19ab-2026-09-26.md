@@ -37,9 +37,14 @@ Fase de **corrección del instrumento** (no de estadística nueva), en cuatro fr
 
 ## 3. Estado del sello
 
-- **Tag:** `v2.71-beta` (`1.96.0-beta`) — paquete de fase.
+- **Tag:** `v2.71-beta` (`1.96.0-beta`) — paquete de fase, apuntando a `a310fbc5` (feat `0c2f5014` + docs encima).
+- **`Release tag CI` del tag:** run `36236375738` — **GREEN en la primera pasada** (8m13s, `intento=1`,
+  **10 jobs + `certify`** en success; `playwright (integrated E2E, opt-in)` **skipped** por diseño).
+- **Mismo commit y tag:** `Python CI` `36236375798`, `Frontend CI` `36236375770`, `Optimize lab`
+  `36236375716` y `Fase 2 scientific` `36236375788`, todos en **success** y en **primera pasada**.
 - **Evidencia de la matriz:** `evidencia-matriz-mutaciones-v2.71-197-2026-09-26.txt` — `197/197`
-  medidas, `197/197` rojas, restauración **byte a byte**, árbol intacto.
+  medidas, `197/197` rojas, restauración **byte a byte** medida con `git status` **limpio antes y
+  después**, árbol intacto.
 - **Base del diff:** `v2.70-beta`.
 - **`v2.70-beta` permanece intacta** (tag inmutable).
 

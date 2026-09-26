@@ -49,6 +49,12 @@ afectadas **13 passed / 1 skipped** · gate offline `api-python` **479 passed / 
 (los 26 tests `*_pg` requieren Postgres real) · `ruff` **All checks passed** · `import-linter`
 **4 kept / 0 broken** · `mypy` **0 issues (501 files)** · matriz **197/197** byte a byte.
 
+**CI del tag `v2.71-beta`** (commit `a310fbc5`; feat `0c2f5014` + docs encima): `Release tag CI` run
+`36236375738` **GREEN en la primera pasada** (8m13s, `intento=1`, **10 jobs** + `certify (aggregate +
+artifact)`, con `playwright (integrated E2E, opt-in)` **skipped** por diseño y **sin flakes ni
+re-ejecuciones**); sobre el mismo commit y tag, `Python CI` `36236375798`, `Frontend CI`
+`36236375770`, `Optimize lab` `36236375716` y `Fase 2 scientific` `36236375788`, todos en **success**.
+
 ## [1.95.0-beta] — AUTO-23 · Validación de evidencia PAPER real (harness) + procedencia imposible de confundir — 2026-09-25
 
 **Fase de preparación y blindaje; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

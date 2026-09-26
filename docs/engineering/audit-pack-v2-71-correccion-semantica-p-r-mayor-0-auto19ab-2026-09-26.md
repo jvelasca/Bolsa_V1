@@ -59,9 +59,14 @@
 | Frontend `vitest` / `typecheck` / `build` / `contract:check` | ver CHANGELOG |
 | `ruff` / `import-linter` / `mypy` | ver CHANGELOG |
 | Matriz de mutaciones | **197/197**, restauración **byte a byte**, árbol intacto |
+| `Release tag CI` del tag `v2.71-beta` | run **`36236375738`** — **GREEN en la primera pasada** (8m13s, `intento=1`, 10 jobs + `certify`) |
+| Mismo commit y tag | `Python CI` `36236375798` · `Frontend CI` `36236375770` · `Optimize lab` `36236375716` · `Fase 2 scientific` `36236375788` — **success** |
 
 > **Evidencia cruda de la matriz**: `evidencia-matriz-mutaciones-v2.71-197-2026-09-26.txt`.
 > Reproducible con `uv run python apps/api-python/scripts/v2_44_mutation_audit.py`.
+> La medición de la fase se hizo **contra el árbol ya commiteado**: la sonda reporta
+> `estado git de esos ficheros (antes): limpio` y `(despues): limpio`, es decir restauración
+> byte a byte sobre un árbol **sellado**, no sobre un working tree sucio.
 >
 > **Nota de conteo:** el plan de fase citaba `192 → 198`; el script define exactamente `M1`–`M197`
 > contiguos (192 previas + las 5 nuevas `M193`–`M197`), así que la matriz real es **197/197**. El
