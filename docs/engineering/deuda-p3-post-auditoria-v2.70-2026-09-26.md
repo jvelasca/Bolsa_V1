@@ -102,7 +102,18 @@ ADAPTIVE_INTERVAL_LEVEL_MAX)` **antes** de publicarlo, igual que `build_replay_r
 **Confirmado por la auditoría externa de `v2.72-beta`** (2026-09-26): `APROBADO CON OBSERVACIONES`,
 **0 bloqueantes**, 10/10 tesis PASS; `M198` muerde los dos tests del clamp y restaura **byte a byte**;
 `P3-4` **CERRADA**. La única observación (H-1, LOW documental) fue precisamente el «payload
-byte-idéntico» de este documento, ya corregido.
+byte-idéntico» de este documento, ya corregido. **Doble pasada:** la segunda auditoría, hecha **desde un
+clon fresco de GitHub** (tag `82b231d3` → `0f8cc888`), reproduce el mismo veredicto y **re-ejecuta el RUN
+BLOQUEADO** contra PostgreSQL vivo con los mismos números.
+
+**Nota INFO declarada (2026-09-26, no es deuda ni defecto).** En
+`test_the_interval_level_is_clamped_and_published`, las aserciones de **identidad de celda**
+(`evidence_for(v)` con `level` fuera de rango == con el nivel clampeado explícito) pasarían **también con
+`M198`**, porque `build_adaptive_uncertainty` **clampa por su cuenta** aguas abajo; la **mordida** de
+`M198` proviene de las aserciones del `level` **publicado**. El contrato **sí muerde** (2 rojos), pero la
+propiedad «no hay segunda aritmética» la garantiza el clamp del bootstrap, **no** ese test. Se deja
+anotado para no sobre-confiar en la cobertura de ese test; endurecerla requeriría un doble que **no**
+clampe por su cuenta.
 
 ## Bloqueante central — material PAPER real
 

@@ -122,3 +122,34 @@ código **byte-idéntico** al del tag).
 - **Límites declarados por el auditor:** re-midió **solo `M198`** (las 197 restantes apoyadas en la
   evidencia persistida), **no** verificó el CI remoto y **no** ejecutó `apps/api-python` completo. La
   atribución de `P3-4` como **preexistente** queda confirmada (idéntico en `v2.70-beta`, sello `v1`).
+
+## 8. Segunda auditoría externa — desde GitHub (clon fresco, 2026-09-26)
+
+Pasada **independiente** hecha **desde un clon fresco de GitHub** (`git clone` + `git fetch --tags` +
+`git checkout v2.72-beta`, en `%TEMP%`), sin usar el árbol de trabajo del propietario. **Mismo veredicto:
+`APROBADO CON OBSERVACIONES`, 0 bloqueantes, 10/10 tesis PASS.**
+
+- **Objeto verificado por sí mismo:** `git cat-file -t v2.72-beta` → `tag` (anotado);
+  `git cat-file -p` → objeto `82b231d3…`; `git rev-list -n 1 v2.72-beta` → `0f8cc888…`;
+  `git diff --stat v2.72-beta origin/main` → **8 ficheros, solo docs/CHANGELOG** (la corrección de H-1) ⇒
+  auditó **el tag**, no `main`.
+- **Re-medición propia:** `M198` muerde (2 tests rojos con nombre) y **restaura byte a byte** (SHA-256
+  `309D2F53…9AD1A6` idéntico, `git status` limpio antes y después); muestra **`M193`–`M197`** re-medida
+  (**5/5** muerden y restauran); lista `MUTATIONS` = **198** contiguos `M1..M198`, sin duplicados.
+- **RUN PAPER re-ejecutado contra PostgreSQL vivo:** material **idéntico** al declarado
+  (**761 / 0 / 751 / 10 / 0**) y `exit 2` en el exportador y en el run, **sin crear** `evidence_runs/`
+  (fail-closed confirmado).
+- **H-1:** confirmada en una línea como **preexistente conocida y ya corregida en `main`** — no contada
+  como hallazgo nuevo.
+- **Observación INFO (nueva, no es defecto):** en `test_the_interval_level_is_clamped_and_published`, las
+  aserciones de **identidad de celda** (`evidence_for == evidence_for`) pasarían **también con M198**,
+  porque `build_adaptive_uncertainty` **clampa por su cuenta** aguas abajo; la **mordida** de `M198`
+  proviene de las aserciones del `level` **publicado** (`low.level == MIN`). El contrato **sí muerde** (2
+  rojos), pero conviene saber que la propiedad «no hay segunda aritmética» la garantiza el **clamp aguas
+  abajo**, no ese test. Queda registrada como nota en la [deuda P3](./deuda-p3-post-auditoria-v2.70-2026-09-26.md).
+- **Límites declarados por este auditor:** **no** re-verificó el CI remoto; **no** re-corrió las 198
+  mutaciones (re-midió `M198` + muestra `M193`–`M197`; las 197 restantes apoyadas en la evidencia
+  persistida, **y declara que eso NO es prueba**); **`mypy` no se pudo ejecutar** por una directiva de
+  Control de aplicaciones de Windows (`os error 4551`), declarado como límite de entorno y **no** como
+  fallo del código. Sí re-midió: `ruff` OK, `lint-imports` **4 kept / 0 broken**, **1265** analytics,
+  **13 passed / 1 skipped** costuras.

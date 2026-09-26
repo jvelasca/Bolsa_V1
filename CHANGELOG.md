@@ -62,7 +62,14 @@ el plan y el audit-pack decían «payload byte-idéntico» a `v2.71` cuando el s
 `v3`; **corregido en `main`** en el plan, el audit-pack, `PROJECT_STATE` y este `CHANGELOG` (queda como
 «idéntico salvo el sello `method`»). El auditor declara sus límites: re-midió solo `M198` (las 197
 restantes apoyadas en la evidencia persistida), no verificó el CI remoto y no ejecutó
-`apps/api-python` completo.
+`apps/api-python` completo. **Segunda pasada independiente desde GitHub** (clon fresco del tag en
+`%TEMP%`, sin tocar el árbol local): mismo veredicto `APROBADO CON OBSERVACIONES`, 0 bloqueantes, 10/10
+tesis PASS; re-mide `M198` (muerde y restaura byte a byte) y la muestra `M193`–`M197` (5/5), confirma
+`MUTATIONS` = **198** contiguos, y **re-ejecuta el RUN contra PostgreSQL vivo** con material idéntico
+(**761 / 0 / 751 / 10 / 0**) y **`exit 2`** sin crear `evidence_runs/`. Añade una **observación INFO** (no
+defecto): en `test_the_interval_level_is_clamped_and_published` las aserciones de **identidad de celda**
+pasarían también con `M198` porque el bootstrap **clampa por su cuenta**; la mordida viene de las
+aserciones del `level` **publicado** (anotado en la deuda P3).
 
 ## [1.96.0-beta] — Corrección de la semántica de `P(R>0)` y cierre de P3 (AUTO-19A/19B) — 2026-09-26
 
