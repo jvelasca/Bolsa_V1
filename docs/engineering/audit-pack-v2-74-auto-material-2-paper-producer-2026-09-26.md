@@ -145,5 +145,16 @@ ciclos medibles por estrategia ni corre `AUTO-22`. **`P3-2`** (correlación por 
 
 ## 8. CI del tag `v2.74-beta` (verificado)
 
-Pendiente de la corrida del tag tras el bump y la publicación (se cita en el commit de sello inmediato
-posterior, como exige la casa).
+`main == 524538d4` == **tag anotado `v2.74-beta`** (el commit de fase; feat `ade26ada` + docs encima).
+
+| Workflow (tag `v2.74-beta`, commit `524538d4`) | Run | Resultado |
+|---|---|---|
+| **Release tag CI** | `36248656947` | **GREEN en la primera pasada** (7m15s; 10 jobs en success + `certify`; `playwright (integrated E2E, opt-in)` **skipped** por diseño) |
+| `Python CI` | `36248656943` | **success** (2m14s) |
+| `Frontend CI` | `36248656985` | **success** (2m25s) |
+| `Optimize lab` | `36248656959` | **success** (1m8s) |
+| `Fase 2 scientific` | `36248657058` | **success** (1m14s) |
+
+Sobre el mismo commit, en `main` (push `524538d4`): `Python CI` `36248618829` · `Frontend CI`
+`36248618794` · `Optimize lab` `36248618844` · `Fase 2 scientific` `36248618843` · `Gitleaks`
+`36248618884`, todos en **success**.
