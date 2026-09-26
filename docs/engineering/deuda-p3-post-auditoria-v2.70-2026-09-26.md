@@ -6,7 +6,9 @@
 > número falso nuevo, pero H1 **sí** mezcla dos funcionales en el mismo nombre.
 > **Estado:** **H1 y H2/H3/H4 cerrados en `v2.71`**; **P3-4** (hallazgo de la auditoría de `v2.71`,
 > preexistente y read-only) **cerrada en `v2.72`**; P3-2 y P3-3 siguen **abiertas** (requieren el
-> primer dataset PAPER real). **El bloqueante central es MATERIAL, no código.**
+> primer dataset PAPER real). **El bloqueante central es MATERIAL, no código** (y desde `v2.74` es de
+> **muestra**, no de forma). **Deuda de proceso declarada:** `v2.73-beta` quedó **sin auditoría
+> externa** (ver más abajo).
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -114,6 +116,28 @@ BLOQUEADO** contra PostgreSQL vivo con los mismos números.
 propiedad «no hay segunda aritmética» la garantiza el clamp del bootstrap, **no** ese test. Se deja
 anotado para no sobre-confiar en la cobertura de ese test; endurecerla requeriría un doble que **no**
 clampe por su cuenta.
+
+## Deuda de AUDITORÍA — `v2.73-beta` (`AUTO-MATERIAL-1`) sin pasada externa — 🟡 ABIERTA (de proceso)
+
+**Estado: 🟡 ABIERTA, declarada (2026-09-26).** `v2.73-beta` (tag anotado objeto `fd891fcd` → commit
+`a9166655`) quedó **sellada y con CI verde** (`Release tag CI` `36244779500`, 10 jobs + `certify`) pero
+**sin auditoría externa**: la fase siguiente (`v2.74-beta`, `AUTO-MATERIAL-2`) se construyó encima y
+**evolucionó su superficie** —el gate subió a **`paper_material_readiness_v2`** (dos niveles
+`PRODUCER_READY`/`EVIDENCE_READY`, `--level`, tres poblaciones) y el CLI ganó la población `DATABASE
+TOTAL`—, de modo que auditar `v2.73` aislado revisaría una forma **superada** del mismo gate.
+
+**Decisión (2026-09-26).** Auditar **`v2.74-beta`** —que **incluye y supera** el gate— y dejar `v2.73`
+como **deuda de auditoría declarada aquí**, no como olvido. Puntos de entrada: el
+[arranque del auditor de `v2.74`](./arranque-auditor-v2-74-auto-material-2-paper-producer-2026-09-26.md)
+(16 puntos) y, si se quisiera la forma v1 sellada, el
+[de `v2.73`](./arranque-auditor-v2.73-auto-material-1-paper-material-readiness-2026-09-26.md) (13 puntos)
+contra su tag **inmutable**.
+
+**Criterio de cierre.** La pasada externa sobre `v2.74-beta` cubre el **linaje** del gate (el módulo
+`paper_material_readiness.py` y su CLI en la forma vigente); esta deuda se cierra cuando esa pasada
+declare el linaje **sostenido**. Si el auditor pide una pasada específica sobre la forma **v1** sellada
+en `v2.73`, se corre contra el tag con su propio arranque (el diff `v2.73-beta → main` es **solo docs**
+⇒ el código del tag es el auditado).
 
 ## Bloqueante central — material PAPER real
 

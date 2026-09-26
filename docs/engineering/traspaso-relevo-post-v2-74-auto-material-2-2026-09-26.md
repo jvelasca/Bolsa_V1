@@ -36,6 +36,11 @@
 - **`P3-2`** (correlación por cubos) y **`P3-3`** (`P(R>0)` vs N) siguen **abiertas**: requieren el
   primer dataset real, aún no acumulado.
 - **La UI** del gate no se toca: el JSON (con los dos niveles) queda listo para una pantalla futura.
+- **La auditoría externa**: `v2.73-beta` quedó **sin pasada externa** y se declara como **deuda de
+  proceso** ([deuda P3](./deuda-p3-post-auditoria-v2.70-2026-09-26.md), sección «Deuda de AUDITORÍA»): se
+  audita **`v2.74-beta`**, que **incluye y supera** el gate (el módulo subió a
+  `paper_material_readiness_v2`). El [arranque del auditor de `v2.74`](./arranque-auditor-v2-74-auto-material-2-paper-producer-2026-09-26.md)
+  es el punto de entrada.
 
 ## Lo que hereda el siguiente
 
