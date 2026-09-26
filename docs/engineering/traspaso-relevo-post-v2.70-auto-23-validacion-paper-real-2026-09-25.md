@@ -36,7 +36,22 @@ Fase de **preparación y blindaje** (no de decisión), en tres frentes:
 | `ruff` / `import-linter` / `mypy` | **All checks passed** / **4 kept, 0 broken** / **0 issues (501 files)** |
 | Matriz de mutaciones | **192/192**, byte a byte |
 
-## 3. Qué NO se ha tocado
+## 3. Estado del sello
+
+- **Tag:** `v2.70-beta` → **`d5f23b50`** (commit del paquete de fase; `9b767f57` es el `feat` del
+  código y el `docs` va encima) = `origin/main`.
+- **CI del tag:** `Release tag CI` run `36227312262` **GREEN** en la **primera** pasada (8m05s;
+  **10 jobs** en success —`security (gitleaks)`, `shared`, `decision-spine`, `frontend`, `python`,
+  `playwright (mock E2E)`, `lifecycle-pg`, `dr-verify`, `a7-gate`, `certify (aggregate + artifact)`—
+  más `playwright (integrated E2E, opt-in)` **skipped** por diseño; **sin flakes ni re-ejecuciones**).
+  Sobre el mismo commit y tag: `Python CI` `36227312288`, `Frontend CI` `36227312248`,
+  `Optimize lab` `36227312257` y `Fase 2 scientific` `36227312254` en **success**.
+- **Evidencia de la matriz:** [`evidencia-matriz-mutaciones-v2.70-192-2026-09-25.txt`](./evidencia-matriz-mutaciones-v2.70-192-2026-09-25.txt)
+  — `192/192` medidas, `192/192` rojas, restauración **byte a byte**, árbol intacto.
+- **Base del diff:** `v2.69-beta`.
+- **`v2.69-beta` permanece intacta** (tag inmutable).
+
+## 4. Qué NO se ha tocado
 
 - **Freeze**: `auto18-v1` / `auto15-v1`, umbrales de rotación, `portfolio_optimizer.py`,
   `portfolio_reservation.py`, `auto_adaptive.py`, `auto_simulation_worker.py`,
@@ -46,14 +61,14 @@ Fase de **preparación y blindaje** (no de decisión), en tres frentes:
 - **Sin migración**: Alembic head `046_fill_reference_mid`.
 - **El reparto no se mueve**: `ALLOCATION = none`.
 
-## 4. Deuda y límite
+## 5. Deuda y límite
 
 - **Bloqueante central: material.** El RUN y el harness están listos, pero **no hay material PAPER
   real**. La corrida real es **paso operativo del propietario**.
 - **P3-2 / P3-3 abiertas** (necesitan el primer dataset real); el harness ya publica los diagnósticos.
 - **Fuera de alcance por decisión**: allocation dinámica, `current-regime gating` operativo, LIVE, SHORT.
 
-## 5. Siguiente paso
+## 6. Siguiente paso
 
 1. Ejecutar el runbook sobre material real (1 estrategia → `auto_evidence_run.py` → 2ª estrategia →
    `auto_evidence_validate.py`).
