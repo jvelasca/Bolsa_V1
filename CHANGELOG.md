@@ -2,6 +2,46 @@
 
 All notable releases of Bolsa V1.
 
+## [2.00.0-beta] — `AUTO-MATERIAL-3`: EVIDENCE READY (muestra acumulada) — 2026-09-26
+
+**Fase de acumulación de muestra; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y
+**sin tocar el freeze** (`auto_simulation_worker.py` intacto) ni el instrumento. El reparto **no se
+mueve**: `auto18-v1` / `auto15-v1` (`ALLOCATION = none`). No se toca `evidence_runs`/
+`evidence_validations`, ni el `exit 2` del exportador y del run, ni la UI, ni ningún umbral.
+
+El bloqueo de `v2.74` («bien formado pero sin muestra») se ataca **sin rebajar el mínimo**: un harness
+nuevo encadena round-trips REALES del productor AUTO 2.0 sobre una **cuenta PAPER nueva** hasta cruzar
+`≥32` ciclos medibles por estrategia, y el gate pasa a **`EVIDENCE_READY`**. Después se corre la
+instrumentación de evidencia (`AUTO-22`/`AUTO-23`) sobre ese material. El invariante que instala: **el
+gate de CANTIDAD se cruza; la DIVERSIDAD de calendario/régimen exige material de mercado y NO se
+fabrica.**
+
+- **Harness de acumulación** (nuevo) `apps/api-python/scripts/v2_75_paper_sample_accumulation.py`:
+  siembra cuenta + instrumento que llena **a ambos lados** (buy y sell) en la ventana de minutos del
+  worker, encadena round-trips con **worker/engine NUEVO por round-trip** (reset de `_minute` para
+  volver a la ventana donde el `seed` del SIM garantiza el fill) y **un DÍA distinto por round-trip**
+  (la identidad de señal es por barra diaria ⇒ así el dedupe anti-repetición no bloquea la siguiente
+  entrada), y lee el material con la MISMA pieza que el gate. `--json`/`--out`; `exit 0` ⇔
+  `EVIDENCE_READY`.
+- **Resultado**: 44 round-trips → **42 ciclos medibles** ⇒ `EVIDENCE_READY` (mínimo 32). Gate CLI
+  `--level evidence`: `EXIT=0`, sello `paper_material_readiness_v2`. Cuenta
+  `40787fbdb2354f70a3aec5256`, versión `v75-producer-orb-v1`.
+- **`AUTO-22` corrido** (sin cambiar el runner): bundle inmutable de 3 niveles con huella
+  `sha256:70418d88…`; 42 ciclos, `P(R>0)=0.0000`, `Effective-N=1`, `WFE=NO MEDIDO`,
+  `Correlación=NO MEDIDO`.
+- **`AUTO-23` corrido** (sin cambiar el instrumento): barrido `{16,32,64}` (64 `insufficient`),
+  correlación con `activeBuckets=1` (sin pares) y régimen `INCONCLUSIVE` (`episodes=1`).
+- **Hallazgo declarado (no barrido)**: el material del productor determinista es **degenerado** (`R`
+  casi constante, un solo bucket de calendario y un solo régimen). Por eso **`P3-2` y `P3-3` siguen
+  ABIERTAS**: cerrarlas exige **material PAPER REAL de mercado** en `≥4` cubos y `≥2` episodios — es
+  acumulación operativa, no código. `read_paper_material` lo etiqueta `paper_real` (material durable),
+  que aquí se declara como PAPER virtual durable, no cotización real.
+- **Sin mutaciones nuevas** (no hay lógica pura nueva; el instrumento ya soportaba `EVIDENCE_READY`
+  desde `v2.74`, cubierto por `M199`/`M200`): la matriz sigue **200/200**.
+- **Evidencia cruda** en `docs/engineering/evidencia-sample-accumulation-v2.75-2026-09-26.txt`,
+  `evidencia-auto22-run-v2.75-2026-09-26.txt` y `evidencia-auto23-validation-v2.75-2026-09-26.txt`.
+- bump `1.99.0-beta` → **`2.00.0-beta`**.
+
 ## [1.99.0-beta] — `AUTO-MATERIAL-2`: PAPER PRODUCER (PRODUCER READY) — 2026-09-26
 
 **Fase de activación y control del productor; SIN migración** (Alembic head sigue en

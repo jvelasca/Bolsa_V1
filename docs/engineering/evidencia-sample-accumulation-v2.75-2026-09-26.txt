@@ -1,0 +1,106 @@
+V2.75 · AUTO-MATERIAL-3 — EVIDENCE READY (muestra acumulada por el productor determinista)
+Comando: uv run --no-sync python apps/api-python/scripts/v2_75_paper_sample_accumulation.py --round-trips 44 --json
+AsOf: 2026-09-26 · Alembic head: 046_fill_reference_mid · Sin migración · Freeze intacto (auto18-v1 / auto15-v1)
+
+PROCEDENCIA DECLARADA (honestidad): la muestra la produce el PRODUCTOR DETERMINISTA del repo
+(decider fijo + price_script controlado sobre la cola SIM de venue paper). El material es PAPER
+virtual y durable; su R es casi constante entre ciclos. Cruza el mínimo de MUESTRA del gate
+(EVIDENCE_READY), NO acredita inferencia de mercado. read_paper_material etiqueta el material de
+PostgreSQL como paper_real (material durable); aquí se declara para no confundirlo con una corrida
+PAPER sobre datos de mercado.
+
+Resultado: 44 round-trips solicitados → 42 abiertos y cerrados → 42 ciclos medibles (≥32) ⇒
+EVIDENCE_READY. Los dos últimos round-trips (índices 42, 43) no cerraron; se declaran (failedAt).
+
+Salida del harness (JSON):
+
+{
+  "account": "40787fbdb2354f70a3aec5256",
+  "blockers": [],
+  "bump": "2.00.0-beta",
+  "engineBase": "auto-v75-4d90bfdd",
+  "instrument": "v75-sample-0000000038",
+  "lineage": {
+    "closure": {
+      "closedCycles": 42,
+      "closedCyclesWithIdentity": 42,
+      "closedCyclesWithRisk": 42,
+      "cyclesWithoutIdentity": 0
+    },
+    "cycle": {
+      "exitOrders": 126,
+      "exitOrdersWithCycle": 126,
+      "fillsWithCycle": 504,
+      "fillsWithoutCycle": 0
+    },
+    "readiness": {
+      "evidenceReady": true,
+      "level": "evidence",
+      "producerReady": true
+    },
+    "reservation": {
+      "live": 0,
+      "released": 168,
+      "rows": 168,
+      "withCycle": 168
+    }
+  },
+  "minCyclesPerStrategy": 32,
+  "phase": "V2.75 AUTO-MATERIAL-3 EVIDENCE READY",
+  "producerBlockers": [],
+  "run": {
+    "closed": 42,
+    "failedAt": [
+      42,
+      43
+    ],
+    "opened": 42,
+    "roundTripsRequested": 44
+  },
+  "sample": {
+    "closedCycles": 42,
+    "evidenceReady": true,
+    "exitOrders": 126,
+    "fills": 504,
+    "maxMeasurableCyclesPerVersion": 42,
+    "measurableCycles": 42,
+    "producerReady": true,
+    "reservations": 168,
+    "verdict": "EVIDENCE_READY",
+    "withCycle": 504
+  },
+  "strategyVersion": "v75-producer-orb-v1"
+}
+
+Gate (CLI) verificado con el MISMO material (no se baja ningún umbral). Comando y salida REALES
+(BROKER_VENUE=paper):
+
+  $ uv run --no-sync python apps/api-python/scripts/paper_material_readiness.py \
+      --account-id 40787fbdb2354f70a3aec5256 --strategy-version v75-producer-orb-v1 --level evidence
+
+  PAPER MATERIAL READINESS (level=evidence)
+  # EVIDENCE_READY: nivel 'evidence' alcanzado (nivel medido: EVIDENCE_READY)
+  ----------------------------------------------------
+  DATABASE TOTAL (all accounts/versions)
+    fills (whole table)         1417
+    reservations (whole table)  205
+    exit orders (whole table)   151
+  ----------------------------------------------------
+  INSTRUMENT UNIVERSE (account 40787fbdb2354f70a3aec5256)
+    fills (all versions)        504
+  ----------------------------------------------------
+  AUTO MATERIAL (requested versions)
+    durable fills               504
+    fills with cycle_id         504  [ok]
+    closed cycles               42  [ok]
+    reserved-risk cycles        42  [ok]
+    exit intents with cycle_id   126
+    reservations                168  [ok]
+    measurable R (>=32/strategy)42  [ok]
+  ----------------------------------------------------
+  PRODUCER READY?               YES
+  EVIDENCE READY?               YES
+  Allocation                    FROZEN
+
+  Sello: paper_material_readiness_v2
+  EXIT=0

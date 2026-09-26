@@ -8,7 +8,9 @@
 > preexistente y read-only) **cerrada en `v2.72`**; **P3-5** (`reserved_risk` sobrecargado: libro vivo
 > vs evidencia histórica) **abierta y declarada** (2026-09-26, tras el E2E PostgreSQL de `v2.74`);
 > P3-2 y P3-3 siguen **abiertas** (requieren el primer dataset PAPER real). **El bloqueante central es
-> MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma). **Deuda de proceso declarada:**
+> MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma; `v2.75` cruza la **cantidad**
+> —42 ciclos medibles ⇒ `EVIDENCE_READY`— pero **no** la **diversidad**: un solo bucket de calendario y
+> un solo episodio de régimen). **Deuda de proceso declarada:**
 > `v2.73-beta` quedó **sin auditoría externa** (ver más abajo).
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
@@ -67,11 +69,21 @@ flag global.
 de cierre: comparar la correlación por cubos contra un oráculo por pares de ciclos emparejados y
 declarar, **antes** de tocar la métrica, si la frecuencia/exposición sesga el número.
 
+**Actualización `v2.75` (2026-09-26):** el instrumento queda **ejercitado de punta a punta** con el
+material acumulado (`activeBuckets=1`, `pairs=[]`, sin inventar celdas; `minBuckets=4` respetado), pero
+**no se cierra**: la muestra del productor determinista cae en **un solo bucket** (timestamps de reloj
+real del mismo día). Cerrarla exige material PAPER REAL de mercado en **≥4 cubos**.
+
 ## P3-3 — `P(R>0)` frente al tamaño muestral
 
 **Estado: 🔴 ABIERTA** (requiere el primer dataset PAPER real). Regla que se mantiene: `P(R>0)` es
 **evidencia descriptiva**; nunca se traduce en `confidence` ni en sizing. El barrido publica
 `P(R>0)`, `P(R>0)` OOS, WFE y `effective_n` sobre el prefijo cronológico para `N ∈ {16,32,64,128}`.
+
+**Actualización `v2.75` (2026-09-26):** el barrido queda **ejercitado** (`16`/`32` medidos, `64`
+`insufficient_measured_cycles`), pero **no se cierra**: con `R` casi constante y **un solo episodio**
+(`episodes=1`), `P(R>0)=0.0000` con `Effective-N=1` es degenerado, no un edge. Cerrarla exige material
+de mercado con diversidad real (`Effective-N > 1`).
 **Nota `v2.71`:** el barrido ya publica la `P(R>0)` por **ciclos** (antes publicaba una mezcla por la
 ambigüedad de H1).
 

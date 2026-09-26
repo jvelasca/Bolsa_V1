@@ -1,0 +1,72 @@
+V2.75 · AUTO-22 — RUN DE EVIDENCIA sobre la muestra acumulada (EVIDENCE_READY)
+Comando: uv run --no-sync python apps/api-python/scripts/auto_evidence_run.py \
+    --account-id 40787fbdb2354f70a3aec5256 --strategy-version v75-producer-orb-v1 --bucket day --folds 3
+AsOf: 2026-09-26 · Alembic head: 046_fill_reference_mid · Sin migración · El RUN no reparte.
+
+Bundle (INMUTABLE, no versionado): evidence_runs/20260926T152807Z-70418d88/
+  cycles.json · artifact.json · render.txt · run.json
+
+Consola REAL (BROKER_VENUE=paper):
+
+  # AUTO-22 EVIDENCE RUN — auto22_evidence_run_bundle_v1 — origen=paper_real —
+  # huella=sha256:70418d88371a04e19306c81c97a68febe00833c22d7561a27a7b81a7ddd12c4d — ciclos=42
+  # NIVEL 1 — MATERIAL
+  #   Origen del material: paper_real
+  #   Cuenta: 40787fbdb2354f70a3aec5256
+  #   Ciclos cerrados: 42
+  #   Medidos (con R): 42
+  #   Sin R: 0
+  #   Fills seleccionados: 504
+  #   Fills excluidos (sin versión): 0
+  #   Fills excluidos (otra versión): 0
+  #   Versiones pedidas: v75-producer-orb-v1
+  #   Versiones observadas: v75-producer-orb-v1
+  #   Huella: sha256:70418d88371a04e19306c81c97a68febe00833c22d7561a27a7b81a7ddd12c4d
+  # NIVEL 2 — STATISTICS
+  #   Método de incertidumbre: walk_forward_calibration_v4
+  #   Media R (OOS): -0.8361
+  #   Cobertura esperada (intervalo): 0.9000
+  #   Ancho medio del intervalo: NO MEDIDO  [no medido]
+  #   P(R>0): 0.0000
+  #   P(R>0) OOS: 0.0000
+  #   WFE: NO MEDIDO  [no medido]
+  #   Effective-N (mediana): 1
+  #   Cobertura (régimen, celdas cubiertas): 0
+  #   Pliegues emparejados: 3
+  # NIVEL 3 — CONTEXT
+  #   Régimen actual: BULL_TREND
+  #   Evidencia v75-producer-orb-v1: P(R>0) 0.0000 (UNKNOWN)
+  #   Correlación entre estrategias: NO MEDIDO  [no medido]
+  # bundle escrito en evidence_runs/20260926T152807Z-70418d88
+
+LECTURA HONESTA (lo que este RUN acredita y lo que NO):
+
+* SÍ acredita: el camino AUTO-22 recorre material PAPER durable de una estrategia con la muestra
+  mínima cumplida (42 ciclos cerrados y medidos, un solo sello de huella) y produce el bundle
+  inmutable de 3 niveles sin reparar ni inventar nada. Los huecos salen ``NO MEDIDO``, nunca ``0``.
+* NO acredita: inferencia de mercado. ``P(R>0)=0`` con ``Effective-N=1`` es la firma de una muestra
+  DEGENERADA —el productor determinista cierra todos los ciclos con R casi idéntico (parada
+  estructural ~ -1)-— y ``Correlación = NO MEDIDO`` porque los 42 ciclos caen en UN solo bucket
+  diario (timestamps de reloj real del mismo día). Es exactamente el límite que V2.75 declara: el
+  gate de CANTIDAD se cruza; la DIVERSIDAD de calendario/régimen exige material de mercado real y
+  deja P3-2/P3-3 ABIERTAS.
+
+run.json (extracto; el fichero completo vive en el bundle, gitignoreado):
+
+{
+  "schema": "auto22_evidence_run_bundle_v1",
+  "generatedAt": "2026-09-26T15:28:07Z",
+  "source": "paper_real",
+  "materialOrigin": "paper_real",
+  "brokerVenue": "paper",
+  "fingerprint": "sha256:70418d88371a04e19306c81c97a68febe00833c22d7561a27a7b81a7ddd12c4d",
+  "account": "40787fbdb2354f70a3aec5256",
+  "strategyVersions": ["v75-producer-orb-v1"],
+  "bucket": "day",
+  "currentRegime": "BULL_TREND",
+  "folds": 3,
+  "seed": 42,
+  "level": 0.9,
+  "resamples": 2000,
+  "cyclesClosed": 42
+}

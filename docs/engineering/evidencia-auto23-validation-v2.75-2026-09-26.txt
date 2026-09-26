@@ -1,0 +1,52 @@
+V2.75 · AUTO-23 — VALIDACIÓN de la muestra acumulada (P3-2 / P3-3: instrumento ejercitado, NO cerradas)
+Comando: uv run --no-sync python apps/api-python/scripts/auto_evidence_validate.py \
+    --account-id 40787fbdb2354f70a3aec5256 --strategy-version v75-producer-orb-v1 --sizes 16,32,64 --buckets day,week
+AsOf: 2026-09-26 · Alembic head: 046_fill_reference_mid · Sin migración.
+
+Informe (INMUTABLE, no versionado): evidence_validations/20260926T152821Z-70418d88/
+  sweep.json · correlation_validation.json · regime_stability.json · validation.json
+
+Consola REAL (BROKER_VENUE=paper):
+
+  # AUTO-23 EVIDENCE VALIDATION — auto23_evidence_validation_v2 — origen=paper_real —
+  # huella=sha256:70418d88371a04e19306c81c97a68febe00833c22d7561a27a7b81a7ddd12c4d — ciclos=42 — medidos=42
+  # informe escrito en evidence_validations/20260926T152821Z-70418d88
+
+--- sweep.json (P3-3: P(R>0) vs N, barrido cronológico de prefijos) ---
+{
+  "schema": "auto23_sample_size_sweep_v2",
+  "method": "chronological_prefix_sweep_v2",
+  "requestedSizes": [16, 32, 64],
+  "measuredCycles": 42,
+  "undatedCycles": 0,
+  "rows": [
+    {"size": 16, "measured": true, "probabilityPositive": 0.0, "probabilityPositiveOos": 0.0,
+     "walkForwardEfficiency": null, "medianEffectiveN": null, "notes": []},
+    {"size": 32, "measured": true, "probabilityPositive": 0.0, "probabilityPositiveOos": 0.0,
+     "walkForwardEfficiency": null, "medianEffectiveN": 1, "notes": []},
+    {"size": 64, "measured": false, "probabilityPositive": null, "probabilityPositiveOos": null,
+     "walkForwardEfficiency": null, "medianEffectiveN": null, "notes": ["insufficient_measured_cycles"]}
+  ],
+  "notes": []
+}
+
+--- correlationValidation (P3-2: correlación por cubos) ---
+bucket=day  → strategies=[v75-producer-orb-v1], pairs=[],
+              diagnostics: cycles=42, firstBucket="2026-09-26", lastBucket="2026-09-26", activeBuckets=1
+bucket=week → strategies=[v75-producer-orb-v1], pairs=[],
+              diagnostics: cycles=42, firstBucket="2026-W39", lastBucket="2026-W39", activeBuckets=1
+(minBuckets=4 ⇒ sin 4 cubos activos NO hay pares medibles: la correlación queda declarada, no inventada)
+
+--- regimeStability (bootstrap de episodios) ---
+strategy v75-producer-orb-v1 · regimenes presentes=["BULL_TREND"]
+global: measuredN=42, episodes=1, effectiveN=1, expectancyR=-0.8361, probabilityPositive=0.0,
+        edgePositiveProbability=null, edgeConfidence="UNKNOWN", verdict="INCONCLUSIVE"
+notes: ["no_measurement"]
+
+LECTURA HONESTA:
+* El INSTRUMENTO (AUTO-23) queda EJERCITADO de punta a punta: barrido de tamaños, correlación por
+  cubo y estabilidad por régimen se producen, con sus huecos declarados (``measured: false`` /
+  ``NO MEDIDO`` / ``INCONCLUSIVE``), sin bajar ``min_episodes`` ni inventar celdas.
+* P3-2 y P3-3 NO se cierran con esta muestra: los 42 ciclos comparten un único bucket de calendario
+  y un único episodio de régimen (el productor determinista no varía día ni régimen). Cerrarlas exige
+  material PAPER REAL de mercado repartido en ≥4 cubos y ≥2 episodios. Se declaran ABIERTAS.
