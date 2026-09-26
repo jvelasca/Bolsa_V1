@@ -119,7 +119,7 @@ def test_the_sweep_declares_the_sample_and_never_selects_a_size() -> None:
         _fixture_cycles(), sizes=(16, 32, 16), **_SWEEP_KWARGS  # type: ignore[arg-type]
     )
     assert sweep["schema"] == SAMPLE_SIZE_SWEEP_SCHEMA
-    assert sweep["method"] == "chronological_prefix_sweep_v1"
+    assert sweep["method"] == "chronological_prefix_sweep_v2"
     # Duplicados colapsados y orden ascendente: la serie es determinista.
     assert sweep["requestedSizes"] == [16, 32]
     assert sweep["measuredCycles"] == len(_measured(_fixture_cycles()))

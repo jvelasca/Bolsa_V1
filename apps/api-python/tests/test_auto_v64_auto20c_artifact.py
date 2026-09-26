@@ -117,7 +117,7 @@ def test_the_battery_writes_the_artifact_and_render_without_changing_stdout(
 
     artifact = json.loads(out.read_text(encoding="utf-8"))
     assert artifact["schema"] == "auto20c_evidence_artifact_v1"
-    assert artifact["report"]["method"] == "walk_forward_calibration_v3"
+    assert artifact["report"]["method"] == "walk_forward_calibration_v4"
     assert artifact["material"] == _manifest(_cycles())
     # AUTO-21: el battery embebe los bloques aditivos medidos. El fixture NO declara
     # ``marketRegime``, así que el régimen actual se declara NO MEDIDO en vez de inventarse.

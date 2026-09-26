@@ -21,6 +21,10 @@ from pathlib import Path
 
 import pytest
 
+from bolsa_analytics.cognitive.auto_adaptive_confidence import (
+    ADAPTIVE_COVERAGE_HIGH,
+    StrategyConfidence,
+)
 from bolsa_analytics.cognitive.auto_adaptive_replay import (
     REPLAY_METHOD,
     REPLAY_OOS_PCT_MAX,
@@ -39,6 +43,9 @@ from bolsa_analytics.cognitive.auto_adaptive_replay import (
     _question_shrinkage,
     build_replay_report,
 )
+from bolsa_analytics.cognitive.auto_adaptive_uncertainty import (
+    ADAPTIVE_INTERVAL_LEVEL_MIN,
+)
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "auto_replay_cycles.json"
 
@@ -50,7 +57,7 @@ def _cell(
     shrunk_error: float | None = 0.4,
     effective_n: int = 10,
     band: str = "MEDIUM",
-    coverage: str = "MEDIUM",
+    coverage: str | None = "MEDIUM",
     edge: str = "MEDIUM",
     dispersion: float | None = 0.2,
     oos_measured_n: int = 6,
@@ -71,7 +78,7 @@ def _cell(
         oos_expectancy_r=0.0,
         oos_dispersion_r=dispersion,
         oos_regime="TREND_UP",
-        regime_coverage=coverage,
+        dominant_regime_coverage=coverage,
         raw_error=raw_error,
         shrunk_error=shrunk_error,
         raw_sign_ok=True,
@@ -269,12 +276,13 @@ def test_the_cell_payload_is_json_shaped_and_rounded() -> None:
         "isConfidence",
         "isCoverage",
         "isEdgeConfidence",
-        "isProbabilityPositive",
+        "isEdgePositiveProbability",
+        "isCyclePositiveShare",
         "oosMeasuredN",
         "oosExpectancyR",
         "oosDispersionR",
         "oosRegime",
-        "regimeCoverage",
+        "dominantRegimeCoverage",
         "oosPositiveN",
         "oosPositiveShare",
         "rawError",
@@ -374,14 +382,16 @@ def test_a_cycle_without_an_instant_is_declared() -> None:
 
 
 def test_the_cell_publishes_the_declared_and_realized_positive_probabilities() -> None:
-    """AUTO-21: la celda lleva la P(R>0) declarada del IS y la frecuencia positiva REALIZADA del OOS."""
+    """La celda lleva la ``P(R>0)`` declarada del IS y la frecuencia positiva REALIZADA del OOS."""
     cycles = _cycles("orb-1", 40, pnl=4.0)  # R = 0.8 en TODOS los ciclos
     cell = build_replay_report(cycles).cells[0]
 
-    assert cell.is_probability_positive == 1.0
+    assert cell.is_cycle_positive_share == 1.0
+    assert cell.is_edge_positive_probability == 1.0
     assert cell.oos_positive_share == 1.0
     assert cell.oos_positive_n == cell.oos_measured_n
-    assert cell.as_dict()["isProbabilityPositive"] == 1.0
+    assert cell.as_dict()["isCyclePositiveShare"] == 1.0
+    assert cell.as_dict()["isEdgePositiveProbability"] == 1.0
     assert cell.as_dict()["oosPositiveShare"] == 1.0
 
 
@@ -395,12 +405,55 @@ def test_a_mixed_oos_declares_its_realized_positive_share() -> None:
     assert cell.oos_measured_n == 12
     assert cell.oos_positive_n == 0
     assert cell.oos_positive_share == 0.0
-    assert cell.is_probability_positive == 1.0, "el IS sigue siendo todo positivo"
+    assert cell.is_cycle_positive_share == 1.0, "el IS sigue siendo todo positivo"
+    assert cell.is_edge_positive_probability == 1.0
 
 
 @pytest.mark.parametrize("bad", [0.0, -1.0])
-def test_the_interval_level_does_not_break_the_report(bad: float) -> None:
+def test_the_interval_level_is_clamped_and_published(bad: float) -> None:
+    """El nivel publicado es el EFECTIVO (clampeado), el mismo que usó el bootstrap."""
     report = build_replay_report(_cycles("orb-1", 40), interval_level=bad)
 
-    assert report.interval_level == bad
+    assert report.interval_level == ADAPTIVE_INTERVAL_LEVEL_MIN
     assert len(report.questions) == 4
+
+
+def test_a_cell_without_a_measured_regime_coverage_is_declared_not_counted_as_uncovered() -> None:
+    """Cobertura NO MEDIDA (sin celda del régimen dominante) no es evidencia de no cobertura."""
+    question = _question_coverage(
+        [
+            _cell(coverage="HIGH", raw_error=0.1),
+            _cell(coverage="HIGH", raw_error=0.2),
+            _cell(coverage=None, raw_error=0.9),
+            _cell(coverage=None, raw_error=0.8),
+        ],
+        2,
+    )
+
+    assert question.verdict == REPLAY_VERDICT_INCONCLUSIVE
+    assert question.metrics["cellsUnmeasured"] == 2
+    assert question.metrics["cellsUncovered"] == 0
+
+
+def test_the_regime_coverage_key_is_a_float_in_confidence_and_a_band_in_replay() -> None:
+    """H4: ``regimeCoverage`` (float de ``StrategyConfidence``) y ``dominantRegimeCoverage`` (banda
+    de ``ReplayCell``) son claves DISTINTAS: el mismo nombre no puede tener dos formas."""
+    confidence = StrategyConfidence(
+        strategy_version="orb-1",
+        sample_size=10,
+        effective_n=5,
+        measurement_completeness="COMPLETE",
+        risk_coverage=1.0,
+        cost_coverage=1.0,
+        regime_coverage=0.6,
+        long_expectancy_r=0.4,
+        recent_expectancy_r=0.3,
+        decay="NONE",
+        confidence="HIGH",
+        by_regime=(),
+        notes=(),
+    )
+    assert confidence.as_dict()["regimeCoverage"] == 0.6
+    cell = _cell(coverage=ADAPTIVE_COVERAGE_HIGH)
+    assert "regimeCoverage" not in cell.as_dict()
+    assert cell.as_dict()["dominantRegimeCoverage"] == ADAPTIVE_COVERAGE_HIGH

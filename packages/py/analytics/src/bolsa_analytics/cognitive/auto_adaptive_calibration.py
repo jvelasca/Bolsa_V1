@@ -98,10 +98,15 @@ __all__ = [
 #: Método declarado de la lectura. Ampliarla (p. ej. validar ``P(R > 0)``) obliga a subir este
 #: sello: dos informes con el mismo aspecto no pueden venir de instrumentos distintos.
 #:
-#: ``AUTO-21`` sube el sello a ``v3``: la lectura gana la pregunta
+#: ``AUTO-21`` subió el sello a ``v3``: la lectura ganó la pregunta
 #: ``probability_positive_calibration`` (¿la P(R > 0) declarada acierta la frecuencia positiva
 #: realizada del OOS?) y el agregado publica ``probabilityPositiveOos``.
-CALIBRATION_METHOD = "walk_forward_calibration_v3"
+#:
+#: La corrección de ``v2.71`` sube el sello a ``v4``: la pregunta compara ahora términos
+#: HOMOGÉNEOS —la ``P(R>0)`` del IS por CICLOS (``is_cycle_positive_share``) contra la frecuencia
+#: positiva del OOS—. Antes comparaba la ``P(edge>0)`` (fracción de medias bootstrap), que es otro
+#: funcional y hacía que la calibración midiera una diferencia de definición, no de calibración.
+CALIBRATION_METHOD = "walk_forward_calibration_v4"
 
 #: Pliegues del walk-forward: por defecto 3, acotado a ``[2, 5]`` (el mismo rango que el walk-forward
 #: de barras de ``optimize``). Con menos de 2 no hay walk-forward —hay un split—, y por encima de 5
@@ -423,24 +428,26 @@ def _question_probability_positive(
 ) -> CalibrationQuestion:
     """(PURA) ¿la ``P(R > 0)`` DECLARADA acierta la frecuencia positiva REALIZADA del OOS?
 
-    Por celda se compara la probabilidad que el bootstrap publicó sobre el IS con la fracción de
-    ciclos OOS que cerraron en positivo. El veredicto mira el **error absoluto medio**: declarar una
-    probabilidad que el OOS desmiente se declara ``not_supported``. Sin celdas con ambos términos no
-    hay comparación: ``inconclusive`` (una probabilidad sin su frecuencia no se puede calibrar).
+    Por celda se compara la ``P(R>0)`` del IS —fracción de CICLOS medidos con R > 0— con la fracción
+    de ciclos OOS que cerraron en positivo. Son términos HOMOGÉNEOS (mismo funcional, distinto
+    tramo); la ``P(edge>0)`` del bootstrap NO entra aquí: mide otra cosa (una expectancy agregada,
+    no un ciclo) y compararla sería medir una diferencia de definición. El veredicto mira el
+    **error absoluto medio**: declarar una probabilidad que el OOS desmiente se declara
+    ``not_supported``. Sin celdas con ambos términos no hay comparación: ``inconclusive``.
     """
     usable = [
         cell
         for cell in cells
-        if cell.is_probability_positive is not None and cell.oos_positive_share is not None
+        if cell.is_cycle_positive_share is not None and cell.oos_positive_share is not None
     ]
     errors = [
-        abs(float(cell.is_probability_positive) - float(cell.oos_positive_share))
+        abs(float(cell.is_cycle_positive_share) - float(cell.oos_positive_share))
         for cell in usable
     ]
     metrics: dict[str, Any] = {
         "meanAbsoluteCalibrationError": _round4(mean(errors)) if errors else None,
         "meanDeclaredProbability": _round4(
-            mean([float(cell.is_probability_positive) for cell in usable])
+            mean([float(cell.is_cycle_positive_share) for cell in usable])
         )
         if usable
         else None,

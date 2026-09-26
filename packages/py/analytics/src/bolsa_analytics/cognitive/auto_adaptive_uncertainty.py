@@ -7,10 +7,13 @@ Cierra el hueco que ``AUTO-18`` dejó declarado: la confianza publicaba **cuánt
 Qué publica, por ``strategyVersion`` (y por celda ``strategy × regime``):
 
 * **``expectancy_interval``** — el intervalo de confianza (por defecto 90 %) de la expectancy, por
-  **bootstrap de episodios** (``bootstrap_episodes_v1``): se remuestrean **rachas de régimen** con
+  **bootstrap de episodios** (``bootstrap_episodes_v3``): se remuestrean **rachas de régimen** con
   reemplazo, no ciclos sueltos, de modo que la incertidumbre respeta la MISMA noción de
   independencia que ``AUTO-18`` fijó (100 ciclos de una sola fase no son 100 observaciones). El
-  intervalo contiene siempre al punto publicado por construcción.
+  intervalo contiene siempre al punto publicado por construcción. Publica DOS probabilidades
+  distintas que no son intercambiables: ``cycle_positive_share`` (= ``P(R>0)`` por **ciclos**:
+  qué fracción de los ciclos medidos cerró en positivo) y ``edge_positive_probability``
+  (= ``P(edge>0)``: qué fracción de las medias bootstrap es positiva).
 * **``edge_confidence``** — ``HIGH``/``MEDIUM``/``LOW``/``UNKNOWN``: la confianza de que **haya
   edge**, derivada del signo del intervalo frente a cero y modulada por la cobertura, el deterioro
   y la base del neto. Es un eje **distinto** de la banda de medición: ``measurement = HIGH`` con
@@ -92,10 +95,14 @@ __all__ = [
 #: no sobre ciclos sueltos. Cambiar el método obliga a declararlo aquí (y a subir el sello de la
 #: lectura), porque dos intervalos con el mismo aspecto podrían venir de supuestos distintos.
 #:
-#: ``AUTO-21`` sube el sello a ``v2``: la MISMA distribución bootstrap que ya encuadraba el
-#: intervalo publica ahora ``probability_positive`` (la fracción de medias bootstrap > 0). No cambia
-#: el intervalo ni su semántica, pero sí la lectura, así que el sello lo declara.
-ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v2"
+#: ``AUTO-21`` subió el sello a ``v2``: la MISMA distribución bootstrap que ya encuadraba el
+#: intervalo publicaba ``probability_positive`` (la fracción de medias bootstrap > 0).
+#:
+#: La corrección de ``v2.71`` sube el sello a ``v3``: la lectura que se llamaba ``P(R>0)`` mezclaba
+#: DOS funcionales. Ahora se publican por separado ``cycle_positive_share`` (= ``P(R>0)`` por
+#: **ciclos**) y ``edge_positive_probability`` (= ``P(edge>0)``, la fracción de medias bootstrap).
+#: El intervalo no cambia, pero sí la lectura: el sello lo declara.
+ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v3"
 
 #: Nivel de confianza del intervalo (90 % por defecto). Se acota a ``[0.5, 0.99]``: por debajo de
 #: 0.5 el "intervalo" no afirma nada y por encima de 0.99 el percentil depende de colas que pocas
@@ -195,10 +202,15 @@ class ExpectancyInterval:
     measured_n: int
     resamples: int
     dispersion_r: float | None = None
-    #: ``AUTO-21`` — P(R > 0): fracción de las medias bootstrap estrictamente positivas. Es la
-    #: probabilidad de que el edge sea positivo **según esta muestra**, no un permiso. ``None``
-    #: cuando no hubo bootstrap (sin ciclos o sin rachas suficientes): el hueco se declara.
-    probability_positive: float | None = None
+    #: ``AUTO-21``/``v2.71`` — la probabilidad del EDGE: fracción de las medias bootstrap
+    #: estrictamente positivas (``P(edge>0)``). **No** es ``P(R>0)``: la media bootstrap es una
+    #: expectancy agregada, no un ciclo. ``None`` cuando no hubo bootstrap (sin ciclos o sin rachas
+    #: suficientes): el hueco se declara.
+    edge_positive_probability: float | None = None
+    #: ``v2.71`` — la probabilidad REALIZADA del tramo medido: fracción de CICLOS con R > 0
+    #: (``P(R>0)``). Es el término homogéneo con la frecuencia positiva del OOS, así que es el que
+    #: consume la calibración. ``None`` sin ciclos medidos.
+    cycle_positive_share: float | None = None
     notes: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
@@ -213,7 +225,8 @@ class ExpectancyInterval:
             "measuredN": self.measured_n,
             "resamples": self.resamples,
             "dispersionR": self.dispersion_r,
-            "probabilityPositive": self.probability_positive,
+            "edgePositiveProbability": self.edge_positive_probability,
+            "cyclePositiveShare": self.cycle_positive_share,
             "notes": list(self.notes),
         }
 
@@ -319,6 +332,12 @@ def _interval_from_episodes(
     """
     values = [float(value) for episode in episodes for value in episode]
     point = _round4(sum(values) / len(values)) if values else None
+    # ``P(R>0)`` REALIZADA de los ciclos medidos: la fracción de ciclos con R estrictamente > 0.
+    # Es un funcional DISTINTO de ``edge_positive_probability`` (fracción de medias bootstrap > 0):
+    # esta sobrevive aunque no haya bootstrap (hay ciclos aunque no haya rachas suficientes).
+    cycle_positive_share = (
+        _round4(sum(1 for value in values if value > 0.0) / len(values)) if values else None
+    )
     bursts = [tuple(float(v) for v in episode) for episode in episodes if episode]
     effective_n = len(bursts)
     if point is None:
@@ -345,6 +364,7 @@ def _interval_from_episodes(
             episodes=effective_n,
             measured_n=len(values),
             resamples=0,
+            cycle_positive_share=cycle_positive_share,
             notes=(ADAPTIVE_UNCERTAINTY_INSUFFICIENT_EPISODES,),
         )
 
@@ -367,9 +387,11 @@ def _interval_from_episodes(
     lower_value = _round4(min(lower, point))
     upper_value = _round4(max(upper, point))
     dispersion = _round4(pstdev(means)) if len(means) > 1 else 0.0
-    # AUTO-21 — P(R > 0): la MISMA distribución que encuadra el intervalo. Estrictamente ``> 0``
+    # ``P(edge>0)``: la MISMA distribución que encuadra el intervalo. Estrictamente ``> 0``
     # (un empate a cero no es un resultado positivo); sin bootstrap no hay probabilidad.
-    probability_positive = _round4(sum(1 for value in means if value > 0.0) / len(means))
+    edge_positive_probability = _round4(
+        sum(1 for value in means if value > 0.0) / len(means)
+    )
     return ExpectancyInterval(
         point=point,
         lower=lower_value,
@@ -381,7 +403,8 @@ def _interval_from_episodes(
         measured_n=len(values),
         resamples=max(1, int(resamples)),
         dispersion_r=dispersion,
-        probability_positive=probability_positive,
+        edge_positive_probability=edge_positive_probability,
+        cycle_positive_share=cycle_positive_share,
     )
 
 

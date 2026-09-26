@@ -80,9 +80,11 @@ __all__ = [
 ]
 
 #: Sello del informe de validación. Cambiar su forma obliga a subir este sello.
-EVIDENCE_VALIDATION_SCHEMA = "auto23_evidence_validation_v1"
-SAMPLE_SIZE_SWEEP_SCHEMA = "auto23_sample_size_sweep_v1"
-REGIME_STABILITY_SCHEMA = "auto23_regime_stability_v1"
+#: ``v2`` (v2.71): ``probabilityPositive`` pasa a ser la ``P(R>0)`` por CICLOS y se añade
+#: ``edgePositiveProbability`` (la ``P(edge>0)`` del bootstrap) en las celdas.
+EVIDENCE_VALIDATION_SCHEMA = "auto23_evidence_validation_v2"
+SAMPLE_SIZE_SWEEP_SCHEMA = "auto23_sample_size_sweep_v2"
+REGIME_STABILITY_SCHEMA = "auto23_regime_stability_v2"
 CORRELATION_VALIDATION_SCHEMA = "auto23_correlation_validation_v1"
 
 #: Tamaños del barrido ``P(R>0)`` vs muestra. No son umbrales ni una rejilla de selección: son los
@@ -257,7 +259,7 @@ def build_sample_size_sweep(
         notes.append("undated_cycles_ordered_last")
     return {
         "schema": SAMPLE_SIZE_SWEEP_SCHEMA,
-        "method": "chronological_prefix_sweep_v1",
+        "method": "chronological_prefix_sweep_v2",
         "requestedSizes": requested,
         "measuredCycles": len(measured),
         "undatedCycles": undated,
@@ -273,13 +275,18 @@ def _verdict(edge_confidence: Any) -> str:
 
 
 def _interval_cell(interval: Any, edge_confidence: Any) -> dict[str, Any]:
-    """Lectura de una celda de incertidumbre, con la banda de edge ya declarada por el backend."""
+    """Lectura de una celda de incertidumbre, con la banda de edge ya declarada por el backend.
+
+    ``probabilityPositive`` es la ``P(R>0)`` por CICLOS (``cycle_positive_share``); la ``P(edge>0)``
+    del bootstrap viaja aparte como ``edgePositiveProbability``. No son intercambiables.
+    """
     return {
         "measuredN": interval.measured_n,
         "episodes": interval.episodes,
         "effectiveN": interval.effective_n,
         "expectancyR": interval.point,
-        "probabilityPositive": interval.probability_positive,
+        "probabilityPositive": interval.cycle_positive_share,
+        "edgePositiveProbability": interval.edge_positive_probability,
         "edgeConfidence": edge_confidence,
         "verdict": _verdict(edge_confidence),
     }

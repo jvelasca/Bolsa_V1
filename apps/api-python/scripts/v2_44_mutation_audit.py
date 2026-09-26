@@ -441,12 +441,13 @@ nivel declarado y reutilización de las preguntas de la fase anterior) añade:
 
 AUTO-21 (V2.68: ``P(R>0)``, correlación por cubo y evidencia del régimen actual) añade:
 
-* **M182 (sello sin subir)** — si la lectura de incertidumbre publica ``P(R>0)`` pero deja el sello
-  en ``bootstrap_episodes_v1``, dos lecturas distintas se vuelven indistinguibles por su método.
-* **M183 (probabilidad fabricada)** — si la ``P(R>0)`` deja de ser la fracción de medias bootstrap
-  positivas y pasa a ser una constante, la evidencia afirma una probabilidad que la muestra no dio.
-* **M184 (sello de calibración sin subir)** — si la pregunta nueva entra sin subir
-  ``CALIBRATION_METHOD``, el informe sella ``v2`` una lectura que ya no es la auditada.
+* **M182 (sello sin subir)** — si la lectura que separa ``P(R>0)``/``P(edge>0)`` deja el sello en
+  ``bootstrap_episodes_v2``, dos lecturas distintas se vuelven indistinguibles por su método.
+* **M183 (probabilidad del edge fabricada)** — si la ``P(edge>0)`` deja de ser la fracción de medias
+  bootstrap positivas y pasa a ser una constante, la evidencia afirma una probabilidad del edge que
+  la muestra no dio.
+* **M184 (sello de calibración sin subir)** — si la pregunta homogénea entra sin subir
+  ``CALIBRATION_METHOD``, el informe sella ``v3`` una lectura que ya no es la auditada.
 * **M185 (pregunta sin muestra mínima)** — si la pregunta de probabilidad deja de exigir celdas con
   ambos términos, una probabilidad sin frecuencia OOS se sella ``supported``/``not_supported``.
 * **M186 (correlación sin cubos)** — si un par SIN cubos compartidos publica ``0.0`` en vez de
@@ -470,6 +471,19 @@ AUTO-23 (V2.70: validación de la evidencia sobre la única aritmética) añade:
   publica un número que puede divergir del instrumento auditado.
 * **M192 (fila fabricada)** — si un tamaño muestral mayor que el material medido deja de declararse
   ``NO MEDIDO``, el barrido fabrica una fila para un ``N`` que la muestra no sostiene.
+
+Corrección del instrumento v2.71 (``P(R>0)`` por ciclos vs ``P(edge>0)`` por medias + P3 de AUTO-19A/19B):
+
+* **M193 (P(R>0) no cuenta ciclos)** — si la fracción positiva deja de mirar el signo de cada ciclo
+  medido, la ``P(R>0)`` publicada deja de ser la probabilidad realizada del tramo.
+* **M194 (calibración heterogénea)** — si la pregunta de calibración compara la ``P(edge>0)`` del
+  bootstrap contra la frecuencia OOS, mide una diferencia de DEFINICIÓN, no de calibración.
+* **M195 (ausencia como evidencia)** — si la cobertura NO MEDIDA (``None``) entra en el grupo no
+  cubierta, la falta de medición se lee como evidencia negativa.
+* **M196 (nivel crudo)** — si el informe publica el nivel sin clampar, publica un nivel distinto del
+  que usó el bootstrap (contradicción silenciosa).
+* **M197 (clave colisionada)** — si la celda reusa ``regimeCoverage`` para su banda, el mismo nombre
+  es un ``float`` en ``StrategyConfidence`` y una banda en ``ReplayCell``: dos formas, un nombre.
 
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
@@ -2127,24 +2141,26 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     ),
     # ── AUTO-21 (V2.68): P(R>0) por bootstrap, correlación por cubo temporal y régimen actual ───
     (
-        "M182 (sello sin subir): la lectura con P(R>0) conserva el sello bootstrap_episodes_v1",
+        "M182 (sello sin subir): la lectura con P(R>0)/P(edge>0) conserva el sello v2",
         AUTO_ADAPTIVE_UNCERTAINTY,
+        'ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v3"\n',
         'ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v2"\n',
-        'ADAPTIVE_UNCERTAINTY_METHOD = "bootstrap_episodes_v1"\n',
         (T_UNCERTAINTY_SEAM,),
     ),
     (
-        "M183 (probabilidad fabricada): la P(R>0) deja de ser la fraccion de medias positivas",
+        "M183 (probabilidad del edge fabricada): la P(edge>0) deja de ser la fraccion de medias positivas",
         AUTO_ADAPTIVE_UNCERTAINTY,
-        "    probability_positive = _round4(sum(1 for value in means if value > 0.0) / len(means))\n",
-        "    probability_positive = 1.0\n",
+        "    edge_positive_probability = _round4(\n"
+        "        sum(1 for value in means if value > 0.0) / len(means)\n"
+        "    )\n",
+        "    edge_positive_probability = 1.0\n",
         (T_UNCERTAINTY,),
     ),
     (
-        "M184 (sello de calibracion sin subir): el informe sella v2 una lectura ya distinta",
+        "M184 (sello de calibracion sin subir): el informe sella v3 una lectura ya distinta",
         AUTO_ADAPTIVE_CALIBRATION,
+        'CALIBRATION_METHOD = "walk_forward_calibration_v4"\n',
         'CALIBRATION_METHOD = "walk_forward_calibration_v3"\n',
-        'CALIBRATION_METHOD = "walk_forward_calibration_v2"\n',
         (T_A20C_ARTIFACT,),
     ),
     (
@@ -2177,7 +2193,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "                    measured_n=strategy.interval.measured_n,\n"
         "                    episodes=strategy.interval.episodes,\n"
         "                    expectancy_r=strategy.interval.point,\n"
-        "                    probability_positive=strategy.interval.probability_positive,\n",
+        "                    probability_positive=strategy.interval.cycle_positive_share,\n",
         (T_REGIME_EVIDENCE,),
     ),
     # ── AUTO-22 (V2.69): run de evidencia (huella, procedencia y fail-closed del bundle) ────────
@@ -2234,6 +2250,44 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    if size > len(measured):\n",
         "    if False:\n",
         (T_EVIDENCE_VALIDATION,),
+    ),
+    # ── v2.71 (correccion del instrumento): P(R>0) por ciclos vs P(edge>0) por medias + P3 ──────
+    (
+        "M193 (P(R>0) no cuenta ciclos): la fraccion positiva deja de mirar el signo de cada ciclo",
+        AUTO_ADAPTIVE_UNCERTAINTY,
+        "        _round4(sum(1 for value in values if value > 0.0) / len(values)) if values else None\n",
+        "        _round4(sum(1 for value in values if value < 0.0) / len(values)) if values else None\n",
+        (T_UNCERTAINTY,),
+    ),
+    (
+        "M194 (calibracion heterogenea): la pregunta compara P(edge>0) contra la frecuencia OOS",
+        AUTO_ADAPTIVE_CALIBRATION,
+        "        abs(float(cell.is_cycle_positive_share) - float(cell.oos_positive_share))\n",
+        "        abs(float(cell.is_edge_positive_probability) - float(cell.oos_positive_share))\n",
+        (T_CALIBRATION,),
+    ),
+    (
+        "M195 (ausencia como evidencia): la cobertura no medida entra en el grupo no cubierta",
+        AUTO_ADAPTIVE_REPLAY,
+        "        if c.dominant_regime_coverage is not None\n",
+        "        if c.dominant_regime_coverage is not None or True\n",
+        (T_REPLAY,),
+    ),
+    (
+        "M196 (nivel crudo): el informe publica un nivel sin clampar, distinto del que uso el bootstrap",
+        AUTO_ADAPTIVE_REPLAY,
+        "    resolved_level = min(\n"
+        "        max(float(interval_level), ADAPTIVE_INTERVAL_LEVEL_MIN), ADAPTIVE_INTERVAL_LEVEL_MAX\n"
+        "    )\n",
+        "    resolved_level = float(interval_level)\n",
+        (T_REPLAY,),
+    ),
+    (
+        "M197 (clave colisionada): la celda reusa regimeCoverage (banda) contra el float de confianza",
+        AUTO_ADAPTIVE_REPLAY,
+        '            "dominantRegimeCoverage": self.dominant_regime_coverage,\n',
+        '            "regimeCoverage": self.dominant_regime_coverage,\n',
+        (T_REPLAY,),
     ),
 ]
 

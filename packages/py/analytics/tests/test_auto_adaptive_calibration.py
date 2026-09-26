@@ -78,7 +78,8 @@ def _cell(
     shrunk_error: float | None = None,
     effective_n: int = 10,
     is_r: float | None = 1.0,
-    is_probability_positive: float | None = None,
+    is_cycle_positive_share: float | None = None,
+    is_edge_positive_probability: float | None = None,
     oos_positive_share: float | None = None,
     oos_positive_n: int = 0,
 ) -> ReplayCell:
@@ -94,12 +95,13 @@ def _cell(
         is_confidence=band,
         is_coverage=coverage,
         is_edge_confidence=edge,
-        is_probability_positive=is_probability_positive,
+        is_cycle_positive_share=is_cycle_positive_share,
+        is_edge_positive_probability=is_edge_positive_probability,
         oos_measured_n=oos_n,
         oos_expectancy_r=oos,
         oos_dispersion_r=dispersion,
         oos_regime="TREND_UP",
-        regime_coverage=coverage,
+        dominant_regime_coverage=coverage,
         oos_positive_n=oos_positive_n,
         oos_positive_share=oos_positive_share,
         raw_error=raw_error,
@@ -374,8 +376,8 @@ def test_the_replay_questions_are_reused_under_calibration_keys() -> None:
 def test_probability_positive_calibration_supports_a_declared_probability_that_holds() -> None:
     question = _question_probability_positive(
         [
-            _cell(is_probability_positive=0.6, oos_positive_share=0.7),
-            _cell(is_probability_positive=0.4, oos_positive_share=0.3),
+            _cell(is_cycle_positive_share=0.6, oos_positive_share=0.7),
+            _cell(is_cycle_positive_share=0.4, oos_positive_share=0.3),
         ],
         min_cells=2,
         tolerance=CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
@@ -391,8 +393,8 @@ def test_probability_positive_calibration_supports_a_declared_probability_that_h
 def test_probability_positive_calibration_refutes_a_declared_probability_the_oos_denies() -> None:
     question = _question_probability_positive(
         [
-            _cell(is_probability_positive=0.9, oos_positive_share=0.2),
-            _cell(is_probability_positive=0.8, oos_positive_share=0.1),
+            _cell(is_cycle_positive_share=0.9, oos_positive_share=0.2),
+            _cell(is_cycle_positive_share=0.8, oos_positive_share=0.1),
         ],
         min_cells=2,
         tolerance=CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
@@ -402,12 +404,35 @@ def test_probability_positive_calibration_refutes_a_declared_probability_the_oos
     assert question.metrics["meanAbsoluteCalibrationError"] == 0.7
 
 
+def test_probability_positive_calibration_ignores_the_edge_probability() -> None:
+    """La calibración compara P(R>0) por CICLOS: la P(edge>0) del bootstrap NO entra en la cuenta."""
+    question = _question_probability_positive(
+        [
+            _cell(
+                is_cycle_positive_share=0.6,
+                is_edge_positive_probability=0.99,
+                oos_positive_share=0.7,
+            ),
+            _cell(
+                is_cycle_positive_share=0.4,
+                is_edge_positive_probability=0.01,
+                oos_positive_share=0.3,
+            ),
+        ],
+        min_cells=2,
+        tolerance=CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,
+    )
+
+    assert question.verdict == REPLAY_VERDICT_SUPPORTED
+    assert question.metrics["meanDeclaredProbability"] == 0.5
+
+
 def test_probability_positive_calibration_is_inconclusive_without_both_terms() -> None:
     thin = _question_probability_positive(
         [
-            _cell(is_probability_positive=None, oos_positive_share=0.5),
-            _cell(is_probability_positive=0.5, oos_positive_share=None),
-            _cell(is_probability_positive=0.5, oos_positive_share=0.5),
+            _cell(is_cycle_positive_share=None, oos_positive_share=0.5),
+            _cell(is_cycle_positive_share=0.5, oos_positive_share=None),
+            _cell(is_cycle_positive_share=0.5, oos_positive_share=0.5),
         ],
         min_cells=2,
         tolerance=CALIBRATION_PROBABILITY_TOLERANCE_DEFAULT,

@@ -90,13 +90,13 @@ def test_the_validation_writes_a_complete_report(tmp_path: Path) -> None:
         assert (dirs[0] / name).is_file(), f"falta {name}"
 
     document = json.loads((dirs[0] / "validation.json").read_text(encoding="utf-8"))
-    assert document["schema"] == "auto23_evidence_validation_v1"
+    assert document["schema"] == "auto23_evidence_validation_v2"
     assert document["materialOrigin"] == "synthetic_fixture"
     assert document["measuredCycles"] == 126
     assert document["run"]["source"] == "fixture"
     assert document["run"]["files"]["sweep"] == "sweep.json"
-    assert document["sweep"]["schema"] == "auto23_sample_size_sweep_v1"
-    assert document["regimeStability"]["schema"] == "auto23_regime_stability_v1"
+    assert document["sweep"]["schema"] == "auto23_sample_size_sweep_v2"
+    assert document["regimeStability"]["schema"] == "auto23_regime_stability_v2"
     assert document["correlationValidation"]["schema"] == "auto23_correlation_validation_v1"
     # El cubo proyectado en run.json es el pedido, no el defecto silencioso.
     assert document["run"]["buckets"] == ["day", "week"]

@@ -10,9 +10,9 @@ Cómo lo mide, sin inventar evidencia:
 
 * **El régimen actual se declara.** Si el llamante lo aporta, se usa; si no, se toma el del ciclo MÁS
   RECIENTE con régimen declarable; si no hay, ``None`` y el hueco se nombra (``no_current_regime``).
-* **Se reutiliza el productor único de incertidumbre.** El intervalo y la ``P(R > 0)`` de cada celda
-  salen de ``build_adaptive_uncertainty`` (mismo bootstrap por episodios): no hay una segunda
-  aritmética de la celda que pudiera divergir del informe.
+* **Se reutiliza el productor único de incertidumbre.** El intervalo, la ``P(R > 0)`` (por CICLOS) y
+  la ``P(edge>0)`` de cada celda salen de ``build_adaptive_uncertainty`` (mismo bootstrap por
+  episodios): no hay una segunda aritmética de la celda que pudiera divergir del informe.
 * **Una estrategia sin celda para ese régimen se declara** (``no_evidence_for_regime``): no se le
   atribuye la lectura agregada ni la de otro régimen.
 * **El carácter adverso es el declarado** por ``ADAPTIVE_ADVERSE_REGIMES`` (la misma fuente que la
@@ -56,7 +56,11 @@ __all__ = [
 
 #: Método declarado de la lectura. No es un bootstrap propio: reutiliza el de ``AUTO-19A``, pero la
 #: SELECCIÓN del régimen actual es una lectura nueva y por eso viaja con su propio sello.
-CURRENT_REGIME_EVIDENCE_METHOD = "current_regime_evidence_v1"
+#:
+#: La corrección de ``v2.71`` sube el sello a ``v2``: ``probability_positive`` pasa a ser la
+#: ``P(R>0)`` por CICLOS (``cycle_positive_share``), no la ``P(edge>0)`` del bootstrap; y se publica
+#: además ``edgePositiveProbability`` de forma aditiva.
+CURRENT_REGIME_EVIDENCE_METHOD = "current_regime_evidence_v2"
 
 REGIME_EVIDENCE_NOTE_NO_CYCLES = "no_cycles"
 REGIME_EVIDENCE_NOTE_NO_CURRENT_REGIME = "no_current_regime"
@@ -98,6 +102,9 @@ class RegimeStrategyEvidence:
     expectancy_r: float | None
     probability_positive: float | None
     edge_confidence: str
+    #: ``v2.71`` — ``P(edge>0)`` del bootstrap (fracción de medias > 0). Aditivo: ``probability_positive``
+    #: es la ``P(R>0)`` por CICLOS; esta es la probabilidad del EDGE. ``None`` sin bootstrap.
+    edge_positive_probability: float | None = None
     notes: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
@@ -108,6 +115,7 @@ class RegimeStrategyEvidence:
             "episodes": self.episodes,
             "expectancyR": self.expectancy_r,
             "probabilityPositive": self.probability_positive,
+            "edgePositiveProbability": self.edge_positive_probability,
             "edgeConfidence": self.edge_confidence,
             "notes": list(self.notes),
         }
@@ -222,8 +230,9 @@ def build_current_regime_evidence(
                 measured_n=cell.interval.measured_n,
                 episodes=cell.interval.episodes,
                 expectancy_r=cell.interval.point,
-                probability_positive=cell.interval.probability_positive,
+                probability_positive=cell.interval.cycle_positive_share,
                 edge_confidence=cell.edge_confidence,
+                edge_positive_probability=cell.interval.edge_positive_probability,
                 notes=tuple(cell.notes),
             )
         )

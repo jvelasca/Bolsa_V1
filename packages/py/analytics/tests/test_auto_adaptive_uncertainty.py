@@ -219,13 +219,14 @@ def test_the_reading_is_a_json_shaped_payload() -> None:
         "measuredN",
         "resamples",
         "dispersionR",
-        "probabilityPositive",
+        "edgePositiveProbability",
+        "cyclePositiveShare",
         "notes",
     }
 
 
-def test_probability_positive_is_the_share_of_positive_bootstrap_means() -> None:
-    """AUTO-21: P(R>0) es la fracción de medias bootstrap > 0, con el mismo material que el intervalo."""
+def test_edge_positive_probability_is_the_share_of_positive_bootstrap_means() -> None:
+    """``P(edge>0)`` es la fracción de medias bootstrap > 0, con el mismo material que el intervalo."""
     regimes = ["TREND_UP", "RANGE"] * 10
     values = [-1.0, -2.0] * 10
     cycles = _cycles("orb-1", regimes, values)
@@ -233,18 +234,20 @@ def test_probability_positive_is_the_share_of_positive_bootstrap_means() -> None
     row = reading.uncertainty_for("orb-1")
 
     assert row is not None
-    assert row.interval.probability_positive == 0.0, "ninguna media bootstrap supera cero"
-    assert row.interval.as_dict()["probabilityPositive"] == 0.0
+    assert row.interval.edge_positive_probability == 0.0, "ninguna media bootstrap supera cero"
+    assert row.interval.as_dict()["edgePositiveProbability"] == 0.0
 
 
-def test_probability_positive_is_none_without_a_bootstrap() -> None:
-    """Sin rachas suficientes no hay bootstrap: la probabilidad se declara ``None``, no un 0 falso."""
+def test_edge_positive_probability_is_none_without_a_bootstrap() -> None:
+    """Sin rachas suficientes no hay bootstrap: la probabilidad del edge es ``None``, no un 0 falso."""
     cycles = _cycles("orb-1", ["TREND_UP"] * 6, [1.0] * 6)
     reading = build_adaptive_uncertainty(cycles)
 
     row = reading.uncertainty_for("orb-1")
     assert row is not None
-    assert row.interval.probability_positive is None
+    assert row.interval.edge_positive_probability is None
+    # ...pero la P(R>0) por CICLOS sí existe: hay ciclos aunque no haya rachas suficientes.
+    assert row.interval.cycle_positive_share == 1.0
 
 
 def test_a_fully_positive_sample_declares_probability_one() -> None:
@@ -254,7 +257,27 @@ def test_a_fully_positive_sample_declares_probability_one() -> None:
 
     row = reading.uncertainty_for("orb-1")
     assert row is not None
-    assert row.interval.probability_positive == 1.0
+    assert row.interval.edge_positive_probability == 1.0
+    assert row.interval.cycle_positive_share == 1.0
+
+
+def test_cycle_positive_share_counts_cycles_not_bootstrap_means() -> None:
+    """La ``P(R>0)`` es la fracción de CICLOS positivos; no es la ``P(edge>0)`` de las medias.
+
+    Con muchos aciertos pequeños y pocas pérdidas grandes la media bootstrap puede ser negativa
+    aunque la mayoría de ciclos cierren en positivo: los dos funcionales DIVERGEN y no se pueden
+    intercambiar.
+    """
+    regimes = ["TREND_UP", "RANGE"] * 10
+    values = [0.5] * 18 + [-10.0, -10.0]
+    cycles = _cycles("orb-1", regimes, values)
+    reading = build_adaptive_uncertainty(cycles, resamples=400, seed=5)
+
+    row = reading.uncertainty_for("orb-1")
+    assert row is not None
+    assert row.interval.cycle_positive_share == pytest.approx(0.9), "18 de 20 ciclos positivos"
+    assert row.interval.edge_positive_probability < 0.5, "la media bootstrap es negativa en su mayoría"
+    assert row.interval.cycle_positive_share != row.interval.edge_positive_probability
 
 
 # ── La banda de EDGE: un eje PROPIO, derivado del intervalo ─────────────────────────

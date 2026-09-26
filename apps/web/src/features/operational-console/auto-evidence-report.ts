@@ -768,9 +768,10 @@ function questionMetrics(
 /**
  * NIVEL 2 — GLOBAL EVIDENCE: las tres cifras de cabecera.
  *
- * `P(R>0)` es la probabilidad **declarada** por el bootstrap sobre el IS (métrica de la pregunta de
- * calibración) y `P(R>0) OOS` la fracción positiva **realizada** fuera de muestra: son cosas
- * distintas y se muestran por separado. Confundirlas sería leer una promesa como un resultado.
+ * `P(R>0)` es la fracción positiva **declarada** sobre el IS (por CICLOS: la métrica de la pregunta
+ * de calibración) y `P(R>0) OOS` la fracción positiva **realizada** fuera de muestra: misma magnitud,
+ * distinto tramo. Confundirlas sería leer una promesa como un resultado. La `P(edge>0)` del bootstrap
+ * es otra cosa y no se muestra en esta cabecera.
  */
 function globalRows(
   artifact: AutoEvidenceArtifact | null | undefined,

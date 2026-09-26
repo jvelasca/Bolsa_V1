@@ -57,6 +57,8 @@ from bolsa_analytics.cognitive.auto_adaptive_uncertainty import (
     ADAPTIVE_EDGE_LOW,
     ADAPTIVE_EDGE_UNKNOWN,
     ADAPTIVE_INTERVAL_LEVEL_DEFAULT,
+    ADAPTIVE_INTERVAL_LEVEL_MAX,
+    ADAPTIVE_INTERVAL_LEVEL_MIN,
     ADAPTIVE_INTERVAL_MIN_EPISODES_DEFAULT,
     ADAPTIVE_INTERVAL_RESAMPLES_DEFAULT,
     ADAPTIVE_INTERVAL_SEED_DEFAULT,
@@ -166,14 +168,21 @@ class ReplayCell:
     oos_expectancy_r: float | None
     oos_dispersion_r: float | None
     oos_regime: str | None
-    regime_coverage: str | None
+    #: Cobertura de la celda del régimen que DOMINÓ el OOS. Es una BANDA (``HIGH``/...) o ``None`` si
+    #: no hay celda para ese régimen. Se llama ``dominant_*`` para no colisionar con el ``float``
+    #: ``regime_coverage`` de ``StrategyConfidence`` (misma palabra, dos formas distintas).
+    dominant_regime_coverage: str | None
     raw_error: float | None
     shrunk_error: float | None
     raw_sign_ok: bool | None
     shrunk_sign_ok: bool | None
     edge_sign_ok: bool | None
-    #: ``AUTO-21`` — P(R > 0) DECLARADA por el IS (bootstrap de episodios). ``None`` sin medición.
-    is_probability_positive: float | None = None
+    #: ``v2.71`` — ``P(edge>0)`` DECLARADA por el IS (fracción de medias bootstrap > 0). ``None``
+    #: sin bootstrap. NO es ``P(R>0)``: la media bootstrap es una expectancy, no un ciclo.
+    is_edge_positive_probability: float | None = None
+    #: ``v2.71`` — ``P(R>0)`` DECLARADA por el IS: fracción de CICLOS medidos con R > 0. Es el
+    #: término homogéneo con ``oos_positive_share`` y el que calibra la pregunta de probabilidad.
+    is_cycle_positive_share: float | None = None
     #: ``AUTO-21`` — fracción positiva REALIZADA del OOS (ciclos con R > 0 sobre medidos).
     oos_positive_share: float | None = None
     #: ``AUTO-21`` — nº de ciclos OOS positivos: el numerador exacto de ``oos_positive_share``, sin
@@ -194,12 +203,13 @@ class ReplayCell:
             "isConfidence": self.is_confidence,
             "isCoverage": self.is_coverage,
             "isEdgeConfidence": self.is_edge_confidence,
-            "isProbabilityPositive": _round4(self.is_probability_positive),
+            "isEdgePositiveProbability": _round4(self.is_edge_positive_probability),
+            "isCyclePositiveShare": _round4(self.is_cycle_positive_share),
             "oosMeasuredN": self.oos_measured_n,
             "oosExpectancyR": _round4(self.oos_expectancy_r),
             "oosDispersionR": _round4(self.oos_dispersion_r),
             "oosRegime": self.oos_regime,
-            "regimeCoverage": self.regime_coverage,
+            "dominantRegimeCoverage": self.dominant_regime_coverage,
             "oosPositiveN": self.oos_positive_n,
             "oosPositiveShare": _round4(self.oos_positive_share),
             "rawError": _round4(self.raw_error),
@@ -286,7 +296,7 @@ def _majority_regime(rows: Sequence[Any]) -> str | None:
     return max(sorted(counts), key=lambda key: counts[key])
 
 
-def _regime_coverage(strategy: Any, regime: str | None) -> str | None:
+def _dominant_regime_coverage(strategy: Any, regime: str | None) -> str | None:
     """Cobertura del IS para el régimen que dominó el OOS, o ``None`` si no hay celda."""
     if strategy is None or regime is None:
         return None
@@ -427,12 +437,17 @@ def measure_is_oos_row(
         is_confidence=is_band,
         is_coverage=is_coverage,
         is_edge_confidence=edge,
-        is_probability_positive=interval.probability_positive if interval is not None else None,
+        is_edge_positive_probability=(
+            interval.edge_positive_probability if interval is not None else None
+        ),
+        is_cycle_positive_share=(
+            interval.cycle_positive_share if interval is not None else None
+        ),
         oos_measured_n=len(oos_values),
         oos_expectancy_r=oos_expectancy,
         oos_dispersion_r=oos_dispersion,
         oos_regime=oos_regime,
-        regime_coverage=_regime_coverage(strategy, oos_regime),
+        dominant_regime_coverage=_dominant_regime_coverage(strategy, oos_regime),
         oos_positive_n=oos_positive_n,
         oos_positive_share=oos_positive_share,
         raw_error=raw_error,
@@ -545,13 +560,24 @@ def _question_confidence(cells: Sequence[ReplayCell], min_cells: int) -> ReplayQ
 
 
 def _question_coverage(cells: Sequence[ReplayCell], min_cells: int) -> ReplayQuestion:
-    """Q4 — ¿la cobertura ``HIGH`` del régimen que dominó el OOS reduce el error?"""
-    usable = [(c.regime_coverage, c.raw_error) for c in cells if c.raw_error is not None]
+    """Q4 — ¿la cobertura ``HIGH`` del régimen que dominó el OOS reduce el error?
+
+    Las celdas sin cobertura MEDIDA del régimen dominante (``dominant_regime_coverage is None``: no
+    había celda para ese régimen) quedan FUERA de la comparación y se declaran en ``cellsUnmeasured``:
+    la ausencia de medición no es evidencia de no cobertura.
+    """
+    measurable = [cell for cell in cells if cell.raw_error is not None]
+    usable = [
+        (c.dominant_regime_coverage, c.raw_error)
+        for c in measurable
+        if c.dominant_regime_coverage is not None
+    ]
     metrics: dict[str, Any] = {
         "meanErrorCovered": None,
         "meanErrorUncovered": None,
         "cellsCovered": 0,
         "cellsUncovered": 0,
+        "cellsUnmeasured": len(measurable) - len(usable),
     }
     covered = [error for coverage, error in usable if coverage == ADAPTIVE_COVERAGE_HIGH]
     uncovered = [error for coverage, error in usable if coverage != ADAPTIVE_COVERAGE_HIGH]
@@ -604,13 +630,18 @@ def build_replay_report(
     resolved_min_is = max(1, int(min_is))
     resolved_min_oos = max(1, int(min_oos))
     resolved_min_cells = max(1, int(min_cells))
+    # El NIVEL efectivo es el clampeado: es el que el bootstrap usa, así que es el que se publica
+    # (un 0.0 publicado junto a un bootstrap hecho con 0.5 sería una contradicción silenciosa).
+    resolved_level = min(
+        max(float(interval_level), ADAPTIVE_INTERVAL_LEVEL_MIN), ADAPTIVE_INTERVAL_LEVEL_MAX
+    )
 
     if not rows:
         return ReplayReport(
             cells=(),
             questions=_questions((), resolved_min_cells),
             oos_pct=resolved_pct,
-            interval_level=interval_level,
+            interval_level=resolved_level,
             seed=int(seed),
             notes=("no_cycles",),
         )
@@ -638,7 +669,7 @@ def build_replay_report(
             min_is=resolved_min_is,
             min_oos=resolved_min_oos,
             min_episodes=max(1, int(min_episodes)),
-            interval_level=interval_level,
+            interval_level=resolved_level,
             resamples=max(1, int(resamples)),
             seed=int(seed),
         )
@@ -652,7 +683,7 @@ def build_replay_report(
         cells=tuple(cells),
         questions=_questions(cells, resolved_min_cells),
         oos_pct=resolved_pct,
-        interval_level=interval_level,
+        interval_level=resolved_level,
         seed=int(seed),
         notes=tuple(notes),
     )
