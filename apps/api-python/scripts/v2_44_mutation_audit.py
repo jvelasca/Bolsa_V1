@@ -617,6 +617,16 @@ PAPER_MATERIAL_READINESS = (
     "packages/py/application/src/bolsa_application/paper_material_readiness.py"
 )
 
+# --- AUTO-MATERIAL-4 (V2.76): PAPER forward con precio de MERCADO ---------------------------
+# Fuente de precio de MERCADO (live + cierre con respaldo declarado) e I/O del runner.
+MARKET_PRICE_SNAPSHOT = (
+    "packages/py/application/src/bolsa_application/market_price_snapshot.py"
+)
+# Deciders versionados (par real de estrategias: A determinista + B ACTIVE, enrutadas).
+AUTO_FORWARD_DECIDERS = (
+    "packages/py/application/src/bolsa_application/auto_forward_deciders.py"
+)
+
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
 T_EV = "packages/py/analytics/tests/test_expected_value.py"
@@ -683,6 +693,10 @@ T_EVIDENCE_VALIDATION = "packages/py/analytics/tests/test_auto_evidence_validati
 T_READINESS = "packages/py/application/tests/test_paper_material_readiness.py"
 # AUTO-MATERIAL-2 (V2.74): costura del productor V2 (estructura: cycle_id/reserva/exit) + CLI.
 T_PRODUCER_SEAM = "apps/api-python/tests/test_auto_v74_producer_seam.py"
+# AUTO-MATERIAL-4 (V2.76): el precio de MERCADO (respaldo declarado + fail-closed) y el par real de
+# versiones (estampado de version + enrutado por simbolo), en suites PURAS hermeticas.
+T_MARKET_PRICE_SNAPSHOT = "packages/py/application/tests/test_market_price_snapshot.py"
+T_FORWARD_DECIDERS = "packages/py/application/tests/test_auto_forward_deciders.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2341,6 +2355,50 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    if producer_blockers:\n",
         "    if False:  # mutacion M200: sin estructura el gate diria PRODUCER_READY\n",
         (T_READINESS, T_PRODUCER_SEAM),
+    ),
+    # ── v2.76 (AUTO-MATERIAL-4): precio de MERCADO y par REAL de versiones (forward PAPER) ───────
+    (
+        "M201 (respaldo sin respeto): el cierre durable SOBRESCRIBE la cotizacion viva",
+        MARKET_PRICE_SNAPSHOT,
+        "                if number is not None and key in watch and key not in prices:\n"
+        "                    prices[key] = number\n"
+        "                    sources[key] = PRICE_SOURCE_CLOSE\n",
+        "                if number is not None and key in watch:\n"
+        "                    prices[key] = number\n"
+        "                    sources[key] = PRICE_SOURCE_CLOSE\n",
+        (T_MARKET_PRICE_SNAPSHOT,),
+    ),
+    (
+        "M202 (precio inventado): un valor no finito o no positivo se sirve como precio",
+        MARKET_PRICE_SNAPSHOT,
+        "    if number != number or number in (float(\"inf\"), float(\"-inf\")) or number <= 0:\n"
+        "        return None\n"
+        "    return number\n",
+        "    return number\n",
+        (T_MARKET_PRICE_SNAPSHOT,),
+    ),
+    (
+        "M203 (apila): la version A propone BUY aunque haya posicion viva",
+        AUTO_FORWARD_DECIDERS,
+        "        if held > 0:\n            return _hold(key, self._source)\n",
+        "        if held > 0 and False:  # mutacion M203: con posicion viva re-propone BUY\n"
+        "            return _hold(key, self._source)\n",
+        (T_FORWARD_DECIDERS,),
+    ),
+    (
+        "M204 (enrutado roto): TODO simbolo cae en la version B y la A no opera",
+        AUTO_FORWARD_DECIDERS,
+        "        if key in self.watch_a:\n            return self.decider_a(key)\n",
+        "        if key in self.watch_a and False:  # mutacion M204: la A nunca recibe su watch\n"
+        "            return self.decider_a(key)\n",
+        (T_FORWARD_DECIDERS,),
+    ),
+    (
+        "M205 (tramos solapados): el reparto del watch deja los dos tramos en el mismo lado",
+        AUTO_FORWARD_DECIDERS,
+        "    return ordered[:cut], ordered[cut:]\n",
+        "    return ordered[:cut], ordered[:cut]\n",
+        (T_FORWARD_DECIDERS,),
     ),
 ]
 

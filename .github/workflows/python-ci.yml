@@ -252,6 +252,14 @@ jobs:
         # ese directorio NO tiene pase de directorio en este job; la costura del productor
         # (``apps/api-python/tests/test_auto_v74_producer_seam.py``) entra por el pase de
         # ``apps/api-python/tests`` de más abajo.
+        # V2.76/AUTO-MATERIAL-4 (material de MERCADO forward): los dos puros nuevos van EXPLÍCITOS
+        # por el mismo motivo (sin pase de directorio): el respaldo de precio con fail-closed
+        # (``.../test_market_price_snapshot.py``, proveedores fake, sin red) y el par real de
+        # versiones sobre UNA cuenta (``.../test_auto_forward_deciders.py``: reparto del watch +
+        # estampado de version + enrutado por simbolo). El runner
+        # ``apps/api-python/scripts/v2_76_forward_market_material.py`` es I/O y NO se invoca desde
+        # ningún workflow (mismo criterio que las sondas de ``scripts/``): su camino real queda
+        # DECLARADO como operación del propietario, no como test de CI.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -309,6 +317,8 @@ jobs:
           packages/py/application/tests/test_sim_durable_v2_state.py
           packages/py/application/tests/test_idempotency_key_budget.py
           packages/py/application/tests/test_paper_material_readiness.py
+          packages/py/application/tests/test_market_price_snapshot.py
+          packages/py/application/tests/test_auto_forward_deciders.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
           packages/py/application/tests/test_strategy_shadow_phase.py
           packages/py/application/tests/test_paper_forward_phase.py
