@@ -491,6 +491,12 @@ Cierre de ``P3-4`` en v2.72 (el ``level`` publicado por la lectura del régimen 
   ``level`` sin clampar, la lectura contradice al bootstrap que la produjo (publica ``0.0`` mientras
   midió con ``0.5``): misma clase que ``H3``, que ``v2.71`` cerró solo en ``build_replay_report``.
 
+AUTO-MATERIAL-1 en v2.73 (el gate de material PAPER no dice READY sin ciclos con R medible):
+
+* **M199 (READY sin mínimo)** — si el gate deja de exigir ``min_cycles_per_strategy`` ciclos cerrados
+  con denominador positivo, declararía READY un material sin R medible y el pre-flight daría luz
+  verde a una corrida que el instrumento (correctamente) va a bloquear.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -599,6 +605,10 @@ EVIDENCE_RUN_SCRIPT = "apps/api-python/scripts/auto_evidence_run.py"
 AUTO_EVIDENCE_VALIDATION = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_validation.py"
 )
+# AUTO-MATERIAL-1 (V2.73): gate de material PAPER (diagnostico read-only, no repara material).
+PAPER_MATERIAL_READINESS = (
+    "packages/py/application/src/bolsa_application/paper_material_readiness.py"
+)
 
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
@@ -662,6 +672,8 @@ T_EVIDENCE_RUN = "packages/py/analytics/tests/test_auto_evidence_run.py"
 T_EVIDENCE_RUN_CLI = "apps/api-python/tests/test_auto_v69_auto22_evidence_run.py"
 # AUTO-23 (V2.70): validación sobre la única aritmética + CLI del informe de validación.
 T_EVIDENCE_VALIDATION = "packages/py/analytics/tests/test_auto_evidence_validation.py"
+# AUTO-MATERIAL-1 (V2.73): diagnóstico del material PAPER (puertas del gate READY/BLOCKED).
+T_READINESS = "packages/py/application/tests/test_paper_material_readiness.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2304,6 +2316,14 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    )\n",
         "    resolved_level = float(level)\n",
         (T_REGIME_EVIDENCE,),
+    ),
+    # ── v2.73 (AUTO-MATERIAL-1): el gate de material PAPER exige ciclos con R medible ────────────
+    (
+        "M199 (READY sin minimo): el gate deja de exigir ciclos con R medible por estrategia",
+        PAPER_MATERIAL_READINESS,
+        "    if max_measurable < max(1, int(min_cycles_per_strategy)):\n",
+        "    if False:  # mutacion M199: sin el minimo de ciclos medibles el gate diria READY\n",
+        (T_READINESS,),
     ),
 ]
 
