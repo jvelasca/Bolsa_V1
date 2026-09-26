@@ -2,6 +2,51 @@
 
 All notable releases of Bolsa V1.
 
+## [1.95.0-beta] — AUTO-23 · Validación de evidencia PAPER real (harness) + procedencia imposible de confundir — 2026-09-25
+
+**Fase de preparación y blindaje; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y
+**sin tocar ningún fichero del freeze**. El reparto **no se mueve**: `auto18-v1` / `auto15-v1`. **La
+corrida PAPER real no se ejecuta** (bloqueo por **material**): esta fase deja el RUN (`AUTO-22`) **más**
+un **harness de validación** y un **runbook** listos para el primer dataset real.
+
+- **UI (punto 22 de la auditoría de `v2.69`).** `auto-evidence-report.ts` gana `classifyExecutionReality`
+  y un bloque `execution` en `EvidenceView`, y `SOURCE` gana un `subtitle` que separa **dato real** de
+  **dinero real** («DATOS REALES DE LA CUENTA PAPER · DINERO VIRTUAL · NO ES DINERO REAL»).
+  `auto-evidence-section.tsx` renderiza un bloque de cabecera **`EXECUTION REALITY`**
+  (`ops-auto-evidence-execution-reality`, `VIRTUAL — NO REAL MONEY`). Reglas duras: `null` ⇒
+  `NO MEDIDO`; un origen `desconocido` **jamás** se degrada a `paper_real`; un `realMoneyAtRisk=true`
+  **no** se disfraza de virtual. La UI **lee**, no recalcula.
+- **Harness puro.** Nuevo `bolsa_analytics/cognitive/auto_evidence_validation.py`
+  (`EVIDENCE_VALIDATION_SCHEMA = "auto23_evidence_validation_v1"`, `EvidenceValidationBlockedError`):
+  `build_sample_size_sweep` (barrido `P(R>0)` / OOS / WFE / `effective_n` sobre el **prefijo
+  cronológico**; `N` > medido ⇒ `NO MEDIDO`), `build_regime_stability` (global vs por régimen +
+  divergencias, lectura no gate) y `build_correlation_validation` (matriz de `AUTO-21` por cubo +
+  diagnósticos `P3-2`). **Compone** `build_evidence_run_bundle` / `build_adaptive_uncertainty` /
+  `build_strategy_correlation_report`: **no** reimplementa ninguna métrica.
+- **CLI.** Nuevo `apps/api-python/scripts/auto_evidence_validate.py`: lee PG (o `--cycles FILE`) por el
+  **lector único** `read_paper_material` y escribe un **bundle inmutable** en
+  `evidence_validations/<UTC>-<huella8>/` (`sweep.json`, `regime_stability.json`,
+  `correlation_validation.json`, `validation.json`) con `exist_ok=False`. `exit 2` **BLOQUEADO** sin PG
+  / sin material / sin R medible / venue ≠ PAPER / validación ya existente, **sin escribir ningún
+  fichero**.
+- **Runbook.** `docs/engineering/protocolo-primer-run-paper-real-v2.70-2026-09-25.md`: prerrequisitos,
+  paso 1 (1 estrategia, **≥32 ciclos medibles**), paso 2 (2ª estrategia → `correlation(A,B)`), paso 3
+  (`P(R>0)` vs N y régimen); **regla dura: no se bajan `min cycles` / `min R` / `folds`**.
+- **Mutaciones `M191`** (el barrido recalcula `P(R>0)` en vez de componerla) y **`M192`** (un `N` mayor
+  que el material fabrica una fila en vez de `NO MEDIDO`) — **192/192** con restauración byte a byte.
+- **Persistencia de la auditoría de `v2.69`** y de su deuda P3 (`auditoria-v2-69-…`, `deuda-p3-post-auditoria-v2.69-…`).
+
+**Compuertas.** Frontend **1339 passed** (232 ficheros) · `typecheck` OK · `lint` **0 errores** (23
+warnings preexistentes) · `build` OK · `contract:check` OK · python application+analytics **3203 passed
+/ 5 skipped** · CLI **6 passed** (sonda PG opt-in) · `ruff` **All checks passed!** · `import-linter`
+**4 kept / 0 broken** · `mypy` **0 issues (501 files)** · matriz completa **192/192** con evidencia cruda
+persistida ([`docs/engineering/evidencia-matriz-mutaciones-v2.70-192-2026-09-25.txt`](docs/engineering/evidencia-matriz-mutaciones-v2.70-192-2026-09-25.txt):
+`192/192` medidas, `192/192` rojas, árbol intacto).
+
+**Límite declarado:** el **material PAPER real no existe todavía**; la corrida real es **paso operativo
+del propietario** y las deudas **P3-2** (correlación por cubos) y **P3-3** (`P(R>0)` vs N) quedan
+**abiertas** hasta el primer dataset real.
+
 ## [1.94.0-beta] — AUTO-22 · RUN de evidencia PAPER reproducible + UI de evidencia en 3 niveles — 2026-09-25
 
 **Fase de instrumentación de la corrida; SIN migración** (Alembic head sigue en `046_fill_reference_mid`)
