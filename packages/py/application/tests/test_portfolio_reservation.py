@@ -11,10 +11,17 @@ Gate de la fase, medido sobre ``plan_v2_tick``:
 4. **Toda reserva se puede liberar** — el rollback del tick devuelve el presupuesto a 0.
 """
 
+import asyncio
+
 import pytest
 
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE
-from bolsa_analytics.cognitive.portfolio_reservation import ReservationLedger, replay
+from bolsa_analytics.cognitive.portfolio_reservation import (
+    RESERVATION_RELEASED_BY_FILL,
+    ReservationLedger,
+    build_reservation,
+    replay,
+)
 from bolsa_application.auto_v2_entry import (
     V2Signal,
     V2Tunables,
@@ -22,6 +29,7 @@ from bolsa_application.auto_v2_entry import (
     plan_v2_tick,
     tunables_from_env,
 )
+from bolsa_application.reservation_store import InMemoryReservationStore
 
 # ── Helpers ───────────────────────────────────────────────────────────────────────
 
@@ -275,3 +283,81 @@ def test_cost_model_bps_are_env_calibrated(monkeypatch: pytest.MonkeyPatch) -> N
     assert model is not None
     assert model.slippage_bps == pytest.approx(12.0)
     assert model.gap_bps == pytest.approx(50.0)
+
+
+# ── V2.74: el store durable conserva el riesgo COMPROMETIDO al cerrar la reserva ───
+
+
+def _store_reservation(risk: float = 1000.0, quantity: float = 200.0):
+    return build_reservation(
+        reservation_id="RES-cyc-1",
+        account_id="acc-1",
+        instrument_id="AAA",
+        side="buy",
+        quantity=quantity,
+        entry=100.0,
+        stop=97.0,
+        reserved_risk=risk,
+        cycle_id="cyc-1",
+        created_at="2026-09-26T08:00:00+00:00",
+    )
+
+
+def test_store_release_preserves_the_committed_risk_for_the_r_denominator() -> None:
+    """La fila durable conserva el riesgo del alta; el objeto devuelto sigue el libro vivo."""
+    store = InMemoryReservationStore()
+    reservation = _store_reservation()
+
+    async def _run() -> None:
+        await store.save(reservation)
+        returned = await store.release(
+            reservation.reservation_id,
+            status=RESERVATION_RELEASED_BY_FILL,
+            released_qty=200.0,
+        )
+        assert returned is not None
+        # El llamante recibe la liberación del libro puro: no viva y a 0.
+        assert returned.is_live is False
+        assert returned.reserved_risk == 0.0
+        # La FILA durable (lo que leerá ``cycle_risk`` por ``list_by_cycle_ids``) conserva el
+        # riesgo COMPROMETIDO: sin él, el R del ciclo cerrado sería inmedible.
+        persisted = await store.get(reservation.reservation_id)
+        assert persisted is not None
+        assert persisted.is_released is True
+        assert persisted.reserved_risk == pytest.approx(1000.0)
+        assert await store.list_live("acc-1") == []
+
+    asyncio.run(_run())
+
+
+def test_store_release_reconstructs_the_committed_risk_across_partial_fills() -> None:
+    """Escalera de fills parciales: el riesgo vivo escala y el durable vuelve al comprometido."""
+    store = InMemoryReservationStore()
+    reservation = _store_reservation()
+
+    async def _run() -> None:
+        await store.save(reservation)
+        partial = await store.release(
+            reservation.reservation_id,
+            status=RESERVATION_RELEASED_BY_FILL,
+            released_qty=80.0,
+        )
+        assert partial is not None and partial.is_live is True
+        # El objeto vivo escala (80/200 liberado ⇒ queda el 60 % del riesgo).
+        assert partial.reserved_risk == pytest.approx(600.0)
+        # La cola sigue viva con su capital escalado.
+        live = await store.list_live("acc-1")
+        assert len(live) == 1 and live[0].reserved_risk == pytest.approx(600.0)
+
+        final = await store.release(
+            reservation.reservation_id,
+            status=RESERVATION_RELEASED_BY_FILL,
+            released_qty=120.0,
+        )
+        assert final is not None and final.is_live is False
+        persisted = await store.get(reservation.reservation_id)
+        assert persisted is not None
+        # El riesgo reconstruido es el COMPROMETIDO en el alta (1000), no la cola escalada.
+        assert persisted.reserved_risk == pytest.approx(1000.0)
+
+    asyncio.run(_run())

@@ -20,6 +20,14 @@ por ``reservation_id``) y ``release`` (que reutiliza el libro puro para escalar 
 liberación), y ninguna de las dos borra la fila: la reserva liberada **se conserva** con su
 estado, su cantidad liberada y su motivo (historia auditable, no un ``DELETE``).
 
+Una excepción declarada al "no recalcula nada" (V2.74 · AUTO-MATERIAL-2): en la liberación
+**total** la fila durable conserva el **riesgo COMPROMETIDO en el alta** (``reserved_risk``),
+aunque el libro vivo lo deje a 0. El motivo es que el denominador de R (``pnl / reserved_risk``)
+tiene que SOBREVIVIR al cierre del ciclo: ``cycle_risk_from_reservations`` lee las reservas
+**liberadas** por ``list_by_cycle_ids`` y exige ``reserved_risk > 0`` — filtrar por ``is_live``
+dejaría sin denominador justo los ciclos cerrados, que son los únicos con R. La liberación en
+memoria (y por tanto el libro vivo y ``list_live``) NO cambia: sigue escalando a 0/escalado.
+
 Convenciones del repo (patrón ``execution_event``/``sim_durable_store``): imports de fila
 **perezosos** por método, ``ON CONFLICT`` para idempotencia, y ``autocommit`` explícito
 (``True`` por defecto: la reserva debe ser durable antes de emitir la orden; ``False`` cede
@@ -33,6 +41,7 @@ todo el libro (fail-closed: "no pude leerlo todo" ≠ "no hay más").
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -761,6 +770,30 @@ class PostgresReservationStore:
         await self._session.rollback()
 
 
+def _committed_risk(row: PortfolioReservation) -> float | None:
+    """Riesgo COMPROMETIDO en el alta de una reserva viva, para conservarlo en su cierre.
+
+    El libro vivo escala ``reserved_risk`` proporcionalmente al llenado y lo deja a 0 en la
+    liberación total (invariante de estado auditado de ``ReservationLedger.release``). Para
+    que el R de un ciclo cerrado siga siendo reconstruible, la fila durable conserva el
+    importe que se reservó: ``reserved_risk × (quantity / remaining_qty)`` — la MISMA
+    proporción que aplica el libro al escalar, leída al revés. Es exacto para una liberación
+    total de una reserva intacta y para la última liberación de una escalera parcial (el
+    ``remaining_qty`` durable es el correcto en cada paso).
+
+    Devuelve ``None`` cuando no hay riesgo comprometido que conservar (reserva de VENTA sin
+    riesgo, o geometría ilegible): nunca un 0 inventado.
+    """
+    risk = row.reserved_risk
+    total = row.quantity
+    remaining = row.remaining_qty
+    if risk is None or total is None or remaining is None:
+        return None
+    if risk <= 0 or total <= 0 or remaining <= 0:
+        return None
+    return round(risk * total / remaining, 4)
+
+
 async def _release(
     store: Any,
     reservation_id: str,
@@ -775,6 +808,11 @@ async def _release(
     cantidad viva los decide ``ReservationLedger.release`` — el mismo código que corre
     dentro del tick. El store solo lee, deja que el libro calcule y persiste el
     resultado. Idempotente: si la reserva no está viva, no toca nada y devuelve ``None``.
+
+    En la liberación **total** la fila durable conserva el riesgo COMPROMETIDO en el alta
+    (``_committed_risk``) aunque el objeto devuelto lo deje a 0: es el denominador de R que
+    ``cycle_risk_from_reservations`` necesita leer DESPUÉS del cierre. El llamante recibe el
+    resultado del libro (vivo/escalado), así que el libro en memoria no cambia.
     """
     key = str(reservation_id or "").strip()
     current = await store.get(key)
@@ -791,5 +829,10 @@ async def _release(
     )
     if updated is None:
         return None
-    await store.save(updated)
+    durable = updated
+    if not updated.is_live:
+        committed = _committed_risk(current)
+        if committed is not None:
+            durable = replace(updated, reserved_risk=committed)
+    await store.save(durable)
     return updated

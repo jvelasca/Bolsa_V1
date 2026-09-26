@@ -497,6 +497,13 @@ AUTO-MATERIAL-1 en v2.73 (el gate de material PAPER no dice READY sin ciclos con
   con denominador positivo, declararía READY un material sin R medible y el pre-flight daría luz
   verde a una corrida que el instrumento (correctamente) va a bloquear.
 
+AUTO-MATERIAL-2 en v2.74 (el gate NO declara ``PRODUCER_READY`` sin ESTRUCTURA):
+
+* **M200 (PRODUCER_READY sin estructura)** — si el gate ignora sus ``producer_blockers``
+  (sin linaje de ciclo, sin reservas, sin cierres, sin salidas o sin denominador positivo), un
+  material mal formado se leería como ``PRODUCER_READY``/``EVIDENCE_READY``. La estructura es la
+  puerta que separa "el productor V2 funciona" de "hay muestra": saltársela es fail-open.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -674,6 +681,8 @@ T_EVIDENCE_RUN_CLI = "apps/api-python/tests/test_auto_v69_auto22_evidence_run.py
 T_EVIDENCE_VALIDATION = "packages/py/analytics/tests/test_auto_evidence_validation.py"
 # AUTO-MATERIAL-1 (V2.73): diagnóstico del material PAPER (puertas del gate READY/BLOCKED).
 T_READINESS = "packages/py/application/tests/test_paper_material_readiness.py"
+# AUTO-MATERIAL-2 (V2.74): costura del productor V2 (estructura: cycle_id/reserva/exit) + CLI.
+T_PRODUCER_SEAM = "apps/api-python/tests/test_auto_v74_producer_seam.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2321,9 +2330,17 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M199 (READY sin minimo): el gate deja de exigir ciclos con R medible por estrategia",
         PAPER_MATERIAL_READINESS,
-        "    if max_measurable < max(1, int(min_cycles_per_strategy)):\n",
-        "    if False:  # mutacion M199: sin el minimo de ciclos medibles el gate diria READY\n",
+        "    evidence_gap = max_measurable < max(1, int(min_cycles_per_strategy))\n",
+        "    evidence_gap = False  # mutacion M199: sin el minimo de ciclos medibles el gate diria READY\n",
         (T_READINESS,),
+    ),
+    # ── v2.74 (AUTO-MATERIAL-2): el gate NO declara PRODUCER_READY sin ESTRUCTURA ────────────────
+    (
+        "M200 (PRODUCER_READY sin estructura): el gate ignora los blockers del productor",
+        PAPER_MATERIAL_READINESS,
+        "    if producer_blockers:\n",
+        "    if False:  # mutacion M200: sin estructura el gate diria PRODUCER_READY\n",
+        (T_READINESS, T_PRODUCER_SEAM),
     ),
 ]
 

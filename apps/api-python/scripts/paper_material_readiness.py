@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""AUTO-MATERIAL-1 — PAPER MATERIAL READINESS: pre-flight del material antes del RUN (AUTO-22).
+"""AUTO-MATERIAL-1/2 — PAPER MATERIAL READINESS: pre-flight del material antes del RUN (AUTO-22).
 
 Qué hace, exactamente: lee de PostgreSQL el material PAPER durable —fills, reservas, intents de
 salida y régimen— con las MISMAS piezas que el lector único (``AUTO-22``) y declara, **antes** de
-``auto_evidence_run.py``, si hay ciclos cerrados con R medible por estrategia y —si no— cuál de los
-eslabones del circuito falta:
+``auto_evidence_run.py``, en qué NIVEL está el material:
 
     FILL → CYCLE → ENTRY+EXIT → RESERVED RISK → R
 
+* ``PRODUCER_READY`` — la estructura está completa (linaje, reservas, cierres, salidas, R medible).
+* ``EVIDENCE_READY`` — además hay ``>=min`` ciclos medibles por estrategia (nivel por defecto).
+
 Por qué existe: en ``v2.72`` el primer RUN real se declaró BLOQUEADO con 761 fills, 0 ``cycle_id``
 y 0 reservas, pero ese diagnóstico solo se veía **después** de intentar la corrida. Este gate mide
-los hechos y los publica (tabla + JSON), de modo que la operación no tenga que esperar a un fallo
-para entender el bloqueo.
+los hechos y los publica (tabla + JSON), y desde ``v2.74`` separa "el material está bien formado"
+de "ya hay evidencia estadística bastante".
 
 Es un LECTOR, no un productor: **no** repara material, **no** infiere ``cycle_id``, **no** inventa
 ``reserved_risk`` y **no** convierte N fills en N operaciones. Un material incompleto se declara.
@@ -21,14 +23,16 @@ Uso::
   uv run --no-sync python apps/api-python/scripts/paper_material_readiness.py \\
       --account-id <uuid> --strategy-version orb-trend
   uv run --no-sync python apps/api-python/scripts/paper_material_readiness.py \\
+      --account-id <uuid> --strategy-version orb-trend --level producer
+  uv run --no-sync python apps/api-python/scripts/paper_material_readiness.py \\
       --account-id <uuid> --strategy-version orb-trend --json > readiness.json
 
 Códigos de salida:
 
-* ``0`` — **READY**: hay al menos una estrategia con el mínimo de ciclos cerrados con R medible.
+* ``0`` — se alcanzó el nivel pedido (``producer`` o ``evidence``).
 * ``1`` — uso incorrecto: lo decide ``argparse``.
-* ``2`` — **BLOCKED**: sin PostgreSQL, sin material, sin linaje/cierres/denominador, o venue no
-  PAPER. "No medido" se declara por stderr y stderr/stdout según ``--json``; nunca un READY falso.
+* ``2`` — **BLOCKED**: sin PostgreSQL, sin material, sin linaje/cierres/denominador, venue no PAPER
+  o por debajo del nivel pedido. "No medido" se declara por stderr; nunca un READY falso.
 """
 
 from __future__ import annotations
@@ -43,7 +47,6 @@ from typing import Any
 from bolsa_application.auto_paper_material import NonPaperVenueError
 from bolsa_application.paper_material_readiness import (
     DEFAULT_MIN_MEASURABLE_CYCLES_PER_STRATEGY,
-    READINESS_READY,
     PaperMaterialReadiness,
     build_paper_material_readiness,
 )
@@ -67,13 +70,17 @@ async def _read(
     min_cycles: int,
 ) -> PaperMaterialReadiness:
     """(I/O) lee el material durable y compone el veredicto. Read-only: no escribe nada."""
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
     from bolsa_application.auto_cycle_regime_reader import read_cycle_regimes
     from bolsa_application.reservation_store import PostgresReservationStore
     from bolsa_application.sim_durable_store import PostgresSimFillFinanceContextStore
     from bolsa_infrastructure.config import get_settings
-    from bolsa_infrastructure.database.models.tables import AutoExitOrderRow
+    from bolsa_infrastructure.database.models.tables import (
+        AutoExitOrderRow,
+        PortfolioReservationRow,
+        SimFillFinanceContextRow,
+    )
     from bolsa_infrastructure.database.repositories.journal_repository import (
         SqlAlchemyJournalRepository,
     )
@@ -109,11 +116,39 @@ async def _read(
             # ``limit`` recibido exacto ⇒ no se puede afirmar que se vio el libro entero.
             reservations_complete = len(reservations) < max(1, int(limit))
 
-            # Linaje de SALIDA: solo la columna ``cycle_id`` (agregado ligero, read-only).
+            # Linaje de SALIDA: la columna ``cycle_id`` de los intents de ESTA cuenta (agregado
+            # ligero, read-only). Acotado por cuenta: un exit de otra cuenta no puede hacer pasar
+            # el bloque de productor.
             exit_cycles = (
-                (await session.execute(select(AutoExitOrderRow.cycle_id))).scalars().all()
+                (
+                    await session.execute(
+                        select(AutoExitOrderRow.cycle_id).where(
+                            AutoExitOrderRow.account_id == account_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
             )
             exit_orders = [{"cycle_id": value} for value in exit_cycles]
+
+            # Población TOTAL de la tabla (informativa): separa "lo que hay en la base" del
+            # universo real del instrumento/cuenta. Nunca entra en un veredicto.
+            database_totals = {
+                "fills": int(
+                    (await session.execute(select(func.count()).select_from(SimFillFinanceContextRow))).scalar_one()
+                ),
+                "reservations": int(
+                    (
+                        await session.execute(
+                            select(func.count()).select_from(PortfolioReservationRow)
+                        )
+                    ).scalar_one()
+                ),
+                "exitOrders": int(
+                    (await session.execute(select(func.count()).select_from(AutoExitOrderRow))).scalar_one()
+                ),
+            }
 
             reading = await read_cycle_regimes(repository.list_by_decision_ids, cycle_ids)
     finally:
@@ -129,6 +164,7 @@ async def _read(
         min_cycles_per_strategy=min_cycles,
         fills_by_version=fills_by_version,
         reservations_read_complete=reservations_complete,
+        database_totals=database_totals,
     )
 
 
@@ -137,33 +173,56 @@ def _mark(ok: bool) -> str:
     return "[ok]" if ok else "[X] "
 
 
-def _print_report(readiness: PaperMaterialReadiness) -> None:
+def _print_report(readiness: PaperMaterialReadiness, *, level: str) -> None:
     facts = readiness.facts
     lineage = readiness.lineage
     min_cycles = int(facts["minCyclesPerStrategy"])
+    level_name = "producer" if level == "producer" else "evidence"
 
-    print("PAPER MATERIAL READINESS")
-    print("-" * 46)
+    print(f"PAPER MATERIAL READINESS (level={level_name})")
+    print("-" * 52)
+
+    # Las TRES poblaciones, separadas para que "761 fills" no se lea como cientos de operaciones
+    # del instrumento (son la tabla entera; el universo de esta cuenta puede ser 4).
+    database = facts.get("databaseTotals")
+    if database is not None:
+        print("DATABASE TOTAL (all accounts/versions)")
+        print(f"  fills (whole table)         {database['fills']}")
+        print(f"  reservations (whole table)  {database['reservations']}")
+        print(f"  exit orders (whole table)   {database['exitOrders']}")
+        print("-" * 52)
+    print(f"INSTRUMENT UNIVERSE (account {facts.get('account')})")
     if facts.get("fillsTotalForAccount") is not None:
-        print(f"Account fills (all versions)  {facts['fillsTotalForAccount']}")
-    print(f"Durable fills (requested)     {facts['durableFills']}")
-    print(f"Fills with cycle_id           {facts['fillsWithCycle']}  {_mark(facts['fillsWithCycle'] > 0)}")
-    print(f"Closed cycles                 {facts['closedCycles']}  {_mark(facts['closedCycles'] > 0)}")
+        print(f"  fills (all versions)        {facts['fillsTotalForAccount']}")
+    else:
+        print("  fills (all versions)        (not measured)")
+    print("-" * 52)
+    print("AUTO MATERIAL (requested versions)")
+    print(f"  durable fills               {facts['durableFills']}")
     print(
-        f"Reserved-risk cycles          {facts['measurableCycles']}  "
+        f"  fills with cycle_id         {facts['fillsWithCycle']}  "
+        f"{_mark(facts['fillsWithCycle'] > 0)}"
+    )
+    print(f"  closed cycles               {facts['closedCycles']}  {_mark(facts['closedCycles'] > 0)}")
+    print(
+        f"  reserved-risk cycles        {facts['measurableCycles']}  "
         f"{_mark(facts['measurableCycles'] > 0)}"
     )
+    print(f"  exit intents with cycle_id   {lineage['cycle']['exitOrdersWithCycle']}")
+    print(f"  reservations                {facts['reservations']}  {_mark(facts['reservations'] > 0)}")
     print(
-        f"Measurable R (>={min_cycles}/strategy)".ljust(30)
+        f"  measurable R (>={min_cycles}/strategy)".ljust(30)
         + f"{facts['maxMeasurableCyclesPerVersion']}  "
         + _mark(bool(facts["versionsMeetingMinimum"]))
     )
-    print(f"Reservations                  {facts['reservations']}  {_mark(facts['reservations'] > 0)}")
-    print(f"Exit intents with cycle_id    {lineage['cycle']['exitOrdersWithCycle']}")
-    print("-" * 46)
-    verdict = "YES" if readiness.ready else "NO"
-    print(f"AUTO-22 READY?                {verdict}")
+    print("-" * 52)
+    print(f"PRODUCER READY?               {'YES' if readiness.producer_ready else 'NO'}")
+    print(f"EVIDENCE READY?               {'YES' if readiness.evidence_ready else 'NO'}")
     print("Allocation                    FROZEN")
+    if readiness.producer_blockers:
+        print("\nPRODUCER BLOCKERS")
+        for blocker in readiness.producer_blockers:
+            print(f"  - {blocker}")
     if readiness.blockers:
         print("\nBLOCKERS")
         for blocker in readiness.blockers:
@@ -186,6 +245,12 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=DEFAULT_MIN_MEASURABLE_CYCLES_PER_STRATEGY,
         help="mínimo de ciclos cerrados con R por estrategia (default declarado del protocolo)",
+    )
+    parser.add_argument(
+        "--level",
+        choices=("producer", "evidence"),
+        default="evidence",
+        help="nivel exigido: 'producer' (estructura) o 'evidence' (estructura + mínimo; default)",
     )
     parser.add_argument("--limit", type=int, default=2000, help="tope de lectura de reservas")
     parser.add_argument("--json", action="store_true", help="emite el diagnóstico como JSON por stdout")
@@ -224,16 +289,18 @@ def main(argv: list[str] | None = None) -> int:
         json.dump(readiness.as_dict(), sys.stdout, indent=2, ensure_ascii=False, default=_json_default)
         sys.stdout.write("\n")
     else:
-        _print_report(readiness)
+        _print_report(readiness, level=args.level)
 
-    if readiness.verdict == READINESS_READY:
+    if readiness.achieved(args.level):
         print(
-            f"# READY: material suficiente en {readiness.facts['versionsMeetingMinimum']}",
+            f"# {readiness.verdict}: nivel '{args.level}' alcanzado "
+            f"(nivel medido: {readiness.verdict})",
             file=sys.stderr,
         )
         return 0
     print(
-        "# BLOQUEADO: material PAPER insuficiente; motivos: "
+        f"# BLOQUEADO: nivel '{args.level}' NO alcanzado (nivel medido: {readiness.verdict}); "
+        "motivos: "
         + "; ".join(readiness.blockers),
         file=sys.stderr,
     )
