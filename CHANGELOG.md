@@ -2,6 +2,55 @@
 
 All notable releases of Bolsa V1.
 
+## [1.99.0-beta] — `AUTO-MATERIAL-2`: PAPER PRODUCER (PRODUCER READY) — 2026-09-26
+
+**Fase de activación y control del productor; SIN migración** (Alembic head sigue en
+`046_fill_reference_mid`) y **sin tocar ningún fichero del freeze** (`auto_simulation_worker.py`
+intacto). El reparto **no se mueve**: `auto18-v1` / `auto15-v1`. No se toca `evidence_runs`/
+`evidence_validations`, ni el `exit 2` del exportador y del run, ni la UI.
+
+El bloqueo por material de `v2.73` deja de ser un diagnóstico sin remedio: se **activa y controla** el
+productor AUTO 2.0 (`AUTO_ENGINE_SIM_V2=ON` + decider + watch + régimen) y se verifica que el material
+PAPER **nace con estructura completa** —`cycle_id` en los fills, reservas con `reserved_risk`, intents
+de salida con `cycle_id`, ciclos cerrados y R medible— sobre una **cuenta PAPER nueva**, sin rellenar el
+histórico legacy. El invariante que instala: **`PRODUCER_READY` (bien formado) ≠ `EVIDENCE_READY`
+(suficiente); el gate jamás declara READY sin estructura y nunca repara ni inventa material.**
+
+- **Veredicto de dos niveles.** `packages/py/application/src/bolsa_application/paper_material_readiness.py`:
+  `PRODUCER_READY` (estructura) / `EVIDENCE_READY` (estructura + `≥min` ciclos medibles/estrategia) /
+  `BLOCKED`, con `producer_blockers` (linaje, reservas, cierres, salidas, denominador) y `blockers`
+  (estructura + mínimo). Sello `paper_material_readiness_v2`. `EVIDENCE_READY ⇒ PRODUCER_READY`.
+- **CLI** `apps/api-python/scripts/paper_material_readiness.py`: `--level {producer,evidence}` (default
+  `evidence`, preserva el contrato) y las **tres poblaciones** `DATABASE TOTAL` / `INSTRUMENT UNIVERSE` /
+  `AUTO MATERIAL`. `0` = nivel pedido alcanzado · `2` = BLOCKED · `1` = uso incorrecto.
+- **Productor de ejercicio controlado** (nuevo)
+  `apps/api-python/scripts/v2_74_paper_producer_evidence.py`: conduce el camino REAL
+  (`AutoSimRuntime` → `worker.real_turn`) con decider determinista y `price_script`, sobre dos cuentas
+  PAPER nuevas, y publica el **A/B estructural LEGACY vs V2** (`--json` / `--out`).
+- **Reparación del denominador de R** (en el **store**, no en el worker congelado):
+  `reservation_store.py` conserva el riesgo COMPROMETIDO en la fila durable al liberar la reserva
+  (`_committed_risk`), para que `cycle_risk_from_reservations` reconstruya el R de los ciclos cerrados.
+  Sin riesgo comprometido no hay denominador: `None`, nunca un `0` inventado.
+- **Inmutabilidad legacy**: guarda testeada de que el productor **no** backfillea `cycle_id`; la cuenta
+  histórica conserva `cycle_id=NULL`. El material V2 vive en una **cuenta nueva** (append por
+  `execution_id`).
+- **Tests + mutación.** `test_paper_material_readiness.py` (**13** puros: dos niveles, exits medidos/no
+  inventados, totales de tabla, reserva liberada con/sin denominador, sello y mínimo), nuevo
+  `apps/api-python/tests/test_auto_v74_producer_seam.py` (**5** herméticos: V2 produce estructura ⇒
+  `PRODUCER_READY`, legacy bloqueado, sin backfill, `--level producer` del CLI, JSON con dos niveles) y el
+  caso del denominador en `test_portfolio_reservation.py`. **`M200`** nueva (el gate no declara
+  `PRODUCER_READY` sin estructura) y `M199` ajustada. Matriz completa **200/200** con restauración **byte
+  a byte**. `test_paper_material_readiness.py` queda registrado en `python-ci.yml` y `release-tag-ci.yml`
+  (antes no corría en la compuerta `quality`).
+
+**Evidencia cruda** contra `bolsa-postgres` (2026-09-26), A/B estructural de dos cuentas nuevas: LEGACY
+(V2 OFF) **8** fills / **0** `cycle_id` / **0** cierres / **0** reservas / **0** exit orders / **0** R
+⇒ `BLOCKED`; V2 (AUTO 2.0 ON) **8** fills / **8** `cycle_id` / **1** ciclo cerrado / **2** reservas /
+**1** exit order con `cycle_id` / **1** R medible ⇒ **`PRODUCER_READY`** (con `insufficient measurable
+cycles per strategy`: la muestra es corta y **se declara sin rebajar el mínimo**). Confirma (no supone) la
+hipótesis de `v2.73`: el camino V2 acuña el linaje, las reservas y las salidas; el legacy no.
+**`EVIDENCE_READY`**, `AUTO-22` y `≥32` ciclos medibles son la **fase siguiente** (V2.75).
+
 ## [1.98.0-beta] — `AUTO-MATERIAL-1`: PAPER MATERIAL READINESS (diagnóstico de linaje) — 2026-09-26
 
 **Fase de diagnóstico read-only; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

@@ -1,0 +1,78 @@
+{
+  "ab": {
+    "legacy": {
+      "closedCycles": 4,
+      "evidenceReady": false,
+      "exitOrders": 0,
+      "fills": 8,
+      "measurableR": 0,
+      "producerReady": false,
+      "reservations": 0,
+      "verdict": "BLOCKED",
+      "withCycle": 0
+    },
+    "v2": {
+      "closedCycles": 1,
+      "evidenceReady": false,
+      "exitOrders": 1,
+      "fills": 8,
+      "measurableR": 1,
+      "producerReady": true,
+      "reservations": 2,
+      "verdict": "PRODUCER_READY",
+      "withCycle": 8
+    }
+  },
+  "accounts": {
+    "legacy": "ea1f0f17b8ee4365b6032cd0b",
+    "v2": "1584664bdbcf4a8dab1c811b8"
+  },
+  "bump": "1.99.0-beta",
+  "instruments": {
+    "legacy": "v74-leg-0000000009",
+    "v2": "v74-v2-0000000004"
+  },
+  "phase": "V2.74 AUTO-MATERIAL-2 PAPER PRODUCER",
+  "runs": {
+    "legacy": {
+      "closed": true,
+      "opened": true
+    },
+    "v2": {
+      "closed": true,
+      "opened": true
+    }
+  },
+  "v2Blockers": [
+    "insufficient measurable cycles per strategy"
+  ],
+  "v2EvidenceReady": false,
+  "v2Lineage": {
+    "closure": {
+      "closedCycles": 1,
+      "closedCyclesWithIdentity": 1,
+      "closedCyclesWithRisk": 1,
+      "cyclesWithoutIdentity": 0
+    },
+    "cycle": {
+      "exitOrders": 1,
+      "exitOrdersWithCycle": 1,
+      "fillsWithCycle": 8,
+      "fillsWithoutCycle": 0
+    },
+    "readiness": {
+      "evidenceReady": false,
+      "level": "producer",
+      "producerReady": true
+    },
+    "reservation": {
+      "live": 0,
+      "released": 2,
+      "rows": 2,
+      "withCycle": 2
+    }
+  },
+  "v2ProducerReady": true,
+  "v2ProducersBlockers": [],
+  "v2Verdict": "PRODUCER_READY"
+}
