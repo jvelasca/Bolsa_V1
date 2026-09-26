@@ -52,6 +52,7 @@
 
 - [Plan](./plan-v2-73-auto-material-1-paper-material-readiness-2026-09-26.md) ·
   [Audit-pack](./audit-pack-v2-73-auto-material-1-paper-material-readiness-2026-09-26.md) ·
+  [Auditor](./arranque-auditor-v2.73-auto-material-1-paper-material-readiness-2026-09-26.md) ·
   [Agente](./arranque-agente-post-v2.73-auto-material-1-paper-material-readiness-2026-09-26.md)
 - Evidencia cruda: `evidencia-material-readiness-v2.73-2026-09-26.txt` ·
   `evidencia-matriz-mutaciones-v2.73-199-2026-09-26.txt`

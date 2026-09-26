@@ -49,6 +49,7 @@ La **auditoría externa de `v2.73-beta`** es la siguiente parada: el pack está 
 
 [Plan](./plan-v2-73-auto-material-1-paper-material-readiness-2026-09-26.md) ·
 [Audit-pack](./audit-pack-v2-73-auto-material-1-paper-material-readiness-2026-09-26.md) ·
+[Auditor](./arranque-auditor-v2.73-auto-material-1-paper-material-readiness-2026-09-26.md) ·
 [Relevo](./traspaso-relevo-post-v2.73-auto-material-1-paper-material-readiness-2026-09-26.md) ·
 [Deuda P3](./deuda-p3-post-auditoria-v2.70-2026-09-26.md) ·
 Evidencia: `evidencia-material-readiness-v2.73-2026-09-26.txt` ·
