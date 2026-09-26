@@ -60,6 +60,24 @@
    umbrales** (`auto_evidence_run.py`), y después el harness de validación (`auto_evidence_validate.py`)
    para cerrar **P3-2** y **P3-3**.
 
+## Follow-on (2026-09-26) — E2E PostgreSQL del productor (punto 12)
+
+Se cierra el punto 12 del seguimiento (¿`AUTO-19` lee estado vivo o evidencia inmutable?) con
+**evidencia sobre PostgreSQL REAL** y una **deuda declarada**, sin migración:
+
+- **E2E nuevo** — `apps/api-python/tests/test_auto_v74_producer_pg_e2e.py` (PG-gated,
+  `AUTO_V74_PRODUCER_PG_REQUIRED=1`): conduce el camino REAL, `engine.dispose()`, y reconstruye el
+  veredicto con el **lector REAL del CLI** desde una conexión NUEVA ⇒ `PRODUCER_READY`, con el
+  denominador del ciclo cerrado conservado en la fila durable (`reserved_risk > 0`, `remaining_qty = 0`).
+  Registrado en los jobs PG de `python-ci.yml` y `release-tag-ci.yml` e ignorado en los offline.
+- **Respuesta al punto 12** — no es el ledger vivo; es la **misma columna** `reserved_risk` releída tras
+  el cierre (`_committed_risk` en `reservation_store.py`). No hay `reserved_risk_at_entry`/`CycleEvidence`.
+- **Deuda P3-5 declarada** — `reserved_risk` sobrecargado (vivo vs histórico); cierre = columna/entidad
+  inmutable o contrato explícito del store; requiere migración (head `046_fill_reference_mid`).
+- **Hallazgo declarado (no bloqueante)** — el productor deja viva una reserva de SALIDA
+  (`sell`, `reserved_risk = 0`) de un intento superado por otro tras quedar plano; no es denominador de
+  R ni cambia el veredicto.
+
 ## Ficheros de la fase
 
 - [Plan](./plan-v2-74-auto-material-2-paper-producer-2026-09-26.md) ·

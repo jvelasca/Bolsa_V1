@@ -553,6 +553,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
           --ignore=apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
+          --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -634,6 +635,13 @@ jobs:
       # real, con oráculo independiente y test same-material AUTO-7 vs AUTO-20. Un skip mudo
       # dejaría la deuda nº 1 de ``v2.62`` sin certificar en el tag.
       AUTO20B_EXPORT_PG_REQUIRED: '1'
+      # V2.74/AUTO-MATERIAL-2 (productor V2 sobre PG real): que la estructura que el worker
+      # AUTO 2.0 acuña —``cycle_id`` en los fills, reserva de entrada con denominador,
+      # salida con ``cycle_id``, ciclo cerrado y R medible— SOBREVIVA al commit y sea
+      # reconstruida por ``paper_material_readiness_v2`` desde una conexión NUEVA (leída por
+      # el lector REAL del CLI). Un skip mudo dejaría el bloqueo del productor sin certificar
+      # sobre PG en el tag.
+      AUTO_V74_PRODUCER_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -735,6 +743,10 @@ jobs:
         # cuantificados como excluidos, versiones observadas frente a las pedidas, y procedencia
         # PAPER virtual— con el universo medido invariante.
         # Gate fail-if-skipped: AUTO20B_EXPORT_PG_REQUIRED=1.
+        # V2.74/AUTO-MATERIAL-2: E2E del PRODUCTOR V2 sobre PG real — el worker AUTO 2.0
+        # acuña la estructura (``cycle_id``/reserva/exit/ciclo cerrado/R medible), se COMMITEA,
+        # se cortan las conexiones y el gate (lector REAL del CLI) la reconstruye desde una
+        # conexión NUEVA hasta ``PRODUCER_READY``. Gate fail-if-skipped: AUTO_V74_PRODUCER_PG_REQUIRED=1.
         # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs (deuda:
         # drift silencioso). Ahora se ejecutan aquí con gate fail-if-skipped.
         run: >
@@ -765,6 +777,7 @@ jobs:
           apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
           apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
+          apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py

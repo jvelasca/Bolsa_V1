@@ -5,10 +5,11 @@
 > **Naturaleza:** hallazgos **P2/P3** sobre **la lectura** de la incertidumbre; ninguno publica un
 > número falso nuevo, pero H1 **sí** mezcla dos funcionales en el mismo nombre.
 > **Estado:** **H1 y H2/H3/H4 cerrados en `v2.71`**; **P3-4** (hallazgo de la auditoría de `v2.71`,
-> preexistente y read-only) **cerrada en `v2.72`**; P3-2 y P3-3 siguen **abiertas** (requieren el
-> primer dataset PAPER real). **El bloqueante central es MATERIAL, no código** (y desde `v2.74` es de
-> **muestra**, no de forma). **Deuda de proceso declarada:** `v2.73-beta` quedó **sin auditoría
-> externa** (ver más abajo).
+> preexistente y read-only) **cerrada en `v2.72`**; **P3-5** (`reserved_risk` sobrecargado: libro vivo
+> vs evidencia histórica) **abierta y declarada** (2026-09-26, tras el E2E PostgreSQL de `v2.74`);
+> P3-2 y P3-3 siguen **abiertas** (requieren el primer dataset PAPER real). **El bloqueante central es
+> MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma). **Deuda de proceso declarada:**
+> `v2.73-beta` quedó **sin auditoría externa** (ver más abajo).
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -116,6 +117,40 @@ BLOQUEADO** contra PostgreSQL vivo con los mismos números.
 propiedad «no hay segunda aritmética» la garantiza el clamp del bootstrap, **no** ese test. Se deja
 anotado para no sobre-confiar en la cobertura de ese test; endurecerla requeriría un doble que **no**
 clampe por su cuenta.
+
+## P3-5 — `reserved_risk` sobrecargado: libro vivo vs evidencia histórica — 🟠 ABIERTA (2026-09-26)
+
+**Origen.** Seguimiento del punto 12 de `v2.74`: ¿`AUTO-19` (`cycle_risk_from_reservations`) obtiene el
+riesgo histórico de una evidencia **inmutable** del ciclo o del estado **mutable** del `ReservationLedger`?
+
+**Observación.** Ninguna de las dos, exactamente. `cycle_risk_from_reservations` **no** lee el ledger vivo
+(lee filas durables de `portfolio_reservations`, vivas y liberadas, y filtra `is_buy and reserved_risk > 0`),
+pero **tampoco** existe una entidad `CycleEvidence`: lee la **misma** columna
+`portfolio_reservations.reserved_risk`, cuya semántica depende del estado — vivo mientras `OPEN`; histórico
+tras el cierre, porque `_release()` la sobrescribe con el riesgo comprometido en el alta
+(`reserved_risk × quantity / remaining_qty`, `_committed_risk`). Es una **reconstrucción tardía en el
+store**, no un snapshot inmutable de entrada.
+
+**Riesgo.** Un lector que no conozca la convención puede leer "riesgo actual `0`" donde el productor quiso
+decir "riesgo comprometido `X`". La reconstrucción es exacta para la liberación total intacta y para la
+última liberación de una escalera (cubierto por `test_portfolio_reservation.py`), pero la garantía vive en
+el store y no en el modelo.
+
+**Criterio de cierre.** O una columna/entidad dedicada e inmutable (`reserved_risk_at_entry` / `CycleEvidence`)
+o declarar la convención como contrato explícito del store. Requiere migración Alembic (hoy head
+`046_fill_reference_mid`); **no** se aborda en `v2.74` (alcance acordado: solo E2E).
+
+**Evidencia de que no bloquea `PRODUCER_READY` (2026-09-26).** El E2E PostgreSQL
+`apps/api-python/tests/test_auto_v74_producer_pg_e2e.py` demuestra que la estructura del productor V2
+sobrevive al COMMIT y el gate la reconstruye desde una conexión **nueva**: la fila durable de la reserva de
+ENTRADA de un ciclo cerrado conserva `reserved_risk > 0` con `remaining_qty = 0`. La convención funciona;
+lo que falta es modelarla explícitamente.
+
+**Hallazgo declarado (no bloqueante).** En la misma corrida, el productor V2 deja VIVA una reserva de
+SALIDA (`side='sell'`, `reserved_risk = 0`) de un intento de salida superado por otro, tras quedar la
+posición plana. No puede ser denominador de R (solo una reserva de COMPRA con `reserved_risk > 0` lo es) y
+no altera el veredicto, pero es una reserva viva después del cierre: queda declarada como observación del
+productor, fuera del alcance de esta fase (`auto_simulation_worker.py` sigue congelado).
 
 ## Deuda de AUDITORÍA — `v2.73-beta` (`AUTO-MATERIAL-1`) sin pasada externa — 🟡 ABIERTA (de proceso)
 
