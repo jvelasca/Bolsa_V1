@@ -1,0 +1,133 @@
+EVIDENCIA CRUDA — PAPER MATERIAL READINESS (pre-flight AUTO-22): BLOQUEADO
+Fase: v2.73-beta (1.98.0-beta) · Fecha: 2026-09-26 · Entorno: PostgreSQL local (docker compose, bolsa-postgres)
+Objetivo: medir y declarar POR QUE el material PAPER no produce ciclos con R medible, ANTES de intentar el RUN.
+REGLA DURA respetada: el gate es un LECTOR; NO repara material, NO infiere cycle_id, NO inventa reserved_risk,
+NO convierte N fills en N operaciones y NO baja ningun umbral (min cycles / min R / folds / min_episodes).
+
+--------------------------------------------------------------------------------
+1) RECONCILIACION CON v2.72 (hechos crudos, tabla completa vs cuenta)
+--------------------------------------------------------------------------------
+
+$ docker exec bolsa-postgres psql -U bolsa -d bolsa_v1 -t -c "select 'table_fills=' || count(*) from sim_fill_finance_context; ..."
+ table_fills=761
+ table_cycle=0
+ table_buy=751
+ table_sell=10
+ table_versions=53
+ acct_fills=4                     (account_id = 181e7e07d27d4cdebc342ff83)
+ acct_versions=1
+ table_reservations=0
+ table_exit_orders=0
+
+LECTURA:
+- Los 761 fills de v2.72 se reproducen EXACTOS (751 buy / 10 sell / 0 con cycle_id).
+- Son 761 en TODA la tabla, repartidos en 53 versiones y varias cuentas. La cuenta del RUN
+  (181e7e07d27d4cdebc342ff83) tiene 4 fills de 1 sola version: ese es el universo que lee el
+  instrumento, y el gate mide ese mismo universo (no un total de tabla que no le corresponde).
+- portfolio_reservations = 0 y auto_exit_orders = 0: ni denominador de R ni intents de salida.
+
+--------------------------------------------------------------------------------
+2) EL GATE — tabla (cuenta CON fills, misma del RUN de v2.72)
+--------------------------------------------------------------------------------
+
+$ $env:BROKER_VENUE="paper"
+$ uv run --no-sync python apps/api-python/scripts/paper_material_readiness.py `
+      --account-id 181e7e07d27d4cdebc342ff83 `
+      --strategy-version ver-disc-inst-a11-b724bd7df2-sma-0-e5048f4d47d3
+
+PAPER MATERIAL READINESS
+----------------------------------------------
+Account fills (all versions)  4
+Durable fills (requested)     4
+Fills with cycle_id           0  [X]
+Closed cycles                 0  [X]
+Reserved-risk cycles          0  [X]
+Measurable R (>=32/strategy)  0  [X]
+Reservations                  0  [X]
+Exit intents with cycle_id    0
+----------------------------------------------
+AUTO-22 READY?                NO
+Allocation                    FROZEN
+
+BLOCKERS
+  - no cycle lineage
+  - no reservations
+  - no closed cycles
+  - insufficient measurable cycles per strategy
+  - producer path not exercised
+
+Sello: paper_material_readiness_v1
+EXIT=2
+
+--------------------------------------------------------------------------------
+3) EL GATE — JSON maquina-legible (--json, misma corrida)
+--------------------------------------------------------------------------------
+
+{
+  "schema": "paper_material_readiness_v1",
+  "verdict": "BLOCKED",
+  "ready": false,
+  "blockers": [
+    "no cycle lineage",
+    "no reservations",
+    "no closed cycles",
+    "insufficient measurable cycles per strategy",
+    "producer path not exercised"
+  ],
+  "facts": {
+    "account": "181e7e07d27d4cdebc342ff83",
+    "requestedStrategyVersions": ["ver-disc-inst-a11-b724bd7df2-sma-0-e5048f4d47d3"],
+    "minCyclesPerStrategy": 32,
+    "executionReality": "VIRTUAL — NO REAL MONEY",
+    "durableFills": 4,
+    "fillsWithCycle": 0,
+    "fillsWithoutCycle": 4,
+    "buys": 4,
+    "sells": 0,
+    "reservations": 0,
+    "reservationsWithCycle": 0,
+    "reservationsLive": 0,
+    "closedCycles": 0,
+    "measurableCycles": 0,
+    "maxFillsPerVersion": 4,
+    "maxMeasurableCyclesPerVersion": 0,
+    "versionsMeetingMinimum": [],
+    "versionsWithoutClosedCycles": ["ver-disc-inst-a11-b724bd7df2-sma-0-e5048f4d47d3"],
+    "perVersion": {},
+    "reservationsReadComplete": true,
+    "fillsTotalForAccount": 4
+  },
+  "lineage": {
+    "cycle": {"fillsWithCycle": 0, "fillsWithoutCycle": 4, "exitOrdersWithCycle": 0, "exitOrders": 0},
+    "reservation": {"rows": 0, "withCycle": 0, "live": 0, "released": 0},
+    "closure": {"closedCycles": 0, "closedCyclesWithIdentity": 0, "closedCyclesWithRisk": 0, "cyclesWithoutIdentity": 0}
+  }
+}
+
+EXIT=2
+
+--------------------------------------------------------------------------------
+4) SONDAS DE LINAJE (A/B/C/D) — lo que mide cada bloque
+--------------------------------------------------------------------------------
+
+A · Cycle lineage    : fills con cycle_id = 0; exit orders con cycle_id = 0 (auto_exit_orders vacia).
+B · Reservation line : reservas totales = 0 (ni vivas ni liberadas) => sin reserved_risk.
+C · Cierre FIFO      : round-trips reconstruidos por cycles_from_fills = 0 (4 buys, 0 sell).
+D · Readiness        : BLOCKED por los cinco motivos; 0 versiones alcanzan el minimo (>=32).
+
+Cada bloque declara un CERO por haber MEDIDO el hecho (tablas accesibles y vacias), no un cero de
+relleno: la lectura de reservas y de exit orders se completo (`reservationsReadComplete = true`).
+Si una lectura no pudiera garantizar completitud, el bloque lo declara (siempre `[X]`, nunca READY).
+
+--------------------------------------------------------------------------------
+5) CONCLUSION DECLARADA
+--------------------------------------------------------------------------------
+
+El bloqueo de v2.72 queda convertido en un DIAGNOSTICO OPERATIVO reproducible y medido: el gate
+declara los cinco eslabones ausentes del circuito (FILL -> CYCLE -> ENTRY+EXIT -> RESERVED RISK -> R)
+y sale 2 SIN publicar un READY falso. Reproduce la hipotesis declarada en el plan: con el pipeline
+AUTO 2.0 (AUTO_ENGINE_SIM_V2) apagado, el camino legacy materializa fills sin cycle_id y sin reservas
+=> 0 cierres con R medible aunque hubiera fills.
+
+Reparar el productor y re-ejecutar la corrida para acumular >=32 ciclos medibles por estrategia sigue
+siendo el PASO OPERATIVO DEL PROPIETARIO, fuera del alcance de esta fase (AUTO-MATERIAL-1 solo mide y declara).

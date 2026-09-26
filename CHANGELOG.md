@@ -2,6 +2,47 @@
 
 All notable releases of Bolsa V1.
 
+## [1.98.0-beta] — `AUTO-MATERIAL-1`: PAPER MATERIAL READINESS (diagnóstico de linaje) — 2026-09-26
+
+**Fase de diagnóstico read-only; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y
+**sin tocar ningún fichero del freeze**. El reparto **no se mueve**: `auto18-v1` / `auto15-v1`. No se
+toca `evidence_runs`/`evidence_validations`, ni el `exit 2` del exportador y del run, ni la UI.
+
+Convierte el bloqueo de `v2.72` («761 fills / 0 `cycle_id` / 0 reservas») en un **gate operativo** que
+se corre **antes** de `auto_evidence_run.py` (`AUTO-22`) y declara **por qué** el material PAPER no
+produce ciclos con R medible. El invariante que instala: **el material se mide y se declara; el gate
+no repara, no infiere `cycle_id` ni `reserved_risk` y no devuelve `READY` sin ciclos cerrados con
+denominador positivo.**
+
+- **Módulo puro.** `packages/py/application/src/bolsa_application/paper_material_readiness.py`
+  (`build_paper_material_readiness` + `PaperMaterialReadiness` + blockers). Mide sobre el **mismo**
+  material que el instrumento (`adaptive_instrument_cycles` = `cycles_from_fills` +
+  `cycle_risk_from_reservations` + fricción): sin un segundo FIFO ni una segunda aritmética de R.
+- **CLI read-only.** `apps/api-python/scripts/paper_material_readiness.py` (tabla + `--json`, guarda
+  de venue `BROKER_VENUE=paper`): `0` READY · `2` BLOCKED · `1` uso incorrecto. Es el **pre-flight**
+  del RUN.
+- **Motivos nombrados (fail-closed).** `no cycle lineage` · `no reservations` · `no closed cycles` ·
+  `insufficient measurable cycles per strategy` · `producer path not exercised`.
+- **Sondas de linaje A/B/C/D** en el JSON (cycle lineage · reservation lineage · cierre FIFO ·
+  readiness); lo que no se puede garantizar completo se declara como no medido, nunca como cero.
+- **Mínimo declarado** `≥32` ciclos medibles por estrategia (operativo del protocolo del primer RUN,
+  `folds=3`/`min_is=8`/`min_oos=4`), parametrizable por `--min-cycles` y **nunca rebajado**.
+- **Tests + mutación.** Tests puros (legacy BLOCKED · V2 READY · bajo mínimo BLOCKED · sin relleno ·
+  linaje de exit orders medido/no inventado · sello y mínimo en el payload) y costura del CLI; **`M199`**
+  nueva. Matriz completa **199/199** con restauración **byte a byte**.
+
+**Evidencia cruda** contra `bolsa-postgres` (2026-09-26): cuenta del RUN `181e7e07d27d4cdebc342ff83` =
+**4** fills / **0** `cycle_id` / **0** reservas / **0** exit orders ⇒ **BLOCKED** con los cinco motivos
+y `exit 2`; tabla completa **761** fills (**751 `buy` / 10 `sell`**), **0** `cycle_id`, **53**
+versiones, **0** reservas. Confirma (no supone) la hipótesis del plan: con `AUTO_ENGINE_SIM_V2` OFF el
+worker usa el camino legacy y materializa fills **sin `cycle_id` y sin reservas** ⇒ sin cierres con R
+medible. La **reparación del material** (activar el productor V2 y acumular `≥32` ciclos medibles) es la
+**fase siguiente**, fuera del alcance de esta.
+
+**Compuertas.** `ruff` **All checks passed** · `import-linter` **4 kept / 0 broken** ·
+`mypy` **0 issues (502 files)** · `analytics`/`application`/`api-python` offline · matriz **199/199**
+byte a byte.
+
 ## [1.97.0-beta] — Cierre de `P3-4` (el `level` de la lectura del régimen es el clampeado) — 2026-09-26
 
 **Fase corta y quirúrgica de corrección del instrumento; SIN migración** (Alembic head sigue en
