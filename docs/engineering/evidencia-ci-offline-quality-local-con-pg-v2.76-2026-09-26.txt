@@ -1,0 +1,106 @@
+........................................................................ [  2%]
+........................................................................ [  4%]
+........................................................................ [  7%]
+........................................................................ [  9%]
+........................................................................ [ 12%]
+........................................................................ [ 14%]
+........................................................................ [ 17%]
+........................................................................ [ 19%]
+........................................................................ [ 22%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 29%]
+........................................................................ [ 32%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 39%]
+........................................................................ [ 42%]
+........................................................................ [ 44%]
+........................................................................ [ 46%]
+........................................................................ [ 49%]
+........................................................................ [ 51%]
+........................................................................ [ 54%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+........................................................................ [ 61%]
+........................................................................ [ 64%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 71%]
+........................................................................ [ 74%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+........................................................................ [ 81%]
+........................................................................ [ 84%]
+........................................................................ [ 86%]
+........................................................................ [ 88%]
+........................................................................ [ 91%]
+........................................................................ [ 93%]
+.....................................................F.................. [ 96%]
+........................................................................ [ 98%]
+..................................                                       [100%]
+================================== FAILURES ===================================
+________ test_the_validation_reads_real_postgres_material_and_seals_it ________
+
+tmp_path = WindowsPath('C:/Users/josea/AppData/Local/Temp/pytest-of-josea/pytest-980/test_the_validation_reads_real0')
+
+    def test_the_validation_reads_real_postgres_material_and_seals_it(tmp_path: Path) -> None:
+        """El comando del propietario, de punta a punta, sobre PostgreSQL real (material sembrado)."""
+        import uuid
+    
+        try:
+            asyncio.run(e2e._probe())
+        except Exception as exc:  # noqa: BLE001 � skip/fail gate honesto por env.
+            e2e._require_or_skip(exc)
+            raise
+    
+        account_id = f"acc-a23-{uuid.uuid4().hex[:10]}"
+        root = tmp_path / "validations"
+        try:
+            asyncio.run(e2e._seed(account_id))
+            argv = [
+                "--account-id",
+                account_id,
+                *_SMALL,
+                "--out-root",
+                str(root),
+            ]
+            for version in e2e._VERSIONS:
+                argv += ["--strategy-version", version]
+            code, _out, err = _run(argv)
+            assert code == 0, err
+            dirs = _run_dirs(root)
+            assert len(dirs) == 1
+            document = json.loads(
+                (dirs[0] / "validation.json").read_text(encoding="utf-8")
+            )
+            assert document["run"]["source"] == "paper_real"
+            assert document["materialOrigin"] == "paper_real"
+            assert document["brokerVenue"] == "paper"
+>           assert document["measuredCycles"] == len(e2e._SPECS)
+E           AssertionError: assert 17 == 26
+E            +  where 26 = len([_CycleSpec(cycle_id='cyc-a20b-a-00', buy_version='orb-a20b-A', sell_version='orb-a20b-A', effective_version='orb-a20b...ell_version='orb-a20b-A', effective_version='orb-a20b-A', with_risk=True, with_reference=True, regime='TREND_UP'), ...])
+E            +    where [_CycleSpec(cycle_id='cyc-a20b-a-00', buy_version='orb-a20b-A', sell_version='orb-a20b-A', effective_version='orb-a20b...ell_version='orb-a20b-A', effective_version='orb-a20b-A', with_risk=True, with_reference=True, regime='TREND_UP'), ...] = e2e._SPECS
+
+apps\api-python\tests\test_auto_v70_auto23_evidence_validation.py:244: AssertionError
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+============================== warnings summary ===============================
+apps/api-python/tests/test_rate_limit.py::test_rate_limit_key_includes_jwt_principal
+apps/api-python/tests/test_rate_limit.py::test_rate_limit_key_omits_default_owner_principal
+  C:\Users\josea\Documents\Informatica\Typescript\Bolsa_V1\.venv\Lib\site-packages\jwt\api_jwt.py:147: InsecureKeyLengthWarning: The HMAC key is 12 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    return self._jws.encode(
+
+apps/api-python/tests/test_rate_limit.py::test_rate_limit_key_includes_jwt_principal
+apps/api-python/tests/test_rate_limit.py::test_rate_limit_key_omits_default_owner_principal
+  C:\Users\josea\Documents\Informatica\Typescript\Bolsa_V1\.venv\Lib\site-packages\jwt\api_jwt.py:368: InsecureKeyLengthWarning: The HMAC key is 12 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    decoded = self.decode_complete(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED apps/api-python/tests/test_auto_v70_auto23_evidence_validation.py::test_the_validation_reads_real_postgres_material_and_seals_it

@@ -2,6 +2,64 @@
 
 All notable releases of Bolsa V1.
 
+## [2.01.0-beta] — `AUTO-MATERIAL-4`: MARKET MATERIAL (forward PAPER con precio real) — 2026-09-26
+
+**Fase de material de MERCADO; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y
+**sin tocar el freeze** (`auto_simulation_worker.py` intacto). El reparto **no se mueve**:
+`auto18-v1` / `auto15-v1` (`ALLOCATION = none`). No se baja ningún umbral, no se repara material y no
+se crea ni sobrescribe nada en `evidence_runs/`/`evidence_validations/`.
+
+`v2.75` cruzó la **cantidad** (`EVIDENCE_READY`, 42 ciclos medibles) pero no la **diversidad**: un solo
+cubo de calendario y un solo episodio de régimen. La causa estaba en dos hechos: el precio del forward
+era **plano** (nadie inyectaba `price_script`) y el régimen estaba **forzado** por
+`AUTO_ENGINE_SIM_V2_REGIME`. Esta fase cablea **precio de MERCADO** por el único seam del motor
+congelado y deja que el **régimen salga de las barras reales**. El invariante que instala: **el forward
+PAPER ya opera con precio y régimen de mercado, y declara en el mismo payload si el universo PUEDE
+entrar hoy — la diversidad de cubos exige tiempo real y NO se fabrica.**
+
+- **Fuente de precio de mercado** (nuevo) `packages/py/application/src/bolsa_application/market_price_snapshot.py`:
+  `MarketPriceSnapshot` con providers **inyectados** (cotización XTB viva + cierre durable del
+  catálogo). La cotización **viva manda** y el cierre **solo rellena** los símbolos ausentes; un valor
+  `None`/`NaN`/`±inf`/`<= 0` **no es un precio** (fail-closed) y un símbolo fuera del watch **no** entra
+  en el cache. `__call__(symbol, minute)` es la lectura síncrona del cache (firma de `PriceScript`).
+  **14** puros herméticos (sin red) en `.../tests/test_market_price_snapshot.py`.
+- **Par real de versiones sobre UNA cuenta** (nuevo)
+  `packages/py/application/src/bolsa_application/auto_forward_deciders.py`: `split_watch` reparte el
+  universo de forma **determinista, disjunta y exhaustiva**; la **versión A** (`VersionedReentryDecider`)
+  estampa `auto-2.0:<vA>` (el prefijo que el worker reconoce para atribuir la estrategia) y re-entra con
+  el símbolo plano, con `HOLD` **fail-closed** si la lectura de posición falla (nunca apila); la
+  **versión B** es la estrategia **ACTIVE** promovida (`active-strategy:<vB>`); `SplitWatchDecider`
+  enruta por símbolo para que AMBAS midan los mismos cubos. **11** puros en
+  `.../tests/test_auto_forward_deciders.py`.
+- **Runner forward + preflight de mercado** (nuevo)
+  `apps/api-python/scripts/v2_76_forward_market_material.py` (solo I/O): `worker(price_script=snapshot,
+  clock=default_clock)` + `AutoSimRuntime`, `snapshot.refresh()` **entre** ticks (el refresh vive en el
+  runner, no en el worker congelado), **sin** fijar `AUTO_ENGINE_SIM_V2_REGIME`, watch derivado del
+  catálogo real (activo + sector + `≥60` barras D1) y veredicto leído con **la misma pieza que el gate**
+  (`build_paper_material_readiness`). `--preflight-only` es **read-only** (no siembra cuenta ni
+  escribe): declara el régimen **por símbolo**, el agregado y si el universo admite entradas LONG.
+- **Hallazgo operativo medido (declarado)**: el agregado de régimen es el veredicto **más conservador**
+  presente, así que con watch amplio **un solo** `trend_down` deja el eje en `BEAR_TREND` y el motor
+  (long-only) veta por `regime_invalid` **todas** las entradas del tick. Medido el 2026-09-26 con el
+  catálogo real: 12 símbolos → `{range: 5, trend_down: 6, trend_up: 1}` ⇒ `BEAR_TREND`; el forward de 8
+  ticks dio `regime_invalid:40` + `top_n_excluded:24` y **0 fills**. **No** se fuerza el régimen ni se
+  elige un watch «que pase»: se declara. Con el bridge XTB caído (`:3002` sin escuchar) los 8/8
+  símbolos se sirven por **`market_close`**: el respaldo declarado, no un fallo silencioso.
+- **CI y mutaciones**: los dos ficheros puros nuevos entran **explícitos** en el job `quality` de
+  `python-ci.yml` (ese directorio no tiene pase de directorio); **`M201`–`M205`** nuevas (respaldo que
+  no sobrescribe; precio no utilizable que no se sirve; A que no apila; enrutado que no se rompe;
+  reparto sin solape) ⇒ matriz **200 → 205**, con restauración **byte a byte** y árbol **intacto**.
+- **Declarado, no hecho**: la **ventana de acumulación** (`≥4` días de calendario) **no se ejecutó**
+  (es operación de tiempo real; los cubos salen de `created_at = datetime.now(UTC)`) y por eso **`P3-2`
+  y `P3-3` siguen ABIERTAS** y **no** se corrieron `AUTO-22`/`AUTO-23` (no hay material que medir: un
+  bundle sobre vacío no acreditaría nada). El fallo local de la sonda PG de `AUTO-23` es
+  **pre-existente** (falla igual en `HEAD` prístino con `git stash`) y en CI ese test **se salta**
+  (el job `quality` no tiene Postgres).
+- **Evidencia cruda**: `evidencia-matriz-mutaciones-v2.76-205-2026-09-26.txt`,
+  `evidencia-ci-offline-quality-v2.76-2026-09-26.txt` (+ la variante local con PG),
+  `evidencia-forward-smoke-v2.76-2026-09-26.txt` y `evidencia-regimen-mercado-v2.76-2026-09-26.txt`.
+- bump `2.00.0-beta` → **`2.01.0-beta`**.
+
 ## [2.00.0-beta] — `AUTO-MATERIAL-3`: EVIDENCE READY (muestra acumulada) — 2026-09-26
 
 **Fase de acumulación de muestra; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

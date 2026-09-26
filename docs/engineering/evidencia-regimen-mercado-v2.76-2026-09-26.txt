@@ -1,0 +1,50 @@
+﻿V2.76 À SONDEO READ-ONLY DEL REGIMEN DE MERCADO (no escribe nada)
+MIN_REGIME_BARS = 60
+XTB_BRIDGE_URL = http://localhost:3002
+candidatos (activo + sector + >=60 barras D1) = 75
+    0a5dc12fd5a24f0a89a91d36a BMW Consumer Cyclical ultima barra D1 = 2026-09-25 00:00:00+00:00
+    0cf0907837fc422db221b0149 HEN3 Consumer Defensive ultima barra D1 = 2026-09-25 00:00:00+00:00
+    240a4ae01a944d3bba1cf1b24 ZAL Consumer Cyclical ultima barra D1 = 2026-09-25 00:00:00+00:00
+    31f9a597d03249319ea0c9345 BAYN Healthcare ultima barra D1 = 2026-09-25 00:00:00+00:00
+    381dd3b0699a44e8b9d13ac13 CON Consumer Cyclical ultima barra D1 = 2026-09-25 00:00:00+00:00
+    49596ff25acb4294b265f321b PAH3 Consumer Cyclical ultima barra D1 = 2026-09-25 00:00:00+00:00
+    4d24ea029283461cb9304421a DB1 Financial Services ultima barra D1 = 2026-09-25 00:00:00+00:00
+    54283bcb54674ec1b70b4db72 AIR Industrials ultima barra D1 = 2026-09-25 00:00:00+00:00
+    5a130eea1ad54dcaaa50b67b9 VOW3 Consumer Cyclical ultima barra D1 = 2026-09-25 00:00:00+00:00
+    5c34aaec1448406ebec94b20f MTX Industrials ultima barra D1 = 2026-09-25 00:00:00+00:00
+    615d243eb830473ab009c8997 MRK Healthcare ultima barra D1 = 2026-09-25 00:00:00+00:00
+    6655c5faff8a458186dcd8adc DHL Industrials ultima barra D1 = 2026-09-25 00:00:00+00:00
+    67c117a7d88f4c75a7174e998 CBK Financial Services ultima barra D1 = 2026-09-25 00:00:00+00:00
+    6db46176cc2d4845845b6ee6e G1A Industrials ultima barra D1 = 2026-09-25 00:00:00+00:00
+    6f6215d935c04e0f9ac7bfef7 SY1 Basic Materials ultima barra D1 = 2026-09-25 00:00:00+00:00
+    74c66a856dde4cbaad4888908 MUV2 Financial Services ultima barra D1 = 2026-09-25 00:00:00+00:00
+    7721cde9af0c49d29576786d5 BEI Consumer Defensive ultima barra D1 = 2026-09-25 00:00:00+00:00
+    840a307d2b074e2db4dfc3373 ADS Consumer Cyclical ultima barra D1 = 2026-09-25 00:00:00+00:00
+    856510e40dda4c758f4d4df89 SAP Technology ultima barra D1 = 2026-09-25 00:00:00+00:00
+    8601a0c3f8d248b0b8052b963 FRE Healthcare ultima barra D1 = 2026-09-25 00:00:00+00:00
+simbolos con barras via loader = 20 de 20
+    0a5dc12fd5a24f0a89a91d36a n= 120 regimen= 'range'
+    0cf0907837fc422db221b0149 n= 120 regimen= 'trend_down'
+    240a4ae01a944d3bba1cf1b24 n= 120 regimen= 'trend_down'
+    31f9a597d03249319ea0c9345 n= 120 regimen= 'range'
+    381dd3b0699a44e8b9d13ac13 n= 120 regimen= 'range'
+    49596ff25acb4294b265f321b n= 120 regimen= 'trend_down'
+    4d24ea029283461cb9304421a n= 120 regimen= 'range'
+    54283bcb54674ec1b70b4db72 n= 120 regimen= 'trend_down'
+    5a130eea1ad54dcaaa50b67b9 n= 120 regimen= 'range'
+    5c34aaec1448406ebec94b20f n= 120 regimen= 'trend_down'
+    615d243eb830473ab009c8997 n= 120 regimen= 'trend_down'
+    6655c5faff8a458186dcd8adc n= 120 regimen= 'trend_up'
+    67c117a7d88f4c75a7174e998 n= 120 regimen= 'trend_up'
+    6db46176cc2d4845845b6ee6e n= 120 regimen= 'range'
+    6f6215d935c04e0f9ac7bfef7 n= 120 regimen= 'range'
+    74c66a856dde4cbaad4888908 n= 120 regimen= 'trend_down'
+    7721cde9af0c49d29576786d5 n= 120 regimen= 'trend_down'
+    840a307d2b074e2db4dfc3373 n= 120 regimen= 'trend_down'
+    856510e40dda4c758f4d4df89 n= 120 regimen= 'trend_up'
+    8601a0c3f8d248b0b8052b963 n= 120 regimen= 'range'
+AGREGADO (mas conservador presente) = 'trend_down'
+EJE OPERATIVO                       = BEAR_TREND
+regime_allows_entry_for(operativo, long) = False
+NOTA: un solo trend_down en el watch basta para BEAR_TREND => veto regime_invalid
+      sobre TODAS las entradas LONG del tick (el motor V2 es long-only).

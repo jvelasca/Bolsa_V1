@@ -7,11 +7,14 @@
 > **Estado:** **H1 y H2/H3/H4 cerrados en `v2.71`**; **P3-4** (hallazgo de la auditoría de `v2.71`,
 > preexistente y read-only) **cerrada en `v2.72`**; **P3-5** (`reserved_risk` sobrecargado: libro vivo
 > vs evidencia histórica) **abierta y declarada** (2026-09-26, tras el E2E PostgreSQL de `v2.74`);
-> P3-2 y P3-3 siguen **abiertas** (requieren el primer dataset PAPER real). **El bloqueante central es
-> MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma; `v2.75` cruza la **cantidad**
-> —42 ciclos medibles ⇒ `EVIDENCE_READY`— pero **no** la **diversidad**: un solo bucket de calendario y
-> un solo episodio de régimen). **Deuda de proceso declarada:**
-> `v2.73-beta` quedó **sin auditoría externa** (ver más abajo).
+> P3-2 y P3-3 siguen **abiertas** (requieren material PAPER real con **diversidad de mercado**). **El
+> bloqueante central es MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma; `v2.75`
+> cruza la **cantidad** —42 ciclos medibles ⇒ `EVIDENCE_READY`— pero **no** la **diversidad**: un solo
+> bucket de calendario y un solo episodio de régimen; `v2.76` cablea **precio y régimen de MERCADO**
+> por el único seam del motor congelado y **declara** por qué, medido, el material de mercado no se
+> puede adelantar: la diversidad de cubos sale de `created_at = datetime.now(UTC)` y exige **tiempo
+> real transcurrido**, no una corrida rápida). **Deuda de proceso declarada:** `v2.73-beta` quedó
+> **sin auditoría externa** (ver más abajo).
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -74,6 +77,20 @@ material acumulado (`activeBuckets=1`, `pairs=[]`, sin inventar celdas; `minBuck
 **no se cierra**: la muestra del productor determinista cae en **un solo bucket** (timestamps de reloj
 real del mismo día). Cerrarla exige material PAPER REAL de mercado en **≥4 cubos**.
 
+**Actualización `v2.76` (2026-09-26):** la **fuente de mercado** queda cableada —`MarketPriceSnapshot`
+(XTB viva + cierre durable, fail-closed) inyectada por el seam público `price_script`, y **sin** fijar
+`AUTO_ENGINE_SIM_V2_REGIME` para que el régimen salga de las barras reales— y el **par real de
+versiones** (A = spine estampado `auto-2.0:<vA>`, B = ACTIVE `active-strategy:<vB>`) queda listo para
+que **ambas** midan los **mismos cubos** sobre **una** cuenta. Pero la deuda **no se cierra** y ahora el
+bloqueante está **medido y nombrado**: (a) la diversidad de cubos sale del **reloj real**
+(`sim_fill_finance_context.created_at = datetime.now(UTC)`) y **exige ≥4 días de calendario
+transcurridos** —ninguna corrida rápida los fabrica—; (b) el agregado de régimen es el veredicto **más
+conservador** presente, de modo que **un solo** `trend_down` en un watch amplio deja el eje en
+`BEAR_TREND` y el motor long-only veta por `regime_invalid` **todas** las entradas del tick (medido el
+2026-09-26: 12 símbolos → `{range: 5, trend_down: 6, trend_up: 1}` ⇒ `BEAR_TREND`; forward de 8 ticks
+con **0 fills**). **No se fuerza** el régimen ni se elige un watch «que pase»: se **declara**. Cerrarla
+sigue exigiendo la **ventana de acumulación operativa** (≥4 días) con el mercado dando **≥2 episodios**.
+
 ## P3-3 — `P(R>0)` frente al tamaño muestral
 
 **Estado: 🔴 ABIERTA** (requiere el primer dataset PAPER real). Regla que se mantiene: `P(R>0)` es
@@ -86,6 +103,14 @@ real del mismo día). Cerrarla exige material PAPER REAL de mercado en **≥4 cu
 de mercado con diversidad real (`Effective-N > 1`).
 **Nota `v2.71`:** el barrido ya publica la `P(R>0)` por **ciclos** (antes publicaba una mezcla por la
 ambigüedad de H1).
+
+**Actualización `v2.76` (2026-09-26):** el **precio real** ya entra por el seam y el **régimen** ya sale
+de las barras (sin override), así que el material que produzca el forward dejará de ser «`R` casi
+constante» y podrá tener `Effective-N > 1` **si** hay mercado que lo permita. Sigue **ABIERTA**: en la
+medición del 2026-09-26 el universe no produjo **ningún** ciclo válido (agregado `BEAR_TREND` ⇒
+`regime_invalid` veta las entradas LONG; 0 fills en 8 ticks), y la ventana ≥4 días **no se ha corrido**.
+Cerrarla exige la **acumulación operativa real** con el watch pudiendo entrar (tendencia alcista/rango)
+y, después, `AUTO-22`/`AUTO-23` sin bajar `folds`/`min_is`/`min_oos` ni `min_episodes`.
 
 ## P3-4 — `build_current_regime_evidence` publica el `level` sin clampar (P3) — 🟢 CERRADA en `v2.72`
 
@@ -192,6 +217,18 @@ en `v2.73`, se corre contra el tag con su propio arranque (el diff `v2.73-beta �
 PAPER real** es el **paso operativo del propietario** y el **hito siguiente**. **No se bajan**
 `min cycles` / `min R` / `folds` para forzarlo. No se toca `evidence_runs`/`evidence_validations` ni
 el runbook.
+
+**Actualización `v2.76` (2026-09-26).** El bloqueante deja de ser «falta el precio» y pasa a ser
+**tiempo real + mercado**: `MarketPriceSnapshot` (XTB viva + cierre durable, fail-closed) entra por el
+único seam del worker congelado (`price_script`) y el régimen ya **no** se fuerza
+(`AUTO_ENGINE_SIM_V2_REGIME` sin fijar ⇒ `DiscoveryRegimeSource`). Queda **medido y declarado** que la
+diversidad de cubos sale de **`created_at = datetime.now(UTC)`** (reloj real): ninguna corrida rápida
+produce ≥4 cubos. Y queda **medido** que con watch amplio el **agregado conservador** de régimen puede
+vetar **todo** el tick (`BEAR_TREND` por un solo `trend_down`; 12 símbolos → `{range: 5, trend_down: 6,
+trend_up: 1}`, 0 fills). Por eso la ventana de **≥4 días** es la operación pendiente y el veredicto
+correcto mientras el material siga degenerado es **`INCONCLUSIVE` / `NO MEDIDO`**, nunca forzar ni
+rebajar umbrales. Comandos exactos en el
+[relevo de `v2.76`](./traspaso-relevo-post-v2-76-auto-material-4-2026-09-26.md).
 
 ## Fuera de alcance de esta deuda
 

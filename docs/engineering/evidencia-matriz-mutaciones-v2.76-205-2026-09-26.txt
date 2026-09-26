@@ -1,0 +1,931 @@
+=== ficheros mutados ===
+  apps/api-python/src/bolsa_api/background/auto_simulation_worker.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_calibration.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_confidence.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_correlation.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_data_gate.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_regime_evidence.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_replay.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_uncertainty.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_report.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_run.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_validation.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_material_manifest.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/auto_self_evaluation.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/expected_value.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/portfolio_optimizer.py
+  packages/py/analytics/src/bolsa_analytics/cognitive/portfolio_reservation.py
+  packages/py/application/src/bolsa_application/adaptive_gate_store.py
+  packages/py/application/src/bolsa_application/applied_cost.py
+  packages/py/application/src/bolsa_application/auto_adaptive_journal.py
+  packages/py/application/src/bolsa_application/auto_adaptive_recovery.py
+  packages/py/application/src/bolsa_application/auto_cycle_journal.py
+  packages/py/application/src/bolsa_application/auto_cycle_reconciliation.py
+  packages/py/application/src/bolsa_application/auto_cycle_regime_reader.py
+  packages/py/application/src/bolsa_application/auto_forward_deciders.py
+  packages/py/application/src/bolsa_application/auto_material_manifest.py
+  packages/py/application/src/bolsa_application/auto_paper_material.py
+  packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py
+  packages/py/application/src/bolsa_application/auto_v2_entry.py
+  packages/py/application/src/bolsa_application/cycle_risk.py
+  packages/py/application/src/bolsa_application/market_price_snapshot.py
+  packages/py/application/src/bolsa_application/paper_material_readiness.py
+  packages/py/application/src/bolsa_application/reservation_store.py
+  packages/py/application/src/bolsa_application/sim_durable_store.py
+  scripts/research/auto_replay_battery.py
+estado git de esos ficheros (antes): ?? packages/py/application/src/bolsa_application/auto_forward_deciders.py
+?? packages/py/application/src/bolsa_application/market_price_snapshot.py
+
+=== linea base (sin mutacion) ===
+  apps/api-python/tests/test_auto_v46_hardkill_recovery.py -> ninguno
+  apps/api-python/tests/test_auto_v50_auto9_cycle_risk_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v52_auto11_adaptive_state_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v53_auto12_confidence_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v54_auto13_data_gate_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v54_auto13_data_gate_wiring_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v54_auto13_recovery_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v54_auto13_regime_fallback_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py -> ninguno
+  apps/api-python/tests/test_auto_v63_auto20b_export_completeness.py -> ninguno
+  apps/api-python/tests/test_auto_v64_auto20c_artifact.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive.py, apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive.py, packages/py/application/tests/test_auto_adaptive_entry.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_calibration.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_confidence.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_confidence.py, packages/py/analytics/tests/test_auto_adaptive.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_correlation.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_data_gate.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_regime_evidence.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_replay.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_uncertainty.py -> ninguno
+  packages/py/analytics/tests/test_auto_adaptive_uncertainty.py, apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py -> ninguno
+  packages/py/analytics/tests/test_auto_evidence_report.py -> ninguno
+  packages/py/analytics/tests/test_auto_evidence_report.py, apps/api-python/tests/test_auto_v64_auto20c_artifact.py -> ninguno
+  packages/py/analytics/tests/test_auto_evidence_run.py -> ninguno
+  packages/py/analytics/tests/test_auto_evidence_run.py, apps/api-python/tests/test_auto_v69_auto22_evidence_run.py -> ninguno
+  packages/py/analytics/tests/test_auto_evidence_validation.py -> ninguno
+  packages/py/analytics/tests/test_auto_material_manifest.py -> ninguno
+  packages/py/analytics/tests/test_auto_self_evaluation.py -> ninguno
+  packages/py/analytics/tests/test_auto_self_evaluation.py, packages/py/analytics/tests/test_auto_adaptive_confidence.py -> ninguno
+  packages/py/analytics/tests/test_auto_self_evaluation.py, packages/py/application/tests/test_auto_self_evaluation_feed.py -> ninguno
+  packages/py/analytics/tests/test_auto_self_evaluation.py, packages/py/application/tests/test_cycle_risk.py -> ninguno
+  packages/py/analytics/tests/test_auto_self_evaluation.py, packages/py/application/tests/test_cycle_risk.py, apps/api-python/tests/test_auto_v57_auto16_applied_cost_seam.py -> ninguno
+  packages/py/analytics/tests/test_expected_value.py -> ninguno
+  packages/py/analytics/tests/test_portfolio_optimizer.py -> ninguno
+  packages/py/analytics/tests/test_portfolio_optimizer.py, packages/py/application/tests/test_auto_v4_optimizer_wiring.py -> ninguno
+  packages/py/application/tests/test_adaptive_gate_store.py -> ninguno
+  packages/py/application/tests/test_adaptive_gate_store.py, apps/api-python/tests/test_auto_v56_auto15_data_gate_durable_seam.py -> ninguno
+  packages/py/application/tests/test_applied_cost.py -> ninguno
+  packages/py/application/tests/test_applied_cost.py, apps/api-python/tests/test_auto_v57_auto16_applied_cost_seam.py -> ninguno
+  packages/py/application/tests/test_applied_cost.py, packages/py/application/tests/test_cycle_risk.py -> ninguno
+  packages/py/application/tests/test_auto_adaptive_journal.py -> ninguno
+  packages/py/application/tests/test_auto_adaptive_recovery.py -> ninguno
+  packages/py/application/tests/test_auto_cycle_journal.py -> ninguno
+  packages/py/application/tests/test_auto_cycle_journal.py, packages/py/application/tests/test_auto_cycle_regime_reader.py -> ninguno
+  packages/py/application/tests/test_auto_cycle_reconciliation.py -> ninguno
+  packages/py/application/tests/test_auto_cycle_reconciliation.py, apps/api-python/tests/test_auto_v52_auto11_adaptive_state_seam.py -> ninguno
+  packages/py/application/tests/test_auto_cycle_regime_reader.py -> ninguno
+  packages/py/application/tests/test_auto_cycle_regime_reader.py, apps/api-python/tests/test_auto_v51_auto10_cycle_regime_seam.py -> ninguno
+  packages/py/application/tests/test_auto_forward_deciders.py -> ninguno
+  packages/py/application/tests/test_auto_self_evaluation_feed.py -> ninguno
+  packages/py/application/tests/test_auto_v47_cycle_trace.py -> ninguno
+  packages/py/application/tests/test_auto_v47_signal_identity.py -> ninguno
+  packages/py/application/tests/test_auto_v4_optimizer_wiring.py -> ninguno
+  packages/py/application/tests/test_auto_v4_optimizer_wiring.py, apps/api-python/tests/test_auto_v2_worker_integration.py::test_v2_optimizer_on_without_an_economic_producer_is_fail_closed -> ninguno
+  packages/py/application/tests/test_auto_v63_auto20b_material_manifest.py -> ninguno
+  packages/py/application/tests/test_cycle_risk.py -> ninguno
+  packages/py/application/tests/test_cycle_risk.py, apps/api-python/tests/test_auto_v57_auto16_applied_cost_seam.py -> ninguno
+  packages/py/application/tests/test_market_price_snapshot.py -> ninguno
+  packages/py/application/tests/test_paper_material_readiness.py -> ninguno
+  packages/py/application/tests/test_paper_material_readiness.py, apps/api-python/tests/test_auto_v74_producer_seam.py -> ninguno
+  packages/py/application/tests/test_sim_fill_reference.py -> ninguno
+
+### M1 (objetivo): el desempate deja de comparar ÔçÆ gana la primera factible
+  rojo en: test_a_tie_on_value_prefers_the_lower_risk, test_capital_picks_the_affordable_subset_instead_of_the_top_of_the_ranking
+  restaurado byte a byte: si
+
+### M2 (vacio): las combinaciones no positivas dejan de descartarse
+  rojo en: test_the_empty_set_wins_when_no_combination_has_a_positive_expectation
+  restaurado byte a byte: si
+
+### M3 (tope): el tope de combinatoria se ignora
+  rojo en: test_the_enumeration_cap_aborts_without_a_silent_greedy
+  restaurado byte a byte: si
+
+### M4 (EV no medido): la candidata sin economia entra y se suma como 0.0
+  rojo en: test_an_unmeasured_expectation_is_never_scored_as_zero
+  restaurado byte a byte: si
+
+### M5 (correlacion): una correlacion DESCONOCIDA deja de ser infeasible
+  rojo en: test_a_known_correlation_limit_makes_an_unknown_correlation_infeasible
+  restaurado byte a byte: si
+
+### M6 (motivo honesto): el journal miente con edge_below_threshold
+  rojo en: test_with_the_flag_on_the_rejected_candidate_publishes_its_real_score, test_with_the_flag_on_the_unmeasurable_top_of_the_ranking_is_not_evaluated
+  restaurado byte a byte: si
+
+### M7 (flag): con ON el tick vuelve al ranking sin declararlo
+  rojo en: test_v2_optimizer_on_without_an_economic_producer_is_fail_closed, test_with_the_flag_on_the_approved_set_never_exceeds_the_top_n, test_with_the_flag_on_the_rejected_candidate_publishes_its_real_score, test_with_the_flag_on_the_unmeasurable_top_of_the_ranking_is_not_evaluated
+  restaurado byte a byte: si
+
+### M8 (direccion short): un stop corto del lado equivocado se acepta
+  rojo en: test_a_short_with_a_long_stop_is_an_inverted_geometry
+  restaurado byte a byte: si
+
+### M9 (direccion desconocida): una direccion no soportada se asume larga
+  rojo en: test_an_unsupported_direction_is_declared_and_never_assumed_long
+  restaurado byte a byte: si
+
+### M10 (target R short): el premio de una corta se mide al reves
+  rojo en: test_a_short_target_r_is_measured_towards_a_lower_price
+  restaurado byte a byte: si
+
+### M11 (cycle acunado): el cycle_id deja de ser determinista por (cuenta, senal)
+  rojo en: test_an_approved_decision_carries_its_cycle_in_the_journal_and_reservation, test_cycle_is_deterministic_by_account_and_signal, test_the_tick_plan_publishes_one_deterministic_cycle_per_candidate
+  restaurado byte a byte: si
+
+### M12 (cycle propagado): el journal deja de publicar el cycleId
+  rojo en: test_an_approved_decision_carries_its_cycle_in_the_journal_and_reservation
+  restaurado byte a byte: si
+
+### M13 (coste inventado): el coste no medido se publica como 0.0
+  rojo en: test_rejection_cost_is_measured_only_with_both_prices
+  restaurado byte a byte: si
+
+### M14 (embudo cerrado sin medir): sin oportunidades el embudo se declara COMPLETE con 0
+  rojo en: test_an_empty_report_is_unknown_not_complete, test_funnel_stays_open_without_opportunities_instead_of_an_invented_zero, test_the_report_declares_what_fills_alone_cannot_measure
+  restaurado byte a byte: si
+
+### M15 (ciclo contado dos veces): la identidad repetida deja de descartarse
+  rojo en: test_a_repeated_cycle_is_counted_once_and_declared, test_the_cross_is_order_independent_and_never_counts_a_duplicate_twice
+  restaurado byte a byte: si
+
+### M16 (colision silenciosa): el dedupe deja de declarar la candidata superada
+  rojo en: test_duplicate_same_strategy_instrument_still_collapses_with_a_journal_trail, test_the_canonical_winner_is_the_best_edge_regardless_of_arrival_order, test_the_default_policy_collapses_but_journals_the_superseded_candidate
+  restaurado byte a byte: si
+
+### M17 (kill recargado): tras reiniciar, el HALT durable deja de adoptarse
+  rojo en: test_a_restored_halt_blocks_entry_but_not_the_protective_exit, test_the_reconciliation_failure_producer_persists_a_halt_across_a_crash
+  restaurado byte a byte: si
+
+### M18 (coste de otra direccion): la direccion no llega al coste
+  rojo en: test_a_short_is_charged_with_the_short_legs_not_with_the_long_ones
+  restaurado byte a byte: si
+
+### M19 (rotacion por salud): la estrategia probadamente negativa deja de pausarse
+  rojo en: test_a_paused_version_discards_its_ramp_instead_of_publishing_it, test_an_undetermined_cross_regime_falls_back_to_the_global_evidence, test_build_adaptive_plan_combines_rotation_and_allocation, test_rotation_pauses_decisive_negative_expectancy, test_rotation_pauses_decisive_profit_factor_below_one, test_rotation_plan_exports_pause_reason_code_vocabulary, test_the_operational_states_travel_in_their_own_field_without_mixing_axes, test_the_ramp_does_not_touch_the_rotation
+  restaurado byte a byte: si
+
+### M20 (rotacion por regimen): la pausa en regimen adverso deja de aplicarse
+  rojo en: test_a_regime_that_could_not_be_read_never_arms_the_adverse_branch, test_rotation_pauses_thin_sample_in_adverse_regime, test_rotation_synthetic_regime_pauses_then_activates
+  restaurado byte a byte: si
+
+### M21 (asignacion monotona): el multiplicador deja de acotarse a [0, 1]
+  rojo en: test_a_measured_cell_moves_the_pool_weight_of_its_version, test_a_thin_positive_edge_cannot_outweigh_a_broad_one, test_allocation_adopts_the_net_axis_when_the_group_shares_one_basis, test_allocation_does_not_mix_axes_when_only_part_of_the_pool_measures_r, test_allocation_ignores_a_measured_but_non_positive_net_r, test_allocation_multipliers_are_monotonic_and_bounded, test_allocation_proportional_to_positive_expectancy, test_allocation_refuses_a_group_with_an_explicitly_mixed_basis, test_allocation_refuses_to_mix_two_cost_bases_in_the_net_axis, test_allocation_weighs_with_measured_net_r_when_the_pool_measures_it, test_allocation_with_unmeasured_net_r_is_identical_to_the_historical_axis, test_the_cell_never_changes_who_competes_nor_mixes_the_axes, test_the_currency_axis_never_applies_a_cell_and_declares_why, test_the_plan_payload_declares_the_axis_and_does_not_change_without_net_r, test_the_ramp_is_a_ceiling_of_the_allocation_and_never_widens, test_without_confidence_the_allocation_is_byte_identical_to_the_historical_one
+  restaurado byte a byte: si
+
+### M22 (sin evidencia neutral): el multiplicador de una version sin evidencia cae a 0
+  rojo en: test_a_strategy_without_a_decisive_edge_keeps_the_neutral_multiplier, test_allocation_axis_requires_decisive_rows_on_both_axes, test_allocation_falls_back_to_the_historical_axis_when_the_two_axes_disagree, test_allocation_materializes_active_version_without_row, test_allocation_multipliers_are_monotonic_and_bounded, test_allocation_never_emits_zero_multiplier, test_allocation_non_decisive_positive_does_not_leak_into_reparto, test_allocation_uniform_when_no_decisive_positive, test_allocation_unknown_multiplier_is_explicit_policy, test_build_adaptive_plan_as_dict_is_read_only_keyed_and_versioned, test_the_cell_never_changes_who_competes_nor_mixes_the_axes, test_without_confidence_the_allocation_is_byte_identical_to_the_historical_one
+  restaurado byte a byte: si
+
+### M23 (gate por fila): una muestra no decisoria entra al reparto proporcional
+  rojo en: test_allocation_axis_requires_decisive_rows_on_both_axes, test_allocation_non_decisive_positive_does_not_leak_into_reparto, test_the_cell_never_changes_who_competes_nor_mixes_the_axes
+  restaurado byte a byte: si
+
+### M24 (policy version): el plan deja de sellar la version de politica
+  rojo en: test_build_adaptive_plan_as_dict_is_read_only_keyed_and_versioned, test_pause_journal_carries_evidence_and_policy_version, test_the_operational_states_travel_in_their_own_field_without_mixing_axes, test_the_policy_version_seals_the_auto18_evidence_contract, test_without_uncertainty_the_plan_is_byte_identical_to_auto18
+  restaurado byte a byte: si
+
+### M25 (hysteresis regimen): el umbral de reactivacion baja al de pausa (sin zona muerta)
+  rojo en: test_rotation_regime_hysteresis_dead_zone
+  restaurado byte a byte: si
+
+### M26 (muestra decisoria): sin decisividad la pausa de salud se declara vigente
+  rojo en: test_rotation_regime_hysteresis_dead_zone
+  restaurado byte a byte: si
+
+### M27 (cooldown): la pausa minima deja de respetarse
+  rojo en: test_rotation_cooldown_keeps_pause_before_min_cycles
+  restaurado byte a byte: si
+
+### M28 (denominador de R): se usa la reserva de entrada MAS NUEVA en vez de la mas antigua
+  rojo en: test_a_candidate_without_a_readable_instant_is_declared_not_silently_ordered, test_the_oldest_entry_reservation_is_measured_in_instants_not_in_text, test_the_oldest_entry_reservation_wins_and_the_rest_are_declared, test_the_producer_is_invariant_to_the_order_of_the_reservations
+  restaurado byte a byte: si
+
+### M29 (reserva de venta): la venta entra como denominador (riesgo 0 admitido)
+  rojo en: test_a_cycle_without_entry_reservation_declares_the_gap, test_a_zero_risk_is_not_a_denominator, test_the_entry_reservation_is_the_denominator
+  restaurado byte a byte: si
+
+### M30 (hueco silencioso): un ciclo sin reservas desaparece del mapa en vez de declararse
+  rojo en: test_a_repeated_cycle_id_is_asked_once_and_keeps_the_input_order, test_apply_cycle_risk_never_writes_an_unmeasured_field, test_every_requested_cycle_appears_even_without_reservations, test_reservations_of_other_cycles_and_rows_without_cycle_are_ignored
+  restaurado byte a byte: si
+
+### M31 (dato no medido): el coste ausente se publica como clave nula en vez de omitirse
+  rojo en: test_apply_cycle_risk_never_writes_an_unmeasured_field, test_only_a_complete_round_trip_is_attached_to_the_cycle
+  restaurado byte a byte: si
+
+### M32 (costura muda): el informe ignora la evidencia de riesgo que le llega
+  rojo en: test_the_cost_model_version_travels_from_the_model_to_the_cycle_row, test_the_feed_declares_the_net_unmeasured_when_the_cost_is_missing, test_the_feed_measures_the_r_when_the_producer_gives_the_denominator, test_the_feed_opens_the_regime_cross_when_the_regime_is_declared, test_the_net_comes_from_the_applied_friction_and_declares_its_basis, test_without_reference_the_net_is_the_estimated_number_of_v2_56
+  restaurado byte a byte: si
+
+### M33 (worker sin denominador): el camino Adaptive deja de leer el riesgo por ciclo
+  rojo en: test_a_saturated_read_declares_the_cycles_that_did_not_fit, test_the_worker_measures_the_r_from_the_cycle_reservation, test_without_reservations_the_plan_keeps_the_auto7_shape
+  restaurado byte a byte: si
+
+### M34 (identidad derivada): un cycle_id ajeno al prefijo tambien se deriva
+  rojo en: test_a_cycle_without_the_derivable_prefix_is_declared_and_never_asked, test_decision_id_declares_when_it_cannot_derive, test_entry_without_a_derivable_cycle_declares_it_instead_of_faking_it, test_the_three_gaps_are_told_apart_in_the_summary
+  restaurado byte a byte: si
+
+### M35 (payload sin cycleId): la traza deja de publicar de que ciclo es
+  rojo en: test_entry_derives_the_decision_id_from_its_cycle, test_entry_without_a_derivable_cycle_declares_it_instead_of_faking_it, test_payload_is_stable_and_omits_absent_strategy
+  restaurado byte a byte: si
+
+### M36 (regimen disfrazado): el regimen ausente se declara COMPLETE
+  rojo en: test_absent_regime_is_declared_not_disguised, test_payload_is_stable_and_omits_absent_strategy
+  restaurado byte a byte: si
+
+### M37 (sink sin usar): el turno deja de publicar el regimen del ciclo
+  rojo en: test_a_broken_sink_degrades_declaring_and_keeps_the_commitment, test_a_cycle_without_identity_is_not_faked, test_an_absent_regime_is_published_declared_not_skipped, test_each_opened_cycle_publishes_its_regime_durably, test_one_opening_is_one_trace
+  restaurado byte a byte: si
+
+### M38 (sink sin commit): la traza se hace flush y se pierde al cerrar la sesion
+  rojo en: test_a_broken_write_leaves_the_tick_session_clean, test_the_durable_sink_commits_the_entry_on_the_tick_session
+  restaurado byte a byte: si
+
+### M39 (sin confirmar): una fila con ese decision_id se cree sin mirar el payload
+  rojo en: test_a_row_of_another_cycle_is_not_believed, test_an_unusable_row_of_more_is_declared_as_gap_not_as_duplicate, test_the_three_gaps_are_told_apart_in_the_summary
+  restaurado byte a byte: si
+
+### M40 (dedupe por llegada): gana la fila mas nueva aunque no confirme el ciclo
+  rojo en: test_the_newest_CONFIRMING_row_wins_over_a_newer_window_entry, test_two_traces_collapse_even_when_one_declares_unknown
+  restaurado byte a byte: si
+
+### M41 (duplicado silencioso): la lectura deja de declarar las filas de mas
+  rojo en: test_a_retry_declares_the_rows_it_collapsed, test_every_extra_row_is_counted_not_just_the_second_one, test_two_traces_collapse_even_when_one_declares_unknown
+  restaurado byte a byte: si
+
+### M42 (identidad sin cuenta): el turno se identifica sin la cuenta, dos cuentas colisionan
+  rojo en: test_a_different_turn_or_account_is_a_different_identity
+  restaurado byte a byte: si
+
+### M43 (fila sin plan): sin recomendacion se escribe una entrada vacia en vez de no-op
+  rojo en: test_without_a_plan_there_is_no_entry
+  restaurado byte a byte: si
+
+### M44 (regimen disfrazado): el regimen ausente de la recomendacion se publica UNKNOWN
+  rojo en: test_an_absent_regime_is_declared_not_disguised
+  restaurado byte a byte: si
+
+### M45 (contador normalizado): un 0 entra al mapa de pausas como si fuera una pausa
+  rojo en: test_the_paused_counter_that_entered_the_decision_is_published_normalized
+  restaurado byte a byte: si
+
+### M46 (racha sin corte): la version sigue contando despues de reactivarse
+  rojo en: test_a_policy_change_keeps_the_counter_and_declares_the_mismatch, test_a_retry_of_the_same_turn_does_not_double_the_streak, test_a_trailing_streak_is_rebuilt_from_the_journal, test_a_version_never_paused_is_absent_from_the_counter, test_a_version_that_disappears_from_the_plan_ends_its_streak, test_the_journal_declares_when_a_version_left_its_pause, test_the_reading_is_invariant_to_the_order_of_the_rows, test_the_streak_stops_at_the_first_active_evaluation
+  restaurado byte a byte: si
+
+### M47 (saturacion sin techo): el contador publicado deja de recortarse al umbral
+  rojo en: test_the_counter_is_saturated_at_the_cooldown_threshold
+  restaurado byte a byte: si
+
+### M48 (dedupe caido): un reintento del sink cuenta dos veces el mismo turno
+  rojo en: test_a_retry_of_the_same_turn_does_not_double_the_streak
+  restaurado byte a byte: si
+
+### M49 (historia corta silenciada): no se declara que la racha es un suelo
+  rojo en: test_an_empty_journal_read_ok_is_not_the_same_as_unread, test_insufficient_history_is_declared_when_the_window_is_not_filled, test_the_summary_publishes_every_declared_limit
+  restaurado byte a byte: si
+
+### M50 (hueco aprobado): un ciclo CON traza confirmada se declara ademas como missing
+  rojo en: test_a_clean_crossing_is_declared_clean, test_a_confirmed_trace_without_a_reservation_is_an_orphan, test_a_reserved_cycle_with_a_confirmed_trace_is_clean, test_the_summary_publishes_each_disagreement_by_its_name
+  restaurado byte a byte: si
+
+### M51 (no preguntado disfrazado): el ciclo que nunca se consulto pasa a ser un hueco
+  rojo en: test_a_reserved_cycle_that_was_never_asked_is_declared_unrequested, test_the_summary_publishes_each_disagreement_by_its_name
+  restaurado byte a byte: si
+
+### M52 (trazas contadas como filas): el duplicado cuenta la entrada de decision del ciclo
+  rojo en: test_the_newest_CONFIRMING_row_wins_over_a_newer_window_entry
+  restaurado byte a byte: si
+
+### M53 (filas de mas silenciadas): la lectura deja de declarar extra_rows
+  rojo en: test_a_retry_declares_the_rows_it_collapsed, test_every_extra_row_is_counted_not_just_the_second_one, test_the_newest_CONFIRMING_row_wins_over_a_newer_window_entry, test_two_traces_collapse_even_when_one_declares_unknown
+  restaurado byte a byte: si
+
+### M54 (antiguedad por texto): el denominador de R se elige comparando created_at como cadena
+  rojo en: test_a_candidate_without_a_readable_instant_is_declared_not_silently_ordered, test_the_oldest_entry_reservation_is_measured_in_instants_not_in_text
+  restaurado byte a byte: si
+
+### M55 (fecha ilegible silenciada): el desempate sin fecha legible deja de declararse
+  rojo en: test_a_candidate_without_a_readable_instant_is_declared_not_silently_ordered
+  restaurado byte a byte: si
+
+### M56 (contador de salida): la evidencia durable publica el estado POSTERIOR a decidir
+  rojo en: test_the_recommendation_is_published_with_the_counter_that_entered
+  restaurado byte a byte: si
+
+### M57 (recuperacion que no siembra): el journal se lee y el contador se descarta
+  rojo en: test_a_policy_change_keeps_the_counter_and_is_declared, test_the_worker_seeds_the_counter_from_the_journal_on_startup
+  restaurado byte a byte: si
+
+### M58 (reconciliacion muda): los huecos del rastro de ciclo se declaran limpios
+  rojo en: test_a_reserved_cycle_without_a_confirmed_trace_is_declared_at_startup
+  restaurado byte a byte: si
+
+### M59 (flag OFF ignorado): con Adaptive apagado el arranque paga la lectura igual
+  rojo en: test_with_the_adaptive_flag_off_there_is_no_read_at_all
+  restaurado byte a byte: si
+
+### M60 (muestra bruta por medida): effective_n cuenta los ciclos sin R
+  rojo en: test_a_cell_without_measured_risk_is_declared_uncovered, test_a_whole_window_of_unmeasured_risk_is_declared_unknown_not_zero, test_the_sample_that_sustains_the_number_is_the_measured_one
+  restaurado byte a byte: si
+
+### M61 (deterioro severo rebajado): la ventana reciente en negativo deja de ser SEVERE
+  rojo en: test_a_homogeneous_window_is_stable_and_keeps_the_historic_decay, test_a_recent_window_that_turned_negative_is_declared_severe, test_a_single_cost_model_keeps_the_historic_stability_and_decay, test_a_stable_applied_window_is_declared_and_keeps_the_historic_decay, test_the_cost_model_transition_alone_blocks_the_decay, test_the_recent_window_is_selected_by_instant_not_by_list_position
+  restaurado byte a byte: si
+
+### M62 (techo sin poner): decay UNKNOWN deja de limitar la confianza
+  rojo en: test_an_unknown_decay_caps_the_confidence_instead_of_premising_it
+  restaurado byte a byte: si
+
+### M63 (fila sin instante silenciada): el orden sin fecha legible deja de declararse
+  rojo en: test_an_unreadable_instant_is_declared_but_a_readable_one_wins
+  restaurado byte a byte: si
+
+### M64 (medicion compuesta disuelta): la completitud se declara COMPLETE sin combinar
+  rojo en: test_measurement_completeness_is_composed_from_r_net_r_and_pnl, test_the_coverage_counts_what_was_actually_measured
+  restaurado byte a byte: si
+
+### M65 (cobertura fingida): la cobertura de coste se afirma sobre la muestra bruta
+  rojo en: test_the_coverage_counts_what_was_actually_measured
+  restaurado byte a byte: si
+
+### M66 (orden por llegada): las ventanas se recortan en el orden de ENTRADA
+  rojo en: test_the_reading_is_order_invariant, test_the_recent_window_is_selected_by_instant_not_by_list_position
+  restaurado byte a byte: si
+
+### M67 (recencia inventada): sin instantes legibles se construye la ventana reciente
+  rojo en: test_an_unknown_decay_caps_the_confidence_instead_of_premising_it, test_without_readable_instants_the_recent_window_is_declared_not_invented
+  restaurado byte a byte: si
+
+### M68 (encogimiento neutralizado): el prior del encogimiento cae a 0
+  rojo en: test_a_thin_positive_edge_cannot_outweigh_a_broad_one, test_the_policy_carries_the_shrinkage_knobs, test_the_published_shrink_factor_is_the_one_actually_applied, test_the_shrinkage_can_be_switched_off_without_hiding_the_measured_band, test_the_shrinkage_reads_the_statistical_n_not_the_measured_n, test_the_shrinkage_redistributes_and_never_empties_a_strategy, test_the_shrinkage_uses_the_confidence_of_the_CELL_not_the_strategy
+  restaurado byte a byte: si
+
+### M69 (descuento neutralizado): el factor de decay SEVERE deja de aplicarse
+  rojo en: test_a_severe_decay_gets_an_additional_declared_discount
+  restaurado byte a byte: si
+
+### M70 (cierre por el primer fill): el instante de cierre toma el PRIMER fill del ciclo
+  rojo en: test_partial_exits_take_the_latest_instant_as_the_close, test_the_close_instant_is_the_last_fill_of_the_cycle
+  restaurado byte a byte: si
+
+### M71 (confianza no cableada): el worker la construye y no la pasa al plan
+  rojo en: test_the_published_evidence_carries_the_confidence_without_a_new_payload_key
+  restaurado byte a byte: si
+
+### M72 (efecto invertido): la tabla estado->efecto deja de mapear OK a ADAPTS
+  rojo en: test_a_clean_reading_adapts, test_the_effect_is_derived_from_the_status
+  restaurado byte a byte: si
+
+### M73 (OK por defecto): un fallo del sink deja de producir DEGRADED
+  rojo en: test_a_single_sink_failure_degrades_without_freezing, test_an_absent_regime_degrades_and_is_never_read_as_adverse, test_an_incomplete_measurement_degrades_when_explicitly_provided, test_an_unavailable_recent_window_degrades, test_the_effect_is_derived_from_the_status, test_the_provenance_of_the_streak_is_declared_and_never_grades, test_thresholds_follow_the_policy
+  restaurado byte a byte: si
+
+### M74 (antiguedad que no bloquea): el journal muerto deja de bloquear al pasar el umbral
+  rojo en: test_a_journal_gap_blocks_the_adaptation, test_blocked_absorbs_the_lesser_reasons, test_the_age_feeds_the_gate_the_same_way_as_a_measured_count, test_the_effect_is_derived_from_the_status, test_the_journal_gap_is_measured_against_the_cycle_count, test_thresholds_follow_the_policy
+  restaurado byte a byte: si
+
+### M75 (contador sin reset): un exito de publicacion no resetea la racha
+  rojo en: test_a_success_between_failures_breaks_the_streak, test_a_successful_publication_resets_the_streak_and_reanchors, test_consecutive_sink_failures_are_counted_and_grade_the_gate
+  restaurado byte a byte: si
+
+### M76 (ancla sin corroborar): la antiguedad bloquea sin un fallo de escritura propio
+  rojo en: test_a_healthy_journal_does_not_stick_blocked_after_a_long_gap, test_the_anchor_alone_does_not_block_until_a_publication_fails
+  restaurado byte a byte: si
+
+### M77 (cadencia ignorada): la antiguedad en segundos no se convierte a ciclos
+  rojo en: test_the_age_feeds_the_gate_the_same_way_as_a_measured_count, test_the_cycle_cadence_is_declared_by_the_policy, test_the_journal_age_converts_seconds_into_declared_cycles, test_the_parse_accepts_offsets_and_naive_instants_as_utc
+  restaurado byte a byte: si
+
+### M78 (BLOCKED adaptando): el tick con evidencia durable muerta sigue construyendo plan
+  rojo en: test_blocked_declares_the_tick_without_a_plan
+  restaurado byte a byte: si
+
+### M79 (STALE reactivando): una pausa viva levanta su cooldown con la evidencia ilegible
+  rojo en: test_stale_holds_a_live_pause_that_would_otherwise_reactivate
+  restaurado byte a byte: si
+
+### M80 (DEGRADED repartiendo): el plan encoge con la confianza que el gate declaro no fiable
+  rojo en: test_degraded_stops_using_the_confidence_but_keeps_the_protection
+  restaurado byte a byte: si
+
+### M81 (regimen siempre disponible): el hueco de regimen se mide y nunca limita
+  rojo en: test_an_unknown_regime_is_declared_absent_and_limits_the_evidence
+  restaurado byte a byte: si
+
+### M82 (completitud por el eje opcional): el net-R sin medir apaga la confianza
+  rojo en: test_an_explicit_healthy_gate_is_equivalent_to_the_composed_one, test_degraded_stops_using_the_confidence_but_keeps_the_protection, test_the_gate_is_composed_from_already_measured_facts, test_with_a_healthy_gate_the_plan_arguments_are_the_historical_ones
+  restaurado byte a byte: si
+
+### M83 (rampa que sube por tiempo): el escalon deja de depender de la evidencia medida
+  rojo en: test_recovering_is_derived_and_the_ceiling_step_returns_the_version_to_active, test_the_auto13_ramp_is_still_the_ceiling_of_the_cell_weight, test_the_operational_states_travel_in_their_own_field_without_mixing_axes, test_the_ramp_climbs_one_step_per_evidence_cycles, test_the_ramp_does_not_climb_by_time_alone, test_the_ramp_is_a_ceiling_of_the_allocation_and_never_widens
+  restaurado byte a byte: si
+
+### M84 (rampa que ensancha): el TECHO del reparto se convierte en suelo
+  rojo en: test_the_auto13_ramp_is_still_the_ceiling_of_the_cell_weight, test_the_ramp_is_a_ceiling_of_the_allocation_and_never_widens
+  restaurado byte a byte: si
+
+### M85 (rampa que llega a 0): el escalon inicial de una evidencia deteriorada es 0
+  rojo en: test_a_deteriorating_evidence_resets_the_ramp_and_declares_why, test_the_unreadable_window_wins_over_an_optimistic_count
+  restaurado byte a byte: si
+
+### M86 (pausa que publica su rampa): el escalon de una version pausada no se descarta
+  rojo en: test_a_paused_version_discards_its_ramp_instead_of_publishing_it, test_the_operational_states_travel_in_their_own_field_without_mixing_axes
+  restaurado byte a byte: si
+
+### M87 (recuperacion no derivada): una version que vuelve por la rampa se publica active
+  rojo en: test_recovering_is_derived_and_the_ceiling_step_returns_the_version_to_active, test_the_auto13_ramp_is_still_the_ceiling_of_the_cell_weight, test_the_operational_states_travel_in_their_own_field_without_mixing_axes
+  restaurado byte a byte: si
+
+### M88 (reincorporacion sin corte probado): se fecha a traves de un turno ilegible
+  rojo en: test_an_unreadable_row_cuts_the_reactivation_instead_of_faking_it
+  restaurado byte a byte: si
+
+### M89 (ventana ilegible declarada disponible): la rampa sube sobre fechas no ordenables
+  rojo en: test_a_version_without_legible_dates_declares_the_window_unavailable
+  restaurado byte a byte: si
+
+### M90 (evidencia anterior al corte): la cuenta no descarta los ciclos previos a la pausa
+  rojo en: test_the_recovery_evidence_counts_only_the_cycles_after_the_cut
+  restaurado byte a byte: si
+
+### M91 (rampa no cableada): el worker la construye y no la pasa al plan
+  rojo en: test_a_completed_ramp_returns_the_version_to_active_at_full_weight, test_a_reactivated_version_is_declared_recovering_at_the_first_step, test_a_version_that_leaves_its_pause_is_dated_in_the_same_tick, test_a_version_that_never_paused_keeps_the_full_weight, test_the_published_evidence_keeps_its_declared_frame, test_the_ramp_climbs_with_the_ticks_own_measured_evidence, test_the_ramp_is_a_ceiling_and_never_widens_the_allocation
+  restaurado byte a byte: si
+
+### M92 (memoria de la rampa no sembrada): el corte durable del journal no llega a la rampa
+  rojo en: test_the_durable_reading_seeds_the_ramp_memory_at_startup
+  restaurado byte a byte: si
+
+### M93 (transicion no fechada en el tick): la reincorporacion observada no se fecha
+  rojo en: test_a_version_that_leaves_its_pause_is_dated_in_the_same_tick
+  restaurado byte a byte: si
+
+### M94 (regimen ilegible tratado como adverso): la rama adversa se arma sin regimen
+  rojo en: test_a_regime_that_could_not_be_read_never_arms_the_adverse_branch, test_rotation_does_not_pause_thin_sample_in_benign_regime
+  restaurado byte a byte: si
+
+### M95 (el motivo del hueco del cruce se pierde): la fila no conserva el par
+  rojo en: test_the_health_row_keeps_the_undetermined_regime_with_its_reason, test_the_plan_publishes_the_undetermined_regimes_in_their_own_field
+  restaurado byte a byte: si
+
+### M96 (el hueco no viaja al plan): la declaracion se construye y se descarta
+  rojo en: test_the_plan_publishes_the_undetermined_regimes_in_their_own_field
+  restaurado byte a byte: si
+
+### M97 (el fallback no se declara): el tick no publica el hueco del cruce
+  rojo en: test_without_a_cross_regime_the_tick_declares_the_fallback_to_global_evidence
+  restaurado byte a byte: si
+
+### M98 (el encogimiento no se puede apagar): el reparto encoge aunque el gate lo prohiba
+  rojo en: test_the_shrinkage_can_be_switched_off_without_hiding_the_measured_band
+  restaurado byte a byte: si
+
+### M99 (celda fina moviendo peso): el guard de decisividad de la celda se cae
+  rojo en: test_a_thin_cell_never_moves_the_weight_and_the_gap_is_declared, test_regime_cell_for_refuses_a_thin_an_unmeasured_or_a_non_positive_cell
+  restaurado byte a byte: si
+
+### M100 (hueco de celda sin declarar): el fallback deja de publicarse
+  rojo en: test_a_measured_cell_moves_the_pool_weight_of_its_version, test_a_thin_cell_never_moves_the_weight_and_the_gap_is_declared, test_an_unreadable_tick_regime_never_arms_the_cell_path, test_the_plan_publishes_the_cell_basis_in_its_own_field_without_touching_the_frame, test_without_cells_the_cell_basis_is_declared_empty_and_stays_reproducible
+  restaurado byte a byte: si
+
+### M101 (version sin celda a cero): pierde su global y entra con 0.0
+  rojo en: test_a_measured_cell_moves_the_pool_weight_of_its_version, test_a_thin_cell_never_moves_the_weight_and_the_gap_is_declared, test_allocation_adopts_the_net_axis_when_the_group_shares_one_basis, test_allocation_axis_requires_decisive_rows_on_both_axes, test_allocation_refuses_a_group_measured_with_two_cost_models, test_allocation_weighs_with_measured_net_r_when_the_pool_measures_it, test_an_unreadable_tick_regime_never_arms_the_cell_path, test_measuring_the_net_r_moves_the_allocation_but_never_the_rotation, test_regime_cells_change_the_allocation_declaration_but_never_the_rotation, test_strategy_health_publishes_the_net_basis_and_its_transition, test_the_cell_never_changes_who_competes_nor_mixes_the_axes, test_the_historical_basis_jump_does_not_change_who_competes, test_the_plan_publishes_the_cell_basis_in_its_own_field_without_touching_the_frame, test_the_shrinkage_uses_the_confidence_of_the_CELL_not_the_strategy, test_without_cells_the_cell_basis_is_declared_empty_and_stays_reproducible
+  restaurado byte a byte: si
+
+### M102 (ejes mezclados en el grupo): el R neto se adopta sin cubrir a todo el grupo
+  rojo en: test_allocation_does_not_mix_axes_when_only_part_of_the_pool_measures_r, test_allocation_falls_back_to_the_historical_axis_when_the_two_axes_disagree, test_allocation_ignores_a_measured_but_non_positive_net_r
+  restaurado byte a byte: si
+
+### M103 (celda de otra version): la busqueda deja de casar la version
+  rojo en: test_regime_cell_for_declares_every_gap_without_inventing_a_cell
+  restaurado byte a byte: si
+
+### M104 (regimen ilegible eligiendo celda): toma la primera celda de la version
+  rojo en: test_an_unreadable_tick_regime_never_arms_the_cell_path, test_regime_cell_for_declares_every_gap_without_inventing_a_cell
+  restaurado byte a byte: si
+
+### M105 (celda PARTIAL tratada como completa): el net-R sin medir habilita decidir
+  rojo en: test_regime_cell_for_refuses_a_thin_an_unmeasured_or_a_non_positive_cell
+  restaurado byte a byte: si
+
+### M106 (encogimiento con la banda de la fila): el shrink ignora la confianza de la celda
+  rojo en: test_the_shrinkage_uses_the_confidence_of_the_CELL_not_the_strategy
+  restaurado byte a byte: si
+
+### M107 (rampa que no topa la celda): la rampa se esquiva cuando el peso vino de una celda
+  rojo en: test_the_auto13_ramp_is_still_the_ceiling_of_the_cell_weight
+  restaurado byte a byte: si
+
+### M108 (racha que se resetea al reiniciar): el arranque deja de sembrar la racha durable
+  rojo en: test_an_unreadable_store_declares_the_gap_and_does_not_invent_a_streak, test_the_recovery_of_the_streak_is_declared_in_the_log
+  restaurado byte a byte: si
+
+### M109 (fallo que no persiste): el fallo se cuenta en el proceso y no se escribe
+  rojo en: test_a_measured_streak_survives_the_restart_and_the_gate_still_sees_it, test_a_publication_after_the_restart_resets_the_durable_streak, test_a_store_that_cannot_persist_keeps_the_streak_in_process_and_declares_it
+  restaurado byte a byte: si
+
+### M110 (racha durable leida pero ignorada): la fila se lee y el valor se descarta
+  rojo en: test_a_measured_streak_survives_the_restart_and_the_gate_still_sees_it, test_a_publication_after_the_restart_resets_the_durable_streak, test_the_provenance_of_the_streak_is_declared_in_the_gate_reading
+  restaurado byte a byte: si
+
+### M111 (reset amplificando): el reset escribe aunque no haya racha viva
+  rojo en: test_a_success_without_a_streak_does_not_write_anything
+  restaurado byte a byte: si
+
+### M112 (racha de otra cuenta): el load deja de casar la cuenta
+  rojo en: test_a_success_resets_a_live_streak_and_keeps_the_failure_trail, test_failures_increment_consecutively_and_stamp_the_failure_instant, test_the_state_travels_to_the_log_with_its_own_field_names, test_the_streak_is_per_account_and_engine_and_never_leaks_across
+  restaurado byte a byte: si
+
+### M113 (ilegible tratado como sano): el estado durable ilegible se declara durable
+  rojo en: test_an_unreadable_store_declares_the_gap_and_does_not_invent_a_streak
+  restaurado byte a byte: si
+
+### M114 (ilegible tratado como fallo): el estado durable ilegible se cuenta como fallo
+  rojo en: test_an_unreadable_store_declares_the_gap_and_does_not_invent_a_streak
+  restaurado byte a byte: si
+
+### M115 (sello sin subir): la procedencia cambia y la version de politica no
+  rojo en: test_the_policy_version_seals_the_auto15_durable_streak_contract
+  restaurado byte a byte: si
+
+### M116 (durable sin store): el hecho sinkFailuresDurable se publica sin store
+  rojo en: test_the_provenance_of_the_streak_is_declared_in_the_gate_reading
+  restaurado byte a byte: si
+
+### M117 (sesion envenenada por el fallo): la escritura fallida no limpia la sesion del tick
+  rojo en: test_a_failed_write_cleans_the_tick_session_and_lets_the_error_up
+  restaurado byte a byte: si
+
+### M118 (sesion envenenada por el reset): el reset fallido no limpia la sesion del tick
+  rojo en: test_a_failed_write_cleans_the_tick_session_and_lets_the_error_up
+  restaurado byte a byte: si
+
+### M119 (coste aplicado ignorado): el pegador devuelve la evidencia intacta
+  rojo en: test_a_group_that_mixes_cost_bases_does_not_move_weights_by_the_net_axis, test_only_a_complete_round_trip_is_attached_to_the_cycle, test_the_applied_friction_reaches_the_net_the_adaptive_plan_reads, test_the_assessment_publishes_the_base_of_the_net_it_measured, test_the_cycle_row_carries_the_applied_friction_with_its_measurement, test_the_entry_leg_measured_in_another_tick_is_read_with_the_exit_leg, test_the_net_comes_from_the_applied_friction_and_declares_its_basis
+  restaurado byte a byte: si
+
+### M120 (friccion como rebaja): el neto SUMA el coste en vez de restarlo
+  rojo en: test_a_homogeneous_basis_keeps_the_pooled_number_and_one_series, test_a_mixed_basis_is_declared_and_never_silently_averaged, test_a_partial_applied_cost_is_a_floor_and_never_enters_the_net, test_a_regime_cell_declares_the_net_expectancy_unmeasured_when_the_cost_is_missing, test_cycle_r_falls_back_to_the_estimate_and_declares_the_other_base, test_cycle_r_is_the_pnl_over_the_committed_risk_and_net_discounts_the_cost, test_cycle_r_prefers_the_applied_friction_and_declares_its_base, test_one_cost_model_keeps_the_pooled_number_and_one_series, test_the_cross_computes_the_r_from_the_raw_cycle_material_when_it_is_not_declared, test_the_feed_measures_the_r_when_the_producer_gives_the_denominator, test_the_net_comes_from_the_applied_friction_and_declares_its_basis, test_the_strategy_row_publishes_the_net_expectancy_with_its_own_measurement, test_without_reference_the_net_is_the_estimated_number_of_v2_56, test_without_the_modelled_commission_the_applied_cannot_be_composed
+  restaurado byte a byte: si
+
+### M121 (comision omitida sin declararlo): el neto aplicado no lleva la comision del modelo
+  rojo en: test_cycle_r_prefers_the_applied_friction_and_declares_its_base, test_the_applied_friction_reaches_the_net_the_adaptive_plan_reads, test_the_net_comes_from_the_applied_friction_and_declares_its_basis
+  restaurado byte a byte: si
+
+### M122 (una sola pata): el agregado no exige las dos direcciones y el suelo entra al neto
+  rojo en: test_half_a_trip_is_a_declared_floor_not_the_cost_of_the_cycle
+  restaurado byte a byte: si
+
+### M123 (referencia ausente = friccion 0): un fill sin mid se mide contra su precio
+  rojo en: test_a_group_that_mixes_cost_bases_does_not_move_weights_by_the_net_axis, test_a_leg_without_a_reference_is_never_a_zero_friction, test_a_leg_without_a_reference_still_counts_for_the_quantity_balance, test_the_assessment_publishes_the_base_of_the_net_it_measured, test_the_average_leg_without_reference_declares_the_gap_and_never_a_zero, test_the_sum_keeps_the_trace_of_how_many_legs_it_could_value, test_without_the_persisted_reference_the_net_is_the_estimate_of_v2_56
+  restaurado byte a byte: si
+
+### M124 (fila de otra cuenta): el lector por ciclo deja de casar la cuenta
+  rojo en: test_a_fill_of_another_account_never_pays_for_this_cycle
+  restaurado byte a byte: si
+
+### M125 (sello sin subir): la base del neto cambia la regla y la version de politica no
+  rojo en: test_the_operational_states_travel_in_their_own_field_without_mixing_axes, test_the_policy_version_seals_the_auto18_evidence_contract, test_without_uncertainty_the_plan_is_byte_identical_to_auto18
+  restaurado byte a byte: si
+
+### M126 (referencia no conservada): el contexto del fill pierde su mid al construirse
+  rojo en: test_a_usable_reference_is_normalized_to_decimal, test_the_reference_survives_the_store_and_is_read_back_by_cycle
+  restaurado byte a byte: si
+
+### M127 (base aplicada sin medicion): el camino sin aplicado declara la base del aplicado
+  rojo en: test_a_group_that_mixes_cost_bases_does_not_move_weights_by_the_net_axis, test_a_historical_transition_is_declared_by_regime_without_splitting_the_cell, test_a_homogeneous_basis_keeps_the_pooled_number_and_one_series, test_a_mixed_basis_is_declared_and_never_silently_averaged, test_a_partial_applied_cost_is_a_floor_and_never_enters_the_net, test_cycle_r_falls_back_to_the_estimate_and_declares_the_other_base, test_the_assessment_publishes_the_base_of_the_net_it_measured, test_the_average_leg_without_reference_declares_the_gap_and_never_a_zero, test_two_cost_models_in_the_same_basis_are_two_series_not_one_average, test_without_a_modelled_commission_the_applied_is_measured_but_not_composed, test_without_reference_the_net_is_the_estimated_number_of_v2_56, test_without_the_modelled_commission_the_applied_cannot_be_composed
+  restaurado byte a byte: si
+
+### M128 (bases mezcladas sin declarar): el agregado deja de publicar la mezcla
+  rojo en: test_a_historical_transition_is_declared_by_regime_without_splitting_the_cell, test_a_mixed_basis_is_declared_and_never_silently_averaged
+  restaurado byte a byte: si
+
+### M129 (balance de cantidades ignorado): un ciclo abierto se lee como ida y vuelta
+  rojo en: test_a_cycle_with_a_partial_exit_never_gets_an_applied_cost, test_a_reopened_cycle_is_not_complete_even_with_a_prior_round_trip, test_a_round_trip_with_unbalanced_quantities_is_not_complete
+  restaurado byte a byte: si
+
+### M130 (cierre ignorado): un ciclo que el ciclo de vida no declaro cerrado recibe friccion
+  rojo en: test_a_cycle_outside_the_closed_set_declares_its_gap_and_never_a_friction
+  restaurado byte a byte: si
+
+### M131 (pooled publicado): con poblacion NO homogenea el agregado SI promedia y publica el pooled
+  rojo en: test_a_historical_transition_is_declared_by_regime_without_splitting_the_cell, test_a_mixed_basis_is_declared_and_never_silently_averaged, test_two_cost_models_in_the_same_basis_are_two_series_not_one_average
+  restaurado byte a byte: si
+
+### M132 (series colapsadas): el desglose agrupa todas las bases como si fueran una
+  rojo en: test_a_historical_transition_is_declared_by_regime_without_splitting_the_cell, test_a_mixed_basis_is_declared_and_never_silently_averaged, test_a_row_without_a_declared_base_is_undeclared_not_completed
+  restaurado byte a byte: si
+
+### M133 (transicion no declarada): el detector nunca marca TRANSITION entre bases
+  rojo en: test_mixed_and_transition_are_two_axes_of_the_same_population, test_the_basis_transition_states_are_declared
+  restaurado byte a byte: si
+
+### M134 (decay cruzando bases): el deterioro se mide aunque la base cambie entre ventanas
+  rojo en: test_a_cost_model_change_separates_series_and_blocks_the_decay, test_a_window_that_spans_two_bases_declares_mixed_and_refuses_to_decay
+  restaurado byte a byte: si
+
+### M135 (reparto mezclando bases): el eje del R neto se adopta sin exigir base comparable
+  rojo en: test_allocation_refuses_a_group_measured_with_two_cost_models, test_allocation_refuses_a_group_with_an_explicitly_mixed_basis, test_allocation_refuses_to_mix_two_cost_bases_in_the_net_axis, test_the_historical_basis_jump_does_not_change_who_competes
+  restaurado byte a byte: si
+
+### M136 (mixed no bloquea): una fila con base mezclada no impide adoptar el eje del neto
+  rojo en: test_allocation_refuses_a_group_with_an_explicitly_mixed_basis
+  restaurado byte a byte: si
+
+### M137 (base no publicada): la salud pierde la base del neto y la evidencia la calla
+  rojo en: test_strategy_health_publishes_the_net_basis_and_its_transition
+  restaurado byte a byte: si
+
+### M138 (base no leida): la confianza no lee la base de la fila y nunca ve la transicion
+  rojo en: test_a_cost_model_change_separates_series_and_blocks_the_decay, test_a_homogeneous_window_is_stable_and_keeps_the_historic_decay, test_a_net_without_a_base_is_data_degraded_and_lowers_the_band, test_a_single_cost_model_keeps_the_historic_stability_and_decay, test_a_stable_applied_window_is_declared_and_keeps_the_historic_decay, test_a_window_that_spans_two_bases_declares_mixed_and_refuses_to_decay
+  restaurado byte a byte: si
+
+### M139 (independencia ignorada): la muestra efectiva es la bruta y las rachas no acotan
+  rojo en: test_an_unknown_decay_caps_the_confidence_instead_of_premising_it, test_consecutive_cycles_of_one_regime_are_a_single_episode, test_effective_n_counts_regime_episodes_not_cycles, test_the_coverage_is_its_own_axis_and_does_not_move_the_band, test_the_payload_is_json_shaped_and_carries_the_gaps, test_the_sample_that_sustains_the_number_is_the_measured_one
+  restaurado byte a byte: si
+
+### M140 (cobertura colapsada): toda celda con muestra se declara cubierta al maximo
+  rojo en: test_coverage_band_is_the_public_surface_of_the_auto18_convention, test_effective_n_counts_regime_episodes_not_cycles, test_the_coverage_bands_follow_the_effective_sample, test_the_coverage_is_its_own_axis_and_does_not_move_the_band, test_the_payload_is_json_shaped_and_carries_the_gaps
+  restaurado byte a byte: si
+
+### M141 (calibracion inventada): se publican bandas sin celdas que las respalden
+  rojo en: test_the_calibration_omits_bands_without_cells
+  restaurado byte a byte: si
+
+### M142 (expectancy sin encoger): la expectancy publicada es la bruta, sin muestra
+  rojo en: test_the_shrunk_expectancy_is_published_and_only_shrinks, test_the_shrunk_helper_declares_absence_instead_of_zero
+  restaurado byte a byte: si
+
+### M143 (medido en vez de efectivo): el reparto encoge por la muestra bruta
+  rojo en: test_the_shrinkage_reads_the_statistical_n_not_the_measured_n, test_the_shrinkage_uses_the_confidence_of_the_CELL_not_the_strategy
+  restaurado byte a byte: si
+
+### M144 (metro perdido): el modelo de coste no publica su version y nadie la propaga
+  rojo en: test_the_cost_model_version_travels_from_the_model_to_the_cycle_row
+  restaurado byte a byte: si
+
+### M145 (series fundidas): dos metros dentro de una base se agrupan como una sola serie
+  rojo en: test_one_cost_model_keeps_the_pooled_number_and_one_series, test_two_cost_models_in_the_same_basis_are_two_series_not_one_average
+  restaurado byte a byte: si
+
+### M146 (transicion de metro no declarada): el detector nunca ve cambiar el instrumento
+  rojo en: test_the_cost_model_transition_is_its_own_state
+  restaurado byte a byte: si
+
+### M147 (decay cross-modelo): el deterioro se mide aunque el metro cambie entre ventanas
+  rojo en: test_the_cost_model_transition_alone_blocks_the_decay
+  restaurado byte a byte: si
+
+### M148 (sello sin moverse): el reparto cambia de regla y el sello se queda en auto17
+  rojo en: test_the_operational_states_travel_in_their_own_field_without_mixing_axes, test_the_policy_version_seals_the_auto18_evidence_contract, test_without_uncertainty_the_plan_is_byte_identical_to_auto18
+  restaurado byte a byte: si
+
+### M149 (episodios aplanados): el bootstrap remuestrea ciclos sueltos, no rachas
+  rojo en: test_edge_positive_probability_is_none_without_a_bootstrap, test_one_single_regime_phase_does_not_fabricate_an_interval
+  restaurado byte a byte: si
+
+### M150 (azar sin semilla): el bootstrap deja de usar la semilla declarada
+  rojo en: test_the_bootstrap_is_reproducible_and_order_invariant
+  restaurado byte a byte: si
+
+### M151 (edge deducida de la medicion): el edge sale de la banda, no del intervalo
+  rojo en: test_a_fully_positive_sample_declares_probability_one, test_a_non_positive_point_is_a_low_edge, test_a_positive_point_that_crosses_zero_is_only_a_medium_edge, test_a_shuffled_input_without_instants_is_not_promised_as_order_invariant, test_an_interval_fully_above_zero_is_a_high_edge, test_an_unknown_decay_does_not_lower_the_edge, test_cycle_positive_share_counts_cycles_not_bootstrap_means, test_edge_positive_probability_is_the_share_of_positive_bootstrap_means, test_low_coverage_lowers_the_edge_one_step_and_declares_it, test_many_episodes_publish_a_positive_interval_and_a_high_edge, test_severe_decay_and_a_degraded_basis_each_lower_the_edge, test_the_bootstrap_is_reproducible_and_order_invariant, test_the_cells_are_measured_over_the_same_episodes_as_the_strategy, test_the_edge_never_degenerates_below_low_while_there_is_measurement, test_the_interval_always_contains_its_point_even_with_a_wild_sample, test_the_level_and_resamples_are_clamped_and_declared, test_the_reading_is_a_json_shaped_payload, test_undated_cycles_are_declared_and_still_measured
+  restaurado byte a byte: si
+
+### M152 (UNKNOWN disfrazado de LOW): la falta de medicion se publica como edge bajo
+  rojo en: test_an_insufficient_interval_is_declared_not_fabricated, test_no_measurement_is_unknown_not_low, test_one_single_regime_phase_does_not_fabricate_an_interval, test_too_few_episodes_are_unknown_even_with_a_point
+  restaurado byte a byte: si
+
+### M153 (rachas insuficientes calladas): se publica percentil con una sola racha
+  rojo en: test_edge_positive_probability_is_none_without_a_bootstrap, test_one_single_regime_phase_does_not_fabricate_an_interval
+  restaurado byte a byte: si
+
+### M154 (replay sin partir): el IS se mide sobre el material con el OOS dentro
+  rojo en: test_a_mixed_oos_declares_its_realized_positive_share, test_the_in_sample_is_the_old_tramo_and_the_out_of_sample_the_recent_one
+  restaurado byte a byte: si
+
+### M155 (veredicto sin muestra): la guarda de muestra minima desaparece
+  rojo en: test_a_strategy_without_enough_material_is_skipped_and_named, test_no_cycles_returns_four_declared_inconclusive_questions, test_the_shrinkage_question_compares_the_error_means
+  restaurado byte a byte: si
+
+### M156 (refutado leido como soportado): la comparacion no distingue el grupo peor
+  rojo en: test_the_confidence_question_compares_oos_dispersion, test_the_coverage_question_compares_the_covered_regime, test_the_effective_n_question_splits_by_the_median, test_the_shrinkage_question_compares_the_error_means
+  restaurado byte a byte: si
+
+### M157 (cobertura invertida): la pregunta compara cubierto y no cubierto al reves
+  rojo en: test_the_coverage_question_compares_the_covered_regime
+  restaurado byte a byte: si
+
+### M158 (sello movido por la lectura): la incertidumbre arrastra otro sello de reparto
+  rojo en: test_the_operational_states_travel_in_their_own_field_without_mixing_axes, test_the_policy_used_by_the_worker_still_seals_the_auto18_rule, test_the_policy_version_seals_the_auto18_evidence_contract, test_without_uncertainty_the_plan_is_byte_identical_to_auto18
+  restaurado byte a byte: si
+
+### M159 (walk-forward contaminado): el IS de un pliegue incluye su propio OOS
+  rojo en: test_material_for_fewer_folds_than_requested_is_declared, test_the_walk_forward_windows_grow_and_never_overlap
+  restaurado byte a byte: si
+
+### M160 (cobertura fabricada): la cobertura cuenta celdas SIN intervalo
+  rojo en: test_the_material_manifest_is_published_verbatim_and_does_not_change_the_reading, test_the_replay_questions_are_reused_under_calibration_keys, test_the_report_is_deterministic_and_order_invariant, test_the_report_payload_is_json_shaped, test_the_report_without_material_is_byte_identical_to_the_audited_one, test_the_synthetic_fixture_is_measured_end_to_end, test_without_an_interval_there_is_nothing_to_cover
+  restaurado byte a byte: si
+
+### M161 (cobertura invertida): cuenta como cubierto lo que cayo FUERA del intervalo
+  rojo en: test_interval_coverage_is_measured_against_the_declared_level, test_interval_coverage_refutes_a_too_narrow_interval
+  restaurado byte a byte: si
+
+### M162 (signo del edge sin muestra): la calibracion del signo no exige muestra minima
+  rojo en: test_medium_and_unknown_edges_do_not_claim_a_sign, test_no_cycles_returns_seven_declared_inconclusive_questions
+  restaurado byte a byte: si
+
+### M163 (un pliegue llamado walk-forward): se anula la acotacion de pliegues
+  rojo en: test_the_folds_are_clamped_to_the_declared_range
+  restaurado byte a byte: si
+
+### M164 (ventana que no crece): el IS deja de ser creciente
+  rojo en: test_a_partially_measured_strategy_is_not_flagged_as_unmeasured, test_material_for_fewer_folds_than_requested_is_declared, test_the_walk_forward_windows_grow_and_never_overlap
+  restaurado byte a byte: si
+
+### M165 (hueco silenciado, O1): la estrategia sin R medible vuelve a desaparecer sin nota
+  rojo en: test_a_strategy_without_any_measurable_r_is_declared_not_silently_dropped
+  restaurado byte a byte: si
+
+### M166 (ratio que mezcla, O2): el WFE vuelve a cruzar la media OOS con la IS de otros pliegues
+  rojo en: test_walk_forward_efficiency_is_computed_on_paired_folds_only
+  restaurado byte a byte: si
+
+### M167 (conteo inflado, O2): los pliegues emparejados se cuentan como si TODOS lo estuvieran
+  rojo en: test_the_walk_forward_efficiency_is_none_without_a_paired_fold, test_walk_forward_efficiency_is_computed_on_paired_folds_only
+  restaurado byte a byte: si
+
+### M168 (material sin riesgo): el instrumento vuelve a leer ciclos sin denominador
+  rojo en: test_instrument_cycles_is_the_public_seam_that_carries_the_risk_basis
+  restaurado byte a byte: si
+
+### M169 (paginacion desactivada): el lector vuelve a leer una sola pagina de reservas
+  rojo en: test_a_page_that_never_advances_is_declared_as_saturated, test_an_exact_multiple_page_size_still_terminates_complete, test_pagination_reads_the_whole_universe_across_pages
+  restaurado byte a byte: si
+
+### M170 (offset ignorado): la lectura paginada repite la primera pagina sin avanzar
+  rojo en: test_a_cycle_query_can_be_paginated_without_gaps_or_repeats
+  restaurado byte a byte: si
+
+### M171 (cyclesWithoutRisk falseado): todo el material se declara con denominador
+  rojo en: test_the_manifest_counts_the_same_material_the_instrument_carries
+  restaurado byte a byte: si
+
+### M172 (huella ciega al universo): la huella deja de ver version y regimen
+  rojo en: test_changing_the_universe_changes_the_fingerprint, test_the_fingerprint_does_not_touch_identifiers_that_look_numeric
+  restaurado byte a byte: si
+
+### M173 (bloque material inventado): el informe publica material aunque no se aporte
+  rojo en: test_the_material_manifest_is_published_verbatim_and_does_not_change_the_reading, test_the_report_payload_is_json_shaped, test_the_report_without_material_is_byte_identical_to_the_audited_one
+  restaurado byte a byte: si
+
+### M174 (manifest no propagado): el battery deja de pasar el material a la calibracion
+  rojo en: test_the_battery_propagates_the_exported_manifest_to_the_calibration_report
+  restaurado byte a byte: si
+
+### M175 (excluidos falseados): el perimetro declara que no hay fills sin version
+  rojo en: test_the_manifest_declares_the_perimeter_of_the_dump
+  restaurado byte a byte: si
+
+### M176 (observadas eliminadas): el manifest deja de declarar las versiones observadas
+  rojo en: test_the_manifest_declares_the_perimeter_of_the_dump
+  restaurado byte a byte: si
+
+### M177 (procedencia borrada): el artefacto deja de declarar la realidad PAPER virtual
+  rojo en: test_the_artifact_declares_the_virtual_paper_reality, test_the_artifact_declares_virtual_paper_and_no_real_money, test_the_render_declares_the_perimeter_and_the_frozen_allocation
+  restaurado byte a byte: si
+
+### M178 (artefacto no escrito): el battery no vuelca el artefacto reproducible
+  rojo en: test_the_artifact_declares_virtual_paper_and_no_real_money, test_the_battery_writes_the_artifact_and_render_without_changing_stdout
+  restaurado byte a byte: si
+
+### M179 (perimetro colapsado): el render vuelve a confundir ausente con lista vacia
+  rojo en: test_the_render_distinguishes_an_absent_perimeter_list_from_an_empty_one, test_the_render_treats_a_non_list_perimeter_value_as_not_measured
+  restaurado byte a byte: si
+
+### M180 (claves del render desalineadas): una fila deja de ser la pregunta canonica
+  rojo en: test_the_render_labels_every_calibration_question, test_the_render_rows_use_the_canonical_calibration_keys
+  restaurado byte a byte: si
+
+### M181 (perimetro no-lista iterado): el render vuelve a iterar un escalar como si fuera lista
+  rojo en: test_the_render_treats_a_non_list_perimeter_value_as_not_measured
+  restaurado byte a byte: si
+
+### M182 (sello sin subir): la lectura con P(R>0)/P(edge>0) conserva el sello v2
+  rojo en: test_the_plan_carries_the_interval_and_the_edge_confidence
+  restaurado byte a byte: si
+
+### M183 (probabilidad del edge fabricada): la P(edge>0) deja de ser la fraccion de medias positivas
+  rojo en: test_cycle_positive_share_counts_cycles_not_bootstrap_means, test_edge_positive_probability_is_the_share_of_positive_bootstrap_means
+  restaurado byte a byte: si
+
+### M184 (sello de calibracion sin subir): el informe sella v3 una lectura ya distinta
+  rojo en: test_the_battery_writes_the_artifact_and_render_without_changing_stdout
+  restaurado byte a byte: si
+
+### M185 (pregunta sin muestra minima): la probabilidad se sella sin su frecuencia OOS
+  rojo en: test_a_strategy_without_any_measurable_r_is_declared_not_silently_dropped, test_a_strategy_without_enough_material_is_skipped_and_named, test_no_cycles_returns_seven_declared_inconclusive_questions, test_probability_positive_calibration_is_inconclusive_without_both_terms, test_the_replay_questions_are_reused_under_calibration_keys
+  restaurado byte a byte: si
+
+### M186 (correlacion sin cubos): un par sin cubos compartidos publica 0.0 en vez de None
+  rojo en: test_without_shared_buckets_the_gap_is_declared
+  restaurado byte a byte: si
+
+### M187 (regimen inventado): la estrategia sin celda publica la lectura agregada
+  rojo en: test_a_strategy_without_a_cell_for_the_regime_declares_the_gap, test_each_strategy_is_reported_independently
+  restaurado byte a byte: si
+
+### M188 (huella perdida): el bundle deja de viajar con la huella del material
+  rojo en: test_the_bundle_composes_the_audited_pieces_and_declares_its_provenance, test_the_run_declares_the_origin_of_a_manifest_instead_of_inventing_it
+  restaurado byte a byte: si
+
+### M189 (origen fabricado): el defecto del run proclama PAPER real sin material
+  rojo en: test_the_default_origin_is_the_synthetic_fixture_never_paper_real
+  restaurado byte a byte: si
+
+### M190 (bundle vacio): sin R medible se publica un bundle en vez de BLOQUEAR
+  rojo en: test_the_run_is_blocked_when_no_cycle_has_a_measurable_r, test_the_run_is_blocked_without_any_cycle
+  restaurado byte a byte: si
+
+### M191 (segunda aritmetica): la validacion recalcula P(R>0) en vez de componerla
+  rojo en: test_the_sweep_copies_the_probability_from_the_only_arithmetic
+  restaurado byte a byte: si
+
+### M192 (fila fabricada): un N mayor que el material medido deja de ser NO MEDIDO
+  rojo en: test_a_size_beyond_the_measured_material_is_not_measured_never_fabricated, test_the_sweep_is_blocked_without_measured_cycles
+  restaurado byte a byte: si
+
+### M193 (P(R>0) no cuenta ciclos): la fraccion positiva deja de mirar el signo de cada ciclo
+  rojo en: test_a_fully_positive_sample_declares_probability_one, test_cycle_positive_share_counts_cycles_not_bootstrap_means, test_edge_positive_probability_is_none_without_a_bootstrap
+  restaurado byte a byte: si
+
+### M194 (calibracion heterogenea): la pregunta compara P(edge>0) contra la frecuencia OOS
+  rojo en: test_probability_positive_calibration_ignores_the_edge_probability, test_probability_positive_calibration_is_inconclusive_without_both_terms, test_probability_positive_calibration_refutes_a_declared_probability_the_oos_denies, test_probability_positive_calibration_supports_a_declared_probability_that_holds, test_the_material_manifest_is_published_verbatim_and_does_not_change_the_reading, test_the_report_is_deterministic_and_order_invariant, test_the_report_payload_is_json_shaped, test_the_report_without_material_is_byte_identical_to_the_audited_one, test_the_synthetic_fixture_is_measured_end_to_end
+  restaurado byte a byte: si
+
+### M195 (ausencia como evidencia): la cobertura no medida entra en el grupo no cubierta
+  rojo en: test_a_cell_without_a_measured_regime_coverage_is_declared_not_counted_as_uncovered
+  restaurado byte a byte: si
+
+### M196 (nivel crudo): el informe publica un nivel sin clampar, distinto del que uso el bootstrap
+  rojo en: test_the_interval_level_is_clamped_and_published
+  restaurado byte a byte: si
+
+### M197 (clave colisionada): la celda reusa regimeCoverage (banda) contra el float de confianza
+  rojo en: test_the_cell_payload_is_json_shaped_and_rounded, test_the_regime_coverage_key_is_a_float_in_confidence_and_a_band_in_replay
+  restaurado byte a byte: si
+
+### M198 (nivel crudo): la lectura del regimen publica el level sin clampar
+  rojo en: test_the_clamped_level_travels_even_without_cycles, test_the_interval_level_is_clamped_and_published
+  restaurado byte a byte: si
+
+### M199 (READY sin minimo): el gate deja de exigir ciclos con R medible por estrategia
+  rojo en: test_below_the_minimum_is_producer_ready_but_not_evidence_ready, test_closures_without_reservations_leave_r_unmeasurable, test_legacy_material_is_blocked_and_declares_every_missing_link, test_thresholds_are_declared_and_never_lowered_by_the_gate
+  restaurado byte a byte: si
+
+### M200 (PRODUCER_READY sin estructura): el gate ignora los blockers del productor
+  rojo en: test_a_complete_structure_without_exit_orders_is_blocked_when_measured, test_a_released_entry_without_a_preserved_risk_stays_unmeasured, test_a_sell_reservation_does_not_become_the_denominator, test_legacy_material_is_blocked_and_declares_every_missing_link, test_legacy_path_leaves_no_structure_and_stays_blocked, test_the_payload_declares_its_seal_and_the_declared_minimum
+  restaurado byte a byte: si
+
+### M201 (respaldo sin respeto): el cierre durable SOBRESCRIBE la cotizacion viva
+  rojo en: test_close_is_the_declared_fallback_for_unsupplied_symbols
+  restaurado byte a byte: si
+
+### M202 (precio inventado): un valor no finito o no positivo se sirve como precio
+  rojo en: test_non_usable_values_are_rejected
+  restaurado byte a byte: si
+
+### M203 (apila): la version A propone BUY aunque haya posicion viva
+  rojo en: test_versioned_reentry_holds_while_a_position_is_open
+  restaurado byte a byte: si
+
+### M204 (enrutado roto): TODO simbolo cae en la version B y la A no opera
+  rojo en: test_build_forward_pair_decider_wires_both_versions, test_split_routes_a_symbols_to_a_and_everything_else_to_b
+  restaurado byte a byte: si
+
+### M205 (tramos solapados): el reparto del watch deja los dos tramos en el mismo lado
+  rojo en: test_split_watch_is_disjoint_exhaustive_and_deterministic, test_split_watch_normalizes_blank_and_duplicate_symbols, test_split_watch_share_is_clamped_so_both_tramos_keep_a_symbol
+  restaurado byte a byte: si
+
+=== huella del arbol ===
+estado git de esos ficheros (despues): ?? packages/py/application/src/bolsa_application/auto_forward_deciders.py
+?? packages/py/application/src/bolsa_application/market_price_snapshot.py
+  intacto: la sonda no altero el arbol
+  medidas: 205/205 (ninguna se quedo sin fragmento)

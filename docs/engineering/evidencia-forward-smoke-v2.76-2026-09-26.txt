@@ -1,0 +1,258 @@
+﻿=== 1) PREFLIGHT (read-only): regimen de MERCADO del watch ===
+uv : INFO alembic.runtime.plugins setup plugin alembic.autogenerate.schemas
+En C:\Users\josea\AppData\Local\Temp\ps-script-1f4e9738-d9de-4137-8dae-d7f811fea522.ps1: 120 Carácter: 1
++ uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO alembic.ru...enerate.schemas:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.tables
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.types
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.constraints
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.defaults
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.comments
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.checkconstraint_byname
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+# preflight: entradas LONG VETADAS (eje BEAR_TREND); no se escribi¾ nada
+{
+  "account": "(no sembrada: el preflight no escribe)",
+  "bump": "2.01.0-beta",
+  "level": "evidence",
+  "marketRegime": {
+    "aggregateTrialRegime": "trend_down",
+    "barsLoaded": 12,
+    "bySymbol": {
+      "0a5dc12fd5a24f0a89a91d36a": "range",
+      "0cf0907837fc422db221b0149": "trend_down",
+      "240a4ae01a944d3bba1cf1b24": "trend_down",
+      "31f9a597d03249319ea0c9345": "range",
+      "381dd3b0699a44e8b9d13ac13": "range",
+      "49596ff25acb4294b265f321b": "trend_down",
+      "4d24ea029283461cb9304421a": "range",
+      "54283bcb54674ec1b70b4db72": "trend_down",
+      "5a130eea1ad54dcaaa50b67b9": "range",
+      "5c34aaec1448406ebec94b20f": "trend_down",
+      "615d243eb830473ab009c8997": "trend_down",
+      "6655c5faff8a458186dcd8adc": "trend_up"
+    },
+    "counts": {
+      "range": 5,
+      "trend_down": 6,
+      "trend_up": 1
+    },
+    "entriesAllowedLong": false,
+    "operationalRegime": "BEAR_TREND"
+  },
+  "minBars": 60,
+  "minCyclesPerStrategy": 32,
+  "mode": "preflight",
+  "phase": "V2.76 AUTO-MATERIAL-4 MARKET MATERIAL FORWARD",
+  "venue": "paper",
+  "watchA": [
+    "0a5dc12fd5a24f0a89a91d36a",
+    "0cf0907837fc422db221b0149",
+    "240a4ae01a944d3bba1cf1b24",
+    "31f9a597d03249319ea0c9345",
+    "381dd3b0699a44e8b9d13ac13",
+    "49596ff25acb4294b265f321b"
+  ],
+  "watchB": [
+    "4d24ea029283461cb9304421a",
+    "54283bcb54674ec1b70b4db72",
+    "5a130eea1ad54dcaaa50b67b9",
+    "5c34aaec1448406ebec94b20f",
+    "615d243eb830473ab009c8997",
+    "6655c5faff8a458186dcd8adc"
+  ],
+  "watchSize": 12
+}
+PREFLIGHT_EXIT=2
+=== 2) FORWARD (precio de MERCADO, reloj real): 8 ticks ===
+uv : INFO alembic.runtime.plugins setup plugin alembic.autogenerate.schemas
+En C:\Users\josea\AppData\Local\Temp\ps-script-1f4e9738-d9de-4137-8dae-d7f811fea522.ps1: 123 Carácter: 1
++ uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO alembic.ru...enerate.schemas:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.tables
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.types
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.constraints
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.defaults
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.comments
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.checkconstraint_byname
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+[16:48:03] ticks=2 prices=8/8 cycles=0/0 verdict=BLOCKED
+[16:48:10] ticks=4 prices=8/8 cycles=0/0 verdict=BLOCKED
+[16:48:17] ticks=6 prices=8/8 cycles=0/0 verdict=BLOCKED
+[16:48:24] ticks=8 prices=8/8 cycles=0/0 verdict=BLOCKED
+# BLOQUEADO: nivel 'evidence' NO alcanzado (nivel medido: blocked); motivos: no closed cycles; insufficient measurable 
+cycles per strategy
+{
+  "account": "aace1382152544b3b7e6e12f2",
+  "bump": "2.01.0-beta",
+  "engineBase": "auto-v76-0fe5c3d8",
+  "journalReasons": [
+    "regime_invalid:40",
+    "top_n_excluded:24"
+  ],
+  "lastGateReason": [
+    "hold_no_op"
+  ],
+  "level": "evidence",
+  "marketRegime": {
+    "aggregateTrialRegime": "trend_down",
+    "barsLoaded": 8,
+    "bySymbol": {
+      "0a5dc12fd5a24f0a89a91d36a": "range",
+      "0cf0907837fc422db221b0149": "trend_down",
+      "240a4ae01a944d3bba1cf1b24": "trend_down",
+      "31f9a597d03249319ea0c9345": "range",
+      "381dd3b0699a44e8b9d13ac13": "range",
+      "49596ff25acb4294b265f321b": "trend_down",
+      "4d24ea029283461cb9304421a": "range",
+      "54283bcb54674ec1b70b4db72": "trend_down"
+    },
+    "counts": {
+      "range": 4,
+      "trend_down": 4
+    },
+    "entriesAllowedLong": false,
+    "operationalRegime": "BEAR_TREND"
+  },
+  "minCyclesPerStrategy": 32,
+  "pairAvailable": false,
+  "phase": "V2.76 AUTO-MATERIAL-4 MARKET MATERIAL FORWARD",
+  "priceSources": {
+    "0a5dc12fd5a24f0a89a91d36a": "market_close",
+    "0cf0907837fc422db221b0149": "market_close",
+    "240a4ae01a944d3bba1cf1b24": "market_close",
+    "31f9a597d03249319ea0c9345": "market_close",
+    "381dd3b0699a44e8b9d13ac13": "market_close",
+    "49596ff25acb4294b265f321b": "market_close",
+    "4d24ea029283461cb9304421a": "market_close",
+    "54283bcb54674ec1b70b4db72": "market_close"
+  },
+  "readiness": {
+    "blockers": [
+      "no closed cycles",
+      "insufficient measurable cycles per strategy"
+    ],
+    "evidenceReady": false,
+    "facts": {
+      "account": "aace1382152544b3b7e6e12f2",
+      "buys": 0,
+      "closedCycles": 0,
+      "durableFills": 0,
+      "evidenceGap": true,
+      "executionReality": "VIRTUAL ù NO REAL MONEY",
+      "fillsTotalForAccount": 0,
+      "fillsWithCycle": 0,
+      "fillsWithoutCycle": 0,
+      "materialNote": "material PAPER REAL sobre cuenta PAPER VIRTUAL (dinero VIRTUAL): el gate solo mide linaje, cierres y denominador de R; no repara ni infiere material",
+      "maxFillsPerVersion": 0,
+      "maxMeasurableCyclesPerVersion": 0,
+      "measurableCycles": 0,
+      "measurableCyclesWithIdentity": 0,
+      "minCyclesPerStrategy": 32,
+      "perVersion": {},
+      "producerBlockers": [
+        "no closed cycles"
+      ],
+      "readinessLevel": "blocked",
+      "requestedStrategyVersions": [
+        "v76-forward-c3d8"
+      ],
+      "reservations": 0,
+      "reservationsLive": 0,
+      "reservationsReadComplete": true,
+      "reservationsWithCycle": 0,
+      "sells": 0,
+      "versionsMeetingMinimum": [],
+      "versionsWithoutClosedCycles": [
+        "v76-forward-c3d8"
+      ]
+    },
+    "lineage": {
+      "closure": {
+        "closedCycles": 0,
+        "closedCyclesWithIdentity": 0,
+        "closedCyclesWithRisk": 0,
+        "cyclesWithoutIdentity": 0
+      },
+      "cycle": {
+        "exitOrders": 0,
+        "exitOrdersWithCycle": 0,
+        "fillsWithCycle": 0,
+        "fillsWithoutCycle": 0
+      },
+      "readiness": {
+        "evidenceReady": false,
+        "level": "blocked",
+        "producerReady": false
+      },
+      "reservation": {
+        "live": 0,
+        "released": 0,
+        "rows": 0,
+        "withCycle": 0
+      }
+    },
+    "producerBlockers": [
+      "no closed cycles"
+    ],
+    "producerReady": false,
+    "ready": false,
+    "schema": "paper_material_readiness_v2",
+    "verdict": "BLOCKED"
+  },
+  "requestedVersions": [
+    "v76-forward-c3d8"
+  ],
+  "sample": {
+    "blockers": [
+      "no closed cycles",
+      "insufficient measurable cycles per strategy"
+    ],
+    "closedCycles": 0,
+    "durableFills": 0,
+    "maxMeasurableCyclesPerVersion": 0,
+    "measurableCycles": 0,
+    "perVersion": {},
+    "pricesServed": 8,
+    "ticks": 8,
+    "verdict": "BLOCKED",
+    "versionsMeetingMinimum": [],
+    "watchSize": 8
+  },
+  "secondaryActive": false,
+  "stopReason": "completed",
+  "ticks": 8,
+  "turnTotals": {
+    "closed": 0,
+    "decided": 64,
+    "fills": 0,
+    "opened": 0,
+    "orders": 0,
+    "proposals": 0,
+    "vetoes": 64
+  },
+  "versionA": "v76-forward-c3d8",
+  "versionB": "",
+  "watchA": [
+    "0a5dc12fd5a24f0a89a91d36a",
+    "0cf0907837fc422db221b0149",
+    "240a4ae01a944d3bba1cf1b24",
+    "31f9a597d03249319ea0c9345"
+  ],
+  "watchB": [
+    "381dd3b0699a44e8b9d13ac13",
+    "49596ff25acb4294b265f321b",
+    "4d24ea029283461cb9304421a",
+    "54283bcb54674ec1b70b4db72"
+  ],
+  "watchSize": 8
+}
+FORWARD_EXIT=2
