@@ -1,9 +1,12 @@
 # Arranque del auditor — `v2.72-beta` · cierre de `P3-4`
 
 > **AsOf:** 2026-09-26 · **Tag a auditar:** `v2.72-beta` (`1.97.0-beta`) · **Base:** `v2.71-beta`
-> **Commit sellado:** el del tag `v2.72-beta` (feat + docs encima) · **Publicado** en `origin/main`
-> **`Release tag CI`:** se cita, con su run y su resultado, en el **commit de sello posterior al tag**
-> (mismo patrón que `v2.71-beta`).
+> **Commit sellado:** `0f8cc888` (feat `02bd2066` + docs encima) · **Tag anotado** objeto `82b231d3`
+> · **Publicado** en `origin/main`
+> **`Release tag CI`:** run `36241408164` **GREEN en la primera pasada** (8m07s, `intento=1`, **10 jobs**
+> + `certify`; `playwright (integrated E2E, opt-in)` skipped por diseño). Sobre el mismo commit y tag:
+> `Python CI` `36241408161`, `Frontend CI` `36241408114`, `Optimize lab` `36241408122` y
+> `Fase 2 scientific` `36241408179`, todos **success** (`intento=1`).
 > **Naturaleza:** **corrección del instrumento** (un nivel publicado), no estadística nueva.
 > **SIN migración** (head `046_fill_reference_mid`). **El freeze no se toca** (`auto18-v1` / `auto15-v1`).
 > **Origen:** `P3-4`, la **única** observación de la auditoría externa de `v2.71-beta`.

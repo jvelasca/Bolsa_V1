@@ -39,7 +39,13 @@ sigue siendo el **paso operativo del propietario**.
 **13 passed / 1 skipped** (PG por DSN fast-fail, ajeno) · `ruff` **All checks passed** ·
 `import-linter` **4 kept / 0 broken** · `mypy` **0 issues (501 files)** · matriz **198/198** byte a byte.
 
-**CI del tag `v2.72-beta`:** se cita en el commit de sello inmediatamente posterior.
+**CI del tag `v2.72-beta`** (commit `0f8cc888`; feat `02bd2066` + docs encima; tag anotado objeto
+`82b231d3`): `Release tag CI` run `36241408164` **GREEN en la primera pasada** (8m07s, `intento=1`,
+**10 jobs** en success —`security (gitleaks)`, `shared`, `decision-spine`, `frontend`, `python`,
+`playwright (mock E2E)`, `lifecycle-pg`, `dr-verify`, `a7-gate`, `certify (aggregate + artifact)`—
+más `playwright (integrated E2E, opt-in)` **skipped** por diseño; **sin flakes ni re-ejecuciones**).
+Sobre el mismo commit y tag: `Python CI` `36241408161`, `Frontend CI` `36241408114`, `Optimize lab`
+`36241408122` y `Fase 2 scientific` `36241408179`, todos en **success** (`intento=1`).
 
 ## [1.96.0-beta] — Corrección de la semántica de `P(R>0)` y cierre de P3 (AUTO-19A/19B) — 2026-09-26
 

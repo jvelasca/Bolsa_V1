@@ -58,6 +58,8 @@ autoreporta con `len(MUTATIONS)`).
 | `analytics` | `uv run --no-sync pytest packages/py/analytics -q` | **1265 passed** (1262 + 3 nuevos) |
 | costuras `api-python` | `test_auto_v60_…_seam` · `test_auto_v64_…_artifact` · `test_auto_v70_…_evidence_validation` | **13 passed, 1 skipped** (PG por DSN fast-fail, ajeno) |
 | Matriz de mutaciones | `uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py` | **198/198**, restauración **byte a byte**, árbol intacto |
+| `Release tag CI` del tag `v2.72-beta` | commit `0f8cc888` (tag anotado objeto `82b231d3`) | run **`36241408164`** — **GREEN en la primera pasada** (8m07s, `intento=1`, 10 jobs + `certify`) |
+| Mismo commit y tag | `Python CI` / `Frontend CI` / `Optimize lab` / `Fase 2 scientific` | `36241408161` · `36241408114` · `36241408122` · `36241408179` — **success** |
 
 > **Evidencia cruda de la matriz**: `evidencia-matriz-mutaciones-v2.72-198-2026-09-26.txt`.
 > La medición se hizo **contra el árbol ya commiteado** (`git status` de los ficheros mutados:
