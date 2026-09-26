@@ -15,7 +15,7 @@
 | 2 | La celda publicada con `level` fuera de rango es la **MISMA** que con el nivel clampeado explícito (no hay segunda aritmética) | ídem | ídem (compara `evidence_for(...)` con la baseline del clamp) |
 | 3 | El hueco declarado (sin ciclos) también publica el nivel clampeado | rama `not rows` | `test_the_clamped_level_travels_even_without_cycles` |
 | 4 | El sello sube a `current_regime_evidence_v3` y ningún consumidor queda desalineado | constante de módulo | `test_the_regime_evidence_seal_is_v3` (fija el literal) |
-| 5 | Con el `level` default (`0.90`) el payload es **byte-idéntico** al de `v2.71` | el clamp es idempotente dentro del rango | `test_the_regime_cell_reuses_the_bootstrap_and_publishes_probability_positive` (sin cambio) |
+| 5 | Con el `level` default (`0.90`) el payload es **idéntico salvo el sello `method`** (`v2` → `v3` por diseño) al de `v2.71` | el clamp es idempotente dentro del rango | `test_the_regime_cell_reuses_the_bootstrap_and_publishes_probability_positive` (sin cambio) |
 | 6 | El freeze, el reparto y la migración siguen intactos | `git diff v2.71-beta..v2.72-beta` del freeze; Alembic head | verificación git + head |
 | 7 | El RUN PAPER se ejecuta **completo o se declara BLOQUEADO**; sin material **no** se baja ningún umbral | `paper_cycles_export.py` / `auto_evidence_run.py` | salidas `exit 2` medidas (ver §5) |
 
@@ -99,3 +99,26 @@ Esta fase **corrige un nivel publicado**; **no** produce estadística nueva ni e
 deudas **P3-2** (correlación por cubos) y **P3-3** (`P(R>0)` vs N) siguen **abiertas** hasta el
 primer dataset real, que sigue **BLOQUEADO por material**. **`P3-4` queda cerrada** por esta fase
 (§1–§3).
+
+## 7. Resultado de la auditoría externa (2026-09-26)
+
+**`APROBADO CON OBSERVACIONES`, 0 bloqueantes; 10/10 tesis PASS.** Auditado contra el **tag anotado**
+`v2.72-beta` (objeto `82b231d3` → commit `0f8cc888`, `HEAD` `bb53e2ee`; diff tag→HEAD **solo docs** ⇒
+código **byte-idéntico** al del tag).
+
+- **Tesis 1–4 y 6:** `PASS` (clamp publicado; celda idéntica al nivel clampeado explícito ⇒ sin segunda
+  aritmética; el hueco sin ciclos también publica el clampeado; sello `v3` fijado por el **literal** del
+  test; `M198` muerde los dos tests y restaura **byte a byte**, SHA-256 idéntico).
+- **Tesis 5, 7–10:** `PASS`. Compuertas **re-medidas** en verde (`ruff` OK, `import-linter`
+  **4 kept / 0 broken**, `mypy` **501 sin issues**, **1265** analytics, **13 passed / 1 skipped**
+  costuras); freeze/reparto/migración **intactos** (`auto18-v1`/`auto15-v1`, head
+  `046_fill_reference_mid`); alcance **read-only**; RUN **BLOQUEADO** reproducido con los mismos números
+  (**761** fills / **0** `cycle_id` / **751 `buy` / 10 `sell`** / **0** reservas; `exit 2` **sin crear**
+  `evidence_runs/`).
+- **Observación H-1 (LOW, documental, de esta fase):** la tesis 5 decía «payload **byte-idéntico**» a
+  `v2.71` con el default, pero el sello `method` **sí** cambia (`v2` → `v3`). **Corregida en `main`**: la
+  tesis (§1) ahora dice «idéntico salvo el sello `method`», y lo mismo en el plan, `PROJECT_STATE`,
+  `CHANGELOG` y el índice.
+- **Límites declarados por el auditor:** re-midió **solo `M198`** (las 197 restantes apoyadas en la
+  evidencia persistida), **no** verificó el CI remoto y **no** ejecutó `apps/api-python` completo. La
+  atribución de `P3-4` como **preexistente** queda confirmada (idéntico en `v2.70-beta`, sello `v1`).

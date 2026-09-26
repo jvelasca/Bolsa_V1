@@ -21,7 +21,7 @@ que instala: **el nivel que se publica es el que se usó** — vale para el info
   **`current_regime_evidence_v3`** (la lectura cambió). Sin consumidor desalineado.
 - **Sin cambio de payload con el default.** Con el `level` default (`0.90`, ya dentro del rango) el
   `byStrategy`, la `P(R>0)` por ciclos, la `P(edge>0)`, los `notes` y el régimen seleccionado son
-  **byte-idénticos** a `v2.71`.
+  **idénticos salvo el sello `method`** (`current_regime_evidence_v2` → `v3`, que sube por diseño).
 - **Tests + mutación.** `test_the_interval_level_is_clamped_and_published` (comprueba además que la
   celda publicada es la MISMA que con el nivel clampeado explícito: no hay segunda aritmética),
   `test_the_clamped_level_travels_even_without_cycles` y `test_the_regime_evidence_seal_is_v3`; **`M198`**
@@ -46,6 +46,23 @@ sigue siendo el **paso operativo del propietario**.
 más `playwright (integrated E2E, opt-in)` **skipped** por diseño; **sin flakes ni re-ejecuciones**).
 Sobre el mismo commit y tag: `Python CI` `36241408161`, `Frontend CI` `36241408114`, `Optimize lab`
 `36241408122` y `Fase 2 scientific` `36241408179`, todos en **success** (`intento=1`).
+
+**Auditoría externa de `v2.72-beta`: `APROBADO CON OBSERVACIONES` (2026-09-26), 0 bloqueantes.**
+El auditor verifica las **10 tesis** contra el tag (objeto `82b231d3` → `0f8cc888`; `HEAD` `bb53e2ee`,
+con un diff tag→HEAD **solo de docs** ⇒ el código auditado es **byte-idéntico** al del tag): confirma el
+defecto `P3-4` y su corrección (el `level` publicado es el **clampeado**, `0.0` → `0.5` y `5.0` → `0.99`,
+sin segunda aritmética; el hueco sin ciclos también lo publica; sello fijado por test), **re-mide** las
+compuertas en verde (`ruff` OK, `import-linter` **4 kept / 0 broken**, `mypy` **501 sin issues**,
+**1265** analytics, **13 passed / 1 skipped** en las costuras), **re-ejecuta `M198`** (**muerde** los dos
+tests del clamp y **restaura byte a byte**), comprueba el **freeze/reparto/migración intactos**
+(`auto18-v1`/`auto15-v1`, head `046_fill_reference_mid`), el alcance **read-only** y **reproduce el
+bloqueo del RUN** contra PostgreSQL real con los mismos números (761 fills / 0 `cycle_id` / 751 `buy` /
+10 `sell` / 0 reservas; `exit 2` sin crear `evidence_runs/`). **Observación única H-1 (LOW, documental)**:
+el plan y el audit-pack decían «payload byte-idéntico» a `v2.71` cuando el sello `method` **sí** cambia a
+`v3`; **corregido en `main`** en el plan, el audit-pack, `PROJECT_STATE` y este `CHANGELOG` (queda como
+«idéntico salvo el sello `method`»). El auditor declara sus límites: re-midió solo `M198` (las 197
+restantes apoyadas en la evidencia persistida), no verificó el CI remoto y no ejecutó
+`apps/api-python` completo.
 
 ## [1.96.0-beta] — Corrección de la semántica de `P(R>0)` y cierre de P3 (AUTO-19A/19B) — 2026-09-26
 

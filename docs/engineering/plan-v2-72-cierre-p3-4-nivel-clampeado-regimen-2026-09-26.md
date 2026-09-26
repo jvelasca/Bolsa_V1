@@ -51,8 +51,8 @@ mismo `resolved_level = level`; el diff `v2.70 → v2.71` no lo toca.
 
 **Lo que NO cambia:** la aritmética del bootstrap, la `P(R>0)` por ciclos, la `P(edge>0)`, el
 `byStrategy`, los `notes`, el régimen seleccionado ni el reparto. Con el `level` default (`0.90`) el
-payload es **byte-idéntico** al de `v2.71`: la corrección solo se manifiesta con un `level` fuera de
-rango.
+payload es **idéntico salvo el sello `method`** (`current_regime_evidence_v2` → `v3`, que sube por
+diseño): la corrección solo se manifiesta con un `level` fuera de rango.
 
 ## 3. Entregables
 

@@ -97,7 +97,12 @@ ADAPTIVE_INTERVAL_LEVEL_MAX)` **antes** de publicarlo, igual que `build_replay_r
 `test_the_interval_level_is_clamped_and_published` (que además comprueba que la celda publicada es la
 **misma** que con el nivel clampeado explícito: no hay segunda aritmética) y
 `test_the_clamped_level_travels_even_without_cycles`. Con el `level` default (`0.90`) el payload es
-**byte-idéntico** al de `v2.71`.
+**idéntico salvo el sello `method`** (`current_regime_evidence_v2` → `v3`, que sube por diseño).
+
+**Confirmado por la auditoría externa de `v2.72-beta`** (2026-09-26): `APROBADO CON OBSERVACIONES`,
+**0 bloqueantes**, 10/10 tesis PASS; `M198` muerde los dos tests del clamp y restaura **byte a byte**;
+`P3-4` **CERRADA**. La única observación (H-1, LOW documental) fue precisamente el «payload
+byte-idéntico» de este documento, ya corregido.
 
 ## Bloqueante central — material PAPER real
 

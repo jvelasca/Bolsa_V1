@@ -44,8 +44,11 @@ Sin material, el resultado correcto es **BLOQUEADO**.
 Con **≥32 ciclos medidos** por estrategia: correr el
 [protocolo del primer RUN](./protocolo-primer-run-paper-real-v2.70-2026-09-25.md) y el harness
 `auto_evidence_validate.py` para cerrar **P3-2** (correlación por cubos) y **P3-3** (`P(R>0)` vs N).
-La auditoría externa de `v2.72-beta` arranca en el
-[arranque del auditor](./arranque-auditor-v2.72-cierre-p3-4-nivel-clampeado-regimen-2026-09-26.md).
+La **auditoría externa de `v2.72-beta` ya se hizo**: **`APROBADO CON OBSERVACIONES`**, **0
+bloqueantes**, 10/10 tesis PASS (resultado en el [audit-pack](./audit-pack-v2-72-cierre-p3-4-nivel-clampeado-regimen-2026-09-26.md) §7 y en
+`PROJECT_STATE`); el [arranque del auditor](./arranque-auditor-v2.72-cierre-p3-4-nivel-clampeado-regimen-2026-09-26.md) queda como
+registro histórico. Su única observación **H-1** (LOW, documental: «payload byte-idéntico» vs el sello
+`method` `v2` → `v3`) **ya está corregida en `main`**.
 
 ## Ficheros de la fase
 
