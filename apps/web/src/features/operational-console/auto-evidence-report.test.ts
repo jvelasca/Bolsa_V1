@@ -10,6 +10,7 @@ import {
   ALLOCATION_CHANGE_NONE,
   AUTO_EVIDENCE_ARTIFACT_SCHEMA,
   AUTO_EVIDENCE_CALIBRATION_KEYS,
+  EXECUTION_LABEL_VIRTUAL,
   EXECUTION_REALITY_VIRTUAL_PAPER,
   INCONCLUSIVE,
   MATERIAL_ORIGIN_PAPER_REAL,
@@ -17,6 +18,7 @@ import {
   NOT_MEASURED,
   buildEvidenceView,
   classifyEvidenceSource,
+  classifyExecutionReality,
   integrityWarnings,
   parseAutoEvidenceArtifact,
   type AutoEvidenceArtifact,
@@ -164,6 +166,45 @@ describe("classifyEvidenceSource", () => {
     expect(
       integrityWarnings(conflicting).some((w) => w.includes("incoherente")),
     ).toBe(true);
+  });
+});
+
+describe("classifyExecutionReality", () => {
+  it("labels a paper artifact as VIRTUAL and never as real money", () => {
+    const view = classifyExecutionReality(artifact());
+    expect(view.kind).toBe("virtual_paper");
+    expect(view.label).toBe(EXECUTION_LABEL_VIRTUAL);
+    expect(view.realMoneyAtRisk).toBe(false);
+    expect(view.tone).toBe("ok");
+  });
+
+  it("separates PAPER REAL data from real money in the source subtitle", () => {
+    const source = classifyEvidenceSource(artifact());
+    expect(source.label).toBe("PAPER REAL");
+    expect(source.subtitle).toContain("NO ES DINERO REAL");
+  });
+
+  it("declares NOT MEASURED when executionReality is absent, never assuming virtual", () => {
+    const view = classifyExecutionReality(artifact({ executionReality: null }));
+    expect(view.kind).toBe("no_medido");
+    expect(view.label).toBe(NOT_MEASURED);
+    expect(view.tone).toBe("warn");
+  });
+
+  it("flags real money at risk as unknown instead of degrading to virtual", () => {
+    const view = classifyExecutionReality(artifact({ realMoneyAtRisk: true }));
+    expect(view.kind).toBe("desconocido");
+    expect(view.tone).toBe("danger");
+    expect(view.realMoneyAtRisk).toBe(true);
+  });
+
+  it("flags a non-virtual execution reality without pretending it is virtual", () => {
+    const view = classifyExecutionReality(
+      artifact({ executionReality: "live" }),
+    );
+    expect(view.kind).toBe("desconocido");
+    expect(view.tone).toBe("danger");
+    expect(view.caveat).toContain("live");
   });
 });
 

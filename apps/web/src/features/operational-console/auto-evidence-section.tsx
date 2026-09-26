@@ -210,18 +210,55 @@ export function OpsAutoEvidenceSection() {
       <CardContent className="space-y-4 text-sm">
         <div
           className={cn(
-            "rounded-md border px-3 py-2 font-semibold tracking-tight",
+            "rounded-md border-2 px-3 py-2 font-semibold tracking-tight",
             toneClasses(view.source.tone),
           )}
           data-testid="ops-auto-evidence-badge"
           data-source-kind={view.source.kind}
         >
-          <span className="text-xs uppercase text-muted-foreground">
+          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             SOURCE
           </span>
-          <div className="text-sm">{view.source.label}</div>
+          <div className="text-lg font-bold uppercase tracking-tight">
+            {view.source.label}
+          </div>
+          {view.source.subtitle ? (
+            <div
+              className="mt-1 text-xs font-bold uppercase tracking-wide"
+              data-testid="ops-auto-evidence-source-subtitle"
+            >
+              {view.source.subtitle}
+            </div>
+          ) : null}
           {view.source.caveat ? (
             <div className="mt-1 text-xs font-normal">{view.source.caveat}</div>
+          ) : null}
+        </div>
+
+        <div
+          className={cn(
+            "rounded-md border-2 px-3 py-2 font-semibold tracking-tight",
+            toneClasses(view.execution.tone),
+          )}
+          data-testid="ops-auto-evidence-execution-reality"
+          data-execution-kind={view.execution.kind}
+        >
+          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            EXECUTION REALITY
+          </span>
+          <div className="text-lg font-bold uppercase tracking-tight">
+            {view.execution.label}
+          </div>
+          {view.execution.realMoneyAtRisk !== null ? (
+            <div className="mt-1 text-xs font-normal">
+              Dinero real en riesgo:{" "}
+              {view.execution.realMoneyAtRisk ? "SÍ (revisar)" : "no"}
+            </div>
+          ) : null}
+          {view.execution.caveat ? (
+            <div className="mt-1 text-xs font-normal">
+              {view.execution.caveat}
+            </div>
           ) : null}
         </div>
 

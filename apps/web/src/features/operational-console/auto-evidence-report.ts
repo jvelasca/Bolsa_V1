@@ -35,6 +35,13 @@ export const NOT_SUPPORTED = "NOT_SUPPORTED";
 /** Etiqueta de lo no medido: espejo de `NOT_MEASURED` en `auto_evidence_report.py`. */
 export const NOT_MEASURED = "NO MEDIDO";
 export const ALLOCATION_CHANGE_NONE = "none";
+/**
+ * AUTO-23 — etiqueta de la realidad de ejecución: "PAPER REAL" significa **datos reales**, NO
+ * dinero real. El rótulo lo dice sin ambigüedad para que nadie lea una corrida virtual como un
+ * resultado con capital real en riesgo.
+ */
+export const EXECUTION_LABEL_VIRTUAL = "VIRTUAL — NO REAL MONEY";
+export const EXECUTION_LABEL_REAL_MONEY = "DINERO REAL EN RIESGO";
 
 export const EVIDENCE_ARTIFACT_DISCLAIMER =
   "Procedencia autodeclarada por el artefacto; la huella sella el universo medido, no es prueba criptográfica de origen.";
@@ -306,9 +313,31 @@ export type EvidenceSourceTone = "ok" | "warn" | "neutral" | "danger";
 export type EvidenceSourceView = {
   kind: EvidenceSourceKind;
   label: string;
+  /** AUTO-23 — línea de separación dato/moneda: "PAPER REAL" son DATOS reales, no dinero real. */
+  subtitle: string | null;
   tone: EvidenceSourceTone;
   /** `true` solo cuando la procedencia es PAPER real: fixture y sin-material NO son base de decisión. */
   decisionSafe: boolean;
+  caveat: string | null;
+};
+
+export type EvidenceExecutionKind =
+  | "virtual_paper"
+  | "no_medido"
+  | "desconocido";
+
+/**
+ * AUTO-23 — realidad de EJECUCIÓN (bloque `EXECUTION REALITY`).
+ *
+ * Es el bloque que impide el malentendido más caro de la vista: `PAPER REAL` describe la
+ * PROCEDENCIA del dato (cuenta PAPER), NO que haya dinero real en riesgo. Aquí se declara, por
+ * separado, si la ejecución es virtual o si el artefacto afirma dinero real.
+ */
+export type EvidenceExecutionView = {
+  kind: EvidenceExecutionKind;
+  label: string;
+  tone: EvidenceSourceTone;
+  realMoneyAtRisk: boolean | null;
   caveat: string | null;
 };
 
@@ -323,6 +352,7 @@ export function classifyEvidenceSource(
     return {
       kind: "sin_material",
       label: "SIN MATERIAL · NO MEDIDO",
+      subtitle: null,
       tone: "neutral",
       decisionSafe: false,
       caveat: "No hay artefacto importado: no se ha medido nada.",
@@ -334,6 +364,7 @@ export function classifyEvidenceSource(
     return {
       kind: "sin_material",
       label: "SIN MATERIAL · NO MEDIDO",
+      subtitle: null,
       tone: "neutral",
       decisionSafe: false,
       caveat:
@@ -349,6 +380,7 @@ export function classifyEvidenceSource(
     return {
       kind: "desconocido",
       label: "PROCEDENCIA DESCONOCIDA",
+      subtitle: null,
       tone: "danger",
       decisionSafe: false,
       caveat: `Contradicción de procedencia autodeclarada: raíz='${rootOrigin}' vs material='${materialOrigin}'; no se asume PAPER real.`,
@@ -359,6 +391,9 @@ export function classifyEvidenceSource(
     return {
       kind: "paper_real",
       label: "PAPER REAL",
+      // AUTO-23: "PAPER REAL" = DATOS reales de la cuenta PAPER; NO es dinero real.
+      subtitle:
+        "DATOS REALES DE LA CUENTA PAPER · DINERO VIRTUAL · NO ES DINERO REAL",
       tone: "ok",
       decisionSafe: true,
       caveat:
@@ -369,6 +404,7 @@ export function classifyEvidenceSource(
     return {
       kind: "synthetic_fixture",
       label: "FIXTURE SINTÉTICO",
+      subtitle: "NO UTILIZAR PARA DECISIONES: datos sintéticos de test.",
       tone: "warn",
       decisionSafe: false,
       caveat: "NO UTILIZAR PARA DECISIONES: datos sintéticos de test.",
@@ -377,9 +413,68 @@ export function classifyEvidenceSource(
   return {
     kind: "desconocido",
     label: "PROCEDENCIA DESCONOCIDA",
+    subtitle: null,
     tone: "danger",
     decisionSafe: false,
     caveat: `materialOrigin ${origin ?? "ausente"} no reconocido: no se asume PAPER real.`,
+  };
+}
+
+/**
+ * AUTO-23 — clasifica la REALIDAD DE EJECUCIÓN (bloque `EXECUTION REALITY`), separada de la
+ * procedencia. Regla dura: un artefacto sin `executionReality` es `NO MEDIDO` (nunca se asume
+ * virtual); si afirma `realMoneyAtRisk=true` o una realidad distinta de `virtual_paper_only`, se
+ * declara `desconocido` con tono de peligro en vez de degradarlo a una corrida virtual.
+ */
+export function classifyExecutionReality(
+  artifact: AutoEvidenceArtifact | null | undefined,
+): EvidenceExecutionView {
+  if (!artifact) {
+    return {
+      kind: "no_medido",
+      label: NOT_MEASURED,
+      tone: "neutral",
+      realMoneyAtRisk: null,
+      caveat:
+        "Sin artefacto importado: no se puede confirmar la realidad de ejecución.",
+    };
+  }
+  if (artifact.realMoneyAtRisk === true) {
+    return {
+      kind: "desconocido",
+      label: EXECUTION_LABEL_REAL_MONEY,
+      tone: "danger",
+      realMoneyAtRisk: true,
+      caveat:
+        "realMoneyAtRisk=true: un artefacto PAPER no debería declarar dinero real en riesgo.",
+    };
+  }
+  if (artifact.executionReality === EXECUTION_REALITY_VIRTUAL_PAPER) {
+    return {
+      kind: "virtual_paper",
+      label: EXECUTION_LABEL_VIRTUAL,
+      tone: "ok",
+      realMoneyAtRisk: artifact.realMoneyAtRisk ?? null,
+      caveat:
+        "DINERO VIRTUAL: sin dinero real en riesgo. Nunca XTB ni una plataforma real.",
+    };
+  }
+  if (artifact.executionReality === null) {
+    return {
+      kind: "no_medido",
+      label: NOT_MEASURED,
+      tone: "warn",
+      realMoneyAtRisk: artifact.realMoneyAtRisk ?? null,
+      caveat:
+        "executionReality ausente: no se puede confirmar ejecución virtual.",
+    };
+  }
+  return {
+    kind: "desconocido",
+    label: `DESCONOCIDA (${artifact.executionReality})`,
+    tone: "danger",
+    realMoneyAtRisk: artifact.realMoneyAtRisk ?? null,
+    caveat: `executionReality='${artifact.executionReality}' no es '${EXECUTION_REALITY_VIRTUAL_PAPER}'.`,
   };
 }
 
@@ -391,6 +486,8 @@ export type EvidenceRow = {
 
 export type EvidenceView = {
   source: EvidenceSourceView;
+  /** AUTO-23 — EXECUTION REALITY: virtual vs dinero real, separado de la procedencia. */
+  execution: EvidenceExecutionView;
   /** NIVEL 1 — MATERIAL: el universo medido, sus huecos declarados y su huella. */
   material: EvidenceRow[];
   /** NIVEL 2 — GLOBAL EVIDENCE: `P(R>0)`, `P(R>0)` OOS y WFE (lo que mide el instrumento). */
@@ -828,6 +925,7 @@ export function buildEvidenceView(
   });
   return {
     source: classifyEvidenceSource(artifact),
+    execution: classifyExecutionReality(artifact),
     material: materialRows(artifact?.material ?? null),
     global: globalRows(artifact),
     calibration,

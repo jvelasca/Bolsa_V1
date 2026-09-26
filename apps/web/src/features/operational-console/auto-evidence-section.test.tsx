@@ -103,6 +103,27 @@ describe("OpsAutoEvidenceSection", () => {
     expect(badge.getAttribute("data-source-kind")).toBe("synthetic_fixture");
   });
 
+  it("separates PAPER REAL data from real money in the SOURCE subtitle", () => {
+    paste(artifactJson());
+    const subtitle = screen.getByTestId("ops-auto-evidence-source-subtitle");
+    expect(subtitle.textContent).toContain("NO ES DINERO REAL");
+  });
+
+  it("renders a prominent VIRTUAL execution reality for a paper artifact", () => {
+    paste(artifactJson());
+    const block = screen.getByTestId("ops-auto-evidence-execution-reality");
+    expect(block.textContent).toContain("VIRTUAL — NO REAL MONEY");
+    expect(block.getAttribute("data-execution-kind")).toBe("virtual_paper");
+  });
+
+  it("flags a real-money artifact in EXECUTION REALITY, never degrading to virtual", () => {
+    paste(artifactJson({ realMoneyAtRisk: true, executionReality: "live" }));
+    const block = screen.getByTestId("ops-auto-evidence-execution-reality");
+    expect(block.textContent).toContain("DINERO REAL EN RIESGO");
+    expect(block.getAttribute("data-execution-kind")).toBe("desconocido");
+    expect(block.textContent).not.toContain("VIRTUAL — NO REAL MONEY");
+  });
+
   it("shows NO MEDIDO instead of inventing a zero", () => {
     paste(
       artifactJson({

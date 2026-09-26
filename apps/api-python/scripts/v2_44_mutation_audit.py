@@ -463,6 +463,14 @@ AUTO-22 (V2.69: run de evidencia end-to-end, un solo comando con bundle) añade:
 * **M190 (bundle vacío)** — si sin ciclos con R medible se publica un bundle en vez de BLOQUEAR, el
   artefacto ``INCONCLUSIVE`` se guarda como una medición que nunca midió nada.
 
+AUTO-23 (V2.70: validación de la evidencia sobre la única aritmética) añade:
+
+* **M191 (segunda aritmética)** — si el barrido ``P(R>0)`` vs N recalcula la probabilidad como
+  fracción de ciclos positivos en vez de COMPONER ``build_evidence_run_bundle``, la validación
+  publica un número que puede divergir del instrumento auditado.
+* **M192 (fila fabricada)** — si un tamaño muestral mayor que el material medido deja de declararse
+  ``NO MEDIDO``, el barrido fabrica una fila para un ``N`` que la muestra no sostiene.
+
 DSN fast-fail para las suites de ``apps/api-python``: el teardown de
 ``apps/api-python/tests/conftest.py`` (``purge_all_residuals``) intenta conectar a Postgres y,
 sin PG levantado, se queda colgado. Se inyecta un ``DATABASE_URL`` a un puerto local cerrado: el
@@ -568,6 +576,9 @@ AUTO_EVIDENCE_RUN = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_run.py"
 )
 EVIDENCE_RUN_SCRIPT = "apps/api-python/scripts/auto_evidence_run.py"
+AUTO_EVIDENCE_VALIDATION = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_validation.py"
+)
 
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
@@ -629,6 +640,8 @@ T_REGIME_EVIDENCE = "packages/py/analytics/tests/test_auto_adaptive_regime_evide
 # AUTO-22 (V2.69): composición pura del bundle + CLI del run de evidencia (bundle/en el disco).
 T_EVIDENCE_RUN = "packages/py/analytics/tests/test_auto_evidence_run.py"
 T_EVIDENCE_RUN_CLI = "apps/api-python/tests/test_auto_v69_auto22_evidence_run.py"
+# AUTO-23 (V2.70): validación sobre la única aritmética + CLI del informe de validación.
+T_EVIDENCE_VALIDATION = "packages/py/analytics/tests/test_auto_evidence_validation.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2188,6 +2201,39 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    if not _measured_cycles(rows):\n",
         "    if False:\n",
         (T_EVIDENCE_RUN, T_EVIDENCE_RUN_CLI),
+    ),
+    # ── AUTO-23 (V2.70): validación sobre la única aritmética y NO MEDIDO real ──────────────────
+    (
+        "M191 (segunda aritmetica): la validacion recalcula P(R>0) en vez de componerla",
+        AUTO_EVIDENCE_VALIDATION,
+        "    return _sweep_row_from_bundle(\n"
+        "        prefix,\n"
+        "        size,\n"
+        "        folds=folds,\n"
+        "        seed=seed,\n"
+        "        level=level,\n"
+        "        resamples=resamples,\n"
+        "    )\n",
+        "    measured = [measured_r(row) for row in prefix]\n"
+        "    values = [value for value in measured if value is not None]\n"
+        "    probability = (sum(1 for value in values if value > 0) / len(values)) if values else None\n"
+        "    return {\n"
+        '        "size": size,\n'
+        '        "measured": True,\n'
+        '        "probabilityPositive": probability,\n'
+        '        "probabilityPositiveOos": None,\n'
+        '        "walkForwardEfficiency": None,\n'
+        '        "medianEffectiveN": None,\n'
+        '        "notes": [],\n'
+        "    }\n",
+        (T_EVIDENCE_VALIDATION,),
+    ),
+    (
+        "M192 (fila fabricada): un N mayor que el material medido deja de ser NO MEDIDO",
+        AUTO_EVIDENCE_VALIDATION,
+        "    if size > len(measured):\n",
+        "    if False:\n",
+        (T_EVIDENCE_VALIDATION,),
     ),
 ]
 
