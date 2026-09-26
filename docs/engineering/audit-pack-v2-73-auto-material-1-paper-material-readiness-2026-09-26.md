@@ -104,9 +104,24 @@ Esta fase **solo mide y declara**. La **reparación de material** (activar el pr
 (correlación por cubos) y **`P3-3`** (`P(R>0)` vs N) siguen **abiertas** hasta el primer dataset real.
 No hay UI en esta fase; el JSON queda listo para reutilizarla.
 
-## 7. CI del tag `v2.73-beta`
+## 7. CI del tag `v2.73-beta` (verificado)
 
-Pendiente de la **acción de release del propietario** (commit + tag anotado `v2.73-beta`): esta fase
-se entrega con las compuertas **locales** en verde (tabla §4) y la evidencia cruda persistida. El
-sello de CI remoto (`Release tag CI` / `Python CI` / `Frontend CI` / `Optimize lab` / `Fase 2
-scientific`) se anota al publicar el tag, fuera del alcance de la implementación.
+`main == a9166655` == **tag anotado objeto `fd891fcd…` → commit `a9166655`**.
+
+| Workflow (tag `v2.73-beta`, commit `a9166655`) | Run | Resultado |
+|---|---|---|
+| **Release tag CI** | `36244779500` | **GREEN en la primera pasada** (8m52s; **10 jobs** en success + `certify`; `playwright (integrated E2E, opt-in)` **skipped** por diseño) |
+| `Python CI` | `36244779488` | **success** (2m51s) |
+| `Frontend CI` | `36244779559` | **success** (3m31s) |
+| `Optimize lab` | `36244779562` | **success** (2m8s) |
+| `Fase 2 scientific` | `36244779467` | **success** (1m25s) |
+
+Jobs del `Release tag CI` (todos verdes): `decision-spine` (31s) · `python (ruff/imports/mypy/pytest
+offline)` (1m54s) · `frontend (typecheck/lint/test/build + contract:check)` (3m11s) · `shared` (34s) ·
+`lifecycle-pg (Alembic + auth + golden restart)` (3m44s) · `security (gitleaks)` (7s) · `playwright
+(mock E2E)` (8m4s) · `dr-verify` (48s) · `a7-gate` (50s) · `certify (aggregate + artifact)` (3s) —
+más `playwright (integrated E2E, opt-in)` **skipped** por diseño.
+
+Sobre el mismo commit, en `main`: `Python CI` `36244778024` · `Frontend CI` `36244778014` ·
+`Gitleaks` `36244778017` · `Optimize lab` `36244778000` · `Fase 2 scientific` `36244778040`, todos en
+**success**.
