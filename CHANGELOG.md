@@ -2,6 +2,53 @@
 
 All notable releases of Bolsa V1.
 
+## [1.96.0-beta] — Corrección de la semántica de `P(R>0)` y cierre de P3 (AUTO-19A/19B) — 2026-09-26
+
+**Fase de corrección del instrumento; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y
+**sin tocar ningún fichero del freeze**. El reparto **no se mueve**: `auto18-v1` / `auto15-v1`. No se
+toca `evidence_runs`/`evidence_validations` ni el runbook: el **primer RUN PAPER real** pasa a ser el
+**hito siguiente** (paso operativo del propietario).
+
+El nombre `P(R>0)` mezclaba **dos funcionales** y la calibración los comparaba como si fueran lo mismo.
+El invariante que instala esta fase: **`P(R>0)` es la fracción de CICLOS positivos (lo medido) y
+`P(edge>0)` es la fracción de MEDIAS bootstrap positivas (el edge); la calibración solo compara
+magnitudes homogéneas, y lo que no se midió se declara — nunca se cuenta como evidencia negativa ni se
+publica con un nivel que no se usó.**
+
+- **Dos probabilidades.** `auto_adaptive_uncertainty.py`: `probability_positive` → **`edge_positive_probability`**
+  (`edgePositiveProbability`, `P(edge>0)`) y nueva **`cycle_positive_share`**
+  (`cyclePositiveShare`, `P(ciclo>0)` estricta, sobrevive sin bootstrap). Sello
+  `ADAPTIVE_UNCERTAINTY_METHOD` `bootstrap_episodes_v2` → **`bootstrap_episodes_v3`**.
+- **Calibración homogénea.** `auto_adaptive_calibration.py` (`_question_probability_positive`) compara
+  `is_cycle_positive_share` (IS) contra `oos_positive_share` (OOS) e **ignora** la `P(edge>0)`. Sello
+  `CALIBRATION_METHOD` `walk_forward_calibration_v3` → **`walk_forward_calibration_v4`**. Se conservan
+  las claves y agregados de la UI (`probability_positive_calibration`, `meanDeclaredProbability`,
+  `meanRealizedPositiveShare`, `probabilityPositiveOos`).
+- **P3 cerradas.**
+  - **H2 (cobertura no medida).** `_question_coverage` excluye `dominant_regime_coverage is None` del
+    grupo "no cubierta" y lo declara en **`cellsUnmeasured`**: la ausencia de medición no es evidencia.
+  - **H3 (nivel clampeado).** `build_replay_report` publica el `interval_level` **efectivo**
+    (`resolved_level`, el mismo que usó el bootstrap), como ya hacía `CalibrationReport`.
+  - **H4 (colisión de clave).** La celda de replay renombra `regimeCoverage` → **`dominantRegimeCoverage`**
+    (campo `dominant_regime_coverage`), fin de la colisión banda/`float` con `StrategyConfidence`.
+- **Consumidores.** `auto_adaptive_replay.py`: `is_edge_positive_probability` + `is_cycle_positive_share`;
+  `auto_adaptive_regime_evidence.py`: `probabilityPositive = P(ciclo>0)` + `edgePositiveProbability`
+  aditiva, sello `current_regime_evidence_v1` → **`current_regime_evidence_v2`**; `auto_evidence_validation.py`:
+  `probabilityPositive = cycle_positive_share` + `edgePositiveProbability`, sellos
+  `auto23_evidence_validation_v2`, `auto23_sample_size_sweep_v2`, `auto23_regime_stability_v2` y método
+  `chronological_prefix_sweep_v2`. La UI **lee**, no recalcula, y mantiene sus claves.
+- **Mutaciones.** `M182`–`M184`/`M187` actualizadas y **`M193`–`M197`** nuevas (P(R>0) cuenta ciclos;
+  calibración homogénea; cobertura no medida; nivel clampeado; clave sin colisión). Matriz completa
+  **197/197** (192 + 5 nuevas; el plan citaba `198` por un desliz aritmético) con restauración
+  **byte a byte** (`apps/api-python/scripts/v2_44_mutation_audit.py`).
+
+**Compuertas.** Frontend **1339 passed** (232 ficheros) · `typecheck` OK · `lint` **0 errores** (23
+warnings preexistentes) · `build` OK · `contract:check` OK · Python `analytics` **1262 passed** ·
+`application` **1945 passed** (5 errores de fixture PG por DSN fast-fail, ajenos) · suites `api-python`
+afectadas **13 passed / 1 skipped** · gate offline `api-python` **479 passed / 14 skipped / 0 fallos**
+(los 26 tests `*_pg` requieren Postgres real) · `ruff` **All checks passed** · `import-linter`
+**4 kept / 0 broken** · `mypy` **0 issues (501 files)** · matriz **197/197** byte a byte.
+
 ## [1.95.0-beta] — AUTO-23 · Validación de evidencia PAPER real (harness) + procedencia imposible de confundir — 2026-09-25
 
 **Fase de preparación y blindaje; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

@@ -1,0 +1,89 @@
+# Audit-pack — `v2.71-beta` (`AUTO-19A`+`AUTO-19B`) · Corrección de `P(R>0)` y cierre de P3
+
+> **AsOf:** 2026-09-26 · **Versión:** `1.96.0-beta` · **Base auditada (diff):** `v2.70-beta`
+> **Alcance:** (A) separar `P(ciclo>0)` de `P(edge>0)` y hacer **homogénea** la pregunta de
+> calibración; (B) cerrar los P3 de la auditoría de `AUTO-19A`/`AUTO-19B`. Fase de **corrección del
+> instrumento**, no de estadística nueva.
+> **SIN migración** (head `046_fill_reference_mid`). **El freeze no se toca.** El reparto **no se
+> mueve** (`auto18-v1` / `auto15-v1`).
+
+## 1. Tesis a verificar (no a creer)
+
+| # | Tesis | Dónde se sostiene | Test / sonda |
+|---|---|---|---|
+| 1 | `P(edge>0)` es la fracción de **medias bootstrap** `> 0` | `ExpectancyInterval.edge_positive_probability` | `test_edge_positive_probability_is_the_share_of_positive_bootstrap_means` + **M183** |
+| 2 | `P(ciclo>0)` es la fracción de **ciclos medidos** con `R>0`, distinta de `P(edge>0)` | `ExpectancyInterval.cycle_positive_share` | `test_cycle_positive_share_counts_cycles_not_bootstrap_means` + **M193** |
+| 3 | Sin bootstrap, `P(edge>0)` es `None` pero `P(ciclo>0)` **existe** | `_interval_from_episodes` (rachas insuficientes) | `test_edge_positive_probability_is_none_without_a_bootstrap` |
+| 4 | La calibración compara **`P(ciclo>0)` IS vs frecuencia positiva OOS** (magnitudes homogéneas) | `_question_probability_positive` | `test_probability_positive_calibration_ignores_the_edge_probability` + **M194** |
+| 5 | La pregunta de calibración **ignora** `P(edge>0)` aunque esté presente | `_question_probability_positive` (filtro/errores por `is_cycle_positive_share`) | ídem |
+| 6 | `regimeEvidence.probabilityPositive` = `P(ciclo>0)`; `edgePositiveProbability` viaja aparte | `auto_adaptive_regime_evidence.py` | `test_auto_adaptive_regime_evidence.py` |
+| 7 | Las celdas de validación publican `probabilityPositive` = `P(ciclo>0)` + `edgePositiveProbability` | `_interval_cell` | `test_auto_evidence_validation.py` |
+| 8 | Los sellos suben: `bootstrap_episodes_v3`, `walk_forward_calibration_v4`, `current_regime_evidence_v2`, `auto23_*_v2` | constantes de módulo | `test_auto_v60_auto19_uncertainty_seam.py`, `test_auto_v64_auto20c_artifact.py`, `test_auto_v70_auto23_evidence_validation.py` + **M182**/**M184** |
+| 9 | La cobertura **NO MEDIDA** (`None`) sale de la comparación y se declara en `cellsUnmeasured` | `_question_coverage` | `test_a_cell_without_a_measured_regime_coverage_is_declared_not_counted_as_uncovered` + **M195** |
+| 10 | El nivel de intervalo publicado es el **clampeado** (el que usó el bootstrap) | `build_replay_report` (`resolved_level`) | `test_the_interval_level_is_clamped_and_published` + **M196** |
+| 11 | `ReplayCell` **no** emite `regimeCoverage`; `StrategyConfidence` sí, como `float` | `ReplayCell.as_dict` vs `StrategyConfidence.as_dict` | `test_the_regime_coverage_key_is_a_float_in_confidence_and_a_band_in_replay` + **M197** |
+| 12 | La UI mantiene sus claves (`meanDeclaredProbability`, `probabilityPositiveOos`, `probabilityPositive`) | `auto-evidence-report.ts` (sin cambio funcional) | `auto-evidence-report.test.ts` |
+| 13 | El reparto y el freeze siguen intactos; sin migración | `git diff` del freeze; Alembic head `046_*` | verificación git + head |
+
+## 2. Qué cambia (y qué no)
+
+**Cambia.**
+
+- `.../auto_adaptive_uncertainty.py`: `edge_positive_probability` + `cycle_positive_share`; sello
+  `bootstrap_episodes_v3`.
+- `.../auto_adaptive_replay.py`: `isEdgePositiveProbability`/`isCyclePositiveShare`,
+  `dominantRegimeCoverage`, `cellsUnmeasured` y nivel clampeado.
+- `.../auto_adaptive_calibration.py`: pregunta homogénea; `walk_forward_calibration_v4`.
+- `.../auto_adaptive_regime_evidence.py`: `probabilityPositive` por ciclos + `edgePositiveProbability`;
+  `current_regime_evidence_v2`.
+- `.../auto_evidence_validation.py`: celdas por ciclos + `edgePositiveProbability`; sellos `_v2`.
+- `apps/api-python/scripts/v2_44_mutation_audit.py`: `M182`–`M187` + `M193`–`M197`.
+- bump `1.95.0-beta` → `1.96.0-beta`.
+
+**No cambia.**
+
+- **La aritmética**: el intervalo bootstrap, el WFE, la correlación, el régimen y la banda de edge
+  quedan **congelados**. Solo cambia **la lectura** de una probabilidad.
+- **Reparto/freeze**: `auto18-v1` / `auto15-v1`, umbrales de rotación, `portfolio_optimizer.py`,
+  `portfolio_reservation.py` intactos. **Sin migración** (`046_fill_reference_mid`).
+- **`evidence_runs`/`evidence_validations`** y el runbook del primer RUN: intactos.
+
+## 3. Compuertas medidas
+
+| Compuerta | Resultado |
+|---|---|
+| Python `packages/py/analytics` | **1262 passed** |
+| Python `packages/py/application` | **1945 passed** (5 errores de fixture PG por DSN fast-fail, ajenos) |
+| Suites `api-python` afectadas | `test_auto_v60_...`, `test_auto_v64_...`, `test_auto_v70_...` verdes (13 passed / 1 skipped) |
+| Suites `api-python` offline (gate CI) | **479 passed, 14 skipped, 0 fallos** (26 tests `*_pg` no ejecutables sin Postgres real) |
+| Frontend `vitest` / `typecheck` / `build` / `contract:check` | ver CHANGELOG |
+| `ruff` / `import-linter` / `mypy` | ver CHANGELOG |
+| Matriz de mutaciones | **197/197**, restauración **byte a byte**, árbol intacto |
+
+> **Evidencia cruda de la matriz**: `evidencia-matriz-mutaciones-v2.71-197-2026-09-26.txt`.
+> Reproducible con `uv run python apps/api-python/scripts/v2_44_mutation_audit.py`.
+>
+> **Nota de conteo:** el plan de fase citaba `192 → 198`; el script define exactamente `M1`–`M197`
+> contiguos (192 previas + las 5 nuevas `M193`–`M197`), así que la matriz real es **197/197**. El
+> script lo autoreporta (`medidas: 197/197, ninguna se quedó sin fragmento`).
+
+## 4. Mutaciones nuevas / actualizadas
+
+| Etiqueta | Invariante | Rojo en |
+|---|---|---|
+| **M182** (act.) | La lectura que separa las dos probabilidades conserva su sello `_v3` | `test_auto_v60_auto19_uncertainty_seam.py` |
+| **M183** (act.) | `P(edge>0)` es la fracción de medias bootstrap positivas | `test_edge_positive_probability_is_the_share_of_positive_bootstrap_means` |
+| **M184** (act.) | La calibración homogénea sella `_v4` | `test_auto_v64_auto20c_artifact.py` |
+| **M187** (act.) | El régimen sin celda no publica la lectura agregada (`P(ciclo>0)`) | `test_auto_adaptive_regime_evidence.py` |
+| **M193** | `P(R>0)` cuenta **ciclos** positivos, no otra cosa | `test_cycle_positive_share_counts_cycles_not_bootstrap_means` |
+| **M194** | La calibración compara `P(ciclo>0)` IS vs OOS (no `P(edge>0)`) | `test_probability_positive_calibration_ignores_the_edge_probability` |
+| **M195** | La cobertura `None` no entra en el grupo no cubierta | `test_a_cell_without_a_measured_regime_coverage_is_declared_not_counted_as_uncovered` |
+| **M196** | El nivel publicado es el clampeado | `test_the_interval_level_is_clamped_and_published` |
+| **M197** | `dominantRegimeCoverage` no colisiona con `regimeCoverage` | `test_the_regime_coverage_key_is_a_float_in_confidence_and_a_band_in_replay` |
+
+## 5. Límite declarado
+
+Esta fase **corrige el instrumento**; **no** produce estadística nueva ni ejecuta la corrida real. El
+**primer RUN PAPER real** sigue siendo el **paso operativo del propietario** y el **hito siguiente**;
+las deudas **P3-2** (correlación por cubos) y **P3-3** (`P(R>0)` vs N) quedan **abiertas** hasta el
+primer dataset real.
