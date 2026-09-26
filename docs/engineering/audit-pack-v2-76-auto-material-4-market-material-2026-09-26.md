@@ -42,6 +42,9 @@
 - `apps/api-python/scripts/v2_76_forward_market_material.py` (**NUEVO**, solo I/O): runner forward +
   **preflight de mercado** read-only (`--preflight-only`).
 - `.github/workflows/python-ci.yml`: los dos ficheros puros nuevos **EXPLÍCITOS** en el job `quality`.
+- `.github/workflows/release-tag-ci.yml` (**corrección POSTERIOR al tag**, `05b5fa85`): los **mismos
+  dos** ficheros **EXPLÍCITOS** en el job `python` del `Release tag CI`. Faltaban al sellar (ver §10);
+  el tag **no** se movió.
 - `apps/api-python/scripts/v2_44_mutation_audit.py`: **M201–M205**; matriz **200 → 205**.
 - `docs/engineering/evidencia-*-v2.76-2026-09-26.txt` (**4 capturas crudas**), plan, audit-pack,
   arranques y relevo. `CHANGELOG.md` + `package.json` (`2.00.0-beta` → **`2.01.0-beta`**).
@@ -149,3 +152,35 @@ La ventana de acumulación (**≥4 días de calendario**) **no** se ejecutó den
 previo y los criterios de cierre de `P3-2` / `P3-3`. Lo que esta fase sí entrega es que **ya no hace
 falta código** para que esa ventana produzca material diverso: el precio es de mercado, el régimen es
 de barras y el par de versiones está cableado.
+
+## 10. CI del tag `v2.76-beta` (medido, primera pasada) y hueco declarado
+
+**Sello:** `main` `2c55a465..703c8185` (dos commits: `34b68dd6` `feat` + `703c8185` `docs`); tag
+**anotado** `v2.76-beta`, objeto `12b46aff` → commit `703c8185`.
+
+**Verde en la primera pasada** (`attempt: 1`):
+
+| Workflow (tag `v2.76-beta`) | Run | Cifras |
+|---|---|---|
+| `Release tag CI` | `36257688157` | **9m15s** · **9** jobs en `success` + `certify` en `success` · `playwright (integrated E2E, opt-in)` **skipped** por diseño |
+| ↳ job `python (ruff/imports/mypy/pytest offline)` | | `All checks passed!` · `Contracts: 4 kept, 0 broken` · `mypy` `0 issues (504 files)` · **`2898 passed / 37 skipped`** |
+| ↳ `lifecycle-pg` | | `165 passed` + gates fail-if-skipped (`45`, `1`, `1`, `3`, `2`, `2`, `1`) |
+| ↳ `decision-spine` · `a7-gate` · `shared` · `frontend` · `playwright (mock E2E)` | | `604` · `7` · `786` · `1339` (232 ficheros) · `76` (+21 skipped) |
+| `Python CI` `36257688137` · `Frontend CI` `36257688152` · `Optimize lab` `36257688154` · `Fase 2 scientific` `36257688143` | | `success` |
+
+**En `main`** (mismo commit y tag; runs `36257682064`, `36257682063`, `36257682069`, `36257682081`,
+`36257682114`): todo en `success`; el job `quality` dio **`2912 passed / 40 skipped`**.
+
+**Hueco declarado (corregido DESPUÉS del tag).** El job `python` del **tag** corrió
+**`2898 passed / 37 skipped`**, número **idéntico** a `v2.75-beta`: los **25** tests nuevos **no**
+estaban registrados en `release-tag-ci.yml` (ese directorio **no** tiene pase de directorio en ese job
+y cada fichero va explícito); solo se registraron en `python-ci.yml`, que es lo que pedía literalmente
+el to-do del plan. **Los 25 tests SÍ se ejercitaron en CI sobre el MISMO commit**: el job `quality` de
+`main` dio **`2912 passed / 40 skipped`** = **`2887 + 25`** sobre `v2.75`, y el auditor los corre
+**explícitamente** (§4, «25 passed»). La corrección entra en `main` como **`05b5fa85`**
+(`fix(v2.76)`: los dos ficheros explícitos en el job `python` del `Release tag CI`) **sin mover el
+tag**: queda **pendiente de ejercitarse en el próximo tag**, porque el workflow del tag solo corre al
+empujar un tag.
+
+**Lo que este hueco NO es:** no es un fallo de producto ni de los puros (25/25 pasan); es un **hueco de
+registro en un workflow** y se declara aquí en lugar de citar `2898/37` como si incluyera los 25.

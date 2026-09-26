@@ -1,7 +1,8 @@
 # Arranque del auditor — `v2.76-beta` (`AUTO-MATERIAL-4`: MARKET MATERIAL, forward PAPER)
 
-> **AsOf:** 2026-09-26 · **Objeto:** `v2.76-beta` · **Versión:** `2.01.0-beta` · **Base (diff):**
-> `v2.75-beta` · **Alembic head:** `046_fill_reference_mid` (**SIN migración**)
+> **AsOf:** 2026-09-26 · **Objeto:** `v2.76-beta` (tag **anotado**, objeto `12b46aff` → commit
+> `703c8185`) · **Versión:** `2.01.0-beta` · **Base (diff):** `v2.75-beta` · **Alembic head:**
+> `046_fill_reference_mid` (**SIN migración**)
 > **Freeze:** `auto_simulation_worker.py` **intacto** · **Reparto:** `auto18-v1` / `auto15-v1`
 > (`ALLOCATION = none`).
 > **Regla de lectura:** esta fase **no** pretende acreditar un cierre estadístico. Acredita que el
@@ -88,6 +89,14 @@ uv run --no-sync pytest packages/py/application/tests/test_market_price_snapshot
 - **`--preflight-only` devuelve `exit 2`** cuando el eje veta las entradas: es un **veredicto**, no un
   error de ejecución.
 - La matriz de mutaciones tarda ~10 min: no la interpretes como colgada.
+- **El job `python` del tag corrió `2898 passed / 37 skipped`** (número **idéntico** a `v2.75-beta`):
+  los **25** tests nuevos **no** estaban registrados en `release-tag-ci.yml` al sellar (solo en
+  `python-ci.yml`, que es lo que pedía el to-do del plan). **No** es un fallo de producto ni de los
+  puros (25/25 pasan y el comando de arriba los ejecuta): los mismos 25 **sí** corrieron en CI sobre el
+  **MISMO commit**, en el job `quality` de `main` (`2912 passed / 40 skipped` = `2887 + 25`). La
+  corrección está en `main` (`05b5fa85`, `fix(v2.76)`: los dos ficheros explícitos en el job `python`
+  del `Release tag CI`) **sin mover el tag**, y queda **pendiente de ejercitarse en el próximo tag**
+  porque ese workflow solo corre al empujar un tag. Declarado en el audit-pack, §10.
 
 ## Veredicto esperado
 
