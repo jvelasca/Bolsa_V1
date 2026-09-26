@@ -55,6 +55,17 @@ artifact)`, con `playwright (integrated E2E, opt-in)` **skipped** por diseño y 
 re-ejecuciones**); sobre el mismo commit y tag, `Python CI` `36236375798`, `Frontend CI`
 `36236375770`, `Optimize lab` `36236375716` y `Fase 2 scientific` `36236375788`, todos en **success**.
 
+**Auditoría externa de `v2.71-beta`: `APROBADA CON OBSERVACIONES` (2026-09-26), 0 bloqueantes.**
+El auditor verifica las **15 tesis** contra el tag (objeto `80dbed6c` → `a310fbc5`; `HEAD` `2ace60fb`,
+con un diff tag→HEAD **solo de docs**), confirma el **freeze**, el **reparto** y la **ausencia de
+migración**, y **re-mide** las compuertas en verde; **14 tesis PASS** y la 15 **PARCIAL** por límite de
+mandato (re-ejecutó solo los 7 mutantes autorizados: **7/7 muerden y restauran byte a byte**, `git`
+limpio). Levanta **una observación P3 heredada de la clase de H3 y preexistente a la fase**:
+`build_current_regime_evidence` publica el `level` **sin clampar** mientras el bootstrap usa el
+clampeado; queda registrada como **P3-4** en
+[`deuda-p3-post-auditoria-v2.70-2026-09-26.md`](./docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md)
+y **no** se aborda en esta fase (instrumento correcto; la deuda es read-only).
+
 ## [1.95.0-beta] — AUTO-23 · Validación de evidencia PAPER real (harness) + procedencia imposible de confundir — 2026-09-25
 
 **Fase de preparación y blindaje; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

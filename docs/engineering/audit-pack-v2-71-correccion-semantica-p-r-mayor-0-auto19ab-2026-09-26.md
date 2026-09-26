@@ -91,4 +91,38 @@
 Esta fase **corrige el instrumento**; **no** produce estadística nueva ni ejecuta la corrida real. El
 **primer RUN PAPER real** sigue siendo el **paso operativo del propietario** y el **hito siguiente**;
 las deudas **P3-2** (correlación por cubos) y **P3-3** (`P(R>0)` vs N) quedan **abiertas** hasta el
-primer dataset real.
+primer dataset real. **P3-4** (ver §6) se **registra** y no se aborda en esta fase.
+
+## 6. Resultado de la auditoría externa (`v2.71-beta`)
+
+**Veredicto: `APROBADA CON OBSERVACIONES` · 0 bloqueantes · 14/15 tesis PASS y la 15 PARCIAL.**
+
+**Objeto auditado.** Tag **anotado** `v2.71-beta` = objeto `80dbed6c` → commit `a310fbc5`; `HEAD` = `2ace60fb`.
+`git diff v2.71-beta..HEAD` = 7 ficheros, **todos docs** (`CHANGELOG.md`, `PROJECT_STATE.md`,
+`engineering-index-2026-08-03.md` y los 4 docs de la fase), `+29/−5` ⇒ **cero código** ⇒ el código
+auditado es **byte-idéntico al del tag**. Verificado de forma independiente en `main`.
+
+| Tesis | Veredicto | Evidencia del auditor |
+|---|---|---|
+| 1–4 (`P(edge)>0` por medias bootstrap; `P(ciclo>0)` por ciclos; divergen; sin bootstrap `None`) | **PASS** | Sondas A/B (18 aciertos + 2 pérdidas ⇒ `cycle=0.9`, `edge=0.109`) + `M183`/`M193` |
+| 5–6 (calibración homogénea; claves UI intactas) | **PASS** | `_question_probability_positive` ignora `P(edge>0)`; diff TS **solo un comentario**; `M194` (9 rojos) |
+| 7–9 (H2 cobertura `None` declarada; H3 nivel clampeado; H4 sin colisión) | **PASS** | Sondas D/E/F + `M195`/`M196`/`M197` |
+| 10–11 (`regimeEvidence` y validación por `P(ciclo>0)` + `edgePositiveProbability`, sellos `_v2`) | **PASS** | Sondas G/H sobre código y payload |
+| 12–14 (freeze; sin migración; la evidencia no reparte ni escribe durables) | **PASS** | `git diff` vacío de los 5 congelados; head `046_fill_reference_mid`; sin refs a `evidence_*` |
+| 15 (matriz 197/197 byte a byte) | **PARCIAL** | Evidencia persistida `197` entradas / `197` restauraciones; **re-ejecutó solo los 7 mandatados → 7/7 muerden y restauran, `git` limpio** (límite de mandato) |
+
+**Compuertas re-medidas por el auditor:** `ruff` **All checks passed** · `import-linter` **4 kept / 0 broken**
+(632 ficheros, 3418 deps) · `mypy` **501 ficheros, 0 issues** · `analytics` **1262 passed** · costuras
+`api-python` **13 passed / 1 skipped** (skip de PG por DSN inválido, delimitado) · sonda propia de 35
+oráculos **34 PASS / 1 FAIL** (el FAIL es P3-4).
+
+**Observación única (P3-4, heredada y ajena a las 15 tesis).**
+`build_current_regime_evidence` publica el `level` **sin clampar** (`auto_adaptive_regime_evidence.py:177`)
+mientras el bootstrap usa el **clampeado**: sonda `G4` ⇒ `level=0.0` publicado vs `interval.level=0.5`
+usado. **Preexistente** (idéntico en `v2.70-beta`), **read-only** y misma clase que **H3**, que esta fase
+cerró **solo** en `build_replay_report`. Queda registrada como **P3-4** en la
+[deuda P3](./deuda-p3-post-auditoria-v2.70-2026-09-26.md) y **no** se aborda aquí.
+
+**Límites declarados del auditor.** No re-corrió las 197 mutaciones (solo las 7 autorizadas); no corrió
+`apps/api-python` completo (cuelgue de PG) ni las suites de frontend; no reproduce los runs de CI
+citados (externos al repo). Cierre: `git status --porcelain` = **0** ⇒ árbol **limpio**.

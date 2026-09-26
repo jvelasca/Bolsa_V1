@@ -4,8 +4,9 @@
 > `auto_adaptive_replay.py` (AUDITORIA 2 sobre `AUTO-23`).
 > **Naturaleza:** hallazgos **P2/P3** sobre **la lectura** de la incertidumbre; ninguno publica un
 > número falso nuevo, pero H1 **sí** mezcla dos funcionales en el mismo nombre.
-> **Estado:** **H1 y H2/H3/H4 cerrados en `v2.71`**; P3-2 y P3-3 siguen **abiertas** (requieren el
-> primer dataset PAPER real). **El bloqueante central es MATERIAL, no código.**
+> **Estado:** **H1 y H2/H3/H4 cerrados en `v2.71`**; **P3-4** (hallazgo de la auditoría de `v2.71`,
+> preexistente y read-only) **abierta**; P3-2 y P3-3 siguen **abiertas** (requieren el primer dataset
+> PAPER real). **El bloqueante central es MATERIAL, no código.**
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -70,6 +71,25 @@ declarar, **antes** de tocar la métrica, si la frecuencia/exposición sesga el 
 `P(R>0)`, `P(R>0)` OOS, WFE y `effective_n` sobre el prefijo cronológico para `N ∈ {16,32,64,128}`.
 **Nota `v2.71`:** el barrido ya publica la `P(R>0)` por **ciclos** (antes publicaba una mezcla por la
 ambigüedad de H1).
+
+## P3-4 — `build_current_regime_evidence` publica el `level` sin clampar (P3) — 🔴 ABIERTA
+
+**Origen:** auditoría externa de `v2.71-beta` (2026-09-26). **Preexistente** (idéntico en `v2.70-beta`;
+el diff `v2.70 → v2.71` **no** lo toca) y **ajena a las 15 tesis** de la fase.
+
+**Observación.** `build_current_regime_evidence`
+(`auto_adaptive_regime_evidence.py:177`) hace `resolved_level = level` **sin clampar** y lo emite en
+`CurrentRegimeEvidence.level`, mientras el bootstrap aguas abajo (`build_adaptive_uncertainty`) **sí**
+clampa (`MIN_INTERVAL_LEVEL`/`MAX_INTERVAL_LEVEL`). Medido con sonda: `level=0.0` se **publica** `0.0`
+pero la incertidumbre **usa** `interval.level=0.5`. Es la **misma clase** que **H3**, que la fase cerró
+**solo** en `build_replay_report`.
+
+**Impacto.** **P3**: evidencia **read-only** (`AUTO-21`/`AUTO-23` no mueven reparto, sizing, plan ni
+reserva); solo observable con un `level` **no default**.
+
+**Criterio de cierre.** Clampar `resolved_level` en `build_current_regime_evidence` y publicar el nivel
+**efectivo**, subir el sello `current_regime_evidence_v2` → **`v3`**, y añadir la mutación + test
+correspondientes. **No se aborda en `v2.71`** (fase cerrada y elevada).
 
 ## Bloqueante central — material PAPER real
 
