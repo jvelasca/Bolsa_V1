@@ -104,3 +104,32 @@ git diff v2.74-beta..v2.75-beta -- apps/api-python/src/bolsa_api/background/auto
 git diff v2.74-beta..v2.75-beta -- packages/py/application/src/bolsa_application/auto_adaptive.py       # vacío
 cd packages/py/infrastructure && uv run alembic heads   # 046_fill_reference_mid (única head)
 ```
+
+## 8. CI del tag `v2.75-beta` (evidencia de GitHub)
+
+Fuente: GitHub Actions sobre el commit `5f834a56` (tag anotado objeto `0e486e20`) en
+`github.com/jvelasca/Bolsa_V1`.
+
+- **`Release tag CI` run `36252496382`** — **GREEN en la primera pasada** (9m16s): 10 jobs en
+  `success` (`dr-verify`, `frontend`, `decision-spine`, `python`, `lifecycle-pg`, `a7-gate`,
+  `security`, `shared`, `playwright (mock E2E)`) + `certify`; `playwright (integrated E2E, opt-in)`
+  **skipped** por diseño.
+  - job `python` del tag: **`2898 passed / 37 skipped`** (offline: ruff/imports/mypy/pytest).
+  - `lifecycle-pg`: **`165 passed`** + gates fail-if-skipped (Golden Day 2.0, Crash/Recovery,
+    Concurrent AUTO, HardKill recovery, crash injection matrix, multiprocess AUTO) y account-isolation.
+  - `a7-gate`: **`7 passed`** (chaos `live_a7` sobre PG dedicada).
+  - `shared`: **`786 passed / 1 todo`** · `frontend`: **`1339 passed`** ·
+    `decision-spine`: **`604 passed`** · `playwright (mock E2E)`: **`76 passed`**.
+- Sobre el mismo commit y tag: `Python CI` `36252496296`, `Frontend CI` `36252496386`,
+  `Optimize lab` `36252496372` y `Fase 2 scientific` `36252496413` en **success**.
+- En `main`: `Python CI` `36252494042` (`quality` **`2887 passed / 40 skipped`**; PG verdes
+  `auto-v2-durable-pg` `60 passed`, `grammar-discovery-pg` `21 passed`, `paper-forward-pg` `2 passed`,
+  `lifecycle-pg` `13 passed`), `Frontend CI` `36252494031`, `Optimize lab` `36252494036` y
+  `Gitleaks` `36252494055`, en **success**.
+
+Verificación del auditor (requiere `gh` autenticado):
+
+```bash
+gh run view 36252496382 --repo jvelasca/Bolsa_V1    # Release tag CI del tag v2.75-beta (GREEN)
+gh run list --repo jvelasca/Bolsa_V1 --limit 6      # runs del commit 5f834a56
+```
