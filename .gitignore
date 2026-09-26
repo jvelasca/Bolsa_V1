@@ -96,3 +96,7 @@ desktop.ini
 # la huella de su material: se reproducen con el comando, no se versionan.
 /evidence_runs/
 /evidence_validations/
+
+# Journal de operabilidad de AUTO-MATERIAL-5 (`v2_77_market_operability.py`): serie diaria GENERADA
+# a partir del forward PAPER. Se reproduce con el comando, no se versiona.
+/operability_runs/

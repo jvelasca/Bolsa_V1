@@ -681,6 +681,13 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         "watchA": list(watch_a),
         "watchB": list(watch_b),
         "secondaryActive": bool(secondary_loaded),
+        # V2.77 · AUTO-MATERIAL-5 — nomenclatura PAIR CAPABLE vs PAIR ACTIVE: ``pairCapable``
+        # declara que la ARQUITECTURA del par está lista (hay universo para repartir y enrutar);
+        # ``pairActive`` declara que las DOS versiones están OPERANDO de verdad. Son estados
+        # distintos y el journal debe poder decir "CAPABLE pero no ACTIVE" (el caso de v2.76).
+        # ``pairAvailable`` se conserva como ALIAS de ``pairActive`` para no romper lecturas previas.
+        "pairCapable": len(watch) >= 2,
+        "pairActive": bool(secondary_loaded and version_b and watch_b),
         "pairAvailable": bool(secondary_loaded and version_b and watch_b),
         "watchSize": len(watch),
         "ticks": ticks,
@@ -796,7 +803,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"ticks                          {evidence['ticks']}")
         print(f"turn totals                    {evidence['turnTotals']}")
-        print(f"par de versiones               {'SI' if evidence['pairAvailable'] else 'NO'}")
+        pair_label = (
+            "ACTIVO"
+            if evidence["pairActive"]
+            else ("CAPABLE (no activo)" if evidence["pairCapable"] else "NO")
+        )
+        print(f"par de versiones               {pair_label}")
         print(f"verdict                        {evidence['sample']['verdict']}")
         print(f"measurable cycles              {evidence['sample']['measurableCycles']}")
         print(

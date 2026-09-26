@@ -260,6 +260,11 @@ jobs:
         # ``apps/api-python/scripts/v2_76_forward_market_material.py`` es I/O y NO se invoca desde
         # ningún workflow (mismo criterio que las sondas de ``scripts/``): su camino real queda
         # DECLARADO como operación del propietario, no como test de CI.
+        # V2.77/AUTO-MATERIAL-5 (journal de OPERABILIDAD): el puro nuevo va EXPLÍCITO por el mismo
+        # motivo: clasifica el veto por familia (regime/governor/liquidity/risk/top_n/data/other),
+        # la nomenclatura CAPABLE vs ACTIVE y el estado del día. La sonda
+        # ``apps/api-python/scripts/v2_77_market_operability.py`` es I/O (lee JSON y escribe el
+        # journal) y no se invoca desde ningún workflow: es operación, no test.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -319,6 +324,7 @@ jobs:
           packages/py/application/tests/test_paper_material_readiness.py
           packages/py/application/tests/test_market_price_snapshot.py
           packages/py/application/tests/test_auto_forward_deciders.py
+          packages/py/application/tests/test_market_operability.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
           packages/py/application/tests/test_strategy_shadow_phase.py
           packages/py/application/tests/test_paper_forward_phase.py

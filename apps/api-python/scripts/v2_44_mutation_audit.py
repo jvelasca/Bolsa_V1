@@ -627,6 +627,13 @@ AUTO_FORWARD_DECIDERS = (
     "packages/py/application/src/bolsa_application/auto_forward_deciders.py"
 )
 
+# --- AUTO-MATERIAL-5 (V2.77): journal de OPERABILIDAD del forward PAPER (puro) ----------------
+# Clasifica cada veto por familia (regime/governor/liquidity/risk/top_n/data/other) y arma la
+# fila diaria; separa pairCapable (arquitectura lista) de pairActive (dos versiones operando).
+MARKET_OPERABILITY = (
+    "packages/py/application/src/bolsa_application/market_operability.py"
+)
+
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
 T_EV = "packages/py/analytics/tests/test_expected_value.py"
@@ -697,6 +704,8 @@ T_PRODUCER_SEAM = "apps/api-python/tests/test_auto_v74_producer_seam.py"
 # versiones (estampado de version + enrutado por simbolo), en suites PURAS hermeticas.
 T_MARKET_PRICE_SNAPSHOT = "packages/py/application/tests/test_market_price_snapshot.py"
 T_FORWARD_DECIDERS = "packages/py/application/tests/test_auto_forward_deciders.py"
+# AUTO-MATERIAL-5 (V2.77): clasificacion del veto por familia + nomenclatura CAPABLE/ACTIVE.
+T_MARKET_OPERABILITY = "packages/py/application/tests/test_market_operability.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2399,6 +2408,50 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    return ordered[:cut], ordered[cut:]\n",
         "    return ordered[:cut], ordered[:cut]\n",
         (T_FORWARD_DECIDERS,),
+    ),
+    # ── v2.77 (AUTO-MATERIAL-5): journal de OPERABILIDAD (veto por familia + CAPABLE vs ACTIVE) ──
+    (
+        "M206 (familia unica): todo el veto se reporta como regime y no se separa por causa",
+        MARKET_OPERABILITY,
+        "        bucket = VETO_BUCKET_BY_REASON.get(code, BUCKET_OTHER)\n",
+        "        bucket = BUCKET_REGIME\n",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M207 (codigo perdido): un motivo sin familia conocida se descarta en vez de ir a other",
+        MARKET_OPERABILITY,
+        "        bucket = VETO_BUCKET_BY_REASON.get(code, BUCKET_OTHER)\n"
+        "        buckets[bucket][code] = buckets[bucket].get(code, 0) + count\n",
+        '        bucket = VETO_BUCKET_BY_REASON.get(code, "")\n'
+        "        if not bucket:\n"
+        "            continue\n"
+        "        buckets[bucket][code] = buckets[bucket].get(code, 0) + count\n",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M208 (CAPABLE como ACTIVE): pairCapable se lee como pairActive y se pierde la distincion",
+        MARKET_OPERABILITY,
+        '    if "pairCapable" in evidence:\n        return bool(evidence.get("pairCapable"))\n',
+        '    if "pairCapable" in evidence:\n        return pair_active(evidence)\n',
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M209 (sin senal falso): se reporta no_signal aunque hubo vetos",
+        MARKET_OPERABILITY,
+        '    if _count(record.get("proposals")) == 0 and _count(record.get("vetoes")) == 0:\n',
+        '    if _count(record.get("proposals")) == 0:\n',
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M210 (contabilidad rota): la suma por familias pierde la familia other",
+        MARKET_OPERABILITY,
+        "    return sum(sum(int(n) for n in bucket.values()) for bucket in buckets.values())\n",
+        "    return sum(\n"
+        "        sum(int(n) for n in bucket.values())\n"
+        "        for key, bucket in buckets.items()\n"
+        "        if key != BUCKET_OTHER\n"
+        "    )\n",
+        (T_MARKET_OPERABILITY,),
     ),
 ]
 
