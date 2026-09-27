@@ -139,6 +139,12 @@ _DAY_EXIT_REASON_BY_PRIMARY: dict[str, str] = {
     "KILL_SWITCH": "kill_switch",
 }
 
+#: Vocabulario PÚBLICO de motivos de SALIDA (los valores del mapa decisorio del día). Son
+#: ATRIBUCIONES de una posición viva (por qué se pidió salir), NO vetos de entrada: un lector
+#: de la operabilidad (``market_operability``) los importa de su dueño en vez de duplicarlos,
+#: para no contarlos como vetos. Derivado del mapa único ``_DAY_EXIT_REASON_BY_PRIMARY``.
+DAY_EXIT_REASONS: frozenset[str] = frozenset(_DAY_EXIT_REASON_BY_PRIMARY.values())
+
 
 def day_exit_reason(primary_reason: str | None) -> str:
     """Etiqueta del día para el motivo de cierre (``""`` si no hay motivo decisorio)."""
@@ -244,6 +250,7 @@ __all__ = [
     "ATR_SOURCE_MISSING",
     "ATR_SOURCE_REAL",
     "DAY_EXIT_REASON_UNDECLARED",
+    "DAY_EXIT_REASONS",
     "EXIT_QTY_OVER_POSITION",
     "FILL_NOT_MATERIALIZED",
     "FILL_PARTIALLY_MATERIALIZED",

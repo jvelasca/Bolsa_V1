@@ -32,6 +32,7 @@ from bolsa_analytics.cognitive.market_regime_gate import (
     regime_allows_entry_for,
 )
 from bolsa_analytics.cognitive.opportunity_ranker import TOP_N_EXCLUDED
+from bolsa_application.auto_reason_codes import DAY_EXIT_REASONS, POSITION_SKIP_REASONS
 from bolsa_application.market_price_snapshot import PRICE_SOURCE_CLOSE, PRICE_SOURCE_LIVE
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     "BUCKET_REGIME",
     "BUCKET_RISK",
     "BUCKET_TOP_N",
+    "NON_VETO_REASON_CODES",
     "OPERABILITY_BUCKETS",
     "STATE_NO_SIGNAL",
     "STATE_OPERATED",
@@ -55,6 +57,7 @@ __all__ = [
     "pair_capable",
     "parse_journal_reasons",
     "render_operability_table",
+    "split_journal_reasons",
     "symbols_operable",
     "veto_counted",
 ]
@@ -128,6 +131,16 @@ VETO_BUCKET_BY_REASON: dict[str, str] = {
     "position_exists": BUCKET_OTHER,
 }
 
+#: Códigos que el journal estampa y NO son vetos: son ATRIBUCIONES de una decisión
+#: (``approved``) o de la gestión de una posición viva (motivos de SALIDA y saltos de
+#: gestión). No pueden engordar ``vetoCounted`` (``P3-6``): un día que SÍ opera lleva
+#: ``approved`` y ``risk_exit`` en el MISMO array de motivos y, sin esta separación, caen en
+#: ``other`` y se contarían como vetos. Los literales se leen de su dueño
+#: (``auto_reason_codes``): aquí no se duplica ninguno.
+NON_VETO_REASON_CODES: frozenset[str] = frozenset(
+    {"approved", *DAY_EXIT_REASONS, *POSITION_SKIP_REASONS}
+)
+
 
 def _as_mapping(value: Any) -> Mapping[str, Any]:
     """Vista de mapping o vacío (un tipo inesperado no revienta la lectura)."""
@@ -174,6 +187,32 @@ def parse_journal_reasons(entries: Sequence[Any]) -> dict[str, int]:
         count = _maybe_int(raw_count) if separator else None
         counts[code] = counts.get(code, 0) + (count if count is not None and count > 0 else 1)
     return counts
+
+
+def split_journal_reasons(
+    reasons: Mapping[str, int],
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Separa los VETOS de las ATRIBUCIONES (``approved`` / salidas / saltos de gestión).
+
+    El journal V2 estampa los motivos de la ENTRADA y de la SALIDA en el mismo array: una
+    decisión ``approved`` y una salida ``risk_exit`` NO son vetos de entrada. Clasificarlas
+    como tales infla ``vetoCounted`` (``P3-6``) y haría fallar el instrumento precisamente en
+    los días que SÍ operan. Devuelve ``(veto_reasons, non_veto_reasons)``; un código
+    desconocido NO es no-veto: va al histograma de vetos y cae en ``other`` (nunca se
+    descarta: la contabilidad no puede perder una entrada).
+    """
+    veto: dict[str, int] = {}
+    non_veto: dict[str, int] = {}
+    for raw_code, raw_count in reasons.items():
+        code = str(raw_code or "").strip()
+        count = _count(raw_count)
+        if not code or count <= 0:
+            continue
+        if code in NON_VETO_REASON_CODES:
+            non_veto[code] = non_veto.get(code, 0) + count
+        else:
+            veto[code] = veto.get(code, 0) + count
+    return veto, non_veto
 
 
 def classify_veto_reasons(reasons: Mapping[str, int]) -> dict[str, dict[str, int]]:
@@ -266,17 +305,20 @@ def _price_source_counts(value: Any) -> dict[str, int]:
 def operability_state(record: Mapping[str, Any]) -> str:
     """Estado primario del día a partir de la fila.
 
-    Regla fail-closed: ``no_signal`` **sólo** si el motor no produjo ni propuestas ni vetos (no
-    llegó a considerar candidata). Si hubo vetos, el estado es ``vetoed`` y el porqué vive en
-    ``vetoByBucket``: así NO se puede leer "no hay señal" donde en realidad hubo un veto de
-    régimen o de ``TOP_N``.
+    Regla fail-closed: la AUSENCIA de medición gana siempre. Un registro vacío, o uno cuyo
+    payload no trae ``turnTotals`` (truncado/malformado), se declara ``unknown`` —"no medido"—
+    y NUNCA ``no_signal`` (que es el hecho más tranquilizador y sólo puede afirmarse cuando el
+    motor no produjo ni propuestas ni vetos). Un día con vetos es ``vetoed``: así no se puede
+    leer "no hay señal" donde en realidad hubo un veto de régimen o de ``TOP_N``.
     """
+    if not record or not bool(record.get("measured", True)):
+        return STATE_UNKNOWN
+    if "proposals" not in record and "vetoes" not in record:
+        return STATE_UNKNOWN
     if _count(record.get("fills")) > 0 or _count(record.get("closed")) > 0:
         return STATE_OPERATED
     if _count(record.get("proposals")) == 0 and _count(record.get("vetoes")) == 0:
         return STATE_NO_SIGNAL
-    if not record:
-        return STATE_UNKNOWN
     return STATE_VETOED
 
 
@@ -286,13 +328,15 @@ def build_operability_record(evidence: Mapping[str, Any], *, day: str) -> dict[s
     totals = _as_mapping(evidence.get("turnTotals"))
     sample = _as_mapping(evidence.get("sample"))
     reasons = parse_journal_reasons(_as_sequence(evidence.get("journalReasons")))
-    buckets = classify_veto_reasons(reasons)
+    veto_reasons, non_veto_reasons = split_journal_reasons(reasons)
+    buckets = classify_veto_reasons(veto_reasons)
     top_codes = sorted(
         ((code, count) for bucket in buckets.values() for code, count in bucket.items()),
         key=lambda item: (-item[1], item[0]),
     )
     record: dict[str, Any] = {
         "day": str(day),
+        "measured": bool(totals),
         "regime": str(market_regime.get("aggregateTrialRegime") or ""),
         "operationalRegime": str(market_regime.get("operationalRegime") or ""),
         "entriesAllowedLong": bool(market_regime.get("entriesAllowedLong")),
@@ -308,6 +352,8 @@ def build_operability_record(evidence: Mapping[str, Any], *, day: str) -> dict[s
         "measurableCycles": _count(sample.get("measurableCycles")),
         "vetoByBucket": buckets,
         "vetoCounted": veto_counted(buckets),
+        "nonVetoByCode": non_veto_reasons,
+        "nonVetoCounted": sum(non_veto_reasons.values()),
         "topVetoCodes": top_codes,
         "priceSources": _price_source_counts(evidence.get("priceSources")),
         "pairCapable": pair_capable(evidence),
@@ -335,6 +381,18 @@ def _veto_summary(record: Mapping[str, Any]) -> str:
         if total > 0:
             parts.append(f"{bucket}={total}")
     return " ".join(parts) if parts else "(sin vetos contabilizados)"
+
+
+def _non_veto_summary(record: Mapping[str, Any]) -> str:
+    """Línea declarada de aprobaciones/salidas (``""`` si el día no tuvo ninguna)."""
+    counted = _count(record.get("nonVetoCounted"))
+    if counted <= 0:
+        return ""
+    by_code = _as_mapping(record.get("nonVetoByCode"))
+    detail = " ".join(
+        f"{code}={_count(by_code[code])}" for code in sorted(by_code) if _count(by_code[code]) > 0
+    )
+    return f"  {record.get('day')}  aprobaciones/salidas: {detail} (NO son vetos)"
 
 
 def render_operability_table(records: Sequence[Mapping[str, Any]]) -> str:
@@ -377,4 +435,7 @@ def render_operability_table(records: Sequence[Mapping[str, Any]]) -> str:
         if top:
             detail = " ".join(f"{code}={count}" for code, count in top)
             lines.append(f"    codigos: {detail}")
+        non_veto = _non_veto_summary(record)
+        if non_veto:
+            lines.append(non_veto)
     return "\n".join(lines)

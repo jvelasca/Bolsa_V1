@@ -2453,6 +2453,36 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    )\n",
         (T_MARKET_OPERABILITY,),
     ),
+    # ── v2.78 (AUTO-MATERIAL-6): contabilidad de vetos PUROS + ausencia fail-closed ──
+    (
+        "M211 (P3-6: el no-veto se filtra): approved/risk_exit vuelven a contar como vetos",
+        MARKET_OPERABILITY,
+        "        if code in NON_VETO_REASON_CODES:\n"
+        "            non_veto[code] = non_veto.get(code, 0) + count\n"
+        "        else:\n"
+        "            veto[code] = veto.get(code, 0) + count\n",
+        "        veto[code] = veto.get(code, 0) + count\n",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M212 (P3-7: la ausencia no se comprueba): un payload sin medicion se lee no_signal",
+        MARKET_OPERABILITY,
+        '    if not record or not bool(record.get("measured", True)):\n'
+        "        return STATE_UNKNOWN\n"
+        '    if "proposals" not in record and "vetoes" not in record:\n'
+        "        return STATE_UNKNOWN\n",
+        "",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M213 (el no-veto se descarta): se filtra pero no se publica (pierde el dato)",
+        MARKET_OPERABILITY,
+        "        if code in NON_VETO_REASON_CODES:\n"
+        "            non_veto[code] = non_veto.get(code, 0) + count\n",
+        "        if code in NON_VETO_REASON_CODES:\n"
+        "            continue\n",
+        (T_MARKET_OPERABILITY,),
+    ),
 ]
 
 # DSN a un puerto local cerrado: el connect falla al instante (en vez de colgar el teardown de PG).

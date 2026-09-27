@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any, get_args
 
 from bolsa_analytics.cognitive.opportunity_ranker import TOP_N_EXCLUDED
+from bolsa_application.auto_reason_codes import DAY_EXIT_REASONS, POSITION_SKIP_REASONS
 from bolsa_application.market_operability import (
     BUCKET_DATA,
     BUCKET_GOVERNOR,
@@ -25,9 +26,11 @@ from bolsa_application.market_operability import (
     BUCKET_REGIME,
     BUCKET_RISK,
     BUCKET_TOP_N,
+    NON_VETO_REASON_CODES,
     OPERABILITY_BUCKETS,
     STATE_NO_SIGNAL,
     STATE_OPERATED,
+    STATE_UNKNOWN,
     STATE_VETOED,
     VETO_BUCKET_BY_REASON,
     build_operability_record,
@@ -37,10 +40,12 @@ from bolsa_application.market_operability import (
     pair_capable,
     parse_journal_reasons,
     render_operability_table,
+    split_journal_reasons,
     symbols_operable,
     veto_counted,
 )
 from bolsa_application.portfolio_decision_engine import DecisionReasonCode
+from bolsa_application.position_manager import RISK_EXIT
 
 # ── Fixture: el forward smoke REAL de v2.76 (8 ticks, mercado cerrado, 0 fills) ────────────────
 
@@ -101,17 +106,48 @@ _FORWARD_SMOKE: dict[str, Any] = {
     "sample": {"measurableCycles": 0, "verdict": "BLOCKED"},
 }
 
+#: Día que SÍ opera: el journal V2 estampa `approved` (la decisión) y `risk_exit` (la salida de
+#: una posición viva) en el MISMO array de motivos. Ninguno es un veto de entrada (`P3-6`).
+_OPERATED_DAY: dict[str, Any] = {
+    **_FORWARD_SMOKE,
+    "journalReasons": ["regime_invalid:2", "approved:3", "risk_exit:1"],
+    "turnTotals": {
+        "decided": 10,
+        "proposals": 3,
+        "vetoes": 2,
+        "orders": 3,
+        "fills": 3,
+        "opened": 3,
+        "closed": 1,
+    },
+}
+
 
 # ── El dueño único de los literales queda cubierto (no puede haber un código sin familia) ─────
 
 
-def test_every_decision_reason_code_has_a_declared_bucket() -> None:
-    """Todo código del dueño (``DecisionReasonCode``) tiene familia declarada (aunque sea ``other``)."""
-    declared = set(VETO_BUCKET_BY_REASON)
+def test_every_decision_reason_code_is_declared_exactly_once() -> None:
+    """Cada código del dueño (``DecisionReasonCode``) es veto (con familia) o atribución no-veto.
+
+    Antes ``approved`` se saltaba con un ``continue``; ahora la partición es EXHAUSTIVA y
+    EXCLUSIVA: ningún código queda sin declarar ni declarado en los dos sitios a la vez.
+    """
     for code in get_args(DecisionReasonCode):
-        if code == "approved":  # no es un veto: es la aprobación.
-            continue
-        assert code in declared, f"codigo sin familia declarada: {code}"
+        is_veto = code in VETO_BUCKET_BY_REASON
+        is_non_veto = code in NON_VETO_REASON_CODES
+        assert is_veto != is_non_veto, (
+            f"codigo mal declarado: {code} (veto={is_veto}, no_veto={is_non_veto})"
+        )
+
+
+def test_non_veto_literals_are_read_from_their_owner() -> None:
+    """Los motivos de salida/skip NO se duplican: se componen del vocabulario del dueño."""
+    assert DAY_EXIT_REASONS <= NON_VETO_REASON_CODES
+    assert POSITION_SKIP_REASONS <= NON_VETO_REASON_CODES
+    assert "approved" in NON_VETO_REASON_CODES
+    assert RISK_EXIT in NON_VETO_REASON_CODES
+    # Un veto de mercado/régimen JAMÁS es una atribución.
+    assert "regime_invalid" not in NON_VETO_REASON_CODES
 
 
 def test_the_top_n_literal_is_read_from_its_owner() -> None:
@@ -138,6 +174,35 @@ def test_journal_reasons_bare_code_counts_one_and_ignores_blank() -> None:
 
 def test_journal_reasons_sum_duplicate_codes() -> None:
     assert parse_journal_reasons(["regime_invalid:2", "regime_invalid:3"]) == {"regime_invalid": 5}
+
+
+# ── split_journal_reasons (P3-6: el no-veto NO es un veto) ─────────────────────────────────────
+
+
+def test_split_journal_reasons_separates_vetoes_from_attributions() -> None:
+    """`approved` y `risk_exit` son atribuciones: no entran en el histograma de vetos."""
+    veto, non_veto = split_journal_reasons({"regime_invalid": 4, "approved": 3, "risk_exit": 1})
+    assert veto == {"regime_invalid": 4}
+    assert non_veto == {"approved": 3, "risk_exit": 1}
+
+
+def test_split_journal_reasons_keeps_unknown_codes_as_vetoes() -> None:
+    """Un código desconocido NO es una atribución: va al histograma (y cae en `other`, contado)."""
+    veto, non_veto = split_journal_reasons({"reason_from_the_future": 7})
+    assert veto == {"reason_from_the_future": 7}
+    assert non_veto == {}
+
+
+def test_split_journal_reasons_treats_skip_reasons_as_non_veto() -> None:
+    veto, non_veto = split_journal_reasons({"mark_rejected": 1, "decision_unavailable": 2})
+    assert veto == {}
+    assert non_veto == {"mark_rejected": 1, "decision_unavailable": 2}
+
+
+def test_split_journal_reasons_ignores_blank_and_non_positive() -> None:
+    veto, non_veto = split_journal_reasons({"": 3, "approved": 0, "regime_invalid": -1})
+    assert veto == {}
+    assert non_veto == {}
 
 
 # ── classify_veto_reasons ──────────────────────────────────────────────────────────────────────
@@ -259,6 +324,21 @@ def test_state_operated_when_there_was_a_fill_or_a_close() -> None:
     assert operability_state({"proposals": 1, "vetoes": 0, "fills": 0, "closed": 1}) == STATE_OPERATED
 
 
+def test_state_unknown_when_the_record_is_empty() -> None:
+    """P3-7: un payload vacío NO puede leerse como `no_signal` (fail-open ante basura)."""
+    assert operability_state({}) == STATE_UNKNOWN
+
+
+def test_state_unknown_when_the_row_was_not_measured() -> None:
+    """Una fila marcada no medida se declara `unknown` aunque las cifras sean cero."""
+    assert operability_state({"proposals": 0, "vetoes": 0, "measured": False}) == STATE_UNKNOWN
+
+
+def test_state_unknown_when_absence_cannot_be_measured() -> None:
+    """Sin `proposals` ni `vetoes` no hay hecho que declarar: no medido, nunca `no_signal`."""
+    assert operability_state({"fills": 0, "closed": 0}) == STATE_UNKNOWN
+
+
 # ── build_operability_record (el smoke real de punta a punta) ───────────────────────────────────
 
 
@@ -276,7 +356,10 @@ def test_record_from_the_real_forward_smoke() -> None:
     assert record["fills"] == 0
     assert record["measurableCycles"] == 0
     assert record["state"] == STATE_VETOED
+    assert record["measured"] is True
     assert record["vetoCounted"] == 64
+    assert record["nonVetoCounted"] == 0
+    assert record["nonVetoByCode"] == {}
     assert record["vetoByBucket"][BUCKET_REGIME] == {"regime_invalid": 40}
     assert record["vetoByBucket"][BUCKET_TOP_N] == {"top_n_excluded": 24}
     assert record["vetoByBucket"][BUCKET_LIQUIDITY] == {}
@@ -292,6 +375,26 @@ def test_record_veto_counted_matches_the_declared_vetoes() -> None:
     """La contabilidad por familias cuadra con los vetos del turno (no se pierde ningún código)."""
     record = build_operability_record(_FORWARD_SMOKE, day="2026-09-26")
     assert record["vetoCounted"] == record["vetoes"]
+
+
+def test_operated_day_accounts_only_pure_vetoes() -> None:
+    """P3-6: en un día que SÍ opera, `approved` y `risk_exit` NO inflan `vetoCounted`."""
+    record = build_operability_record(_OPERATED_DAY, day="2026-09-26")
+    assert record["measured"] is True
+    assert record["vetoes"] == 2
+    assert record["vetoCounted"] == 2  # antes: 4 (approved=3 + risk_exit=1 caían en `other`)
+    assert record["vetoByBucket"][BUCKET_REGIME] == {"regime_invalid": 2}
+    assert record["vetoByBucket"][BUCKET_OTHER] == {}
+    assert record["nonVetoByCode"] == {"approved": 3, "risk_exit": 1}
+    assert record["nonVetoCounted"] == 4
+    assert record["state"] == STATE_OPERATED
+
+
+def test_a_truncated_payload_is_declared_unmeasured() -> None:
+    """P3-7: sin `turnTotals` no hay medición: la fila lo declara y el estado es `unknown`."""
+    record = build_operability_record({"phase": "truncado"}, day="2026-09-27")
+    assert record["measured"] is False
+    assert record["state"] == STATE_UNKNOWN
 
 
 def test_record_without_journal_reasons_declares_empty_buckets_not_invented() -> None:
@@ -317,3 +420,17 @@ def test_render_table_is_deterministic_and_declares_the_families() -> None:
     assert "regime=40" in rendered
     assert "top_n=24" in rendered
     assert rendered == render_operability_table(records)
+
+
+def test_render_declares_the_non_vetoes_of_an_operated_day() -> None:
+    """El render publica aprobaciones/salidas como NO vetos (para no leerlas como veto)."""
+    records = [build_operability_record(_OPERATED_DAY, day="2026-09-26")]
+    rendered = render_operability_table(records)
+    assert "aprobaciones/salidas: approved=3 risk_exit=1" in rendered
+    assert "(NO son vetos)" in rendered
+
+
+def test_render_does_not_declare_non_vetoes_when_there_are_none() -> None:
+    records = [build_operability_record(_FORWARD_SMOKE, day="2026-09-26")]
+    rendered = render_operability_table(records)
+    assert "aprobaciones/salidas" not in rendered
