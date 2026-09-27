@@ -1,0 +1,189 @@
+# V2.78 / AUTO-MATERIAL-6 - OPERABILITY ACCOUNTING: evidencia cruda
+# (contabilidad de vetos PUROS + ausencia fail-closed)
+#
+# Fecha de captura: 2026-09-27
+# Fase: `2.03.0-beta` - SIN migracion (Alembic head `046_fill_reference_mid`)
+#       reparto congelado `auto18-v1` / `auto15-v1` - `ALLOCATION = none` - freeze intacto
+#
+# Sonda (SIN cambios en esta fase): apps/api-python/scripts/v2_77_market_operability.py.
+#   Su banner interno sigue rotulado "V2.77 · AUTO-MATERIAL-5", que es su fase de ORIGEN; `v2.78`
+#   no la modifica: solo cambia el PURO `packages/py/application/src/bolsa_application/
+#   market_operability.py` que la sonda consume, mas el vocabulario del dueño de `auto_reason_codes.py`.
+#
+# Entradas (JSON en `operability_runs/`, directorio NO versionado):
+#   1) forward-20260926.json                  -> smoke REAL de `v2.76` (extraido de
+#                                                docs/engineering/evidencia-forward-smoke-v2.76-2026-09-26.txt)
+#   2) forward-20260927-operated-fixture.json -> FIXTURE DECLARADO del dia OPERADO (con `approved` y `risk_exit`)
+#   3) forward-20260928-truncado.json         -> FIXTURE DECLARADO SIN `turnTotals` (payload truncado)
+#
+# Comandos:
+#   uv run --no-sync python apps/api-python/scripts/v2_77_market_operability.py \
+#       --forward <f.json> --journal <j.jsonl> --render      # tabla + familias + aprobaciones/salidas
+#   uv run --no-sync python apps/api-python/scripts/v2_77_market_operability.py \
+#       --journal <j.jsonl> --json                           # la MISMA fila, maquina-legible
+#   Exit de todos los comandos: 0  (0 = se leyo >=1 registro; 2 = sin registros)
+#
+# ---------------------------------------------------------------------------------------------
+# 1) SMOKE REAL (v2.76) -> la contabilidad NO cambia; `nonVetoCounted = 0`
+# ---------------------------------------------------------------------------------------------
+AUTO MARKET OPERABILITY (V2.77 · AUTO-MATERIAL-5) — read-only, sin PostgreSQL
+============================================================================================
+Dia         Regimen     Long  SimbOper  Decid  Prop  Veto  Fills  Ciclos  Par
+----------  ----------  ----  --------  -----  ----  ----  -----  ------  -----
+2026-09-26  BEAR_TREND  NO    4/8       64     0     64    0      0       CAPAZ
+
+Vetos por familia (por dia):
+  2026-09-26  regime=40 top_n=24
+    codigos: regime_invalid=40 top_n_excluded=24
+
+Nota: un dia con vetos NO se lee como 'sin senal'; el PORQUE vive en las familias.
+      pairCapable = arquitectura lista; pairActive = dos versiones operando.
+
+[
+  {
+    "day": "2026-09-26",
+    "daySource": "filename",
+    "state": "vetoed",
+    "measured": true,
+    "decided": 64,
+    "proposals": 0,
+    "vetoes": 64,
+    "fills": 0,
+    "closed": 0,
+    "vetoCounted": 64,
+    "nonVetoByCode": {},
+    "nonVetoCounted": 0,
+    "topVetoCodes": [["regime_invalid", 40], ["top_n_excluded", 24]],
+    "vetoByBucket": {
+      "regime": {"regime_invalid": 40},
+      "top_n": {"top_n_excluded": 24},
+      "governor": {}, "liquidity": {}, "risk": {}, "data": {}, "other": {}
+    },
+    "regime": "trend_down",
+    "operationalRegime": "BEAR_TREND",
+    "entriesAllowedLong": false,
+    "symbolsOperable": 4,
+    "pairCapable": true,
+    "pairActive": false,
+    "secondaryActive": false,
+    "priceSources": {"close": 8, "live": 0, "missing": 0},
+    "versions": ["v76-forward-c3d8"],
+    "watchSize": 8
+  }
+]
+
+# ---------------------------------------------------------------------------------------------
+# 2) DIA OPERADO (fixture) -> `vetoCounted == vetoes` y `other` VACIA; el no-veto se publica aparte
+# ---------------------------------------------------------------------------------------------
+AUTO MARKET OPERABILITY (V2.77 · AUTO-MATERIAL-5) — read-only, sin PostgreSQL
+============================================================================================
+Dia         Regimen     Long  SimbOper  Decid  Prop  Veto  Fills  Ciclos  Par
+----------  ----------  ----  --------  -----  ----  ----  -----  ------  ------
+2026-09-27  BULL_TREND  SI    8/8       10     3     2     3      3       ACTIVO
+
+Vetos por familia (por dia):
+  2026-09-27  regime=2
+    codigos: regime_invalid=2
+  2026-09-27  aprobaciones/salidas: approved=3 risk_exit=1 (NO son vetos)
+
+Nota: un dia con vetos NO se lee como 'sin senal'; el PORQUE vive en las familias.
+      pairCapable = arquitectura lista; pairActive = dos versiones operando.
+
+[
+  {
+    "day": "2026-09-27",
+    "daySource": "filename",
+    "state": "operated",
+    "measured": true,
+    "decided": 10,
+    "proposals": 3,
+    "vetoes": 2,
+    "fills": 3,
+    "closed": 1,
+    "vetoCounted": 2,
+    "nonVetoByCode": {"approved": 3, "risk_exit": 1},
+    "nonVetoCounted": 4,
+    "topVetoCodes": [["regime_invalid", 2]],
+    "vetoByBucket": {
+      "regime": {"regime_invalid": 2},
+      "governor": {}, "liquidity": {}, "risk": {}, "top_n": {}, "data": {}, "other": {}
+    },
+    "regime": "trend_up",
+    "operationalRegime": "BULL_TREND",
+    "entriesAllowedLong": true,
+    "symbolsOperable": 8,
+    "pairCapable": true,
+    "pairActive": true,
+    "secondaryActive": true,
+    "priceSources": {"close": 0, "live": 8, "missing": 0},
+    "versions": ["v78-fixture-a", "v78-fixture-b"],
+    "watchSize": 8
+  }
+]
+
+# ---------------------------------------------------------------------------------------------
+# 3) PAYLOAD TRUNCADO (fixture sin `turnTotals`) -> `measured = false` y `state = unknown`
+#    (P3-7: la ausencia GANA; NUNCA se lee `no_signal`)
+# ---------------------------------------------------------------------------------------------
+AUTO MARKET OPERABILITY (V2.77 · AUTO-MATERIAL-5) — read-only, sin PostgreSQL
+============================================================================================
+Dia         Regimen     Long  SimbOper  Decid  Prop  Veto  Fills  Ciclos  Par
+----------  ----------  ----  --------  -----  ----  ----  -----  ------  -----
+2026-09-28  BULL_TREND  SI    8/8       0      0     0     0      0       CAPAZ
+
+Vetos por familia (por dia):
+  2026-09-28  (sin vetos contabilizados)
+
+Nota: un dia con vetos NO se lee como 'sin senal'; el PORQUE vive en las familias.
+      pairCapable = arquitectura lista; pairActive = dos versiones operando.
+
+[
+  {
+    "day": "2026-09-28",
+    "daySource": "filename",
+    "state": "unknown",
+    "measured": false,
+    "decided": 0,
+    "proposals": 0,
+    "vetoes": 0,
+    "fills": 0,
+    "closed": 0,
+    "vetoCounted": 0,
+    "nonVetoByCode": {},
+    "nonVetoCounted": 0,
+    "topVetoCodes": [],
+    "vetoByBucket": {
+      "regime": {}, "governor": {}, "liquidity": {}, "risk": {}, "top_n": {}, "data": {}, "other": {}
+    },
+    "regime": "trend_up",
+    "operationalRegime": "BULL_TREND",
+    "entriesAllowedLong": true,
+    "symbolsOperable": 8,
+    "pairCapable": true,
+    "pairActive": false,
+    "secondaryActive": false,
+    "priceSources": {"close": 0, "live": 0, "missing": 0},
+    "versions": [],
+    "watchSize": 8
+  }
+]
+
+# ---------------------------------------------------------------------------------------------
+# LECTURA (declarada, sin sesgo)
+# ---------------------------------------------------------------------------------------------
+#   - El SMOKE NO CAMBIA: tenia 0 propuestas, asi que ningun `approved` aparecia y `vetoCounted`
+#     ya valia 64 == `vetoes`. `nonVetoCounted=0` es correcto (no hubo aprobaciones ni salidas).
+#     Que el smoke cuadre NO significa que el defecto `P3-6` no existiera: solo significa que el
+#     caso que lo dispara (un dia que SI opera) no estaba en la muestra.
+#   - DIA OPERADO (el caso que `P3-6` rompia): `journalReasons = regime_invalid:2 + approved:3 +
+#     risk_exit:1`. Antes, `approved` y `risk_exit` caian en `other` y `vetoCounted` valia 6 != 2.
+#     Ahora: familia `regime=2` (`regime_invalid`), `vetoCounted == vetoes == 2`, `other` VACIA, y
+#     las ATRIBUCIONES se publican aparte (`nonVetoByCode = {approved: 3, risk_exit: 1}`,
+#     `nonVetoCounted = 4`) con su linea declarada `aprobaciones/salidas: … (NO son vetos)`.
+#   - PAYLOAD TRUNCADO (`P3-7`): sin `turnTotals` la fila declara `measured=false` y el estado es
+#     `unknown` (NO MEDIDO), JAMAS `no_signal` (que es el hecho mas tranquilizador y solo se afirma
+#     cuando el motor no produjo ni propuestas ni vetos). `STATE_UNKNOWN` deja de ser codigo muerto.
+#   - Un codigo DESCONOCIDO seguiria cayendo en `other` y CONTANDO (nunca se descarta): `M207` sigue
+#     mordiendo. El no-veto no se descarta: se PUBLICA (`M213` lo prueba al quitarlo).
+#   - Los dos fixtures (operado / truncado) son DECLARADOS, no corridas de mercado; sirven para
+#     ejercitar el camino que el smoke (mercado cerrado, 0 propuestas) NO toca.

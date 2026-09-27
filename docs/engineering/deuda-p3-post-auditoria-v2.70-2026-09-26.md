@@ -8,9 +8,9 @@
 > preexistente y read-only) **cerrada en `v2.72`**; **P3-5** (`reserved_risk` sobrecargado: libro vivo
 > vs evidencia histórica) **abierta y declarada** (2026-09-26, tras el E2E PostgreSQL de `v2.74`);
 > **P3-6** (la contabilidad por familias no es de vetos puros: `approved`/`risk_exit` engordan `other`)
-> y **P3-7** (`STATE_UNKNOWN` inalcanzable: un payload vacío se lee como `no_signal`) **NUEVAS** (ambas
-> de la auditoría externa de `v2.77-beta`, 2026-09-26; `P3-6` es MEDIUM y afecta al caso de uso
-> principal del instrumento);
+> y **P3-7** (`STATE_UNKNOWN` inalcanzable: un payload vacío se lee como `no_signal`) **CERRADAS en
+> `v2.78`** (2026-09-27) — ambas de la auditoría externa de `v2.77-beta`, 2026-09-26; `P3-6` era
+> MEDIUM y afectaba al caso de uso principal del instrumento;
 > P3-2 y P3-3 siguen **abiertas** (requieren material PAPER real con **diversidad de mercado**). **El
 > bloqueante central es MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma; `v2.75`
 > cruza la **cantidad** —42 ciclos medibles ⇒ `EVIDENCE_READY`— pero **no** la **diversidad**: un solo
@@ -209,7 +209,7 @@ posición plana. No puede ser denominador de R (solo una reserva de COMPRA con `
 no altera el veredicto, pero es una reserva viva después del cierre: queda declarada como observación del
 productor, fuera del alcance de esta fase (`auto_simulation_worker.py` sigue congelado).
 
-## P3-6 — La contabilidad por familias no es de vetos puros: `approved` y `risk_exit` engordan `other` — 🔴 NUEVA (2026-09-26)
+## P3-6 — La contabilidad por familias no es de vetos puros: `approved` y `risk_exit` engordan `other` — 🟢 CERRADA en `v2.78` (2026-09-27)
 
 **Origen.** Auditoría externa de `v2.77-beta` (clon fresco del tag), **OBS-1 (MEDIUM)**. **No es
 bloqueante** y **no** invalida el sello, pero es un defecto semántico real **en el caso de uso
@@ -240,7 +240,18 @@ decisión.
 **Reversión.** Vuelve a estar mal si un día operado vuelve a publicar `vetoCounted != vetoes` o una
 familia `other` con códigos que no son vetos.
 
-## P3-7 — `STATE_UNKNOWN` es inalcanzable: un payload vacío se lee como `no_signal` — 🟡 NUEVA (2026-09-26)
+**Cierre (`v2.78`, 2026-09-27).** Se eligió la **vía 1**: `split_journal_reasons` separa los VETOS de
+las ATRIBUCIONES (`approved` ∪ motivos de salida ∪ saltos de gestión, importados del dueño
+`auto_reason_codes`) **antes** de clasificar; `build_operability_record` clasifica sólo los vetos y
+**publica** las atribuciones aparte (`nonVetoByCode` / `nonVetoCounted`), de modo que no se pierde
+ningún dato. El contrato del módulo se declaró en `NON_VETO_REASON_CODES`. Protegido por
+`test_operated_day_accounts_only_pure_vetoes` (fixture `_OPERATED_DAY` con `approved=3` + `risk_exit=1`
+y `proposals>0`: `vetoCounted == vetoes == 2` y `other` **vacía**), por el contrato exhaustivo del
+dueño (`test_every_decision_reason_code_is_declared_exactly_once`) y por **`M211`** (el no-veto vuelve
+a contar como veto) y **`M213`** (se filtra pero se descarta). **No** se tocó el motor ni el
+gobernador: es la **lectura** del journal.
+
+## P3-7 — `STATE_UNKNOWN` es inalcanzable: un payload vacío se lee como `no_signal` — 🟢 CERRADA en `v2.78` (2026-09-27)
 
 **Origen.** Auditoría externa de `v2.77-beta`, **OBS-2 (LOW)**.
 
@@ -254,6 +265,15 @@ cuyo contrato declarado es fail-closed.
 **Criterio de cierre.** Que lo ausente no se pueda leer como un hecho del mercado: comprobar **primero**
 la ausencia de registro/evidencia medible y declararlo con un test que pase un payload vacío. **Sin**
 tocar el motor.
+
+**Cierre (`v2.78`, 2026-09-27).** `operability_state` comprueba **primero** la ausencia: `not record`,
+`measured == False` (la fila no trae `turnTotals`) o la falta de `proposals`/`vetoes` ⇒
+`STATE_UNKNOWN`; sólo después resuelve `operated`/`no_signal`/`vetoed`. `build_operability_record`
+publica `measured = bool(turnTotals)`. Protegido por `test_state_unknown_when_the_record_is_empty`,
+`test_state_unknown_when_the_row_was_not_measured`, `test_state_unknown_when_absence_cannot_be_measured`
+y `test_a_truncated_payload_is_declared_unmeasured`, y por **`M212`** (sin la comprobación de ausencia,
+un payload sin medición se lee `no_signal`). Se conserva la lectura de filas ya escritas (`measured`
+ausente ⇒ `True`). **Sin** tocar el motor.
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 
@@ -321,11 +341,12 @@ operación pendiente del propietario; mientras no exista, el veredicto correcto 
 `NO MEDIDO`**. Comandos exactos en el
 [relevo de `v2.77`](./traspaso-relevo-post-v2-77-auto-material-5-2026-09-26.md).
 
-**Corrección de lectura (auditoría externa de `v2.77-beta`, 2026-09-26).** El instrumento **no** es
-todavía de fiar en los días que **sí operan**: `approved` y `risk_exit` caen en `other` e **inflan**
-`vetoCounted` (**`P3-6`**), de modo que `vetoCounted == vetoes` solo cuadra en días **sin propuestas**
-(como el smoke sellado). Mientras `P3-6` esté abierta, el desglose por familias de un día operado debe
-leerse como **cota superior** de veto, no como censo.
+**Corrección de lectura (auditoría externa de `v2.77-beta`, 2026-09-26; CERRADA en `v2.78`,
+2026-09-27).** El instrumento **no** era de fiar en los días que **sí operan**: `approved` y
+`risk_exit` caían en `other` e **inflaban** `vetoCounted` (**`P3-6`**), de modo que
+`vetoCounted == vetoes` solo cuadraba en días **sin propuestas** (como el smoke sellado). `v2.78`
+cierra `P3-6` (la contabilidad es ahora de **vetos puros** y las atribuciones se publican aparte), así
+que el desglose por familias de un día operado vuelve a leerse como **censo**, no como cota superior.
 
 ## Fuera de alcance de esta deuda
 

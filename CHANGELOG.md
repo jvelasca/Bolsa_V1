@@ -2,6 +2,52 @@
 
 All notable releases of Bolsa V1.
 
+## [2.03.0-beta] — `AUTO-MATERIAL-6`: OPERABILITY ACCOUNTING (contabilidad de vetos puros) — 2026-09-27
+
+**Fase de CORRECCIÓN del instrumento de medición, no de decisión; SIN migración** (Alembic head sigue
+en `046_fill_reference_mid`) y **sin tocar el freeze** (`auto_simulation_worker.py` intacto). El reparto
+**no se mueve**: `auto18-v1` / `auto15-v1` (`ALLOCATION = none`). **No** se toca el gobernador
+(`aggregate_trial_regime`), ni `TOP_N`, ni un solo umbral; no se repara material y no se crea ni
+sobrescribe nada en `evidence_runs/`/`evidence_validations/`.
+
+La auditoría externa de `v2.77-beta` dejó dos defectos en el journal de operabilidad. **`P3-6` (MEDIUM)**
+— la contabilidad por familias **no era de vetos puros**: el journal V2 estampa en el mismo array los
+motivos de **entrada** y de **salida**, así que `approved` (`auto_v2_entry.py:2247`) y `risk_exit`
+(`position_manager.py:71`) caían en `other` e **inflaban `vetoCounted`**; el cuadre de hoy solo se
+sostenía porque el smoke sellado tenía `proposals=0`, y el instrumento **habría fallado precisamente en
+los días que sí operan**. **`P3-7` (LOW)** — `STATE_UNKNOWN` era **inalcanzable**: `operability_state`
+evaluaba `proposals==0 and vetoes==0` **antes** de `if not record`, de modo que un payload
+vacío/malformado se leía `no_signal` (fail-**open** ante basura). El invariante que instala esta fase:
+**la contabilidad de vetos es de VETOS PUROS y la ausencia de medición se declara `unknown`, nunca el
+hecho más tranquilizador**.
+
+- **Contrato del dueño (aditivo)** `packages/py/application/src/bolsa_application/auto_reason_codes.py`:
+  `DAY_EXIT_REASONS` publica los valores del mapa decisorio `_DAY_EXIT_REASON_BY_PRIMARY` (`time_exit`,
+  `risk_exit`, `regime_exit`, `kill_switch`, `structural_stop`, …) para que el lector los **importe** de
+  su dueño en vez de duplicarlos.
+- **El puro (corrección)** `packages/py/application/src/bolsa_application/market_operability.py`:
+  `NON_VETO_REASON_CODES` = `{"approved"}` ∪ `DAY_EXIT_REASONS` ∪ `POSITION_SKIP_REASONS` (son
+  **atribuciones**, no vetos). `split_journal_reasons` separa VETOS de ATRIBUCIONES **antes** de
+  clasificar; `build_operability_record` clasifica **sólo** los vetos y **publica** las atribuciones
+  aparte (`nonVetoByCode`/`nonVetoCounted`) más su medición (`measured = bool(turnTotals)`);
+  `operability_state` comprueba **primero** la ausencia (`not record` / `measured == False` / falta de
+  `proposals`-`vetoes` ⇒ `STATE_UNKNOWN`); el `render` añade, **sólo si existen**, la línea
+  `aprobaciones/salidas: … (NO son vetos)`. Un código **desconocido** sigue yendo a `other` y **se
+  cuenta** (nunca se descarta).
+- **Tests (25 → 37)**: contrato del dueño **exhaustivo y exclusivo** (cada literal de
+  `DecisionReasonCode` está en exactamente uno de `VETO_BUCKET_BY_REASON` ∪ `NON_VETO_REASON_CODES`;
+  antes `approved` se saltaba con un `continue`), **día operado** (`approved=3` + `risk_exit=1`,
+  `proposals>0` ⇒ `vetoCounted == vetoes == 2`, `other` vacía) y los casos de `P3-7` (payload vacío /
+  no medido).
+- **Mutaciones (`M211`–`M213`, 210 → 213)**: el no-veto se filtra; la ausencia no se comprueba; el
+  no-veto se descarta. Matriz **213/213**, restauración **byte a byte**, árbol **intacto**.
+- **CI sin huecos nuevos**: `test_market_operability.py` ya estaba registrado **explícito** en el job
+  `quality` de `python-ci.yml` y en el job `python` de `release-tag-ci.yml`; sólo se añadieron casos al
+  mismo fichero (el job `python` del tag sube **+12**, sin tocar ningún workflow).
+- **Declarado, NO hecho**: la ventana de **≥4 días** de calendario sigue siendo operación del
+  propietario; `P3-2`/`P3-3` siguen **ABIERTAS**, `AUTO-22`/`AUTO-23` no se corren sin material, y las
+  observaciones de proceso `OBS-3`/`OBS-4`/`OBS-5` quedan **declaradas**.
+
 ## [2.02.0-beta] — `AUTO-MATERIAL-5`: MARKET OPERABILITY (journal de operabilidad del forward) — 2026-09-26
 
 **Fase de INSTRUMENTO de medición, no de decisión; SIN migración** (Alembic head sigue en
