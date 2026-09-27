@@ -10,7 +10,10 @@
 > **P3-6** (la contabilidad por familias no es de vetos puros: `approved`/`risk_exit` engordan `other`)
 > y **P3-7** (`STATE_UNKNOWN` inalcanzable: un payload vacío se lee como `no_signal`) **CERRADAS en
 > `v2.78`** (2026-09-27) — ambas de la auditoría externa de `v2.77-beta`, 2026-09-26; `P3-6` era
-> MEDIUM y afectaba al caso de uso principal del instrumento;
+> MEDIUM y afectaba al caso de uso principal del instrumento. **La auditoría externa de `v2.78-beta`
+> (2026-09-27) reabrió `P3-6` PARCIALMENTE (`H-1`: los motivos de gestión de posición seguían
+> inflando `vetoCounted`) y añadió `H-2`/`H-3` (LOW, contrato del dueño y disjunción veto/no-veto):
+> los tres se **CIERRAN en `v2.79`** (censo de ENTRADA + canal de posición aparte);
 > P3-2 y P3-3 siguen **abiertas** (requieren material PAPER real con **diversidad de mercado**). **El
 > bloqueante central es MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma; `v2.75`
 > cruza la **cantidad** —42 ciclos medibles ⇒ `EVIDENCE_READY`— pero **no** la **diversidad**: un solo
@@ -209,7 +212,7 @@ posición plana. No puede ser denominador de R (solo una reserva de COMPRA con `
 no altera el veredicto, pero es una reserva viva después del cierre: queda declarada como observación del
 productor, fuera del alcance de esta fase (`auto_simulation_worker.py` sigue congelado).
 
-## P3-6 — La contabilidad por familias no es de vetos puros: `approved` y `risk_exit` engordan `other` — 🟢 CERRADA en `v2.78` (2026-09-27)
+## P3-6 — La contabilidad por familias no es de vetos puros: `approved` y `risk_exit` engordan `other` — 🟢 CERRADA en `v2.79` (reabierta por `H-1`)
 
 **Origen.** Auditoría externa de `v2.77-beta` (clon fresco del tag), **OBS-1 (MEDIUM)**. **No es
 bloqueante** y **no** invalida el sello, pero es un defecto semántico real **en el caso de uso
@@ -251,6 +254,19 @@ dueño (`test_every_decision_reason_code_is_declared_exactly_once`) y por **`M21
 a contar como veto) y **`M213`** (se filtra pero se descarta). **No** se tocó el motor ni el
 gobernador: es la **lectura** del journal.
 
+**Reabierta PARCIALMENTE por la auditoría externa de `v2.78-beta` (2026-09-27) — `H-1` (MEDIUM).** La
+corrección cubrió `approved`, las salidas (`risk_exit`/`time_exit`/…) y los saltos de gestión, pero
+**no** el resto de eventos de **gestión de posición** que el worker congelado
+(`auto_simulation_worker._journal_position_event` → `auto_v2_entry.build_position_management_journal_entry`,
+payload `event="auto_position_management"`) anexa al MISMO journal: `protect_requested`,
+`stop_ratchet_applied`/`_rejected`, `protection_missing`, `atr_geometry`, `lifecycle_transition_rejected`,
+`lifecycle_state_unverified`, `reconciliation_required`, `no_mark_data`, `fill_not_materialized`,
+`reservation_created`, `reservation_released_fill`. Medido: `journalReasons=["regime_invalid:2","approved:3","risk_exit:1","protect_requested:1"]`
+con `vetoes=2` ⇒ `vetoCounted=3` y `other={protect_requested:1}` — **exactamente** el criterio de
+reversión declarado arriba, alcanzable en el caso de uso principal (un día con posiciones vivas). El
+smoke sellado (`proposals=0`) no lo ejercita. **CERRADA en `v2.79`** (censo de ENTRADA + canal de
+posición aparte, ver `H-1` más abajo).
+
 ## P3-7 — `STATE_UNKNOWN` es inalcanzable: un payload vacío se lee como `no_signal` — 🟢 CERRADA en `v2.78` (2026-09-27)
 
 **Origen.** Auditoría externa de `v2.77-beta`, **OBS-2 (LOW)**.
@@ -274,6 +290,51 @@ publica `measured = bool(turnTotals)`. Protegido por `test_state_unknown_when_th
 y `test_a_truncated_payload_is_declared_unmeasured`, y por **`M212`** (sin la comprobación de ausencia,
 un payload sin medición se lee `no_signal`). Se conserva la lectura de filas ya escritas (`measured`
 ausente ⇒ `True`). **Sin** tocar el motor.
+
+## H-1 — Los motivos de gestión de posición inflan `vetoCounted` y caen en `other` (P3) — 🟢 CERRADO en `v2.79` (2026-09-27)
+
+**Origen.** Auditoría externa de `v2.78-beta` (clon fresco del tag), **H-1 (MEDIUM)**. **No es
+bloqueante** y **no** invalida el sello, pero es el defecto semántico que **`P3-6` no terminó de
+cerrar** (ver arriba).
+
+**Observación.** `market_operability.NON_VETO_REASON_CODES` solo declara `approved`, las salidas
+(`risk_exit`/`time_exit`/…) y los saltos de gestión (`mark_rejected`/`decision_unavailable`). El
+runner agrega `journalReasons` sobre **todas** las entradas del journal, y el worker congelado anexa
+los eventos de **gestión de posición** (`auto_position_management`) con su propio `reasonCodes`:
+`protect_requested`, `stop_ratchet_applied`/`_rejected`, `protection_missing`, `atr_geometry`,
+`lifecycle_transition_rejected`, `lifecycle_state_unverified`, `reconciliation_required`,
+`no_mark_data`, `fill_not_materialized`, `reservation_created`, `reservation_released_fill`. Todos
+ellos caían en `other` y sumaban a `vetoCounted` **en el caso de uso principal** (un día con
+posiciones vivas). Medido: `vetoCounted=3` con `vetoes=2` y `other={protect_requested:1}`.
+
+**Cierre (`v2.79`).** El censo pasa a ser de **decisiones de ENTRADA**: `collect_journal_reasons`
+filtra por `ENTRY_DECISION_EVENT` (`auto_entry_decision`), y los motivos de gestión se publican por
+un **canal propio** (`positionEventByCode`/`positionEventCounted`, del conjunto del dueño
+`POSITION_ATTRIBUTION_REASONS`) que **nunca** engorda `vetoCounted` **ni se descarta**. El runner
+separa `journalReasons` (entrada) de `positionEventReasons` (posición). Protegido por
+`test_the_audit_reversal_example_is_caught`, `test_position_management_events_are_published_not_discarded`,
+`test_legacy_merged_rows_still_read_their_position_codes_as_non_veto` y **`M214`**/**`M215`**.
+
+## H-2 — El contrato del dueño no cubre todos los dueños (P3) — 🟢 CERRADO en `v2.79` (2026-09-27)
+
+**Origen.** Auditoría externa de `v2.78-beta`, **H-2 (LOW)**. `test_every_decision_reason_code_is_declared_exactly_once`
+solo recorría `DecisionReasonCode`; añadir un código en `OPTIMIZER_REASONS`, `ADAPTIVE_STRATEGY_PAUSED`,
+`POSITION_LIFECYCLE_REASONS`, `MATERIALIZATION_REASONS`, `RESERVATION_REASONS` o `NO_MARK_DATA` no
+rompía ninguna compuerta.
+
+**Cierre (`v2.79`).** El test recorre el vocabulario **completo** que puede llegar a `reasonCodes`
+(`_OWNER_JOURNAL_CODES`) y exige que cada código esté **exactamente en uno** de los dos lados. Además
+se declaran en `VETO_BUCKET_BY_REASON` los vetos de ENTRADA que faltaban (`OPTIMIZER_REASONS`,
+`ADAPTIVE_STRATEGY_PAUSED`, `reservation_unmeasurable`, `reservation_already_live`). Protegido por
+**`M216`**/**`M217`**/**`M219`**.
+
+## H-3 — La disjunción veto/no-veto no estaba guardada por ningún test (P3) — 🟢 CERRADO en `v2.79` (2026-09-27)
+
+**Origen.** Auditoría externa de `v2.78-beta`, **H-3 (LOW)**.
+
+**Cierre (`v2.79`).** `test_veto_buckets_and_non_veto_codes_are_disjoint` exige
+`VETO_BUCKET_BY_REASON ∩ NON_VETO_REASON_CODES == ∅`, y `POSITION_ATTRIBUTION_REASONS` **excluye
+explícitamente** los tres vetos fail-closed de la reserva. Protegido por **`M218`**.
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 
@@ -341,12 +402,14 @@ operación pendiente del propietario; mientras no exista, el veredicto correcto 
 `NO MEDIDO`**. Comandos exactos en el
 [relevo de `v2.77`](./traspaso-relevo-post-v2-77-auto-material-5-2026-09-26.md).
 
-**Corrección de lectura (auditoría externa de `v2.77-beta`, 2026-09-26; CERRADA en `v2.78`,
-2026-09-27).** El instrumento **no** era de fiar en los días que **sí operan**: `approved` y
+**Corrección de lectura (auditoría externa de `v2.77-beta`, 2026-09-26; `v2.78`, 2026-09-27; matizada
+por `v2.79`).** El instrumento **no** era de fiar en los días que **sí operan**: `approved` y
 `risk_exit` caían en `other` e **inflaban** `vetoCounted` (**`P3-6`**), de modo que
 `vetoCounted == vetoes` solo cuadraba en días **sin propuestas** (como el smoke sellado). `v2.78`
-cierra `P3-6` (la contabilidad es ahora de **vetos puros** y las atribuciones se publican aparte), así
-que el desglose por familias de un día operado vuelve a leerse como **censo**, no como cota superior.
+filtró esas atribuciones, pero la auditoría de `v2.78` midió que **`P3-6` seguía abierto** para el
+resto de eventos de **gestión de posición** (**`H-1`**). `v2.79` cierra el caso general (censo de
+**decisiones de ENTRADA** + canal de posición aparte), así que el desglose por familias de un día
+operado vuelve a leerse como **censo**, no como cota superior.
 
 ## Fuera de alcance de esta deuda
 

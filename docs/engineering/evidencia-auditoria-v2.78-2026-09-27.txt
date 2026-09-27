@@ -1,0 +1,80 @@
+EVIDENCIA CRUDA — AUDITORÍA EXTERNA de v2.78-beta (AUTO-MATERIAL-6: OPERABILITY ACCOUNTING)
+AsOf: 2026-09-27 · Clon fresco en temp · árbol del workspace INTACTO (la pasada no escribió nada)
+Tag anotado: 7d3a5e91f60c40b4f3c547679eea995722b3fe5f -> commit f8aa3697247d48d9f7f6fc918d3fa3afd1132e53
+package.json: 2.03.0-beta
+Alembic head: 046_fill_reference_mid
+Base: v2.77-beta (tag 22da1bb0 -> commit ade1df58, tree 6ec1c4c3, 2.02.0-beta)
+Tree id ANTES de la matriz:  93d8b8f062010f8b02d0585792124692859d44cd
+Tree id DESPUES de la matriz: 93d8b8f062010f8b02d0585792124692859d44cd  (IDENTICO)
+git status --porcelain (antes/despues): vacio / vacio
+
+=== COMPUERTAS ===
+$ uv run --no-sync ruff check packages/py apps/api-python --config pyproject.toml
+All checks passed!
+
+$ uv run --no-sync lint-imports --config packages/py/.importlinter
+Contracts: 4 kept, 0 broken.  (636 files, 3441 dependencies)
+
+$ uv run --no-sync python -m mypy packages/py/domain/src packages/py/market/src \
+      packages/py/infrastructure/src packages/py/application/src apps/api-python/src --follow-imports=silent
+Success: no issues found in 505 source files
+
+$ uv run --no-sync alembic heads        # en packages/py/infrastructure
+046_fill_reference_mid (head)
+
+$ uv run --no-sync python -m pytest packages/py/application/tests/test_market_operability.py -q
+37 passed
+
+NOTA: los shims `pytest`/`mypy` fueron bloqueados por Windows Application Control (os error 4551);
+se corrieron por `python -m ...` con los mismos interpretes/paquetes y los mismos resultados.
+
+=== MATRIZ DE MUTACIONES (completa) ===
+$ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py
+213/213 · restauracion byte a byte: si (x213), no (x0)
+M211 muerde: test_operated_day_accounts_only_pure_vetoes, test_render_declares_the_non_vetoes_of_an_operated_day,
+             test_split_journal_reasons_separates_vetoes_from_attributions, test_split_journal_reasons_treats_skip_reasons_as_non_veto
+M212 muerde: test_a_truncated_payload_is_declared_unmeasured, test_state_unknown_when_absence_cannot_be_measured,
+             test_state_unknown_when_the_record_is_empty, test_state_unknown_when_the_row_was_not_measured
+M213 muerde: test_operated_day_accounts_only_pure_vetoes, test_render_declares_the_non_vetoes_of_an_operated_day,
+             test_split_journal_reasons_separates_vetoes_from_attributions, test_split_journal_reasons_treats_skip_reasons_as_non_veto
+estado git (despues): limpio · intacto: la sonda no altero el arbol
+
+=== DIFF v2.77-beta..v2.78-beta (20 ficheros) ===
+M  CHANGELOG.md
+M  apps/api-python/scripts/v2_44_mutation_audit.py
+M  docs/engineering/PROJECT_STATE.md
+A  docs/engineering/arranque-agente-v2-78-auto-material-6-operability-accounting-2026-09-27.md
+M  docs/engineering/arranque-auditor-v2-77-auto-material-5-market-operability-2026-09-26.md
+A  docs/engineering/arranque-auditor-v2-78-auto-material-6-operability-accounting-2026-09-27.md
+M  docs/engineering/audit-pack-v2-77-auto-material-5-market-operability-2026-09-26.md
+A  docs/engineering/audit-pack-v2-78-auto-material-6-operability-accounting-2026-09-27.md
+M  docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md
+M  docs/engineering/engineering-index-2026-08-03.md
+A  docs/engineering/evidencia-ci-tag-v2.77-2026-09-26.txt
+A  docs/engineering/evidencia-matriz-mutaciones-v2.78-213-2026-09-27.txt
+A  docs/engineering/evidencia-operabilidad-v2.78-2026-09-27.txt
+A  docs/engineering/plan-v2-78-auto-material-6-operability-accounting-2026-09-27.md
+M  docs/engineering/traspaso-relevo-post-v2-77-auto-material-5-2026-09-26.md
+A  docs/engineering/traspaso-relevo-post-v2-78-auto-material-6-operability-accounting-2026-09-27.md
+M  package.json
+M  packages/py/application/src/bolsa_application/auto_reason_codes.py        (+7/-0)
+M  packages/py/application/src/bolsa_application/market_operability.py       (+68/-7)
+M  packages/py/application/tests/test_market_operability.py                  (+123/-6)
+
+Sin cambios en .github/workflows/*. Sin cambios en ficheros congelados.
+
+=== H-1: DEMOSTRACION DEL CRITERIO DE REVERSION (snippet contra el puro sellado) ===
+journalReasons = ["regime_invalid:2", "approved:3", "risk_exit:1", "protect_requested:1"]
+turnTotals     = {"vetoes": 2, "proposals": 3, "fills": 3, "closed": 1}
+=> vetoes=2  vetoCounted=3  other={'protect_requested': 1}  nonVeto={'approved':3, 'risk_exit':1}
+codigos de gestion emitidos por auto_simulation_worker._journal_position_event -> payload event
+"auto_position_management" (auto_v2_entry.build_position_management_journal_entry:1683-1685):
+protect_requested, stop_ratchet_applied, stop_ratchet_rejected, protection_missing, atr_geometry,
+lifecycle_transition_rejected, lifecycle_state_unverified, reconciliation_required, no_mark_data,
+fill_not_materialized, reservation_created, reservation_released_fill
+(optimizer_not_selected y adaptive_strategy_paused NO son de posicion: son decisiones de ENTRADA.)
+
+=== NO VERIFICADO ===
+- Re-derivacion end-to-end de la tabla de operabilidad desde el JSON crudo: operability_runs/ es
+  gitignored y no esta en el clon.
+- Suites con PostgreSQL/E2E: sin BD.

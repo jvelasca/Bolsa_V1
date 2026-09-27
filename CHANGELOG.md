@@ -2,6 +2,49 @@
 
 All notable releases of Bolsa V1.
 
+## [2.04.0-beta] — `AUTO-MATERIAL-7`: OPERABILITY CENSUS (el censo de vetos mide solo decisiones de ENTRADA) — 2026-09-27
+
+**Fase de CORRECCIÓN del instrumento de medición, no de decisión; SIN migración** (Alembic head sigue
+en `046_fill_reference_mid`) y **sin tocar el freeze** (`auto_simulation_worker.py` intacto). El reparto
+**no se mueve**: `auto18-v1` / `auto15-v1` (`ALLOCATION = none`). **No** se toca el gobernador
+(`aggregate_trial_regime`), ni `TOP_N`, ni un solo umbral; no se repara material y no se crea ni
+sobrescribe nada en `evidence_runs/`/`evidence_validations/`.
+
+La auditoría externa de `v2.78-beta` (2026-09-27) midió que `P3-6` solo estaba **parcialmente** cerrada.
+**`H-1` (MEDIUM)** — el worker congelado anexa al journal los eventos de **gestión de posición**
+(`auto_position_management`) y sus motivos (`protect_requested`, `stop_ratchet_*`, `atr_geometry`,
+`lifecycle_*`, `reconciliation_required`, `no_mark_data`, `fill_not_materialized`, `reservation_created`,
+`reservation_released_fill`) seguían cayendo en `other` e **inflando `vetoCounted`** en los días que SÍ
+operan (medido: `vetoCounted=3` con `vetoes=2`). **`H-2` (LOW)** — el contrato del dueño solo se validaba
+sobre `DecisionReasonCode`. **`H-3` (LOW)** — la disjunción veto/no-veto no tenía test. El invariante que
+instala esta fase: **una entrada = una decisión de ENTRADA**.
+
+- **Contrato del dueño (aditivo)** `packages/py/application/src/bolsa_application/auto_reason_codes.py`:
+  `POSITION_ATTRIBUTION_REASONS` reúne los motivos de **gestión de posición** (ciclo de vida,
+  materialización, saltos, `no_mark_data` y las liberaciones de reserva). **Excluye** explícitamente los
+  tres vetos fail-closed de la reserva (`reservation_failed`, `reservation_unmeasurable`,
+  `reservation_already_live`), que son vetos de ENTRADA.
+- **El puro (corrección)** `packages/py/application/src/bolsa_application/market_operability.py`:
+  `ENTRY_DECISION_EVENT = "auto_entry_decision"` y `POSITION_JOURNAL_EVENTS`
+  (`auto_position_management`/`auto_position_decision`/`auto_position_skip`); `collect_journal_reasons(
+  entries, *, events)` es la **única puerta** del censo; `NON_VETO_REASON_CODES` incorpora
+  `POSITION_ATTRIBUTION_REASONS`; `VETO_BUCKET_BY_REASON` declara `OPTIMIZER_REASONS` (default `risk`,
+  con `top_n`/`liquidity`/`data` explícitos), `ADAPTIVE_STRATEGY_PAUSED` y los dos vetos de reserva;
+  `build_operability_record` publica `positionEventByCode`/`positionEventCounted`; el `render` añade,
+  **sólo si existen**, la línea `eventos/posicion: … (NO son vetos)`.
+- **El runner** `apps/api-python/scripts/v2_76_forward_market_material.py`: `_journal_reasons` cuenta
+  **solo entrada**; nuevo `_journal_position_reasons`; clave **aditiva** `positionEventReasons` en el JSON.
+- **Tests (37 → 48)**: contrato exhaustivo de **todos** los dueños, disjunción veto/no-veto, ejemplo de
+  reversión (`protect_requested` no infla el censo), canal de posición publicado, fila legacy mezclada y
+  contrato de eventos pined contra los productores.
+- **Mutaciones (213 → 219)**: `M214`–`M219` (filtro de evento, canal de posición no publicado,
+  optimizador y Adaptive sin familia, solape veto/no-veto, owner incompleto), todos muerden y restauran
+  byte a byte.
+
+**Breaking declarado:** sin migración; sin cambio de decisión; cambio de **vocabulario de lectura**
+(`optimizer_*`/`adaptive_strategy_paused`/`reservation_unmeasurable`/`reservation_already_live` pasan de
+`other` a su familia real); claves nuevas **aditivas** en el JSON de evidencia.
+
 ## [2.03.0-beta] — `AUTO-MATERIAL-6`: OPERABILITY ACCOUNTING (contabilidad de vetos puros) — 2026-09-27
 
 **Fase de CORRECCIÓN del instrumento de medición, no de decisión; SIN migración** (Alembic head sigue
