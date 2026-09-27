@@ -32,10 +32,24 @@ mientras no lo permita es **`INCONCLUSIVE` / `NO MEDIDO`**.
 |---|---|---|---|
 | 1 | **No hay estrategia ACTIVE** sobre la cuenta de la ventana (`versionB=""`, `pairActive=false`) | sin B, el par A/B no opera y el material no gana diversidad por estrategia | promover una estrategia **ACTIVE** + su `EdgeReport` sobre la cuenta; verificar `pairActive=true` |
 | 2 | **`--account-id` no fijado** | sin fijarlo, **cada corrida siembra una cuenta nueva** y el journal no acumula (el dedupe del journal es por `(day, account)`) | fijar `--account-id <uuid>` **desde el día 2** (y reusar `--version-a` del día 1) |
+
+> **Resuelto (2026-09-27) — `AUTO-MATERIAL-12` (operación).** Las brechas 1 y 2 quedan **cerradas por
+> semilla operativa** antes de D1: cuenta **dedicada y fija** `1484e253d2d54645945a6b1d7`,
+> `$VERSION_A = v283-window-a`, y estrategia B **ACTIVE sembrada** (`v283-window-b`) para
+> `pairActive=true`. **Declaración:** la B es una **semilla operativa NO gate-certificada**
+> (`shadow_validated=false`, `reasons=["semilla_operativa_ventana_no_gate_certificada"]`): habilita el
+> par y su medición, **no** certifica gates ni cierra `P3-3`. Detalle, verificación y reglas duras en
+> [arranque operativo de la ventana PAPER](./arranque-ventana-paper-operativa-2026-09-27.md). Las
+> brechas **3** (scheduler de barras) y **4** (glob distinguible) siguen vigentes tal cual.
 | 3 | **Scheduler de barras** | el régimen y el ATR salen de `ohlcv_bars` **reales**; sin barras frescas el preflight cae en `UNKNOWN` | mantener vivo `SyncInstrumentDailyBars` / `auto_sync_worker` (corren dentro del proceso API) |
 | 4 | **Glob de corridas reales distinguible** | en `operability_runs/` ya hay **fixtures**; no hay que borrarlos ni mezclarlos | usar el glob `operability_runs/forward-market-*.json` para las corridas **reales** |
 
 ### 2.1 Cuenta PAPER fija (deuda operativa; resolverla ANTES de D1)
+
+> **Resuelto (2026-09-27):** el `.env` local ya fija la cuenta dedicada de la ventana
+> (`PAPER_D_ACCOUNT_ID=1484e253d2d54645945a6b1d7`, ver
+> [arranque operativo](./arranque-ventana-paper-operativa-2026-09-27.md)). Lo que sigue es el
+> procedimiento general, conservado como referencia.
 
 `PAPER_D_ACCOUNT_ID` está **comentado** en `.env` (línea `# PAPER_D_ACCOUNT_ID=`), así que hoy **no** hay
 cuenta fija: cada corrida puede sembrar una cuenta nueva y el journal no acumula (el dedupe es por
