@@ -642,6 +642,10 @@ AUTO_REASON_CODES = "packages/py/application/src/bolsa_application/auto_reason_c
 # Fila diaria desde el journal durable + gate de la ventana (4 días / 2 episodios / 32 ciclos).
 OPERABILITY_WINDOW = "packages/py/application/src/bolsa_application/operability_window.py"
 
+# --- AUTO-MATERIAL-11 (V2.83) / AUTO-MATERIAL-12 (V2.84): AUDITORÍA de la ventana (TOTAL + tasas) --
+# Lectura acumulada READ-ONLY del bundle de la ventana: fila TOTAL, tasas y funnel agregado.
+OPERABILITY_AUDIT = "packages/py/application/src/bolsa_application/operability_audit.py"
+
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
 T_EV = "packages/py/analytics/tests/test_expected_value.py"
@@ -716,6 +720,8 @@ T_FORWARD_DECIDERS = "packages/py/application/tests/test_auto_forward_deciders.p
 T_MARKET_OPERABILITY = "packages/py/application/tests/test_market_operability.py"
 # AUTO-MATERIAL-8 (V2.80): serie diaria de la ventana + gate (contratos puros, sin PG).
 T_OPERABILITY_WINDOW = "packages/py/application/tests/test_operability_window.py"
+# AUTO-MATERIAL-12 (V2.84): auditoría de la ventana (TOTAL + tasas + funnel agregado), pura.
+T_OPERABILITY_AUDIT = "packages/py/application/tests/test_operability_audit.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2626,6 +2632,25 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    return html.escape(\"\" if value is None else str(value))\n",
         "    return \"\" if value is None else str(value)\n",
         (T_OPERABILITY_WINDOW,),
+    ),
+    # ── v2.84 (AUTO-MATERIAL-12): CONTRATO DEL FUNNEL (agregado y enriquecido), read-only ──
+    (
+        "M231 (auditoria: el funnel medido se sobrescribe): el re-llenado pisa los escalones ya medidos",
+        OPERABILITY_AUDIT,
+        "        if _maybe_int(existing.get(\"count\")) is not None:\n"
+        "            merged[step] = dict(existing)\n",
+        "        if False:\n"
+        "            merged[step] = dict(existing)\n",
+        (T_OPERABILITY_AUDIT,),
+    ),
+    (
+        "M232 (auditoria: el funnel suma dias NO medidos): measured_rows vuelve a ser rows",
+        OPERABILITY_AUDIT,
+        "        for row in measured_rows:\n"
+        "            entry = _as_mapping(_as_mapping(row.get(\"funnel\")).get(step))\n",
+        "        for row in rows:\n"
+        "            entry = _as_mapping(_as_mapping(row.get(\"funnel\")).get(step))\n",
+        (T_OPERABILITY_AUDIT,),
     ),
 ]
 

@@ -285,3 +285,43 @@ def test_enrich_rows_never_overwrites_a_measured_pair() -> None:
     assert row["pairActive"] is True
     enriched = enrich_rows_with_evidence([row], {"2026-09-24": {"pairActive": False}})
     assert enriched[0]["pairActive"] is True
+
+
+def test_enrich_rows_never_overwrites_a_measured_funnel() -> None:
+    """El funnel YA medido no se pisa al re-enriquecer: sólo se rellenan los escalones ``None``.
+
+    Regresión de ``OBS-6`` (auditoría externa de ``v2.83.1-beta``): ``enrich`` reconstruía el funnel
+    ENTERO con la evidencia nueva, así que un escalón medido (``universe``/``orders``) se sobrescribía.
+    """
+    row = build_window_row(
+        "2026-09-24", entries=[_entry("approved")], fills=0, evidence=dict(_EVIDENCE)
+    )
+    assert row["funnel"]["universe"]["count"] == 8
+    assert row["funnel"]["orders"]["count"] == 2
+
+    # Misma jornada, evidencia DISTINTA: los escalones ya medidos deben sobrevivir.
+    enlarged = {"watchSize": 999, "turnTotals": {"orders": 99}}
+    enriched = enrich_rows_with_evidence([row], {"2026-09-24": enlarged})
+    assert enriched[0]["funnel"]["universe"]["count"] == 8
+    assert enriched[0]["funnel"]["orders"]["count"] == 2
+    assert enriched[0]["funnel"]["signals"]["count"] == 1
+
+
+def test_window_totals_funnel_ignores_unmeasured_rows() -> None:
+    """Un día NO medido con evidencia NO suma en el funnel agregado (coherente con ``counts``/``rSum``).
+
+    Regresión de ``OBS-7``: el bloque ``funnel`` iteraba ``rows`` (todas) en vez de ``measured_rows``,
+    así que los escalones superiores de un día ``measured=False`` engordaban el TOTAL.
+    """
+    measured = build_window_row(
+        "2026-09-24", entries=[_entry("approved")], fills=0, evidence=dict(_EVIDENCE)
+    )
+    unmeasured = build_window_row("2026-09-25", evidence=dict(_EVIDENCE))
+    assert unmeasured["measured"] is False
+    assert unmeasured["funnel"]["universe"]["count"] == 8  # la fila SÍ trae el escalón...
+
+    totals = window_totals([measured, unmeasured])
+    assert totals["daysMeasured"] == 1
+    assert totals["funnel"]["universe"]["count"] == 8  # ...pero NO se suma al TOTAL
+    assert totals["funnel"]["universe"]["days"] == 1
+    assert totals["funnel"]["orders"]["count"] == 2

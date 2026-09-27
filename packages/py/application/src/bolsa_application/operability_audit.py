@@ -117,7 +117,7 @@ def window_totals(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     Suma **sólo** los días con el campo medido; un día no medido (o un campo ausente) **no** se suma
     como ``0``. ``coverage[field].partial`` delata un TOTAL construido sobre días incompletos, para que
     no se lea como una medida cerrada. El ``rSum`` es la suma de R de los ciclos medibles (su cobertura
-    se publica igual) y el funnel agrega, escalón a escalón, los días que SÍ lo midieron.
+    se publica igual) y el funnel agrega, escalón a escalón, **sólo** los días MEDIDOS que SÍ lo midieron.
     """
     rows = list(rows)
     days_total = len(rows)
@@ -171,14 +171,19 @@ def window_totals(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     for step in FUNNEL_STEPS:
         total = 0
         days = 0
-        for row in rows:
+        for row in measured_rows:
             entry = _as_mapping(_as_mapping(row.get("funnel")).get(step))
             value = _maybe_int(entry.get("count"))
             if value is None:
                 continue
             total += value
             days += 1
-        funnel[step] = {"count": total, "days": days, "measured": days > 0, "partial": days < days_total}
+        funnel[step] = {
+            "count": total,
+            "days": days,
+            "measured": days > 0,
+            "partial": days < days_measured,
+        }
 
     return {
         "daysTotal": days_total,
@@ -360,14 +365,34 @@ def _evidence_price_counts(value: Any) -> dict[str, int] | None:
     return counts
 
 
+def _fill_funnel_gaps(row: Mapping[str, Any], rebuilt: Mapping[str, Any]) -> dict[str, Any]:
+    """(PURA) Conserva cada escalón YA medido de la fila y toma del reconstruido SÓLO los huecos.
+
+    ``build_operability_funnel`` recalcula el funnel ENTERO (los cuatro escalones superiores salen de
+    la evidencia), así que usarlo como **reemplazo** PISARÍA un escalón ya medido cuando esa evidencia
+    discrepa de la que midió la fila. Aquí se respeta el contrato del módulo: **sólo** se rellena lo
+    que la fila declaró ``None``; un escalón medido se conserva (y con él su ``source``).
+    """
+    current = _as_mapping(row.get("funnel"))
+    merged: dict[str, Any] = {}
+    for step in FUNNEL_STEPS:
+        existing = _as_mapping(current.get(step))
+        if _maybe_int(existing.get("count")) is not None:
+            merged[step] = dict(existing)
+        else:
+            merged[step] = dict(_as_mapping(rebuilt.get(step)))
+    return merged
+
+
 def enrich_rows_with_evidence(
     rows: Sequence[Mapping[str, Any]], evidence_by_day: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
     """(PURA) Rellena los huecos DECLARADOS de cada fila con la evidencia del runner (``--forward``).
 
-    Sólo actúa en los campos que la fila declaró ``None`` y RECONSTRUYE el funnel con la MISMA función
-    del instrumento (``build_operability_funnel``), así que los escalones durables no pueden divergir.
-    Un día sin evidencia se devuelve intacto: el hueco sigue declarado, nunca se supone.
+    Sólo actúa en los campos que la fila declaró ``None``. El funnel se RECONSTRUYE con la MISMA función
+    del instrumento (``build_operability_funnel``) para no abrir una segunda aritmética, pero de ahí se
+    toman **sólo** los escalones que la fila dejó en ``None`` (``_fill_funnel_gaps``): un escalón YA
+    medido **jamás** se sobrescribe. Un día sin evidencia se devuelve intacto: el hueco sigue declarado.
     """
     enriched_rows: list[dict[str, Any]] = []
     for row in rows:
@@ -376,7 +401,8 @@ def enrich_rows_with_evidence(
         if not evidence:
             enriched_rows.append(enriched)
             continue
-        enriched["funnel"] = build_operability_funnel(row, evidence=evidence)
+        rebuilt = build_operability_funnel(row, evidence=evidence)
+        enriched["funnel"] = _fill_funnel_gaps(row, rebuilt)
         if enriched.get("symbolsObserved") is None:
             enriched["symbolsObserved"] = _maybe_int(evidence.get("watchSize"))
         if enriched.get("pairCapable") is None:
@@ -443,7 +469,7 @@ def _funnel_lines(totals: Mapping[str, Any]) -> list[str]:
         entry = _as_mapping(funnel.get(step))
         count = _maybe_int(entry.get("count"))
         days = _maybe_int(entry.get("days")) or 0
-        of_days = _maybe_int(totals.get("daysTotal")) or 0
+        of_days = _maybe_int(totals.get("daysMeasured")) or 0
         rendered = "n/d" if count is None or days == 0 else str(count)
         lines.append(f"  {step:<14} {rendered:>6}  ({days}/{of_days} dias medidos)")
     return lines

@@ -24,7 +24,8 @@ Uso (desde la raíz del repo; el bundle lo produce el runbook de la ventana)::
         --out operability_runs/operability-audit.json
 
 Códigos de salida: ``0`` si se leyó al menos un día; ``2`` si no hay material legible (se declara por
-stderr); ``1`` uso incorrecto.
+stderr) **o** si los argumentos son inválidos: ``argparse`` sale con ``2`` en el uso incorrecto, así que
+el código NO distingue «sin material» de «uso incorrecto» — el mensaje de stderr sí lo hace.
 """
 
 from __future__ import annotations
