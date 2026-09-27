@@ -638,6 +638,10 @@ MARKET_OPERABILITY = (
 # El dueño del vocabulario de motivos (atribuciones de POSICIÓN vs vetos de entrada).
 AUTO_REASON_CODES = "packages/py/application/src/bolsa_application/auto_reason_codes.py"
 
+# --- AUTO-MATERIAL-8 (V2.80): MARKET WINDOW (serie diaria de la ventana de operación) ---------
+# Fila diaria desde el journal durable + gate de la ventana (4 días / 2 episodios / 32 ciclos).
+OPERABILITY_WINDOW = "packages/py/application/src/bolsa_application/operability_window.py"
+
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
 T_EV = "packages/py/analytics/tests/test_expected_value.py"
@@ -710,6 +714,8 @@ T_MARKET_PRICE_SNAPSHOT = "packages/py/application/tests/test_market_price_snaps
 T_FORWARD_DECIDERS = "packages/py/application/tests/test_auto_forward_deciders.py"
 # AUTO-MATERIAL-5 (V2.77): clasificacion del veto por familia + nomenclatura CAPABLE/ACTIVE.
 T_MARKET_OPERABILITY = "packages/py/application/tests/test_market_operability.py"
+# AUTO-MATERIAL-8 (V2.80): serie diaria de la ventana + gate (contratos puros, sin PG).
+T_OPERABILITY_WINDOW = "packages/py/application/tests/test_operability_window.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2534,6 +2540,55 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    RESERVATION_ALREADY_LIVE: BUCKET_RISK,\n",
         "",
         (T_MARKET_OPERABILITY,),
+    ),
+    # ── v2.80 (AUTO-MATERIAL-8): MARKET WINDOW (estado unresolved + cobertura + gate) ──
+    (
+        "M220 (auditoria v2.79: unresolved colapsa a vetoed): propuestas sin veto se leen vetoed",
+        MARKET_OPERABILITY,
+        "    if _count(record.get(\"vetoes\")) == 0:\n"
+        "        return STATE_UNRESOLVED\n",
+        "",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M221 (auditoria v2.79: la cobertura miente): unknown de cobertura forzado a 0",
+        MARKET_OPERABILITY,
+        "        \"unknown\": len(unknown),\n",
+        "        \"unknown\": 0,\n",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M222 (auditoria v2.79: la violacion no se marca): contractViolation siempre False",
+        MARKET_OPERABILITY,
+        "        \"contractViolation\": other_count > 0,\n",
+        "        \"contractViolation\": False,\n",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M223 (ventana: el gate cuenta FILAS): 4 corridas del mismo dia fingen 4 cubos",
+        OPERABILITY_WINDOW,
+        "    days = {day for row in rows if (day := _text(row.get(\"day\")))}\n",
+        "    days = [_text(row.get(\"day\")) for row in rows]\n",
+        (T_OPERABILITY_WINDOW,),
+    ),
+    (
+        "M224 (ventana: el hueco se rellena): priceSources ausente se publica como ceros",
+        OPERABILITY_WINDOW,
+        "    sources = _as_mapping(value)\n"
+        "    if not sources:\n"
+        "        return None\n",
+        "    sources = _as_mapping(value)\n"
+        "    if not sources:\n"
+        "        return {\"live\": 0, \"close\": 0, \"missing\": 0}\n",
+        (T_OPERABILITY_WINDOW,),
+    ),
+    (
+        "M225 (ventana: el evento no se filtra): los eventos de POSICION vuelven al censo",
+        OPERABILITY_WINDOW,
+        "    entry_reasons = collect_journal_reasons(entries, "
+        "events=frozenset({ENTRY_DECISION_EVENT}))\n",
+        "    entry_reasons = collect_journal_reasons(entries)\n",
+        (T_OPERABILITY_WINDOW,),
     ),
 ]
 

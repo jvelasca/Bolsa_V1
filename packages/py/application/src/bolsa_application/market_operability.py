@@ -30,7 +30,7 @@ Qué NO hace (reglas duras del repo):
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from bolsa_analytics.cognitive.market_regime_gate import (
@@ -62,6 +62,7 @@ __all__ = [
     "BUCKET_REGIME",
     "BUCKET_RISK",
     "BUCKET_TOP_N",
+    "DECLARED_REASON_CODES",
     "ENTRY_DECISION_EVENT",
     "NON_VETO_REASON_CODES",
     "OPERABILITY_BUCKETS",
@@ -69,15 +70,18 @@ __all__ = [
     "STATE_NO_SIGNAL",
     "STATE_OPERATED",
     "STATE_UNKNOWN",
+    "STATE_UNRESOLVED",
     "STATE_VETOED",
     "VETO_BUCKET_BY_REASON",
     "build_operability_record",
     "classify_veto_reasons",
     "collect_journal_reasons",
     "operability_state",
+    "other_veto_count",
     "pair_active",
     "pair_capable",
     "parse_journal_reasons",
+    "reason_catalog_coverage",
     "render_operability_table",
     "split_journal_reasons",
     "symbols_operable",
@@ -108,6 +112,10 @@ OPERABILITY_BUCKETS: tuple[str, ...] = (
 #: Estado primario de un día (separa el operar del no operar y el PORQUÉ del no operar).
 STATE_OPERATED = "operated"
 STATE_VETOED = "vetoed"
+#: Hubo PROPUESTAS pero ningún veto registrado y ningún desenlace (ni fill ni cierre). El nombre
+#: del estado no puede afirmar "el motor las rechazó" —no hay ni un veto que lo respalde—: es un
+#: día con oportunidades **sin resolver**. Sigue siendo fail-closed (`P3-7`): NUNCA es `no_signal`.
+STATE_UNRESOLVED = "unresolved"
 STATE_NO_SIGNAL = "no_signal"
 STATE_UNKNOWN = "unknown"
 
@@ -197,6 +205,11 @@ VETO_BUCKET_BY_REASON: dict[str, str] = {
 NON_VETO_REASON_CODES: frozenset[str] = frozenset(
     {"approved", *DAY_EXIT_REASONS, *POSITION_SKIP_REASONS, *POSITION_ATTRIBUTION_REASONS}
 )
+
+#: Catálogo DECLARADO completo: todo código de motivo con dueño, sea veto (con familia) o
+#: atribución no-veto. Es la unión de los dos conjuntos que el contrato `H-2` prueba exhaustivos
+#: y disjuntos, así que un código observado que NO esté aquí es un hueco real de catalogación.
+DECLARED_REASON_CODES: frozenset[str] = frozenset(VETO_BUCKET_BY_REASON) | NON_VETO_REASON_CODES
 
 
 def _as_mapping(value: Any) -> Mapping[str, Any]:
@@ -325,6 +338,34 @@ def veto_counted(buckets: Mapping[str, Mapping[str, int]]) -> int:
     return sum(sum(int(n) for n in bucket.values()) for bucket in buckets.values())
 
 
+def other_veto_count(buckets: Mapping[str, Mapping[str, int]]) -> int:
+    """Entradas del cubo ``other``: motivos SIN familia declarada (violación de contrato).
+
+    Con el catálogo exhaustivo de ``v2.79``, un motivo que aterriza en ``other`` ya no es una
+    clasificación más: es un código que se escapó del contrato. Se publica como número para que
+    el aviso sea medible (``other == 0`` no es accidental).
+    """
+    return sum(_count(count) for count in _as_mapping(buckets.get(BUCKET_OTHER)).values())
+
+
+def reason_catalog_coverage(observed: Iterable[str]) -> dict[str, int]:
+    """Cobertura del catálogo declarado frente a los códigos OBSERVADOS (``auditoría v2.79`` §21).
+
+    Devuelve ``declared`` (tamaño del catálogo con dueño), ``observed`` (códigos distintos vistos,
+    sin el token vacío) y ``unknown`` (observados sin declaración: el hueco). Sobre un día normal
+    ``unknown`` debe ser ``0`` y coincidir con ``other_veto_count``: que la cobertura sea completa
+    deja de ser una suposición y pasa a ser un dato.
+    """
+    codes = {str(code).strip() for code in observed}
+    codes.discard("")
+    unknown = {code for code in codes if code not in DECLARED_REASON_CODES}
+    return {
+        "declared": len(DECLARED_REASON_CODES),
+        "observed": len(codes),
+        "unknown": len(unknown),
+    }
+
+
 def symbols_operable(market_regime: Mapping[str, Any]) -> int | None:
     """Cuántos símbolos del watch admitirían entrada LONG por SÍ MISMOS (o ``None`` si no medible).
 
@@ -397,6 +438,11 @@ def operability_state(record: Mapping[str, Any]) -> str:
     y NUNCA ``no_signal`` (que es el hecho más tranquilizador y sólo puede afirmarse cuando el
     motor no produjo ni propuestas ni vetos). Un día con vetos es ``vetoed``: así no se puede
     leer "no hay señal" donde en realidad hubo un veto de régimen o de ``TOP_N``.
+
+    (auditoría de ``v2.79``) Un día con PROPUESTAS pero **cero vetos registrados** y sin
+    desenlace no se etiqueta ``vetoed``: el nombre afirmaría una causa ("el motor las rechazó")
+    que el dato no respalda. Se declara ``unresolved`` —propuestas sin desenlace claro—, que
+    sigue siendo fail-closed y nunca cae en ``no_signal``.
     """
     if not record or not bool(record.get("measured", True)):
         return STATE_UNKNOWN
@@ -406,6 +452,8 @@ def operability_state(record: Mapping[str, Any]) -> str:
         return STATE_OPERATED
     if _count(record.get("proposals")) == 0 and _count(record.get("vetoes")) == 0:
         return STATE_NO_SIGNAL
+    if _count(record.get("vetoes")) == 0:
+        return STATE_UNRESOLVED
     return STATE_VETOED
 
 
@@ -418,6 +466,12 @@ def build_operability_record(evidence: Mapping[str, Any], *, day: str) -> dict[s
     position_reasons = parse_journal_reasons(_as_sequence(evidence.get("positionEventReasons")))
     veto_reasons, non_veto_reasons = split_journal_reasons(reasons)
     buckets = classify_veto_reasons(veto_reasons)
+    other_count = other_veto_count(buckets)
+    observed_codes = (
+        {code for bucket in buckets.values() for code in bucket}
+        | set(non_veto_reasons)
+        | set(position_reasons)
+    )
     top_codes = sorted(
         ((code, count) for bucket in buckets.values() for code, count in bucket.items()),
         key=lambda item: (-item[1], item[0]),
@@ -440,6 +494,9 @@ def build_operability_record(evidence: Mapping[str, Any], *, day: str) -> dict[s
         "measurableCycles": _count(sample.get("measurableCycles")),
         "vetoByBucket": buckets,
         "vetoCounted": veto_counted(buckets),
+        "otherCount": other_count,
+        "contractViolation": other_count > 0,
+        "reasonCatalogCoverage": reason_catalog_coverage(observed_codes),
         "nonVetoByCode": non_veto_reasons,
         "nonVetoCounted": sum(non_veto_reasons.values()),
         "positionEventByCode": position_reasons,
@@ -497,6 +554,24 @@ def _position_event_summary(record: Mapping[str, Any]) -> str:
     return f"    eventos/posicion: {detail} (NO son vetos)"
 
 
+def _contract_violation_alert(record: Mapping[str, Any]) -> str:
+    """Aviso declarado si algún motivo cayó en ``other`` (sin familia): viola el contrato.
+
+    Con el catálogo exhaustivo de ``v2.79``, ``other > 0`` deja de ser un cubo más y pasa a ser
+    una señal: un código que se escapó del dueño único. Se AVISA (no se tumba la corrida) y se
+    nombran los motivos, para poder dar de alta el código o corregir la clasificación.
+    """
+    count = _count(record.get("otherCount"))
+    if count <= 0:
+        return ""
+    others = _as_mapping(_as_mapping(record.get("vetoByBucket")).get(BUCKET_OTHER))
+    detail = " ".join(f"{code}={_count(others[code])}" for code in sorted(others))
+    return (
+        f"    ALERTA CONTRATO: other>0 (motivo(s) no catalogado(s): {detail}) "
+        "— revisar alta de reason code"
+    )
+
+
 def render_operability_table(records: Sequence[Mapping[str, Any]]) -> str:
     """Tabla textual (determinista) + desglose de vetos por familia, para el journal del operador."""
     headers = ("Dia", "Regimen", "Long", "SimbOper", "Decid", "Prop", "Veto", "Fills", "Ciclos", "Par")
@@ -537,6 +612,9 @@ def render_operability_table(records: Sequence[Mapping[str, Any]]) -> str:
         if top:
             detail = " ".join(f"{code}={count}" for code, count in top)
             lines.append(f"    codigos: {detail}")
+        alert = _contract_violation_alert(record)
+        if alert:
+            lines.append(alert)
         non_veto = _non_veto_summary(record)
         if non_veto:
             lines.append(non_veto)

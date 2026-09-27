@@ -39,6 +39,7 @@ from bolsa_application.market_operability import (
     BUCKET_REGIME,
     BUCKET_RISK,
     BUCKET_TOP_N,
+    DECLARED_REASON_CODES,
     ENTRY_DECISION_EVENT,
     NON_VETO_REASON_CODES,
     OPERABILITY_BUCKETS,
@@ -46,15 +47,18 @@ from bolsa_application.market_operability import (
     STATE_NO_SIGNAL,
     STATE_OPERATED,
     STATE_UNKNOWN,
+    STATE_UNRESOLVED,
     STATE_VETOED,
     VETO_BUCKET_BY_REASON,
     build_operability_record,
     classify_veto_reasons,
     collect_journal_reasons,
     operability_state,
+    other_veto_count,
     pair_active,
     pair_capable,
     parse_journal_reasons,
+    reason_catalog_coverage,
     render_operability_table,
     split_journal_reasons,
     symbols_operable,
@@ -406,6 +410,22 @@ def test_state_unknown_when_absence_cannot_be_measured() -> None:
     assert operability_state({"fills": 0, "closed": 0}) == STATE_UNKNOWN
 
 
+def test_state_unresolved_when_proposals_have_no_veto_nor_outcome() -> None:
+    """Matiz de la auditoría: propuestas SIN veto registrado ni desenlace NO se leen `vetoed`."""
+    state = operability_state({"proposals": 3, "vetoes": 0, "fills": 0, "closed": 0})
+    assert state == STATE_UNRESOLVED
+
+
+def test_state_unresolved_is_fail_closed_and_never_no_signal() -> None:
+    """Sigue siendo fail-closed: `unresolved` nunca cae en el estado más tranquilizador."""
+    assert operability_state({"proposals": 1, "vetoes": 0, "fills": 0, "closed": 0}) != STATE_NO_SIGNAL
+
+
+def test_state_vetoed_wins_over_unresolved_when_there_are_vetoes() -> None:
+    """Con al menos un veto registrado, el estado sigue siendo `vetoed` (hay causa declarada)."""
+    assert operability_state({"proposals": 3, "vetoes": 2, "fills": 0, "closed": 0}) == STATE_VETOED
+
+
 # ── build_operability_record (el smoke real de punta a punta) ───────────────────────────────────
 
 
@@ -469,6 +489,49 @@ def test_record_without_journal_reasons_declares_empty_buckets_not_invented() ->
     record = build_operability_record(payload, day="2026-09-27")
     assert record["vetoCounted"] == 0
     assert tuple(record["vetoByBucket"]) == OPERABILITY_BUCKETS
+
+
+def test_declared_reason_codes_is_the_union_of_the_partition() -> None:
+    """El catálogo declarado es exactamente veto ∪ no-veto (la partición que prueba H-2)."""
+    assert DECLARED_REASON_CODES == frozenset(VETO_BUCKET_BY_REASON) | NON_VETO_REASON_CODES
+
+
+def test_reason_catalog_coverage_counts_declared_observed_and_unknown() -> None:
+    """Cobertura de `auditoría v2.79` §21: declarado / observado / desconocido."""
+    assert reason_catalog_coverage({"regime_invalid": 40, "top_n_excluded": 24}) == {
+        "declared": len(DECLARED_REASON_CODES),
+        "observed": 2,
+        "unknown": 0,
+    }
+    assert reason_catalog_coverage({"nuevo_motivo": 1})["unknown"] == 1
+    assert reason_catalog_coverage({"": 1})["observed"] == 0
+
+
+def test_other_veto_count_sums_only_the_other_bucket() -> None:
+    buckets = classify_veto_reasons({"regime_invalid": 2, "nuevo_motivo": 3})
+    assert other_veto_count(buckets) == 3
+
+
+def test_an_unknown_veto_code_is_a_declared_contract_violation() -> None:
+    """`auditoría v2.79` §20: un motivo sin dueño se declara (aviso), no se silencia."""
+    payload = {**_OPERATED_DAY, "journalReasons": ["regime_invalid:2", "nuevo_motivo:1"]}
+    record = build_operability_record(payload, day="2026-09-27")
+    assert record["otherCount"] == 1
+    assert record["contractViolation"] is True
+    assert record["reasonCatalogCoverage"]["unknown"] == 1
+    assert record["vetoByBucket"][BUCKET_OTHER] == {"nuevo_motivo": 1}
+
+
+def test_the_operated_day_has_full_catalog_coverage_and_no_violation() -> None:
+    """Un día real opera con el catálogo completo: `other == 0` no es accidental."""
+    record = build_operability_record(_AUDIT_REVERSAL_DAY, day="2026-09-26")
+    assert record["otherCount"] == 0
+    assert record["contractViolation"] is False
+    assert record["reasonCatalogCoverage"] == {
+        "declared": len(DECLARED_REASON_CODES),
+        "observed": 4,
+        "unknown": 0,
+    }
 
 
 # ── collect_journal_reasons + censo de ENTRADA (H-1) ───────────────────────────────────────────
@@ -627,3 +690,18 @@ def test_render_declares_position_events_apart_from_vetoes() -> None:
     assert "eventos/posicion" not in render_operability_table(
         [build_operability_record(_FORWARD_SMOKE, day="2026-09-26")]
     )
+
+
+def test_render_warns_on_a_contract_violation() -> None:
+    """`auditoría v2.79` §20: con `other>0` el render publica la ALERTA y nombra el motivo."""
+    payload = {**_OPERATED_DAY, "journalReasons": ["regime_invalid:2", "nuevo_motivo:1"]}
+    rendered = render_operability_table([build_operability_record(payload, day="2026-09-27")])
+    assert "ALERTA CONTRATO: other>0" in rendered
+    assert "nuevo_motivo=1" in rendered
+
+
+def test_render_does_not_warn_without_a_contract_violation() -> None:
+    rendered = render_operability_table(
+        [build_operability_record(_AUDIT_REVERSAL_DAY, day="2026-09-26")]
+    )
+    assert "ALERTA CONTRATO" not in rendered

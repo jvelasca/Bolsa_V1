@@ -325,6 +325,7 @@ jobs:
           packages/py/application/tests/test_market_price_snapshot.py
           packages/py/application/tests/test_auto_forward_deciders.py
           packages/py/application/tests/test_market_operability.py
+          packages/py/application/tests/test_operability_window.py
           packages/py/analytics/tests/test_rules_engine_series_wiring.py
           packages/py/application/tests/test_strategy_shadow_phase.py
           packages/py/application/tests/test_paper_forward_phase.py
