@@ -1,0 +1,256 @@
+EVIDENCIA CRUDA - AUDITORIA EXTERNA v2.79-beta (AUTO-MATERIAL-7: OPERABILITY CENSUS)
+AsOf: 2026-09-27
+Auditor externo. Clon temporal REUTILIZADO: $env:TEMP\audit-v279 (de un intento previo interrumpido
+por el proveedor, no por la tarea). NO se toco el arbol local del desarrollador.
+
+================================================================================
+0. IDENTIDAD DEL CLON (primer paso obligatorio)
+================================================================================
+$ cd "$env:TEMP\audit-v279"; git rev-parse HEAD
+0314199c4f063583eb76c8dfafe23247ae373a38
+$ git rev-parse 'HEAD^{tree}'
+df8fed61a82b35fddbef8d4095fda4141480355f
+$ git status --porcelain
+(vacio)
+$ git describe --tags
+v2.79-beta
+
+Tag anotado (objeto): e68d45dc6d5b4737aa9f7100f4c975e9d1a3a88e
+Commit (v2.79-beta^{commit}): 0314199c4f063583eb76c8dfafe23247ae373a38
+Base v2.78-beta^{commit}: f8aa3697247d48d9f7f6fc918d3fa3afd1132e53
+Version declarada (package.json): 2.04.0-beta
+
+--- commit post-tag de la cita del CI (96f52eba) ---
+$ git merge-base --is-ancestor 96f52eba v2.79-beta ; echo exit=$LASTEXITCODE
+exit=1                      # NO esta en el tag
+$ git merge-base --is-ancestor 96f52eba origin/main ; echo exit=$LASTEXITCODE
+exit=0                      # SI esta en main (cita post-tag, DECLARADA por el proyecto)
+$ git log --oneline -1 origin/main
+96f52eba docs(v2.79): cita el CI del tag v2.79-beta ...
+
+================================================================================
+1. FREEZE / ALCANCE DEL DIFF
+================================================================================
+$ git diff v2.78-beta..v2.79-beta --name-only
+CHANGELOG.md
+apps/api-python/scripts/v2_44_mutation_audit.py
+apps/api-python/scripts/v2_76_forward_market_material.py
+docs/engineering/PROJECT_STATE.md
+docs/engineering/arranque-agente-v2-79-auto-material-7-operability-census-2026-09-27.md
+docs/engineering/arranque-auditor-v2-79-auto-material-7-operability-census-2026-09-27.md
+docs/engineering/audit-pack-v2-79-auto-material-7-operability-census-2026-09-27.md
+docs/engineering/auditoria-v2-78-auto-material-6-operability-accounting-2026-09-27.md
+docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md
+docs/engineering/engineering-index-2026-08-03.md
+docs/engineering/evidencia-auditoria-v2.78-2026-09-27.txt
+docs/engineering/evidencia-ci-tag-v2.78-2026-09-27.txt
+docs/engineering/evidencia-matriz-mutaciones-v2.79-219-2026-09-27.txt
+docs/engineering/plan-v2-79-auto-material-7-operability-census-2026-09-27.md
+docs/engineering/runbook-ventana-forward-v2.78-2026-09-27.md
+package.json
+packages/py/application/src/bolsa_application/auto_reason_codes.py
+packages/py/application/src/bolsa_application/market_operability.py
+packages/py/application/tests/test_market_operability.py
+
+$ git diff v2.78-beta..v2.79-beta --name-only -- <ficheros congelados>
+# auto_simulation_worker.py, portfolio_decision_engine.py, opportunity_ranker.py,
+# market_regime_gate.py, paper_material_readiness.py
+(vacio)                    # NINGUN fichero congelado cambia
+
+$ git diff v2.78-beta..v2.79-beta --name-only -- .github/
+(vacio)                    # NINGUN workflow cambia
+
+Constantes congeladas (en ficheros fuera del diff):
+  DATA_GATE_POLICY_VERSION = "auto15-v1"     (auto_adaptive_data_gate.py)
+  ADAPTIVE_POLICY_VERSION  = "auto18-v1"     (auto_adaptive.py; ALLOCATION = none)
+  TOP_N default            = 5               (auto_v2_entry.V2Tunables.top_n)
+  min cycles               = 32              (DEFAULT_MIN_MEASURABLE_CYCLES_PER_STRATEGY)
+  folds                    = 3               (CALIBRATION_FOLDS_DEFAULT)
+  min_is                   = 8               (REPLAY_MIN_IS_MEASURED_DEFAULT)
+  min_oos                  = 4               (REPLAY_MIN_OOS_MEASURED_DEFAULT)
+  min_episodes             = 2               (ADAPTIVE_INTERVAL_MIN_EPISODES_DEFAULT)
+
+================================================================================
+2. COMPUERTAS (medidas)
+================================================================================
+$ uv run --no-sync ruff check packages/py apps/api-python --config pyproject.toml
+All checks passed!
+RUFF_EXIT=0
+
+$ uv run --no-sync lint-imports --config packages/py/.importlinter
+Import Linter: Contracts
+Analyzed 636 files, 3441 dependencies.
+Domain no importa infra, analytics, application ni SDKs LLM KEPT
+SDKs LLM solo via bolsa_ai (Proxy First) KEPT
+bolsa_ai no entra en domain KEPT
+analytics y market no se importan entre si KEPT
+Contracts: 4 kept, 0 broken.
+IMPORTS_EXIT=0
+
+$ uv run --no-sync mypy packages/py/domain/src packages/py/market/src packages/py/infrastructure/src \
+      packages/py/application/src apps/api-python/src --follow-imports=silent
+Success: no issues found in 505 source files
+MYPY_EXIT=0
+
+$ cd packages/py/infrastructure && uv run --no-sync alembic heads
+046_fill_reference_mid (head)
+ALEMBIC_EXIT=0
+
+$ uv run --no-sync python -m pytest packages/py/application/tests/test_market_operability.py -q
+48 passed in 0.29s
+PYTEST_EXIT=0
+# re-verificado DESPUES de la matriz: 48 passed in 0.27s
+
+================================================================================
+3. RE-DERIVACION INDEPENDIENTE (no confiada a la evidencia persistida)
+================================================================================
+Script (fuera del clon): $env:TEMP\audit-v279-recheck.py  ->  uv run --no-sync python <script>
+
+[H-1 reversal] vetoes=2 vetoCounted=2 other={} nonVetoCounted=4 positionEventCounted=1
+               positionEventByCode={'protect_requested': 1}
+
+[H-1 render]
+Dia         Regimen  Long  SimbOper  Decid  Prop  Veto  Fills  Ciclos  Par
+----------  -------  ----  --------  -----  ----  ----  -----  ------  ---
+2026-09-26           NO    n/d       10     3     2     3      0       NO
+
+Vetos por familia (por dia):
+  2026-09-26  regime=2
+    codigos: regime_invalid=2
+  2026-09-26  aprobaciones/salidas: approved=3 risk_exit=1 (NO son vetos)
+    eventos/posicion: protect_requested=1 (NO son vetos)
+
+[H-1 legacy] vetoCounted=2 other={} nonVetoByCode={'approved': 3, 'protect_requested': 1}
+[H-3 disjoint] veto_buckets & non_veto == empty: True
+   reservation_failed          excluded from attribution: True | is veto: True
+   reservation_unmeasurable    excluded from attribution: True | is veto: True
+   reservation_already_live    excluded from attribution: True | is veto: True
+
+[point5] signal reject codes declared? (en VETO_BUCKET=False, en NON_VETO=False) para:
+   signal_duplicate, signal_stale, signal_identity_missing,
+   signal_superseded_by_candidate, signal_distinct_strategy_not_representable
+[point5] build_operability_record con esos 5 codigos en un evento auto_entry_decision:
+   vetoCounted=10 vs vetoes=0 ; other={'signal_duplicate':2, ...}   -> H-4 (LOW)
+
+[point2/3] entry-only census: {'regime_invalid': 1}
+[point2/3] position-only census: {'protect_requested': 1}
+RECHECK_EXIT=0
+
+================================================================================
+4. MATRIZ DE MUTACIONES COMPLETA (re-ejecutada)
+================================================================================
+Comando: uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py
+Duracion: ~10m (627.6 s). NO se interpreto como colgada.
+
+--- mordida de las mutaciones nuevas (M214-M219) ---
+### M214 (H-1: el evento no se filtra): el censo cuenta tambien los eventos de POSICION
+    rojo en: test_collect_journal_reasons_filters_by_event
+    restaurado byte a byte: si
+### M215 (H-1: los eventos de posicion se descartan): el canal de posicion no se publica
+    rojo en: test_position_management_events_are_published_not_discarded,
+             test_render_declares_position_events_apart_from_vetoes,
+             test_the_audit_reversal_example_is_caught
+    restaurado byte a byte: si
+### M216 (H-2: el optimizador vuelve a other): sus motivos dejan de tener familia
+    rojo en: test_every_owner_reason_code_is_declared_exactly_once,
+             test_optimizer_and_adaptive_codes_are_declared_as_vetoes
+    restaurado byte a byte: si
+### M217 (H-2: el adaptativo vuelve a other): adaptive_strategy_paused sin familia
+    rojo en: test_every_owner_reason_code_is_declared_exactly_once,
+             test_optimizer_and_adaptive_codes_are_declared_as_vetoes
+    restaurado byte a byte: si
+### M218 (H-3: familias solapadas): un veto real de reserva entra como atribucion de posicion
+    rojo en: test_every_owner_reason_code_is_declared_exactly_once,
+             test_position_attribution_literals_are_read_from_their_owner,
+             test_veto_buckets_and_non_veto_codes_are_disjoint
+    restaurado byte a byte: si
+### M219 (H-2: owner incompleto): los vetos fail-closed de reserva quedan sin declarar
+    rojo en: test_every_owner_reason_code_is_declared_exactly_once,
+             test_optimizer_and_adaptive_codes_are_declared_as_vetoes
+    restaurado byte a byte: si
+
+--- huella del arbol (salida del propio script) ---
+estado git de esos ficheros (despues): limpio
+  intacto: la sonda no altero el arbol
+  medidas: 219/219 (ninguna se quedo sin fragmento)
+
+================================================================================
+5. INTEGRIDAD DEL CLON ANTES / DESPUES (prueba de no-alteracion)
+================================================================================
+TREE_BEFORE = df8fed61a82b35fddbef8d4095fda4141480355f
+HEAD        = 0314199c4f063583eb76c8dfafe23247ae373a38
+TREE_AFTER  = df8fed61a82b35fddbef8d4095fda4141480355f   (IDENTICO)
+$ git status --porcelain
+(vacio)   -> STATUS_LINES=0
+
+================================================================================
+6. CI EN REMOTO (gh, repo jvelasca/Bolsa_V1)
+================================================================================
+[Release tag CI] run 36309108865  branch v2.79-beta  HEAD 0314199c  completed/success
+  frontend (typecheck/lint/test/build + contract:check)      success
+  security (gitleaks)                                        success
+  shared (build/typecheck/test)                              success
+  playwright (mock E2E)                                      success
+  python (ruff/imports/mypy/pytest offline)                  success
+  decision-spine                                             success
+  dr-verify (battery DB_DR / TCP CI)                         success
+  lifecycle-pg (Alembic + auth + golden restart)             success
+  a7-gate (A7 C3 chaos live_a7 / dedicated real-PG)          success
+  playwright (integrated E2E, opt-in)                        skipped
+  certify (aggregate + artifact)                             success
+  => 10 jobs success + certify ; integrated E2E skipped (opt-in)
+
+[Job python del tag] id 108591476815 (success); extracto del log:
+  All checks passed!
+  Contracts: 4 kept, 0 broken.
+  Success: no issues found in 505 source files
+  2971 passed, 37 skipped, 6 warnings in 70.44s
+
+[Mismo commit/tag]
+  Python CI        36309108894  v2.79-beta  0314199c  success
+      job quality 108591476873 (success): All checks passed! ; mypy 505 ;
+      2960 passed, 40 skipped, 6 warnings in 126.56s
+  Frontend CI      36309108916  v2.79-beta  0314199c  success
+  Optimize lab     36309108867  v2.79-beta  0314199c  success
+  Fase 2 scientific 36309108863 v2.79-beta  0314199c  success
+
+[En main]
+  Python CI        36309104906  main  0314199c  success
+      quality success + paper-forward-pg / grammar-discovery-pg / lifecycle-pg /
+      auto-v2-durable-pg success
+  Frontend CI      36309104815  main  0314199c  success
+  Optimize lab     36309104777  main  0314199c  success
+  Fase 2 scientific 36309104818 main  0314199c  success
+  Gitleaks         36309104775  main  0314199c  success
+
+Skips SIN MOVER: tag python 37 = 37 ; quality 40 = 40.
+Casos nuevos: tag python 2960 -> 2971 (+11) ; quality 2949 -> 2960 (+11).
+
+================================================================================
+7. PUNTOS 11 y 12 (sonda read-only / runner)
+================================================================================
+$ git diff v2.78-beta..v2.79-beta --name-only -- apps/api-python/scripts/v2_77_market_operability.py
+(vacio)                    # sonda NO modificada
+# sin imports de psycopg/asyncpg/postgres/create_engine/sqlalchemy (solo texto "sin PostgreSQL")
+
+Runner v2_76_forward_market_material.py:
+  _journal_reasons / _journal_position_reasons  -> solo LEEN worker._v2_journal en memoria
+  unico open(..., "w") = --out (linea 810) ; --preflight-only retorna antes de sembrar/comitear
+
+================================================================================
+8. LIMITES DECLARADOS DE ESTA AUDITORIA
+================================================================================
+* Sin PostgreSQL local: lifecycle-pg/decision-spine/a7-gate/dr-verify verificados por CI, NO en local.
+* Sin material PAPER real (operability_runs/ gitignoreado): la tabla se re-derivo con fixtures, no
+  desde un journal real. NO puede afirmarse que P3-2/P3-3 esten cerradas ni que exista material diverso.
+* Deuda PG pre-existente ajena al diff: apps/api-python/tests/test_auto_v70_auto23_evidence_validation.py
+  (assert 17 == 26), se salta en CI sin Postgres. OBS-5 sigue declarada.
+
+================================================================================
+9. VEREDICTO
+================================================================================
+APROBADO CON OBSERVACIONES - 0 bloqueantes.
+Hallazgo nuevo: H-4 (LOW) - el contrato exhaustivo de duenos (H-2) no cubre el vocabulario de rechazo
+pre-ranqueo de auto_v2_entry (signal_duplicate/signal_stale/signal_identity_missing/
+signal_superseded_by_candidate/signal_distinct_strategy_not_representable), que alimenta eventos
+auto_entry_decision y cae en `other` inflando vetoCounted. Es lectura, no decision; no invalida el sello.

@@ -45,6 +45,22 @@ instala esta fase: **una entrada = una decisión de ENTRADA**.
 (`optimizer_*`/`adaptive_strategy_paused`/`reservation_unmeasurable`/`reservation_already_live` pasan de
 `other` a su familia real); claves nuevas **aditivas** en el JSON de evidencia.
 
+**Auditoría externa de esta versión (2026-09-27): `APROBADO CON OBSERVACIONES`, 0 bloqueantes.** El
+auditor trabaja desde un **clon fresco del tag** y demuestra que no lo alteró (tree `df8fed61…` idéntico
+antes/después y `git status` vacío); reproduce las cinco compuertas (`ruff` OK, import-linter **4 kept/0
+broken**, `mypy` **0 issues/505 files**, `test_market_operability.py` **48 passed**, `alembic heads`
+`046_fill_reference_mid`) y la **matriz completa 219/219** con `M214`–`M219` mordiendo y restauración
+byte a byte; confirma el núcleo de `H-1` (el censo no cuenta eventos de posición; el canal de posición se
+publica y no se descarta), y los cierres de `H-2`/`H-3`. Levanta **1 hallazgo nuevo: `H-4` (LOW)** — el
+test de exhaustividad construye `_OWNER_JOURNAL_CODES` **a mano** y **omite** el vocabulario de rechazo
+**pre-ranqueo** de `auto_v2_entry.py` (`signal_duplicate`, `signal_stale`, `signal_identity_missing`,
+`signal_superseded_by_candidate`, `signal_distinct_strategy_not_representable`), que alimenta eventos
+`auto_entry_decision` (la población del censo) ⇒ cae en `other` y **suma a `vetoCounted`** (re-derivado:
+`vetoCounted=10` frente a `vetoes=0`); **ningún conteo se descarta** —el defecto es la **familia** vacía y
+que el test **afirma** una exhaustividad que no cumple sobre el vocabulario real— ⇒ punto 5 **PARCIAL** y
+**`H-4` ABIERTO** en la deuda P3 (nada invalida el sello). Entregables: [auditoría](./docs/engineering/auditoria-v2-79-auto-material-7-operability-census-2026-09-27.md)
+y [evidencia cruda](./docs/engineering/evidencia-auditoria-v2.79-2026-09-27.txt).
+
 ## [2.03.0-beta] — `AUTO-MATERIAL-6`: OPERABILITY ACCOUNTING (contabilidad de vetos puros) — 2026-09-27
 
 **Fase de CORRECCIÓN del instrumento de medición, no de decisión; SIN migración** (Alembic head sigue

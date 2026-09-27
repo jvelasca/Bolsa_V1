@@ -14,6 +14,9 @@
 > (2026-09-27) reabrió `P3-6` PARCIALMENTE (`H-1`: los motivos de gestión de posición seguían
 > inflando `vetoCounted`) y añadió `H-2`/`H-3` (LOW, contrato del dueño y disjunción veto/no-veto):
 > los tres se **CIERRAN en `v2.79`** (censo de ENTRADA + canal de posición aparte);
+> **la auditoría externa de `v2.79-beta` (2026-09-27) emite `APROBADO CON OBSERVACIONES` (0
+> bloqueantes) y añade `H-4` (LOW, el test de exhaustividad omite el vocabulario de rechazo
+> pre-ranqueo de `auto_v2_entry`), que queda **ABIERTO y declarado**;**
 > P3-2 y P3-3 siguen **abiertas** (requieren material PAPER real con **diversidad de mercado**). **El
 > bloqueante central es MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma; `v2.75`
 > cruza la **cantidad** —42 ciclos medibles ⇒ `EVIDENCE_READY`— pero **no** la **diversidad**: un solo
@@ -335,6 +338,35 @@ se declaran en `VETO_BUCKET_BY_REASON` los vetos de ENTRADA que faltaban (`OPTIM
 **Cierre (`v2.79`).** `test_veto_buckets_and_non_veto_codes_are_disjoint` exige
 `VETO_BUCKET_BY_REASON ∩ NON_VETO_REASON_CODES == ∅`, y `POSITION_ATTRIBUTION_REASONS` **excluye
 explícitamente** los tres vetos fail-closed de la reserva. Protegido por **`M218`**.
+
+## H-4 — El test de exhaustividad omite el vocabulario de rechazo pre-ranqueo de `auto_v2_entry` (P3) — 🟡 ABIERTO (2026-09-27)
+
+**Origen.** Auditoría externa de `v2.79-beta`, **H-4 (LOW)**, sobre el punto 5 del
+[arranque del auditor](./arranque-auditor-v2-79-auto-material-7-operability-census-2026-09-27.md).
+
+**Observación.** `test_every_owner_reason_code_is_declared_exactly_once` construye su conjunto de
+«dueños» (`_OWNER_JOURNAL_CODES`, `test_market_operability.py:151`) **a mano** a partir de 10 fuentes y
+**omite** las cinco constantes de rechazo **pre-ranqueo** de `packages/py/application/src/bolsa_application/auto_v2_entry.py`
+(líneas ~2014-2028): `SIGNAL_DUPLICATE` (`signal_duplicate`), `SIGNAL_STALE` (`signal_stale`),
+`SIGNAL_IDENTITY_MISSING` (`signal_identity_missing`), `SIGNAL_SUPERSEDED_BY_CANDIDATE`
+(`signal_superseded_by_candidate`) y `SIGNAL_DISTINCT_STRATEGY_NOT_REPRESENTABLE`
+(`signal_distinct_strategy_not_representable`).
+
+**Impacto medido (re-derivado por el auditor).** Esos cinco códigos se emiten en eventos
+`auto_entry_decision` —la **población del censo**, no la de gestión de posición— y **no** están
+declarados ni en `VETO_BUCKET_BY_REASON` ni en `NON_VETO_REASON_CODES`, así que caen en `other` y
+**suman a `vetoCounted`** (re-derivado con esos códigos: `vetoCounted=10` frente a `vetoes=0`).
+**No se descarta ningún conteo** (el fallback de `other` los mantiene visibles): el defecto real es
+que la **familia** queda vacía y que el test **afirma** una exhaustividad que **no** cumple sobre el
+vocabulario real. **No es bloqueante** y **no** invalida el sello de `v2.79`.
+
+**Nota de diseño.** A diferencia de `approved`/`risk_exit`/`DAY_EXIT_REASONS` (atribuciones), los
+`signal_*` son **rechazos de candidato** ⇒ el arreglo natural es declararlos como **veto con familia**
+(`signal_identity_missing`/`signal_stale` apuntan a `data`), no como no-veto. Es decisión de la fase
+que lo cierre.
+
+**Criterio de cierre.** Que `_OWNER_JOURNAL_CODES` **importe** el vocabulario de su dueño (no lo liste a
+mano), que los cinco códigos tengan **familia declarada**, y una **mutación** (`M2xx`) que lo proteja.
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 
