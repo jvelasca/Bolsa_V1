@@ -1,0 +1,84 @@
+# V2.83.1 / AUTO-MATERIAL-11 RE-SELLO - CI del tag `v2.83.1-beta`: evidencia cruda
+#
+# Fecha de captura: 2026-09-27
+# Tag anotado: v2.83.1-beta -> commit del sello (bump + docs). Version: 2.08.1-beta.
+# SIN migracion (Alembic head 046_fill_reference_mid). Codigo IDENTICO a v2.83 (2.08.0-beta).
+#
+# ========================================================================================
+# QUE ES ESTE FICHERO (leer ANTES de sacar conclusiones)
+# ========================================================================================
+# ESTE fichero viaja DENTRO del tag `v2.83.1-beta`. Sirve para dos cosas:
+#   (a) ACREDITAR, DESDE EL PROPIO TAG, el CI de la fase auditada `v2.83` (run 36329460515,
+#       SUCCESS), que en el tag `v2.83-beta` quedaba como placeholder "PENDIENTE DE TAG"; y
+#   (b) DECLARAR el CI del tag `v2.83.1-beta` (este objeto), cuya cita, por construccion del
+#       workflow, NO puede existir dentro del propio tag y se escribe en un commit POST-TAG.
+#
+# LIMITE ESTRUCTURAL (patron OBS-3/OBS-4, v2.74-v2.83): `Release tag CI` SOLO corre al EMPUJAR el
+# tag; su resultado no puede preexistir a ese push. Ningun tag puede contener su propio resultado
+# de CI. Lo que SI podemos entregar -y es lo que hace este re-sello- es que un tag contenga el
+# instrumento Y la cita del CI de la fase auditada. Por eso `v2.83.1-beta` NO es un cambio de
+# motor/instrumento: es el MISMO objeto en un formato auditable de forma autocontenida.
+#
+# ========================================================================================
+# (1) CI DEL TAG `v2.83-beta` - ACREDITADO, Y VISIBLE DESDE ESTE TAG
+# ========================================================================================
+# Tag anotado `v2.83-beta` (objeto 8cfe7f6f) -> commit 0ebf6630. Version 2.08.0-beta.
+# Release tag CI  run 36329460515 : SUCCESS (attempt 1; 9m15s; 15:24:56Z -> 15:34:11Z)
+#   Jobs: 10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno.
+#   decision-spine / shared / python / dr-verify / playwright (mock) / frontend / security (gitleaks) /
+#   a7-gate / lifecycle-pg / certify  -> success
+#   Job `python` del tag : ruff `All checks passed!` ; imports `4 kept, 0 broken` ;
+#                          mypy `0 issues (507 files)` ; pytest `3020 passed, 37 skipped` (= 3004 + 16)
+# Python CI  run 36329460471 : success (mismo commit/tag)
+#   quality : 3009 passed, 40 skipped (= 2993 + 16); skips 40 = 40; jobs PG verdes.
+# Cadena verificada desde el tag `v2.83.1-beta`: tag v2.83-beta -> run 36329460515 -> SUCCESS.
+#
+# ========================================================================================
+# (2) CI DEL TAG `v2.83.1-beta` (ESTE OBJETO) - PENDIENTE / POST-TAG
+# ========================================================================================
+# ESTADO EN EL MOMENTO DEL SELLO: PENDIENTE DE TAG / AUN NO SE HA EMPUJADO.
+# La cita real se escribe en el commit POST-TAG y se rellena aqui abajo cuando el run exista.
+# ESPERADO (el codigo NO cambia respecto a v2.83, luego el resultado debe ser el mismo):
+#   Job `python` del tag : 3020 passed / 37 skipped
+#   Job `quality`        : 3009 passed / 40 skipped
+#   Conclusion           : SUCCESS
+# Esta prediccion NO se hereda: se cita el run del tag `v2.83.1-beta` cuando exista.
+#
+# ==== CITA REAL DEL CI DE v2.83.1 (a rellenar en el commit post-tag) ====
+# Release tag CI  run <PENDIENTE> : <PENDIENTE>
+#   <PENDIENTE: jobs, conteos, duracion, attempt>
+# Commit del sello : <PENDIENTE>
+# Tag anotado objeto: <PENDIENTE>
+#
+# ========================================================================================
+# (3) COMPUERTAS MEDIDAS EN LOCAL (antes del sello, no heredadas)
+# ========================================================================================
+# ruff          : All checks passed!
+# import-linter : Contracts: 4 kept, 0 broken. (638 ficheros, 3457 dependencias)
+# mypy          : Success: no issues found in 507 source files
+# alembic       : 046_fill_reference_mid (head)
+# puros         : test_operability_audit.py -> 16 passed
+# aplicacion    : pytest packages/py/application/tests -q -> 2087 passed (172.24s)
+# matriz        : 230/230 NO re-ejecutada en este re-sello (no cambia una linea de logica): vigente
+#                 y acreditada en el tag `v2.83-beta` (evidencia-ci-tag-v2.83-2026-09-27.txt).
+#
+# ========================================================================================
+# (4) DIFF ACOTADO (lo unico que cambia respecto a v2.83-beta)
+# ========================================================================================
+# `git diff v2.83-beta..v2.83.1-beta --stat` debe mostrar SOLO:
+#   - package.json                      (2.08.0-beta -> 2.08.1-beta)
+#   - CHANGELOG.md                      (entrada [2.08.1-beta])
+#   - docs/engineering/*                (arranque del auditor, relevo, esta evidencia,
+#                                        PROJECT_STATE, indice, deuda P3)
+# NO aparece NINGUN fichero de motor, gobernador, TOP_N, umbrales, allocation, pesos A/B,
+# migraciones, ni del instrumento (`operability_audit.py`, `v2_83_window_audit.py`,
+# `test_operability_audit.py`).
+#
+# ========================================================================================
+# (5) LECTURA HONESTA
+# ========================================================================================
+# Re-sello DOCS-ONLY: mismo motor congelado, mismo instrumento, mismo reparto
+# (`auto18-v1`/`auto15-v1`, `ALLOCATION = none`), SIN migracion. Entrega el objeto auditado con la
+# cita del CI de la fase DENTRO del tag, para eliminar el falso positivo "CI no acreditado".
+# NO cierra deuda: `P3-2`/`P3-3` siguen ABIERTAS (exigen la ventana PAPER >=4 dias real); `H-4` (LOW)
+# ABIERTO (se hace VISIBLE en `warnings: reason_contract`, no se cierra); `P3-5` y `OBS-5` declaradas.

@@ -2,6 +2,31 @@
 
 All notable releases of Bolsa V1.
 
+## [2.08.1-beta] — `AUTO-MATERIAL-11` (re-sello): el objeto auditado lleva la cita de CI DENTRO — 2026-09-27
+
+**Re-sello DOCS-ONLY; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin tocar el
+freeze** (`auto_simulation_worker.py` intacto). **Código IDÉNTICO a `2.08.0-beta`**: el diff
+`v2.83-beta..v2.83.1-beta` es **solo** `package.json` + `docs/engineering/*`. `TOP_N`, umbrales, allocation,
+pesos de estrategia, lógica A/B, gobernador y migraciones **no se mueven**.
+
+Origen: el patrón declarado `OBS-3`/`OBS-4` (`v2.74`–`v2.83`) hace que la cita del CI de un tag viva
+**fuera** del tag (el workflow `Release tag CI` solo corre **al empujar** el tag), de modo que un auditor
+que clona el tag aislado lee el **placeholder** «PENDIENTE DE TAG» y puede concluir, por error, «CI no
+acreditado». Este re-sello entrega un **snapshot inmutable autocontenido**: el tag `v2.83.1-beta` incluye
+el instrumento de `v2.83` **y** la cita real del CI de `v2.83` (`Release tag CI` `36329460515`, GREEN).
+
+- **`package.json`**: `2.08.0-beta → 2.08.1-beta` (**único** cambio no-doc).
+- **Docs del re-sello**: [arranque del auditor](./docs/engineering/arranque-auditor-v2-83-1-auto-material-11-window-readonly-audit-2026-09-27.md) ·
+  [relevo](./docs/engineering/traspaso-relevo-post-v2-83-1-auto-material-11-reseal-2026-09-27.md) ·
+  [evidencia CI del tag](./docs/engineering/evidencia-ci-tag-v2.83.1-2026-09-27.txt); la
+  [deuda P3](./docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md) registra la materialización de `OBS-3`/`OBS-4`.
+- **Compuertas esperadas**: idénticas a `2.08.0-beta` (el código no cambia) — `ruff` limpio,
+  `Contracts: 4 kept, 0 broken`, `mypy` **507** fuentes, `alembic heads` `046_fill_reference_mid`,
+  suite de aplicación **2087 passed**, matriz adversarial **230/230**.
+- **Deuda declarada (NO se cierra):** `P3-2`/`P3-3` siguen **ABIERTAS** (exige la ventana PAPER real
+  ≥4 días); `H-4` (LOW) **ABIERTO**; `P3-5` y `OBS-5` declaradas. **No** es un cambio de motor ni de
+  instrumento: es la entrega del **mismo** objeto en un formato auditable desde GitHub.
+
 ## [2.08.0-beta] — `AUTO-MATERIAL-11`: AUDITORÍA READ-ONLY de la ventana PAPER (≥4 días) — 2026-09-27
 
 **Fase de INSTRUMENTO READ-ONLY; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y

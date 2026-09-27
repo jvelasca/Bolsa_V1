@@ -460,6 +460,20 @@ No son deuda de código; se declaran para que no se lean como sorpresas en la pr
 > **POST-TAG** (`80b18061`) y el `run` (`36329460515`) en el **arranque del auditor** y en el audit-pack—
 > para que el auditor **no** dependa de leer el objeto sellado aislado. Cadena verificada:
 > `tag v2.83-beta` → `Release tag CI 36329460515` → **SUCCESS**. `OBS-5` sigue declarada (defensiva).
+>
+> **`v2.83.1` (2026-09-27) — RE-SELLO docs-only: `OBS-3`/`OBS-4` MATERIALIZADAS dentro de un tag.**
+> `AUTO-MATERIAL-11` / `v2.83.1` (`2.08.1-beta`, **código idéntico** a `v2.83`; el diff `v2.83-beta..
+> v2.83.1-beta` es **solo** `package.json` + `docs/engineering/*`) entrega el objeto auditado en un tag
+> que lleva **dentro** la cita del CI de la fase (`Release tag CI` `36329460515`, **SUCCESS**), de modo que
+> el auditor que clone **solo** el tag `v2.83.1-beta` ya **no** lee el placeholder «PENDIENTE DE TAG» ni
+> puede concluir «CI no acreditado». **Límite estructural declarado (sigue vivo):** el CI del propio
+> `v2.83.1` **no puede** existir dentro de su tag (ningún tag puede contener su propio resultado de CI,
+> porque `Release tag CI` solo corre al empujarlo) ⇒ se cita en el commit **POST-TAG** mediante
+> `evidencia-ci-tag-v2.83.1-2026-09-27.txt`, con el resultado esperado declarado (`python` del tag
+> `3020/37`; `quality` `3009/40`). Es decir, `OBS-3`/`OBS-4` quedan **materializadas** en la entrega
+> (la fase auditada y su cita van juntas en el mismo tag) sin que el patrón del workflow desaparezca.
+> `OBS-5` sigue declarada (defensiva). Entrega: [arranque del auditor](./arranque-auditor-v2-83-1-auto-material-11-window-readonly-audit-2026-09-27.md)
+> · [relevo](./traspaso-relevo-post-v2-83-1-auto-material-11-reseal-2026-09-27.md).
 
 ## Deuda de AUDITORÍA — `v2.73-beta` (`AUTO-MATERIAL-1`) sin pasada externa — 🟡 ABIERTA (de proceso)
 
