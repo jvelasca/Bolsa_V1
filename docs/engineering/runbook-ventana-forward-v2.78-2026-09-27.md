@@ -35,6 +35,40 @@ mientras no lo permita es **`INCONCLUSIVE` / `NO MEDIDO`**.
 | 3 | **Scheduler de barras** | el régimen y el ATR salen de `ohlcv_bars` **reales**; sin barras frescas el preflight cae en `UNKNOWN` | mantener vivo `SyncInstrumentDailyBars` / `auto_sync_worker` (corren dentro del proceso API) |
 | 4 | **Glob de corridas reales distinguible** | en `operability_runs/` ya hay **fixtures**; no hay que borrarlos ni mezclarlos | usar el glob `operability_runs/forward-market-*.json` para las corridas **reales** |
 
+### 2.1 Cuenta PAPER fija (deuda operativa; resolverla ANTES de D1)
+
+`PAPER_D_ACCOUNT_ID` está **comentado** en `.env` (línea `# PAPER_D_ACCOUNT_ID=`), así que hoy **no** hay
+cuenta fija: cada corrida puede sembrar una cuenta nueva y el journal no acumula (el dedupe es por
+`(day, account)`). Sin cuenta fija, `pairActive` y la **continuidad** de la ventana **no son verificables**,
+y el material de D1..D4 **no** sería comparable. **El valor del UUID es operación del propietario: no se
+inventa.**
+
+Procedimiento (operación del propietario, una sola vez antes de D1):
+
+1. Elegir la **cuenta DEMO** de la ventana (UUID real existente en el entorno DEMO).
+2. Descomentar y fijar en `.env`: `PAPER_D_ACCOUNT_ID=<uuid-cuenta-demo>` (gate fail-closed **A5** de
+   [`paper_d_propose.py`](../../packages/py/application/src/bolsa_application/paper_d_propose.py): si está
+   set, `execute=true` solo se permite sobre **esa** cuenta).
+3. Reiniciar el API (`node scripts/dev-api-python.mjs`) para que el proceso relea el `.env`.
+4. Verificar que **el mismo** UUID se usa como `--account-id` en el forward (`v2_76_…`), en el capturador
+   (`v2_80_market_window.py`) y en la auditoría (`v2_83_window_audit.py`, vía `--window`).
+
+**Regla dura:** `$ACCOUNT` **constante** en D1..D4. Un cambio de cuenta intermedio (D1 = cuenta A,
+D2 = cuenta B) rompe la comparabilidad e **invalida** la ventana; se declara, no se «arregla» sumando.
+
+**Par A/B (`pairActive=true`):** exige una estrategia B **ACTIVE** con su `EdgeReport` sobre la **misma**
+cuenta. Sin eso, el símbolo `Par` queda `CAPAZ` sin `ACTIVO` y la auditoría emite `pair_not_active`/`n/d`:
+no se certifica A/B en la ventana real.
+
+### 2.2 Pin de cuenta y versión (D1..D4)
+
+| Día | `$ACCOUNT` | `$VERSION_A` | Resultado esperado en el journal |
+|---|---|---|---|
+| D1 | `fijo` (mismo UUID) | **se captura** en D1 | primera fila `(day, account, versionA)` |
+| D2 | **reusar** el de D1 | **reusar** el de D1 | acumula sin sembrar cuenta nueva |
+| D3 | **reusar** el de D1 | **reusar** el de D1 | acumula |
+| D4 | **reusar** el de D1 | **reusar** el de D1 | ventana leíble (`window_gate`) |
+
 ## 3. Cadencia diaria (una vez por día de mercado)
 
 ```bash
@@ -83,6 +117,52 @@ sin `--forward`) y anexa a `window.jsonl` las filas nuevas por `día+cuenta+vers
 que `--render --days 4` re-imprime la serie completa de la ventana. La cabecera del
 capturador declara `exit 0` con ≥1 día y `exit 2` sin material legible; avisa por `stderr`
 (`# ALERTA CONTRATO …`) si algún día tiene `other>0`.
+
+### 3.1 Variante PowerShell (Windows)
+
+El shell de este entorno es **PowerShell**: `$(date +%Y%m%d)` (bash) **no** existe. Usa la fecha nativa y
+fija las variables una sola vez (reusadas D1..D4):
+
+```powershell
+$env:BROKER_VENUE = "paper"
+$ACCOUNT   = "<uuid-cuenta-demo>"      # FIJO D1..D4 (misma cuenta; ver 2.1)
+$VERSION_A = "<version-a-de-D1>"       # capturada en D1 y REUSADA D2..D4
+$DIA       = Get-Date -Format "yyyyMMdd"
+
+# 1) Preflight (read-only)
+uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_material.py --preflight-only --watch-size 20
+
+# 2) Forward del dia
+uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_material.py `
+    --account-id "$ACCOUNT" --version-a "$VERSION_A" `
+    --interval-seconds 60 --max-ticks 400 --stop-when-ready --level evidence `
+    --json --out "operability_runs/forward-market-$DIA.json"
+
+# 4) Ventana (serie + funnel + HTML) y 5) AUDITORIA (TOTAL + tasas + avisos)
+uv run --no-sync python apps/api-python/scripts/v2_80_market_window.py `
+    --account-id "$ACCOUNT" --strategy-version "$VERSION_A" --days 4 --render `
+    --forward 'operability_runs/forward-market-*.json' `
+    --out "operability_runs/operability-window.json" `
+    --html "operability_runs/operability-window.html"
+uv run --no-sync python apps/api-python/scripts/v2_83_window_audit.py `
+    --window "operability_runs/operability-window.json" `
+    --forward 'operability_runs/forward-market-*.json' --render `
+    --out "operability_runs/operability-audit.json"
+```
+
+### 3.2 Checklist D1..D4 y cierre
+
+| Día | [ ] Preflight | [ ] Forward (`--account-id` **fijo**) | [ ] Ventana `--days 4` | [ ] Auditoría `v2_83` | Nota del día |
+|---|---|---|---|---|---|
+| D1 | `exit 0/2` declarado | `$VERSION_A` **capturada** | serie D1 | `TOTAL`/tasas | primera fila `(day, account, versionA)` |
+| D2 | idem | **reusa** cuenta y versión | serie D1..D2 | idem | régimen puede seguir `BEAR_TREND` |
+| D3 | idem | idem | serie D1..D3 | idem | vigilar `otherCount` (H-4 visible) |
+| D4 | idem | idem | serie D1..D4 | `window_gate` | `READY` solo con ≥4 días / ≥2 episodios / ≥32 ciclos |
+
+**Lectura honesta al cerrar.** Si el preflight sigue en `BEAR_TREND` (LONG vetadas), la ventana puede dar
+**0 oportunidades por veto de régimen legítimo**: se **declara** (`regime_invalid`), **no** se fuerza el
+gobernador ni se elige otro watch. El veredicto correcto sin material suficiente sigue siendo
+**`INCONCLUSIVE` / `NO MEDIDO`**, y `P3-2`/`P3-3`/`H-4` **no** se cierran por documentación.
 
 ## 4. Cuándo se puede leer el material (gate de evidencia)
 

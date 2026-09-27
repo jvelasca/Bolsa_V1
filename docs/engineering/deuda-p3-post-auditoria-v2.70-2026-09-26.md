@@ -448,9 +448,18 @@ No son deuda de código; se declaran para que no se lean como sorpresas en la pr
 >
 > **`v2.83` (2026-09-27):** `OBS-3`/`OBS-4`/`OBS-5` siguen **DECLARADAS**; `AUTO-MATERIAL-11` no las
 > aborda. `OBS-3`/`OBS-4` se materializan igual (cita del CI y rango en el commit POST-TAG, patrón
-> `v2.74`–`v2.82`) y, además, esta fase **declara** que el tag `v2.83-beta` **no** se ha empujado desde el
-> entorno de la fase: `evidencia-ci-tag-v2.83-2026-09-27.txt` nace como **declaración de pendiente** (con
-> las compuertas medidas en local y el conteo **esperado** de CI), sin inventar run ni `attempt`.
+> `v2.74`–`v2.82`) y el tag `v2.83-beta` **sí se empujó**: su `Release tag CI` `36329460515` quedó
+> **GREEN** en la primera pasada (`attempt 1`, 10 jobs + `certify`; job `python` `3020/37`; `quality`
+> `3009/40`; cuatro jobs PG verdes). La cita vive en el commit **POST-TAG `80b18061`** (`main`) y la
+> instancia del fichero **dentro** del tag es el **placeholder pre-tag** ("PENDIENTE DE TAG").
+>
+> **Reconciliación (`v2.83`, 2026-09-27) — falso positivo de auditoría.** Una revisión externa leyó el
+> placeholder **dentro del tag** y lo declaró "CI del tag no acreditado". Es exactamente el patrón
+> OBS-3/OBS-4 ya declarado (la cita **no puede** existir dentro del tag, porque `Release tag CI` solo
+> corre al empujarlo): **no** hay CI pendiente. Se aplica el criterio propio del proyecto —citar el hash
+> **POST-TAG** (`80b18061`) y el `run` (`36329460515`) en el **arranque del auditor** y en el audit-pack—
+> para que el auditor **no** dependa de leer el objeto sellado aislado. Cadena verificada:
+> `tag v2.83-beta` → `Release tag CI 36329460515` → **SUCCESS**. `OBS-5` sigue declarada (defensiva).
 
 ## Deuda de AUDITORÍA — `v2.73-beta` (`AUTO-MATERIAL-1`) sin pasada externa — 🟡 ABIERTA (de proceso)
 

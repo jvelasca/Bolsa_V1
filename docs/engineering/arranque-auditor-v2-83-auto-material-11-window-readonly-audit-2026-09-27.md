@@ -56,8 +56,28 @@ esa limitación, no leerla como cierre. **`H-4` (LOW)** sigue **ABIERTO** (esta 
 - Par A/B y cuenta fija: **NO VERIFICABLES** (`PAPER_D_ACCOUNT_ID` está **comentado** en `.env`) ⇒ brechas
   **ABIERTAS**; **no** se declaran resueltas por documentación.
 
-## 4. Cita del CI del tag
+## 4. Cita del CI del tag (ACREDITADO)
 
 El workflow `Release tag CI` sólo corre al **empujar** el tag: la cita de su resultado vive en
-`evidencia-ci-tag-v2.83-2026-09-27.txt` (commit POST-TAG). Dentro del tag, el auditor lo reproduce con los
-comandos de §1.
+`evidencia-ci-tag-v2.83-2026-09-27.txt` (commit POST-TAG `80b18061` en `main`). Dentro del tag, el auditor
+lo reproduce con los comandos de §1.
+
+**Cita concreta (`v2.83-beta`):**
+
+- **tag anotado** `v2.83-beta` (objeto `8cfe7f6f`) → commit del sello `0ebf6630`.
+- **`Release tag CI`** run [`36329460515`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36329460515) ·
+  HEAD `0ebf6630` · `event=push` · branch `v2.83-beta` · **conclusion `SUCCESS`** · `attempt 1` ·
+  15:24:56Z → 15:34:11Z · **10 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)`
+  `skipped` por diseño).
+- Job `python` del tag: `3020 passed / 37 skipped` (= `3004 + 16`), `ruff All checks passed`,
+  `Contracts: 4 kept, 0 broken`, `mypy 0 issues (507 files)`.
+- **Sobre el mismo commit y tag:** `Python CI` `36329460471` con `quality` `3009 passed / 40 skipped`
+  (= `2993 + 16`) y los cuatro jobs PG (A12/A13/A14/`auto-v2-durable-pg`) en `success`.
+- **Cadena verificada:** tag `v2.83-beta` → `Release tag CI` `36329460515` → **SUCCESS**.
+
+**Nota de patrón (falso positivo a evitar).** La instancia de
+`evidencia-ci-tag-v2.83-2026-09-27.txt` **dentro del tag** es el **placeholder pre-tag**
+("PENDIENTE DE TAG"), porque la cita del CI **no puede** existir antes de empujar el tag (patrón
+OBS-3/OBS-4, `v2.74`–`v2.82`). La cita **acreditada** es el commit **POST-TAG** `80b18061` en `main`: un
+auditor que trabaje **estrictamente** sobre el objeto sellado leerá el placeholder y **no** debe concluir
+"CI no acreditado" — debe citar `80b18061` (ver `evidencia-ci-tag-v2.83-2026-09-27.txt` en `main`).

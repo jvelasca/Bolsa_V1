@@ -50,7 +50,10 @@ baja ningún umbral y no se escribe en `evidence_runs/`/`evidence_validations/` 
 7. **Registro en CI.** `test_operability_audit.py` está **explícito** en el job `quality` de
    `python-ci.yml` **y** en el job `python` de `release-tag-ci.yml` (patrón que el hueco de `v2.76` obligó
    a formalizar; `v2.77`–`v2.82` lo siguen).
-8. **CI del tag** `v2.83-beta` verde en la primera pasada (ver §4 y `evidencia-ci-tag-v2.83-2026-09-27.txt`).
+8. **CI del tag** `v2.83-beta` **acreditado**: `Release tag CI` `36329460515` **GREEN** en la primera
+   pasada (`attempt 1`, 10 jobs + `certify`; `playwright (integrated)` skipped por diseño). La cita vive en
+   el commit **POST-TAG** `80b18061` (ver §4 y `evidencia-ci-tag-v2.83-2026-09-27.txt`); la instancia
+   **dentro** del tag es el **placeholder pre-tag** (patrón OBS-3/OBS-4), no un CI no acreditado.
 
 ## 2. Verificación pre-D1 declarada (no forzada)
 
@@ -76,7 +79,10 @@ resueltas por documentación.
 
 ## 4. Evidencia cruda
 
-- `evidencia-ci-tag-v2.83-2026-09-27.txt` — CI del tag `v2.83-beta` (commit POST-TAG).
+- `evidencia-ci-tag-v2.83-2026-09-27.txt` — CI del tag `v2.83-beta`, **acreditado** en el commit
+  **POST-TAG** `80b18061` (`main`): tag anotado `8cfe7f6f` → `0ebf6630`; `Release tag CI`
+  `36329460515` **SUCCESS** (`attempt 1`); job `python` `3020/37`; `quality` (Python CI `36329460471`)
+  `3009/40`; cuatro jobs PG en `success`. La instancia **dentro** del tag es el **placeholder pre-tag**.
 - Matriz adversarial vigente: [`evidencia-matriz-mutaciones-v2.81-230-2026-09-27.txt`](./evidencia-matriz-mutaciones-v2.81-230-2026-09-27.txt)
   (re-ejecutada en local en esta fase: **230/230**, restauración **byte a byte**, árbol limpio).
 - Consolidada de la fase: [`evidencia-auditoria-v2.83-2026-09-27.txt`](./evidencia-auditoria-v2.83-2026-09-27.txt).

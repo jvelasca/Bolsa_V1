@@ -4,6 +4,14 @@
 # Tag anotado: v2.83-beta (objeto 8cfe7f6f) -> commit 0ebf6630 (sello en DOS commits: 4dd1aea1 feat + 0ebf6630 docs)
 # Version: 2.08.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
 #
+# COMMIT QUE CITA ESTE FICHERO: 80b18061 (en `main`). La cita del CI del tag vive aqui, FUERA del tag.
+# NOTA DE PATRON (falso positivo de auditoria): la instancia de ESTE fichero DENTRO del tag `v2.83-beta`
+# es el PLACEHOLDER pre-tag ("PENDIENTE DE TAG"), porque `Release tag CI` solo corre al EMPUJAR el tag y
+# su resultado no puede existir antes de ese push (patron OBS-3/OBS-4, v2.74-v2.82). Un auditor que trabaje
+# estrictamente sobre el objeto sellado (commit 0ebf6630) leera el placeholder y NO debe concluir
+# "CI no acreditado": la cita acreditada es este fichero en el commit POST-TAG 80b18061. Cadena verificada:
+#   tag v2.83-beta -> Release tag CI 36329460515 -> SUCCESS.
+#
 # REGLA DECLARADA (patron v2.74-v2.82): el workflow `Release tag CI` SOLO corre al empujar el tag,
 # asi que la cita de su resultado vive en un commit POST-TAG (este). Dentro del tag, el auditor no ve
 # este fichero; lo reproduce con los comandos del `arranque-auditor-v2-83-*.md`.
