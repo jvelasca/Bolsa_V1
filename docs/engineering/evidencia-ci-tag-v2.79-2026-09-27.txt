@@ -1,0 +1,64 @@
+# V2.79 / AUTO-MATERIAL-7 - CI del tag `v2.79-beta`: evidencia cruda (cita POST-TAG)
+#
+# Fecha de captura: 2026-09-27
+# Tag anotado: v2.79-beta -> commit 0314199c (sello en dos commits: 709f9a90 feat + 0314199c docs)
+# Version: 2.04.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
+#
+# REGLA DECLARADA (patron v2.74-v2.78): el workflow `Release tag CI` SOLO corre al empujar el tag,
+# asi que la cita de su resultado vive en un commit POST-TAG (este). Dentro del tag, el auditor no ve
+# este fichero; lo reproduce con los comandos del `arranque-auditor-v2-79-*.md`.
+#
+# --- Commits y push ---
+# 709f9a90  feat(v2.79): censo de ENTRADA del journal de operabilidad (AUTO-MATERIAL-7)
+# 0314199c  docs(v2.79): paquete de fase AUTO-MATERIAL-7 + auditoria v2.78 + runbook de ventana
+# git push origin main        : 4446df78..0314199c  main -> main
+# git push origin v2.79-beta  : * [new tag] v2.79-beta -> v2.79-beta
+# tag anotado objeto e68d45dc -> commit 0314199c (0314199c4f063583eb76c8dfafe23247ae373a38)
+#
+# --- Release tag CI (run 36309108865, HEAD 0314199c, event=push, branch v2.79-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 7m29s)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   frontend (typecheck/lint/test/build + contract:check) in 3m08s
+#   security (gitleaks) in 7s
+#   shared (build/typecheck/test) in 34s
+#   playwright (mock E2E) in 7m17s
+#   python (ruff/imports/mypy/pytest offline) in 1m53s
+#   decision-spine in 27s
+#   dr-verify (battery DB_DR / TCP CI) in 56s
+#   lifecycle-pg (Alembic + auth + golden restart) in 3m42s
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG) in 56s
+#   - playwright (integrated E2E, opt-in) in 0s   [skipped, por diseno]
+#   certify (aggregate + artifact) in 5s
+#
+# Job `python` del tag:
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 505 source files
+#   pytest  : 2971 passed, 37 skipped, 6 warnings in 70.44s
+#             => 2960 (job python del tag de v2.78) + 11 (los puros NUEVOS de v2.79: el fichero
+#                `test_market_operability.py` pasa de 37 a 48). Los SKIPS NO se mueven (37 = 37):
+#                ninguna entrada nueva queda sin correr. SIN cambios de workflow.
+#
+# --- Sobre el MISMO commit y tag (0314199c, v2.79-beta) ---
+#   Python CI          36309108894 : success (3m33s)  quality: 2960 passed, 40 skipped
+#   Frontend CI        36309108916 : success (4m03s)
+#   Optimize lab       36309108867 : success (1m22s)
+#   Fase 2 scientific  36309108863 : success (1m29s)
+#
+# --- En main (0314199c) ---
+#   Python CI          36309104906 : success (2m19s)
+#       quality: 2960 passed, 40 skipped = 2949 (quality del tag de v2.78) + 11 (los puros nuevos);
+#       skips sin mover (40 = 40). Jobs PG: auto-v2-durable-pg / grammar-discovery-pg /
+#       lifecycle-pg (A12) / paper-forward-pg (A13): success
+#   Frontend CI        36309104815 : success (3m40s)
+#   Optimize lab       36309104777 : success (1m26s)
+#   Fase 2 scientific  36309104818 : success (1m13s)
+#   Gitleaks           36309104775 : success (0m12s)
+#
+# LECTURA (sin sesgo): el CENSO de ENTRADA (collect_journal_reasons + canal `positionEventByCode`,
+# H-1/H-2/H-3, M214-M219) queda EJERCITADO por el CI del tag, con los saltos intactos y sin mover un
+# solo umbral, sin migracion y sin tocar el freeze ni el reparto (`auto18-v1`/`auto15-v1`,
+# `ALLOCATION = none`).
+#
+# DECLARADO, NO HECHO: la ventana de >=4 dias de calendario sigue siendo operacion del propietario
+# (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita ni la sustituye.
