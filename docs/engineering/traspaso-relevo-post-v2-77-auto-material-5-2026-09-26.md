@@ -7,6 +7,14 @@
 > **CI del tag:** `Release tag CI` `36279417767` **GREEN a la primera** (10 jobs + `certify`; job
 > `python` del tag **`2948 passed / 37 skipped`**), y **10/10** runs del commit `ade1df58` en
 > `success`. Detalle en [`evidencia-ci-tag-v2.77-2026-09-26.txt`](./evidencia-ci-tag-v2.77-2026-09-26.txt).
+> **AUDITORÍA EXTERNA:** `APROBADO CON OBSERVACIONES` (2026-09-26), **0 bloqueantes**, 10/13 tesis PASS
+> y 3 PARCIAL, desde un **clon fresco del tag** (árbol `6ec1c4c3…` intacto). **Deuda nueva a la que
+> apunta el relevo:** **`P3-6` (MEDIUM)** — la contabilidad por familias **no es de vetos puros**
+> (`approved`/`risk_exit` → `other` → inflan `vetoCounted`; el cuadre de hoy es coincidencia de un smoke
+> con `proposals=0`) y **`P3-7` (LOW)** — `STATE_UNKNOWN` inalcanzable (payload vacío ⇒ `no_signal`,
+> fail-open). **Advertencia operativa:** hasta cerrar `P3-6`, el desglose por familias de un día que
+> **sí opere** debe leerse como **cota superior** de veto, no como censo. Ver
+> [`deuda P3`](./deuda-p3-post-auditoria-v2.70-2026-09-26.md).
 
 ## Qué quedó hecho
 

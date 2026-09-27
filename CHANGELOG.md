@@ -60,6 +60,15 @@ la operación real (`pairActive`)**.
   de `v2.77`), sin haber movido el tag `v2.76-beta`. Evidencia en
   `evidencia-ci-tag-v2.77-2026-09-26.txt`. **Rango `v2.76-beta..v2.77-beta` = 4 commits, declarado**:
   `05b5fa85` y `40d3d9dc` son **post-tag de `v2.76`**, no de esta fase.
+- **Auditoría externa: `APROBADO CON OBSERVACIONES`** (2026-09-26), **0 bloqueantes**; 10/13 puntos PASS
+  y 3 PARCIAL, desde un **clon fresco del tag** con el árbol `6ec1c4c3…` **intacto**. **Deuda nueva:**
+  **`P3-6` (MEDIUM)** — la contabilidad por familias **no es de vetos puros** (`approved`/`risk_exit` caen
+  en `other` e **inflan `vetoCounted`**; el cuadre de hoy es **coincidencia** del smoke con
+  `proposals=0`, y el instrumento **fallaría en los días que sí operan**, que son justo los que existe
+  para medir) y **`P3-7` (LOW)** — **`STATE_UNKNOWN` inalcanzable** (un payload vacío se lee `no_signal`:
+  fail-**open** ante basura). **Advertencia:** hasta cerrar `P3-6`, el desglose por familias de un día
+  **operado** es **cota superior** de veto, no censo. Detalle en
+  `deuda-p3-post-auditoria-v2.70-2026-09-26.md` (y §10.a del audit-pack).
 
 ## [2.01.0-beta] — `AUTO-MATERIAL-4`: MARKET MATERIAL (forward PAPER con precio real) — 2026-09-26
 

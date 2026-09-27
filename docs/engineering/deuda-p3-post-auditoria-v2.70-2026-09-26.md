@@ -7,6 +7,10 @@
 > **Estado:** **H1 y H2/H3/H4 cerrados en `v2.71`**; **P3-4** (hallazgo de la auditoría de `v2.71`,
 > preexistente y read-only) **cerrada en `v2.72`**; **P3-5** (`reserved_risk` sobrecargado: libro vivo
 > vs evidencia histórica) **abierta y declarada** (2026-09-26, tras el E2E PostgreSQL de `v2.74`);
+> **P3-6** (la contabilidad por familias no es de vetos puros: `approved`/`risk_exit` engordan `other`)
+> y **P3-7** (`STATE_UNKNOWN` inalcanzable: un payload vacío se lee como `no_signal`) **NUEVAS** (ambas
+> de la auditoría externa de `v2.77-beta`, 2026-09-26; `P3-6` es MEDIUM y afecta al caso de uso
+> principal del instrumento);
 > P3-2 y P3-3 siguen **abiertas** (requieren material PAPER real con **diversidad de mercado**). **El
 > bloqueante central es MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma; `v2.75`
 > cruza la **cantidad** —42 ciclos medibles ⇒ `EVIDENCE_READY`— pero **no** la **diversidad**: un solo
@@ -205,6 +209,68 @@ posición plana. No puede ser denominador de R (solo una reserva de COMPRA con `
 no altera el veredicto, pero es una reserva viva después del cierre: queda declarada como observación del
 productor, fuera del alcance de esta fase (`auto_simulation_worker.py` sigue congelado).
 
+## P3-6 — La contabilidad por familias no es de vetos puros: `approved` y `risk_exit` engordan `other` — 🔴 NUEVA (2026-09-26)
+
+**Origen.** Auditoría externa de `v2.77-beta` (clon fresco del tag), **OBS-1 (MEDIUM)**. **No es
+bloqueante** y **no** invalida el sello, pero es un defecto semántico real **en el caso de uso
+principal** del instrumento que la fase entrega.
+
+**Observación.** `build_operability_record` clasifica **todos** los `journalReasons`
+(`market_operability.py:288-289`) y `_journal_reasons` agrega **todos** los `reasonCodes` del journal
+(`v2_76_forward_market_material.py:449-451`). El journal V2 estampa `reasonCodes` con los motivos de la
+**entrada y de la salida**: una decisión `approved` lleva `("approved",)` (`auto_v2_entry.py:2247`) y una
+salida lleva `risk_exit` (`position_manager.py:71`). Ninguno de los dos está en `VETO_BUCKET_BY_REASON`
+(`market_operability.py:93-128`), así que caen en `other` y **suman** en `veto_counted` (`:197-198`). En
+un día que **sí opera**, por tanto, `vetoCounted > vetoes` y aparece una familia `other` que **no es un
+veto**.
+
+La aserción `test_record_veto_counted_matches_the_declared_vetoes` pasa **solo porque** el smoke sellado
+tiene `proposals = 0` (0 propuestas ⇒ ningún `approved`): la igualdad de hoy es una **coincidencia del
+fixture**, no una propiedad del instrumento. Es decir: **fallaría precisamente en los días que existe
+para medir** —los que operan—, que es justo cuando el propietario lo va a leer.
+
+**Criterio de cierre (dos vías; elegir una y justificarla).** 1) **Excluir el no-veto del histograma**
+antes de clasificar (filtrar `approved` y los motivos de salida) y declararlo en el contrato del módulo;
+o 2) **derivar `vetoCounted` de `turnTotals.vetoes`** —la fuente que publica el motor— y dejar el
+histograma por familias como **desglose de causas**, no como suma de vetos. En ambos casos: un test que
+ejercite un payload **con** `approved` y `risk_exit` (no solo el smoke de 0 propuestas) y una mutación
+nueva en la matriz. **Sin** tocar el motor ni el gobernador: es la **lectura** del journal, no la
+decisión.
+
+**Reversión.** Vuelve a estar mal si un día operado vuelve a publicar `vetoCounted != vetoes` o una
+familia `other` con códigos que no son vetos.
+
+## P3-7 — `STATE_UNKNOWN` es inalcanzable: un payload vacío se lee como `no_signal` — 🟡 NUEVA (2026-09-26)
+
+**Origen.** Auditoría externa de `v2.77-beta`, **OBS-2 (LOW)**.
+
+**Observación.** `operability_state` (`market_operability.py:275-281`) resuelve primero la condición
+`proposals == 0 and vetoes == 0` y **después** comprueba `if not record: return STATE_UNKNOWN`; con un
+payload vacío ambas cifras son `0`, así que gana `no_signal` y **`STATE_UNKNOWN` nunca se publica**. Un
+JSON de entrada vacío, truncado o malformado se lee como «**sin señal**» —la lectura más
+tranquilizadora posible— en vez de «**no medido**». Es fail-**open** ante entrada basura, en un módulo
+cuyo contrato declarado es fail-closed.
+
+**Criterio de cierre.** Que lo ausente no se pueda leer como un hecho del mercado: comprobar **primero**
+la ausencia de registro/evidencia medible y declararlo con un test que pase un payload vacío. **Sin**
+tocar el motor.
+
+## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
+
+No son deuda de código; se declaran para que no se lean como sorpresas en la próxima pasada.
+
+- **OBS-3 / OBS-4 (LOW, patrón heredado).** La cita del CI (`evidencia-ci-tag-v2.77-2026-09-26.txt`) y la
+  declaración del **rango** de 4 commits (audit-pack §1.b, punto 13 del arranque del auditor) viven
+  **solo** en el commit **post-tag** `568ce317`. Leídas **desde el tag**, no existen: el auditor que
+  trabaje estrictamente sobre el objeto sellado no ve la §1.b ni el punto 13. Es el **mismo patrón** de
+  `v2.74`/`v2.75`/`v2.76` (la cita del CI siempre es posterior al tag, porque el workflow del tag solo
+  corre al empujarlo) y el propio fichero de evidencia lo declara en su cabecera. **Criterio:** si una
+  fase futura quiere que el auditor lo vea **dentro** del tag, la declaración del rango debe entrar en el
+  commit **del sello** (o citarse por hash en el arranque del auditor, como se hizo aquí).
+- **OBS-5 (LOW, defensivo).** `classify_veto_reasons` **descarta** entradas con conteo `<= 0` o no entero
+  si se le pasa un mapping crudo; el parser del journal las coacciona a `1`, así que el camino real está a
+  salvo, pero el contrato del módulo no lo declara. Anotarlo en el docstring o endurecer el tipo.
+
 ## Deuda de AUDITORÍA — `v2.73-beta` (`AUTO-MATERIAL-1`) sin pasada externa — 🟡 ABIERTA (de proceso)
 
 **Estado: 🟡 ABIERTA, declarada (2026-09-26).** `v2.73-beta` (tag anotado objeto `fd891fcd` → commit
@@ -254,6 +320,12 @@ símbolos operables, `CAPAZ` sin `ACTIVE`**. El instrumento **mide** el impacto 
 operación pendiente del propietario; mientras no exista, el veredicto correcto es **`INCONCLUSIVE` /
 `NO MEDIDO`**. Comandos exactos en el
 [relevo de `v2.77`](./traspaso-relevo-post-v2-77-auto-material-5-2026-09-26.md).
+
+**Corrección de lectura (auditoría externa de `v2.77-beta`, 2026-09-26).** El instrumento **no** es
+todavía de fiar en los días que **sí operan**: `approved` y `risk_exit` caen en `other` e **inflan**
+`vetoCounted` (**`P3-6`**), de modo que `vetoCounted == vetoes` solo cuadra en días **sin propuestas**
+(como el smoke sellado). Mientras `P3-6` esté abierta, el desglose por familias de un día operado debe
+leerse como **cota superior** de veto, no como censo.
 
 ## Fuera de alcance de esta deuda
 

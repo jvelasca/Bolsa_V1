@@ -207,3 +207,24 @@ CAPABLE ≠ ACTIVE, mutaciones mordiendo y restaurando) se sostiene y las declar
 hecho se leen como tales. Lo que **no** puede afirmarse: que `P3-2`/`P3-3` estén cerradas, que el
 gobernador conservador «sea el problema» (el instrumento **mide**, no concluye) ni que exista
 material de mercado diverso — **no hubo ventana**.
+
+### 10.a Veredicto emitido (2026-09-26)
+
+**`APROBADO CON OBSERVACIONES`**, 0 bloqueantes; **10/13 puntos PASS y 3 PARCIAL** (3, 4 y 13),
+**desde un clon fresco del tag** y con el árbol `6ec1c4c3…` **idéntico** antes y después de la matriz.
+El auditor **reprodujo** las compuertas y la matriz 210/210 y **re-derivó** la tabla de operabilidad
+desde el JSON real, sin fiarse de la evidencia persistida.
+
+**Deuda registrada (no bloqueante):**
+
+| Obs. | Sev. | Qué es | Dónde |
+|---|---|---|---|
+| **OBS-1** | **MEDIUM** | La contabilidad por familias **no es de vetos puros**: `approved` y `risk_exit` caen en `other` e **inflan `vetoCounted`**; el cuadre de hoy es **coincidencia** del smoke (`proposals=0`) y el instrumento **fallaría en los días que sí operan** | **`P3-6`** |
+| **OBS-2** | LOW | **`STATE_UNKNOWN` inalcanzable**: un payload vacío/malformado se lee `no_signal` (fail-**open** ante basura) | **`P3-7`** |
+| OBS-3/OBS-4 | LOW | La cita del CI y la declaración del rango viven **solo post-tag** (`568ce317`): **dentro del tag** no existen (patrón v2.74–v2.76, declarado en la cabecera de la evidencia) | declarada |
+| OBS-5 | LOW | `classify_veto_reasons` descarta conteos `<= 0`/no enteros ante un mapping crudo (inofensivo por el parser del journal) | declarada |
+
+**Ruta:** [`deuda P3`](./deuda-p3-post-auditoria-v2.70-2026-09-26.md) · cita del CI y rango en
+[`evidencia-ci-tag-v2.77-2026-09-26.txt`](./evidencia-ci-tag-v2.77-2026-09-26.txt).
+**Advertencia operativa heredada:** hasta cerrar `P3-6`, el desglose por familias de un día **operado**
+es **cota superior** de veto, no censo.
