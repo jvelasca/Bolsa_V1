@@ -196,6 +196,29 @@ POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
     }
 )
 
+#: Códigos que el journal V2 estampa en eventos de **GESTIÓN DE POSICIÓN** (nunca en una
+#: decisión de ENTRADA): son ATRIBUCIONES de una posición viva (por qué se protegió, se redujo o
+#: no se pudo gestionar) y hitos de materialización/reserva, NO vetos de entrada. El lector de la
+#: operabilidad los publica por su canal propio y **jamás** los cuenta como vetos (``P3-6``/``H-1``).
+#:
+#: Se compone de los miembros **explícitos** de cada familia: NO se une ``RESERVATION_REASONS``
+#: entero, porque contiene vetos de entrada REALES (``reservation_failed`` — ya en
+#: ``VETO_BUCKET_BY_REASON`` — y ``reservation_unmeasurable``/``reservation_already_live``, que son
+#: aperturas vetadas fail-closed). Meterlos aquí los descatalogaría como "no-veto".
+POSITION_ATTRIBUTION_REASONS: frozenset[str] = frozenset(
+    {
+        *POSITION_LIFECYCLE_REASONS,
+        *MATERIALIZATION_REASONS,
+        *POSITION_SKIP_REASONS,
+        NO_MARK_DATA,
+        RESERVATION_CREATED,
+        RESERVATION_RELEASED_FILL,
+        RESERVATION_RELEASED_CANCEL,
+        RESERVATION_RELEASED_RESTART,
+        RESERVATION_RELEASED_ROLLBACK,
+    }
+)
+
 # V2.45/AUTO-5 — estados FINALES del embudo de oportunidades (``V2.47``/AUTO-7 adelanta aquí
 # su vocabulario para poder certificarlo desde ya). Cada oportunidad del día termina en
 # EXACTAMENTE uno de los cuatro, y los tres no-operados llevan motivo: `seen == traded +
@@ -280,6 +303,7 @@ __all__ = [
     "OPTIMIZER_RISK_UNMEASURED",
     "OPTIMIZER_SECTOR_EXCEEDED",
     "OPTIMIZER_SECTOR_UNMEASURED",
+    "POSITION_ATTRIBUTION_REASONS",
     "POSITION_DECISION_UNAVAILABLE",
     "POSITION_LIFECYCLE_REASONS",
     "POSITION_MARK_REJECTED",

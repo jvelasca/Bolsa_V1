@@ -17,7 +17,20 @@ from __future__ import annotations
 from typing import Any, get_args
 
 from bolsa_analytics.cognitive.opportunity_ranker import TOP_N_EXCLUDED
-from bolsa_application.auto_reason_codes import DAY_EXIT_REASONS, POSITION_SKIP_REASONS
+from bolsa_application.auto_reason_codes import (
+    ADAPTIVE_STRATEGY_PAUSED,
+    DAY_EXIT_REASONS,
+    MATERIALIZATION_REASONS,
+    NO_MARK_DATA,
+    OPTIMIZER_REASONS,
+    POSITION_ATTRIBUTION_REASONS,
+    POSITION_LIFECYCLE_REASONS,
+    POSITION_SKIP_REASONS,
+    RESERVATION_ALREADY_LIVE,
+    RESERVATION_FAILED,
+    RESERVATION_REASONS,
+    RESERVATION_UNMEASURABLE,
+)
 from bolsa_application.market_operability import (
     BUCKET_DATA,
     BUCKET_GOVERNOR,
@@ -26,8 +39,10 @@ from bolsa_application.market_operability import (
     BUCKET_REGIME,
     BUCKET_RISK,
     BUCKET_TOP_N,
+    ENTRY_DECISION_EVENT,
     NON_VETO_REASON_CODES,
     OPERABILITY_BUCKETS,
+    POSITION_JOURNAL_EVENTS,
     STATE_NO_SIGNAL,
     STATE_OPERATED,
     STATE_UNKNOWN,
@@ -35,6 +50,7 @@ from bolsa_application.market_operability import (
     VETO_BUCKET_BY_REASON,
     build_operability_record,
     classify_veto_reasons,
+    collect_journal_reasons,
     operability_state,
     pair_active,
     pair_capable,
@@ -126,18 +142,69 @@ _OPERATED_DAY: dict[str, Any] = {
 # ── El dueño único de los literales queda cubierto (no puede haber un código sin familia) ─────
 
 
-def test_every_decision_reason_code_is_declared_exactly_once() -> None:
-    """Cada código del dueño (``DecisionReasonCode``) es veto (con familia) o atribución no-veto.
+#: Todo código que puede llegar al array ``reasonCodes`` de un evento del journal V2, con su
+#: dueño. ``H-2``: el contrato no puede depender de que ``DecisionReasonCode`` sea el único dueño
+#: (los eventos de POSICIÓN, el optimizador y el Adaptive alimentan el MISMO journal). Se excluyen
+#: a propósito los vocabularios que NO son motivos de journal (``ATR_SOURCES``,
+#: ``OPPORTUNITY_STATUSES``, ``OPPORTUNITY_COST_UNMEASURED``, ``MAE_MFE_UNMEASURED``,
+#: ``DAY_EXIT_REASON_UNDECLARED``): no viajan en ``reasonCodes``.
+_OWNER_JOURNAL_CODES: frozenset[str] = frozenset(
+    {
+        *get_args(DecisionReasonCode),
+        TOP_N_EXCLUDED,
+        *OPTIMIZER_REASONS,
+        ADAPTIVE_STRATEGY_PAUSED,
+        *DAY_EXIT_REASONS,
+        *POSITION_SKIP_REASONS,
+        *MATERIALIZATION_REASONS,
+        *RESERVATION_REASONS,
+        *POSITION_LIFECYCLE_REASONS,
+        NO_MARK_DATA,
+    }
+)
 
-    Antes ``approved`` se saltaba con un ``continue``; ahora la partición es EXHAUSTIVA y
-    EXCLUSIVA: ningún código queda sin declarar ni declarado en los dos sitios a la vez.
+
+def test_every_owner_reason_code_is_declared_exactly_once() -> None:
+    """H-2: cada código de CUALQUIER dueño del journal es veto (con familia) o atribución no-veto.
+
+    La partición es EXHAUSTIVA y EXCLUSIVA sobre todo el vocabulario que puede llegar a
+    ``reasonCodes`` (antes sólo se miraba ``DecisionReasonCode``): ningún código queda sin
+    declarar ni declarado en los dos sitios a la vez.
     """
-    for code in get_args(DecisionReasonCode):
+    for code in _OWNER_JOURNAL_CODES:
         is_veto = code in VETO_BUCKET_BY_REASON
         is_non_veto = code in NON_VETO_REASON_CODES
         assert is_veto != is_non_veto, (
             f"codigo mal declarado: {code} (veto={is_veto}, no_veto={is_non_veto})"
         )
+
+
+def test_veto_buckets_and_non_veto_codes_are_disjoint() -> None:
+    """H-3: un código no puede ser a la vez veto y atribución (la disjunción era suerte)."""
+    assert set(VETO_BUCKET_BY_REASON).isdisjoint(NON_VETO_REASON_CODES)
+
+
+def test_position_attribution_literals_are_read_from_their_owner() -> None:
+    """Las ATRIBUCIONES de POSICIÓN se leen de su dueño; los vetos de reserva NO son atribuciones."""
+    assert POSITION_ATTRIBUTION_REASONS <= NON_VETO_REASON_CODES
+    assert POSITION_LIFECYCLE_REASONS <= NON_VETO_REASON_CODES
+    assert MATERIALIZATION_REASONS <= NON_VETO_REASON_CODES
+    assert NO_MARK_DATA in NON_VETO_REASON_CODES
+    # Los tres vetos fail-closed de la reserva JAMÁS se descatalogán como no-veto.
+    assert RESERVATION_FAILED not in NON_VETO_REASON_CODES
+    assert RESERVATION_UNMEASURABLE not in NON_VETO_REASON_CODES
+    assert RESERVATION_ALREADY_LIVE not in NON_VETO_REASON_CODES
+
+
+def test_optimizer_and_adaptive_codes_are_declared_as_vetoes() -> None:
+    """H-2: el optimizador y el Adaptive son decisiones de ENTRADA ⇒ vetos con familia, no ``other``."""
+    for code in OPTIMIZER_REASONS:
+        assert code in VETO_BUCKET_BY_REASON, f"optimizer sin familia: {code}"
+        assert code not in NON_VETO_REASON_CODES
+        assert VETO_BUCKET_BY_REASON[code] != BUCKET_OTHER
+    assert VETO_BUCKET_BY_REASON[ADAPTIVE_STRATEGY_PAUSED] == BUCKET_RISK
+    assert RESERVATION_UNMEASURABLE in VETO_BUCKET_BY_REASON
+    assert RESERVATION_ALREADY_LIVE in VETO_BUCKET_BY_REASON
 
 
 def test_non_veto_literals_are_read_from_their_owner() -> None:
@@ -404,6 +471,121 @@ def test_record_without_journal_reasons_declares_empty_buckets_not_invented() ->
     assert tuple(record["vetoByBucket"]) == OPERABILITY_BUCKETS
 
 
+# ── collect_journal_reasons + censo de ENTRADA (H-1) ───────────────────────────────────────────
+
+
+class _Entry:
+    """Entrada mínima de journal: basta con un ``payload`` (misma forma que el registro real)."""
+
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self.payload = payload
+
+
+def _journal(*payloads: dict[str, Any]) -> list[_Entry]:
+    return [_Entry(payload) for payload in payloads]
+
+
+def test_collect_journal_reasons_filters_by_event() -> None:
+    """Sólo los eventos pedidos entran: la entrada no ve el evento de gestión, y viceversa."""
+    entries = _journal(
+        {"event": ENTRY_DECISION_EVENT, "reasonCodes": ["regime_invalid"]},
+        {"event": "auto_position_management", "reasonCodes": ["protect_requested"]},
+        {"event": "otro_evento", "reasonCodes": ["lo_que_sea"]},
+    )
+    assert collect_journal_reasons(entries, events=frozenset({ENTRY_DECISION_EVENT})) == {
+        "regime_invalid": 1
+    }
+    assert collect_journal_reasons(entries, events=POSITION_JOURNAL_EVENTS) == {
+        "protect_requested": 1
+    }
+    assert collect_journal_reasons(entries) == {
+        "regime_invalid": 1,
+        "protect_requested": 1,
+        "lo_que_sea": 1,
+    }
+
+
+def test_collect_journal_reasons_ignores_malformed_entries_without_losing_counts() -> None:
+    """Una entrada con forma inesperada o un motivo vacío se ignora; el conteo bueno no se pierde."""
+    entries: list[Any] = [
+        _Entry({"event": ENTRY_DECISION_EVENT, "reasonCodes": ["", None, "approved"]}),
+        object(),
+        {"payload": "no-es-mapping"},
+    ]
+    assert collect_journal_reasons(entries, events=frozenset({ENTRY_DECISION_EVENT})) == {
+        "approved": 1
+    }
+
+
+#: El ejemplo EXACTO de reversión de ``P3-6`` que la auditoría de ``v2.78`` reprodujo: un evento de
+#: gestión (``protect_requested``) en el MISMO array inflaba ``vetoCounted`` (2 -> 3). Con el censo
+#: de ENTRADA, el canal de posición lo publica aparte y el cuadre del día operado se restaura.
+_AUDIT_REVERSAL_DAY: dict[str, Any] = {
+    **_OPERATED_DAY,
+    "journalReasons": ["regime_invalid:2", "approved:3", "risk_exit:1"],
+    "positionEventReasons": ["protect_requested:1"],
+}
+
+
+def test_the_audit_reversal_example_is_caught() -> None:
+    """H-1: un evento de gestión NO infla ``vetoCounted`` (el cuadre del día operado se sostiene)."""
+    record = build_operability_record(_AUDIT_REVERSAL_DAY, day="2026-09-26")
+    assert record["vetoes"] == 2
+    assert record["vetoCounted"] == 2
+    assert record["vetoByBucket"][BUCKET_OTHER] == {}
+    assert record["positionEventByCode"] == {"protect_requested": 1}
+    assert record["positionEventCounted"] == 1
+
+
+def test_position_management_events_are_not_entry_vetoes() -> None:
+    """Los motivos de GESTIÓN se publican en su canal y NUNCA aparecen como vetos."""
+    record = build_operability_record(_AUDIT_REVERSAL_DAY, day="2026-09-26")
+    veto_codes = {code for bucket in record["vetoByBucket"].values() for code in bucket}
+    assert veto_codes.isdisjoint(record["positionEventByCode"])
+
+
+def test_position_management_events_are_published_not_discarded() -> None:
+    """El canal de posición no se descarta: se publica el conteo (no se pierde el dato)."""
+    record = build_operability_record(_AUDIT_REVERSAL_DAY, day="2026-09-26")
+    assert record["positionEventCounted"] >= 1
+    assert record["positionEventByCode"].get("protect_requested") == 1
+
+
+def test_legacy_merged_rows_still_read_their_position_codes_as_non_veto() -> None:
+    """Compatibilidad: una fila antigua que mezcló ambos eventos no reinfla ``vetoCounted``."""
+    legacy = {
+        **_OPERATED_DAY,
+        "journalReasons": ["regime_invalid:2", "approved:3", "protect_requested:1"],
+    }
+    record = build_operability_record(legacy, day="2026-09-26")
+    assert record["vetoes"] == 2
+    assert record["vetoCounted"] == 2
+    assert record["vetoByBucket"][BUCKET_OTHER] == {}
+    assert record["nonVetoByCode"].get("protect_requested") == 1
+
+
+def test_position_event_constants_match_the_producer_payloads() -> None:
+    """El contrato de eventos del lector se pinea contra el productor real (sin editarlo)."""
+    from bolsa_application.auto_investment_system import (
+        EVENT_ENTRY_DECISION,
+        EVENT_POSITION_DECISION,
+        EVENT_POSITION_SKIP,
+    )
+    from bolsa_application.auto_v2_entry import build_position_management_journal_entry
+
+    assert ENTRY_DECISION_EVENT == EVENT_ENTRY_DECISION
+    assert EVENT_POSITION_DECISION in POSITION_JOURNAL_EVENTS
+    assert EVENT_POSITION_SKIP in POSITION_JOURNAL_EVENTS
+    assert EVENT_ENTRY_DECISION not in POSITION_JOURNAL_EVENTS
+    entry = build_position_management_journal_entry(
+        instrument_id="AAA",
+        reason_code="protect_requested",
+        actor="test",
+        as_of="2026-09-27T00:00:00Z",
+    )
+    assert entry.payload["event"] in POSITION_JOURNAL_EVENTS
+
+
 # ── render_operability_table ───────────────────────────────────────────────────────────────────
 
 
@@ -434,3 +616,14 @@ def test_render_does_not_declare_non_vetoes_when_there_are_none() -> None:
     records = [build_operability_record(_FORWARD_SMOKE, day="2026-09-26")]
     rendered = render_operability_table(records)
     assert "aprobaciones/salidas" not in rendered
+
+
+def test_render_declares_position_events_apart_from_vetoes() -> None:
+    """El render publica los eventos de posición en su línea, y sólo cuando existen."""
+    rendered = render_operability_table(
+        [build_operability_record(_AUDIT_REVERSAL_DAY, day="2026-09-26")]
+    )
+    assert "eventos/posicion: protect_requested=1 (NO son vetos)" in rendered
+    assert "eventos/posicion" not in render_operability_table(
+        [build_operability_record(_FORWARD_SMOKE, day="2026-09-26")]
+    )

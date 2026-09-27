@@ -634,6 +634,10 @@ MARKET_OPERABILITY = (
     "packages/py/application/src/bolsa_application/market_operability.py"
 )
 
+# --- AUTO-MATERIAL-7 (V2.79): censo de ENTRADA del journal de operabilidad --------------------
+# El dueño del vocabulario de motivos (atribuciones de POSICIÓN vs vetos de entrada).
+AUTO_REASON_CODES = "packages/py/application/src/bolsa_application/auto_reason_codes.py"
+
 # --- suites que deben morder ----------------------------------------------------------------
 T_OPT = "packages/py/analytics/tests/test_portfolio_optimizer.py"
 T_EV = "packages/py/analytics/tests/test_expected_value.py"
@@ -2481,6 +2485,54 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "            non_veto[code] = non_veto.get(code, 0) + count\n",
         "        if code in NON_VETO_REASON_CODES:\n"
         "            continue\n",
+        (T_MARKET_OPERABILITY,),
+    ),
+    # ── v2.79 (AUTO-MATERIAL-7): censo de ENTRADA + atribuciones de POSICION + contrato del dueno ──
+    (
+        "M214 (H-1: el evento no se filtra): el censo cuenta tambien los eventos de POSICION",
+        MARKET_OPERABILITY,
+        "        if events is not None and str(payload.get(\"event\") or \"\") not in events:\n"
+        "            continue\n",
+        "",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M215 (H-1: los eventos de posicion se descartan): el canal de posicion no se publica",
+        MARKET_OPERABILITY,
+        "        \"positionEventByCode\": position_reasons,\n"
+        "        \"positionEventCounted\": sum(position_reasons.values()),\n",
+        "        \"positionEventByCode\": {},\n"
+        "        \"positionEventCounted\": 0,\n",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M216 (H-2: el optimizador vuelve a other): sus motivos dejan de tener familia",
+        MARKET_OPERABILITY,
+        "    **{code: _OPTIMIZER_BUCKET_OVERRIDES.get(code, BUCKET_RISK) "
+        "for code in OPTIMIZER_REASONS},\n",
+        "",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M217 (H-2: el adaptativo vuelve a other): adaptive_strategy_paused sin familia",
+        MARKET_OPERABILITY,
+        "    ADAPTIVE_STRATEGY_PAUSED: BUCKET_RISK,\n",
+        "",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M218 (H-3: familias solapadas): un veto real de reserva entra como atribucion de posicion",
+        AUTO_REASON_CODES,
+        "        NO_MARK_DATA,\n        RESERVATION_CREATED,\n",
+        "        NO_MARK_DATA,\n        RESERVATION_FAILED,\n        RESERVATION_CREATED,\n",
+        (T_MARKET_OPERABILITY,),
+    ),
+    (
+        "M219 (H-2: owner incompleto): los vetos fail-closed de reserva quedan sin declarar",
+        MARKET_OPERABILITY,
+        "    RESERVATION_UNMEASURABLE: BUCKET_RISK,\n"
+        "    RESERVATION_ALREADY_LIVE: BUCKET_RISK,\n",
+        "",
         (T_MARKET_OPERABILITY,),
     ),
 ]

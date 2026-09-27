@@ -12,6 +12,12 @@ DECLARADA (``regime`` / ``governor`` / ``liquidity`` / ``risk`` / ``top_n`` / ``
 ``other``), separando el hecho de MERCADO (``regime_invalid``) del PERMISO del gobernador
 (``governor_exit_only``/``governor_halted``) y del tope de EVALUACIÓN (``top_n_excluded``).
 
+Desde ``v2.79`` (``AUTO-MATERIAL-7``) el censo es de **decisiones de ENTRADA**: el histograma sólo
+cuenta los eventos ``auto_entry_decision`` (``ENTRY_DECISION_EVENT``) y los motivos de GESTIÓN DE
+POSICIÓN (``POSITION_JOURNAL_EVENTS``: protección, materialización, reserva, ciclo de vida…) se
+**publican aparte** (``positionEventByCode``), porque un evento de gestión no es una entrada y
+contarlo inflaba ``vetoCounted`` (``P3-6``/``H-1``). Ninguna entrada se descarta.
+
 Qué NO hace (reglas duras del repo):
 
 * **No** decide: no toca el motor, el gobernador ni ``TOP_N``; no recalcula el gate ni cambia
@@ -32,7 +38,20 @@ from bolsa_analytics.cognitive.market_regime_gate import (
     regime_allows_entry_for,
 )
 from bolsa_analytics.cognitive.opportunity_ranker import TOP_N_EXCLUDED
-from bolsa_application.auto_reason_codes import DAY_EXIT_REASONS, POSITION_SKIP_REASONS
+from bolsa_application.auto_reason_codes import (
+    ADAPTIVE_STRATEGY_PAUSED,
+    DAY_EXIT_REASONS,
+    OPTIMIZER_ENUMERATION_CAP_EXCEEDED,
+    OPTIMIZER_LIQUIDITY_BELOW_MINIMUM,
+    OPTIMIZER_LIQUIDITY_UNKNOWN,
+    OPTIMIZER_NOT_SELECTED,
+    OPTIMIZER_REASONS,
+    OPTIMIZER_SECTOR_UNMEASURED,
+    POSITION_ATTRIBUTION_REASONS,
+    POSITION_SKIP_REASONS,
+    RESERVATION_ALREADY_LIVE,
+    RESERVATION_UNMEASURABLE,
+)
 from bolsa_application.market_price_snapshot import PRICE_SOURCE_CLOSE, PRICE_SOURCE_LIVE
 
 __all__ = [
@@ -43,8 +62,10 @@ __all__ = [
     "BUCKET_REGIME",
     "BUCKET_RISK",
     "BUCKET_TOP_N",
+    "ENTRY_DECISION_EVENT",
     "NON_VETO_REASON_CODES",
     "OPERABILITY_BUCKETS",
+    "POSITION_JOURNAL_EVENTS",
     "STATE_NO_SIGNAL",
     "STATE_OPERATED",
     "STATE_UNKNOWN",
@@ -52,6 +73,7 @@ __all__ = [
     "VETO_BUCKET_BY_REASON",
     "build_operability_record",
     "classify_veto_reasons",
+    "collect_journal_reasons",
     "operability_state",
     "pair_active",
     "pair_capable",
@@ -88,6 +110,34 @@ STATE_OPERATED = "operated"
 STATE_VETOED = "vetoed"
 STATE_NO_SIGNAL = "no_signal"
 STATE_UNKNOWN = "unknown"
+
+# ── Población del censo (V2.79): una entrada = una decisión ────────────────────────────────────
+#: Evento del journal V2 que representa una **DECISIÓN DE ENTRADA** (un veto o una aprobación).
+#: Es la ÚNICA población que el censo de vetos puede contar: el histograma por familias mide por
+#: qué NO se entró, y una decisión de gestión de una posición viva no es una entrada.
+ENTRY_DECISION_EVENT = "auto_entry_decision"
+
+#: Eventos de **GESTIÓN DE POSICIÓN** del journal V2 (decisión de gestión, salto de gestión y
+#: evento rico de gestión). Sus motivos son ATRIBUCIONES de una posición viva: se publican por su
+#: canal propio (``positionEventByCode``) y **jamás** engordan ``vetoCounted`` (``P3-6``/``H-1``).
+#: El literal de cada evento vive en su productor (``auto_v2_entry``/``auto_investment_system``);
+#: aquí se fija el contrato del LECTOR y un test lo pinea contra el productor real.
+POSITION_JOURNAL_EVENTS: frozenset[str] = frozenset(
+    {"auto_position_management", "auto_position_decision", "auto_position_skip"}
+)
+
+#: Reparto de los motivos del **optimizador** de cartera (V2.44/AUTO-4). Son decisiones de ENTRADA
+#: (la candidata se evaluó y no entró en la combinación elegida, o el optimizador no llegó a
+#: decidir). El valor por defecto es ``risk`` (compuertas de cantidad de riesgo y mediciones
+#: fallidas, misma convención que ``risk_measurement_*``); las excepciones se declaran aquí para no
+#: mezclar liquidez (``liquidity``), dato no verificable (``data``) ni tope de evaluación (``top_n``).
+_OPTIMIZER_BUCKET_OVERRIDES: dict[str, str] = {
+    OPTIMIZER_NOT_SELECTED: BUCKET_TOP_N,
+    OPTIMIZER_ENUMERATION_CAP_EXCEEDED: BUCKET_TOP_N,
+    OPTIMIZER_LIQUIDITY_UNKNOWN: BUCKET_LIQUIDITY,
+    OPTIMIZER_LIQUIDITY_BELOW_MINIMUM: BUCKET_LIQUIDITY,
+    OPTIMIZER_SECTOR_UNMEASURED: BUCKET_DATA,
+}
 
 #: Familia declarada de cada código de motivo. Los literales de decisión son los del dueño único
 #: (``portfolio_decision_engine.DecisionReasonCode`` / ``_NO_TRADE_REASONS``); ``top_n_excluded``
@@ -127,18 +177,25 @@ VETO_BUCKET_BY_REASON: dict[str, str] = {
     "sector_exposure_unverifiable": BUCKET_DATA,
     "stale_data": BUCKET_DATA,
     "atr_unknown": BUCKET_DATA,
+    # V2.79 — motivos del OPTIMIZADOR y del ADAPTIVE: son decisiones de ENTRADA (la candidata se
+    # evaluó y no entró, o su estrategia está pausada) ⇒ vetos con familia, nunca ``other``.
+    **{code: _OPTIMIZER_BUCKET_OVERRIDES.get(code, BUCKET_RISK) for code in OPTIMIZER_REASONS},
+    ADAPTIVE_STRATEGY_PAUSED: BUCKET_RISK,
+    # V2.79 — vetos fail-closed de la espina de reserva (aperturas vetadas): NO son atribuciones.
+    RESERVATION_UNMEASURABLE: BUCKET_RISK,
+    RESERVATION_ALREADY_LIVE: BUCKET_RISK,
     # Sin familia propia declarada: se cuenta igual (nunca se descarta).
     "position_exists": BUCKET_OTHER,
 }
 
 #: Códigos que el journal estampa y NO son vetos: son ATRIBUCIONES de una decisión
-#: (``approved``) o de la gestión de una posición viva (motivos de SALIDA y saltos de
-#: gestión). No pueden engordar ``vetoCounted`` (``P3-6``): un día que SÍ opera lleva
-#: ``approved`` y ``risk_exit`` en el MISMO array de motivos y, sin esta separación, caen en
-#: ``other`` y se contarían como vetos. Los literales se leen de su dueño
-#: (``auto_reason_codes``): aquí no se duplica ninguno.
+#: (``approved``) o de la gestión de una posición viva (motivos de SALIDA, saltos de gestión y el
+#: resto de eventos de POSICIÓN: materialización, reserva y ciclo de vida). No pueden engordar
+#: ``vetoCounted`` (``P3-6``/``H-1``): un día que SÍ opera lleva ``approved`` y ``risk_exit`` en el
+#: MISMO array de motivos y, sin esta separación, caen en ``other`` y se contarían como vetos. Los
+#: literales se leen de su dueño (``auto_reason_codes``): aquí no se duplica ninguno.
 NON_VETO_REASON_CODES: frozenset[str] = frozenset(
-    {"approved", *DAY_EXIT_REASONS, *POSITION_SKIP_REASONS}
+    {"approved", *DAY_EXIT_REASONS, *POSITION_SKIP_REASONS, *POSITION_ATTRIBUTION_REASONS}
 )
 
 
@@ -167,6 +224,36 @@ def _maybe_int(value: Any) -> int | None:
 def _count(value: Any) -> int:
     number = _maybe_int(value)
     return number if number is not None and number > 0 else 0
+
+
+def _entry_payload(entry: Any) -> Mapping[str, Any]:
+    """Payload de una entrada del journal (objeto con ``payload`` o mapping), o vacío."""
+    payload = entry.get("payload") if isinstance(entry, Mapping) else getattr(entry, "payload", None)
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def collect_journal_reasons(
+    entries: Sequence[Any], *, events: frozenset[str] | None = None
+) -> dict[str, int]:
+    """Agrega los ``reasonCodes`` de los eventos pedidos, sin perder ningún conteo.
+
+    Esta es la ÚNICA puerta por la que se decide **qué población entra en el censo** (``H-1``): con
+    ``events`` fijado al evento de ENTRADA, el histograma mide sólo decisiones de entrada y un
+    evento de gestión de posición no puede inflar ``vetoCounted``. Con ``events=None`` agrega
+    TODAS las entradas (lectura tolerante de filas antiguas sin ``event`` declarado). Una entrada
+    con forma inesperada o un motivo vacío se ignora; ningún conteo se descarta.
+    """
+    counts: dict[str, int] = {}
+    for entry in entries or ():
+        payload = _entry_payload(entry)
+        if events is not None and str(payload.get("event") or "") not in events:
+            continue
+        for reason in _as_sequence(payload.get("reasonCodes")):
+            key = str(reason or "").strip()
+            if not key:
+                continue
+            counts[key] = counts.get(key, 0) + 1
+    return counts
 
 
 def parse_journal_reasons(entries: Sequence[Any]) -> dict[str, int]:
@@ -328,6 +415,7 @@ def build_operability_record(evidence: Mapping[str, Any], *, day: str) -> dict[s
     totals = _as_mapping(evidence.get("turnTotals"))
     sample = _as_mapping(evidence.get("sample"))
     reasons = parse_journal_reasons(_as_sequence(evidence.get("journalReasons")))
+    position_reasons = parse_journal_reasons(_as_sequence(evidence.get("positionEventReasons")))
     veto_reasons, non_veto_reasons = split_journal_reasons(reasons)
     buckets = classify_veto_reasons(veto_reasons)
     top_codes = sorted(
@@ -354,6 +442,8 @@ def build_operability_record(evidence: Mapping[str, Any], *, day: str) -> dict[s
         "vetoCounted": veto_counted(buckets),
         "nonVetoByCode": non_veto_reasons,
         "nonVetoCounted": sum(non_veto_reasons.values()),
+        "positionEventByCode": position_reasons,
+        "positionEventCounted": sum(position_reasons.values()),
         "topVetoCodes": top_codes,
         "priceSources": _price_source_counts(evidence.get("priceSources")),
         "pairCapable": pair_capable(evidence),
@@ -393,6 +483,18 @@ def _non_veto_summary(record: Mapping[str, Any]) -> str:
         f"{code}={_count(by_code[code])}" for code in sorted(by_code) if _count(by_code[code]) > 0
     )
     return f"  {record.get('day')}  aprobaciones/salidas: {detail} (NO son vetos)"
+
+
+def _position_event_summary(record: Mapping[str, Any]) -> str:
+    """Línea declarada de eventos de GESTIÓN DE POSICIÓN (``""`` si el día no tuvo ninguno)."""
+    counted = _count(record.get("positionEventCounted"))
+    if counted <= 0:
+        return ""
+    by_code = _as_mapping(record.get("positionEventByCode"))
+    detail = " ".join(
+        f"{code}={_count(by_code[code])}" for code in sorted(by_code) if _count(by_code[code]) > 0
+    )
+    return f"    eventos/posicion: {detail} (NO son vetos)"
 
 
 def render_operability_table(records: Sequence[Mapping[str, Any]]) -> str:
@@ -438,4 +540,7 @@ def render_operability_table(records: Sequence[Mapping[str, Any]]) -> str:
         non_veto = _non_veto_summary(record)
         if non_veto:
             lines.append(non_veto)
+        position_events = _position_event_summary(record)
+        if position_events:
+            lines.append(position_events)
     return "\n".join(lines)

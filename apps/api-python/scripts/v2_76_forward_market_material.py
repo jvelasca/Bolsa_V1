@@ -436,19 +436,40 @@ async def _read_readiness(
 
 
 def _journal_reasons(worker: Any) -> list[str]:
-    """Agrega los motivos del journal V2 EN MEMORIA (por qué el tick no abre/falta material).
+    """Motivos de las DECISIONES DE ENTRADA del journal V2 EN MEMORIA (por qué el tick no abre).
 
     Es el diagnóstico que el operador necesita para saber si el bloqueo es de DATO (sector,
-    liquidez, ATR, régimen, edge) o de MERCADO (sin movimiento). No escribe nada.
+    liquidez, ATR, régimen, edge) o de MERCADO (sin movimiento). Cuenta SÓLO el evento de entrada
+    (``auto_entry_decision``): un evento de GESTIÓN DE POSICIÓN no es una entrada y no puede
+    inflar el censo de vetos (``H-1``). No escribe nada.
     """
-    counts: dict[str, int] = {}
-    for entry in list(getattr(worker, "_v2_journal", ()) or ()):
-        payload = getattr(entry, "payload", None)
-        if not isinstance(payload, dict):
-            continue
-        for reason in payload.get("reasonCodes") or ():
-            key = str(reason)
-            counts[key] = counts.get(key, 0) + 1
+    from bolsa_application.market_operability import (  # noqa: PLC0415 — import perezoso
+        ENTRY_DECISION_EVENT,
+        collect_journal_reasons,
+    )
+
+    counts = collect_journal_reasons(
+        list(getattr(worker, "_v2_journal", ()) or ()),
+        events=frozenset({ENTRY_DECISION_EVENT}),
+    )
+    return [f"{key}:{value}" for key, value in sorted(counts.items(), key=lambda kv: -kv[1])]
+
+
+def _journal_position_reasons(worker: Any) -> list[str]:
+    """Motivos de GESTIÓN DE POSICIÓN del journal V2 (ATRIBUCIONES, nunca vetos de entrada).
+
+    Se publican por su propio canal para que el operador vea la salud de la posición sin que
+    ensucien ``vetoCounted``. Mismos eventos que declara el lector (``POSITION_JOURNAL_EVENTS``).
+    """
+    from bolsa_application.market_operability import (  # noqa: PLC0415 — import perezoso
+        POSITION_JOURNAL_EVENTS,
+        collect_journal_reasons,
+    )
+
+    counts = collect_journal_reasons(
+        list(getattr(worker, "_v2_journal", ()) or ()),
+        events=POSITION_JOURNAL_EVENTS,
+    )
     return [f"{key}:{value}" for key, value in sorted(counts.items(), key=lambda kv: -kv[1])]
 
 
@@ -694,6 +715,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         "turnTotals": totals,
         "lastGateReason": last_gate_reason,
         "journalReasons": _journal_reasons(runtime.worker),
+        "positionEventReasons": _journal_position_reasons(runtime.worker),
         "marketRegime": market_regime,
         "stopReason": stop_reason,
         "priceSources": snapshot.sources(),
