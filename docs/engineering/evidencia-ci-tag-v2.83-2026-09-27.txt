@@ -1,14 +1,72 @@
-# V2.83 / AUTO-MATERIAL-11 - CI del tag `v2.83-beta`: PENDIENTE DE TAG (declaracion, NO cita)
+# V2.83 / AUTO-MATERIAL-11 - CI del tag `v2.83-beta`: evidencia cruda (cita POST-TAG)
 #
-# Fecha: 2026-09-27  ·  Version: 2.08.0-beta  ·  SIN migracion (Alembic head 046_fill_reference_mid).
+# Fecha de captura: 2026-09-27
+# Tag anotado: v2.83-beta (objeto 8cfe7f6f) -> commit 0ebf6630 (sello en DOS commits: 4dd1aea1 feat + 0ebf6630 docs)
+# Version: 2.08.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
 #
-# ESTADO DECLARADO: el tag `v2.83-beta` AUN NO SE HA EMPUJADO desde el entorno de esta fase, asi que
-# NO existe run de `Release tag CI` que citar. Este fichero NO inventa un run, un `attempt` ni unos
-# tiempos: declara lo que se midio EN LOCAL y lo que se ESPERA del CI.
+# REGLA DECLARADA (patron v2.74-v2.82): el workflow `Release tag CI` SOLO corre al empujar el tag,
+# asi que la cita de su resultado vive en un commit POST-TAG (este). Dentro del tag, el auditor no ve
+# este fichero; lo reproduce con los comandos del `arranque-auditor-v2-83-*.md`.
 #
-# REGLA DEL PROYECTO (patron v2.74-v2.82): el workflow `Release tag CI` SOLO corre al empujar el tag,
-# asi que su cita vive en un commit POST-TAG. Al sellar, reemplazar esta cabecera por la cita cruda
-# (run id, conclusion, attempt, duracion, jobs, conteos) siguiendo `evidencia-ci-tag-v2.82-*.txt`.
+# --- Commits y push ---
+# 4dd1aea1594d3d7da5e2cbd49d3d7be1486f6dc3  feat(v2.83): WINDOW READ-ONLY AUDIT (AUTO-MATERIAL-11) -
+#           modulo puro `operability_audit.py` + CLI read-only `v2_83_window_audit.py` +
+#           `test_operability_audit.py` (16 puros) registrado en `python-ci.yml` y `release-tag-ci.yml`
+#           (5 ficheros, +1049 lineas; 3 nuevos).
+# 0ebf66302f41a4b226add449d0da4e8ad2397d5b  docs(v2.83): docs de fase + bump `2.07.0-beta` ->
+#           `2.08.0-beta` (UNICO cambio no-doc fuera del instrumento nuevo) (13 ficheros).
+# git push origin main        : 0afa5e4f..0ebf6630  main -> main
+# git push origin v2.83-beta  : * [new tag] v2.83-beta -> v2.83-beta
+# tag anotado objeto 8cfe7f6f -> commit 0ebf6630
+#
+# --- Release tag CI (run 36329460515, HEAD 0ebf6630, event=push, branch v2.83-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 9m15s; 15:24:56Z -> 15:34:11Z)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   decision-spine                                          success
+#   shared (build/typecheck/test)                           success
+#   python (ruff/imports/mypy/pytest offline)               success
+#   dr-verify (battery DB_DR / TCP CI)                      success
+#   playwright (mock E2E)                                   success
+#   frontend (typecheck/lint/test/build + contract:check)   success
+#   security (gitleaks)                                     success
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)        success
+#   lifecycle-pg (Alembic + auth + golden restart)          success
+#   playwright (integrated E2E, opt-in)                     [skipped, por diseno]
+#   certify (aggregate + artifact)                          success
+#
+# Job `python` del tag:
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 507 source files     <-- 506 -> 507 (+1: operability_audit.py)
+#   pytest  : 3020 passed, 37 skipped, 6 warnings in 62.30s
+#             => `3004 + 16 = 3020` = EXACTAMENTE lo ESPERADO y declarado ANTES del sello; skips SIN
+#                mover (37 = 37) => el registro explicito del test nuevo en `release-tag-ci.yml` SI
+#                ejecuto (nada nuevo queda sin correr).
+#
+# --- Sobre el MISMO commit y tag (0ebf6630, v2.83-beta) ---
+#   Python CI           36329460471 : success (attempt 1; 15:24:56Z -> 15:26:59Z)
+#       quality: 3009 passed, 40 skipped, 6 warnings in 80.68s = `2993 + 16 = 3009` = lo ESPERADO;
+#                skips 40 = 40; `ruff` `All checks passed!` / `Contracts: 4 kept, 0 broken` /
+#                `mypy 0 issues (507 files)`.
+#       Jobs PG del tag intactos (el diff no toca el material durable ni las migraciones):
+#       grammar-discovery-pg (A14 E2E) / lifecycle-pg (A12 E2E) /
+#       auto-v2-durable-pg (Alembic 040-045 + reinicio real) / paper-forward-pg (A13 E2E): success
+#   Frontend CI         36329460461 : success (attempt 1)
+#   Optimize lab        36329460472 : success (attempt 1)
+#   Fase 2 scientific   36329460449 : success (attempt 1)
+#
+# --- En main (fast-forward 0afa5e4f..0ebf6630) ---
+#   Python CI           36329458792 : success (attempt 1)
+#       quality: 3009 passed, 40 skipped, 6 warnings in 75.52s; skips 40 = 40; jobs PG per-commit
+#       (`grammar-discovery-pg` A14 / `lifecycle-pg` A12 / `auto-v2-durable-pg` / `paper-forward-pg` A13)
+#       en success.
+#       NOTA DECLARADA (diferencia con v2.82): en `main` **SI** corrió `Python CI` (y `Fase 2 scientific`),
+#       porque el sello incluye ficheros Python y el trigger por rutas de `python-ci.yml` los ve; en v2.82
+#       (docs + `package.json`) no corrian. Es comportamiento por diseno, no un fallo.
+#   Frontend CI         36329458704 : success (attempt 1)
+#   Optimize lab        36329458657 : success (attempt 1)
+#   Fase 2 scientific   36329458664 : success (attempt 1)
+#   Gitleaks            36329458758 : success (attempt 1)
 #
 # --- Compuertas medidas EN LOCAL (antes del sello, no heredadas) ---
 # ruff          : All checks passed!
@@ -25,19 +83,17 @@
 # pre-D1        : preflight exit 2 (BEAR_TREND, LONG vetadas; barras 20/20); par A/B y cuenta fija NO
 #                 verificables (`PAPER_D_ACCOUNT_ID` comentado en `.env`) -> brechas ABIERTAS
 #
-# --- ESPERADO en el CI (NO medido; se declara como esperado, no como observado) ---
-# Job `python` del tag : 3004 + 16 = 3020 passed / 37 skipped  (registro explicito del test nuevo en
-#                        `release-tag-ci.yml`)
-# Job `quality`        : 2993 + 16 = 3009 passed / 40 skipped  (registro explicito del test nuevo en
-#                        `python-ci.yml`)
-# Skips: SIN mover (37 = 37; 40 = 40): la fase no anade tests que requieran servicios externos.
-# Jobs PG del tag: intactos (el diff no toca el material durable ni las migraciones).
+# --- ESPERADO vs OBSERVADO (el sello declaro su prediccion antes de empujar) ---
+# Job `python` del tag : ESPERADO 3020/37  · OBSERVADO 3020/37  -> COINCIDE (3004 + 16; 37 = 37)
+# Job `quality`        : ESPERADO 3009/40  · OBSERVADO 3009/40  -> COINCIDE (2993 + 16; 40 = 40)
+#   => la prediccion del fichero PRE-TAG era un calculo (`base + 16`), no una urna: se cumplio exacta,
+#      y por eso ninguna cifra se corrigio despues.
 #
-# LECTURA (sin sesgo): fase de INSTRUMENTO READ-ONLY. Compuertas verdes, +16 tests nuevos, mypy
-# 506 -> 507, matriz 230/230 con restauracion byte a byte y arbol limpio, SIN migracion y sin tocar el
-# freeze ni el reparto (`auto18-v1`/`auto15-v1`, `ALLOCATION = none`). El instrumento nuevo NO fabrica
-# medicion (`n/d` != `0`): el CLI es read-only y no escribe en el journal durable ni en `evidence_runs/`
-# ni en `evidence_validations/`.
+# LECTURA (sin sesgo): fase de INSTRUMENTO READ-ONLY. CI del tag GREEN en la PRIMERA pasada con
+# EXACTAMENTE los conteos predichos, +16 tests nuevos, mypy 506 -> 507, matriz 230/230 con restauracion
+# byte a byte y arbol limpio, SIN migracion y sin tocar el freeze ni el reparto (`auto18-v1`/`auto15-v1`,
+# `ALLOCATION = none`). El instrumento nuevo NO fabrica medicion (`n/d` != `0`): el CLI es read-only y no
+# escribe en el journal durable ni en `evidence_runs/` ni en `evidence_validations/`.
 #
 # DECLARADO, NO HECHO: la ventana de >=4 dias de calendario sigue siendo OPERACION DEL PROPIETARIO
 # (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita ni la sustituye; `H-4` (LOW) sigue ABIERTO (esta
