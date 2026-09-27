@@ -1,0 +1,78 @@
+# V2.82 / AUTO-MATERIAL-10 - CI del tag `v2.82-beta`: evidencia cruda (cita POST-TAG)
+#
+# Fecha de captura: 2026-09-27
+# Tag anotado: v2.82-beta (objeto d99e17b7) -> commit ae90776a (sello en UN commit: fase DOCS-ONLY + bump)
+# Version: 2.07.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
+#
+# REGLA DECLARADA (patron v2.74-v2.81): el workflow `Release tag CI` SOLO corre al empujar el tag,
+# asi que la cita de su resultado vive en un commit POST-TAG (este). Dentro del tag, el auditor no ve
+# este fichero; lo reproduce con los comandos del `arranque-auditor-v2-82-*.md`.
+#
+# --- Commits y push ---
+# ae90776a  docs(v2.82): OBSERVATION WINDOW (AUTO-MATERIAL-10) - fase OPERATIVA docs-only: formaliza la
+#           ventana de mercado >=4 dias como operacion del propietario + bump 2.06.0-beta -> 2.07.0-beta
+#           (UNICO cambio no-doc). NO hay commit `feat`: la fase no entrega codigo.
+# git push origin main        : 44047ee8..ae90776a  main -> main
+# git push origin v2.82-beta  : * [new tag] v2.82-beta -> v2.82-beta
+# tag anotado objeto d99e17b7 -> commit ae90776a (ae90776a660b187756f361a590f13f8da90b7deb)
+#
+# --- Release tag CI (run 36321324133, HEAD ae90776a, event=push, branch v2.82-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 8m05s; 13:07:45Z -> 13:15:50Z)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   decision-spine                                          success
+#   shared (build/typecheck/test)                           success
+#   python (ruff/imports/mypy/pytest offline)               success
+#   dr-verify (battery DB_DR / TCP CI)                      success
+#   playwright (mock E2E)                                   success
+#   frontend (typecheck/lint/test/build + contract:check)   success
+#   security (gitleaks)                                     success
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)        success
+#   lifecycle-pg (Alembic + auth + golden restart)          success
+#   playwright (integrated E2E, opt-in)                     [skipped, por diseno]
+#   certify (aggregate + artifact)                          success
+#
+# Job `python` del tag:
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 506 source files
+#   pytest  : 3004 passed, 37 skipped, 6 warnings in 71.22s
+#             => IDENTICO al job `python` del tag de v2.81 (3004/37): fase DOCS-ONLY, ni tests nuevos ni
+#                skips nuevos (37 = 37). Nada nuevo queda sin correr.
+#
+# --- Sobre el MISMO commit y tag (ae90776a, v2.82-beta) ---
+#   Python CI           36321324203 : success (attempt 1)
+#       quality: 2993 passed, 40 skipped = IDENTICO al `quality` del tag de v2.81 (2993/40); skips 40 = 40.
+#       Jobs PG del tag intactos: grammar-discovery-pg (A14 E2E) / lifecycle-pg (A12 E2E) /
+#       auto-v2-durable-pg (Alembic 040-045 + reinicio real) / paper-forward-pg (A13 E2E): success
+#   Frontend CI         36321324136 : success (attempt 1)
+#   Optimize lab        36321324146 : success (attempt 1)
+#   Fase 2 scientific   36321324077 : success (attempt 1)
+#
+# --- En main (fast-forward 44047ee8..ae90776a) ---
+#   Gitleaks            36321322792 : success (attempt 1)
+#   Frontend CI         36321322793 : success (attempt 1)
+#   Optimize lab        36321322797 : success (attempt 1)
+#   NOTA DECLARADA: en `main` NO corrieron `Python CI` ni `Fase 2 scientific` para este commit (sus
+#   triggers estan filtrados por rutas y el diff es docs + `package.json`, SIN ficheros Python): es el
+#   comportamiento declarado por diseno, no un fallo. En el TAG si corrieron (el workflow del tag no filtra
+#   por rutas): `Python CI` 36321324203 success.
+#
+# --- Compuertas medidas EN LOCAL (antes del sello, no heredadas) ---
+# ruff          : All checks passed!
+# import-linter : Contracts: 4 kept, 0 broken.
+# mypy          : Success: no issues found in 506 source files
+# puros         : 81 passed (58 de `test_market_operability.py` + 23 de `test_operability_window.py`)
+# aplicacion    : pytest packages/py/application/tests -q -> 2071 passed
+# matriz        : 230/230, restauracion byte a byte, arbol intacto
+#                 (sonda re-ejecutada sobre el arbol limpio: "medidas: 230/230 (ninguna se quedo sin
+#                  fragmento)"; "intacto: la sonda no altero el arbol"; `M226`-`M230` muerden y restauran)
+# alembic       : 046_fill_reference_mid (head)
+#
+# LECTURA (sin sesgo): fase DOCS-ONLY. El CI del tag queda GREEN en la PRIMERA pasada con los MISMOS
+# numeros que v2.81 (job `python` 3004/37; `quality` 2993/40), sin mover skips (37 = 37; 40 = 40), sin
+# migracion y sin tocar el freeze ni el reparto (`auto18-v1`/`auto15-v1`, `ALLOCATION = none`). El unico
+# cambio no-doc es `package.json` (bump). El instrumento (funnel + `unresolved_age` + HTML) queda intacto.
+#
+# DECLARADO, NO HECHO: la ventana de >=4 dias de calendario sigue siendo operacion del propietario
+# (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita ni la sustituye, y `H-4` (LOW) sigue ABIERTO
+# (v2.82 no lo cierra: se cierra despues de la primera ventana y solo si `otherCount > 0`).
