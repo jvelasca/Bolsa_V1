@@ -5,7 +5,8 @@
 > **Herramienta:** `v2_76_forward_market_material.py` (AUTO-MATERIAL-4) + journal de operabilidad
 > `v2_77_market_operability.py` (AUTO-MATERIAL-5) + **capturador de la ventana**
 > `v2_80_market_window.py` (AUTO-MATERIAL-8, read-only sobre el journal **durable**; ampliado en
-> AUTO-MATERIAL-9/**v2.81** con `--forward` y `--html` y el **funnel de operabilidad**).
+> AUTO-MATERIAL-9/**v2.81** con `--forward` y `--html` y el **funnel de operabilidad**). En
+> `v2.82` (`AUTO-MATERIAL-10`) esta ventana se formaliza como **fase OPERATIVA** (docs-only: ver §8).
 > **Regla dura:** esto es **operación**, no una fase de código. **No** se bajan umbrales, **no** se
 > fuerza el régimen, **no** se backdatea nada.
 
@@ -120,3 +121,45 @@ Cuando se cumpla el gate de §4, el material y su lectura son la entrada para ce
 (ver [`deuda-p3-post-auditoria-v2.70-2026-09-26.md`](./deuda-p3-post-auditoria-v2.70-2026-09-26.md)).
 Si la ventana no se puede correr, se **declara** y las dos deudas siguen **abiertas**: no se cierran
 con un material degenerado.
+
+## 8. Escalera de éxito de `v2.82` (`AUTO-MATERIAL-10`, fase operativa)
+
+`v2.82` **formaliza esta ventana como fase operativa** (docs-only: no cambia motor, gobernador, `TOP_N`,
+umbrales, allocation, pesos ni A/B). La escalera se recorre **en orden** y **no se salta ningún peldaño**:
+si falta cualquiera de los tres primeros, el veredicto honesto es **`INCONCLUSIVE` / `NO MEDIDO`**.
+
+```mermaid
+flowchart TD
+  A["Operar PAPER (forward real)"] --> B[">=4 dias distintos de calendario"]
+  B --> C[">=2 episodios de regimen"]
+  C --> D[">=32 ciclos medibles"]
+  D --> E["Par A/B (pairActive=true)"]
+  E --> F["AUTO-22 / AUTO-23"]
+  F --> G["P3-2 y P3-3"]
+  G --> H["P(R>0) / WFE / OOS / correlacion A/B"]
+  B -.->|"mientras no se cumpla: INCONCLUSIVE"| X["NO MEDIDO (honesto)"]
+```
+
+### 8.1 Lectura por día (`D1..Dn`) — sin mezclar `0` real con `n/d`
+
+- `D1, D2, D3, D4, …` se leen de la serie diaria (`--render`) y del informe (`--html`): cada día publica
+  `ENTRY`, `VETOS`, `FILLS`, `CYCLES`, `R`, `Par`, `Precio` y su `Estado`.
+- **Funnel por día:** `universe → marketData → regimeAllowed → signals → topN → risk → reservation →
+  orders → fills → cycles`. Cada caída localiza el **escalón** del cuello de botella:
+  - `universe` alto + `regimeAllowed` bajo ⇒ **mercado/gobernador** (no tocar `TOP_N`).
+  - `signals` alto + `topN` bajo ⇒ tope de **evaluación** (`TOP_N`), no de mercado.
+  - `signals`/`topN` altos + `risk` bajo ⇒ **riesgo/plan**.
+  - `reservation`/`orders` altos + `fills` bajo ⇒ **ejecución/mercado**.
+- **`unresolved_age`:** `gt20m` frecuente delata un problema de **integración**, no de mercado.
+- **Huecos:** `n/d` = **no medido** (`None`), **nunca** `0`. Sin `--forward`, los escalones superiores se
+  declaran `n/d` (correcto, no un defecto).
+- **Después de los días:** el `TOTAL` se lee **sin** sumar huecos como ceros; sólo los días **medidos**
+  cuentan para el gate (§4).
+
+### 8.2 Qué NO se hace durante la ventana
+
+- **No** se cambia `TOP_N`, el gobernador, los umbrales, la allocation, los pesos ni la lógica A/B
+  (recomendación de la auditoría de `v2.81`: medir, no alterar para producir más operaciones).
+- **No** se cierra `H-4` por anticipado: `otherCount == 0` durante toda la ventana ⇒ deuda **preventiva**;
+  `otherCount > 0` ⇒ catalogar los `signal_*` **antes** de cerrar la fase estadística.
+- **No** se implementa `resolutionJoined` ni la fila `TOTAL`: mejoras futuras, con datos que las justifiquen.

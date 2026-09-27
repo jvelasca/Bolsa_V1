@@ -114,6 +114,11 @@ regla fail-closed `no_signal` **sólo** si no hubo ni propuestas ni vetos. Sobre
 una línea** y `pairCapable`/`pairActive` separan «arquitectura lista» de «dos versiones operando».
 Comandos en el [relevo de `v2.77`](./traspaso-relevo-post-v2-77-auto-material-5-2026-09-26.md).
 
+**Actualización `v2.82` (2026-09-27):** `AUTO-MATERIAL-10` es una fase **docs-only**: formaliza la
+**ventana ≥4 días** como **operación del propietario** (runbook) y **no** la corre. La deuda sigue
+**ABIERTA**; el instrumento (funnel + `unresolved_age` + HTML) queda **intacto** y **no** se cierra con
+fixtures: exige material PAPER real en **≥4 cubos**.
+
 ## P3-3 — `P(R>0)` frente al tamaño muestral
 
 **Estado: 🔴 ABIERTA** (requiere el primer dataset PAPER real). Regla que se mantiene: `P(R>0)` es
@@ -141,6 +146,10 @@ fills con `regime=40` + `top_n=24` y **4/8** símbolos operables por sí mismos:
 **cuantifica** la tensión del agregado conservador sin concluir. El barrido (`P(R>0)` por ciclos,
 `Effective-N`) sigue **sin poder cerrarse** porque no hay ciclos válidos: **ABIERTA** por falta de
 ventana real de mercado.
+
+**Actualización `v2.82` (2026-09-27):** `AUTO-MATERIAL-10` (docs-only) mantiene la deuda **ABIERTA**: la
+ventana **≥4 días** con **≥2 episodios** sigue siendo **operación del propietario**, y la fase **no**
+rebaja `folds`/`min_is`/`min_oos`/`min_episodes` para forzar una corrida.
 
 ## P3-4 — `build_current_regime_evidence` publica el `level` sin clampar (P3) — 🟢 CERRADA en `v2.72`
 
@@ -186,6 +195,9 @@ anotado para no sobre-confiar en la cobertura de ese test; endurecerla requerir�
 clampe por su cuenta.
 
 ## P3-5 — `reserved_risk` sobrecargado: libro vivo vs evidencia histórica — 🟠 ABIERTA (2026-09-26)
+
+> **`v2.82` (2026-09-27):** sigue **ABIERTA y declarada**; `AUTO-MATERIAL-10` **no** la aborda (fase
+> operativa docs-only, cero cambios de código).
 
 **Origen.** Seguimiento del punto 12 de `v2.74`: ¿`AUTO-19` (`cycle_risk_from_reservations`) obtiene el
 riesgo histórico de una evidencia **inmutable** del ciclo o del estado **mutable** del `ReservationLedger`?
@@ -387,6 +399,10 @@ distribución de motivos y en `reasonCatalogCoverage["unknown"]` con contexto. E
 **pospone a después de la primera ventana real**, tal como recomienda la auditoría (§24): si esos códigos
 aparecen durante la ventana, `otherCount>0` lo dirá y `H-4` dejará de ser deuda teórica.
 
+**Estado en `v2.82` (2026-09-27).** `AUTO-MATERIAL-10` (docs-only) **no** cierra `H-4`: la decisión del
+auditor es cerrarlo **después** de la primera ventana real y **sólo** si `otherCount > 0`; el funnel y
+`reasonCatalogCoverage["unknown"]` siguen haciéndolo **visible**.
+
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 
 No son deuda de código; se declaran para que no se lean como sorpresas en la próxima pasada.
@@ -402,6 +418,10 @@ No son deuda de código; se declaran para que no se lean como sorpresas en la pr
 - **OBS-5 (LOW, defensivo).** `classify_veto_reasons` **descarta** entradas con conteo `<= 0` o no entero
   si se le pasa un mapping crudo; el parser del journal las coacciona a `1`, así que el camino real está a
   salvo, pero el contrato del módulo no lo declara. Anotarlo en el docstring o endurecer el tipo.
+
+> **`v2.82` (2026-09-27):** `OBS-3`/`OBS-4`/`OBS-5` siguen **DECLARADAS**; `AUTO-MATERIAL-10` no las
+> aborda. `OBS-3`/`OBS-4` se materializan también en `v2.82` (la cita del CI y el rango viven en el commit
+> POST-TAG, patrón `v2.74`–`v2.81`).
 
 ## Deuda de AUDITORÍA — `v2.73-beta` (`AUTO-MATERIAL-1`) sin pasada externa — 🟡 ABIERTA (de proceso)
 

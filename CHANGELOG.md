@@ -2,6 +2,30 @@
 
 All notable releases of Bolsa V1.
 
+## [2.07.0-beta] — `AUTO-MATERIAL-10`: OBSERVATION WINDOW (fase operativa) — 2026-09-27
+
+**Fase OPERATIVA; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin tocar el
+freeze** (`auto_simulation_worker.py` intacto). El reparto **no se mueve**: `auto18-v1` / `auto15-v1`
+(`ALLOCATION = none`). **No** se toca el gobernador (`aggregate_trial_regime`), ni `TOP_N`, ni un solo
+umbral, ni la allocation, ni los pesos de estrategia, ni la lógica A/B. **El único cambio no-doc es
+`package.json`.**
+
+Origen: la auditoría externa de `v2.81-beta` (**APROBADA, 0 bloqueantes**) dejó claro que el siguiente
+paso ya no es arquitectura, sino **observar** al AUTO operando: la **ventana ≥4 días de calendario** es
+**operación del propietario**, no otra capa de infraestructura. Su recomendación es **conservadora** —no
+alterar `TOP_N`/gobernador/umbrales/allocation/A/B para producir más operaciones— y **sí** dejar funcionar
+PAPER y recoger la serie `D1..Dn` con el **funnel**, el **`unresolved_age`**, la **cobertura de motivos**
+y el **informe HTML** ya construidos en `v2.81`.
+
+- **Marcador de fase (docs-only):** `v2.82-beta` formaliza ese paso operativo sin añadir código. El
+  instrumento de observación (funnel + `unresolved_age` + HTML) queda **intacto**; `None ≠ 0` y el
+  veredicto honesto `INCONCLUSIVE`/`NO MEDIDO` siguen vigentes.
+- **Escalera de éxito (operación, no código):** `≥4 días` → `≥2 episodios` → `≥32 ciclos medibles` →
+  par A/B (`pairActive=true`) → `AUTO-22`/`AUTO-23` → `P3-2`/`P3-3` → `P(R>0)`/WFE/OOS/correlación A/B.
+- **Deuda declarada:** `P3-2`/`P3-3` siguen **ABIERTAS** (falta mercado real); `H-4` (LOW) **ABIERTO**
+  (se cierra **después** de la primera ventana, y sólo si `otherCount > 0`); `P3-5`/`OBS-5` declaradas;
+  `resolutionJoined=false` y la fila `TOTAL` quedan como mejoras futuras, con datos que las justifiquen.
+
 ## [2.06.0-beta] — `AUTO-MATERIAL-9`: REAL WINDOW EXECUTION (funnel + informe de ventana) — 2026-09-27
 
 **Fase de INSTRUMENTO de OBSERVACIÓN, no de decisión; SIN migración** (Alembic head sigue en
