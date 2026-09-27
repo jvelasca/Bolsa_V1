@@ -27,7 +27,12 @@
 > bucket de calendario y un solo episodio de régimen; `v2.76` cablea **precio y régimen de MERCADO**
 > por el único seam del motor congelado y **declara** por qué, medido, el material de mercado no se
 > puede adelantar: la diversidad de cubos sale de `created_at = datetime.now(UTC)` y exige **tiempo
-> real transcurrido**, no una corrida rápida). **Deuda de proceso declarada:** `v2.73-beta` quedó
+> real transcurrido**, no una corrida rápida). **La auditoría externa de `v2.83.1-beta` (2026-09-27,
+> clon fresco de GitHub) emite `APROBADO CON OBSERVACIONES` (0 bloqueantes; 6/8 PASS, 2 PARTIAL —
+> semántica del instrumento y compuertas PG no reproducibles en local) y levanta `OBS-6` (MEDIUM),
+> `OBS-7`/`OBS-8` (LOW), que quedan **ABIERTOS y declarados** (ver más abajo); el re-sello es docs-only ⇒
+> los tres hallazgos son del instrumento de `v2.83` (`operability_audit.py`), no de `v2.83.1`.**
+> **Deuda de proceso declarada:** `v2.73-beta` quedó
 > **sin auditoría externa** (ver más abajo).
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
@@ -425,6 +430,59 @@ remediación (pospuesta por decisión del auditor, §24): la fase **lo hace visi
 aviso `reason_contract` (`other>0` ⇒ `ALERTA CONTRATO` + los motivos `other` nombrados) y con la cobertura
 `unknown` del instrumento. Si esos `signal_*` aparecen durante la ventana, la auditoría lo dirá en una
 línea; hasta entonces `H-4` sigue siendo deuda **teórica y ABIERTA**.
+
+## OBS-6 / OBS-7 / OBS-8 — Observaciones de la auditoría externa de `v2.83.1-beta` (2026-09-27) — 🟡 ABIERTAS
+
+**Origen.** Auditoría externa del objeto sellado **`v2.83.1-beta`** (clon fresco de GitHub; tag anotado
+`e939bbf0` → commit `42c97bab`; `2.08.1-beta`). **Veredicto: `APROBADO CON OBSERVACIONES`, 0 bloqueantes**
+(8 puntos: 6 PASS, 2 PARTIAL —semántica del instrumento y compuertas PG no reproducibles en local—). Los
+tres hallazgos son del **instrumento de `v2.83`** (`operability_audit.py`, **byte-idéntico** en este tag:
+el re-sello es docs-only), **no** los introduce `v2.83.1`. Informe crudo en
+[`auditoria-v2-83-1-auto-material-11-reseal-2026-09-27.md`](./auditoria-v2-83-1-auto-material-11-reseal-2026-09-27.md).
+
+### OBS-6 (MEDIUM) — `enrich_rows_with_evidence` **sobrescribe** un funnel ya medido
+
+**Observación.** El docstring del módulo y el contrato de la fase prometen que el enriquecimiento con
+`--forward` «rellena **sólo** los campos que la fila declaró `None`» y «**jamás** sobrescribe lo medido».
+Pero `operability_audit.py:379` hace
+`enriched["funnel"] = build_operability_funnel(row, evidence=evidence)` **incondicionalmente**: reconstruye
+**todo** el funnel desde la evidencia, así que un escalón **ya medido** (`universe`, `orders`, …) se
+**pisa** si la evidencia discrepa. Medido por el auditor: fila con evidencia (`universe=8`, `orders=2`)
+re-enriquecida con otra evidencia (`watchSize=999`, `orders=99`) ⇒ `universe` 8 → **999** y `orders`
+2 → **99**; los escalares (`symbolsObserved`, `pairActive`, `priceSources`) **sí** se preservan (siguen
+el patrón `is None`). Los **16** tests cubren `pairActive` pero **no** el funnel ya medido.
+
+**Impacto.** En el uso del runbook (`v2_83_window_audit.py --forward 'operability_runs/forward-market-*.json'`
+sobre el bundle de `v2_80`) el resultado suele ser **idempotente** (la misma evidencia con la que `v2_80`
+ya construyó el funnel), pero el **contrato** que el instrumento declara («no sobrescribe lo medido»)
+**no** se cumple: un día cuyo JSON de forward se regenere/edite, o un bundle construido sin `--forward` y
+auditado con él, puede publicar un funnel **derivado de la evidencia** en vez del medido. Es justo la
+clase de defecto que `v2.83` vino a hacer imposible (`n/d` ≠ `0`, no fabricar medición).
+
+**Criterio de cierre.** `enrich_rows_with_evidence` rellena **sólo** los escalones `None` del funnel (no
+reconstruye los ya medidos), con un test que re-enriquezca una fila con funnel **ya poblado** y exija que
+**no** cambie, y una **mutación** (`M2xx`) que lo proteja. Fase de **INSTRUMENTO** (read-only; sin motor,
+gobernador ni migración).
+
+### OBS-7 (LOW) — el funnel agregado de `window_totals` suma filas `measured=False`
+
+**Observación.** `window_totals` excluye correctamente los días no medidos en `counts`/`coverage`/`rSum`
+(usa `measured_rows`), pero el bloque **`funnel`** (`operability_audit.py:174`) itera **`rows`**: una fila
+sin entradas/ciclos/fills (`measured=False`) pero **con evidencia** (`v2_80` puebla los escalones
+superiores del funnel con `--forward`) **suma** en el agregado. Medido por el auditor: `daysMeasured=0`
+con `funnel.universe=8` y `orders=2`. El `partial` del funnel queda `True`, así que **no** se oculta, pero
+se incumple la lectura estricta «suma **sólo** días medidos» para ese bloque.
+
+**Criterio de cierre.** Agregar el funnel sobre `measured_rows` (coherente con el resto de la fila `TOTAL`)
+con un test de fila `measured=False` que **no** suma, y su mutación. Fase de INSTRUMENTO.
+
+### OBS-8 (LOW) — los códigos de salida del CLI están documentados inexactos
+
+**Observación.** `plan-v2-83` §3.2 y el docstring de `v2_83_window_audit.py` declaran `1` = uso
+incorrecto, pero `argparse` sale con **`2`** (`… --bogus` → `exit 2`). Solo afecta a **documentación**.
+
+**Criterio de cierre.** Alinear la doc con el comportamiento real (o el comportamiento con la doc) al
+cerrar `OBS-6`/`OBS-7`.
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 
