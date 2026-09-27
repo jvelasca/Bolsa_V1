@@ -2,6 +2,67 @@
 
 All notable releases of Bolsa V1.
 
+## [2.05.0-beta] — `AUTO-MATERIAL-8`: MARKET WINDOW (instrumento de contrato + capturador de la ventana) — 2026-09-27
+
+**Fase de INSTRUMENTO de medición y OBSERVACIÓN, no de decisión; SIN migración** (Alembic head sigue
+en `046_fill_reference_mid`) y **sin tocar el freeze** (`auto_simulation_worker.py` intacto). El reparto
+**no se mueve**: `auto18-v1` / `auto15-v1` (`ALLOCATION = none`). **No** se toca el gobernador
+(`aggregate_trial_regime`), ni `TOP_N`, ni un solo umbral; no se repara material y no se crea ni
+sobrescribe nada en `evidence_runs/`/`evidence_validations/`.
+
+Origen: la auditoría de `v2.79-beta` deja dos frentes de código (un matiz de nomenclatura y dos mejoras
+de contrato) más el bloqueante real (la **ventana de mercado** de ≥4 días). El invariante que instala esta
+fase: **el censo declara su contrato** —un motivo sin catalogar deja de ser un cubo más y pasa a ser una
+**señal**— y la operación se puede leer como **serie diaria** con linaje desde el **journal durable**.
+
+- **Estado `unresolved` (auditoría 2)** `packages/py/application/src/bolsa_application/market_operability.py`:
+  `STATE_UNRESOLVED` para el caso `proposals>0`, **cero vetos registrados** y **sin desenlace** (ni fill ni
+  cierre). Antes caía en `vetoed` —un nombre que afirma "el motor las rechazó" sin que el dato lo
+  respalde—. Sigue siendo **fail-closed**: nunca cae en `no_signal`.
+- **Contrato del catálogo (auditoría 1 §20/§21)** en el mismo módulo: `DECLARED_REASON_CODES` (la unión
+  veto ∪ no-veto, el catálogo con dueño), `reason_catalog_coverage` (`declared`/`observed`/`unknown`) y
+  `other_veto_count`; `build_operability_record` publica `otherCount`, `contractViolation`
+  (`other > 0`) y `reasonCatalogCoverage`. El `render` añade, **sólo si hay violación**, la línea
+  `ALERTA CONTRATO: other>0 (motivo(s) no catalogado(s): …) — revisar alta de reason code`. Es un
+  **aviso**, no un fallo duro (ratificado): la corrida no se tumba.
+- **Serie diaria de la ventana (nuevo, puro)** `packages/py/application/src/bolsa_application/operability_window.py`:
+  `build_window_row(day, *, account, entries, position_entries, cycles, fills, price_sources, versions,
+  symbols_observed, instruments, captured_at)` reutiliza **la misma puerta del censo** que
+  `market_operability` (`collect_journal_reasons`/`split_journal_reasons`/`classify_veto_reasons`) y **el
+  mismo R** que el informe (`measured_r`); publica el **linaje** (`account`, `instruments`, `versions`,
+  `cycleIds`) y declara sus huecos como `None`/`UNKNOWN` (nunca un `0` inventado: `pairCapable`/
+  `pairActive`/`priceSources` desde esta fuente quedan **ausentes declarados**). `render_window_series`
+  publica la tabla diaria y separa los canales (vetos / `aprobaciones/salidas` / `eventos/posicion`).
+  `window_gate` cuenta **cubos de CALENDARIO** (días distintos, no filas) y exige ≥4 días, ≥2 episodios de
+  régimen y ≥32 ciclos medibles; si falta algo, el veredicto es **`INCONCLUSIVE`** (NO MEDIDO).
+- **Capturador (nuevo, READ-ONLY)** `apps/api-python/scripts/v2_80_market_window.py`: lee el **journal
+  durable** (`SqlAlchemyJournalRepository.list_entries`, paginado) + los fills por versión + las reservas y
+  el régimen por ciclo (`read_all_reservations`, `read_cycle_regimes`,
+  `cycle_risk_from_reservations`, `adaptive_instrument_cycles`), agrupa por día durable y emite la serie;
+  `--render`/`--json`/`--out`/`--journal`/`--no-write`/`--days`/`--since`. **No** escribe en el journal
+  durable, **no** toca el material y **no** recalcula el gate; `exit 2` sin días legibles; avisa por
+  `stderr` si algún día tiene `other>0` (violación de contrato).
+- **Tests (48 → 71 en la fase)**: `test_market_operability.py` **48 → 59** (`unresolved` y su orden
+  fail-closed; cobertura del catálogo; `other>0` como violación declarada; aviso del render) y
+  **`test_operability_window.py` (NUEVO, 12 puros)**: linaje y huecos `None`, canales separados,
+  `window_gate` (cubos de calendario, no filas; `READY`/`INCONCLUSIVE`) y render determinista.
+- **Mutaciones (219 → 225)**: `M220`–`M225` (`unresolved` colapsado, cobertura que miente, violación no
+  marcada, gate que cuenta filas, hueco rellenado con ceros, evento de posición devuelto al censo),
+  **todas muerden** y restauran **byte a byte**.
+- **CI**: `test_operability_window.py` se registra **explícito** en el job `quality` de `python-ci.yml` y
+  en el job `python` de `release-tag-ci.yml` (lección de `v2.76`).
+
+**Breaking declarado:** sin migración; sin cambio de decisión; estado nuevo `unresolved` en la lectura del
+journal; claves nuevas **aditivas** (`otherCount`/`contractViolation`/`reasonCatalogCoverage`) y un
+**aviso** de contrato.
+
+**Declarado, NO hecho (operación del propietario):** la **ventana ≥4 días** de calendario sigue siendo
+operación en tiempo real (los cubos salen del instante durable); por eso **`P3-2`/`P3-3` siguen ABIERTAS**
+y esta fase **no puede certificar** diversidad de mercado. **`H-4` (LOW)** —el vocabulario de rechazo
+pre-ranqueo de `auto_v2_entry` (`signal_*`) sigue sin familia— queda **ABIERTO**: es exactamente lo que el
+nuevo `otherCount`/`contractViolation` y la cobertura `unknown` permiten **ver** (antes se perdía en
+`other` sin señal). `P3-5` y `OBS-5` siguen declaradas.
+
 ## [2.04.0-beta] — `AUTO-MATERIAL-7`: OPERABILITY CENSUS (el censo de vetos mide solo decisiones de ENTRADA) — 2026-09-27
 
 **Fase de CORRECCIÓN del instrumento de medición, no de decisión; SIN migración** (Alembic head sigue

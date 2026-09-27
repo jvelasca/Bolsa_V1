@@ -16,7 +16,11 @@
 > los tres se **CIERRAN en `v2.79`** (censo de ENTRADA + canal de posición aparte);
 > **la auditoría externa de `v2.79-beta` (2026-09-27) emite `APROBADO CON OBSERVACIONES` (0
 > bloqueantes) y añade `H-4` (LOW, el test de exhaustividad omite el vocabulario de rechazo
-> pre-ranqueo de `auto_v2_entry`), que queda **ABIERTO y declarado**;**
+> pre-ranqueo de `auto_v2_entry`), que queda **ABIERTO y declarado**; la fase `v2.80` (`AUTO-MATERIAL-8`,
+> 2026-09-27) **no lo cierra** (fuera de su alcance) pero lo hace **VISIBLE**: el nuevo `otherCount`/
+> `contractViolation`/`reasonCatalogCoverage` de `market_operability.py` declaran en el journal los códigos
+> que caen en `other` en vez de diluirlos; el cierre formal (familia declarada para los cinco `signal_*` y
+> exhaustividad del test vía import) sigue **pendiente**;**
 > P3-2 y P3-3 siguen **abiertas** (requieren material PAPER real con **diversidad de mercado**). **El
 > bloqueante central es MATERIAL, no código** (y desde `v2.74` es de **muestra**, no de forma; `v2.75`
 > cruza la **cantidad** —42 ciclos medibles ⇒ `EVIDENCE_READY`— pero **no** la **diversidad**: un solo
@@ -367,6 +371,13 @@ que lo cierre.
 
 **Criterio de cierre.** Que `_OWNER_JOURNAL_CODES` **importe** el vocabulario de su dueño (no lo liste a
 mano), que los cinco códigos tengan **familia declarada**, y una **mutación** (`M2xx`) que lo proteja.
+
+**Estado en `v2.80` (2026-09-27).** `AUTO-MATERIAL-8` **no cierra `H-4`** (su alcance es la ventana:
+`STATE_UNRESOLVED`, cobertura del catálogo y capturador), pero **lo hace visible**: `otherCount` /
+`contractViolation` (AVISO) y `reasonCatalogCoverage["unknown"]` publican en el journal de operabilidad
+exactamente los códigos que caen en `other` sin familia — antes se diluían sin señal —. El cierre formal
+(familia declarada para los cinco `signal_*` y exhaustividad del test vía import) sigue **pendiente** y es
+la fase candidata inmediata.
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 

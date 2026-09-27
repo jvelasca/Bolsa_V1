@@ -3,7 +3,8 @@
 > **AsOf:** 2026-09-27 · **Objeto:** obtener el primer dataset PAPER **forward** con **diversidad de
 > mercado** (≥4 cubos de calendario compartidos y ≥2 episodios de régimen) para cerrar `P3-2`/`P3-3`.
 > **Herramienta:** `v2_76_forward_market_material.py` (AUTO-MATERIAL-4) + journal de operabilidad
-> `v2_77_market_operability.py` (AUTO-MATERIAL-5).
+> `v2_77_market_operability.py` (AUTO-MATERIAL-5) + **capturador de la ventana**
+> `v2_80_market_window.py` (AUTO-MATERIAL-8, read-only sobre el journal **durable**).
 > **Regla dura:** esto es **operación**, no una fase de código. **No** se bajan umbrales, **no** se
 > fuerza el régimen, **no** se backdatea nada.
 
@@ -49,10 +50,23 @@ uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_material.py
 # 3) Journal de operabilidad (publica la tabla diaria + el desglose por familia):
 uv run --no-sync python apps/api-python/scripts/v2_77_market_operability.py \
     --forward "operability_runs/forward-market-$(date +%Y%m%d).json" --render
+
+# 4) Serie diaria de la VENTANA desde el journal DURABLE (read-only, AUTO-MATERIAL-8).
+#    Reutiliza el mismo censo (entrada vs posicion) y el mismo R que el informe; declara
+#    los huecos (None/UNKNOWN) y el gate honesto (>=4 dias / >=2 episodios / >=32 ciclos):
+$env:BROKER_VENUE="paper"
+uv run --no-sync python apps/api-python/scripts/v2_80_market_window.py \
+    --account-id "$ACCOUNT" --strategy-version "$VERSION_A" --days 4 --render \
+    --out "operability_runs/window-$(date +%Y%m%d).json"
 ```
 
-Repite 1–3 **cada día de mercado**. El journal (`operability_runs/journal.jsonl`, no versionado)
-acumula las filas; `--render` sin `--forward` re-imprime la serie completa.
+Repite 1–4 **cada día de mercado**. El journal de la sonda del runner
+(`operability_runs/journal.jsonl`) y el de la **ventana** (`operability_runs/window.jsonl`, ambos **no
+versionados**) acumulan filas; el capturador **siempre** relee el journal **durable** (`--days`/`--since`,
+sin `--forward`) y anexa a `window.jsonl` las filas nuevas por `día+cuenta+versiones` (sin duplicar), así
+que `--render --days 4` re-imprime la serie completa de la ventana. La cabecera del
+capturador declara `exit 0` con ≥1 día y `exit 2` sin material legible; avisa por `stderr`
+(`# ALERTA CONTRATO …`) si algún día tiene `other>0`.
 
 ## 4. Cuándo se puede leer el material (gate de evidencia)
 
@@ -89,6 +103,8 @@ fabricado. Mientras no se cumpla el gate, el veredicto honesto es **`NO MEDIDO`*
 | `Vetos por familia` | reparto `regime`/`governor`/`liquidity`/`risk`/`top_n`/`data`/`other` |
 | `aprobaciones/salidas` | atribuciones **no** vetos (`approved`, `risk_exit`, …) |
 | `eventos/posicion` | motivos de **gestión de posición** (`protect_requested`, `atr_geometry`, …): **no** son vetos |
+| `otherCount` / `ALERTA CONTRATO` | `other>0` ⇒ **violación de contrato** (**AVISO**, no fallo): un motivo sin familia declarada; revisar alta de reason code |
+| `Cobertura` (`declared/observed/unknown`) | prueba que `other==0` **no** es accidental; `unknown>0` nombra el hueco (hoy `H-4`: los `signal_*` pre-ranqueo) |
 | `Par` (`CAPAZ`/`ACTIVO`) | `CAPAZ` sin `ACTIVO` ⇒ falta la estrategia B (brecha 1) |
 
 ## 7. Entregable

@@ -1,0 +1,43 @@
+# V2.80 / AUTO-MATERIAL-8 - CI del tag `v2.80-beta`: evidencia cruda
+#
+# Fecha: 2026-09-27
+# Version: 2.05.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
+# Tag anotado: v2.80-beta (preparado; ver commit del sello).
+#
+# REGLA DECLARADA (patron v2.74-v2.79): el workflow `Release tag CI` SOLO corre al EMPUJAR el tag, asi
+# que su cita vive en un commit POST-TAG. Mientras el tag no se empuje, aqui NO hay run que citar: se
+# declara PENDIENTE (no se inventa un run id). Lo que SI se midio en local se lista abajo.
+#
+# ESTADO: *** CI del tag PENDIENTE DE PUSH *** -> al empujar `main` y el tag `v2.80-beta`, actualizar
+#         este fichero (patron de v2.74-v2.79) con el run id, los jobs y el conteo de pytest.
+
+# --- Commits (sello en dos commits) ---
+# <feat>  feat(v2.80): MARKET WINDOW (instrumento + capturador) + bump 2.05.0-beta
+# <docs>  docs(v2.80): paquete de fase AUTO-MATERIAL-8 + PROJECT_STATE/indice/CHANGELOG/deuda/runbook
+# git push origin main         : pendiente
+# git push origin v2.80-beta   : pendiente (tag anotado)
+
+# --- Compuertas medidas EN LOCAL (no heredadas) ---
+# ruff          : uv run --no-sync ruff check packages/py apps/api-python --config pyproject.toml
+#                 -> All checks passed!
+# import-linter : uv run --no-sync lint-imports --config packages/py/.importlinter
+#                 -> Contracts: 4 kept, 0 broken.
+# mypy          : uv run --no-sync mypy packages/py/domain/src packages/py/market/src \
+#                     packages/py/infrastructure/src packages/py/application/src apps/api-python/src \
+#                     --follow-imports=silent
+#                 -> Success: no issues found in 506 source files
+# puros         : uv run --no-sync python -m pytest \
+#                     packages/py/application/tests/test_market_operability.py \
+#                     packages/py/application/tests/test_operability_window.py -q
+#                 -> 71 passed (58 + 13: test_market_operability 48 -> 58, test_operability_window 13 NUEVOS)
+# aplicacion    : uv run --no-sync python -m pytest packages/py/application/tests -q
+#                 -> 2061 passed
+# matriz        : uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py
+#                 -> 225/225, restauracion byte a byte, arbol intacto
+#                    (docs/engineering/evidencia-matriz-mutaciones-v2.80-225-2026-09-27.txt)
+# alembic       : pendiente de comprobar en CI (head esperado: 046_fill_reference_mid)
+
+# --- Lo no hecho (declarado) ---
+# * La VENTANA >=4 dias de calendario es operacion del propietario: P3-2/P3-3 siguen ABIERTAS.
+# * H-4 (LOW) sigue ABIERTO (vocabulario signal_* pre-ranqueo sin familia): esta fase lo hace VISIBLE.
+# * Sin PostgreSQL local: los jobs PG del tag se verificaran por CI.
