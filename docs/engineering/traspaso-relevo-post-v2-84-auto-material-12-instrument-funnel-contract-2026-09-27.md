@@ -50,11 +50,31 @@ uv run --no-sync lint-imports --config packages/py/.importlinter                
 uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py M231 M232
 ```
 
-## 5. Cita del CI del tag `v2.84-beta` — PENDIENTE (se añade POST-TAG)
+## 5. Cita del CI del tag `v2.84-beta` — ACREDITADA (commit POST-TAG)
 
 `Release tag CI` **solo corre al empujar** el tag, así que su resultado **no puede** estar dentro del
-mismo tag (patrón declarado `OBS-3`/`OBS-4`). Se citará por hash en un commit **POST-TAG** (y, si procede,
-en `evidencia-ci-tag-v2.84-2026-09-27.txt`).
+mismo tag (patrón declarado `OBS-3`/`OBS-4`). Dentro del tag vive el **placeholder** declarado
+(`evidencia-ci-tag-v2.84-2026-09-27.txt`) y la cita acreditada se añade en el **commit POST-TAG**.
+
+- Tag anotado objeto **`e6d921a8`** → commit **`fd3859e3`**; sello en **tres** commits:
+  `a0f03017` feat + `bad2866c` chore(ops) + `fd3859e3` docs.
+- `Release tag CI` run **`36353503867`** ⇒ **SUCCESS en la primera pasada** (`attempt 1`, 8m54s,
+  **10 jobs en `success` + `certify` en `success`**; `playwright (integrated E2E, opt-in)` **skipped**
+  por diseño). Job `python` del tag: **`3022 passed / 37 skipped`** = `3020` + **2**, skips `37 = 37`,
+  `ruff` `All checks passed!`, `Contracts: 4 kept, 0 broken`, `mypy` `0 issues (507 files)`.
+- Sobre el mismo commit y tag: `Python CI` **`36353503833`** (`quality` **`3011 passed / 40 skipped`** =
+  `3009` + 2, skips `40 = 40`, cuatro jobs PG verdes), `Frontend CI` `36353503843`, `Optimize lab`
+  `36353503832`, `Fase 2 scientific` `36353503849`.
+- En `main` (fast-forward `605eedd9..fd3859e3`): `Python CI` `36353481118` (`quality` `3011/40` + 4 jobs
+  PG), `Frontend CI` `36353481072`, `Optimize lab` `36353481116`, `Fase 2 scientific` `36353481110`,
+  `Gitleaks` `36353481089`, todos en **success**.
+
+> **CONSTANCIA (honestidad, `OBS-3`)** — el **placeholder pre-tag** llevaba un **ERROR ARITMÉTICO** en su
+> predicción (`3040` y `3029`): sumó `18` sobre una base (`3022`/`3011`) que **ya** incluía los 2 tests
+> nuevos. La predicción **correcta** era `3022/37` y `3011/40`, que es **exactamente** lo observado.
+> **Ninguna cifra observada se corrigió**: se corrigió la **fórmula**, y el error queda declarado dentro
+> del propio fichero de evidencia. Evidencia cruda:
+> [`evidencia-ci-tag-v2.84-2026-09-27.txt`](./evidencia-ci-tag-v2.84-2026-09-27.txt).
 
 ## 6. Deuda y próximo paso
 

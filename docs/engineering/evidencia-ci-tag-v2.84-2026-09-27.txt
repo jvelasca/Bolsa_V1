@@ -1,15 +1,27 @@
-# V2.84 / AUTO-MATERIAL-12 - CI del tag `v2.84-beta`: evidencia cruda
+# V2.84 / AUTO-MATERIAL-12 - CI del tag `v2.84-beta`: evidencia cruda (cita POST-TAG)
 #
-# Fecha: 2026-09-27
-# Tag anotado: v2.84-beta (<objeto tag>) -> commit <commit del sello>
+# Fecha de captura: 2026-09-27
+# Tag anotado: v2.84-beta (objeto e6d921a8) -> commit fd3859e3 (sello en TRES commits:
+#   a0f03017 feat + bad2866c chore(ops) + fd3859e3 docs)
 # Version: 2.09.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
 #
-# ESTADO: PLACEHOLDER PRE-TAG ("PENDIENTE DE TAG").
-# El workflow `Release tag CI` SOLO corre al EMPUJAR el tag, asi que su resultado NO puede existir
-# antes de ese push (patron declarado OBS-3/OBS-4, v2.74-v2.83). Un auditor que trabaje estrictamente
-# sobre el objeto sellado leera ESTE placeholder y NO debe concluir "CI no acreditado": la cita
-# acreditada se anade en un commit POST-TAG y este mismo fichero se actualiza alli.
-# Dentro del tag, el auditor reproduce las compuertas con los comandos del `arranque-auditor-v2-84-*.md`.
+# COMMIT QUE CITA ESTE FICHERO: es ESTE MISMO commit POST-TAG, el primero de `main` posterior al tag
+# `v2.84-beta`. Localizalo sin ambiguedad con:
+#     git log -1 --format=%H -- docs/engineering/evidencia-ci-tag-v2.84-2026-09-27.txt
+# (NOTA: un commit NO puede citar su propio hash sin conocerlo antes; en `v2.83` esa linea se anadio en
+#  un commit posterior. Aqui se declara el comando en lugar de inventar el hash, y el hash concreto se
+#  registra en el commit siguiente.)
+# La cita del CI del tag vive aqui, FUERA del tag.
+# NOTA DE PATRON (falso positivo de auditoria): la instancia de ESTE fichero DENTRO del tag `v2.84-beta`
+# es el PLACEHOLDER pre-tag ("PENDIENTE DE TAG"), porque `Release tag CI` solo corre al EMPUJAR el tag y
+# su resultado no puede existir antes de ese push (patron OBS-3/OBS-4, v2.74-v2.83). Un auditor que trabaje
+# estrictamente sobre el objeto sellado (commit fd3859e3) leera el placeholder y NO debe concluir
+# "CI no acreditado": la cita acreditada es este fichero en el commit POST-TAG. Cadena verificada:
+#   tag v2.84-beta -> Release tag CI 36353503867 -> SUCCESS.
+#
+# REGLA DECLARADA (patron v2.74-v2.83): el workflow `Release tag CI` SOLO corre al empujar el tag,
+# asi que la cita de su resultado vive en un commit POST-TAG (este). Dentro del tag, el auditor no ve
+# este fichero; lo reproduce con los comandos del `arranque-auditor-v2-84-*.md`.
 #
 # --- Objeto de la fase (instrumento read-only; cierra OBS-6/OBS-7/OBS-8) ---
 # packages/py/application/src/bolsa_application/operability_audit.py
@@ -39,23 +51,71 @@
 #                                                                    deja 3 y 4 vigentes)
 #
 # --- Commits y push ---
-# (PENDIENTE: se rellena al sellar)
-# git push origin main        : <rango> main -> main
+# a0f03017ef81d56e1f8f6a7888d9c6d0f4fdc0b8  feat(v2.84): CONTRATO DEL FUNNEL (AUTO-MATERIAL-12) -
+#           cierra OBS-6/OBS-7/OBS-8 de la auditoria de v2.83.1-beta
+#           (operability_audit.py + test_operability_audit.py + v2_83_window_audit.py +
+#            v2_44_mutation_audit.py; 4 ficheros, +101 -9)
+# bad2866caab2857779400df504c10f7bc314e57c  chore(ops): anexo operativo de la ventana PAPER - semilla
+#           del par A/B (NO gate-certificada)
+#           (ops_seed_window_pair.py NUEVO + arranque de la ventana NUEVO + runbook; 3 ficheros, +524)
+# fd3859e305b7ef68f85f8c813b34fa434fb0a73f  docs(v2.84): docs de fase + bump `2.08.1-beta` -> `2.09.0-beta`
+#           (plan/audit-pack/arranque auditor/arranque agente/relevo/evidencia matriz 232/placeholder CI +
+#            CHANGELOG + PROJECT_STATE + engineering-index + deuda P3 + `package.json`)
+# git push origin main        : 605eedd9..fd3859e3  main -> main
 # git push origin v2.84-beta  : * [new tag] v2.84-beta -> v2.84-beta
+# tag anotado objeto e6d921a8 -> commit fd3859e3
 #
-# --- Release tag CI (run PENDIENTE, HEAD <sello>, event=push, branch v2.84-beta) ---
-# (PENDIENTE DE TAG)
+# --- Release tag CI (run 36353503867, HEAD fd3859e3, event=push, branch v2.84-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 8m54s; 21:56:12Z -> 22:05:06Z)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   decision-spine                                          success
+#   shared (build/typecheck/test)                           success
+#   python (ruff/imports/mypy/pytest offline)               success
+#   dr-verify (battery DB_DR / TCP CI)                      success
+#   playwright (mock E2E)                                   success
+#   frontend (typecheck/lint/test/build + contract:check)   success
+#   security (gitleaks)                                     success
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)        success
+#   lifecycle-pg (Alembic + auth + golden restart)          success
+#   playwright (integrated E2E, opt-in)                     [skipped, por diseno]
+#   certify (aggregate + artifact)                          success
+#
 # Job `python` del tag:
 #   ruff    : All checks passed!
 #   imports : Contracts: 4 kept, 0 broken.
-#   mypy    : Success: no issues found in 507 source files
-#   pytest  : <3022 + 18> = esperado 3040 passed, 37 skipped
-# Job `quality`:
-#   pytest  : <3011 + 18> = esperado 3029 passed, 40 skipped
+#   mypy    : Success: no issues found in 507 source files     <-- SIN cambio (507 = 507)
+#   pytest  : 3022 passed, 37 skipped, 6 warnings in 71.56s
+#             => `3020 + 2 = 3022` = EXACTAMENTE lo ESPERADO y declarado ANTES del sello; skips SIN
+#                mover (37 = 37) => el registro explicito del test en `release-tag-ci.yml` SI ejecuto.
+#
+# --- Sobre el MISMO commit y tag (fd3859e3, v2.84-beta) ---
+#   Python CI            36353503833 : success (attempt 1)
+#       quality: 3011 passed, 40 skipped, 6 warnings in 87.57s = `3009 + 2 = 3011` = lo ESPERADO;
+#                skips 40 = 40; `ruff` `All checks passed!` / `Contracts: 4 kept, 0 broken` /
+#                `mypy 0 issues (507 files)`.
+#       Jobs PG del tag intactos (el diff no toca el material durable ni las migraciones):
+#       grammar-discovery-pg (A14 E2E) / paper-forward-pg (A13 E2E) /
+#       auto-v2-durable-pg (Alembic 040-045 + reinicio real) / lifecycle-pg (A12 E2E): success
+#   Frontend CI          36353503843 : success (attempt 1)
+#   Optimize lab         36353503832 : success (attempt 1)
+#   Fase 2 scientific    36353503849 : success (attempt 1)
+#
+# --- En main (fast-forward 605eedd9..fd3859e3) ---
+#   Python CI            36353481118 : success (attempt 1)
+#       quality: 3011 passed, 40 skipped, 6 warnings in 116.70s; skips 40 = 40; jobs PG per-commit
+#       (`grammar-discovery-pg` A14 / `paper-forward-pg` A13 / `auto-v2-durable-pg` /
+#        `lifecycle-pg` A12) en success.
+#       NOTA DECLARADA: en `main` **SI** corrieron `Python CI` y `Fase 2 scientific`, porque el sello
+#       incluye ficheros Python y el trigger por rutas de `python-ci.yml` los ve. Es comportamiento
+#       por diseno, no un fallo.
+#   Frontend CI          36353481072 : success (attempt 1)
+#   Optimize lab         36353481116 : success (attempt 1)
+#   Fase 2 scientific    36353481110 : success (attempt 1)
+#   Gitleaks             36353481089 : success (attempt 1)
 #
 # --- Compuertas medidas EN LOCAL (antes del sello, no heredadas) ---
 # ruff          : All checks passed!
-# import-linter : Contracts: 4 kept, 0 broken.
+# import-linter : Contracts: 4 kept, 0 broken. (638 ficheros, 3457 dependencias)
 # mypy          : Success: no issues found in 507 source files
 # alembic       : 046_fill_reference_mid (head)
 # puros nuevos  : test_operability_audit.py -> 18 passed (16 + 2)
@@ -66,14 +126,34 @@
 #                 unitario por diseno (script de operador como sus hermanos del mismo directorio) y NO
 #                 esta en el alcance de mypy (`apps/api-python/src`). Declarado, no gate-certificado.
 #
-# --- ESPERADO vs OBSERVADO ---
-# (PENDIENTE: se cumple o se corrige POST-TAG)
+# --- ESPERADO vs OBSERVADO (el sello declaro su prediccion antes de empujar) ---
+# Job `python` del tag : ESPERADO 3022/37  · OBSERVADO 3022/37  -> COINCIDE (3020 + 2; 37 = 37)
+# Job `quality`        : ESPERADO 3011/40  · OBSERVADO 3011/40  -> COINCIDE (3009 + 2; 40 = 40)
+#   => la prediccion del fichero PRE-TAG era un calculo (`base + 2`), no una urna: se cumplio exacta,
+#      y por eso ninguna cifra se corrigio despues.
 #
-# LECTURA (sin sesgo): fase de INSTRUMENTO READ-ONLY que cierra las 3 observaciones de la auditoria
-# externa de v2.83.1-beta. Los invariantes del instrumento NO cambian: `rate=None` (nunca 0.0) sin
-# dias/denominador, render determinista con `n/d`, CLI estrictamente read-only (no escribe con
-# --render/--json sin --out; no toca el journal durable ni `evidence_runs/`/`evidence_validations/`).
+# --- CONSTANCIA DE UN ERROR ARITMETICO EN EL PLACEHOLDER PRE-TAG (honestidad) ---
+# El PLACEHOLDER pre-tag (la instancia de ESTE fichero DENTRO del tag `v2.84-beta`) escribia:
+#     Job `python` del tag: `<3022 + 18> = esperado 3040 passed, 37 skipped`
+#     Job `quality`       : `<3011 + 18> = esperado 3029 passed, 40 skipped`
+# Ambas lineas son un ERROR ARITMETICO: sumaban 18 (el total de la suite pura) sobre una base
+# (3022 / 3011) que YA INCLUIA los 2 tests nuevos (`3020 + 2` / `3009 + 2`). La prediccion CORRECTA
+# era 3022/37 y 3011/40, que es EXACTAMENTE lo observado en el CI del tag.
+# REGLA APLICADA: no se corrigio NINGUNA cifra observada; se corrigio la FORMULA, y el error queda
+# declarado aqui y en `PROJECT_STATE.md` / `engineering-index` (patron OBS-3: declarar, no maquillar).
+# El codigo, los tests y la matriz NO dependen de esta aritmetica.
+#
+# LECTURA (sin sesgo): fase de INSTRUMENTO READ-ONLY. CI del tag GREEN en la PRIMERA pasada con
+# EXACTAMENTE los conteos predichos (3022/37 y 3011/40), +2 tests nuevos, mypy 507 = 507, matriz
+# 232/232 con restauracion byte a byte y arbol limpio, SIN migracion y sin tocar el freeze ni el
+# reparto (`auto18-v1`/`auto15-v1`, `ALLOCATION = none`). Los invariantes del instrumento NO cambian:
+# `rate=None` (nunca `0.0`) sin dias/denominador, render determinista con `n/d`, CLI estrictamente
+# read-only (no escribe con `--render`/`--json` sin `--out`; no toca el journal durable ni
+# `evidence_runs/`/`evidence_validations/`).
 #
 # DECLARADO, NO HECHO: la ventana de >=4 dias de calendario sigue siendo OPERACION DEL PROPIETARIO
-# (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita. `H-4` (LOW) sigue ABIERTO (visible via
-# `warnings: reason_contract`, no cerrado). `OBS-9` (doc-only) DECLARADA. `P3-5` y `OBS-5` declaradas.
+# (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita ni la sustituye; `H-4` (LOW) sigue ABIERTO (esta
+# fase lo hace VISIBLE en `warnings: reason_contract`, no lo cierra); `OBS-9` (doc-only) DECLARADA;
+# `P3-5` y `OBS-5` declaradas. El anexo operativo (`ops_seed_window_pair.py`) es una SEMILLA NO
+# GATE-CERTIFICADA: `pairActive=true` significa "par sembrado", no "promocion certificada", y NO cierra
+# `P3-3`.

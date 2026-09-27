@@ -82,6 +82,11 @@ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py         
   **no** está gate-certificada (`shadow_validated=false`) ⇒ `pairActive=true` significa «par sembrado», no
   «promoción certificada»; **no** cierra `P3-3`. Y `PAPER_D_ACCOUNT_ID`/`BROKER_VENUE` viven en el `.env`
   **local** (no versionado): sin ellos, ese script queda **bloqueado** (`exit 2`).
+- **Placeholder pre-tag con error aritmético declarado:** la copia de `evidencia-ci-tag-v2.84-2026-09-27.txt`
+  **dentro** del tag predice `3040`/`3029` por un fallo de fórmula (`+18` sobre una base que ya incluía los
+  2 tests nuevos). Lo correcto es **`3022/37`** y **`3011/40`**, que es lo que midió el CI del tag. Ninguna
+  cifra observada se corrigió; se corrigió la fórmula (ver §5 del
+  [relevo](./traspaso-relevo-post-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md)).
 
 Referencias: [plan](./plan-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md) ·
 [arranque del auditor](./arranque-auditor-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md) ·
