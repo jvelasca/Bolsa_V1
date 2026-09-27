@@ -119,6 +119,13 @@ Comandos en el [relevo de `v2.77`](./traspaso-relevo-post-v2-77-auto-material-5-
 **ABIERTA**; el instrumento (funnel + `unresolved_age` + HTML) queda **intacto** y **no** se cierra con
 fixtures: exige material PAPER real en **≥4 cubos**.
 
+**Actualización `v2.83` (2026-09-27):** `AUTO-MATERIAL-11` entrega el instrumento de **lectura acumulada**
+de la ventana (`operability_audit.py` puro + `v2_83_window_audit.py` **read-only**: fila `TOTAL` y las
+**tasas** `topNExclusionRate`/`riskRejectionRate`/`reservationFailureRate`/`fillRate`/`cycleRate`/
+`unresolvedRate`), pero la deuda sigue **ABIERTA**: el instrumento **no** corre la ventana ni fabrica
+medición (`n/d` ≠ `0`; el gate sigue siendo `INCONCLUSIVE` sin ≥4 días/≥2 episodios/≥32 ciclos). La
+lectura por **cubos** sigue exigiendo material PAPER real.
+
 ## P3-3 — `P(R>0)` frente al tamaño muestral
 
 **Estado: 🔴 ABIERTA** (requiere el primer dataset PAPER real). Regla que se mantiene: `P(R>0)` es
@@ -150,6 +157,12 @@ ventana real de mercado.
 **Actualización `v2.82` (2026-09-27):** `AUTO-MATERIAL-10` (docs-only) mantiene la deuda **ABIERTA**: la
 ventana **≥4 días** con **≥2 episodios** sigue siendo **operación del propietario**, y la fase **no**
 rebaja `folds`/`min_is`/`min_oos`/`min_episodes` para forzar una corrida.
+
+**Actualización `v2.83` (2026-09-27):** `AUTO-MATERIAL-11` mantiene la deuda **ABIERTA**: añade la
+**lectura** de la ventana (`TOTAL` + tasas, read-only) pero **no** la corre y **no** rebaja
+`folds`/`min_is`/`min_oos`/`min_episodes`. El preflight de 2026-09-27 volvió a **vetar** las entradas
+LONG (`exit 2`, `BEAR_TREND`: `{range:8, trend_down:9, trend_up:3}`), así que sigue sin haber ciclos
+válidos que barrer.
 
 ## P3-4 — `build_current_regime_evidence` publica el `level` sin clampar (P3) — 🟢 CERRADA en `v2.72`
 
@@ -198,6 +211,10 @@ clampe por su cuenta.
 
 > **`v2.82` (2026-09-27):** sigue **ABIERTA y declarada**; `AUTO-MATERIAL-10` **no** la aborda (fase
 > operativa docs-only, cero cambios de código).
+>
+> **`v2.83` (2026-09-27):** sigue **ABIERTA y declarada**; `AUTO-MATERIAL-11` **no** la aborda (fase de
+> INSTRUMENTO **read-only**: módulo puro + CLI de auditoría, **sin** tocar el store ni el motor
+> congelado; requiere migración, que esta fase **no** añade).
 
 **Origen.** Seguimiento del punto 12 de `v2.74`: ¿`AUTO-19` (`cycle_risk_from_reservations`) obtiene el
 riesgo histórico de una evidencia **inmutable** del ciclo o del estado **mutable** del `ReservationLedger`?
@@ -403,6 +420,12 @@ aparecen durante la ventana, `otherCount>0` lo dirá y `H-4` dejará de ser deud
 auditor es cerrarlo **después** de la primera ventana real y **sólo** si `otherCount > 0`; el funnel y
 `reasonCatalogCoverage["unknown"]` siguen haciéndolo **visible**.
 
+**Estado en `v2.83` (2026-09-27).** `AUTO-MATERIAL-11` **no** cierra `H-4` y **no** añade su
+remediación (pospuesta por decisión del auditor, §24): la fase **lo hace visible en la auditoría** con el
+aviso `reason_contract` (`other>0` ⇒ `ALERTA CONTRATO` + los motivos `other` nombrados) y con la cobertura
+`unknown` del instrumento. Si esos `signal_*` aparecen durante la ventana, la auditoría lo dirá en una
+línea; hasta entonces `H-4` sigue siendo deuda **teórica y ABIERTA**.
+
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 
 No son deuda de código; se declaran para que no se lean como sorpresas en la próxima pasada.
@@ -422,6 +445,12 @@ No son deuda de código; se declaran para que no se lean como sorpresas en la pr
 > **`v2.82` (2026-09-27):** `OBS-3`/`OBS-4`/`OBS-5` siguen **DECLARADAS**; `AUTO-MATERIAL-10` no las
 > aborda. `OBS-3`/`OBS-4` se materializan también en `v2.82` (la cita del CI y el rango viven en el commit
 > POST-TAG, patrón `v2.74`–`v2.81`).
+>
+> **`v2.83` (2026-09-27):** `OBS-3`/`OBS-4`/`OBS-5` siguen **DECLARADAS**; `AUTO-MATERIAL-11` no las
+> aborda. `OBS-3`/`OBS-4` se materializan igual (cita del CI y rango en el commit POST-TAG, patrón
+> `v2.74`–`v2.82`) y, además, esta fase **declara** que el tag `v2.83-beta` **no** se ha empujado desde el
+> entorno de la fase: `evidencia-ci-tag-v2.83-2026-09-27.txt` nace como **declaración de pendiente** (con
+> las compuertas medidas en local y el conteo **esperado** de CI), sin inventar run ni `attempt`.
 
 ## Deuda de AUDITORÍA — `v2.73-beta` (`AUTO-MATERIAL-1`) sin pasada externa — 🟡 ABIERTA (de proceso)
 

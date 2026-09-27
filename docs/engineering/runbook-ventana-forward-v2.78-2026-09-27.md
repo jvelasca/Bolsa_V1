@@ -5,7 +5,9 @@
 > **Herramienta:** `v2_76_forward_market_material.py` (AUTO-MATERIAL-4) + journal de operabilidad
 > `v2_77_market_operability.py` (AUTO-MATERIAL-5) + **capturador de la ventana**
 > `v2_80_market_window.py` (AUTO-MATERIAL-8, read-only sobre el journal **durable**; ampliado en
-> AUTO-MATERIAL-9/**v2.81** con `--forward` y `--html` y el **funnel de operabilidad**). En
+> AUTO-MATERIAL-9/**v2.81** con `--forward` y `--html` y el **funnel de operabilidad**) + la
+> **auditoría read-only** `v2_83_window_audit.py` (AUTO-MATERIAL-11/**v2.83**: fila `TOTAL` agregada y
+> **tasas** de operabilidad, §9). En
 > `v2.82` (`AUTO-MATERIAL-10`) esta ventana se formaliza como **fase OPERATIVA** (docs-only: ver §8).
 > **Regla dura:** esto es **operación**, no una fase de código. **No** se bajan umbrales, **no** se
 > fuerza el régimen, **no** se backdatea nada.
@@ -64,6 +66,14 @@ uv run --no-sync python apps/api-python/scripts/v2_80_market_window.py \
     --forward 'operability_runs/forward-market-*.json' \
     --out "operability_runs/operability-window.json" \
     --html "operability_runs/operability-window.html"
+
+# 5) AUDITORIA de la ventana (read-only, AUTO-MATERIAL-11/v2.83): fila TOTAL acumulada + tasas
+#    de operabilidad (topN/riesgo/reserva/fill/ciclo/unresolved) + AVISOS. No abre el motor ni
+#    PostgreSQL y NO escribe en el journal durable ni en evidence_runs/evidence_validations:
+uv run --no-sync python apps/api-python/scripts/v2_83_window_audit.py \
+    --window "operability_runs/operability-window.json" \
+    --forward 'operability_runs/forward-market-*.json' --render \
+    --out "operability_runs/operability-audit.json"
 ```
 
 Repite 1–4 **cada día de mercado**. El journal de la sonda del runner
@@ -114,6 +124,8 @@ fabricado. Mientras no se cumpla el gate, el veredicto honesto es **`NO MEDIDO`*
 | `Par` (`CAPAZ`/`ACTIVO`) | `CAPAZ` sin `ACTIVO` ⇒ falta la estrategia B (brecha 1) |
 | `Funnel` (v2.81) | `universe → marketData → regimeAllowed → signals → topN → risk → reservation → orders → fills → cycles`: localiza el ESCALÓN donde se pierde la oportunidad; `n/d` = **no medido** (sin `--forward` los superiores no se pueden afirmar), nunca `0` |
 | `unresolved_age` (v2.81) | permanencia de las propuestas (`lt1m`/`1to5m`/`5to20m`/`gt20m`): `gt20m` frecuente delata un problema de **integración**, no de mercado |
+| `TOTAL` acumulado (v2.83) | suma **sólo** los días **medidos** y publica `coverage[*].partial`: un hueco **no** se suma como `0`; un `TOTAL` sobre días incompletos se ve como incompleto |
+| `Tasas` (v2.83) | `topNExclusionRate` · `riskRejectionRate` · `reservationFailureRate` · `fillRate` · `cycleRate` · `unresolvedRate`: cada una con `numerator`/`denominator`/`coveredDays`/`source`; `n/d` (None) si no hay días medidos o el denominador es `0` — **nunca** `0.0` |
 
 ## 7. Entregable
 
@@ -154,7 +166,8 @@ flowchart TD
 - **Huecos:** `n/d` = **no medido** (`None`), **nunca** `0`. Sin `--forward`, los escalones superiores se
   declaran `n/d` (correcto, no un defecto).
 - **Después de los días:** el `TOTAL` se lee **sin** sumar huecos como ceros; sólo los días **medidos**
-  cuentan para el gate (§4).
+  cuentan para el gate (§4). Desde `v2.83` el `TOTAL` y las **tasas** los publica la herramienta
+  `v2_83_window_audit.py` (§9) — no se calculan a mano.
 
 ### 8.2 Qué NO se hace durante la ventana
 
@@ -162,4 +175,31 @@ flowchart TD
   (recomendación de la auditoría de `v2.81`: medir, no alterar para producir más operaciones).
 - **No** se cierra `H-4` por anticipado: `otherCount == 0` durante toda la ventana ⇒ deuda **preventiva**;
   `otherCount > 0` ⇒ catalogar los `signal_*` **antes** de cerrar la fase estadística.
-- **No** se implementa `resolutionJoined` ni la fila `TOTAL`: mejoras futuras, con datos que las justifiquen.
+- **No** se implementa `resolutionJoined` (mejora futura, con datos que la justifiquen). La fila `TOTAL`
+  ya está implementada desde `v2.83`, pero **read-only** y **sin** decidir nada (§9).
+
+## 9. Auditoría read-only de la ventana (`v2.83` / `AUTO-MATERIAL-11`)
+
+`v2.83` añade el instrumento de **lectura acumulada** de la ventana: un módulo **puro**
+(`bolsa_application/operability_audit.py`, sin I/O ni reloj) y un **CLI read-only**
+(`apps/api-python/scripts/v2_83_window_audit.py`). **No** abre PostgreSQL, **no** toca el motor, **no**
+recalcula el gate ni los umbrales y **no** escribe en el journal durable, `evidence_runs/` ni
+`evidence_validations/`.
+
+```bash
+uv run --no-sync python apps/api-python/scripts/v2_83_window_audit.py \
+    --window operability_runs/operability-window.json --render \
+    --forward 'operability_runs/forward-market-*.json' \
+    --out operability_runs/operability-audit.json
+```
+
+Publica la tabla `D1..Dn` + **`TOTAL`** + funnel agregado + **tasas** + `AVISOS` (`reason_contract`,
+`price_missing`, `pair_not_active`, `pair_unmeasured`). Reglas:
+
+- Las tasas se **derivan del funnel** (una sola aritmética) y llevan `numerator`/`denominator`/
+  `coveredDays`/`source`; `rate=None` si no hay días medidos o el denominador es `0` (**nunca** `0.0`).
+- `--forward` es **opcional** y **sólo** rellena los huecos **declarados** (`orders`/`pairActive`):
+  **jamás** sobrescribe lo medido.
+- Códigos: `0` con ≥1 día · `2` sin material legible · `1` uso incorrecto.
+- **No sustituye** al gate: el veredicto de la ventana sigue siendo `READY`/`INCONCLUSIVE` por
+  `window_gate` (≥4 días, ≥2 episodios, ≥32 ciclos).

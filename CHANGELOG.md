@@ -2,6 +2,41 @@
 
 All notable releases of Bolsa V1.
 
+## [2.08.0-beta] — `AUTO-MATERIAL-11`: AUDITORÍA READ-ONLY de la ventana PAPER (≥4 días) — 2026-09-27
+
+**Fase de INSTRUMENTO READ-ONLY; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y
+**sin tocar el freeze** (`auto_simulation_worker.py` intacto). El reparto **no se mueve**:
+`auto18-v1` / `auto15-v1` (`ALLOCATION = none`). **No** se toca el gobernador (`aggregate_trial_regime`),
+ni `TOP_N`, ni un solo umbral, ni la allocation, ni los pesos de estrategia, ni la lógica A/B.
+
+Origen: `v2.82` formalizó la **ventana ≥4 días** como fase **operativa** (docs-only). El instrumento de
+`v2.81` ya publica la serie diaria, el **funnel**, el `unresolved_age` y el informe HTML, pero faltaba la
+**lectura acumulada**: la fila **`TOTAL`** y las **tasas de operabilidad**. Esta fase las entrega **sin**
+tocar el motor y **sin** fabricar medición.
+
+- **Módulo puro (nuevo)** `packages/py/application/src/bolsa_application/operability_audit.py` (sin I/O ni
+  reloj): `window_totals` (TOTAL que suma **sólo** los días medidos y publica `coverage[*].partial`),
+  `window_rates` (`topNExclusionRate` · `riskRejectionRate` · `reservationFailureRate` · `fillRate` ·
+  `cycleRate` · `unresolvedRate`, **derivadas del funnel**, con `source` declarada y `rate=None` —**nunca**
+  `0.0`— sin días medidos o con denominador `0`), `window_audit` (TOTAL + tasas + funnel + `window_gate` +
+  **avisos**), `render_window_audit` (tabla `D1..Dn` + `TOTAL` + funnel agregado + tasas + `AVISOS`) y
+  `enrich_rows_with_evidence` (rellena **sólo** los huecos declarados con la **misma** función del
+  instrumento; jamás sobrescribe lo medido).
+- **CLI read-only (nuevo)** `apps/api-python/scripts/v2_83_window_audit.py`: consume
+  `operability-window.json`/`window.jsonl` (+ `--forward` opcional para enriquecer `orders`/`pairActive`),
+  `--render`/`--json`/`--out`; **no** abre PostgreSQL, **no** toca el motor, **no** recalcula el gate ni los
+  umbrales y **no** escribe en el journal durable, `evidence_runs/` ni `evidence_validations/`;
+  `0` con ≥1 día · `2` sin material legible · `1` uso.
+- **Tests:** `test_operability_audit.py` (**16** puros) registrado **explícito** en `python-ci.yml` y
+  `release-tag-ci.yml`; suite de aplicación **2071 → 2087 passed**; `mypy` **506 → 507** fuentes; matriz
+  adversarial **230/230** intacta (restauración **byte a byte**, árbol limpio; **sin** mutaciones nuevas).
+- **Verificación pre-D1 declarada:** preflight **exit 2** · `{range:8, trend_down:9, trend_up:3}` ⇒
+  `BEAR_TREND` ⇒ **LONG VETADAS**; barras **20/20**; el par A/B (`pairActive=true`) y la cuenta fija
+  **NO** son verificables (`PAPER_D_ACCOUNT_ID` **comentado** en `.env`) ⇒ brechas **ABIERTAS**.
+- **Deuda declarada:** `P3-2`/`P3-3` siguen **ABIERTAS** (la ventana la produce la operación real);
+  `H-4` (LOW) **ABIERTO** (esta fase lo hace **visible** en `warnings: reason_contract`, **no** lo cierra);
+  `P3-5` y `OBS-5` declaradas; `resolutionJoined=false` sigue como mejora futura.
+
 ## [2.07.0-beta] — `AUTO-MATERIAL-10`: OBSERVATION WINDOW (fase operativa) — 2026-09-27
 
 **Fase OPERATIVA; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin tocar el

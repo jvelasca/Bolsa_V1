@@ -1,0 +1,87 @@
+# V2.83 / AUTO-MATERIAL-11 - evidencia cruda LOCAL (compuertas + verificacion pre-D1 + smoke del CLI)
+#
+# Fecha de captura: 2026-09-27  ·  Version sellada: 2.08.0-beta  ·  SIN migracion (Alembic head 046).
+# Arbol de trabajo: solo los ficheros de la fase + `package.json`. Motor congelado intacto.
+#
+# --- Compuertas (medidas EN LOCAL, no heredadas) ---
+#
+# $ uv run --no-sync ruff check packages/py apps/api-python --config pyproject.toml
+#   All checks passed!
+#
+# $ uv run --no-sync lint-imports --config packages/py/.importlinter
+#   Domain no importa infra, analytics, application ni SDKs LLM      KEPT
+#   SDKs LLM solo via bolsa_ai (Proxy First)                         KEPT
+#   bolsa_ai no entra en domain                                      KEPT
+#   analytics y market no se importan entre si                       KEPT
+#   Contracts: 4 kept, 0 broken.
+#
+# $ uv run --no-sync mypy packages/py/domain/src packages/py/market/src \
+#       packages/py/infrastructure/src packages/py/application/src apps/api-python/src \
+#       --follow-imports=silent
+#   Success: no issues found in 507 source files        <-- 506 -> 507 (+1 = operability_audit.py)
+#
+# $ (cd packages/py/infrastructure && uv run --no-sync --project <raiz> alembic heads)
+#   046_fill_reference_mid (head)                       <-- SIN migracion
+#
+# --- Tests ---
+#
+# $ uv run --no-sync pytest packages/py/application/tests/test_operability_audit.py -q
+#   16 passed in 0.29s                                  <-- NUEVO: test_operability_audit.py
+#
+# $ uv run --no-sync pytest packages/py/application/tests -q
+#   2087 passed in 174.52s (0:02:54)                    <-- base 2071 + 16 nuevos de esta fase
+#
+# $ uv run --no-sync pytest packages/py/application/tests/test_operability_audit.py \
+#       packages/py/application/tests/test_operability_window.py \
+#       packages/py/application/tests/test_market_operability.py -q
+#   97 passed in 0.41s
+#
+# --- Matriz adversarial (re-ejecutada; no se anaden mutaciones en esta fase) ---
+#
+# $ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py
+#   (cola) ... M226-M230: rojo en los tests del funnel/age/html; "restaurado byte a byte: si"
+#   === huella del arbol ===
+#   estado git de esos ficheros (despues): limpio
+#     intacto: la sonda no altero el arbol
+#     medidas: 230/230 (ninguna se quedo sin fragmento)
+#   EXIT=0
+#
+# --- Verificacion pre-D1 (operativa; read-only; se DECLARA, no se fuerza) ---
+#
+# $ uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_material.py \
+#       --preflight-only --watch-size 20
+#   # preflight: entradas LONG VETADAS (eje BEAR_TREND); no se escribio nada
+#   PREFLIGHT - REGIMEN DE MERCADO DEL WATCH (read-only, no escribe)
+#   --------------------------------------------------------------
+#   watch                          20 simbolos
+#   barras servidas por el loader  20
+#   regimen por simbolo            {'range': 8, 'trend_down': 9, 'trend_up': 3}
+#   agregado (mas conservador)     trend_down
+#   eje operativo                  BEAR_TREND
+#   entradas LONG                  VETADAS (regime_invalid)
+#   EXIT=2
+#
+# Brechas del runbook §2:
+#   [OK]   barras: 20/20 servidas (el scheduler de barras responde hoy)
+#   [VETO] regimen: BEAR_TREND => LONG vetadas hoy (no se fuerza el regimen ni se elige otro watch)
+#   [ABIERTA] par A/B (pairActive=true con estrategia B ACTIVE + EdgeReport): NO VERIFICABLE —
+#             `PAPER_D_ACCOUNT_ID` esta COMENTADO en `.env` (`# PAPER_D_ACCOUNT_ID=...`) => no hay
+#             cuenta fija para el par; no se declara resuelta por documentacion.
+#   [ABIERTA] cuenta fija desde D2 (`$ACCOUNT`/`$VERSION_A`): NO VERIFICABLE (misma causa).
+#   [PENDIENTE] glob `operability_runs/forward-market-*.json`: aun no existe bundle real; el patron
+#               del runbook excluye los fixtures.
+#
+# --- Smoke del CLI read-only sobre un fixture (no hay bundle real todavia) ---
+#
+# $ uv run --no-sync python apps/api-python/scripts/v2_83_window_audit.py \
+#       --journal operability_runs/journal.jsonl --render
+#   (exit 0) tabla D1..Dn + TOTAL acumulado + funnel agregado + tasas + GATE + AVISOS.
+#   La fila del fixture no trae `funnel` (formato del censo de v2.77) => los escalones se leen `n/d`
+#   y las tasas `n/d`: es el comportamiento DECLARADO (hueco, no cero). No se escribio ningun fichero.
+#
+# --- Lectura (sin sesgo) ---
+# Fase de INSTRUMENTO READ-ONLY: compuertas verdes, +16 tests nuevos (2087 en application), mypy
+# 506 -> 507, matriz 230/230 con restauracion byte a byte y arbol limpio, SIN migracion. La ventana
+# real de >=4 dias sigue siendo OPERACION DEL PROPIETARIO: P3-2/P3-3 ABIERTAS; H-4 (LOW) ABIERTO;
+# P3-5 y OBS-5 declaradas. El preflight de hoy VETA LONG por regimen y el par A/B no es verificable
+# sin cuenta fija: se declara, no se fabrica.

@@ -1,0 +1,44 @@
+# V2.83 / AUTO-MATERIAL-11 - CI del tag `v2.83-beta`: PENDIENTE DE TAG (declaracion, NO cita)
+#
+# Fecha: 2026-09-27  ·  Version: 2.08.0-beta  ·  SIN migracion (Alembic head 046_fill_reference_mid).
+#
+# ESTADO DECLARADO: el tag `v2.83-beta` AUN NO SE HA EMPUJADO desde el entorno de esta fase, asi que
+# NO existe run de `Release tag CI` que citar. Este fichero NO inventa un run, un `attempt` ni unos
+# tiempos: declara lo que se midio EN LOCAL y lo que se ESPERA del CI.
+#
+# REGLA DEL PROYECTO (patron v2.74-v2.82): el workflow `Release tag CI` SOLO corre al empujar el tag,
+# asi que su cita vive en un commit POST-TAG. Al sellar, reemplazar esta cabecera por la cita cruda
+# (run id, conclusion, attempt, duracion, jobs, conteos) siguiendo `evidencia-ci-tag-v2.82-*.txt`.
+#
+# --- Compuertas medidas EN LOCAL (antes del sello, no heredadas) ---
+# ruff          : All checks passed!
+# import-linter : Contracts: 4 kept, 0 broken.
+# mypy          : Success: no issues found in 507 source files      <-- 506 -> 507 (+1: operability_audit.py)
+# alembic       : 046_fill_reference_mid (head)
+# puros nuevos  : test_operability_audit.py -> 16 passed
+# aplicacion    : pytest packages/py/application/tests -q -> 2087 passed (base 2071 + 16)
+# instrumento   : test_operability_audit.py + test_operability_window.py + test_market_operability.py
+#                 -> 97 passed
+# matriz        : 230/230, restauracion byte a byte, arbol intacto (no se anaden mutaciones)
+#                 (sonda re-ejecutada: "medidas: 230/230 (ninguna se quedo sin fragmento)";
+#                  "intacto: la sonda no altero el arbol")
+# pre-D1        : preflight exit 2 (BEAR_TREND, LONG vetadas; barras 20/20); par A/B y cuenta fija NO
+#                 verificables (`PAPER_D_ACCOUNT_ID` comentado en `.env`) -> brechas ABIERTAS
+#
+# --- ESPERADO en el CI (NO medido; se declara como esperado, no como observado) ---
+# Job `python` del tag : 3004 + 16 = 3020 passed / 37 skipped  (registro explicito del test nuevo en
+#                        `release-tag-ci.yml`)
+# Job `quality`        : 2993 + 16 = 3009 passed / 40 skipped  (registro explicito del test nuevo en
+#                        `python-ci.yml`)
+# Skips: SIN mover (37 = 37; 40 = 40): la fase no anade tests que requieran servicios externos.
+# Jobs PG del tag: intactos (el diff no toca el material durable ni las migraciones).
+#
+# LECTURA (sin sesgo): fase de INSTRUMENTO READ-ONLY. Compuertas verdes, +16 tests nuevos, mypy
+# 506 -> 507, matriz 230/230 con restauracion byte a byte y arbol limpio, SIN migracion y sin tocar el
+# freeze ni el reparto (`auto18-v1`/`auto15-v1`, `ALLOCATION = none`). El instrumento nuevo NO fabrica
+# medicion (`n/d` != `0`): el CLI es read-only y no escribe en el journal durable ni en `evidence_runs/`
+# ni en `evidence_validations/`.
+#
+# DECLARADO, NO HECHO: la ventana de >=4 dias de calendario sigue siendo OPERACION DEL PROPIETARIO
+# (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita ni la sustituye; `H-4` (LOW) sigue ABIERTO (esta
+# fase lo hace VISIBLE en `warnings: reason_contract`, no lo cierra); `P3-5` y `OBS-5` declaradas.
