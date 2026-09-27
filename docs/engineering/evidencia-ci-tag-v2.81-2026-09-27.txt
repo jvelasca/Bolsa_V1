@@ -1,39 +1,78 @@
-# V2.81 / AUTO-MATERIAL-9 - CI del tag `v2.81-beta`: evidencia (cita POST-TAG)
+# V2.81 / AUTO-MATERIAL-9 - CI del tag `v2.81-beta`: evidencia cruda (cita POST-TAG)
 #
-# Fecha de captura local: 2026-09-27
+# Fecha de captura: 2026-09-27
+# Tag anotado: v2.81-beta (objeto 2c69bb64) -> commit bd9d9c17 (sello en dos commits: ab918127 feat + bd9d9c17 docs)
 # Version: 2.06.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
 #
 # REGLA DECLARADA (patron v2.74-v2.80): el workflow `Release tag CI` SOLO corre al empujar el tag,
-# asi que la cita de su resultado vive en un commit POST-TAG (este fichero, completado tras el push).
-# Dentro del tag, el auditor lo reproduce con los comandos del `arranque-auditor-v2-81-*.md`.
+# asi que la cita de su resultado vive en un commit POST-TAG (este). Dentro del tag, el auditor no ve
+# este fichero; lo reproduce con los comandos del `arranque-auditor-v2-81-*.md`.
 #
 # --- Commits y push ---
-# PENDIENTE: rellenar tras empujar la rama y el tag anotado `v2.81-beta` (feat + docs) y observar
-# `Release tag CI` (run id, conclusion, jobs y conteos de pytest).
+# ab918127  feat(v2.81): REAL WINDOW EXECUTION (AUTO-MATERIAL-9): funnel de operabilidad + unresolved_age + informe HTML
+# bd9d9c17  docs(v2.81): paquete de fase AUTO-MATERIAL-9 + runbook de la ventana + PROJECT_STATE/indice/CHANGELOG/deuda + evidencia matriz 230/230
+# git push origin main        : 7bfa5efa..bd9d9c17  main -> main
+# git push origin v2.81-beta  : * [new tag] v2.81-beta -> v2.81-beta
+# tag anotado objeto 2c69bb64 -> commit bd9d9c17 (bd9d9c17ed59b64c6a06a4aac34139335a004232)
 #
-# --- Release tag CI ---
-# PENDIENTE de push (no observable en local). NO se inventa.
+# --- Release tag CI (run 36318148752, HEAD bd9d9c17, event=push, branch v2.81-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 8m48s; 12:11:11Z -> 12:19:59Z)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   frontend (typecheck/lint/test/build + contract:check) in 3m12s
+#   security (gitleaks) in 9s
+#   shared (build/typecheck/test) in 36s
+#   playwright (mock E2E) in 8m14s
+#   python (ruff/imports/mypy/pytest offline) in 1m41s
+#   decision-spine in 31s
+#   dr-verify (battery DB_DR / TCP CI) in 1m0s
+#   lifecycle-pg (Alembic + auth + golden restart) in 4m58s
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG) in 52s
+#   - playwright (integrated E2E, opt-in)   [skipped, por diseno]
+#   certify (aggregate + artifact) in 4s
+#
+# Job `python` del tag:
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 506 source files
+#   pytest  : 3004 passed, 37 skipped, 6 warnings in 60.04s
+#             => 2994 (job python del tag de v2.80) + 10 (los puros NUEVOS de v2.81:
+#                `test_operability_window.py` 13 -> 23). Los SKIPS NO se mueven (37 = 37): ninguna
+#                entrada nueva queda sin correr. `test_operability_window.py` esta registrado
+#                EXPLICITO en `release-tag-ci.yml` (job `python`), asi que corre en el tag (no como
+#                `--ignore`-ado): el conteo lo prueba.
+#
+# --- Sobre el MISMO commit y tag (bd9d9c17, v2.81-beta) ---
+#   Python CI          36318148738 : success (attempt 1)
+#       quality: 2993 passed, 40 skipped = 2983 (quality del tag de v2.80) + 10 (los mismos puros
+#       nuevos); skips sin mover (40 = 40). Jobs PG del tag intactos: grammar-discovery-pg /
+#       lifecycle-pg (A12) / auto-v2-durable-pg / paper-forward-pg: success
+#   Frontend CI        36318148764 : success (attempt 1)
+#   Optimize lab       36318148749 : success (attempt 1)
+#   Fase 2 scientific  36318148751 : success (attempt 1)
+#
+# --- En main (fast-forward 7bfa5efa..bd9d9c17) ---
+#   Python CI          36318147149 : success (attempt 1)
+#       quality: 2993 passed, 40 skipped; y los cuatro jobs PG
+#       (auto-v2-durable-pg / grammar-discovery-pg / lifecycle-pg (A12) / paper-forward-pg): success
+#   Frontend CI        36318147223 : success (attempt 1)
+#   Optimize lab       36318147151 : success (attempt 1)
+#   Fase 2 scientific  36318147247 : success (attempt 1)
+#   Gitleaks           36318147196 : success (attempt 1)
 #
 # --- Compuertas medidas EN LOCAL (antes del sello, no heredadas) ---
 # ruff          : All checks passed!
 # import-linter : Contracts: 4 kept, 0 broken.
 # mypy          : Success: no issues found in 506 source files
-# puros         : test_operability_window.py 23 passed + test_market_operability.py 58 passed
+# puros         : 81 passed (58 de `test_market_operability.py` + 23 de `test_operability_window.py`)
 # aplicacion    : pytest packages/py/application/tests -q -> 2071 passed
 # matriz        : 230/230, restauracion byte a byte, arbol intacto
 #                 (docs/engineering/evidencia-matriz-mutaciones-v2.81-230-2026-09-27.txt)
 #
-# --- Sobre el commit y tag (PENDIENTE de push) ---
-#   Release tag CI  : PENDIENTE
-#   Python CI       : PENDIENTE
-#   Frontend CI     : PENDIENTE
-#   Optimize lab    : PENDIENTE
-#   Fase 2 scientific: PENDIENTE
-#
-# LECTURA (sin sesgo): el funnel de operabilidad, el `unresolved_age` y el informe HTML quedan
-# EJERCITADOS por los tests puros de `test_operability_window.py` (13 -> 23) y por `M226`-`M230`,
-# sin mover el freeze ni el reparto (`auto18-v1`/`auto15-v1`, `ALLOCATION = none`) ni la migracion.
+# LECTURA (sin sesgo): el FUNNEL de operabilidad, el `unresolved_age` y el informe HTML quedan
+# EJERCITADOS por el CI del tag (los 10 puros nuevos corren en el job `python` del tag: 3004/37) sin
+# mover los saltos (37 = 37) ni los del job `quality` (40 = 40), sin migracion y sin tocar el freeze
+# ni el reparto (`auto18-v1`/`auto15-v1`, `ALLOCATION = none`).
 #
 # DECLARADO, NO HECHO: la ventana de >=4 dias de calendario sigue siendo operacion del propietario
 # (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita ni la sustituye, y `H-4` (LOW) sigue ABIERTO
-# (v2.81 lo hace mas visible, no lo cierra).
+# (v2.81 lo hace mas VISIBLE, no lo cierra).

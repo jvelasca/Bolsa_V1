@@ -46,6 +46,18 @@ deja la **ventana ≥4 días** como operación del propietario.
 operación en tiempo real; por eso **`P3-2`/`P3-3` siguen ABIERTAS**. `H-4` (LOW) sigue **ABIERTO** (esta
 fase lo hace más visible, no lo cierra). `LIVE` y allocation dinámica siguen congelados.
 
+**CI del tag `v2.81-beta`** (tag anotado objeto `2c69bb64` → commit `bd9d9c17`): `Release tag CI` run
+`36318148752` **GREEN en la primera pasada** (`attempt: 1`, 8m48s; **10 jobs en `success` + `certify`**;
+`playwright (integrated E2E, opt-in)` skipped por diseño; job `python` del tag **`3004 passed / 37 skipped`**
+= `2994` + **10** puros nuevos, con `ruff` `All checks passed!`, `Contracts: 4 kept, 0 broken` y `mypy`
+`0 issues (506 files)`, skips sin mover `37 = 37`), con `Python CI` `36318148738` (`quality`
+**`2993 passed / 40 skipped`**, skips `40 = 40`), `Frontend CI` `36318148764`, `Optimize lab` `36318148749`
+y `Fase 2 scientific` `36318148751` en success sobre el mismo commit y tag; en `main` (fast-forward
+`7bfa5efa..bd9d9c17`), `Python CI` `36318147149` (`quality` **`2993 passed / 40 skipped`** y los cuatro
+jobs PG verdes), `Frontend CI` `36318147223`, `Optimize lab` `36318147151`, `Fase 2 scientific`
+`36318147247` y `Gitleaks` `36318147196`, en success. Evidencia cruda en
+[`evidencia-ci-tag-v2.81-2026-09-27.txt`](docs/engineering/evidencia-ci-tag-v2.81-2026-09-27.txt).
+
 ## [2.05.0-beta] — `AUTO-MATERIAL-8`: MARKET WINDOW (instrumento de contrato + capturador de la ventana) — 2026-09-27
 
 **Fase de INSTRUMENTO de medición y OBSERVACIÓN, no de decisión; SIN migración** (Alembic head sigue
