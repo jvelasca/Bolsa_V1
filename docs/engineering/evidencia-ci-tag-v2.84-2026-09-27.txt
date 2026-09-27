@@ -1,0 +1,79 @@
+# V2.84 / AUTO-MATERIAL-12 - CI del tag `v2.84-beta`: evidencia cruda
+#
+# Fecha: 2026-09-27
+# Tag anotado: v2.84-beta (<objeto tag>) -> commit <commit del sello>
+# Version: 2.09.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
+#
+# ESTADO: PLACEHOLDER PRE-TAG ("PENDIENTE DE TAG").
+# El workflow `Release tag CI` SOLO corre al EMPUJAR el tag, asi que su resultado NO puede existir
+# antes de ese push (patron declarado OBS-3/OBS-4, v2.74-v2.83). Un auditor que trabaje estrictamente
+# sobre el objeto sellado leera ESTE placeholder y NO debe concluir "CI no acreditado": la cita
+# acreditada se anade en un commit POST-TAG y este mismo fichero se actualiza alli.
+# Dentro del tag, el auditor reproduce las compuertas con los comandos del `arranque-auditor-v2-84-*.md`.
+#
+# --- Objeto de la fase (instrumento read-only; cierra OBS-6/OBS-7/OBS-8) ---
+# packages/py/application/src/bolsa_application/operability_audit.py
+#   OBS-6: `_fill_funnel_gaps` -> el enriquecimiento RELLENA solo escalones None y NUNCA pisa uno medido.
+#   OBS-7: el funnel agregado de `window_totals` itera `measured_rows`; `partial` se mide contra
+#          `days_measured`; el render muestra `dias/diasMedidos`.
+# packages/py/application/tests/test_operability_audit.py
+#   +2 tests de regresion: `test_enrich_rows_never_overwrites_a_measured_funnel`,
+#                          `test_window_totals_funnel_ignores_unmeasured_rows` (16 -> 18).
+# apps/api-python/scripts/v2_83_window_audit.py
+#   OBS-8: docstring de codigos de salida alineado con `argparse` (uso incorrecto = 2).
+# apps/api-python/scripts/v2_44_mutation_audit.py
+#   marcadores OPERABILITY_AUDIT / T_OPERABILITY_AUDIT + mutaciones M231 y M232 (230 -> 232).
+# NO se toca motor, gobernador, `operability_window.py`, `v2_80_market_window.py`, TOP_N, umbrales,
+# allocation, pesos A/B, UI ni migraciones.
+#
+# --- ANEXO OPERATIVO (DECLARADO, fuera del instrumento read-only) ---
+# apps/api-python/scripts/ops_seed_window_pair.py
+#   Script OPS (lo ejecuta el operador, no el CI): siembra la cuenta fija de la ventana, la version B
+#   ACTIVE como SEMILLA NO GATE-CERTIFICADA (`shadow_validated=false`,
+#   `reasons=["semilla_operativa_ventana_no_gate_certificada"]`), su localizador de promocion y los
+#   EdgeReport de A/B. Escribe SOLO filas propias y `operability_runs/window-setup.json` (gitignoreado).
+#   Sin `--account-id` crea cuenta nueva => NO idempotente por defecto; con cuenta fija SI.
+#   Sin PostgreSQL (o cuenta inexistente) queda BLOQUEADO (exit 2). NO cierra P3-3.
+# docs/engineering/arranque-ventana-paper-operativa-2026-09-27.md   (docs-only)
+# docs/engineering/runbook-ventana-forward-v2.78-2026-09-27.md      (docs-only: cierra brechas 1 y 2;
+#                                                                    deja 3 y 4 vigentes)
+#
+# --- Commits y push ---
+# (PENDIENTE: se rellena al sellar)
+# git push origin main        : <rango> main -> main
+# git push origin v2.84-beta  : * [new tag] v2.84-beta -> v2.84-beta
+#
+# --- Release tag CI (run PENDIENTE, HEAD <sello>, event=push, branch v2.84-beta) ---
+# (PENDIENTE DE TAG)
+# Job `python` del tag:
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 507 source files
+#   pytest  : <3022 + 18> = esperado 3040 passed, 37 skipped
+# Job `quality`:
+#   pytest  : <3011 + 18> = esperado 3029 passed, 40 skipped
+#
+# --- Compuertas medidas EN LOCAL (antes del sello, no heredadas) ---
+# ruff          : All checks passed!
+# import-linter : Contracts: 4 kept, 0 broken.
+# mypy          : Success: no issues found in 507 source files
+# alembic       : 046_fill_reference_mid (head)
+# puros nuevos  : test_operability_audit.py -> 18 passed (16 + 2)
+# aplicacion    : pytest packages/py/application/tests -q -> 2089 passed (base 2087 + 2)
+# matriz        : 232/232 (M231/M232 nuevas muerden los 2 tests nuevos), restauracion byte a byte,
+#                 arbol intacto (evidencia: evidencia-matriz-mutaciones-v2.84-232-2026-09-27.txt)
+# anexo OPS     : `ops_seed_window_pair.py` pasa `ruff` (incluido en `apps/api-python`); NO tiene test
+#                 unitario por diseno (script de operador como sus hermanos del mismo directorio) y NO
+#                 esta en el alcance de mypy (`apps/api-python/src`). Declarado, no gate-certificado.
+#
+# --- ESPERADO vs OBSERVADO ---
+# (PENDIENTE: se cumple o se corrige POST-TAG)
+#
+# LECTURA (sin sesgo): fase de INSTRUMENTO READ-ONLY que cierra las 3 observaciones de la auditoria
+# externa de v2.83.1-beta. Los invariantes del instrumento NO cambian: `rate=None` (nunca 0.0) sin
+# dias/denominador, render determinista con `n/d`, CLI estrictamente read-only (no escribe con
+# --render/--json sin --out; no toca el journal durable ni `evidence_runs/`/`evidence_validations/`).
+#
+# DECLARADO, NO HECHO: la ventana de >=4 dias de calendario sigue siendo OPERACION DEL PROPIETARIO
+# (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita. `H-4` (LOW) sigue ABIERTO (visible via
+# `warnings: reason_contract`, no cerrado). `OBS-9` (doc-only) DECLARADA. `P3-5` y `OBS-5` declaradas.

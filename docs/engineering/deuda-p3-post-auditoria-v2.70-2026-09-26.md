@@ -30,8 +30,9 @@
 > real transcurrido**, no una corrida rápida). **La auditoría externa de `v2.83.1-beta` (2026-09-27,
 > clon fresco de GitHub) emite `APROBADO CON OBSERVACIONES` (0 bloqueantes; 6/8 PASS, 2 PARTIAL —
 > semántica del instrumento y compuertas PG no reproducibles en local) y levanta `OBS-6` (MEDIUM),
-> `OBS-7`/`OBS-8` (LOW), que quedan **ABIERTOS y declarados** (ver más abajo); el re-sello es docs-only ⇒
-> los tres hallazgos son del instrumento de `v2.83` (`operability_audit.py`), no de `v2.83.1`.**
+> `OBS-7`/`OBS-8` (LOW), que quedan **ABIERTOS** y se **CIERRAN en `v2.84`** (ver más abajo); el re-sello
+> es docs-only ⇒ los tres hallazgos son del instrumento de `v2.83` (`operability_audit.py`), no de
+> `v2.83.1`. `OBS-9` (nuevo, LOW doc-only) queda **ABIERTA y declarada**.**
 > **Deuda de proceso declarada:** `v2.73-beta` quedó
 > **sin auditoría externa** (ver más abajo).
 
@@ -431,7 +432,7 @@ aviso `reason_contract` (`other>0` ⇒ `ALERTA CONTRATO` + los motivos `other` n
 `unknown` del instrumento. Si esos `signal_*` aparecen durante la ventana, la auditoría lo dirá en una
 línea; hasta entonces `H-4` sigue siendo deuda **teórica y ABIERTA**.
 
-## OBS-6 / OBS-7 / OBS-8 — Observaciones de la auditoría externa de `v2.83.1-beta` (2026-09-27) — 🟡 ABIERTAS
+## OBS-6 / OBS-7 / OBS-8 — Observaciones de la auditoría externa de `v2.83.1-beta` (2026-09-27) — 🟢 CERRADAS en `v2.84`
 
 **Origen.** Auditoría externa del objeto sellado **`v2.83.1-beta`** (clon fresco de GitHub; tag anotado
 `e939bbf0` → commit `42c97bab`; `2.08.1-beta`). **Veredicto: `APROBADO CON OBSERVACIONES`, 0 bloqueantes**
@@ -483,6 +484,36 @@ incorrecto, pero `argparse` sale con **`2`** (`… --bogus` → `exit 2`). Solo 
 
 **Criterio de cierre.** Alinear la doc con el comportamiento real (o el comportamiento con la doc) al
 cerrar `OBS-6`/`OBS-7`.
+
+**Cierre (`v2.84`, 2026-09-27).** Fase de **INSTRUMENTO READ-ONLY** (`AUTO-MATERIAL-12`): `enrich` pasa a
+conservar cada escalón **ya medido** y a rellenar del reconstruido **sólo** los `None`
+(`_fill_funnel_gaps`); el funnel agregado de `window_totals` itera `measured_rows` con `partial` contra
+`daysMeasured`; y el docstring de `v2_83_window_audit.py` declara la realidad de `argparse`. Protegido por
+`test_enrich_rows_never_overwrites_a_measured_funnel` + **`M231`** (`OBS-6`) y por
+`test_window_totals_funnel_ignores_unmeasured_rows` + **`M232`** (`OBS-7`); `test_operability_audit.py`
+**16 → 18 passed** y matriz **230 → 232** re-medida **232/232**. **`OBS-8`** se cierra por
+**documentación** (es su naturaleza: `argparse` no ofrece un código distinto y forzarlo a `1` divergiría
+de todos los CLIs hermanos — ver `OBS-9`). **Sin** tocar motor, gobernador ni migración.
+
+## OBS-9 — La frase «`1` = uso incorrecto: lo decide `argparse`» está replicada y es inexacta (LOW, doc-only) — 🟡 ABIERTA (2026-09-27)
+
+**Origen.** Al cerrar `OBS-8` se midió que la afirmación **no** es de `v2_83_window_audit.py`: el proyecto
+declara el mismo contrato en varios CLIs y **ninguno** lo implementa (no hay `ArgumentParser` propio ni
+`error()` sobrescrito; `argparse` sale con **`2`** en el uso incorrecto sea cual sea el script).
+
+**Observación.** El código `1` que la doc promete es **inalcanzable** vía `argparse`; los scripts siguen
+decidiendo bien `0`/`2`. **Ningún impacto funcional**: afecta a la **lectura** del contrato (y a un auditor
+que lo compruebe, como pasó en la auditoría de `v2.83.1`).
+
+**Criterio de cierre.** Barrido **docs-only** coherente (una sola convención: o se corrige la frase en
+todos, o se implementa un parser compartido que devuelva `1`). **No** se aborda en `v2.84` (su alcance es
+el instrumento auditado). Ficheros medidos con la frase: `v2_75_paper_sample_accumulation.py`,
+`v2_76_forward_market_material.py`, `v2_77_market_operability.py`, `v2_80_market_window.py`,
+`paper_material_readiness.py`, `paper_cycles_export.py`, `auto_evidence_validate.py`, y en docs
+`plan-v2-83` / `runbook-ventana-forward-v2.78` / `arranque-auditor-v2.73`.
+
+> **`v2.84` (2026-09-27):** `OBS-9` queda **ABIERTA y declarada**; sólo se corrigió la instancia del
+> instrumento auditado (`v2_83_window_audit.py`) al cerrar `OBS-8`.
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 

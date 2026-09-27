@@ -2,6 +2,45 @@
 
 All notable releases of Bolsa V1.
 
+## [2.09.0-beta] — `AUTO-MATERIAL-12`: CONTRATO DEL FUNNEL de la auditoría (cierre de `OBS-6`/`OBS-7`/`OBS-8`) — 2026-09-27
+
+**Fase de INSTRUMENTO READ-ONLY; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin
+tocar el freeze** (`auto_simulation_worker.py` intacto). El reparto **no se mueve**: `auto18-v1`/`auto15-v1`
+(`ALLOCATION = none`). `TOP_N`, umbrales, allocation, pesos de estrategia, lógica A/B, gobernador y
+migraciones **no se mueven**. Origen: auditoría externa de `v2.83.1-beta` (`APROBADO CON OBSERVACIONES`,
+0 bloqueantes) levantó tres hallazgos sobre el **instrumento de `v2.83`** (`operability_audit.py`,
+**byte-idéntico** en aquel tag: el re-sello era docs-only).
+
+- **`OBS-6` (MEDIUM) — `enrich_rows_with_evidence` sobrescribía un funnel YA medido.** `build_operability_funnel`
+  recalcula el funnel ENTERO (los escalones superiores salen de la evidencia); usarlo como **reemplazo** pisaba
+  un escalón medido cuando la evidencia discrepa (medido por el auditor: `universe` 8→999, `orders` 2→99).
+  Nuevo `_fill_funnel_gaps`: se conserva cada escalón **ya medido** de la fila y del reconstruido se toman
+  **sólo** los huecos (`None`). Protegido por **`M231`**.
+- **`OBS-7` (LOW) — el funnel agregado de `window_totals` sumaba días NO medidos.** El bloque `funnel` iteraba
+  `rows` (todas) en vez de `measured_rows` (medido: `daysMeasured=0` con `universe=8`). Ahora agrega sobre
+  `measured_rows`, el `partial` se mide contra `daysMeasured` (coherente con `counts`/`coverage`/`rSum`) y el
+  render publica `(días/díasMedidos)`. Protegido por **`M232`**.
+- **`OBS-8` (LOW) — códigos de salida documentados inexactos.** `argparse` sale con `2` en el uso incorrecto
+  (no `1`); el docstring de `v2_83_window_audit.py` declara que el código **no** distingue «sin material» de
+  «uso incorrecto» (el mensaje de stderr sí). **`OBS-9` (nuevo, LOW, doc-only):** la misma frase
+  «`1` = uso incorrecto: lo decide `argparse`» está **replicada** en otros CLIs del proyecto
+  (`v2_75`/`v2_76`/`v2_77`/`v2_80`, `paper_material_readiness`, `paper_cycles_export`, `auto_evidence_validate`…):
+  **declarada**, no barrida aquí (fuera de alcance).
+- **Tests**: `test_operability_audit.py` **16 → 18 passed** (`test_enrich_rows_never_overwrites_a_measured_funnel`,
+  `test_window_totals_funnel_ignores_unmeasured_rows`); suite de aplicación **2087 → 2089 passed**.
+- **Mutaciones**: `M231`/`M232` nuevas ⇒ matriz **230 → 232**; re-medida **232/232** con restauración **byte a
+  byte** (mismos **5 huecos locales preexistentes** `M117`/`M118`/`M170`/`M176`/`M197`, idénticos a la
+  evidencia de `v2.81-230`, **no** introducidos por esta fase).
+- **Compuertas medidas en local**: `ruff` `All checks passed!`, `import-linter` **4 kept / 0 broken**,
+  `mypy` **0 issues (507 files)**, `alembic heads` `046_fill_reference_mid`.
+- **Deuda declarada (NO se cierra):** `P3-2`/`P3-3` **ABIERTAS** (exige la ventana PAPER real ≥4 días);
+  `H-4` (LOW) **ABIERTO**; `P3-5`/`OBS-5` declaradas; `OBS-9` (nuevo) declarada. `OBS-6`/`OBS-7`/`OBS-8` **CERRADAS**.
+- **Rótulo cerrado en:** [plan](./docs/engineering/plan-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md) ·
+  [audit-pack](./docs/engineering/audit-pack-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md) ·
+  [arranque del auditor](./docs/engineering/arranque-auditor-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md) ·
+  [relevo](./docs/engineering/traspaso-relevo-post-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md) ·
+  [evidencia matriz 232](./docs/engineering/evidencia-matriz-mutaciones-v2.84-232-2026-09-27.txt).
+
 ## [2.08.1-beta] — `AUTO-MATERIAL-11` (re-sello): el objeto auditado lleva la cita de CI DENTRO — 2026-09-27
 
 **Re-sello DOCS-ONLY; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin tocar el
