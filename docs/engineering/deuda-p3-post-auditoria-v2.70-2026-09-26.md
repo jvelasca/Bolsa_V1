@@ -379,6 +379,14 @@ exactamente los códigos que caen en `other` sin familia — antes se diluían s
 (familia declarada para los cinco `signal_*` y exhaustividad del test vía import) sigue **pendiente** y es
 la fase candidata inmediata.
 
+**Estado en `v2.81` (2026-09-27).** `AUTO-MATERIAL-9` tampoco cierra `H-4` (su alcance es el instrumento
+de observación: funnel + `unresolved_age` + informe). Lo hace **más visible** todavía: el **funnel** separa
+`signals → topN → risk → reservation`, de modo que un código `signal_*` que caiga en `other` se verá en la
+distribución de motivos y en `reasonCatalogCoverage["unknown"]` con contexto. El cierre formal
+(`_OWNER_JOURNAL_CODES` importando su dueño + familia declarada para los cinco `signal_*` + mutación) se
+**pospone a después de la primera ventana real**, tal como recomienda la auditoría (§24): si esos códigos
+aparecen durante la ventana, `otherCount>0` lo dirá y `H-4` dejará de ser deuda teórica.
+
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 
 No son deuda de código; se declaran para que no se lean como sorpresas en la próxima pasada.

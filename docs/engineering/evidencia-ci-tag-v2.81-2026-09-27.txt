@@ -1,0 +1,39 @@
+# V2.81 / AUTO-MATERIAL-9 - CI del tag `v2.81-beta`: evidencia (cita POST-TAG)
+#
+# Fecha de captura local: 2026-09-27
+# Version: 2.06.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
+#
+# REGLA DECLARADA (patron v2.74-v2.80): el workflow `Release tag CI` SOLO corre al empujar el tag,
+# asi que la cita de su resultado vive en un commit POST-TAG (este fichero, completado tras el push).
+# Dentro del tag, el auditor lo reproduce con los comandos del `arranque-auditor-v2-81-*.md`.
+#
+# --- Commits y push ---
+# PENDIENTE: rellenar tras empujar la rama y el tag anotado `v2.81-beta` (feat + docs) y observar
+# `Release tag CI` (run id, conclusion, jobs y conteos de pytest).
+#
+# --- Release tag CI ---
+# PENDIENTE de push (no observable en local). NO se inventa.
+#
+# --- Compuertas medidas EN LOCAL (antes del sello, no heredadas) ---
+# ruff          : All checks passed!
+# import-linter : Contracts: 4 kept, 0 broken.
+# mypy          : Success: no issues found in 506 source files
+# puros         : test_operability_window.py 23 passed + test_market_operability.py 58 passed
+# aplicacion    : pytest packages/py/application/tests -q -> 2071 passed
+# matriz        : 230/230, restauracion byte a byte, arbol intacto
+#                 (docs/engineering/evidencia-matriz-mutaciones-v2.81-230-2026-09-27.txt)
+#
+# --- Sobre el commit y tag (PENDIENTE de push) ---
+#   Release tag CI  : PENDIENTE
+#   Python CI       : PENDIENTE
+#   Frontend CI     : PENDIENTE
+#   Optimize lab    : PENDIENTE
+#   Fase 2 scientific: PENDIENTE
+#
+# LECTURA (sin sesgo): el funnel de operabilidad, el `unresolved_age` y el informe HTML quedan
+# EJERCITADOS por los tests puros de `test_operability_window.py` (13 -> 23) y por `M226`-`M230`,
+# sin mover el freeze ni el reparto (`auto18-v1`/`auto15-v1`, `ALLOCATION = none`) ni la migracion.
+#
+# DECLARADO, NO HECHO: la ventana de >=4 dias de calendario sigue siendo operacion del propietario
+# (P3-2/P3-3 ABIERTAS); el CI del tag NO la acredita ni la sustituye, y `H-4` (LOW) sigue ABIERTO
+# (v2.81 lo hace mas visible, no lo cierra).

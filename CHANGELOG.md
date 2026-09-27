@@ -2,6 +2,50 @@
 
 All notable releases of Bolsa V1.
 
+## [2.06.0-beta] — `AUTO-MATERIAL-9`: REAL WINDOW EXECUTION (funnel + informe de ventana) — 2026-09-27
+
+**Fase de INSTRUMENTO de OBSERVACIÓN, no de decisión; SIN migración** (Alembic head sigue en
+`046_fill_reference_mid`) y **sin tocar el freeze** (`auto_simulation_worker.py` intacto). El reparto
+**no se mueve**: `auto18-v1` / `auto15-v1` (`ALLOCATION = none`). **No** se toca el gobernador
+(`aggregate_trial_regime`), ni `TOP_N`, ni un solo umbral.
+
+Origen: la auditoría externa de `v2.80-beta` (APROBADA, 0 bloqueantes) señaló que el siguiente avance ya
+no es arquitectura, sino **observar** la ventana: §19/§20 piden la serie diaria con linaje y,
+«especialmente», un **funnel de operabilidad**; §22 pide un **`unresolved_age`**. Esta fase los entrega y
+deja la **ventana ≥4 días** como operación del propietario.
+
+- **Funnel de operabilidad (nuevo, puro)** `packages/py/application/src/bolsa_application/operability_window.py`:
+  `build_operability_funnel` publica diez escalones (`universe → marketData → regimeAllowed → signals →
+  topN → risk → reservation → orders → fills → cycles`) como `{count, source, measured}`. Los escalones
+  superiores sólo se miden con la EVIDENCIA del runner (`--forward`); sin ella se declaran `None`. Los
+  durables son la aritmética **declarada** del censo de ENTRADA (`decided` menos la familia que cada
+  compuerta quitó). Un prerrequisito ausente deja `None` sus dependientes: **nunca** un `0` de relleno.
+- **`unresolved_age` (nuevo, puro)**: histograma de permanencia de las propuestas (`approved`) sin
+  desenlace, medido **dentro del día** (referencia = último instante durable del día, para no inflar días
+  antiguos). Cubos `lt1m`/`1to5m`/`5to20m`/`gt20m`/`unknown`; sin timestamps ⇒ **no medido**. Límite
+  declarado `resolutionJoined=false` (no hay join propuesta→fill por identidad).
+- **Informe HTML (nuevo, puro)** `render_window_html(rows, meta)`: autocontenido, determinista y
+  **escapado** (`html.escape`); publica la serie diaria, el veredicto del gate, el funnel, la distribución
+  de motivos con cobertura, la `ALERTA CONTRATO: other>0` y el `unresolved_age`.
+- **Capturador ampliado (READ-ONLY)** `apps/api-python/scripts/v2_80_market_window.py`: `--forward`
+  (evidencia opcional, repetible, admite glob) enriquece `priceSources`/`pairCapable`/`pairActive`/
+  `symbolsObserved` y los escalones superiores del funnel; `--html` escribe
+  `operability_runs/operability-window.html`. La escritura sigue limitada a `operability_runs/`; `exit 2`
+  sin días legibles.
+- **Tests (13 → 23 en el fichero de la ventana)**: funnel (sin/con evidencia, sin fabricar `0`),
+  `unresolved_age` (cubos, no medido, cero medido), HTML (determinista, escapado, veredicto del gate +
+  alerta de contrato). Suite de aplicación: **2071 passed**.
+- **Mutaciones (225 → 230)**: `M226`–`M230` (escalón `None`→`0`; escalón sin prerrequisito; toda entrada
+  contada como propuesta; veredicto del gate omitido en el HTML; HTML sin escapar), **todas muerden** y
+  restauran **byte a byte**.
+
+**Breaking declarado:** sin migración; sin cambio de decisión; claves nuevas **aditivas** por fila
+(`funnel`, `unresolvedAge`) y un artefacto HTML nuevo; `--forward`/`--html` en el capturador.
+
+**Declarado, NO hecho (operación del propietario):** la **ventana ≥4 días** de calendario sigue siendo
+operación en tiempo real; por eso **`P3-2`/`P3-3` siguen ABIERTAS**. `H-4` (LOW) sigue **ABIERTO** (esta
+fase lo hace más visible, no lo cierra). `LIVE` y allocation dinámica siguen congelados.
+
 ## [2.05.0-beta] — `AUTO-MATERIAL-8`: MARKET WINDOW (instrumento de contrato + capturador de la ventana) — 2026-09-27
 
 **Fase de INSTRUMENTO de medición y OBSERVACIÓN, no de decisión; SIN migración** (Alembic head sigue

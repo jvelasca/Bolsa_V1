@@ -4,7 +4,8 @@
 > mercado** (≥4 cubos de calendario compartidos y ≥2 episodios de régimen) para cerrar `P3-2`/`P3-3`.
 > **Herramienta:** `v2_76_forward_market_material.py` (AUTO-MATERIAL-4) + journal de operabilidad
 > `v2_77_market_operability.py` (AUTO-MATERIAL-5) + **capturador de la ventana**
-> `v2_80_market_window.py` (AUTO-MATERIAL-8, read-only sobre el journal **durable**).
+> `v2_80_market_window.py` (AUTO-MATERIAL-8, read-only sobre el journal **durable**; ampliado en
+> AUTO-MATERIAL-9/**v2.81** con `--forward` y `--html` y el **funnel de operabilidad**).
 > **Regla dura:** esto es **operación**, no una fase de código. **No** se bajan umbrales, **no** se
 > fuerza el régimen, **no** se backdatea nada.
 
@@ -53,11 +54,15 @@ uv run --no-sync python apps/api-python/scripts/v2_77_market_operability.py \
 
 # 4) Serie diaria de la VENTANA desde el journal DURABLE (read-only, AUTO-MATERIAL-8).
 #    Reutiliza el mismo censo (entrada vs posicion) y el mismo R que el informe; declara
-#    los huecos (None/UNKNOWN) y el gate honesto (>=4 dias / >=2 episodios / >=32 ciclos):
+#    los huecos (None/UNKNOWN) y el gate honesto (>=4 dias / >=2 episodios / >=32 ciclos).
+#    `--forward` (OPCIONAL, read-only) enriquece el FUNNEL con universo/dato/regimen/ordenes
+#    y el par A/B; `--html` escribe el artefacto `operability-window.html` (v2.81):
 $env:BROKER_VENUE="paper"
 uv run --no-sync python apps/api-python/scripts/v2_80_market_window.py \
     --account-id "$ACCOUNT" --strategy-version "$VERSION_A" --days 4 --render \
-    --out "operability_runs/window-$(date +%Y%m%d).json"
+    --forward 'operability_runs/forward-market-*.json' \
+    --out "operability_runs/operability-window.json" \
+    --html "operability_runs/operability-window.html"
 ```
 
 Repite 1–4 **cada día de mercado**. El journal de la sonda del runner
@@ -106,6 +111,8 @@ fabricado. Mientras no se cumpla el gate, el veredicto honesto es **`NO MEDIDO`*
 | `otherCount` / `ALERTA CONTRATO` | `other>0` ⇒ **violación de contrato** (**AVISO**, no fallo): un motivo sin familia declarada; revisar alta de reason code |
 | `Cobertura` (`declared/observed/unknown`) | prueba que `other==0` **no** es accidental; `unknown>0` nombra el hueco (hoy `H-4`: los `signal_*` pre-ranqueo) |
 | `Par` (`CAPAZ`/`ACTIVO`) | `CAPAZ` sin `ACTIVO` ⇒ falta la estrategia B (brecha 1) |
+| `Funnel` (v2.81) | `universe → marketData → regimeAllowed → signals → topN → risk → reservation → orders → fills → cycles`: localiza el ESCALÓN donde se pierde la oportunidad; `n/d` = **no medido** (sin `--forward` los superiores no se pueden afirmar), nunca `0` |
+| `unresolved_age` (v2.81) | permanencia de las propuestas (`lt1m`/`1to5m`/`5to20m`/`gt20m`): `gt20m` frecuente delata un problema de **integración**, no de mercado |
 
 ## 7. Entregable
 
