@@ -46,11 +46,14 @@ uv run --no-sync lint-imports --config packages/py/.importlinter                
 git show v2.83.1-beta:docs/engineering/evidencia-ci-tag-v2.83-2026-09-27.txt
 ```
 
-## 5. Cita del CI del tag `v2.83.1-beta`
+## 5. Cita del CI del tag `v2.83.1-beta` — ACREDITADA
 
-Vive en `evidencia-ci-tag-v2.83.1-2026-09-27.txt` (**commit POST-TAG**, patrón declarado). Esperado
-(código idéntico a `v2.83`): job `python` del tag `3020 passed / 37 skipped` y `quality`
-`3009 passed / 40 skipped`. **No se hereda**: se cita el run cuando exista.
+`Release tag CI` run [`36333090789`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36333090789)
+**GREEN en la primera pasada** (`attempt 1`, 8m9s; **10 jobs `success` + `certify` `success`**;
+`playwright (integrated E2E, opt-in)` `skipped` por diseño). Job `python` del tag
+**`3020 passed / 37 skipped`** y `quality` **`3009 passed / 40 skipped`** = **idénticos a `v2.83`**,
+como se predijo **antes** del sello. La cita vive en `evidencia-ci-tag-v2.83.1-2026-09-27.txt`
+(**commit POST-TAG**, patrón declarado: ningún tag puede contener su propio resultado de CI).
 
 ## 6. Deuda y próximo paso
 

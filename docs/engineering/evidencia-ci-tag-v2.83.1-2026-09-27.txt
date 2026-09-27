@@ -13,6 +13,9 @@
 #   (b) DECLARAR el CI del tag `v2.83.1-beta` (este objeto), cuya cita, por construccion del
 #       workflow, NO puede existir dentro del propio tag y se escribe en un commit POST-TAG.
 #
+# NOTA (dos vidas de este fichero): por eso la instancia DENTRO del tag (commit 42c97bab) lleva la
+# seccion (2) como PLACEHOLDER, y la instancia POST-TAG (esta) lleva la cita real del run.
+#
 # LIMITE ESTRUCTURAL (patron OBS-3/OBS-4, v2.74-v2.83): `Release tag CI` SOLO corre al EMPUJAR el
 # tag; su resultado no puede preexistir a ese push. Ningun tag puede contener su propio resultado
 # de CI. Lo que SI podemos entregar -y es lo que hace este re-sello- es que un tag contenga el
@@ -34,21 +37,64 @@
 # Cadena verificada desde el tag `v2.83.1-beta`: tag v2.83-beta -> run 36329460515 -> SUCCESS.
 #
 # ========================================================================================
-# (2) CI DEL TAG `v2.83.1-beta` (ESTE OBJETO) - PENDIENTE / POST-TAG
+# (2) CI DEL TAG `v2.83.1-beta` (ESTE OBJETO) - ACREDITADO (cita POST-TAG)
 # ========================================================================================
-# ESTADO EN EL MOMENTO DEL SELLO: PENDIENTE DE TAG / AUN NO SE HA EMPUJADO.
-# La cita real se escribe en el commit POST-TAG y se rellena aqui abajo cuando el run exista.
-# ESPERADO (el codigo NO cambia respecto a v2.83, luego el resultado debe ser el mismo):
-#   Job `python` del tag : 3020 passed / 37 skipped
-#   Job `quality`        : 3009 passed / 40 skipped
-#   Conclusion           : SUCCESS
-# Esta prediccion NO se hereda: se cita el run del tag `v2.83.1-beta` cuando exista.
+# COMMIT QUE ACREDITA ESTA CITA: el commit POST-TAG en `main` inmediatamente posterior al sello
+# `42c97bab` (donde este fichero se actualiza con la cita real). La cita del CI del tag vive aqui,
+# FUERA del tag. NOTA DE PATRON: la instancia de ESTE fichero DENTRO del tag
+# `v2.83.1-beta` (commit 42c97bab) lleva la seccion (2) como PLACEHOLDER ("PENDIENTE DE TAG"),
+# porque `Release tag CI` solo corre al EMPUJAR el tag. Un auditor que trabaje estrictamente
+# sobre el objeto sellado leera el placeholder y NO debe concluir "CI no acreditado": la cita
+# acreditada es ESTE fichero en el commit POST-TAG. Cadena verificada:
+#   tag v2.83.1-beta -> Release tag CI 36333090789 -> SUCCESS.
 #
-# ==== CITA REAL DEL CI DE v2.83.1 (a rellenar en el commit post-tag) ====
-# Release tag CI  run <PENDIENTE> : <PENDIENTE>
-#   <PENDIENTE: jobs, conteos, duracion, attempt>
-# Commit del sello : <PENDIENTE>
-# Tag anotado objeto: <PENDIENTE>
+# --- Release tag CI (run 36333090789, HEAD 42c97bab, event=push, branch v2.83.1-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 8m9s; 16:23:54Z -> 16:32:03Z)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   shared (build/typecheck/test)                            success
+#   decision-spine                                           success
+#   python (ruff/imports/mypy/pytest offline)                success
+#   dr-verify (battery DB_DR / TCP CI)                       success
+#   playwright (mock E2E)                                    success
+#   frontend (typecheck/lint/test/build + contract:check)    success
+#   security (gitleaks)                                      success
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)         success
+#   lifecycle-pg (Alembic + auth + golden restart)           success
+#   playwright (integrated E2E, opt-in)                     [skipped, por diseno]
+#   certify (aggregate + artifact)                           success
+#
+# Job `python` del tag:
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 507 source files
+#   pytest  : 3020 passed, 37 skipped, 6 warnings in 70.35s
+#             => ESPERADO 3020/37  -> OBSERVADO 3020/37  -> COINCIDE (codigo identico a v2.83).
+#
+# --- Sobre el MISMO commit y tag (42c97bab, v2.83.1-beta) ---
+#   Python CI           36333090773 : success (attempt 1; 1m54s)
+#       quality: 3009 passed, 40 skipped, 6 warnings in 80.50s; skips 40 = 40; `ruff` `All checks
+#                passed!` / `Contracts: 4 kept, 0 broken` / `mypy 0 issues (507 files)`.
+#       Jobs PG del tag intactos: grammar-discovery-pg (A14) / lifecycle-pg (A12) /
+#       auto-v2-durable-pg (Alembic 040-045 + reinicio) / paper-forward-pg (A13): success.
+#       => Job `quality` ESPERADO 3009/40 -> OBSERVADO 3009/40 -> COINCIDE.
+#   Frontend CI         36333090809 : success
+#   Optimize lab        36333090816 : success
+#   Fase 2 scientific   36333090783 : success
+#
+# --- En main (fast-forward b5761e17..42c97bab) ---
+#   Gitleaks 36333079527 · Frontend CI 36333079508 · Optimize lab 36333079545 : success.
+#   NOTA DECLARADA: en `main` NO corrieron `Python CI` ni `Fase 2 scientific` (triggers filtrados
+#   por rutas: el diff es `package.json` + docs, sin ficheros Python) => igual que `v2.82`.
+#   Es comportamiento por diseno, no un fallo.
+#
+# Commit del sello : 42c97bab477f2d1ac45ea4b33ee93dc3a6d5b0ee (bump + docs; 8 ficheros, +315/-2)
+# Tag anotado objeto: e939bbf00dee29213417d6f05fb0c266988a7bb6 -> commit 42c97bab
+#
+# --- ESPERADO vs OBSERVADO (el sello declaro su prediccion antes de empujar) ---
+# Job `python` del tag : ESPERADO 3020/37  · OBSERVADO 3020/37  -> COINCIDE
+# Job `quality`        : ESPERADO 3009/40  · OBSERVADO 3009/40  -> COINCIDE
+#   => la prediccion pre-tag era un calculo (`identico a v2.83`), no una urna: se cumplio exacta
+#      y por eso ninguna cifra se corrigio despues.
 #
 # ========================================================================================
 # (3) COMPUERTAS MEDIDAS EN LOCAL (antes del sello, no heredadas)

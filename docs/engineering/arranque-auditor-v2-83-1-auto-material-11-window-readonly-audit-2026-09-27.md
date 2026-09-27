@@ -46,12 +46,23 @@ gitGraph
 | `Python CI` (mismo commit y tag) | `36329460471` — `quality` `3009 passed / 40 skipped` (= `2993 + 16`) + los cuatro jobs PG verdes |
 | Predicción pre-tag | `3020/37` y `3009/40` declarados **antes** del sello ⇒ **se cumplieron exactos** (skips `37 = 37`, `40 = 40`) |
 
-### 1.2 CI del tag `v2.83.1-beta` (este objeto)
+### 1.2 CI del tag `v2.83.1-beta` (este objeto) — ACREDITADO
 
-Igual que en `v2.83`, su cita **no puede estar dentro** del propio tag y vive en un commit **POST-TAG**
-(declarado): `evidencia-ci-tag-v2.83.1-2026-09-27.txt`. Como el código es **idéntico** al de `v2.83`, el
-resultado esperado es el **mismo**: job `python` del tag `3020 passed / 37 skipped` y `quality`
-`3009 passed / 40 skipped`. **No** se hereda: se **cita el run** cuando exista.
+| Campo | Valor |
+|---|---|
+| Workflow | `Release tag CI` |
+| Run | [`36333090789`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36333090789) |
+| Tag / object | `v2.83.1-beta` (tag anotado `e939bbf0`) → commit `42c97bab` |
+| **Conclusion** | **SUCCESS** (primera pasada, `attempt 1`; 8m9s; 16:23:54Z → 16:32:03Z) |
+| Jobs | **10 `success` + `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped` por diseño |
+| Job `python` del tag | `3020 passed / 37 skipped` · `ruff All checks passed!` · `Contracts: 4 kept, 0 broken` · `mypy 0 issues (507 files)` |
+| `Python CI` (mismo commit y tag) | `36333090773` — `quality` `3009 passed / 40 skipped` + cuatro jobs PG verdes |
+| Predicción pre-tag | `3020/37` y `3009/40` declarados **antes** del sello (código idéntico a `v2.83`) ⇒ **se cumplieron exactos** |
+
+**Su cita vive post-tag** (ningún tag puede contener su propio resultado de CI): `evidencia-ci-tag-v2.83.1-2026-09-27.txt`.
+**No** se hereda de `v2.83`: se **cita el run** `36333090789`. En `main` (fast-forward `b5761e17..42c97bab`)
+corrieron `Gitleaks` `36333079527`, `Frontend CI` `36333079508` y `Optimize lab` `36333079545` (en `main`
+**no** se disparan `Python CI`/`Fase 2 scientific`: triggers por rutas, diff = `package.json` + docs).
 
 ## 2. Qué tiene que comprobar el auditor (por este orden)
 

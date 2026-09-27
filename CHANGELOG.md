@@ -20,6 +20,12 @@ el instrumento de `v2.83` **y** la cita real del CI de `v2.83` (`Release tag CI`
   [relevo](./docs/engineering/traspaso-relevo-post-v2-83-1-auto-material-11-reseal-2026-09-27.md) ·
   [evidencia CI del tag](./docs/engineering/evidencia-ci-tag-v2.83.1-2026-09-27.txt); la
   [deuda P3](./docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md) registra la materialización de `OBS-3`/`OBS-4`.
+- **CI del tag (cita POST-TAG):** tag anotado objeto `e939bbf0` → commit `42c97bab` (`bump` + docs, 8 ficheros);
+  `Release tag CI` run `36333090789` **GREEN en la primera pasada** (`attempt 1`, 8m9s, **10 jobs `success` +
+  `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped` por diseño), con el job `python` del
+  tag **`3020 passed / 37 skipped`** y, sobre el mismo commit, `quality` **`3009 passed / 40 skipped`** —
+  **idénticos a `v2.83`**, como se predijo **antes** del sello. Cadena: `tag v2.83.1-beta` →
+  `Release tag CI 36333090789` → `SUCCESS`.
 - **Compuertas esperadas**: idénticas a `2.08.0-beta` (el código no cambia) — `ruff` limpio,
   `Contracts: 4 kept, 0 broken`, `mypy` **507** fuentes, `alembic heads` `046_fill_reference_mid`,
   suite de aplicación **2087 passed**, matriz adversarial **230/230**.

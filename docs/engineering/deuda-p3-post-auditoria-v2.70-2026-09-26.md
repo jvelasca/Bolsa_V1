@@ -474,6 +474,10 @@ No son deuda de código; se declaran para que no se lean como sorpresas en la pr
 > (la fase auditada y su cita van juntas en el mismo tag) sin que el patrón del workflow desaparezca.
 > `OBS-5` sigue declarada (defensiva). Entrega: [arranque del auditor](./arranque-auditor-v2-83-1-auto-material-11-window-readonly-audit-2026-09-27.md)
 > · [relevo](./traspaso-relevo-post-v2-83-1-auto-material-11-reseal-2026-09-27.md).
+> **Acreditado (2026-09-27):** `Release tag CI` run `36333090789` **GREEN en la primera pasada** (`attempt 1`,
+> 8m9s; 10 jobs + `certify`; job `python` del tag `3020/37`; `quality` `3009/40`; cuatro jobs PG verdes), con
+> la **predicción pre-tag cumplida exacta**. El CI del **propio** `v2.83.1` sigue viviendo post-tag (cita en
+> `evidencia-ci-tag-v2.83.1-2026-09-27.txt`), como el patrón exige.
 
 ## Deuda de AUDITORÍA — `v2.73-beta` (`AUTO-MATERIAL-1`) sin pasada externa — 🟡 ABIERTA (de proceso)
 
