@@ -1,0 +1,58 @@
+# V2.78 / AUTO-MATERIAL-6 - CI del tag `v2.78-beta`: evidencia cruda (cita POST-TAG)
+#
+# Fecha de captura: 2026-09-27
+# Tag anotado: v2.78-beta -> commit f8aa3697 (sello en dos commits: 5059c069 feat + f8aa3697 docs)
+# Version: 2.03.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
+#
+# REGLA DECLARADA (patron v2.74-v2.77): el workflow `Release tag CI` SOLO corre al empujar el tag,
+# asi que la cita de su resultado vive en un commit POST-TAG (este). Dentro del tag, el auditor no ve
+# este fichero; lo reproduce con los comandos del `arranque-auditor-v2-78-*.md`.
+#
+# --- Commits y push ---
+# 5059c069  feat(v2.78): contabilidad de vetos PUROS + ausencia fail-closed (P3-6/P3-7)
+# f8aa3697  docs(v2.78): paquete de fase AUTO-MATERIAL-6 + evidencia + cierre de P3-6/P3-7
+# git push origin main        : 5495a58e..f8aa3697  main -> main
+# git push origin v2.78-beta  : * [new tag] v2.78-beta -> v2.78-beta
+#
+# --- Release tag CI (run 36304053558, HEAD f8aa3697, event=push, branch v2.78-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 9m38s)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   security (gitleaks) in 6s
+#   lifecycle-pg (Alembic + auth + golden restart) in 3m48s
+#   shared (build/typecheck/test) in 35s
+#   frontend (typecheck/lint/test/build + contract:check) in 2m55s
+#   python (ruff/imports/mypy/pytest offline) in 1m18s
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG) in 53s
+#   playwright (mock E2E) in 7m57s
+#   decision-spine in 34s
+#   dr-verify (battery DB_DR / TCP CI) in 1m12s
+#   - playwright (integrated E2E, opt-in) in 0s   [skipped, por diseno]
+#   certify (aggregate + artifact) in 5s
+#
+# Job `python` del tag (ID 108577067978):
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 505 source files
+#   pytest  : 2960 passed, 37 skipped, 6 warnings in 46.21s
+#             => 2948 (job python del tag de v2.77) + 12 (los puros NUEVOS de v2.78). El fichero
+#                `test_market_operability.py` YA estaba registrado EXPLICITO en los dos workflows:
+#                SIN cambios de workflow (no se repite el hueco de registro de v2.76).
+#
+# --- Sobre el MISMO commit y tag (f8aa3697, v2.78-beta) ---
+#   Python CI          36304053564 : success (3m9s)
+#   Frontend CI        36304053556 : success (4m1s)
+#   Optimize lab       36304053591 : success (1m35s)
+#   Fase 2 scientific  36304053569 : success (1m41s)
+#
+# --- En main (f8aa3697) ---
+#   Python CI          36304052800 : success (3m2s)
+#       quality: 2949 passed, 40 skipped = 2937 (quality de v2.77) + 12 (los puros nuevos);
+#       auto-v2-durable-pg / grammar-discovery-pg / lifecycle-pg / paper-forward-pg: success
+#   Frontend CI        36304052817 : success (3m12s)
+#   Optimize lab       36304052814 : success (1m36s)
+#   Fase 2 scientific  36304052791 : success (1m32s)
+#   Gitleaks           36304052816 : success (15s)
+#
+# LECTURA (sin sesgo): la contabilidad de vetos PUROS (+12 puros, M211-M213) y la ausencia
+# fail-closed quedan EJERCITADAS por el CI del tag, sin mover un solo umbral, sin migracion y sin
+# tocar el freeze ni el reparto (`auto18-v1` / `auto15-v1`, `ALLOCATION = none`).
