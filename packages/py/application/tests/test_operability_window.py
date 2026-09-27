@@ -11,6 +11,7 @@ Lo que se fija aquí (sin red ni PostgreSQL):
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE, MEASUREMENT_UNKNOWN
@@ -22,13 +23,17 @@ from bolsa_application.market_operability import (
     STATE_UNRESOLVED,
 )
 from bolsa_application.operability_window import (
+    FUNNEL_STEPS,
     MARKET_WINDOW_INCONCLUSIVE,
     MARKET_WINDOW_MIN_CYCLES,
     MARKET_WINDOW_MIN_DAYS,
     MARKET_WINDOW_MIN_EPISODES,
     MARKET_WINDOW_READY,
+    UNRESOLVED_AGE_BUCKETS,
     build_window_row,
+    render_window_html,
     render_window_series,
+    unresolved_age,
     window_gate,
 )
 
@@ -36,9 +41,14 @@ _ENTRY_EVENT = ENTRY_DECISION_EVENT
 _POSITION_EVENT = sorted(POSITION_JOURNAL_EVENTS)[0]
 
 
-def _entry(*reason_codes: str, event: str = _ENTRY_EVENT) -> dict[str, Any]:
+def _entry(
+    *reason_codes: str, event: str = _ENTRY_EVENT, at: datetime | None = None
+) -> dict[str, Any]:
     """Entrada de journal con la MISMA forma que el registro durable: el evento vive en ``payload``."""
-    return {"payload": {"event": event, "reasonCodes": list(reason_codes)}}
+    entry: dict[str, Any] = {"payload": {"event": event, "reasonCodes": list(reason_codes)}}
+    if at is not None:
+        entry["created_at"] = at
+    return entry
 
 
 def _cycle(
@@ -227,3 +237,129 @@ def test_render_window_series_warns_on_a_contract_violation() -> None:
     rendered = render_window_series([row])
     assert "ALERTA CONTRATO: other>0" in rendered
     assert "nuevo_motivo=1" in rendered
+
+
+# ── Funnel de operabilidad (v2.81) ─────────────────────────────────────────────────────────────
+
+
+def test_build_operability_funnel_declares_upper_steps_without_evidence() -> None:
+    """Sin `--forward`, los escalones que sólo mide el runner se DECLARAN, nunca se inventan a 0."""
+    row = build_window_row(
+        "2026-09-27",
+        entries=[
+            _entry("regime_invalid", "top_n_excluded", "risk_budget_exceeded"),
+            _entry("approved"),
+        ],
+        fills=0,
+    )
+    funnel = row["funnel"]
+    assert set(funnel) == set(FUNNEL_STEPS)
+    for step in ("universe", "marketData", "regimeAllowed", "orders"):
+        assert funnel[step]["count"] is None
+        assert funnel[step]["measured"] is False
+    assert funnel["signals"]["count"] == 4
+    assert funnel["topN"]["count"] == 3
+    assert funnel["risk"]["count"] == 2
+    assert funnel["reservation"]["count"] == 2
+    assert funnel["fills"]["count"] == 0
+    assert funnel["cycles"]["count"] == 0
+
+
+def test_build_operability_funnel_with_evidence_is_complete() -> None:
+    evidence = {
+        "watchSize": 8,
+        "priceSources": {"a": "market_close", "b": "market_live", "c": "missing"},
+        "sample": {"pricesServed": 2},
+        "marketRegime": {"counts": {"trend_down": 6, "range": 2}},
+        "turnTotals": {"orders": 1},
+    }
+    row = build_window_row("2026-09-27", entries=[_entry("approved")], fills=0, evidence=evidence)
+    funnel = row["funnel"]
+    assert funnel["universe"]["count"] == 8
+    assert funnel["marketData"]["count"] == 2
+    assert funnel["regimeAllowed"]["count"] == 2
+    assert funnel["orders"]["count"] == 1
+    assert row["symbolsObserved"] == 8
+    assert row["pairCapable"] is True
+    assert row["pairActive"] is False
+
+
+def test_build_operability_funnel_never_fabricates_a_step_without_its_predecessor() -> None:
+    """Un día no medido deja TODOS los escalones durables en ``None`` (no un cero de relleno)."""
+    row = build_window_row("2026-09-27")
+    funnel = row["funnel"]
+    for step in ("signals", "topN", "risk", "reservation", "fills", "cycles"):
+        assert funnel[step]["count"] is None
+
+
+def test_render_window_series_publishes_funnel_and_age() -> None:
+    row = build_window_row("2026-09-27", entries=[_entry("regime_invalid")], fills=0)
+    rendered = render_window_series([row])
+    assert "Funnel de operabilidad" in rendered
+    assert "signals=1" in rendered
+    assert "universe=n/d" in rendered
+    assert "unresolved_age" in rendered
+
+
+# ── unresolved_age (v2.81) ─────────────────────────────────────────────────────────────────────
+
+
+def test_unresolved_age_buckets_by_dwell_within_the_day() -> None:
+    reference = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
+    entries = [
+        _entry("approved", at=reference - timedelta(seconds=30)),
+        _entry("approved", at=reference - timedelta(minutes=3)),
+        _entry("approved", at=reference - timedelta(minutes=10)),
+        _entry("approved", at=reference - timedelta(minutes=45)),
+        _entry("regime_invalid", at=reference),
+    ]
+    age = unresolved_age(entries)
+    assert age["measured"] is True
+    assert age["proposals"] == 4
+    assert age["resolutionJoined"] is False
+    assert age["reference"] == reference.isoformat()
+    assert age["buckets"] == {"lt1m": 1, "1to5m": 1, "5to20m": 1, "gt20m": 1, "unknown": 0}
+
+
+def test_unresolved_age_declares_not_measured_without_timestamps() -> None:
+    age = unresolved_age([_entry("approved")])
+    assert age["measured"] is False
+    assert age["proposals"] == 1
+    assert all(age["buckets"][name] is None for name in UNRESOLVED_AGE_BUCKETS)
+
+
+def test_unresolved_age_is_measured_zero_when_there_are_no_proposals() -> None:
+    age = unresolved_age([_entry("regime_invalid", at=datetime(2026, 9, 27, 12, 0, tzinfo=UTC))])
+    assert age["measured"] is True
+    assert age["proposals"] == 0
+    assert age["buckets"] == {name: 0 for name in UNRESOLVED_AGE_BUCKETS}
+
+
+def test_build_window_row_marks_age_unmeasured_when_the_day_is_unmeasured() -> None:
+    row = build_window_row("2026-09-27")
+    assert row["unresolvedAge"]["measured"] is False
+    assert row["unresolvedAge"]["proposals"] is None
+
+
+# ── render_window_html (v2.81) ─────────────────────────────────────────────────────────────────
+
+
+def test_render_window_html_is_deterministic_and_escapes_reason_codes() -> None:
+    row = build_window_row("2026-09-27", entries=[_entry("<b>evil</b>")], fills=0)
+    meta = {
+        "header": {"account": "acc<script>", "versions": ["vA"], "capturedAt": "2026-09-27T20:00:00Z"},
+        "gate": window_gate([row]),
+    }
+    rendered = render_window_html([row], meta)
+    assert rendered == render_window_html([row], meta)
+    assert "<b>evil</b>" not in rendered
+    assert "&lt;b&gt;evil&lt;/b&gt;" in rendered
+    assert "acc&lt;script&gt;" in rendered
+
+
+def test_render_window_html_publishes_gate_verdict_and_contract_alert() -> None:
+    row = build_window_row("2026-09-27", entries=[_entry("nuevo_motivo")], fills=0)
+    meta = {"header": {"account": "acc", "versions": [], "capturedAt": "x"}, "gate": window_gate([row])}
+    rendered = render_window_html([row], meta)
+    assert "GATE: INCONCLUSIVE" in rendered
+    assert "ALERTA CONTRATO: other&gt;0" in rendered

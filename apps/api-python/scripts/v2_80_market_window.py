@@ -13,11 +13,18 @@ el gate y NO cambia un umbral. Reutiliza la MISMA puerta del censo que ``market_
 que el informe (``measured_r``). Escribe SOLO su propio journal (JSONL, directorio no versionado);
 nunca ``evidence_runs/`` ni ``evidence_validations/``.
 
+Desde ``v2.81`` (``AUTO-MATERIAL-9``) la misma corrida publica además el **funnel de operabilidad**
+(``--render``), el ``unresolved_age`` y un **informe HTML** autocontenido; ``--forward`` (OPCIONAL,
+read-only) enriquece el funnel con el universo/dato/régimen/órdenes del runner y el par A/B.
+
 Uso (desde la raíz del repo)::
 
-    # Serie de los últimos 4 días para la cuenta de la ventana:
+    # Serie de los últimos 4 días + informe HTML (artefacto de la ventana):
     BROKER_VENUE=paper uv run --no-sync python apps/api-python/scripts/v2_80_market_window.py \\
-        --account-id "$ACCOUNT" --strategy-version "$VERSION_A" --days 4 --render
+        --account-id "$ACCOUNT" --strategy-version "$VERSION_A" --days 4 --render \\
+        --forward 'operability_runs/forward-market-*.json' \\
+        --out operability_runs/operability-window.json \\
+        --html operability_runs/operability-window.html
 
     # Guardar la serie en un JSON (sin escribir el journal acumulado):
     BROKER_VENUE=paper uv run --no-sync python apps/api-python/scripts/v2_80_market_window.py \\
@@ -32,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import glob
 import json
 import sys
 from datetime import UTC, datetime, timedelta
@@ -41,6 +49,7 @@ from typing import Any
 _ROOT = Path(__file__).resolve().parents[3]
 _DOTENV = _ROOT / ".env"
 _DEFAULT_JOURNAL = _ROOT / "operability_runs" / "window.jsonl"
+_DEFAULT_HTML = _ROOT / "operability_runs" / "operability-window.html"
 
 
 def _die(message: str, code: int = 2) -> int:
@@ -62,6 +71,40 @@ def _since_day(args: argparse.Namespace) -> str | None:
     if args.days:
         return (datetime.now(UTC) - timedelta(days=int(args.days))).date().isoformat()
     return None
+
+
+def _evidence_day(path: Path, evidence: dict[str, Any]) -> str:
+    """Día de la evidencia del runner, declarado (nunca se adivina): campo o nombre del fichero."""
+    for field in ("day", "asOf", "date"):
+        value = str(evidence.get(field) or "").strip()
+        if value:
+            return value[:10]
+    digits = "".join(ch if ch.isdigit() else " " for ch in path.stem).split()
+    for token in digits:
+        if len(token) == 8:  # YYYYMMDD
+            return f"{token[:4]}-{token[4:6]}-{token[6:]}"
+    return ""
+
+
+def _load_evidence(patterns: list[str]) -> dict[str, dict[str, Any]]:
+    """Evidencia del runner por día (``--forward``, OPCIONAL y read-only). Sin campo de día, se omite."""
+    by_day: dict[str, dict[str, Any]] = {}
+    for pattern in patterns:
+        for match in sorted(glob.glob(str(pattern), recursive=True)):
+            path = Path(match)
+            if not path.is_file():
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                print(f"  !! evidencia ilegible {path}; se omite", file=sys.stderr)
+                continue
+            if not isinstance(payload, dict):
+                continue
+            day = _evidence_day(path, payload)
+            if day:
+                by_day.setdefault(day, payload)
+    return by_day
 
 
 async def _read_journal(repository: Any, account_id: str, since: str | None) -> list[Any]:
@@ -169,6 +212,9 @@ async def _collect(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict
     if since_day:
         days = [day for day in days if day >= since_day]
 
+    # Evidencia del runner (OPCIONAL, read-only): enriquece el funnel y el par A/B del día.
+    evidence_by_day = _load_evidence(list(args.forward or []))
+
     rows: list[dict[str, Any]] = []
     for day in days:
         day_fills = fills_by_day.get(day, [])
@@ -184,6 +230,7 @@ async def _collect(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict
                 versions=versions,
                 instruments=[name for name in instruments if name],
                 captured_at=captured_at,
+                evidence=evidence_by_day.get(day),
             )
         )
 
@@ -201,6 +248,7 @@ async def _collect(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict
         "regimeGaps": len(reading.absent) + len(reading.unconfirmed) + len(reading.not_derivable),
         "journalEntriesRead": len(journal),
         "undatedCycles": undated_cycles,
+        "evidenceDays": sorted(evidence_by_day),
     }
     return rows, {"header": header, "gate": window_gate(rows)}
 
@@ -210,7 +258,7 @@ def _render(rows: list[dict[str, Any]], meta: dict[str, Any]) -> None:
 
     header = meta["header"]
     gate = meta["gate"]
-    print("AUTO MARKET WINDOW (V2.80 · AUTO-MATERIAL-8) — read-only, sin PostgreSQL de escritura")
+    print("AUTO MARKET WINDOW (V2.81 · AUTO-MATERIAL-9) — read-only, sin PostgreSQL de escritura")
     print("=" * 92)
     print(
         f"cuenta {header['account']}  ·  versiones {', '.join(header['versions']) or '(ninguna)'}"
@@ -221,6 +269,7 @@ def _render(rows: list[dict[str, Any]], meta: dict[str, Any]) -> None:
         f"  ·  reservas {header['reservationsRead']}"
         f"{' (SATURADO: lectura incompleta)' if header['reservationsSaturated'] else ''}"
         f"  ·  entradas de journal {header['journalEntriesRead']}"
+        f"  ·  evidencia (--forward) dias {len(header.get('evidenceDays') or [])}"
     )
     print("")
     print(render_window_series(rows))
@@ -244,6 +293,13 @@ def _write_out(path: Path, rows: list[dict[str, Any]], meta: dict[str, Any]) -> 
         json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False, default=str) + "\n",
         encoding="utf-8",
     )
+
+
+def _write_html(path: Path, rows: list[dict[str, Any]], meta: dict[str, Any]) -> None:
+    from bolsa_application.operability_window import render_window_html
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_window_html(rows, meta) + "\n", encoding="utf-8")
 
 
 def _append_journal(path: Path, rows: list[dict[str, Any]]) -> int:
@@ -299,6 +355,20 @@ def main(argv: list[str] | None = None) -> int:
         help="journal JSONL acumulado (por defecto operability_runs/window.jsonl, no versionado)",
     )
     parser.add_argument("--out", default=None, help="escribe la serie completa en este JSON")
+    parser.add_argument(
+        "--forward",
+        action="append",
+        default=None,
+        metavar="PATH|GLOB",
+        help="JSON de evidencia del runner (repetible; admite glob). OPCIONAL: enriquece el "
+        "funnel (universo/dato/régimen/órdenes) y el par A/B del día; read-only.",
+    )
+    parser.add_argument(
+        "--html",
+        default=str(_DEFAULT_HTML),
+        help="informe HTML de la ventana (por defecto operability_runs/operability-window.html, "
+        "no versionado); vacío para no escribirlo",
+    )
     parser.add_argument("--render", action="store_true", help="publica la tabla diaria y el gate")
     parser.add_argument("--json", action="store_true", help="emite la serie como JSON por stdout")
     parser.add_argument(
@@ -324,6 +394,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.out:
         _write_out(Path(args.out), rows, meta)
+    if args.html:
+        html_path = Path(args.html)
+        if not html_path.is_absolute():
+            html_path = _ROOT / html_path
+        _write_html(html_path, rows, meta)
+        print(f"# informe html: {html_path}", file=sys.stderr)
     if not args.no_write:
         journal_path = Path(args.journal)
         if not journal_path.is_absolute():

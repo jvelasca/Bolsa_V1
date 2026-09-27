@@ -2590,6 +2590,43 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    entry_reasons = collect_journal_reasons(entries)\n",
         (T_OPERABILITY_WINDOW,),
     ),
+    # ── v2.81 (AUTO-MATERIAL-9): INFORME DE VENTANA (funnel + unresolved_age + HTML) ──
+    (
+        "M226 (ventana: el hueco se cuenta como cero): un escalon no medido se publica 0",
+        OPERABILITY_WINDOW,
+        "    return {\"count\": number, \"source\": source, \"measured\": number is not None}\n",
+        "    return {\"count\": 0 if number is None else number, \"source\": source, "
+        "\"measured\": number is not None}\n",
+        (T_OPERABILITY_WINDOW,),
+    ),
+    (
+        "M227 (ventana: el escalon se fabrica sin su prerrequisito): None se vuelve 0",
+        OPERABILITY_WINDOW,
+        "    return None if base is None else max(0, base - lost)\n",
+        "    return max(0, (base or 0) - lost)\n",
+        (T_OPERABILITY_WINDOW,),
+    ),
+    (
+        "M228 (ventana: toda entrada es una propuesta): el filtro approved deja de filtrar",
+        OPERABILITY_WINDOW,
+        "        if \"approved\" not in reasons:\n            continue\n",
+        "        if \"approved\" not in reasons:\n            pass\n",
+        (T_OPERABILITY_WINDOW,),
+    ),
+    (
+        "M229 (informe: el veredicto del gate se omite): el HTML no dice READY/INCONCLUSIVE",
+        OPERABILITY_WINDOW,
+        "{_e(gate.get(\"verdict\") or \"INCONCLUSIVE\")}",
+        "{_e(\"\")}",
+        (T_OPERABILITY_WINDOW,),
+    ),
+    (
+        "M230 (informe: el codigo de motivo se inyecta): el HTML deja de escapar",
+        OPERABILITY_WINDOW,
+        "    return html.escape(\"\" if value is None else str(value))\n",
+        "    return \"\" if value is None else str(value)\n",
+        (T_OPERABILITY_WINDOW,),
+    ),
 ]
 
 # DSN a un puerto local cerrado: el connect falla al instante (en vez de colgar el teardown de PG).
