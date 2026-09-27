@@ -69,6 +69,9 @@ mismo tag (patrón declarado `OBS-3`/`OBS-4`). Dentro del tag vive el **placehol
   PG), `Frontend CI` `36353481072`, `Optimize lab` `36353481116`, `Fase 2 scientific` `36353481110`,
   `Gitleaks` `36353481089`, todos en **success**.
 
+> **COMMIT QUE INTRODUJO ESTA CITA:** `1f2638aa3278fe7d071f4e7c3c203e637928cbc1` — el primer commit de
+> `main` posterior al tag `v2.84-beta` (el hash concreto se registra en el commit inmediato siguiente).
+>
 > **CONSTANCIA (honestidad, `OBS-3`)** — el **placeholder pre-tag** llevaba un **ERROR ARITMÉTICO** en su
 > predicción (`3040` y `3029`): sumó `18` sobre una base (`3022`/`3011`) que **ya** incluía los 2 tests
 > nuevos. La predicción **correcta** era `3022/37` y `3011/40`, que es **exactamente** lo observado.

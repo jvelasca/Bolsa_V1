@@ -5,12 +5,12 @@
 #   a0f03017 feat + bad2866c chore(ops) + fd3859e3 docs)
 # Version: 2.09.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
 #
-# COMMIT QUE CITA ESTE FICHERO: es ESTE MISMO commit POST-TAG, el primero de `main` posterior al tag
-# `v2.84-beta`. Localizalo sin ambiguedad con:
-#     git log -1 --format=%H -- docs/engineering/evidencia-ci-tag-v2.84-2026-09-27.txt
-# (NOTA: un commit NO puede citar su propio hash sin conocerlo antes; en `v2.83` esa linea se anadio en
-#  un commit posterior. Aqui se declara el comando en lugar de inventar el hash, y el hash concreto se
-#  registra en el commit siguiente.)
+# COMMIT QUE INTRODUJO ESTA CITA: 1f2638aa3278fe7d071f4e7c3c203e637928cbc1 (abreviado `1f2638aa`),
+# primer commit de `main` POSTERIOR al tag `v2.84-beta`. Un commit no puede citar su propio hash dentro
+# de su contenido, asi que el valor concreto se registra aqui en el commit inmediatamente siguiente (el
+# SEGUNDO POST-TAG, docs-only, que NO cambia ninguna afirmacion de este fichero). Verificalo con:
+#     git log --format=%h:%s -- docs/engineering/evidencia-ci-tag-v2.84-2026-09-27.txt
+# y toma el commit cuyo asunto empieza por "docs(v2.84): cita POST-TAG del CI del tag".
 # La cita del CI del tag vive aqui, FUERA del tag.
 # NOTA DE PATRON (falso positivo de auditoria): la instancia de ESTE fichero DENTRO del tag `v2.84-beta`
 # es el PLACEHOLDER pre-tag ("PENDIENTE DE TAG"), porque `Release tag CI` solo corre al EMPUJAR el tag y
