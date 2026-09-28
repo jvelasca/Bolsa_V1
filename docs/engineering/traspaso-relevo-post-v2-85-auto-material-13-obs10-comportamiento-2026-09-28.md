@@ -160,6 +160,16 @@ fase entrega **código + docs + bump** (`package.json` `2.09.0-beta → 2.10.0-b
 `v2.85-beta` + la cita del CI POST-TAG, **autocontenida** según el patrón `OBS-3`/`OBS-4`) queda
 **PENDIENTE** y declarado. **No** se cita aquí ningún `run` de CI: **`(pendiente)`** hasta que exista el tag.
 
+> **[POST-TAG 2026-09-28 — se conserva arriba el texto SELLADO, verbatim.]** El sello **ya se ejecutó**: la
+> ventana PAPER se cerró honestamente como **`NO MEDIDO`** (ver
+> [`ventana-paper-cierre-no-medido-2026-09-28.md`](./ventana-paper-cierre-no-medido-2026-09-28.md)) y esta
+> rama se mergeó **`--ff-only`** a `main` (`63696d0c → 481cf168`), con tag anotado **`v2.85-beta`** (objeto
+> `0582799b` → commit `481cf168`). La cita del CI vive POST-TAG en
+> [`evidencia-ci-tag-v2.85-2026-09-28.txt`](./evidencia-ci-tag-v2.85-2026-09-28.txt): `Release tag CI`
+> **`36392052899` SUCCESS** (primera pasada; `python` `3023/37` = `3022 + 1`; `quality` `3012/40` =
+> `3011 + 1`; `mypy 507 = 507`; `Contracts: 4 kept, 0 broken`). **`(pendiente)` queda resuelto.**
+
+
 ## Lo que hereda el siguiente
 
 1. **OPERACIÓN (bloqueante real, no se puede fabricar):** D1 quedó **relanzado y vivo**
@@ -177,6 +187,26 @@ fase entrega **código + docs + bump** (`package.json` `2.09.0-beta → 2.10.0-b
    ventana cierre** (hoy `main` no puede moverse).
 4. **Sello `v2.85-beta`** en `main` (tag + cita POST-TAG). Después, `AUTO-22`/`AUTO-23` y cierre de
    `P3-2`/`P3-3`; `H-4` sólo si `otherCount > 0`; `OBS-11` cuando se decida la semántica.
+
+> **[POST-TAG 2026-09-28 — estado de los 4 puntos heredados, tras ejecutarlos.]**
+> **(1) Operación:** **CERRADA como `NO MEDIDO`** (no se completó D2..D4: era *moot* — con `BEAR_TREND` la
+> ventana no acumula nada por construcción). Forward D1 parado por el operador; evidencia cruda en
+> [`ventana-paper-cierre-no-medido-2026-09-28.md`](./ventana-paper-cierre-no-medido-2026-09-28.md).
+> **(2) Auditoría de comportamiento:** resuelta **por el protocolo**: el atasco se localiza en el **escalón 0**
+> (el eje veta y no hay ni una propuesta) ⇒ veredicto honesto **`NO MEDIDO`**; nada se cierra con 0 días
+> medidos.
+> **(3) Merge a `main`:** **HECHO** (`--ff-only`, `63696d0c → 481cf168`). **CORRECCIÓN DECLARADA de una
+> referencia obsoleta del texto sellado:** el punto 3 citaba `commit 89f0596d`, que fue una **variante previa**
+> del commit de código, hoy **inalcanzable** (`git branch -a --contains 89f0596d` vacío;
+> `git merge-base --is-ancestor 89f0596d HEAD` ⇒ exit 1). Los commits reales del sello son **`e69d3b60`** (feat)
+> y **`481cf168`** (docs). El objeto sellado **no** se corrige (no se reescribe el tag); se declara aquí.
+> **(4) Sello `v2.85-beta`:** **HECHO** (tag anotado, objeto `0582799b` → commit `481cf168`; cita POST-TAG en
+> [`evidencia-ci-tag-v2.85-2026-09-28.txt`](./evidencia-ci-tag-v2.85-2026-09-28.txt), `Release tag CI`
+> `36392052899` **SUCCESS**). **Pendiente de verdad:** `AUTO-22`/`AUTO-23`, el cierre de `P3-2`/`P3-3` (exige
+> ventana PAPER real ≥4 días **con material**), `H-4` (sólo si `otherCount > 0`) y la semántica de `OBS-11`.
+> **Nota de freeze:** los comandos de abajo citaban el freeze **pre-merge** (`980c7b6e…`/`ffe36fd2…`); el
+> freeze de `main` es ahora `apps` `ddcf636f39054e29cf9013e0273da2b773c1fd76` / `packages`
+> `ba90ccf233bce9bada4e41cf81eb0b69312fd0d1`, y ese movimiento **es** el objeto de la fase.
 
 ## Reglas duras que siguen vigentes
 
@@ -211,6 +241,7 @@ python apps/api-python/scripts/v2_44_mutation_audit.py   # medidas: 233/233
 - [Protocolo de comportamiento](./protocolo-auditoria-comportamiento-auto-2026-09-28.md) ·
   [evidencia matriz 233](./evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt)
 - **Cierre de la ventana:** [ventana PAPER — veredicto `NO MEDIDO` (2026-09-28)](./ventana-paper-cierre-no-medido-2026-09-28.md)
+- **Cita del CI del tag (POST-TAG):** [evidencia CI `v2.85-beta`](./evidencia-ci-tag-v2.85-2026-09-28.txt)
 - Registro de la ventana: [arranque operativo PAPER](./arranque-ventana-paper-operativa-2026-09-27.md) ·
   [runbook](./runbook-ventana-forward-v2.78-2026-09-27.md)
 - Auditoría externa que originó `OBS-10`:

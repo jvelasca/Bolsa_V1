@@ -68,6 +68,16 @@ git merge-base --is-ancestor v2.84-beta HEAD; $?   # base = fd3859e3 (2.09.0-bet
     hay re-sello intermedio, pero **no** puede existir cita de CI de un tag que **aún no se ha creado** y
     que debe nacer en `main` **tras** cerrar la ventana. **No** concluyas «CI no acreditado»: es **PENDIENTE
     declarado**. Tampoco hay `evidencia-ci-tag-v2.85…` en esta entrega.
+
+    > **[POST-TAG 2026-09-28 — se conserva arriba el texto SELLADO, verbatim.]** El tag **`v2.85-beta`** ya
+    > existe (objeto `0582799b` → commit `481cf168`) y su cita vive en
+    > [`evidencia-ci-tag-v2.85-2026-09-28.txt`](./evidencia-ci-tag-v2.85-2026-09-28.txt): `Release tag CI`
+    > **`36392052899` SUCCESS** en la primera pasada, `python` `3023 passed / 37 skipped` (= `3022 + 1`),
+    > `mypy 0 issues (507 files)`, `Contracts: 4 kept, 0 broken`, `ruff All checks passed`, y `quality` en
+    > `main` `3012 passed / 40 skipped` (= `3011 + 1`). **No** hay placeholder dentro del tag (v2.85 se
+    > sella sin él, a diferencia de v2.83/v2.84): lo sellado dice literalmente `(pendiente)` y **eso** es lo
+    > que un auditor verá en el objeto sellado — es declaración, no fallo.
+
 14. **Límites declarados**: `OBS-11` (nuevo), `P3-2`/`P3-3` **ABIERTAS** (exigen ventana PAPER real ≥4 días
     / ≥2 episodios / ≥32 ciclos), `H-4` **ABIERTO** (visible vía `warnings: reason_contract`),
     `OBS-9`/`P3-5`/`OBS-5` declaradas. **No** se cierra ninguna deuda por documentación.

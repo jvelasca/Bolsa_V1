@@ -99,6 +99,20 @@ arreglo sólo afecta a filas `measured=False`, y el material real no tiene ningu
   declarado**. **No** se cita aquí ningún `run` de CI: **`(pendiente)`** hasta que exista el tag.
 - **Sin CI del tag todavía** ⇒ no hay `evidencia-ci-tag` de `v2.85`; el auditor **no** debe leer su
   ausencia como fallo.
+
+> **[POST-TAG 2026-09-28 — se conserva arriba el texto SELLADO, verbatim.]** El sello **SÍ se ejecutó** tras
+> cerrar la ventana: merge **`--ff-only`** de `feat/v2.85-obs10-comportamiento` a `main` (`63696d0c → 481cf168`),
+> tag anotado **`v2.85-beta`** (objeto `0582799b` → commit `481cf168`, sello en **DOS** commits: `e69d3b60`
+> feat + `481cf168` docs) y **cita POST-TAG** en
+> [`evidencia-ci-tag-v2.85-2026-09-28.txt`](./evidencia-ci-tag-v2.85-2026-09-28.txt):
+> `Release tag CI` **`36392052899` SUCCESS** (attempt 1, primera pasada, `07:30:53Z→07:39:58Z`; `10 success` +
+> `certify` success + `playwright` integrado `skipped` por diseño), job `python` **`ruff` All checks passed** /
+> `Contracts: 4 kept, 0 broken` / `mypy 0 issues (507 files)` / **`3023 passed, 37 skipped`** =
+> `3022 + 1` = lo predicho. `Python CI` del mismo commit en `main` **`36392050763` SUCCESS** con `quality`
+> **`3012 passed, 40 skipped`** = `3011 + 1`. **`(pendiente)` queda resuelto**; el par
+> `980c7b6e…`/`ffe36fd2…` de arriba era el freeze **pre-merge** y ya no describe `main` (ver la cita POST-TAG,
+> que declara el movimiento de freeze como el objeto mismo de la fase). **OBS-10 queda CERRADA en `main`.**
+
 - **Caveat de entorno (honesto):** en este worktree, invocar los shims de consola `mypy` y `lint-imports`
   está bloqueado por **Windows Application Control** (`os error 4551`); ambos se ejecutaron mediante
   `python -m mypy` y `importlinter.cli`. Son **las mismas herramientas**, no sustitutos.

@@ -1,0 +1,174 @@
+# V2.85 / AUTO-MATERIAL-13 - CI del tag `v2.85-beta`: evidencia cruda (cita POST-TAG)
+#
+# Fecha de captura: 2026-09-28
+# Tag anotado: v2.85-beta (objeto 0582799bcacfc457cc04763cc4e5861857aea9ae) -> commit
+#   481cf1687340d73cebdfbd0153651ee06abb3f9a (sello en DOS commits del rango 63696d0c..481cf168:
+#   e69d3b604266a32b05f58460f8f53a2c563c59c4 feat + 481cf1687340d73cebdfbd0153651ee06abb3f9a docs)
+# Version: 2.10.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
+#
+# COMMIT QUE INTRODUJO ESTA CITA: el PRIMER commit de `main` POSTERIOR al tag `v2.85-beta`. Un commit no
+# puede citar su propio hash dentro de su contenido, asi que el valor concreto se registra aqui en el
+# commit inmediatamente siguiente (el SEGUNDO POST-TAG, docs-only, que NO cambia ninguna afirmacion de
+# este fichero). Verificalo con:
+#     git log --format=%h:%s -- docs/engineering/evidencia-ci-tag-v2.85-2026-09-28.txt
+# y toma el commit cuyo asunto empieza por "docs(v2.85): cita POST-TAG del CI del tag".
+# La cita del CI del tag vive aqui, FUERA del tag.
+#
+# DIFERENCIA DECLARADA CON EL PATRON v2.83/v2.83.1/v2.84 (no se maquilla):
+#   En v2.83 y v2.84 el tag SI llevaba un fichero `evidencia-ci-tag-<version>-*.txt` con un PLACEHOLDER
+#   ("PENDIENTE DE TAG") que se reescribia POST-TAG. En v2.85 NO se creo ese placeholder: los docs
+#   sellados dicen literalmente `(pendiente)` (audit-pack §5, arranque del auditor §13 y la seccion
+#   "Decision de sellado" del relevo) y el tag anotado lo declara en su propio mensaje. Un auditor que
+#   trabaje estrictamente sobre el objeto sellado (commit 481cf168) vera `(pendiente)` y NO debe
+#   concluir "CI no acreditado": la cita acreditada es ESTE fichero en el commit POST-TAG.
+#   Cadena verificada: tag v2.85-beta -> Release tag CI 36392052899 -> SUCCESS.
+#
+# REGLA DECLARADA (patron v2.74-v2.84): el workflow `Release tag CI` SOLO corre al empujar el tag, asi
+# que la cita de su resultado vive en un commit POST-TAG (este). Dentro del tag, el auditor no ve este
+# fichero; lo reproduce con los comandos del `arranque-auditor-v2-85-*.md`.
+#
+# ============================================================================================
+# 0. CONSTANCIA DE REFERENCIAS OBSOLETAS EN EL OBJETO SELLADO (honestidad; NO se corrige el tag)
+# ============================================================================================
+# (a) El relevo sellado (`traspaso-relevo-post-v2-85-*.md`, §"Lo que hereda el siguiente", punto 3)
+#     cita la rama como `feat/v2.85-obs10-comportamiento`, **commit `89f0596d`**. Esa referencia es
+#     OBSOLETA: `89f0596d570fc384a7f89ee8ae1cfa5afa9d1ea0` fue una VARIANTE PREVIA del commit de codigo
+#     (los docs de fase se reescribieron despues), hoy INALCANZABLE (`git branch -a --contains 89f0596d`
+#     no devuelve NADA; `git merge-base --is-ancestor 89f0596d HEAD` => exit 1). Los commits reales del
+#     sello son `e69d3b60` (feat) y `481cf168` (docs). El objeto sellado NO se corrige; se declara aqui.
+# (b) Los docs sellados afirman "NO mergeada a `main`; `main` intacto en `63696d0c`" y citan el freeze de
+#     `main` como `980c7b6e...`/`ffe36fd2...`. Eso era CIERTO **al autorar la fase** (pre-merge). Tras el
+#     merge y el sello: `main` = `481cf168` y el freeze de `main` pasa a
+#     `apps` `ddcf636f39054e29cf9013e0273da2b773c1fd76` / `packages` `ba90ccf233bce9bada4e41cf81eb0b69312fd0d1`.
+#     El MOVIMIENTO de ese freeze ES el objeto de la fase (`v2.85` toca `packages/`), no una violacion:
+#     la regla de freeze prohibia moverlo MIENTRAS la ventana PAPER estaba viva, y la ventana se cerro
+#     como `NO MEDIDO` ANTES del merge (ver `ventana-paper-cierre-no-medido-2026-09-28.md`).
+# (c) El relevo sellado, §"Comandos de verificacion rapida", dice `git branch --show-current` =>
+#     `feat/v2.85-obs10-comportamiento` y freeze `980c7b6e...`/`ffe36fd2...`. Igualmente cierto AL AUTORAR
+#     y obsoleto tras el merge (la rama se elimino; `main` esta en `481cf168`). Se declara, no se corrige.
+# (d) En v2.85 NO hay placeholder ni ERROR ARITMETICO de prediccion (a diferencia de v2.84, donde el
+#     placeholder sumaba mal y quedo declarado). Aqui la prediccion se dio ANTES de empujar y se cumplio
+#     exacta (ver §5).
+#
+# --- Objeto de la fase (instrumento read-only; cierra OBS-10) ---
+# packages/py/application/src/bolsa_application/operability_audit.py
+#   OBS-10: el bloque `stateCounts` de `window_totals` iteraba `rows` mientras `counts`/`coverage`/
+#           `rSum`/`funnel` usaban `measured_rows`; ahora itera `measured_rows` y el docstring de
+#           `window_totals` lo declara. Etiqueta honesta de `unresolvedRate` (INDICADOR 1.0/None; NO tasa
+#           de propuestas) en `_RATE_SOURCES`, docstring de `window_rates` y render `_rate_lines`, SIN
+#           renombrar la clave y SIN mover la aritmetica.
+# packages/py/application/tests/test_operability_audit.py
+#   +1 test de regresion: `test_window_totals_state_counts_ignores_unmeasured_rows` (18 -> 19).
+# apps/api-python/scripts/v2_44_mutation_audit.py
+#   marcador + mutacion M233 que muerde ese test (matriz 232 -> 233).
+# apps/api-python/scripts/ops_seed_window_pair.py  (ANEXO OPS, no gate-certificado)
+#   `--allow-create`: sin `--account-id` y sin `--allow-create` imprime "# uso incorrecto: ..." en stderr y
+#   sale con codigo 1 ANTES de tocar PostgreSQL (no acuna cuenta en silencio y no rompe la muestra).
+# NO se toca motor, gobernador, `operability_window.py`, `v2_80_market_window.py`, TOP_N, umbrales,
+# allocation, pesos A/B, UI ni migraciones.
+#
+# --- Commits y push ---
+# e69d3b604266a32b05f58460f8f53a2c563c59c4  feat(v2.85): cierra OBS-10 (stateCounts sobre measured_rows)
+#           + M233 + OBS-11 + endurece ops_seed_window_pair
+#           1 fichero de codigo + 1 de test + 1 de matriz + 1 ops + package.json + docs de fase
+# 481cf1687340d73cebdfbd0153651ee06abb3f9a  docs(v2.85): cierre de la ventana PAPER D1..D4 con veredicto
+#           honesto NO MEDIDO (+ enlace desde el relevo)
+#           rango 63696d0c..481cf168 = 15 ficheros, +1806 -9 (git diff --stat)
+# git push origin main        : 63696d0c..481cf168  main -> main
+# git push origin v2.85-beta  : * [new tag] v2.85-beta -> v2.85-beta
+# tag anotado objeto 0582799bcacfc457cc04763cc4e5861857aea9ae -> commit 481cf168
+# merge: `git merge --ff-only feat/v2.85-obs10-comportamiento` sobre `main` en 63696d0c (sin merge commit;
+#        `main` == la rama sellada). Worktree aislado eliminado y rama borrada tras el sello.
+#
+# --- Release tag CI (run 36392052899, HEAD 481cf168, event=push, ref=v2.85-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 07:30:53Z -> 07:39:58Z, ~9m05s)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   shared (build/typecheck/test)                          success
+#   python (ruff/imports/mypy/pytest offline)              success
+#   decision-spine                                        success
+#   lifecycle-pg (Alembic + auth + golden restart)         success
+#   frontend (typecheck/lint/test/build + contract:check)  success
+#   dr-verify (battery DB_DR / TCP CI)                     success
+#   security (gitleaks)                                    success
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)      success
+#   playwright (mock E2E)                                  success
+#   playwright (integrated E2E, opt-in)                    [skipped, por diseno]
+#   certify (aggregate + artifact)                         success
+#
+# Job `python` del tag (verbatim):
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 507 source files     <-- SIN cambio (507 = 507)
+#   pytest  : 3023 passed, 37 skipped, 6 warnings in 56.33s
+#             => `3022 + 1 = 3023` = EXACTAMENTE lo ESPERADO y declarado ANTES del sello; skips SIN
+#                mover (37 = 37) => el registro explicito del test en `release-tag-ci.yml` SI ejecuto.
+#
+# --- Sobre el MISMO commit y tag (481cf168, v2.85-beta) ---
+#   Python CI            36392052944 : success (attempt 1)
+#   Frontend CI          36392052955 : success (attempt 1)
+#   Optimize lab         36392052947 : success (attempt 1)
+#   Fase 2 scientific    36392052975 : success (attempt 1)
+#
+# --- En main (fast-forward 63696d0c..481cf168) ---
+#   Python CI            36392050763 : success (attempt 1)
+#       quality: 3012 passed, 40 skipped, 6 warnings in 127.70s = `3011 + 1 = 3012` = lo ESPERADO;
+#                skips 40 = 40; `ruff` `All checks passed!` / `Contracts: 4 kept, 0 broken` /
+#                `mypy 0 issues (507 files)`.
+#       Jobs PG del commit (el diff NO toca material durable ni migraciones):
+#       grammar-discovery-pg (Alembic + A14 E2E, per-commit)          success
+#       auto-v2-durable-pg (Alembic 040-045 + reinicio real)          success
+#       lifecycle-pg (Alembic + A12 E2E, per-commit)                  success
+#       paper-forward-pg (Alembic + A13 E2E, per-commit)              success
+#       NOTA DECLARADA: en `main` **SI** corrieron `Python CI` / `Fase 2 scientific` / `Optimize lab`, por
+#       el trigger por rutas (el sello incluye ficheros Python). Es comportamiento por diseno, no un fallo.
+#   Frontend CI          36392050716 : success (attempt 1)
+#   Optimize lab         36392050816 : success (attempt 1)
+#   Fase 2 scientific    36392050737 : success (attempt 1)
+#   Gitleaks             36392050785 : success (attempt 1)
+#
+# --- Compuertas medidas EN LOCAL (antes del sello, no heredadas) ---
+# ruff          : All checks passed!
+# import-linter : Contracts: 4 kept, 0 broken.
+# mypy          : Success: no issues found in 507 source files
+# alembic       : 046_fill_reference_mid (head)
+# puros nuevos  : test_operability_audit.py -> 19 passed (18 + 1)
+# aplicacion    : pytest packages/py/application/tests -q -> 2085 passed / 5 skipped (2090, eran 2089)
+# matriz        : 233/233 (M233 muerde el test nuevo), restauracion byte a byte, arbol limpio
+#                 (evidencia: evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt)
+# medida real   : `stateCounts` sobre el material real de la ventana ANTES/DESPUES del fix => sin delta
+#                 ({'no_signal': 30, 'operated': 1}) => ninguna cifra publicada se mueve
+# anexo OPS     : `ops_seed_window_pair.py` endurecido; NO tiene test unitario por diseno (script de
+#                 operador como sus hermanos del mismo directorio) y NO esta en el alcance de mypy
+#                 (`apps/api-python/src`). Declarado, no gate-certificado.
+#
+# --- ESPERADO vs OBSERVADO (el sello declaro su prediccion antes de empujar) ---
+# Job `python` del tag : ESPERADO 3023/37  <-> OBSERVADO 3023/37  -> COINCIDE (3022 + 1; 37 = 37)
+# Job `quality`        : ESPERADO 3012/40  <-> OBSERVADO 3012/40  -> COINCIDE (3011 + 1; 40 = 40)
+#   => la prediccion era un calculo (`base + 1`), no una urna: se cumplio exacta y no se corrigio ninguna
+#      cifra observada.
+#
+# --- VENTANA PAPER D1..D4: veredicto honesto NO MEDIDO (no lo acredita el CI) ---
+# El tag NO acredita ninguna ventana: se cerro como NO MEDIDO por veto legitimo de regimen. Evidencia
+# cruda en `ventana-paper-cierre-no-medido-2026-09-28.md`: preflight exit 2 (eje BEAR_TREND, LONG vetadas
+# por regime_invalid); forward D1 detached (PID 16508) con cycles=0/0 y verdict=BLOCKED, parado por el
+# operador, sin escribir su --out (el runner escribe solo al final); v2_80_market_window.py exit 2 (no hay
+# ningun dia de operabilidad que leer en la ventana); paper_material_readiness.py exit 2 (PRODUCER READY?
+# NO, EVIDENCE READY? NO, durable fills 0, closed cycles 0, reservations 0); v2_83_window_audit.py NO
+# EJECUTABLE (sin `--window`). Causa medida: los vetos de entrada viven en RAMA del proceso y el censo de
+# dias de `v2_80` se construye SOLO con material durable (fills | cycles | journal) => sin fills no hay
+# filas y D2..D4 no cambiarian nada. NO se bajaron `min cycles`/`min R`/`folds`/`min_episodes` ni se
+# forzaron entradas.
+#
+# LECTURA (sin sesgo): fase de INSTRUMENTO READ-ONLY + ANEXO OPS. CI del tag GREEN en la PRIMERA pasada con
+# EXACTAMENTE los conteos predichos (3023/37 y 3012/40), +1 test nuevo, mypy 507 = 507, matriz 233/233 con
+# restauracion byte a byte y arbol limpio, SIN migracion y sin tocar el motor congelado ni el gobernador.
+# Cambio real y medido de freeze en `main` (`apps` `980c7b6e` -> `ddcf636f`, `packages` `ffe36fd2` ->
+# `ba90ccf2`): ES el objeto de la fase y ocurre DESPUES de cerrar la ventana, no durante.
+#
+# DECLARADO, NO HECHO: la ventana de >=4 dias de calendario con material REAL sigue siendo OPERACION DEL
+# PROPIETARIO (`P3-2`/`P3-3` ABIERTAS); el CI del tag NO la acredita ni la sustituye. `H-4` (LOW) sigue
+# ABIERTO (esta fase lo hace VISIBLE en `warnings: reason_contract`, no lo cierra). `OBS-11` (LOW)
+# DECLARADA, NO cerrada (es nueva de esta fase). `OBS-9` (doc-only), `P3-5` y `OBS-5` declaradas. El anexo
+# operativo (`ops_seed_window_pair.py`) es un ENDURECIMIENTO NO GATE-CERTIFICADO: `--allow-create` evita
+# acunar cuenta en silencio, pero NO cierra `P3-3`. `OBS-10` CERRADA por codigo + test + mutacion (efectiva
+# en `main` desde `481cf168`).
