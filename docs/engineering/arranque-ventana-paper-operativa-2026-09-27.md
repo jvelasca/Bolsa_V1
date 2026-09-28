@@ -130,8 +130,30 @@ compartan **un único árbol**.
 | PID del forward | `34492` (proceso `uv`, lanzado **2026-09-28 00:02:32** local) |
 | Salida | `operability_runs/forward-market-20260928.json` (se escribe **al terminar**) |
 | Logs | `logs/dev/forward-d1.out.log`, `logs/dev/forward-d1.err.log` |
-| Duración prevista | 400 ticks × 60 s ≈ **6 h 40 min** (fin ≈ 06:45 local) |
+| Duración prevista | 400 ticks × 60 s ≈ **6 h 40 min** (estimación **incumplida**: ver *cadencia observada*) |
 | Primera lectura del relanzamiento | `[22:11:36Z] ticks=10 prices=20/20 cycles=0/0 verdict=BLOCKED` |
+
+**Cadencia observada — la máquina SE SUSPENDIÓ durante D1 (declarado 2026-09-28):** el log del
+forward registra solo **tres** marcas en 7 h 30 min, con un **salto** entre el tick 20 y el tick 30:
+
+```text
+[22:11:36] ticks=10 prices=20/20 cycles=0/0 verdict=BLOCKED
+[22:21:52] ticks=20 prices=20/20 cycles=0/0 verdict=BLOCKED
+[05:30:12] ticks=30 prices=20/20 cycles=0/0 verdict=BLOCKED   <-- ~7 h 08 min después del tick 20
+```
+
+El forward pidió **60 s por tick**, así que esos 10 ticks «debían» tardar 10 min: hubo ≈**6 h 58 min**
+de **suspensión del equipo** (no de trabajo del motor). Consecuencias, declaradas en lugar de maquilladas:
+
+- **D1 NO termina ≈06:45**: a 60 s/tick le restan ~370 ticks ⇒ fin **≈11:40 local** (estimación, puede
+  moverse). El `--max-ticks 400` sigue siendo el criterio, no el reloj.
+- **La cadencia no es «1 tick = 1 minuto de mercado»**: la suspensión dilata el reloj de pared. El
+  material que se acumule sigue siendo **honesto** (cada tick sigue midiendo precio/régimen reales), pero
+  el **día** del material es el de la fecha de ejecución y **no** se puede inferir del número de ticks.
+- **No** se altera el proceso ni se reinicia D1 por esto: la suspensión **no** cambia el árbol de
+  **código** (los hashes `apps`/`packages` siguen intactos) ni fabrica ni pierde material.
+- **Recomendación operativa:** mantener el equipo **sin suspensión** durante D1..D4 (o declarar cada
+  salto como este) para que los cuatro días tengan una cadencia comparable.
 
 **Cómo comprobar que el árbol de código no se movió** (debe repetirse al cerrar la ventana):
 
