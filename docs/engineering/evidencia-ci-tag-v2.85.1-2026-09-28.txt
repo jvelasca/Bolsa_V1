@@ -1,0 +1,152 @@
+# V2.85.1 / AUTO-MATERIAL-13 RE-SELLO - CI del objeto auditado `v2.85` : evidencia cruda
+#
+# Fecha de captura: 2026-09-28
+# Tag anotado: v2.85.1-beta -> commit del sello (bump + docs). Version: 2.10.1-beta.
+# SIN migracion (Alembic head 046_fill_reference_mid). CODIGO IDENTICO a v2.85 (2.10.0-beta).
+#
+# ========================================================================================
+# QUE ES ESTE FICHERO (leer ANTES de sacar conclusiones)
+# ========================================================================================
+# ESTE fichero viaja DENTRO del tag `v2.85.1-beta`. Sirve para dos cosas:
+#   (a) ACREDITAR, DESDE EL PROPIO TAG, el CI de la fase auditada `v2.85` (Release tag CI
+#       36392052899, SUCCESS), que en el tag `v2.85-beta` NO quedaba citado dentro (el sello
+#       declaro literalmente `(pendiente)` y la cita real se escribio en commits POST-TAG); y
+#   (b) DECLARAR el CI del tag `v2.85.1-beta` (este objeto), cuya cita, por construccion del
+#       workflow, NO puede existir dentro del propio tag y se escribe en un commit POST-TAG.
+#
+# LIMITE ESTRUCTURAL (patron OBS-3/OBS-4, v2.74-v2.84): `Release tag CI` SOLO corre al EMPUJAR el
+# tag; su resultado no puede preexistir a ese push. Ningun tag puede contener su propio resultado
+# de CI. Lo que SI podemos entregar -y es lo que hace este re-sello- es que un tag contenga el
+# INSTRUMENTO Y la cita del CI de la fase auditada. Por eso `v2.85.1-beta` NO es un cambio de
+# motor/instrumento: es el MISMO objeto en un formato auditable de forma autocontenida.
+#
+# DIFERENCIA DECLARADA CON v2.83.1 (no se maquilla): en `v2.83-beta` el fichero de evidencia SI
+# viajaba dentro del tag como PLACEHOLDER ("PENDIENTE DE TAG"). En `v2.85-beta` NO se creo ningun
+# placeholder: los docs sellados dicen literalmente `(pendiente)`. Este re-sello es el que deja,
+# por primera vez para v2.85, la cita del CI del objeto auditado DENTRO del tag.
+#
+# ========================================================================================
+# (1) CI DEL TAG `v2.85-beta` - ACREDITADO, Y VISIBLE DESDE ESTE TAG
+# ========================================================================================
+# Tag anotado `v2.85-beta` (objeto 0582799bcacfc457cc04763cc4e5861857aea9ae) -> commit
+#   481cf1687340d73cebdfbd0153651ee06abb3f9a. Version 2.10.0-beta.
+#   Sello en DOS commits: e69d3b604266a32b05f58460f8f53a2c563c59c4 (feat: fix OBS-10 + test +
+#   M233 + etiqueta unresolvedRate + endurecimiento OPS) + 481cf168 (docs: cierre de la ventana
+#   PAPER con veredicto NO MEDIDO). Rango 63696d0c..481cf168 = 15 ficheros, +1806 -9.
+#   Merge: `git merge --ff-only feat/v2.85-obs10-comportamiento` sobre main en 63696d0c.
+#   Push: `git push origin main` 63696d0c..481cf168 ; `git push origin v2.85-beta` (new tag).
+#
+# Release tag CI  run 36392052899 : SUCCESS (attempt 1; ~9m05s; 07:30:53Z -> 07:39:58Z)
+#   Jobs: 10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno.
+#   shared (build/typecheck/test) / python (ruff/imports/mypy/pytest offline) / decision-spine /
+#   lifecycle-pg / frontend (typecheck/lint/test/build + contract:check) / dr-verify / security
+#   (gitleaks) / a7-gate / playwright (mock E2E) -> success ; certify (aggregate + artifact) ->
+#   success.
+#   Job `python` del tag (verbatim):
+#     ruff    : All checks passed!
+#     imports : Contracts: 4 kept, 0 broken.
+#     mypy    : Success: no issues found in 507 source files     <-- 507 = 507, SIN cambio
+#     pytest  : 3023 passed, 37 skipped, 6 warnings in 56.33s
+#               => `3022 + 1 = 3023` = EXACTAMENTE lo declarado ANTES de empujar; skips 37 = 37.
+#
+# Sobre el MISMO commit y tag (481cf168, v2.85-beta):
+#   Python CI          36392052944 : success (attempt 1)
+#   Frontend CI        36392052955 : success (attempt 1)
+#   Optimize lab       36392052947 : success (attempt 1)
+#   Fase 2 scientific  36392052975 : success (attempt 1)
+#   (playwright integrado opt-in: skipped por diseno)
+#
+# En `main` (fast-forward 63696d0c..481cf168):
+#   Python CI          36392050763 : success (attempt 1)
+#       quality: 3012 passed, 40 skipped, 6 warnings in 127.70s = `3011 + 1 = 3012` = lo ESPERADO;
+#                skips 40 = 40; `ruff All checks passed!` / `Contracts: 4 kept, 0 broken` /
+#                `mypy 0 issues (507 files)`.
+#       Jobs PG del commit (el diff NO toca material durable ni migraciones):
+#       grammar-discovery-pg (Alembic + A14 E2E, per-commit)   success
+#       auto-v2-durable-pg (Alembic 040-045 + reinicio real)   success
+#       lifecycle-pg (Alembic + A12 E2E, per-commit)           success
+#       paper-forward-pg (Alembic + A13 E2E, per-commit)       success
+#   Frontend CI        36392050716 : success
+#   Optimize lab       36392050816 : success
+#   Fase 2 scientific  36392050737 : success
+#   Gitleaks           36392050785 : success
+#   NOTA: en `main` SI corrieron Python CI / Fase 2 scientific / Optimize lab (el sello incluye
+#         ficheros Python y el trigger por rutas los ve). Comportamiento por diseno, no un fallo.
+#
+# Cita POST-TAG del CI de `v2.85-beta` (fuera del tag, en `main`): commits
+#   e7d652d03675f19132559501e98b82b65d414d5e (docs: cita POST-TAG) y
+#   46fb6d62d4a4d27bdf26f7bfb24bde9ee976b370 (docs: registra el hash del anterior).
+#
+# ========================================================================================
+# (2) CI DEL TAG `v2.85.1-beta` (ESTE objeto) - POST-TAG POR CONSTRUCCION
+# ========================================================================================
+# `Release tag CI` de `v2.85.1-beta` NO puede estar aqui: solo corre al empujar el tag. Su cita se
+# escribe en el PRIMER commit POST-TAG de `main` posterior a este tag, en la version de ESTE fichero
+# que vive FUERA del tag. Comandos para verificarlo:
+#     git log --format=%h:%s -- docs/engineering/evidencia-ci-tag-v2.85.1-2026-09-28.txt
+#     gh run list --branch v2.85.1-beta
+#
+# ========================================================================================
+# (3) COMPUERTAS MEDIDAS EN LOCAL (antes del sello `v2.85`, no heredadas del CI)
+# ========================================================================================
+# ruff          : All checks passed!
+# import-linter : Contracts: 4 kept, 0 broken.
+# mypy          : Success: no issues found in 507 source files
+# alembic       : 046_fill_reference_mid (head)   -> SIN migracion
+# puros nuevos  : test_operability_audit.py -> 19 passed (18 + 1)
+# aplicacion    : 2085 passed / 5 skipped  (= 2090 recogidos; eran 2089)
+# matriz        : 233/233 (M233 muerde el test nuevo), restauracion byte a byte, arbol limpio
+#                 (evidencia: evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt)
+# medida real   : `stateCounts` sobre el material real de la ventana ANTES/DESPUES del fix => sin
+#                 delta ({'no_signal': 30, 'operated': 1}) => ninguna cifra publicada se mueve.
+#
+# ========================================================================================
+# (4) HECHOS DECLARADOS DEL OBJETO (honestidad; nada de esto es un hallazgo del auditor)
+# ========================================================================================
+# (a) VENTANA PAPER D1..D4 = `NO MEDIDO` (por veto legitimo de regimen, NO por fallo de codigo).
+#     Evidencia cruda en `ventana-paper-cierre-no-medido-2026-09-28.md`: preflight exit 2 con eje
+#     BEAR_TREND (LONG vetadas por `regime_invalid`); forward D1 detached (PID 16508) con
+#     cycles=0/0 y verdict=BLOCKED, parado por el operador y sin escribir su `--out` (el runner
+#     escribe solo al final); `v2_80_market_window.py` exit 2 (no hay ningun dia de operabilidad
+#     que leer en la ventana); `paper_material_readiness.py` exit 2 (PRODUCER READY? NO, EVIDENCE
+#     READY? NO, durable fills 0, closed cycles 0, reservations 0); `v2_83_window_audit.py` NO
+#     EJECUTABLE por falta de `--window`. Causa medida: el censo de dias de `v2_80` se construye
+#     SOLO con material durable (fills | cycles | journal) => sin fills no hay filas y D2..D4 no
+#     cambiarian nada. NO se bajaron `min cycles`/`min R`/`folds`/`min_episodes` ni se forzaron
+#     entradas. `P3-2`/`P3-3` siguen ABIERTAS: el CI del tag NO las acredita.
+# (b) DUPLICIDAD DOCUMENTAL DECLARADA (registrada como `OBS-12`, LOW, higiene documental; CERRADA
+#     en este re-sello). El tag contiene DOS sets de traspaso/arranque para `v2.85`:
+#       - docs-only PREVIO: `traspaso-relevo-post-v2-85-auto-material-13-comportamiento-2026-09-28.md`
+#         y `arranque-agente-v2-85-auto-material-13-comportamiento-2026-09-28.md` -> llevan cabecera
+#         [SUPERSEDED]; dicen "SIN bump y SIN tag" y citan HEAD `d7a4924d` porque son ANTERIORES a la
+#         ejecucion. Se conservan por trazabilidad, NO se borran.
+#       - fase EJECUTADA (VIGENTE): los `...-auto-material-13-obs10-comportamiento-2026-09-28.md`.
+#     Hasta este re-sello, `PROJECT_STATE.md` llamaba "Relevo vivo" al set docs-only: un auditor que
+#     siguiera el punto de entrada aterrizaba en un documento que NEGABA la existencia del tag. Ya
+#     corregido. Es un defecto DOCUMENTAL, no una deuda de datos.
+# (c) REFERENCIA OBSOLETA en el objeto sellado `v2.85-beta` (declarada, NO corregida ahi): el relevo
+#     cita el commit `89f0596d` de la rama, que fue una VARIANTE PREVIA del commit de codigo, hoy
+#     INALCANZABLE (`git branch -a --contains 89f0596d` vacio; `git merge-base --is-ancestor
+#     89f0596d HEAD` => exit 1). Los commits reales del sello son `e69d3b60` (feat) + `481cf168`
+#     (docs).
+# (d) Los documentos del set docs-only citaban el freeze de `main` como `apps` `980c7b6e...` /
+#     `packages` `ffe36fd2...` ("INTACTO"). Ese era el freeze PRE-MERGE. El freeze de `main` es ahora
+#     `apps` `ddcf636f39054e29cf9013e0273da2b773c1fd76` / `packages`
+#     `ba90ccf233bce9bada4e41cf81eb0b69312fd0d1`, y ese movimiento ES el objeto de la fase: la regla
+#     de freeze prohibia moverlo MIENTRAS la ventana PAPER estaba viva, y la ventana se cerro como
+#     `NO MEDIDO` ANTES del merge.
+#
+# ========================================================================================
+# (5) ALCANCE DEL RE-SELLO (que DEBE verificar el auditor, en vez de fiarse)
+# ========================================================================================
+# `git diff --stat v2.85-beta v2.85.1-beta` debe dar EXACTAMENTE: `package.json` (bump
+# 2.10.0-beta -> 2.10.1-beta) + `docs/engineering/*` (+ `CHANGELOG.md`). NINGUN fichero de
+# `packages/` ni de `apps/`. El instrumento (`operability_audit.py`), el test, la matriz (`M233`) y
+# `ops_seed_window_pair.py` deben estar BYTE-IDENTICOS entre ambos tags. Si hay CUALQUIER cambio
+# fuera de ese alcance, este re-sello es FALSO: declaralo.
+#
+# LECTURA (sin sesgo): re-sello docs-only para dejar el objeto auditado autocontenido: el tag lleva
+# el instrumento de `v2.85` Y la cita de su CI (`Release tag CI 36392052899`, SUCCESS en la primera
+# pasada, con `3023/37` y `mypy 507 = 507` = lo predicho), mas la rectificacion documental declarada
+# (`OBS-12`). NO cambia codigo, NO mueve el freeze, NO cierra deuda de datos. `OBS-10` CERRADA;
+# `OBS-11` (LOW), `P3-2`/`P3-3`, `H-4`, `OBS-9`, `P3-5`/`OBS-5` ABIERTAS y declaradas.

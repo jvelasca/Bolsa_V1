@@ -1,5 +1,16 @@
 # Arranque del auditor — `v2.85` / `AUTO-MATERIAL-13` (cierre de `OBS-10` + etiqueta de `unresolvedRate` + endurecimiento OPS)
 
+> **[HAY UN RE-SELLO: usa `v2.85.1-beta`.]** Este texto se redactó para la rama y el tag `v2.85-beta`. El
+> objeto de auditoría **vigente** es el tag anotado **`v2.85.1-beta`** (re-sello **docs-only**: código
+> **byte-idéntico** a `v2.85`; el diff es `package.json` + `docs/engineering/*`). Punto de entrada vigente:
+> [`arranque-auditor-v2-85-1-auto-material-13-obs10-comportamiento-2026-09-28.md`](./arranque-auditor-v2-85-1-auto-material-13-obs10-comportamiento-2026-09-28.md).
+> **Motivos del re-sello:** (a) dejar la **cita del CI de `v2.85` DENTRO** del tag (patrón `OBS-3`/`OBS-4`:
+> donde este documento diga `(pendiente)`, léelo como *estado al autorar* y usa la cita real); y (b)
+> **`OBS-12`** (LOW, higiene documental): el tag contiene **dos sets** de traspaso/arranque para `v2.85` — el
+> **docs-only previo** (hoy con cabecera **[SUPERSEDED]**, dice «SIN bump y SIN tag», `HEAD` `d7a4924d`) y el
+> de la **fase ejecutada** (vigente). **No** leas esa duplicidad como fallo. Las referencias de abajo a la
+> rama / «NO mergeada a `main`» describen el estado **al autorar**; hoy `main` lleva `v2.85` y `v2.85.1`.
+
 > Trabaja **desde un clon fresco** de la rama **`feat/v2.85-obs10-comportamiento`** (o del tag
 > `v2.85-beta` **cuando exista**) y **nunca** sobre el árbol local del propietario. Deja constancia de que
 > no lo alteras: `git status --porcelain` vacío antes y después de cada sonda.

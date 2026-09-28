@@ -1,5 +1,13 @@
 # Arranque del agente siguiente — post `AUTO-MATERIAL-13` (docs-only)
 
+> **[SUPERSEDED — NO ES EL ARRANQUE VIGENTE]** Marca de fecha: 2026-09-28. Este documento es la entrega
+> **docs-only** **previa** a la ejecución de la fase (`main` = `d7a4924d`, «SIN bump, SIN tag»). El
+> arranque vigente es
+> [`arranque-agente-v2-85-auto-material-13-obs10-comportamiento-2026-09-28.md`](./arranque-agente-v2-85-auto-material-13-obs10-comportamiento-2026-09-28.md)
+> (con la ejecución real: `OBS-10` cerrada, `v2.85-beta` y `v2.85.1-beta` sellados). Para **auditar**, usa
+> [`arranque-auditor-v2-85-1-auto-material-13-obs10-comportamiento-2026-09-28.md`](./arranque-auditor-v2-85-1-auto-material-13-obs10-comportamiento-2026-09-28.md).
+> Se conserva por trazabilidad histórica y **no** se borra; **no** lo leas como el estado vigente.
+
 > **Punto de entrada** para el siguiente chat/agente. **AsOf:** 2026-09-28 · **Estado:** entrega
 > **docs-only** (SIN bump, SIN tag), base `v2.84-beta` (`2.09.0-beta`, `fd3859e3`), `main` = `d7a4924d`.
 > **Alembic head:** `046_fill_reference_mid`. **Freeze intacto:** `980c7b6e…` / `ffe36fd2…`.

@@ -1,5 +1,15 @@
 # Traspaso / relevo — tras `AUTO-MATERIAL-13`: AUDITORÍA DE COMPORTAMIENTO y `OBS-10`
 
+> **[SUPERSEDED — NO ES EL RELEVO VIGENTE]** Marca de fecha: 2026-09-28. Este documento es la entrega
+> **docs-only** **previa** a la ejecución de la fase. El relevo vigente es
+> [`traspaso-relevo-post-v2-85-auto-material-13-obs10-comportamiento-2026-09-28.md`](./traspaso-relevo-post-v2-85-auto-material-13-obs10-comportamiento-2026-09-28.md),
+> que **sí ejecuta** la fase (cierra `OBS-10` con **código + test + `M233`**), mergea a `main` y sella
+> `v2.85-beta` (más su re-sello docs-only `v2.85.1-beta`). Se conserva por **trazabilidad histórica** y
+> **no** se borra. A continuación el texto **original, verbatim**: el `HEAD` `d7a4924d`, el freeze
+> `980c7b6e…`/`ffe36fd2…` y la etiqueta «SIN bump y SIN tag» eran ciertos **al autorar este documento** y
+> **ya no** describen `main` (ver [`PROJECT_STATE.md`](./PROJECT_STATE.md)). **No leas este documento como
+> el estado vigente.**
+
 > **AsOf:** 2026-09-28 · **Etiqueta de entrega:** **SIN bump y SIN tag** (docs-only) · **Base:**
 > `v2.84-beta` (`2.09.0-beta`, tag `e6d921a8` → commit `fd3859e3`) · **HEAD de `main`:** `d7a4924d`
 > **Alembic head:** `046_fill_reference_mid` (**SIN migración**) · **Freeze intacto:** `apps` =

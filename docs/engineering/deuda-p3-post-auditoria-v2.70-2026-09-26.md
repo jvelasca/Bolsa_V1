@@ -38,10 +38,14 @@
 > `stateCounts` del `TOTAL` recorre todas las filas mientras el resto usa `measured_rows`. Queda
 > **ABIERTA y APLAZADA** a la fase de código `v2.85`/`AUTO-MATERIAL-13` (no se toca `packages` con una
 > ventana PAPER en curso); su semántica de cierre ya está **decidida** (`measured_rows`). **`v2.85`
-> (2026-09-28) la CIERRA en la rama `feat/v2.85-obs10-comportamiento`** (código + test + **`M233`**;
-> pendiente de merge a `main`) y, al etiquetar `unresolvedRate`, registra la observación nueva **`OBS-11`
+> (2026-09-28) la CIERRA en `main`** (código + test + **`M233`**; sellada en `v2.85-beta` y re-sellada en
+> `v2.85.1-beta`) y, al etiquetar `unresolvedRate`, registra la observación nueva **`OBS-11`
 > (LOW)**: su aritmética es un **indicador** (`numerador == denominador`), no una proporción — **ABIERTA y
 > declarada** (la etiqueta honesta se hizo; la semántica de la clave, no).
+> **`OBS-12` (LOW, higiene documental, hallazgo del propietario al ir a auditar):** el tag `v2.85-beta`
+> llevaba **dos sets documentales** de la misma fase y `PROJECT_STATE` llamaba «Relevo vivo» al
+> **obsoleto** ⇒ un auditor podía emitir un hallazgo **falso** («los docs niegan el tag»).
+> **CERRADA en el re-sello `v2.85.1`** (docs-only; ver más abajo).
 > **Deuda de proceso declarada:** `v2.73-beta` quedó
 > **sin auditoría externa** (ver más abajo).
 
@@ -533,7 +537,7 @@ el instrumento auditado). Ficheros medidos con la frase: `v2_75_paper_sample_acc
 > corrige en la entrega docs-only (el fichero es `apps/`, prohibido con la ventana PAPER viva). Ver
 > [`auditoria-v2-84-…`](./auditoria-v2-84-auto-material-12-instrument-funnel-contract-2026-09-28.md) §3 (H-2).
 
-## OBS-10 — `stateCounts` del TOTAL recorre TODAS las filas mientras el resto usa `measured_rows` (LOW) — CERRADA en la rama `v2.85` (2026-09-28)
+## OBS-10 — `stateCounts` del TOTAL recorre TODAS las filas mientras el resto usa `measured_rows` (LOW) — 🟢 CERRADA en `v2.85` (`main`, 2026-09-28)
 
 **Origen.** Auditoría externa del objeto sellado **`v2.84-beta`** (`AUTO-MATERIAL-12`; tag anotado
 `e6d921a8` → commit `fd3859e3`; `2.09.0-beta`). El auditor la marca como observación a **vigilar** (no
@@ -637,6 +641,44 @@ una cifra publicada sin necesidad). Sin impacto funcional medido: la clave no de
 > **Estado:** ABIERTA y declarada (2026-09-28). La **etiqueta** honesta ya está hecha; el **cierre** exige
 > decidir la semántica, no documentarla.
 
+
+## OBS-12 — Doble set documental en el objeto sellado y «Relevo vivo» apuntando al obsoleto (LOW, higiene documental) — 🟢 CERRADA en el re-sello `v2.85.1` (2026-09-28)
+
+**Origen.** **Hallazgo del propietario**, no del CI: al ir a **auditar externamente** el tag `v2.85-beta`
+desde GitHub, apareció que el objeto sellado contenía **dos sets documentales paralelos** de la **misma**
+fase y que el punto de entrada (`PROJECT_STATE.md`) señalaba al equivocado.
+
+**Observación (medida).**
+- **Set docs-only previo** — `traspaso-relevo-post-v2-85-auto-material-13-comportamiento-2026-09-28.md` y
+  `arranque-agente-v2-85-auto-material-13-comportamiento-2026-09-28.md`: declaran **«SIN bump y SIN tag»** y
+  citan `HEAD` `d7a4924d` y el freeze **pre-merge** `980c7b6e…`/`ffe36fd2…` (ciertos **al autorarlos**:
+  son **anteriores** a la ejecución de la fase).
+- **Set de la fase ejecutada (vigente)** — los `…-auto-material-13-obs10-comportamiento-2026-09-28.md`.
+- `PROJECT_STATE.md` llamaba **«Relevo vivo»** al set **docs-only**.
+
+**Riesgo real (por eso es deuda y no cosmética).** Un auditor externo que clone **solo** el tag y siga el
+punto de entrada aterriza en un documento que **niega la existencia del tag** («SIN tag») ⇒ hallazgo
+**FALSO** del tipo «los docs se contradicen / no hay tag». Es el **espejo** del patrón `OBS-3`/`OBS-4`
+(auditor leyendo el objeto sellado y concluyendo un falso negativo).
+
+**Cierre (en `v2.85.1-beta`, docs-only).**
+1. Cabecera **[SUPERSEDED]** en **los dos** documentos del set docs-only (**conservados**, no borrados).
+2. `PROJECT_STATE.md`: «Relevo vivo» pasa a apuntar al relevo **real**; el docs-only queda marcado
+   **[SUPERSEDED]**.
+3. **Declaración explícita** de la duplicidad en **tres** sitios: el relevo del re-sello, el `audit-pack` y la
+   evidencia del CI que **viaja dentro del tag** ([`evidencia-ci-tag-v2.85.1-2026-09-28.txt`](./evidencia-ci-tag-v2.85.1-2026-09-28.txt)).
+
+**Por qué esta deuda SÍ se cierra con documentación (y no contradice la regla).** Es un defecto
+**documental**: el arreglo **es** documental por naturaleza. La regla «ninguna deuda se cierra por
+documentación» rige para deuda de **datos/semántica**: `P3-2`/`P3-3` exigen ventana PAPER **real**, `H-4`
+exige `otherCount > 0` y `OBS-11` exige **decidir una semántica**. Este cierre **no** se usa como precedente
+para ninguna de ellas.
+
+**Verificación.** `git grep -l "SUPERSEDED" -- docs/engineering` devuelve los dos documentos del set
+docs-only; `git diff v2.85-beta v2.85.1-beta -- packages apps` está **vacío** (el re-sello no toca código).
+
+> **Estado:** 🟢 **CERRADA** (2026-09-28) en el re-sello `v2.85.1-beta`. Sin cambio de código, sin migración
+> y sin mover el freeze.
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 

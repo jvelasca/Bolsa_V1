@@ -2,6 +2,43 @@
 
 All notable releases of Bolsa V1.
 
+## [2.10.1-beta] — `AUTO-MATERIAL-13` RE-SELLO docs-only: objeto de auditoría autocontenido + `OBS-12` — 2026-09-28
+
+**Re-sello DOCS-ONLY de `v2.85` (`v2.85.1-beta`). El CÓDIGO es BYTE-IDÉNTICO a `2.10.0-beta`**: el diff
+`v2.85-beta..v2.85.1-beta` es **sólo** `package.json` + `docs/engineering/*` (+ este `CHANGELOG.md`).
+**SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin mover el freeze** en este
+re-sello (`git diff v2.85-beta v2.85.1-beta -- packages apps` debe estar **vacío**). El reparto **no se
+mueve**: `auto18-v1`/`auto15-v1` (`ALLOCATION = none`). El sello `v2.85-beta` **SÍ se ejecutó**: la rama se
+mergeó **`--ff-only`** a `main` (`63696d0c → 481cf168`) y la ventana PAPER D1..D4 se cerró honestamente como
+**`NO MEDIDO`** (eje `BEAR_TREND` ⇒ LONG vetadas por `regime_invalid`; el censo de días de
+`v2_80_market_window.py` se construye **sólo** con material durable ⇒ sin fills, correr D2..D4 no cambiaría
+nada). **No** se bajaron `min cycles`/`min R`/`folds`/`min_episodes` ni se forzaron entradas.
+
+**Dos motivos para este re-sello:**
+
+- **Autocontención (`OBS-3`/`OBS-4`).** `Release tag CI` sólo corre al empujar el tag ⇒ la cita de su
+  resultado no puede vivir dentro del propio tag. A diferencia de `v2.83`/`v2.84` (que dejaron un
+  *placeholder*), `v2.85-beta` **no** creó ninguno: sus docs decían literalmente `(pendiente)`. Ahora
+  `v2.85.1-beta` viaja con la **cita del CI de `v2.85` DENTRO**
+  ([evidencia](./docs/engineering/evidencia-ci-tag-v2.85.1-2026-09-28.txt)): `Release tag CI`
+  **`36392052899` SUCCESS** en la primera pasada (`python` **`3023 passed / 37 skipped`** = `3022 + 1`;
+  `quality` en `main` **`3012 passed / 40 skipped`** = `3011 + 1`; `mypy` `0 issues (507 files)`;
+  `Contracts: 4 kept, 0 broken`).
+- **`OBS-12` (LOW, higiene documental) — hallazgo del propietario, CERRADA.** El objeto sellado
+  `v2.85-beta` contenía **dos sets documentales paralelos** de la misma fase (el **docs-only previo**, que
+  dice «SIN bump y SIN tag» y cita `HEAD` `d7a4924d`, y el de la **fase ejecutada**) y `PROJECT_STATE.md`
+  llamaba **«Relevo vivo»** al **obsoleto**: un auditor externo que siguiera el punto de entrada aterrizaba
+  en un documento que **negaba la existencia del tag** ⇒ riesgo de hallazgo **FALSO** (espejo del patrón
+  `OBS-3`/`OBS-4`). **Cierre:** cabecera **[SUPERSEDED]** en los dos documentos del set docs-only
+  (**conservados**, no borrados), puntero «Relevo vivo» corregido al relevo real y **declaración explícita**
+  de la duplicidad en el relevo, el `audit-pack` y la evidencia que viaja dentro del tag. Es un defecto
+  **documental** (por eso su cierre **es** documental); la regla «ninguna deuda se cierra por documentación»
+  rige para deuda de **datos** (`P3-2`/`P3-3`/`H-4`/`OBS-11`) y **no** se relaja por esto.
+
+- **Declarado, no hecho:** `P3-2`/`P3-3` (ventana PAPER **real** ≥4 días **con material**), `OBS-11` (LOW),
+  `H-4` (LOW), `OBS-9`, `P3-5` y `OBS-5` siguen **ABIERTAS**; el CI del tag **no** las acredita.
+  **`OBS-10` CERRADA** (código + test + `M233`).
+
 ## [2.10.0-beta] — `AUTO-MATERIAL-13`: cierre de `OBS-10`, etiqueta de `unresolvedRate` y endurecimiento OPS — 2026-09-28
 
 **Fase de CÓDIGO ejecutada en RAMA AISLADA (`feat/v2.85-obs10-comportamiento`, worktree sobre `63696d0c`),

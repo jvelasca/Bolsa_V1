@@ -6,6 +6,28 @@
 > (**SIN migración**). **Tag `v2.85-beta`: PENDIENTE** (se crea en `main` tras cerrar la ventana PAPER y
 > mergear la rama; ver §5).
 
+> **[RE-SELLO `v2.85.1-beta` — LEER ESTO PRIMERO, 2026-09-28.]** El objeto de auditoría vigente es el tag
+> anotado **`v2.85.1-beta`** (re-sello **docs-only**: **código byte-idéntico** a `v2.85-beta`; el diff es
+> `package.json` + `docs/engineering/*`). Cambios respecto a la redacción original de este pack:
+> **(1) La fase SÍ se ejecutó y SÍ se selló.** Donde abajo diga «NO mergeada a `main`» o «Tag PENDIENTE»,
+> léelo como el **estado al autorar**: la rama se mergeó **`--ff-only`** a `main` (`63696d0c → 481cf168`),
+> tag **`v2.85-beta`** (objeto `0582799b`) y después **`v2.85.1-beta`**; contrasta con §5 y con
+> [`evidencia-ci-tag-v2.85.1-2026-09-28.txt`](./evidencia-ci-tag-v2.85.1-2026-09-28.txt).
+> **(2) `OBS-10` está CERRADA en `main`**; **`OBS-11` (LOW) sigue ABIERTA**.
+> **(3) DECLARACIÓN DE DUPLICIDAD DOCUMENTAL — no la leas como fallo.** El tag contiene **dos sets** de
+> traspaso/arranque para `v2.85`: el **docs-only previo**
+> (`traspaso-relevo-post-v2-85-auto-material-13-comportamiento-2026-09-28.md` y su `arranque-agente`, hoy con
+> cabecera **[SUPERSEDED]**) y el de la **fase ejecutada**
+> (`…-auto-material-13-obs10-comportamiento-2026-09-28.md`, el vigente). El set docs-only **no** describe el
+> sello (dice «SIN bump y SIN tag», `HEAD` `d7a4924d`) porque es **anterior** a la ejecución; se conserva
+> por trazabilidad y **no** se borra. **Referencia obsoleta ya declarada:** el relevo sellado citaba el
+> commit `89f0596d`, variante previa hoy **inalcanzable** (los commits reales del sello son `e69d3b60` feat
+> + `481cf168` docs). Todo esto queda registrado como **`OBS-12` (LOW, higiene documental)**, **CERRADA** en
+> este re-sello.
+> **(4) Ventana PAPER:** cerrada como **`NO MEDIDO`** (ver
+> [`ventana-paper-cierre-no-medido-2026-09-28.md`](./ventana-paper-cierre-no-medido-2026-09-28.md));
+> **`P3-2`/`P3-3` ABIERTAS** — el CI del tag **no** las acredita.
+
 ## 1. Qué es esta fase
 
 Fase de **código** que cierra la observación **`OBS-10`** de la auditoría externa de `v2.84-beta`, etiqueta
