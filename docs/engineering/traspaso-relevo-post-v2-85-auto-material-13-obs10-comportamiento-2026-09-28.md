@@ -210,6 +210,7 @@ python apps/api-python/scripts/v2_44_mutation_audit.py   # medidas: 233/233
   [deuda P3](./deuda-p3-post-auditoria-v2.70-2026-09-26.md) (`OBS-10` cerrada, `OBS-11` abierta)
 - [Protocolo de comportamiento](./protocolo-auditoria-comportamiento-auto-2026-09-28.md) ·
   [evidencia matriz 233](./evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt)
+- **Cierre de la ventana:** [ventana PAPER — veredicto `NO MEDIDO` (2026-09-28)](./ventana-paper-cierre-no-medido-2026-09-28.md)
 - Registro de la ventana: [arranque operativo PAPER](./arranque-ventana-paper-operativa-2026-09-27.md) ·
   [runbook](./runbook-ventana-forward-v2.78-2026-09-27.md)
 - Auditoría externa que originó `OBS-10`:
