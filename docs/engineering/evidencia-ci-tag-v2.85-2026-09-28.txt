@@ -6,7 +6,8 @@
 #   e69d3b604266a32b05f58460f8f53a2c563c59c4 feat + 481cf1687340d73cebdfbd0153651ee06abb3f9a docs)
 # Version: 2.10.0-beta. SIN migracion (Alembic head 046_fill_reference_mid).
 #
-# COMMIT QUE INTRODUJO ESTA CITA: el PRIMER commit de `main` POSTERIOR al tag `v2.85-beta`. Un commit no
+# COMMIT QUE INTRODUJO ESTA CITA: e7d652d03675f19132559501e98b82b65d414d5e (abreviado `e7d652d0`), el
+# PRIMER commit de `main` POSTERIOR al tag `v2.85-beta`. Un commit no
 # puede citar su propio hash dentro de su contenido, asi que el valor concreto se registra aqui en el
 # commit inmediatamente siguiente (el SEGUNDO POST-TAG, docs-only, que NO cambia ninguna afirmacion de
 # este fichero). Verificalo con:
