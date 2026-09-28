@@ -15,6 +15,18 @@ añade capas de observabilidad, corrige una inconsistencia de semántica y endur
 el árbol de **código** no se mueva (`git rev-parse "HEAD:apps" "HEAD:packages"`) y esta fase **sí** toca
 `packages/`. Ejecutarla antes invalidaría D1..D4 en curso.
 
+> **Decisión de sellado (2026-09-28, propietario) — NO hay re-sello intermedio.**
+> `v2.84-beta` ya está auditado, así que la siguiente auditoría externa necesita un objeto nuevo. Se
+> **descarta** el re-sello docs-only `v2.84.1-beta` (su delta de **código** sería **cero**: el mismo
+> `operability_audit.py` byte-idéntico que el auditor ya aprobó) y el siguiente objeto sellado es
+> **`v2.85-beta`** — con el cambio de código **real** (`OBS-10` + `M233` + endurecimiento OPS). Por eso:
+> **(a)** se ejecuta **una sola** elevación, **después** de cerrar la ventana; **(b)** el sello `v2.85-beta`
+> debe ser **autocontenido** (patrón `OBS-3`/`OBS-4`: cita del CI **y** del rango en el commit de sello), para
+> que el auditor del tag aislado **no** vuelva a leer «CI no acreditado»; y **(c)** el sello incorpora los
+> docs acumulados en `main` desde `v2.84` (protocolo de comportamiento, registro de `OBS-10`, correcciones
+> **H-1**/**H-2**), de modo que el auditor **no** reencuentre H-1/H-2 (hoy sólo corregidos en `main`, **no**
+> dentro del tag `v2.84-beta`).
+
 ## 1. Alcance (4 entregables)
 
 ### 1.1 `OBS-10` — `stateCounts` debe respetar `measured_rows` (INSTRUMENTO)

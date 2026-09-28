@@ -127,6 +127,12 @@ uv run --no-sync python apps/api-python/scripts/paper_material_readiness.py `
 
 ### Fase C — CÓDIGO `v2.85` / `AUTO-MATERIAL-13` (**solo DESPUÉS** de cerrar la ventana)
 
+> **Decisión de sellado (2026-09-28, propietario): `v2.85-beta` es la SIGUIENTE auditoría externa y NO
+> hay re-sello intermedio.** Se descarta `v2.84.1-beta` (un re-sello docs-only tendría **código cero
+> nuevo**: el mismo instrumento que el auditor ya aprobó). El sello `v2.85-beta` debe ser **autocontenido**
+> (cita del CI + rango en el commit de sello, patrón `OBS-3`/`OBS-4`) e incorporar los docs acumulados en
+> `main` (protocolo, `OBS-10`, correcciones **H-1**/**H-2**), para que su auditor **no** reencuentre H-1/H-2.
+
 5. **`OBS-10`**: `stateCounts` sobre `measured_rows`; test
    `test_window_totals_state_counts_ignores_unmeasured_rows`; mutación **`M233`** (matriz **232 → 233**).
 6. **Etiqueta de `unresolvedRate`**: aclarar render/docstring (**sin** renombrar la clave).
