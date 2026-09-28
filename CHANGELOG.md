@@ -2,6 +2,53 @@
 
 All notable releases of Bolsa V1.
 
+## [2.10.0-beta] — `AUTO-MATERIAL-13`: cierre de `OBS-10`, etiqueta de `unresolvedRate` y endurecimiento OPS — 2026-09-28
+
+**Fase de CÓDIGO ejecutada en RAMA AISLADA (`feat/v2.85-obs10-comportamiento`, worktree sobre `63696d0c`),
+NO mergeada a `main`; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin tocar el
+freeze de `main`** (`apps` `980c7b6e…` / `packages` `ffe36fd2…`; `auto_simulation_worker.py` intacto). El
+reparto **no se mueve**: `auto18-v1`/`auto15-v1` (`ALLOCATION = none`). `TOP_N`, umbrales, allocation,
+pesos de estrategia, lógica A/B, gobernador y migraciones **no se mueven**. **Por qué en rama:** hay una
+**ventana PAPER viva** (D1..D4) y la regla de freeze prohíbe mover `packages/`/`apps/` en `main` mientras
+corre; la rama **no** toca el árbol de trabajo que leen las lecturas hacia delante de la ventana. El sello
+`v2.85-beta` (tag + cita del CI POST-TAG) queda **PENDIENTE**: se crea en `main` tras cerrar la ventana y
+mergear.
+
+- **`OBS-10` (LOW) CERRADA por código + test + mutación.** En `operability_audit.py`, el bloque `stateCounts`
+  de `window_totals` iteraba `rows` mientras `counts`/`coverage`/`rSum`/`funnel` usaban `measured_rows`;
+  ahora itera **`measured_rows`** y su docstring lo declara. Protegido por
+  `test_window_totals_state_counts_ignores_unmeasured_rows` (`test_operability_audit.py` **18 → 19 passed**)
+  y por **`M233`** (matriz **232 → 233**, re-medida **233/233**). Sin impacto medido sobre el material real:
+  sólo el bucket `unknown` podía contaminarse (los productores son fail-closed).
+- **Etiqueta honesta de `unresolvedRate` (sin renombrar la clave).** `_RATE_SOURCES`, el docstring de
+  `window_rates` y el render `_rate_lines` declaran que la clave es un **indicador** (vale `1.0` en cuanto
+  hay un día medido en `unresolved`, `None` si no lo hay), **no** una proporción ni una tasa de propuestas.
+  **No** se renombra la clave y **no** cambia la aritmética: ningún número publicado se mueve.
+- **`OBS-11` (nuevo, LOW) declarado, NO cerrado.** La aritmética de `unresolvedRate` es un **indicador**
+  (`numerador == denominador ==` días medidos en `unresolved`); se etiqueta y la pregunta de fondo se
+  **registra** como deuda abierta en la [deuda P3](./docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md).
+- **`ops_seed_window_pair.py` endurecido (anexo OPS).** Ya no acuña una cuenta nueva en silencio: nuevo flag
+  `--allow-create`; sin `--account-id` y sin `--allow-create` imprime `# uso incorrecto: …` a `stderr` y sale
+  con **código 1** **antes** de tocar PostgreSQL; `_resolve_account(..., allow_create=False)` levanta
+  `ValueError` defensivamente. Motivo (auditor): sin cuenta fija se rompe la continuidad de la muestra.
+- **Compuertas medidas en la rama (números exactos):** `test_operability_audit.py` **19 passed**; suite de
+  aplicación **2085 passed / 5 skipped** (**2090** recogidos; eran **2089**); `ruff` `All checks passed!`;
+  `lint-imports` **Contracts: 4 kept, 0 broken.**; `mypy` **Success: no issues found in 507 source files**;
+  matriz **233/233** (crudo en [`evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt`](./docs/engineering/evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt)).
+  **Caveat de entorno:** los shims `mypy`/`lint-imports` estuvieron bloqueados por Windows Application
+  Control (`os error 4551`); se corrieron por `python -m mypy` / `importlinter.cli` (las mismas herramientas).
+- **Sello PENDIENTE, declarado.** `v2.85-beta` es la siguiente auditoría externa y **no** hay re-sello
+  intermedio; el tag anotado y su cita de CI **no** pueden nacer hasta que la ventana PAPER cierre y `main`
+  pueda moverse (la cita del CI es POST-TAG por construcción, patrón `OBS-3`/`OBS-4`). **`(pendiente)`.**
+- **Deuda declarada (NO se cierra):** `OBS-11` (nuevo, LOW) **ABIERTA**; `P3-2`/`P3-3` **ABIERTAS** (exigen
+  la ventana PAPER real ≥4 días); `H-4` (LOW) **ABIERTO**; `OBS-9`/`P3-5`/`OBS-5` declaradas. **`OBS-10`
+  CERRADA** (en la rama; efecto definitivo al mergear a `main`).
+- **Rótulo cerrado en:** [audit-pack](./docs/engineering/audit-pack-v2-85-auto-material-13-obs10-comportamiento-2026-09-28.md) ·
+  [arranque del auditor](./docs/engineering/arranque-auditor-v2-85-auto-material-13-obs10-comportamiento-2026-09-28.md) ·
+  [arranque del agente](./docs/engineering/arranque-agente-v2-85-auto-material-13-obs10-comportamiento-2026-09-28.md) ·
+  [relevo](./docs/engineering/traspaso-relevo-post-v2-85-auto-material-13-obs10-comportamiento-2026-09-28.md) ·
+  [evidencia matriz 233](./docs/engineering/evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt).
+
 ## [2.09.0-beta] — `AUTO-MATERIAL-12`: CONTRATO DEL FUNNEL de la auditoría (cierre de `OBS-6`/`OBS-7`/`OBS-8`) — 2026-09-27
 
 **Fase de INSTRUMENTO READ-ONLY; SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin

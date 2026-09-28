@@ -2652,6 +2652,15 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "            entry = _as_mapping(_as_mapping(row.get(\"funnel\")).get(step))\n",
         (T_OPERABILITY_AUDIT,),
     ),
+    (
+        "M233 (auditoria: stateCounts cuenta dias NO medidos): measured_rows vuelve a ser rows",
+        OPERABILITY_AUDIT,
+        "    for row in measured_rows:\n"
+        "        state = _text(row.get(\"state\"))\n",
+        "    for row in rows:\n"
+        "        state = _text(row.get(\"state\"))\n",
+        (T_OPERABILITY_AUDIT,),
+    ),
 ]
 
 # DSN a un puerto local cerrado: el connect falla al instante (en vez de colgar el teardown de PG).

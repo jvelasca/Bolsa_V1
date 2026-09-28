@@ -37,7 +37,11 @@
 > emite `APROBADO` (0 bloqueantes)** sobre una fase de instrumento read-only y levanta **`OBS-10` (LOW)**:
 > `stateCounts` del `TOTAL` recorre todas las filas mientras el resto usa `measured_rows`. Queda
 > **ABIERTA y APLAZADA** a la fase de código `v2.85`/`AUTO-MATERIAL-13` (no se toca `packages` con una
-> ventana PAPER en curso); su semántica de cierre ya está **decidida** (`measured_rows`).
+> ventana PAPER en curso); su semántica de cierre ya está **decidida** (`measured_rows`). **`v2.85`
+> (2026-09-28) la CIERRA en la rama `feat/v2.85-obs10-comportamiento`** (código + test + **`M233`**;
+> pendiente de merge a `main`) y, al etiquetar `unresolvedRate`, registra la observación nueva **`OBS-11`
+> (LOW)**: su aritmética es un **indicador** (`numerador == denominador`), no una proporción — **ABIERTA y
+> declarada** (la etiqueta honesta se hizo; la semántica de la clave, no).
 > **Deuda de proceso declarada:** `v2.73-beta` quedó
 > **sin auditoría externa** (ver más abajo).
 
@@ -529,7 +533,7 @@ el instrumento auditado). Ficheros medidos con la frase: `v2_75_paper_sample_acc
 > corrige en la entrega docs-only (el fichero es `apps/`, prohibido con la ventana PAPER viva). Ver
 > [`auditoria-v2-84-…`](./auditoria-v2-84-auto-material-12-instrument-funnel-contract-2026-09-28.md) §3 (H-2).
 
-## OBS-10 — `stateCounts` del TOTAL recorre TODAS las filas mientras el resto usa `measured_rows` (LOW) — 🟡 ABIERTA y APLAZADA (2026-09-28)
+## OBS-10 — `stateCounts` del TOTAL recorre TODAS las filas mientras el resto usa `measured_rows` (LOW) — CERRADA en la rama `v2.85` (2026-09-28)
 
 **Origen.** Auditoría externa del objeto sellado **`v2.84-beta`** (`AUTO-MATERIAL-12`; tag anotado
 `e6d921a8` → commit `fd3859e3`; `2.09.0-beta`). El auditor la marca como observación a **vigilar** (no
@@ -591,6 +595,48 @@ intencionadamente independiente.
 > **Mejora de lectura asociada (no la cierra `OBS-10`).** `unresolvedRate` es una tasa de **días** en
 > estado `unresolved` sobre días medidos (declarado en `_RATE_SOURCES`), no de propuestas. Se aplaza su
 > aclaración en render/docstring a `v2.85` por el mismo motivo (no tocar `packages` ahora).
+> **Hecho en `v2.85` (2026-09-28):** `_RATE_SOURCES`, el docstring de `window_rates` y el render
+> `_rate_lines` ya lo declaran **indicador** (ver `OBS-11`).
+
+**Cierre (`v2.85` / `AUTO-MATERIAL-13`, 2026-09-28) — CERRADA por CÓDIGO, no por documentación.** En la rama
+`feat/v2.85-obs10-comportamiento` (worktree aislado, **NO** mergeada a `main`; `main` intacto en
+`63696d0c`), el bloque `stateCounts` de `window_totals` (`operability_audit.py`) **itera `measured_rows`**
+—coherente con `counts`/`coverage`/`rSum`/`funnel`— y el docstring de `window_totals` lo declara. Protegido
+por `test_window_totals_state_counts_ignores_unmeasured_rows` (`test_operability_audit.py` **18 → 19
+passed**) y por **`M233`** (matriz **232 → 233**, re-medida **233/233**; crudo en
+[`evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt`](./evidencia-matriz-mutaciones-v2.85-233-2026-09-28.txt)).
+**Sin impacto medido sobre el material real:** sólo el bucket `unknown` podía contaminarse (los productores
+son fail-closed) y ninguna cifra publicada se mueve. **La deuda cierra en la rama; su efecto definitivo se
+materializa cuando la rama se mergee a `main`** (pendiente: `main` no puede moverse con la ventana PAPER
+viva). Fase de **INSTRUMENTO** (read-only; sin motor, gobernador ni migración).
+
+## OBS-11 — `unresolvedRate` es un INDICADOR (numerador == denominador), no una proporción (LOW) — ABIERTA (2026-09-28)
+
+**Origen.** Al **etiquetar** `unresolvedRate` en la fase `v2.85`/`AUTO-MATERIAL-13` (tarea que el plan
+pedía: aclarar su lectura **sin** renombrar la clave), se comprobó la aritmética y **no** encaja con su
+etiqueta antigua.
+
+**Observación.** En `window_rates` (`operability_audit.py`), `unresolved_pairs = [(1, 1) for row in rows if
+_measured(row) and _text(row.get("state")) == STATE_UNRESOLVED]`, y `_rate_from_pairs` **suma** los pares ⇒
+`numerador == denominador ==` número de días **medidos** en estado `unresolved`. Por tanto `rate` es **`1.0`**
+en cuanto hay **un** día así, y **`None`** cuando no lo hay: es un **indicador binario** de presencia, **no**
+una proporción **ni** una tasa de propuestas (el nombre `…Rate` sugiere una fracción, y el cálculo la hace
+constante).
+
+**Decisión tomada en `v2.85` (declaración honesta, NO cierre).** Se **etiqueta** correctamente
+(`_RATE_SOURCES`, docstring de `window_rates` y render `_rate_lines`), **sin renombrar la clave** y **sin
+cambiar la aritmética** ⇒ **ningún número publicado se mueve**. La pregunta de fondo (¿debe `unresolvedRate`
+ser una fracción real, p. ej. días `unresolved` / días medidos, o mantenerse como indicador?) queda
+**registrada aquí como deuda abierta**.
+
+**Criterio de cierre.** Decidir la semántica de la clave (indicador declarado vs. proporción real), y —si se
+opta por cambiarla— hacerlo **renombrando o versionando** la clave para no romper informes anteriores, con
+test y mutación. **No** se aborda en `v2.85` (el plan sólo pedía etiquetar; cambiar la aritmética movería
+una cifra publicada sin necesidad). Sin impacto funcional medido: la clave no decide nada aguas abajo.
+
+> **Estado:** ABIERTA y declarada (2026-09-28). La **etiqueta** honesta ya está hecha; el **cierre** exige
+> decidir la semántica, no documentarla.
+
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 

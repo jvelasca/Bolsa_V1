@@ -325,3 +325,23 @@ def test_window_totals_funnel_ignores_unmeasured_rows() -> None:
     assert totals["funnel"]["universe"]["count"] == 8  # ...pero NO se suma al TOTAL
     assert totals["funnel"]["universe"]["days"] == 1
     assert totals["funnel"]["orders"]["count"] == 2
+
+
+def test_window_totals_state_counts_ignores_unmeasured_rows() -> None:
+    """Un día NO medido no cuenta en ``stateCounts`` (coherente con ``counts``/``rSum``/``funnel``).
+
+    Regresión de ``OBS-10``: el bloque ``stateCounts`` iteraba ``rows`` (todas) en vez de
+    ``measured_rows``, así que el ``state`` de un día ``measured=False`` engordaba el TOTAL.
+    """
+    measured = build_window_row("2026-09-24", entries=[_entry("approved")], fills=1)
+    unmeasured = build_window_row("2026-09-25")
+    assert unmeasured["measured"] is False
+
+    totals = window_totals([measured, unmeasured])
+    assert totals["daysMeasured"] == 1
+    assert totals["stateCounts"] == {measured["state"]: 1}  # el hueco no aporta bucket
+    assert unmeasured["state"] not in totals["stateCounts"]
+
+    # El escenario literal de ``OBS-10``: ``measured=False`` CON ``state`` poblado tampoco cuenta.
+    forged = {"day": "2026-09-26", "measured": False, "state": STATE_UNRESOLVED}
+    assert window_totals([measured, forged])["stateCounts"] == {measured["state"]: 1}

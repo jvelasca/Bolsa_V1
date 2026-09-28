@@ -77,8 +77,15 @@ SEED_VERSION_LABEL = "v2.83-window-operator-seed"
 logger = logging.getLogger("ops_seed_window_pair")
 
 
-async def _resolve_account(session: Any, *, account_id: str | None, name: str) -> tuple[str, bool]:
-    """Devuelve ``(account_id, created)``. Sin ``--account-id`` crea una cuenta simulada nueva."""
+async def _resolve_account(
+    session: Any, *, account_id: str | None, name: str, allow_create: bool = False
+) -> tuple[str, bool]:
+    """Devuelve ``(account_id, created)``.
+
+    Sin ``--account-id`` NO se acuna una cuenta en silencio: solo se crea una cuenta simulada
+    nueva con opt-in explícito (``allow_create=True``). Eso protege la continuidad de la
+    muestra D1..D4 (una cuenta fija), que se rompería si cada corrida acuñara una cuenta nueva.
+    """
     from bolsa_infrastructure.database.models.tables import InvestmentAccountRow
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
@@ -89,6 +96,12 @@ async def _resolve_account(session: Any, *, account_id: str | None, name: str) -
         if existing is None:
             raise LookupError(f"la cuenta indicada no existe: {account_id}")
         return str(existing.id), False
+
+    if not allow_create:
+        raise ValueError(
+            "sin --account-id no se acuna una cuenta nueva en silencio: "
+            "pasa --allow-create para habilitarlo (la muestra D1..D4 exige cuenta fija)"
+        )
 
     scope = await SqlAlchemyAccountRepository(session).create_simulated_account(
         name=f"{name}-{uuid4().hex[:6]}",
@@ -257,7 +270,10 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
 
     async with factory() as session:
         account_id, account_created = await _resolve_account(
-            session, account_id=args.account_id, name=args.account_name
+            session,
+            account_id=args.account_id,
+            name=args.account_name,
+            allow_create=bool(args.allow_create),
         )
         watch = [s.strip() for s in (args.watch or "").split(",") if s.strip()]
         if not watch:
@@ -338,7 +354,14 @@ def _print_summary(payload: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--account-id", default=None, help="cuenta existente a reusar (si falta, se crea)"
+        "--account-id",
+        default=None,
+        help="cuenta existente a reusar (obligatoria salvo --allow-create)",
+    )
+    parser.add_argument(
+        "--allow-create",
+        action="store_true",
+        help="acunar una cuenta simulada NUEVA si no se indica --account-id (por defecto NO)",
     )
     parser.add_argument(
         "--account-name",
@@ -374,6 +397,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if float(args.lot_qty) <= 0:
         print("# uso incorrecto: --lot-qty debe ser > 0", file=sys.stderr)
+        return 1
+    if not args.account_id and not args.allow_create:
+        print(
+            "# uso incorrecto: sin --account-id hace falta --allow-create explicito "
+            "(no se acuna una cuenta nueva en silencio: la muestra D1..D4 exige cuenta fija)",
+            file=sys.stderr,
+        )
         return 1
 
     if sys.platform == "win32":  # pragma: no cover — psycopg async no soporta ProactorEventLoop.

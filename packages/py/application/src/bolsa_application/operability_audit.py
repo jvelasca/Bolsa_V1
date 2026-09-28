@@ -70,7 +70,7 @@ _RATE_SOURCES: dict[str, str] = {
     "reservationFailureRate": "funnel (risk - reservation) / risk",
     "fillRate": "funnel fills / orders (requiere --forward)",
     "cycleRate": "funnel measurableCycles / fills",
-    "unresolvedRate": "dias en estado 'unresolved' / dias medidos",
+    "unresolvedRate": "dias MEDIDOS con state 'unresolved' (indicador 1.0/None; NO es tasa de propuestas)",
 }
 
 
@@ -118,6 +118,9 @@ def window_totals(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     como ``0``. ``coverage[field].partial`` delata un TOTAL construido sobre días incompletos, para que
     no se lea como una medida cerrada. El ``rSum`` es la suma de R de los ciclos medibles (su cobertura
     se publica igual) y el funnel agrega, escalón a escalón, **sólo** los días MEDIDOS que SÍ lo midieron.
+    ``stateCounts`` TAMBIÉN respeta ``measured_rows``: el ``state`` de un día con ``measured=False`` NO
+    infla ningún bucket, y hoy sólo el bucket ``unknown`` podría verse afectado porque ``operability_state``
+    es fail-closed.
     """
     rows = list(rows)
     days_total = len(rows)
@@ -142,7 +145,9 @@ def window_totals(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     coverage["rSum"] = _coverage(r_days, days_measured)
 
     state_counts: dict[str, int] = {}
-    for row in rows:
+    # OBS-10: ``stateCounts`` honra ``measured_rows`` igual que ``counts``/``coverage``/``rSum``/``funnel``;
+    # el ``state`` de un día NO medido no debe inflar ningún bucket.
+    for row in measured_rows:
         state = _text(row.get("state"))
         if state:
             state_counts[state] = state_counts.get(state, 0) + 1
@@ -245,6 +250,12 @@ def window_rates(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     cada cociente se calcula sobre los días en que sus DOS escalones se midieron, y sin días medidos
     (o con denominador ``0``) el ``rate`` queda ``None`` —nunca un ``0.0`` fabricado. La ``fillRate``
     sólo existe con la evidencia del runner (``--forward``), pero sin ella se declara ``n/d``.
+
+    ``unresolvedRate`` cuenta DÍAS, no propuestas: se construye con pares ``(1, 1)``, así que
+    ``numerator == denominator ==`` número de días MEDIDOS cuyo ``state`` es ``unresolved``; su ``rate``
+    es ``1.0`` en cuanto hay uno de esos días y ``None`` cuando no hay ninguno. NO debe leerse como una
+    proporción ni como una tasa de propuestas. La clave NO se renombra a propósito, por compatibilidad
+    con informes anteriores.
     """
     rows = list(rows)
 
@@ -492,6 +503,9 @@ def _rate_lines(rates: Mapping[str, Any]) -> list[str]:
         days = _maybe_int(rate.get("coveredDays")) or 0
         detail = "n/d" if numerator is None else f"{numerator}/{denominator}"
         lines.append(f"  {name:<26} {_number(value):>8}  ({detail}, {days} dia(s))")
+    lines.append(
+        "  # unresolvedRate: dias MEDIDOS en estado 'unresolved' (indicador, NO tasa de propuestas)"
+    )
     return lines
 
 
