@@ -63,17 +63,28 @@ gitGraph
 | Otros runs del tag | `Frontend CI` `36392052955` · `Optimize lab` `36392052947` · `Fase 2 scientific` `36392052975` → **success** |
 | Predicción pre-tag | `3023/37` y `3012/40` declarados **antes** del sello ⇒ **se cumplieron exactos** (skips `37 = 37`, `40 = 40`) |
 
-### 1.2 CI del tag `v2.85.1-beta` (este objeto) — **POST-TAG**
+### 1.2 CI del tag `v2.85.1-beta` (este objeto) — ACREDITADO (cita POST-TAG)
 
 | Campo | Valor |
 |---|---|
 | Workflow | `Release tag CI` |
-| Tag / object | `v2.85.1-beta` (tag **anotado**) → commit del sello |
-| **Conclusion** | **(post-tag: se escribe en el primer commit de `main` posterior a este tag)** |
+| Run | [`36395524355`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36395524355) |
+| Tag / object | `v2.85.1-beta` (tag anotado `07004b8a548f32fc5546c9f9df1d861e4bf8401d`) → commit `3ce8b85e` |
+| `event` / ref | `push` / `v2.85.1-beta` |
+| **Conclusion** | **SUCCESS** (primera pasada, `attempt 1`; ~8m19s; 08:07:52Z → 08:16:11Z) |
+| Jobs | **10 `success` + `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped` por diseño |
+| Job `python` del tag | `3023 passed / 37 skipped` · `ruff All checks passed!` · `Contracts: 4 kept, 0 broken` · `mypy 0 issues (507 files)` |
+| `Python CI` (mismo commit y ref del tag) | `36395524224` — `quality` `3012 passed / 40 skipped` + los cuatro jobs PG verdes (A14/A12/A13 + `auto-v2-durable-pg`) |
+| Otros runs del ref del tag | `Frontend CI` `36395524092` · `Optimize lab` `36395524203` · `Fase 2 scientific` `36395524309` → **success** |
+| En `main` (push `46fb6d62..3ce8b85e`) | `Gitleaks` `36395521662` · `Frontend CI` `36395521415` · `Optimize lab` `36395521510` → **success** |
+| Predicción pre-tag | `3023/37` y `3012/40` declarados **antes** del sello (código idéntico a `v2.85`) ⇒ **se cumplieron exactos** (skips `37 = 37`, `40 = 40`) |
 
-**Su cita vive post-tag** (ningún tag puede contener su propio resultado de CI). **No** se hereda de `v2.85`:
-se **cita el run** `36392052899`. Verifícalo con
-`gh run list --branch v2.85.1-beta` y con `git log --format=%h:%s -- docs/engineering/evidencia-ci-tag-v2.85.1-2026-09-28.txt`.
+**Declarado:** en `main` **no** corrieron `Python CI` ni `Fase 2 scientific` (trigger filtrado por rutas: el
+diff es `package.json` + `docs/engineering` + `CHANGELOG.md`, **sin** ficheros Python) ⇒ igual que el
+re-sello `v2.83.1`; es comportamiento **por diseño**, no un fallo. La verificación de `quality` la aporta el
+run del ref del tag. **Su cita vive post-tag** (ningún tag puede contener su propio resultado de CI):
+[`evidencia-ci-tag-v2.85.1-2026-09-28.txt`](./evidencia-ci-tag-v2.85.1-2026-09-28.txt) — la instancia
+**dentro** del tag dice que el run «no puede estar ahí», y esa es la declaración, no un fallo.
 
 ## 2. Qué tiene que comprobar el auditor (por este orden)
 

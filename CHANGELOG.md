@@ -35,6 +35,12 @@ nada). **No** se bajaron `min cycles`/`min R`/`folds`/`min_episodes` ni se forza
   **documental** (por eso su cierre **es** documental); la regla «ninguna deuda se cierra por documentación»
   rige para deuda de **datos** (`P3-2`/`P3-3`/`H-4`/`OBS-11`) y **no** se relaja por esto.
 
+- **CI del re-sello (POST-TAG).** `Release tag CI` **`36395524355` SUCCESS** en la **primera** pasada
+  (~8m19s; 10 jobs + `certify`; `playwright` integrado `skipped` por diseño): job `python` del tag
+  **`3023 passed / 37 skipped`** y `quality` **`3012 passed / 40 skipped`** = **idénticos a `v2.85`**, como se
+  predijo **antes** de sellar. En `main` no corrieron `Python CI`/`Fase 2 scientific` (triggers por rutas: el
+  diff no lleva ficheros Python) — declarado, no un fallo.
+
 - **Declarado, no hecho:** `P3-2`/`P3-3` (ventana PAPER **real** ≥4 días **con material**), `OBS-11` (LOW),
   `H-4` (LOW), `OBS-9`, `P3-5` y `OBS-5` siguen **ABIERTAS**; el CI del tag **no** las acredita.
   **`OBS-10` CERRADA** (código + test + `M233`).

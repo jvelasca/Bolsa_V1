@@ -78,13 +78,68 @@
 #   46fb6d62d4a4d27bdf26f7bfb24bde9ee976b370 (docs: registra el hash del anterior).
 #
 # ========================================================================================
-# (2) CI DEL TAG `v2.85.1-beta` (ESTE objeto) - POST-TAG POR CONSTRUCCION
+# (2) CI DEL TAG `v2.85.1-beta` (ESTE OBJETO) - ACREDITADO (cita POST-TAG)
 # ========================================================================================
-# `Release tag CI` de `v2.85.1-beta` NO puede estar aqui: solo corre al empujar el tag. Su cita se
-# escribe en el PRIMER commit POST-TAG de `main` posterior a este tag, en la version de ESTE fichero
-# que vive FUERA del tag. Comandos para verificarlo:
-#     git log --format=%h:%s -- docs/engineering/evidencia-ci-tag-v2.85.1-2026-09-28.txt
-#     gh run list --branch v2.85.1-beta
+# NOTA (DOS VIDAS DE ESTE FICHERO): por eso la instancia DENTRO del tag (commit 3ce8b85e) lleva esta
+# seccion (2) como AUN NO DISPONIBLE ("NO puede estar aqui ... gh run list --branch v2.85.1-beta"), y
+# la instancia POST-TAG (esta) lleva la cita REAL del run. Un auditor que trabaje estrictamente sobre
+# el objeto sellado leera ese texto y NO debe concluir "CI no acreditado": la cita acreditada es ESTE
+# fichero en el commit POST-TAG. Cadena verificada:
+#   tag v2.85.1-beta (objeto 07004b8a548f32fc5546c9f9df1d861e4bf8401d) -> Release tag CI 36395524355 -> SUCCESS.
+#
+# ESPERADO (el codigo NO cambia respecto a v2.85, luego el resultado debe ser IDENTICO):
+#   Job `python` del tag : 3023 passed / 37 skipped
+#   Job `quality`        : 3012 passed / 40 skipped
+#   Conclusion           : SUCCESS
+# Esta prediccion NO se hereda: se cita el run del tag `v2.85.1-beta`.
+#
+# COMMIT QUE ACREDITA ESTA CITA: el PRIMER commit POST-TAG de `main` posterior al sello `3ce8b85e`.
+# La cita del CI del tag vive aqui, FUERA del tag.
+#
+# --- Release tag CI (run 36395524355, HEAD 3ce8b85e, event=push, ref=v2.85.1-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 08:07:52Z -> 08:16:11Z, ~8m19s)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   shared (build/typecheck/test)                          success
+#   python (ruff/imports/mypy/pytest offline)              success
+#   decision-spine                                        success
+#   lifecycle-pg (Alembic + auth + golden restart)         success
+#   frontend (typecheck/lint/test/build + contract:check)  success
+#   dr-verify (battery DB_DR / TCP CI)                     success
+#   security (gitleaks)                                    success
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)       success
+#   playwright (mock E2E)                                  success
+#   playwright (integrated E2E, opt-in)                    [skipped, por diseno]
+#   certify (aggregate + artifact)                         success
+#
+# Job `python` del tag (verbatim):
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 507 source files
+#   pytest  : 3023 passed, 37 skipped, 6 warnings in 70.86s
+#             => ESPERADO 3023/37 -> OBSERVADO 3023/37 -> COINCIDE (codigo identico a v2.85).
+#
+# --- Sobre el MISMO commit y ref del tag (3ce8b85e, v2.85.1-beta) ---
+#   Python CI           36395524224 : success (attempt 1)
+#       quality: 3012 passed, 40 skipped, 6 warnings in 132.61s; skips 40 = 40; `ruff` `All checks
+#                passed!` / `Contracts: 4 kept, 0 broken` / `mypy 0 issues (507 files)`.
+#       Jobs PG del commit intactos: grammar-discovery-pg (A14) / lifecycle-pg (A12) /
+#       auto-v2-durable-pg (Alembic 040-045 + reinicio real) / paper-forward-pg (A13): success.
+#       => Job `quality` ESPERADO 3012/40 -> OBSERVADO 3012/40 -> COINCIDE.
+#   Frontend CI         36395524092 : success
+#   Optimize lab        36395524203 : success
+#   Fase 2 scientific   36395524309 : success
+#
+# --- En main (push 46fb6d62..3ce8b85e) ---
+#   Gitleaks            36395521662 : success
+#   Frontend CI         36395521415 : success
+#   Optimize lab        36395521510 : success
+#   NOTA DECLARADA: en `main` NO corrieron `Python CI` ni `Fase 2 scientific` (trigger filtrado por
+#   rutas: el diff es `package.json` + `docs/engineering` + `CHANGELOG.md`, SIN ficheros Python) =>
+#   igual que el re-sello `v2.83.1`. Es comportamiento por diseno, no un fallo. La verificacion de
+#   `quality` (3012/40) la aporta el run del ref del tag (36395524224).
+#
+# Commit del sello  : 3ce8b85e5db5f51d14a20e0ce231075e46f2142a (bump + docs; 12 ficheros, +559/-5)
+# Tag anotado objeto: 07004b8a548f32fc5546c9f9df1d861e4bf8401d -> commit 3ce8b85e
 #
 # ========================================================================================
 # (3) COMPUERTAS MEDIDAS EN LOCAL (antes del sello `v2.85`, no heredadas del CI)

@@ -47,6 +47,14 @@
 - `deuda-p3-post-auditoria-v2.70-2026-09-26.md`: registra **`OBS-12`** y su cierre; **`OBS-11`** sigue abierta.
 - `engineering-index` (entrada del re-sello) · `CHANGELOG.md` (`[2.10.1-beta]`) · `package.json`.
 
+**CI del re-sello (POST-TAG):** `Release tag CI` **`36395524355` SUCCESS** en la **primera** pasada (~8m19s;
+10 jobs + `certify`; `playwright` integrado `skipped` por diseño). Job `python` del tag
+**`3023 passed / 37 skipped`** y `quality` **`3012 passed / 40 skipped`** = **idénticos a `v2.85`**, como se
+predijo **antes** de sellar. En `main` **no** corrieron `Python CI` ni `Fase 2 scientific` (triggers por
+rutas: el diff no lleva ficheros Python) — declarado, no un fallo. Cita completa (y el run del objeto
+auditado, dentro del tag) en
+[`evidencia-ci-tag-v2.85.1-2026-09-28.txt`](./evidencia-ci-tag-v2.85.1-2026-09-28.txt).
+
 ## 3. `OBS-12` (LOW, higiene documental) — registrada y CERRADA
 
 **Hallazgo (del propietario, no del CI):** en el objeto sellado `v2.85-beta` coexistían (a) dos sets de
