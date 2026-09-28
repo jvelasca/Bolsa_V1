@@ -53,7 +53,7 @@ Límite estructural (`OBS-3`/`OBS-4`): `Release tag CI` **solo corre al empujar*
 puede preexistir dentro del propio tag. La instancia **dentro** del tag declara esto y la cita real se
 escribe en un commit **POST-TAG**. **Predicción pre-tag** (el código es byte-idéntico a `v2.85.1`): job
 `python` del tag **`3023 passed / 37 skipped`** y `quality` **`3012 passed / 40 skipped`**.
-Ver [`evidencia-ci-tag-v2.85.2-2026-09-28.txt`](./evidencia-ci-tag-v2.85.2-2026-09-28.txt).
+Ver [`evidencia-ci-tag-v2.85.2-2026-09-28.txt`](./evidencia-ci-tag-v2.85.2-2026-09-28.txt). **ACREDITADO (POST-TAG):** `Release tag CI` [`36460491904`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36460491904) **SUCCESS en la primera pasada** (~7m32s; 10 jobs + `certify`; `playwright` integrado `skipped` por diseño): job `python` del tag **`3023 passed / 37 skipped`** y `quality` **`3012 passed / 40 skipped`** = **idénticos a `v2.85.1`**, como se predijo **antes** de sellar.
 
 ## 2. Qué tiene que comprobar el auditor (por este orden)
 

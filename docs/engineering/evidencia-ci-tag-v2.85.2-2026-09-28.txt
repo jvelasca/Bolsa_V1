@@ -57,18 +57,55 @@
 # Commit que acredita esta cita: 57631636fbf462a01028fc991f9b165fcb422e14 (POST-TAG de v2.85.1).
 #
 # ========================================================================================
-# (2) CI DEL TAG `v2.85.2-beta` (ESTE OBJETO) - DECLARADO POST-TAG
+# (2) CI DEL TAG `v2.85.2-beta` (ESTE OBJETO) - ACREDITADO (cita POST-TAG)
 # ========================================================================================
-# La instancia DENTRO del tag lleva esta seccion (2) como AUN NO DISPONIBLE. Un auditor que trabaje
-# estrictamente sobre el objeto sellado NO debe concluir "CI no acreditado": la cita acreditada es
-# ESTE fichero en el commit POST-TAG.
+# La instancia DENTRO del tag lleva esta seccion (2) como AUN NO DISPONIBLE (por construccion del
+# workflow: `Release tag CI` solo corre al empujar). ESTA instancia del fichero (POST-TAG, en `main`)
+# lleva la cita REAL del run.
 #
-# ESPERADO (el codigo NO cambia respecto a v2.85.1, luego el resultado debe ser IDENTICO):
-#   Job `python` del tag : 3023 passed / 37 skipped
-#   Job `quality`        : 3012 passed / 40 skipped
-#   Conclusion           : SUCCESS
-# Esta prediccion NO se hereda: se cita el run del tag `v2.85.2-beta`.
-#   Comando: `gh run list --workflow "Release tag CI" --branch v2.85.2-beta`
+# --- Release tag CI (run 36460491904, HEAD 983b0eac, event=push, ref=v2.85.2-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 17:46:18Z -> 17:53:50Z, ~7m32s)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   shared (build/typecheck/test)                          success
+#   python (ruff/imports/mypy/pytest offline)              success
+#   decision-spine                                        success
+#   lifecycle-pg (Alembic + auth + golden restart)         success
+#   frontend (typecheck/lint/test/build + contract:check)  success
+#   dr-verify (battery DB_DR / TCP CI)                     success
+#   security (gitleaks)                                    success
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)       success
+#   playwright (mock E2E)                                  success
+#   playwright (integrated E2E, opt-in)                    [skipped, por diseno]
+#   certify (aggregate + artifact)                         success
+#
+# Job `python` del tag (verbatim):
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 507 source files
+#   pytest  : 3023 passed, 37 skipped, 6 warnings in 72.58s
+#             => ESPERADO 3023/37 -> OBSERVADO 3023/37 -> COINCIDE (codigo identico a v2.85.1).
+#
+# --- Sobre el MISMO commit y ref del tag (983b0eac, v2.85.2-beta) ---
+#   Python CI           36460491915 : success (1m55s)
+#       quality: 3012 passed, 40 skipped, 6 warnings in 79.05s; `ruff All checks passed!` /
+#                `Contracts: 4 kept, 0 broken` / `mypy 0 issues (507 files)`; jobs PG intactos
+#                (grammar-discovery-pg A14 / lifecycle-pg A12 / auto-v2-durable-pg / paper-forward-pg A13).
+#       => Job `quality` ESPERADO 3012/40 -> OBSERVADO 3012/40 -> COINCIDE.
+#   Frontend CI         36460491982 : success (3m17s)
+#   Optimize lab        36460491932 : success (1m30s)
+#   Fase 2 scientific   36460491947 : success (1m15s)
+#
+# --- En main (push 6b501b8c..983b0eac) ---
+#   Gitleaks            36460485968 : success
+#   Frontend CI         36460485947 : success
+#   Optimize lab        36460485975 : success
+#   NOTA DECLARADA: en `main` NO corrieron `Python CI` ni `Fase 2 scientific` (trigger filtrado por
+#   rutas: el diff no lleva ficheros Python) => igual que los re-sellos `v2.83.1`/`v2.85.1`; es
+#   comportamiento por diseno, no un fallo. La verificacion de `quality` (3012/40) la aporta el run
+#   del ref del tag (36460491915).
+#
+# Commit del sello  : 983b0eac7eb99bc1400f9971abb1ea63f4738465 (bump + docs + evidencia; 15 ficheros, +987/-2)
+# Tag anotado objeto: ea571db8806a05bb78878647b4853554d0464397 -> commit 983b0eac
 #
 # ========================================================================================
 # (3) COMPUERTAS MEDIDAS EN LOCAL

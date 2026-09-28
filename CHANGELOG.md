@@ -30,7 +30,7 @@ fila de `v2_77`. Este re-sello los incluye **verbatim** (con SHA-256) en
 - **CI del re-sello (POST-TAG).** El tag `v2.85.2-beta` viaja con la **cita del CI de `v2.85.1` DENTRO**
   (`Release tag CI` `36395524355` **SUCCESS**; ver
   [`evidencia-ci-tag-v2.85.2-2026-09-28.txt`](./docs/engineering/evidencia-ci-tag-v2.85.2-2026-09-28.txt));
-  el CI de este tag se cita en un commit POST-TAG (límite estructural del workflow).
+  el CI de este tag se cita en un commit POST-TAG (límite estructural del workflow): `Release tag CI` **`36460491904` SUCCESS en la PRIMERA pasada** (~7m32s; job `python` del tag `3023 passed / 37 skipped` y `quality` `3012 passed / 40 skipped` = **idénticos a `v2.85.1`**).
 - **Declarado, no hecho:** `P3-2`/`P3-3` (ventana PAPER **real** ≥4 días **con material**), `OBS-11` (LOW),
   `H-4` (LOW), `OBS-9`, `P3-5`, `OBS-5` y `OBS-13` siguen **ABIERTAS**; el CI del tag **no** las acredita.
 
