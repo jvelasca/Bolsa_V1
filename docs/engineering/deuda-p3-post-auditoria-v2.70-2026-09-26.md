@@ -792,6 +792,20 @@ resto de eventos de **gestión de posición** (**`H-1`**). `v2.79` cierra el cas
 **decisiones de ENTRADA** + canal de posición aparte), así que el desglose por familias de un día
 operado vuelve a leerse como **censo**, no como cota superior.
 
+**Actualización `v2.85.2` (2026-09-28).** El cierre de la ventana D1..D4 como **`NO MEDIDO`** se deja
+**acreditado dentro del tag** `v2.85.2-beta`, con la **evidencia cruda** del día D1 (`forward-market-20260928.json`,
+su cronología, su `stderr` y la fila de `v2_77`) en `docs/engineering/evidence/v2.85.2/` (los originales
+viven en `operability_runs/`/`logs/`, **gitignoreados**). Registra **`OBS-13` (LOW, instrumento/diagnóstico),
+NUEVA y ABIERTA**: en una corrida del **par** A/B, `vetoes` (totales del par, `8000`) y `vetoCounted` (censo
+del journal del **worker primario** = versión A, `4000`) **no cuadran** por construcción del seam
+(`_journal_reasons` lee `runtime.worker._v2_journal`; la versión B corre por `secondary` y no aporta) y
+`contractViolation` **no** lo detecta (solo mide `other > 0`). Medido: `regime_invalid:2000` + `top_n_excluded:2000`
+= los 10 símbolos de `watchA` (`5 × 400` + `5 × 400`). **No** es bloqueante (el veto es legítimo y el veredicto
+`NO MEDIDO` no cambia), pero un auditor que compare la columna `Veto` con las familias verá el factor `×2`.
+**Bloqueante operativo medido** (para el próximo intento): las barras de `ohlcv_bars` estaban **estancadas en
+`2026-09-26`** ⇒ el eje no sale de `BEAR_TREND`; hay que **refrescar el material** antes de gastar más días.
+`P3-2`/`P3-3` siguen **ABIERTAS**: exigen ventana real **con material**.
+
 ## Fuera de alcance de esta deuda
 
 - **Allocation dinámica** y **LIVE AUTO**: `❌`, no abordados.

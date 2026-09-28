@@ -4,3 +4,8 @@
 # generador se rompen (JSON compact de prettier vs `json.dumps(indent=2)` + LF).
 apps/web/api/openapi.json
 apps/web/src/api/schema.d.ts
+
+# Evidencia cruda de la ventana PAPER (docs/engineering/evidence/**): debe viajar
+# VERBATIM (su SHA-256 se publica en el tag). Prettier la reformatearia (JSON) y
+# romperia la huella; se versiona sin formatear a proposito.
+docs/engineering/evidence/

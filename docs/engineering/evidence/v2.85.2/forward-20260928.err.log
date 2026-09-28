@@ -1,0 +1,10 @@
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.schemas
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.tables
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.types
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.constraints
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.defaults
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.comments
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.checkconstraint_byname
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+# BLOQUEADO: nivel 'evidence' NO alcanzado (nivel medido: blocked); motivos: no closed cycles; insufficient measurable cycles per strategy

@@ -1,6 +1,6 @@
 {
   "name": "bolsa-v1",
-  "version": "2.10.1-beta",
+  "version": "2.10.2-beta",
   "private": true,
   "description": "Plataforma personal de gestión bursátil — IBEX, Europa, acciones",
   "scripts": {

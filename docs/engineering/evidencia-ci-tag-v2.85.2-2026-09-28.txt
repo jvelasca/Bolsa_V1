@@ -1,0 +1,118 @@
+# V2.85.2 / AUTO-MATERIAL-13 RE-SELLO - cierre de la ventana D1 + evidencia cruda : cita de CI
+#
+# Fecha de captura: 2026-09-28
+# Tag anotado: v2.85.2-beta -> commit del sello (bump + docs + evidencia). Version: 2.10.2-beta.
+# SIN migracion (Alembic head 046_fill_reference_mid). CODIGO IDENTICO a v2.85.1/v2.85.
+#
+# ========================================================================================
+# QUE ES ESTE FICHERO (leer ANTES de sacar conclusiones)
+# ========================================================================================
+# ESTE fichero viaja DENTRO del tag `v2.85.2-beta`. Sirve para dos cosas:
+#   (a) ACREDITAR, DESDE EL PROPIO TAG, el CI de la fase auditada `v2.85.1` (Release tag CI
+#       36395524355, SUCCESS), que en el tag `v2.85.1-beta` ya vivia DENTRO (patron OBS-3/OBS-4);
+#       y
+#   (b) DECLARAR el CI del tag `v2.85.2-beta` (este objeto), cuya cita, por construccion del
+#       workflow, NO puede existir dentro del propio tag y se escribe en un commit POST-TAG.
+#
+# LIMITE ESTRUCTURAL (patron OBS-3/OBS-4): `Release tag CI` SOLO corre al EMPUJAR el tag; su
+# resultado no puede preexistir a ese push. Ningun tag puede contener su propio resultado de CI.
+#
+# ========================================================================================
+# (1) CI DEL TAG `v2.85.1-beta` - ACREDITADO, Y VISIBLE DESDE ESTE TAG
+# ========================================================================================
+# Tag anotado `v2.85.1-beta` (objeto 07004b8a548f32fc5546c9f9df1d861e4bf8401d) -> commit
+#   3ce8b85e5db5f51d14a20e0ce231075e46f2142a. Version 2.10.1-beta. Re-sello docs-only de v2.85
+#   (objeto 0582799b -> 481cf168; CI 36392052899 SUCCESS, citado DENTRO de v2.85.1).
+#
+# --- Release tag CI (run 36395524355, HEAD 3ce8b85e, event=push, ref=v2.85.1-beta) ---
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 08:07:52Z -> 08:16:11Z, ~8m19s)
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   shared (build/typecheck/test)                          success
+#   python (ruff/imports/mypy/pytest offline)              success
+#   decision-spine                                        success
+#   lifecycle-pg (Alembic + auth + golden restart)         success
+#   frontend (typecheck/lint/test/build + contract:check)  success
+#   dr-verify (battery DB_DR / TCP CI)                     success
+#   security (gitleaks)                                    success
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)       success
+#   playwright (mock E2E)                                  success
+#   playwright (integrated E2E, opt-in)                    [skipped, por diseno]
+#   certify (aggregate + artifact)                         success
+#
+# Job `python` del tag (verbatim):
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 507 source files
+#   pytest  : 3023 passed, 37 skipped, 6 warnings in 70.86s
+#
+# --- Sobre el MISMO commit y ref del tag (3ce8b85e, v2.85.1-beta) ---
+#   Python CI           36395524224 : success (attempt 1)
+#       quality: 3012 passed, 40 skipped, 6 warnings in 132.61s; `ruff` `All checks passed!` /
+#                `Contracts: 4 kept, 0 broken` / `mypy 0 issues (507 files)`; jobs PG intactos
+#                (grammar-discovery-pg A14 / lifecycle-pg A12 / auto-v2-durable-pg / paper-forward-pg A13).
+#   Frontend CI         36395524092 : success
+#   Optimize lab        36395524203 : success
+#   Fase 2 scientific   36395524309 : success
+#
+# Commit que acredita esta cita: 57631636fbf462a01028fc991f9b165fcb422e14 (POST-TAG de v2.85.1).
+#
+# ========================================================================================
+# (2) CI DEL TAG `v2.85.2-beta` (ESTE OBJETO) - DECLARADO POST-TAG
+# ========================================================================================
+# La instancia DENTRO del tag lleva esta seccion (2) como AUN NO DISPONIBLE. Un auditor que trabaje
+# estrictamente sobre el objeto sellado NO debe concluir "CI no acreditado": la cita acreditada es
+# ESTE fichero en el commit POST-TAG.
+#
+# ESPERADO (el codigo NO cambia respecto a v2.85.1, luego el resultado debe ser IDENTICO):
+#   Job `python` del tag : 3023 passed / 37 skipped
+#   Job `quality`        : 3012 passed / 40 skipped
+#   Conclusion           : SUCCESS
+# Esta prediccion NO se hereda: se cita el run del tag `v2.85.2-beta`.
+#   Comando: `gh run list --workflow "Release tag CI" --branch v2.85.2-beta`
+#
+# ========================================================================================
+# (3) COMPUERTAS MEDIDAS EN LOCAL
+# ========================================================================================
+# NO re-medidas en este re-sello: es DOCS-ONLY y el codigo es byte-identico a v2.85/v2.85.1. Las
+# compuertas vigentes son las de `evidencia-ci-tag-v2.85.1-2026-09-28.txt` (heredadas por identidad
+# de codigo, NO por copia): `ruff` / `Contracts: 4 kept, 0 broken` / `mypy 0 issues (507 files)` /
+# `alembic heads 046_fill_reference_mid` / `test_operability_audit.py 19 passed`.
+#
+# ========================================================================================
+# (4) HECHOS DECLARADOS DEL OBJETO (honestidad; nada de esto es un hallazgo del auditor)
+# ========================================================================================
+# (a) MOTIVO DEL RE-SELLO: la evidencia del dia D1 NO viajaba a GitHub. `operability_runs/`
+#     (.gitignore:102) y `logs/` (.gitignore:12) estan gitignoreados, asi que un clon fresco del
+#     tag no contenia ni el `--out` del forward, ni su cronologia, ni la fila de `v2_77`. Este
+#     re-sello los incluye, VERBATIM y con SHA-256, en `docs/engineering/evidence/v2.85.2/`.
+# (b) VENTANA PAPER D1..D4 = `NO MEDIDO` (por veto legitimo de regimen, NO por fallo de codigo).
+#     Forward v2_76 con 400 ticks completos (`stopReason=completed`): `decided=8000`,
+#     `vetoes=8000` (`vetoCounted=4000`), `proposals/orders/fills/opened/closed = 0`, `state=vetoed`.
+#     Eje `BEAR_TREND` (`aggregateTrialRegime=trend_down`, `entriesAllowedLong=false`,
+#     `{range:8, trend_down:9, trend_up:3}`, `symbolsOperable 11/20`). `v2_80` exit 2 (censo de dias
+#     SOLO durable: `fills | cycles | journal`); `paper_material_readiness` exit 2; `v2_83` no
+#     ejecutable. NO se bajaron `min cycles`/`min R`/`folds`/`min_episodes` ni se forzaron entradas.
+# (c) POR QUE TARDO ~7h38m (medido, recomputable desde la evidencia): `60 s x 400 ticks = 6h40m`
+#     por construccion; `--stop-when-ready` NO puede cortar (0 ciclos medibles); el unico desvio es
+#     una SUSPENSION del equipo (+58m: salto 12:28:06Z -> 13:35:25Z). Cadencia medida ~60.2 s/tick.
+# (d) `OBS-13` (LOW, instrumento/diagnostico) NUEVA y ABIERTA, medida al recomputar la evidencia:
+#     `vetoes=8000` (par A+B) frente a `vetoCounted=4000` (solo version A: los 5 `trend_down` de
+#     watchA => `regime_invalid:2000` = 5x400; los 5 `range` de watchA => `top_n_excluded:2000` =
+#     5x400). El censo lee `runtime.worker._v2_journal` (worker primario = version A); la version B
+#     (`secondary`) NO aporta. `contractViolation=false` porque solo mide `other>0`. NO es bloqueante
+#     (el veto es legitimo y el veredicto `NO MEDIDO` no cambia) pero se declara.
+#
+# ========================================================================================
+# (5) ALCANCE DEL RE-SELLO (que DEBE verificar el auditor, en vez de fiarse)
+# ========================================================================================
+# `git diff --stat v2.85.1-beta v2.85.2-beta` debe dar EXACTAMENTE: `package.json` (bump
+# 2.10.1-beta -> 2.10.2-beta) + `docs/engineering/*` (incluye `docs/engineering/evidence/v2.85.2/*`)
+# + `CHANGELOG.md` + `.prettierignore` (excluye `docs/engineering/evidence/` del formateo).
+# NINGUN fichero de `packages/` ni de `apps/`. Si hay CUALQUIER cambio fuera de ese
+# alcance, este re-sello es FALSO: declaralo.
+#
+# LECTURA (sin sesgo): re-sello docs-only para dejar el objeto auditado AUTOCONTENIDO: el tag lleva
+# el instrumento de v2.85 (identico), la cita del CI de v2.85.1, la EVIDENCIA CRUDA del dia D1 y su
+# cierre documentado con causa medida + tiempos + `OBS-13`. NO cambia codigo, NO mueve el freeze, NO
+# cierra deuda de datos. `OBS-10`/`OBS-12` CERRADAS; `OBS-11`, `H-4`, `OBS-9`, `P3-2`/`P3-3`,
+# `P3-5`/`OBS-5` y `OBS-13` ABIERTAS y declaradas.

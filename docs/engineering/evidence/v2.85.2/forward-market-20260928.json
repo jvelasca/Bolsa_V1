@@ -1,0 +1,208 @@
+{
+  "account": "1484e253d2d54645945a6b1d7",
+  "bump": "2.01.0-beta",
+  "engineBase": "auto-v76-d35ecdb3",
+  "journalReasons": [
+    "top_n_excluded:2000",
+    "regime_invalid:2000"
+  ],
+  "lastGateReason": [
+    "hold_no_op"
+  ],
+  "level": "evidence",
+  "marketRegime": {
+    "aggregateTrialRegime": "trend_down",
+    "barsLoaded": 20,
+    "bySymbol": {
+      "0a5dc12fd5a24f0a89a91d36a": "range",
+      "0cf0907837fc422db221b0149": "trend_down",
+      "240a4ae01a944d3bba1cf1b24": "trend_down",
+      "31f9a597d03249319ea0c9345": "range",
+      "381dd3b0699a44e8b9d13ac13": "range",
+      "49596ff25acb4294b265f321b": "trend_down",
+      "4d24ea029283461cb9304421a": "range",
+      "54283bcb54674ec1b70b4db72": "trend_down",
+      "5a130eea1ad54dcaaa50b67b9": "range",
+      "5c34aaec1448406ebec94b20f": "trend_down",
+      "615d243eb830473ab009c8997": "trend_down",
+      "6655c5faff8a458186dcd8adc": "trend_up",
+      "67c117a7d88f4c75a7174e998": "trend_up",
+      "6db46176cc2d4845845b6ee6e": "range",
+      "6f6215d935c04e0f9ac7bfef7": "range",
+      "74c66a856dde4cbaad4888908": "trend_down",
+      "7721cde9af0c49d29576786d5": "trend_down",
+      "840a307d2b074e2db4dfc3373": "trend_down",
+      "856510e40dda4c758f4d4df89": "trend_up",
+      "8601a0c3f8d248b0b8052b963": "range"
+    },
+    "counts": {
+      "range": 8,
+      "trend_down": 9,
+      "trend_up": 3
+    },
+    "entriesAllowedLong": false,
+    "operationalRegime": "BEAR_TREND"
+  },
+  "minCyclesPerStrategy": 32,
+  "pairActive": true,
+  "pairAvailable": true,
+  "pairCapable": true,
+  "phase": "V2.76 AUTO-MATERIAL-4 MARKET MATERIAL FORWARD",
+  "positionEventReasons": [],
+  "priceSources": {
+    "0a5dc12fd5a24f0a89a91d36a": "market_live",
+    "0cf0907837fc422db221b0149": "market_live",
+    "240a4ae01a944d3bba1cf1b24": "market_live",
+    "31f9a597d03249319ea0c9345": "market_live",
+    "381dd3b0699a44e8b9d13ac13": "market_live",
+    "49596ff25acb4294b265f321b": "market_live",
+    "4d24ea029283461cb9304421a": "market_live",
+    "54283bcb54674ec1b70b4db72": "market_live",
+    "5a130eea1ad54dcaaa50b67b9": "market_live",
+    "5c34aaec1448406ebec94b20f": "market_live",
+    "615d243eb830473ab009c8997": "market_live",
+    "6655c5faff8a458186dcd8adc": "market_live",
+    "67c117a7d88f4c75a7174e998": "market_live",
+    "6db46176cc2d4845845b6ee6e": "market_live",
+    "6f6215d935c04e0f9ac7bfef7": "market_live",
+    "74c66a856dde4cbaad4888908": "market_live",
+    "7721cde9af0c49d29576786d5": "market_live",
+    "840a307d2b074e2db4dfc3373": "market_live",
+    "856510e40dda4c758f4d4df89": "market_live",
+    "8601a0c3f8d248b0b8052b963": "market_live"
+  },
+  "readiness": {
+    "blockers": [
+      "no closed cycles",
+      "insufficient measurable cycles per strategy"
+    ],
+    "evidenceReady": false,
+    "facts": {
+      "account": "1484e253d2d54645945a6b1d7",
+      "buys": 0,
+      "closedCycles": 0,
+      "durableFills": 0,
+      "evidenceGap": true,
+      "executionReality": "VIRTUAL — NO REAL MONEY",
+      "fillsTotalForAccount": 0,
+      "fillsWithCycle": 0,
+      "fillsWithoutCycle": 0,
+      "materialNote": "material PAPER REAL sobre cuenta PAPER VIRTUAL (dinero VIRTUAL): el gate solo mide linaje, cierres y denominador de R; no repara ni infiere material",
+      "maxFillsPerVersion": 0,
+      "maxMeasurableCyclesPerVersion": 0,
+      "measurableCycles": 0,
+      "measurableCyclesWithIdentity": 0,
+      "minCyclesPerStrategy": 32,
+      "perVersion": {},
+      "producerBlockers": [
+        "no closed cycles"
+      ],
+      "readinessLevel": "blocked",
+      "requestedStrategyVersions": [
+        "v283-window-a",
+        "v283-window-b"
+      ],
+      "reservations": 0,
+      "reservationsLive": 0,
+      "reservationsReadComplete": true,
+      "reservationsWithCycle": 0,
+      "sells": 0,
+      "versionsMeetingMinimum": [],
+      "versionsWithoutClosedCycles": [
+        "v283-window-a",
+        "v283-window-b"
+      ]
+    },
+    "lineage": {
+      "closure": {
+        "closedCycles": 0,
+        "closedCyclesWithIdentity": 0,
+        "closedCyclesWithRisk": 0,
+        "cyclesWithoutIdentity": 0
+      },
+      "cycle": {
+        "exitOrders": 0,
+        "exitOrdersWithCycle": 0,
+        "fillsWithCycle": 0,
+        "fillsWithoutCycle": 0
+      },
+      "readiness": {
+        "evidenceReady": false,
+        "level": "blocked",
+        "producerReady": false
+      },
+      "reservation": {
+        "live": 0,
+        "released": 0,
+        "rows": 0,
+        "withCycle": 0
+      }
+    },
+    "producerBlockers": [
+      "no closed cycles"
+    ],
+    "producerReady": false,
+    "ready": false,
+    "schema": "paper_material_readiness_v2",
+    "verdict": "BLOCKED"
+  },
+  "requestedVersions": [
+    "v283-window-a",
+    "v283-window-b"
+  ],
+  "sample": {
+    "blockers": [
+      "no closed cycles",
+      "insufficient measurable cycles per strategy"
+    ],
+    "closedCycles": 0,
+    "durableFills": 0,
+    "maxMeasurableCyclesPerVersion": 0,
+    "measurableCycles": 0,
+    "perVersion": {},
+    "pricesServed": 20,
+    "ticks": 400,
+    "verdict": "BLOCKED",
+    "versionsMeetingMinimum": [],
+    "watchSize": 20
+  },
+  "secondaryActive": true,
+  "stopReason": "completed",
+  "ticks": 400,
+  "turnTotals": {
+    "closed": 0,
+    "decided": 8000,
+    "fills": 0,
+    "opened": 0,
+    "orders": 0,
+    "proposals": 0,
+    "vetoes": 8000
+  },
+  "versionA": "v283-window-a",
+  "versionB": "v283-window-b",
+  "watchA": [
+    "0a5dc12fd5a24f0a89a91d36a",
+    "0cf0907837fc422db221b0149",
+    "240a4ae01a944d3bba1cf1b24",
+    "31f9a597d03249319ea0c9345",
+    "381dd3b0699a44e8b9d13ac13",
+    "49596ff25acb4294b265f321b",
+    "4d24ea029283461cb9304421a",
+    "54283bcb54674ec1b70b4db72",
+    "5a130eea1ad54dcaaa50b67b9",
+    "5c34aaec1448406ebec94b20f"
+  ],
+  "watchB": [
+    "615d243eb830473ab009c8997",
+    "6655c5faff8a458186dcd8adc",
+    "67c117a7d88f4c75a7174e998",
+    "6db46176cc2d4845845b6ee6e",
+    "6f6215d935c04e0f9ac7bfef7",
+    "74c66a856dde4cbaad4888908",
+    "7721cde9af0c49d29576786d5",
+    "840a307d2b074e2db4dfc3373",
+    "856510e40dda4c758f4d4df89",
+    "8601a0c3f8d248b0b8052b963"
+  ],
+  "watchSize": 20
+}

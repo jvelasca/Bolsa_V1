@@ -2,6 +2,38 @@
 
 All notable releases of Bolsa V1.
 
+## [2.10.2-beta] — `AUTO-MATERIAL-13` RE-SELLO docs-only: cierre de la ventana D1 + evidencia cruda dentro del tag + `OBS-13` — 2026-09-28
+
+**Re-sello DOCS-ONLY de `v2.85.1` (`v2.85.2-beta`). El CÓDIGO es BYTE-IDÉNTICO a `2.10.1-beta`**: el diff
+`v2.85.1-beta..v2.85.2-beta` es **sólo** `package.json` + `docs/engineering/*` (+ este `CHANGELOG.md` + `.prettierignore`).
+**SIN migración** (Alembic head sigue en `046_fill_reference_mid`) y **sin mover el freeze** en este
+re-sello (`git diff v2.85.1-beta v2.85.2-beta -- packages apps` debe estar **vacío**).
+
+**Motivo (medido).** El propietario fue a auditar **desde GitHub** el resultado operativo y encontró que la
+**evidencia del día D1 no viajaba**: `operability_runs/` (`.gitignore:102`) y `logs/` (`.gitignore:12`) están
+gitignoreados ⇒ un clon fresco del tag **no** contenía ni el `--out` del forward, ni su cronología, ni la
+fila de `v2_77`. Este re-sello los incluye **verbatim** (con SHA-256) en
+[`docs/engineering/evidence/v2.85.2/`](./docs/engineering/evidence/v2.85.2/README.md) y documenta el cierre.
+
+- **Ventana PAPER D1..D4 = `NO MEDIDO`** (veto legítimo de régimen, no fallo de código). Forward `v2_76` con
+  **400 ticks completos** (`stopReason=completed`): `decided=8000`, `proposals/orders/fills/opened/closed=0`,
+  `state=vetoed`; eje `BEAR_TREND` (`aggregateTrialRegime=trend_down`, `entriesAllowedLong=false`,
+  `{range:8, trend_down:9, trend_up:3}`). `v2_80` exit 2 (censo **solo** durable). **No** se bajaron
+  `min cycles`/`min R`/`folds`/`min_episodes` ni se forzaron entradas.
+- **Por qué tardó ~7h38m** (medido): `60 s × 400 ticks = 6h40m` por construcción; `--stop-when-ready` **no**
+  puede cortar (0 ciclos medibles); el único desvío es una **suspensión del equipo** (`+58 min`, salto
+  `12:28:06Z → 13:35:25Z`). Cadencia medida `~60.2 s/tick`.
+- **`OBS-13` (LOW, instrumento/diagnóstico) — nueva y ABIERTA**, medida al recomputar la evidencia:
+  `vetoes=8000` (par A+B) frente a `vetoCounted=4000` (**sólo** versión A: `regime_invalid:2000` +
+  `top_n_excluded:2000`, los 10 símbolos de `watchA`), y `contractViolation=false` (sólo mide `other>0`). El
+  censo lee `runtime.worker._v2_journal` (worker primario); la versión B (`secondary`) **no** aporta.
+- **CI del re-sello (POST-TAG).** El tag `v2.85.2-beta` viaja con la **cita del CI de `v2.85.1` DENTRO**
+  (`Release tag CI` `36395524355` **SUCCESS**; ver
+  [`evidencia-ci-tag-v2.85.2-2026-09-28.txt`](./docs/engineering/evidencia-ci-tag-v2.85.2-2026-09-28.txt));
+  el CI de este tag se cita en un commit POST-TAG (límite estructural del workflow).
+- **Declarado, no hecho:** `P3-2`/`P3-3` (ventana PAPER **real** ≥4 días **con material**), `OBS-11` (LOW),
+  `H-4` (LOW), `OBS-9`, `P3-5`, `OBS-5` y `OBS-13` siguen **ABIERTAS**; el CI del tag **no** las acredita.
+
 ## [2.10.1-beta] — `AUTO-MATERIAL-13` RE-SELLO docs-only: objeto de auditoría autocontenido + `OBS-12` — 2026-09-28
 
 **Re-sello DOCS-ONLY de `v2.85` (`v2.85.1-beta`). El CÓDIGO es BYTE-IDÉNTICO a `2.10.0-beta`**: el diff
