@@ -168,4 +168,6 @@ uv run --no-sync pytest packages/py/application/tests/test_operability_audit.py 
   [Arranque del auditor `v2.84`](./arranque-auditor-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md)
 - Registro de la ventana: [arranque operativo PAPER](./arranque-ventana-paper-operativa-2026-09-27.md) ·
   [runbook](./runbook-ventana-forward-v2.78-2026-09-27.md)
+- Auditoría externa de la base: [auditoría `v2.84`](./auditoria-v2-84-auto-material-12-instrument-funnel-contract-2026-09-28.md)
+  (`APROBADO`, 0 bloqueantes; H-1/H-2 LOW documentales, corregidos/registrados)
 - Contexto previo: [relevo `v2.84`](./traspaso-relevo-post-v2-84-auto-material-12-instrument-funnel-contract-2026-09-27.md)

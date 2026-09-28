@@ -89,6 +89,11 @@ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py         
   fixtures deterministas; **no** se certifica `P3-2`/`P3-3`.
 - **5 huecos locales preexistentes** de la matriz (`M117`/`M118`/`M170`/`M176`/`M197`): idénticos a la
   evidencia de `v2.81-230`, **no** introducidos por esta fase.
+  > **Reconciliación post-tag (auditoría externa de `v2.84-beta`, 2026-09-28 — H-1):** «no muerden en este
+  > entorno» es **observacional y dependiente del entorno** y **no reproduce** en un clon fresco (el
+  > auditor midió **5/5** mordiendo). Los cinco labels son **PREEXISTENTES**; si muerden o no **depende del
+  > entorno** ⇒ no se declara como propiedad del código. Ver
+  > [`auditoria-v2-84-…`](./auditoria-v2-84-auto-material-12-instrument-funnel-contract-2026-09-28.md) §3 (H-1).
 - **`OBS-9`** (nuevo, doc-only) queda **declarado**, no barrido.
 - **`OBS-10`** (nuevo, LOW, de la auditoría de `v2.84-beta`): `stateCounts` del `TOTAL` recorre todas las
   filas mientras `counts`/`coverage`/`rSum`/`funnel` usan `measured_rows`. **Declarado y aplazado** a la

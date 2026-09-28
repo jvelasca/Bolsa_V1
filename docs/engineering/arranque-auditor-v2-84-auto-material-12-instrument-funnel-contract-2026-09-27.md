@@ -50,7 +50,7 @@ Select-String -Path package.json -Pattern version # 2.09.0-beta
     > `v2.84` es **imprecisa**: en `v2.84` la cita del CI de la fase **es** la de este tag, y vive
     > POST-TAG. Usa **esta** versión (la de `main`) para el punto 12 y **no** concluyas «CI no
     > acreditado».
-13. **Límites declarados**: `P3-2`/`P3-3` **ABIERTAS**, `H-4` **ABIERTO**, `P3-5`/`OBS-5`/`OBS-9`/`OBS-10` declaradas; **5 huecos locales preexistentes** de la matriz (`M117`/`M118`/`M170`/`M176`/`M197`).
+13. **Límites declarados**: `P3-2`/`P3-3` **ABIERTAS**, `H-4` **ABIERTO**, `P3-5`/`OBS-5`/`OBS-9`/`OBS-10` declaradas; **5 huecos locales preexistentes** de la matriz (`M117`/`M118`/`M170`/`M176`/`M197`) — **preexistentes y dependientes del entorno**: la auditoría externa de `v2.84` los reproduce **5/5** en un clon fresco, así que **no** se declaran «que no muerden» (ver H-1 en [`auditoria-v2-84-…`](./auditoria-v2-84-auto-material-12-instrument-funnel-contract-2026-09-28.md)).
 
 ## 3. Qué invalida la fase
 

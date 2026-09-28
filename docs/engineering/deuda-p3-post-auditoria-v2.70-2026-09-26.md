@@ -514,11 +514,20 @@ que lo compruebe, como pasó en la auditoría de `v2.83.1`).
 todos, o se implementa un parser compartido que devuelva `1`). **No** se aborda en `v2.84` (su alcance es
 el instrumento auditado). Ficheros medidos con la frase: `v2_75_paper_sample_accumulation.py`,
 `v2_76_forward_market_material.py`, `v2_77_market_operability.py`, `v2_80_market_window.py`,
-`paper_material_readiness.py`, `paper_cycles_export.py`, `auto_evidence_validate.py`, y en docs
+`paper_material_readiness.py`, `paper_cycles_export.py`, `auto_evidence_validate.py`,
+`ops_seed_window_pair.py` (instancia **NUEVA**, ver abajo), y en docs
 `plan-v2-83` / `runbook-ventana-forward-v2.78` / `arranque-auditor-v2.73`.
 
 > **`v2.84` (2026-09-27):** `OBS-9` queda **ABIERTA y declarada**; sólo se corrigió la instancia del
 > instrumento auditado (`v2_83_window_audit.py`) al cerrar `OBS-8`.
+
+> **`v2.84` — instancia NUEVA declarada por la auditoría externa (2026-09-28, hallazgo H-2):**
+> `ops_seed_window_pair.py` (anexo operativo de `v2.84`) **introduce una instancia nueva** del mismo
+> defecto: su docstring (`:44`) promete «`1` uso incorrecto» mientras `argparse` sale con **`2`** en el uso
+> incorrecto de argv (su **validación manual** de argumentos sí devuelve `1`, coherente consigo misma, pero
+> el nivel argv es `2`). Mismo patrón que `OBS-8` ⇒ **engrosa** el barrido declarado de `OBS-9`; **no** se
+> corrige en la entrega docs-only (el fichero es `apps/`, prohibido con la ventana PAPER viva). Ver
+> [`auditoria-v2-84-…`](./auditoria-v2-84-auto-material-12-instrument-funnel-contract-2026-09-28.md) §3 (H-2).
 
 ## OBS-10 — `stateCounts` del TOTAL recorre TODAS las filas mientras el resto usa `measured_rows` (LOW) — 🟡 ABIERTA y APLAZADA (2026-09-28)
 

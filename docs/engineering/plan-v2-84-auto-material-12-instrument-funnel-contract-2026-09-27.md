@@ -56,8 +56,14 @@ packages/py/.importlinter` · `mypy` (full-tree, 5 raíces `src`) · `alembic he
   en otros CLIs del proyecto (`v2_75`/`v2_76`/`v2_77`/`v2_80`, `paper_material_readiness`,
   `paper_cycles_export`, `auto_evidence_validate`…) y **ninguno** la implementa. Se **declara**; el barrido
   es una fase docs-only aparte.
-- **5 huecos locales PREEXISTENTES** de la matriz (`M117`/`M118`/`M170`/`M176`/`M197` no muerden en este
-  entorno; idénticos a la evidencia de `v2.81-230`) — **no** los introduce esta fase.
+- **5 huecos locales PREEXISTENTES** de la matriz (`M117`/`M118`/`M170`/`M176`/`M197`; idénticos a la
+  evidencia de `v2.81-230`) — **no** los introduce esta fase.
+  > **Reconciliación post-tag (auditoría externa de `v2.84-beta`, 2026-09-28 — H-1):** la frase «no
+  > muerden en este entorno» era **observacional y dependiente del entorno**, y **no se reproduce** en un
+  > clon fresco (el auditor midió **5/5** con rojo en su test y restauración byte a byte). Lo permanente y
+  > correcto es: los cinco labels son **PREEXISTENTES** (no los introduce `v2.84`) y **si muerden o no
+  > depende del entorno** ⇒ **no** se afirma como propiedad del código. Ver
+  > [`auditoria-v2-84-…`](./auditoria-v2-84-auto-material-12-instrument-funnel-contract-2026-09-28.md) §3 (H-1).
 
 ## 7. Criterio de salida
 
