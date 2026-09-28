@@ -804,7 +804,37 @@ del journal del **worker primario** = versión A, `4000`) **no cuadran** por con
 `NO MEDIDO` no cambia), pero un auditor que compare la columna `Veto` con las familias verá el factor `×2`.
 **Bloqueante operativo medido** (para el próximo intento): las barras de `ohlcv_bars` estaban **estancadas en
 `2026-09-26`** ⇒ el eje no sale de `BEAR_TREND`; hay que **refrescar el material** antes de gastar más días.
+> **REFUTADO por la Fase B (2026-09-28, ver más abajo):** medido read-only, las barras están **frescas**
+> (`20/20` con barra `2026-09-28`, `{'current': 20}`) y el eje **sigue** en `BEAR_TREND`. El
+> `2026-09-26` era un **artefacto de fin de semana** (1 barra), no un estancamiento del sincronizador.
+> `OBS-13` queda además **CONFIRMADA** en una segunda muestra (sonda de 20 ticks).
 `P3-2`/`P3-3` siguen **ABIERTAS**: exigen ventana real **con material**.
+
+**Actualización `v2.85.2` — Fase B (operación, 2026-09-28, docs-only).** Ejecutado el procedimiento
+operativo post-`v2.85.2` **sin tocar `apps/` ni `packages/`** (freeze intacto). **(1) El bloqueante
+declarado en `v2.85.2` §2 queda REFUTADO por medición:** `ohlcv_bars` **no** está estancada —
+**20/20** instrumentos del watch con barra **`2026-09-28`**, frescura `{'current': 20}`, último
+`data_sync_log` `success` (`15:48–16:04Z`), `sync_settings` `auto_sync_enabled=True`,
+`post_market_only=False`, `scope=lists`. El `2026-09-26` es **sábado** y aparece con **1 sola barra**
+(artefacto recurrente de fin de semana, igual que `2026-09-19`/`2026-09-20`): se **declara**, no se
+borra. **(2) Con el material fresco el eje SIGUE en `BEAR_TREND`** (preflight `exit 2`;
+`{range: 6, trend_down: 9, trend_up: 5}` ⇒ `entriesAllowedLong=false`), así que la ventana sigue
+**`NO MEDIDO`** y **no** se lanzó el forward de 400 ticks (la puerta del preflight evita el sobrecoste
+de ~7 h). **(3) Sonda corta (20 ticks)** como evidencia parcial operativa (el `--out` solo se escribe al
+terminar): `decided=400`, `proposals/orders/fills/cycles=0`, `vetoes=400`; nombre `probe-market-*` **fuera**
+del glob `forward-market-*` de la ventana (dedupe `v2_77`: `0 fila(s) nueva(s), 1 ya presente(s)`).
+**(4) `OBS-13` CONFIRMADA** en **dos** muestras (D1 del tag y la sonda): el censo cubre **exactamente**
+`|watchA|` símbolos por tick (`censo/tick = 10.00`) y `vetoCounted == vetoes × |watchA| / |watch|`; su
+arreglo sigue siendo **fase de código**. **(5) Hallazgo estructural medido en código:** `TOP_N` es un
+tope de **evaluación** y corre **ANTES** del gate de régimen (`auto_v2_entry.py:1168-1207`), y el régimen
+se pasa como **valor único por tick** (`auto_simulation_worker.py:2944`) ⇒ con `TOP_N=5` y `|watchA|=10`
+salen **5 `top_n_excluded` + 5 `regime_invalid`** por tick; el 5/5 del censo es **coincidencia de
+conteo**, no una clasificación por símbolo. **(6) Robustez registrada (NO implementada):** el
+propietario anota en `P3-2` la necesidad de `watchdog`/`heartbeat`/`resume`/`checkpoint` +
+**evidencia incremental** del `--out`, porque D1 perdió **~58 min** por suspensión del equipo y una
+ventana de ≥4 días es frágil sin continuidad (`tick N → checkpoint → tick N+1`; `restart → recover →
+continue` sin duplicar ciclos). Registro completo en
+[`operacion-fase-b-preflight-y-sonda-2026-09-28.md`](./operacion-fase-b-preflight-y-sonda-2026-09-28.md).
 
 ## Fuera de alcance de esta deuda
 
