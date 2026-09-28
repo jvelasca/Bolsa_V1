@@ -48,7 +48,8 @@
 - `engineering-index` (entrada del re-sello) · `CHANGELOG.md` (`[2.10.1-beta]`) · `package.json`.
 
 **CI del re-sello (POST-TAG):** `Release tag CI` **`36395524355` SUCCESS** en la **primera** pasada (~8m19s;
-10 jobs + `certify`; `playwright` integrado `skipped` por diseño). Job `python` del tag
+10 jobs + `certify`; `playwright` integrado `skipped` por diseño); cita escrita en el POST-TAG
+**`57631636`**. Job `python` del tag
 **`3023 passed / 37 skipped`** y `quality` **`3012 passed / 40 skipped`** = **idénticos a `v2.85`**, como se
 predijo **antes** de sellar. En `main` **no** corrieron `Python CI` ni `Fase 2 scientific` (triggers por
 rutas: el diff no lleva ficheros Python) — declarado, no un fallo. Cita completa (y el run del objeto

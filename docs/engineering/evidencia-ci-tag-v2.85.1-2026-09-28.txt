@@ -93,8 +93,9 @@
 #   Conclusion           : SUCCESS
 # Esta prediccion NO se hereda: se cita el run del tag `v2.85.1-beta`.
 #
-# COMMIT QUE ACREDITA ESTA CITA: el PRIMER commit POST-TAG de `main` posterior al sello `3ce8b85e`.
-# La cita del CI del tag vive aqui, FUERA del tag.
+# COMMIT QUE ACREDITA ESTA CITA: `57631636fbf462a01028fc991f9b165fcb422e14` = PRIMER commit POST-TAG de
+# `main` posterior al sello `3ce8b85e` (aquel commit escribe esta cita; este segundo POST-TAG solo
+# registra su hash). La cita del CI del tag vive aqui, FUERA del tag.
 #
 # --- Release tag CI (run 36395524355, HEAD 3ce8b85e, event=push, ref=v2.85.1-beta) ---
 # conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 08:07:52Z -> 08:16:11Z, ~8m19s)
