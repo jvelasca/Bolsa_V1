@@ -33,6 +33,11 @@
 > `OBS-7`/`OBS-8` (LOW), que quedan **ABIERTOS** y se **CIERRAN en `v2.84`** (ver más abajo); el re-sello
 > es docs-only ⇒ los tres hallazgos son del instrumento de `v2.83` (`operability_audit.py`), no de
 > `v2.83.1`. `OBS-9` (nuevo, LOW doc-only) queda **ABIERTA y declarada**.**
+> **La auditoría externa de `v2.84-beta` (2026-09-28, `AUTO-MATERIAL-12`, tag `e6d921a8` → `fd3859e3`)
+> emite `APROBADO` (0 bloqueantes)** sobre una fase de instrumento read-only y levanta **`OBS-10` (LOW)**:
+> `stateCounts` del `TOTAL` recorre todas las filas mientras el resto usa `measured_rows`. Queda
+> **ABIERTA y APLAZADA** a la fase de código `v2.85`/`AUTO-MATERIAL-13` (no se toca `packages` con una
+> ventana PAPER en curso); su semántica de cierre ya está **decidida** (`measured_rows`).
 > **Deuda de proceso declarada:** `v2.73-beta` quedó
 > **sin auditoría externa** (ver más abajo).
 
@@ -514,6 +519,69 @@ el instrumento auditado). Ficheros medidos con la frase: `v2_75_paper_sample_acc
 
 > **`v2.84` (2026-09-27):** `OBS-9` queda **ABIERTA y declarada**; sólo se corrigió la instancia del
 > instrumento auditado (`v2_83_window_audit.py`) al cerrar `OBS-8`.
+
+## OBS-10 — `stateCounts` del TOTAL recorre TODAS las filas mientras el resto usa `measured_rows` (LOW) — 🟡 ABIERTA y APLAZADA (2026-09-28)
+
+**Origen.** Auditoría externa del objeto sellado **`v2.84-beta`** (`AUTO-MATERIAL-12`; tag anotado
+`e6d921a8` → commit `fd3859e3`; `2.09.0-beta`). El auditor la marca como observación a **vigilar** (no
+bloqueante) dentro de un veredicto global `APROBADO` (0 bloqueantes) sobre una fase de instrumento.
+
+**Observación.** En `window_totals` (`operability_audit.py`) el bloque `stateCounts` recorre **`rows`**
+(todas las filas) mientras `counts`, `coverage`, `rSum` y `funnel` recorren **`measured_rows`**. El propio
+auditor lo mide así:
+
+```text
+TOTAL
+   ├── funnel      -> sólo medido
+   ├── counts      -> sólo medido
+   └── stateCounts -> podría incluir no medido   <-- la asimetría
+```
+
+Cita exacta del código (`packages/py/application/src/bolsa_application/operability_audit.py:144-148`):
+
+```144:148:packages/py/application/src/bolsa_application/operability_audit.py
+    state_counts: dict[str, int] = {}
+    for row in rows:
+        state = _text(row.get("state"))
+        if state:
+            state_counts[state] = state_counts.get(state, 0) + 1
+```
+
+**Matiz medido por esta fase (no lo tenía el auditor).** El escenario concreto del auditor
+(`measured=False` **y** `state="unresolved"`) **no es alcanzable por los productores del repo**:
+`operability_state` (`market_operability.py:448-449`) es **fail-closed** y devuelve `unknown` en cuanto
+`measured` no es `True`, y `build_window_row` (`operability_window.py:482-484`) le pasa
+`"measured": day_measured`. Por tanto, con el material producido hoy el **único** bucket afectado es
+`stateCounts["unknown"]` (que absorbe los días no medidos). **Pero** `window_totals` es una **función pura
+sobre filas arbitrarias** —el CLI consume `operability-window.json`/`window.jsonl` y los tests construyen
+filas a mano—, así que una fila heredada, editada o fabricada **sí** dispara la inconsistencia. El
+endurecimiento pedido es **válido** y esta fase lo registra en vez de argumentarlo.
+
+**Sin impacto actual medido:** ningún test cubre `stateCounts` (hoy aparece sólo en docs), y los días no
+medidos **ya** se publican aparte como `daysTotal - daysMeasured`, de modo que la información no se
+pierde: lo que se declara es la **incoherencia de semántica** entre bloques del mismo `TOTAL`.
+
+**Semántica decidida (2026-09-28, por el propietario).** `stateCounts` debe respetar **`measured_rows`**,
+igual que `counts`/`coverage`/`rSum`/`funnel`. Los días no medidos quedan cubiertos por
+`daysTotal - daysMeasured`, que ya se publica. No se consideró necesario declarar una semántica
+intencionadamente independiente.
+
+**Criterio de cierre.** `stateCounts` itera `measured_rows`; test
+`test_window_totals_state_counts_ignores_unmeasured_rows` (fila `measured=False` con `state` poblado que
+**no** cuenta); mutación **`M233`** (matriz **232 → 233**); compuertas completas. Fase de **INSTRUMENTO**
+(read-only; sin motor, gobernador ni migración).
+
+> **Aplazamiento declarado (`2026-09-28`).** **No** se corrige en la entrega docs-only de esta fecha: hay
+> una **ventana PAPER en curso** (D1 lanzado 2026-09-28 00:02:32) y su propio registro exige que el árbol
+> de **código** no se mueva durante D1..D4 (`git rev-parse "HEAD:apps" "HEAD:packages"` = `980c7b6e…` /
+> `ffe36fd2…`); D1 ya se reinició una vez por un cambio de `packages` ajeno. Tocar `operability_audit.py`
+> **invalidaría** la ventana, así que el fix se difiere a la fase de código **`v2.85` / `AUTO-MATERIAL-13`**
+> (ver el [plan](./plan-v2-85-auto-material-13-statecounts-y-auditoria-comportamiento-2026-09-28.md)),
+> **después** de cerrar la ventana. Registrado aquí para que no se cierre por documentación.
+
+> **Mejora de lectura asociada (no la cierra `OBS-10`).** `unresolvedRate` es una tasa de **días** en
+> estado `unresolved` sobre días medidos (declarado en `_RATE_SOURCES`), no de propuestas. Se aplaza su
+> aclaración en render/docstring a `v2.85` por el mismo motivo (no tocar `packages` ahora).
 
 ## Observaciones de proceso de la auditoría de `v2.77-beta` — 🟡 DECLARADAS (2026-09-26)
 

@@ -73,11 +73,29 @@ uv run --no-sync python apps/api-python/scripts/v2_44_mutation_audit.py         
 
 ## 5. Límites declarados (honestidad)
 
+- **CI del tag — patrón `OBS-3`/`OBS-4` (LÉEME):** `Release tag CI` **solo corre al empujar** el tag, así
+  que su resultado **no puede** estar dentro del propio tag. Dentro de `v2.84-beta`, el fichero
+  `evidencia-ci-tag-v2.84-2026-09-27.txt` es un **PLACEHOLDER pre-tag** y su predicción contiene un
+  **error aritmético declarado** (`3040`/`3029` en vez de `3022/37` y `3011/40`). La cita **acreditada**
+  vive en los commits **POST-TAG** de `main` **`1f2638aa`** y **`434f058d`**:
+  `Release tag CI` **`36353503867`** = **SUCCESS** (`attempt 1`, 8m54s, `headSha` `fd3859e3`), job
+  `python` del tag **`3022 passed / 37 skipped`**, job `quality` **`3011 passed / 40 skipped`**,
+  `mypy 0 issues (507 files)`, `ruff All checks passed!`, `Contracts: 4 kept, 0 broken`; en `main`
+  `Python CI 36353481118` (`quality` `3011/40`), `Frontend CI 36353481072`, `Optimize lab 36353481116`,
+  `Fase 2 scientific 36353481110`, `Gitleaks 36353481089`. **Ninguna cifra observada se corrigió**: se
+  corrigió la **fórmula** (verificado: `git show v2.84-beta:docs/engineering/evidencia-ci-tag-v2.84-2026-09-27.txt`
+  muestra el placeholder; la versión de `main` muestra las cifras reales).
 - **Sin material PAPER real**: `operability_runs/` está gitignoreado ⇒ la ventana se re-deriva con
   fixtures deterministas; **no** se certifica `P3-2`/`P3-3`.
 - **5 huecos locales preexistentes** de la matriz (`M117`/`M118`/`M170`/`M176`/`M197`): idénticos a la
   evidencia de `v2.81-230`, **no** introducidos por esta fase.
 - **`OBS-9`** (nuevo, doc-only) queda **declarado**, no barrido.
+- **`OBS-10`** (nuevo, LOW, de la auditoría de `v2.84-beta`): `stateCounts` del `TOTAL` recorre todas las
+  filas mientras `counts`/`coverage`/`rSum`/`funnel` usan `measured_rows`. **Declarado y aplazado** a la
+  fase de código `v2.85`/`AUTO-MATERIAL-13` (semántica de cierre ya decidida: `measured_rows`); **no** se
+  corrige en la entrega docs-only porque **no debe tocarse `packages` con la ventana PAPER en curso**. Ver
+  [deuda P3](./deuda-p3-post-auditoria-v2.70-2026-09-26.md) y el
+  [protocolo de comportamiento](./protocolo-auditoria-comportamiento-auto-2026-09-28.md).
 - **Anexo operativo (§2.1) declarado, no certificado:** la semilla del par A/B (`ops_seed_window_pair.py`)
   **no** está gate-certificada (`shadow_validated=false`) ⇒ `pairActive=true` significa «par sembrado», no
   «promoción certificada»; **no** cierra `P3-3`. Y `PAPER_D_ACCOUNT_ID`/`BROKER_VENUE` viven en el `.env`

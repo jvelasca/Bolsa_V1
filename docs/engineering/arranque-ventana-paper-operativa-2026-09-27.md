@@ -84,6 +84,106 @@ decider real con `source="active-strategy:v283-window-b"` ⇒ **`secondaryActive
   estadística. `n/d` = **no medido**, nunca `0`.
 - Ninguna deuda (`P3-2`, `P3-3`, `H-4`) se cierra por documentación: **primero datos, después evidencia**.
 
+## 4.bis Registro de D1 (lanzado; reiniciado por cambio de árbol ajeno)
+
+D1 quedó **lanzado** con el comando exacto del runbook §3.1 (protocolo completo, **sin** atajos de
+cadencia), en segundo plano:
+
+```
+uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_material.py \
+    --account-id 1484e253d2d54645945a6b1d7 --version-a v283-window-a \
+    --interval-seconds 60 --max-ticks 400 --stop-when-ready --level evidence \
+    --json --out operability_runs/forward-market-20260928.json
+```
+
+### Incidente: el árbol cambió DURANTE la ventana (declarado)
+
+Entre el primer lanzamiento y el definitivo, **terceros** (no esta operación) crearon tres commits
+en el repo **mientras D1 corría**:
+
+| Commit | Hora | Alcance |
+|---|---|---|
+| `a0f03017` `feat(v2.84): CONTRATO DEL FUNNEL (AUTO-MATERIAL-12)` | 23:54:56 | **código**: `operability_audit.py` (+42/-9), `v2_83_window_audit.py` (docstring), `v2_44_mutation_audit.py`, tests |
+| `bad2866c` `chore(ops): anexo operativo…` | 23:55:04 | barrió los ficheros de **esta** operación (script ops + este doc + runbook) |
+| `fd3859e3` `docs(v2.84): docs de fase + bump … -> 2.09.0-beta` | 23:55:14 | docs de fase + **bump de `package.json`** |
+
+El commit declara **no** tocar motor, gobernador, `operability_window.py`, `TOP_N`, umbrales,
+allocation, pesos A/B, UI ni migraciones (sigue `046_fill_reference_mid`), pero **sí** cambia la
+lectura del funnel que usa el pipeline (`v2_83`). Mantener el primer forward habría dejado el material
+**en un árbol y la auditoría en otro**: se **abortó y reinició** D1 para que forward y auditoría
+compartan **un único árbol**.
+
+- **Coste:** ~20 min de reloj y **cero** material (comprobado: `sim_fill_finance_context`,
+  `sim_auto_positions`, `sim_consumed_signals`, `portfolio_reservations`, `pending_orders`,
+  `execution_events`, `decision_sessions`, `trial_records` = **0 filas** para la cuenta). No se borró
+  ni se fabricó nada.
+- **Verificación previa al relanzamiento:** imports OK de `v2_76`/`v2_77`/`v2_80`/`v2_83` en el árbol
+  nuevo y preflight read-only idéntico (`BEAR_TREND`, exit 2).
+- **Si el árbol vuelve a moverse durante D1..D4, esta hoja debe repetirse.**
+
+### Estado final del forward de D1
+
+| Dato | Valor |
+|---|---|
+| Árbol de **CÓDIGO** congelado (lo que importa) | `apps` = `980c7b6e782296dda50be99385a2350b2cb4b83e`, `packages` = `ffe36fd2fbcf3c12ea26b7523c334f6399a6b716` |
+| Commit de arranque | `fd3859e3` (docs-only posteriores: `1f2638aa`, `434f058d` — **no** tocan `apps`/`packages`) |
+| PID del forward | `34492` (proceso `uv`, lanzado **2026-09-28 00:02:32** local) |
+| Salida | `operability_runs/forward-market-20260928.json` (se escribe **al terminar**) |
+| Logs | `logs/dev/forward-d1.out.log`, `logs/dev/forward-d1.err.log` |
+| Duración prevista | 400 ticks × 60 s ≈ **6 h 40 min** (fin ≈ 06:45 local) |
+| Primera lectura del relanzamiento | `[22:11:36Z] ticks=10 prices=20/20 cycles=0/0 verdict=BLOCKED` |
+
+**Cómo comprobar que el árbol de código no se movió** (debe repetirse al cerrar la ventana):
+
+```powershell
+git rev-parse "HEAD:apps" "HEAD:packages"   # debe dar 980c7b6e… y ffe36fd2…
+```
+
+Si esos dos hashes cambian durante D1..D4, la ventana deja de ser de un solo árbol de código y hay que
+**declararlo** (y decidir si se reinicia el día, como se hizo aquí).
+
+**Nota de día:** el forward arrancó pasada la medianoche local, así que el día del material es
+**2026-09-28** y el fichero se nombra en consecuencia. `v2_77` deriva el `day` del **nombre del
+fichero** (`_derive_day`: sin campo `day`/`asOf`/`date` en el JSON del runner, toma el token `YYYYMMDD`
+del stem) y lo declara en `daySource`; por eso el nombre del fichero **no** es cosmético.
+
+**Lectura honesta:** el runner sirve precio de los 20 símbolos (`prices=20/20`) y **no** acumula
+ciclos (`cycles=0/0`, `verdict=BLOCKED`) porque el eje sigue en `BEAR_TREND` y el motor veta las
+entradas LONG. Es el **veto legítimo de régimen** ya declarado en §3, no un fallo de AUTO:
+`signals=0`/`fills=0` **no** se maquilla ni se fuerza.
+
+## 4.ter Pipeline de D1 (al terminar el forward)
+
+Una vez exista `operability_runs/forward-market-20260928.json`, se encadena (valores fijos, sin
+placeholders):
+
+```powershell
+$ACCOUNT   = "1484e253d2d54645945a6b1d7"
+$VERSION_A = "v283-window-a"
+$DIA       = "20260928"
+
+uv run --no-sync python apps/api-python/scripts/v2_77_market_operability.py `
+    --forward "operability_runs/forward-market-$DIA.json" --render
+
+uv run --no-sync python apps/api-python/scripts/v2_80_market_window.py `
+    --account-id "$ACCOUNT" --strategy-version "$VERSION_A" --days 4 --render `
+    --forward 'operability_runs/forward-market-*.json' `
+    --out "operability_runs/operability-window.json" `
+    --html "operability_runs/operability-window.html"
+
+uv run --no-sync python apps/api-python/scripts/v2_83_window_audit.py `
+    --window "operability_runs/operability-window.json" `
+    --forward 'operability_runs/forward-market-*.json' --render `
+    --out "operability_runs/operability-audit.json"
+```
+
+**Qué se exige leer al terminar el pipeline:** `Par = ACTIVO` y **ausencia** del aviso
+`pair_not_active` (la semilla habilitó `pairActive=true`); el funnel
+`universe → marketData → regimeAllowed → signals → topN → risk → reservation → orders → fills → cycles`
+debe localizar el escalón donde se pierde la oportunidad (con `BEAR_TREND`, el corte cae en
+`regimeAllowed`). El gate de evidencia sigue en **`NO MEDIDO`** hasta reunir ≥4 cubos, ≥2 episodios y
+≥32 ciclos.
+
 ## 5. Cadencia diaria D1..D4
 
 Los comandos exactos (PowerShell) están en el

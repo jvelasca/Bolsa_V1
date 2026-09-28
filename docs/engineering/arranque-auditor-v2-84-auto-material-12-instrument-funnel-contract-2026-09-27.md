@@ -35,11 +35,22 @@ Select-String -Path package.json -Pattern version # 2.09.0-beta
 9. **Mutaciones**: matriz **232/232** medida; `M231`/`M232` muerden **los dos tests nuevos**; restauración **byte a byte**.
 10. **Compuertas**: `ruff`, `lint-imports`, `mypy` (**507** fuentes), `alembic heads` `046_fill_reference_mid`, suite de aplicación **2089 passed**.
 11. **Registro en CI**: `test_operability_audit.py` sigue **explícito** en el job `quality` (`python-ci.yml`) y en el job `python` (`release-tag-ci.yml`).
-12. **Cita del CI dentro del tag**: el tag lleva la cita del CI de la fase (patrón `OBS-3`/`OBS-4`); el CI del **propio** tag vive **post-tag** y se cita por hash. Además, el placeholder pre-tag
-    **dentro** del tag contiene un **ERROR ARITMÉTICO declarado** en su predicción (`3040`/`3029`: sumó `18` sobre una base `3022`/`3011` que **ya** incluía los 2 tests nuevos). Lo correcto es
-    `3022/37` y `3011/40`, que es **exactamente** lo observado en el CI del tag: **no** se corrigió ninguna cifra observada, se corrigió la fórmula — verifícalo tú mismo y compáralo con
-    `evidencia-ci-tag-v2.84-2026-09-27.txt` (versión post-tag).
-13. **Límites declarados**: `P3-2`/`P3-3` **ABIERTAS**, `H-4` **ABIERTO**, `P3-5`/`OBS-5`/`OBS-9` declaradas; **5 huecos locales preexistentes** de la matriz (`M117`/`M118`/`M170`/`M176`/`M197`).
+12. **Cita del CI del tag `v2.84-beta` (patrón `OBS-3`/`OBS-4`) — LEER CON CUIDADO**: `Release tag CI`
+    **solo corre al EMPUJAR** el tag, así que su resultado **no puede** existir dentro de ese mismo tag.
+    Dentro del tag, `evidencia-ci-tag-v2.84-2026-09-27.txt` es un **PLACEHOLDER pre-tag** («PENDIENTE DE
+    TAG») y, además, contiene un **ERROR ARITMÉTICO DECLARADO** en su predicción: escribe `esperado 3040`
+    y `3029` porque sumó `18` sobre una base (`3022`/`3011`) que **ya** incluía los 2 tests nuevos. La
+    predicción **correcta** es `3022/37` (job `python` del tag) y `3011/40` (job `quality`), y es
+    **exactamente** lo que midió el CI. **No** se corrigió ninguna cifra observada: se corrigió la
+    **fórmula**. La cita **acreditada** vive en los commits **POST-TAG** de `main` `1f2638aa` y
+    `434f058d`; verifícala con `gh run view 36353503867` (SUCCESS, `headSha` `fd3859e3`).
+
+    > **Aviso de instancia (auditor sobre el tag aislado):** esta misma frase, **dentro** del tag
+    > `v2.84-beta`, dice «el tag lleva la cita del CI de la fase» — redacción heredada de `v2.83` que en
+    > `v2.84` es **imprecisa**: en `v2.84` la cita del CI de la fase **es** la de este tag, y vive
+    > POST-TAG. Usa **esta** versión (la de `main`) para el punto 12 y **no** concluyas «CI no
+    > acreditado».
+13. **Límites declarados**: `P3-2`/`P3-3` **ABIERTAS**, `H-4` **ABIERTO**, `P3-5`/`OBS-5`/`OBS-9`/`OBS-10` declaradas; **5 huecos locales preexistentes** de la matriz (`M117`/`M118`/`M170`/`M176`/`M197`).
 
 ## 3. Qué invalida la fase
 
