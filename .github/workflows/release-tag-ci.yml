@@ -1072,18 +1072,90 @@ jobs:
             > artifacts/replay-oos-durable-v2.88.7.log 2>&1
           tail -n 5 artifacts/replay-oos-durable-v2.88.7.log
 
+      - name: Huella del runner y digest por secciones del artefacto (auditoría del rojo)
+        # El assert del SHA-256 es BINARIO: dice «no reproducido» pero no dice DÓNDE. Sin
+        # esto, un rojo obligaba a reproducir el runner a mano para saber qué había cambiado
+        # —exactamente lo que este trabajo quiere eliminar—. Aquí se publica (a) la huella
+        # del runner (versión de Python, TZ, locale, hash seed y si hay env del motor en el
+        # ambiente) y (b) el digest POR SECCIONES del artefacto: si difiere `census` el
+        # desvío es de ENTRADA y si difiere `replay` es del MOTOR. Corre con `always()` para
+        # que el rojo deje la evidencia en el log.
+        if: always()
+        run: |
+          echo "== huella del runner =="
+          echo "python      $(uv run --no-sync python -V 2>&1)"
+          echo "uv          $(uv --version)"
+          echo "TZ          ${TZ:-<vacío>}"
+          echo "LANG        ${LANG:-<vacío>}  LC_ALL=${LC_ALL:-<vacío>}"
+          echo "CPUs        $(nproc)"
+          echo "HASHSEED    ${PYTHONHASHSEED:-<no fijado>}"
+          env | grep -c '^AUTO_ENGINE_SIM_' >/dev/null 2>&1 \
+            && env | grep '^AUTO_ENGINE_SIM_' | cut -d= -f1 | sort | sed 's/^/env motor   /' \
+            || echo "env motor   ninguno (ambiente limpio, como debe)"
+          echo
+          echo "== digest por secciones =="
+          if [ ! -f artifacts/replay-oos-durable-v2.88.7.json ]; then
+            echo "SIN ARTEFACTO: el replay no llegó a escribirlo (ver su log arriba)"
+            exit 0
+          fi
+          uv run --no-sync python apps/api-python/scripts/replay_artifact_digest.py \
+            --file artifacts/replay-oos-durable-v2.88.7.json --lines
+
+      - name: Determinismo del runner (2ª corrida con el MISMO entorno)
+        # Separa las dos causas posibles de un rojo: si dos corridas IDÉNTICAS del runner no
+        # coinciden entre sí, el artefacto no es determinista NI dentro del CI (orden de
+        # planificación, `hash` de las claves, etc.); si coinciden y aun así difieren del
+        # sello, la diferencia es de PLATAFORMA (la máquina que selló no es el runner).
+        if: always()
+        run: |
+          set -o pipefail
+          if [ ! -f artifacts/replay-oos-durable-v2.88.7.json ]; then
+            echo "SIN ARTEFACTO: no hay nada que repetir"
+            exit 0
+          fi
+          WATCH="$(uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py \
+            watch --fixture docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson)"
+          uv run --no-sync python apps/api-python/scripts/v2_87_replay_oos_durable_cycle.py \
+            --json --watch "$WATCH" \
+            --out artifacts/replay-repro-2.json \
+            > artifacts/replay-repro-2.log 2>&1
+          echo "== 2ª corrida =="
+          uv run --no-sync python apps/api-python/scripts/replay_artifact_digest.py \
+            --file artifacts/replay-repro-2.json --lines
+          if cmp -s artifacts/replay-oos-durable-v2.88.7.json artifacts/replay-repro-2.json; then
+            echo "VEREDICTO 2ª corrida IDÉNTICA (el runner es determinista consigo mismo)"
+          else
+            echo "VEREDICTO 2ª corrida DISTINTA (hay no-determinismo DENTRO del runner)"
+          fi
+          uv run --no-sync python apps/api-python/scripts/replay_artifact_digest.py \
+            --file artifacts/replay-oos-durable-v2.88.7.json --lines \
+            > artifacts/digest-1.txt
+          uv run --no-sync python apps/api-python/scripts/replay_artifact_digest.py \
+            --file artifacts/replay-repro-2.json --lines > artifacts/digest-2.txt
+          diff -u artifacts/digest-1.txt artifacts/digest-2.txt \
+            && echo "DIGEST igual en las dos corridas" \
+            || echo "DIGEST distinto entre las dos corridas (arriba, el diff)"
+
       - name: ASSERT del SHA-256 y del tamaño (el sello tiene que salir byte a byte)
         run: >
           uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py
           assert-artifact --file artifacts/replay-oos-durable-v2.88.7.json
 
       - uses: actions/upload-artifact@v4
+        # `if: always()`: un rojo TIENE que entregar el artefacto divergente y sus digests.
+        # Sin esto el assert abortaba el job antes del upload y el fichero que había que
+        # auditar se perdía con el runner (fue el caso de la corrida 36627838819).
+        if: always()
         with:
           name: replay-oos-durable-v2.88.7
           path: |
             artifacts/replay-oos-durable-v2.88.7.json
             artifacts/replay-oos-durable-v2.88.7.log
-          if-no-files-found: error
+            artifacts/replay-repro-2.json
+            artifacts/replay-repro-2.log
+            artifacts/digest-1.txt
+            artifacts/digest-2.txt
+          if-no-files-found: warn
 
   dr-verify:
     # DR honesta en el CI del tag (hallazgo C2-12 P2 / C2-13): `pnpm db:dr:test`
