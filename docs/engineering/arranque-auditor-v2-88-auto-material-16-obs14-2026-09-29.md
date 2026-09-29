@@ -161,6 +161,11 @@ predicción estructural («correrán los jobs de Python»), que **se cumplió**.
 
 ## 3. Puntos de entrada por orden
 
+- **PAQUETE DE ENTREGA (empieza aquí):** [`entrega-auditoria-externa-mia-v2.88.3-2026-09-29.md`](./entrega-auditoria-externa-mia-v2.88.3-2026-09-29.md)
+  — firma de estado verificada **en un clon fresco de GitHub**, **8 trampas declaradas**, comandos de
+  reproducción, entregable esperado y **prompt listo para pegar**.
+- **Objeto vigente (`v2.88.3`):** [`evidence/v2.88.3/README.md`](./evidence/v2.88.3/README.md) ·
+  [`obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md`](./obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md).
 - **Informe/relevo del cierre (motor + defectos):** [`obs-14-cierre-por-turno-v2.88-2026-09-29.md`](./obs-14-cierre-por-turno-v2.88-2026-09-29.md).
 - **Evidencia cruda del cierre:** [`evidence/v2.88/README.md`](./evidence/v2.88/README.md)
   (diff del motor, nombres de tests, `M245`/`M246`, tabla de defectos, **NO MEDIDO**).
