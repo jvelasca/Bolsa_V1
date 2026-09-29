@@ -1067,6 +1067,13 @@ async def close_tick(worker: Any, *, durable_cycle: bool = True) -> bool:
     ``durable_cycle=False`` es el modo CONTROL: no toca el libro y deja la reserva huérfana
     viva (es el goteo que truncaba ``v2.86``, ahora medible). Devuelve ``True`` si reconcilió.
 
+    ``only_ids`` acota el cierre a las reservas que el worker dio de alta
+    (``_v2_owned_reservations``), igual que el motor real (OBS-14.b). En un proceso ÚNICO el
+    huérfano del tick es del propio turno, así que el conjunto acota sin quitar nada: el
+    cierre retira exactamente lo mismo que antes. Lo que deja de existir es la ventana en la
+    que una sesión retiraba la reserva viva de OTRA —indistinguible de una orden muerta hasta
+    que la otra emite y liquida— devolviendo al mercado capital que sí se materializó.
+
     Fail-loud: si la pieza congelada desaparece, NO se degrada en silencio — un replay que
     cree haber cerrado el ciclo sin cerrarlo publicaría un horizonte que miente.
     """
@@ -1078,7 +1085,12 @@ async def close_tick(worker: Any, *, durable_cycle: bool = True) -> bool:
             "el worker no expone _v2_reconcile_reservations: sin la pieza de producción el "
             "cierre de tick no puede declararse hecho"
         )
-    await reconcile(startup=False, attribute_fills=False)
+    owned = getattr(worker, "_v2_owned_reservations", None)
+    await reconcile(
+        startup=False,
+        attribute_fills=False,
+        only_ids=frozenset(owned) if owned is not None else None,
+    )
     return True
 
 

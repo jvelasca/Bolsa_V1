@@ -262,7 +262,11 @@ async def test_close_tick_control_mode_does_not_touch_the_worker() -> None:
 
     class _Boom:
         async def _v2_reconcile_reservations(  # pragma: no cover
-            self, *, startup: bool, attribute_fills: bool = True
+            self,
+            *,
+            startup: bool,
+            attribute_fills: bool = True,
+            only_ids: frozenset[str] | None = None,
         ) -> None:
             raise AssertionError("el modo CONTROL no debe reconciliar")
 
@@ -282,15 +286,33 @@ async def test_close_tick_does_not_re_attribute_fills() -> None:
     class _Recorder:
         def __init__(self) -> None:
             self.calls: list[dict[str, Any]] = []
+            # OBS-14.b — la costura pasa la PROPIEDAD de la sesión al cierre de tick.
+            self._v2_owned_reservations = {"RES-propia"}
 
         async def _v2_reconcile_reservations(
-            self, *, startup: bool, attribute_fills: bool = True
+            self,
+            *,
+            startup: bool,
+            attribute_fills: bool = True,
+            only_ids: frozenset[str] | None = None,
         ) -> None:
-            self.calls.append({"startup": startup, "attribute_fills": attribute_fills})
+            self.calls.append(
+                {
+                    "startup": startup,
+                    "attribute_fills": attribute_fills,
+                    "only_ids": only_ids,
+                }
+            )
 
     recorder = _Recorder()
     assert await close_tick(recorder) is True
-    assert recorder.calls == [{"startup": False, "attribute_fills": False}]
+    assert recorder.calls == [
+        {
+            "startup": False,
+            "attribute_fills": False,
+            "only_ids": frozenset({"RES-propia"}),
+        }
+    ]
 
 
 # ── el techo de 1000 fills APPLIED ───────────────────────────────────────────────
@@ -432,9 +454,16 @@ def _startup_only_reconcile(worker: AutoSimulationWorker, monkeypatch: pytest.Mo
     """
     original = worker._v2_reconcile_reservations  # noqa: SLF001
 
-    async def _only_startup(*, startup: bool, attribute_fills: bool = True) -> None:
+    async def _only_startup(
+        *,
+        startup: bool,
+        attribute_fills: bool = True,
+        only_ids: frozenset[str] | None = None,
+    ) -> None:
         if startup:
-            await original(startup=startup, attribute_fills=attribute_fills)
+            await original(
+                startup=startup, attribute_fills=attribute_fills, only_ids=only_ids
+            )
 
     monkeypatch.setattr(worker, "_v2_reconcile_reservations", _only_startup)
 
@@ -555,6 +584,9 @@ async def test_closing_reconcile_keeps_captured_unapplied_capital_in_flight(
     )
     worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
     worker._decider = _buy_only("BBB")  # noqa: SLF001 — AAA queda intocado por el plan.
+    # La reserva en vuelo es de ESTA sesión: así el test sigue midiendo la guarda
+    # ``in_flight`` (y no el acotado por propiedad, que tiene su propio test).
+    worker._v2_owned_reservations.add("RES-inflight-AAA")  # noqa: SLF001
 
     await _real_turn(worker, exec_store=exec_store, store=store, contexts=contexts)
 
@@ -606,6 +638,9 @@ async def test_closing_reconcile_keeps_the_live_tail_of_a_partially_filled_order
         await _save_context(contexts, execution_id)
     worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
     worker._decider = _buy_only("BBB")  # noqa: SLF001 — AAA queda intocado por el plan.
+    # La reserva parcial es de ESTA sesión: así el test mide la guarda de fills aplicados
+    # (``filled > 0``) y no el acotado por propiedad.
+    worker._v2_owned_reservations.add("RES-partial-AAA")  # noqa: SLF001
     # Se aísla el CIERRE de turno: el bloque durable ya está readoptado por el proceso.
     worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
     worker._v2_reservations_reconciled = True  # noqa: SLF001
@@ -617,3 +652,77 @@ async def test_closing_reconcile_keeps_the_live_tail_of_a_partially_filled_order
     assert partial.is_live, "la cola viva del fill parcial NO se retira en el cierre de turno"
     assert float(partial.remaining_qty) == 10.0, "el cierre NO re-atribuye fills ya liberados"
     assert float(partial.released_qty) == 0.0, "el fill lo libera el camino caliente, no el cierre"
+
+
+@pytest.mark.asyncio
+async def test_closing_reconcile_does_not_touch_another_sessions_reservation(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14.b · FAIL-OPEN de CARRERA: el cierre de turno no retira reservas AJENAS.
+
+    Regresión medida en el tag ``v2.88.1-beta`` (``lifecycle-pg``, ``test_concurrent_auto_pg``):
+    tres sesiones concurrentes sobre la MISMA cuenta y señal, una gana el ``save_claim`` y
+    reserva; la perdedora cierra su turno y ve la reserva viva de la ganadora —cuya orden
+    todavía no se ha emitido ni liquidado— con las DOS lecturas medibles y SIN fill. La regla
+    2 la declaraba "orden muerta sin llenar" y liberaba la cantidad COMPLETA
+    (``released=200`` frente a ``materializado=147``): la ganadora materializaba su fill
+    después y su liberación por fill ya no tenía fila viva, así que el capital comprometido
+    volvía al mercado (fail-OPEN). La evidencia durable no puede distinguir "orden muerta" de
+    "orden que otra sesión aún no ha emitido": el discriminador es la PROPIEDAD.
+
+    El MISMO caso retirado por la reconciliación de ARRANQUE sí se retira: ahí el proceso nace
+    sin memoria y la huérfana ajena es exactamente lo que hay que barrer.
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    # Reserva viva de OTRA sesión: sin fill, sin traza en vuelo ⇒ en los dos barridos la
+    # regla 2 la ve como candidata. Solo la PROPIEDAD decide.
+    await store.save(
+        build_reservation(
+            reservation_id="RES-ajena-AAA",
+            account_id=_ACCOUNT,
+            tick_id="2026-09-17T09:00:00Z",
+            instrument_id="AAA",
+            side="buy",
+            sector="tech",
+            quantity=10,
+            entry=100.0,
+            reserved_risk=50.0,
+            created_at="2026-09-17T09:00:00Z",
+        )
+    )
+    worker = _worker(reservation_store=store, exec_store=exec_store)
+    worker._decider = _buy_only("BBB")  # noqa: SLF001 — AAA queda intocado por el plan.
+    # Se aísla el CIERRE de turno (el bloque durable ya está readoptado por el proceso): el
+    # barrido de arranque se prueba aparte, al final.
+    worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
+    worker._v2_reservations_reconciled = True  # noqa: SLF001
+
+    await _real_turn(worker, exec_store=exec_store, store=store)
+
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    foreign = after["RES-ajena-AAA"]
+    assert foreign.is_live, "el cierre de turno NO puede retirar la reserva de otra sesión"
+    assert float(foreign.released_qty) == 0.0, "no se libera ni un lote de una identidad ajena"
+    assert "RES-ajena-AAA" in {
+        row.reservation_id for row in worker._v2_reservations  # noqa: SLF001
+    }, "su capital sigue comprometido para esta sesión"
+    # Y las SUYAS del turno sí se retiran (el acotado no desactiva el cierre).
+    propias = [row for key, row in after.items() if key != "RES-ajena-AAA"]
+    assert propias, "el turno debe comprometer reservas propias"
+    assert {row.status for row in propias} == {"RELEASED_BY_CANCEL"}
+
+    # Contraste: en un proceso NUEVO (``_v2_reservations_reconciled`` en falso) el barrido de
+    # ARRANQUE sí recorre el libro COMPLETO — sin ``only_ids``— y retira la huérfana ajena.
+    worker2 = _worker(reservation_store=store, exec_store=exec_store)
+    worker2._decider = _buy_only("BBB")  # noqa: SLF001
+    await _real_turn(worker2, exec_store=exec_store, store=store)
+
+    swept = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    assert not swept["RES-ajena-AAA"].is_live, "el arranque barre la huérfana, sea de quien sea"
+    assert swept["RES-ajena-AAA"].status == "RELEASED_BY_RESTART"
+    # DEUDA DECLARADA (OBS-14.b residual): ese mismo barrido de arranque NO distingue una
+    # huérfana de una reserva VIVA de otra sesión a mitad de turno. Ya era así en ``v2.85.2``
+    # y el arreglo acordado es de ALCANCE (solo el cierre de turno): el discriminador posible
+    # es una ventana de gracia por EDAD y queda en la deuda P3, no se arregla aquí.

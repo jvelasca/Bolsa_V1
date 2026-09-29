@@ -712,6 +712,15 @@ class AutoSimulationWorker:
         self._v2_reservations_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
         self._v2_reservation_blocked: frozenset[str] = frozenset()
         self._v2_reservation_carryover: frozenset[str] = frozenset()
+        # OBS-14.b — PROPIEDAD de las reservas dadas de alta por ESTA sesión
+        # (``save_claim`` ganado en el tick o reserva de salida persistida). El cierre de
+        # turno NO puede retirar reservas ajenas: en una carrera entre sesiones la
+        # evidencia durable («sin APPLIED y sin traza en vuelo») es INDISTINGUIBLE de una
+        # orden que otra sesión aún no ha emitido en su propio turno, y liberarla sería
+        # fail-OPEN (devolver al mercado un capital que sí se materializó después). La
+        # reconciliación de ARRANQUE sí barre el libro completo: ahí el proceso nace sin
+        # memoria y la reserva ajena huérfana es exactamente lo que hay que retirar.
+        self._v2_owned_reservations: set[str] = set()
         self._v2_open_orders_read_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
         self._v2_reservations_reconciled = False
         # V2.43.3 (P0-1) — espejo durable del latch de la parada dura. Sin store la parada
@@ -2321,6 +2330,9 @@ class AutoSimulationWorker:
                 # se re-compromete (re-intento legítimo dentro de la barra).
                 claimed.add(reservation.instrument_id)
                 continue
+            # OBS-14.b — ``save_claim`` ganado: esta sesión es la DUEÑA del compromiso y
+            # es la única con autoridad para retirarlo al cerrar SU turno.
+            self._v2_owned_reservations.add(reservation.reservation_id)
             persisted.append(reservation)
         try:
             await store.commit()
@@ -2524,6 +2536,9 @@ class AutoSimulationWorker:
         reserved = order.with_reserved(reservation.reservation_id, at=at)
         await self._v2_save_exit_order(reserved)
         self._v2_exit_orders[exit_order_id] = reserved
+        # OBS-14.b — la reserva de salida también es de ESTA sesión: si su orden no llega
+        # a materializarse dentro del turno, el cierre de turno es quien debe retirarla.
+        self._v2_owned_reservations.add(reservation.reservation_id)
         merged: dict[str, PortfolioReservation] = {
             row.reservation_id: row for row in self._v2_reservations if row.is_live
         }
@@ -2609,7 +2624,11 @@ class AutoSimulationWorker:
         return frozenset(instruments)
 
     async def _v2_reconcile_reservations(
-        self, *, startup: bool, attribute_fills: bool = True
+        self,
+        *,
+        startup: bool,
+        attribute_fills: bool = True,
+        only_ids: frozenset[str] | None = None,
     ) -> None:
         """Reconcilia el libro durable de reservas con lo MATERIALIZADO (AUTO-1b).
 
@@ -2645,6 +2664,17 @@ class AutoSimulationWorker:
         parcialmente llenada — la cola VIVA del fill parcial, capital realmente comprometido
         (fail-OPEN). El cierre de turno invoca con ``attribute_fills=False``: libera solo lo
         que NUNCA se materializó (regla 2), que es exactamente el huérfano del tick.
+
+        ``only_ids`` — ALCANCE del barrido (OBS-14.b). ``None`` barre el libro completo
+        (reconciliación de ARRANQUE: el proceso nace sin memoria y la reserva huérfana,
+        propia o ajena, es lo que hay que retirar). Un conjunto explícito acota el barrido a
+        esas reservas: es lo que usa el CIERRE DE TURNO con las SUYAS
+        (``_v2_owned_reservations``). Sin ese acotado, dos sesiones concurrentes se pisan: la
+        que cierra su turno ve la reserva viva de la otra —su orden todavía no se ha emitido
+        ni liquidado— con las DOS lecturas medibles y SIN fill, y la regla 2 la declararía
+        "muerta sin llenar", liberando un capital que la otra sesión SÍ materializará en su
+        turno (fail-OPEN). La evidencia durable no puede distinguir "orden muerta" de "orden
+        que otra sesión aún no ha emitido": el único discriminador es la PROPIEDAD.
         """
         store = self._reservation_store
         if store is None:
@@ -2655,6 +2685,8 @@ class AutoSimulationWorker:
         if not live:
             self._v2_reservations = ()
             self._v2_reservations_measurement = book_measurement
+            # OBS-14.b — sin reservas vivas no hay propiedad viva que conservar.
+            self._v2_owned_reservations.clear()
             return
         facts_read = await read_applied_fill_facts(
             self._exec_store, self._context_store, self._account_id
@@ -2692,6 +2724,14 @@ class AutoSimulationWorker:
                         filled += qty
             available = max(0.0, filled - consumed.get(fill_key, 0.0))
             fill_qty = min(available, reservation.remaining_qty)
+            # OBS-14.b — FUERA DE ALCANCE: ni se libera ni se toca su INTENT de salida. Se
+            # conserva viva en el libro (su capital/riesgo SIGUE comprometido para esta
+            # sesión) y no consume fills, así que el orden de lectura no la mezcla con las
+            # propias. No se publica en ``outcomes``: sin entrada, ``_v2_sync_exit_orders``
+            # la lee como ``(0.0, None)`` y no actúa sobre una identidad ajena.
+            if only_ids is not None and reservation.reservation_id not in only_ids:
+                resolved.append(reservation)
+                continue
             released: PortfolioReservation | None = None
             if attribute_fills and fill_qty > 0:
                 consumed[fill_key] = consumed.get(fill_key, 0.0) + fill_qty
@@ -2721,6 +2761,11 @@ class AutoSimulationWorker:
             outcomes[reservation.reservation_id] = (fill_qty, released)
             resolved.append(released if released is not None else reservation)
         self._v2_reservations = tuple(row for row in resolved if row.is_live)
+        # OBS-14.b — la PROPIEDAD solo se conserva mientras la reserva siga viva: una ya
+        # liberada no vuelve a ser autoridad de retirada de nadie.
+        self._v2_owned_reservations &= {
+            row.reservation_id for row in self._v2_reservations
+        }
         self._v2_reservations_measurement = (
             book_measurement
             if measurable
@@ -4954,7 +4999,17 @@ class AutoSimulationWorker:
             # fills del turno y la regla 1 es no idempotente, así que re-atribuirla en cada
             # turno drenaría la cola VIVA de una orden parcialmente llenada (fail-OPEN). El
             # cierre de turno solo retira el huérfano que NUNCA se materializó.
-            await self._v2_reconcile_reservations(startup=False, attribute_fills=False)
+            #
+            # OBS-14.b — y solo retira las reservas de ESTA sesión (``only_ids``): en una
+            # carrera entre sesiones, la reserva que otra acaba de dar de alta es
+            # INDISTINGUIBLE de una orden muerta sin llenar hasta que esa otra sesión emite
+            # y liquida, y retirarla devolvería al mercado un capital que sí se materializa
+            # (fail-OPEN observado en ``test_concurrent_auto_pg.py``).
+            await self._v2_reconcile_reservations(
+                startup=False,
+                attribute_fills=False,
+                only_ids=frozenset(self._v2_owned_reservations),
+            )
             if auto_store is not None:
                 snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
                 seq = (snap.ticks + 1) if snap is not None else 1

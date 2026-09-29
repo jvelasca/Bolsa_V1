@@ -74,6 +74,22 @@
 > `close_tick` del replay alineado. **`OBS-14` sigue CERRADA**, ahora con la guarda correcta.
 > **Deuda nueva declarada (instrumento):** el artefacto multianual de `v2.87` se midió con la costura
 > previa ⇒ **exige RE-EJECUCIÓN** antes de citar su R (ver informe `obs-14-correccion-fail-open-v2.88.1`).
+> **`v2.88.2` (2026-09-29):** **RE-SELLO** `v2.88.2-beta` (`AUTO-MATERIAL-16b`) que corrige un **segundo**
+> defecto **fail-OPEN** del mismo cierre, esta vez de **carrera entre sesiones**: bump `2.11.1-beta →
+> 2.11.2-beta`, **sin migración**. El tag `v2.88.1-beta` quedó **público con `Release tag CI` ROJO**
+> (`lifecycle-pg`, `test_concurrent_auto_pg.py`: `released=200.000000` vs `materializado=147.000000`).
+> **Causa raíz:** la **regla 2** decide con evidencia **durable**, que **no** puede distinguir «orden
+> muerta» de «orden que OTRA sesión aún no ha emitido en su turno»: la sesión perdedora liberaba la
+> reserva **viva** de la ganadora y el fill que esta materializaba después se quedaba sin fila que
+> liberar. **Corrección (alcance):** `only_ids` en `_v2_reconcile_reservations`; el cierre de turno solo
+> retira las reservas que **esta sesión** dio de alta (`_v2_owned_reservations`), el barrido de
+> **arranque** sigue global; `close_tick` del replay alineado. **`OBS-14` sigue CERRADA**, ahora con el
+> alcance correcto. **Abre `OBS-14.b` (MEDIUM, residual):** el barrido de arranque tampoco distingue una
+> huérfana de una reserva viva de otra sesión (reinicio rodante); discriminador posible, **no**
+> implementado: ventana de gracia por **EDAD** (ver más abajo).
+> **Nuevo dato de no-regresión:** los tres pasos que quedaron **saltados** en el CI de `v2.88-beta`
+> (`HardKill recovery`, `crash injection matrix`, `multiprocess AUTO`) se ejecutaron por primera vez en
+> este RE-SELLO: **5 passed** en local.
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -935,7 +951,21 @@ Informe: [`replay-oos-ciclo-durable-v2.87-2026-09-29.md`](./replay-oos-ciclo-dur
 5/5**. Artefactos JSON (3 165 540 B y 2 949 320 B, gitignoreados) con **SHA-256 `DC61B3B9…C6C54F`** y
 **`FE4CBF79…78CCD1`**; resumen verificado en [`evidence/v2.87/`](./evidence/v2.87/README.md).
 
-## OBS-14 — El motor real también retiene reservas muertas entre reinicios (MEDIUM, alcance motor) — 🟢 CERRADA en `v2.88` (2026-09-29) · 🔁 corregida en `v2.88.1`
+## OBS-14 — El motor real también retiene reservas muertas entre reinicios (MEDIUM, alcance motor) — 🟢 CERRADA en `v2.88` (2026-09-29) · 🔁 corregida en `v2.88.1` · 🔁🔁 acotada por PROPIEDAD en `v2.88.2`
+
+> **Nota de corrección 2 (2026-09-29 · RE-SELLO `v2.88.2-beta`).** La segunda versión del cierre de turno
+> seguía siendo **fail-OPEN**, ahora por **carrera entre sesiones**: con evidencia durable (sin APPLIED, sin
+> traza en vuelo, lecturas medibles) una sesión **no puede** distinguir «orden muerta sin llenar» de «orden
+> que OTRA sesión aún no ha emitido en su propio turno», así que la perdedora liberaba la reserva **viva**
+> de la ganadora y el fill que la ganadora materializaba después se quedaba sin fila viva que liberar
+> (`released=200` frente a `materializado=147`). Lo detectó el `Release tag CI` del tag `v2.88.1-beta`
+> (job `lifecycle-pg`, `test_concurrent_auto_pg.py`). La corrección es de **alcance**: el cierre de turno
+> solo retira las reservas que **esta sesión** dio de alta (`only_ids` = `_v2_owned_reservations`); el
+> barrido de **arranque** sigue siendo global. Detalle en
+> [obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md](./obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md).
+>
+> **Deuda residual abierta en la misma corrección:** ver **`OBS-14.b`** (barrido de arranque sin ventana de
+> gracia) más abajo en este mismo documento.
 
 > **Nota de corrección (2026-09-29 · RE-SELLO `v2.88.1-beta`).** La primera versión del cierre de turno
 > era **fail-OPEN**: al invocar la reconciliación en cada turno, su regla 1 **re-liberaba fills ya
@@ -1007,6 +1037,42 @@ criterio de cierre —*reconciliar en el **cierre de turno/tick***, lo que el re
 
 **Evidencia:** [`obs-14-cierre-por-turno-v2.88-2026-09-29.md`](./obs-14-cierre-por-turno-v2.88-2026-09-29.md) ·
 [`evidence/v2.88/`](./evidence/v2.88/README.md). La deuda queda **CERRADA y MEDIDA**, no por documentación.
+
+## OBS-14.b — El barrido de ARRANQUE tampoco distingue una huérfana de una reserva VIVA de otra sesión (MEDIUM, alcance motor) — 🔴 ABIERTA (2026-09-29)
+
+**Origen.** Medido al corregir la **carrera entre sesiones** del cierre de turno (`v2.88.2`). El cierre de
+turno quedó acotado por **propiedad** (`only_ids`), pero la reconciliación de **ARRANQUE** sigue barriendo
+el libro **completo** de la cuenta.
+
+**Observación.** El barrido de arranque decide con la **misma** evidencia durable que el cierre (sin
+`APPLIED`, sin traza en vuelo, lecturas medibles) y por tanto **no puede** distinguir:
+
+- una reserva **huérfana** que dejó un proceso muerto (lo que quiere retirar), de
+- una reserva **viva** que **otra sesión** acaba de dar de alta y cuya orden **aún no ha emitido** en su
+  propio turno (lo que **no** debe tocar: retirarla devolvería al mercado un capital que sí se
+  materializa después — el mismo fail-**OPEN** de `OBS-14`/`OBS-14.b` primos).
+
+**Ventana de exposición.** Un **reinicio rodante** (arranca un motor mientras otro opera la misma cuenta).
+En el arranque simultáneo de varias sesiones la ventana es nula (todas barren antes de que ninguna
+reserve), que es lo que mide la suite de CI; por eso el defecto **no** se ha manifestado en CI. **Ya era
+así en `v2.85.2`** (no es una regresión de `v2.88`).
+
+**Por qué no se arregla en `v2.88.2`.** Alcance acordado: la corrección de la fase es el **cierre de
+turno** (el defecto que CI destapó). Tocar el arranque es una decisión de diseño con su propio radio
+(qué se considera «huérfana» y con qué reloj).
+
+**Discriminador propuesto (no implementado).** **Ventana de gracia por EDAD**: en el arranque, retirar una
+reserva candidata solo si su `created_at` es anterior a `now − ventana` (la ventana debe cubrir un turno
+completo del motor). Una reserva más joven se **conserva** (fail-closed) y el barrido del siguiente
+arranque la recoge. Requiere declarar la ventana como parámetro medido y una mutación que la fije.
+
+**Estado de la evidencia.** El comportamiento actual queda **caracterizado** (no aprobado) por
+`test_closing_reconcile_does_not_touch_another_sessions_reservation`, que verifica que el barrido de
+arranque **sí** retira la huérfana ajena; su docstring declara esta deuda. Mutación asociada: **`M250`**
+(acotar el arranque ⇒ el test se pone rojo).
+
+**Evidencia:** [`obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md`](./obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md) ·
+[`evidence/v2.88.2/`](./evidence/v2.88.2/README.md).
 
 ## OBS-15 — El techo de lectura de 1000 filas `APPLIED` puede parar el motor (MEDIUM, alcance motor) — 🔴 ABIERTA (2026-09-29)
 

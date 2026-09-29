@@ -2,6 +2,61 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.2-beta] — `AUTO-MATERIAL-16b` RE-SELLO: corrección fail-OPEN de CARRERA en el cierre de turno (`only_ids`) — 2026-09-29
+
+**RE-SELLO del objeto `v2.88`.** El tag `v2.88.1-beta` (`dd8a16a5`) quedó **público con `Release tag CI`
+en ROJO** (run `36548125321`): el job `lifecycle-pg` tumbó `test_concurrent_auto_pg.py` con
+`AssertionError: lo liberado por fill debe ser exactamente lo materializado: released=200.000000
+materializado=147.000000`. **Bump** `2.11.1-beta` → `2.11.2-beta`. **SIN migración** (Alembic head sigue
+en `046_fill_reference_mid`). Base del diff: `dd8a16a5` (= `v2.88.1-beta`).
+
+- **Corrección de un diagnóstico previo:** en el CI de `v2.88-beta` ese paso figura como **skipped** (el
+  job murió antes en crash/recovery) ⇒ **el defecto existía ya en `v2.88-beta` y estaba enmascarado**.
+  Los tres pasos que allí quedaron saltados (`HardKill`, `crash injection matrix`, `multiprocess AUTO`) se
+  ejecutaron por primera vez en este RE-SELLO: **5 passed** en local.
+- **Causa raíz (carrera entre SESIONES, fail-OPEN):** la **regla 2** decide «la reserva murió sin
+  llenarse» con evidencia **durable** (sin APPLIED, sin traza en vuelo, lecturas medibles). Al correr la
+  reconciliación también al **cierre de cada turno**, una sesión perdedora ve la reserva **viva de la
+  ganadora** —cuya orden aún no se ha emitido ni liquidado— y la libera **completa**. La ganadora
+  materializa su fill después y su liberación por fill ya no encuentra fila viva: `released=200` frente a
+  `materializado=147`, es decir **capital comprometido devuelto al mercado**. La evidencia durable **no
+  puede** distinguir «orden muerta» de «orden que otra sesión aún no ha emitido».
+- **Traza del diagnóstico** (instrumentación temporal, retirada; árbol sin residuos): **una sola**
+  liberación, `CANCEL` total `remain_before=200.0` desde `real_turn` del **perdedor**, y el
+  `qty=147` del **ganador** llegando después (`store.release` → `None`).
+- **Prueba de causalidad (A/B mismo árbol):** cierre con `attribute_fills=False` (sello `v2.88.1`) →
+  **3 failed** (`200` vs `147`); worker revertido a `HEAD~1` (cierre `v2.88-beta`, regla 1 activa) →
+  **3 failed idénticos**; con el acotado por propiedad → **7 passed**. El fallo **no** lo causaba la guarda
+  `attribute_fills`, sino el **alcance** del cierre.
+- **Corrección (alcance por PROPIEDAD):** nuevo parámetro `only_ids: frozenset[str] | None = None` en
+  `_v2_reconcile_reservations`. `None` ⇒ **arranque** (barre el libro completo, como siempre); un conjunto
+  ⇒ **cierre de turno**, acotado a las reservas que **esta sesión** dio de alta
+  (`_v2_owned_reservations`, alimentado en los dos únicos puntos de alta: `save_claim` ganado en
+  `_v2_persist_tick_reservations` y `_v2_reserve_exit`; podado al final de cada reconciliación). Las
+  reservas ajenas se **conservan vivas** y no se tocan sus `INTENT` de salida. **Solo puede retirar menos,
+  nunca más** (fail-CLOSED).
+- **Costura del instrumento alineada:** `close_tick` (`bolsa_application/replay_oos.py`) pasa el mismo
+  conjunto, de modo que motor e instrumento no divergen. En proceso ÚNICO el acotado no quita nada (el
+  huérfano del tick es del propio turno), así que **los números del artefacto `v2.87` no cambian por este
+  acotado** (la declaración de RE-EJECUCIÓN **se mantiene** por la guarda `attribute_fills` anterior).
+- **Validación:** carrera `7 passed` (antes 3 failed); ciclo durable `14 passed`; instrumento
+  `14 passed`; vecinos del motor (crash/recovery PG + partial fills + worker integration + lifecycle PG)
+  `49 passed`; pasos saltados de CI `5 passed`; `ruff --config pyproject.toml` **All checks passed**;
+  mutaciones `M249`–`M251` **3/3** detectadas (matriz `248` → **`251`**); **matriz COMPLETA** tras el
+  re-anclaje: **`251/251`** medidas, árbol **intacto**, `exit 0`.
+- **Mutaciones nuevas:** `M249` (el cierre pierde el acotado y vuelve a liberar reservas ajenas), `M250`
+  (el barrido de arranque se acota y deja de retirar la huérfana) y `M251` (la costura del replay deja de
+  acotar). **Re-anclaje obligado:** `M240`/`M246`/`M247`/`M248` anclaban el texto que este sello cambió; la
+  matriz las declaró **sin medir** (ROJO, sin fingir cobertura) y se re-anclaron **sin cambiar su
+  semántica** (`--only M240 M246 M247 M248` → **4/4**, árbol byte a byte).
+- **Deuda nueva `OBS-14.b` (MEDIUM, residual):** el barrido de **arranque** sigue siendo global y tampoco
+  distingue una huérfana de una reserva **viva de otra sesión a mitad de turno** (reinicio rodante con
+  otro motor operando). Ya era así en `v2.85.2`; el arreglo acordado es de **alcance**. Discriminador
+  posible y **no** implementado: ventana de gracia por EDAD.
+- **No cambia:** ninguna compuerta, régimen ni umbral; la reconciliación de arranque, intacta.
+- **Informe:** `docs/engineering/obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md` · **Evidencia:**
+  `docs/engineering/evidence/v2.88.2/README.md` (incluye el rojo de `v2.88.1-beta`, conservado).
+
 ## [2.11.1-beta] — `AUTO-MATERIAL-16` RE-SELLO: corrección fail-OPEN del cierre de turno (`attribute_fills`) — 2026-09-29
 
 **RE-SELLO del objeto `v2.88`.** El tag `v2.88-beta` (`564240d2`) quedó **público con `Release tag CI`
