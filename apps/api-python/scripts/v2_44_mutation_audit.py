@@ -557,9 +557,7 @@ AUTO_ADAPTIVE_CONFIDENCE = (
 AUTO_ADAPTIVE_UNCERTAINTY = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_uncertainty.py"
 )
-AUTO_ADAPTIVE_REPLAY = (
-    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_replay.py"
-)
+AUTO_ADAPTIVE_REPLAY = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_replay.py"
 AUTO_ADAPTIVE_CALIBRATION = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive_calibration.py"
 )
@@ -590,24 +588,16 @@ WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 # AUTO-20B (V2.63): completitud del volcado de material + manifest/huella de la investigacion.
 # (AUTO-22 movió la paginación al lector único: la sonda de M169 apunta a ``AUTO_PAPER_MATERIAL``.)
 RESERVATION_STORE = "packages/py/application/src/bolsa_application/reservation_store.py"
-MATERIAL_MANIFEST_APP = (
-    "packages/py/application/src/bolsa_application/auto_material_manifest.py"
-)
+MATERIAL_MANIFEST_APP = "packages/py/application/src/bolsa_application/auto_material_manifest.py"
 MATERIAL_FINGERPRINT = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_material_manifest.py"
 )
 REPLAY_BATTERY = "scripts/research/auto_replay_battery.py"
 # AUTO-20C (V2.64): artefacto reproducible + render + invariante PAPER virtual.
-EVIDENCE_REPORT = (
-    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_report.py"
-)
+EVIDENCE_REPORT = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_report.py"
 # AUTO-22 (V2.69): run de evidencia end-to-end (lectura unica + composicion pura + bundle).
-AUTO_PAPER_MATERIAL = (
-    "packages/py/application/src/bolsa_application/auto_paper_material.py"
-)
-AUTO_EVIDENCE_RUN = (
-    "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_run.py"
-)
+AUTO_PAPER_MATERIAL = "packages/py/application/src/bolsa_application/auto_paper_material.py"
+AUTO_EVIDENCE_RUN = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_run.py"
 EVIDENCE_RUN_SCRIPT = "apps/api-python/scripts/auto_evidence_run.py"
 AUTO_EVIDENCE_VALIDATION = (
     "packages/py/analytics/src/bolsa_analytics/cognitive/auto_evidence_validation.py"
@@ -619,20 +609,14 @@ PAPER_MATERIAL_READINESS = (
 
 # --- AUTO-MATERIAL-4 (V2.76): PAPER forward con precio de MERCADO ---------------------------
 # Fuente de precio de MERCADO (live + cierre con respaldo declarado) e I/O del runner.
-MARKET_PRICE_SNAPSHOT = (
-    "packages/py/application/src/bolsa_application/market_price_snapshot.py"
-)
+MARKET_PRICE_SNAPSHOT = "packages/py/application/src/bolsa_application/market_price_snapshot.py"
 # Deciders versionados (par real de estrategias: A determinista + B ACTIVE, enrutadas).
-AUTO_FORWARD_DECIDERS = (
-    "packages/py/application/src/bolsa_application/auto_forward_deciders.py"
-)
+AUTO_FORWARD_DECIDERS = "packages/py/application/src/bolsa_application/auto_forward_deciders.py"
 
 # --- AUTO-MATERIAL-5 (V2.77): journal de OPERABILIDAD del forward PAPER (puro) ----------------
 # Clasifica cada veto por familia (regime/governor/liquidity/risk/top_n/data/other) y arma la
 # fila diaria; separa pairCapable (arquitectura lista) de pairActive (dos versiones operando).
-MARKET_OPERABILITY = (
-    "packages/py/application/src/bolsa_application/market_operability.py"
-)
+MARKET_OPERABILITY = "packages/py/application/src/bolsa_application/market_operability.py"
 
 # --- AUTO-MATERIAL-7 (V2.79): censo de ENTRADA del journal de operabilidad --------------------
 # El dueño del vocabulario de motivos (atribuciones de POSICIÓN vs vetos de entrada).
@@ -722,6 +706,24 @@ T_MARKET_OPERABILITY = "packages/py/application/tests/test_market_operability.py
 T_OPERABILITY_WINDOW = "packages/py/application/tests/test_operability_window.py"
 # AUTO-MATERIAL-12 (V2.84): auditoría de la ventana (TOTAL + tasas + funnel agregado), pura.
 T_OPERABILITY_AUDIT = "packages/py/application/tests/test_operability_audit.py"
+
+# --- AUTO-MATERIAL-14 (V2.86): REPLAY OOS de viabilidad (censo + no-lookahead + puntuación) ---
+# Módulo PURO y aditivo: el worker congelado solo se cablea, nunca se edita.
+REPLAY_OOS = "packages/py/application/src/bolsa_application/replay_oos.py"
+# Suite pura hermetica (sin PG): el no-lookahead, el censo y la puntuacion OOS.
+T_REPLAY_OOS = "packages/py/application/tests/test_replay_oos.py"
+
+# --- AUTO-MATERIAL-15 (V2.87): CICLO DURABLE del replay (cierre de tick + retencion) ---
+# El instrumento orquesta el replay: cierra el ciclo durable al final de cada tick y publica
+# el libro de compromisos y el horizonte. El worker congelado solo se INVOCA, nunca se edita.
+V87_REPLAY_DURABLE = "apps/api-python/scripts/v2_87_replay_oos_durable_cycle.py"
+# Contratos puros del libro y del horizonte (mediacion fail-closed, retiradas, truncacion).
+T_REPLAY_OOS_DURABLE = "packages/py/application/tests/test_replay_oos_durable_cycle.py"
+# Costura HERMETICA (sin PG): la reserva huerfana se retira al cierre y el libro no gotea.
+T_AUTO_DURABLE = "apps/api-python/tests/test_auto_v2_durable_cycle.py"
+# Render de consola de los DOS orquestadores: el contrato es el dict, no el dataclass.
+V86_REPLAY_VIABILITY = "apps/api-python/scripts/v2_86_replay_oos_viability.py"
+T_CLI_RENDERERS = "apps/api-python/tests/test_replay_oos_cli_renderers.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -1577,7 +1579,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "M109 (fallo que no persiste): el fallo se cuenta en el proceso y no se escribe",
         WORKER,
         "            persisted = await store.record_failure(\n"
-        "                self._account_id or \"\", self._engine_id, at=self._v2_instant()\n"
+        '                self._account_id or "", self._engine_id, at=self._v2_instant()\n'
         "            )\n",
         "            persisted = local\n",
         (T_GATE_DURABLE_SEAM,),
@@ -1646,31 +1648,23 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M117 (sesion envenenada por el fallo): la escritura fallida no limpia la sesion del tick",
         ADAPTIVE_GATE_STORE,
-        "            await self._session.rollback()\n"
-        "            raise\n"
-        "        return failures\n",
-        "            raise\n"
-        "        return failures\n",
+        "            await self._session.rollback()\n            raise\n        return failures\n",
+        "            raise\n        return failures\n",
         (T_GATE_STORE,),
     ),
     (
         "M118 (sesion envenenada por el reset): el reset fallido no limpia la sesion del tick",
         ADAPTIVE_GATE_STORE,
-        "            await self._session.rollback()\n"
-        "            raise\n"
-        "        return reset\n",
-        "            raise\n"
-        "        return reset\n",
+        "            await self._session.rollback()\n            raise\n        return reset\n",
+        "            raise\n        return reset\n",
         (T_GATE_STORE,),
     ),
     # ── AUTO-16 (V2.57): el coste REAL por ciclo y la base declarada del R neto ──────────────
     (
         "M119 (coste aplicado ignorado): el pegador devuelve la evidencia intacta",
         CYCLE_RISK,
-        "    if not applied:\n"
-        "        return dict(cycle_risk)\n",
-        "    if True:\n"
-        "        return dict(cycle_risk)\n",
+        "    if not applied:\n        return dict(cycle_risk)\n",
+        "    if True:\n        return dict(cycle_risk)\n",
         (T_CYCLE_RISK, T_APPLIED_SEAM),
     ),
     (
@@ -1706,8 +1700,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         SIM_FILL_STORE,
         '            if str(row.cycle_id or "").strip() in wanted\n'
         "            and (account_id is None or row.account_id == account_id)\n",
-        '            if str(row.cycle_id or "").strip() in wanted\n'
-        "            and True\n",
+        '            if str(row.cycle_id or "").strip() in wanted\n            and True\n',
         (T_SIM_REF,),
     ),
     (
@@ -1765,9 +1758,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    if basis == SELF_EVAL_COST_BASIS_MIXED:\n"
         "        return None\n"
         "    if len(series) != 1:\n",
-        "    if not series:\n"
-        "        return None\n"
-        "    if False:\n",
+        "    if not series:\n        return None\n    if False:\n",
         (T_SELF[0], T_CONFIDENCE),
     ),
     (
@@ -1780,10 +1771,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M133 (transicion no declarada): el detector nunca marca TRANSITION entre bases",
         AUTO_ADAPTIVE_CONFIDENCE,
-        "        if long_basis != recent_basis:\n"
-        "            return ADAPTIVE_BASIS_TRANSITION\n",
-        "        if False:\n"
-        "            return ADAPTIVE_BASIS_TRANSITION\n",
+        "        if long_basis != recent_basis:\n            return ADAPTIVE_BASIS_TRANSITION\n",
+        "        if False:\n            return ADAPTIVE_BASIS_TRANSITION\n",
         (T_CONFIDENCE,),
     ),
     (
@@ -1812,10 +1801,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M136 (mixed no bloquea): una fila con base mezclada no impide adoptar el eje del neto",
         AUTO_ADAPTIVE,
-        "        if basis == SELF_EVAL_COST_BASIS_MIXED:\n"
-        "            return False\n",
-        "        if False:\n"
-        "            return False\n",
+        "        if basis == SELF_EVAL_COST_BASIS_MIXED:\n            return False\n",
+        "        if False:\n            return False\n",
         (T_ADAPTIVE,),
     ),
     (
@@ -1828,10 +1815,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M138 (base no leida): la confianza no lee la base de la fila y nunca ve la transicion",
         AUTO_ADAPTIVE_CONFIDENCE,
-        "        net_r_basis=row.net_r_basis,\n"
-        "        net_r_series=row.net_r_series,\n",
-        "        net_r_basis=None,\n"
-        "        net_r_series=(),\n",
+        "        net_r_basis=row.net_r_basis,\n        net_r_series=row.net_r_series,\n",
+        "        net_r_basis=None,\n        net_r_series=(),\n",
         (T_CONFIDENCE,),
     ),
     # ── AUTO-18 (V2.59): la confianza estadistica y el metro del coste ────────────────────────
@@ -1846,13 +1831,13 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "M140 (cobertura colapsada): toda celda con muestra se declara cubierta al maximo",
         AUTO_ADAPTIVE_CONFIDENCE,
         "    quality = sample_quality_from_n(effective_n)\n"
-        "    if quality in (\"developing\", \"useful\"):\n"
+        '    if quality in ("developing", "useful"):\n'
         "        return ADAPTIVE_COVERAGE_HIGH\n"
-        "    if quality == \"preliminary\":\n"
+        '    if quality == "preliminary":\n'
         "        return ADAPTIVE_COVERAGE_MEDIUM\n"
         "    return ADAPTIVE_COVERAGE_LOW\n",
         "    quality = sample_quality_from_n(effective_n)\n"
-        "    if quality in (\"developing\", \"useful\"):\n"
+        '    if quality in ("developing", "useful"):\n'
         "        return ADAPTIVE_COVERAGE_HIGH\n"
         "    return ADAPTIVE_COVERAGE_HIGH\n",
         (T_CONFIDENCE,),
@@ -1860,9 +1845,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M141 (calibracion inventada): se publican bandas sin celdas que las respalden",
         AUTO_ADAPTIVE_CONFIDENCE,
-        "        entries = grouped.get(level)\n"
-        "        if not entries:\n"
-        "            continue\n",
+        "        entries = grouped.get(level)\n        if not entries:\n            continue\n",
         "        entries = grouped.get(level) or []\n",
         (T_CONFIDENCE,),
     ),
@@ -1876,15 +1859,15 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M143 (medido en vez de efectivo): el reparto encoge por la muestra bruta",
         AUTO_ADAPTIVE,
-        "    effective_n = max(0, int(getattr(confidence, \"effective_n\", 0) or 0))\n",
-        "    effective_n = max(0, int(getattr(confidence, \"measured_n\", 0) or 0))\n",
+        '    effective_n = max(0, int(getattr(confidence, "effective_n", 0) or 0))\n',
+        '    effective_n = max(0, int(getattr(confidence, "measured_n", 0) or 0))\n',
         (T_ADAPTIVE,),
     ),
     (
         "M144 (metro perdido): el modelo de coste no publica su version y nadie la propaga",
         PORTFOLIO_RESERVATION,
-        "            \"costModelVersion\": self.cost_model_signature(),\n",
-        "            \"costModelVersion\": None,\n",
+        '            "costModelVersion": self.cost_model_signature(),\n',
+        '            "costModelVersion": None,\n',
         (T_CYCLE_RISK,),
     ),
     (
@@ -1899,8 +1882,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         AUTO_ADAPTIVE_CONFIDENCE,
         "            if model != recent_model:\n"
         "                return ADAPTIVE_BASIS_COST_MODEL_TRANSITION\n",
-        "            if False:\n"
-        "                return ADAPTIVE_BASIS_COST_MODEL_TRANSITION\n",
+        "            if False:\n                return ADAPTIVE_BASIS_COST_MODEL_TRANSITION\n",
         (T_CONFIDENCE,),
     ),
     (
@@ -1922,8 +1904,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M148 (sello sin moverse): el reparto cambia de regla y el sello se queda en auto17",
         AUTO_ADAPTIVE,
-        "ADAPTIVE_POLICY_VERSION = \"auto18-v1\"\n",
-        "ADAPTIVE_POLICY_VERSION = \"auto17-v1\"\n",
+        'ADAPTIVE_POLICY_VERSION = "auto18-v1"\n',
+        'ADAPTIVE_POLICY_VERSION = "auto17-v1"\n',
         (T_ADAPTIVE,),
     ),
     # ── AUTO-19A (V2.60): la incertidumbre del edge y el replay OOS ──────────────────────────
@@ -1999,10 +1981,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M156 (refutado leido como soportado): la comparacion no distingue el grupo peor",
         AUTO_ADAPTIVE_REPLAY,
-        "    if candidate > baseline + epsilon:\n"
-        "        return REPLAY_VERDICT_NOT_SUPPORTED\n",
-        "    if candidate > baseline + epsilon:\n"
-        "        return REPLAY_VERDICT_SUPPORTED\n",
+        "    if candidate > baseline + epsilon:\n        return REPLAY_VERDICT_NOT_SUPPORTED\n",
+        "    if candidate > baseline + epsilon:\n        return REPLAY_VERDICT_SUPPORTED\n",
         (T_REPLAY,),
     ),
     (
@@ -2015,8 +1995,8 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M158 (sello movido por la lectura): la incertidumbre arrastra otro sello de reparto",
         AUTO_ADAPTIVE,
-        "ADAPTIVE_POLICY_VERSION = \"auto18-v1\"\n",
-        "ADAPTIVE_POLICY_VERSION = \"auto19a-v1\"\n",
+        'ADAPTIVE_POLICY_VERSION = "auto18-v1"\n',
+        'ADAPTIVE_POLICY_VERSION = "auto19a-v1"\n',
         (T_ADAPTIVE, T_UNCERTAINTY_SEAM),
     ),
     # ── AUTO-19B (V2.61): la calibración del intervalo y el walk-forward ─────────────────────
@@ -2396,7 +2376,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M202 (precio inventado): un valor no finito o no positivo se sirve como precio",
         MARKET_PRICE_SNAPSHOT,
-        "    if number != number or number in (float(\"inf\"), float(\"-inf\")) or number <= 0:\n"
+        '    if number != number or number in (float("inf"), float("-inf")) or number <= 0:\n'
         "        return None\n"
         "    return number\n",
         "    return number\n",
@@ -2495,15 +2475,14 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         MARKET_OPERABILITY,
         "        if code in NON_VETO_REASON_CODES:\n"
         "            non_veto[code] = non_veto.get(code, 0) + count\n",
-        "        if code in NON_VETO_REASON_CODES:\n"
-        "            continue\n",
+        "        if code in NON_VETO_REASON_CODES:\n            continue\n",
         (T_MARKET_OPERABILITY,),
     ),
     # ── v2.79 (AUTO-MATERIAL-7): censo de ENTRADA + atribuciones de POSICION + contrato del dueno ──
     (
         "M214 (H-1: el evento no se filtra): el censo cuenta tambien los eventos de POSICION",
         MARKET_OPERABILITY,
-        "        if events is not None and str(payload.get(\"event\") or \"\") not in events:\n"
+        '        if events is not None and str(payload.get("event") or "") not in events:\n'
         "            continue\n",
         "",
         (T_MARKET_OPERABILITY,),
@@ -2511,10 +2490,9 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M215 (H-1: los eventos de posicion se descartan): el canal de posicion no se publica",
         MARKET_OPERABILITY,
-        "        \"positionEventByCode\": position_reasons,\n"
-        "        \"positionEventCounted\": sum(position_reasons.values()),\n",
-        "        \"positionEventByCode\": {},\n"
-        "        \"positionEventCounted\": 0,\n",
+        '        "positionEventByCode": position_reasons,\n'
+        '        "positionEventCounted": sum(position_reasons.values()),\n',
+        '        "positionEventByCode": {},\n        "positionEventCounted": 0,\n',
         (T_MARKET_OPERABILITY,),
     ),
     (
@@ -2542,8 +2520,7 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M219 (H-2: owner incompleto): los vetos fail-closed de reserva quedan sin declarar",
         MARKET_OPERABILITY,
-        "    RESERVATION_UNMEASURABLE: BUCKET_RISK,\n"
-        "    RESERVATION_ALREADY_LIVE: BUCKET_RISK,\n",
+        "    RESERVATION_UNMEASURABLE: BUCKET_RISK,\n    RESERVATION_ALREADY_LIVE: BUCKET_RISK,\n",
         "",
         (T_MARKET_OPERABILITY,),
     ),
@@ -2551,41 +2528,38 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M220 (auditoria v2.79: unresolved colapsa a vetoed): propuestas sin veto se leen vetoed",
         MARKET_OPERABILITY,
-        "    if _count(record.get(\"vetoes\")) == 0:\n"
-        "        return STATE_UNRESOLVED\n",
+        '    if _count(record.get("vetoes")) == 0:\n        return STATE_UNRESOLVED\n',
         "",
         (T_MARKET_OPERABILITY,),
     ),
     (
         "M221 (auditoria v2.79: la cobertura miente): unknown de cobertura forzado a 0",
         MARKET_OPERABILITY,
-        "        \"unknown\": len(unknown),\n",
-        "        \"unknown\": 0,\n",
+        '        "unknown": len(unknown),\n',
+        '        "unknown": 0,\n',
         (T_MARKET_OPERABILITY,),
     ),
     (
         "M222 (auditoria v2.79: la violacion no se marca): contractViolation siempre False",
         MARKET_OPERABILITY,
-        "        \"contractViolation\": other_count > 0,\n",
-        "        \"contractViolation\": False,\n",
+        '        "contractViolation": other_count > 0,\n',
+        '        "contractViolation": False,\n',
         (T_MARKET_OPERABILITY,),
     ),
     (
         "M223 (ventana: el gate cuenta FILAS): 4 corridas del mismo dia fingen 4 cubos",
         OPERABILITY_WINDOW,
-        "    days = {day for row in rows if (day := _text(row.get(\"day\")))}\n",
-        "    days = [_text(row.get(\"day\")) for row in rows]\n",
+        '    days = {day for row in rows if (day := _text(row.get("day")))}\n',
+        '    days = [_text(row.get("day")) for row in rows]\n',
         (T_OPERABILITY_WINDOW,),
     ),
     (
         "M224 (ventana: el hueco se rellena): priceSources ausente se publica como ceros",
         OPERABILITY_WINDOW,
+        "    sources = _as_mapping(value)\n    if not sources:\n        return None\n",
         "    sources = _as_mapping(value)\n"
         "    if not sources:\n"
-        "        return None\n",
-        "    sources = _as_mapping(value)\n"
-        "    if not sources:\n"
-        "        return {\"live\": 0, \"close\": 0, \"missing\": 0}\n",
+        '        return {"live": 0, "close": 0, "missing": 0}\n',
         (T_OPERABILITY_WINDOW,),
     ),
     (
@@ -2600,9 +2574,9 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M226 (ventana: el hueco se cuenta como cero): un escalon no medido se publica 0",
         OPERABILITY_WINDOW,
-        "    return {\"count\": number, \"source\": source, \"measured\": number is not None}\n",
-        "    return {\"count\": 0 if number is None else number, \"source\": source, "
-        "\"measured\": number is not None}\n",
+        '    return {"count": number, "source": source, "measured": number is not None}\n',
+        '    return {"count": 0 if number is None else number, "source": source, '
+        '"measured": number is not None}\n',
         (T_OPERABILITY_WINDOW,),
     ),
     (
@@ -2615,51 +2589,147 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M228 (ventana: toda entrada es una propuesta): el filtro approved deja de filtrar",
         OPERABILITY_WINDOW,
-        "        if \"approved\" not in reasons:\n            continue\n",
-        "        if \"approved\" not in reasons:\n            pass\n",
+        '        if "approved" not in reasons:\n            continue\n',
+        '        if "approved" not in reasons:\n            pass\n',
         (T_OPERABILITY_WINDOW,),
     ),
     (
         "M229 (informe: el veredicto del gate se omite): el HTML no dice READY/INCONCLUSIVE",
         OPERABILITY_WINDOW,
-        "{_e(gate.get(\"verdict\") or \"INCONCLUSIVE\")}",
-        "{_e(\"\")}",
+        '{_e(gate.get("verdict") or "INCONCLUSIVE")}',
+        '{_e("")}',
         (T_OPERABILITY_WINDOW,),
     ),
     (
         "M230 (informe: el codigo de motivo se inyecta): el HTML deja de escapar",
         OPERABILITY_WINDOW,
-        "    return html.escape(\"\" if value is None else str(value))\n",
-        "    return \"\" if value is None else str(value)\n",
+        '    return html.escape("" if value is None else str(value))\n',
+        '    return "" if value is None else str(value)\n',
         (T_OPERABILITY_WINDOW,),
     ),
     # ── v2.84 (AUTO-MATERIAL-12): CONTRATO DEL FUNNEL (agregado y enriquecido), read-only ──
     (
         "M231 (auditoria: el funnel medido se sobrescribe): el re-llenado pisa los escalones ya medidos",
         OPERABILITY_AUDIT,
-        "        if _maybe_int(existing.get(\"count\")) is not None:\n"
+        '        if _maybe_int(existing.get("count")) is not None:\n'
         "            merged[step] = dict(existing)\n",
-        "        if False:\n"
-        "            merged[step] = dict(existing)\n",
+        "        if False:\n            merged[step] = dict(existing)\n",
         (T_OPERABILITY_AUDIT,),
     ),
     (
         "M232 (auditoria: el funnel suma dias NO medidos): measured_rows vuelve a ser rows",
         OPERABILITY_AUDIT,
         "        for row in measured_rows:\n"
-        "            entry = _as_mapping(_as_mapping(row.get(\"funnel\")).get(step))\n",
+        '            entry = _as_mapping(_as_mapping(row.get("funnel")).get(step))\n',
         "        for row in rows:\n"
-        "            entry = _as_mapping(_as_mapping(row.get(\"funnel\")).get(step))\n",
+        '            entry = _as_mapping(_as_mapping(row.get("funnel")).get(step))\n',
         (T_OPERABILITY_AUDIT,),
     ),
     (
         "M233 (auditoria: stateCounts cuenta dias NO medidos): measured_rows vuelve a ser rows",
         OPERABILITY_AUDIT,
-        "    for row in measured_rows:\n"
-        "        state = _text(row.get(\"state\"))\n",
-        "    for row in rows:\n"
-        "        state = _text(row.get(\"state\"))\n",
+        '    for row in measured_rows:\n        state = _text(row.get("state"))\n',
+        '    for row in rows:\n        state = _text(row.get("state"))\n',
         (T_OPERABILITY_AUDIT,),
+    ),
+    # ── v2.86 (AUTO-MATERIAL-14): REPLAY OOS (censo + no-lookahead + puntuacion) ──
+    (
+        "M234 (no-lookahead: la guardia NO acota): las barras futuras entran en el censo",
+        REPLAY_OOS,
+        "    return [bar for bar in (bars or []) if (day := bar_day(bar)) and day <= limit]\n",
+        "    return list(bars or [])\n",
+        (T_REPLAY_OOS,),
+    ),
+    (
+        "M235 (no-lookahead: la fecha ilegible se admite): una barra sin dia entra en la ventana",
+        REPLAY_OOS,
+        "    return [bar for bar in (bars or []) if (day := bar_day(bar)) and day <= limit]\n",
+        "    return [bar for bar in (bars or []) if not (day := bar_day(bar)) or day <= limit]\n",
+        (T_REPLAY_OOS,),
+    ),
+    (
+        "M236 (censo: la direccion se ignora): trend_down vuelve a contar como operable",
+        REPLAY_OOS,
+        "        operable = sum(1 for label in regimes.values() if label in _LONG_FRIENDLY_TRIAL)\n",
+        "        operable = sum(1 for _label in regimes.values())\n",
+        (T_REPLAY_OOS,),
+    ),
+    (
+        "M237 (censo: se pierde el gate direccional): BEAR_TREND deja de vetar el long",
+        REPLAY_OOS,
+        '                entries_allowed_long=bool(regime_allows_entry_for(operational, "long")),\n',
+        '                entries_allowed_long=bool(regime_allows_entry_for(operational, "short")),\n',
+        (T_REPLAY_OOS,),
+    ),
+    (
+        "M238 (puntuacion: el hueco se rellena): un riesgo no medible se publica como 0.0",
+        REPLAY_OOS,
+        "    if risk != risk or risk <= 0 or exit_price != exit_price:\n        return None\n",
+        "    if risk != risk or risk <= 0 or exit_price != exit_price:\n        return 0.0\n",
+        (T_REPLAY_OOS,),
+    ),
+    (
+        "M239 (puntuacion: el signo se invierte): el acierto R>0 se lee como R<0",
+        REPLAY_OOS,
+        "        return sum(1 for value in values if value > 0) / len(values)\n",
+        "        return sum(1 for value in values if value < 0) / len(values)\n",
+        (T_REPLAY_OOS,),
+    ),
+    # ── v2.87 (AUTO-MATERIAL-15): CICLO DURABLE reserva->fill->liberacion ──
+    (
+        "M240 (ciclo durable apagado): el cierre de tick deja de retirar la reserva huerfana",
+        REPLAY_OOS,
+        "    await reconcile(startup=False)\n    return True\n",
+        "    return True\n",
+        (T_REPLAY_OOS_DURABLE, T_AUTO_DURABLE),
+    ),
+    (
+        "M241 (reconciliacion a medias): la reserva muerta sin fill deja de retirarse",
+        WORKER,
+        "            elif (\n"
+        "                measurable\n"
+        "                and created is not None\n"
+        "                and instrument not in (in_flight or frozenset())\n"
+        "                and filled == 0.0\n"
+        "            ):\n",
+        "            elif False:\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M242 (retencion invertida): el espejo APPLIED archiva el fill MAS RECIENTE",
+        V87_REPLAY_DURABLE,
+        "        for _, execution_id in applied[:excess]:\n",
+        "        for _, execution_id in applied[-excess:]:\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M243 (horizonte mudo): una truncacion sin causa deja de declararse",
+        REPLAY_OOS,
+        "    if reason is None and done_ticks < wanted:\n        reason = HORIZON_UNDECLARED\n",
+        "    if False:\n        reason = HORIZON_UNDECLARED\n",
+        (T_REPLAY_OOS_DURABLE,),
+    ),
+    (
+        "M244 (medicion inflada): una medicion ilegible del libro se publica COMPLETE",
+        REPLAY_OOS,
+        "    return label if label in _MEASUREMENT_LABELS else MEASUREMENT_UNKNOWN\n",
+        "    return label if label else MEASUREMENT_COMPLETE\n",
+        (T_REPLAY_OOS_DURABLE,),
+    ),
+    (
+        "M245 (render contra el dataclass): el censo lee atributos del dict que main le pasa",
+        V86_REPLAY_VIABILITY,
+        "    print(f\"  por eje operativo       {census.get('operableByOperational')}\")\n",
+        "    print(f\"  por eje operativo       {census.operableByOperational()}\")\n",
+        (T_CLI_RENDERERS,),
+    ),
+    # ── OBS-14: cierre de turno del libro de reservas en el camino durable (real_turn) ──
+    (
+        "M246 (cierre de turno revertido): el motor durable deja de retirar la reserva muerta",
+        WORKER,
+        "            await self._v2_reconcile_reservations(startup=False)\n",
+        "            pass\n",
+        (T_AUTO_DURABLE,),
     ),
 ]
 

@@ -2,6 +2,59 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.0-beta] — `AUTO-MATERIAL-16` SELO CONJUNTO: cierre de `OBS-14` (reconciliación al cierre de turno) + `v2.86` + `v2.87` + `OBS-15` — 2026-09-29
+
+**Sello CONJUNTO de `v2.88-beta`.** El tag (anotado, lo crea el propietario) sella **tres** incrementos ya
+implementados y **sin commitear**: `v2.86` (`AUTO-MATERIAL-14`), `v2.87` (`AUTO-MATERIAL-15`) y el **cierre
+de `OBS-14`** (`AUTO-MATERIAL-16`). **Bump** `2.10.2-beta → 2.11.0-beta`. **SIN migración** (Alembic head
+sigue en `046_fill_reference_mid`). Base (HEAD antes del sello): `3483b6b5`; tag anterior `v2.85.2-beta`.
+
+- **Cierre de `OBS-14` (MEDIUM, alcance motor) por la ruta (a):** la retirada de una reserva muerta ocurre
+  al **cierre de turno** en el camino durable (`real_turn`). Diff del motor **+7 / -0**, **un solo hunk**
+  (líneas 4937-4943): `await self._v2_reconcile_reservations(startup=False)` justo después de
+  `report = await self.auto_turn()` y antes de `if auto_store is not None:`. `startup=False` ⇒ etiqueta
+  **`RESERVATION_RELEASED_BY_CANCEL`** (no `..._BY_RESTART`). **NO** se tocó `auto_turn`, ni el interior de
+  `_v2_reconcile_reservations`, ni la regla de retirada, ni ningún umbral. **Por qué:** AUTO es **solo**
+  `{paper, simulated}` y **sin bridge LIVE** (docstring del módulo) ⇒ la orden o liquida dentro del tick o
+  no se materializa nunca: una reserva viva al cierre cuya orden **no está en vuelo** está muerta; va en
+  `real_turn` (durable) y **no** en `auto_turn` (hermético, usado por decenas de tests y por el instrumento
+  de replay) para **no perturbarlos**. **4 tests** nuevos (`test_auto_v2_durable_cycle.py`, **7 → 11**) y
+  mutación **`M246`** que muerde **3/3**, árbol restaurado **byte a byte**.
+- **Revisión interna (C).** **Bugbot: 1 hallazgo (medium)** en `v2_86_replay_oos_viability.py:448`:
+  `_print_census` estaba escrito contra `CensusReport` (atributos) pero `main` le pasa
+  `evidence["census"] = census.to_dict()` (un **`dict`**) ⇒ el modo **texto** sin `--json` reventaba con
+  `AttributeError: 'dict' object has no attribute 'watch'`, **silencioso** porque el `--out` se escribe
+  **antes** del render. **Arreglado** (`_print_census` consume el `dict`; renderer idéntico al de `v2.87`)
+  con `test_replay_oos_cli_renderers.py` (**3** tests; uno exige que los renderers de `v2.86` y `v2.87`
+  coincidan con el mismo payload) y mutación **`M245`** que muerde **3/3**. **Security review: sin hallazgos.**
+- **Dos defectos extra corregidos.** **(1) Versión inexistente:** 6 documentos afirmaban `2.11.0-beta`, que
+  **nunca existió** (`package.json`, `CHANGELOG.md` y toda la historia de git dicen `2.10.2-beta`);
+  corregidas **7 ocurrencias** (`PROJECT_STATE`, índice, deuda P3, `evidence/v2.86`, `evidence/v2.87` y los
+  dos informes `v2.86`/`v2.87`). **(2) 7 errores `I001`** que habrían hecho fallar el job `quality` de CI
+  (los ficheros de `v2.86`/`v2.87` nunca se commitearon y nunca se lintaron con la config de raíz);
+  el comando **exacto** de CI es `uv run ruff check packages/py apps/api-python --config pyproject.toml`
+  (invocar `ruff` por fichero **sin** `--config` descubre la config anidada y da otro resultado).
+- **`OBS-15` (nueva, MEDIUM, alcance motor) declarada, NO cerrada.** El techo de lectura de **1000 filas
+  `APPLIED`** (`DEFAULT_APPLIED_LIMIT`) puede **parar el motor**: `truncated = len(events) >= limit` ⇒
+  `MEASUREMENT_UNKNOWN` ⇒ la reconciliación **no puede** ser COMPLETE y el motor **veta aperturas**.
+  **Preexistente** (la reconciliación de arranque lee idénticamente) y **no** introducido por `OBS-14`;
+  radio: también la reconstrucción de **posición** (`read_position_ledger`). Fail-closed y **declarado** en
+  el journal, pero **parada dura alcanzable por operación normal**. La madurez de la cuenta real está
+  **NO MEDIDA** (sonda read-only **bloqueada** por la revisión automática). La retención de **900** de
+  `v2.87` es mitigación **interna al instrumento**, **no** existe en producción.
+- **Compuertas medidas (números exactos):** guardarraíles (10 suites) **142 passed**;
+  `uv run ruff check packages/py apps/api-python --config pyproject.toml` → **All checks passed!** (exit 0);
+  matriz de mutaciones **246** (eran **239** en `v2.85.2`), `M245`/`M246` **3/3**; `git diff --numstat` del
+  motor **`7  0`**; `test_auto_v2_durable_cycle.py` **11**, `test_replay_oos.py` **18**,
+  `test_replay_oos_durable_cycle.py` **29**, `test_replay_oos_cli_renderers.py` **3**.
+- **Evidencia:** [`docs/engineering/evidence/v2.88/`](./docs/engineering/evidence/v2.88/README.md) ·
+  informe/relevo [`obs-14-cierre-por-turno-v2.88-2026-09-29.md`](./docs/engineering/obs-14-cierre-por-turno-v2.88-2026-09-29.md) ·
+  audit-pack y arranque del auditor `v2.88`.
+- **Declarado, no hecho:** `P3-2`/`P3-3` (ventana PAPER **real** ≥4 días **con material**), `OBS-15`
+  (nueva), `OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5` y `OBS-5` siguen **ABIERTAS**; **`OBS-14` CERRADA**.
+  La cita del CI del tag es **POST-TAG** (límite estructural del workflow, patrón `OBS-3`/`OBS-4`):
+  **`(pendiente)`**.
+
 ## [2.10.2-beta] — `AUTO-MATERIAL-13` RE-SELLO docs-only: cierre de la ventana D1 + evidencia cruda dentro del tag + `OBS-13` — 2026-09-28
 
 **Re-sello DOCS-ONLY de `v2.85.1` (`v2.85.2-beta`). El CÓDIGO es BYTE-IDÉNTICO a `2.10.1-beta`**: el diff

@@ -4934,6 +4934,13 @@ class AutoSimulationWorker:
             # de ser invisible. Read-only: solo declara, no corrige.
             await self._v2_reconcile_cycle_traces()
             report = await self.auto_turn()
+            # OBS-14 — CIERRE del ciclo de reservas del turno: retira las reservas MUERTAS
+            # (la orden no llegó a materializarse dentro del tick) sobre la MISMA sesión del
+            # turno, sin reiniciar. ``startup=False`` porque la reserva no murió por un
+            # reinicio sino porque su orden no se materializó (``RESERVATION_RELEASED_BY_CANCEL``).
+            # Es el análogo de lo que el instrumento ``v2.87`` hace en su ``close_tick``; corre
+            # en CADA turno, no solo en la reconciliación de arranque.
+            await self._v2_reconcile_reservations(startup=False)
             if auto_store is not None:
                 snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
                 seq = (snap.ticks + 1) if snap is not None else 1

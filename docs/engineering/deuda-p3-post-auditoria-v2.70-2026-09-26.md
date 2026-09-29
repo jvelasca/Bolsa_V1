@@ -48,6 +48,20 @@
 > **CERRADA en el re-sello `v2.85.1`** (docs-only; ver más abajo).
 > **Deuda de proceso declarada:** `v2.73-beta` quedó
 > **sin auditoría externa** (ver más abajo).
+> **`v2.86` (2026-09-29):** fase de **instrumento** (replay OOS de viabilidad, sin bump/migración/tag):
+> **no cierra ni mueve** ninguna deuda de datos; añade la clase de evidencia **replay con reloj simulado**
+> y declara la **causa raíz de instrumento** que truncaba el replay (libro de compromisos no retirado).
+> **`v2.87` (2026-09-29):** fase de **instrumento** que **resuelve** esa causa (ciclo durable
+> `reserva→fill→liberación` al cierre de tick; replay multi-anual **completo**, 62 ciclos en 4
+> temporadas). Sigue **sin bump/migración/tag** y **NO cierra `P3-2`/`P3-3`** (reloj simulado). **Abre
+> `OBS-14` (MEDIUM, alcance motor)**: el motor real retira reservas muertas **solo al arranque**, no
+> entre reinicios (ver más abajo).
+> **`v2.88` (2026-09-29):** **sello conjunto** `v2.88-beta` (`AUTO-MATERIAL-16`) de tres incrementos
+> implementados y **sin commitear** (`v2.86` + `v2.87` + el cierre de `OBS-14`); bump
+> `2.10.2-beta → 2.11.0-beta`, **sin migración** (Alembic head `046_fill_reference_mid`). **`OBS-14`
+> CERRADA** por la **ruta (a)** de su criterio de cierre (reconciliación al **cierre de turno**, en
+> `real_turn`; ver más abajo). **Abre `OBS-15` (MEDIUM, alcance motor):** el techo de lectura de **1000
+> filas `APPLIED`** puede **parar el motor** (ver más abajo).
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -840,3 +854,171 @@ continue` sin duplicar ciclos). Registro completo en
 
 - **Allocation dinámica** y **LIVE AUTO**: `❌`, no abordados.
 - **Current-regime gating operativo**: fase posterior declarada.
+
+## `AUTO-MATERIAL-14` / `v2.86` — Replay OOS de viabilidad (2026-09-29): evidencia nueva que **NO cierra** `P3-2`/`P3-3`
+
+Fase de **instrumento de investigación** (sin bump, sin migración, sin tag) que añade una **clase de
+evidencia nueva** —**replay OOS con reloj simulado**— a la cola de este expediente. **No cierra ni mueve
+ninguna deuda de datos:** los cubos de calendario del forward se construyen con reloj de **pared**
+(`sim_fill_finance_context.created_at = datetime.now(UTC)`), de modo que un replay determinista **no
+puede** acreditarlos. Informe: [`replay-oos-viabilidad-auto-v2.86-2026-09-29.md`](./replay-oos-viabilidad-auto-v2.86-2026-09-29.md).
+
+**Lo que la fase mide (y aporta al expediente):**
+
+- **`P3-2`/`P3-3` (ABIERTAS).** El replay **no las sustituye**. La muestra (13 ciclos, un único episodio
+  `2022-02 → 2022-05`, régimen `HIGH_VOLATILITY`) **no es concluyente**: `15.4 %` de signo positivo con
+  `n=13` no decide nada sobre el edge. La ventana PAPER real **≥4 días con material** sigue siendo la
+  única evidencia que las cierra.
+- **Dato nuevo y reutilizable para `P3-2` (operabilidad histórica):** censo de **1 284 días** con
+  **318 operables** (24.8 %, racha máxima **205**), desglosados por eje operativo
+  `{HIGH_VOLATILITY: 310, SIDEWAYS: 8}`. **`BULL_TREND` operables = 0** en 5 años y la operabilidad se
+  concentra en **2022 (218/257)** frente a 2023–2026 (100/950). Es la medición más directa hasta ahora de
+  *por qué* cuesta tanto acumular una ventana: el régimen, no el material.
+- **Dato nuevo sobre `OBS-13` (instrumento/diagnóstico):** el replay **reproduce** el patrón ya declarado
+  (`TOP_N` como tope de **evaluación** que corre **antes** del gate de régimen; régimen **único por tick**;
+  `5 top_n_excluded + 5 regime_invalid` por tick con `|watchA|=10`), esta vez sobre 5 años.
+- **Causa declarada para el siguiente intento (deuda de INSTRUMENTO, nueva):** un replay multi-anual del
+  motor congelado **no es viable hoy**: el libro de compromisos pendientes
+  (`_v2_refresh_open_orders` = reservas + `execution_events` no-`APPLIED`) **no se retira** sin el ciclo
+  durable completo de reserva→fill→liberación, y el motor —correctamente— deja de abrir
+  (`risk_budget_exceeded`; o `open_orders_unmeasurable` sin el libro de reservas). El replay se trunca a su
+  **primer episodio** tras `2022-05-06`, con **266 días operables** por delante. **No** se degradó ninguna
+  compuerta para estirar la muestra. Queda registrado como **límite del instrumento**, no como resultado
+  del motor.
+
+**Robustez de la fase:** 18 tests puros nuevos, guardarraíles vecinos **71 passed**, `ruff` limpio y
+**6 mutaciones nuevas `M234`–`M239`** (matriz **233 → 239**) **verificadas mordiendo 6/6**. Artefacto JSON
+(2 054 030 B, gitignoreado) con **SHA-256 `91A871FB…143A90`**; resumen verificado en
+[`evidence/v2.86/`](./evidence/v2.86/README.md).
+
+**Regla vigente, sin excepción:** ninguna deuda de datos se cierra por documentación. `P3-2`/`P3-3`,
+`OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5` y `OBS-5` siguen **ABIERTAS**.
+
+## `AUTO-MATERIAL-15` / `v2.87` — Replay OOS del ciclo durable (`2026-09-29`): el instrumento de `v2.86` deja de truncarse; **NO cierra** `P3-2`/`P3-3` y abre `OBS-14`
+
+Fase de **instrumento de investigación** (sin bump, sin migración, sin tag) que resuelve la causa raíz
+declarada al cerrar `v2.86`: el libro de compromisos pendientes del replay hermético **no se retiraba**.
+Informe: [`replay-oos-ciclo-durable-v2.87-2026-09-29.md`](./replay-oos-ciclo-durable-v2.87-2026-09-29.md).
+
+**Lo que la fase mide (y aporta al expediente):**
+
+- **`P3-2`/`P3-3` (ABIERTAS).** El replay **no las sustituye**: el reloj es **simulado** y los cubos de
+  calendario salen de `datetime.now(UTC)`. La muestra ya es **multi-anual** (62 ciclos en 2022/2023/
+  2024/2025, R medio −0.296, signo positivo 37.1 %) pero sigue siendo **un solo instrumento**, **una
+  sola cuenta/versión/watch** y `pairActive=false`, así que **no es concluyente** sobre el edge.
+- **Dato nuevo reutilizable (instrumento):** con la reconciliación de cierre (la **misma** rutina
+  `_v2_reconcile_reservations(startup=False)` del arranque real) las reservas vivas nunca superan **1**
+  (final **0**, `reservedRisk` final **0.0**), el horizonte se **completa** (1224/1224,
+  `truncationReason=null`) y `risk_budget_exceeded` cae de **1 400** a **11**. La **contraprueba A/B**
+  (`--no-durable-cycle`, mismo harness) **reproduce el goteo de `v2.86`**: 15 reservas huérfanas vivas,
+  `$6000` comprometidos y toda la actividad congelada tras `~2022-05` (118 fills / 13 ciclos). El
+  desbloqueo queda así **medido**, no narrado.
+- **Instrumentación declarativa:** el artefacto publica `book` (serie diaria + medición), `releases`
+  (delta `FILL` vs `CANCEL`) y `horizon` (`completed`/`lastDay`/`truncationReason`); una medición
+  ilegible es `UNKNOWN` y una truncación sin causa es `undeclared_truncation`, nunca silencio. La
+  retención `APPLIED` (900 < 1000) evita la parada dura `RECONCILIATION_FAILURE` de un replay multi-anual.
+
+**Robustez de la fase:** 29 tests puros + 7 de costura nuevos, guardarraíles vecinos **71 passed**,
+`ruff` limpio y **5 mutaciones nuevas `M240`–`M244`** (matriz **239 → 244**) **verificadas mordiendo
+5/5**. Artefactos JSON (3 165 540 B y 2 949 320 B, gitignoreados) con **SHA-256 `DC61B3B9…C6C54F`** y
+**`FE4CBF79…78CCD1`**; resumen verificado en [`evidence/v2.87/`](./evidence/v2.87/README.md).
+
+## OBS-14 — El motor real también retiene reservas muertas entre reinicios (MEDIUM, alcance motor) — 🟢 CERRADA en `v2.88` (2026-09-29)
+
+**Origen.** Medido al cerrar `v2.87`: la fase demostró que el **único** camino que retiraba reservas
+huérfanas del libro de compromisos era `_v2_reconcile_reservations`, y que su **único llamante de
+producción** es el **arranque** del proceso (`_v2_reconcile_reservations(startup=True)`,
+`auto_simulation_worker.py:4927`). El replay necesitó invocarlo **al cierre de cada tick** para no
+gota; el motor real **no lo hace**.
+
+**Observación (de instrumento a motor).** En producción, una reserva de **entrada** creada por
+`_v2_plan_tick` que no llega a llenarse (el bucle de ejecución la veta/salta — p. ej. `held > 0`,
+`position_reconciliation_not_ok`) queda **viva** hasta el **siguiente reinicio** del worker. Durante
+esa ventana el libro de compromisos reporta `reservedRisk` inflado y el motor —correctamente— veta
+aperturas con `risk_budget_exceeded` / `risk_measurement_partial`. **Es la misma clase de goteo** que
+`v2.86` midió en el replay hermético, solo que acotada por el reinicio del proceso en vez de ser
+permanente. **No** es un defecto de la decisión (el fail-closed es correcto): es que la **retirada** de
+una reserva muerta depende del ciclo de vida del **proceso**.
+
+**Impacto.** El replay de `v2.87` **cuantifica** la diferencia: con retirada por tick, 210 órdenes / 752
+fills / 62 ciclos; sin ella, 31 / 118 / 13. Si el worker real se mantiene vivo mucho tiempo entre
+reinicios, el mismo mecanismo puede **infra-abrir** sin que ninguna cifra publicada sea falsa (los
+vetos son legítimos y están en el journal). **No** hay medición de producción todavía: es deuda de
+**motor**, no de datos.
+
+**Criterio de cierre.** Decidir **dónde** retira el motor las reservas muertas **sin** reiniciar: (a)
+reconciliar en el **cierre de turno/tick** (lo que el replay demuestra que es fiel al motor SIM y
+seguro), o (b) un `reconcile` periódico declarado (p. ej. al cierre de sesión), o (c) declarar
+explícitamente que la retirada **solo** ocurre al arranque y que el veteo por goteo es intencional.
+Cualquiera de las tres exige **fase de código del motor congelado** (`auto_simulation_worker.py`),
+test y mutación, y **no** se aborda en `v2.87` (alcance **replay-only**). La evidencia de este intento
+está en [`replay-oos-ciclo-durable-v2.87-2026-09-29.md`](./replay-oos-ciclo-durable-v2.87-2026-09-29.md) §5
+y en [`evidence/v2.87/`](./evidence/v2.87/README.md).
+
+**Reversión.** Vuelve a ser deuda teórica si se mide que el worker real **nunca** acumula reservas
+huérfanas entre reinicios (p. ej. porque siempre hay un fill o porque el bucle de ejecución no deja
+huérfanas). Hoy **no** hay tal medición.
+
+**CIERRE (2026-09-29, sello conjunto `v2.88-beta` / `AUTO-MATERIAL-16`).** Se elige la **ruta (a)** del
+criterio de cierre —*reconciliar en el **cierre de turno/tick***, lo que el replay de `v2.87` demuestra
+**fiel al motor SIM y seguro*— y se implementa sobre el **camino durable**. Evidencia **medida**:
+
+- **Hunk del motor:** `apps/api-python/src/bolsa_api/background/auto_simulation_worker.py`, diff **+7 / -0**,
+  **un solo hunk** (líneas **4937-4943**), en `real_turn`, justo después de `report = await self.auto_turn()`
+  y antes de `if auto_store is not None:`; la línea añadida es
+  `await self._v2_reconcile_reservations(startup=False)`. `startup=False` ⇒ la etiqueta de la retirada es
+  **`RESERVATION_RELEASED_BY_CANCEL`** (no `..._BY_RESTART`). **NO** se tocó `auto_turn`, ni el interior de
+  `_v2_reconcile_reservations`, ni la regla de retirada, ni ningún umbral.
+- **Por qué es fiel (medido en código):** AUTO es **solo** `{paper, simulated}` y **sin bridge LIVE**
+  (docstring del módulo, `auto_simulation_worker.py:5`/`:13`); la orden o liquida dentro del tick
+  (`submit_simulated_order`) o no se materializa nunca ⇒ una reserva viva al cierre cuya orden **no está en
+  vuelo** está muerta. Va en `real_turn` (durable) y **no** en `auto_turn` (hermético, usado por decenas de
+  tests y por el instrumento de replay) para **no perturbarlos**.
+- **Tests:** la suite `apps/api-python/tests/test_auto_v2_durable_cycle.py` pasa de **7 a 11** (4 nuevos:
+  `test_real_turn_releases_the_orphan_reservation_at_the_end_of_the_same_turn`,
+  `test_two_real_turns_do_not_drip_the_book_between_them`,
+  `test_control_without_tick_close_reproduces_the_drip`,
+  `test_closing_reconcile_keeps_captured_unapplied_capital_in_flight`). El **control** reproduce el goteo
+  previo; el capital capturado y no aplicado se **conserva**.
+- **Mutación:** **`M246`** («cierre de turno revertido») muerde **3/3**, árbol restaurado **byte a byte**.
+  Compuertas: guardarraíles (10 suites) **142 passed**; `ruff` (comando exacto de CI) **All checks passed!**;
+  matriz **246** (eran **239** en `v2.85.2`).
+
+**Evidencia:** [`obs-14-cierre-por-turno-v2.88-2026-09-29.md`](./obs-14-cierre-por-turno-v2.88-2026-09-29.md) ·
+[`evidence/v2.88/`](./evidence/v2.88/README.md). La deuda queda **CERRADA y MEDIDA**, no por documentación.
+
+## OBS-15 — El techo de lectura de 1000 filas `APPLIED` puede parar el motor (MEDIUM, alcance motor) — 🔴 ABIERTA (2026-09-29)
+
+**Origen.** Registrada al sellar `v2.88` (`AUTO-MATERIAL-16`); el propietario decidió **registrar, no
+arreglar** en esta fase (el arreglo toca varias capas, ver criterio de cierre).
+
+**Medido en código.** `read_applied_fill_facts` (`packages/py/application/src/bolsa_application/applied_fills.py`)
+lee `list_applied(account_id, limit=DEFAULT_APPLIED_LIMIT=1000)`; `PostgresExecutionEventStore.list_applied`
+(`execution_event.py`) ordena `applied_at.asc()` y aplica `.limit(limit)` ⇒ **no** está acotado a una
+jornada, pese al comentario de `applied_fills` («fills aplicados de una jornada AUTO»).
+`truncated = len(events) >= limit` ⇒ `MEASUREMENT_UNKNOWN`.
+
+**Efecto.** En `_v2_reconcile_reservations`, una lectura `UNKNOWN` implica que (a) la regla 1 no puede casar
+ningún fill (`facts=()`), (b) la regla 2 **nunca** libera (no es `measurable`) y (c)
+`_v2_reservations_measurement` queda `UNKNOWN` ⇒ el libro pendiente es `UNKNOWN` ⇒ el motor **veta
+aperturas**. Con `>=1000` filas `APPLIED` acumuladas, la reconciliación de reservas **no puede** ser
+COMPLETE y el motor deja de abrir.
+
+**Declarado.** Es **preexistente** (la reconciliación de arranque lee idénticamente) y **NO** lo introdujo
+la fase de `OBS-14`. Es fail-closed y **declarado** en el journal (no es corrupción silenciosa), pero es
+una **parada dura alcanzable por operación normal**. **Radio de impacto:** afecta también a la
+reconstrucción de **posición** (`read_position_ledger` y las posiciones canónicas usan el mismo límite por
+defecto).
+
+**Disparador.** `>=1000` filas con `status='APPLIED'` para la cuenta (derivado del código). La **madurez de
+la cuenta real está `NO MEDIDA`** (una sonda read-only fue **bloqueada por la revisión automática**); no se
+estima.
+
+**Criterio de cierre.** Hacer que la lectura de fills de la reconciliación de reservas sea COMPLETA **para
+su propósito**, acotándola a la **ventana viva** (p. ej. `since = min(created_at)` de las reservas vivas,
+ya que la regla 1 solo casa fills con `applied_at >= created_at`), y/o acotar honestamente la lectura de
+posición. Exige tocar `applied_fills` + protocolo del store + InMemory + Postgres + tests + mutaciones.
+
+**Nota.** La ventana de retención de **900** de `v2.87` es una mitigación **interna al instrumento**
+(`_RetentionExecutionEventStore`, solo replay); **no** existe en producción. Cerrarla es **fase de código
+del motor**, no de instrumento.
