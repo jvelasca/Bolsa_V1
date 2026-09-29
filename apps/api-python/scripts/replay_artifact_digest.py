@@ -73,6 +73,21 @@ def _get(doc: Any, dotted: str) -> Any:
     return node
 
 
+def _render_of(raw: bytes) -> str:
+    """Etiqueta el render del fichero: ``CRLF`` (modo texto de Windows) o ``LF``."""
+    return "CRLF (modo texto de Windows)" if raw.count(b"\r\n") else "LF"
+
+
+def _canonical_lf(raw: bytes) -> bytes:
+    """Contenido con salto de línea LF: quita la traducción del modo texto de Windows.
+
+    El artefacto se escribe con ``indent=2`` y sus únicos bytes ``\\r`` son los que el SO
+    intercala delante de cada ``\\n``; dentro de las cadenas JSON un salto va escapado
+    (``\\n``), nunca en crudo. Normalizar ``\\r\\n`` → ``\\n`` no puede alterar la evidencia.
+    """
+    return raw.replace(b"\r\n", b"\n")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--file", required=True, type=pathlib.Path, help="artefacto JSON")
@@ -84,10 +99,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     raw = args.file.read_bytes()
+    canonical = _canonical_lf(raw)
     doc = json.loads(raw)
 
     if args.lines:
         print(f"fichero {len(raw)} {hashlib.sha256(raw).hexdigest().upper()}")
+        print(f"render {_render_of(raw)} {len(canonical)} {hashlib.sha256(canonical).hexdigest().upper()}")
         for key, (size, digest) in _sections(doc).items():
             print(f"{key} {size} {digest}")
         replay = doc.get("replay") or {}

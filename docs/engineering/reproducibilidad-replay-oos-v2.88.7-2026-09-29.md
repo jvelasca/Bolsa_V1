@@ -45,8 +45,11 @@ por tanto, **una promesa sin forma de verificarla**.
    `verify`, `watch`, `assert-artifact`).
 2. **`docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson`** — la **entrada congelada**:
    NDJSON con línea de **manifiesto** autodescriptiva + 20 instrumentos + 25 700 barras.
-   `7 482 624` B, SHA-256
-   `683A08DAF87999E30EFAAB6E111FA5B10EDA53DD7CC2D26FD9E20FF95603AC44`.
+   `7 482 989` B, SHA-256
+   `857C9F7D3F2CD43713080736B2C20E7CAE5C94E590A1B4626201D159A1C8279C`.
+   *(Ese hash es el **posterior** al hallazgo de §6: el manifiesto declara ahora los **dos
+   renders** del artefacto, lo que añade **365 B** al fichero. Su hash previo era
+   `683A08DA…5603AC44` / `7 482 624` B; las 25 720 líneas de datos son idénticas.)*
 3. **Job `replay-repro`** en `.github/workflows/release-tag-ci.yml`: PostgreSQL de servicio →
    siembra el fixture → **regenera el artefacto con el MISMO script del sello** → **ASSERTA**
    SHA-256 y tamaño → sube el artefacto (`replay-oos-durable-v2.88.7`, 90 días) y su log.
@@ -87,10 +90,13 @@ uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py asse
 
 ```
 artefacto        /tmp/replay.json
-bytes            3393187  (esperado 3393187)
+render           CRLF (modo texto de Windows)
+bytes            3393187  (sello 3393187 · mismo contenido en LF 3290062)
 sha256           7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461
-esperado         7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461
-VEREDICTO        REPRODUCIDO
+sello (render)   7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461
+sha256 LF        A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+sello (contenido)A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+VEREDICTO        REPRODUCIDO (render del sello, byte a byte)
 ```
 
 **`3 393 187` B y `7D998E4D…C804A0461` = el sello, desde otra base de datos.** La igualdad del hash
@@ -113,7 +119,83 @@ service, así que **acierta por coincidencia**. Aquí se evita la trampa por con
 *(No se arregla en este cambio: tocar `env.py` afectaría a todos los workflows y merece su propio
 análisis. Queda declarado.)*
 
-## 6. Límites de esta evidencia (lo que NO acredita)
+## 6. Hallazgo: el `sha256` del sello hasheaba **el render de Windows**, no la evidencia
+
+La primera corrida del job (`workflow_dispatch` **`36627838819`**, `main`) puso `replay-repro` en
+**rojo** con un número que no cuadraba con ninguna de las hipótesis de entorno:
+
+```
+bytes            3290062  (esperado 3393187)
+sha256           A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+esperado         7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461
+```
+
+Antes de tocar nada se **descartó por medición** la lista de sospechosos habituales:
+
+| Hipótesis | Cómo se probó | Resultado |
+| --- | --- | --- |
+| El `.env` local entra en el motor | replay con `load_dotenv` **neutralizado** | **no**: reproduce el sello (`7D998E4D…`) |
+| Deriva de dependencias (`uv.lock` vs `.venv`) | entorno **limpio** creado desde el lock | **no**: mismas versiones (Python 3.12.13, SQLAlchemy 2.0.51, Pydantic 2.13.4) y mismo sello |
+| Versión/imagen de PostgreSQL | `docker ps` + `docker-compose.yml` | **no**: `postgres:16-alpine` en ambos lados |
+| Reloj/zona horaria | el artefacto **no contiene** ni un timestamp | **no**: 0 `ISO`-stamps, 0 `engine_id`, 0 `ULID` |
+
+Para no depender de reproducir el runner a mano, el job se instrumentó (mismo commit) con un
+**digest por secciones** (`replay_artifact_digest.py`, nuevo) y una **2ª corrida idéntica**. La
+segunda corrida (`36636706369`) publicó esto:
+
+| Sección | Runner (Linux) | Sello (Windows) | |
+| --- | --- | --- | --- |
+| `census` | `1237098` `45E4CC80CFBA6E5C` | `1237098` `45E4CC80CFBA6E5C` | **igual** |
+| `replay` | `891272` `EE81E76CEE0995AA` | `891272` `EE81E76CEE0995AA` | **igual** |
+| `score` | `24112` `96B3D601BAE8B99C` | `24112` `96B3D601BAE8B99C` | **igual** |
+| `totals` | `{"decided":24500,"fills":752,"orders":210,"proposals":238,"vetoes":24303}` | idem | **igual** |
+| `watch` (20 ids, orden) | `561` `40230635349BF2A0` | `561` `40230635349BF2A0` | **igual** |
+| 2ª corrida del runner | idéntica a la 1ª (`cmp` = igual) | — | determinista |
+
+Todas las **secciones** coincidían byte a byte y el runner era determinista consigo mismo, pero el
+**fichero entero** no: luego lo que difería no era el contenido, era **cómo se escribía**. Medido
+sobre los dos ficheros reales:
+
+| | bytes | `LF` | `CRLF` |
+| --- | --- | --- | --- |
+| Sello (Windows) | `3 393 187` | **103 125** | **103 125** |
+| Runner (Linux) | `3 290 062` | **103 125** | **0** |
+| Diferencia | **103 125** | 0 | 103 125 |
+
+`103 125` = **exactamente el número de líneas del JSON**: un `\r` por línea. Y la comprobación
+cruzada cierra el caso:
+
+- `sha256( sello con CRLF→LF )` = `A4DA036C…13CB` = **el hash del runner**;
+- `sha256( artefacto del runner con LF→CRLF )` = `7D998E4D…0461` = **el hash del sello**.
+
+**Conclusión.** El artefacto se escribe con `json.dumps(..., indent=2)` y el fichero se abría en
+**modo texto**: en Windows el SO tradujo cada `\n` a `\r\n`. El `sha256` declarado
+(`7D998E4D…`) no identificaba la **evidencia**, identificaba **su render en Windows**. La
+evidencia es reproducible (ahora está probado sección a sección, y desde el runner), pero un
+contraste por bytes del fichero **no podía pasar nunca** en Linux. No era un fallo del motor ni
+del fixture: era el **contraste** el que medía la cosa equivocada.
+
+### 6.1 El arreglo (el contraste pasa a medir el CONTENIDO)
+
+`assert-artifact` declara ahora **los dos renders** y acepta ambos, diciendo cuál ha visto:
+
+- `_SEALED_ARTIFACT_SHA256` / `_SEALED_ARTIFACT_BYTES` → `7D998E4D…` / `3 393 187` (render del sello);
+- `_SEALED_ARTIFACT_SHA256_LF` / `_SEALED_ARTIFACT_BYTES_LF` → `A4DA036C…` / `3 290 062` (mismo contenido en `LF`).
+
+El veredicto distingue los dos casos y **no admite trampa**: un fichero manipulado (probado
+cambiando `"fills":752` por `753`) da **`NO reproducido`**, y si se pasan `--sha256`/`--bytes`
+explícitos se exige **ese** render concreto (la vía normalizada solo vale contra los valores
+sellados). El manifiesto del fixture publica los dos pares
+(`expectedArtifactSha256(Lf)`/`expectedArtifactBytes(Lf)`).
+
+**Deuda declarada (para el SIGUIENTE sello, no para este):** el escritor del replay debería fijar
+`newline="\n"` — el del fixture ya lo hace (`replay_oos_input_fixture.py`, línea 191) — para que el
+mismo contenido tenga **un solo** hash en cualquier SO. No se hace aquí a propósito: tocar el
+script del sello invalidaría la cadena «el artefacto del tag lo produjo ESTE script» que este
+trabajo precisamente acredita. Mientras siga así, el `sha256` del fichero **no** es portable y el
+hash que identifica la evidencia es el **LF**.
+
+## 7. Límites de esta evidencia (lo que NO acredita)
 
 - **NO** acredita que la semántica de `OBS-20` sea correcta: reproduce **el mismo artefacto** que el
   sello; si el motor estuviera equivocado, el fixture reproduciría **el mismo error**. Es una prueba
@@ -127,11 +209,16 @@ análisis. Queda declarado.)*
 - **NO** versiona datos de mercado más allá del watch sellado (el resto del catálogo sigue sin
   congelar: si el sync cambia las barras del watch, el `export` produciría otro fixture y el job se
   pondría rojo — que es exactamente el comportamiento deseado).
+- **NO** hace portable el `sha256` **del fichero** del sello: sigue siendo el render `CRLF` de
+  Windows. Lo portable (y lo que ahora se asserta) es el **contenido** en `LF` (§6). El día que se
+  re-selle con `newline="\n"` habrá **un** hash por contenido en cualquier SO.
 
-## 7. Ficheros tocados
+## 8. Ficheros tocados
 
-- `apps/api-python/scripts/replay_oos_input_fixture.py` (nuevo)
-- `docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson` (nuevo, 7,5 MB)
-- `.github/workflows/release-tag-ci.yml` (job `replay-repro` + cableado en `certify`)
+- `apps/api-python/scripts/replay_oos_input_fixture.py` (nuevo; `assert-artifact` por CONTENIDO, §6)
+- `apps/api-python/scripts/replay_artifact_digest.py` (nuevo; digest por secciones + render)
+- `docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson` (nuevo, 7,5 MB; manifiesto con los dos renders)
+- `.github/workflows/release-tag-ci.yml` (job `replay-repro` + cableado en `certify`; huella del
+  runner, digest por secciones y 2ª corrida, `upload-artifact` con `always()`)
 - `.gitignore` (`/artifacts/`)
 - este informe + `docs/engineering/evidence/v2.88.7/README.md`

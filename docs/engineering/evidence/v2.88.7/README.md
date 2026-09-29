@@ -269,8 +269,8 @@ así que un runner arrancaba con la tabla vacía y el censo daba **0 días opera
 artefacto).
 
 Se cierra con una **entrada congelada** versionada en este mismo directorio
-([`replay-input-fixture.ndjson`](./replay-input-fixture.ndjson), `7 482 624` B, SHA-256
-`683A08DAF87999E30EFAAB6E111FA5B10EDA53DD7CC2D26FD9E20FF95603AC44`: 20 instrumentos + **25 700** barras)
+([`replay-input-fixture.ndjson`](./replay-input-fixture.ndjson), `7 482 989` B, SHA-256
+`857C9F7D3F2CD43713080736B2C20E7CAE5C94E590A1B4626201D159A1C8279C`: 20 instrumentos + **25 700** barras)
 y un job de tag que **regenera** el artefacto con el **mismo** script del sello y **asserta** su
 SHA-256 y su tamaño: `replay-repro`, cableado en `certify` (un rojo ahí **no-GREENea** el tag).
 Herramienta: [`replay_oos_input_fixture.py`](../../../apps/api-python/scripts/replay_oos_input_fixture.py).
@@ -279,9 +279,35 @@ Herramienta: [`replay_oos_input_fixture.py`](../../../apps/api-python/scripts/re
 creada y migrada desde cero) y regenerando con el script intacto:
 
 ```
-bytes   3393187  (esperado 3393187)
-sha256  7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461  -> REPRODUCIDO
+artefacto        /tmp/replay.json
+render           CRLF (modo texto de Windows)
+bytes            3393187  (sello 3393187 · mismo contenido en LF 3290062)
+sha256           7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461
+sha256 LF        A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+VEREDICTO        REPRODUCIDO (render del sello, byte a byte)
 ```
+
+### 11.1 El primer rojo del job fue un hallazgo, no un fallo del motor (`36636706369`)
+
+El `workflow_dispatch` **`36627838819`** puso `replay-repro` en **rojo** con `3 290 062` B /
+`A4DA036C…13CB`. El job se instrumentó (huella del runner + **digest por secciones** + **2ª corrida**
+idéntica, con [`replay_artifact_digest.py`](../../../apps/api-python/scripts/replay_artifact_digest.py))
+y la corrida **`36636706369`** publicó que **todas las secciones coinciden byte a byte** con el sello
+(`census` `1237098`/`45E4CC80CFBA6E5C`, `replay` `891272`/`EE81E76CEE0995AA`, `totals` con
+`fills=752`, `watch` `561`/`40230635349BF2A0`) y que el runner es **determinista consigo mismo**.
+
+Lo único distinto es el **salto de línea**: el sello se escribió en Windows en modo texto, así que sus
+`103 125` líneas llevan `\r\n` (`3 393 187` B); el runner escribe `\n` (`3 290 062` B). Diferencia =
+`103 125` B = **una `\r` por línea**, y la comprobación cruzada lo cierra: `sha256(sello CRLF→LF)` =
+`A4DA036C…` (el del runner) y `sha256(runner LF→CRLF)` = `7D998E4D…` (el del sello). Por tanto el
+`sha256` del fichero identificaba **el render de Windows**, no la evidencia.
+
+Arreglo: `assert-artifact` declara **los dos renders** y acepta ambos diciendo cuál ha visto (un
+fichero manipulado sigue dando **`NO reproducido`**); el manifiesto del fixture publica los dos pares
+(`expectedArtifactSha256(Lf)`/`expectedArtifactBytes(Lf)`). **Deuda declarada para el siguiente sello:**
+fijar `newline="\n"` en el escritor del replay (el del fixture ya lo hace) para que el mismo contenido
+tenga **un** hash en cualquier SO.
+
 
 Límites declarados: el job se añade **después** del sello, así que `v2.88.7-beta` se selló **sin** él
 (la primera certificación del job es la del **siguiente** tag o de un `workflow_dispatch`); reproduce

@@ -97,9 +97,21 @@ _SEALED_WATCH = (
     "8601a0c3f8d248b0b8052b963",
 )
 
-#: Artefacto que este fixture debe reproducir (el sello auditado).
+#: Artefacto que este fixture debe reproducir (el sello auditado), **tal cual se selló**. El
+#: sello se escribió en Windows en modo texto, así que sus `\n` están traducidos a `\r\n`.
 _SEALED_ARTIFACT_SHA256 = "7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461"
 _SEALED_ARTIFACT_BYTES = 3_393_187
+
+#: EL MISMO CONTENIDO con separador LF: lo que escribe cualquier SO que no traduzca `\n`
+#: (el runner de GitHub, sin ir más lejos). Medido el 2026-09-29 sobre el artefacto real del
+#: runner (job `replay-repro`, corrida 36636706369): la única diferencia entre los dos
+#: ficheros son 103 125 bytes = las 103 125 líneas del JSON, exactamente 1 `\r` por línea.
+#: Sus SECCIONES son idénticas byte a byte (`census` 1 237 098 / `45E4CC80CFBA6E5C`,
+#: `replay` 891 272 / `EE81E76CEE0995AA`). Es decir: el `sha256` del sello hasheaba el
+#: **render de Windows**, no la evidencia, y por eso el job del tag no podía pasar en Linux.
+#: Se declaran LOS DOS renders y se asserta el CONTENIDO (ver `_assert_artifact`).
+_SEALED_ARTIFACT_SHA256_LF = "A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB"
+_SEALED_ARTIFACT_BYTES_LF = 3_290_062
 
 #: ``to_char`` de un ``timestamptz`` a ISO-8601 UTC con microsegundos y offset explícito.
 #: Se fija ``+00:00`` literal (``AT TIME ZONE 'UTC'`` ya normaliza) para no depender del
@@ -115,6 +127,24 @@ def _sha256_file(path: pathlib.Path) -> tuple[str, int]:
             digest.update(chunk)
             size += len(chunk)
     return digest.hexdigest().upper(), size
+
+
+def _canonical_lf(raw: bytes) -> bytes:
+    """Contenido con salto de línea LF (quita la traducción del modo texto de Windows).
+
+    El artefacto se escribe con ``json.dumps(..., indent=2)``, así que sus únicos bytes
+    ``\\r`` son los que el SO intercala delante de cada ``\\n`` al abrir el fichero en modo
+    texto: dentro de las cadenas JSON un salto va escapado (``\\n``), nunca en crudo. Por eso
+    normalizar ``\\r\\n`` → ``\\n`` no puede alterar la evidencia, solo el render.
+    """
+    return raw.replace(b"\r\n", b"\n")
+
+
+def _render_of(raw: bytes) -> str:
+    """Etiqueta el render del fichero: ``CRLF`` (Windows) o ``LF`` (todo lo demás)."""
+    if raw.count(b"\r\n"):
+        return "CRLF (modo texto de Windows)"
+    return "LF"
 
 
 def _write_line(handle: Any, row: dict[str, Any]) -> None:
@@ -207,6 +237,13 @@ async def _export(args: argparse.Namespace) -> int:
                 "lastBar": max((row["timestamp"] for row in bars), default=None),
                 "expectedArtifactSha256": _SEALED_ARTIFACT_SHA256,
                 "expectedArtifactBytes": _SEALED_ARTIFACT_BYTES,
+                "expectedArtifactSha256Lf": _SEALED_ARTIFACT_SHA256_LF,
+                "expectedArtifactBytesLf": _SEALED_ARTIFACT_BYTES_LF,
+                "expectedArtifactRenderNote": (
+                    "El sello se escribio en Windows en modo texto: su LF va como CRLF. El "
+                    "MISMO contenido en LF es expectedArtifactSha256Lf/BytesLf. Los dos "
+                    "renders son validos y las secciones son identicas byte a byte."
+                ),
                 "omittedColumns": [
                     "ohlcv_bars.id",
                     "ohlcv_bars.created_at",
@@ -452,7 +489,8 @@ def _verify(args: argparse.Namespace) -> int:
     print(f"adj_close nulos  {sum(1 for row in bars if row['adj_close'] is None)}")
     print(f"bytes            {size}")
     print(f"sha256           {digest}")
-    print(f"a reproducir     {_SEALED_ARTIFACT_SHA256} ({_SEALED_ARTIFACT_BYTES} B)")
+    print(f"a reproducir     {_SEALED_ARTIFACT_SHA256} ({_SEALED_ARTIFACT_BYTES} B)  render del sello (CRLF)")
+    print(f"                 {_SEALED_ARTIFACT_SHA256_LF} ({_SEALED_ARTIFACT_BYTES_LF} B)  el MISMO contenido en LF")
     return 0
 
 
@@ -468,20 +506,55 @@ def _print_watch(args: argparse.Namespace) -> int:
 
 
 def _assert_artifact(args: argparse.Namespace) -> int:
+    """Contrasta el artefacto regenerado con el sello, separando CONTENIDO de RENDER.
+
+    El sello se escribió en Windows en modo texto y el runner escribe en LF: el `sha256` del
+    fichero **no** identifica la evidencia, identifica su render (medido: 103 125 bytes de
+    diferencia = 1 `\\r` por línea, con las secciones idénticas). Así que hay dos formas
+    válidas de estar «reproducido», y se declaran las dos en vez de esconder una:
+
+    * **render del sello**: byte a byte == `7D998E4D…` / 3 393 187 B (fichero CRLF);
+    * **mismo contenido**: LF normalizado == `A4DA036C…` / 3 290 062 B (fichero LF).
+
+    Si se pasan `--sha256`/`--bytes` explícitos se exige ese render concreto: la vía
+    normalizada solo se acepta contra los valores SELLADOS, no contra un valor suelto.
+    """
     path = pathlib.Path(args.file)
     if not path.is_file():
         print(f"# ABORTO: no existe el artefacto {path}", file=sys.stderr)
         return 2
+
+    raw = path.read_bytes()
     digest, size = _sha256_file(path)
+    canonical = _canonical_lf(raw)
+    canonical_digest = hashlib.sha256(canonical).hexdigest().upper()
+
     expected_sha = (args.sha256 or _SEALED_ARTIFACT_SHA256).upper()
     expected_bytes = int(args.bytes or _SEALED_ARTIFACT_BYTES)
+    override = bool(args.sha256 or args.bytes)
+
+    render_ok = digest == expected_sha and size == expected_bytes
+    content_ok = (
+        not override
+        and canonical_digest == _SEALED_ARTIFACT_SHA256_LF
+        and len(canonical) == _SEALED_ARTIFACT_BYTES_LF
+    )
+
     print(f"artefacto        {path}")
-    print(f"bytes            {size}  (esperado {expected_bytes})")
+    print(f"render           {_render_of(raw)}")
+    print(f"bytes            {size}  (sello {expected_bytes} · mismo contenido en LF {_SEALED_ARTIFACT_BYTES_LF})")
     print(f"sha256           {digest}")
-    print(f"esperado         {expected_sha}")
-    ok = digest == expected_sha and size == expected_bytes
-    print(f"VEREDICTO        {'REPRODUCIDO' if ok else 'NO reproducido'}")
-    return 0 if ok else 1
+    print(f"sello (render)   {expected_sha}")
+    print(f"sha256 LF        {canonical_digest}")
+    print(f"sello (contenido){_SEALED_ARTIFACT_SHA256_LF}")
+    if render_ok:
+        verdict = "REPRODUCIDO (render del sello, byte a byte)"
+    elif content_ok:
+        verdict = "REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)"
+    else:
+        verdict = "NO reproducido"
+    print(f"VEREDICTO        {verdict}")
+    return 0 if (render_ok or content_ok) else 1
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────────
