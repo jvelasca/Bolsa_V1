@@ -1003,6 +1003,88 @@ jobs:
             exit 1
           fi
 
+  replay-repro:
+    name: replay-repro (regenera el artefacto del sello desde el fixture)
+    runs-on: ubuntu-latest
+    # V2.88.7/AUTO-MATERIAL-20 (auditoría del replay OOS durable): el artefacto de 3,39 MB del
+    # sello NO era reproducible desde GitHub. Vive fuera del repo (`operability_runs/` está en
+    # `.gitignore`) y el CI no podía regenerarlo: el script del replay LEE BARRAS D1 REALES de
+    # PostgreSQL (`SqlAlchemyOhlcvRepository`) y el `db:seed` del repo solo siembra
+    # INSTRUMENTOS —las barras vienen de un sync externo—, así que un runner arrancaba con la
+    # tabla vacía y el censo daba 0 días operables: no se producía artefacto alguno.
+    # Este job siembra la ENTRADA CONGELADA (`replay-input-fixture.ndjson`: 20 instrumentos y
+    # 25 700 barras) y regenera el artefacto con el MISMO script del sello; después ASSERTA su
+    # SHA-256 y su tamaño. Un rojo aquí = el sello NO es reproducible, y el tag no es GREEN.
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bolsa
+          POSTGRES_PASSWORD: bolsa_dev
+          POSTGRES_DB: bolsa_v1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolsa -d bolsa_v1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: bolsa
+      DB_PASSWORD: bolsa_dev
+      DB_NAME: bolsa_v1
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Sembrar la ENTRADA congelada del replay (esquema + 25 700 barras)
+        # El `seed` lleva el esquema a head él mismo (`ensure_migrated`) y siembra la entrada.
+        # NO se usa el CLI de `alembic`: su `env.py` construye el engine con
+        # `engine_from_config` desde `alembic.ini` e IGNORA `DATABASE_URL` en la ruta online
+        # (`_resolved_url` solo se usa en modo offline), así que migraría la BD equivocada.
+        run: >
+          uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py seed
+          --fixture docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson
+
+      - name: Regenerar el artefacto del sello (mismo script del sello, sin tocarlo)
+        # El watch sale del MANIFIESTO del fixture: una sola fuente de verdad, la lista de 20
+        # ids NO se repite aquí (no puede derivar). Se usa el script del sello tal cual: si se
+        # tocara el motor o el instrumento, el hash dejaría de cuadrar y el job se pondría rojo.
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          WATCH="$(uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py \
+            watch --fixture docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson)"
+          echo "watch congelado: $(echo "$WATCH" | tr ',' '\n' | wc -l) símbolos"
+          uv run --no-sync python apps/api-python/scripts/v2_87_replay_oos_durable_cycle.py \
+            --json --watch "$WATCH" \
+            --out artifacts/replay-oos-durable-v2.88.7.json \
+            > artifacts/replay-oos-durable-v2.88.7.log 2>&1
+          tail -n 5 artifacts/replay-oos-durable-v2.88.7.log
+
+      - name: ASSERT del SHA-256 y del tamaño (el sello tiene que salir byte a byte)
+        run: >
+          uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py
+          assert-artifact --file artifacts/replay-oos-durable-v2.88.7.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: replay-oos-durable-v2.88.7
+          path: |
+            artifacts/replay-oos-durable-v2.88.7.json
+            artifacts/replay-oos-durable-v2.88.7.log
+          if-no-files-found: error
+
   dr-verify:
     # DR honesta en el CI del tag (hallazgo C2-12 P2 / C2-13): `pnpm db:dr:test`
     # (batería de Disaster Recovery: dump + checksum + restore a scratch + Alembic
@@ -1169,7 +1251,7 @@ jobs:
   certify:
     name: certify (aggregate + artifact)
     runs-on: ubuntu-latest
-    needs: [security, shared, spine, frontend, python, playwright-mock, lifecycle-pg, dr-verify, a7-gate]
+    needs: [security, shared, spine, frontend, python, playwright-mock, lifecycle-pg, replay-repro, dr-verify, a7-gate]
     if: always()
     steps:
       - name: Fail if any required job failed
@@ -1181,6 +1263,7 @@ jobs:
           needs.python.result != 'success' ||
           needs.playwright-mock.result != 'success' ||
           needs.lifecycle-pg.result != 'success' ||
+          needs.replay-repro.result != 'success' ||
           needs.dr-verify.result != 'success' ||
           needs.a7-gate.result != 'success'
         run: |
@@ -1192,6 +1275,7 @@ jobs:
           echo "python=${{ needs.python.result }}"
           echo "playwright-mock=${{ needs.playwright-mock.result }}"
           echo "lifecycle-pg=${{ needs.lifecycle-pg.result }}"
+          echo "replay-repro=${{ needs.replay-repro.result }}"
           echo "dr-verify=${{ needs.dr-verify.result }}"
           echo "a7-gate=${{ needs.a7-gate.result }}"
           exit 1
@@ -1206,6 +1290,7 @@ jobs:
           JOB_PYTHON: ${{ needs.python.result }}
           JOB_PLAYWRIGHT_MOCK: ${{ needs.playwright-mock.result }}
           JOB_LIFECYCLE_PG: ${{ needs.lifecycle-pg.result }}
+          JOB_REPLAY_REPRO: ${{ needs.replay-repro.result }}
           JOB_DR_VERIFY: ${{ needs.dr-verify.result }}
           JOB_A7_GATE: ${{ needs.a7-gate.result }}
         run: |
@@ -1228,6 +1313,7 @@ jobs:
                   "python": os.environ["JOB_PYTHON"],
                   "playwright-mock": os.environ["JOB_PLAYWRIGHT_MOCK"],
                   "lifecycle-pg": os.environ["JOB_LIFECYCLE_PG"],
+                  "replay-repro": os.environ["JOB_REPLAY_REPRO"],
                   "dr-verify": os.environ["JOB_DR_VERIFY"],
                   "a7-gate": os.environ["JOB_A7_GATE"],
               },

@@ -258,3 +258,33 @@ cita. Integridad de esta evidencia **re-medida** tras el sello: los dos artefact
 `APPLIED`**), `OBS-16` ni la deuda de datos; **NO** cierra **`OBS-19`** (la deriva entre las dos listas
 offline de pytest, que sigue **abierta**). El replay **no** escribe en PostgreSQL (cuarentena en memoria,
 por construcción). El tag `v2.88.6-beta` **no** se borra: queda como **rojo citado**.
+
+## 11. Reproducibilidad del artefacto (POST-SELLO, 2026-09-29)
+
+**El artefacto de esta tabla ya NO es una promesa sin verificar.** Cuando se selló `v2.88.7-beta`, el
+`7D998E4D…C804A0461` **no era auditable**: el fichero vive fuera del repo (`operability_runs/` está en
+`.gitignore`) y el CI **no podía regenerarlo** (el script del replay lee barras D1 **reales** de
+PostgreSQL y el `db:seed` del repo **solo siembra instrumentos**: las barras vienen de un sync externo,
+así que un runner arrancaba con la tabla vacía y el censo daba **0 días operables** → **ningún**
+artefacto).
+
+Se cierra con una **entrada congelada** versionada en este mismo directorio
+([`replay-input-fixture.ndjson`](./replay-input-fixture.ndjson), `7 482 624` B, SHA-256
+`683A08DAF87999E30EFAAB6E111FA5B10EDA53DD7CC2D26FD9E20FF95603AC44`: 20 instrumentos + **25 700** barras)
+y un job de tag que **regenera** el artefacto con el **mismo** script del sello y **asserta** su
+SHA-256 y su tamaño: `replay-repro`, cableado en `certify` (un rojo ahí **no-GREENea** el tag).
+Herramienta: [`replay_oos_input_fixture.py`](../../../apps/api-python/scripts/replay_oos_input_fixture.py).
+
+**Medido, no prometido** — sembrando el fixture en una base **distinta** (`bolsa_v1_replay_fixture`,
+creada y migrada desde cero) y regenerando con el script intacto:
+
+```
+bytes   3393187  (esperado 3393187)
+sha256  7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461  -> REPRODUCIDO
+```
+
+Límites declarados: el job se añade **después** del sello, así que `v2.88.7-beta` se selló **sin** él
+(la primera certificación del job es la del **siguiente** tag o de un `workflow_dispatch`); reproduce
+**el mismo artefacto**, luego acredita **reproducibilidad**, **no** la corrección de la semántica de
+`OBS-20`. Informe completo:
+[`reproducibilidad-replay-oos-v2.88.7-2026-09-29.md`](../reproducibilidad-replay-oos-v2.88.7-2026-09-29.md).

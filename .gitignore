@@ -100,3 +100,8 @@ desktop.ini
 # Journal de operabilidad de AUTO-MATERIAL-5 (`v2_77_market_operability.py`): serie diaria GENERADA
 # a partir del forward PAPER. Se reproduce con el comando, no se versiona.
 /operability_runs/
+
+# Salida de los jobs de CI que suben artefactos (`certify` y `replay-repro` de
+# `release-tag-ci.yml`): se generan en el runner, no se versionan. Un `artifacts/` local es
+# residuo de reproducir los pasos del job a mano.
+/artifacts/
