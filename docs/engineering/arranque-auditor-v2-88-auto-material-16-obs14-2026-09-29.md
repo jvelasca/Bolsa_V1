@@ -30,8 +30,10 @@
 > del workflow el comando del step `Pytest offline` y correrlo **entero** con
 > `uv run --no-sync python -m pytest` (los ejecutables `pytest`/`mypy` están bloqueados por Windows
 > Application Control, `os error 4551`). Mejora posible, **no** implementada: fábrica de costura
-> compartida. Límite declarado: `M252` acota la pata de **entrada**; `_v2_reserve_exit` **no** tiene
-> mutación ni test dedicados.
+> compartida. Límite declarado (de `v2.88.3`, **ya cerrado** en `v2.88.4`): `M252` acota la pata de
+> **entrada**; `_v2_reserve_exit` **no** tenía mutación ni test dedicados ⇒ **`OBS-17`**, cerrada en
+> **`v2.88.4`** con el test de simetría + **`M253`** (ver §2, fila 8, y
+> [`obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md`](./obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md)).
 
 > **Objeto auditado:** tag anotado **`v2.88-beta`** (lo crea el propietario) · **Versión:** `2.11.0-beta`
 > (**bump** `2.10.2-beta → 2.11.0-beta`) · **Base (diff):** `v2.85.2-beta`, commit base **`3483b6b5`** ·
@@ -117,22 +119,22 @@ predicción estructural («correrán los jobs de Python»), que **se cumplió**.
 ## 2. Qué tiene que comprobar el auditor (por este orden)
 
 > **Alcance de esta lista (declarado, `POST-TAG`).** Los 12 puntos de abajo son la lista de la fase de
-> **ORIGEN** (`v2.88` / `2.11.0-beta`, matriz `246`). El **objeto vigente** es **`v2.88.3-beta`** /
-> **`2.11.3-beta`**. Solo estos valores cambian; **el resto sigue vigente tal cual**:
+> **ORIGEN** (`v2.88` / `2.11.0-beta`, matriz `246`). El **objeto vigente** es **`v2.88.4-beta`** /
+> **`2.11.4-beta`**. Solo estos valores cambian; **el resto sigue vigente tal cual**:
 >
-> | Punto | Fase de origen (`v2.88`) | Objeto vigente (`v2.88.3-beta`) |
+> | Punto | Fase de origen (`v2.88`) | Objeto vigente (`v2.88.4-beta`) |
 > | --- | --- | --- |
-> | 1 · `package.json` | `2.11.0-beta` | **`2.11.3-beta`** (`2.11.1-beta` → `v2.88.1`; `2.11.2-beta` → `v2.88.2`) |
-> | 1 · tag | `v2.88-beta` | **`v2.88.3-beta`** (objeto `66f47cf8e72449dc5bb907ef208abcc7afb0e857` → commit `0038adfc`) |
-> | 3 · diff del motor | `7  0` (cierre de `OBS-14` en `real_turn`) | **vacío**: `v2.88.3` **no** toca el motor; el motor es el de `v2.88.2` (que **sí** cambia `_v2_reconcile_reservations` con `only_ids`) |
+> | 1 · `package.json` | `2.11.0-beta` | **`2.11.4-beta`** (`2.11.1` → `v2.88.1`; `2.11.2` → `v2.88.2`; `2.11.3` → `v2.88.3`; `2.11.4` → `v2.88.4`) |
+> | 1 · tag | `v2.88-beta` | **`v2.88.4-beta`** (`v2.88.3-beta` = objeto `66f47cf8` → commit `0038adfc`; `v2.88.4` = simetría de ownership, `OBS-17`) |
+> | 3 · diff del motor | `7  0` (cierre de `OBS-14` en `real_turn`) | **vacío**: `v2.88.3` y `v2.88.4` **no** tocan el motor; el motor es el de `v2.88.2` (que **sí** cambia `_v2_reconcile_reservations` con `only_ids`) |
 > | 4 · etiqueta `RESERVATION_RELEASED_BY_CANCEL` | `startup=False` | igual (heredado sin cambios) |
-> | 8 · matriz de mutaciones | `246` | **`252`**: `+M247`/`M248` (`v2.88.1`), `+M249`/`M250`/`M251` (`v2.88.2`), `+M252` (`v2.88.3`) |
-> | 10 · «ningún doc dice `2.11.0-beta`» | cierto en su sello | `2.11.0-beta` es **histórico**; el vigente es **`2.11.3-beta`** |
+> | 8 · matriz de mutaciones | `246` | **`253`**: `+M247`/`M248` (`v2.88.1`), `+M249`/`M250`/`M251` (`v2.88.2`), `+M252` (`v2.88.3`), **`+M253` (`v2.88.4`)** |
+> | 10 · «ningún doc dice `2.11.0-beta`» | cierto en su sello | `2.11.0-beta` es **histórico**; el vigente es **`2.11.4-beta`** |
 >
 > La lista **sellada NO se reescribe** (viaja dentro del tag); esta tabla la reconcilia **POST-TAG**, que
 > es donde vive también la cita del CI (§1.1). Para el estado exacto del objeto vigente, la fuente es
-> [`evidence/v2.88.3/README.md`](./evidence/v2.88.3/README.md) y
-> [`obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md`](./obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md).
+> [`evidence/v2.88.4/README.md`](./evidence/v2.88.4/README.md) y
+> [`obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md`](./obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md).
 
 1. **Naturaleza del objeto.** `package.json` = `2.11.0-beta`; tag `v2.88-beta` **anotado**; árbol
    **intacto** (`git status --porcelain` vacío) antes y después de cualquier sonda.

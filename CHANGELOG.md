@@ -2,6 +2,35 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.4-beta] — `AUTO-MATERIAL-17` SIMETRÍA DEL OWNERSHIP DE SALIDA: la reserva de `_v2_reserve_exit` también es de su sesión — 2026-09-29
+
+**Cierre de `OBS-17`** — hallazgo de la **auditoría externa de `v2.88.3-beta`** (`APROBADO`, 0 bloqueantes),
+que lo señaló como **«la siguiente mejora técnica prioritaria»**: la pata de **ENTRADA** del alta de
+reservas tenía prueba de propiedad (`M252`, 6 tests), pero la de **SALIDA** (`_v2_reserve_exit`) **no tenía
+test ni mutación**: ningún test la ejercía. El contrato del ciclo **no estaba simétricamente demostrado**.
+
+**Bump** `2.11.3-beta` → `2.11.4-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+Base del diff: `0038adfc` (= `v2.88.3-beta`). **NO se toca el motor: el diff es un test + el arnés + docs.**
+
+- **Por qué importa:** el cierre de turno acota la retirada por **propiedad**
+  (`only_ids=frozenset(self._v2_owned_reservations)`). Un defecto de ownership en la **salida** —retirar la
+  reserva de salida **viva** de otra sesión— es el **mismo fail-OPEN de carrera** que motivó
+  `v2.88.1`/`v2.88.2`, pero por la pata que **ninguna prueba guardaba**.
+- **Test que faltaba (hermético, sin PostgreSQL):** `apps/api-python/tests/test_auto_v2_durable_cycle.py`
+  (**14 → 16**). `test_reserve_exit_ownership_is_scoped_to_the_session_that_created_it` demuestra las dos
+  caras: **la sesión B, que no la dio de alta, NO puede liberar la reserva de SALIDA de A** (sigue viva,
+  `released_qty == 0`), y **la sesión A SÍ retira la suya** (`RELEASED_BY_CANCEL` / `cancel`, con poda de su
+  propiedad). `test_reserve_exit_without_a_durable_intent_does_not_claim_ownership` es el **CONTROL**
+  fail-closed: sin store de reservas no hay reserva viva ni propiedad huérfana.
+- **Mutación `M253`** (matriz **252 → 253**): elimina el `add` de propiedad en `_v2_reserve_exit` ⇒ la caza
+  **exactamente** el test nuevo. Simetría de la matriz: **`M252`** muerde la ENTRADA (6 tests) y **`M253`** la
+  SALIDA (1 test).
+- **Verificación:** costura **16 passed**; `--only M252 M253` **2/2** detectadas con el árbol **intacto** y
+  restauración **byte a byte**; **matriz COMPLETA `253/253`**; `ruff` (comando exacto del CI)
+  **All checks passed!**; `git diff v2.88.3-beta..HEAD -- packages/py apps/api-python/src` **vacío**.
+- **Sigue ABIERTO** (no lo cierra esta fase): `OBS-14.b`, `OBS-15`, `OBS-16`, `P3-2`/`P3-3`. Orden de
+  prioridad del auditor tras `OBS-17`: **`OBS-14.b`** y **volver a PAPER real**.
+
 ## [2.11.3-beta] — `AUTO-MATERIAL-16c` RE-SELLO 3: la costura del journal autodeclara el libro de propiedad — 2026-09-29
 
 **RE-SELLO del objeto `v2.88`.** El tag `v2.88.2-beta` (`41e7e679`) quedó **público con el job

@@ -40,6 +40,7 @@ from bolsa_application.applied_fills import DEFAULT_APPLIED_LIMIT, read_applied_
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import ExecutionEvent, InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
 from bolsa_application.replay_oos import close_tick, snapshot_book
 from bolsa_application.reservation_store import InMemoryReservationStore
 from bolsa_application.sim_durable_store import (
@@ -726,3 +727,99 @@ async def test_closing_reconcile_does_not_touch_another_sessions_reservation(
     # huérfana de una reserva VIVA de otra sesión a mitad de turno. Ya era así en ``v2.85.2``
     # y el arreglo acordado es de ALCANCE (solo el cierre de turno): el discriminador posible
     # es una ventana de gracia por EDAD y queda en la deuda P3, no se arregla aquí.
+
+
+# ── OBS-17: simetría del ownership en la pata de SALIDA (``_v2_reserve_exit``) ────
+#
+# La pata de ENTRADA tiene prueba de propiedad (``_v2_persist_tick_reservations``, mordida
+# por ``M252``). La de SALIDA (``_v2_reserve_exit``) NO tenía ni test ni mutación: ningún
+# test la ejercía (solo un docstring la mencionaba). Sin esa propiedad, el cierre de turno
+# de una sesión perdedora retiraría la reserva de SALIDA viva de otra sesión — el MISMO
+# fail-OPEN de carrera de ``v2.88.1``, pero por la pata que estaba sin guardar por prueba.
+
+
+@pytest.mark.asyncio
+async def test_reserve_exit_ownership_is_scoped_to_the_session_that_created_it(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-17: la reserva de SALIDA también es de ESTA sesión; otra no puede liberarla.
+
+    Dos caras de la misma simetría: (a) la sesión B, que no la dio de alta, **no** la
+    retira al cerrar su turno; (b) la sesión A, que sí la dio de alta, **sí** la retira.
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    store = InMemoryReservationStore()
+    exit_store = InMemoryExitOrderStore()
+    exec_store = InMemoryExecutionEventStore()
+    at = "2026-09-17T09:00:00Z"
+
+    # Sesión A: reserva de SALIDA con identidad durable (INTENT persistido + reserva viva).
+    session_a = _worker(
+        reservation_store=store, exec_store=exec_store, exit_order_store=exit_store
+    )
+    exit_order_id = await session_a._v2_reserve_exit(  # noqa: SLF001
+        symbol="AAA", qty=Decimal("10"), price=Decimal("100"), sector="tech", at=at
+    )
+    assert exit_order_id, "la salida debe tener identidad durable"
+    res_id = f"exit:{exit_order_id}"
+    assert res_id in session_a._v2_owned_reservations, (  # noqa: SLF001
+        "la pata de SALIDA debe registrar la propiedad (simetría con la de ENTRADA)"
+    )
+    live = {row.reservation_id: row for row in await store.list_live(_ACCOUNT)}
+    assert set(live) == {res_id}, "la reserva de salida queda viva y comprometida"
+    assert live[res_id].side == "sell"
+
+    # Sesión B (proceso distinto, sin memoria de A): su CIERRE de turno no toca la ajena.
+    session_b = _worker(
+        reservation_store=store, exec_store=exec_store, exit_order_store=exit_store
+    )
+    assert session_b._v2_owned_reservations == set()  # noqa: SLF001
+    await session_b._v2_reconcile_reservations(  # noqa: SLF001
+        startup=False,
+        attribute_fills=False,
+        only_ids=frozenset(session_b._v2_owned_reservations),  # noqa: SLF001
+    )
+    after_b = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    assert after_b[res_id].is_live, "B NO puede liberar la reserva de SALIDA de A"
+    assert float(after_b[res_id].released_qty) == 0.0
+
+    # Sesión A: su propio cierre SÍ retira su reserva de salida (misma sesión y propiedad).
+    await session_a._v2_reconcile_reservations(  # noqa: SLF001
+        startup=False,
+        attribute_fills=False,
+        only_ids=frozenset(session_a._v2_owned_reservations),  # noqa: SLF001
+    )
+    after_a = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    assert not after_a[res_id].is_live, "A SÍ puede liberar su propia reserva de salida"
+    assert after_a[res_id].status == "RELEASED_BY_CANCEL"
+    assert after_a[res_id].release_reason == "cancel"
+    assert session_a._v2_owned_reservations == set(), (  # noqa: SLF001
+        "la propiedad se poda al liberar la reserva"
+    )
+
+
+@pytest.mark.asyncio
+async def test_reserve_exit_without_a_durable_intent_does_not_claim_ownership(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-17 · CONTROL: si la reserva de salida NO es durable, no hay propiedad que reclamar.
+
+    Con el store de reservas ausente ``_v2_reserve_exit`` devuelve ``None`` sin comprometer
+    nada (fail-closed del libro): no debe quedar ninguna reserva viva ni propiedad huérfana
+    que el cierre de turno pudiera usar para retirar capital de otra sesión.
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    exit_store = InMemoryExitOrderStore()
+    session = _worker(reservation_store=None, exit_order_store=exit_store)
+
+    exit_order_id = await session._v2_reserve_exit(  # noqa: SLF001
+        symbol="AAA",
+        qty=Decimal("10"),
+        price=Decimal("100"),
+        sector="tech",
+        at="2026-09-17T09:00:00Z",
+    )
+    assert exit_order_id is None, "sin store de reservas la salida no se materializa"
+    assert session._v2_owned_reservations == set()  # noqa: SLF001
+    assert session._v2_reservations == ()  # noqa: SLF001
+

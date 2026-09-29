@@ -1168,7 +1168,7 @@ declarado** (y, opcionalmente, que las costuras compartan la siembra del estado)
 
 ---
 
-## OBS-17 — La pata de SALIDA (`_v2_reserve_exit`) no tiene test ni mutación: el ownership está demostrado solo en la ENTRADA (MEDIUM, alcance motor/tests) — 🔴 ABIERTA (2026-09-29)
+## OBS-17 — La pata de SALIDA (`_v2_reserve_exit`) no tiene test ni mutación: el ownership está demostrado solo en la ENTRADA (MEDIUM, alcance motor/tests) — 🟢 CERRADA en `v2.88.4` (2026-09-29)
 
 **Origen.** **Hallazgo de la auditoría externa de `v2.88.3-beta`** (**`APROBADO`, 0 bloqueantes**), que lo
 señala como **«la siguiente mejora técnica prioritaria»**. **Ya estaba DECLARADO** en el handover
@@ -1208,13 +1208,20 @@ M253 (elimina el ownership de _v2_reserve_exit) → el test FALLA
 re-anclaje de `M253` al texto real de `_v2_reserve_exit` + corrida de la matriz completa con el árbol
 restaurado **byte a byte**.
 
-**NO implementado.** El auditor **no** lo ejecuta: es una **recomendación** para la fase siguiente, que
-además pide **no** abrir «otra cadena interminable» (solo esto + `OBS-14.b` + comprobar el riesgo de
-`OBS-15`, y **después volver a PAPER real**).
+**CERRADA en `v2.88.4` (`AUTO-MATERIAL-17`, 2026-09-29).** Test + mutación entregados: **2** tests nuevos en
+`apps/api-python/tests/test_auto_v2_durable_cycle.py` (**14 → 16**, hermético) —la **simetría** de ownership
+(B no puede liberar la reserva de salida de A; A sí la suya) y el **CONTROL** fail-closed sin store de
+reservas— y la mutación **`M253`** (matriz **252 → 253**), que **muerde exactamente** el test nuevo. `ruff`
+**All checks passed!**, matriz COMPLETA **`253/253`** con el árbol **intacto** y **`0` cambios en el motor**
+(`git diff v2.88.3-beta..HEAD -- packages/py apps/api-python/src` **vacío**). Cierre en el
+[informe/relevo `v2.88.4`](./obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md) y su
+[evidencia](./evidence/v2.88.4/README.md). **Límite declarado:** la corrida **real** de concurrencia/recovery
+la acredita el job `lifecycle-pg` del CI del tag, **no** el test hermético.
 
 **Evidencia:** [`auditoria-v2-88-3-auto-material-16c-2026-09-29.md`](./auditoria-v2-88-3-auto-material-16c-2026-09-29.md) (§14-§17) ·
 [`entrega-auditoria-externa-mia-v2.88.3-2026-09-29.md`](./entrega-auditoria-externa-mia-v2.88.3-2026-09-29.md) (§8) ·
-[`obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md`](./obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md).
+[`obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md`](./obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md) ·
+[`evidence/v2.88.4/README.md`](./evidence/v2.88.4/README.md).
 
 ---
 
@@ -1223,8 +1230,9 @@ además pide **no** abrir «otra cadena interminable» (solo esto + `OBS-14.b` +
 La auditoría externa (`APROBADO`, 0 bloqueantes) **NO** pide otra cadena de endurecimiento indiscriminado.
 Pide **exactamente tres** acciones, en este orden:
 
-1. **Cerrar la simetría de ownership** → **`OBS-17`** (test + mutación **`M253`** sobre `_v2_reserve_exit`).
-2. **Atacar `OBS-14.b`** (`restart → startup sweep → reservas → ownership → grace/no grace`).
+1. ✅ **Cerrar la simetría de ownership** → **`OBS-17`** — **HECHO en `v2.88.4`**: test de simetría +
+   mutación **`M253`** sobre `_v2_reserve_exit` (matriz `252 → 253`).
+2. **Atacar `OBS-14.b`** (`restart → startup sweep → reservas → ownership → grace/no grace`). **← SIGUIENTE.**
 3. **Volver a PAPER real** — pasar de *«¿puede AUTO sobrevivir correctamente?»* a
    *«¿qué hace AUTO durante varios días de operación real?»*; comprobar antes el riesgo de **`OBS-15`**
    (1000 `APPLIED`).

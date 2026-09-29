@@ -2773,6 +2773,13 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "            persisted.append(reservation)\n",
         (T_AUTO_DURABLE,),
     ),
+    (
+        "M253 (salida sin propiedad): la reserva de SALIDA se persiste pero NO registra quien es su dueno",
+        WORKER,
+        "        self._v2_owned_reservations.add(reservation.reservation_id)\n        merged: dict[str, PortfolioReservation] = {\n",
+        "        merged: dict[str, PortfolioReservation] = {\n",
+        (T_AUTO_DURABLE,),
+    ),
 ]
 
 # DSN a un puerto local cerrado: el connect falla al instante (en vez de colgar el teardown de PG).

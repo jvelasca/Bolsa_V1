@@ -33,8 +33,9 @@
 > extraer del workflow el comando del step `Pytest offline` y correrlo **entero** con
 > `uv run --no-sync python -m pytest` (los ejecutables `pytest`/`mypy` están bloqueados por Windows
 > Application Control, `os error 4551`). Mejora posible, **no** implementada: fábrica de costura
-> compartida. Límite declarado: `M252` acota la pata de **entrada**; `_v2_reserve_exit` **no** tiene
-> mutación ni test dedicados.
+> compartida. Límite declarado (de `v2.88.3`, **ya cerrado** en `v2.88.4`): `M252` acota la pata de
+> **entrada**; `_v2_reserve_exit` **no** tenía mutación ni test dedicados ⇒ **`OBS-17`**, cerrada en
+> **`v2.88.4`** con el test de simetría + **`M253`** (matriz `253`).
 
 > **Objeto a auditar:** tag anotado **`v2.88-beta`** (lo crea el propietario) · **Versión:** `2.11.0-beta`
 > (**bump** `2.10.2-beta → 2.11.0-beta`) · **Base del diff:** `v2.85.2-beta` (commit base **`3483b6b5`**)
