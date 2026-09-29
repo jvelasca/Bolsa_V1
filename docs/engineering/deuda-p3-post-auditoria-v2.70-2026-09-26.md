@@ -1165,3 +1165,71 @@ declarado** (y, opcionalmente, que las costuras compartan la siembra del estado)
 
 **Evidencia:** [`obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md`](./obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md) ·
 [`evidence/v2.88.3/README.md`](./evidence/v2.88.3/README.md).
+
+---
+
+## OBS-17 — La pata de SALIDA (`_v2_reserve_exit`) no tiene test ni mutación: el ownership está demostrado solo en la ENTRADA (MEDIUM, alcance motor/tests) — 🔴 ABIERTA (2026-09-29)
+
+**Origen.** **Hallazgo de la auditoría externa de `v2.88.3-beta`** (**`APROBADO`, 0 bloqueantes**), que lo
+señala como **«la siguiente mejora técnica prioritaria»**. **Ya estaba DECLARADO** en el handover
+(§8, «pata de SALIDA sin cobertura») y en el informe de `v2.88.3`; aquí **adquiere ID propio** y un criterio
+de cierre con su mutación.
+
+**Observación.** El sello `v2.88.3` cubre el **alta** de propiedad con la mutación **`M252`** (el tick
+persiste la reserva pero **no** registra su dueño ⇒ la cazan 6 tests). Pero la **otra** pata de alta —
+`_v2_reserve_exit`, documentada en el docstring del worker — **no** tiene test ni mutación dedicados
+(ningún test la ejerce). Contrato del ciclo:
+
+```text
+ENTRADA  reservar → propietario   🟢 (M252)
+SALIDA   reservar → propietario   🔴 (sin cobertura)
+```
+
+⇒ El contrato **no está simétricamente demostrado**: `v2.88.2` acotó el cierre por **propiedad**
+(`only_ids = frozenset(self._v2_owned_reservations)`, alimentado en los **dos** puntos de alta — `save_claim`
+ganado en `_v2_persist_tick_reservations` **y** `_v2_reserve_exit`) y **solo** la pata de entrada tiene
+prueba adversarial. Un defecto de ownership en la **salida** (liberar la reserva de salida de **otra**
+sesión, fail-**OPEN** de carrera) no lo cazaría hoy ningún test ni mutación.
+
+**Radio.** Bajo en **frecuencia** (una sola ruta, la de `EXIT_ONLY`/salida), **alto en daño** si ocurre: es
+capital comprometido devuelto al mercado, el **mismo** fail-OPEN que motivó `v2.88.1`/`v2.88.2` — pero por la
+pata que aún no está guardada por prueba.
+
+**Criterio de cierre (lo que pide el auditor).** Test explícito de aislamiento de salida +
+mutación **`M253`**:
+
+```text
+session A → reserve exit → session B → attempt reconcile
+comprobar: B cannot release A's exit reservation
+M253 (elimina el ownership de _v2_reserve_exit) → el test FALLA
+```
+
+`M253` ⇒ matriz `252` → **`253`**. Requiere: el test de costura de la pata de salida (hermético) + el
+re-anclaje de `M253` al texto real de `_v2_reserve_exit` + corrida de la matriz completa con el árbol
+restaurado **byte a byte**.
+
+**NO implementado.** El auditor **no** lo ejecuta: es una **recomendación** para la fase siguiente, que
+además pide **no** abrir «otra cadena interminable» (solo esto + `OBS-14.b` + comprobar el riesgo de
+`OBS-15`, y **después volver a PAPER real**).
+
+**Evidencia:** [`auditoria-v2-88-3-auto-material-16c-2026-09-29.md`](./auditoria-v2-88-3-auto-material-16c-2026-09-29.md) (§14-§17) ·
+[`entrega-auditoria-externa-mia-v2.88.3-2026-09-29.md`](./entrega-auditoria-externa-mia-v2.88.3-2026-09-29.md) (§8) ·
+[`obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md`](./obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md).
+
+---
+
+## Prioridad declarada por la auditoría externa de `v2.88.3` (2026-09-29) — 🎯 RECOMENDACIÓN, no ejecutada
+
+La auditoría externa (`APROBADO`, 0 bloqueantes) **NO** pide otra cadena de endurecimiento indiscriminado.
+Pide **exactamente tres** acciones, en este orden:
+
+1. **Cerrar la simetría de ownership** → **`OBS-17`** (test + mutación **`M253`** sobre `_v2_reserve_exit`).
+2. **Atacar `OBS-14.b`** (`restart → startup sweep → reservas → ownership → grace/no grace`).
+3. **Volver a PAPER real** — pasar de *«¿puede AUTO sobrevivir correctamente?»* a
+   *«¿qué hace AUTO durante varios días de operación real?»*; comprobar antes el riesgo de **`OBS-15`**
+   (1000 `APPLIED`).
+
+**Explícitamente NO tocar:** `TOP_N` / `REGIME` / `RISK` / `SIGNALS` / `A/B` / `thresholds` por motivos de
+comportamiento de mercado. **Ninguna** de las tres acciones está ejecutada; **ninguna** deuda se cierra por
+este informe.
+
