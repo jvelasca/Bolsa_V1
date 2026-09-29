@@ -218,6 +218,48 @@ sobre el objeto empujado. **Se cita el run, no se hereda.**
 Job `python`: **`3049 passed, 37 skipped`** (los `3042` de `v2.88.4` + **7** netos) y los **mismos `37`
 skips**. **Matriz completa `256/256`** con el árbol intacto.
 
-### 7.2 Observado (`Release tag CI`, POST-TAG)
+### 7.2 Observado (`Release tag CI`, run [`36581692155`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36581692155))
 
-_Pendiente de push: se rellena en el commit de cita POST-TAG, sin tocar el objeto sellado._
+```
+HEAD d16e3ade · event=push · ref=v2.88.5-beta
+conclusion: SUCCESS   (GREEN en la PRIMERA pasada; attempt 1; 14:18:33Z -> 14:27:33Z, ~9m00s)
+10 jobs success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseño
+```
+
+| Job | Resultado |
+| --- | --- |
+| `shared (build/typecheck/test)` | success |
+| `python (ruff/imports/mypy/pytest offline)` | success |
+| `decision-spine` | success |
+| `lifecycle-pg (Alembic + auth + golden restart)` | success |
+| `frontend (typecheck/lint/test/build + contract:check)` | success |
+| `dr-verify (battery DB_DR / TCP CI)` | success |
+| `security (gitleaks)` | success |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | success |
+| `playwright (mock E2E)` | success |
+| `playwright (integrated E2E, opt-in)` | skipped (por diseño) |
+| `certify (aggregate + artifact)` | success |
+
+Job `python` del tag (**verbatim**):
+
+```
+ruff    : All checks passed!
+imports : Contracts: 4 kept, 0 broken.
+mypy    : Success: no issues found in 508 source files
+pytest  : 3049 passed, 37 skipped, 6 warnings in 63.71s (0:01:03)
+```
+
+**ESPERADO `3049/37` → OBSERVADO `3049/37` → COINCIDE.** El falso rojo de la costura (`v2.88.2`) **no
+reaparece** y los **7** tests netos de `OBS-14.b` corren en CI con los **mismos `37` skips**.
+
+Además: `decision-spine 604 passed in 5.72s`; `a7-gate 7 passed in 14.67s`; y `lifecycle-pg` **GREEN** con
+**`220 passed`** en sus **8** invocaciones (**0 failed / 0 skipped**; guardas `fail if skipped` verdes:
+crash/recovery, **3 sesiones concurrentes**, golden day, aislamiento de cuenta, HardKill, crash injection
+matrix y multiprocess).
+
+Companion sobre el mismo commit/ref: `Python CI 36581692059`, `Frontend CI 36581691966`,
+`Optimize lab 36581692245`, `Fase 2 scientific 36581692285` → **`success`** las cuatro; en `main` (push
+`d16e3ade`) `Python CI 36581687611` `quality` **`3038 passed, 40 skipped`** (= `3031 + 7`) con los cuatro
+jobs PG per-commit verdes.
+
+Cita completa, cruda y verbatim: `docs/engineering/evidencia-ci-tag-v2.88.5-2026-09-29.txt`.

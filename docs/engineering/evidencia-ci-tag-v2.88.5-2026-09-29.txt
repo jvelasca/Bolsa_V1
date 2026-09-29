@@ -1,0 +1,79 @@
+# Evidencia cruda — CI del tag v2.88.5-beta (`AUTO-MATERIAL-18` / `OBS-14.b`), POST-TAG, 2026-09-29
+#
+# Tag anotado : v2.88.5-beta -> objeto del tag 23cb2bfa -> commit del sello d16e3ade.
+# Version paq.: 2.11.4-beta -> 2.11.5-beta (package.json).
+# Base del diff: a4d32c0d (= v2.88.4-beta + cita POST-TAG de su CI).
+# Alembic head: 046_fill_reference_mid (SIN migracion).
+# Motor       : SI se toca (+91/-20, 5 hunks en apps/api-python/src/bolsa_api/background/
+#               auto_simulation_worker.py): ventana de gracia por EDAD en la reconciliacion.
+#
+# ---------------------------------------------------------------------------------------
+# Release tag CI -- run 36581692155 -- ref v2.88.5-beta -- HEAD d16e3ade
+# ---------------------------------------------------------------------------------------
+# conclusion : SUCCESS  (GREEN en la PRIMERA pasada; attempt 1)
+# ventana    : 2026-09-29T14:18:33Z -> 2026-09-29T14:27:33Z  (~9m00s)
+# jobs (11):
+#   shared (build/typecheck/test)                                success
+#   security (gitleaks)                                          success
+#   python (ruff/imports/mypy/pytest offline)                    success
+#   frontend (typecheck/lint/test/build + contract:check)        success
+#   lifecycle-pg (Alembic + auth + golden restart)               success
+#   playwright (mock E2E)                                        success
+#   dr-verify (battery DB_DR / TCP CI)                           success
+#   decision-spine                                               success
+#   a7-gate (A7 C3 chaos live_a7 - dedicated real-PG)            success
+#   playwright (integrated E2E, opt-in)                          skipped (por diseno)
+#   certify (aggregate + artifact)                               success
+#
+# Job `python` del tag (VERBATIM, timestamps UTC del runner):
+#   2026-09-29T14:19:52Z All checks passed!                       (ruff)
+#   2026-09-29T14:19:52Z Contracts: 4 kept, 0 broken.             (import-linter)
+#   2026-09-29T14:20:16Z Success: no issues found in 508 source files   (mypy)
+#   2026-09-29T14:21:22Z 3049 passed, 37 skipped, 6 warnings in 63.71s (0:01:03)   (pytest)
+#
+#   ESPERADO 3049 passed / 37 skipped  ==  OBSERVADO 3049 passed / 37 skipped  -> COINCIDE
+#   (los 3042 passed + 37 skipped de v2.88.4, + 7 tests netos de OBS-14.b; mismos 37 skips)
+#
+# lifecycle-pg (VERBATIM, recuentos por invocacion; guarda `fail if skipped` en verde):
+#   165 passed, 2 warnings in 100.80s   (Alembic + auth + golden restart, 8 invocaciones)
+#    45 passed, 4 warnings in 15.86s
+#     1 passed in 10.62s   (Crash/Recovery Day)
+#     1 passed in 9.42s    (Concurrent AUTO - 3 sesiones sobre la misma senal)
+#     3 passed in 2.45s    (Golden Day 2.0)
+#     2 passed in 1.89s    (cuenta / aislamiento)
+#     2 passed in 1.00s    (HardKill recovery)
+#     1 passed in 35.34s   (multiprocess AUTO)   [y `2 passed` crash injection]
+#   -> 220 passed, 0 failed, 0 skipped en las 8 invocaciones
+#
+# decision-spine : 604 passed in 5.72s
+# a7-gate        : 7 passed in 14.67s
+#
+# ---------------------------------------------------------------------------------------
+# Companion runs sobre el MISMO commit/ref (v2.88.5-beta, d16e3ade)
+# ---------------------------------------------------------------------------------------
+#   Python CI          36581692059   success
+#   Frontend CI        36581691966   success
+#   Optimize lab       36581692245   success
+#   Fase 2 scientific  36581692285   success
+#
+# Push a `main` (d16e3ade) -- runs per-commit:
+#   Python CI          36581687611   success   -> quality 3038 passed, 40 skipped in 127.29s
+#   Frontend CI        36581687825   success
+#   Optimize lab       36581688069   success
+#   Gitleaks           36581687618   success
+#
+# ---------------------------------------------------------------------------------------
+# Referencia: objeto ANTERIOR (v2.88.4-beta)
+# ---------------------------------------------------------------------------------------
+#   Release tag CI     36565287635   success   -> python 3042 passed, 37 skipped
+#   (companion: Python CI 36565287435 / Frontend CI 36565287444 / Optimize lab 36565287497 /
+#    Fase 2 scientific 36565287530 -> success las cuatro)
+#
+# NOTA: el recuento local (bateria offline con el comando EXACTO del CI extraido del workflow,
+# 115 args) fue `1 failed, 3085 passed` -> 3086 recogidos. El unico fallo es PRE-EXISTENTE de
+# solo-entorno (test_auto_v70_auto23_evidence_validation.py, `assert 17 == 26`, material
+# paper_real sembrado de la BD de desarrollo) y en el job `python` del CI se salta, de modo que
+# forma parte de los 37 skips. Cuadre de recuentos:
+#    LOCAL: 3085 passed + 1 failed        = 3086 recogidos
+#    CI   : 3049 passed + 37 skipped      = 3086 recogidos   -> COINCIDE
+#   (los 3079 recogidos de v2.88.4 + 7 netos de OBS-14.b)

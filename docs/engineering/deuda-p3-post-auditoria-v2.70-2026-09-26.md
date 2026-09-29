@@ -1091,7 +1091,7 @@ criterio de cierre —*reconciliar en el **cierre de turno/tick***, lo que el re
 > **(9) Límite declarado:** la ventana (**60 s** con la cadencia nominal) es una decisión **declarada**, no
 > medida en producción; el techo de retención de una huérfana es esa ventana. **La cita del CI es
 > POST-TAG** (patrón `OBS-3`/`OBS-4`): esperado job `python` **`3049 passed, 37 skipped`** (los `3042` de
-> `v2.88.4` + **7** netas), con los **mismos `37` skips`. **NO** cierra `OBS-15` ni `OBS-16` ni `P3-2`/`P3-3`.
+> `v2.88.4` + **7** netas), con los **mismos `37` skips** — **se cita el run, no se hereda**. **CITA REAL (POST-TAG, 2026-09-29):** `Release tag CI` run **`36581692155`** (HEAD `d16e3ade`, `ref=v2.88.5-beta`) → **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `14:18:33Z → 14:27:33Z`, **~9m00s**), **10 jobs reales verdes + `certify` verde** y `playwright` integrado `skipped` por diseño; job `python` **verbatim** `3049 passed, 37 skipped, 6 warnings in 63.71s` ⇒ **ESPERADO = OBSERVADO**; `decision-spine 604 passed`, `a7-gate 7 passed` y `lifecycle-pg` **`220 passed`** en **8** invocaciones (**0 failed / 0 skipped**). Cita cruda: [`evidencia-ci-tag-v2.88.5-2026-09-29.txt`](./evidencia-ci-tag-v2.88.5-2026-09-29.txt). **NO** cierra `OBS-15` ni `OBS-16` ni `P3-2`/`P3-3`.
 > Informe: [`obs-14b-ventana-de-gracia-arranque-v2.88.5-2026-09-29.md`](./obs-14b-ventana-de-gracia-arranque-v2.88.5-2026-09-29.md)
 > · evidencia cruda: [`evidence/v2.88.5/README.md`](./evidence/v2.88.5/README.md).
 

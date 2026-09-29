@@ -213,7 +213,32 @@ cambio acotado): job `python` **`3049 passed, 37 skipped`** (los `3042` passed d
 
 ### 7.1 Cita REAL del run (POST-TAG, este commit)
 
-_Pendiente de push: se rellena en el commit de cita POST-TAG, sin tocar el objeto sellado._
+```
+Release tag CI  run 36581692155 · HEAD d16e3ade · event=push · ref=v2.88.5-beta
+conclusion: SUCCESS   (GREEN en la PRIMERA pasada; attempt 1; 14:18:33Z -> 14:27:33Z, ~9m00s)
+10 jobs success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseño
+
+job `python` (verbatim):
+  ruff    : All checks passed!
+  imports : Contracts: 4 kept, 0 broken.
+  mypy    : Success: no issues found in 508 source files
+  pytest  : 3049 passed, 37 skipped, 6 warnings in 63.71s (0:01:03)
+```
+
+**ESPERADO `3049/37` → OBSERVADO `3049/37` → COINCIDE** (`3042` de `v2.88.4` + **7** netos, con los
+**mismos `37` skips**). Además: `decision-spine 604 passed in 5.72s`; `a7-gate 7 passed in 14.67s`; y
+`lifecycle-pg` quedó **GREEN** con **`220 passed`** en sus **8** invocaciones (`165 + 45 + 1 + 1 + 3 + 2 +
+2 + 1`), **0 failed / 0 skipped**, con las guardas `fail if skipped` verdes (crash/recovery del día real,
+**3 sesiones concurrentes** sobre la misma señal, golden day, aislamiento de cuenta, HardKill y multiprocess).
+
+Companion sobre el mismo commit/ref (`v2.88.5-beta`, `d16e3ade`): `Python CI 36581692059`,
+`Frontend CI 36581691966`, `Optimize lab 36581692245`, `Fase 2 scientific 36581692285` → **`success`** las
+cuatro. En `main` (push `d16e3ade`): `Python CI 36581687611` `quality` **`3038 passed, 40 skipped`**
+(= `3031 + 7`), `Frontend CI 36581687825`, `Optimize lab 36581688069` y `Gitleaks 36581687618` → **success**.
+
+Cita cruda completa: [`evidencia-ci-tag-v2.88.5-2026-09-29.txt`](./evidencia-ci-tag-v2.88.5-2026-09-29.txt).
+
+Anterior (objeto `v2.88.4-beta`): `Release tag CI 36565287635` `SUCCESS`, `python` `3042 passed, 37 skipped`.
 
 ---
 

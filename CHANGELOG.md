@@ -55,6 +55,14 @@ diferencia de `v2.88.4`): +91 / −20 en `auto_simulation_worker.py` (5 hunks).
   offline completa con el comando del CI **extraído del workflow** **`1 failed, 3085 passed in 73.77s`**
   (`3086` recogidos; el único fallo es **pre-existente** de PG-local, `assert 17 == 26`, y en CI **se
   salta**); **matriz COMPLETA `256/256`** con el árbol **intacto**.
+- **CI del tag (POST-TAG):** `Release tag CI` run **`36581692155`** (`ref=v2.88.5-beta`, HEAD `d16e3ade`)
+  → **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `~9m00s`), **10 jobs reales verdes + `certify` verde**
+  y `playwright` integrado `skipped` por diseño; job `python` **verbatim** `ruff All checks passed!` /
+  `Contracts: 4 kept, 0 broken` / `mypy 508 source files` / **`3049 passed, 37 skipped, 6 warnings in
+  63.71s`** ⇒ **ESPERADO `3049/37` = OBSERVADO `3049/37`**; además `decision-spine 604 passed`, `a7-gate
+  7 passed` y `lifecycle-pg` **`220 passed`** en **8** invocaciones (**0 failed / 0 skipped**: crash/recovery,
+  3 sesiones concurrentes, golden day, aislamiento de cuenta, HardKill y multiprocess). Cita cruda:
+  [`evidencia-ci-tag-v2.88.5-2026-09-29.txt`](./docs/engineering/evidencia-ci-tag-v2.88.5-2026-09-29.txt).
 - **Sigue ABIERTO** (no lo cierra esta fase): `OBS-15` (techo de 1000 `APPLIED`), `OBS-16` (costuras
   manuales de `object.__new__`), `P3-2`/`P3-3` y la ventana **PAPER real**. Orden del auditor tras esto:
   comprobar el riesgo de **1000 `APPLIED`** y **volver a PAPER real**.

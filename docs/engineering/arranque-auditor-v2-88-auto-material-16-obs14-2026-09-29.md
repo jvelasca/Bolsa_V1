@@ -116,6 +116,18 @@ tag **`3040 passed, 37 skipped`** (0 fallos) y `lifecycle-pg` **220 passed** (8 
 predijo ningún número, **no hay ninguna predicción aritmética que cumplir o rectificar** — solo la
 predicción estructural («correrán los jobs de Python»), que **se cumplió**. Ver §1.1.
 
+### 1.3 CI del **objeto vigente** `v2.88.5-beta` — **ACREDITADO** (cita **POST-TAG** en `main`)
+
+`Release tag CI` [`36581692155`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36581692155) ·
+HEAD `d16e3ade` · `ref=v2.88.5-beta` · **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `14:18:33Z →
+14:27:33Z`, **~9m00s**): **10 jobs reales verdes + `certify` verde** y `playwright (integrated E2E,
+opt-in)` `skipped` por diseño. Job `python` **verbatim** `3049 passed, 37 skipped, 6 warnings in 63.71s`
+⇒ **ESPERADO `3049/37` = OBSERVADO `3049/37`** (`3042` de `v2.88.4` + **7** netos); `decision-spine 604
+passed`, `a7-gate 7 passed` y `lifecycle-pg` **`220 passed`** en **8** invocaciones (**0 failed / 0
+skipped**). Companion sobre el mismo commit/ref: `Python CI 36581692059`, `Frontend CI 36581691966`,
+`Optimize lab 36581692245`, `Fase 2 scientific 36581692285` → **`success`** las cuatro. Cita cruda:
+[`evidencia-ci-tag-v2.88.5-2026-09-29.txt`](./evidencia-ci-tag-v2.88.5-2026-09-29.txt).
+
 ## 2. Qué tiene que comprobar el auditor (por este orden)
 
 > **Alcance de esta lista (declarado, `POST-TAG`).** Los 12 puntos de abajo son la lista de la fase de
@@ -235,6 +247,7 @@ ventana PAPER real exige **días de pared con material durable**. El auditor deb
 - **CI del objeto vigente: ACREDITADO POST-TAG** (no dentro del tag, por construcción: patrón
   `OBS-3`/`OBS-4`). `Release tag CI` [`36558405748`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405748)
   **SUCCESS** en la primera pasada; job `python` **`3040 passed, 37 skipped`** (0 fallos) y `lifecycle-pg`
-  **220 passed**. Dentro del tag la cita dice `(pendiente)` **a propósito**; ver §1.1.
+  **220 passed**. Dentro del tag la cita dice `(pendiente)` **a propósito**; ver §1.1. Para el objeto
+  **vigente** (`v2.88.5-beta`), la cita real es el run `36581692155` (**§1.3**).
 - Los defectos documentales de la fase (**versión inexistente**; **7 `I001`**) están **corregidos** y se
   declaran; ninguno es deuda de datos.
