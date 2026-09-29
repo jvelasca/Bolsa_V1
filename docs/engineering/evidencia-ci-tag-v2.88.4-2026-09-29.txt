@@ -1,0 +1,159 @@
+# V2.88.4 / AUTO-MATERIAL-17 - simetria del ownership de SALIDA (OBS-17) : cita de CI
+#
+# Fecha de captura: 2026-09-29
+# Tag anotado: v2.88.4-beta -> commit del sello cf246282. Version: 2.11.4-beta.
+# SIN migracion (Alembic head 046_fill_reference_mid). MOTOR IDENTICO a v2.88.3-beta.
+#
+# ========================================================================================
+# QUE ES ESTE FICHERO (leer ANTES de sacar conclusiones)
+# ========================================================================================
+# ESTE fichero vive en `main` como commit POST-TAG. Sirve para una sola cosa:
+#   CITAR el CI del tag `v2.88.4-beta` (este objeto), cuya cita, por construccion del workflow
+#   `Release tag CI`, NO puede existir dentro del propio tag: `Release tag CI` solo corre AL
+#   EMPUJAR el tag, asi que ningun tag puede contener su propio resultado (patron OBS-3/OBS-4).
+#
+# Lo que SI viaja DENTRO del tag son las compuertas locales medidas antes del sello y los tests
+# nuevos (ver `docs/engineering/evidence/v2.88.4/README.md`, seccion 6).
+# ========================================================================================
+# (1) IDENTIDAD DEL OBJETO
+# ========================================================================================
+# Commit del sello  : cf2462828f0156210902e540d77a238e2d42233f
+# Tag anotado objeto: e4739d87c381828c773e38974908efb8fd2f0176 -> commit cf246282
+# Version paquete   : 2.11.3-beta -> 2.11.4-beta (`package.json`)
+# Base del diff     : 0038adfc = `v2.88.3-beta`
+# Alembic head      : 046_fill_reference_mid (SIN migracion)
+# Diff del motor    : VACIO (`packages/py` + `apps/api-python/src` byte-identicos a v2.88.3-beta)
+#
+# Alcance del sello (`git show --stat cf246282`), verbatim:
+#   CHANGELOG.md                                       |  29 +++++
+#   apps/api-python/scripts/v2_44_mutation_audit.py    |   7 ++
+#   .../api-python/tests/test_auto_v2_durable_cycle.py |  97 ++++++++++++++++
+#   docs/engineering/PROJECT_STATE.md                  |   4 +-
+#   ...itor-v2-88-auto-material-16-obs14-2026-09-29.md |  26 +++--
+#   ...2-88-auto-material-14-15-16-obs14-2026-09-29.md |   5 +-
+#   .../deuda-p3-post-auditoria-v2.70-2026-09-26.md    |  22 ++--
+#   docs/engineering/engineering-index-2026-08-03.md   |   2 +
+#   docs/engineering/evidence/v2.88.4/README.md        | 116 ++++++++++++++++++
+#   ...simetria-ownership-salida-v2.88.4-2026-09-29.md | 129 +++++++++++++++++++++
+#   package.json                                       |   2 +-
+#   11 files changed, 416 insertions(+), 23 deletions(-)
+# NINGUN fichero de `packages/` ni de `apps/api-python/src/`.
+#
+# ========================================================================================
+# (2) Release tag CI (run 36565287635, HEAD cf246282, event=push, ref=v2.88.4-beta)
+# ========================================================================================
+# conclusion: SUCCESS (GREEN en la PRIMERA pasada; attempt 1; 12:00:26Z -> 12:09:25Z, ~8m59s)
+# URL: https://github.com/jvelasca/Bolsa_V1/actions/runs/36565287635
+#
+# JOBS (10 success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseno):
+#   shared (build/typecheck/test)                          success   12:00:29Z -> 12:01:07Z
+#   python (ruff/imports/mypy/pytest offline)              success   12:00:30Z -> 12:02:33Z
+#   decision-spine                                         success   12:00:29Z -> 12:00:55Z
+#   lifecycle-pg (Alembic + auth + golden restart)         success   12:00:29Z -> 12:05:31Z
+#   frontend (typecheck/lint/test/build + contract:check)  success   12:00:29Z -> 12:03:39Z
+#   dr-verify (battery DB_DR / TCP CI)                     success   12:00:30Z -> 12:01:26Z
+#   security (gitleaks)                                    success   12:00:30Z -> 12:00:40Z
+#   a7-gate (A7 C3 chaos live_a7, dedicated real-PG)       success   12:00:30Z -> 12:01:23Z
+#   playwright (mock E2E)                                  success   12:00:29Z -> 12:08:40Z
+#   playwright (integrated E2E, opt-in)                    [skipped, por diseno]
+#   certify (aggregate + artifact)                         success   12:08:44Z -> 12:09:24Z
+#
+# --- Job `python` del tag (verbatim, extraido del log del job 109395597137) ---
+#   ruff    : All checks passed!
+#   imports : Contracts: 4 kept, 0 broken.
+#   mypy    : Success: no issues found in 508 source files
+#   pytest  : 3042 passed, 37 skipped, 6 warnings in 73.97s (0:01:13)
+#   => ESPERADO (README seccion 6, escrito DENTRO del tag) 3042/37 -> OBSERVADO 3042/37 -> COINCIDE.
+#      Descomposicion: 3040 de v2.88.3 + 2 tests nuevos de OBS-17. Cero fallos.
+#
+# --- Job `decision-spine` (verbatim) ---
+#   604 passed in 7.44s
+#
+# --- Job `a7-gate` (verbatim) ---
+#   7 passed in 16.73s
+#
+# --- Job `lifecycle-pg` (pasos verbatim, TODOS en verde; hay guardas "fail if skipped") ---
+#   ✓ Alembic upgrade head
+#   ✓ Pytest lifecycle PG + auth + golden V1.88-V1.91/V1.95/V1.96 + worker V1.92/V1.93/V1.97
+#     + integrity V1.94 + health schema-aware V2.15 (fail if skipped)
+#   ✓ Prepare dedicated iso scratch DB (bolsa_v1_iso) drop+create+migrate
+#   ✓ Pytest account-isolation gate V2.15.4 (dedicated real-PG, account-less + workspaces/...)
+#   ✓ Pytest Golden Day 2.0 (proceso scheduler V2 + PG, fail if skipped)
+#   ✓ Fail on skipped Golden Day 2.0 (no skip silencioso)
+#   ✓ Pytest Crash/Recovery Day (proceso scheduler matado en sucio + PG, fail if skipped)
+#   ✓ Fail on skipped Crash/Recovery Day (no skip silencioso)
+#   ✓ Pytest Concurrent AUTO (3 sesiones concurrentes + PG, fail if skipped)
+#   ✓ Fail on skipped Concurrent AUTO (no skip silencioso)
+#   ✓ Pytest HardKill recovery (parada dura durable + PG, fail if skipped)
+#   ✓ Fail on skipped HardKill recovery (no skip silencioso)
+#   ✓ Pytest crash injection matrix (exactly-once + PG, fail if skipped)
+#   ✓ Fail on skipped crash injection matrix (no skip silencioso)
+#   ✓ Pytest multiprocess AUTO (N procesos reales + PG, fail if skipped)
+#   ✓ Fail on skipped multiprocess AUTO (no skip silencioso)
+#   LECTURA: la concurrencia real (3 sesiones sobre la misma senal), el crash/recovery, el golden
+#   day, el aislamiento de cuenta y el exactly-once NO se saltaron: corrieron y pasaron.
+#
+# ANOTACIONES del run (no bloqueantes, verbatim):
+#   - "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026." (runner-images)
+#   - Node.js 20 deprecation en actions/upload-artifact@v4 (forzado a Node.js 24).
+#
+# ========================================================================================
+# (3) Workflows companion SOBRE EL MISMO commit y ref del tag (cf246282, v2.88.4-beta)
+# ========================================================================================
+#   Python CI           36565287435 : success (push, v2.88.4-beta)
+#   Frontend CI         36565287444 : success (push, v2.88.4-beta)
+#   Optimize lab        36565287497 : success (push, v2.88.4-beta)
+#   Fase 2 scientific   36565287530 : success (push, v2.88.4-beta)
+#
+# ========================================================================================
+# (4) En `main` (push cf246282, 11:57:30Z)
+# ========================================================================================
+#   Python CI           36564977328 : success
+#       job `quality` (verbatim): ruff `All checks passed!` / `Contracts: 4 kept, 0 broken` /
+#         `mypy Success: no issues found in 508 source files` /
+#         `3031 passed, 40 skipped, 6 warnings in 116.20s (0:01:56)`
+#       jobs PG (per-commit) intactos: lifecycle-pg (A12) / grammar-discovery-pg (A14) /
+#         paper-forward-pg (A13) / auto-v2-durable-pg (Alembic 040-045 + reinicio real) -> success
+#   Frontend CI         36564977318 : success
+#   Optimize lab        36564977267 : success
+#   Gitleaks            36564977382 : success
+#
+# ========================================================================================
+# (5) COMPUERTAS MEDIDAS EN LOCAL ANTES DEL SELLO (las de dentro del tag)
+# ========================================================================================
+#   $ uv run --no-sync python -m pytest apps/api-python/tests/test_auto_v2_durable_cycle.py -q
+#     -> 16 passed in 1.03s   (14 -> 16: los 2 tests nuevos de OBS-17)
+#   $ uv run ruff check packages/py apps/api-python --config pyproject.toml
+#     -> All checks passed!
+#   $ Matriz de mutacion COMPLETA (253 rotulos), rotulada por el run:
+#     -> M252 DETECTADA (6 tests) / M253 DETECTADA (1 test, el de simetria) /
+#        `253/253` medidas / arbol restaurado byte a byte / `exit 0`
+#   $ git diff v2.88.3-beta..HEAD -- packages/py apps/api-python/src
+#     -> VACIO (el motor no se toca)
+#
+# BATERIA OFFLINE COMPLETA EN LOCAL (previa al sello), declarada con su desvio:
+#   3078 passed, 1 failed  -> el unico rojo es
+#   `test_auto_v70_auto23_evidence_validation.py::...` con `assert 17 == 26`, que depende del
+#   censo sembrado en la Postgres LOCAL de desarrollo (diferencia de entorno declarada de
+#   antemano, NO un fallo del codigo ni del sello). Ese test NO se ejecuta en el CI offline
+#   (`python (ruff/imports/mypy/pytest offline)`), que fue GREEN: 3042 passed / 37 skipped.
+#
+# ========================================================================================
+# (6) LECTURA SIN SESGO Y LIMITES DECLARADOS
+# ========================================================================================
+# LECTURA: el objeto `v2.88.4-beta` hereda el motor de `v2.88.3-beta` SIN CAMBIOS y anade
+# exactamente UNA cosa funcional: la prueba adversarial (+ mutacion `M253`) de la pata de SALIDA
+# del ownership de reservas (`_v2_reserve_exit`). Con ello la simetria ENTRADA/SALIDA queda
+# demostrada: `M252` protege el alta del tick, `M253` protege el alta de la salida, y el test de
+# concurrencia hermetico demuestra que la sesion B NO puede liberar la reserva de SALIDA de la
+# sesion A mientras A si puede.
+#
+# LIMITES (honestidad; nada de esto es un hallazgo nuevo):
+#   - NO cierra `OBS-14.b` (barrido de arranque sin ventana de gracia). ABIERTA.
+#   - NO cierra `OBS-15` (techo de 1000 filas APPLIED). ABIERTA (MEDIUM).
+#   - NO cierra `OBS-16` (15 costuras `object.__new__(AutoSimulationWorker)`). ABIERTA.
+#   - NO cierra `P3-2` / `P3-3` (cuenta PAPER real prolongada). ABIERTAS / NO MEDIDAS.
+#   - El test nuevo es HERMETICO (sin PostgreSQL): la acreditacion REAL de concurrencia y
+#     recovery la da el job `lifecycle-pg` del CI del tag, NO el test.
+#   - El CI de tag acredita el OBJETO. NO acredita comportamiento de mercado ni longevidad
+#     operacional de una cuenta real: eso sigue NO MEDIDO.

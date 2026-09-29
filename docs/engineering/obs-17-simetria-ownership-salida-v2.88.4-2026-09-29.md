@@ -118,11 +118,37 @@ Simetría de la matriz: **`M252`** acota la pata de **ENTRADA** (6 tests) y **`M
 `v2.88.3-beta` + 2 tests puros nuevos): job `python` **`3042 passed, 37 skipped`** (los `3077` recogidos de
 `v2.88.3` + **2**), con los **mismos `37` skips**. **Se cita el run, no se hereda.**
 
+### 6.1 Cita REAL del run (POST-TAG, este commit)
+
+```
+Release tag CI  run 36565287635 · HEAD cf246282 · event=push · ref=v2.88.4-beta
+conclusion: SUCCESS   (GREEN en la PRIMERA pasada; attempt 1; 12:00:26Z -> 12:09:25Z, ~8m59s)
+10 jobs success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseño
+
+job `python` (verbatim):
+  ruff    : All checks passed!
+  imports : Contracts: 4 kept, 0 broken.
+  mypy    : Success: no issues found in 508 source files
+  pytest  : 3042 passed, 37 skipped, 6 warnings in 73.97s (0:01:13)
+```
+
+**ESPERADO `3042/37` → OBSERVADO `3042/37` → COINCIDE.** El falso rojo de la costura (`v2.88.2`) **no
+reaparece**: `M253` está dentro del objeto y el job `python` sigue verde con los **2** tests nuevos.
+
+Además: `decision-spine 604 passed`; `a7-gate 7 passed`; y `lifecycle-pg` **no se saltó** ninguno de los
+pasos reales (crash/recovery, 3 sesiones concurrentes, golden day, aislamiento de cuenta, HardKill,
+exactly-once) — todos con guarda `fail if skipped` en verde. Companion sobre el mismo commit/ref:
+`Python CI 36565287435`, `Frontend CI 36565287444`, `Optimize lab 36565287497`,
+`Fase 2 scientific 36565287530` → **success** las cuatro.
+
+Cita cruda completa: [`evidencia-ci-tag-v2.88.4-2026-09-29.txt`](./evidencia-ci-tag-v2.88.4-2026-09-29.txt).
+
 ---
 
 ## 7. Evidencia y registros
 
-- **Evidencia cruda:** [`evidence/v2.88.4/README.md`](./evidence/v2.88.4/README.md).
+- **Evidencia cruda:** [`evidence/v2.88.4/README.md`](./evidence/v2.88.4/README.md) · cita CI cruda:
+  [`evidencia-ci-tag-v2.88.4-2026-09-29.txt`](./evidencia-ci-tag-v2.88.4-2026-09-29.txt).
 - **Registros:** `PROJECT_STATE.md` · `engineering-index-2026-08-03.md` (entrada 187) ·
   [`deuda-p3-post-auditoria-v2.70-2026-09-26.md`](./deuda-p3-post-auditoria-v2.70-2026-09-26.md) (`OBS-17` → **CERRADA**).
 - **Origen:** [`auditoria-v2-88-3-auto-material-16c-2026-09-29.md`](./auditoria-v2-88-3-auto-material-16c-2026-09-29.md).

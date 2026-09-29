@@ -1216,12 +1216,19 @@ reservas— y la mutación **`M253`** (matriz **252 → 253**), que **muerde exa
 (`git diff v2.88.3-beta..HEAD -- packages/py apps/api-python/src` **vacío**). Cierre en el
 [informe/relevo `v2.88.4`](./obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md) y su
 [evidencia](./evidence/v2.88.4/README.md). **Límite declarado:** la corrida **real** de concurrencia/recovery
-la acredita el job `lifecycle-pg` del CI del tag, **no** el test hermético.
+la acredita el job `lifecycle-pg` del CI del tag, **no** el test hermético. **CI del tag MEDIDO (POST-TAG,
+patrón `OBS-3`/`OBS-4`)**: `Release tag CI` run **`36565287635`** (`HEAD cf246282`, `ref=v2.88.4-beta`) →
+**`SUCCESS` en la primera pasada** (`attempt 1`, **~8m59s**; 10 jobs reales + `certify`,
+`playwright` integrado `skipped` por diseño), job `python` **`3042 passed, 37 skipped`** = **ESPERADO
+`3042/37` → OBSERVADO `3042/37`** (el falso rojo de la costura **no** reaparece) y `lifecycle-pg` **sin
+saltarse** crash/recovery + 3 sesiones concurrentes + golden day + aislamiento de cuenta + HardKill +
+exactly-once. Cita cruda: [`evidencia-ci-tag-v2.88.4-2026-09-29.txt`](./evidencia-ci-tag-v2.88.4-2026-09-29.txt).
 
 **Evidencia:** [`auditoria-v2-88-3-auto-material-16c-2026-09-29.md`](./auditoria-v2-88-3-auto-material-16c-2026-09-29.md) (§14-§17) ·
 [`entrega-auditoria-externa-mia-v2.88.3-2026-09-29.md`](./entrega-auditoria-externa-mia-v2.88.3-2026-09-29.md) (§8) ·
 [`obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md`](./obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md) ·
-[`evidence/v2.88.4/README.md`](./evidence/v2.88.4/README.md).
+[`evidence/v2.88.4/README.md`](./evidence/v2.88.4/README.md) ·
+[`evidencia-ci-tag-v2.88.4-2026-09-29.txt`](./evidencia-ci-tag-v2.88.4-2026-09-29.txt).
 
 ---
 

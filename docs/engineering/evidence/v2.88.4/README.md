@@ -110,7 +110,56 @@ $ git diff v2.88.3-beta..HEAD -- packages/py apps/api-python/src      # vacío (
 
 ## 6. CI del tag — POST-TAG (patrón `OBS-3`/`OBS-4`)
 
-`Release tag CI` solo corre **al empujar**, así que su cita **no puede** vivir dentro del tag: **pendiente
-de medir y citar en `main`** tras el push. Esperado sobre este objeto (motor idéntico a `v2.88.3-beta` +
-**2** tests puros nuevos): job `python` **`3042 passed, 37 skipped`** (los `3077` recogidos de `v2.88.3` +
-**2**) y los **mismos `37` skips**. **Se cita el run, no se hereda.**
+`Release tag CI` solo corre **al empujar**, así que su cita **no puede** vivir dentro del tag. La
+instancia **dentro del tag** de este fichero declaraba lo **esperado**; aquí queda la cita **REAL**,
+medida sobre el objeto empujado. **Se cita el run, no se hereda.**
+
+### 6.1 Esperado (escrito DENTRO del tag, antes del push)
+
+Job `python`: **`3042 passed, 37 skipped`** (los `3077` recogidos de `v2.88.3` + **2** tests nuevos) y
+los **mismos `37` skips**.
+
+### 6.2 Observado (`Release tag CI` run [`36565287635`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36565287635))
+
+```
+HEAD cf246282 · event=push · ref=v2.88.4-beta
+conclusion: SUCCESS   (GREEN en la PRIMERA pasada; attempt 1; 12:00:26Z -> 12:09:25Z, ~8m59s)
+10 jobs success + `certify` success; `playwright (integrated E2E, opt-in)` SKIPPED por diseño
+```
+
+| Job | Resultado |
+| --- | --- |
+| `shared (build/typecheck/test)` | success |
+| `python (ruff/imports/mypy/pytest offline)` | success |
+| `decision-spine` | success |
+| `lifecycle-pg (Alembic + auth + golden restart)` | success |
+| `frontend (typecheck/lint/test/build + contract:check)` | success |
+| `dr-verify (battery DB_DR / TCP CI)` | success |
+| `security (gitleaks)` | success |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | success |
+| `playwright (mock E2E)` | success |
+| `playwright (integrated E2E, opt-in)` | skipped (por diseño) |
+| `certify (aggregate + artifact)` | success |
+
+Job `python` del tag (**verbatim**):
+
+```
+ruff    : All checks passed!
+imports : Contracts: 4 kept, 0 broken.
+mypy    : Success: no issues found in 508 source files
+pytest  : 3042 passed, 37 skipped, 6 warnings in 73.97s (0:01:13)
+```
+
+**ESPERADO `3042/37` → OBSERVADO `3042/37` → COINCIDE.** Cero fallos: el falso rojo de la costura
+(`v2.88.2`) no reaparece.
+
+Además: `decision-spine 604 passed in 7.44s`; `a7-gate 7 passed in 16.73s`; y `lifecycle-pg` corrió
+**sin saltarse** los pasos de crash/recovery, 3 sesiones concurrentes, golden day, aislamiento de
+cuenta, HardKill y exactly-once (todos con guarda `fail if skipped`).
+
+Companion sobre el mismo commit/ref: `Python CI 36565287435`, `Frontend CI 36565287444`,
+`Optimize lab 36565287497`, `Fase 2 scientific 36565287530` → **success** las cuatro.
+
+Cita completa, cruda y verbatim (incluye el push a `main`,
+`quality 3031 passed / 40 skipped`, y las anotaciones no bloqueantes del runner):
+`docs/engineering/evidencia-ci-tag-v2.88.4-2026-09-29.txt`.
