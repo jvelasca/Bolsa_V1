@@ -45,6 +45,15 @@ Base del diff: `032ae7cc` (= `v2.88.6-beta`). **SÍ se toca el motor.**
 - **Artefacto byte-reproducible:** `replay-oos-durable-obs20-fix-20260929.json` —
   `3 393 187` B, SHA-256 `7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461`, **idéntico** en
   dos corridas independientes.
+- **CI del tag (POST-TAG):** `Release tag CI` run **`36614230366`** (`ref=v2.88.7-beta`, HEAD `5cbe84b0`)
+  → **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `~8m39s`), **10 jobs reales verdes + `certify` verde**
+  y `playwright` integrado `skipped` por diseño; job `python` **verbatim** `ruff All checks passed!` /
+  `Contracts: 4 kept, 0 broken` / `mypy 508 source files` / **`3104 passed, 37 skipped, 6 warnings in
+  55.36s`** ⇒ **ESPERADO `3104/37` = OBSERVADO `3104/37`**; `lifecycle-pg` **`220 passed`** en **8**
+  invocaciones (**0 failed / 0 skipped**), incluido **`Pytest Crash/Recovery Day` `1 passed in 9.34s`**
+  — **el paso que salió ROJO en el tag de `v2.88.6`** — y `Pytest Concurrent AUTO` `3 passed`. En `main`
+  (push `5cbe84b0`) `quality` **`3093 passed, 40 skipped`** con los 4 jobs PG per-commit verdes. Cita
+  cruda: [`evidencia-ci-tag-v2.88.7-2026-09-29.txt`](./docs/engineering/evidencia-ci-tag-v2.88.7-2026-09-29.txt).
 
 **Límites declarados.** **NO** se toca `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/`A/B` ni ningún umbral, ni se
 backdatea; **NO** acredita `P3-2`/`P3-3` (reloj **simulado**: el replay **no** sustituye la ventana PAPER

@@ -311,6 +311,21 @@ que en `v2.88.5`/`v2.88.6` (`local − 37 skips`). Identidad que fija el esperad
 dentro del tag declara lo **esperado** (`3104 passed, 37 skipped`, matriz `267/267`) y la cita **real** se
 añade después, sobre el objeto empujado. **Se cita el run, no se hereda.**
 
+**CITA REAL (POST-TAG, 2026-09-29).** `Release tag CI` run
+**[`36614230366`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36614230366)** (HEAD `5cbe84b0`,
+`ref=v2.88.7-beta`) → **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `18:44:34Z → 18:53:13Z`, **~8m39s**),
+**10 jobs reales verdes + `certify` verde** y `playwright (integrated E2E, opt-in)` `skipped` por diseño.
+Job `python` **verbatim**: `ruff All checks passed!` · `Contracts: 4 kept, 0 broken` ·
+`mypy no issues found in 508 source files` · **`3104 passed, 37 skipped, 6 warnings in 55.36s`** ⇒
+**ESPERADO `3104/37` = OBSERVADO `3104/37` → COINCIDE**. `lifecycle-pg` **GREEN con `220 passed`** en sus
+**8** invocaciones (**0 failed / 0 skipped**), incluido **`Pytest Crash/Recovery Day` `1 passed in 9.34s`**
+— **el paso que salió ROJO en el tag de `v2.88.6`** — y **`Pytest Concurrent AUTO` `3 passed in 2.30s`**
+(las dos suites re-ancladas certificadas sobre PostgreSQL real). Companion sobre el mismo commit/ref
+(`Python CI 36614230218`, `Frontend CI 36614230417`, `Optimize lab 36614230409`,
+`Fase 2 scientific 36614230180`) → **`success`** las cuatro; en `main` (push `5cbe84b0`)
+`Python CI 36614223164` `quality` **`3093 passed, 40 skipped`** con sus **4** jobs PG per-commit verdes.
+Cita cruda: [`evidencia-ci-tag-v2.88.7-2026-09-29.txt`](./evidencia-ci-tag-v2.88.7-2026-09-29.txt).
+
 ---
 
 ## 9. Evidencia y registros
@@ -318,6 +333,8 @@ añade después, sobre el objeto empujado. **Se cita el run, no se hereda.**
 - Evidencia cruda y verificable: [`evidence/v2.88.7/README.md`](./evidence/v2.88.7/README.md).
 - Cita del rojo que motiva esta entrega:
   [`evidencia-ci-tag-v2.88.6-2026-09-29.txt`](./evidencia-ci-tag-v2.88.6-2026-09-29.txt) (run `36603391512`).
+- Cita del CI **de este sello**:
+  [`evidencia-ci-tag-v2.88.7-2026-09-29.txt`](./evidencia-ci-tag-v2.88.7-2026-09-29.txt) (run `36614230366`).
 - Deuda: [`deuda-p3-post-auditoria-v2.70-2026-09-26.md`](./deuda-p3-post-auditoria-v2.70-2026-09-26.md)
   (`OBS-20` **cerrada**; `OBS-19` **abierta**).
 - Índice: [`engineering-index-2026-08-03.md`](./engineering-index-2026-08-03.md) ·

@@ -212,7 +212,39 @@ Log crudo de la matriz completa, **versionado dentro del sello**:
 (`test_auto_v70_auto23_evidence_validation.py`, `assert 17 == 26`) **exige PostgreSQL** y el job offline lo
 **skippea**: forma parte de los `37`.
 
-## 8. Límite de esta evidencia
+## 9. Cita real del CI del tag (POST-TAG, 2026-09-29)
+
+`Release tag CI` run **[`36614230366`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36614230366)**
+(HEAD `5cbe84b0`, `ref=v2.88.7-beta`) → **`SUCCESS` en la PRIMERA pasada** (`attempt 1`;
+`18:44:34Z → 18:53:13Z`, **~8m39s**), **10 jobs reales verdes + `certify` verde** y
+`playwright (integrated E2E, opt-in)` `skipped` por diseño.
+
+Job `python` **verbatim**: `ruff All checks passed!` · `Contracts: 4 kept, 0 broken` ·
+`mypy no issues found in 508 source files` · **`3104 passed, 37 skipped, 6 warnings in 55.36s`**
+⇒ **ESPERADO `3104/37` = OBSERVADO `3104/37` → COINCIDE**.
+
+`lifecycle-pg` **GREEN con `220 passed`** en sus **8** invocaciones (**0 failed / 0 skipped**), todas con
+guarda `fail if skipped`:
+
+| Paso | Resultado |
+| --- | --- |
+| Alembic + auth + golden V1.88–V1.97 + integridad | `165 passed in 98.45 s` |
+| Aislamiento de cuenta V2.15.4 | `45 passed in 15.02 s` |
+| Golden Day 2.0 | `1 passed in 10.64 s` |
+| **Crash/Recovery Day** | **`1 passed in 9.34 s`** ← **el rojo del tag de `v2.88.6`** |
+| Concurrent AUTO (3 sesiones) | `3 passed in 2.30 s` |
+| HardKill recovery | `2 passed in 1.76 s` |
+| Crash injection (exactly-once) | `2 passed in 0.92 s` |
+| Multiprocess AUTO (N procesos reales) | `1 passed in 113.13 s` |
+
+Companion sobre el mismo commit/ref (`Python CI 36614230218`, `Frontend CI 36614230417`,
+`Optimize lab 36614230409`, `Fase 2 scientific 36614230180`) → **`success`** las cuatro; en `main`
+(push `5cbe84b0`) `Python CI 36614223164` `quality` **`3093 passed, 40 skipped`** con sus **4** jobs PG
+per-commit verdes, y `Frontend CI 36614223183` / `Optimize lab 36614223230` /
+`Fase 2 scientific 36614223235` / `Gitleaks 36614223332` **`success`**. Cita cruda:
+[`evidencia-ci-tag-v2.88.7-2026-09-29.txt`](../evidencia-ci-tag-v2.88.7-2026-09-29.txt).
+
+## 10. Límite de esta evidencia
 
 **NO** acredita `P3-2`/`P3-3`: el replay usa **reloj simulado** (una cuenta/versión/watch,
 `pairActive=false`) y **no** sustituye la ventana PAPER real. **NO** cierra `OBS-15` (techo de **1000

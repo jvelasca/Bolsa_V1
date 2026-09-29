@@ -128,25 +128,49 @@ skipped**). Companion sobre el mismo commit/ref: `Python CI 36581692059`, `Front
 `Optimize lab 36581692245`, `Fase 2 scientific 36581692285` → **`success`** las cuatro. Cita cruda:
 [`evidencia-ci-tag-v2.88.5-2026-09-29.txt`](./evidencia-ci-tag-v2.88.5-2026-09-29.txt).
 
+### 1.4 CI del objeto **vigente** `v2.88.7-beta` — **ACREDITADO** (cita **POST-TAG** en `main`)
+
+`Release tag CI` [`36614230366`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36614230366) ·
+HEAD `5cbe84b0` · `ref=v2.88.7-beta` · **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `18:44:34Z →
+18:53:13Z`, **~8m39s**): **10 jobs reales verdes + `certify` verde** y `playwright (integrated E2E,
+opt-in)` `skipped` por diseño. Job `python` **verbatim** `ruff All checks passed!` ·
+`Contracts: 4 kept, 0 broken.` · `mypy no issues found in 508 source files` ·
+`3104 passed, 37 skipped, 6 warnings in 55.36s` ⇒ **ESPERADO `3104/37` = OBSERVADO `3104/37`**
+(`3103` de `v2.88.6` + **1** del test hermético nuevo); `lifecycle-pg` **`220 passed`** en **8**
+invocaciones (**0 failed / 0 skipped**), incluido **`Pytest Crash/Recovery Day` `1 passed in 9.34s`**
+— **el paso que salió ROJO en el tag de `v2.88.6`** y cuya causa (`OBS-20`) se cierra aquí — y
+**`Pytest Concurrent AUTO` `3 passed in 2.30s`**. Companion sobre el mismo commit/ref: `Python CI
+36614230218`, `Frontend CI 36614230417`, `Optimize lab 36614230409`, `Fase 2 scientific 36614230180` →
+**`success`** las cuatro; en `main` (push `5cbe84b0`) `quality` **`3093 passed, 40 skipped`** con sus
+**4** jobs PG per-commit verdes. Cita cruda:
+[`evidencia-ci-tag-v2.88.7-2026-09-29.txt`](./evidencia-ci-tag-v2.88.7-2026-09-29.txt).
+
+> **`v2.88.6-beta` queda como ROJO CITADO** (`Release tag CI` `36603391512`, `~7m33s`): su job `python`
+> fue **verde** (`3103 passed, 37 skipped`) y el único rojo real fue `lifecycle-pg` →
+> `Pytest Crash/Recovery Day`, que exigía una **cola de reserva viva** mientras el motor de `OBS-18`
+> —sellado en el **mismo commit**— la **retira** (`tail_dead`). Esa causa se cierra en `v2.88.7-beta`
+> (`OBS-20`); el tag **no** se borra (precedente de `v2.88`/`v2.88.1`). Detalle:
+> [`evidencia-ci-tag-v2.88.6-2026-09-29.txt`](./evidencia-ci-tag-v2.88.6-2026-09-29.txt).
+
 ## 2. Qué tiene que comprobar el auditor (por este orden)
 
 > **Alcance de esta lista (declarado, `POST-TAG`).** Los 12 puntos de abajo son la lista de la fase de
-> **ORIGEN** (`v2.88` / `2.11.0-beta`, matriz `246`). El **objeto vigente** es **`v2.88.5-beta`** /
-> **`2.11.5-beta`**. Solo estos valores cambian; **el resto sigue vigente tal cual**:
+> **ORIGEN** (`v2.88` / `2.11.0-beta`, matriz `246`). El **objeto vigente** es **`v2.88.7-beta`** /
+> **`2.11.7-beta`**. Solo estos valores cambian; **el resto sigue vigente tal cual**:
 >
-> | Punto | Fase de origen (`v2.88`) | Objeto vigente (`v2.88.5-beta`) |
+> | Punto | Fase de origen (`v2.88`) | Objeto vigente (`v2.88.7-beta`) |
 > | --- | --- | --- |
-> | 1 · `package.json` | `2.11.0-beta` | **`2.11.5-beta`** (`2.11.1` → `v2.88.1`; `2.11.2` → `v2.88.2`; `2.11.3` → `v2.88.3`; `2.11.4` → `v2.88.4`; `2.11.5` → `v2.88.5`) |
-> | 1 · tag | `v2.88-beta` | **`v2.88.5-beta`** (`v2.88.3-beta` = objeto `66f47cf8` → commit `0038adfc`; `v2.88.4` = simetría de ownership, `OBS-17`; `v2.88.5` = ventana de gracia por EDAD, `OBS-14.b`) |
-> | 3 · diff del motor | `7  0` (cierre de `OBS-14` en `real_turn`) | **`+91 / −20`** en `auto_simulation_worker.py` (5 hunks: ventana de gracia por **EDAD** en la regla 2, `OBS-14.b`). `v2.88.3`/`v2.88.4` **no** tocan el motor; `v2.88.2` lo cambia con `only_ids` y `v2.88.5` añade el **segundo discriminador** |
+> | 1 · `package.json` | `2.11.0-beta` | **`2.11.7-beta`** (`2.11.1` → `v2.88.1`; `2.11.2` → `v2.88.2`; `2.11.3` → `v2.88.3`; `2.11.4` → `v2.88.4`; `2.11.5` → `v2.88.5`; `2.11.6` → `v2.88.6`; `2.11.7` → `v2.88.7`) |
+> | 1 · tag | `v2.88-beta` | **`v2.88.7-beta`** (`v2.88.3-beta` = objeto `66f47cf8` → commit `0038adfc`; `v2.88.4` = simetría de ownership, `OBS-17`; `v2.88.5` = ventana de gracia por EDAD, `OBS-14.b`; `v2.88.6` = reconciliación por evidencia de la reserva, `OBS-18` — su `lifecycle-pg` salió **ROJO**, ver §1.4 —; `v2.88.7` = materialización EXACTA del ciclo + re-anclaje de las suites PG, `OBS-20`) |
+> | 3 · diff del motor | `7  0` (cierre de `OBS-14` en `real_turn`) | **`+42 / −0`** en `auto_simulation_worker.py` (`OBS-20`: la materialización se **completa** con el fill APLICADO de **SU ciclo**, `cycle_id`, acotado por LADO). `v2.88.3`/`v2.88.4` **no** tocan el motor; `v2.88.2` lo cambia con `only_ids`; `v2.88.5` añade el **segundo discriminador** (EDAD); `v2.88.6` cambia la regla 2 a la **evidencia de la FILA** (`+37 / −8`) y `v2.88.7` la **completa** |
 > | 4 · etiqueta `RESERVATION_RELEASED_BY_CANCEL` | `startup=False` | igual (heredado sin cambios) |
-> | 8 · matriz de mutaciones | `246` | **`256`**: `+M247`/`M248` (`v2.88.1`), `+M249`/`M250`/`M251` (`v2.88.2`), `+M252` (`v2.88.3`), `+M253` (`v2.88.4`), **`+M254`/`M255`/`M256` + `M250` re-anclada (`v2.88.5`)** |
-> | 10 · «ningún doc dice `2.11.0-beta`» | cierto en su sello | `2.11.0-beta` es **histórico**; el vigente es **`2.11.5-beta`** |
+> | 8 · matriz de mutaciones | `246` | **`267`**: `+M247`/`M248` (`v2.88.1`), `+M249`/`M250`/`M251` (`v2.88.2`), `+M252` (`v2.88.3`), `+M253` (`v2.88.4`), `+M254`/`M255`/`M256` + `M250` re-anclada (`v2.88.5`), `+M257`…`M265` (`v2.88.6`), **`+M266`/`M267` (`v2.88.7`)** |
+> | 10 · «ningún doc dice `2.11.0-beta`» | cierto en su sello | `2.11.0-beta` es **histórico**; el vigente es **`2.11.7-beta`** |
 >
 > La lista **sellada NO se reescribe** (viaja dentro del tag); esta tabla la reconcilia **POST-TAG**, que
 > es donde vive también la cita del CI (§1.1). Para el estado exacto del objeto vigente, la fuente es
-> [`evidence/v2.88.5/README.md`](./evidence/v2.88.5/README.md) y
-> [`obs-14b-ventana-de-gracia-arranque-v2.88.5-2026-09-29.md`](./obs-14b-ventana-de-gracia-arranque-v2.88.5-2026-09-29.md).
+> [`evidence/v2.88.7/README.md`](./evidence/v2.88.7/README.md) y
+> [`obs-20-atribucion-por-ciclo-v2.88.7-2026-09-29.md`](./obs-20-atribucion-por-ciclo-v2.88.7-2026-09-29.md).
 
 1. **Naturaleza del objeto.** `package.json` = `2.11.0-beta`; tag `v2.88-beta` **anotado**; árbol
    **intacto** (`git status --porcelain` vacío) antes y después de cualquier sonda.
@@ -248,6 +272,8 @@ ventana PAPER real exige **días de pared con material durable**. El auditor deb
   `OBS-3`/`OBS-4`). `Release tag CI` [`36558405748`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405748)
   **SUCCESS** en la primera pasada; job `python` **`3040 passed, 37 skipped`** (0 fallos) y `lifecycle-pg`
   **220 passed**. Dentro del tag la cita dice `(pendiente)` **a propósito**; ver §1.1. Para el objeto
-  **vigente** (`v2.88.5-beta`), la cita real es el run `36581692155` (**§1.3**).
+  **vigente** (`v2.88.7-beta`), la cita real es el run `36614230366` (**§1.4**); el `v2.88.6-beta` queda
+  como **rojo citado** (`36603391512`, `lifecycle-pg` → `Pytest Crash/Recovery Day`) con su causa cerrada
+  aquí (`OBS-20`).
 - Los defectos documentales de la fase (**versión inexistente**; **7 `I001`**) están **corregidos** y se
   declaran; ninguno es deuda de datos.

@@ -1520,9 +1520,21 @@ real —una cuenta/versión/watch, `pairActive=false`—); **NO** cierra `OBS-15
 pytest sigue **ABIERTA**); el replay sigue **sin** escribir en PostgreSQL (cuarentena en memoria, por
 construcción). La cita del CI es **POST-TAG**: esperado job `python` **`3104 passed, 37 skipped`**
 (identidad **recogidos local − 37**: `3141 − 37`; los `3103` de `v2.88.6` + **`1`** del test hermético nuevo),
-con los **mismos `37` skips**.
+con los **mismos `37` skips`**.
+
+**CITA REAL (POST-TAG, 2026-09-29).** `Release tag CI` run **`36614230366`** (HEAD `5cbe84b0`,
+`ref=v2.88.7-beta`) → **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `18:44:34Z → 18:53:13Z`,
+**~8m39s**), **10 jobs reales verdes + `certify` verde** y `playwright (integrated E2E, opt-in)`
+`skipped` por diseño. Job `python` **verbatim**: `ruff All checks passed!` · `Contracts: 4 kept, 0
+broken` · `mypy no issues found in 508 source files` · **`3104 passed, 37 skipped, 6 warnings in
+55.36s`** ⇒ **ESPERADO `3104/37` = OBSERVADO `3104/37` → COINCIDE**. `lifecycle-pg` **GREEN con `220
+passed`** en sus **8** invocaciones (**0 failed / 0 skipped**), incluido **`Pytest Crash/Recovery Day`
+`1 passed in 9.34s`** — **el paso que salió ROJO en el tag de `v2.88.6`**, que es el rojo que esta
+deuda cierra — y **`Pytest Concurrent AUTO` `3 passed in 2.30s`** (la otra suite re-anclada). En `main`
+(push `5cbe84b0`) `quality` **`3093 passed, 40 skipped`** con los **4** jobs PG per-commit verdes.
 
 **Evidencia:** [`obs-20-atribucion-por-ciclo-v2.88.7-2026-09-29.md`](./obs-20-atribucion-por-ciclo-v2.88.7-2026-09-29.md) ·
+[`evidencia-ci-tag-v2.88.7-2026-09-29.txt`](./evidencia-ci-tag-v2.88.7-2026-09-29.txt) (cita cruda del CI del tag) ·
 [`evidence/v2.88.7/README.md`](./evidence/v2.88.7/README.md) ·
 [`evidence/v2.88.7/mutation-matrix-267.log`](./evidence/v2.88.7/mutation-matrix-267.log) ·
 [`evidencia-ci-tag-v2.88.6-2026-09-29.txt`](./evidencia-ci-tag-v2.88.6-2026-09-29.txt) (rojo citado) ·

@@ -1,0 +1,99 @@
+# Evidencia cruda -- CI del tag v2.88.7-beta (`AUTO-MATERIAL-20` / `OBS-20`), POST-TAG, 2026-09-29
+#
+# Tag anotado : v2.88.7-beta -> commit del sello 5cbe84b0 (5cbe84b06efd1942271255e8ee4f4b063a8ef91d).
+# Version paq.: 2.11.6-beta -> 2.11.7-beta (package.json).
+# Base del diff: 032ae7cc (= v2.88.6-beta, con su cita POST-TAG del CI ya dentro).
+# Alembic head: 046_fill_reference_mid (SIN migracion).
+# Motor       : SI se toca (+42/-0 en apps/api-python/src/bolsa_api/background/
+#               auto_simulation_worker.py, `_v2_reconcile_reservations`): la materializacion de la
+#               reserva se COMPLETA con el fill APLICADO de SU ciclo (`cycle_id`, acotado por LADO).
+#               `packages/py` : `AppliedFillFact.cycle_id` (+17/-0, evidencia interna, NO en to_dict)
+#               y `read_applied_fill_facts` lo propaga (+6/-0).
+#
+# RESULTADO   : VERDE en la PRIMERA pasada (attempt 1). El sello ES certificable y la causa del
+#               rojo de v2.88.6-beta queda CERRADA aqui (OBS-20). El tag v2.88.6-beta NO se borra:
+#               queda como rojo citado en evidencia-ci-tag-v2.88.6-2026-09-29.txt.
+# ---------------------------------------------------------------------------------------
+# Release tag CI -- run 36614230366 -- ref v2.88.7-beta -- HEAD 5cbe84b0
+# ---------------------------------------------------------------------------------------
+# conclusion : SUCCESS  (attempt 1)
+# ventana    : 2026-09-29T18:44:34Z -> 2026-09-29T18:53:13Z  (~8m39s)
+# jobs (11):
+#   python (ruff/imports/mypy/pytest offline)                    success
+#   shared (build/typecheck/test)                                success
+#   decision-spine                                               success
+#   playwright (mock E2E)                                        success
+#   lifecycle-pg (Alembic + auth + golden restart)               success   <-- el job del rojo anterior
+#   dr-verify (battery DB_DR / TCP CI)                           success
+#   security (gitleaks)                                          success
+#   a7-gate (A7 C3 chaos live_a7 - dedicated real-PG)            success
+#   frontend (typecheck/lint/test/build + contract:check)        success
+#   playwright (integrated E2E, opt-in)                          skipped (por diseno)
+#   certify (aggregate + artifact)                               success
+#
+# Job `python` del tag (VERBATIM, timestamps UTC del runner):
+#   2026-09-29T18:44:55Z All checks passed!                       (ruff)
+#   2026-09-29T18:44:55Z Contracts: 4 kept, 0 broken.             (import-linter)
+#   2026-09-29T18:45:15Z Success: no issues found in 508 source files   (mypy)
+#   2026-09-29T18:46:11Z 3104 passed, 37 skipped, 6 warnings in 55.36s  (pytest)
+#
+#   ESPERADO 3104 passed / 37 skipped  ==  OBSERVADO 3104 passed / 37 skipped  -> COINCIDE
+#   (identidad `recogidos local - 37 skips`: 3141 recogidos - 37 = 3104; los 37 skips son los
+#    mismos tests PG-gated de siempre. Los 3103 de v2.88.6 + 1 = 3104: el test hermetico nuevo
+#    `test_a_cancel_is_never_declared_while_an_applied_fill_waits_in_the_ledger`.)
+#
+# lifecycle-pg (VERBATIM, recuentos por invocacion; todas con guarda `fail if skipped`):
+#   165 passed, 2 warnings in 98.45s   (Alembic + auth + golden restart V1.88-V1.97 + integridad)
+#    45 passed, 4 warnings in 15.02s   (account-isolation gate V2.15.4)
+#     1 passed in 10.64s               (Golden Day 2.0)
+#     1 passed in 9.34s                (Crash/Recovery Day)   <-- EL ROJO DE v2.88.6, AHORA VERDE
+#     3 passed in 2.30s                (Concurrent AUTO, 3 sesiones concurrentes)
+#     2 passed in 1.76s                (HardKill recovery)
+#     2 passed in 0.92s                (crash injection matrix, exactly-once)
+#     1 passed in 113.13s (0:01:53)    (multiprocess AUTO, N procesos reales)
+#   -> 220 passed en total, 0 failed / 0 skipped: el re-anclaje de
+#      `test_crash_recovery_day_process_pg.py` a la semantica de OBS-18 (cola muerta RETIRADA con
+#      motivo `tail_dead`) queda certificado sobre PostgreSQL REAL, no en local.
+#
+# ---------------------------------------------------------------------------------------
+# Companion runs sobre el MISMO commit/ref (v2.88.7-beta, 5cbe84b0) -- todas VERDES
+# ---------------------------------------------------------------------------------------
+#   Python CI          36614230218   success
+#   Frontend CI        36614230417   success
+#   Optimize lab       36614230409   success
+#   Fase 2 scientific  36614230180   success
+#
+# En `main` (push del mismo commit 5cbe84b0) -- todas VERDES
+# ---------------------------------------------------------------------------------------
+#   Python CI          36614223164   success   -> job `quality`: 3093 passed, 40 skipped
+#                                                 (+ 4 jobs PG per-commit: grammar-discovery-pg,
+#                                                  auto-v2-durable-pg, paper-forward-pg, lifecycle-pg)
+#   Frontend CI        36614223183   success
+#   Optimize lab       36614223230   success
+#   Fase 2 scientific  36614223235   success
+#   Gitleaks           36614223332   success
+#
+# ---------------------------------------------------------------------------------------
+# Referencia: objeto ANTERIOR (v2.88.6-beta) -- EL ROJO QUE ESTE SELLO CIERRA
+# ---------------------------------------------------------------------------------------
+#   Release tag CI     36603391512   FAILURE   -> lifecycle-pg rojo en `Pytest Crash/Recovery Day`
+#                                                (`la muerte debe ocurrir con el fill PARCIAL durable
+#                                                (cola de reserva viva); reservas vivas: []`);
+#                                                job `python` VERDE con 3103 passed, 37 skipped.
+#
+# NOTA de recuentos locales de este sello (bateria offline con el comando EXACTO del job
+# `python`, 121 tokens = 81 rutas + 39 `--ignore` + `-q`): `1 failed, 3140 passed` -> 3141
+# recogidos. El unico fallo es PRE-EXISTENTE de solo-entorno
+# (test_auto_v70_auto23_evidence_validation.py, `assert 17 == 26`, material paper_real sembrado en
+# la BD de desarrollo) y en el job `python` del CI se salta:
+#    LOCAL: 3140 passed + 1 failed  = 3141 recogidos
+#    CI   : 3104 passed + 37 skipped = 3141 recogidos   -> COINCIDE
+#
+# Compuertas locales medidas de este sello (para que el VERDE del tag no se lea como suerte):
+#   ruff `All checks passed!` · import-linter `Contracts: 4 kept, 0 broken.` · mypy 508 source files
+#   cinco suites del motor e instrumento `98 passed` (27/18/45/5/3)
+#   PG locales: golden day 1 · crash/recovery 1 · concurrencia 3 (x12 consecutivas) ·
+#               v46 hardkill 2 · crash injection 2 · multiprocess 1 (113.46 s)
+#   matriz de mutaciones COMPLETA `267/267` (M266/M267 muerden el test nuevo), arbol intacto, exit 0
+#   artefacto del replay BYTE-REPRODUCIBLE: 3393187 B, SHA-256
+#   7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461
