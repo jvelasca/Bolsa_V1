@@ -265,3 +265,21 @@ este tag es **idéntico** al de `v2.88.2`; lo que cambia es que **la validación
 > ```
 > git log --format=%h:%s -1 --grep "cita POST-TAG del CI del tag v2.88.3-beta"
 > ```
+
+### 7.1 El resto de workflows del MISMO commit (`0038adfc`) — todos verdes
+
+Citados para **no dejar el árbol a medias**: el commit sellado no solo pasa `Release tag CI`.
+
+| Workflow | Ref | Run | Resultado |
+| --- | --- | --- | --- |
+| Python CI | `v2.88.3-beta` | [`36558405715`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405715) | success |
+| Frontend CI | `v2.88.3-beta` | [`36558405669`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405669) | success |
+| Optimize lab | `v2.88.3-beta` | [`36558405730`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405730) | success |
+| Fase 2 scientific | `v2.88.3-beta` | [`36558405668`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405668) | success |
+| Python CI | `main` | [`36558402839`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558402839) | success |
+| Frontend CI | `main` | [`36558402720`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558402720) | success |
+| Optimize lab | `main` | [`36558402895`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558402895) | success |
+| Gitleaks | `main` | [`36558402801`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558402801) | success |
+
+Los dos commits **POST-TAG** (`a6c44b77` y el siguiente, `docs`-only, sin tocar `packages/`/`apps/`) **no**
+disparan workflows de Python por el trigger por rutas: la cita **no** introduce código nuevo.
