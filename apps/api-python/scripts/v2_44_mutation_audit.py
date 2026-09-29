@@ -728,6 +728,9 @@ T_CRASH_MATRIX = "apps/api-python/tests/test_auto_v44_exit_crash_matrix.py"
 # Render de consola de los DOS orquestadores: el contrato es el dict, no el dataclass.
 V86_REPLAY_VIABILITY = "apps/api-python/scripts/v2_86_replay_oos_viability.py"
 T_CLI_RENDERERS = "apps/api-python/tests/test_replay_oos_cli_renderers.py"
+#: AUTO-MATERIAL-19 (V2.88.6): el log de retiradas del harness publica el MOTIVO, no solo el
+#: estado. Sin él, ``byDeadTail``/``reasons`` serían un cero silencioso sobre retiradas reales.
+T_RELEASE_LOG = "apps/api-python/tests/test_v2_87_release_log.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2690,11 +2693,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M241 (reconciliacion a medias): la reserva muerta sin fill deja de retirarse",
         WORKER,
+        # OBS-18: la rama se ancla a la CONDICION VIGENTE (evidencia de la reserva + guardia de
+        # ``in_flight``); ``and filled == 0.0`` ya no existe aqui (era el defecto que cerro OBS-18).
         "            elif (\n"
-        "                measurable\n"
-        "                and created is not None\n"
-        "                and instrument not in (in_flight or frozenset())\n"
-        "                and filled == 0.0\n"
+        "                measurable and created is not None and instrument not in (in_flight or frozenset())\n"
         "            ):\n",
         "            elif False:\n",
         (T_AUTO_DURABLE,),
@@ -2804,6 +2806,93 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        return (self._time - created) > self._v2_reservation_grace\n",
         "        return (self._time - created) >= self._v2_reservation_grace\n",
         (T_AUTO_DURABLE,),
+    ),
+    (
+        "M257 (regla 2 por AGREGADO): la retirada vuelve a decidirse por el total de fills del instrumento+lado (su forma historica). Una reserva que NUNCA materializo sobrevive si una hermana suya lleno",
+        WORKER,
+        "            elif (\n"
+        "                measurable and created is not None and instrument not in (in_flight or frozenset())\n"
+        "            ):\n",
+        "            elif (\n"
+        "                measurable\n"
+        "                and created is not None\n"
+        "                and instrument not in (in_flight or frozenset())\n"
+        "                and filled == 0.0\n"
+        "            ):\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M258 (cola muerta conservada): exigir 'no materializado' para retirar -> la COLA de un fill parcial no la retira NADIE y su capital queda comprometido para siempre",
+        WORKER,
+        "            elif (\n"
+        "                measurable and created is not None and instrument not in (in_flight or frozenset())\n"
+        "            ):\n",
+        "            elif (\n"
+        "                measurable\n"
+        "                and created is not None\n"
+        "                and instrument not in (in_flight or frozenset())\n"
+        "                and not materialized\n"
+        "            ):\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M259 (motivo mudo): la cola de un fill parcial se declara 'cancel' -> la cola retirada y la huerfana se confunden y el mecanismo desaparece del conteo",
+        WORKER,
+        "                    reason=(\n"
+        "                        RELEASE_REASON_RESTART\n"
+        "                        if startup\n"
+        "                        else (\n"
+        "                            RELEASE_REASON_DEAD_TAIL\n"
+        "                            if materialized > 0.0\n"
+        "                            else RELEASE_REASON_CANCEL\n"
+        "                        )\n"
+        "                    ),\n",
+        "                    reason=(\n"
+        "                        RELEASE_REASON_RESTART if startup else RELEASE_REASON_CANCEL\n"
+        "                    ),\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M260 (estancamiento mudo): el umbral deja de aplicarse -> un libro comprometido y parado se publica como corrida COMPLETA",
+        REPLAY_OOS,
+        "    days = max(0, int(operable_days_without_activity))\n    if days < max(1, int(threshold)):\n        return None\n",
+        "    days = max(0, int(operable_days_without_activity))\n    if True:\n        return None\n",
+        (T_REPLAY_OOS_DURABLE,),
+    ),
+    (
+        "M261 (estancamiento fail-OPEN): un riesgo ILEGIBLE deja de contar como comprometido -> 'no puedo afirmar que el libro este limpio' se lee como libro limpio",
+        REPLAY_OOS,
+        "    committed = int(live_reservations) > 0 or risk is None or risk > 0.0\n",
+        "    committed = int(live_reservations) > 0 or (risk is not None and risk > 0.0)\n",
+        (T_REPLAY_OOS_DURABLE,),
+    ),
+    (
+        "M262 (log sin motivo): el instrumento registra la retirada pero NO su causa -> byDeadTail vuelve a ser el cero silencioso que OBS-18 mide",
+        V87_REPLAY_DURABLE,
+        '                    "reason": str(getattr(row, "release_reason", "") or reason or ""),\n',
+        '                    "reason": "",\n',
+        (T_RELEASE_LOG,),
+    ),
+    (
+        "M263 (motivo por ESTADO): los motivos se cuentan por estado de retirada -> tail_dead y cancel colapsan en el mismo cubo",
+        REPLAY_OOS,
+        "        reason = _release_reason(row)\n        if reason:\n            counts[reason] = counts.get(reason, 0) + 1\n",
+        "        counts[_release_status(row)] = counts.get(_release_status(row), 0) + 1\n",
+        (T_REPLAY_OOS_DURABLE,),
+    ),
+    (
+        "M264 (delta de motivos inflado): el delta del tick lee la causa del log ENTERO -> una retirada vieja se cuenta como nueva del tick",
+        REPLAY_OOS,
+        "        delta_reasons=count_release_reasons(log[already:]),\n",
+        "        delta_reasons=count_release_reasons(log),\n",
+        (T_REPLAY_OOS_DURABLE,),
+    ),
+    (
+        "M265 (operabilidad inventada): un indice fuera del censo cuenta como dia OPERABLE -> un censo recortado infla los dias sin actividad y declara un estancamiento que no se midio",
+        REPLAY_OOS,
+        "    if index < 0 or index >= len(operable_days):\n        return False\n",
+        "    if index < 0 or index >= len(operable_days):\n        return True\n",
+        (T_REPLAY_OOS_DURABLE,),
     ),
 ]
 

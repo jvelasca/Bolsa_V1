@@ -90,7 +90,10 @@ from bolsa_analytics.cognitive.operational_governor import (
     to_market_regime,
 )
 from bolsa_analytics.cognitive.portfolio_reservation import (
+    RELEASE_REASON_CANCEL,
+    RELEASE_REASON_DEAD_TAIL,
     RELEASE_REASON_FILL,
+    RELEASE_REASON_RESTART,
     RESERVATION_RELEASED_BY_CANCEL,
     RESERVATION_RELEASED_BY_FILL,
     RESERVATION_RELEASED_BY_RESTART,
@@ -2683,10 +2686,18 @@ class AutoSimulationWorker:
            es progresivo en orden de alta, así que dos reservas del mismo instrumento no
            cuentan el mismo fill dos veces.
         2. **Cancelación / reinicio** — solo si las DOS lecturas son MEDIBLES (``COMPLETE``)
-           y la orden de esa reserva no está ni en vuelo ni materializada: la reserva murió
-           sin llenarse. Con una lectura incompleta la reserva se CONSERVA (liberar por un
+           y la orden de esa reserva no está EN VUELO: la reserva no tiene nada que la vaya
+           a consumir. Con una lectura incompleta la reserva se CONSERVA (liberar por un
            hueco de lectura sería fail-OPEN: devolvería al mercado un capital que quizá
            está comprometido).
+
+           OBS-18 — la decisión se toma con la EVIDENCIA DE LA RESERVA (su cantidad
+           materializada, ``released_qty``) y con la ausencia de traza en vuelo del
+           instrumento, NUNCA con el agregado de fills del instrumento+lado: una reserva
+           que no materializó nada quedaba viva para siempre en cuanto OTRA reserva del
+           mismo instrumento+lado llenaba (``filled != 0``), y la COLA de un fill parcial
+           no la retiraba nadie (la regla 1 solo libera lo materializado). Ambas cosas
+           comprometían capital de forma indefinida hasta agotar el presupuesto.
         3. **Lectura ilegible** — con reservas vivas que no se pudieron reconciliar, el
            libro queda ``UNKNOWN`` y el motor veta aperturas. "No pude leerlo" nunca se
            lee como "no había nada comprometido".
@@ -2788,6 +2799,7 @@ class AutoSimulationWorker:
                 resolved.append(reservation)
                 continue
             released: PortfolioReservation | None = None
+            materialized = float(reservation.released_qty or 0.0)
             if attribute_fills and fill_qty > 0:
                 consumed[fill_key] = consumed.get(fill_key, 0.0) + fill_qty
                 released = await self._v2_release_reservation(
@@ -2797,12 +2809,27 @@ class AutoSimulationWorker:
                     released_qty=fill_qty,
                 )
             elif (
-                measurable
-                and created is not None
-                and instrument not in (in_flight or frozenset())
-                and filled == 0.0
+                measurable and created is not None and instrument not in (in_flight or frozenset())
             ):
-                # Ni materializada ni en vuelo: la orden de esta reserva murió sin llenar.
+                # OBS-18 — "murió" se decide por la EVIDENCIA DE LA RESERVA (``released_qty``,
+                # lo que el camino caliente liberó de ESTA fila), NUNCA por el agregado de
+                # fills del instrumento+lado. Antes esta rama exigía ``filled == 0.0``: el
+                # total de fills del instrumento posteriores al alta. Dos consecuencias
+                # medidas en el replay multianual (16 reservas vivas, riesgo ``6000/6000``,
+                # actividad congelada tras ``2022-05``):
+                #
+                # * una reserva que NUNCA materializó quedaba viva PARA SIEMPRE en cuanto
+                #   otra reserva del mismo instrumento+lado llenaba (``filled != 0``), aunque
+                #   su propia fila no registrara ni un lote (``released_qty == 0``);
+                # * la COLA de un fill parcial no la retiraba NADIE: la regla 1 solo libera
+                #   lo materializado y esta rama exigía ``filled == 0``.
+                #
+                # El sesgo fail-closed no cambia: la guardia de ``in_flight`` manda (una traza
+                # sin aplicar del instrumento significa que la orden sigue trabajando y su cola
+                # todavía puede materializar), con una lectura incompleta no se libera nada, y
+                # el motivo declara la causa — ``tail_dead`` cuando la fila SÍ registró fill
+                # parcial (se retira la cola, no lo materializado) y ``cancel`` cuando no
+                # materializó nada. La liberación nunca supera la cantidad viva.
                 released = await self._v2_release_reservation(
                     reservation,
                     status=(
@@ -2810,9 +2837,21 @@ class AutoSimulationWorker:
                         if startup
                         else RESERVATION_RELEASED_BY_CANCEL
                     ),
-                    reason="restart" if startup else "cancel",
+                    reason=(
+                        RELEASE_REASON_RESTART
+                        if startup
+                        else (
+                            RELEASE_REASON_DEAD_TAIL
+                            if materialized > 0.0
+                            else RELEASE_REASON_CANCEL
+                        )
+                    ),
                     released_qty=None,
                 )
+                # El outcome declara la evidencia DE LA RESERVA, no el agregado: una reserva
+                # que no materializó no puede "marcar como llenado" el fill de su hermana al
+                # sincronizar el INTENT de salida (lo cerraría como PARTIAL con cantidad ajena).
+                fill_qty = materialized
             outcomes[reservation.reservation_id] = (fill_qty, released)
             resolved.append(released if released is not None else reservation)
         self._v2_reservations = tuple(row for row in resolved if row.is_live)

@@ -65,7 +65,10 @@ from bolsa_application.discovery_market_regime import (
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "DEAD_TAIL_REASON",
+    "HORIZON_STALLED_BOOK",
     "HORIZON_UNDECLARED",
+    "STALL_OPERABLE_DAYS",
     "BookSnapshot",
     "CensusDay",
     "CensusReport",
@@ -83,11 +86,14 @@ __all__ = [
     "census_operable_days",
     "clamp_bars_as_of",
     "close_tick",
+    "count_release_reasons",
     "count_releases",
     "declare_book_measurement",
     "declare_horizon",
+    "declare_stall",
     "make_as_of_bar_loader",
     "make_day_price_script",
+    "operable_days_without_activity",
     "release_deltas",
     "score_replay",
     "snapshot_book",
@@ -805,6 +811,87 @@ _MEASUREMENT_LABELS: frozenset[str] = frozenset(
 #: Motivo publicado cuando el horizonte queda corto y NINGUNA causa se declaró.
 HORIZON_UNDECLARED = "undeclared_truncation"
 
+#: Motivo publicado cuando el motor DEJÓ DE OPERAR con el libro todavía comprometido
+#: (OBS-18: presupuesto agotado por compromisos que nadie retira). No es una medición
+#: incompleta: es una corrida que recorrió todos los ticks sin ejercitar el horizonte.
+HORIZON_STALLED_BOOK = "stalled_book"
+
+#: Días OPERABLES consecutivos sin una sola orden/fill tras los cuales un libro que sigue
+#: comprometiendo capital deja de ser "el motor eligió no operar" y se declara ESTANCAMIENTO.
+#: Es un umbral de DECLARACIÓN, no un gate de comportamiento: la corrida nunca se corta por
+#: él, solo deja de publicarse como completa. Un mes de días operables es holgadamente mayor
+#: que cualquier hueco legítimo medido entre temporadas (el mayor del histórico es de 2025-04
+#: a 2026-01, y en él el libro estaba LIMPIO: la condición exige las dos cosas).
+STALL_OPERABLE_DAYS = 20
+
+#: Motivo tipificado de retirada (OBS-18): la cola de un fill parcial cuyo orden ya no está
+#: en vuelo. ``portfolio_reservation.RELEASE_REASON_DEAD_TAIL``; se duplica aquí para no
+#: importar el paquete de analítica desde la capa de aplicación.
+DEAD_TAIL_REASON = "tail_dead"
+
+
+def operable_days_without_activity(
+    operable_days: Sequence[bool] | None,
+    *,
+    last_active_index: int | None,
+    end_index: int,
+) -> int:
+    """Días OPERABLES recorridos después del último día con actividad (aritmética del guardarraíl).
+
+    ``operable_days`` es la operabilidad POR ÍNDICE de día (el censo es 1:1 con el calendario
+    que el replay recorre) y ``end_index`` es exclusivo (los días efectivamente simulados).
+
+    Dos decisiones fail-loud, explícitas:
+
+    * un ``last_active_index is None`` (ni una sola orden en toda la corrida) cuenta desde el
+      principio: la ausencia de actividad es TOTAL, no "desconocida";
+    * un índice fuera del censo NO se cuenta como operable —no se puede AFIRMAR que ese día
+      fuera operable—, así que un censo recortado **sub-declara** el estancamiento en vez de
+      inventarlo. El precio es conocido y se prefiere: declarar de más convierte un hueco
+      legítimo en un falso positivo; declarar de menos solo deja la puerta abierta al silencio
+      que este guardarraíl existe para cerrar, y ese caso queda cubierto por el libro
+      (``declare_stall`` exige ADEMÁS capital comprometido).
+    """
+    if last_active_index is None:
+        start = 0
+    else:
+        start = max(0, int(last_active_index) + 1)
+    flags = operable_days or ()
+    return sum(1 for offset in range(start, max(0, int(end_index))) if _is_operable(flags, offset))
+
+
+def _is_operable(operable_days: Sequence[bool], index: int) -> bool:
+    """True solo si el censo DECLARA el día como operable; un índice sin censo no lo es."""
+    if index < 0 or index >= len(operable_days):
+        return False
+    return bool(operable_days[index])
+
+
+def declare_stall(
+    *,
+    operable_days_without_activity: int,
+    live_reservations: int,
+    reserved_risk: float | None,
+    threshold: int = STALL_OPERABLE_DAYS,
+) -> str | None:
+    """Declara ``stalled_book`` si el libro compromete capital y el motor lleva N días sin operar.
+
+    Fail-loud con dos condiciones EXPLÍCITAS, para no confundir "no quiso operar" con "no pudo":
+
+    * el libro sigue comprometido (``live_reservations > 0`` o ``reserved_risk > 0``), y
+    * pasaron ``threshold`` días operables consecutivos sin una sola orden ni fill.
+
+    Un libro limpio con una temporada sin señales (o sin gate) NO es un estancamiento, y
+    tampoco lo es un libro sucio en el último tick. ``reserved_risk`` ilegible se lee como
+    "no puedo afirmar que esté limpio" y por tanto cuenta como comprometido (fail-closed).
+    """
+    days = max(0, int(operable_days_without_activity))
+    if days < max(1, int(threshold)):
+        return None
+    risk = _opt_float(reserved_risk)
+    committed = int(live_reservations) > 0 or risk is None or risk > 0.0
+    return HORIZON_STALLED_BOOK if committed else None
+
 
 def declare_book_measurement(measurement: Any) -> str:
     """Etiqueta de medición del libro, **fail-closed**: lo ilegible es ``UNKNOWN``.
@@ -902,6 +989,8 @@ class ReleaseTally:
 
     total: Mapping[str, int]
     delta: Mapping[str, int]
+    reasons: Mapping[str, int] = field(default_factory=dict)
+    delta_reasons: Mapping[str, int] = field(default_factory=dict)
 
     @property
     def by_fill(self) -> int:
@@ -911,6 +1000,15 @@ class ReleaseTally:
     def by_cancel(self) -> int:
         """Retiradas por CANCELACIÓN acumuladas: la firma del compromiso huérfano."""
         return int(self.total.get("RELEASED_BY_CANCEL", 0))
+
+    @property
+    def by_dead_tail(self) -> int:
+        """OBS-18 — colas de fill parcial retiradas porque su orden ya no estaba en vuelo.
+
+        Se separa de ``by_cancel`` porque no son huérfanas: su fila SÍ registró fill parcial.
+        Mezclarlas escondería el mecanismo (la cola que nadie retiraba) detrás del síntoma.
+        """
+        return int(self.reasons.get(DEAD_TAIL_REASON, 0))
 
     @property
     def delta_by_fill(self) -> int:
@@ -927,8 +1025,11 @@ class ReleaseTally:
             "delta": dict(self.delta),
             "byFill": self.by_fill,
             "byCancel": self.by_cancel,
+            "byDeadTail": self.by_dead_tail,
+            "reasons": dict(self.reasons),
             "deltaByFill": self.delta_by_fill,
             "deltaByCancel": self.delta_by_cancel,
+            "deltaReasons": dict(self.delta_reasons),
         }
 
 
@@ -941,6 +1042,15 @@ def _release_status(row: Any) -> str:
     return str(raw or "").strip().upper()
 
 
+def _release_reason(row: Any) -> str:
+    """Motivo normalizado de la retirada (``""`` si la fila no lo declara)."""
+    if isinstance(row, Mapping):
+        raw = row.get("reason") or row.get("release_reason")
+    else:
+        raw = getattr(row, "reason", None) or getattr(row, "release_reason", None)
+    return str(raw or "").strip().lower()
+
+
 def count_releases(reservations: Sequence[Any] | None) -> dict[str, int]:
     """Cuenta acumulada de retiradas por estado destino, sobre el libro completo."""
     counts: dict[str, int] = {}
@@ -948,6 +1058,18 @@ def count_releases(reservations: Sequence[Any] | None) -> dict[str, int]:
         status = _release_status(row)
         if status in _RELEASED_STATUSES:
             counts[status] = counts.get(status, 0) + 1
+    return counts
+
+
+def count_release_reasons(reservations: Sequence[Any] | None) -> dict[str, int]:
+    """Cuenta acumulada de retiradas por MOTIVO declarado (OBS-18: ``tail_dead`` aparte)."""
+    counts: dict[str, int] = {}
+    for row in reservations or ():
+        if _release_status(row) not in _RELEASED_STATUSES:
+            continue
+        reason = _release_reason(row)
+        if reason:
+            counts[reason] = counts.get(reason, 0) + 1
     return counts
 
 
@@ -989,7 +1111,12 @@ def tally_releases(
     """
     log = tuple(events or ())
     already = max(0, min(len(previous or ()), len(log)))
-    return ReleaseTally(total=count_releases(log), delta=count_releases(log[already:]))
+    return ReleaseTally(
+        total=count_releases(log),
+        delta=count_releases(log[already:]),
+        reasons=count_release_reasons(log),
+        delta_reasons=count_release_reasons(log[already:]),
+    )
 
 
 @dataclass(frozen=True, slots=True)

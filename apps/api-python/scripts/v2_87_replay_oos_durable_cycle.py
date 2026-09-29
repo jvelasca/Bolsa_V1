@@ -29,6 +29,21 @@ Qué cambia esta fase
    un pico de ``RELEASED_BY_CANCEL`` es la firma del compromiso huérfano, ahora medida.
 4. **Puntuación por año** (``score.byYear``): es lo que permite leer si la muestra es
    multianual o sigue siendo un único episodio.
+5. **Evidencia POR RESERVA en la reconciliación (``OBS-18``).** La regla 2 decidía por el
+   AGREGADO de fills del instrumento+lado (``filled == 0.0``): una reserva que NUNCA
+   materializó quedaba viva para siempre en cuanto una hermana suya llenaba, y la COLA de un
+   fill parcial no la retiraba nadie (la regla 1 solo libera lo materializado). El motor
+   decide ahora por la EVIDENCIA DE LA RESERVA (``released_qty``, lo que ESTA fila liberó) y
+   declara el motivo de la retirada: ``tail_dead`` cuando la fila sí registró fill parcial (se
+   retira la cola, no lo materializado) y ``cancel`` cuando no materializó nada. El replay
+   publica los motivos (``releases.reasons``): sin ellos ``byDeadTail`` sería un **cero
+   silencioso** —«no medí el motivo» leído como «ninguna retirada fue una cola muerta»—, y la
+   corrida sellada mide **36 colas muertas** de las 64 retiradas por CANCEL.
+6. **Guardarraíl de estancamiento.** Un libro que conserva capital comprometido y deja de
+   producir actividad durante ``STALL_OPERABLE_DAYS`` días operables se declara
+   ``truncationReason=stalled_book`` en vez de presentarse como corrida completa: la
+   contraprueba A/B cerraba con **15 reservas vivas** y ``$6000`` comprometidos, **266 días
+   operables** sin una sola orden, y aun así publicaba ``completed=true``.
 
 Qué NO es (se declara, no se disfraza)
 --------------------------------------
@@ -56,6 +71,7 @@ import logging
 import os
 import pathlib
 import sys
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -184,6 +200,10 @@ class _AccountingReservationStore:
     de liberación. El conteo por log es EXACTO y no depende de releer el libro con un tope
     que un replay largo podría agotar: ``release`` devuelve ``None`` cuando no había nada que
     liberar (idempotente), así que cada entrada del log es una retirada REAL.
+
+    El log publica también el MOTIVO de la retirada (``reason``). Sin él, ``byDeadTail``
+    habría sido un **cero silencioso**: "no se midió el motivo" leído como "ninguna retirada
+    fue una cola muerta". La autoridad es la fila que devuelve el libro.
     """
 
     def __init__(self) -> None:
@@ -212,6 +232,12 @@ class _AccountingReservationStore:
                     "status": str(getattr(row, "status", "") or ""),
                     "instrumentId": str(getattr(row, "instrument_id", "") or ""),
                     "at": str(at or ""),
+                    # OBS-18: el MOTIVO viaja al log. La autoridad es la fila devuelta por el
+                    # libro (si el llamante no lo declara, se conserva el que ya tuviera), de
+                    # modo que la cola de un fill parcial (``tail_dead``) sea MEDIBLE y no un
+                    # cero silencioso: no medir un motivo no es medir "sin motivo".
+                    "reason": str(getattr(row, "release_reason", "") or reason or ""),
+                    "releasedQty": getattr(row, "released_qty", None),
                 }
             )
         return row
@@ -238,6 +264,7 @@ async def _run_durable_replay(
     account_id: str,
     version_a: str,
     engine_id: str,
+    operable_days: Sequence[bool] = (),
     durable_cycle: bool = True,
 ) -> dict[str, Any]:
     """Replay hermético con el ciclo durable de reservas CERRADO en cada tick."""
@@ -248,13 +275,16 @@ async def _run_durable_replay(
     from bolsa_application.exit_order_store import InMemoryExitOrderStore
     from bolsa_application.kill_switch_store import InMemoryKillSwitchStore
     from bolsa_application.replay_oos import (
+        STALL_OPERABLE_DAYS,
         ReplayCursor,
         ReplayFill,
         ReplayTick,
         close_tick,
         declare_book_measurement,
         declare_horizon,
+        declare_stall,
         make_as_of_bar_loader,
+        operable_days_without_activity,
         score_replay,
         snapshot_book,
         tally_releases,
@@ -319,6 +349,7 @@ async def _run_durable_replay(
     cancel_release_days = 0
     truncation_reason: str | None = None
     refused_day: str | None = None
+    last_active_index: int | None = None
     end = len(days) if int(max_ticks) <= 0 else min(len(days), start_index + int(max_ticks))
 
     for index in range(start_index, end):
@@ -347,6 +378,16 @@ async def _run_durable_replay(
         release_mark = len(reservations.releases)
         if int(tally.delta_by_cancel) > 0:
             cancel_release_days += 1
+        # GUARDARRAÍL DE ESTANCAMIENTO: "actividad" = el tick produjo orden, llenado o
+        # retiró un compromiso. Un libro con presupuesto comprometido que deja de tener
+        # actividad N días operables NO es una corrida completa: se declara.
+        if (
+            int(getattr(report, "orders", 0) or 0) > 0
+            or int(getattr(report, "fills", 0) or 0) > 0
+            or int(tally.delta_by_fill) > 0
+            or int(tally.delta_by_cancel) > 0
+        ):
+            last_active_index = index
 
         rows = contexts.order[consumed:]
         consumed = len(contexts.order)
@@ -464,6 +505,23 @@ async def _run_durable_replay(
     except Exception:  # noqa: BLE001 — sin lectura del journal se declara el hueco.
         logger.exception("no se pudieron leer los motivos del journal")
 
+    # ── GUARDARRAÍL DE ESTANCAMIENTO (fail-loud) ───────────────────────────────
+    # Un replay que agota su presupuesto y deja de producir actividad NO ha terminado el
+    # ciclo: se ha quedado sin gasolina. Antes esto se leía como «corrida completa» (el
+    # libro sucio solo se veía en los conteos). Ahora se DECLARA la truncación.
+    replayed = start_index + len(ticks)
+    operable_without_activity = operable_days_without_activity(
+        operable_days, last_active_index=last_active_index, end_index=replayed
+    )
+    final_row = book_rows[-1] if book_rows else {}
+    stall_reason = declare_stall(
+        operable_days_without_activity=operable_without_activity,
+        live_reservations=int(final_row.get("liveReservations", 0) or 0),
+        reserved_risk=final_row.get("reservedRisk"),
+    )
+    if truncation_reason is None:
+        truncation_reason = stall_reason
+
     horizon = declare_horizon(
         ticks=len(ticks),
         total_ticks=max(0, end - start_index),
@@ -495,8 +553,19 @@ async def _run_durable_replay(
             "measuredUnknownDays": [row["day"] for row in book_rows if not row["measurable"]],
             "finalReservedCash": (book_rows[-1]["reservedCash"] if book_rows else None),
             "finalReservedRisk": (book_rows[-1]["reservedRisk"] if book_rows else None),
+            "stall": {
+                "thresholdOperableDays": int(STALL_OPERABLE_DAYS),
+                "operableDaysWithoutActivity": int(operable_without_activity),
+                "lastActiveDay": (
+                    days[last_active_index]
+                    if last_active_index is not None and last_active_index < len(days)
+                    else None
+                ),
+                "declared": stall_reason is not None,
+            },
         },
         "releases": releases.to_dict(),
+        "finalBook": await _final_book_detail(worker),
         "retention": {
             "appliedRetention": _APPLIED_RETENTION,
             "appliedArchived": int(events.archived_applied),
@@ -509,6 +578,55 @@ async def _run_durable_replay(
 
 
 # ── Informe ──────────────────────────────────────────────────────────────────────
+
+
+async def _final_book_detail(worker: Any) -> dict[str, Any]:
+    """Declara el LIBRO FINAL con IDENTIDAD, no solo con conteos.
+
+    El artefacto de ``v2.87`` publicaba ``liveMax``/``finalReservedRisk``, que dicen que el
+    libro gotea pero **no** qué lo gotea. Un replay que se declara «viable» con el libro
+    sucio necesita poder auditarse: aquí se publican las reservas vivas una a una (identidad,
+    lado, dimensiones, alta) y las trazas de ``execution_events``, **más** el conjunto
+    ``inFlight`` con el que la regla 2 decide (una traza sin aplicar CONSERVA el compromiso:
+    es el candidato natural a explicar una reserva que no se retira nunca).
+    """
+    live = [
+        {
+            "reservationId": str(getattr(row, "reservation_id", "") or ""),
+            "instrument": str(getattr(row, "instrument_id", "") or ""),
+            "side": str(getattr(row, "side", "") or ""),
+            "status": str(getattr(row, "status", "") or ""),
+            "createdAt": getattr(row, "created_at", None),
+            "quantity": getattr(row, "quantity", None),
+            "remainingQty": getattr(row, "remaining_qty", None),
+            "releasedQty": getattr(row, "released_qty", None),
+            "entry": getattr(row, "entry", None),
+            "reservedCash": getattr(row, "reserved_cash", None),
+            "reservedRisk": getattr(row, "reserved_risk", None),
+            "strategyVersion": getattr(row, "strategy_version_id", None),
+        }
+        for row in (getattr(worker, "_v2_reservations", ()) or ())
+    ]
+    read = getattr(worker, "_v2_read_unapplied", None)
+    rows: list[Any] = []
+    read_measurement: Any = None
+    if callable(read):
+        rows, read_measurement = await read()
+    in_flight_read = getattr(worker, "_v2_in_flight_instruments", None)
+    in_flight = None
+    if callable(in_flight_read):
+        in_flight = sorted(str(x) for x in await in_flight_read(rows))
+    traces = [order.to_dict() for order in (getattr(worker, "_v2_open_orders", ()) or ())]
+    owned = getattr(worker, "_v2_owned_reservations", None)
+    return {
+        "liveReservations": live,
+        "unappliedRows": [str(getattr(row, "execution_id", "") or "") for row in rows],
+        "unappliedMeasurement": str(read_measurement),
+        "inFlight": in_flight,
+        "pendingTraces": traces,
+        "pendingTraceCount": len(traces),
+        "ownedReservationIds": sorted(str(x) for x in owned) if owned is not None else None,
+    }
 
 
 def _print_census(census: dict[str, Any]) -> None:
@@ -551,6 +669,13 @@ def _print_book(replay: dict[str, Any]) -> None:
     print(f"días con retirada CANCEL  {book['cancelReleaseDays']}")
     print(f"retiradas acumuladas      {replay['releases']['total']}")
     print(f"riesgo comprometido final {book['finalReservedRisk']}")
+    stall = book.get("stall") or {}
+    if stall.get("lastActiveDay") is not None or stall.get("operableDaysWithoutActivity"):
+        print(
+            f"actividad                 último día {stall.get('lastActiveDay')} · "
+            f"{stall.get('operableDaysWithoutActivity')} días operables sin actividad "
+            f"(umbral {stall.get('thresholdOperableDays')})"
+        )
     print(
         f"retención APPLIED         {replay['retention']['appliedRetention']} "
         f"(archivadas {replay['retention']['appliedArchived']}, "
@@ -658,6 +783,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 account_id=str(args.account_id),
                 version_a=str(args.version_a),
                 engine_id=f"replay-oos-durable-{os.urandom(3).hex()}",
+                operable_days=tuple(bool(row.entries_allowed_long) for row in census.days),
                 durable_cycle=bool(args.durable_cycle),
             )
         elif not args.no_replay:

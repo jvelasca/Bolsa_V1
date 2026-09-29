@@ -463,9 +463,7 @@ def _startup_only_reconcile(worker: AutoSimulationWorker, monkeypatch: pytest.Mo
         only_ids: frozenset[str] | None = None,
     ) -> None:
         if startup:
-            await original(
-                startup=startup, attribute_fills=attribute_fills, only_ids=only_ids
-            )
+            await original(startup=startup, attribute_fills=attribute_fills, only_ids=only_ids)
 
     monkeypatch.setattr(worker, "_v2_reconcile_reservations", _only_startup)
 
@@ -606,15 +604,20 @@ async def test_closing_reconcile_keeps_captured_unapplied_capital_in_flight(
 async def test_closing_reconcile_keeps_the_live_tail_of_a_partially_filled_order(
     v2_env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """OBS-14 · FAIL-OPEN: el cierre de turno NO re-atribuye fills YA liberados.
+    """OBS-14 · FAIL-OPEN: el cierre de turno NO re-atribuye fills NI drena una cola EN VUELO.
 
     Regresión medida en el tag ``v2.88-beta`` (job ``lifecycle-pg``, crash/recovery): la
     regla 1 de la reconciliación reparte el histórico COMPLETO de fills ≥ ``created_at``
-    (``consumed`` se reinicia en cada llamada), así que invocarla en cada turno re-libera
-    lo que el camino caliente ya liberó y DRENA el ``remaining_qty`` de una orden
+    (``consumed`` se reinicia en cada llamada), así que invocarla en cada turno re-liberaba
+    lo que el camino caliente ya liberó y DRENABA el ``remaining_qty`` de una orden
     parcialmente llenada: la cola VIVA, capital comprometido de verdad. El cierre de turno
-    corre con ``attribute_fills=False``, de modo que solo retira el huérfano que NUNCA se
-    materializó (regla 2).
+    corre con ``attribute_fills=False``.
+
+    Re-anclado en ``OBS-18``: el discriminante que CONSERVA esa cola ya no es el agregado
+    ``filled == 0`` (que conservaba también lo que nunca materializó, hasta agotar el
+    presupuesto del replay multianual) sino la traza del INTENT **sin aplicar**: mientras el
+    instrumento tenga capital en vuelo, la orden sigue trabajando y su cola puede
+    materializar todavía. Con la guardia de ``in_flight`` activa no se toca ni un lote.
     """
     monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
     exec_store = InMemoryExecutionEventStore()
@@ -638,10 +641,23 @@ async def test_closing_reconcile_keeps_the_live_tail_of_a_partially_filled_order
     for index in (1, 2, 3, 4):
         execution_id = await _applied_event(exec_store, index)
         await _save_context(contexts, execution_id)
+    # Y la COLA de la orden sigue EN VUELO: traza capturada y NO aplicada del mismo
+    # instrumento (es el contrato del fill parcial: ``fill_unapplied`` = capital en vuelo).
+    pending_id = "exec-partial-tail"
+    await exec_store.capture(
+        ExecutionEvent(
+            execution_id=pending_id,
+            order_id="order-partial-tail",
+            venue="paper",
+            qty=Decimal("6"),
+            account_id=_ACCOUNT,
+        )
+    )
+    await _save_context(contexts, pending_id)
     worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
     worker._decider = _buy_only("BBB")  # noqa: SLF001 — AAA queda intocado por el plan.
-    # La reserva parcial es de ESTA sesión: así el test mide la guarda de fills aplicados
-    # (``filled > 0``) y no el acotado por propiedad.
+    # La reserva parcial es de ESTA sesión: así el test mide la guardia de capital en vuelo
+    # (``in_flight``) y no el acotado por propiedad.
     worker._v2_owned_reservations.add("RES-partial-AAA")  # noqa: SLF001
     # Se aísla el CIERRE de turno: el bloque durable ya está readoptado por el proceso.
     worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
@@ -651,9 +667,64 @@ async def test_closing_reconcile_keeps_the_live_tail_of_a_partially_filled_order
 
     after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
     partial = after["RES-partial-AAA"]
-    assert partial.is_live, "la cola viva del fill parcial NO se retira en el cierre de turno"
+    assert partial.is_live, "la cola viva del fill parcial NO se retira con capital en vuelo"
     assert float(partial.remaining_qty) == 10.0, "el cierre NO re-atribuye fills ya liberados"
     assert float(partial.released_qty) == 0.0, "el fill lo libera el camino caliente, no el cierre"
+
+
+@pytest.mark.asyncio
+async def test_closing_reconcile_retires_a_dead_order_whose_release_was_lost(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-18 · DECLARACIÓN del cambio: con la orden MUERTA, el cierre retira la reserva.
+
+    Es la cara opuesta del test anterior, y la que el replay multianual midió como goteo: si
+    el instrumento NO tiene capital en vuelo, la orden ya no puede materializar nada. Antes
+    el cierre se abstenía cuando el agregado veía fills (``filled != 0``) y dejaba la decisión
+    al PRÓXIMO ARRANQUE: en un proceso que no reinicia (el replay, o un motor vivo durante
+    días) esa abstención es una retención indefinida de capital que acaba agotando el
+    presupuesto. El sesgo sigue siendo fail-closed — nada en vuelo + lecturas medibles — y la
+    liberación no supera la cantidad viva ni cuenta el fill como propio (``released_qty`` de
+    la fila queda como evidencia de lo materializado).
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    exec_store = InMemoryExecutionEventStore()
+    contexts = InMemorySimFillFinanceContextStore()
+    store = InMemoryReservationStore()
+    await store.save(
+        build_reservation(
+            reservation_id="RES-orphan-dead",
+            account_id=_ACCOUNT,
+            tick_id="2026-09-17T09:00:00Z",
+            instrument_id="AAA",
+            side="buy",
+            sector="tech",
+            quantity=10,
+            entry=100.0,
+            reserved_risk=50.0,
+            created_at="2026-09-17T09:00:00Z",
+        )
+    )
+    # Fills DURABLES del instrumento (de OTRAS órdenes del mismo instrumento+lado): con la
+    # regla anterior bastaban para que esta reserva nunca se retirase.
+    for index in (5, 6, 7, 8):
+        execution_id = await _applied_event(exec_store, index)
+        await _save_context(contexts, execution_id)
+    worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
+    worker._decider = _buy_only("BBB")  # noqa: SLF001
+    worker._v2_owned_reservations.add("RES-orphan-dead")  # noqa: SLF001
+    worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
+    worker._v2_reservations_reconciled = True  # noqa: SLF001
+
+    await _real_turn(worker, exec_store=exec_store, store=store, contexts=contexts)
+
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    orphan = after["RES-orphan-dead"]
+    assert not orphan.is_live, "sin capital en vuelo la orden está muerta: se retira"
+    assert orphan.status == "RELEASED_BY_CANCEL"
+    assert orphan.release_reason == "cancel", "no materializó nada: NO es una cola muerta"
+    assert float(orphan.remaining_qty) == 0.0, "no queda cantidad viva que comprometa capital"
+    assert float(orphan.released_qty) <= 10.0, "la liberación nunca supera la cantidad viva"
 
 
 # ── OBS-14.b · VENTANA DE GRACIA POR EDAD: el barrido deja de ser indiscriminado ──
@@ -761,7 +832,8 @@ async def test_closing_reconcile_does_not_touch_a_young_foreign_reservation(
     assert foreign.is_live, "el cierre de turno NO puede retirar la reserva JOVEN de otra sesión"
     assert float(foreign.released_qty) == 0.0, "no se libera ni un lote de una identidad ajena"
     assert "RES-ajena-AAA" in {
-        row.reservation_id for row in worker._v2_reservations  # noqa: SLF001
+        row.reservation_id
+        for row in worker._v2_reservations  # noqa: SLF001
     }, "su capital sigue comprometido para esta sesión"
     assert "RES-ajena-AAA" not in worker._v2_owned_reservations, (  # noqa: SLF001
         "conservarla NO la adopta: la propiedad no se puede inventar"
@@ -805,7 +877,8 @@ async def test_closing_reconcile_retires_a_foreign_reservation_once_it_aged(
     assert foreign.status == "RELEASED_BY_CANCEL", "no murió por reinicio: murió al cerrar"
     assert foreign.release_reason == "cancel"
     assert "RES-ajena-AAA" not in {
-        row.reservation_id for row in worker._v2_reservations  # noqa: SLF001
+        row.reservation_id
+        for row in worker._v2_reservations  # noqa: SLF001
     }
 
 
@@ -951,9 +1024,7 @@ async def test_closing_reconcile_does_not_abandon_a_young_foreign_exit_intent(
     exec_store = InMemoryExecutionEventStore()
 
     # Sesión A: reserva de SALIDA con INTENT durable, fechada DENTRO de la ventana.
-    session_a = _worker(
-        reservation_store=store, exec_store=exec_store, exit_order_store=exit_store
-    )
+    session_a = _worker(reservation_store=store, exec_store=exec_store, exit_order_store=exit_store)
     exit_order_id = await session_a._v2_reserve_exit(  # noqa: SLF001
         symbol="AAA",
         qty=Decimal("10"),
@@ -965,9 +1036,7 @@ async def test_closing_reconcile_does_not_abandon_a_young_foreign_exit_intent(
     res_id = f"exit:{exit_order_id}"
 
     # Sesión B (sin memoria de A): su CIERRE ve la reserva viva y ajena ⇒ la conserva entera.
-    session_b = _worker(
-        reservation_store=store, exec_store=exec_store, exit_order_store=exit_store
-    )
+    session_b = _worker(reservation_store=store, exec_store=exec_store, exit_order_store=exit_store)
     await session_b._v2_reconcile_reservations(  # noqa: SLF001
         startup=False,
         attribute_fills=False,
@@ -1010,9 +1079,7 @@ async def test_reserve_exit_ownership_is_scoped_to_the_session_that_created_it(
     at = "2026-09-17T09:00:00Z"
 
     # Sesión A: reserva de SALIDA con identidad durable (INTENT persistido + reserva viva).
-    session_a = _worker(
-        reservation_store=store, exec_store=exec_store, exit_order_store=exit_store
-    )
+    session_a = _worker(reservation_store=store, exec_store=exec_store, exit_order_store=exit_store)
     exit_order_id = await session_a._v2_reserve_exit(  # noqa: SLF001
         symbol="AAA", qty=Decimal("10"), price=Decimal("100"), sector="tech", at=at
     )
@@ -1026,9 +1093,7 @@ async def test_reserve_exit_ownership_is_scoped_to_the_session_that_created_it(
     assert live[res_id].side == "sell"
 
     # Sesión B (proceso distinto, sin memoria de A): su CIERRE de turno no toca la ajena.
-    session_b = _worker(
-        reservation_store=store, exec_store=exec_store, exit_order_store=exit_store
-    )
+    session_b = _worker(reservation_store=store, exec_store=exec_store, exit_order_store=exit_store)
     assert session_b._v2_owned_reservations == set()  # noqa: SLF001
     await session_b._v2_reconcile_reservations(  # noqa: SLF001
         startup=False,
@@ -1079,3 +1144,247 @@ async def test_reserve_exit_without_a_durable_intent_does_not_claim_ownership(
     assert session._v2_owned_reservations == set()  # noqa: SLF001
     assert session._v2_reservations == ()  # noqa: SLF001
 
+
+# ── OBS-18: la regla 2 decide por la EVIDENCIA DE LA RESERVA ─────────────────────
+#
+# Reproducción del goteo medido con el motor SELLADO en el replay multianual (§ artefacto
+# ``replay-oos-ciclo-durable-resello``): 16 reservas vivas, riesgo comprometido ``6000``
+# sobre un presupuesto de ``6000`` y la actividad congelada tras ``2022-05``. El
+# discriminante que las conservaba no era ni la propiedad (``owned=16``), ni la guardia de
+# ``in_flight`` (``unapplied=0``, ``inFlight=[]``), ni la medición (``COMPLETE``): era
+# ``filled == 0.0`` — un AGREGADO del instrumento+lado. Si cualquier OTRA reserva del mismo
+# instrumento+lado materializó, la que **nunca** materializó quedaba viva para siempre.
+
+
+async def _applied_fill(
+    store: Any, contexts: Any, *, index: int, instrument: str = "AAA", side: str = "buy"
+) -> str:
+    """Fill APLICADO del libro (evento + contexto): es la fuente de ``read_applied_fill_facts``."""
+    execution_id = f"exec-obs18-{index:03d}"
+    await store.capture(
+        ExecutionEvent(
+            execution_id=execution_id,
+            order_id=f"order-obs18-{index}",
+            venue="paper",
+            qty=Decimal("1"),
+            account_id=_ACCOUNT,
+        )
+    )
+    assert await store.start_apply(execution_id, owner="test") is True
+    assert await store.mark_applied(execution_id) is True
+    await contexts.save(
+        SimFillFinanceContext(
+            execution_id=execution_id,
+            instrument_id=instrument,
+            side=side,
+            quantity=Decimal("1"),
+            price=Decimal("100"),
+            account_id=_ACCOUNT,
+        )
+    )
+    return execution_id
+
+
+async def _seed_sibling_reservations(
+    store: InMemoryReservationStore,
+    worker: AutoSimulationWorker,
+    *,
+    quantity: float = 10.0,
+) -> tuple[str, str]:
+    """Dos reservas vivas del MISMO instrumento+lado; la VIEJA nace antes que la nueva.
+
+    Devuelve ``(vieja, nueva)``. La vieja queda sin materializar (``released_qty == 0``) y la
+    nueva es la que el camino caliente acredita con el fill (``released_qty > 0``), que es
+    exactamente la asimetría que el agregado mezclaba.
+    """
+    old_id = "RES-obs18-vieja"
+    new_id = "RES-obs18-nueva"
+    for reservation_id, offset in (
+        (old_id, timedelta(minutes=-5)),
+        (new_id, timedelta(minutes=-4)),
+    ):
+        await store.save(
+            build_reservation(
+                reservation_id=reservation_id,
+                account_id=_ACCOUNT,
+                tick_id="2026-09-17T09:00:00Z",
+                instrument_id="AAA",
+                side="buy",
+                sector="tech",
+                quantity=quantity,
+                entry=100.0,
+                reserved_cash=quantity * 100.0,
+                reserved_risk=50.0,
+                created_at=_stamp(worker._time, offset),  # noqa: SLF001
+            )
+        )
+    return old_id, new_id
+
+
+@pytest.mark.asyncio
+async def test_never_materialized_reservation_is_retired_even_if_a_sibling_filled(
+    v2_env: None,
+) -> None:
+    """OBS-18 · la reserva que NUNCA materializó se retira aunque su hermano sí materializara.
+
+    Con la regla 2 del motor sellado, la vieja quedaba VIVA para siempre: ``filled`` (el
+    agregado instrumento+lado posterior a su alta) era ``1 > 0`` por el fill de la nueva, así
+    que la condición ``filled == 0.0`` no se cumplía — aunque la evidencia de la PROPIA
+    reserva dijera lo contrario (``releasedQty == 0``, sin traza en vuelo, lecturas medibles).
+    El resultado medido en el replay es un libro que no gotea: se AGOTA (riesgo comprometido
+    ``5999.9998`` sobre ``6000``) y el motor deja de abrir.
+    """
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    contexts = InMemorySimFillFinanceContextStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
+    old_id, new_id = await _seed_sibling_reservations(store, worker)
+    # El fill APLICADO del instrumento+lado es posterior al alta de las DOS (el camino
+    # caliente lo atribuye a la más reciente).
+    await _applied_fill(exec_store, contexts, index=1)
+    released = await store.release(
+        new_id,
+        status="RELEASED_BY_FILL",
+        reason="fill",
+        released_qty=1.0,
+        at="2026-09-17T09:00:30Z",
+    )
+    assert released is not None and released.is_live, "la nueva sobrevive con su cola viva"
+
+    worker._v2_owned_reservations = {old_id, new_id}  # noqa: SLF001 — ambas SON de la sesión.
+    worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
+    worker._v2_reservations_reconciled = True  # noqa: SLF001
+
+    await worker._v2_reconcile_reservations(  # noqa: SLF001
+        startup=False,
+        attribute_fills=False,
+        only_ids=frozenset(worker._v2_owned_reservations),  # noqa: SLF001
+    )
+
+    rows = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    vieja = rows[old_id]
+    assert not vieja.is_live, (
+        "la reserva que NUNCA materializó debe retirarse: su evidencia propia dice que nada "
+        "la va a consumir, y el agregado del instrumento no es evidencia sobre ELLA"
+    )
+    assert vieja.status == "RELEASED_BY_CANCEL"
+    assert vieja.release_reason == "cancel", "no materializó: se cancela, no se cierra por fill"
+    assert float(vieja.remaining_qty) == 0.0
+    assert worker._v2_reservations == ()  # noqa: SLF001
+    shelf = snapshot_book(
+        "2026-09-17",
+        reservations=[row for row in await store.list_live(_ACCOUNT)],
+        measurement="COMPLETE",
+    )
+    assert shelf.reserved_risk == 0.0, "el riesgo de la reserva muerta no sigue comprometido"
+
+
+@pytest.mark.asyncio
+async def test_dead_tail_of_a_partially_filled_reservation_is_cancelled(
+    v2_env: None,
+) -> None:
+    """OBS-18 · la COLA de un fill parcial sin traza en vuelo deja de comprometer capital.
+
+    Un fill parcial deja ``released_qty > 0`` y ``remaining_qty > 0``. Si su orden ya no está
+    en vuelo (todas sus trazas aplicadas o inexistentes), ninguna orden va a consumir esa
+    cola: hoy no la retira NADIE (la regla 1 solo libera lo materializado y la regla 2 exigía
+    ``filled == 0``). El capital queda comprometido hasta el infinito. Se retira como
+    cancelación con motivo DECLARADO (``tail_dead``), para que el libro sepa distinguir "murió
+    sin llenar" de "se llenó a medias y su cola murió".
+    """
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    contexts = InMemorySimFillFinanceContextStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
+    _old_id, new_id = await _seed_sibling_reservations(store, worker)
+    await _applied_fill(exec_store, contexts, index=2)
+    released = await store.release(
+        new_id,
+        status="RELEASED_BY_FILL",
+        reason="fill",
+        released_qty=4.0,
+        at="2026-09-17T09:00:30Z",
+    )
+    assert released is not None
+    assert released.is_live and float(released.remaining_qty) == 6.0
+
+    worker._v2_owned_reservations = {new_id}  # noqa: SLF001
+    worker._v2_reservations = (released,)  # noqa: SLF001
+
+    await worker._v2_reconcile_reservations(  # noqa: SLF001
+        startup=False,
+        attribute_fills=False,
+        only_ids=frozenset({new_id}),
+    )
+
+    rows = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    nueva = rows[new_id]
+    assert not nueva.is_live, "la cola sin traza en vuelo se retira: nada la va a consumir"
+    assert float(nueva.remaining_qty) == 0.0
+    assert float(nueva.released_qty) == 10.0, "lo materializado (4) sigue declarado en la fila"
+    assert nueva.status == "RELEASED_BY_CANCEL"
+    assert nueva.release_reason == "tail_dead", (
+        "el motivo declara la causa: la cola de un fill parcial murió, no la orden entera"
+    )
+    assert worker._v2_reservations == ()  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_a_tail_with_capital_in_flight_is_conserved(
+    v2_env: None,
+) -> None:
+    """OBS-18 · CONTROL fail-closed: si la cola SIGUE en vuelo, no se toca ni un lote.
+
+    Es la mitad que impide que el arreglo sea fail-OPEN: una traza NO aplicada del mismo
+    instrumento (capital en vuelo) significa que la orden sigue trabajando — su cola puede
+    materializar todavía. La guardia de ``in_flight`` manda sobre la evidencia de la reserva.
+    """
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    contexts = InMemorySimFillFinanceContextStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
+    _old_id, new_id = await _seed_sibling_reservations(store, worker)
+    await _applied_fill(exec_store, contexts, index=3)
+    released = await store.release(
+        new_id,
+        status="RELEASED_BY_FILL",
+        reason="fill",
+        released_qty=4.0,
+        at="2026-09-17T09:00:30Z",
+    )
+    assert released is not None
+    # Traza NO aplicada del mismo instrumento: la orden sigue en vuelo.
+    pending_id = "exec-obs18-pending"
+    await exec_store.capture(
+        ExecutionEvent(
+            execution_id=pending_id,
+            order_id="order-obs18-pending",
+            venue="paper",
+            qty=Decimal("6"),
+            account_id=_ACCOUNT,
+        )
+    )
+    await contexts.save(
+        SimFillFinanceContext(
+            execution_id=pending_id,
+            instrument_id="AAA",
+            side="buy",
+            quantity=Decimal("6"),
+            price=Decimal("100"),
+            account_id=_ACCOUNT,
+        )
+    )
+
+    worker._v2_owned_reservations = {new_id}  # noqa: SLF001
+    worker._v2_reservations = (released,)  # noqa: SLF001
+
+    await worker._v2_reconcile_reservations(  # noqa: SLF001
+        startup=False,
+        attribute_fills=False,
+        only_ids=frozenset({new_id}),
+    )
+
+    assert new_id in {row.reservation_id for row in worker._v2_reservations}  # noqa: SLF001
+    rows = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    assert rows[new_id].is_live, "con capital en vuelo la cola sigue comprometida (fail-closed)"
+    assert float(rows[new_id].remaining_qty) == 6.0

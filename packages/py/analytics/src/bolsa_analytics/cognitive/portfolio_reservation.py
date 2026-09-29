@@ -80,6 +80,10 @@ RELEASE_REASON_FILL = "fill"
 RELEASE_REASON_CANCEL = "cancel"
 RELEASE_REASON_RESTART = "restart"
 RELEASE_REASON_ROLLBACK = "rollback"
+#: OBS-18 — la COLA de un fill parcial cuyo orden ya no está en vuelo: nada la va a consumir.
+#: Se distingue de ``cancel`` (la orden murió SIN materializar) porque el libro debe poder
+#: separar "murió sin llenar" de "se llenó a medias y su cola murió" sin reinterpretar la fila.
+RELEASE_REASON_DEAD_TAIL = "tail_dead"
 
 _RELEASED_STATUSES: frozenset[str] = frozenset(
     {
@@ -1164,6 +1168,7 @@ def build_portfolio_risk_state(
 
 __all__ = [
     "RELEASE_REASON_CANCEL",
+    "RELEASE_REASON_DEAD_TAIL",
     "RELEASE_REASON_FILL",
     "RELEASE_REASON_RESTART",
     "RELEASE_REASON_ROLLBACK",

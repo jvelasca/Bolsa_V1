@@ -2,6 +2,78 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.6-beta] — `AUTO-MATERIAL-19` `OBS-18`: la reconciliación decide por la EVIDENCIA DE LA RESERVA (y el replay OOS deja de disfrazar un libro estancado) — 2026-09-29
+
+**Cierre de `OBS-18`** — abierta por el **replay OOS multianual** de `AUTO-MATERIAL-15` (`v2.87`): su
+artefacto quedó marcado **NO reproducible con el código sellado** y, al re-ejecutarlo sobre `v2.88.5-beta`,
+el replay **volvió a truncarse** con el libro reteniendo **16 reservas vivas** y `$5999.9998 / $6000` de
+riesgo comprometido… y el horizonte lo publicaba como **`completed: true`**.
+
+**Bump** `2.11.5-beta` → `2.11.6-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+Base del diff: `27264aab` (= `v2.88.5-beta` + cita POST-TAG de su CI). **SÍ se toca el motor** (la regla 2 de
+`_v2_reconcile_reservations`) **y** el instrumento de replay.
+
+- **El hueco (motor): la regla 2 decidía por el AGREGADO.** `filled` sumaba los fills de **cualquier** orden
+  del mismo `(instrumento, lado)` posteriores al alta, así que una reserva **nunca materializada**
+  sobrevivía **para siempre** en cuanto una hermana suya llenaba (`filled > 0`), y la **COLA** de un fill
+  parcial (`released_qty > 0`, `remaining_qty > 0`, sin traza en vuelo) **no la retiraba nadie** (la regla 1
+  solo libera lo materializado). Medido: **16** reservas vivas y el **100 %** del presupuesto de riesgo
+  comprometido ⇒ `risk_budget_exceeded` **1400** ⇒ actividad congelada tras `2022-05-06`.
+- **El mecanismo (motor): evidencia POR RESERVA + motivo declarado.** La decisión pasa a leerse de
+  `materialized = released_qty` **de esa fila**, con la guardia de `in_flight` **mandando** (fail-closed:
+  traza sin aplicar ⇒ la orden sigue trabajando y su cola puede materializar; lectura incompleta o sin
+  fecha ⇒ no se libera nada; nunca se libera más que la cantidad viva). Nuevo motivo de contrato
+  `RELEASE_REASON_DEAD_TAIL = "tail_dead"`: la **cola** de un fill parcial se retira declarando que lo es,
+  frente a `cancel` (no materializó nada). El `outcome` publica la evidencia de **la reserva**, no el chunk
+  del agregado: una reserva que no materializó no puede «marcar como llenado» el fill de su hermana.
+- **El hueco (instrumento): la retirada no declaraba su causa.** El log del harness registraba estado,
+  instrumento e instante… **y no el motivo**: el artefacto publicaba `byDeadTail: 0` sobre **64** retiradas —
+  un **cero silencioso** («no medí el motivo» leído como «ninguna fue una cola muerta»). Corregido, la
+  corrida sellada **mide el mecanismo**: `fill 174` · `cancel 64`, de las cuales **36 son `tail_dead`** y
+  **28** reservas que nunca materializaron.
+- **El hueco (instrumento): un libro agotado se publicaba como corrida completa.** Se añade el
+  **guardarraíl de estancamiento**: si el libro conserva capital comprometido (`live_reservations > 0`, o
+  riesgo `> 0`, o riesgo **ilegible** —que NO se lee como limpio—) y pasaron **`STALL_OPERABLE_DAYS = 20`**
+  días **operables** sin una sola orden ni fill, el horizonte se declara **`stalled_book`**. Es un umbral de
+  **declaración**, no un gate: la corrida nunca se corta por él. Un libro **limpio** con una temporada sin
+  señales **no** se declara (el motor **eligió** no operar).
+- **Medición sellada (ciclo durable, `1224/1224` ticks, `2021-12-07 → 2026-09-28`):** **752** fills, **210**
+  órdenes, **62** ciclos en **4 temporadas** (`2022` 50 · `2023` 7 · `2024` 2 · `2025` 3), `R` total
+  **−18.3660**, signo positivo **37.10 %**; libro **limpio** (pico **0**, riesgo final **`0.0`**) y
+  `stall.declared = false` con **36** días operables sin actividad. Artefacto **byte-reproducible**
+  (SHA-256 `9AF077A0…F9928E4A`, idéntico en dos corridas independientes) — frente al `v2.87`, que **no**
+  lo era.
+- **Contraprueba A/B (`--no-durable-cycle`, declarada):** 118 fills, **13** ciclos (solo `2022`), **15**
+  reservas vivas, **`5999.9998`** de riesgo final y horizonte **`completed: false · stalled_book`** con
+  `lastActiveDay: 2022-05-06` (**266** días operables sin actividad). Su SHA-256 **no** es reproducible
+  porque **23** rutas de `finalBook` llevan identificadores `exit:<ULID>` (reloj de pared) de las reservas
+  que **sobreviven**: se **declara** en vez de esconderse; sus **cifras** se reproducen.
+- **Relectura de `v2.87`:** el puntaje **no se mueve** (62 ciclos, mismo `R`) — lo que cambia es la
+  contabilidad del libro, que allí **sobre-liberaba** (`byFill 237 / byCancel 1` frente a los **174 / 64**
+  reales, por la costura anterior a la guarda de `v2.88.1`). La cifra antigua **no debe citarse**.
+- **Tests (`+25` netos):** `test_replay_oos_durable_cycle.py` **29 → 45** (motivos de retirada, guardarraíl
+  y la **aritmética pura** de los días operables sin actividad), `test_auto_v2_durable_cycle.py` **22 → 26**
+  (nunca-materializada con hermana llena, cola muerta de fill parcial, cola **con capital en vuelo
+  conservada**, orden muerta cuya liberación se perdió) y **NUEVA**
+  `test_v2_87_release_log.py` (5: el contrato del log que impide el cero silencioso).
+- **Mutaciones (matriz `256` → `265`):** `M257` (regla 2 por AGREGADO) · `M258` (cola muerta conservada) ·
+  `M259` (motivo mudo) · `M260` (estancamiento mudo) · `M261` (estancamiento fail-OPEN con riesgo ilegible) ·
+  `M262` (log sin motivo) · `M263` (motivo por ESTADO) · `M264` (delta de motivos inflado) · `M265`
+  (operabilidad inventada). **9/9 muerden**, matriz **COMPLETA `265/265`** con el árbol intacto.
+- **Límites:** **NO** se toca `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/`A/B` ni se backdatea nada; **NO** cierra
+  `OBS-15` (techo de 1000 `APPLIED`), `OBS-16` ni `P3-2`/`P3-3` (reloj simulado: el replay **no** sustituye
+  la ventana PAPER real); el replay sigue sin escribir en PostgreSQL (cuarentena en memoria).
+- **Hueco de cobertura del CI, medido y cerrado (`2` workflows):** al correr la batería offline del job
+  `python` el delta fue **`+9`** cuando la fase añade **`+25`** funciones de test. Causa: el fichero del
+  instrumento `packages/py/application/tests/test_replay_oos_durable_cycle.py` (**45 tests herméticos**,
+  `0.33 s`, sin PG) **no estaba en la lista de NINGÚN workflow** desde `v2.88` (`564240d2`) — ese directorio
+  se lista fichero a fichero. Sin cerrarlo, **los 16 tests que protegen la regla 2 por evidencia, la cola
+  muerta y el guardarraíl no habrían corrido en CI**. Se añade a `release-tag-ci.yml` (`115 → 116`
+  argumentos) y a `python-ci.yml`, con nota de procedencia en ambos (patrón «HUECO DECLARADO» de `v2.76`).
+  Esperado del job `python` del tag: **`3103 passed, 37 skipped`** (`3140` recogidos en local − `37`). La
+  deriva estructural entre las dos listas offline (`98` tests solo en el tag, `56` solo en `main`) queda
+  **abierta** como **`OBS-19`**.
+
 ## [2.11.5-beta] — `AUTO-MATERIAL-18` `OBS-14.b`: ventana de gracia por EDAD — el barrido de reservas deja de ser fail-OPEN en un reinicio rodante — 2026-09-29
 
 **Cierre de `OBS-14.b`** — deuda residual abierta al corregir la carrera entre sesiones (`v2.88.2`) y
