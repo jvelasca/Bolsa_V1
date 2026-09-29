@@ -215,6 +215,12 @@ async def read_applied_fill_facts(
             # ``account_id=None`` la lectura ve todas las cuentas y sin esto el libro
             # fundía dos posiciones del mismo símbolo en una sola cantidad.
             account_id=getattr(event, "account_id", None),
+            # OBS-20: el CICLO del fill viaja en el contexto financiero (V2.47) y es la
+            # identidad que lo ata a SU reserva sin heurísticas. La reserva que lo originó
+            # declara el mismo ``cycle_id`` (migración 042/047), así que el reconciliador
+            # puede declarar el motivo de una retirada con EVIDENCIA EXACTA aunque la fila
+            # todavía no haya registrado el fill.
+            cycle_id=getattr(context, "cycle_id", None),
         )
         if fact is None:
             rejected += 1

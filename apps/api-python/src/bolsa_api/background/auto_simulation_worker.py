@@ -2698,6 +2698,15 @@ class AutoSimulationWorker:
            mismo instrumento+lado llenaba (``filled != 0``), y la COLA de un fill parcial
            no la retiraba nadie (la regla 1 solo libera lo materializado). Ambas cosas
            comprometían capital de forma indefinida hasta agotar el presupuesto.
+
+           OBS-20 — esa evidencia se COMPLETA con la materialización EXACTA del CICLO:
+           ``cycle_id`` ata un fill aplicado a la reserva que lo originó (ambos lo declaran,
+           V2.47) y es el único vínculo sin heurísticas. Hace falta porque la liberación del
+           camino caliente la ejecuta la sesión que LIQUIDA el fill y, si esa sesión no tiene
+           la reserva en su libro, no llega a ocurrir — la fila se queda en ``0`` con el fill
+           ya aplicado y el cierre declaraba ``cancel`` sobre una reserva que SÍ materializó
+           (proveniencia falsa, con el ledger en contradicción). Instrumento+lado NO sirve
+           como sustituto: dos órdenes del mismo instrumento y lado son ciclos distintos.
         3. **Lectura ilegible** — con reservas vivas que no se pudieron reconciliar, el
            libro queda ``UNKNOWN`` y el motor veta aperturas. "No pude leerlo" nunca se
            lee como "no había nada comprometido".
@@ -2773,6 +2782,23 @@ class AutoSimulationWorker:
             applied.setdefault((fact.instrument_id, fact.side), []).append(
                 (instant, float(fact.quantity))
             )
+        # OBS-20 — materialización EXACTA por CICLO. ``cycle_id`` es la identidad que ata un
+        # fill aplicado a la reserva que lo originó (la reserva lo declara y el fill lo hereda
+        # del contexto financiero, V2.47): la única prueba SIN heurísticas. Hace falta porque la
+        # liberación del camino caliente la ejecuta la sesión que LIQUIDA el fill y, si esa
+        # sesión no tiene la reserva en su libro, no llega a ocurrir —la fila se queda en ``0``
+        # con el fill YA aplicado— y el cierre declaraba ``cancel`` (proveniencia falsa) sobre
+        # una reserva que SÍ materializó, con el ledger en contradicción. Se acota por LADO
+        # porque un ciclo puede tener las DOS patas (entrada BUY y salida SELL); instrumento+lado
+        # NO sirve de identidad: dos órdenes del mismo instrumento y lado son ciclos distintos,
+        # que es justamente el defecto que OBS-18 corrigió y no se reintroduce ni para el motivo.
+        cycle_fills: dict[tuple[str, str], float] = {}
+        for fact in facts_read.facts:
+            cycle = str(getattr(fact, "cycle_id", None) or "").strip()
+            if not cycle:
+                continue
+            key = (cycle, fact.side)
+            cycle_fills[key] = cycle_fills.get(key, 0.0) + float(fact.quantity)
         consumed: dict[tuple[str, str], float] = {}
         resolved: list[PortfolioReservation] = []
         outcomes: dict[str, tuple[float, PortfolioReservation | None]] = {}
@@ -2800,6 +2826,22 @@ class AutoSimulationWorker:
                 continue
             released: PortfolioReservation | None = None
             materialized = float(reservation.released_qty or 0.0)
+            # OBS-20 — si el fill de ESTE ciclo ya está en el ledger, la reserva materializó
+            # aunque su fila no lo haya registrado todavía (la liberación del camino caliente
+            # la ejecuta la sesión que liquida el fill; si no tiene la reserva en su libro, no
+            # ocurre). El hecho aplicado es evidencia durable: se toma como lo materializado de
+            # ESTA reserva para no declarar ``cancel`` —"nunca materializó"— sobre una reserva
+            # que sí lo hizo. Lo registrado en la fila nunca se rebaja, solo se completa.
+            cycle = str(getattr(reservation, "cycle_id", None) or "").strip()
+            if cycle:
+                linked = cycle_fills.get((cycle, reservation.side), 0.0)
+                if linked > 0.0:
+                    # Cota por lo COMPROMETIDO: la evidencia dice qué materializó el ciclo, no
+                    # puede declarar más de lo que esta reserva se comprometió a consumir.
+                    committed = float(reservation.quantity or 0.0)
+                    materialized = max(
+                        materialized, min(linked, committed) if committed > 0.0 else linked
+                    )
             if attribute_fills and fill_qty > 0:
                 consumed[fill_key] = consumed.get(fill_key, 0.0) + fill_qty
                 released = await self._v2_release_reservation(

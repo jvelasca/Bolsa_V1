@@ -585,6 +585,9 @@ PORTFOLIO_RESERVATION = (
 )
 SIM_FILL_STORE = "packages/py/application/src/bolsa_application/sim_durable_store.py"
 WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
+# AUTO-MATERIAL-20 (V2.88.7): el ciclo del fill viaja del contexto financiero al hecho aplicado
+# (``read_applied_fill_facts``) y es la evidencia EXACTA con la que el cierre declara el motivo.
+APPLIED_FILLS_READ = "packages/py/application/src/bolsa_application/applied_fills.py"
 # AUTO-20B (V2.63): completitud del volcado de material + manifest/huella de la investigacion.
 # (AUTO-22 movió la paginación al lector único: la sonda de M169 apunta a ``AUTO_PAPER_MATERIAL``.)
 RESERVATION_STORE = "packages/py/application/src/bolsa_application/reservation_store.py"
@@ -2893,6 +2896,22 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    if index < 0 or index >= len(operable_days):\n        return False\n",
         "    if index < 0 or index >= len(operable_days):\n        return True\n",
         (T_REPLAY_OOS_DURABLE,),
+    ),
+    (
+        "M266 (atribucion por ciclo MUDA): el reconciliador deja de completar la evidencia de la fila con el fill APLICADO de SU ciclo -> el cierre vuelve a declarar 'cancel' (\"nunca materializo\") sobre una reserva que SI materializo (OBS-20)",
+        WORKER,
+        '            cycle = str(getattr(reservation, "cycle_id", None) or "").strip()\n'
+        "            if cycle:\n",
+        '            cycle = ""\n'
+        "            if cycle:\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M267 (ciclo no viaja): la lectura del libro no propaga el ciclo del contexto financiero al hecho aplicado -> ningun fill puede atarse a SU reserva y la evidencia exacta desaparece sin que nada falle",
+        APPLIED_FILLS_READ,
+        '            cycle_id=getattr(context, "cycle_id", None),\n',
+        "            cycle_id=None,\n",
+        (T_AUTO_DURABLE,),
     ),
 ]
 

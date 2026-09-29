@@ -1157,9 +1157,21 @@ async def test_reserve_exit_without_a_durable_intent_does_not_claim_ownership(
 
 
 async def _applied_fill(
-    store: Any, contexts: Any, *, index: int, instrument: str = "AAA", side: str = "buy"
+    store: Any,
+    contexts: Any,
+    *,
+    index: int,
+    instrument: str = "AAA",
+    side: str = "buy",
+    cycle_id: str | None = None,
 ) -> str:
-    """Fill APLICADO del libro (evento + contexto): es la fuente de ``read_applied_fill_facts``."""
+    """Fill APLICADO del libro (evento + contexto): es la fuente de ``read_applied_fill_facts``.
+
+    ``cycle_id`` reproduce la cadena real (V2.47): el fill hereda el ciclo del intent que lo
+    emitió, que es el MISMO que la reserva que lo comprometió declara. Es la identidad exacta
+    con la que OBS-20 ata un hecho aplicado a SU reserva — sin ella, "fill sin ciclo" es
+    desconocido, nunca una pista para atribuirlo a una reserva concreta.
+    """
     execution_id = f"exec-obs18-{index:03d}"
     await store.capture(
         ExecutionEvent(
@@ -1180,9 +1192,17 @@ async def _applied_fill(
             quantity=Decimal("1"),
             price=Decimal("100"),
             account_id=_ACCOUNT,
+            cycle_id=cycle_id,
         )
     )
     return execution_id
+
+
+#: OBS-20 — ciclos de las reservas hermanas de la fixture. El fill se ata al ciclo de la
+#: reserva que lo originó (la más reciente), que es lo que permite distinguirlas sin
+#: heurísticas de instrumento+lado: dos órdenes del mismo símbolo y lado son ciclos distintos.
+_CYCLE_OLD = "cyc-obs18-vieja"
+_CYCLE_NEW = "cyc-obs18-nueva"
 
 
 async def _seed_sibling_reservations(
@@ -1195,13 +1215,15 @@ async def _seed_sibling_reservations(
 
     Devuelve ``(vieja, nueva)``. La vieja queda sin materializar (``released_qty == 0``) y la
     nueva es la que el camino caliente acredita con el fill (``released_qty > 0``), que es
-    exactamente la asimetría que el agregado mezclaba.
+    exactamente la asimetría que el agregado mezclaba. Cada una declara su PROPIO ciclo
+    (``cyc-``), como en el motor real: sin él, la evidencia del fill aplicado no se puede atar
+    a una reserva concreta (OBS-20).
     """
     old_id = "RES-obs18-vieja"
     new_id = "RES-obs18-nueva"
-    for reservation_id, offset in (
-        (old_id, timedelta(minutes=-5)),
-        (new_id, timedelta(minutes=-4)),
+    for reservation_id, cycle_id, offset in (
+        (old_id, _CYCLE_OLD, timedelta(minutes=-5)),
+        (new_id, _CYCLE_NEW, timedelta(minutes=-4)),
     ):
         await store.save(
             build_reservation(
@@ -1216,6 +1238,7 @@ async def _seed_sibling_reservations(
                 reserved_cash=quantity * 100.0,
                 reserved_risk=50.0,
                 created_at=_stamp(worker._time, offset),  # noqa: SLF001
+                cycle_id=cycle_id,
             )
         )
     return old_id, new_id
@@ -1240,8 +1263,8 @@ async def test_never_materialized_reservation_is_retired_even_if_a_sibling_fille
     worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
     old_id, new_id = await _seed_sibling_reservations(store, worker)
     # El fill APLICADO del instrumento+lado es posterior al alta de las DOS (el camino
-    # caliente lo atribuye a la más reciente).
-    await _applied_fill(exec_store, contexts, index=1)
+    # caliente lo atribuye a la más reciente: es de SU ciclo).
+    await _applied_fill(exec_store, contexts, index=1, cycle_id=_CYCLE_NEW)
     released = await store.release(
         new_id,
         status="RELEASED_BY_FILL",
@@ -1297,7 +1320,7 @@ async def test_dead_tail_of_a_partially_filled_reservation_is_cancelled(
     contexts = InMemorySimFillFinanceContextStore()
     worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
     _old_id, new_id = await _seed_sibling_reservations(store, worker)
-    await _applied_fill(exec_store, contexts, index=2)
+    await _applied_fill(exec_store, contexts, index=2, cycle_id=_CYCLE_NEW)
     released = await store.release(
         new_id,
         status="RELEASED_BY_FILL",
@@ -1330,6 +1353,57 @@ async def test_dead_tail_of_a_partially_filled_reservation_is_cancelled(
 
 
 @pytest.mark.asyncio
+async def test_a_cancel_is_never_declared_while_an_applied_fill_waits_in_the_ledger(
+    v2_env: None,
+) -> None:
+    """OBS-20 · una retirada NO puede declarar ``cancel`` si su fill YA está en el ledger.
+
+    Carrera medida en ``test_concurrent_auto_pg.py[5]`` (1 de cada ~9 corridas): el fill ya
+    está APPLIED —por eso la guardia de ``in_flight`` no lo ve en vuelo— pero la liberación
+    del camino caliente todavía no ha persistido el ``released_qty`` de la fila, y el cierre
+    de turno de OTRA sesión decide con lo que dice la fila (``0``) ⇒ retira declarando
+    ``cancel`` ("nunca materializó") una reserva que SÍ materializó, con el ledger en
+    contradicción (Σ APPLIED del instrumento > 0). Antes de OBS-18 esa ventana era inocua
+    porque la regla 2 exigía el AGREGADO de fills del instrumento+lado en ``0``.
+
+    Qué DEBE cumplirse, sin prescribir todavía la forma del arreglo: o la reserva se CONSERVA
+    (fail-closed: hay materialización sin asentar) o se retira declarando la causa real
+    (``tail_dead``). Nunca ``cancel``.
+    """
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    contexts = InMemorySimFillFinanceContextStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
+    _old_id, new_id = await _seed_sibling_reservations(store, worker)
+    # El fill YA está aplicado (la reserva materializó) y la fila todavía no lo registra.
+    await _applied_fill(exec_store, contexts, index=2, cycle_id=_CYCLE_NEW)
+    before = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    assert before[new_id].is_live and float(before[new_id].released_qty) == 0.0, (
+        "la fixture debe caer en la VENTANA: fill aplicado y fila sin registrar"
+    )
+
+    worker._v2_owned_reservations = {new_id}  # noqa: SLF001
+    worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
+
+    await worker._v2_reconcile_reservations(  # noqa: SLF001
+        startup=False,
+        attribute_fills=False,
+        only_ids=frozenset({new_id}),
+    )
+
+    nueva = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}[new_id]
+    if nueva.is_live:
+        assert float(nueva.remaining_qty or 0) > 0, (
+            "conservarla significa dejar su capital comprometido (no un cierre a medias)"
+        )
+    else:
+        assert nueva.release_reason == "tail_dead", (
+            "la fila tiene un fill aplicado en el ledger: la retirada no puede declarar "
+            f"'cancel' (motivo={nueva.release_reason!r}, released={nueva.released_qty})"
+        )
+
+
+@pytest.mark.asyncio
 async def test_a_tail_with_capital_in_flight_is_conserved(
     v2_env: None,
 ) -> None:
@@ -1344,7 +1418,7 @@ async def test_a_tail_with_capital_in_flight_is_conserved(
     contexts = InMemorySimFillFinanceContextStore()
     worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
     _old_id, new_id = await _seed_sibling_reservations(store, worker)
-    await _applied_fill(exec_store, contexts, index=3)
+    await _applied_fill(exec_store, contexts, index=3, cycle_id=_CYCLE_NEW)
     released = await store.release(
         new_id,
         status="RELEASED_BY_FILL",

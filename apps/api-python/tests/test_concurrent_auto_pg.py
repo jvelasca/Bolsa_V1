@@ -22,8 +22,15 @@ Invariante que se certifica (1 señal ⇒ 1 decisión ⇒ 1 orden):
   idempotente — invisible a un ``count``. El intent sí lo ve;
 * **una sola fila** de reserva durable por ``(cuenta, instrumento)`` (claim atómico por
   ``reservation_id`` determinista ``RES-dec-<hash>`` derivado de ``(cuenta, señal)``);
-* ``Σ reserved_cash`` viva == la cola NO llenada (jamás × nº de workers);
-* contabilidad cerrada: ``released_qty == Σ APPLIED`` y ``remaining_qty == pedido − Σ``;
+* **OBS-18** — al cerrar el turno la COLA del fill parcial NO se retiene viva: la fila queda
+  liberada **entera** (``released_qty == pedido``, ``remaining_qty == 0``, motivo
+  ``tail_dead``, estado ``RELEASED_BY_CANCEL``) y el capital comprometido retenido es ``0``
+  (jamás × nº de workers). El fill PARCIAL sigue siendo el objeto del escenario, pero su
+  evidencia durable es ``Σ APPLIED == materializado < pedido``, no una cola viva;
+* contabilidad cerrada: ``released_qty == pedido`` con ``Σ APPLIED == materializado`` y
+  ``0 < materializado < pedido``;
+* la asimetría deliberada de la fila cerrada: el ``reserved_cash`` retenido cae a ``0`` y el
+  riesgo COMPROMETIDO se conserva (``reserved_risk > 0``) como denominador de R;
 * toda instancia que NO abrió declara POR QUÉ (ni un veto silencioso).
 
 Gate: ``AUTO_CONCURRENT_PG_REQUIRED=1`` ⇒ un skip mudo es FALLO duro.
@@ -322,33 +329,53 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
         released = Decimal(str(reservation.released_qty or 0))
         remaining = Decimal(str(reservation.remaining_qty or 0))
 
-        # (5) Contabilidad cerrada: pedido = liberado por fill + cola viva.
-        assert released == held, (
-            "lo liberado por fill debe ser exactamente lo materializado: "
-            f"released={released} materializado={held}"
+        # (5) Contabilidad cerrada con la semántica de OBS-18: la fila queda liberada ENTERA
+        #     —lo materializado por FILL y la COLA muerta retirada declarando ``tail_dead``—
+        #     y lo materializado lo manda el ledger (``Σ APPLIED``), no la fila.
+        assert released == requested, (
+            "la reserva debe quedar liberada ENTERA (materializado por fill + cola retirada); "
+            f"released={released} pedido={requested} materializado={held}"
         )
-        assert remaining == requested - held, (
-            f"cola viva {remaining} != pedido {requested} − materializado {held}"
+        assert remaining == 0, (
+            f"OBS-18: al cerrar el turno no puede quedar cola viva (remaining={remaining})"
         )
-        assert remaining > 0, (
-            "el escenario exige fill PARCIAL (cola viva); el id debe producir un parcial"
+        assert str(reservation.release_reason) == "tail_dead", (
+            "la retirada debe DECLARAR que había cola de fill parcial: "
+            f"motivo={reservation.release_reason!r} status={reservation.status!r}"
+        )
+        assert str(reservation.status).upper() != "OPEN", (
+            f"una reserva retirada no puede quedar OPEN: {reservation.status!r}"
         )
         applied = await _applied_buy_qty(concurrent_pg_factory, account_id)
-        assert applied == released, (
-            f"Σ APPLIED BUY ({applied}) != reserva liberada ({released})"
+        assert applied == held, (
+            f"Σ APPLIED BUY ({applied}) != materializado en posición ({held})"
+        )
+        assert 0 < applied < requested, (
+            "el escenario exige fill PARCIAL (0 < materializado < pedido): "
+            f"materializado={applied} pedido={requested}"
         )
 
-        # (6) Sin sobre-riesgo: lo comprometido vivo es la cola de UNA reserva, no ×3.
+        # (6) Sin sobre-riesgo NI capital muerto: N workers no dejan N compromisos (la fila
+        #     ÚNICA de (4) ya lo excluye) y al cerrar el turno no queda capital retenido. El
+        #     riesgo comprometido SÍ se conserva como denominador de R (documentado en el
+        #     store): la asimetría ``reserved_cash == 0`` / ``reserved_risk > 0`` es
+        #     deliberada y aquí queda fijada.
         live = [
             row
             for row in rows
             if str(row.status).upper() == "OPEN" and float(row.remaining_qty or 0) > 0
         ]
-        assert len(live) <= 1, f"doble compromiso vivo: {[r.reservation_id for r in live]}"
-        committed = sum(float(row.reserved_cash or 0) for row in live)
-        ceiling = float(reservation.reserved_cash or 0)
-        assert committed <= ceiling + 1e-6, (
-            f"sobre-riesgo: comprometido {committed} > tope de una reserva {ceiling}"
+        assert live == [], (
+            "OBS-18: no puede quedar capital comprometido vivo al cerrar el turno: "
+            f"{[r.reservation_id for r in live]}"
+        )
+        retained = sum(float(row.reserved_cash or 0) for row in rows)
+        assert retained == 0.0, (
+            f"capital retenido tras la retirada del parcial: {retained} (workers={sessions})"
+        )
+        assert float(reservation.reserved_risk or 0) > 0, (
+            "la fila cerrada conserva el riesgo comprometido como denominador de R: "
+            f"reserved_risk={reservation.reserved_risk}"
         )
 
         # ── OLEADA 2 · N instancias NUEVAS (RAM vacía) sobre la MISMA base ─────────

@@ -1,0 +1,87 @@
+# Evidencia cruda -- CI del tag v2.88.6-beta (`AUTO-MATERIAL-19` / `OBS-18`), POST-TAG, 2026-09-29
+#
+# Tag anotado : v2.88.6-beta -> commit del sello 032ae7cc (032ae7ccb5cb1da23144a0485cbc3e47d49f1850).
+# Version paq.: 2.11.5-beta -> 2.11.6-beta (package.json).
+# Base del diff: 27264aab (= v2.88.5-beta + cita POST-TAG de su CI).
+# Alembic head: 046_fill_reference_mid (SIN migracion).
+# Motor       : SI se toca (+37/-8 en apps/api-python/src/bolsa_api/background/
+#               auto_simulation_worker.py, regla 2): retirada por EVIDENCIA DE LA RESERVA.
+#
+# RESULTADO   : ROJO. El sello NO era certificable. Esta cita se conserva como precedente
+#               citado (patron v2.88 / v2.88.1) y su causa se cierra en v2.88.7-beta (OBS-20).
+# ---------------------------------------------------------------------------------------
+# Release tag CI -- run 36603391512 -- ref v2.88.6-beta -- HEAD 032ae7cc
+# ---------------------------------------------------------------------------------------
+# conclusion : FAILURE  (attempt 1)
+# ventana    : 2026-09-29T17:13:15Z -> 2026-09-29T17:20:48Z  (~7m33s)
+# jobs (11):
+#   python (ruff/imports/mypy/pytest offline)                    success
+#   shared (build/typecheck/test)                                success
+#   decision-spine                                               success
+#   playwright (mock E2E)                                        success
+#   lifecycle-pg (Alembic + auth + golden restart)               FAILURE   <-- unico rojo real
+#   dr-verify (battery DB_DR / TCP CI)                           success
+#   security (gitleaks)                                          success
+#   a7-gate (A7 C3 chaos live_a7 - dedicated real-PG)            success
+#   frontend (typecheck/lint/test/build + contract:check)        success
+#   playwright (integrated E2E, opt-in)                          skipped (por diseno)
+#   certify (aggregate + artifact)                               FAILURE   (cascada)
+#
+# Job `python` del tag (VERBATIM, timestamps UTC del runner) -- ESTE job SI era verde:
+#   2026-09-29T17:13:31Z All checks passed!                       (ruff)
+#   2026-09-29T17:13:31Z Contracts: 4 kept, 0 broken.             (import-linter)
+#   2026-09-29T17:13:59Z Success: no issues found in 508 source files   (mypy)
+#   2026-09-29T17:15:13Z 3103 passed, 37 skipped, 6 warnings in 72.38s (0:01:12)   (pytest)
+#
+#   ESPERADO 3103 passed / 37 skipped  ==  OBSERVADO 3103 passed / 37 skipped  -> COINCIDE
+#   (identidad `recogidos local - 37 skips`: 3140 recogidos - 37 = 3103; los 37 skips son los
+#    mismos tests PG-gated de siempre. El cableado del fichero del instrumento en este sello
+#    elevaba el esperado de 3049 (v2.88.5) a 3103: +9 de los ficheros que ya estaban en la
+#    lista +45 del fichero cableado, de los que 29 eran anteriores y 16 nuevos de OBS-18.)
+#
+# lifecycle-pg (VERBATIM, recuentos por invocacion; guarda `fail if skipped` en rojo por cascada):
+#   165 passed, 2 warnings in 76.65s   (Alembic + auth + golden restart)
+#    45 passed, 4 warnings in 9.95s    (account-isolation gate V2.15.4)
+#     1 passed in 8.91s                (Golden Day 2.0)
+#     1 failed in 122.20s (0:02:02)    (Crash/Recovery Day)   <-- AQUI
+#   -> los 5 pasos siguientes (`Fail on skipped ...`) y `certify` fallan EN CASCADA: el job
+#      aborta en el primer rojo (diseno anti-skip silencioso de v2.76), no son defectos propios.
+#
+# El fallo (VERBATIM del step `Pytest Crash/Recovery Day`):
+#   E   AssertionError: la muerte debe ocurrir con el fill PARCIAL durable (cola de reserva viva);
+#       reservas vivas: []
+#   E   assert []
+#   1 failed in 122.20s (0:02:02)
+#
+#   LECTURA: la asercion sellada en 032ae7cc exigia una COLA VIVA al morir el proceso. El motor
+#   de OBS-18 (tambien sellado aqui) RETIRA la cola muerta al cerrar el turno (motivo `tail_dead`,
+#   `remaining_qty = 0`), asi que ese hecho durable ya no existe por construccion: el test mide
+#   la semantica ANTERIOR. El re-anclaje del test ya estaba en el arbol de trabajo (no commiteado
+#   en 032ae7cc) y se sella, junto con el arreglo de motor que la suite de concurrencia destapo
+#   al repetirse, en v2.88.7-beta (OBS-20).
+#
+# ---------------------------------------------------------------------------------------
+# Companion runs sobre el MISMO commit/ref (v2.88.6-beta, 032ae7cc) -- todas VERDES
+# ---------------------------------------------------------------------------------------
+#   Python CI          36603391298   success
+#   Frontend CI        36603391395   success
+#   Optimize lab       36603391509   success
+#   Fase 2 scientific  36603391457   success
+#
+#   NOTA: `Release tag CI` es el UNICO que ejercita el job `lifecycle-pg` completo (las suites
+#   PG de proceso real, con `fail if skipped`). Los workflows por commit no lo corren, de modo
+#   que un rojo de semantica como este SOLO puede aparecer en el sello del tag.
+#
+# ---------------------------------------------------------------------------------------
+# Referencia: objeto ANTERIOR (v2.88.5-beta)
+# ---------------------------------------------------------------------------------------
+#   Release tag CI     36581692155   success   -> python 3049 passed, 37 skipped
+#   (companion: Python CI 36581692059 / Frontend CI 36581691966 / Optimize lab 36581692245 /
+#    Fase 2 scientific 36581692285 -> success las cuatro)
+#
+# NOTA de recuentos locales de este sello (bateria offline con el comando EXACTO del job
+# `python`, 116 args): `1 failed, 3139 passed` -> 3140 recogidos. El unico fallo es
+# PRE-EXISTENTE de solo-entorno (test_auto_v70_auto23_evidence_validation.py, `assert 17 == 26`,
+# material paper_real sembrado en la BD de desarrollo) y en el job `python` del CI se salta:
+#    LOCAL: 3139 passed + 1 failed = 3140 recogidos
+#    CI   : 3103 passed + 37 skipped = 3140 recogidos   -> COINCIDE

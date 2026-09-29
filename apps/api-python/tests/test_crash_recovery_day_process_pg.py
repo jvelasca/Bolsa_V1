@@ -7,23 +7,26 @@ inyecta reloj/precio/decider y descarta el objeto worker—, aquí el día lo co
 la MUERTE es una **muerte sucia de proceso** (``kill()``/``terminate()``, sin apagado
 ordenado): la RAM se pierde de verdad y sólo sobrevive lo DURABLE.
 
-Secuencia certificada:
+Secuencia certificada (semántica OBS-18: la cola del fill parcial se RETIRA declarada):
 
-    BUY PARCIAL (la cola SIM corta la orden: quedan tranchas aplicadas + cola viva)
+    BUY PARCIAL (la cola SIM corta la orden: tranchas aplicadas) y su COLA muerta retirada
+    al cerrar el turno con motivo ``tail_dead`` (la fila durable queda ``RELEASED_BY_CANCEL``)
       → MUERTE SUCIA (se mata el proceso; nada de shutdown)
       → REINICIO (MISMO engine/cuenta sobre la MISMA BD)
-      → RECONCILIACIÓN (readopt + reconciliación de arranque: la cola viva se libera)
+      → RECONCILIACIÓN (readopt de la posición + idempotencia: sin doble liberación)
       → CONTINUAR + CIERRE LIMPIO (``holdingDeadlineAt`` vencido ⇒ ``time_exit``)
 
 Invariantes (medidos sobre lo durable, nunca sobre RAM del test):
 
 * ``fills > orders`` (hubo tranchas reales, no un fill de una pieza);
-* al morir el proceso queda una **reserva viva** por la cola NO llenada (el fill parcial
-  es un hecho durable, no una impresión del test);
+* al morir el proceso el fill parcial es un hecho **durable** con su huella explícita: la fila
+  de la reserva con ``release_reason == 'tail_dead'``, ``remaining_qty == 0`` —OBS-18 retira la
+  cola muerta en vez de conservarla viva para siempre— y sin capital muerto retenido;
+* el reinicio NO re-libera ni resucita la cola (la fila cerrada no se toca: idempotencia);
 * todo ``ExecutionEvent`` en ``APPLIED`` y **cada** fill con su transacción
   (``transactions.idempotency_key``);
 * ``POSITION == Σ APPLIED BUY − Σ APPLIED SELL`` y libro canónico plano al cerrar;
-* ni una reserva viva al final (la reconciliación del reinicio liberó la cola);
+* ni una reserva viva al final (ni cola retenida ni liberaciones pendientes);
 * cero trazas de venue LIVE.
 
 DESVIACIÓN DECLARADA (§7 del plan). La cola SIM materializa TODAS las tranchas de una
@@ -153,7 +156,7 @@ def _crash_instrument_id(prefix: str) -> str:
 
 
 async def _live_reservations(factory: Any, account_id: str) -> list[Any]:
-    """Reservas VIVAS de la cuenta: la cola de capital NO materializada (fill parcial)."""
+    """Reservas VIVAS de la cuenta: capital comprometido AHORA (nada retirado)."""
     from bolsa_infrastructure.database.models.tables import PortfolioReservationRow
 
     async with factory() as session:
@@ -171,6 +174,38 @@ async def _live_reservations(factory: Any, account_id: str) -> list[Any]:
             .scalars()
             .all()
         )
+
+
+async def _retired_dead_tails(factory: Any, account_id: str) -> list[Any]:
+    """Filas con la huella DURABLE de OBS-18: la cola de un fill parcial retirada declarada.
+
+    ``release_reason == 'tail_dead'`` significa, por contrato del motor, que la fila **sí**
+    registró fill parcial (``released_qty > 0``) y que lo que se retiró fue su **cola**. Se
+    ordenan por ``released_at`` para leer primero la retirada real del turno bajo prueba.
+    """
+    from bolsa_infrastructure.database.models.tables import PortfolioReservationRow
+
+    async with factory() as session:
+        from sqlalchemy import select
+
+        rows = (
+            await session.execute(
+                select(PortfolioReservationRow).where(
+                    PortfolioReservationRow.account_id == account_id,
+                    PortfolioReservationRow.release_reason == "tail_dead",
+                )
+            )
+        ).scalars()
+        return sorted(rows.all(), key=lambda r: (str(r.released_at or ""), str(r.created_at or "")))
+
+
+def _live_tail(live: list[Any], instrument_id: str) -> list[Any]:
+    """Filas VIVAS del instrumento con cantidad por llenar (la cola RETENIDA, si la hubiera)."""
+    return [
+        row
+        for row in live
+        if str(row.instrument_id) == instrument_id and float(row.remaining_qty or 0) > 0
+    ]
 
 
 async def _kill_hard(proc: subprocess.Popen[bytes]) -> None:
@@ -245,8 +280,13 @@ async def test_crash_recovery_day_real_process_survives_dirty_kill_pg(
         env = _env_for(account_id, engine_id, instrument_ids=[instrument_id])
         proc = _spawn(env, log_path)
 
-        # ── FASE 1 · el proceso abre con un fill PARCIAL (cola viva) ──────────────
+        # ── FASE 1 · el proceso abre con un fill PARCIAL y su COLA se retira declarada ────
+        # OBS-18 — el hecho durable que la muerte sucia debe dejar en disco NO es una cola
+        # viva (eso era el bug: capital muerto retenido para siempre) sino la EVIDENCIA de la
+        # retirada: la fila del fill parcial con motivo ``tail_dead``. Se espera a las DOS
+        # cosas: posición materializada Y retirada declarada, sin cola viva del instrumento.
         position_seen = 0
+        retired: list[Any] = []
         live: list[Any] = []
         for _ in range(_OPEN_POLLS):
             await asyncio.sleep(0.5)
@@ -258,9 +298,9 @@ async def test_crash_recovery_day_real_process_survives_dirty_kill_pg(
                     )
                 )
             position_seen = await _count_positions(golden_pg_factory, account_id)
+            retired = await _retired_dead_tails(golden_pg_factory, account_id)
             live = await _live_reservations(golden_pg_factory, account_id)
-            # El fill parcial es un hecho DURABLE: posición materializada + cola viva.
-            if position_seen >= 1 and any(float(r.remaining_qty or 0) > 0 for r in live):
+            if position_seen >= 1 and retired and not _live_tail(live, instrument_id):
                 break
 
         ticks = await _count_scoped_ticks(golden_pg_factory, engine_id)
@@ -281,26 +321,47 @@ async def test_crash_recovery_day_real_process_survives_dirty_kill_pg(
             f"se esperaban MÁS tranchas que órdenes (fills={fills}, orders={orders})",
             log_path,
         )
-        tail = [
-            r
-            for r in live
-            if r.instrument_id == instrument_id and float(r.remaining_qty or 0) > 0
-        ]
-        assert tail, _proc_failure(
-            "la muerte debe ocurrir con el fill PARCIAL durable (cola de reserva viva); "
-            f"reservas vivas: {[(r.reservation_id, str(r.remaining_qty)) for r in live]}",
+        # El fill PARCIAL es un hecho durable con su huella declarada (OBS-18), no una cola
+        # viva: el motivo ``tail_dead`` solo lo emite el motor cuando la fila registró fill.
+        assert retired, _proc_failure(
+            "la muerte debe ocurrir con el fill PARCIAL durable y su cola RETIRADA declarada "
+            "(motivo 'tail_dead', OBS-18); filas retiradas: "
+            f"{[(r.reservation_id, str(r.release_reason)) for r in retired]}",
             log_path,
         )
-        partial_reservation = tail[0]
-        released_before = float(partial_reservation.released_qty or 0)
-        remaining_before = float(partial_reservation.remaining_qty or 0)
-        assert released_before > 0, "debe haber materializado al menos una trancha"
+        dead_tail = retired[0]
+        assert str(dead_tail.release_reason) == "tail_dead", _proc_failure(
+            f"la retirada debe declarar la causa 'tail_dead' (motivo={dead_tail.release_reason!r})",
+            log_path,
+        )
+        assert str(dead_tail.status) == "RELEASED_BY_CANCEL", _proc_failure(
+            f"una cola retirada cierra la fila como RELEASED_BY_CANCEL (status={dead_tail.status!r})",
+            log_path,
+        )
+        assert Decimal(str(dead_tail.remaining_qty or 0)) == 0, _proc_failure(
+            "la cola retirada no puede dejar cantidad viva: "
+            f"remaining_qty={dead_tail.remaining_qty}",
+            log_path,
+        )
+        released_before = Decimal(str(dead_tail.released_qty or 0))
+        assert released_before > 0, _proc_failure(
+            "el motivo 'tail_dead' exige evidencia de fill parcial en la fila: "
+            f"released_qty={dead_tail.released_qty}",
+            log_path,
+        )
+        # OBS-18: al cerrar el turno NO puede quedar retenido el capital de la cola muerta.
+        assert not _live_tail(live, instrument_id), _proc_failure(
+            "al cerrar el turno no puede quedar retenida la cola del fill parcial "
+            "(capital inmovilizado): "
+            f"{[(r.reservation_id, str(r.remaining_qty)) for r in _live_tail(live, instrument_id)]}",
+            log_path,
+        )
 
         # ── MUERTE SUCIA (RAM perdida; sólo sobrevive lo durable) ─────────────────
         await _kill_hard(proc)
         proc = None
 
-        # ── REINICIO · el techo vencido ⇒ reconciliación + ``time_exit`` ──────────
+        # ── REINICIO · el techo vencido ⇒ reconciliación (readopt) + ``time_exit`` ─────────
         expired = await _expire_holding_deadlines(golden_pg_factory, account_id)
         assert expired >= 1, "debe vencer el techo durable del plan parcial"
 
@@ -348,13 +409,36 @@ async def test_crash_recovery_day_real_process_survives_dirty_kill_pg(
         # (1) Cada fill con su transacción y ningún fill sin materializar.
         await _assert_materialized_and_flat(golden_pg_factory, account_id=account_id)
 
-        # (2) La cola parcial se liberó al reconciliar: ni una reserva viva al final.
+        # (2) OBS-18: la cola del parcial quedó retirada ANTES del crash (retirada declarada) y
+        #     el reinicio no la resucita; al cerrar el día no queda ninguna reserva viva.
         leftover = await _live_reservations(golden_pg_factory, account_id)
         assert leftover == [], (
-            "la reconciliación del reinicio debe liberar la cola del fill parcial; "
-            f"quedan vivas: {[(r.reservation_id, str(r.remaining_qty)) for r in leftover]}"
+            "no puede quedar ninguna reserva viva al cerrar el día (la cola del parcial se "
+            "retira declarada y el reinicio no la resucita); vivas: "
+            f"{[(r.reservation_id, str(r.remaining_qty)) for r in leftover]}"
         )
-        assert remaining_before > 0, "el escenario exige cola viva ANTES del reinicio"
+
+        # (2b) Idempotencia del reinicio: la fila ya retirada NO se vuelve a liberar ni cambia
+        #      de motivo (la reconciliación ignora lo que ya no está vivo: nunca un doble
+        #      liberado, nunca una retirada inventada).
+        closed_before = {str(row.reservation_id): row for row in retired}
+        closed_after = {
+            str(row.reservation_id): row
+            for row in await _retired_dead_tails(golden_pg_factory, account_id)
+        }
+        assert set(closed_after) == set(closed_before), (
+            "el reinicio no puede añadir ni perder retiradas de cola: "
+            f"antes={sorted(closed_before)} después={sorted(closed_after)}"
+        )
+        for reservation_id, row in closed_before.items():
+            after = closed_after[reservation_id]
+            assert Decimal(str(after.released_qty or 0)) == Decimal(str(row.released_qty or 0)), (
+                f"el reinicio re-liberó la fila {reservation_id} (doble liberado): "
+                f"antes={row.released_qty} después={after.released_qty}"
+            )
+            assert str(after.release_reason) == "tail_dead", (
+                f"la retirada cambió de motivo tras el reinicio: {after.release_reason!r}"
+            )
 
         # (3) ``fills > orders`` sigue siendo cierto tras el reinicio (sin doble orden).
         fills_after = await _count_fill_contexts(golden_pg_factory, account_id)

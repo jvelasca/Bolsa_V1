@@ -2,6 +2,58 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.7-beta] — `AUTO-MATERIAL-20` `OBS-20`: la retirada declara el motivo con la materialización EXACTA del ciclo (y las suites PG re-ancladas a la semántica de `OBS-18`) — 2026-09-29
+
+**Cierre de `OBS-20`** — el rojo `lifecycle-pg` del tag anterior (`Release tag CI` run **`36603391512`**,
+ref `v2.88.6-beta`, `032ae7cc`): `test_crash_recovery_day_process_pg.py` seguía exigiendo una **cola de
+reserva viva** al morir el proceso, mientras el motor de `OBS-18` —sellado en el mismo commit— **retira** la
+cola muerta al cerrar el turno (`tail_dead`, `remaining_qty = 0`). El re-anclaje ya estaba en el árbol de
+trabajo y se sella aquí. **El tag `v2.88.6-beta` NO se borra: queda como rojo citado.**
+
+**Bump** `2.11.6-beta` → `2.11.7-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+Base del diff: `032ae7cc` (= `v2.88.6-beta`). **SÍ se toca el motor.**
+
+- **El hueco (motor): la evidencia del motivo no viajaba entera.** `OBS-18` decide por la evidencia **de la
+  fila** (`released_qty`), pero esa evidencia la escribe el camino caliente de la sesión que **liquida** el
+  fill, y solo sobre las reservas que esa sesión tiene **en su libro**. Si no la tiene (libro de otra sesión,
+  o barrido de arranque de un proceso sin memoria), el ledger dice `APPLIED` y la fila dice `released_qty = 0`
+  ⇒ el cierre de turno declara **`cancel`** («nunca materializó») sobre una reserva que **sí** materializó.
+  Firma medida en `test_concurrent_auto_pg.py[5]`: **~1 de cada 9** corridas, `assert 'cancel' == 'tail_dead'`.
+- **La corrección: `cycle_id` como identidad, sin heurísticas.** `cycle_id` **ya** viajaba en las dos partes
+  (`AppliedFillFact` desde el contexto financiero del fill; `portfolio_reservations` desde la reserva) y **ya**
+  estaba persistido (`042`/`047`). El motor agrupa los hechos aplicados por **`(ciclo, lado)`** y completa
+  `materialized` con `max(materialized, min(linked, committed))`. Acotado por **LADO** (un ciclo tiene las dos
+  patas) y **nunca** por `instrumento+lado` (el defecto que `OBS-18` corrigió). El `max` garantiza que lo
+  registrado en la fila **nunca** se rebaja; la cota por lo **comprometido** evita inflar; `cycle_id = None`
+  ⇒ comportamiento de `OBS-18` (decide la fila). **Fail-closed intacto**: `in_flight` manda, `measurable`
+  manda y nunca se libera más que la cantidad viva. `AppliedFillFact.cycle_id` **no** se publica en
+  `to_dict()`: el contrato serializado **no cambia**.
+- **La medida que lo separa de «un fallo de test» (4 retiradas del replay multianual).** Ciclo durable
+  `1225/1225` ticks (`2021-12-07 → 2026-09-29`): `tail_dead` **36 → 40** y `cancel` **28 → 24** — cuatro días,
+  **una retirada cada uno** (`2022-03-14`, `2022-03-16`, `2022-06-09`, `2022-06-13`), **ningún otro día
+  cambia**. **4** de las **64** cancelaciones eran **proveniencia falsa**. El **puntaje no se mueve**: mismos
+  **62** ciclos y mismo `R` total **−18.3660** (el replay **no** es una palanca de resultados).
+- **Un test hermético nuevo** (`test_auto_v2_durable_cycle.py` **26 → 27**):
+  `test_a_cancel_is_never_declared_while_an_applied_fill_waits_in_the_ledger` — un fill aplicado que espera
+  en el ledger con la fila sin liberar **no** puede declararse `cancel`.
+- **Mutaciones (matriz `265` → `267`):** `M266` (worker: atribución por ciclo silenciada) y `M267` (el lector
+  de fills aplicados no propaga `cycle_id`) ⇒ **2/2 muerden** el test nuevo; matriz **COMPLETA `267/267`** con
+  el árbol **intacto**.
+- **Re-anclaje de las suites PG** (`test_concurrent_auto_pg.py`, `test_crash_recovery_day_process_pg.py`) a
+  la semántica de `OBS-18`/`OBS-20`: la retirada declara `tail_dead`, `released == requested`,
+  `remaining == 0`, `retained == 0.0`, y el arranque **no** re-libera ni cambia el motivo.
+- **Artefacto byte-reproducible:** `replay-oos-durable-obs20-fix-20260929.json` —
+  `3 393 187` B, SHA-256 `7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461`, **idéntico** en
+  dos corridas independientes.
+
+**Límites declarados.** **NO** se toca `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/`A/B` ni ningún umbral, ni se
+backdatea; **NO** acredita `P3-2`/`P3-3` (reloj **simulado**: el replay **no** sustituye la ventana PAPER
+real); **NO** cierra `OBS-15` (techo de **1000 `APPLIED`**), `OBS-16` ni la deuda de datos; **NO** cierra
+**`OBS-19`** (la deriva entre las dos listas offline de pytest sigue **ABIERTA**). El replay sigue sin
+escribir en PostgreSQL (cuarentena en memoria). Informe:
+[`obs-20-atribucion-por-ciclo-v2.88.7-2026-09-29.md`](./docs/engineering/obs-20-atribucion-por-ciclo-v2.88.7-2026-09-29.md);
+evidencia: [`docs/engineering/evidence/v2.88.7/README.md`](./docs/engineering/evidence/v2.88.7/README.md).
+
 ## [2.11.6-beta] — `AUTO-MATERIAL-19` `OBS-18`: la reconciliación decide por la EVIDENCIA DE LA RESERVA (y el replay OOS deja de disfrazar un libro estancado) — 2026-09-29
 
 **Cierre de `OBS-18`** — abierta por el **replay OOS multianual** de `AUTO-MATERIAL-15` (`v2.87`): su

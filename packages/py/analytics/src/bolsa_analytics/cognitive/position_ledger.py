@@ -97,6 +97,15 @@ class AppliedFillFact:
     # mismo instrumento en cuentas distintas y la reconciliación no podía distinguirlas.
     # Un hecho sin cuenta declarada va al cajón ``""`` (se agrupa, nunca se suma a otra).
     account_id: str = ""
+    # V2.88.7/OBS-20: el ciclo financiero del fill (``cycle_id``), que la reserva que lo
+    # originó también declara. Es la ÚNICA identidad que ata un fill aplicado a SU reserva
+    # sin heurísticas —instrumento+lado no basta: dos órdenes del mismo instrumento y lado
+    # pertenecen a ciclos distintos— y por eso es la evidencia que el reconciliador usa para
+    # declarar el motivo de una retirada cuando la fila todavía no registró el fill.
+    # ``None`` = el hecho no declara ciclo (lectura antigua o fila sin ciclo): no se afirma
+    # vínculo. NO se publica en ``to_dict``: es evidencia interna de reconciliación, no
+    # superficie de reporte (el contrato serializado de los libros no cambia).
+    cycle_id: str | None = None
 
     def __post_init__(self) -> None:
         if not str(self.execution_id or "").strip():
@@ -475,6 +484,7 @@ def coerce_applied_fill_fact(
     applied_at: Any = None,
     strategy_version_id: Any = None,
     account_id: Any = None,
+    cycle_id: Any = None,
 ) -> AppliedFillFact | None:
     """Normaliza una fila cruda a ``AppliedFillFact``; ``None`` si NO es interpretable.
 
@@ -503,6 +513,13 @@ def coerce_applied_fill_fact(
         # La cuenta del hecho acota la posición (AUTO hardening v2.43.2). Sin ella el
         # hecho cae al cajón ``""`` y el libro no lo funde con una cuenta concreta.
         account_id=(str(account_id).strip() if account_id is not None else ""),
+        # OBS-20: el ciclo financiero del fill, si la fila lo declara. Se normaliza a
+        # ``None`` cuando viene vacío: "no declara ciclo" nunca se lee como un ciclo "".
+        cycle_id=(
+            str(cycle_id).strip()
+            if isinstance(cycle_id, str) and str(cycle_id).strip()
+            else None
+        ),
     )
 
 
