@@ -158,10 +158,17 @@ Titulares del instrumento que sella el tag (leídos de
 - **NO** cierra `P3-2`/`P3-3` (ventana PAPER **real** ≥4 días **con material**): el sello no mide ventana.
 - **NO** afirma edge: no cambia ninguna cifra del material real; cierra una **parada de apertura** del motor.
 - **`mypy` / `lint-imports` de esta fase: NO MEDIDO** (no citados en el paquete de verificación del sello).
-- **Sello pendiente, con motivo.** El tag anotado **`v2.88-beta`** y su **cita de CI** los crea el
-  propietario: `Release tag CI` **solo corre al empujar**, así que su resultado es **POST-TAG** por
-  construcción (patrón `OBS-3`/`OBS-4`). **No** se cita aquí ningún `run`: **`(pendiente)`** hasta que
-  exista el tag.
+  **Pero SÍ medidos por el CI del objeto vigente (POST-TAG):** `Contracts: 4 kept, 0 broken.` y
+  `mypy 508` ficheros, en el job `python` del run `36558405748`.
+- **Sello: HECHO, con su CI citado POST-TAG.** El tag anotado **`v2.88.3-beta`** (objeto
+  `66f47cf8e72449dc5bb907ef208abcc7afb0e857` → commit `0038adfc`) lo creó el propietario, y su
+  `Release tag CI` **solo corre al empujar**, así que la cita es **POST-TAG** por construcción (patrón
+  `OBS-3`/`OBS-4`). **Acreditado:** run
+  [`36558405748`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405748) **SUCCESS en la primera
+  pasada** (`8m29s`; 10 jobs reales + `certify`; `playwright` integrado `skipped` por diseño); job `python`
+  **`3040 passed, 37 skipped`** (0 fallos) y `lifecycle-pg` **220 passed**. Dentro del tag la cita dice
+  `(pendiente)` **a propósito**: un auditor que trabaje solo sobre el objeto sellado **no** debe leerlo
+  como «CI no acreditado».
 - **Paso 4 parcial:** la actualización de registros (`PROJECT_STATE`, índice, deuda P3) se hace en esta
   fase; cualquier re-sello/tag es **decisión del propietario**.
 

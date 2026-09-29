@@ -200,8 +200,67 @@ Los **6** fallos de la costura **desaparecen** con el arreglo de una línea.
   estrategia ni mueve `P3-2`/`P3-3`.
 - `mypy`/`pytest` **no medidos localmente como ejecutables** (Windows Application Control); los mide el CI.
 
-## 7. CI del objeto vigente (`v2.88.3-beta`)
+## 7. CI del objeto vigente (`v2.88.3-beta`) — **VERDE, citado POST-TAG**
 
-<!-- PENDIENTE-TAG: se rellena en el commit POST-TAG con las URLs y conclusiones del CI del tag vigente. -->
+> **Límite estructural declarado (patrón `OBS-3`/`OBS-4`, no un fallo):** `Release tag CI` **solo corre al
+> EMPUJAR** el tag, así que la cita de su resultado **no puede** existir dentro de ese mismo tag. La copia
+> de este fichero **dentro** de `v2.88.3-beta` dice literalmente
+> «Pendiente de medir: se publica en cuanto el tag `v2.88.3-beta` dispare `Release tag CI`» — un auditor
+> que trabaje **estrictamente sobre el objeto sellado** verá eso y **NO** debe concluir «CI no
+> acreditado»: la cita acreditada es **esta sección**, en un commit **POST-TAG** de `main`.
 
-Pendiente de medir: se publica en cuanto el tag `v2.88.3-beta` dispare `Release tag CI`.
+`Release tag CI` run [`36558405748`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405748)
+(tag anotado **`v2.88.3-beta`** = objeto `66f47cf8e72449dc5bb907ef208abcc7afb0e857` → commit `0038adfc`;
+HEAD `0038adfc`, `event=push`, `ref=v2.88.3-beta`, 2026-09-29T10:53:59Z → 11:02:28Z, **8m29s**),
+**`conclusion: success` en la PRIMERA pasada** (`attempt 1`):
+
+| Job | Resultado |
+| --- | --- |
+| shared (build/typecheck/test) | success |
+| **python (ruff/imports/mypy/pytest offline)** | **success** ← el job que tumbó `v2.88.2-beta` |
+| decision-spine | success |
+| frontend (typecheck/lint/test/build + contract:check) | success |
+| playwright (mock E2E) | success |
+| **lifecycle-pg (Alembic + auth + golden restart)** | **success** ← crash/recovery + 3 sesiones concurrentes |
+| dr-verify (battery DB_DR / TCP CI) | success |
+| a7-gate (A7 C3 chaos live_a7 · dedicated real-PG) | success |
+| security (gitleaks) | success |
+| playwright (integrated E2E, opt-in) | skipped (por diseño) |
+| certify (aggregate + artifact) | success |
+
+Recuentos **verbatim** del job `python` (la puerta que falló en `v2.88.2`):
+
+```
+Ruff            All checks passed!
+Import-linter   Contracts: 4 kept, 0 broken.
+Mypy            Success: no issues found in 508 source files
+Pytest offline  3040 passed, 37 skipped, 6 warnings in 69.72s (0:01:09)
+```
+
+**Cuadre con el rojo del objeto anterior:** `3040 passed + 37 skipped = 3077` recogidos = exactamente los
+`3034 passed + 6 failed + 37 skipped = 3077` de `v2.88.2-beta`. Los **6** fallos de la costura
+**desaparecen** sin mover ni un `skip`: el arreglo no oculta tests, los **enruta**.
+
+Otros jobs (recuentos verbatim de sus logs):
+
+| Job | Recuento |
+| --- | --- |
+| decision-spine | `604 passed in 5.32s` |
+| a7-gate (A7 C3 chaos live_a7 · PG real) | `7 passed in 15.48s` |
+| lifecycle-pg | **8 invocaciones `pytest`** (`165`, `45`, `1`, `1`, `3`, `2`, `2`, `1` passed) = **220 passed, 0 failed** |
+| dr-verify | success (batería de script, sin líneas `pytest`) |
+
+**Lectura honesta:** los **dos** gates que perseguían los tres RE-SELLOS anteriores quedan verdes en el
+**mismo** run — el job `python` (costura offline, lo nuevo de `v2.88.3`) y `lifecycle-pg` (crash/recovery
+real + carrera de 3 sesiones + golden day + aislamiento por cuenta, lo heredado de `v2.88.2`). El motor de
+este tag es **idéntico** al de `v2.88.2`; lo que cambia es que **la validación ya no miente**.
+
+<!-- COMMIT-QUE-INTRODUJO-ESTA-CITA: PENDIENTE-SEGUNDO-POST-TAG -->
+
+> **Un commit no puede citar su propio hash.** El hash del commit **POST-TAG** que introdujo esta sección
+> se registra en el commit **inmediatamente siguiente** (el SEGUNDO POST-TAG, `docs`-only, que **no**
+> cambia ninguna afirmación de este fichero). Verifícalo con:
+>
+> ```
+> git log --format=%h:%s -1 --grep "cita POST-TAG del CI del tag v2.88.3-beta"
+> ```

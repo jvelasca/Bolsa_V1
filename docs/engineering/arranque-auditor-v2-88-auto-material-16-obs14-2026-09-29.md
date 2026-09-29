@@ -72,21 +72,63 @@ gitGraph
 
 ## 1. Cita del CI (lo primero que hay que comprobar)
 
-### 1.1 CI del tag `v2.88-beta` (este objeto) — **PENDIENTE**, se acredita **POST-TAG**
+### 1.1 CI del tag vigente `v2.88.3-beta` — **ACREDITADO** (cita **POST-TAG** en `main`)
 
 Límite estructural (`OBS-3`/`OBS-4`): `Release tag CI` **solo corre al empujar** el tag ⇒ su resultado no
-puede preexistir dentro del propio tag. La instancia **dentro** del tag declara esto y la cita real se
-escribe en un commit **POST-TAG**. **No** se cita aquí ningún `run`: **`(pendiente)`** hasta que exista el
-tag. El auditor **no** debe leer su ausencia como fallo.
+puede preexistir dentro del propio tag. La instancia **dentro** del tag dice literalmente «**`(pendiente)`**
+hasta que exista el tag — el auditor **no** debe leer su ausencia como fallo». La cita **acreditada** es
+esta, escrita en un commit **POST-TAG** de `main`:
+
+`Release tag CI` [`36558405748`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405748)
+(tag anotado `v2.88.3-beta` = objeto `66f47cf8e72449dc5bb907ef208abcc7afb0e857` → commit `0038adfc`):
+**SUCCESS en la primera pasada** (`attempt 1`, `8m29s`, 2026-09-29T10:53:59Z → 11:02:28Z). **10 jobs reales
+verdes** (`playwright` integrado `skipped` por diseño) + `certify` verde:
+
+| Job | Resultado | Recuento verbatim |
+| --- | --- | --- |
+| **python (ruff/imports/mypy/pytest offline)** | **success** | `All checks passed!` · `Contracts: 4 kept, 0 broken.` · `mypy 508` ficheros · **`3040 passed, 37 skipped`** |
+| **lifecycle-pg (Alembic + auth + golden restart)** | **success** | 8 invocaciones `pytest` = **220 passed**, 0 failed |
+| decision-spine | success | `604 passed` |
+| a7-gate (chaos live_a7 · PG real) | success | `7 passed` |
+| dr-verify / shared / frontend / playwright (mock) / security | success | — |
+
+**Cuadre con el rojo del objeto anterior (sin maquillar):** `3040 + 37 = 3077` recogidos = los mismos
+`3077` que en `v2.88.2-beta` (`3034 passed + 6 failed + 37 skipped`). Los **6** fallos de la costura
+**desaparecen** y **no se mueve un `skip`**: el arreglo **enruta** los tests, no los oculta.
+`mypy` pasa de `507` a `508` ficheros por `replay_oos.py` (instrumento de `v2.86`), el único `.py` de
+`src` añadido desde `v2.85.2`; **este sello no añade ningún fichero de `src`**.
 
 ### 1.2 Predicción pre-tag (declarada, no medida)
 
 El resultado del job `python` del tag **y** del job `quality` en `main` de este sello: **NO MEDIDO** en el
 paquete de la fase. La predicción estructural (código Python **nuevo**: módulo de replay, CLI, tests,
 mutaciones) es que **sí** correrán `Release tag CI` y `Python CI`, a diferencia de los re-sellos docs-only
-de `v2.85.1`/`v2.85.2`. **NO** se inventa ningún conteo: los números se citarán **POST-TAG**.
+de `v2.85.1`/`v2.85.2`. **NO** se inventa ningún conteo: los números se citan **POST-TAG**.
+
+**OBSERVADO (POST-TAG):** `Release tag CI` **`36558405748` SUCCESS** en la primera pasada; job `python` del
+tag **`3040 passed, 37 skipped`** (0 fallos) y `lifecycle-pg` **220 passed** (8 invocaciones). Como no se
+predijo ningún número, **no hay ninguna predicción aritmética que cumplir o rectificar** — solo la
+predicción estructural («correrán los jobs de Python»), que **se cumplió**. Ver §1.1.
 
 ## 2. Qué tiene que comprobar el auditor (por este orden)
+
+> **Alcance de esta lista (declarado, `POST-TAG`).** Los 12 puntos de abajo son la lista de la fase de
+> **ORIGEN** (`v2.88` / `2.11.0-beta`, matriz `246`). El **objeto vigente** es **`v2.88.3-beta`** /
+> **`2.11.3-beta`**. Solo estos valores cambian; **el resto sigue vigente tal cual**:
+>
+> | Punto | Fase de origen (`v2.88`) | Objeto vigente (`v2.88.3-beta`) |
+> | --- | --- | --- |
+> | 1 · `package.json` | `2.11.0-beta` | **`2.11.3-beta`** (`2.11.1-beta` → `v2.88.1`; `2.11.2-beta` → `v2.88.2`) |
+> | 1 · tag | `v2.88-beta` | **`v2.88.3-beta`** (objeto `66f47cf8e72449dc5bb907ef208abcc7afb0e857` → commit `0038adfc`) |
+> | 3 · diff del motor | `7  0` (cierre de `OBS-14` en `real_turn`) | **vacío**: `v2.88.3` **no** toca el motor; el motor es el de `v2.88.2` (que **sí** cambia `_v2_reconcile_reservations` con `only_ids`) |
+> | 4 · etiqueta `RESERVATION_RELEASED_BY_CANCEL` | `startup=False` | igual (heredado sin cambios) |
+> | 8 · matriz de mutaciones | `246` | **`252`**: `+M247`/`M248` (`v2.88.1`), `+M249`/`M250`/`M251` (`v2.88.2`), `+M252` (`v2.88.3`) |
+> | 10 · «ningún doc dice `2.11.0-beta`» | cierto en su sello | `2.11.0-beta` es **histórico**; el vigente es **`2.11.3-beta`** |
+>
+> La lista **sellada NO se reescribe** (viaja dentro del tag); esta tabla la reconcilia **POST-TAG**, que
+> es donde vive también la cita del CI (§1.1). Para el estado exacto del objeto vigente, la fuente es
+> [`evidence/v2.88.3/README.md`](./evidence/v2.88.3/README.md) y
+> [`obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md`](./obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md).
 
 1. **Naturaleza del objeto.** `package.json` = `2.11.0-beta`; tag `v2.88-beta` **anotado**; árbol
    **intacto** (`git status --porcelain` vacío) antes y después de cualquier sonda.
@@ -176,8 +218,12 @@ ventana PAPER real exige **días de pared con material durable**. El auditor deb
 
 - **No** cierra `P3-2`/`P3-3` ni sustituye una ventana PAPER real: el sello **no** mide ventana.
 - **Sí** cierra **`OBS-14`** (código + tests + mutación) y **abre** **`OBS-15`** (MEDIUM, alcance motor).
-- **`mypy` / `lint-imports` de esta fase: NO MEDIDO** (no citados en el paquete de verificación del sello).
-- **No** se cita ningún `run` de CI: **`(pendiente)`** hasta que el propietario cree el tag (la cita del CI
-  es **POST-TAG** por construcción, patrón `OBS-3`/`OBS-4`).
+- **`mypy` / `lint-imports` de esta fase: NO MEDIDO** en el paquete de la fase, **pero SÍ medidos por el CI
+  del objeto vigente**: `Contracts: 4 kept, 0 broken.` y `mypy 508` ficheros (job `python` del run
+  `36558405748`).
+- **CI del objeto vigente: ACREDITADO POST-TAG** (no dentro del tag, por construcción: patrón
+  `OBS-3`/`OBS-4`). `Release tag CI` [`36558405748`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405748)
+  **SUCCESS** en la primera pasada; job `python` **`3040 passed, 37 skipped`** (0 fallos) y `lifecycle-pg`
+  **220 passed**. Dentro del tag la cita dice `(pendiente)` **a propósito**; ver §1.1.
 - Los defectos documentales de la fase (**versión inexistente**; **7 `I001`**) están **corregidos** y se
   declaran; ninguno es deuda de datos.

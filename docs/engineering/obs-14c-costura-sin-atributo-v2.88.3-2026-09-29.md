@@ -156,3 +156,31 @@ Mutación nueva:
   **conservado**: `v2.88-beta` (crash/recovery), `v2.88.1-beta` (carrera concurrente), `v2.88.2-beta`
   (costura del journal) — las tres citas están en `evidence/v2.88/`, `evidence/v2.88.1/` y
   `evidence/v2.88.2/`.
+
+## 9. CI del objeto vigente: **VERDE**, citado POST-TAG
+
+> Sección **POST-TAG**: `Release tag CI` solo corre al empujar el tag, así que este resultado **no puede**
+> viajar dentro de `v2.88.3-beta`. La copia sellada de este informe y de
+> [`evidence/v2.88.3/README.md`](./evidence/v2.88.3/README.md) declaran ese límite **antes** del push.
+
+`Release tag CI` [`36558405748`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36558405748)
+(tag `v2.88.3-beta` → commit `0038adfc`): **SUCCESS en la primera pasada** (`attempt 1`, 8m29s,
+2026-09-29T10:53:59Z → 11:02:28Z). **Los 10 jobs reales en verde** (`playwright` integrado `skipped` por
+diseño) + `certify` en verde.
+
+Lo que mide, contra lo que perseguía este RE-SELLO:
+
+| Gate | `v2.88.2-beta` (rojo) | `v2.88.3-beta` |
+| --- | --- | --- |
+| `python` · **Pytest offline** | `6 failed, 3034 passed, 37 skipped` | **`3040 passed, 37 skipped`** (0 fallos) |
+| `python` · `ruff` / `imports` / `mypy` | verdes | verdes (`All checks passed!` · `Contracts: 4 kept, 0 broken.` · `508` ficheros) |
+| `lifecycle-pg` (crash/recovery + 3 sesiones concurrentes + golden day) | success | **success** (8 invocaciones `pytest`, **220 passed**, 0 failed) |
+| `decision-spine` | success | success (`604 passed`) |
+| `a7-gate` (chaos live_a7 · PG real) | success | success (`7 passed`) |
+| `dr-verify` / `shared` / `frontend` / `playwright (mock)` / `security` | success | success |
+
+**Cuadre declarado, sin maquillar:** `3040 + 37 = 3077` recogidos = los mismos `3077` del objeto anterior
+(`3034 + 6 + 37`). El arreglo **no** oculta tests ni mueve un `skip`: los **6** que fallaban pasan.
+`mypy` pasa de `507` a `508` ficheros, y el **único** `.py` de `src` añadido desde `v2.85.2` (`983b0eac`)
+es `packages/py/application/src/bolsa_application/replay_oos.py` (instrumento de `v2.86`) — **ningún**
+fichero nuevo de este sello.
