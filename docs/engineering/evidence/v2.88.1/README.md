@@ -118,8 +118,29 @@ desaparecidos, en vez de fingir cobertura.
 - `mypy` **NO MEDIDO en local** (Windows Application Control bloquea `mypy.main` y `uvx`): se cita el
   resultado de CI del tag, que sí lo ejecuta en el job `python (ruff/imports/mypy/pytest offline)`.
 
-## 6. CI del objeto vigente (`v2.88.1-beta`)
+## 6. CI del objeto de este sello (`v2.88.1-beta`) — **ROJO, citado POST-TAG**
 
-<!-- PENDIENTE-TAG: se rellena en el commit POST-TAG con las URLs y conclusiones del CI del tag vigente. -->
+> **[SUPERADO por `v2.88.2-beta` y, después, por `v2.88.3-beta`.]** El objeto de auditoría vigente es
+> **`v2.88.3-beta`**: ver [`evidence/v2.88.3/README.md`](../v2.88.3/README.md). Esta evidencia se conserva
+> **verbatim** (su rojo es parte de ella).
 
-Pendiente de medir: se publica en cuanto el tag `v2.88.1-beta` dispare `Release tag CI`.
+`Release tag CI` run [`36548125321`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36548125321)
+(8m58s): `shared`, `frontend`, `playwright (mock)`, `decision-spine`, `security`, `dr-verify` y
+**`python (ruff/imports/mypy/pytest offline)`** = **success**; cae **`lifecycle-pg`** en el paso
+`Pytest Concurrent AUTO` (`test_concurrent_auto_pg.py`, **`FFF`**):
+
+```
+AssertionError: lo liberado por fill debe ser exactamente lo materializado:
+              released=200.000000 materializado=147.000000
+```
+
+Los cinco workflows de `main` del **mismo commit** fueron **todos verdes**: Python CI
+[`36548121882`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36548121882) · Frontend CI
+[`36548121855`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36548121855) · Optimize lab
+[`36548121901`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36548121901) · Fase 2 scientific
+[`36548121839`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36548121839) · Gitleaks
+[`36548121852`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36548121852).
+
+Es decir: **la guarda `attribute_fills` de este sello funcionó** (el crash/recovery pasó) y dejó a la vista
+el **segundo** defecto fail-OPEN, la **carrera entre sesiones**, corregida en `v2.88.2`. Traza y prueba de
+causalidad: [`evidence/v2.88.2/README.md`](../v2.88.2/README.md) §1–§3.

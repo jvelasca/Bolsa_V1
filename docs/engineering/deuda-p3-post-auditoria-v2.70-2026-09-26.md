@@ -90,6 +90,20 @@
 > **Nuevo dato de no-regresión:** los tres pasos que quedaron **saltados** en el CI de `v2.88-beta`
 > (`HardKill recovery`, `crash injection matrix`, `multiprocess AUTO`) se ejecutaron por primera vez en
 > este RE-SELLO: **5 passed** en local.
+>
+> **`v2.88.3` (2026-09-29):** **RE-SELLO 3** `v2.88.3-beta` (`AUTO-MATERIAL-16c`): bump `2.11.2-beta →
+> 2.11.3-beta`, **sin migración**, **motor INTACTO** (el diff es un test + el arnés + docs). El tag
+> `v2.88.2-beta` (`41e7e679`) quedó **público con el job `python (ruff/imports/mypy/pytest offline)` ROJO**
+> (`Release tag CI` `36553839085`): `ruff`/`import-linter`/`mypy` verdes y `Pytest offline` con **6 fallos**
+> (`AttributeError: 'AutoSimulationWorker' object has no attribute '_v2_owned_reservations'`,
+> `auto_simulation_worker.py:2335`, los seis en `test_auto_v51_auto10_cycle_journal_seam.py`). **Lo que ese
+> rojo CONFIRMA:** el job `lifecycle-pg` (crash/recovery + **3 sesiones concurrentes** + golden day +
+> aislamiento de cuenta) quedó **GREEN**, junto con `a7-gate`, `dr-verify`, `shared`, `frontend`, `spine` y
+> `security` ⇒ **la corrección de `v2.88.2` funciona y lo mide el CI del tag**. **Causa raíz: de la
+> VALIDACIÓN, no del motor** — esa costura construye el worker con `object.__new__` (**sin `__init__`**) y
+> declara a mano el libro de reservas; al añadir el libro de propiedad al `__init__` se quedó sin declararlo.
+> **Arreglo:** 1 línea en la costura (`worker._v2_owned_reservations = set()`), sin relajar el motor con
+> `getattr`. **Observación nueva `OBS-16`** (ver más abajo). **`OBS-14.b` y `OBS-15` siguen ABIERTAS**.
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -1109,3 +1123,45 @@ posición. Exige tocar `applied_fills` + protocolo del store + InMemory + Postgr
 **Nota.** La ventana de retención de **900** de `v2.87` es una mitigación **interna al instrumento**
 (`_RetentionExecutionEventStore`, solo replay); **no** existe en producción. Cerrarla es **fase de código
 del motor**, no de instrumento.
+
+## OBS-16 — La verificación local puede NO cubrir la batería offline del CI (MEDIUM, proceso) — 🔴 ABIERTA (2026-09-29)
+
+**Origen.** Medido en **tres rojos consecutivos** de tag (`v2.88-beta` → `v2.88.1-beta` → `v2.88.2-beta`).
+El tercero lo destapó en su forma más pura: el motor estaba **correcto** y el CI cayó por un
+`AttributeError` de una **costura de test**.
+
+**Observación.** La validación local de esta fase se hizo **por suites vecinas** (carrera `7 passed`, ciclo
+durable `14`, instrumento `14`, vecinos del motor `49 passed`, pasos saltados de CI `5 passed`) y **no**
+por la **batería offline completa** que ejecuta el job `python (ruff/imports/mypy/pytest offline)` del
+workflow del tag. Esa batería recorre **3077** tests y es la puerta real.
+
+**Dos mecanismos, ambos medidos:**
+
+1. **La batería no se corría entera.** Cubrir por vecindad deja fuera ficheros que ejercitan la misma
+   ruta por otra puerta.
+2. **15 costuras `object.__new__(AutoSimulationWorker)` duplican a mano el estado del worker**, porque
+   construyen el objeto **sin `__init__`** para aislar la costura de la aritmética. Consecuencia
+   estructural: **cualquier atributo nuevo del `__init__`** que una ruta de costura use **rompe el job
+   offline sin aviso local**. En `v2.88.2` pasó exactamente eso con `_v2_owned_reservations`
+   (`test_auto_v51_auto10_cycle_journal_seam.py`, **6** tests).
+
+**Radio.** Alto en **frecuencia** (el patrón se repite en 15 ficheros y estos sellos añaden atributos al
+`__init__`), bajo en **daño** (es un rojo de CI, no un defecto de motor: el camino de producción sí pasa
+`__init__`).
+
+**Mitigación ADOPTADA y MEDIDA (en `v2.88.3`).** *«Antes de sellar, correr la batería offline del CI»*: se
+**extrae el comando del propio workflow** (step `Pytest offline`) y se ejecuta **entero** en local. Nota de
+entorno: los ejecutables `pytest` y `mypy` están **bloqueados por Windows Application Control**
+(`os error 4551`), así que el sustituto medido es `uv run --no-sync python -m pytest <mismos argumentos>`.
+Resultado de referencia: **3076 passed, 1 failed** (el fallo es el de entorno ya conocido
+`assert 17 == 26`, material sembrado; en CI se salta porque ese job no tiene Postgres).
+
+**Mejora posible, NO implementada.** Una **fábrica de costura compartida** que derive el estado del
+`__init__` en vez de duplicarlo a mano (p. ej. `object.__new__` + un `_seed_worker_state(worker, **overrides)`
+único), de modo que añadir un atributo al `__init__` no deje 15 ficheros desincronizados.
+
+**Criterio de cierre.** Que la validación previa al sello incluya la batería offline completa **como paso
+declarado** (y, opcionalmente, que las costuras compartan la siembra del estado).
+
+**Evidencia:** [`obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md`](./obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md) ·
+[`evidence/v2.88.3/README.md`](./evidence/v2.88.3/README.md).

@@ -116,6 +116,11 @@ def _worker(*, sink: Any | None = None, regime: str | None = _REGIME) -> AutoSim
     worker._v2_reservations = ()
     worker._v2_reservation_blocked = frozenset()
     worker._v2_reservation_carryover = frozenset()
+    # OBS-14.b — el alta de la reserva registra la PROPIEDAD de la sesión (quién la puede
+    # retirar al cerrar su turno). Esta costura construye el worker con ``object.__new__``
+    # (sin ``__init__``), así que el libro de propiedad se declara aquí, como el resto del
+    # estado del libro de reservas que la costura ya declara.
+    worker._v2_owned_reservations = set()
     worker._v2_tunables = SimpleNamespace(regime_override=None)
     worker._v2_regime_source = (lambda: regime) if regime is not None else None
     worker._cycle_regime_sink = sink

@@ -1,5 +1,12 @@
 # Evidencia cruda — Corrección fail-OPEN de CARRERA en el cierre de turno (`v2.88.2`, 2026-09-29)
 
+> **[SUPERADO por `v2.88.3-beta` — 2026-09-29.]** Este tag quedó **público con el job `python` ROJO**
+> (una **costura de test** que construye el worker sin `__init__`; el motor es correcto y su
+> `lifecycle-pg` —crash/recovery + 3 sesiones concurrentes— **pasó**). El **objeto de auditoría vigente**
+> pasa a `v2.88.3-beta`: ver [`evidence/v2.88.3/README.md`](../v2.88.3/README.md) y
+> [`obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md`](../obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md).
+> Esta evidencia se conserva **verbatim** (el rojo es parte de ella) y su CI queda citado en §7.
+
 Resumen **verificable** del RE-SELLO que sustituye a `v2.88.1-beta`. Conserva el **rojo original** de
 `v2.88.1-beta` (no se borra: es parte de la evidencia), la traza del diagnóstico y la validación de la
 corrección. Las cifras están transcritas de las corridas, sin edición.
@@ -182,8 +189,59 @@ Salida del arnés (transcrita):
 - `mypy` **NO MEDIDO en local** (Windows Application Control bloquea `mypy.main` y `uvx`): lo mide el job
   `python (ruff/imports/mypy/pytest offline)` del CI del tag.
 
-## 7. CI del objeto vigente (`v2.88.2-beta`)
+## 7. CI del objeto de este sello (`v2.88.2-beta`) — **ROJO, citado POST-TAG**
 
-<!-- PENDIENTE-TAG: se rellena en el commit POST-TAG con las URLs y conclusiones del CI del tag vigente. -->
+**Estado: el tag `v2.88.2-beta` quedó público con el job `python` en ROJO.** Se conserva la cita completa
+(el objeto vigente pasa a ser `v2.88.3-beta`; ver `evidence/v2.88.3/README.md`).
 
-Pendiente de medir: se publica en cuanto el tag `v2.88.2-beta` dispare `Release tag CI`.
+`Release tag CI` run [`36553839085`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36553839085)
+(commit `41e7e679`, 8m54s):
+
+| Job | Resultado |
+| --- | --- |
+| shared / frontend / playwright (mock) / decision-spine / security | success |
+| dr-verify | success |
+| a7-gate (A7 C3 chaos live_a7 · dedicated real-PG) | success |
+| **lifecycle-pg (Alembic + auth + golden restart)** | **success** ← crash/recovery **y** las 3 sesiones concurrentes |
+| **python (ruff/imports/mypy/pytest offline)** | **failure** |
+| certify (aggregate + artifact) | failure (agrega el fallo de `python`) |
+
+Dentro del job `python`, los cuatro sub-pasos:
+
+```
+✓ Ruff            ✓ Import-linter        ✓ Mypy
+X Pytest offline   →  6 failed, 3034 passed, 37 skipped, 6 warnings in 54.15s
+```
+
+Los 6 fallos, idénticos:
+
+```
+AttributeError: 'AutoSimulationWorker' object has no attribute '_v2_owned_reservations'.
+  Did you mean: '_v2_reservations'?
+apps/api-python/src/bolsa_api/background/auto_simulation_worker.py:2335
+FAILED apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py::test_each_opened_cycle_publishes_its_regime_durably
+FAILED apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py::test_one_opening_is_one_trace
+FAILED apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py::test_a_cycle_without_identity_is_not_faked
+FAILED apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py::test_an_absent_regime_is_published_declared_not_skipped
+FAILED apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py::test_without_a_sink_the_turn_is_untouched
+FAILED apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py::test_a_broken_sink_degrades_declaring_and_keeps_the_commitment
+```
+
+**Lectura honesta: el único rojo es de la COSTURA del test, no del motor.** El gate que perseguían los
+dos RE-SELLOS anteriores (`lifecycle-pg`: crash/recovery + carrera de 3 sesiones) quedó **verde**.
+
+Los workflows de `main` del **mismo commit** (`41e7e679`), citados también para no dejar el árbol a medias:
+
+| Workflow (`main`) | Run | Resultado |
+| --- | --- | --- |
+| Python CI | [`36553838466`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36553838466) | **failure** (misma causa: offline `Pytest`) |
+| Frontend CI | [`36553838471`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36553838471) | success |
+| Optimize lab | [`36553838505`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36553838505) | success |
+| Fase 2 scientific | [`36553838422`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36553838422) | success |
+| Gitleaks | [`36553838420`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36553838420) | success |
+
+Contraste útil para el auditor: en `v2.88.1-beta` los mismos cinco workflows de `main` fueron **todos
+verdes** (`36548121882` / `36548121855` / `36548121901` / `36548121839` / `36548121852`) y solo cayó el CI
+del **tag** (la carrera concurrente). Aquí es al revés: `main` y el tag caen por la **costura** y el
+`lifecycle-pg` (que es el que importa para la corrección) pasa.
+

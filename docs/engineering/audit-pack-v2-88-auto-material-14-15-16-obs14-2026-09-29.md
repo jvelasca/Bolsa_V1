@@ -1,23 +1,40 @@
 # Audit-pack — `AUTO-MATERIAL-14/15/16` / `V2.88` — SELLO CONJUNTO: cierre de `OBS-14` (reconciliación al cierre de turno) + `v2.86` + `v2.87` + `OBS-15`
 
-> **[OBJETO VIGENTE — RE-SELLO `v2.88.2-beta`, 2026-09-29.]** Los tags `v2.88-beta` y `v2.88.1-beta` del
+> **[OBJETO VIGENTE — RE-SELLO `v2.88.3-beta`, 2026-09-29.]** Los tags `v2.88-beta` y `v2.88.1-beta` del
 > que habla este pack quedaron **públicos con `Release tag CI` en ROJO** (`lifecycle-pg`): primero el
 > cierre de turno del `OBS-14` **re-liberaba fills ya liberados** y **drenaba la cola viva** de las
 > órdenes parcialmente llenadas (fail-**OPEN**); y, tras la guarda `attribute_fills`, el mismo cierre
-> **liberaba la reserva VIVA de otra sesión** en una carrera concurrente (fail-**OPEN**). El objeto a
-> auditar es ahora el tag anotado **`v2.88.2-beta`** (**Versión `2.11.2-beta`**), que incluye la guarda
+> **liberaba la reserva VIVA de otra sesión** en una carrera concurrente (fail-**OPEN**); y, ya con el
+> cierre acotado por PROPIEDAD, `v2.88.2-beta` quedó **público con el job `python` ROJO** — un
+> `AttributeError` de una **costura de test** que construye el worker sin `__init__`, **no** del motor: en
+> ese mismo CI, `lifecycle-pg` (crash/recovery + **3 sesiones concurrentes**), `a7-gate`, `dr-verify`,
+> `shared`, `frontend`, `spine` y `security` quedaron **verdes**. El objeto a auditar es ahora el tag
+> anotado **`v2.88.3-beta`** (**Versión `2.11.3-beta`**), **idéntico al motor de `v2.88.2-beta`** (este
+> sello arregla el test: su diff es un test + el arnés + docs). Incluye la guarda
 > `attribute_fills` **y** el **alcance por PROPIEDAD** (`only_ids`) del cierre de turno, más la costura
 > del replay alineada. El resto de este pack se conserva **verbatim** y sigue siendo válido para
 > `v2.86`/`v2.87`/`OBS-14`/`OBS-15`; para el delta de las correcciones, ver
 > [obs-14-correccion-fail-open-v2.88.1-2026-09-29.md](./obs-14-correccion-fail-open-v2.88.1-2026-09-29.md),
 > [obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md](./obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md)
+> [obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md](./obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md)
 > y [evidence/v2.88.1/README.md](./evidence/v2.88.1/README.md) +
-> [evidence/v2.88.2/README.md](./evidence/v2.88.2/README.md) (con los dos rojos conservados).
+> [evidence/v2.88.2/README.md](./evidence/v2.88.2/README.md) +
+> [evidence/v2.88.3/README.md](./evidence/v2.88.3/README.md) (con los tres rojos conservados).
 >
 > **Deuda nueva declarada — `OBS-14.b` (MEDIUM):** el barrido de **ARRANQUE** sigue siendo global y
 > tampoco distingue una reserva huérfana de una reserva **viva de otra sesión a mitad de turno**
 > (reinicio rodante con otro motor operando). Ya era así en `v2.85.2`; el arreglo acordado es de
 > **alcance** (cierre de turno). Discriminador posible, **no** implementado: ventana de gracia por EDAD.
+>
+> **Observación nueva declarada — `OBS-16` (MEDIUM, proceso):** la verificación local puede **no** cubrir
+> la batería offline del CI. Dos mecanismos: (a) se validó por suites vecinas y no entera, y (b) **15
+> costuras `object.__new__(AutoSimulationWorker)` duplican a mano el estado del worker**, así que todo
+> atributo nuevo del `__init__` puede romper el job offline sin aviso local. **Mitigación medida:**
+> extraer del workflow el comando del step `Pytest offline` y correrlo **entero** con
+> `uv run --no-sync python -m pytest` (los ejecutables `pytest`/`mypy` están bloqueados por Windows
+> Application Control, `os error 4551`). Mejora posible, **no** implementada: fábrica de costura
+> compartida. Límite declarado: `M252` acota la pata de **entrada**; `_v2_reserve_exit` **no** tiene
+> mutación ni test dedicados.
 
 > **Objeto a auditar:** tag anotado **`v2.88-beta`** (lo crea el propietario) · **Versión:** `2.11.0-beta`
 > (**bump** `2.10.2-beta → 2.11.0-beta`) · **Base del diff:** `v2.85.2-beta` (commit base **`3483b6b5`**)

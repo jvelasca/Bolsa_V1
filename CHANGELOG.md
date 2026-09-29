@@ -2,6 +2,54 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.3-beta] — `AUTO-MATERIAL-16c` RE-SELLO 3: la costura del journal autodeclara el libro de propiedad — 2026-09-29
+
+**RE-SELLO del objeto `v2.88`.** El tag `v2.88.2-beta` (`41e7e679`) quedó **público con el job
+`python (ruff/imports/mypy/pytest offline)` en ROJO** (`Release tag CI` run `36553839085`): `ruff`,
+`import-linter` y `mypy` **verdes**; cayó `Pytest offline` con **6 fallos idénticos**:
+
+```
+AttributeError: 'AutoSimulationWorker' object has no attribute '_v2_owned_reservations'
+apps/api-python/src/bolsa_api/background/auto_simulation_worker.py:2335  (alta de la reserva)
+apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py  (6 tests, FFFFFF)
+```
+
+**Bump** `2.11.2-beta` → `2.11.3-beta`. **SIN migración** (Alembic head sigue en
+`046_fill_reference_mid`). Base del diff: `41e7e679` (= `v2.88.2-beta`).
+
+- **La corrección de `v2.88.2` SÍ funciona — y queda medida por el propio CI del tag:** el job
+  `lifecycle-pg` (crash/recovery día real + **3 sesiones concurrentes** + golden day + aislamiento de
+  cuenta) quedó **GREEN**, junto con `a7-gate`, `dr-verify`, `shared`, `frontend`, `spine` y `security`.
+  Es la primera vez que el cierre de turno pasa el gate completo de correctitud **y** el de la carrera.
+- **Causa raíz — de la VALIDACIÓN, no del motor:** la costura
+  `apps/api-python/tests/test_auto_v51_auto10_cycle_journal_seam.py` construye el worker con
+  `object.__new__(AutoSimulationWorker)` (**sin `__init__`**) y declara a mano el estado del libro de
+  reservas que la ruta ejercitada necesita. Al añadir `self._v2_owned_reservations` al `__init__`, esa
+  costura se quedó sin declararlo y `_v2_persist_tick_reservations` reventó con `AttributeError`.
+  **El motor no tenía el defecto: lo tenía mi validación**, que corrió suites vecinas (49 passed) pero
+  **no la batería offline completa** que es la puerta real del CI.
+- **Arreglo (1 línea):** la costura declara `worker._v2_owned_reservations = set()`, como ya declara el
+  resto del libro. Comprobado que de las **15** costuras con `object.__new__(AutoSimulationWorker)` es la
+  **única** que llama a `_v2_persist_tick_reservations` / `_v2_reserve_exit` / `_v2_reconcile_reservations`
+  (grep exhaustivo sobre `apps/api-python/tests`).
+- **Verificación NUEVA (la que faltaba):** se **extrae del propio workflow** el comando de `Pytest offline`
+  y se corre **entero** en local → **3076 passed, 1 failed**, y ese 1 es el fallo de **entorno ya
+  declarado** de este proyecto (`assert 17 == 26`, material sembrado de la BD de desarrollo; en CI ese job
+  no tiene Postgres y el test se salta). Los 6 fallos de la costura **desaparecen**. En local `pytest` y
+  `mypy` como ejecutables están bloqueados por Windows Application Control, así que la batería se corre con
+  `uv run --no-sync python -m pytest` (sustituto medido, declarado).
+- **Mutación nueva `M252`:** el tick persiste la reserva pero **no** registra su dueño ⇒ la cazan **6**
+  tests del ciclo durable. Matriz `251` → **`252`**.
+- **Observación nueva `OBS-16` (MEDIUM, proceso):** la verificación local puede **no** cubrir la batería
+  offline del CI; mitigación adoptada y medida (`extraer el comando del workflow + python -m pytest`).
+  Cubre dos mecanismos: (a) la batería no se corría entera y (b) **15 costuras `object.__new__` duplican a
+  mano el estado del worker**, así que todo atributo nuevo del `__init__` puede romperlas sin aviso local.
+- **No cambia:** ninguna compuerta, régimen, umbral ni la lógica de propiedad; el motor es **byte a byte**
+  el de `v2.88.2` salvo nada (este sello solo toca un test + el arnés + docs).
+- **Informe:** `docs/engineering/obs-14c-costura-sin-atributo-v2.88.3-2026-09-29.md` · **Evidencia:**
+  `docs/engineering/evidence/v2.88.3/README.md` (con la cita POST-TAG del rojo de `v2.88.2` conservada en
+  `evidence/v2.88.2/README.md` §7).
+
 ## [2.11.2-beta] — `AUTO-MATERIAL-16b` RE-SELLO: corrección fail-OPEN de CARRERA en el cierre de turno (`only_ids`) — 2026-09-29
 
 **RE-SELLO del objeto `v2.88`.** El tag `v2.88.1-beta` (`dd8a16a5`) quedó **público con `Release tag CI`

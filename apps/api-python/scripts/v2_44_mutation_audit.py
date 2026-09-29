@@ -2766,6 +2766,13 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        only_ids=None,\n",
         (T_AUTO_DURABLE,),
     ),
+    (
+        "M252 (alta sin propiedad): el tick persiste la reserva pero NO registra quien es su dueno",
+        WORKER,
+        "            self._v2_owned_reservations.add(reservation.reservation_id)\n            persisted.append(reservation)\n",
+        "            persisted.append(reservation)\n",
+        (T_AUTO_DURABLE,),
+    ),
 ]
 
 # DSN a un puerto local cerrado: el connect falla al instante (en vez de colgar el teardown de PG).
