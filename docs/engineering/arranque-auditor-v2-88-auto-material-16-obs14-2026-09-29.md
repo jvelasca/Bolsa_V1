@@ -98,6 +98,10 @@ verdes** (`playwright` integrado `skipped` por diseño) + `certify` verde:
 `mypy` pasa de `507` a `508` ficheros por `replay_oos.py` (instrumento de `v2.86`), el único `.py` de
 `src` añadido desde `v2.85.2`; **este sello no añade ningún fichero de `src`**.
 
+> **COMMIT QUE INTRODUJO ESTA CITA (verificable):** `a6c44b77e446c1e62d0ad0bdeb9f47441398fc6e`
+> (abreviado `a6c44b77`), el PRIMER commit de `main` POSTERIOR al tag `v2.88.3-beta`. Repródelo con
+> `git log --format=%h:%s -1 --grep "cita POST-TAG del CI del tag v2.88.3-beta"`.
+
 ### 1.2 Predicción pre-tag (declarada, no medida)
 
 El resultado del job `python` del tag **y** del job `quality` en `main` de este sello: **NO MEDIDO** en el

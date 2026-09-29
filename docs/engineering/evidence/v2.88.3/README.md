@@ -255,11 +255,12 @@ Otros jobs (recuentos verbatim de sus logs):
 real + carrera de 3 sesiones + golden day + aislamiento por cuenta, lo heredado de `v2.88.2`). El motor de
 este tag es **idéntico** al de `v2.88.2`; lo que cambia es que **la validación ya no miente**.
 
-<!-- COMMIT-QUE-INTRODUJO-ESTA-CITA: PENDIENTE-SEGUNDO-POST-TAG -->
+<!-- COMMIT-QUE-INTRODUJO-ESTA-CITA: a6c44b77e446c1e62d0ad0bdeb9f47441398fc6e (abreviado `a6c44b77`) -->
 
 > **Un commit no puede citar su propio hash.** El hash del commit **POST-TAG** que introdujo esta sección
 > se registra en el commit **inmediatamente siguiente** (el SEGUNDO POST-TAG, `docs`-only, que **no**
-> cambia ninguna afirmación de este fichero). Verifícalo con:
+> cambia ninguna afirmación de este fichero): **`a6c44b77e446c1e62d0ad0bdeb9f47441398fc6e`**, el PRIMER
+> commit de `main` POSTERIOR al tag `v2.88.3-beta`. Verifícalo con:
 >
 > ```
 > git log --format=%h:%s -1 --grep "cita POST-TAG del CI del tag v2.88.3-beta"
