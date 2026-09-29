@@ -1,5 +1,15 @@
 # Arranque del auditor — `v2.88-beta` / `AUTO-MATERIAL-16`: sello conjunto (`v2.86` + `v2.87` + cierre de `OBS-14`) + `OBS-15`
 
+> **[OBJETO VIGENTE — RE-SELLO `v2.88.1-beta`, 2026-09-29.]** El tag `v2.88-beta` quedó **público y
+> ROJO** en `Release tag CI` (`lifecycle-pg`, fail-**OPEN** del cierre de turno). Audita el tag anotado
+> **`v2.88.1-beta`** (**Versión `2.11.1-beta`**, mismo commit base **`3483b6b5`**), que añade la guarda
+> `attribute_fills=False` en el cierre de turno y la alineación de la costura del replay, con dos tests
+> y las mutaciones `M247`/`M248` que la fijan. Delta y prueba de causalidad:
+> [obs-14-correccion-fail-open-v2.88.1-2026-09-29.md](./obs-14-correccion-fail-open-v2.88.1-2026-09-29.md);
+> evidencia cruda (incluye el rojo original, conservado):
+> [evidence/v2.88.1/README.md](./evidence/v2.88.1/README.md). El resto de este arranque se conserva
+> **verbatim**.
+
 > **Objeto auditado:** tag anotado **`v2.88-beta`** (lo crea el propietario) · **Versión:** `2.11.0-beta`
 > (**bump** `2.10.2-beta → 2.11.0-beta`) · **Base (diff):** `v2.85.2-beta`, commit base **`3483b6b5`** ·
 > **AsOf:** 2026-09-29 · **Alembic head:** `046_fill_reference_mid` (**SIN migración**).

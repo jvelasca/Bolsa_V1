@@ -1050,12 +1050,19 @@ def declare_horizon(
 async def close_tick(worker: Any, *, durable_cycle: bool = True) -> bool:
     """Cierra el ciclo DURABLE del tick sobre el worker congelado (costura de ``v2.87``).
 
-    Invoca el método de PRODUCCIÓN ``_v2_reconcile_reservations(startup=False)`` —el mismo
-    que el motor real corre al ARRANCAR el proceso— al final de cada tick del replay. En el
-    motor SIM la orden se liquida DENTRO del tick, así que la reserva que sigue viva al cierre
-    es la de una orden que murió sin llenarse: retirarla (``RELEASED_BY_CANCEL``) es fiel, no
-    un atajo. La guardia de ``in_flight`` del propio método CONSERVA la reserva cuyo fill esté
-    capturado y sin aplicar.
+    Invoca el método de PRODUCCIÓN ``_v2_reconcile_reservations(startup=False,
+    attribute_fills=False)`` —el MISMO que el motor real corre al cerrar cada turno— al final
+    de cada tick del replay. En el motor SIM la orden se liquida DENTRO del tick, así que la
+    reserva que sigue viva al cierre y NUNCA se materializó es la de una orden que murió sin
+    llenarse: retirarla (``RELEASED_BY_CANCEL``) es fiel, no un atajo.
+
+    ``attribute_fills=False`` NO es cosmético: la regla 1 de la reconciliación reparte el
+    histórico COMPLETO de fills ≥ ``created_at`` (``consumed`` se reinicia en cada llamada) y
+    ``_release`` aplica ``released_qty`` como delta, así que la atribución **no es
+    idempotente**. Al cerrar cada tick re-liberaría fills ya liberados por el camino caliente
+    y DRENARÍA la cola VIVA de una orden parcialmente llenada — capital comprometido de
+    verdad (fail-OPEN). La guardia de ``in_flight`` del propio método CONSERVA además la
+    reserva cuyo fill esté capturado y sin aplicar.
 
     ``durable_cycle=False`` es el modo CONTROL: no toca el libro y deja la reserva huérfana
     viva (es el goteo que truncaba ``v2.86``, ahora medible). Devuelve ``True`` si reconcilió.
@@ -1071,7 +1078,7 @@ async def close_tick(worker: Any, *, durable_cycle: bool = True) -> bool:
             "el worker no expone _v2_reconcile_reservations: sin la pieza de producción el "
             "cierre de tick no puede declararse hecho"
         )
-    await reconcile(startup=False)
+    await reconcile(startup=False, attribute_fills=False)
     return True
 
 

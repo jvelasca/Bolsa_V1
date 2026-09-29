@@ -1,5 +1,14 @@
 # Evidencia cruda — Replay OOS del ciclo durable reserva→fill→liberación (`v2.87`, 2026-09-29)
 
+> **[ARTEFACTO NO REPRODUCIBLE CON EL CÓDIGO SELLADO — RE-SELLO `v2.88.1-beta`, 2026-09-29.]** Estas
+> cifras se midieron con la costura de `close_tick` **anterior** a la guarda que corrige el fail-OPEN del
+> cierre de turno (la reconciliación re-liberaba fills ya liberados y drenaba la cola viva de las órdenes
+> parcialmente llenadas). **Exigen RE-EJECUCIÓN** antes de citarse: siguen siendo evidencia de
+> INVESTIGACIÓN de aquel modelo, pero **NO** son reproducibles con el árbol sellado ni sirven para mover
+> `P3-2`/`P3-3`. Ver
+> [obs-14-correccion-fail-open-v2.88.1-2026-09-29.md](../../obs-14-correccion-fail-open-v2.88.1-2026-09-29.md).
+> El texto sellado se conserva **verbatim**; esta nota es la única adición.
+
 Resumen **verificable** del artefacto del replay. El JSON completo (3 165 540 B) es
 **gitignoreado** (`.gitignore:102` → `/operability_runs/`), así que no viaja en un clon del
 repositorio; se regenera con el comando de abajo. Estas cifras son las que el JSON contiene,

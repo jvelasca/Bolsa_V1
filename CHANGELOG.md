@@ -2,6 +2,41 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.1-beta] — `AUTO-MATERIAL-16` RE-SELLO: corrección fail-OPEN del cierre de turno (`attribute_fills`) — 2026-09-29
+
+**RE-SELLO del objeto `v2.88`.** El tag `v2.88-beta` (`564240d2`) quedó **público con `Release tag CI`
+en ROJO**: el job `lifecycle-pg` tumbó `test_crash_recovery_day_real_process_survives_dirty_kill_pg` con
+`la muerte debe ocurrir con el fill PARCIAL durable (cola de reserva viva); reservas vivas: []`. Este
+RE-SELLO sella la corrección como **`v2.88.1-beta`**. **Bump** `2.11.0-beta → 2.11.1-beta`. **SIN
+migración** (Alembic head sigue en `046_fill_reference_mid`). Base del diff: `3483b6b5`.
+
+- **Causa raíz (fail-OPEN, no cosmética):** la regla 1 de `_v2_reconcile_reservations` reparte el
+  histórico **COMPLETO** de fills `applied_at >= created_at` (`consumed` se reinicia en cada llamada) y
+  `_release` aplica `released_qty` como **delta** ⇒ la atribución **no es idempotente**. Al invocarla
+  también al cerrar cada turno, cada turno **re-liberaba fills ya liberados** por el camino caliente
+  (`_v2_release_reservations_for_fill`) y **drenaba el `remaining_qty` de una orden parcialmente
+  llenada** — la cola VIVA del fill parcial, capital realmente comprometido.
+- **Corrección:** nuevo parámetro `attribute_fills` (por defecto `True` ⇒ la reconciliación de
+  **ARRANQUE** conserva su semántica exacta). El **cierre de turno** corre con
+  `attribute_fills=False` y solo aplica la **regla 2** (la reserva que NUNCA se materializó), que es el
+  huérfano que persigue `OBS-14`. Una orden parcialmente llenada (`filled > 0`) queda **intacta**.
+- **Costura del instrumento alineada:** `close_tick` (`bolsa_application/replay_oos.py`) cierra también
+  con `attribute_fills=False`.
+- **Prueba de causalidad:** revertir SOLO el worker a `HEAD~1` ⇒ el test PG pasa en 8,87 s; con el
+  cierre de turno activo ⇒ falla. En CI sobre Postgres 16 nuevo + `alembic upgrade head` falla idéntico
+  ⇒ no era estado de la BD de desarrollo. (Corrige el diagnóstico previo que atribuía los 7 fallos
+  locales al entorno: **uno era esta regresión**.)
+- **Validación:** crash/recovery PG **1 passed** (8,32 s); batería motor + instrumento **105 passed**;
+  `ruff` limpio; mutaciones `M245`–`M248` **4/4** detectadas (matriz `246` → **`248`**).
+- **Mutaciones nuevas:** `M247` (el cierre de turno vuelve a repartir el histórico) y `M248` (la costura
+  del replay vuelve a repartir). `M246` **re-anclado** (su fragmento ya no existía y el arnés declara y
+  falla los fragmentos desaparecidos).
+- **Límite declarado:** el artefacto multianual de `v2.87` se midió con la costura previa a la guarda ⇒
+  **exige RE-EJECUCIÓN** y no se usa como evidencia de estrategia ni para mover `P3-2`/`P3-3`.
+- **No cambia:** ninguna compuerta, régimen ni umbral; la reconciliación de arranque, intacta.
+- **Informe:** `docs/engineering/obs-14-correccion-fail-open-v2.88.1-2026-09-29.md` · **Evidencia:**
+  `docs/engineering/evidence/v2.88.1/README.md` (incluye el rojo de `v2.88-beta`, conservado).
+
 ## [2.11.0-beta] — `AUTO-MATERIAL-16` SELO CONJUNTO: cierre de `OBS-14` (reconciliación al cierre de turno) + `v2.86` + `v2.87` + `OBS-15` — 2026-09-29
 
 **Sello CONJUNTO de `v2.88-beta`.** El tag (anotado, lo crea el propietario) sella **tres** incrementos ya

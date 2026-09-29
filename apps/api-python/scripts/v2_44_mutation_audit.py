@@ -2727,8 +2727,22 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M246 (cierre de turno revertido): el motor durable deja de retirar la reserva muerta",
         WORKER,
-        "            await self._v2_reconcile_reservations(startup=False)\n",
+        "            await self._v2_reconcile_reservations(startup=False, attribute_fills=False)\n",
         "            pass\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M247 (cierre re-atribuye fills): el turno vuelve a repartir el historico y drena la cola viva",
+        WORKER,
+        "            await self._v2_reconcile_reservations(startup=False, attribute_fills=False)\n",
+        "            await self._v2_reconcile_reservations(startup=False, attribute_fills=True)\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M248 (costura re-atribuye fills): el cierre de tick del replay vuelve a repartir el historico",
+        REPLAY_OOS,
+        "    await reconcile(startup=False, attribute_fills=False)\n",
+        "    await reconcile(startup=False)\n",
         (T_AUTO_DURABLE,),
     ),
 ]

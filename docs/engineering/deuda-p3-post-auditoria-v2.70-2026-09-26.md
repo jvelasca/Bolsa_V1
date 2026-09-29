@@ -62,6 +62,18 @@
 > CERRADA** por la **ruta (a)** de su criterio de cierre (reconciliación al **cierre de turno**, en
 > `real_turn`; ver más abajo). **Abre `OBS-15` (MEDIUM, alcance motor):** el techo de lectura de **1000
 > filas `APPLIED`** puede **parar el motor** (ver más abajo).
+> **`v2.88.1` (2026-09-29):** **RE-SELLO** `v2.88.1-beta` (`AUTO-MATERIAL-16`) que corrige un defecto
+> **fail-OPEN** introducido por el cierre de `OBS-14`: bump `2.11.0-beta → 2.11.1-beta`, **sin
+> migración**. El tag `v2.88-beta` quedó **público con `Release tag CI` ROJO** (`lifecycle-pg`,
+> `test_crash_recovery_day_real_process_survives_dirty_kill_pg`). **Causa raíz:** la regla 1 de
+> `_v2_reconcile_reservations` reparte el histórico **COMPLETO** de fills (`consumed` se reinicia en cada
+> llamada) y `_release` aplica `released_qty` como **delta** ⇒ **no idempotente**; invocada en cada turno
+> **re-liberaba fills ya liberados** y **drenaba la cola viva** de las órdenes parcialmente llenadas
+> (capital comprometido devuelto al mercado). **Corrección:** `attribute_fills` (por defecto `True` ⇒
+> arranque intacto); el cierre de turno corre con `attribute_fills=False` y solo aplica la **regla 2**;
+> `close_tick` del replay alineado. **`OBS-14` sigue CERRADA**, ahora con la guarda correcta.
+> **Deuda nueva declarada (instrumento):** el artefacto multianual de `v2.87` se midió con la costura
+> previa ⇒ **exige RE-EJECUCIÓN** antes de citar su R (ver informe `obs-14-correccion-fail-open-v2.88.1`).
 
 ## H1 — `P(R>0)` mezclaba dos funcionales (P2/P3) — 🟢 CERRADO en `v2.71`
 
@@ -923,7 +935,16 @@ Informe: [`replay-oos-ciclo-durable-v2.87-2026-09-29.md`](./replay-oos-ciclo-dur
 5/5**. Artefactos JSON (3 165 540 B y 2 949 320 B, gitignoreados) con **SHA-256 `DC61B3B9…C6C54F`** y
 **`FE4CBF79…78CCD1`**; resumen verificado en [`evidence/v2.87/`](./evidence/v2.87/README.md).
 
-## OBS-14 — El motor real también retiene reservas muertas entre reinicios (MEDIUM, alcance motor) — 🟢 CERRADA en `v2.88` (2026-09-29)
+## OBS-14 — El motor real también retiene reservas muertas entre reinicios (MEDIUM, alcance motor) — 🟢 CERRADA en `v2.88` (2026-09-29) · 🔁 corregida en `v2.88.1`
+
+> **Nota de corrección (2026-09-29 · RE-SELLO `v2.88.1-beta`).** La primera versión del cierre de turno
+> era **fail-OPEN**: al invocar la reconciliación en cada turno, su regla 1 **re-liberaba fills ya
+> liberados** por el camino caliente y **drenaba la cola viva** de las órdenes parcialmente llenadas.
+> Lo detectó el `Release tag CI` del tag `v2.88-beta` (job `lifecycle-pg`, crash/recovery). La
+> corrección (`attribute_fills=False` en el cierre de turno; la reconciliación de arranque intacta)
+> conserva el criterio de cierre de esta observación —retirar el huérfano que **nunca** se materializó—
+> sin tocar las reservas con fill. Detalle en
+> [obs-14-correccion-fail-open-v2.88.1-2026-09-29.md](./obs-14-correccion-fail-open-v2.88.1-2026-09-29.md).
 
 **Origen.** Medido al cerrar `v2.87`: la fase demostró que el **único** camino que retiraba reservas
 huérfanas del libro de compromisos era `_v2_reconcile_reservations`, y que su **único llamante de

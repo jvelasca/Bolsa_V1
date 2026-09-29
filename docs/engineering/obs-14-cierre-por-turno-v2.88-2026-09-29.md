@@ -1,5 +1,13 @@
 # Cierre del ciclo de reservas al cierre de turno — `AUTO-MATERIAL-16` / `v2.88`
 
+> **[SUPERADO — RE-SELLO `v2.88.1-beta`, 2026-09-29.]** El objeto de este informe (`v2.88-beta` = `564240d2`)
+> quedó **público con `Release tag CI` en ROJO**: el cierre de turno que aquí se describe **re-liberaba
+> fills ya liberados** y **drenaba la cola viva** de las órdenes parcialmente llenadas (fail-**OPEN**).
+> La corrección, su prueba de causalidad y el objeto vigente están en
+> [obs-14-correccion-fail-open-v2.88.1-2026-09-29.md](./obs-14-correccion-fail-open-v2.88.1-2026-09-29.md);
+> el rojo se conserva en [evidence/v2.88.1/README.md](./evidence/v2.88.1/README.md). El texto sellado se
+> conserva **verbatim**; esta nota es la única adición.
+
 > **AsOf:** 2026-09-29 · **Fase:** cierre de motor (`real_turn`) + **sello conjunto** de tres incrementos.
 > **Tipo de entrega:** código de motor (`apps/api-python/src/`) + tests + informe + evidencia.
 > **Bump:** `2.10.2-beta` → `2.11.0-beta` · **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).

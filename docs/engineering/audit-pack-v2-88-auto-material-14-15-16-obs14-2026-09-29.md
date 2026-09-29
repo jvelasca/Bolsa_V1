@@ -1,5 +1,16 @@
 # Audit-pack — `AUTO-MATERIAL-14/15/16` / `V2.88` — SELLO CONJUNTO: cierre de `OBS-14` (reconciliación al cierre de turno) + `v2.86` + `v2.87` + `OBS-15`
 
+> **[OBJETO VIGENTE — RE-SELLO `v2.88.1-beta`, 2026-09-29.]** El tag `v2.88-beta` del que habla este pack
+> quedó **público con `Release tag CI` en ROJO** (`lifecycle-pg`): el cierre de turno del `OBS-14`
+> **re-liberaba fills ya liberados** y **drenaba la cola viva** de las órdenes parcialmente llenadas
+> (fail-**OPEN**). El objeto a auditar es ahora el tag anotado **`v2.88.1-beta`** (**Versión
+> `2.11.1-beta`**, mismo commit base **`3483b6b5`**), que incluye la guarda `attribute_fills` y la
+> costura del replay alineada. El resto de este pack se conserva **verbatim** y sigue siendo válido para
+> `v2.86`/`v2.87`/`OBS-14`/`OBS-15`; para el delta de la corrección, ver
+> [obs-14-correccion-fail-open-v2.88.1-2026-09-29.md](./obs-14-correccion-fail-open-v2.88.1-2026-09-29.md)
+> y [evidence/v2.88.1/README.md](./evidence/v2.88.1/README.md) (incluye el rojo de `v2.88-beta`,
+> conservado como evidencia).
+
 > **Objeto a auditar:** tag anotado **`v2.88-beta`** (lo crea el propietario) · **Versión:** `2.11.0-beta`
 > (**bump** `2.10.2-beta → 2.11.0-beta`) · **Base del diff:** `v2.85.2-beta` (commit base **`3483b6b5`**)
 > · **AsOf:** 2026-09-29 · **Alembic head:** `046_fill_reference_mid` (**SIN migración**) · **Remote:**

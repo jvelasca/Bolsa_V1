@@ -1,5 +1,12 @@
 # Evidencia cruda — Cierre del ciclo de reservas al cierre de turno (`v2.88`, 2026-09-29)
 
+> **[SUPERADO — RE-SELLO `v2.88.1-beta`, 2026-09-29.]** El tag `v2.88-beta` quedó **rojo** en
+> `lifecycle-pg` (fail-**OPEN** del cierre de turno). La evidencia vigente —con el rojo conservado, la
+> prueba de causalidad y la corrección— está en
+> [evidence/v2.88.1/README.md](../v2.88.1/README.md) y en
+> [obs-14-correccion-fail-open-v2.88.1-2026-09-29.md](../../obs-14-correccion-fail-open-v2.88.1-2026-09-29.md).
+> El texto sellado se conserva **verbatim**; esta nota es la única adición.
+
 Resumen **verificable** del sello conjunto. El código de `v2.86`/`v2.87` **nunca se commiteó**; este
 sello lo entrega junto con el cierre de motor de `OBS-14`. Las cifras son las que el árbol de trabajo
 contiene, transcritas sin edición.

@@ -9,7 +9,18 @@
 > **[NOTA DE CONTEXTO POSTERIOR — 2026-09-29.]** Esta fase viaja dentro del tag **`v2.88-beta`** del
 > **sello conjunto** (`AUTO-MATERIAL-14` + `AUTO-MATERIAL-15` + cierre de `OBS-14` / `AUTO-MATERIAL-16`).
 > Su cabecera dice «SIN tag» porque describe el **estado al autorarla**: `v2.87` se autoró y **no** se
-> commiteó hasta ese sello. El texto sellado se conserva **verbatim**; esta nota es la única adición.
+> commiteó hasta ese sello. El texto sellado se conserva **verbatim**; las notas de contexto son la
+> única adición.
+>
+> **[CAMBIO DE COSTURA POSTERIOR — 2026-09-29 · RE-SELLO `v2.88.1-beta`.]** El tag `v2.88-beta` quedó
+> **rojo** en `lifecycle-pg`: la reconciliación invocada al cerrar cada turno/tick **re-liberaba fills ya
+> liberados** por el camino caliente (la regla 1 no es idempotente) y **drenaba la cola viva** de las
+> órdenes parcialmente llenadas — fail-**OPEN**. `close_tick` cierra ahora con
+> **`attribute_fills=False`** (ver [obs-14-correccion-fail-open-v2.88.1-2026-09-29.md](./obs-14-correccion-fail-open-v2.88.1-2026-09-29.md)).
+> **Consecuencia declarada: el artefacto multianual de esta fase se midió con la costura ANTERIOR, de
+> modo que sus cifras NO son reproducibles con el código sellado y EXIGEN RE-EJECUCIÓN.** Siguen siendo
+> evidencia de INVESTIGACIÓN de aquel modelo; **no** se usan como evidencia de estrategia ni para mover
+> `P3-2`/`P3-3`.
 
 ---
 

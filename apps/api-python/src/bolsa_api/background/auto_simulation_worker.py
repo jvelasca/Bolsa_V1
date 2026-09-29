@@ -2608,7 +2608,9 @@ class AutoSimulationWorker:
                 instruments.add(instrument)
         return frozenset(instruments)
 
-    async def _v2_reconcile_reservations(self, *, startup: bool) -> None:
+    async def _v2_reconcile_reservations(
+        self, *, startup: bool, attribute_fills: bool = True
+    ) -> None:
         """Reconcilia el libro durable de reservas con lo MATERIALIZADO (AUTO-1b).
 
         Autoridad invertida respecto a V2.40.4: ``reserved_cash``/``pending_risk`` los
@@ -2633,6 +2635,16 @@ class AutoSimulationWorker:
 
         Una reserva sin ``created_at`` legible no se puede ventanear y se conserva
         (sigue consumiendo presupuesto: el lado conservador del invariante).
+
+        ``attribute_fills`` — la regla 1 SOLO es correcta cuando la llamada es la primera
+        que ve esos fills (el arranque de un proceso, que parte de memoria vacía). La
+        atribución es **no idempotente**: ``consumed`` se reinicia en cada llamada, así que
+        re-atribuye el histórico COMPLETO de fills ≥ ``created_at`` de la reserva. En el
+        CIERRE DE TURNO eso re-liberaría fills ya liberados por el camino caliente
+        (``_v2_release_reservations_for_fill``) y drenaría el ``remaining_qty`` de una orden
+        parcialmente llenada — la cola VIVA del fill parcial, capital realmente comprometido
+        (fail-OPEN). El cierre de turno invoca con ``attribute_fills=False``: libera solo lo
+        que NUNCA se materializó (regla 2), que es exactamente el huérfano del tick.
         """
         store = self._reservation_store
         if store is None:
@@ -2681,7 +2693,7 @@ class AutoSimulationWorker:
             available = max(0.0, filled - consumed.get(fill_key, 0.0))
             fill_qty = min(available, reservation.remaining_qty)
             released: PortfolioReservation | None = None
-            if fill_qty > 0:
+            if attribute_fills and fill_qty > 0:
                 consumed[fill_key] = consumed.get(fill_key, 0.0) + fill_qty
                 released = await self._v2_release_reservation(
                     reservation,
@@ -4938,9 +4950,11 @@ class AutoSimulationWorker:
             # (la orden no llegó a materializarse dentro del tick) sobre la MISMA sesión del
             # turno, sin reiniciar. ``startup=False`` porque la reserva no murió por un
             # reinicio sino porque su orden no se materializó (``RESERVATION_RELEASED_BY_CANCEL``).
-            # Es el análogo de lo que el instrumento ``v2.87`` hace en su ``close_tick``; corre
-            # en CADA turno, no solo en la reconciliación de arranque.
-            await self._v2_reconcile_reservations(startup=False)
+            # ``attribute_fills=False`` es OBLIGATORIO aquí: el camino caliente ya liberó los
+            # fills del turno y la regla 1 es no idempotente, así que re-atribuirla en cada
+            # turno drenaría la cola VIVA de una orden parcialmente llenada (fail-OPEN). El
+            # cierre de turno solo retira el huérfano que NUNCA se materializó.
+            await self._v2_reconcile_reservations(startup=False, attribute_fills=False)
             if auto_store is not None:
                 snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
                 seq = (snap.ticks + 1) if snap is not None else 1

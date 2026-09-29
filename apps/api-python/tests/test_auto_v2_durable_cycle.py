@@ -261,10 +261,36 @@ async def test_close_tick_control_mode_does_not_touch_the_worker() -> None:
     """El modo CONTROL es inerte a propósito (y no exige que el worker sepa reconciliar)."""
 
     class _Boom:
-        async def _v2_reconcile_reservations(self, *, startup: bool) -> None:  # pragma: no cover
+        async def _v2_reconcile_reservations(  # pragma: no cover
+            self, *, startup: bool, attribute_fills: bool = True
+        ) -> None:
             raise AssertionError("el modo CONTROL no debe reconciliar")
 
     assert await close_tick(_Boom(), durable_cycle=False) is False
+
+
+@pytest.mark.asyncio
+async def test_close_tick_does_not_re_attribute_fills() -> None:
+    """La costura de ``v2.87`` cierra con ``attribute_fills=False`` (nunca re-reparte fills).
+
+    Sin ese kwarg el cierre de tick del replay re-liberaría los fills que el camino caliente
+    ya liberó y drenaría la cola VIVA de una orden parcialmente llenada. Los números del
+    artefacto ``v2.87`` se midieron ANTES de esta guarda: la evidencia declara que exigen
+    re-ejecución.
+    """
+
+    class _Recorder:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
+        async def _v2_reconcile_reservations(
+            self, *, startup: bool, attribute_fills: bool = True
+        ) -> None:
+            self.calls.append({"startup": startup, "attribute_fills": attribute_fills})
+
+    recorder = _Recorder()
+    assert await close_tick(recorder) is True
+    assert recorder.calls == [{"startup": False, "attribute_fills": False}]
 
 
 # ── el techo de 1000 fills APPLIED ───────────────────────────────────────────────
@@ -406,9 +432,9 @@ def _startup_only_reconcile(worker: AutoSimulationWorker, monkeypatch: pytest.Mo
     """
     original = worker._v2_reconcile_reservations  # noqa: SLF001
 
-    async def _only_startup(*, startup: bool) -> None:
+    async def _only_startup(*, startup: bool, attribute_fills: bool = True) -> None:
         if startup:
-            await original(startup=startup)
+            await original(startup=startup, attribute_fills=attribute_fills)
 
     monkeypatch.setattr(worker, "_v2_reconcile_reservations", _only_startup)
 
@@ -540,3 +566,54 @@ async def test_closing_reconcile_keeps_captured_unapplied_capital_in_flight(
     released = [row for key, row in rows.items() if key != "RES-inflight-AAA"]
     assert released, "el turno debe comprometer otras reservas"
     assert {row.status for row in released} == {"RELEASED_BY_CANCEL"}
+
+
+@pytest.mark.asyncio
+async def test_closing_reconcile_keeps_the_live_tail_of_a_partially_filled_order(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14 · FAIL-OPEN: el cierre de turno NO re-atribuye fills YA liberados.
+
+    Regresión medida en el tag ``v2.88-beta`` (job ``lifecycle-pg``, crash/recovery): la
+    regla 1 de la reconciliación reparte el histórico COMPLETO de fills ≥ ``created_at``
+    (``consumed`` se reinicia en cada llamada), así que invocarla en cada turno re-libera
+    lo que el camino caliente ya liberó y DRENA el ``remaining_qty`` de una orden
+    parcialmente llenada: la cola VIVA, capital comprometido de verdad. El cierre de turno
+    corre con ``attribute_fills=False``, de modo que solo retira el huérfano que NUNCA se
+    materializó (regla 2).
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    exec_store = InMemoryExecutionEventStore()
+    contexts = InMemorySimFillFinanceContextStore()
+    store = InMemoryReservationStore()
+    await store.save(
+        build_reservation(
+            reservation_id="RES-partial-AAA",
+            account_id=_ACCOUNT,
+            tick_id="2026-09-17T09:00:00Z",
+            instrument_id="AAA",
+            side="buy",
+            sector="tech",
+            quantity=10,
+            entry=100.0,
+            reserved_risk=50.0,
+            created_at="2026-09-17T09:00:00Z",
+        )
+    )
+    # Fills DURABLES ya aplicados para AAA (buy): 4 unidades.
+    for index in (1, 2, 3, 4):
+        execution_id = await _applied_event(exec_store, index)
+        await _save_context(contexts, execution_id)
+    worker = _worker(reservation_store=store, exec_store=exec_store, context_store=contexts)
+    worker._decider = _buy_only("BBB")  # noqa: SLF001 — AAA queda intocado por el plan.
+    # Se aísla el CIERRE de turno: el bloque durable ya está readoptado por el proceso.
+    worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
+    worker._v2_reservations_reconciled = True  # noqa: SLF001
+
+    await _real_turn(worker, exec_store=exec_store, store=store, contexts=contexts)
+
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    partial = after["RES-partial-AAA"]
+    assert partial.is_live, "la cola viva del fill parcial NO se retira en el cierre de turno"
+    assert float(partial.remaining_qty) == 10.0, "el cierre NO re-atribuye fills ya liberados"
+    assert float(partial.released_qty) == 0.0, "el fill lo libera el camino caliente, no el cierre"
