@@ -2,6 +2,63 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.5-beta] — `AUTO-MATERIAL-18` `OBS-14.b`: ventana de gracia por EDAD — el barrido de reservas deja de ser fail-OPEN en un reinicio rodante — 2026-09-29
+
+**Cierre de `OBS-14.b`** — deuda residual abierta al corregir la carrera entre sesiones (`v2.88.2`) y
+**paso 2** del orden de prioridad de la **auditoría externa de `v2.88.3-beta`** (`APROBADO`, 0
+bloqueantes; paso 1 = `OBS-17`, ya cerrado en `v2.88.4`).
+
+**Bump** `2.11.4-beta` → `2.11.5-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+Base del diff: `a4d32c0d` (= `v2.88.4-beta` + cita POST-TAG de su CI). **SÍ se toca el motor** (a
+diferencia de `v2.88.4`): +91 / −20 en `auto_simulation_worker.py` (5 hunks).
+
+- **El hueco:** `v2.88.2` acotó el **cierre de turno** por **propiedad** (`only_ids`), pero el **barrido de
+  ARRANQUE** seguía barriendo el libro **completo**. La **regla 2** ("esta orden murió sin llenarse")
+  decide con **evidencia durable** que **no puede** distinguir una reserva **huérfana** (de un proceso
+  muerto) de una reserva **viva** que **otra sesión** acaba de dar de alta y **aún no ha emitido**: en un
+  **reinicio rodante** el arranque de B retiraba la reserva viva de A y devolvía al mercado un capital que
+  A **sí materializa** (capital reservado ≠ materializado). El **mismo fail-OPEN** de `v2.88.1`, por la
+  pata que el CI **no** ejercitaba (en el arranque simultáneo la ventana es nula). **Ya existía en
+  `v2.85.2`**: no es una regresión de la serie `v2.88`.
+- **El mecanismo (PROPIEDAD *o* EDAD):** `V2_RESERVATION_GRACE_TURNS = 1` y
+  `reservation_grace_window()` derivada de la **cadencia real del loop**
+  (`AUTO_ENGINE_SIM_INTERVAL_SECONDS`, default **60 s**) ⇒ ventana de **60 s**, **no** un número mágico. La
+  regla 2 retira si `mine = only_ids is not None and res_id in only_ids` **o** si la reserva **ya
+  envejeció**; una **ajena y joven** se **CONSERVA** (fail-closed). En este motor la orden **liquida
+  dentro del tick** (solo `paper`/`simulated`, sin bridge LIVE), así que una reserva que superó **un turno
+  completo** sin fill ni traza está muerta **por construcción**: la EDAD es el discriminador y no requiere
+  identidad de sesión (que el esquema no tiene).
+- **Fail-closed por construcción en el predicado:** `(self._time - created) > grace` con **`>` estricto**
+  (el borde `== 1 turno` **conserva**); `created is None` ⇒ **conserva**; fecha **futura** (relojes no
+  comparables) ⇒ **conserva**. Se compara contra `self._time`, la **misma** autoridad temporal con la que
+  la sesión fecha sus propias altas.
+- **Retirada DIFERIDA y acotada (declarada):** la huérfana de un crash que **aún no envejeció** sobrevive
+  al barrido de arranque y se retira en el **primer cierre de turno posterior a la ventana**
+  (`RELEASED_BY_CANCEL`) — a lo sumo **un turno más tarde** — o en el arranque siguiente
+  (`RELEASED_BY_RESTART`). La retención tiene **techo**, no es fuga.
+- **Simetría con `OBS-17`:** la reserva ajena y joven conservada **no** entra en `outcomes`, así que
+  `_v2_sync_exit_orders` la lee como `(0.0, None)` y **no** marca `ABANDONED` el `ExitOrder` del dueño.
+- **Tests (`+8` funciones nuevas ⇒ `+7` netos):** `test_auto_v2_durable_cycle.py` **16 → 22** (cierre con
+  joven conservada / con envejecida retirada; **arranque** con joven conservada / envejecida retirada;
+  **fecha futura**; **borde estricto** a 1 turno; **INTENT de salida no abandonado**) y
+  `test_auto_v44_exit_crash_matrix.py` **8 → 9** (`test_c2b_restart_inside_the_grace_window_retains_and_then_converges`:
+  reinicio **dentro** de la ventana **conserva** y el siguiente arranque, ya envejecido, **converge**).
+  Re-anclados a la semántica de edad explícita: `test_auto_v44_exit_crash_matrix.py` (`C2`/`C4`),
+  `test_auto_v44_exit_governance.py` (9) y `test_auto_v46_crash_recovery.py` (2).
+- **Mutaciones (matriz `253 → 256`):** `M250` **re-anclada** (ventana **nula**: `is_aged → True`),
+  **`M254`** (ventana **infinita**: `is_aged → False`), **`M255`** (edad **absoluta** ⇒ un reloj futuro
+  cuenta como envejecido) y **`M256`** (borde **no estricto** `>=`). Las cuatro direcciones de la ventana
+  (propiedad, edad, borde, relojes no comparables) tienen su mutación; `M250`/`M255` atacan el
+  fail-closed y `M254`/`M256` la terminación.
+- **Verificación:** ciclo durable **22 passed**; matriz de crash **9 passed**; gobernanza **9 passed**;
+  crash/recovery `v46` **2 passed**; `ruff` (comando EXACTO del CI) **All checks passed!**; batería
+  offline completa con el comando del CI **extraído del workflow** **`1 failed, 3085 passed in 73.77s`**
+  (`3086` recogidos; el único fallo es **pre-existente** de PG-local, `assert 17 == 26`, y en CI **se
+  salta**); **matriz COMPLETA `256/256`** con el árbol **intacto**.
+- **Sigue ABIERTO** (no lo cierra esta fase): `OBS-15` (techo de 1000 `APPLIED`), `OBS-16` (costuras
+  manuales de `object.__new__`), `P3-2`/`P3-3` y la ventana **PAPER real**. Orden del auditor tras esto:
+  comprobar el riesgo de **1000 `APPLIED`** y **volver a PAPER real**.
+
 ## [2.11.4-beta] — `AUTO-MATERIAL-17` SIMETRÍA DEL OWNERSHIP DE SALIDA: la reserva de `_v2_reserve_exit` también es de su sesión — 2026-09-29
 
 **Cierre de `OBS-17`** — hallazgo de la **auditoría externa de `v2.88.3-beta`** (`APROBADO`, 0 bloqueantes),

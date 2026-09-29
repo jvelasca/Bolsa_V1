@@ -119,22 +119,22 @@ predicción estructural («correrán los jobs de Python»), que **se cumplió**.
 ## 2. Qué tiene que comprobar el auditor (por este orden)
 
 > **Alcance de esta lista (declarado, `POST-TAG`).** Los 12 puntos de abajo son la lista de la fase de
-> **ORIGEN** (`v2.88` / `2.11.0-beta`, matriz `246`). El **objeto vigente** es **`v2.88.4-beta`** /
-> **`2.11.4-beta`**. Solo estos valores cambian; **el resto sigue vigente tal cual**:
+> **ORIGEN** (`v2.88` / `2.11.0-beta`, matriz `246`). El **objeto vigente** es **`v2.88.5-beta`** /
+> **`2.11.5-beta`**. Solo estos valores cambian; **el resto sigue vigente tal cual**:
 >
-> | Punto | Fase de origen (`v2.88`) | Objeto vigente (`v2.88.4-beta`) |
+> | Punto | Fase de origen (`v2.88`) | Objeto vigente (`v2.88.5-beta`) |
 > | --- | --- | --- |
-> | 1 · `package.json` | `2.11.0-beta` | **`2.11.4-beta`** (`2.11.1` → `v2.88.1`; `2.11.2` → `v2.88.2`; `2.11.3` → `v2.88.3`; `2.11.4` → `v2.88.4`) |
-> | 1 · tag | `v2.88-beta` | **`v2.88.4-beta`** (`v2.88.3-beta` = objeto `66f47cf8` → commit `0038adfc`; `v2.88.4` = simetría de ownership, `OBS-17`) |
-> | 3 · diff del motor | `7  0` (cierre de `OBS-14` en `real_turn`) | **vacío**: `v2.88.3` y `v2.88.4` **no** tocan el motor; el motor es el de `v2.88.2` (que **sí** cambia `_v2_reconcile_reservations` con `only_ids`) |
+> | 1 · `package.json` | `2.11.0-beta` | **`2.11.5-beta`** (`2.11.1` → `v2.88.1`; `2.11.2` → `v2.88.2`; `2.11.3` → `v2.88.3`; `2.11.4` → `v2.88.4`; `2.11.5` → `v2.88.5`) |
+> | 1 · tag | `v2.88-beta` | **`v2.88.5-beta`** (`v2.88.3-beta` = objeto `66f47cf8` → commit `0038adfc`; `v2.88.4` = simetría de ownership, `OBS-17`; `v2.88.5` = ventana de gracia por EDAD, `OBS-14.b`) |
+> | 3 · diff del motor | `7  0` (cierre de `OBS-14` en `real_turn`) | **`+91 / −20`** en `auto_simulation_worker.py` (5 hunks: ventana de gracia por **EDAD** en la regla 2, `OBS-14.b`). `v2.88.3`/`v2.88.4` **no** tocan el motor; `v2.88.2` lo cambia con `only_ids` y `v2.88.5` añade el **segundo discriminador** |
 > | 4 · etiqueta `RESERVATION_RELEASED_BY_CANCEL` | `startup=False` | igual (heredado sin cambios) |
-> | 8 · matriz de mutaciones | `246` | **`253`**: `+M247`/`M248` (`v2.88.1`), `+M249`/`M250`/`M251` (`v2.88.2`), `+M252` (`v2.88.3`), **`+M253` (`v2.88.4`)** |
-> | 10 · «ningún doc dice `2.11.0-beta`» | cierto en su sello | `2.11.0-beta` es **histórico**; el vigente es **`2.11.4-beta`** |
+> | 8 · matriz de mutaciones | `246` | **`256`**: `+M247`/`M248` (`v2.88.1`), `+M249`/`M250`/`M251` (`v2.88.2`), `+M252` (`v2.88.3`), `+M253` (`v2.88.4`), **`+M254`/`M255`/`M256` + `M250` re-anclada (`v2.88.5`)** |
+> | 10 · «ningún doc dice `2.11.0-beta`» | cierto en su sello | `2.11.0-beta` es **histórico**; el vigente es **`2.11.5-beta`** |
 >
 > La lista **sellada NO se reescribe** (viaja dentro del tag); esta tabla la reconcilia **POST-TAG**, que
 > es donde vive también la cita del CI (§1.1). Para el estado exacto del objeto vigente, la fuente es
-> [`evidence/v2.88.4/README.md`](./evidence/v2.88.4/README.md) y
-> [`obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md`](./obs-17-simetria-ownership-salida-v2.88.4-2026-09-29.md).
+> [`evidence/v2.88.5/README.md`](./evidence/v2.88.5/README.md) y
+> [`obs-14b-ventana-de-gracia-arranque-v2.88.5-2026-09-29.md`](./obs-14b-ventana-de-gracia-arranque-v2.88.5-2026-09-29.md).
 
 1. **Naturaleza del objeto.** `package.json` = `2.11.0-beta`; tag `v2.88-beta` **anotado**; árbol
    **intacto** (`git status --porcelain` vacío) antes y después de cualquier sonda.

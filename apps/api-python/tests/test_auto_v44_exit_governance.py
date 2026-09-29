@@ -417,7 +417,11 @@ async def test_v2_restart_mid_risk_exit_releases_the_dead_sell_reservation_once(
 
     # Reinicio sobre los MISMOS stores.
     monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "84000")  # RISK_OFF
-    _s, clock = step_minute_clock(datetime(2026, 9, 15, 9, 1, tzinfo=UTC))
+    # OBS-14.b — el reinicio cae MÁS ALLÁ de la ventana de gracia (alta 09:01, reloj 09:03):
+    # la reserva superó un turno completo sin fill ni traza, así que está muerta por
+    # construcción y el barrido de arranque la retira. Un reinicio DENTRO de la ventana la
+    # CONSERVA (fail-closed): ver los tests ``test_startup_sweep_*`` del ciclo durable.
+    _s, clock = step_minute_clock(datetime(2026, 9, 15, 9, 2, tzinfo=UTC))
     w2 = AutoSimulationWorker(
         clock=clock,
         exec_store=store,

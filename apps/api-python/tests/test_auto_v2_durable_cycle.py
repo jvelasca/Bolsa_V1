@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -34,6 +34,7 @@ import bolsa_api.background.auto_simulation_worker as worker_module
 from bolsa_analytics.cognitive.portfolio_reservation import build_reservation
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
+    reservation_grace_window,
     step_minute_clock,
 )
 from bolsa_application.applied_fills import DEFAULT_APPLIED_LIMIT, read_applied_fill_facts
@@ -655,11 +656,72 @@ async def test_closing_reconcile_keeps_the_live_tail_of_a_partially_filled_order
     assert float(partial.released_qty) == 0.0, "el fill lo libera el camino caliente, no el cierre"
 
 
+# ── OBS-14.b · VENTANA DE GRACIA POR EDAD: el barrido deja de ser indiscriminado ──
+#
+# ``v2.88.2`` acotó el CIERRE de turno a las reservas PROPIAS (``only_ids``, OBS-14) y el
+# barrido de ARRANQUE (``only_ids=None``: el proceso nace sin memoria y nada es suyo) quedó
+# como estaba: retiraba TODA reserva viva sin fill y sin traza en vuelo. En un reinicio
+# rodante, un motor que arranca ve la reserva ACTIVA de otra sesión a mitad de turno
+# —indistinguible de una orden muerta— y le devuelve al mercado un capital que sí se
+# materializa (el MISMO fail-OPEN de carrera de ``v2.88.1``, ahora por la puerta del
+# arranque). Sin identidad de sesión en la evidencia durable, el discriminador disponible es
+# la EDAD: en el motor AUTO la orden liquida DENTRO del tick, así que una reserva que superó
+# un turno completo sin fill ni traza está muerta por construcción (su dueño, sea quien sea,
+# ya cerró su turno); una AJENA y JOVEN puede ser una orden que la otra sesión aún no emitió.
+#
+# Los tests de abajo fijan las CUATRO esquinas (propia/ajena × joven/envejecida) del cierre
+# y del arranque, más el sesgo de reloj (fecha futura ⇒ se conserva) y la pata de SALIDA.
+# Cada fixture fecha la reserva ajena RELATIVA al reloj de la sesión (``_GRACE``), no con un
+# literal: el literal de ``09:00:00Z`` que usaban estos tests caía justo en el borde de la
+# ventana y pasaba por el ``>`` estricto, no por la propiedad.
+
+#: Ventana declarada: ``V2_RESERVATION_GRACE_TURNS`` turnos de la cadencia real del loop.
+_GRACE = reservation_grace_window()
+
+
+def _stamp(base: datetime, offset: timedelta) -> str:
+    """Instante ISO ``Z`` desplazado respecto a ``base`` (el reloj de la sesión)."""
+    return (base + offset).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _age(now: datetime, stamp: str) -> timedelta:
+    """Edad de una reserva fechada con ``_stamp``, medida contra el reloj de la sesión."""
+    return now - datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+
+
+async def _seed_foreign(
+    store: InMemoryReservationStore,
+    *,
+    created_at: str,
+    reservation_id: str = "RES-ajena-AAA",
+) -> None:
+    """Reserva viva de OTRA sesión: sin fill y sin traza en vuelo ⇒ la regla 2 la ve candidata.
+
+    La regla 2 solo la mira como "orden muerta sin llenar": la lectura medible (sin fills) y
+    la ausencia de traza en vuelo están garantizadas por los stores en memoria vacíos. Lo que
+    decide si se retira es la PROPIEDAD (aquí: ajena) y la EDAD (la que fije la fixture).
+    """
+    await store.save(
+        build_reservation(
+            reservation_id=reservation_id,
+            account_id=_ACCOUNT,
+            tick_id="2026-09-17T09:00:00Z",
+            instrument_id="AAA",
+            side="buy",
+            sector="tech",
+            quantity=10,
+            entry=100.0,
+            reserved_risk=50.0,
+            created_at=created_at,
+        )
+    )
+
+
 @pytest.mark.asyncio
-async def test_closing_reconcile_does_not_touch_another_sessions_reservation(
+async def test_closing_reconcile_does_not_touch_a_young_foreign_reservation(
     v2_env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """OBS-14.b · FAIL-OPEN de CARRERA: el cierre de turno no retira reservas AJENAS.
+    """OBS-14.b · FAIL-OPEN de CARRERA: el cierre de turno no retira reservas AJENAS y JOVENES.
 
     Regresión medida en el tag ``v2.88.1-beta`` (``lifecycle-pg``, ``test_concurrent_auto_pg``):
     tres sesiones concurrentes sobre la MISMA cuenta y señal, una gana el ``save_claim`` y
@@ -669,64 +731,258 @@ async def test_closing_reconcile_does_not_touch_another_sessions_reservation(
     (``released=200`` frente a ``materializado=147``): la ganadora materializaba su fill
     después y su liberación por fill ya no tenía fila viva, así que el capital comprometido
     volvía al mercado (fail-OPEN). La evidencia durable no puede distinguir "orden muerta" de
-    "orden que otra sesión aún no ha emitido": el discriminador es la PROPIEDAD.
-
-    El MISMO caso retirado por la reconciliación de ARRANQUE sí se retira: ahí el proceso nace
-    sin memoria y la huérfana ajena es exactamente lo que hay que barrer.
+    "orden que otra sesión aún no ha emitido": el primer discriminador es la PROPIEDAD
+    (``only_ids``) y el segundo (OBS-14.b) la EDAD — el hermano
+    ``..._retires_a_foreign_reservation_once_it_aged`` certifica la retirada diferida.
     """
     monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
     store = InMemoryReservationStore()
     exec_store = InMemoryExecutionEventStore()
-    # Reserva viva de OTRA sesión: sin fill, sin traza en vuelo ⇒ en los dos barridos la
-    # regla 2 la ve como candidata. Solo la PROPIEDAD decide.
-    await store.save(
-        build_reservation(
-            reservation_id="RES-ajena-AAA",
-            account_id=_ACCOUNT,
-            tick_id="2026-09-17T09:00:00Z",
-            instrument_id="AAA",
-            side="buy",
-            sector="tech",
-            quantity=10,
-            entry=100.0,
-            reserved_risk=50.0,
-            created_at="2026-09-17T09:00:00Z",
-        )
-    )
     worker = _worker(reservation_store=store, exec_store=exec_store)
+    # La ajena nace DENTRO de la ventana contada desde el reloj de esta sesión: un turno
+    # antes del cierre ⇒ joven al cerrar (su dueño puede estar emitiéndola ahora mismo).
+    young = _stamp(worker._time, _GRACE)  # noqa: SLF001
+    await _seed_foreign(store, created_at=young)
     worker._decider = _buy_only("BBB")  # noqa: SLF001 — AAA queda intocado por el plan.
     # Se aísla el CIERRE de turno (el bloque durable ya está readoptado por el proceso): el
-    # barrido de arranque se prueba aparte, al final.
+    # barrido de arranque se prueba aparte, con los tests ``test_startup_sweep_*``.
     worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
     worker._v2_reservations_reconciled = True  # noqa: SLF001
 
     await _real_turn(worker, exec_store=exec_store, store=store)
 
+    # Guarda de la fixture: si la cadencia cambiara, el test debe caer por la EDAD declarada
+    # (mensaje explícito) y no por una comparación accidental.
+    assert _age(worker._time, young) <= _GRACE, (  # noqa: SLF001
+        "la ajena debe seguir DENTRO de la ventana de gracia al cerrar el turno"
+    )
     after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
     foreign = after["RES-ajena-AAA"]
-    assert foreign.is_live, "el cierre de turno NO puede retirar la reserva de otra sesión"
+    assert foreign.is_live, "el cierre de turno NO puede retirar la reserva JOVEN de otra sesión"
     assert float(foreign.released_qty) == 0.0, "no se libera ni un lote de una identidad ajena"
     assert "RES-ajena-AAA" in {
         row.reservation_id for row in worker._v2_reservations  # noqa: SLF001
     }, "su capital sigue comprometido para esta sesión"
+    assert "RES-ajena-AAA" not in worker._v2_owned_reservations, (  # noqa: SLF001
+        "conservarla NO la adopta: la propiedad no se puede inventar"
+    )
     # Y las SUYAS del turno sí se retiran (el acotado no desactiva el cierre).
     propias = [row for key, row in after.items() if key != "RES-ajena-AAA"]
     assert propias, "el turno debe comprometer reservas propias"
     assert {row.status for row in propias} == {"RELEASED_BY_CANCEL"}
 
-    # Contraste: en un proceso NUEVO (``_v2_reservations_reconciled`` en falso) el barrido de
-    # ARRANQUE sí recorre el libro COMPLETO — sin ``only_ids``— y retira la huérfana ajena.
-    worker2 = _worker(reservation_store=store, exec_store=exec_store)
-    worker2._decider = _buy_only("BBB")  # noqa: SLF001
-    await _real_turn(worker2, exec_store=exec_store, store=store)
 
-    swept = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
-    assert not swept["RES-ajena-AAA"].is_live, "el arranque barre la huérfana, sea de quien sea"
-    assert swept["RES-ajena-AAA"].status == "RELEASED_BY_RESTART"
-    # DEUDA DECLARADA (OBS-14.b residual): ese mismo barrido de arranque NO distingue una
-    # huérfana de una reserva VIVA de otra sesión a mitad de turno. Ya era así en ``v2.85.2``
-    # y el arreglo acordado es de ALCANCE (solo el cierre de turno): el discriminador posible
-    # es una ventana de gracia por EDAD y queda en la deuda P3, no se arregla aquí.
+@pytest.mark.asyncio
+async def test_closing_reconcile_retires_a_foreign_reservation_once_it_aged(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14.b · RETIRADA DIFERIDA: la ajena que superó la ventana SÍ se retira al cerrar.
+
+    Es la cara que evita que la retención fail-closed sea un goteo eterno: la huérfana de un
+    crash que no envejeció en el barrido de arranque no espera a OTRO reinicio, se retira en
+    el primer cierre de turno posterior a la ventana (a lo sumo un turno más tarde).
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store)
+    # Nace DOS ventanas antes del reloj de alta: sigue envejecida aunque el turno no avanzara
+    # el reloj, así que la EDAD es el único discriminador que puede retirarla.
+    aged = _stamp(worker._time, -2 * _GRACE)  # noqa: SLF001
+    await _seed_foreign(store, created_at=aged)
+    worker._decider = _buy_only("BBB")  # noqa: SLF001
+    worker._v2_reservations = tuple(await store.list_live(_ACCOUNT))  # noqa: SLF001
+    worker._v2_reservations_reconciled = True  # noqa: SLF001
+
+    await _real_turn(worker, exec_store=exec_store, store=store)
+
+    assert _age(worker._time, aged) > _GRACE, (  # noqa: SLF001
+        "la ajena debe haber superado la ventana de gracia al cerrar el turno"
+    )
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    foreign = after["RES-ajena-AAA"]
+    assert not foreign.is_live, "la ajena ENVEJECIDA se retira (su dueño ya cerró su turno)"
+    assert foreign.status == "RELEASED_BY_CANCEL", "no murió por reinicio: murió al cerrar"
+    assert foreign.release_reason == "cancel"
+    assert "RES-ajena-AAA" not in {
+        row.reservation_id for row in worker._v2_reservations  # noqa: SLF001
+    }
+
+
+@pytest.mark.asyncio
+async def test_startup_sweep_retains_a_young_foreign_reservation(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14.b · ARRANQUE: el barrido ya NO es indiscriminado — la ajena JOVEN se conserva.
+
+    Es el reinicio RODANTE: el motor que arranca no tiene memoria de la reserva ajena, la ve
+    candidata y antes la retiraba entera. Retirarla devolvería al mercado el capital de una
+    orden que la sesión dueña está emitiendo en ese mismo tick (fail-OPEN). Sin identidad de
+    sesión, la EDAD es lo único que separa "activa" de "huérfana": dentro de la ventana se
+    conserva (fail-closed) y su capital queda comprometido para esta sesión hasta que envejezca.
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store)
+    # Recién creada contra el reloj de arranque: edad 0 ⇒ dentro de la ventana.
+    await _seed_foreign(store, created_at=_stamp(worker._time, timedelta(0)))  # noqa: SLF001
+
+    await worker._v2_reconcile_reservations(startup=True)  # noqa: SLF001
+
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    foreign = after["RES-ajena-AAA"]
+    assert foreign.is_live, "el arranque NO puede retirar una reserva DENTRO de la ventana"
+    assert float(foreign.released_qty) == 0.0
+    assert foreign.status == "OPEN", "no se le inventa un cierre a una identidad ajena"
+    assert {row.reservation_id for row in worker._v2_reservations} == {"RES-ajena-AAA"}  # noqa: SLF001
+    assert worker._v2_owned_reservations == set(), (  # noqa: SLF001
+        "conservar la ajena no la convierte en propia: el arranque no reclama lo que no creó"
+    )
+    assert not worker._v2_kill_switch_halted(), (  # noqa: SLF001
+        "conservar no es un fallo de medición: no hay HALT"
+    )
+
+
+@pytest.mark.asyncio
+async def test_startup_sweep_retires_an_aged_foreign_reservation(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14.b · ARRANQUE: la ajena ENVEJECIDA sí se barre, y como ``RELEASED_BY_RESTART``.
+
+    Es la huérfana de un crash: nadie la va a emitir ni a liquidar (su dueño murió, o ya
+    cerró su turno hace más de un turno), así que el arranque es exactamente quien debe
+    retirarla. El estado delata la CAUSA (reinicio) y no la de un cierre de turno.
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store)
+    aged = _stamp(worker._time, -2 * _GRACE)  # noqa: SLF001
+    await _seed_foreign(store, created_at=aged)
+
+    await worker._v2_reconcile_reservations(startup=True)  # noqa: SLF001
+
+    assert _age(worker._time, aged) > _GRACE  # noqa: SLF001
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    foreign = after["RES-ajena-AAA"]
+    assert not foreign.is_live, "la huérfana envejecida se barre al arrancar, sea de quien sea"
+    assert foreign.status == "RELEASED_BY_RESTART"
+    assert foreign.release_reason == "restart"
+    assert worker._v2_reservations == ()  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_startup_sweep_retains_a_foreign_reservation_dated_in_the_future(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14.b · RELOJES NO COMPARABLES: una fecha FUTURA no autoriza a retirar.
+
+    Dos procesos cuyos relojes no son comparables no pueden ordenar "esta reserva es más
+    vieja que un turno" — la aritmética da negativo y el ``>`` estricto diría "no envejeció",
+    pero un ``created_at`` adelantado tampoco es evidencia de vida. El sesgo declarado es
+    conservador: sin edad AFIRMABLE la reserva se conserva (fail-closed, el mismo criterio
+    que una fecha ilegible). Retirar de más es fail-OPEN; conservar de más solo compromete
+    presupuesto, que es la dirección segura del error.
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store)
+    ahead = _stamp(worker._time, 2 * _GRACE)  # noqa: SLF001 — reloj adelantado (skew)
+    await _seed_foreign(store, created_at=ahead)
+
+    await worker._v2_reconcile_reservations(startup=True)  # noqa: SLF001
+
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    assert after["RES-ajena-AAA"].is_live, "una fecha futura no es prueba de muerte"
+    assert worker._v2_reservations, "sigue comprometida para esta sesión"  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_grace_window_boundary_is_strict_at_exactly_one_turn(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14.b · BORDE: la edad tiene que SUPERAR la ventana; ``==`` todavía no autoriza.
+
+    El borde no es un detalle de redondeo. En el mismo instante en que se cumple un turno el
+    dueño puede estar cerrando su turno (``auto_sim_loop`` hace ``run_tick()`` y luego
+    ``sleep(interval)``, así que su evidencia aún no es terminal), y retirar ahí es fail-OPEN
+    por un instante; conservar ahí cuesta, a lo sumo, un turno más de capital comprometido
+    (fail-closed). El contrato se fija con ``>`` y aquí se mide con DOS reservas idénticas
+    separadas por UN segundo: la del borde exacto y la que acaba de superarlo.
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    store = InMemoryReservationStore()
+    exec_store = InMemoryExecutionEventStore()
+    worker = _worker(reservation_store=store, exec_store=exec_store)
+    anchor = worker._time  # noqa: SLF001 — reloj de alta de ESTA sesión
+    at_edge = _stamp(anchor, -_GRACE)  # edad == ventana
+    past_edge = _stamp(anchor, -_GRACE - timedelta(seconds=1))  # edad == ventana + 1 s
+    await _seed_foreign(store, created_at=at_edge, reservation_id="RES-borde")
+    await _seed_foreign(store, created_at=past_edge, reservation_id="RES-pasado")
+
+    await worker._v2_reconcile_reservations(startup=True)  # noqa: SLF001
+
+    assert _age(worker._time, at_edge) == _GRACE, "la fixture debe caer en el borde EXACTO"  # noqa: SLF001
+    assert _age(worker._time, past_edge) > _GRACE  # noqa: SLF001
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    assert after["RES-borde"].is_live, "edad == ventana todavía NO autoriza a retirar"
+    assert not after["RES-pasado"].is_live, "un segundo más allá de la ventana sí autoriza"
+    assert after["RES-pasado"].status == "RELEASED_BY_RESTART"
+    assert {row.reservation_id for row in worker._v2_reservations} == {"RES-borde"}  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_closing_reconcile_does_not_abandon_a_young_foreign_exit_intent(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14.b · PATA DE SALIDA: conservar la ajena no debe abandonar su INTENT (V2.43.3).
+
+    ``_v2_sync_exit_orders`` lee ``outcomes`` para decidir qué INTENT de salida queda
+    ``ABANDONED``. La reserva ajena y joven NO se publica ahí (no hay entrada ⇒ ``(0.0,
+    None)`` ⇒ no se toca), así que su INTENT sigue ``INTENT``/abierto: se conserva la reserva
+    **sin** cerrarle la salida al dueño. Si la gracia fuera del cierre correcto pero el INTENT
+    ajeno se abandonara, el fail-OPEN volvería por la puerta de la salida.
+    """
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _ZeroFillSettlement())
+    store = InMemoryReservationStore()
+    exit_store = InMemoryExitOrderStore()
+    exec_store = InMemoryExecutionEventStore()
+
+    # Sesión A: reserva de SALIDA con INTENT durable, fechada DENTRO de la ventana.
+    session_a = _worker(
+        reservation_store=store, exec_store=exec_store, exit_order_store=exit_store
+    )
+    exit_order_id = await session_a._v2_reserve_exit(  # noqa: SLF001
+        symbol="AAA",
+        qty=Decimal("10"),
+        price=Decimal("100"),
+        sector="tech",
+        at=_stamp(session_a._time, _GRACE),  # noqa: SLF001 — joven al cerrar la otra sesión
+    )
+    assert exit_order_id, "la salida debe tener identidad durable"
+    res_id = f"exit:{exit_order_id}"
+
+    # Sesión B (sin memoria de A): su CIERRE ve la reserva viva y ajena ⇒ la conserva entera.
+    session_b = _worker(
+        reservation_store=store, exec_store=exec_store, exit_order_store=exit_store
+    )
+    await session_b._v2_reconcile_reservations(  # noqa: SLF001
+        startup=False,
+        attribute_fills=False,
+        only_ids=frozenset(session_b._v2_owned_reservations),  # noqa: SLF001
+    )
+
+    after = {row.reservation_id: row for row in await store.list_all(_ACCOUNT)}
+    assert after[res_id].is_live, "B no puede liberar la reserva de SALIDA joven de A"
+    assert float(after[res_id].released_qty) == 0.0
+    open_intents = {row.exit_order_id: row for row in await exit_store.list_open(_ACCOUNT)}
+    assert exit_order_id in open_intents, "el INTENT de salida de A sigue abierto"
+    intent = open_intents[exit_order_id]
+    assert intent.state != "ABANDONED", "no se abandonó la salida ajena"
+    assert intent.is_open
+    assert intent.reservation_id == res_id, "el vínculo INTENT↔reserva sigue intacto"
 
 
 # ── OBS-17: simetría del ownership en la pata de SALIDA (``_v2_reserve_exit``) ────

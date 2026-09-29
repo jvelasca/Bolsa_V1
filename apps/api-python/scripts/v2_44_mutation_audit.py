@@ -721,6 +721,10 @@ V87_REPLAY_DURABLE = "apps/api-python/scripts/v2_87_replay_oos_durable_cycle.py"
 T_REPLAY_OOS_DURABLE = "packages/py/application/tests/test_replay_oos_durable_cycle.py"
 # Costura HERMETICA (sin PG): la reserva huerfana se retira al cierre y el libro no gotea.
 T_AUTO_DURABLE = "apps/api-python/tests/test_auto_v2_durable_cycle.py"
+#: La matriz de crash de SALIDA (C1..C5). Entra como objetivo de ``M254`` porque ahí vive la
+#: certificación de que un crash CONVERGE: si la ventana de gracia se volviera infinita, el
+#: fallo no sería "un test de la gracia en rojo" sino "el crash dejó de cerrar la cola".
+T_CRASH_MATRIX = "apps/api-python/tests/test_auto_v44_exit_crash_matrix.py"
 # Render de consola de los DOS orquestadores: el contrato es el dict, no el dataclass.
 V86_REPLAY_VIABILITY = "apps/api-python/scripts/v2_86_replay_oos_viability.py"
 T_CLI_RENDERERS = "apps/api-python/tests/test_replay_oos_cli_renderers.py"
@@ -2753,10 +2757,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         (T_AUTO_DURABLE,),
     ),
     (
-        "M250 (arranque acotado por propiedad): el barrido de arranque deja de retirar la huerfana ajena",
+        "M250 (barrido sin EDAD, ventana NULA): toda reserva 'envejece' al instante -> el barrido vuelve a retirar la AJENA y JOVEN (fail-OPEN). Su forma historica (`only_ids=frozenset()`) dejo de medir al entrar la EDAD: se re-ancla aqui",
         WORKER,
-        "                await self._v2_reconcile_reservations(startup=True)\n",
-        "                await self._v2_reconcile_reservations(startup=True, only_ids=frozenset())\n",
+        "        return (self._time - created) > self._v2_reservation_grace\n",
+        "        return True\n",
         (T_AUTO_DURABLE,),
     ),
     (
@@ -2778,6 +2782,27 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         WORKER,
         "        self._v2_owned_reservations.add(reservation.reservation_id)\n        merged: dict[str, PortfolioReservation] = {\n",
         "        merged: dict[str, PortfolioReservation] = {\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M254 (ventana INFINITA): ninguna reserva envejece -> la retirada diferida no llega nunca y el crash deja de converger",
+        WORKER,
+        "        if created is None:\n            return False\n        return (self._time - created) > self._v2_reservation_grace\n",
+        "        return False\n",
+        (T_AUTO_DURABLE, T_CRASH_MATRIX),
+    ),
+    (
+        "M255 (edad sin signo): la distancia ABSOLUTA cuenta como edad -> una reserva con el reloj ADELANTADO se retira (skew = fail-OPEN)",
+        WORKER,
+        "        return (self._time - created) > self._v2_reservation_grace\n",
+        "        return abs(self._time - created) > self._v2_reservation_grace\n",
+        (T_AUTO_DURABLE,),
+    ),
+    (
+        "M256 (borde no estricto): edad == ventana ya autoriza a retirar -> se retira en el instante en que el dueno puede estar cerrando",
+        WORKER,
+        "        return (self._time - created) > self._v2_reservation_grace\n",
+        "        return (self._time - created) >= self._v2_reservation_grace\n",
         (T_AUTO_DURABLE,),
     ),
 ]

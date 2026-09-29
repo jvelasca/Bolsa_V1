@@ -344,7 +344,11 @@ async def test_c2_crash_after_reserving_before_emit_releases_dead_and_exits_once
         stores, exit_order_id="seed-c2", reservation_id="exit:seed-c2", qty=200.0, at="2026-09-15T09:01:00Z"
     )
 
-    w = _restart(stores, minute=1)
+    # OBS-14.b — el reinicio cae MÁS ALLÁ de la ventana de gracia (alta 09:01, reloj 09:03):
+    # la reserva superó un turno completo sin fill ni traza, así que está muerta por
+    # construcción y el barrido de arranque la retira. Un reinicio DENTRO de la ventana la
+    # CONSERVA (fail-closed) y converge en el arranque siguiente: ``test_c2b_*``.
+    w = _restart(stores, minute=2)
     await w.readopt_positions()
     await w._v2_reconcile_reservations(startup=True)
 
@@ -368,6 +372,74 @@ async def test_c2_crash_after_reserving_before_emit_releases_dead_and_exits_once
     intents = list(stores.exit_orders._rows.values())  # noqa: SLF001 — lectura de test.
     assert len(intents) == 2, "el INTENT muerto (ABANDONED) + el del cierre efectivo"
     assert {intent.state for intent in intents} == {"ABANDONED", "FILLED"}
+
+
+@pytest.mark.asyncio
+async def test_c2b_restart_inside_the_grace_window_retains_and_then_converges(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OBS-14.b: reinicio DENTRO de la ventana ⇒ conserva; PASADA la ventana ⇒ converge.
+
+    Es el precio de la gracia y su cota, medidos en el escenario de C2. El barrido de
+    ARRANQUE no puede distinguir, con la evidencia durable, una reserva MUERTA de una que
+    otra sesión acaba de dar de alta y aún no ha emitido: sin identidad de sesión, el único
+    discriminador es la EDAD, así que dentro de la ventana se CONSERVA (fail-closed) —reserva
+    y INTENT intactos, nada emitido— y se retira en el primer arranque posterior a la ventana.
+    La convergencia sigue siendo ACOTADA (un turno), no un goteo: la misma salida se cierra
+    UNA vez y la posición queda plana, exactamente como en C2.
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "84000")  # DD 16 % ⇒ RISK_OFF
+    stores = _Stores()
+    await _seed_buy_position(
+        stores, execution_id="buy-c2b", qty=Decimal("200"), price=Decimal("100")
+    )
+    await _seed_live_sell_reservation(
+        stores, reservation_id="exit:seed-c2b", qty=200.0, at="2026-09-15T09:01:00Z"
+    )
+    await _seed_exit_intent(
+        stores,
+        exit_order_id="seed-c2b",
+        reservation_id="exit:seed-c2b",
+        qty=200.0,
+        at="2026-09-15T09:01:00Z",
+    )
+
+    # (1) Reinicio INMEDIATO: alta 09:01, reloj 09:02 ⇒ edad 60 s = la ventana, todavía dentro.
+    soon = _restart(stores, minute=1)
+    await soon.readopt_positions()
+    await soon._v2_reconcile_reservations(startup=True)
+
+    live = await stores.reservations.list_live(ACCOUNT_ID)
+    assert [row.reservation_id for row in live] == ["exit:seed-c2b"], (
+        "dentro de la ventana el arranque NO puede declarar muerta una reserva que otra "
+        "sesión puede estar emitiendo"
+    )
+    kept = await stores.exit_orders.get("seed-c2b")
+    assert kept is not None and kept.is_open and kept.state != "ABANDONED", (
+        "conservar la reserva no puede abandonar su INTENT: la salida sigue viva"
+    )
+    assert await _sell_fills(stores) == [], "conservar no emite ni liquida nada"
+
+    # (2) Reinicio PASADA la ventana: alta 09:01, reloj 09:04 ⇒ edad 180 s > ventana.
+    later = _restart(stores, minute=3)
+    await later.readopt_positions()
+    await later._v2_reconcile_reservations(startup=True)
+
+    rows = await stores.reservations.list_all(ACCOUNT_ID)
+    dead = [row for row in rows if row.reservation_id == "exit:seed-c2b"]
+    assert dead and dead[0].status == RESERVATION_RELEASED_BY_RESTART, (
+        "pasada la ventana la orden muerta se libera al reiniciar (y UNA vez)"
+    )
+    assert await stores.reservations.list_live(ACCOUNT_ID) == []
+    abandoned = await stores.exit_orders.get("seed-c2b")
+    assert abandoned is not None and abandoned.state == "ABANDONED"
+
+    later._decider = _hold()
+    await later.auto_turn()
+    assert later._open.get("AAA", Decimal("0")) == 0
+    fills = await _sell_fills(stores)
+    assert _sell_total(fills) == Decimal("200"), "la cola liberada se cierra exactamente una vez"
+    assert len(_sell_order_ids(fills)) == 1, "un solo INTENT para la cola liberada"
 
 
 @pytest.mark.asyncio
@@ -433,7 +505,10 @@ async def test_c4_crash_after_partial_fill_carries_the_intent_and_converges(
         stop_price=Decimal("97"),
     )
 
-    w = _restart(stores, minute=1)
+    # OBS-14.b — reinicio MÁS ALLÁ de la ventana de gracia (alta 09:01, reloj 09:03): la
+    # reserva murió sin llenar y ya superó un turno, así que el arranque la retira. Es la
+    # misma condición declarada en C2; la retención dentro de la ventana va en ``test_c2b_*``.
+    w = _restart(stores, minute=2)
     await w.readopt_positions()
     await w._v2_reconcile_reservations(startup=True)
 

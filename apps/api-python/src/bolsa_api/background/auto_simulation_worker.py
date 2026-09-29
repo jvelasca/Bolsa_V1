@@ -434,6 +434,35 @@ def _dec_or_none(value: Any) -> Decimal | None:
     return dec if dec.is_finite() else None
 
 
+# ── OBS-14.b — ventana de gracia del barrido de reservas: PROPIEDAD **o** EDAD ─────
+#: Ventana de gracia, en TURNOS del motor, que acota la retirada de una reserva **ajena**
+#: en el barrido de reservas (``_v2_reconcile_reservations``).
+#:
+#: Por qué existe: la regla 2 retira la reserva que "murió sin llenarse" con la MISMA
+#: evidencia durable que el cierre de turno (sin ``APPLIED``, sin traza en vuelo, lecturas
+#: medibles), y esa evidencia **no puede** distinguir una orden MUERTA de una orden que OTRA
+#: sesión acaba de dar de alta y todavía no ha emitido ni liquidado. En el motor AUTO (solo
+#: ``paper``/``simulated``, sin bridge LIVE) la orden liquida DENTRO del tick, así que una
+#: reserva que ya superó un turno completo sin fill y sin traza en vuelo está muerta **por
+#: construcción**: la EDAD es el discriminador, y sin él la regla 2 es fail-**OPEN** en un
+#: reinicio rodante (devuelve al mercado un capital que la otra sesión SÍ materializa).
+V2_RESERVATION_GRACE_TURNS = 1
+
+
+def reservation_grace_window(interval_seconds: float | None = None) -> timedelta:
+    """Ventana de gracia del barrido de reservas, derivada de la cadencia REAL del loop.
+
+    ``AUTO_ENGINE_SIM_INTERVAL_SECONDS`` (default ``60 s``) es la cadencia del turno del
+    motor, así que la ventana se declara en TURNOS y **no** como un número mágico. Un turno
+    que sobrepase su intervalo queda fuera del contrato del scheduler (``auto_sim_loop`` hace
+    ``run_tick()`` y luego ``sleep(interval)``), pero el turno SIM real es trabajo en proceso
+    + BD sin esperas de red: con la cadencia nominal la ventana deja un margen de dos órdenes
+    de magnitud sobre la duración medida del turno.
+    """
+    seconds = _sim_interval_seconds() if interval_seconds is None else interval_seconds
+    return timedelta(seconds=V2_RESERVATION_GRACE_TURNS * seconds)
+
+
 def _instant(value: Any) -> datetime | None:
     """Instante ISO (``Z``, con offset o naive) → ``datetime`` UTC; ``None`` si no se lee.
 
@@ -608,6 +637,11 @@ class AutoSimulationWorker:
         # y ``execution_events`` queda como reconciliación de arranque. Sin él (camino
         # hermético) el libro de órdenes pendientes sigue derivándose como en V2.40.4.
         reservation_store: ReservationStore | None = None,
+        # OBS-14.b — ventana de gracia por EDAD del barrido de reservas: una candidata AJENA
+        # que todavía no envejeció se CONSERVA (fail-closed). ``None`` ⇒ la derivada de la
+        # cadencia real del loop (``reservation_grace_window()``). ``timedelta(0)`` restaura
+        # el comportamiento previo (retirar toda candidata); se usa para contraste.
+        reservation_grace: timedelta | None = None,
         # AUTO-10: sink DURABLE del régimen por ciclo (``decision_journal_entries``). Con él,
         # el ``marketRegime`` de un ciclo deja de vivir solo en la lista del proceso y el eje
         # ``strategy × regime`` gana su insumo. Sin él (camino hermético o test) no se escribe
@@ -708,6 +742,11 @@ class AutoSimulationWorker:
         # aprobación sin reserva durable). ``_v2_reservation_carryover`` son los
         # instrumentos con reserva viva de ticks ANTERIORES: no se apila otra igual.
         self._reservation_store = reservation_store
+        # OBS-14.b — ventana de gracia por EDAD del barrido de reservas (``None`` ⇒ la
+        # derivada de la cadencia real del loop: ``V2_RESERVATION_GRACE_TURNS`` turnos).
+        self._v2_reservation_grace: timedelta = (
+            reservation_grace if reservation_grace is not None else reservation_grace_window()
+        )
         self._v2_reservations: tuple[PortfolioReservation, ...] = ()
         self._v2_reservations_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
         self._v2_reservation_blocked: frozenset[str] = frozenset()
@@ -2665,16 +2704,29 @@ class AutoSimulationWorker:
         (fail-OPEN). El cierre de turno invoca con ``attribute_fills=False``: libera solo lo
         que NUNCA se materializó (regla 2), que es exactamente el huérfano del tick.
 
-        ``only_ids`` — ALCANCE del barrido (OBS-14.b). ``None`` barre el libro completo
-        (reconciliación de ARRANQUE: el proceso nace sin memoria y la reserva huérfana,
-        propia o ajena, es lo que hay que retirar). Un conjunto explícito acota el barrido a
-        esas reservas: es lo que usa el CIERRE DE TURNO con las SUYAS
-        (``_v2_owned_reservations``). Sin ese acotado, dos sesiones concurrentes se pisan: la
-        que cierra su turno ve la reserva viva de la otra —su orden todavía no se ha emitido
-        ni liquidado— con las DOS lecturas medibles y SIN fill, y la regla 2 la declararía
-        "muerta sin llenar", liberando un capital que la otra sesión SÍ materializará en su
-        turno (fail-OPEN). La evidencia durable no puede distinguir "orden muerta" de "orden
-        que otra sesión aún no ha emitido": el único discriminador es la PROPIEDAD.
+        ``only_ids`` — ALCANCE POR PROPIEDAD. ``None`` = la llamada NO tiene reservas a su
+        cargo (es el caso del ARRANQUE: el proceso nace sin memoria y nada es suyo). Un
+        conjunto explícito = esas reservas son de ESTA sesión, y es lo que usa el CIERRE DE
+        TURNO con las SUYAS (``_v2_owned_reservations``). Sin ese acotado, dos sesiones
+        concurrentes se pisan: la que cierra su turno ve la reserva viva de la otra —su orden
+        todavía no se ha emitido ni liquidado— con las DOS lecturas medibles y SIN fill, y la
+        regla 2 la declararía "muerta sin llenar", liberando un capital que la otra sesión SÍ
+        materializará en su turno (fail-OPEN). La evidencia durable no puede distinguir "orden
+        muerta" de "orden que otra sesión aún no ha emitido".
+
+        Ventana de gracia por EDAD (``OBS-14.b``) — el segundo discriminador, y el que cierra
+        esa indistinguibilidad sin identidad de sesión: una candidata solo se retira si es
+        **de esta sesión** (``only_ids``) **o** si ya superó la ventana
+        (``self._v2_reservation_grace``, ``V2_RESERVATION_GRACE_TURNS`` turnos de la cadencia
+        real del loop). En el motor AUTO (solo ``paper``/``simulated``, sin bridge LIVE) la
+        orden liquida DENTRO del tick, así que una reserva que superó un turno completo sin
+        fill y sin traza en vuelo está muerta **por construcción**: su dueño —sea quien
+        sea— ya cerró el turno. Una AJENA y JOVEN se CONSERVA (fail-closed: puede ser una
+        orden que la otra sesión todavía no ha emitido). Consecuencia declarada: la huérfana
+        de un crash que aún no envejeció no se retira en el barrido de arranque, sino en el
+        primer cierre de turno posterior a la ventana (a lo sumo un turno más tarde), en vez
+        de esperar a otro reinicio. Sin fecha legible, o con una fecha FUTURA respecto al
+        reloj de esta sesión (relojes no comparables), no se afirma edad y se conserva.
         """
         store = self._reservation_store
         if store is None:
@@ -2724,12 +2776,15 @@ class AutoSimulationWorker:
                         filled += qty
             available = max(0.0, filled - consumed.get(fill_key, 0.0))
             fill_qty = min(available, reservation.remaining_qty)
-            # OBS-14.b — FUERA DE ALCANCE: ni se libera ni se toca su INTENT de salida. Se
-            # conserva viva en el libro (su capital/riesgo SIGUE comprometido para esta
-            # sesión) y no consume fills, así que el orden de lectura no la mezcla con las
-            # propias. No se publica en ``outcomes``: sin entrada, ``_v2_sync_exit_orders``
-            # la lee como ``(0.0, None)`` y no actúa sobre una identidad ajena.
-            if only_ids is not None and reservation.reservation_id not in only_ids:
+            # OBS-14.b — FUERA DE ALCANCE y TODAVÍA JOVEN: ni se libera ni se toca su INTENT
+            # de salida. Se conserva viva en el libro (su capital/riesgo SIGUE comprometido
+            # para esta sesión) y no consume fills, así que el orden de lectura no la mezcla
+            # con las propias. No se publica en ``outcomes``: sin entrada,
+            # ``_v2_sync_exit_orders`` la lee como ``(0.0, None)`` y no actúa sobre una
+            # identidad ajena. Una vez envejecida (su dueño ya cerró su turno) SÍ entra en la
+            # regla 2 como candidata: es la retirada diferida que acota la retención.
+            mine = only_ids is not None and reservation.reservation_id in only_ids
+            if not mine and not self._v2_reservation_is_aged(created):
                 resolved.append(reservation)
                 continue
             released: PortfolioReservation | None = None
@@ -2779,6 +2834,19 @@ class AutoSimulationWorker:
         # que una reconciliación explícita lo levante.
         if not measurable and self._v2_reservations:
             await self.engage_kill_switch_durable("RECONCILIATION_FAILURE")
+
+    def _v2_reservation_is_aged(self, created: datetime | None) -> bool:
+        """¿La reserva ya superó la ventana de gracia? ``False`` si no se puede afirmar.
+
+        OBS-14.b. Se compara contra el reloj de ESTA sesión (``self._time``, la misma
+        autoridad temporal con la que se fecha el alta de las reservas propias). Sin fecha
+        legible, o con una fecha FUTURA respecto a este reloj —dos procesos con relojes no
+        comparables—, no se afirma edad: la reserva se conserva (fail-closed, el mismo
+        criterio que la regla 2).
+        """
+        if created is None:
+            return False
+        return (self._time - created) > self._v2_reservation_grace
 
     async def _v2_sync_exit_orders(
         self, outcomes: Mapping[str, tuple[float, PortfolioReservation | None]]
@@ -5000,10 +5068,13 @@ class AutoSimulationWorker:
             # turno drenaría la cola VIVA de una orden parcialmente llenada (fail-OPEN). El
             # cierre de turno solo retira el huérfano que NUNCA se materializó.
             #
-            # OBS-14.b — y solo retira las reservas de ESTA sesión (``only_ids``): en una
-            # carrera entre sesiones, la reserva que otra acaba de dar de alta es
-            # INDISTINGUIBLE de una orden muerta sin llenar hasta que esa otra sesión emite
-            # y liquida, y retirarla devolvería al mercado un capital que sí se materializa
+            # OBS-14.b — el cierre retira las reservas de ESTA sesión (``only_ids``) y, además,
+            # cualquier OTRA reserva que ya haya envejecido más de la ventana de gracia (su
+            # dueño, sea quien sea, ya cerró su turno): es la retirada DIFERIDA que acota la
+            # retención de la huérfana ajena a ~un turno, en vez de esperar a otro reinicio.
+            # La reserva AJENA y JOVEN se conserva: en una carrera entre sesiones es
+            # INDISTINGUIBLE de una orden muerta sin llenar hasta que esa otra sesión emite y
+            # liquida, y retirarla devolvería al mercado un capital que sí se materializa
             # (fail-OPEN observado en ``test_concurrent_auto_pg.py``).
             await self._v2_reconcile_reservations(
                 startup=False,

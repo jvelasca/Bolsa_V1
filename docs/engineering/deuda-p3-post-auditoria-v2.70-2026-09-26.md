@@ -1052,7 +1052,48 @@ criterio de cierre —*reconciliar en el **cierre de turno/tick***, lo que el re
 **Evidencia:** [`obs-14-cierre-por-turno-v2.88-2026-09-29.md`](./obs-14-cierre-por-turno-v2.88-2026-09-29.md) ·
 [`evidence/v2.88/`](./evidence/v2.88/README.md). La deuda queda **CERRADA y MEDIDA**, no por documentación.
 
-## OBS-14.b — El barrido de ARRANQUE tampoco distingue una huérfana de una reserva VIVA de otra sesión (MEDIUM, alcance motor) — 🔴 ABIERTA (2026-09-29)
+## OBS-14.b — El barrido de ARRANQUE tampoco distingue una huérfana de una reserva VIVA de otra sesión (MEDIUM, alcance motor) — 🟢 CERRADA en `v2.88.5` (2026-09-29)
+
+> **CIERRE (`v2.88.5-beta` / `AUTO-MATERIAL-18`, 2026-09-29).** Implementado el **discriminador propuesto**
+> en su forma exacta (**ventana de gracia por EDAD**), en el **motor**, con la ventana **declarada como
+> parámetro medido** y **4 mutaciones** (`M250` re-anclada + `M254`/`M255`/`M256`). Diff del motor
+> **+91 / −20** (5 hunks) en `auto_simulation_worker.py`; **SIN migración** (head `046_fill_reference_mid`);
+> **SÍ se toca el motor** (a diferencia de `v2.88.4`). **(1) La regla 2 pasa a «PROPIEDAD *o* EDAD»:**
+> `mine = only_ids is not None and reservation.reservation_id in only_ids` ⇒ se **CONSERVA** (fail-closed)
+> si `not mine and not self._v2_reservation_is_aged(created)`. **(2) La ventana:** `V2_RESERVATION_GRACE_TURNS
+> = 1` y `reservation_grace_window()` derivada de la **cadencia real del loop**
+> (`AUTO_ENGINE_SIM_INTERVAL_SECONDS`, default **`60 s`**) ⇒ **60 s**, **no** un número mágico. El
+> fundamento declarado: en este motor la orden **liquida DENTRO del tick** (solo `paper`/`simulated`, sin
+> bridge LIVE), así que una reserva que superó **un turno completo** sin fill ni traza en vuelo está muerta
+> **por construcción** — su dueño, sea quien sea, ya cerró su turno; la EDAD es el discriminador y **no**
+> requiere identidad de sesión (que el esquema no tiene). **(3) Fail-closed por construcción:**
+> `(self._time - created) > grace` con **`>` estricto** (el borde `age == 1 turno` **conserva**),
+> `created is None` ⇒ **conserva**, y fecha **FUTURA** (relojes no comparables) ⇒ **conserva**; la
+> comparación es contra `self._time`, la **misma** autoridad temporal con la que la sesión fecha sus
+> altas. **(4) Retirada DIFERIDA y ACOTADA (declarada, no indefinida):** la huérfana que **aún no
+> envejeció** sobrevive al barrido de arranque y se retira en el **primer cierre de turno posterior a la
+> ventana** (`RELEASED_BY_CANCEL`) — a lo sumo **un turno más tarde** — o en el arranque siguiente
+> (`RELEASED_BY_RESTART`). **(5) Simetría con `OBS-17`:** la ajena y joven conservada **no** entra en
+> `outcomes` ⇒ `_v2_sync_exit_orders` la lee como `(0.0, None)` y **no** marca `ABANDONED` el `ExitOrder`
+> del dueño. **(6) Tests (8 funciones nuevas ⇒ +7 netas):** `test_auto_v2_durable_cycle.py` **16 → 22** (cierre con joven
+> conservada / envejecida retirada; **arranque** joven conservada / envejecida retirada; **fecha futura**;
+> **borde estricto** a 1 turno; **INTENT de salida no abandonado**) y `test_auto_v44_exit_crash_matrix.py`
+> **8 → 9** (`test_c2b_restart_inside_the_grace_window_retains_and_then_converges`: reinicio **dentro** de
+> la ventana **retiene** y el siguiente, ya envejecido, **converge**); re-anclados a la semántica de edad
+> explícita `test_auto_v44_exit_crash_matrix.py` (`C2`/`C4`), `test_auto_v44_exit_governance.py` (9) y
+> `test_auto_v46_crash_recovery.py` (2). **(7) Mutaciones (matriz `253` → `256`):** `M250` **re-anclada**
+> (ventana **nula**), **`M254`** (ventana **infinita**), **`M255`** (edad **absoluta** ⇒ un reloj futuro
+> cuenta como envejecido) y **`M256`** (borde **no estricto** `>=`); las cuatro direcciones de la ventana
+> tienen su mutación (`M250`/`M255` atacan el fail-closed; `M254`/`M256` la terminación).
+> **(8) Verificación:** ciclo durable **`22 passed`**, matriz de crash **`9 passed`**, gobernanza
+> **`9 passed`**, crash/recovery `v46` **`2 passed`**; `uv run ruff check packages/py apps/api-python
+> --config pyproject.toml` → **All checks passed!**; batería offline completa con el comando **EXACTO** del CI (extraído del workflow) **`1 failed, 3085 passed, 4 warnings in 73.77s`** (**`3086` recogidos**; el único fallo es **PRE-EXISTENTE** de PG-local —`assert 17 == 26`— y en CI **se salta**); **matriz COMPLETA `256/256`** con el árbol **intacto**.
+> **(9) Límite declarado:** la ventana (**60 s** con la cadencia nominal) es una decisión **declarada**, no
+> medida en producción; el techo de retención de una huérfana es esa ventana. **La cita del CI es
+> POST-TAG** (patrón `OBS-3`/`OBS-4`): esperado job `python` **`3049 passed, 37 skipped`** (los `3042` de
+> `v2.88.4` + **7** netas), con los **mismos `37` skips`. **NO** cierra `OBS-15` ni `OBS-16` ni `P3-2`/`P3-3`.
+> Informe: [`obs-14b-ventana-de-gracia-arranque-v2.88.5-2026-09-29.md`](./obs-14b-ventana-de-gracia-arranque-v2.88.5-2026-09-29.md)
+> · evidencia cruda: [`evidence/v2.88.5/README.md`](./evidence/v2.88.5/README.md).
 
 **Origen.** Medido al corregir la **carrera entre sesiones** del cierre de turno (`v2.88.2`). El cierre de
 turno quedó acotado por **propiedad** (`only_ids`), pero la reconciliación de **ARRANQUE** sigue barriendo
@@ -1080,10 +1121,18 @@ reserva candidata solo si su `created_at` es anterior a `now − ventana` (la ve
 completo del motor). Una reserva más joven se **conserva** (fail-closed) y el barrido del siguiente
 arranque la recoge. Requiere declarar la ventana como parámetro medido y una mutación que la fije.
 
-**Estado de la evidencia.** El comportamiento actual queda **caracterizado** (no aprobado) por
-`test_closing_reconcile_does_not_touch_another_sessions_reservation`, que verifica que el barrido de
-arranque **sí** retira la huérfana ajena; su docstring declara esta deuda. Mutación asociada: **`M250`**
-(acotar el arranque ⇒ el test se pone rojo).
+> **IMPLEMENTADO en `v2.88.5` (`AUTO-MATERIAL-18`)**, tal cual: ventana **declarada en TURNOS**
+> (`V2_RESERVATION_GRACE_TURNS = 1`) y derivada de la cadencia real del loop (60 s con la nominal), con
+> **retirada diferida** (cierre de turno posterior a la ventana, no solo «el barrido del siguiente
+> arranque») y **4 mutaciones** que la fijan. Ver el bloque de cierre al inicio de esta sección.
+
+**Estado de la evidencia.** El comportamiento ANTERIOR quedó **caracterizado** (no aprobado) por
+`test_closing_reconcile_does_not_touch_another_sessions_reservation`, que verificaba que el barrido de
+arranque **sí** retiraba la huérfana ajena. **En `v2.88.5` ese test se sustituye por la semántica de
+EDAD explícita** (`test_closing_reconcile_does_not_touch_a_young_foreign_reservation`,
+`..._retires_a_foreign_reservation_once_it_aged`, `test_startup_sweep_retains_a_young_foreign_reservation`
+y compañía) y la mutación **`M250`** se **re-ancla** a `_v2_reservation_is_aged` (ventana **nula** ⇒ las
+retenciones se caen) para que siga mordiendo.
 
 **Evidencia:** [`obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md`](./obs-14b-carrera-entre-sesiones-v2.88.2-2026-09-29.md) ·
 [`evidence/v2.88.2/`](./evidence/v2.88.2/README.md).
@@ -1232,19 +1281,23 @@ exactly-once. Cita cruda: [`evidencia-ci-tag-v2.88.4-2026-09-29.txt`](./evidenci
 
 ---
 
-## Prioridad declarada por la auditoría externa de `v2.88.3` (2026-09-29) — 🎯 RECOMENDACIÓN, no ejecutada
+## Prioridad declarada por la auditoría externa de `v2.88.3` (2026-09-29) — 🎯 2 de 3 EJECUTADAS (paso 3 pendiente)
 
 La auditoría externa (`APROBADO`, 0 bloqueantes) **NO** pide otra cadena de endurecimiento indiscriminado.
 Pide **exactamente tres** acciones, en este orden:
 
 1. ✅ **Cerrar la simetría de ownership** → **`OBS-17`** — **HECHO en `v2.88.4`**: test de simetría +
    mutación **`M253`** sobre `_v2_reserve_exit` (matriz `252 → 253`).
-2. **Atacar `OBS-14.b`** (`restart → startup sweep → reservas → ownership → grace/no grace`). **← SIGUIENTE.**
+2. ✅ **Atacar `OBS-14.b`** (`restart → startup sweep → reservas → ownership → grace/no grace`) —
+   **HECHO en `v2.88.5` / `AUTO-MATERIAL-18`**: ventana de gracia por **EDAD** (propiedad **o** edad) en la
+   reconciliación, 8 tests nuevos y **4 mutaciones** (`M250` re-anclada + `M254`/`M255`/`M256`; matriz
+   `253 → 256`). Ver el bloque de cierre de `OBS-14.b` arriba.
 3. **Volver a PAPER real** — pasar de *«¿puede AUTO sobrevivir correctamente?»* a
    *«¿qué hace AUTO durante varios días de operación real?»*; comprobar antes el riesgo de **`OBS-15`**
-   (1000 `APPLIED`).
+   (1000 `APPLIED`). **← SIGUIENTE.**
 
 **Explícitamente NO tocar:** `TOP_N` / `REGIME` / `RISK` / `SIGNALS` / `A/B` / `thresholds` por motivos de
-comportamiento de mercado. **Ninguna** de las tres acciones está ejecutada; **ninguna** deuda se cierra por
-este informe.
+comportamiento de mercado. La acción **1** se cerró en `v2.88.4` y la **2** en `v2.88.5`; la **3** **no**
+está ejecutada, y tampoco `OBS-15` / `P3-2` / `P3-3`: **ninguna** de esas deudas se cierra por estos
+informes.
 

@@ -413,7 +413,11 @@ async def test_crash_recovery_releases_the_unfilled_tail_of_the_partial_reservat
         "el fill parcial deja una cola de reserva viva (capital comprometido)"
     )
 
-    w2 = _worker(stores, minute=0, decider=_hold())
+    # OBS-14.b — el reinicio ocurre DESPUÉS de la ventana de gracia (la reserva ya superó un
+    # turno completo sin fill ni traza ⇒ muerta por construcción). Un reinicio que llegue
+    # DENTRO de la ventana conserva la reserva y su INTENT hasta el arranque siguiente
+    # (fail-closed): lo certifican los tests ``test_startup_sweep_*`` del ciclo durable.
+    w2 = _worker(stores, minute=4, decider=_hold())
     await w2.readopt_positions()
     await w2._v2_reconcile_reservations(startup=True)
 
