@@ -244,6 +244,13 @@ per-commit verdes, y `Frontend CI 36614223183` / `Optimize lab 36614223230` /
 `Fase 2 scientific 36614223235` / `Gitleaks 36614223332` **`success`**. Cita cruda:
 [`evidencia-ci-tag-v2.88.7-2026-09-29.txt`](../evidencia-ci-tag-v2.88.7-2026-09-29.txt).
 
+**Cola de la cita** (push en `main` del commit que **transporta** esta cita, `190e4e3a`, solo documentación):
+`Gitleaks 36625625987` **`success`**, y **nada más corre**: los workflows de código llevan **filtro de
+ruta** y no se disparan con un push de solo-docs, así que su ausencia **no** es un hueco de CI. El
+certificado del sello vive en el run **`36614230366` del tag** (commit `5cbe84b0`), **no** en el commit de
+cita. Integridad de esta evidencia **re-medida** tras el sello: los dos artefactos del replay siguen
+**byte-idénticos** (`3 393 187` B, `7D998E4D…C804A0461`).
+
 ## 10. Límite de esta evidencia
 
 **NO** acredita `P3-2`/`P3-3`: el replay usa **reloj simulado** (una cuenta/versión/watch,

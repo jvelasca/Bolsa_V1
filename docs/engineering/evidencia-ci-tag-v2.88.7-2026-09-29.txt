@@ -97,3 +97,23 @@
 #   matriz de mutaciones COMPLETA `267/267` (M266/M267 muerden el test nuevo), arbol intacto, exit 0
 #   artefacto del replay BYTE-REPRODUCIBLE: 3393187 B, SHA-256
 #   7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461
+#
+# ---------------------------------------------------------------------------------------
+# COLA DE LA CITA: push en `main` del commit de cita 190e4e3a (SOLO documentacion)
+# ---------------------------------------------------------------------------------------
+#   Gitleaks           36625625987   success   (~16s)   <-- UNICA compuerta disparada
+#
+#   NOTA (por que solo corre Gitleaks): los workflows de CODIGO (`Python CI`, `Frontend CI`,
+#   `Optimize lab`, `Fase 2 scientific`) llevan filtro de RUTA y NO se disparan con un push de
+#   solo-documentacion. Por diseno, la unica compuerta aplicable al commit de CITA es Gitleaks,
+#   que fue VERDE. Su ausencia NO es un hueco de CI ni un rojo silenciado: es el mismo criterio
+#   ya documentado para v2.88.6-beta. El certificado del sello vive en el run 36614230366 del
+#   TAG (commit 5cbe84b0), NO en el commit de cita -- este ultimo solo transporta la cita.
+#
+#   Arbol de trabajo: LIMPIO (`git status --porcelain` vacio) tras el push.
+#
+# Verificacion de integridad de la evidencia citada (re-medida 2026-09-29, posterior al sello):
+#   `replay-oos-durable-obs20-fix-20260929.json`       3393187 B  7D998E4D...C804A0461  COINCIDE
+#   `replay-oos-durable-obs20-fix-repro-20260929.json` 3393187 B  7D998E4D...C804A0461  COINCIDE
+#   -> los dos artefactos del replay siguen BYTE-IDENTICOS y siguen cuadrando con el SHA-256
+#      publicado en docs/engineering/evidence/v2.88.7/README.md (no hubo deriva del fichero).
