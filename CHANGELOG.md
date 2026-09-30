@@ -2,6 +2,32 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.12-beta] — DISEÑO `GRANULARIDAD-OPERATIVA`: rethink `config-driven` de la cadencia del motor AUTO (el dato es diario, el bucle es de 60 s)
+
+**Bump** `2.11.11-beta` → `2.11.12-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+**SÓLO documentación: CERO `src`, CERO tests, CERO migraciones, CERO umbrales** (`TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-B:
+intactos, sin backdating); **NO enmienda el ADR 010** (sólo añade un enlace **no normativo** en su sección de Referencias).
+
+- **El diagnóstico.** La **granularidad del dato** (`ohlcv_bars.timeframe`, default `1d`; `KERNEL_TIMEFRAMES = {1d, 1wk}`)
+  y la **cadencia del bucle** (`AUTO_ENGINE_SIM_INTERVAL_SECONDS`, default **60 s**) están **desacopladas**: el motor
+  ejecuta **~1.440 ticks/día** para, en la práctica, tomar **~1 decisión real por barra diaria**. Protección, marcas,
+  barrido de reservas, settlement y `record_tick` corren **cada tick** aunque la barra D1 no cambie.
+- **Hallazgo medido.** En producción `AutoSimRuntime` se construye **sin `price_script`** ⇒ el motor usa
+  `flat_price_script` (**100.0 constante**); el **único** punto con cuotas reales (`MarketPriceSnapshot`) es el script
+  `v2_76_forward_market_material.py`. Es decir: miles de iteraciones sobre un precio que no se mueve.
+- **Incoherencia de granularidad.** El *fill* usa `seed = minute` y `base_mid = price_script(...)` (precio por tick)
+  mientras la **decisión** se toma sobre **barras D1** cerradas.
+- **La propuesta (no implementada).** Una **única fuente de verdad** `OperativeGranularity` (VO puro; `1d`/`1wk`
+  hoy, seam intradía **fail-closed**) de la que **se derivan** régimen/ATR/señal, cadencia, modelo de protección,
+  ejecución al **open de la barra siguiente** y cubos de evidencia; y un **planificador por barra cerrada**
+  (**C**), con **short-circuit por cambio de barra** (**A**) como paso intermedio. Reapunta la **ventana de gracia de
+  reservas** (hoy derivada de `_sim_interval_seconds()`) y el **settlement** al anclaje por barra.
+- **Evidencia / auditoría.** Documento de diseño: [`docs/engineering/rethink-granularidad-operativa-auto-2026-09-30.md`](./docs/engineering/rethink-granularidad-operativa-auto-2026-09-30.md).
+  Punto de entrada del auditor: [`docs/engineering/arranque-auditor-v2-88-12-granularidad-operativa-2026-09-30.md`](./docs/engineering/arranque-auditor-v2-88-12-granularidad-operativa-2026-09-30.md).
+  Entrega con preguntas concretas: [`docs/engineering/entrega-auditoria-externa-mia-v2.88.12-2026-09-30.md`](./docs/engineering/entrega-auditoria-externa-mia-v2.88.12-2026-09-30.md).
+- **Deudas que NO cierra.** `P3-2`/`P3-3` (ventana PAPER real ≥4 días con material), `OBS-22`, `OBS-19`, `OBS-15`,
+  `OBS-16`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5`, `OBS-5`. Este sello **no** mide ni mueve ninguna.
+
 ## [2.11.11-beta] — `OBS-21` **CERRADA**: el terminal del fill deja de confundir **TRANSITORIO** con **PERMANENTE** (un rechazo determinista del dominio pasa a `FAILED`, no a un `RETRY` indefinido) — 2026-09-30
 
 **Bump** `2.11.10-beta` → `2.11.11-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).

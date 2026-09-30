@@ -196,3 +196,4 @@ Frontend (panel flotante) **no antes de P3** — gestor de trackers necesita API
 - [platform-kernel.ts](../../packages/shared/src/platform-kernel.ts)
 - [RESEARCH_RADAR/SCREENERS y señales](./011-quantitative-research-platform.md) *(histórico: `SCREENERS_SIGNALS_ALIGNMENT.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso)*
 - [BACKTESTING_DATA_ARCHITECTURE.md](../BACKTESTING_DATA_ARCHITECTURE.md)
+- Diseño relacionado (no normativo): [rethink-granularidad-operativa-auto-2026-09-30.md](../engineering/rethink-granularidad-operativa-auto-2026-09-30.md) — repiensa la cadencia del motor AUTO frente a la granularidad del dato (dato diario vs bucle de 60 s). **No** modifica ninguna decisión de este ADR; habilitar intradía seguiría exigiendo su enmienda.
