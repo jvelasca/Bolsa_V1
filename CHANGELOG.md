@@ -75,6 +75,24 @@ líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-
   **espurio** en la certificación) — **no** toca el motor, ni el sello del replay OOS de `v2.88.7`.
 - **Informe:** [`docs/engineering/flake-1-causa-raiz-2026-09-30.md`](./docs/engineering/flake-1-causa-raiz-2026-09-30.md) ·
   **evidencia del sello:** [`docs/engineering/evidence/v2.88.9/README.md`](./docs/engineering/evidence/v2.88.9/README.md).
+- **CITA REAL (POST-TAG, 2026-09-30).** `Release tag CI` run **`36685888972`** (`ref=v2.88.9-beta`, HEAD
+  `1e2985f5`, `07:48:56Z → 07:57:11Z`, **~8m15s**) → **`SUCCESS`**: **10 jobs reales verdes + `certify` GREEN**
+  (**11 verdes en total, 0 rojos**; `playwright` integrado `skipped` por diseño) ⇒ **primer tag VERDE desde
+  `v2.88.7-beta`**. **El job
+  `python`: `3115 passed, 37 skipped, 6 warnings in 45,70 s`** = **exactamente lo previsto** (identidad
+  `3152 − 37`, con los **mismos `37` skips**), y la cuenta **`+3`** se confirma por segunda vía en `main`
+  (`Python CI` **`36685885987`**, verde): `quality` pasa de `3101` a **`3104 passed, 40 skipped`**.
+  **`lifecycle-pg` —el job que daba el rojo— VERDE:** `165 passed, 2 warnings in 100,62 s` con **0 skips**
+  (los gates *fail-if-skipped* se cumplieron), más `45 passed` account-isolation, `1` golden day, `1`
+  crash/recovery, `3` concurrent AUTO, `2` hard-kill, `2` crash injection y `1` multiprocess (`113,14 s`); el
+  head **`046_fill_reference_mid`** queda **confirmado en el propio log** del job. **`replay-repro` (segunda
+  certificación a nivel de tag):** `# sembrado 20 instrumentos, 25700 barras D1`, `watch congelado: 20
+  símbolos`, render **LF** `3 290 062` B / `A4DA036C…13CB`, **`VEREDICTO 2ª corrida IDÉNTICA`** + `DIGEST
+  igual en las dos corridas` y **`VEREDICTO REPRODUCIDO`** (artefacto **`11083079436`**, `285 944` B);
+  `certify` publica `"status": "GREEN"` (artefacto **`11083039890`**). **Límite declarado:** un solo verde
+  **NO demuestra** el arreglo —el rojo era una lotería del **6,68 %** sobre el `instrument_id` sorteado—: lo
+  demuestran la medida **`0/20 000`** y el contraste contra PG con el **mismo `instrument_id`** (ROJO con
+  `60`, VERDE con `30`); el tag aporta **encaje de cuentas y ausencia de regresión**.
 
 ## [2.11.8-beta] — `FLAKE-1` deja de ser mudo (el `RETRY` sin causa queda instrumentado y **cazado**) + tercera deriva de las listas offline de pytest (`OBS-19`) + PRIMERA certificación del job `replay-repro` en un tag real — 2026-09-30
 

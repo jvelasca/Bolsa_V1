@@ -194,18 +194,34 @@ contenido tenga **un** hash en cualquier SO — exige **re-medir los cinco diges
 
 ## 9. Cita real del CI del tag
 
-`Release tag CI` del tag **`v2.88.9-beta`** → **PENDIENTE DE CITAR** (patrón `OBS-3`/`OBS-4`: el workflow
-solo corre al empujar el tag, así que la cita es **POST-TAG** y se añade en el commit de cita inmediatamente
-posterior, **citando el run**). Lo que este sello compromete a observar, y por qué:
+`Release tag CI` del tag **`v2.88.9-beta`** → **run `36685888972`** (`ref=v2.88.9-beta`, HEAD `1e2985f5`,
+`2026-09-30T07:48:56Z → 07:57:11Z`, **~8m15s**) → **`SUCCESS`**: **10 jobs reales verdes + `certify` GREEN**
+(**11 verdes en total, 0 rojos**; `playwright` integrado `skipped` por diseño). **Es el primer tag VERDE
+desde `v2.88.7-beta`**: el anterior (`v2.88.8-beta`) murió en `lifecycle-pg` por `FLAKE-1`.
 
-* **El job `python`** (que ahora incluye los **3 gates nuevos** vía el cableado de `OBS-19`): **esperado
-  `3112 + 3 = 3115 passed, 37 skipped`** (los `3149` recogidos de `v2.88.8` + los `3` gates de este sello =
-  `3152`; `3152 − 37` = `3115`), con los **mismos `37` skips**.
-* **El job `lifecycle-pg`** (el que daba el rojo): **esperado VERDE**. Su rojo era una **lotería del 6,68 %**
-  sobre el `instrument_id` sorteado, así que **una sola corrida verde NO demuestra** el arreglo —lo demuestra
-  la medida de §3 (`0/20 000`) y el contraste de §4 (mismo `instrument_id`: rojo→verde)—, pero la corrida
-  del tag es la **primera evidencia en el runner** y debe salir verde.
-* **`replay-repro`**: sin cambios en su cadena; se espera `success` (segunda certificación a nivel de tag).
+**Lo previsto contra lo observado (identidad, no impresión):**
+
+| Job | Previsto al sellar | Observado en el runner | Veredicto |
+| --- | --- | --- | --- |
+| `python` | `3115 passed, 37 skipped` | **`3115 passed, 37 skipped, 6 warnings in 45,70 s`** | **COINCIDE** |
+| `lifecycle-pg` (**el que daba el rojo**) | VERDE | **`165 passed, 2 warnings in 100,62 s`** en la batería que contiene `test_simulated_finance_pg.py` (0 skips: los gates *fail-if-skipped* se cumplieron) + `45 passed` (account-isolation) + `1` golden day + `1` crash/recovery + `3` concurrent AUTO + `2` hard-kill + `2` crash injection + `1` multiprocess (`113,14 s`) | **VERDE** |
+| `replay-repro` | `success` | `success` — `# sembrado 20 instrumentos, 25700 barras D1`, `watch congelado: 20 símbolos`, render **LF** `3 290 062` B / `A4DA036C…13CB`, **`VEREDICTO 2ª corrida IDÉNTICA`** + `DIGEST igual en las dos corridas`, **`VEREDICTO REPRODUCIDO`**, artefacto **ID `11083079436`** (`285 944` B) | **COINCIDE** |
+| `certify` | GREEN | **GREEN** (`"status": "GREEN"`, artefacto **ID `11083039890`**, `413` B) | **COINCIDE** |
+
+**La cuenta `+3` cierra por dos vías independientes:** en el tag, `3115 = 3112 (v2.88.8) + 3` gates (`3152`
+recogidos − `37` skips); y en `main` (`Python CI` **`36685885987`**, verde), `quality` pasa de `3101` a
+**`3104 passed, 40 skipped, in 125,99 s`** = **`+3`**, con `ruff All checks passed!`, `Contracts: 4 kept, 0
+broken` y `Success: no issues found in 508 source files`. **Los `37`/`40` skips no se mueven.**
+
+**El head de Alembic, confirmado en el log del propio job** (no declarado): la última línea de `Running
+upgrade` es `045_adaptive_gate_state -> 046_fill_reference_mid` ⇒ **`046_fill_reference_mid`**, como exige
+este sello.
+
+**Qué prueba y qué NO prueba esta corrida.** El verde de `lifecycle-pg` es la **primera evidencia en el
+runner**, pero **una sola corrida verde NO demuestra** el arreglo: su rojo era una **lotería del 6,68 %**
+sobre el `instrument_id` sorteado. Lo que lo demuestra es la medida de §3 (**`0/20 000`**) y el contraste de
+§4 (mismo `instrument_id`: rojo con `60`, verde con `30`). La corrida del tag aporta **encaje de cuentas y
+ausencia de regresión**, no la prueba de la causa — que ya venía medida.
 
 **Informes de las cadenas que este sello cierra y de la que lo abrió:**
 [`flake-1-causa-raiz-2026-09-30.md`](../../flake-1-causa-raiz-2026-09-30.md) (informe de causa raíz) ·

@@ -1726,7 +1726,9 @@ independientes): o fue mala suerte, o alguna corrida previa tuvo un aporte **inv
 esconderse. **`OBS-21` (abajo) NO se arregla aquí** — sólo se registra: es una derivada del mismo `RETRY`.
 Evidencia del sello: [`evidence/v2.88.9/README.md`](./evidence/v2.88.9/README.md) · informe de causa raíz:
 [`flake-1-causa-raiz-2026-09-30.md`](./flake-1-causa-raiz-2026-09-30.md) · cita del CI del tag:
-**pendiente en el commit de sello inmediatamente posterior**.
+**`36685888972`** → **`SUCCESS`** (10 jobs reales verdes + `certify` GREEN = **11 verdes, 0 rojos**;
+`python` **`3115 passed, 37 skipped`** = previsto, `lifecycle-pg` **`165 passed`** VERDE, `replay-repro`
+**`REPRODUCIDO`**) ⇒ **primer tag verde desde `v2.88.7-beta`**. Detalle en §9 de la evidencia.
 
 
 ---
