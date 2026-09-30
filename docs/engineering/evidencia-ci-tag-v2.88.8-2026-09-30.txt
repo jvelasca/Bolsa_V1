@@ -1,0 +1,167 @@
+# Evidencia cruda -- CI del tag v2.88.8-beta (FLAKE-1 INSTRUMENTADO + OBS-19 tercer caso + replay-repro), POST-TAG, 2026-09-30
+#
+# Tag anotado : v2.88.8-beta -> objeto bffa0035 -> commit del sello 21c85c0a
+#               (21c85c0ab630bbd6660ca2bb04748425943553c1).
+# Version paq.: 2.11.7-beta -> 2.11.8-beta (package.json).
+# Base del diff: 5cbe84b0 (= v2.88.7-beta).
+# Alembic head: 046_fill_reference_mid (SIN migracion).
+# MOTOR       : INTACTO, medido. `git diff v2.88.7-beta..HEAD` sobre
+#               apps/api-python/src/bolsa_api/background/auto_simulation_worker.py,
+#               packages/py/application/src/bolsa_application/replay_oos.py y
+#               apps/api-python/scripts/v2_87_replay_oos_durable_cycle.py -> VACIO.
+#               Unico cambio funcional: +15/-0 en
+#               packages/py/application/src/bolsa_application/simulated_finance.py (la traza que
+#               faltaba) y +42/-1 en packages/py/application/tests/test_simulated_finance.py.
+#
+# RESULTADO   : ROJO en la PRIMERA pasada (attempt 1). El rojo es FLAKE-1 -- AJENO al objeto del sello y
+#               PRE-EXISTENTE -- pero el sello CAZA SU CAUSA INMEDIATA (ver mas abajo), que era justo lo
+#               que compraba. Lo que SI queda certificado aqui: (a) replay-repro VERDE en un TAG real
+#               por PRIMERA vez, y (b) el job python cuadrando EXACTAMENTE con lo declarado. El tag
+#               v2.88.8-beta NO se borra: queda como ROJO CITADO, igual que v2.88.6-beta y v2.88.2-beta.
+# ---------------------------------------------------------------------------------------
+# Release tag CI -- run 36681305812 -- ref v2.88.8-beta -- HEAD 21c85c0a
+# ---------------------------------------------------------------------------------------
+# conclusion : FAILURE  (attempt 1)
+# ventana    : 2026-09-30T07:00:49Z -> 2026-09-30T07:08:02Z  (~7m13s)
+# jobs (12): 9 verdes, 1 rojo, 1 skipped por diseno, + certify rojo (agrega, como debe)
+#   python (ruff/imports/mypy/pytest offline)                    success
+#   shared (build/typecheck/test)                                success
+#   decision-spine                                               success
+#   frontend (typecheck/lint/test/build + contract:check)         success
+#   security (gitleaks)                                          success
+#   dr-verify (battery DB_DR / TCP CI)                           success
+#   a7-gate (A7 C3 chaos live_a7 - dedicated real-PG)            success
+#   playwright (mock E2E)                                        success
+#   replay-repro (regenera el artefacto del sello desde el fix..) success  <-- PRIMERA vez bajo un TAG
+#   lifecycle-pg (Alembic + auth + golden restart)               FAILURE  <-- FLAKE-1 (ver abajo)
+#   playwright (integrated E2E, opt-in)                          skipped (por diseno)
+#   certify (aggregate + artifact)                               failure  (agrega el rojo del job anterior)
+#
+# Job `python` del tag (VERBATIM, timestamps UTC del runner):
+#   2026-09-30T07:01:06Z All checks passed!                              (ruff)
+#   2026-09-30T07:01:06Z Contracts: 4 kept, 0 broken.                    (import-linter)
+#   2026-09-30T07:01:32Z Success: no issues found in 508 source files     (mypy)
+#   2026-09-30T07:02:42Z 3112 passed, 37 skipped, 6 warnings in 68.43s    (pytest)
+#
+#   ESPERADO 3112 passed / 37 skipped  ==  OBSERVADO 3112 passed / 37 skipped  -> COINCIDE
+#   (identidad `recogidos local - 37 skips`: 3149 recogidos - 37 = 3112. Los 3149 salen de la bateria
+#    local con el comando EXACTO extraido de este workflow -- 118 lineas = `uv run pytest` + 78 rutas +
+#    39 `--ignore` + `-q` -- sobre PostgreSQL real: `1 failed, 3148 passed in 94,20 s`, siendo el unico
+#    rojo el PG-local pre-existente que ESTE job skipea, dentro de los 37. Los 3141 del sello v2.88.7 +
+#    8 = 3149: los 8 tests de packages/py/application/tests/test_simulated_finance.py, que NO estaba en
+#    la lista de ningun workflow y se cablea aqui -- tercera deriva de OBS-19. La identidad se confirmo
+#    ADEMAS en main: quality 3093 -> 3101 passed / 40 skipped, `Python CI` 36678944192, verde.)
+#
+# replay-repro (VERBATIM) -- PRIMERA certificacion a nivel de TAG del job anadido tras el sello v2.88.7
+#   2026-09-30T07:01:27Z # sembrado  20 instrumentos, 25700 barras D1
+#   2026-09-30T07:01:27Z watch congelado: 20 simbolos
+#   2026-09-30T07:03:07Z render LF 3290062 A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+#   2026-09-30T07:04:46Z render LF 3290062 A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+#   2026-09-30T07:04:46Z VEREDICTO 2ª corrida IDENTICA (el runner es determinista consigo mismo)
+#   2026-09-30T07:04:46Z artefacto        artifacts/replay-oos-durable-v2.88.7.json
+#   2026-09-30T07:04:46Z render           LF
+#   2026-09-30T07:04:46Z bytes            3290062  (sello 3393187 - mismo contenido en LF 3290062)
+#   2026-09-30T07:04:46Z sha256           A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+#   2026-09-30T07:04:46Z sello (render)   7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461
+#   2026-09-30T07:04:46Z sha256 LF        A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+#   2026-09-30T07:04:46Z VEREDICTO        REPRODUCIDO (mismo CONTENIDO; el sello esta en CRLF y este
+#                                        fichero en LF)
+#   2026-09-30T07:04:47Z Artifact replay-oos-durable-v2.88.7 has been successfully uploaded!
+#                        Final size is 285944 bytes. Artifact ID is 11082315804
+#                        (SHA256 del zip: 649c0e4e8fa3dcdf1f53c8bae2f5d24714c1428c1b872724a6e6f5ebeab09c70)
+#   -> el digest por secciones del runner coincide con el del sello y las dos corridas del runner son
+#      identicas (`cmp`): la reproducibilidad del artefacto del replay OOS queda certificada DESDE EL TAG.
+#
+# lifecycle-pg (EL ROJO) -- FLAKE-1, y la instrumentacion del sello LO CAZA
+#   Step: `Pytest lifecycle PG + auth + golden V1.88-V1.91/V1.95/V1.96 + worker V1.92/V1.93/V1.97 +
+#          integrity V1.94 + health schema-aware V2.15 (fail if skipped)`
+#   2026-09-30T07:03:03Z 1 failed, 164 passed, 2 warnings in 95.69s (0:01:35)
+#   2026-09-30T07:03:03Z FAILED apps/api-python/tests/test_simulated_finance_pg.py::
+#                        test_finance_auto_day_materializes_executetrade_exactly_once - AssertionError: RETRY
+#   2026-09-30T07:03:03Z apps/api-python/tests/test_simulated_finance_pg.py:328:
+#                            assert row is not None and row.status == "APPLIED"
+#                        E   AssertionError: RETRY
+#                        E     - APPLIED
+#                        E     + RETRY
+#
+#   Captured stderr call (LA TRAZA QUE ANADE ESTE SELLO, en su PRIMER uso):
+#   2026-09-30T07:03:03Z ERROR [bolsa_application.simulated_finance] apply_finance NO efectivo por
+#                        excepcion de ExecuteTrade
+#                        (execution_id=sim-engine-58b3e99de0f64798b13fd4cc2-sell-instfin59e064e70b-finselle3a415b3#2,
+#                         instrument_id=inst-fin-59e064e70b); el store lo encamina a RETRY
+#   2026-09-30T07:03:03Z Traceback (most recent call last):
+#                          File ".../packages/py/application/src/bolsa_application/simulated_finance.py",
+#                            line 260, in _apply
+#                            await executor(
+#                          File ".../packages/py/application/src/bolsa_application/accounts/trade.py",
+#                            line 131, in execute
+#                            result = await self._portfolio_repo.execute_trade(
+#                          File ".../bolsa_infrastructure/database/repositories/portfolio_repository.py",
+#                            line 383, in execute_trade
+#                            raise ValueError(f"No tienes suficientes acciones. En cartera: {held}")
+#                        ValueError: No tienes suficientes acciones. En cartera: 0.0
+#   ... y la MISMA traza para la trancha #3 del mismo venue_order_id.
+#
+#   LEIDO: la pata SELL del ciclo se aplica contra portfolio_repository.execute_trade, que lee la
+#   posicion de inst-fin-59e064e70b y encuentra held = 0.0 -> rechaza la venta. El rechazo es CORRECTO
+#   y fail-closed: el defecto no esta en el rechazo, esta en que el motor llegue ahi. NO es la clave de
+#   idempotencia (sospecha razonable: v2.40.3/F1 fue justo ese colapso de claves, ya corregido en
+#   bounded_idempotency_key): lo descarta la traza, que es del REPOSITORIO DE CARTERA, no de un
+#   IdempotencyKeyReused en ExecuteTrade. Las DOS tranchas fallan -> es ESTADO, no azar por trancha.
+#   QUEDA POR AISLAR: (a) orden/visibilidad entre las dos patas del MISMO ciclo, o (b) desajuste de
+#   cuenta/cartera entre patas. Es la siguiente fase.
+#
+#   Lo que el sello compraba, MEDIDO: el rojo pasa de MUDO (error="apply_ineffective", indistinguible de
+#   un None del resolver) a una traza con fichero, linea, excepcion y execution_id. Contrato intacto:
+#   sigue fail-closed y jamas marca APPLIED por excepcion.
+#
+# Steps del job lifecycle-pg (el rojo aborta el step 7 y los siguientes quedan skipped, con sus guardas
+# `Fail on skipped ...` en rojo -- no hay certificacion parcial silenciosa):
+#   Set up job / Initialize containers / checkout / setup-uv / Install dependencies   success
+#   Alembic upgrade head                                                              success
+#   Pytest lifecycle PG + auth + golden + worker + integrity + health                 FAILURE
+#   Install PostgreSQL client / Prepare iso scratch DB / Pytest account-isolation     skipped
+#   Pytest Golden Day 2.0                                     + Fail on skipped      skipped / failure
+#   Pytest Crash/Recovery Day                                 + Fail on skipped      skipped / failure
+#   Pytest Concurrent AUTO                                    + Fail on skipped      skipped / failure
+#   Pytest HardKill recovery                                  + Fail on skipped      skipped / failure
+#   Pytest crash injection matrix                             + Fail on skipped      skipped / failure
+#   Pytest multiprocess AUTO                                  + Fail on skipped      skipped / failure
+#   Stop containers                                                                   success
+#
+# ---------------------------------------------------------------------------------------
+# Companion runs sobre el MISMO commit/ref (21c85c0a) -- TODAS VERDES
+# ---------------------------------------------------------------------------------------
+#   ref v2.88.8-beta: Python CI 36681305814 success | Frontend CI 36681305733 success
+#                     Optimize lab 36681305800 success | Fase 2 scientific 36681305748 success
+#   push a main      : Frontend CI 36680395035 success | Optimize lab 36680395055 success
+#                      Gitleaks 36680394992 success
+#
+#   `Python CI` NO corre en el push a main de este commit: cambio package.json + CHANGELOG + docs, y el
+#   workflow lleva FILTRO DE RUTAS sobre ficheros de Python -> su ausencia NO es un hueco de CI.
+#
+# ---------------------------------------------------------------------------------------
+# Reproduccion local (lo que se midio ANTES de empujar)
+# ---------------------------------------------------------------------------------------
+#   Bateria offline con el comando EXACTO del job python (PG real, shell limpio):
+#     1 failed, 3148 passed in 94,20 s   (3149 recogidos, 0 skipped)
+#     el unico rojo es el PG-local pre-existente test_auto_v70_auto23_evidence_validation.py::
+#     test_the_validation_reads_real_postgres_material_and_seals_it, que el job offline skipea.
+#
+#   NOTA DE HONESTIDAD (medicion contaminada, declarada): la primera pasada dio
+#     `2 failed, 3112 passed, 26 skipped, 9 errors`
+#   por HUELLA DEL REPRO DE FLAKE-1 en la sesion de shell: DATABASE_URL apuntando a la base scratch
+#   `bolsa_v1_flake1` (ya borrada) y los 23 gates `*_PG_REQUIRED=1` del job lifecycle-pg. Esos fixtures
+#   leen del ENTORNO con `load_dotenv(..., override=False)`, asi que el entorno GANA sobre `.env`.
+#   Limpiada la sesion, la medicion cuadra. Se declara porque una medicion contaminada se parece
+#   demasiado a un hallazgo.
+#
+#   FLAKE-1 no reproducible en local: 0 rojos en 59 corridas (50 directas del test objetivo con dos
+#   politicas de selector + 9 del comando exacto del job lifecycle-pg con BD scratch fresca
+#   drop+create+migrate por iteracion). La variable es del ENTORNO (runner de 2 vCPU), no del motor.
+#
+# ---------------------------------------------------------------------------------------
+# Sin migracion. NO se toca el motor, ni el test del dia AUTO, ni TOP_N/REGIME/RISK/SIGNALS/A-B ni
+# ningun umbral, ni se backdatea. OBS-19 sigue ABIERTA (se cierra su tercer caso, no la causa
+# estructural). FLAKE-1: ABIERTA con causa inmediata nombrada. Deuda re-acarreada: fijar newline="\n"
+# en el escritor del replay (exige re-medir los cinco digests de seccion contra el sello).

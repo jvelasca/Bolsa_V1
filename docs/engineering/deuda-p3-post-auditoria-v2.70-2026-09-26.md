@@ -1575,7 +1575,7 @@ informes.
 
 ---
 
-## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟡 ABIERTA: INSTRUMENTADA y sellada en `v2.88.8` (2026-09-29)
+## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟡 ABIERTA: **TRAZA CAZADA** en `v2.88.8` (run `36681305812`) — causa raíz localizada, falta aislar el *por qué* (2026-09-30)
 
 **Qué se midió.** Tres corridas de `release-tag-ci`: **dos rojos** (`36627838819`, `36636706369`) y
 **un verde** (`36638231729`, `165 passed in 82,89 s`; en los rojos, `1 failed, 164 passed in 100,07 s`).
@@ -1619,20 +1619,48 @@ queda en el log, y pytest la muestra en «Captured log call» cuando el test fal
 de `release-tag-ci.yml`— con su comentario de procedencia, igual que se hizo con
 `test_replay_oos_durable_cycle.py` en `v2.88.6`.
 
-**Deuda que queda.** La **causa raíz** (qué excepción lanza `ExecuteTrade` en el runner) solo se sabrá en
-el **próximo** rojo del CI, ya con traza. **No** se toca ni el motor ni el test del día AUTO.
+**Deuda que queda (ACTUALIZADA 2026-09-30: la traza YA se cazó).** El **próximo** rojo del CI llegó en el
+**mismo sello** `v2.88.8`: `Release tag CI` run **`36681305812`**, job `lifecycle-pg`, con la
+**traza completa** que la instrumentación destapa:
+
+```
+simulated_finance.py:260 (_apply)  ->  accounts/trade.py:131 (ExecuteTrade.execute)
+  ->  portfolio_repository.py:383 (execute_trade)
+ValueError: No tienes suficientes acciones. En cartera: 0.0
+```
+
+en la pata **SELL** (`execution_id=sim-engine-58b3e99de0f64798b13fd4cc2-sell-instfin59e064e70b-finselle3a415b3#2`
+**y** `#3`). **Lo que esto fija y lo que refuta:**
+- **Causa ya NO es «excepción desconocida»:** es `ValueError` del **repositorio de cartera** al ejecutar la
+  pata `sell` con **`held = 0.0`**. El **rechazo es correcto y *fail-closed*** — el defecto **no** está en
+  el rechazo del repo, está en que el motor llegue ahí con `0` acciones.
+- **REFUTADA la hipótesis de clave de idempotencia:** la excepción es del **repo de cartera**, no un
+  `IdempotencyKeyReused`; la sospecha `F1`/`v2.40.3` **cae**.
+- **Estado, no azar por trancha:** fallan **las dos** tranchas (`#2` y `#3`) ⇒ es un **estado del ciclo**
+  (orden/visibilidad de patas), no suerte de una sola trancha.
+- **El `except Exception: return False` era el mudo:** queda confirmado que el `RETRY` venía de
+  `ExecuteTrade` **lanzando** y siendo tragado — exactamente el caso (b) que la lectura de código predijo.
+
+**Deuda que queda (aislar el *por qué*).** La causa raíz está **localizada**; falta decidir entre las dos
+lecturas: **(a)** la pata `sell` del ciclo se liquida **antes** de que las acciones del `buy` del mismo
+ciclo sean visibles en el repositorio de cartera, o **(b)** hay un **desajuste cuenta/cartera** entre patas
+(la pata `sell` consulta una cartera/cuenta distinta de la que recibió el `buy`). **No** se toca el motor
+en este sello.
 
 **Alcance.** Proceso/tests (rojo **espurio** en la certificación). Si el tag se cortase en una corrida
 donde dispara, `certify` **no-GREENearía** el tag por una causa **ajena** al artefacto. **No** afecta al
 sello del replay OOS de `v2.88.7` (otra cadena) ni a su remedición de integridad.
 
-**SELLO `v2.88.8` (2026-09-29).** El arreglo se **sella** con **bump `2.11.7-beta` → `2.11.8-beta`**,
+**SELLO `v2.88.8` (2026-09-30).** El arreglo se **sella** con **bump `2.11.7-beta` → `2.11.8-beta`**,
 **sin migración** y con el **motor intacto** (`git diff v2.88.7-beta..HEAD` sobre
 `auto_simulation_worker.py`/`replay_oos.py`/`v2_87_replay_oos_durable_cycle.py` → **vacío**; el único cambio
 funcional es **`+15/−0`** en `simulated_finance.py` y **`+42/−1`** en su test). **El hallazgo sigue
 ABIERTO**: lo que se sella es la **instrumentación**, no la causa. La razón de sellar en vez de seguir
 depurando es aritmética: con **`0` rojos en `59` corridas** locales (50 directas + 9 del comando exacto con
 BD scratch fresca por iteración) no existe un caso que depurar — el **próximo rojo del CI llega con la
-traza**, y eso es lo que convierte este hallazgo en cerrable. Evidencia del sello:
-[`evidence/v2.88.8/README.md`](./evidence/v2.88.8/README.md).
+traza**, y eso es lo que convierte este hallazgo en cerrable. **El sello cumplió su objeto:** el rojo
+llegó **en el mismo tag** (`36681305812`) **con traza** (ver arriba) y, además, la **primera certificación
+a nivel de tag** de `replay-repro` salió **verde**. Evidencia del sello:
+[`evidence/v2.88.8/README.md`](./evidence/v2.88.8/README.md) · cita cruda del CI:
+[`evidencia-ci-tag-v2.88.8-2026-09-30.txt`](./evidencia-ci-tag-v2.88.8-2026-09-30.txt).
 

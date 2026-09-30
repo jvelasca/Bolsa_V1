@@ -1,4 +1,4 @@
-# Evidencia cruda — `FLAKE-1` instrumentado + tercera deriva de las listas offline (`OBS-19`) + primera certificación de `replay-repro` en un tag (`v2.88.8`, 2026-09-29)
+# Evidencia cruda — `FLAKE-1` instrumentado + tercera deriva de las listas offline (`OBS-19`) + primera certificación de `replay-repro` en un tag (`v2.88.8`, 2026-09-30)
 
 Resumen **verificable** del sello. Las cifras están **transcritas** de las corridas, sin edición. Este
 sello **no** produce artefacto propio: su contenido es **instrumentación de un rojo espurio**, el cableado
@@ -134,19 +134,91 @@ que el job offline del CI **skippea** (dentro de los `37`).
 > con la convención del sello anterior (`0` skips en local). Se declara porque una medición contaminada se
 > parece demasiado a un hallazgo.
 
-## 6. Cita real del CI del tag (POST-TAG, 2026-09-29)
+## 6. Cita real del CI del tag (POST-TAG, 2026-09-30)
 
-_Pendiente: se rellena en el commit de cita inmediatamente posterior al empuje del tag (patrón
-`OBS-3`/`OBS-4`: `Release tag CI` solo corre al empujar). Este sello es la **primera** certificación a nivel
-de tag del job `replay-repro`._
+`Release tag CI` run **[`36681305812`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36681305812)**
+(`ref=v2.88.8-beta`, HEAD `21c85c0a`) → **`FAILURE`** (`attempt 1`; `07:00:49Z → 07:08:02Z`, **~7m13s**).
+**11 jobs reales: 9 verdes, `lifecycle-pg` rojo, `playwright (integrated E2E, opt-in)` `skipped` por diseño
+y `certify` rojo** (agrega, como debe).
+
+| Job | Resultado |
+| --- | --- |
+| **`replay-repro`** | ✅ **`success`** ← **primera certificación a nivel de tag** |
+| `python` | ✅ `3112 passed, 37 skipped` |
+| `decision-spine` · `dr-verify` · `a7-gate` · `security` · `shared` · `frontend` · `playwright (mock)` | ✅ `success` |
+| **`lifecycle-pg`** | ❌ **`failure`** — `FLAKE-1`, **ahora DIAGNOSTICADO** (ver §6.2) |
+| `certify` | ❌ `failure` (agrega el rojo; **el tag queda ROJO y NO se borra: queda como rojo citado**) |
+
+Job `python` **verbatim**: `ruff All checks passed!` · `Contracts: 4 kept, 0 broken` ·
+`Success: no issues found in 508 source files` · **`3112 passed, 37 skipped, 6 warnings in 68.43s`**
+⇒ **ESPERADO `3112/37` = OBSERVADO `3112/37` → COINCIDE**. La identidad `+8` de §5 queda **confirmada por
+el runner**, no solo en local.
+
+### 6.1 La certificación que el sello compraba: `replay-repro` en un tag
+
+El job que se añadió **después** del sello `v2.88.7` corrió **por primera vez bajo un tag** y salió
+**verde**: siembra la entrada congelada, regenera el artefacto con el **mismo** script del sello y asserta
+SHA-256 y tamaño. Es la **primera vez** que el artefacto del replay OOS es reproducible **desde el propio
+tag**, no desde un `workflow_dispatch` sobre `main`.
+
+### 6.2 El rojo de `lifecycle-pg` es `FLAKE-1` — y la instrumentación del sello lo CAZA
+
+El rojo **no** es una regresión del sello: es el **mismo** flake, con la **misma** firma, y la traza que
+este sello añadió entrega la **causa exacta** que llevaba dos sellos sin poder nombrarse:
+
+```
+FAILED apps/api-python/tests/test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once
+  1 failed, 164 passed in 95.69s (0:01:35)
+
+AssertionError: RETRY          (assert de test_simulated_finance_pg.py:328)
+
+Captured stderr call:
+ERROR [bolsa_application.simulated_finance] apply_finance NO efectivo por excepción de ExecuteTrade
+  (execution_id=sim-engine-58b3e99de0f64798b13fd4cc2-sell-instfin59e064e70b-finselle3a415b3#2,
+   instrument_id=inst-fin-59e064e70b); el store lo encamina a RETRY
+Traceback (most recent call last):
+  File ".../packages/py/application/src/bolsa_application/simulated_finance.py", line 260, in _apply
+    await executor(
+  File ".../packages/py/application/src/bolsa_application/accounts/trade.py", line 131, in execute
+    result = await self._portfolio_repo.execute_trade(
+  File ".../packages/py/infrastructure/src/bolsa_infrastructure/database/repositories/portfolio_repository.py", line 383, in execute_trade
+    raise ValueError(f"No tienes suficientes acciones. En cartera: {held}")
+ValueError: No tienes suficientes acciones. En cartera: 0.0
+```
+
+**Qué dice exactamente.** La pata **SELL** del ciclo (`...-sell-instfin59e064e70b-finselle3a415b3`, tranchas
+`#2` y `#3`) se aplica contra `portfolio_repository.execute_trade`, que lee la posición de
+`inst-fin-59e064e70b` y encuentra **`held = 0.0`**, así que **rechaza la venta**. **No** es la clave de
+idempotencia (una sospecha razonable: `v2.40.3`/F1 fue exactamente ese colapso de claves, ya corregido en
+`bounded_idempotency_key`) — lo descarta la traza: la excepción es del **repositorio de cartera**, no del
+`ExecuteTrade` por clave reusada.
+
+**Lo que se sabe y lo que NO.** Se sabe: **la venta se intenta liquidar cuando la cartera real todavía no
+tiene las acciones** (el motor cree estar posicionado y la cartera `positions` dice `0.0`), y las **dos**
+tranchas fallan, así que es **estado**, no azar por trancha. **No** se sabe todavía **por qué**: las dos
+candidatas declaradas son (a) **orden/visibilidad entre patas del mismo ciclo** (la entrada aún no
+materializó cuando la salida se liquida) y (b) **desajuste de cuenta/cartera entre patas** (las dos patas
+resolviendo `account_id`/cartera distintos). **`portfolio_repository` rechazar la venta es correcto y
+fail-closed**: el error no está en el rechazo, está en que el motor llegue ahí. El aislamiento de la causa
+es el **próximo** trabajo, y ahora es abordable porque el rojo **se reproduce en el runner bajo demanda**
+(el mismo test, el mismo job) y **deja traza**.
+
+**Valor del sello, medido:** la instrumentación convirtió un rojo **mudo** (`error="apply_ineffective"`,
+indistinguible de un `None` del resolver) en una **traza con fichero, línea, excepción y `execution_id`**,
+en su **primer** uso — y sin cambiar el contrato (sigue *fail-closed*).
 
 ## 7. Límites de esta evidencia
 
-**`FLAKE-1` NO queda cerrado: queda INSTRUMENTADO.** La causa raíz —qué excepción lanza `ExecuteTrade` en el
-runner de 2 vCPU— **solo se conocerá en el próximo rojo**, ya con traza. **NO** se toca el motor, ni el test
-del día AUTO, ni `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/`A/B` ni ningún umbral, ni se backdatea. **`OBS-19` sigue
-ABIERTA.** **NO** acredita `P3-2`/`P3-3` y **NO** cierra `OBS-15` (techo de **1000 `APPLIED`**), `OBS-16`,
-`OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5` ni `OBS-5`.
+**El sello es ROJO y NO se borra: queda como rojo citado.** El rojo es `FLAKE-1` —**ajeno** al objeto del
+sello y **pre-existente**—, y su **causa inmediata ya está nombrada** por la instrumentación que el sello
+añade (§6.2): la pata **SELL** se liquida con la cartera a **`0.0`** y `portfolio_repository` la rechaza
+(*fail-closed* y **correcto**). Lo que **NO** queda aislado es **por qué** el motor llega ahí: las dos
+candidatas declaradas —**orden/visibilidad entre patas del mismo ciclo** o **desajuste de cuenta/cartera
+entre patas**— exigen su propia fase de diagnóstico, ahora abordable porque el rojo **se reproduce en el
+runner** (mismo test, mismo job, traza disponible). **NO** se toca el motor, ni el test del día AUTO, ni
+`TOP_N`/`REGIME`/`RISK`/`SIGNALS`/`A/B` ni ningún umbral, ni se backdatea. **`OBS-19` sigue ABIERTA.** **NO**
+acredita `P3-2`/`P3-3` y **NO** cierra `OBS-15` (techo de **1000 `APPLIED`**), `OBS-16`, `OBS-13`, `OBS-11`,
+`H-4`, `OBS-9`, `P3-5` ni `OBS-5`.
 
 **Deuda declarada que este sello RE-ACARREA** (de [`../v2.88.7/README.md`](../v2.88.7/README.md) §11.1):
 fijar `newline="\n"` en el escritor del replay para que el mismo contenido tenga **un** hash en cualquier

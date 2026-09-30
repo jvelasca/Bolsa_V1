@@ -2,7 +2,7 @@
 
 All notable releases of Bolsa V1.
 
-## [2.11.8-beta] — `FLAKE-1` deja de ser mudo (el `RETRY` sin causa queda instrumentado) + tercera deriva de las listas offline de pytest (`OBS-19`) + PRIMERA certificación del job `replay-repro` en un tag real — 2026-09-29
+## [2.11.8-beta] — `FLAKE-1` deja de ser mudo (el `RETRY` sin causa queda instrumentado y **cazado**) + tercera deriva de las listas offline de pytest (`OBS-19`) + PRIMERA certificación del job `replay-repro` en un tag real — 2026-09-30
 
 **Bump** `2.11.7-beta` → `2.11.8-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
 **MOTOR INTACTO — medido, no declarado:** `git diff v2.88.7-beta..HEAD` sobre `auto_simulation_worker.py`,
@@ -68,19 +68,49 @@ el resto es cableado de CI (**`+7`** en `python-ci.yml`, **`+166/−1`** en `rel
   `NO reproducido`. En `main` ya se validó por `workflow_dispatch` (`36638231729`, todo verde, `certify`
   incluido).
 
-**Límites declarados.** **`FLAKE-1` NO queda cerrado: queda INSTRUMENTADO.** La causa raíz —qué excepción
-lanza `ExecuteTrade` en el runner de 2 vCPU— **solo se conocerá en el próximo rojo**, ya con traza; por eso
-el estado del hallazgo en [`deuda-p3`](./docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md) pasa a
-«🟡 ABIERTA: instrumentada y sellada en `v2.88.8`» y **no** a «cerrada». **NO** se toca el motor, ni el test
-del día AUTO, ni `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/`A/B` ni ningún umbral, ni se backdatea. **`OBS-19` sigue
-ABIERTA** (la causa estructural —dos listas manuales— no se toca; esta fase cierra su **tercer** caso).
-**Deuda declarada que este sello RE-ACARREA** (de `evidence/v2.88.7/README.md` §11.1): fijar
-`newline="\n"` en el escritor del replay para que el mismo contenido tenga **un** hash en cualquier SO; no se
-hace aquí por la misma razón que allí —tocar el script del sello invalidaría la cadena «el artefacto lo
+**Límites declarados.** **`FLAKE-1` NO queda cerrado, pero deja de ser MUDO — y ya tiene causa nombrada.**
+La traza que añade este sello se disparó **en su primer uso**: el rojo del tag (§ «CITA REAL» abajo) publica
+`ValueError: No tienes suficientes acciones. En cartera: 0.0` desde
+`portfolio_repository.execute_trade:383`, es decir **la pata `sell` se liquida con la cartera a `0.0` y el
+repositorio la rechaza** (rechazo **correcto** y *fail-closed*). **Queda por aislar** el *por qué* —las dos
+candidatas declaradas son **orden/visibilidad entre las dos patas del mismo ciclo** y **desajuste de
+cuenta/cartera entre patas**—, y **no** se declara cerrado por eso; el estado del hallazgo en
+[`deuda-p3`](./docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md) pasa a
+«🟡 ABIERTA: instrumentada, con causa inmediata nombrada por el sello `v2.88.8`». **NO** se toca el motor, ni
+el test del día AUTO, ni `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/`A/B` ni ningún umbral, ni se backdatea.
+**`OBS-19` sigue ABIERTA** (la causa estructural —dos listas manuales— no se toca; esta fase cierra su
+**tercer** caso). **Deuda declarada que este sello RE-ACARREA** (de `evidence/v2.88.7/README.md` §11.1):
+fijar `newline="\n"` en el escritor del replay para que el mismo contenido tenga **un** hash en cualquier SO;
+no se hace aquí por la misma razón que allí —tocar el script del sello invalidaría la cadena «el artefacto lo
 produjo **este** script»— y **exige su propia fase** (re-medir los **cinco** digests de sección contra el
 sello). **NO** acredita `P3-2`/`P3-3` ni cierra `OBS-15`/`OBS-16`/`OBS-13`/`OBS-11`/`H-4`/`OBS-9`/`P3-5`/`OBS-5`,
-que siguen **ABIERTAS**. La cita del CI es **POST-TAG** (patrón `OBS-3`/`OBS-4`: `Release tag CI` solo corre
-al empujar) y se añade en el commit de cita inmediatamente posterior, **citando el run**.
+que siguen **ABIERTAS**.
+
+**CITA REAL (POST-TAG, 2026-09-30).** `Release tag CI` run **`36681305812`** (`ref=v2.88.8-beta`, HEAD
+`21c85c0a`) → **`FAILURE`** (`attempt 1`; `07:00:49Z → 07:08:02Z`, **~7m13s**). **11 jobs reales: 9 verdes,
+`lifecycle-pg` rojo, `playwright` integrado `skipped` por diseño y `certify` rojo** (agrega, como debe).
+**(1) Lo que el sello compraba, y lo compró:** **`replay-repro` → `success`** — **primera certificación a
+nivel de tag** del job que se añadió *después* del sello `v2.88.7`: siembra la entrada congelada, regenera el
+artefacto con el **mismo** script y asserta el SHA-256 (hasta ahora solo había corrido por
+`workflow_dispatch` sobre `main`). **(2) El job `python`, `verbatim`:** `ruff All checks passed!` ·
+`Contracts: 4 kept, 0 broken` · `Success: no issues found in 508 source files` · **`3112 passed, 37 skipped,
+6 warnings in 68.43s`** ⇒ **ESPERADO `3112/37` = OBSERVADO `3112/37` → COINCIDE**, confirmando en el runner
+la identidad `+8` medida primero en local y luego en `main`. **(3) El rojo es `FLAKE-1`, y el sello lo
+CAZA:** `1 failed, 164 passed in 95.69s` con la firma de siempre (`AssertionError: RETRY`) — **ajeno al
+objeto del sello y pre-existente** — pero ahora con la **traza completa** que este sello añade
+(`simulated_finance.py:260 → accounts/trade.py:131 → portfolio_repository.py:383`):
+**`ValueError: No tienes suficientes acciones. En cartera: 0.0`** en la pata `sell`
+(`execution_id=sim-engine-58b3e99de0f64798b13fd4cc2-sell-instfin59e064e70b-finselle3a415b3#2` y `#3`, ambas
+tranchas). **Refutada por la traza la sospecha de clave de idempotencia** (`v2.40.3`/F1): la excepción es del
+**repositorio de cartera**, no de `ExecuteTrade` por clave reusada. **El tag `v2.88.8-beta` NO se borra:
+queda como ROJO CITADO** y su aislamiento es el siguiente trabajo. Cita cruda:
+[`evidencia-ci-tag-v2.88.8-2026-09-30.txt`](./docs/engineering/evidencia-ci-tag-v2.88.8-2026-09-30.txt);
+evidencia:
+[`evidence/v2.88.8/README.md`](./docs/engineering/evidence/v2.88.8/README.md). En `main` (push `21c85c0a`)
+corrieron **solo** los workflows cuyo filtro de rutas casa —`Frontend CI` `36680395035`, `Optimize lab`
+`36680395055` y `Gitleaks` `36680394992`, **los tres `success`**—: **`Python CI` NO corre aquí** porque el
+commit de sello no toca **ninguna** ruta de Python (es bump + `CHANGELOG` + docs), así que su ausencia **no**
+es un hueco de CI. **Objeto vigente:** tag anotado **`v2.88.8-beta`** (rojo citado).
 
 ## [2.11.7-beta] — `AUTO-MATERIAL-20` `OBS-20`: la retirada declara el motivo con la materialización EXACTA del ciclo (y las suites PG re-ancladas a la semántica de `OBS-18`) — 2026-09-29
 
