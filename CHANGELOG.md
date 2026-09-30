@@ -2,9 +2,83 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.9-beta] — `FLAKE-1` **CERRADA**: el rojo intermitente de `lifecycle-pg` NO era el motor, ni el entorno, ni la clave de idempotencia — era el **FIXTURE** (la venta del test pedía más acciones de las que su propia compra había dejado en cartera) — 2026-09-30
+
+**Bump** `2.11.8-beta` → `2.11.9-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+**MOTOR INTACTO — medido, no declarado:** `git diff v2.88.8-beta..HEAD` sobre `auto_simulation_worker.py`,
+`replay_oos.py` y `v2_87_replay_oos_durable_cycle.py` → **vacío**. **El cambio es SÓLO de tests** (2 ficheros)
+**más documentación**: `packages/py/application/tests/test_simulated_finance.py` (**`+118/−0`**: los tres
+gates) y `apps/api-python/tests/test_simulated_finance_pg.py` (**`+75/−34`**: el fixture dimensionado). **Cero
+líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-B, sin backdating.
+
+- **El cierre del hallazgo que `v2.88.8` dejó instrumentado.** Aquel sello hizo **visible** el `RETRY` mudo y
+  el rojo llegó **en el mismo tag** (`36681305812`) **con traza**: `ValueError: No tienes suficientes acciones.
+  En cartera: 0.0` al ejecutar la pata **SELL** (`...-finselle3a415b3#2` y `#3`). Con la traza en la mano, la
+  causa se aisló **en un turno**.
+- **Lo que NO era (tres hipótesis REFUTADAS).** **(a)** Orden/visibilidad entre las patas del mismo ciclo:
+  las dos patas corren **secuencialmente** con `await` en la **misma** sesión. **(b)** Desajuste
+  cuenta/cartera: las dos resuelven el **mismo `scope`**. **(c)** Variable de **entorno** (runner 2 vCPU vs
+  local): la causa es una **función pura**. La sospecha de **clave de idempotencia** ya había caído: la
+  excepción es del **repositorio de cartera**, no un `IdempotencyKeyReused`.
+- **Lo que SÍ era (mecanismo, función pura).** `draw_queue_noise` y `mid_cut` derivan de **`(seed, side,
+  instrument_id)`** — de la **PATA**, no de la orden, y **nunca** del `venue_order_id` —, así que con el
+  **mismo** seed la pata `buy` puede cortar sus parciales **antes** que la `sell`. Con `quantity=60` y
+  `fill_chunks=3` cada pata sólo puede acabar en **30** (cortada) o **60**. En el rojo real
+  (`instrument_id = inst-fin-59e064e70b`, primer seed válido = `2`):
+
+  ```
+  BUY   30                      (cortada tras su 1er chunk)  -> deja 30 en cartera
+  SELL  30 + 14,1 + 15,9 = 60    (llena los tres)             -> pide 60
+  ```
+
+  `sell#1` (30) deja la cartera en **0** — y la posición se **borra** al llegar a cero —, así que `sell#2` y
+  `sell#3` piden contra **`held = 0.0`** ⇒ `ValueError` ⇒ **`RETRY`**. **Predice exactamente las tranchas
+  `#2` y `#3` del run `36681305812`**, y explica por qué `#1` sí pasaba. **El motor hizo lo correcto:
+  rechazó (`fail-closed`) una venta que no cabía en la cartera.** El selector clásico del test
+  (`_seed_with_fills`) exigía «algún fill en cada pata» —y eso lo cumplían las dos—: nunca exigió que **la
+  venta cupiera en la cartera**.
+- **Medido (determinista, 20 000 sorteos de `instrument_id`).** Fixture **viejo**: **1336 rojos = 6,68 %**,
+  con el patrón de tranchas **`(2,3)` en el 100 %** de ellos. Fixture **arreglado**: **0**. Sin regresiones
+  nuevas. Y **el «no reproducible en local» queda explicado**: la causa es la **lotería** del `uuid4` que el
+  test sortea, no el entorno — con tasa 6,68 %, ver `0` rojos en `59` corridas tiene probabilidad ≈ **1,7 %**.
+- **Contraste contra PG REAL (mismo `instrument_id`, mismo código, mismo base).** Fijando el
+  `instrument_id` del CI y variando **sólo** la cantidad de la venta: **ROJO con 60** (traza línea por línea
+  idéntica a la del CI: `simulated_finance.py:260` → `accounts/trade.py:131` → `portfolio_repository.py:383`)
+  y **VERDE con 30** (los 4 fills `APPLIED`, ida-y-vuelta cerrado a cero). Ese es el cierre: **lo único que
+  cambia es el plan del fixture**.
+- **El arreglo (sólo tests).** El fixture PG pasa de `_seed_with_fills` a **`_roundtrip_plan`**, que
+  dimensiona la pata `sell` a lo que la pata `buy` **liquida** de verdad —y **propaga esa cantidad** al
+  resolver del applier, que **rehace el schedule** para recuperar el precio/cantidad de cada fill—, más un
+  invariante explícito del propio fixture (`sum(sell) <= realized`).
+- **El sello: tres gates herméticos que FUERZAN el fallo**, en
+  `packages/py/application/tests/test_simulated_finance.py` (**fichero ya cableado a CI** desde `OBS-19` en
+  `v2.88.8`), sin PG: (i) fijan la **asimetría** con el **`instrument_id` real del rojo**; (ii) exigen que el
+  **espejo puro del dominio** rechace el plan viejo (`sim_roundtrip_accounting` → `ValueError: sell exceeds
+  the held position`); (iii) comprueban sobre una rejilla **fija** que el dimensionado nuevo **nunca**
+  sobrevende —**exigiendo además que la rejilla alcance al fallo** que arregla (un gate que no cubre el fallo
+  que arregla no sella nada).
+- **Derivada registrada (`OBS-21`, ABIERTA — NO arreglada aquí).** La traza dejó a la vista algo que el
+  `RETRY` mudo tapaba: `retryable_on_ineffective=True` marca como **REINTENTABLE** un rechazo **PERMANENTE**
+  del dominio (`No tienes suficientes acciones`). Un motor real lo reintentaría **indefinidamente** sobre un
+  hecho que no cambia. **No** se toca aquí (el alcance era la causa del rojo de CI) y su arreglo exige
+  **clasificar** transitorio vs permanente y **mutarlo**: marcar `FAILED` a lo ancho apagaría reintentos
+  legítimos y podría **cegar** fills que sí eran transitorios.
+- **Nota de honestidad (declarada).** La tasa medida (**6,68 %**) explica el rojo de `36681305812`, pero **no**
+  explica del todo la racha de **3 rojos en 4 corridas** de `lifecycle-pg` (~**0,1 %** si fueran independientes
+  a esa tasa): o fue **mala suerte**, o alguna corrida anterior tuvo un aporte adicional **que no se pudo ver**
+  porque el `RETRY` era **mudo** hasta `v2.88.8`. Con la instrumentación ese agujero ya no existe, y con el
+  arreglo **la clase entera desaparece** (`0/20 000`), así que la pregunta deja de tener efecto práctico. Se
+  declara en lugar de reclamar un cierre perfecto.
+- **Verificación.** `ruff` con la **invocación exacta del CI** (`--config pyproject.toml`) → `All checks
+  passed!`; `mypy` con el **gate del CI** → `no issues found in 508 source files`; `12 passed` entre el
+  fichero hermético (**11**: 8 previos + 3 nuevos) y el test PG objetivo. **Alcance:** proceso/tests (rojo
+  **espurio** en la certificación) — **no** toca el motor, ni el sello del replay OOS de `v2.88.7`.
+- **Informe:** [`docs/engineering/flake-1-causa-raiz-2026-09-30.md`](./docs/engineering/flake-1-causa-raiz-2026-09-30.md) ·
+  **evidencia del sello:** [`docs/engineering/evidence/v2.88.9/README.md`](./docs/engineering/evidence/v2.88.9/README.md).
+
 ## [2.11.8-beta] — `FLAKE-1` deja de ser mudo (el `RETRY` sin causa queda instrumentado y **cazado**) + tercera deriva de las listas offline de pytest (`OBS-19`) + PRIMERA certificación del job `replay-repro` en un tag real — 2026-09-30
 
-> **POST-SELLO (2026-09-30) — `FLAKE-1` QUEDA 🟢 CERRADA, y NO era el motor, ni el entorno, ni la clave de idempotencia: era el FIXTURE.** La traza que este mismo sello hizo visible (`run 36681305812`) cerró el caso: `draw_queue_noise`/`mid_cut` derivan de **`(seed, side, instrument_id)`** — de la **PATA**, no de la orden —, así que con el MISMO seed la pata `buy` puede cortar sus parciales **antes** que la `sell`. En el rojo real: **`BUY = 30`** (cortada) contra **`SELL = 30 + 14,1 + 15,9 = 60`** ⇒ `sell#1` vacía la cartera y `sell#2`/`sell#3` piden contra **`held = 0.0`** ⇒ `ValueError` ⇒ `RETRY`, **prediciendo exactamente las tranchas `#2` y `#3`** observadas. El motor hizo lo **correcto** (rechazo `fail-closed`). **Medido:** fixture viejo **6,68 %** de rojo (1336/20000, patrón `(2,3)` al 100 %); arreglado **0**. **Contraste contra PG real** fijando el `instrument_id` del CI: **ROJO con venta 60**, **VERDE con venta 30**. **Arreglo: sólo tests** — el fixture PG pasa a **`_roundtrip_plan`** (venta dimensionada a lo que la compra **liquida**) + **tres gates herméticos** que fuerzan la asimetría con el `instrument_id` real del rojo. **Sin bump y sin migración**; motor y umbrales intactos. **Derivada registrada (`OBS-21`, ABIERTA)**: el settlement marca como **REINTENTABLE** un rechazo **permanente** del dominio. Informe: [`docs/engineering/flake-1-causa-raiz-2026-09-30.md`](./docs/engineering/flake-1-causa-raiz-2026-09-30.md).
+> **POST-SELLO (2026-09-30) — `FLAKE-1` QUEDA 🟢 CERRADA, y NO era el motor, ni el entorno, ni la clave de idempotencia: era el FIXTURE.** El arreglo del hallazgo **no** entró en este sello (aquí sólo se sella la **instrumentación**): se cerró en el cambio siguiente, **sellado como `2.11.9-beta` / `v2.88.9-beta`** (ver la sección de arriba). La traza que este sello hizo visible (`run 36681305812`) fue la que cerró el caso: `draw_queue_noise`/`mid_cut` derivan de **`(seed, side, instrument_id)`** — de la **PATA**, no de la orden —, así que con el MISMO seed la pata `buy` puede cortar sus parciales **antes** que la `sell`. En el rojo real: **`BUY = 30`** (cortada) contra **`SELL = 30 + 14,1 + 15,9 = 60`** ⇒ `sell#1` vacía la cartera y `sell#2`/`sell#3` piden contra **`held = 0.0`** ⇒ `ValueError` ⇒ `RETRY`, **prediciendo exactamente las tranchas `#2` y `#3`** observadas. El motor hizo lo **correcto** (rechazo `fail-closed`). **Medido:** fixture viejo **6,68 %** de rojo (1336/20000, patrón `(2,3)` al 100 %); arreglado **0**. **Contraste contra PG real** fijando el `instrument_id` del CI: **ROJO con venta 60**, **VERDE con venta 30**. **Derivada registrada (`OBS-21`, ABIERTA)**: el settlement marca como **REINTENTABLE** un rechazo **permanente** del dominio. Informe: [`docs/engineering/flake-1-causa-raiz-2026-09-30.md`](./docs/engineering/flake-1-causa-raiz-2026-09-30.md).
 
 **Bump** `2.11.7-beta` → `2.11.8-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
 **MOTOR INTACTO — medido, no declarado:** `git diff v2.88.7-beta..HEAD` sobre `auto_simulation_worker.py`,

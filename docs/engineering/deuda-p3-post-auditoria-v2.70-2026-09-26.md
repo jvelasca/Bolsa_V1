@@ -1575,7 +1575,7 @@ informes.
 
 ---
 
-## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟢 **CERRADA** (era el FIXTURE, no el motor) — causa raíz medida, reproducida contra PG y sellada con gate (2026-09-30)
+## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟢 **CERRADA** (era el FIXTURE, no el motor) — causa raíz medida, reproducida contra PG y sellada con gate (2026-09-30) · **SELLO DE CIERRE `v2.88.9-beta` (`2.11.9-beta`)**
 
 **Qué se midió.** Tres corridas de `release-tag-ci`: **dos rojos** (`36627838819`, `36636706369`) y
 **un verde** (`36638231729`, `165 passed in 82,89 s`; en los rojos, `1 failed, 164 passed in 100,07 s`).
@@ -1707,6 +1707,26 @@ llegó **en el mismo tag** (`36681305812`) **con traza** (ver arriba) y, además
 a nivel de tag** de `replay-repro` salió **verde**. Evidencia del sello:
 [`evidence/v2.88.8/README.md`](./evidence/v2.88.8/README.md) · cita cruda del CI:
 [`evidencia-ci-tag-v2.88.8-2026-09-30.txt`](./evidencia-ci-tag-v2.88.8-2026-09-30.txt).
+
+**SELLO DE CIERRE `v2.88.9` (2026-09-30).** El arreglo del fixture se **sella** con **bump
+`2.11.8-beta` → `2.11.9-beta`**, **sin migración** (Alembic head sigue en `046_fill_reference_mid`) y con
+**CERO líneas de `src`** tocadas: el diff es **sólo tests** (`test_simulated_finance_pg.py` y
+`test_simulated_finance.py`, `+193/−34`) más docs. Con ello `FLAKE-1` pasa de *instrumentada* (`v2.88.8`)
+a **CERRADA y sellada**: (i) el fixture PG ya **no** construye el ida-y-vuelta con la misma cantidad en
+ambas patas, sino con la venta **dimensionada a lo que la compra liquida** (`_roundtrip_plan`, con la
+cantidad propagada al resolver del applier); (ii) **tres gates herméticos** en
+`packages/py/application/tests/test_simulated_finance.py` —fichero **ya cableado a CI** desde `OBS-19`—
+**fuerzan** la asimetría con el `instrument_id` real del rojo, exigen que el **espejo puro del dominio**
+rechace el plan viejo (`sell exceeds the held position`) y comprueban sobre rejilla fija que el
+dimensionado nuevo **nunca** sobrevende; (iii) la medición queda en **`0/20 000`** rojos frente a
+**`1336/20 000` = 6,68 %** del fixture viejo. **Nota de honestidad (re-arrastrada):** la tasa medida
+explica el rojo de `36681305812` pero no del todo la racha de 3 rojos en 4 corridas (~0,1 % si fueran
+independientes): o fue mala suerte, o alguna corrida previa tuvo un aporte **invisible** porque el
+`RETRY` era mudo hasta `v2.88.8`; con el arreglo **la clase entera desaparece** y ya no hay agujero donde
+esconderse. **`OBS-21` (abajo) NO se arregla aquí** — sólo se registra: es una derivada del mismo `RETRY`.
+Evidencia del sello: [`evidence/v2.88.9/README.md`](./evidence/v2.88.9/README.md) · informe de causa raíz:
+[`flake-1-causa-raiz-2026-09-30.md`](./flake-1-causa-raiz-2026-09-30.md) · cita del CI del tag:
+**pendiente en el commit de sello inmediatamente posterior**.
 
 
 ---
