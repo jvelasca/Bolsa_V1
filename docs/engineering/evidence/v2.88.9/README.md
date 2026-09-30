@@ -103,10 +103,32 @@ modelo coincide **trancha a trancha** con el del runner. Regresiones nuevas intr
 
 **Y esto cierra la frase que este hallazgo arrastró desde el principio.** El sello anterior midió **`0` rojos
 en `59` corridas locales** y lo leyó como «la variable es del entorno (runner 2 vCPU vs local)». **Era
-falso como explicación, y verdadero como observación:** con tasa **6,68 %**, no ver ningún rojo en **59**
-corridas tiene probabilidad ≈ **1,7 %** — improbable, pero perfectamente posible, y precisamente lo que hace
-de este un caso de «no reproducible en local» tan engañoso. La causa es **pura**: **sin CPU, sin paralelismo
-y sin red**.
+falso como explicación**; la causa es **pura** — **sin CPU, sin paralelismo y sin red**.
+
+> **CORRECCIÓN POST-SELLO (`2026-09-30`), medida sobre los logs crudos de la terminal — no sobre lo que se
+> recordaba.** El recuento **`59`** estaba **inflado**: de las tres tandas que lo componían, **dos no
+> ejecutaron nada**.
+>
+> | Tanda | Lo que de verdad pasó | Información sobre `FLAKE-1` |
+> | --- | --- | --- |
+> | **`50` corridas directas** (dos políticas de selector) | **Las `50` murieron en `0,00–0,06 s` con `psycopg.InterfaceError: Psycopg cannot use the 'ProactorEventLoop'`** — el bug de `win32` ya conocido del repo (`SelectorEventLoop`, PR #39) —: **nunca llegaron al dominio** | **ninguna** |
+> | **`50` corridas directas** re-hechas con el *event loop* correcto | **`50 ok`, `TOTAL fallos: 0`** (`25` + `25`, una por política) | **la buena** |
+> | **`8` iteraciones** del comando exacto del job `lifecycle-pg` | Cada una duró **`0,1–0,6 s`** y su `resumen` salió **VACÍO**; una corrida real de esa batería tarda **~`100 s`** ⇒ **la suite no llegó a ejecutarse** | **ninguna** |
+>
+> ⇒ **La evidencia local válida es `50` corridas, `0` rojos** (**no** `59`): con tasa **`6,68 %`**,
+> `P(0 en 50) = (1 − 0,0668)^50 ≈ **3,2 %**`.
+>
+> **Y hay algo MEJOR que la suerte para explicar ese `0`, que sí está en esos logs: la asimetría que salió en
+> local fue la INOFENSIVA.** Las iteraciones **`001`, `002` y `020`** de esa tanda registran
+> `buy=filled(60.000000/60,chunks=3)` con `sell=partial(30.000000/60,chunks=1)` — esto es **venta cortada /
+> compra completa**: vende `30` de los `60` que hay en cartera ⇒ **nunca sobrevende**. La orientación que
+> hacía daño es la **contraria** —**compra cortada / venta completa**—, y **no salió en ninguna de las `50`**.
+> Con esto el `0` deja de ser «mala suerte» y pasa a ser un **sesgo del sorteo observado en los propios
+> logs**. (El término «`9` corridas del comando exacto» que citan los sellos `v2.88.7`/`v2.88.8` se sostiene,
+> por tanto, en **una** corrida —aquella con `165 passed, 0 skipped`—, no en nueve: **aquellos ficheros no se
+> reescriben**, son evidencia sellada y reescribirlos invalidaría la cadena; la corrección se declara
+> **aquí**, que es su sitio.) **El fondo del hallazgo no cambia en nada:** causa raíz = fixture (§2), tasa
+> `6,68 %` (§3), contraste contra PG (§4), `0/20 000` con el arreglo (§3) y tag **VERDE** (§9).
 
 ## 4. Contraste contra PG REAL — ROJO → VERDE con el MISMO `instrument_id`
 

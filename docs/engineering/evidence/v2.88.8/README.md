@@ -72,7 +72,7 @@ salen `partial`. Pero **no** es la causa:
 | Corridas directas con un lado `partial` (selector permisivo) | **4 de 25** → **pasaron** |
 | Corridas directas exigiendo esquema **completo** | **25 de 25** → pasaron |
 
-**No reproducible en local: `0` rojos en `59` corridas.**
+**No reproducible en local: `0` rojos en `59` corridas.** <br>**⚠️ CORRECCIÓN POST-SELLO (`2026-09-30`), medida sobre los logs crudos: el `59` estaba INFLADO.** La tanda de `50` murió **entera** con `psycopg.InterfaceError: ProactorEventLoop` (`0,00–0,06 s`, sin llegar al dominio ⇒ 0 información) y las `8` del comando exacto duraron `0,1–0,6 s` con `resumen` **vacío** (la suite no se ejecutó). Válidas: **`50` corridas, `0` rojos**. El fondo del hallazgo (fixture, `6,68 %`, contraste PG) **no cambia**: §3 de [`../v2.88.9/README.md`](../v2.88.9/README.md).
 
 | Experimento | Corridas | Rojos |
 | --- | --- | --- |

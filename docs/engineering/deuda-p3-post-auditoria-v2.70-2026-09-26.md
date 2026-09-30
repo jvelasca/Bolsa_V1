@@ -1605,13 +1605,26 @@ documenta como «un chunk en `RETRY`»): cierto que el selector del test (`_seed
 **No reproducible en local (medido).** `50` corridas directas del test objetivo (dos políticas de
 selector) + **9** corridas del **comando exacto del CI** (`lifecycle-pg`, con BD scratch **fresca**
 drop+create+migrate por iteración; 8 con `161 passed, 4 skipped` y la última con `165 passed, 0 skipped`)
-⇒ **0 rojos**. La variable es del **entorno** (runner 2 vCPU vs local), no del motor.
+→ **0 rojos**. La variable es del **entorno** (runner 2 vCPU vs local), no del motor.
 **⚠️ REFUTADO el 2026-09-30 (`CAUSA RAÍZ`, abajo):** la variable **no** era del entorno — era
 el `instrument_id` que el test **sortea** (`uuid4`), y el desenlace es una **función pura** de
 él. Las `59` corridas locales dieron `0` rojos sencillamente porque la lotería no salió (y con
 **6,68 %** de tasa, `0/59` tiene probabilidad ≈ `1,7 %`… que es justo lo que hace de este un
 caso de «no reproducible en local» tan engañoso). El «no reproducible en local» era correcto
 como **observación** y falso como **explicación**.
+
+**⚠️ CORRECCIÓN POST-SELLO (`2026-09-30`), medida sobre los logs crudos de la terminal:** el recuento **`59`**
+(`50` + `9`) estaba **inflado**, porque **dos de sus tres tandas no ejecutaron nada**. La tanda de **`50`**
+corridas directas murió **entera** con `psycopg.InterfaceError: ProactorEventLoop` (`0,00–0,06 s`, sin llegar
+al dominio ⇒ **0 información**); las **`8`** iteraciones del comando exacto del job duraron **`0,1–0,6 s`** con
+`resumen` **vacío** (la suite **no se ejecutó**; una corrida real tarda ~`100 s`). La evidencia local
+**válida** es **`50` corridas, `0` rojos** ⇒ `P(0 en 50) = (1 − 0,0668)^50 ≈ **3,2 %**` (no `1,7 %`). Y la
+explicación **mejor que la suerte** sí está en esos logs: la asimetría que salió en local fue la
+**INOFENSIVA** — `buy=filled(60/60,chunks=3)` con `sell=partial(30/60,chunks=1)` (iteraciones `001`, `002` y
+`020`): vende `30` de `60` ⇒ **nunca** sobrevende —, mientras que la que hacía daño (**compra cortada** /
+**venta completa**) **no salió en ninguna**. Detalle: §3 de
+[`evidence/v2.88.9/README.md`](./evidence/v2.88.9/README.md). Los ficheros sellados de `v2.88.7`/`v2.88.8`
+**no se reescriben** (invalidaría la cadena); la corrección se declara aquí.
 
 **Arreglo aplicado (lo único accionable sin repro): hacer visible lo que se tragaba.**
 `simulated_finance._apply` registra ahora `logger.exception(...)` con el `execution_id` y el
@@ -1700,8 +1713,10 @@ sello del replay OOS de `v2.88.7` (otra cadena) ni a su remedición de integrida
 funcional es **`+15/−0`** en `simulated_finance.py` y **`+42/−1`** en su test). **En ese sello el hallazgo
 seguía ABIERTO**: lo que se selló entonces fue la **instrumentación**, no la causa (**cerrada el
 2026-09-30**, ver `CAUSA RAÍZ` arriba). La razón de sellar en vez de seguir
-depurando es aritmética: con **`0` rojos en `59` corridas** locales (50 directas + 9 del comando exacto con
-BD scratch fresca por iteración) no existe un caso que depurar — el **próximo rojo del CI llega con la
+depurando es aritmética: con **`0` rojos en `50` corridas válidas** locales (50 directas + 9 del comando exacto con
+BD scratch fresca por iteración — **corregido POST-SELLO el 2026-09-30: el `59` que decía aquí estaba
+inflado; las 8 reiteraciones del comando exacto no llegaron a ejecutar la suite y la tanda de `50` murió con
+`ProactorEventLoop`, ver §3 de [`evidence/v2.88.9/README.md`](./evidence/v2.88.9/README.md)**) no existe un caso que depurar — el **próximo rojo del CI llega con la
 traza**, y eso es lo que convierte este hallazgo en cerrable. **El sello cumplió su objeto:** el rojo
 llegó **en el mismo tag** (`36681305812`) **con traza** (ver arriba) y, además, la **primera certificación
 a nivel de tag** de `replay-repro` salió **verde**. Evidencia del sello:

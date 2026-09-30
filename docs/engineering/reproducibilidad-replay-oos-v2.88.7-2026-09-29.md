@@ -224,7 +224,10 @@ el assert de la línea 327 leyendo `RETRY`). Es **intermitente**, y la sospecha 
 si el resolver da `None` —descartado: el schedule se recomputa determinista con el MISMO
 `venue_order_id`— o porque `ExecuteTrade.execute` **lanzó** y la excepción se **tragaba**. **No
 reproducible en local:** 50 corridas directas del test objetivo + **9** del comando exacto de este job (BD
-scratch fresca por iteración, una de ellas `165 passed, 0 skipped`) ⇒ **0 rojos**. **Arreglo aplicado:**
+scratch fresca por iteración, una de ellas `165 passed, 0 skipped`) ⇒ **0 rojos** (**⚠️ CORRECCIÓN
+POST-SELLO, `2026-09-30`: de esas `59` sólo `50` son válidas — la tanda de `50` murió con
+`ProactorEventLoop` y las `8` del comando exacto no ejecutaron la suite; ver §3 de
+[`evidence/v2.88.9/README.md`](./evidence/v2.88.9/README.md)**). **Arreglo aplicado:**
 `simulated_finance._apply` registra ahora la traza (`logger.exception`) antes de devolver `False` —el
 contrato no cambia: sigue fail-closed y **jamás** APPLIED por excepción— con gate
 `test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause`, así que el **próximo** rojo del CI llegará

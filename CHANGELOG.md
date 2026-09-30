@@ -40,7 +40,15 @@ líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-
 - **Medido (determinista, 20 000 sorteos de `instrument_id`).** Fixture **viejo**: **1336 rojos = 6,68 %**,
   con el patrón de tranchas **`(2,3)` en el 100 %** de ellos. Fixture **arreglado**: **0**. Sin regresiones
   nuevas. Y **el «no reproducible en local» queda explicado**: la causa es la **lotería** del `uuid4` que el
-  test sortea, no el entorno — con tasa 6,68 %, ver `0` rojos en `59` corridas tiene probabilidad ≈ **1,7 %**.
+  test sortea, no el entorno — con tasa 6,68 %, ver `0` rojos en las `50` corridas **válidas** tiene
+  probabilidad ≈ **3,2 %** (no `1,7 %`). **CORRECCIÓN POST-SELLO (2026-09-30, medida sobre los logs crudos de
+  la terminal):** el recuento `59` estaba **inflado** — la tanda de `50` murió **entera** con
+  `psycopg.InterfaceError: ProactorEventLoop` (0,00–0,06 s, sin llegar al dominio ⇒ 0 información) y las `8`
+  iteraciones del comando exacto duraron `0,1–0,6 s` con `resumen` **vacío** (la suite no se ejecutó; una
+  corrida real tarda ~100 s) —; y la asimetría que **sí** salió en local fue la **INOFENSIVA**
+  (`buy=filled(60/60,chunks=3)` con `sell=partial(30/60,chunks=1)`: vende `30` de `60` ⇒ **nunca**
+  sobrevende), no la que hacía daño (**compra cortada** / **venta completa**). §3 de
+  [`docs/engineering/evidence/v2.88.9/README.md`](./docs/engineering/evidence/v2.88.9/README.md).
 - **Contraste contra PG REAL (mismo `instrument_id`, mismo código, mismo base).** Fijando el
   `instrument_id` del CI y variando **sólo** la cantidad de la venta: **ROJO con 60** (traza línea por línea
   idéntica a la del CI: `simulated_finance.py:260` → `accounts/trade.py:131` → `portfolio_repository.py:383`)
@@ -128,6 +136,12 @@ el resto es cableado de CI (**`+7`** en `python-ci.yml`, **`+166/−1`** en `rel
   objetivo (dos políticas de selector) + **9** del **comando exacto del CI** (`lifecycle-pg`, con BD scratch
   **fresca** drop+create+migrate por iteración: 8 con `161 passed, 4 skipped` y una con `165 passed,
   0 skipped`). La variable es del **entorno** (runner de 2 vCPU frente a local), **no** del motor.
+  **⚠️ CORRECCIÓN POST-SELLO (`2026-09-30`), medida sobre los logs crudos: el recuento `59` estaba
+  INFLADO.** La tanda de `50` murió **entera** con `psycopg.InterfaceError: ProactorEventLoop`
+  (`0,00–0,06 s`: nunca llegó al dominio) y las `8` iteraciones del comando exacto duraron `0,1–0,6 s` con
+  `resumen` **vacío** (la suite **no se ejecutó**). La evidencia local **válida** es **`50` corridas, `0`
+  rojos**, y la asimetría que **sí** salió fue la **inofensiva** (`sell` cortada / `buy` completa). Detalle y
+  consecuencia: §3 de [`docs/engineering/evidence/v2.88.9/README.md`](./docs/engineering/evidence/v2.88.9/README.md).
   Conclusión honesta: **no se arregla lo que no se reproduce.**
 - **El arreglo: hacer visible lo que se tragaba (lo único accionable sin repro).**
   `simulated_finance._apply` registra ahora `logger.exception(...)` con el `execution_id` y el
