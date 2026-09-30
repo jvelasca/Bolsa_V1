@@ -129,16 +129,45 @@ Y el head de Alembic se lee **en el log del job**, no en una declaración.
 
 ## 6. Cita real del CI del tag
 
-`Release tag CI` del tag **`v2.88.10-beta`** → **PENDIENTE DE CITAR** (patrón `OBS-3`/`OBS-4`: el workflow
-solo corre al empujar el tag, así que la cita es **POST-TAG** y se añade en el commit de cita inmediatamente
-posterior). **Esperado**, y por qué:
+`Release tag CI` del tag **`v2.88.10-beta`** → run **`36688942921`** (`ref=refs/tags/v2.88.10-beta`, HEAD
+`6c2b964c`, `08:18:57Z → 08:27:20Z`, **~8m23s**) → **`SUCCESS`**: **10 jobs reales verdes + `certify`
+GREEN** (**11 verdes, 0 rojos**; `playwright (integrated E2E, opt-in)` `skipped` por diseño). Artefacto del
+agregado `release-tag-ci-summary` (**ID `11084264360`**, `414` B) con `"status": "GREEN"`, `tag` =
+`v2.88.10-beta`, `sha` = `6c2b964c`, `asOf` = `2026-09-30T08:27:17Z` y los **10** jobs a `success`.
 
-* **El job `python`**: **`3115 passed, 37 skipped`**, con los **mismos `37` skips** — el código es
-  **idéntico** al de `v2.88.9-beta` y este sello **no toca ni un test**, así que la cuenta **no debe
-  moverse**. Si se moviera, sería un hallazgo.
-* **`lifecycle-pg`**: **VERDE** esperado (mismo código).
-* **`replay-repro`**: `success` (tercera certificación a nivel de tag).
-* **`certify`**: GREEN.
+**(a) El job `python`, verbatim:** `ruff All checks passed!` / `Contracts: 4 kept, 0 broken.` /
+`Success: no issues found in 508 source files` / **`3115 passed, 37 skipped, 6 warnings in 50.41s`** ⇒
+**ESPERADO `3115/37` = OBSERVADO `3115/37` → COINCIDE**. **Y no es una coincidencia:** la terna
+`3115 passed / 37 skipped` es **byte-idéntica** a la del run `36685888972` del tag `v2.88.9-beta`, que es
+exactamente lo que **debía** pasar —**cero deriva de código** entre los dos tags, medido en el runner y no
+solo declarado en el diff de ficheros.
+
+**(b) El job que daba el rojo, VERDE:** `lifecycle-pg` **`165 passed, 2 warnings in 97.61s`** (**0 skips**:
+los gates *fail-if-skipped* se cumplieron) — otra vez **la misma terna** que en `v2.88.9-beta` —, más
+`45 passed` account-isolation, `1` golden day, `1` crash/recovery, `3` concurrent AUTO, `2` hard-kill,
+`2` crash injection y `1` multiprocess (`112,91 s`); el head de Alembic queda **confirmado en el propio
+log** (última línea de migración `Running upgrade 045_adaptive_gate_state -> 046_fill_reference_mid`).
+
+**(c) `replay-repro` (tercera certificación a nivel de tag):** `# sembrado 20 instrumentos, 25700 barras
+D1`, `watch congelado: 20 símbolos`, render **LF** `3 290 062` B /
+`A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB` (con el sello en CRLF: `3 393 187` B ·
+*mismo contenido en LF `3 290 062`*), **`VEREDICTO 2ª corrida IDÉNTICA (el runner es determinista consigo
+mismo)`** + **`DIGEST igual en las dos corridas`** y veredicto **`REPRODUCIDO (mismo CONTENIDO; el sello
+está en CRLF y este fichero en LF)`**; artefacto subido `replay-oos-durable-v2.88.7.zip` (**ID
+`11084548512`**, `285 944` B, SHA-256 del zip `467f6db4…6561`). Totalizadores de la corrida:
+`{"decided":24500,"fills":752,"orders":210,"proposals":238,"vetoes":24303}` — **idénticos** a los del tag
+`v2.88.9-beta`, como corresponde al mismo código.
+
+**(d) En `main` (push `6c2b964c`) corrieron solo los workflows cuyo filtro de rutas casa** — `Gitleaks`
+`36688939425`, `Optimize lab` `36688939490` y `Frontend CI` `36688939793`, los tres **`success`**—:
+**`Python CI` NO corre aquí** (el commit de sello no toca ninguna ruta de Python: bump + `CHANGELOG` +
+docs), así que su ausencia **no** es un hueco de CI.
+
+**Lo que este verde NO añade (límite declarado).** Aporta **encaje de cuentas, ausencia de deriva y
+reproducibilidad**, no una demostración nueva de nada: este sello **no toca código**, así que **no
+re-certifica** el arreglo de `FLAKE-1` —eso ya lo hicieron la medida `0/20 000` y el contraste PG de
+`v2.88.9`—. Su objeto era que **el artefacto auditado contuviera su certificación y su corrección**, y eso
+lo cumple **dentro del tag** (§2 y §3).
 
 ## 7. Límites de esta evidencia y deudas que NO cierra
 
