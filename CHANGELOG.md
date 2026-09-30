@@ -2,6 +2,86 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.8-beta] — `FLAKE-1` deja de ser mudo (el `RETRY` sin causa queda instrumentado) + tercera deriva de las listas offline de pytest (`OBS-19`) + PRIMERA certificación del job `replay-repro` en un tag real — 2026-09-29
+
+**Bump** `2.11.7-beta` → `2.11.8-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+**MOTOR INTACTO — medido, no declarado:** `git diff v2.88.7-beta..HEAD` sobre `auto_simulation_worker.py`,
+`replay_oos.py` y `v2_87_replay_oos_durable_cycle.py` → **vacío**. Base del diff: `5cbe84b0` (= `v2.88.7-beta`).
+El **único** cambio funcional son **`+15/−0`** en `simulated_finance.py` (una traza) y **`+42/−1`** en su test;
+el resto es cableado de CI (**`+7`** en `python-ci.yml`, **`+166/−1`** en `release-tag-ci.yml`) y docs.
+
+- **El rojo espurio que este sello cierra por INSTRUMENTACIÓN (`FLAKE-1`).** `lifecycle-pg` salió **rojo
+  intermitente** en **dos** de las tres corridas del sello anterior (`36627838819`, `36636706369`) y
+  **verde** en la tercera (`36638231729`), siempre con la **misma firma**: `AssertionError: RETRY` en el
+  assert de `test_simulated_finance_pg.py:327` (`row.status == "APPLIED"`) — un `execution_id` que el venue
+  reportó **lleno** seguía en **`RETRY`**, con el **dinero sin mover**. El resto del rojo era **cascada** (el
+  step aborta y las baterías siguientes se quedan sin log ⇒ «no dejó log de la corrida»). **El riesgo que
+  motiva el sello:** si el tag se corta en una corrida donde dispara, `certify` **no-GREENea** el tag por una
+  causa **ajena** al artefacto.
+- **El mecanismo, acotado por LECTURA DE CÓDIGO (no por opinión).** Ese `RETRY` solo puede venir de
+  `apply_execution_financial_once(retryable_on_ineffective=True)` → `mark_retry(error="apply_ineffective")`
+  cuando el applier devuelve `False`, y `build_simulated_execute_trade_applier._apply` devuelve `False` en
+  **dos** casos: (a) el resolver da `None` —**descartado**: el schedule se recomputa determinista con el
+  **mismo** `venue_order_id`, así que el match por `execution_id` no puede fallar— o (b)
+  `ExecuteTrade.execute` **lanzó** y la excepción **se tragaba** (`except Exception: return False`). El
+  `RETRY` era, por tanto, un fallo de `ExecuteTrade` **sin causa visible**: el único rastro era
+  `error="apply_ineffective"`, **idéntico** al de un `None` del resolver.
+- **La sospecha previa (llenado parcial) queda REFUTADA con medida.** El selector del test acepta esquemas
+  parciales —medido offline: **9 de 80** órdenes ≈ **11 %** salen `partial`—, pero **no** es la causa: en el
+  bucle directo **4 de 25** corridas tuvieron un lado `partial` y **pasaron**, y forzar el selector a exigir
+  esquema **completo** no mueve nada (`25/25`). Un `partial` **no** produce `RETRY`.
+- **No reproducible en local (medido): `0` rojos en `59` corridas.** `50` corridas directas del test
+  objetivo (dos políticas de selector) + **9** del **comando exacto del CI** (`lifecycle-pg`, con BD scratch
+  **fresca** drop+create+migrate por iteración: 8 con `161 passed, 4 skipped` y una con `165 passed,
+  0 skipped`). La variable es del **entorno** (runner de 2 vCPU frente a local), **no** del motor.
+  Conclusión honesta: **no se arregla lo que no se reproduce.**
+- **El arreglo: hacer visible lo que se tragaba (lo único accionable sin repro).**
+  `simulated_finance._apply` registra ahora `logger.exception(...)` con el `execution_id` y el
+  `instrument_id` **antes** de devolver `False`. **El contrato NO cambia:** sigue *fail-closed* y **jamás**
+  marca `APPLIED` por excepción. Gate nuevo
+  `test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause`, que afirma las **dos** mitades (devuelve
+  `False` **y** la traza queda en el log; pytest la muestra en «Captured log call» cuando el test falla).
+  ⇒ El **próximo** rojo del CI llega **con causa**.
+- **Tercera deriva de las listas offline (`OBS-19`): el gate NO habría corrido.** Medido:
+  `packages/py/application/tests/test_simulated_finance.py` (**8 tests herméticos**, `0,12 s`) **no estaba en
+  la lista de NINGÚN workflow** (existe desde `v2.22/A9`), así que el gate nuevo —y los **7** tests que ya
+  vivían ahí— **no se habrían ejecutado nunca en CI**. Es el **tercer** caso de la misma clase
+  (`test_replay_oos_durable_cycle.py` en `v2.88.6`, más la deriva estructural `98`/`56` tests entre las dos
+  listas): se cablea en los **dos** jobs offline (`python-ci.yml` y el job `python` de
+  `release-tag-ci.yml`) con su comentario de procedencia. **`OBS-19` sigue ABIERTA** — se cierra el caso,
+  **no** la causa estructural.
+- **La cuenta del recuento cierra por TRES vías independientes (identidad `+8`).** (i) Batería offline con el
+  **comando EXACTO** extraído del workflow (`118` líneas: `uv run pytest` + **78** rutas + **39** `--ignore`
+  + `-q`) sobre PG real: **`1 failed, 3148 passed in 94,20 s`** ⇒ **`3149`** recogidos (los **`3141`** del
+  sello + **`8`**); el único rojo es el **PG-local pre-existente**
+  (`test_auto_v70_auto23_evidence_validation.py::test_the_validation_reads_real_postgres_material_and_seals_it`),
+  que el job offline **skippea** (dentro de los `37`). (ii) En `main`, `quality` pasa de **`3093`** a
+  **`3101 passed, 40 skipped`** (`Python CI` run **`36678944192`**, verde) = **`+8`**. (iii) El fichero mide
+  **`8`** tests. ⇒ **El esperado del job `python` del tag es `3112 passed, 37 skipped`** (identidad
+  *recogidos local − `37` skips* = `3149 − 37`), **con los mismos `37` skips**.
+- **PRIMERA certificación de `replay-repro` en un TAG real.** El job se añadió **después** del sello
+  `v2.88.7` —su propia evidencia lo declara—, así que aquel tag se selló **sin** él y su primera
+  certificación a nivel de tag es **este** sello, sobre el **mismo** código de motor que `v2.88.7-beta`:
+  `replay-repro` siembra la entrada congelada `evidence/v2.88.7/replay-input-fixture.ndjson`, regenera el
+  artefacto con el **mismo** script del sello y **asserta** SHA-256 y tamaño. El assert acepta **los dos
+  renders** (CRLF del sello / LF del runner) y **declara cuál ha visto**; un fichero manipulado sigue dando
+  `NO reproducido`. En `main` ya se validó por `workflow_dispatch` (`36638231729`, todo verde, `certify`
+  incluido).
+
+**Límites declarados.** **`FLAKE-1` NO queda cerrado: queda INSTRUMENTADO.** La causa raíz —qué excepción
+lanza `ExecuteTrade` en el runner de 2 vCPU— **solo se conocerá en el próximo rojo**, ya con traza; por eso
+el estado del hallazgo en [`deuda-p3`](./docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md) pasa a
+«🟡 ABIERTA: instrumentada y sellada en `v2.88.8`» y **no** a «cerrada». **NO** se toca el motor, ni el test
+del día AUTO, ni `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/`A/B` ni ningún umbral, ni se backdatea. **`OBS-19` sigue
+ABIERTA** (la causa estructural —dos listas manuales— no se toca; esta fase cierra su **tercer** caso).
+**Deuda declarada que este sello RE-ACARREA** (de `evidence/v2.88.7/README.md` §11.1): fijar
+`newline="\n"` en el escritor del replay para que el mismo contenido tenga **un** hash en cualquier SO; no se
+hace aquí por la misma razón que allí —tocar el script del sello invalidaría la cadena «el artefacto lo
+produjo **este** script»— y **exige su propia fase** (re-medir los **cinco** digests de sección contra el
+sello). **NO** acredita `P3-2`/`P3-3` ni cierra `OBS-15`/`OBS-16`/`OBS-13`/`OBS-11`/`H-4`/`OBS-9`/`P3-5`/`OBS-5`,
+que siguen **ABIERTAS**. La cita del CI es **POST-TAG** (patrón `OBS-3`/`OBS-4`: `Release tag CI` solo corre
+al empujar) y se añade en el commit de cita inmediatamente posterior, **citando el run**.
+
 ## [2.11.7-beta] — `AUTO-MATERIAL-20` `OBS-20`: la retirada declara el motivo con la materialización EXACTA del ciclo (y las suites PG re-ancladas a la semántica de `OBS-18`) — 2026-09-29
 
 **Cierre de `OBS-20`** — el rojo `lifecycle-pg` del tag anterior (`Release tag CI` run **`36603391512`**,

@@ -1419,6 +1419,17 @@ en `release-tag-ci.yml` (`115 → 116` argumentos: es el job que juzga el tag) *
 nota de procedencia en ambos (patrón «HUECO DECLARADO» de `v2.76`); la re-medida da `3094 → 3139 passed`
 (**`+45`** = tamaño exacto del fichero). El esperado del CI pasa de **`3058`** a **`3103 passed, 37 skipped`**.
 
+**Observación (TERCER caso, CERRADO en `v2.88.8`).** Al sellar `FLAKE-1` se buscó dónde corría su gate nuevo y
+el fichero **no estaba en la lista de NINGÚN workflow**: `packages/py/application/tests/test_simulated_finance.py`
+(**8 tests herméticos**, `0,12 s`; existe desde `v2.22/A9`) quedaba fuera de las **dos** listas, así que el gate
+recién escrito **y los 7 tests previos** no se habrían ejecutado **nunca** en CI. Es el **mismo** mecanismo del
+caso de `v2.88.6` (fichero omitido en un directorio que se lista **fichero a fichero**), ahora en un fichero
+**antiguo** en vez de uno nuevo: la omisión no solo afecta a lo que se añade. Se cablea en los dos jobs offline
+con su comentario de procedencia y la identidad del recuento cierra por **tres** vías independientes
+(`+8`): local `3141 → 3149` recogidos con el comando **exacto** del workflow, `quality` en `main`
+`3093 → 3101 passed, 40 skipped` (`Python CI` `36678944192`, verde), y el tamaño del fichero (`8`). El esperado
+del job `python` del tag pasa a **`3112 passed, 37 skipped`**.
+
 **Observación (caso ABIERTO: deriva entre las DOS listas).** Comparadas las listas offline de
 `python-ci.yml` (job `quality`, step `Pytest`) y `release-tag-ci.yml` (job `python`, step `Pytest offline`),
 **no son la misma lista**:
@@ -1564,7 +1575,7 @@ informes.
 
 ---
 
-## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟡 ABIERTA (2026-09-29)
+## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟡 ABIERTA: INSTRUMENTADA y sellada en `v2.88.8` (2026-09-29)
 
 **Qué se midió.** Tres corridas de `release-tag-ci`: **dos rojos** (`36627838819`, `36636706369`) y
 **un verde** (`36638231729`, `165 passed in 82,89 s`; en los rojos, `1 failed, 164 passed in 100,07 s`).
@@ -1614,4 +1625,14 @@ el **próximo** rojo del CI, ya con traza. **No** se toca ni el motor ni el test
 **Alcance.** Proceso/tests (rojo **espurio** en la certificación). Si el tag se cortase en una corrida
 donde dispara, `certify` **no-GREENearía** el tag por una causa **ajena** al artefacto. **No** afecta al
 sello del replay OOS de `v2.88.7` (otra cadena) ni a su remedición de integridad.
+
+**SELLO `v2.88.8` (2026-09-29).** El arreglo se **sella** con **bump `2.11.7-beta` → `2.11.8-beta`**,
+**sin migración** y con el **motor intacto** (`git diff v2.88.7-beta..HEAD` sobre
+`auto_simulation_worker.py`/`replay_oos.py`/`v2_87_replay_oos_durable_cycle.py` → **vacío**; el único cambio
+funcional es **`+15/−0`** en `simulated_finance.py` y **`+42/−1`** en su test). **El hallazgo sigue
+ABIERTO**: lo que se sella es la **instrumentación**, no la causa. La razón de sellar en vez de seguir
+depurando es aritmética: con **`0` rojos en `59` corridas** locales (50 directas + 9 del comando exacto con
+BD scratch fresca por iteración) no existe un caso que depurar — el **próximo rojo del CI llega con la
+traza**, y eso es lo que convierte este hallazgo en cerrable. Evidencia del sello:
+[`evidence/v2.88.8/README.md`](./evidence/v2.88.8/README.md).
 
