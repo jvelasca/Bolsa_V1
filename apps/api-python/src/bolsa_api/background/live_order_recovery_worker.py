@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_application.live_order_query import LiveOrderQueryPort
 from bolsa_application.live_order_store import PostgresLiveOrderStore
+from bolsa_domain.errors import PermanentRejectionError
 
 logger = logging.getLogger(__name__)
 
@@ -341,6 +342,17 @@ async def _apply_recovery_fills_financially(
                     idempotency_key=recovery_idempotency_key(_execution.execution_id),
                 )
                 return True
+            except PermanentRejectionError:
+                # OBS-21: rechazo DETERMINISTA del dominio (p.ej. «No tienes
+                # suficientes acciones»): reintentar el mismo fill no cambiará nada.
+                # Se RE-LANZA para que el store lo marque FAILED (no reintentable).
+                # Sigue siendo fail-closed: jamás se marca APPLIED por excepción.
+                logger.exception(
+                    "recovery financial ExecuteTrade RECHAZADO de forma PERMANENTE "
+                    "execution_id=%s",
+                    _execution.execution_id,
+                )
+                raise
             except Exception:  # noqa: BLE001 — NOT applied; no marcar APPLIED.
                 logger.exception(
                     "recovery financial ExecuteTrade failed execution_id=%s",

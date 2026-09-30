@@ -1759,7 +1759,7 @@ de las dos**.
 
 ---
 
-## OBS-21 — El `RETRY` trata como REINTENTABLE un rechazo **permanente** del dominio (`No tienes suficientes acciones`) (LOW/MEDIUM, alcance motor) — 🔴 ABIERTA (2026-09-30)
+## OBS-21 — El `RETRY` trata como REINTENTABLE un rechazo **permanente** del dominio (`No tienes suficientes acciones`) (LOW/MEDIUM, alcance motor) — 🟢 CERRADA en `v2.88.11-beta` (`2.11.11-beta`, 2026-09-30)
 
 **Cómo aparece.** No se buscaba: la **traza que destapó `v2.88.8`** dejó a la vista el
 tratamiento que el `RETRY` mudo ocultaba. `apply_simulated_order_once(...,
@@ -1800,3 +1800,24 @@ declarado era la causa del rojo de CI (`FLAKE-1`), y este hallazgo es una **deri
 instrumentación que lo cerró. Se registra porque la traza lo puso delante y porque
 «terminación correcta» es una propiedad del motor que conviene decidir a propósito, no por
 omisión.
+
+**🟢 CIERRE EN `v2.88.11-beta` (`2.11.11-beta`, 2026-09-30).** La observación se cierra por
+**ruta de código** (motor + tests + mutación), no por documentación:
+
+- **El tipo de dominio.** Nueva `PermanentRejectionError(ValueError)` en `bolsa_domain.errors`
+  (subclase de `ValueError` para **no romper** ningún `except ValueError`), que `execute_trade`
+  del repositorio de cartera lanza en sus **seis** rechazos **deterministas** (key vacía,
+  `qty<=0`, `price<=0`, instrumento no encontrado, cartera no encontrada, efectivo insuficiente,
+  acciones insuficientes).
+- **La propagación.** Los appliers (`simulated_finance._apply` y el recovery LIVE) **RE-LANZAN**
+  el rechazo permanente en vez de tragárselo como `False`.
+- **El terminal.** `apply_execution_financial_once` y `reap_stale_applying` lo mapean a
+  `mark_failed` (`FAILED`, `error="apply_permanent_rejection"`/`"reap_apply_permanent_rejection"`).
+  La **frontera** queda declarada y es **fail-safe**: lo **no clasificado** (deadlock, timeout,
+  conexión, ledger, `lock_account`) sigue por `except Exception` → `RETRY`. **Invariante intacto:**
+  JAMÁS se marca `APPLIED` por excepción.
+- **Regresión + mutación.** Gates en `test_execution_event.py` (permanente → `FAILED` contrastando
+  con el genérico → `RETRY`; reaper que no reencola), `test_simulated_finance.py` (re-lanza),
+  `test_financial_invariants.py` (los rechazos del repo exigen el tipo) y `test_simulated_finance_pg.py`
+  (venta sin posición → `FAILED` de extremo a extremo en PG); **`M268`/`M269` muerden**.
+- **Evidencia:** [`evidence/v2.88.11/README.md`](./evidence/v2.88.11/README.md).

@@ -14,7 +14,7 @@ from bolsa_domain.entities.portfolio import (
     TradeResult,
     Transaction,
 )
-from bolsa_domain.errors import IdempotencyKeyExists
+from bolsa_domain.errors import IdempotencyKeyExists, PermanentRejectionError
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.db_errors import is_unique_violation
 from bolsa_infrastructure.database.models import (
@@ -334,17 +334,17 @@ class SqlAlchemyPortfolioRepository:
         call-sites internos (AUTO execute / confirm) que la construyen desde datos.
         """
         if not idempotency_key.strip():
-            raise ValueError("idempotency_key no puede estar vacía")
+            raise PermanentRejectionError("idempotency_key no puede estar vacía")
         if quantity <= 0:
-            raise ValueError("La cantidad debe ser mayor que cero")
+            raise PermanentRejectionError("La cantidad debe ser mayor que cero")
         if price <= 0:
-            raise ValueError("El precio debe ser mayor que cero")
+            raise PermanentRejectionError("El precio debe ser mayor que cero")
 
         instrument_stmt = select(InstrumentRow).where(InstrumentRow.id == instrument_id)
         instrument_result = await self._session.execute(instrument_stmt)
         instrument = instrument_result.scalar_one_or_none()
         if instrument is None:
-            raise ValueError("Instrumento no encontrado")
+            raise PermanentRejectionError("Instrumento no encontrado")
 
         portfolio = await self._resolve_portfolio(legacy_portfolio_id)
         # OR-P2: no multiplicar en float antes de Decimal.
@@ -357,12 +357,12 @@ class SqlAlchemyPortfolioRepository:
             with_for_update=True,
         )
         if portfolio_row is None:
-            raise ValueError("Cartera no encontrada")
+            raise PermanentRejectionError("Cartera no encontrada")
 
         cash = portfolio_row.cash
         if trade_type == "buy" and cash < total + fees:
             needed = float(total + fees)
-            raise ValueError(
+            raise PermanentRejectionError(
                 f"Efectivo insuficiente (incl. comisiones). Necesario: {needed:.2f} € · Disponible: {float(cash):.2f} €",
             )
 
@@ -380,7 +380,7 @@ class SqlAlchemyPortfolioRepository:
         if trade_type == "sell":
             held = float(existing_position.quantity) if existing_position else 0.0
             if held < quantity:
-                raise ValueError(f"No tienes suficientes acciones. En cartera: {held}")
+                raise PermanentRejectionError(f"No tienes suficientes acciones. En cartera: {held}")
 
         now = datetime.now(UTC)
         transaction = TransactionRow(

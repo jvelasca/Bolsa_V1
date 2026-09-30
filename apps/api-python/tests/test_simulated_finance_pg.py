@@ -394,3 +394,94 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
                 except Exception:  # noqa: BLE001 — cleanup nunca tira el test
                     pass
                 await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_permanent_rejection_materializes_failed_not_retry(
+    fin_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """OBS-21 end-to-end: una venta sin acciones materializa ``FAILED``, NO ``RETRY``.
+
+    El repo de cartera rechaza de forma DETERMINISTA (``PermanentRejectionError``) una
+    venta por encima de lo que hay en cartera. Antes ese rechazo se tragaba como un
+    ``False`` del applier y, con ``retryable_on_ineffective=True``, dejaba el fill en
+    ``RETRY`` (reintentable indefinidamente sobre un hecho que no cambia). Ahora el
+    applier RE-LANZA el rechazo permanente y el store lo sella en ``FAILED``.
+    """
+    instrument_id = f"inst-fin-{uuid.uuid4().hex[:10]}"
+    seed = 7
+    account_id: str | None = None
+    try:
+        async with fin_pg_factory() as session:
+            account_id = await _seed_account_tag(session)
+            await _seed_instrument(session, instrument_id)
+
+        # Venta SIN posición previa: la cartera tiene 0 acciones → rechazo permanente.
+        from bolsa_application.execution_event import PostgresExecutionEventStore
+        from bolsa_application.simulated_settlement import (
+            auto_venue_order_id,
+            submit_simulated_order,
+        )
+
+        sell_qty = Decimal("60")
+        logical_order_id = f"fin-sell-{uuid.uuid4().hex[:8]}"
+        venue_order_id = auto_venue_order_id(
+            engine_id="engine",
+            account_id=account_id,
+            instrument_id=instrument_id,
+            side="sell",
+            logical_order_id=logical_order_id,
+        )
+        async with fin_pg_factory() as session:
+            exec_store = PostgresExecutionEventStore(session)
+            applier = _finance_applier_for(
+                session,
+                account_id=account_id,
+                instrument_id=instrument_id,
+                side="sell",
+                seed=seed,
+                venue_order_id=venue_order_id,
+                quantity=sell_qty,
+            )
+            result, outcomes = await submit_simulated_order(
+                exec_store,
+                instrument_id=instrument_id,
+                side="sell",
+                quantity=sell_qty,
+                account_id=account_id,
+                venue="simulated",
+                seed=seed,
+                fill_chunks=3,
+                base_mid=100.0,
+                order_id=f"auto-fin-sell-{uuid.uuid4().hex[:8]}",
+                engine_id="engine",
+                logical_order_id=logical_order_id,
+                owner="fin-pg-gate-obs21",
+                apply_finance=applier,
+            )
+            assert result.fills, "el schedule simulado debió producir fills"
+            assert outcomes, "el settlement debió intentar materializar los fills"
+            # NINGÚN outcome puede ser reintentable ni APPLIED: rechazo permanente.
+            assert all(o == "failed" for o in outcomes.values()), outcomes
+            for execution_id, _outcome in outcomes.items():
+                row = await exec_store.get(execution_id)
+                assert row is not None
+                assert row.status == "FAILED", (execution_id, row.status)
+    finally:
+        if account_id:
+            from sqlalchemy import delete  # noqa: PLC0415
+
+            from bolsa_infrastructure.database.models.tables import InstrumentRow  # noqa: PLC0415
+            from bolsa_infrastructure.database.repositories.account_repository import (  # noqa: PLC0415
+                SqlAlchemyAccountRepository,
+            )
+
+            async with fin_pg_factory() as session:
+                await session.execute(
+                    delete(InstrumentRow).where(InstrumentRow.id == instrument_id)
+                )
+                try:
+                    await SqlAlchemyAccountRepository(session).close_account(account_id)
+                except Exception:  # noqa: BLE001 — cleanup nunca tira el test
+                    pass
+                await session.commit()

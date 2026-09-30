@@ -22,6 +22,7 @@ from bolsa_application.execution_event import (
     apply_pending_execution,
     reap_stale_applying,
 )
+from bolsa_domain.errors import PermanentRejectionError
 
 
 def _exec(event_id: str = "ev-1", *, qty: str = "40") -> ExecutionEvent:
@@ -312,6 +313,62 @@ async def test_durable_apply_exception_marks_retry_not_applied() -> None:
     assert row is not None
     assert row.status == "RETRY"
     assert row.last_error == "apply_exception"
+
+
+@pytest.mark.asyncio
+async def test_durable_apply_permanent_rejection_marks_failed() -> None:
+    """OBS-21: rechazo PERMANENTE del dominio → FAILED (no RETRY), jamás APPLIED.
+
+    Un rechazo determinista (p.ej. «No tienes suficientes acciones») reintentado
+    encontraría el mismo estado: su terminal correcto es NO reintentable. Se contrasta
+    con ``test_durable_apply_exception_marks_retry_not_applied`` (fallo transitorio
+    genérico → RETRY).
+    """
+    store = InMemoryExecutionEventStore()
+
+    async def applier(execution: ExecutionEvent) -> bool:  # noqa: ARG001
+        raise PermanentRejectionError("No tienes suficientes acciones. En cartera: 0.0")
+
+    ev = _exec("ev-durable-permanent")
+    outcome = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    assert outcome == "failed"
+    row = await store.get(ev.execution_id)
+    assert row is not None
+    assert row.status == "FAILED"
+    assert row.last_error == "apply_permanent_rejection"
+
+
+@pytest.mark.asyncio
+async def test_reap_permanent_rejection_marks_failed_not_retry() -> None:
+    """OBS-21 (reaper): reaplicar un APPLYING stale que rechaza de forma permanente
+    termina en FAILED; el reaper NO devuelve el fill a RETRY."""
+    from datetime import timedelta
+
+    store = InMemoryExecutionEventStore()
+    ev = _exec("ev-reap-permanent")
+    await store.capture(ev)
+    # Dejamos la fila APPLYING con un dueño caído (lease vencida) para forzar el reclaim.
+    await store.start_apply(ev.execution_id, owner="dead-owner")
+    stale_before = datetime.now(UTC) + timedelta(seconds=1)
+
+    async def resolver(row: ExecutionEvent) -> ExecutionEvent:
+        return row
+
+    async def apply_finance(execution: ExecutionEvent) -> bool:  # noqa: ARG001
+        raise PermanentRejectionError("No tienes suficientes acciones. En cartera: 0.0")
+
+    counts = await reap_stale_applying(
+        store,
+        owner="reaper",
+        stale_before=stale_before,
+        resolve_candidate=resolver,
+        apply_finance=apply_finance,
+    )
+    assert counts["failed"] == 1
+    assert counts["retry"] == 0
+    row = await store.get(ev.execution_id)
+    assert row is not None
+    assert row.status == "FAILED"
 
 
 @pytest.mark.asyncio

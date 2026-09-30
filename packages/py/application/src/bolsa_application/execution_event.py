@@ -33,6 +33,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal, Protocol, runtime_checkable
 
+from bolsa_domain.errors import PermanentRejectionError
+
 _INSERTED = "inserted"
 _DUPLICATE = "duplicate"
 CaptureStatus = Literal["inserted", "duplicate"]
@@ -1131,6 +1133,21 @@ async def apply_execution_financial_once(
     fence = owned.lease_generation
     try:
         effective = await apply_finance(execution)
+    except PermanentRejectionError:
+        # OBS-21: rechazo DETERMINISTA del dominio (p.ej. «No tienes suficientes
+        # acciones»). Reintentar el mismo fill lo vuelve a encontrar idéntico, así que
+        # su terminal correcto es NO reintentable (FAILED), no un RETRY indefinido que
+        # el reaper/recovery volvería a barrer pagando cómputo por un hecho inmutable.
+        # Fail-closed intacto: jamás se marca APPLIED.
+        marked = await store.mark_failed(
+            execution.execution_id,
+            error="apply_permanent_rejection",
+            lease_owner=owner,
+            lease_generation=fence,
+        )
+        if not marked:
+            return "no_apply_another_in_progress"
+        return "failed"
     except Exception:  # noqa: BLE001 — error en la materialización no es un APPLIED.
         marked = await store.mark_retry(
             execution.execution_id,
@@ -1253,6 +1270,21 @@ async def reap_stale_applying(
                     continue
                 try:
                     effective = await apply_finance(candidate)
+                except PermanentRejectionError:
+                    # OBS-21: rechazo determinista del dominio al reaplicar un APPLYING
+                    # stale → FAILED (no reintentable). No se devuelve a RETRY: el reaper
+                    # no debe reencolar un hecho que no cambia.
+                    marked = await store.mark_failed(
+                        execution_id,
+                        error="reap_apply_permanent_rejection",
+                        lease_owner=owner,
+                        lease_generation=fence,
+                    )
+                    if marked:
+                        counts["failed"] += 1
+                    else:
+                        counts["errors"] += 1
+                    continue
                 except Exception:  # noqa: BLE001 — no marcar APPLIED por error.
                     await store.mark_retry(
                         execution_id,

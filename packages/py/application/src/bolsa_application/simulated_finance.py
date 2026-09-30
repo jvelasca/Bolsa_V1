@@ -54,6 +54,7 @@ from bolsa_application.simulated_settlement import (
     AUTO_SETTLE_VENUES,
     simulated_idempotency_key,
 )
+from bolsa_domain.errors import PermanentRejectionError
 
 logger = logging.getLogger(__name__)
 
@@ -268,6 +269,18 @@ def build_simulated_execute_trade_applier(
                 strategy_version_id=finance.strategy_version_id,
             )
             return True
+        except PermanentRejectionError:
+            # OBS-21: rechazo DETERMINISTA del dominio (p.ej. «No tienes suficientes
+            # acciones»): reintentar el mismo fill lo vuelve a encontrar idéntico. NO
+            # se traga aquí; se RE-LANZA para que el store lo clasifique como terminal
+            # NO reintentable (FAILED). Sigue siendo fail-closed: jamás APPLIED.
+            logger.exception(
+                "apply_finance RECHAZADO de forma PERMANENTE por el dominio "
+                "(execution_id=%s, instrument_id=%s); el store lo encamina a FAILED",
+                getattr(execution, "execution_id", None),
+                getattr(finance, "instrument_id", None),
+            )
+            raise
         except Exception:  # noqa: BLE001 — no applied; no marcar APPLIED por excepción.
             # FLAKE-1 (2026-09-29): el contrato es fail-closed (False → el store lo
             # encamina a RETRY/FAILED), pero tragarse la causa dejaba el RETRY SIN

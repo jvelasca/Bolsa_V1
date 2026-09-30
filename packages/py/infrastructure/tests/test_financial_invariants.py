@@ -16,6 +16,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import select
 
+from bolsa_domain.errors import PermanentRejectionError
 from bolsa_infrastructure.database.models import InstrumentRow, PortfolioRow
 
 # psycopg async no soporta ProactorEventLoop en Windows (como en application/tests/conftest.py)
@@ -131,7 +132,8 @@ async def test_buy_insufficient_never_overdraws(db_session) -> None:
     pid, iid = await _new_environment(db_session)
     await db_session.commit()
     # cash=1500; buy notional 100*100=10000 > 1500 → rechazado, cash intacto ≥ 0.
-    with pytest.raises(ValueError, match="Efectivo insuficiente"):
+    # OBS-21: el rechazo es DETERMINISTA del dominio → PermanentRejectionError.
+    with pytest.raises(PermanentRejectionError, match="Efectivo insuficiente"):
         await SqlAlchemyPortfolioRepository(db_session).execute_trade(
             instrument_id=iid,
             trade_type="buy",
@@ -164,8 +166,9 @@ async def test_sell_more_than_held_never_negative_qty(db_session) -> None:
     await db_session.commit()
     assert await _query_qty(db_session, pid, iid) == 5.0
 
-    # Vender más de lo que se tiene → ValueError, qty se mantiene 5 (no negativa).
-    with pytest.raises(ValueError, match="No tienes suficientes acciones"):
+    # Vender más de lo que se tiene → PermanentRejectionError (OBS-21: rechazo
+    # permanente del estado), qty se mantiene 5 (no negativa).
+    with pytest.raises(PermanentRejectionError, match="No tienes suficientes acciones"):
         await repo.execute_trade(
             instrument_id=iid,
             trade_type="sell",

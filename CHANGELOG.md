@@ -2,6 +2,48 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.11-beta] — `OBS-21` **CERRADA**: el terminal del fill deja de confundir **TRANSITORIO** con **PERMANENTE** (un rechazo determinista del dominio pasa a `FAILED`, no a un `RETRY` indefinido) — 2026-09-30
+
+**Bump** `2.11.10-beta` → `2.11.11-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+**SÍ se toca MOTOR** (clasificación del terminal del fill AUTO): `bolsa_domain.errors`,
+`portfolio_repository.execute_trade`, `simulated_finance`, `execution_event` y el applier del recovery LIVE.
+Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-B, sin backdating.
+
+- **El defecto (`OBS-21`, la derivada que dejó a la vista la traza de `v2.88.8`).** El applier
+  `build_simulated_execute_trade_applier._apply` capturaba **cualquier** `except Exception` y devolvía
+  `False`; ese `False` entraba en `apply_execution_financial_once` y, con `retryable_on_ineffective=True`,
+  terminaba en `mark_retry(error="apply_ineffective")` → `RETRY`. Entre las excepciones tragadas estaba el
+  rechazo **determinista** del repositorio de cartera:
+  `ValueError: No tienes suficientes acciones. En cartera: 0.0`. `RETRY` sobre un hecho que **no cambia**
+  es un bucle: el reaper/recovery lo vuelve a barrer pagando cómputo por un fill que nunca podrá
+  materializarse. Matiz medido: el flag `retryable_on_ineffective` **sólo** gobernaba el camino de retorno
+  `False`; el camino de **excepción** marcaba `RETRY` **siempre**, así que **no existía ninguna vía** por la
+  que un rechazo permanente acabara en `FAILED`.
+- **La corrección (clasificación explícita `TRANSIENT` vs `PERMANENT`).** Nueva excepción de dominio
+  `PermanentRejectionError(ValueError)` (`bolsa_domain.errors`): subclase de `ValueError` para **no romper**
+  ningún `except ValueError` existente, pero con la marca que permite al settlement distinguir la causa.
+  `portfolio_repository.execute_trade` la lanza en sus seis rechazos **deterministas** (`idempotency_key`
+  vacía, `qty<=0`, `price<=0`, instrumento no encontrado, cartera no encontrada, efectivo insuficiente,
+  acciones insuficientes). Los appliers (`simulated_finance._apply` y el recovery LIVE) **RE-LANZAN** ese
+  tipo en vez de tragárselo; `apply_execution_financial_once` y `reap_stale_applying` lo mapean a
+  `mark_failed` (`FAILED`, terminal **no reintentable**). Todo lo **no clasificado** (deadlock, timeout,
+  conexión, ledger, `lock_account`) sigue por `except Exception` → `RETRY` (fail-safe). **El invariante se
+  mantiene: JAMÁS se marca `APPLIED` por excepción.**
+- **Flujo resultante:** `success → APPLIED`; `PermanentRejectionError → FAILED`; cualquier otro fallo →
+  `RETRY`; retorno `False` sin excepción → `RETRY`/`FAILED` según `retryable_on_ineffective`.
+- **Tests de regresión.** `test_execution_event.py`: `PermanentRejectionError` → `FAILED` (contrasta con el
+  `RuntimeError` genérico → `RETRY`) y el reaper que reaplica un `APPLYING` stale terminal en `FAILED` (no
+  `RETRY`). `test_simulated_finance.py`: el applier **re-lanza** el rechazo permanente en vez de devolver
+  `False`. `test_financial_invariants.py`: los casos «efectivo insuficiente» y «no tienes suficientes
+  acciones» ahora exigen el tipo permanente. `test_simulated_finance_pg.py`: una venta sin posición
+  materializa `FAILED` de extremo a extremo.
+- **Mutación (matriz `v2_44_mutation_audit.py`).** **`M268`** (el terminal permanente vuelve a `mark_retry`)
+  y **`M269`** (el applier vuelve a tragarse el rechazo como `False`): **ambas MUERDEN** y la sonda deja el
+  árbol intacto.
+- **Evidencia (punto de entrada de la auditoría):** [`docs/engineering/evidence/v2.88.11/README.md`](./docs/engineering/evidence/v2.88.11/README.md).
+- **CITA REAL (POST-TAG):** **PENDIENTE DE CITAR** — patrón de cita POST-TAG (`OBS-3`/`OBS-4`/`OBS-22`); se
+  anota aquí cuando el tag `v2.88.11-beta` tenga su corrida de `Release tag CI`.
+
 ## [2.11.10-beta] — Consolidación `v2.88.10`: el tag pasa a ser **autoconsistente** (cita de su CI + corrección del recuento local) y **queda como objeto auditado** — 2026-09-30
 
 **Bump** `2.11.9-beta` → `2.11.10-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).

@@ -43,6 +43,7 @@ from bolsa_application.simulated_finance import (
     sim_roundtrip_accounting,
 )
 from bolsa_application.simulated_settlement import simulated_execution_candidates
+from bolsa_domain.errors import PermanentRejectionError
 from bolsa_domain.lifecycle import LIFECYCLE_CASH, LifecycleAccounting, assert_equity_invariant
 
 _Q = Decimal("100.000000")
@@ -245,6 +246,35 @@ def test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause(caplog) -> None:
     assert record.exc_info is not None
     assert isinstance(record.exc_info[1], RuntimeError)  # ...y POR QUÉ (traza completa)
     assert "deadlock simulado" in str(record.exc_info[1])
+
+
+class _PermanentlyRejectingExecuteTrade:
+    """ExecuteTrade que rechaza de forma DETERMINISTA (p.ej. sin acciones)."""
+
+    async def execute(self, **kwargs: object) -> object:
+        raise PermanentRejectionError("No tienes suficientes acciones. En cartera: 0.0")
+
+
+def test_applier_propagates_permanent_rejection_instead_of_swallowing() -> None:
+    """OBS-21: un rechazo PERMANENTE del dominio NO se traga como ``False``.
+
+    El applier debe RE-LANZAR ``PermanentRejectionError`` para que el store lo
+    clasifique como ``FAILED`` (no reintentable), en vez de devolver ``False`` y que
+    ``retryable_on_ineffective`` lo encamine a un ``RETRY`` indefinido. Sigue siendo
+    fail-closed: JAMÁS se marca APPLIED por excepción.
+    """
+    result = _schedule("buy")
+    applier = _applier_for(result, fake=_PermanentlyRejectingExecuteTrade())
+    fill = result.fills[0]
+    event = ExecutionEvent(
+        execution_id=fill.execution_id,
+        order_id="o",
+        venue="SIMULATED",
+        qty=abs(fill.qty_delta),
+    )
+
+    with pytest.raises(PermanentRejectionError):
+        asyncio.run(applier(event))
 
 
 def test_apply_idempotent_same_fill_effective_once() -> None:

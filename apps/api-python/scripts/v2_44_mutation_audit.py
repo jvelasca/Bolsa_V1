@@ -735,6 +735,14 @@ T_CLI_RENDERERS = "apps/api-python/tests/test_replay_oos_cli_renderers.py"
 #: estado. Sin él, ``byDeadTail``/``reasons`` serían un cero silencioso sobre retiradas reales.
 T_RELEASE_LOG = "apps/api-python/tests/test_v2_87_release_log.py"
 
+# --- OBS-21 (V2.88.11): clasificación TRANSIENT vs PERMANENT del terminal del fill ---
+# El applier del settlement AUTO (SIM) y la capa durable que mapea el rechazo permanente
+# del dominio a FAILED. Su gate hermético vive en las suites ya cableadas a CI.
+SIMULATED_FINANCE = "packages/py/application/src/bolsa_application/simulated_finance.py"
+EXECUTION_EVENT = "packages/py/application/src/bolsa_application/execution_event.py"
+T_EXECUTION_EVENT = "packages/py/application/tests/test_execution_event.py"
+T_SIMULATED_FINANCE = "packages/py/application/tests/test_simulated_finance.py"
+
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
@@ -2912,6 +2920,30 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         '            cycle_id=getattr(context, "cycle_id", None),\n',
         "            cycle_id=None,\n",
         (T_AUTO_DURABLE,),
+    ),
+    (
+        "M268 (OBS-21, permanente reclasificado como transitorio): la rama de rechazo PERMANENTE vuelve a marcar RETRY en vez de FAILED -> un rechazo determinista se reintenta indefinidamente",
+        EXECUTION_EVENT,
+        "        marked = await store.mark_failed(\n"
+        "            execution.execution_id,\n"
+        '            error="apply_permanent_rejection",\n',
+        "        marked = await store.mark_retry(\n"
+        "            execution.execution_id,\n"
+        '            error="apply_permanent_rejection",\n',
+        (T_EXECUTION_EVENT,),
+    ),
+    (
+        "M269 (OBS-21, propagacion MUDA del rechazo permanente): el applier vuelve a tragarse PermanentRejectionError como False -> el rechazo permanente nunca llega a clasificarse y cae en RETRY",
+        SIMULATED_FINANCE,
+        "                getattr(finance, \"instrument_id\", None),\n"
+        "            )\n"
+        "            raise\n"
+        "        except Exception:  # noqa: BLE001 — no applied; no marcar APPLIED por excepción.\n",
+        "                getattr(finance, \"instrument_id\", None),\n"
+        "            )\n"
+        "            return False\n"
+        "        except Exception:  # noqa: BLE001 — no applied; no marcar APPLIED por excepción.\n",
+        (T_SIMULATED_FINANCE,),
     ),
 ]
 
