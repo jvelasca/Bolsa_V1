@@ -716,6 +716,14 @@ REPLAY_OOS = "packages/py/application/src/bolsa_application/replay_oos.py"
 # Suite pura hermetica (sin PG): el no-lookahead, el censo y la puntuacion OOS.
 T_REPLAY_OOS = "packages/py/application/tests/test_replay_oos.py"
 
+# --- W3 (V2.88.16): FRONTERA DE BARRAS CERRADAS (una sola definición, motor + replay) ---
+# ``M234``/``M235`` se MUDAN aquí: la guardia de no-lookahead dejó de vivir en el módulo del
+# replay para ser la MISMA que usa el motor (señal, régimen, ATR y ancla del fill). El
+# mordisco es idéntico: ``replay_oos`` la re-exporta, así que su suite sigue en rojo.
+CLOSED_BARS = "packages/py/application/src/bolsa_application/closed_bars.py"
+#: Contratos puros de la frontera: barra viva nunca visible + tick estable por barra.
+T_CLOSED_BARS = "packages/py/application/tests/test_closed_bars.py"
+
 # --- AUTO-MATERIAL-15 (V2.87): CICLO DURABLE del replay (cierre de tick + retencion) ---
 # El instrumento orquesta el replay: cierra el ciclo durable al final de cada tick y publica
 # el libro de compromisos y el horizonte. El worker congelado solo se INVOCA, nunca se edita.
@@ -755,6 +763,12 @@ T_OPERATIVE_GRANULARITY = "packages/py/domain/tests/test_operative_granularity.p
 T_OPERATIVE_GRANULARITY_POLICY = (
     "packages/py/application/tests/test_operative_granularity_policy.py"
 )
+
+# W2 (Fase A, short-circuit por barra). El worker del motor AUTO y la suite de equivalencia
+# estricta: el invariante que se mide es que la optimizacion NO cambia el informe del dia y
+# que los bordes (aprobacion viva, cambio de barra) siguen siendo fail-closed.
+AUTO_SIM_WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
+T_AUTO_BAR_SHORT_CIRCUIT = "apps/api-python/tests/test_auto_v2_bar_short_circuit.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -2666,17 +2680,17 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     # ── v2.86 (AUTO-MATERIAL-14): REPLAY OOS (censo + no-lookahead + puntuacion) ──
     (
         "M234 (no-lookahead: la guardia NO acota): las barras futuras entran en el censo",
-        REPLAY_OOS,
+        CLOSED_BARS,
         "    return [bar for bar in (bars or []) if (day := bar_day(bar)) and day <= limit]\n",
         "    return list(bars or [])\n",
-        (T_REPLAY_OOS,),
+        (T_REPLAY_OOS, T_CLOSED_BARS),
     ),
     (
         "M235 (no-lookahead: la fecha ilegible se admite): una barra sin dia entra en la ventana",
-        REPLAY_OOS,
+        CLOSED_BARS,
         "    return [bar for bar in (bars or []) if (day := bar_day(bar)) and day <= limit]\n",
         "    return [bar for bar in (bars or []) if not (day := bar_day(bar)) or day <= limit]\n",
-        (T_REPLAY_OOS,),
+        (T_REPLAY_OOS, T_CLOSED_BARS),
     ),
     (
         "M236 (censo: la direccion se ignora): trend_down vuelve a contar como operable",
@@ -2992,6 +3006,40 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "    granularity = _KNOWN_GRANULARITIES.get(value)\n",
         "    granularity = _KNOWN_GRANULARITIES.get(value) or DAILY_GRANULARITY\n",
         (T_OPERATIVE_GRANULARITY_POLICY,),
+    ),
+    (
+        "M275 (W2, FAIL-OPEN: la guarda de pendiente se ignora): una barra con una aprobacion SIN consumir vuelve a reutilizar el dato -> el reintento dentro de la barra (el fill se ancla al minuto) se pierde en silencio",
+        AUTO_SIM_WORKER,
+        "        if self._v2_bar_pending:\n"
+        "            return False\n"
+        "        return self._v2_current_bar_start() == self._v2_bar_plan_bar\n",
+        "        return self._v2_current_bar_start() == self._v2_bar_plan_bar\n",
+        (T_AUTO_BAR_SHORT_CIRCUIT,),
+    ),
+    (
+        "M276 (W2, FAIL-OPEN: la barra deja de acotar): la reutilizacion del dato sobrevive al cambio de barra -> el motor deja de decidir el dia siguiente (reusa el dato de ayer)",
+        AUTO_SIM_WORKER,
+        "        return self._v2_current_bar_start() == self._v2_bar_plan_bar\n",
+        "        return True\n",
+        (T_AUTO_BAR_SHORT_CIRCUIT,),
+    ),
+    (
+        "M277 (W2, la DECISION si se omite): el turno reutilizado deja el plan a ``None`` en vez de recalcular la funcion pura -> embudo, journal y procedencia del ATR de la barra desaparecen del informe",
+        AUTO_SIM_WORKER,
+        "                self._v2_plan = await self._v2_plan_tick(reuse_bar_datum=same_bar_datum)\n",
+        "                self._v2_plan = (\n"
+        "                    None\n"
+        "                    if same_bar_datum\n"
+        "                    else await self._v2_plan_tick(reuse_bar_datum=False)\n"
+        "                )\n",
+        (T_AUTO_BAR_SHORT_CIRCUIT,),
+    ),
+    (
+        "M278 (W2, ahorro VACIO): la reutilizacion no llega al I/O del plan -> el short-circuit cuenta turnos ahorrados pero sigue releyendo regimen, contexto y ordenes (optimizacion narrada, no medida)",
+        AUTO_SIM_WORKER,
+        "                self._v2_plan = await self._v2_plan_tick(reuse_bar_datum=same_bar_datum)\n",
+        "                self._v2_plan = await self._v2_plan_tick(reuse_bar_datum=False)\n",
+        (T_AUTO_BAR_SHORT_CIRCUIT,),
     ),
 ]
 

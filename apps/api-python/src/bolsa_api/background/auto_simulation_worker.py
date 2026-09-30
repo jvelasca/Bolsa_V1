@@ -740,6 +740,28 @@ class AutoSimulationWorker:
         self._v2_granularity = resolve_operative_granularity(
             self._v2_tunables.signal_timeframe
         )
+        # W2 · Fase A — short-circuit por barra. Con el reloj de DECISIÓN en D1, todo el
+        # I/O de DATO del tick (régimen, espejo de señales consumidas, contexto de cartera,
+        # órdenes pendientes, Adaptive, poda) relee dentro de la MISMA barra un dato que ya
+        # está cargado en RAM y no puede cambiar lo que la barra ya decidió. El turno
+        # DURABLE reutiliza ese dato de barra; la DECISIÓN no se omite (la función pura
+        # ``plan_v2_tick`` se recalcula con el estado corriente), de modo que la
+        # contabilidad del tick —embudo, journal, procedencia del ATR— sale idéntica.
+        # ``False`` por defecto: el camino hermético (tests y replay, que llaman
+        # ``auto_turn`` suelto) reproduce el comportamiento previo byte a byte. Lo enciende
+        # ``real_turn`` para el alcance de SU turno (misma disciplina que los stores).
+        self._v2_bar_short_circuit = False
+        #: Barra cuyo dato de decisión ya se cargó en ESTE proceso (``""`` = ninguna aún).
+        self._v2_bar_plan_bar: str = ""
+        #: Plan Adaptive del dato de barra (se reutiliza junto con el resto del I/O).
+        self._v2_bar_adaptive: AdaptivePlan | None = None
+        #: ``True`` si el plan de la barra dejó entradas aprobadas SIN consumir: mientras
+        #: quede algo pendiente NO se salta nada (el reintento dentro de la barra es
+        #: observable y hay que preservarlo). Fail-closed: sin poder afirmar que está
+        #: liquidada, la barra se planifica como siempre.
+        self._v2_bar_pending = False
+        #: Turnos que reutilizaron el dato de barra (instrumentación; 0 en hermético).
+        self._v2_bar_short_circuit_ticks = 0
         self._v2_positions: dict[str, Any] = {}
         # V2.40.4 — libro de órdenes PENDIENTES (fills no materializados) del último
         # refresco, con su estado de medición. Por defecto vacío y COMPLETO (sin espejo
@@ -3046,6 +3068,46 @@ class AutoSimulationWorker:
             self._v2_consumed_bar = bar_start
             self._v2_consumed_signals.clear()
 
+    # ---- W2 · Fase A: short-circuit por barra (seam en ``auto_turn``) ----------------
+    def _v2_bar_short_circuit_applies(self) -> bool:
+        """¿Este turno puede REUTILIZAR el dato de barra en vez de releerlo?
+
+        Fase A (``W2``). Solo se afirma cuando las TRES cosas se sostienen: (a) el turno es
+        durable (``real_turn`` encendió el seam), (b) el dato de decisión de la barra
+        corriente ya se cargó en ESTE proceso, y (c) esa barra no dejó entradas aprobadas
+        sin consumir — si quedara alguna, el reintento dentro de la barra es observable (el
+        fill se ancla al minuto) y hay que releer como siempre.
+
+        Fail-closed en los bordes: sin barra legible (timeframe no entendido) o sin dato de
+        barra cargado NO se reutiliza nada.
+        """
+        if not self._v2_bar_short_circuit or not self._v2_bar_plan_bar:
+            return False
+        if self._v2_bar_pending:
+            return False
+        return self._v2_current_bar_start() == self._v2_bar_plan_bar
+
+    def _v2_bar_note_plan(self) -> None:
+        """Fija la barra cuyo dato de decisión acaba de cargarse en ESTE proceso."""
+        self._v2_bar_plan_bar = self._v2_current_bar_start()
+        self._v2_bar_pending = False
+
+    def _v2_bar_note_settlement(self) -> None:
+        """Cierra el turno: ¿quedó alguna entrada aprobada SIN consumir?
+
+        La señal se marca consumida al materializarse el fill (``_v2_mark_signal_consumed``),
+        así que una aprobación cuya señal sigue sin consumir es un reintento PENDIENTE que el
+        short-circuit no puede saltarse (el fill depende del minuto).
+        """
+        plan = self._v2_plan
+        if plan is None:
+            return
+        entries = getattr(plan, "entry_packages", None) or {}
+        self._v2_bar_pending = any(
+            self._v2_tick_signals.get(symbol) not in self._v2_consumed_signals
+            for symbol in entries
+        )
+
     async def _v2_load_consumed_signals(self) -> None:
         """Carga del espejo durable las señales consumidas de la barra corriente.
 
@@ -3119,11 +3181,27 @@ class AutoSimulationWorker:
             # reintenta (la RAM ya la tiene y el tick siguiente la re-marcará).
             logger.exception("auto_sim v2 consumed signal persist failed symbol=%s", symbol)
 
-    async def _v2_plan_tick(self) -> Any:
-        """Planifica el tick completo (entradas) por el pipeline AUTO 2.0."""
-        await self._v2_refresh_regime()
+    async def _v2_plan_tick(self, *, reuse_bar_datum: bool = False) -> Any:
+        """Planifica el tick completo (entradas) por el pipeline AUTO 2.0.
+
+        ``reuse_bar_datum`` (``W2`` · Fase A) es el short-circuit por barra: el reloj de
+        DECISIÓN es D1, así que dentro de la MISMA barra el I/O de DATO del tick no puede
+        aportar nada que la barra no haya decidido ya. Se omite —régimen, espejo durable de
+        señales consumidas, contexto de cartera, órdenes pendientes, Adaptive y poda— y se
+        trabaja con el dato de barra ya cargado en RAM.
+
+        Lo que NO se omite es la DECISIÓN: ``plan_v2_tick`` es una función PURA y se
+        recalcula con el estado corriente (posiciones, reservas vivas, señales consumidas,
+        precio del tick). Eso es lo que mantiene el turno **semánticamente idéntico**: el
+        embudo, el journal de decisión y la procedencia del ATR se publican igual, con el
+        estado de la barra en el momento del turno (una señal nueva que aparezca a mitad de
+        barra sigue decidiéndose), y solo desaparece el I/O redundante.
+        """
+        if not reuse_bar_datum:
+            await self._v2_refresh_regime()
         self._v2_roll_consumed_bar()
-        await self._v2_load_consumed_signals()
+        if not reuse_bar_datum:
+            await self._v2_load_consumed_signals()
         regime = self._v2_regime()
         packages = self._v2_collect_packages()
         # Contexto de cartera (sector/ADV) y edge son datos EXTERNOS: se precargan una vez
@@ -3136,21 +3214,27 @@ class AutoSimulationWorker:
             for pkg in packages.values()
         }
         versions.update(self._position_version.values())
-        await self._v2_refresh_trade_context(tuple(packages), tuple(sorted(versions)))
-        # Órdenes pendientes (capital ya comprometido): se leen ANTES de construir la
-        # foto para que la decisión del tick no pueda gastar dos veces el mismo cash.
-        # AUTO-1b: con libro durable de reservas, la autoridad del compromiso son las
-        # reservas vivas y estas trazas quedan como reconciliación (solo suma lo que
-        # ninguna reserva cubre).
-        await self._v2_refresh_open_orders()
+        if not reuse_bar_datum:
+            await self._v2_refresh_trade_context(tuple(packages), tuple(sorted(versions)))
+            # Órdenes pendientes (capital ya comprometido): se leen ANTES de construir la
+            # foto para que la decisión del tick no pueda gastar dos veces el mismo cash.
+            # AUTO-1b: con libro durable de reservas, la autoridad del compromiso son las
+            # reservas vivas y estas trazas quedan como reconciliación (solo suma lo que
+            # ninguna reserva cubre).
+            await self._v2_refresh_open_orders()
         # V2.48/AUTO-8 — Adaptive: con el flag ON se construye la recomendación desde los
         # fills durables de las versiones observadas; con OFF (o sin store) es ``None`` y
-        # el tick no paga ningún I/O nuevo (byte-idéntico).
-        adaptive = (
-            await self._v2_build_adaptive_plan(versions, regime)
-            if self._v2_tunables.adaptive_enabled
-            else None
-        )
+        # el tick no paga ningún I/O nuevo (byte-idéntico). El dato de barra ya lo trae
+        # construido, así que el turno reutilizado no lo relee.
+        if reuse_bar_datum:
+            adaptive = self._v2_bar_adaptive
+        else:
+            adaptive = (
+                await self._v2_build_adaptive_plan(versions, regime)
+                if self._v2_tunables.adaptive_enabled
+                else None
+            )
+            self._v2_bar_adaptive = adaptive
         snapshot = self._v2_snapshot(regime)
         plan = plan_v2_tick(
             snapshot=snapshot,
@@ -3164,6 +3248,8 @@ class AutoSimulationWorker:
         )
         # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
+        # Con el dato de barra reutilizado la llamada se conserva: si la barra aún aprobara
+        # algo nuevo (señal distinta aparecida a mitad de barra) su reserva DEBE persistirse.
         await self._v2_persist_tick_reservations(plan)
         # AUTO-11: la recomendación Adaptive se publica DESPUÉS de que el motor determinista la
         # consumió (mismo orden que AUTO-10: primero el dinero, después la traza). Así el journal
@@ -3173,11 +3259,16 @@ class AutoSimulationWorker:
         # V2.45/AUTO-5 — embudo del día. El precio posterior de las rechazadas de ticks
         # ANTERIORES se mide con el tick corriente (es su primer precio DESPUÉS del
         # descarte); las filas de ESTE tick se incorporan después, porque una oportunidad no
-        # puede ser su propio "precio posterior".
+        # puede ser su propio "precio posterior". Con el dato de barra reutilizado esto se
+        # sigue midiendo con el precio VIVO del turno (es RAM, no I/O).
         self._v2_measure_opportunity_costs()
         self._v2_opportunities.extend(plan.opportunities)
         self._v2_seen_signals += int(getattr(plan, "seen_signals", 0) or 0)
-        await self._v2_prune_consumed_signals()
+        if not reuse_bar_datum:
+            # La poda del espejo durable cubre la ventana ANTERIOR a la barra corriente, que
+            # ya está podada cuando el dato de barra se cargó: dentro de la misma barra no
+            # hay nada nuevo que podar.
+            await self._v2_prune_consumed_signals()
         return plan
 
     async def _v2_cycle_risk(self, fills: Sequence[Any]) -> dict[str, CycleRisk] | None:
@@ -4642,11 +4733,24 @@ class AutoSimulationWorker:
         self._v2_last_exit_reasons = {}
         self._v2_last_exit_label = {}
         if self._v2_enabled and not kill and venue_ok and not account_required:
+            # W2 · Fase A: con el dato de barra ya cargado, el turno REUTILIZA ese dato y
+            # se ahorra el I/O redundante (régimen, espejo de consumo, contexto de cartera,
+            # órdenes pendientes, Adaptive, poda). La DECISIÓN se recalcula igual (función
+            # pura) para que la contabilidad del tick no cambie: embudo, journal y
+            # procedencia del ATR se publican en TODOS los turnos de la barra.
+            same_bar_datum = self._v2_bar_short_circuit_applies()
+            if same_bar_datum:
+                self._v2_bar_short_circuit_ticks += 1
             try:
-                self._v2_plan = await self._v2_plan_tick()
+                self._v2_plan = await self._v2_plan_tick(reuse_bar_datum=same_bar_datum)
+                if not same_bar_datum:
+                    self._v2_bar_note_plan()
             except Exception:  # noqa: BLE001 — sin plan V2 se degrada a no operar.
                 logger.exception("auto_sim v2 plan failed (tick sin entradas)")
                 self._v2_plan = None
+                # Fail-closed: un plan que no se materializó no acredita la barra, así que
+                # el turno siguiente vuelve a releer el dato en vez de heredar el hueco.
+                self._v2_bar_plan_bar = ""
 
         for symbol in _watch_symbols():
             symbol = symbol.strip()
@@ -4961,6 +5065,7 @@ class AutoSimulationWorker:
                 await self._persist_position(symbol, new_held)
             report.orders += 1
             report.fills += len(settlement.applied)
+        self._v2_bar_note_settlement()
         self._last_gate_reason = tuple(dict.fromkeys(reasons))
         return report
 
@@ -5069,7 +5174,12 @@ class AutoSimulationWorker:
         prev_adaptive_sink = self._adaptive_sink
         prev_adaptive_reader = self._adaptive_reader
         prev_adaptive_gate_store = self._adaptive_gate_store
+        # W2 · Fase A: el seam de la barra queda ENCENDIDO todo el turno durable y se
+        # restaura al salir, para que el camino hermético (``auto_turn`` directo) siga
+        # midiendo el plan completo aunque comparta instancia con el camino real.
+        prev_bar_short_circuit = self._v2_bar_short_circuit
         try:
+            self._v2_bar_short_circuit = True
             self._exec_store = exec_store
             self._auto_store = auto_store
             self._finance_applier = finance_applier
@@ -5208,6 +5318,7 @@ class AutoSimulationWorker:
             self._adaptive_sink = prev_adaptive_sink
             self._adaptive_reader = prev_adaptive_reader
             self._adaptive_gate_store = prev_adaptive_gate_store
+            self._v2_bar_short_circuit = prev_bar_short_circuit
 
 
 # V2.22-env + V2.23/A9 (Bloque 2): cuenta SIM inequívoca para el motor autónomo.

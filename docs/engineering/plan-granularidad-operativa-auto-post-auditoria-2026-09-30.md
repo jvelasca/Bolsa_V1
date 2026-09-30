@@ -104,12 +104,55 @@ El diagnóstico de la auditoría se sostiene sobre estos hechos, todos presentes
 
 **Objetivo:** dentro de la misma barra D1, no repetir el trabajo que no puede cambiar resultado.
 
-- Guard: si `_v2_current_bar_start() == _v2_consumed_bar` (`:3020`, `:909`), saltar decisión / protección / marks / liquidación **pero mantener el heartbeat** (`record_tick`, `auto_engine_state_store.py:107`) ⇒ **`Δ record_tick = 0`** y **no se toca el contrato del store**.
-- **Arnés de equivalencia estricta** (misma config/seed/cuenta/barras, OLD tick-60s vs NEW short-circuit): `Δ fills = Δ cycles = Δ PnL = Δ reservas = Δ settlements = Δ evidence = 0`.
-- Instrumentación ticks/día y CPU antes/después (si no se mide, **NO MEDIDO**, no se inventa cifra).
-- Mutaciones: short-circuit que se salta el heartbeat, o que no reinicia al cambiar de barra → el arnés debe romper.
+> **ESTADO (2026-09-30): IMPLEMENTADO, pendiente de commit/tag del propietario.** `ruff`/`mypy`/
+> `import-linter` verdes, golden del día intacto, suite nueva **5/5**, mutaciones `M275`→`M278` **4/4**.
+> Evidencia: [`evidence/v2.88.15/README.md`](./evidence/v2.88.15/README.md). La cita del CI es **POST-TAG**
+> (predicción declarada: job `python` **`3142 passed, 38 skipped`** = `3137 + 5`).
+>
+> **PRECISIÓN FECHADA AL DISEÑO DEL GUARD (no reescritura de los entregables).** Los entregables de abajo
+> decían «saltar decisión / protección / marks / liquidación». **Medido y decidido al implementar:** se
+> reutiliza **sólo el DATO de barra** (lecturas de régimen, espejo de consumo, contexto de cartera, órdenes
+> pendientes, Adaptive y poda) y la **decisión pura se RECALCULA en cada turno** (`plan_v2_tick`), porque
+> el embudo, el journal y la procedencia del ATR son **contabilidad del tick** y omitirlos cambiaría el
+> informe del día (`Δ evidence ≠ 0`). **La PROTECCIÓN y la liquidación NO se cortocircuitan jamás:** corren
+> en el bucle por símbolo de `auto_turn`, fuera del seam de I/O. Guardas **fail-closed** medidas: barra con
+> aprobación **sin consumir** (`_v2_bar_pending`) ⇒ no se reutiliza; plan que **falla** ⇒ la barra no queda
+> acreditada y el turno siguiente relee; **cambio de barra** ⇒ relee. El seam vive **sólo** dentro de
+> `real_turn` (encendido con `try…finally`), así que el arnés hermético sigue midiendo el plan completo.
+>
+> **Y `OBS-16` deja de vigilarse «por suites vecinas»:** la cobertura local-vs-CI se **mide** con las dos
+> listas recogidas localmente (`python-ci.yml` `3172`; `release-tag-ci.yml` `3180` = `3142 + 38`) y el único
+> rojo local es el **PG-local pre-existente** `test_auto_v70_auto23_evidence_validation.py` (`assert 17 ==
+> 26`), que CI **salta** y que falla **idéntico** con el cambio de `W2` descartado. La **instrumentación de
+> CPU/ticks-día** queda declarada **NO MEDIDA**; lo medido es el I/O por turno (`4 → 1` lecturas de
+> régimen/contexto/órdenes en una barra de 4 turnos).
+
+**Entregables**
+- Guard: si `_v2_current_bar_start()` (`:3050`) == `_v2_consumed_bar` (`:939`), reutilizar el **dato** de barra **manteniendo la decisión y el heartbeat** (`record_tick`; `auto_engine_state_store.py:107`) ⇒ **`Δ record_tick = 0`** y **sin tocar el contrato del store**.
+- **Arnés de equivalencia estricta** (A/B sobre el **mismo** turno durable con el seam apagado): `Δ fills = Δ cycles = Δ PnL = Δ reservas = Δ settlements = Δ evidence = 0`.
+- Instrumentación del I/O ahorrado por turno (**medida**); CPU/ticks-día: **NO MEDIDO** (no se inventa cifra).
+- Mutaciones: **`M275`**(guarda de pendiente fail-open) · **`M276`**(sobrevive al cambio de barra) · **`M277`**(la decisión sí se omite) · **`M278`**(ahorro vacío) ⇒ el arnés rompe en todas.
 
 **Gate de cierre:** tabla `Δ = 0` en evidencia + golden intacto.
+
+> **Deriva de citas tras `W2` (`v2.88.15-beta`) — re-medida 2026-09-30.** El sello `W2` toca **sólo dos**
+> ficheros citados en §1 (`auto_simulation_worker.py` `+131/−20` y `v2_44_mutation_audit.py` `+40`), así que
+> las citas de esas filas se desplazan otra vez. Regla medida del desplazamiento: **`+22`** para todo lo
+> posterior a `:743` (el bloque de estado de barra), **`+40`** adicional para lo posterior a `:3107` (los
+> helpers del seam) y el resto de los hunks de `auto_turn`/`real_turn`. Valores **hoy** en el árbol:
+>
+> - `auto_simulation_worker.py`: `seed` del fill `:1333 → :1355` · `base_mid` `:1334 → :1356` ·
+>   `_v2_consumed_bar` `:917 → :939` · `_v2_current_bar_start` `:3028 → :3050` (el `bar_window(...)` que
+>   usa, `:3034 → :3056`) · `_v2_roll_consumed_bar` `:3037 → :3059` · `AutoSimRuntime` `:6005 → :6116` ·
+>   `interval_seconds=` `:6038 → :6149` · `_sim_interval_seconds` `:6044 → :6155`. **Intactas** (≤`:743` o
+>   ficheros no tocados): `PriceScript` `:297`, `flat_price_script` `:318`, default `:617`,
+>   `self._price_script` `:687`.
+> - `v2_44_mutation_audit.py`: `MUTATIONS` `:760 → :766`; la última mutación deja de ser `M274` y la matriz
+>   llega a **`M278`** (`:3030`).
+>
+> **La lectura del dato de decisión sigue SIN leer `signal_timeframe` suelto:** `bar_window` se alimenta de
+> `self._v2_granularity.decision.timeframe` (`:3056`), el seam inerte de `W1` — con el default `1d` el valor
+> es idéntico.
 
 ---
 
@@ -160,7 +203,7 @@ El diagnóstico de la auditoría se sostiene sobre estos hechos, todos presentes
 | --- | --- | --- |
 | `OBS-23` | Fix del flake PG: fijar `instrument_id`/semilla o forzar un `queue_event` de llenado en `apps/api-python/tests/test_simulated_finance_pg.py::test_permanent_rejection_materializes_failed_not_retry` (≈5,6 % de cola terminal por uuid aleatorio) | **bundled en W1** (evita arrastrar rojos de CI) |
 | `OBS-19` | Listas pytest manuales divergentes → alta en ambos workflows (auto-descubrimiento como deuda aparte) | W1 |
-| `OBS-15` / `OBS-16` | Techo de 1000 `APPLIED` y cobertura local-vs-CI: vigilar al tocar el bucle | W2 |
+| `OBS-15` / `OBS-16` | Techo de 1000 `APPLIED` y cobertura local-vs-CI: vigilar al tocar el bucle | **W2 (`v2.88.15`)**: la cobertura local-vs-CI queda **medida** con las dos listas (`3180 = 3142 + 38`) y `OBS-15` **no se agrava** (el short-circuit no toca la liquidación) — **las dos siguen ABIERTAS** |
 | **PAPER longitudinal** | **≥4 días, ≥2 episodios, ≥32 ciclos** — **el objetivo real del proyecto** | Medición en cuanto **W4** esté en `main`, en paralelo a W5/W6 |
 
 ---
@@ -185,7 +228,7 @@ flowchart LR
 
 ## 6. Deudas que este plan NO cierra
 
-`P3-2` / `P3-3` (ventana PAPER real ≥4 días con material), `OBS-22`, `OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5`, `OBS-5`. Las que **sí** entran en el plan: `OBS-23` y `OBS-19` (W1), `OBS-15` / `OBS-16` (W2, vigiladas).
+`P3-2` / `P3-3` (ventana PAPER real ≥4 días con material), `OBS-22`, `OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5`, `OBS-5`. Las que **sí** entran en el plan: `OBS-23` y `OBS-19` (W1), `OBS-15` / `OBS-16` (W2, **vigiladas y medidas** en `v2.88.15`; siguen **ABIERTAS**).
 
 ---
 
