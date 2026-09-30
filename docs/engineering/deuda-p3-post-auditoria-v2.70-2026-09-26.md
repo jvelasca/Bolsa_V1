@@ -1562,3 +1562,34 @@ comportamiento de mercado. La acción **1** se cerró en `v2.88.4` y la **2** en
 está ejecutada, y tampoco `OBS-15` / `P3-2` / `P3-3`: **ninguna** de esas deudas se cierra por estos
 informes.
 
+---
+
+## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟡 ABIERTA (2026-09-29)
+
+**Qué se midió.** Tres corridas de `release-tag-ci`: **dos rojos** (`36627838819`, `36636706369`) y
+**un verde** (`36638231729`, `165 passed in 82,89 s`; en los rojos, `1 failed, 164 passed in 100,07 s`).
+Por tanto **NO** es determinista: la afirmación previa de «reproducible» era **incorrecta** y se corrigió
+en `PROJECT_STATE.md`, en el índice (`192`) y en el informe de reproducibilidad (§6.2).
+
+**Firma exacta.** `AssertionError: RETRY` en el assert de `test_simulated_finance_pg.py:327`
+(`row.status == "APPLIED"`, cuyo mensaje de fallo es el estado real): un `execution_id` que el venue
+reportó **lleno** seguía en **`RETRY`** (dinero NO movido) al leerlo. El resto del rojo de `lifecycle-pg`
+es **cascada** (el step aborta y las baterías siguientes se quedan sin log ⇒ «no dejó log de la corrida»).
+
+**Hipótesis principal (medida, NO aislada).** El propio repo documenta ese estado como «un chunk en
+`RETRY` de un **llenado parcial**» (`src/bolsa_api/background/auto_simulation_worker.py`), y el selector
+del test (`_seed_with_fills`, que solo exige `fills` no vacío) **acepta** esquemas parciales: medido
+offline con ese mismo criterio sobre **40 instrumentos al azar** (`simulated_fill_schedule`,
+`fill_chunks=3`, `qty=60`), **9 de 80** órdenes (≈ **11 %**) salen `partial` (la cola topa a mitad y no
+llena el resto). El paso causal exacto **no** está aislado.
+
+**Repro pendiente (la deuda).** Bucle local contra PG real iterando `instrument_id` aleatorios hasta
+reproducir y, si se confirma, decidir entre (a) endurecer el selector del test para exigir esquema
+**completo** (determinista, como ya se hizo con `fill_chunks`) o (b) declarar explícito en el test que un
+`RETRY` de una cola parcial es un estado **esperado**. **No** se toca ni el motor ni el test en este
+trabajo.
+
+**Alcance.** Proceso/tests (rojo **espurio** en la certificación). Si el tag se cortase en una corrida
+donde dispara, `certify` **no-GREENearía** el tag por una causa **ajena** al artefacto. **No** afecta al
+sello del replay OOS de `v2.88.7` (otra cadena) ni a su remedición de integridad.
+

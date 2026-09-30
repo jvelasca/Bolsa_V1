@@ -195,6 +195,33 @@ script del sello invalidaría la cadena «el artefacto del tag lo produjo ESTE s
 trabajo precisamente acredita. Mientras siga así, el `sha256` del fichero **no** es portable y el
 hash que identifica la evidencia es el **LF**.
 
+### 6.2 Cierre: verificado en el CI (no en local)
+
+Corrida **`36638231729`** (`workflow_dispatch`, `main`, commit **`4478fe89`**): **todo verde**,
+`certify` incluido. Lo que dejó escrito el runner:
+
+| Comprobación | Salida del runner |
+| --- | --- |
+| Sembrado | `# sembrado 20 instrumentos, 25700 barras D1` |
+| Render del artefacto | `render LF 3290062 A4DA036C…13CB` |
+| 2ª corrida del MISMO job | `VEREDICTO 2ª corrida IDÉNTICA (el runner es determinista consigo mismo)` |
+| Digest por secciones | `census 1237098 45e4cc80cfba6e5c` · `replay 891272 ee81e76cee0995aa` · `score 24112 96b3d601bae8b99c` · `watch 561 40230635349bf2a0` · `totals {"decided":24500,"fills":752,"orders":210,"proposals":238,"vetoes":24303}` |
+| Contraste con el sello | `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)` |
+| Artefacto | subido (`replay-oos-durable-v2.88.7`, id `11065725850`) |
+
+Los cinco digests de sección coinciden **exactamente** con los medidos en local sobre el sello: no es
+una coincidencia de tamaño, es el mismo contenido **parte a parte**.
+
+**Corrección de un diagnóstico previo de este informe.** El otro rojo de la primera corrida,
+`lifecycle-pg`, **no** era determinista: esta corrida salió **verde** (`165 passed in 82,89 s`) tras
+dos rojos con la misma firma (`AssertionError: RETRY` en
+`test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once`, que es
+el assert de la línea 327 leyendo `RETRY`). Es **intermitente**; la hipótesis —**no aislada**— es el
+camino de **llenado parcial** que el propio repo documenta como «un chunk en `RETRY`», y que el
+selector del test **sí** acepta: medido offline con el mismo criterio, **9 de 80** órdenes (≈11 %,
+40 instrumentos al azar) salen `partial`. Queda como **deuda** con repro local contra PG real;
+**no** afecta al sello del replay.
+
 ## 7. Límites de esta evidencia (lo que NO acredita)
 
 - **NO** acredita que la semántica de `OBS-20` sea correcta: reproduce **el mismo artefacto** que el

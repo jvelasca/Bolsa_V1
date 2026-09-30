@@ -308,6 +308,39 @@ fichero manipulado sigue dando **`NO reproducido`**); el manifiesto del fixture 
 fijar `newline="\n"` en el escritor del replay (el del fixture ya lo hace) para que el mismo contenido
 tenga **un** hash en cualquier SO.
 
+### 11.2 El cierre en verde (`36638231729`, commit `4478fe89`)
+
+`workflow_dispatch` sobre `main` (para no tocar el tag): **todo verde**, `certify` incluido. Salida
+cruda del runner:
+
+```
+== digest por secciones ==
+render LF 3290062 A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+census 1237098 45e4cc80cfba6e5c
+replay 891272 ee81e76cee0995aa
+watch 561 40230635349bf2a0
+watchSize 2 f5ca38f748a1d6ea
+totals {"decided":24500,"fills":752,"orders":210,"proposals":238,"vetoes":24303}
+score 24112 96b3d601bae8b99c
+VEREDICTO 2ª corrida IDÉNTICA (el runner es determinista consigo mismo)
+render           LF
+bytes            3290062  (sello 3393187 · mismo contenido en LF 3290062)
+sha256           A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB
+VEREDICTO        REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)
+Artifact replay-oos-durable-v2.88.7 has been successfully uploaded! Artifact ID is 11065725850
+```
+
+Los cinco digests de sección coinciden **exactamente** con los medidos en local sobre el sello: la
+reproducción es del **contenido**, parte a parte, no una coincidencia de tamaño.
+
+**Corrección:** el otro rojo de la primera corrida, `lifecycle-pg`, **no** es determinista — aquí salió
+**verde** (`165 passed in 82,89 s`) tras dos rojos con la misma firma (`AssertionError: RETRY` en
+`test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once`). Es
+**intermitente**: la hipótesis no aislada es el camino de **llenado parcial** (documentado en el repo
+como «un chunk en `RETRY`»), y el selector del test acepta esquemas parciales — medido offline, **9 de
+80** órdenes (≈11 %) salen `partial`. Deuda con repro local; **no** afecta al sello del replay.
+
+
 
 Límites declarados: el job se añade **después** del sello, así que `v2.88.7-beta` se selló **sin** él
 (la primera certificación del job es la del **siguiente** tag o de un `workflow_dispatch`); reproduce
