@@ -159,11 +159,35 @@ git diff --stat v2.88.13-beta v2.88.14-beta -- packages/py apps/api-python/src \
 
 ---
 
-## 11. Cita del CI (POST-TAG) — `(pendiente)`
+## 11. Cita del CI (POST-TAG, 2026-09-30)
 
 Límite estructural (`OBS-3`/`OBS-4`): `Release tag CI` **sólo corre al empujar** el tag ⇒ su resultado no
-puede vivir dentro del propio tag; se cita en `main` como commit **POST-TAG**. Esperado del job `python`: los
-**mismos `37` skips** + los **19** tests nuevos — **se cita el run, no se hereda**.
+puede vivir dentro del propio tag; se cita en `main` como commit **POST-TAG**.
+
+**`Release tag CI` run [`36737341525`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36737341525)**
+(`ref=refs/tags/v2.88.14-beta`, HEAD `421686d4`) → **`SUCCESS`** en la **primera pasada**: **10 jobs reales
+verdes + `certify` GREEN** (**0 rojos**; `playwright (integrated E2E, opt-in)` `skipped` por diseño), artefacto
+`release-tag-ci-summary`.
+
+| Job | Resultado (verbatim) |
+| --- | --- |
+| `python` | `All checks passed!` · `Contracts: 4 kept, 0 broken.` · `Success: no issues found in 510 source files` · **`3137 passed, 38 skipped, 6 warnings in 56.77s`** |
+| `lifecycle-pg` | todas las baterías PG verdes; `AUTO_GOLDEN_DAY_V2_PG_REQUIRED: 1`; golden día v2 `1 passed in 8.42s` y la batería pesada de reinicio `1 passed in 112.32s` |
+| `replay-repro` | **`REPRODUCIDO`** — `sha256 A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB`, **idéntico** en su render LF (`sha256 LF` **igual**) ⇒ artefacto **byte-reproducible** |
+| `decision-spine` / `shared` / `dr-verify` / `security` / `frontend` / `a7-gate` / `playwright (mock)` | `success` |
+
+**Encaje de cuentas (`ESPERADO = OBSERVADO`):** `python` **`3137`** = los **`3118`** de `v2.88.11-beta` +
+**`19`** tests nuevos (11 dominio + 8 aplicación), **exactamente** el bundle de `W1`.
+
+**Corrección declarada:** el dossier predijo «los **mismos `37` skips**»; el **observado es `38`**. La predicción
+venía ya corregida en la cita de `v2.88.11-beta` (`37 → 38`, por el test PG de `OBS-21` que se salta offline y
+corre en `lifecycle-pg`) y este sello lo **re-mide**: `38`. El recuento de **passes** no se mueve por ello
+(`3118` base + `19` = `3137`).
+
+**Límite declarado:** este verde aporta **cero deriva de código en el runner** (`ruff`/`mypy`/`import-linter`
+con los mismos veredictos que en local) y **reproducibilidad del artefacto del sello**; **no** demuestra la
+semántica del `W1` —eso lo hace el golden byte-idéntico (§4)— ni acredita deuda alguna (§10). **Objeto
+vigente:** tag anotado **`v2.88.14-beta`**.
 
 ---
 
