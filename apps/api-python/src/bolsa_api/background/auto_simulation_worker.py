@@ -199,6 +199,11 @@ from bolsa_application.auto_v2_entry import (
 from bolsa_application.auto_v2_entry import (
     edge_from_package as _edge_from_package,
 )
+from bolsa_application.closed_bars import (
+    bar_tick,
+    last_closed_bar_day,
+    make_closed_bar_loader,
+)
 from bolsa_application.cycle_risk import CycleRisk, cycle_risk_from_reservations
 from bolsa_application.decision_contract import (
     DecisionPackage,
@@ -232,6 +237,7 @@ from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_UNKNOWN,
     reconcile_sim_account,
 )
+from bolsa_application.simulated_broker import fill_seed
 from bolsa_application.simulated_settlement import (
     normalized_auto_venue,
     submit_simulated_order,
@@ -294,6 +300,12 @@ def sim_worker_enabled() -> bool:
 
 
 # ── Reloj / precio SIM deterministas (inyectables; "minutos simulados") ─────────
+#: Precio por ``(símbolo, tick)``. ``tick`` es el índice temporal del CALENDARIO del
+#: proveedor: el worker le pasa el **tick de BARRA** (``closed_bars.bar_tick``), que es
+#: estable dentro de la barra, para que la referencia de EJECUCIÓN de un reintento
+#: intra-barra sea la MISMA (idempotencia del fill). Los proveedores actuales ignoran el
+#: argumento (constante, snapshot vivo, reloj del replay), así que pasar el tick de barra
+#: en vez del minuto no mueve ningún precio; lo que fija es el CONTRATO temporal.
 PriceScript = Callable[[str, int], float]
 Clock = Callable[[], datetime]
 
@@ -315,7 +327,7 @@ def step_minute_clock(
     return cur["now"], clock
 
 
-def flat_price_script(_symbol: str, _minute: int) -> float:
+def flat_price_script(_symbol: str, _tick: int) -> float:
     """Precio plano determinista por defecto (sin movimientos del mercado)."""
     return 100.0
 
@@ -949,7 +961,18 @@ class AutoSimulationWorker:
         self._open: dict[str, Decimal] = {}
         # V2.24/A9.1 (P1-03): identidades de orden lógicas únicas por intención, para
         # namespacear el ``execution_id`` (no colisión entre cuentas/engines).
+        # W3 (v2.88.16): ``_order_seq`` deja de formar parte de la IDENTIDAD (que se ancla a
+        # la barra) pero se CONSERVA como contador monotónico de INTENT de entrada del
+        # worker: es la telemetría declarada de AUTO-6 (invariante ``Σ _order_seq == 1`` de
+        # las suites hermética y PG concurrentes) y la traza histórica del día.
         self._order_seq: int = 0
+        # W3 (v2.88.16): ordinal de INTENCIÓN **dentro de la barra corriente**. La identidad
+        # lógica de la orden se ancla al tick de barra (estable dentro de la barra) + este
+        # ordinal, de modo que un reintento intra-barra reproduce la MISMA identidad y la
+        # liquidación la resuelve ``already_applied`` (no abre dos veces). Se reinicia al
+        # cambiar de barra: una intención nueva de otra barra no colisiona con la anterior.
+        self._v2_intent_bar = ""
+        self._v2_intent_seq: dict[tuple[str, str], int] = {}
         self._active_orders: dict[str, str] = {}
         self._journal: list[SimJournalRow] = []
         # V2.23/A9: última razón del gate determinista (para telemetría/durable).
@@ -1206,11 +1229,29 @@ class AutoSimulationWorker:
         V2.43.3: una salida con ``exit_order_id`` embebe su identidad durable, de modo que
         ``logical_order_id`` → ``venue_order_id`` → ``execution_id`` queden atribuidos al
         INTENT concreto (y un reinicio no re-genere la misma traza por casualidad).
+
+        W3 (v2.88.16): la intención SIN identidad durable se ancla a la **barra** (tick de
+        barra + ordinal de la intención dentro de esa barra), no al minuto. Es lo que hace
+        que un reintento intra-barra del MISMO intento reproduzca el mismo ``execution_id``
+        (el ledger lo resuelve ``already_applied``) en vez de abrir una segunda ejecución.
+        El ordinal se reinicia al cambiar de barra: una intención NUEVA de otra barra no
+        colisiona con la anterior.
         """
         if exit_order_id:
             return f"{self._engine_id}-{side}-{symbol}-{exit_order_id}"
+        # ``_order_seq`` es el contador MONOTÓNICO de INTENT de entrada del worker
+        # (telemetría y el invariante de AUTO-6 ``Σ _order_seq == 1``): se incrementa
+        # exactamente donde lo hacía antes de W3 (una entrada emitida), mientras que la
+        # IDENTIDAD de la orden pasa a anclarse a la barra.
         self._order_seq += 1
-        return f"{self._engine_id}-{self._minute}-{side}-{symbol}-{self._order_seq}"
+        bar = self._v2_current_bar_start()
+        if bar != self._v2_intent_bar:
+            self._v2_intent_bar = bar
+            self._v2_intent_seq.clear()
+        key = (str(side).strip().lower(), str(symbol).strip())
+        ordinal = self._v2_intent_seq.get(key, 0) + 1
+        self._v2_intent_seq[key] = ordinal
+        return f"{self._engine_id}-{self._v2_bar_tick()}-{side}-{symbol}-{ordinal}"
 
     # ---- gate fail-closed / de autoridad (Bloque 3) --------------------------
     def _kill_active(self) -> bool:
@@ -1343,6 +1384,13 @@ class AutoSimulationWorker:
         structural = self._finance_applier is None
         venue = self._venue()
         logical_order_id = self._next_logical_order_id(symbol, side, exit_order_id)
+        # W3 (v2.88.16): la EJECUCIÓN se ancla a la barra (tick de barra, estable dentro de
+        # ella), no al minuto: el ``seed`` del book y la referencia de precio dejan de
+        # cambiar entre reintentos del mismo intento, así que un reintento intra-barra
+        # reproduce el MISMO ``execution_id`` y no mueve dinero dos veces. Lo que NO se toca
+        # aquí es el marco de la PROtección (reloj independiente, diseño v2): su lectura
+        # sigue siendo del tick corriente.
+        bar_tick_now = self._v2_bar_tick()
         try:
             result, outcomes = await submit_simulated_order(
                 self._exec_store,
@@ -1352,13 +1400,13 @@ class AutoSimulationWorker:
                 # V2.23/A9 (P2-12): cuenta SIM inequívoca (nunca ``None`` en motor real).
                 account_id=self._account_id,
                 venue=venue,
-                seed=self._minute * 100_003 + sum(map(ord, symbol)) % 9999,
-                base_mid=self._price_script(symbol, self._minute) or 100.0,
+                seed=fill_seed(bar_tick_now, symbol),
+                base_mid=self._price_script(symbol, bar_tick_now) or 100.0,
                 fill_chunks=_FILL_CHUNKS,
                 order_id=(
                     f"auto-{side}-{symbol}-{exit_order_id}"
                     if exit_order_id
-                    else f"auto-{side}-{symbol}-{self._minute}"
+                    else f"auto-{side}-{symbol}-{bar_tick_now}"
                 ),
                 # V2.24/A9.1 (P1-03): namespace de identidad (no colisión entre cuentas).
                 engine_id=self._engine_id,
@@ -3055,6 +3103,27 @@ class AutoSimulationWorker:
         """
         window = bar_window(self._time, self._v2_granularity.decision.timeframe)
         return window[0] if window is not None else ""
+
+    def _v2_bar_tick(self) -> int:
+        """``W3`` — índice ENTERO de la barra de decisión corriente (estable dentro de ella).
+
+        Es la unidad de identidad temporal del motor: con ella se anclan el ``seed`` del
+        fill y la identidad lógica de la orden, de modo que un reintento dentro de la misma
+        barra reproduce el MISMO ``execution_id`` (idempotente) en vez de una segunda
+        ejecución. Es también el ``tick`` que recibe ``PriceScript`` para la referencia de
+        EJECUCIÓN (un solo ancla temporal por barra).
+        """
+        return bar_tick(self._time, self._v2_granularity.decision.timeframe)
+
+    def _v2_closed_bar_as_of(self) -> str:
+        """``W3`` — ``as_of`` de la decisión: día de la última barra **CERRADA** (``B-1``).
+
+        Es la frontera de NO lookahead que se pasa a los cargadores de barras (señal,
+        régimen, ATR): la barra que contiene ``self._time`` NO está cerrada y no puede
+        alimentar la decisión. Fail-closed: si el timeframe no permite expresar la frontera
+        (barra sub-diaria o ilegible) devuelve ``""`` ⇒ ventana VACÍA ⇒ el motor no decide.
+        """
+        return last_closed_bar_day(self._time, self._v2_granularity.decision.timeframe)
 
     def _v2_roll_consumed_bar(self) -> None:
         """Al cambiar de barra, la memoria de consumo se reinicia.
@@ -5585,7 +5654,7 @@ def _compose_canonical_reader(session: Any) -> Any:
 
 
 def _compose_regime_source(
-    session: Any, *, watch: Sequence[str], math_version: str | None = None
+    session: Any, *, watch: Sequence[str], as_of: Any, math_version: str | None = None
 ) -> Any:
     """V2.40.1: régimen REAL del tick (barras del universo → régimen operativo).
 
@@ -5598,21 +5667,32 @@ def _compose_regime_source(
 
     V2.43/AUTO-3: ``math_version`` permite pedir ``discovery_market_regime_v1`` (añade
     ``low_vol``). Por defecto ``v0`` ⇒ comportamiento y etiquetas de siempre.
+
+    ``W3`` (v2.88.16): las barras se cargan con la **frontera de barras CERRADAS**
+    (``as_of`` = día de la última barra cerrada, parámetro OBLIGATORIO). Antes se leían las
+    últimas N barras SIN cota, de modo que el régimen veía el ``high``/``low`` de la barra
+    EN CURSO: un juicio sobre datos que la barra todavía no había cerrado. Ahora el régimen
+    de la barra ``B`` se decide con las barras ``<= B-1``. Sin ``as_of`` resoluble la
+    ventana es vacía ⇒ ``NO_REGIME`` (fail-closed), jamás "mercado operable" por defecto.
     """
-    from bolsa_application.active_strategy_signal_evaluator import (  # noqa: PLC0415
-        make_bar_snapshot_loader,
-    )
     from bolsa_infrastructure.database.repositories.ohlcv_repository import (  # noqa: PLC0415
         SqlAlchemyOhlcvRepository,
     )
 
-    loader = make_bar_snapshot_loader(SqlAlchemyOhlcvRepository(session), list(watch))
+    loader = make_closed_bar_loader(
+        SqlAlchemyOhlcvRepository(session),
+        list(watch),
+        as_of,
+        # Mismo techo de barras que el cargador histórico: W3 mueve la FRONTERA, no el
+        # presupuesto de lectura.
+        limit=120,
+    )
     if math_version is None:
         return DiscoveryRegimeSource(bars_provider=loader)
     return DiscoveryRegimeSource(bars_provider=loader, math_version=math_version)
 
 
-def _compose_atr_source(session: Any, *, watch: Sequence[str]) -> Any:
+def _compose_atr_source(session: Any, *, watch: Sequence[str], as_of: Any) -> Any:
     """V2.42 slice 2b (E2): ATR REAL del tick (barras del universo → ATR por símbolo).
 
     El motor AUTO abría con una geometría sintética (2% del precio) *fabricada en el
@@ -5622,17 +5702,20 @@ def _compose_atr_source(session: Any, *, watch: Sequence[str]) -> Any:
 
     Fail-closed: sin barras suficientes el símbolo queda SIN ATR (``atr_source`` lo
     declara) y con ``AUTO_ENGINE_SIM_V2_ATR_REQUIRED=1`` la candidata no entra.
+
+    ``W3`` (v2.88.16): la ventana es la de barras **CERRADAS** (``as_of`` obligatorio), la
+    MISMA que la del régimen: el ATR de la barra ``B`` no puede incluir el
+    ``high``/``low`` de la barra en curso.
     """
-    from bolsa_application.active_strategy_signal_evaluator import (  # noqa: PLC0415
-        make_bar_snapshot_loader,
-    )
     from bolsa_infrastructure.database.repositories.ohlcv_repository import (  # noqa: PLC0415
         SqlAlchemyOhlcvRepository,
     )
 
-    loader = make_bar_snapshot_loader(
+    loader = make_closed_bar_loader(
         SqlAlchemyOhlcvRepository(session),
         list(watch),
+        as_of,
+        limit=120,
     )
     return AtrSource(bars_provider=loader)
 
@@ -5723,6 +5806,7 @@ async def load_active_strategy_decider(
     lot_qty: float = 100.0,
     ohlcv: Any = None,
     signal_enabled: bool = False,
+    as_of: Any = None,
 ) -> DecisionProvider | None:
     """Carga la estrategia ACTIVE del store y la expone vía ``DecisionProvider``.
 
@@ -5738,6 +5822,11 @@ async def load_active_strategy_decider(
     Sin snapshot, sin definición ejecutable o ante error de evaluación, la ACTIVE
     devuelve HOLD; NUNCA hereda la acción de otra estrategia. ``ohlcv`` permite inyectar
     el repo en tests; si es ``None`` se compone por sesión.
+
+    ``W3`` (v2.88.16): ``as_of`` es la **frontera de barras cerradas** que alimenta la
+    señal (día de la última barra cerrada, o provider). Es un parámetro EXPLÍCITO: si no
+    se declara, la señal se evalúa como antes (sin cota) y eso es un lookahead declarado
+    del llamante, no un default escondido del motor.
     """
     if not active_strategy_enabled():
         return None
@@ -5762,6 +5851,7 @@ async def load_active_strategy_decider(
                     lot_qty=lot_qty,
                     ohlcv=repo,
                     instrument_id=instrument_id,
+                    as_of=as_of,
                 )
 
         return active_strategy_decider(
@@ -5782,12 +5872,19 @@ async def _build_signal_decider(
     lot_qty: float,
     ohlcv: Any,
     instrument_id: str,
+    as_of: Any = None,
 ) -> DecisionProvider:
     """Compone el ``DecisionProvider`` con SignalEvaluator real + snapshot de barras.
 
     El snapshot se carga con la sesión viva del llamante (async) y se cierra sobre el
     decisor síncrono. Cualquier fallo del snapshot se absorbe: el símbolo sin datos
     hará HOLD (fail-closed), nunca se delega en otra estrategia (V2.31/A11).
+
+    ``W3`` (v2.88.16): el snapshot se carga con la frontera de barras CERRADAS cuando el
+    llamante declara ``as_of`` (el motor lo hace con ``_v2_closed_bar_as_of``). Con
+    ``as_of`` declarado, una ventana vacía (frontera no expresable, p. ej. granularidad
+    sub-diaria) deja el símbolo SIN barras ⇒ HOLD: fail-closed, nunca se decide con la
+    barra en curso.
     """
     from bolsa_application.active_strategy_signal_evaluator import (
         make_active_strategy_decider,
@@ -5797,12 +5894,25 @@ async def _build_signal_decider(
     symbols = tuple(str(s) for s in (record.active.definition.get("watch") or watch)) or (
         instrument_id,
     )
-    refresh = make_bar_snapshot_loader(ohlcv, symbols, limit=_signal_snapshot_limit())
-    snapshot = await refresh()
+    limit = _signal_snapshot_limit()
+    refresh = (
+        make_closed_bar_loader(ohlcv, symbols, as_of, limit=limit)
+        if as_of is not None
+        else make_bar_snapshot_loader(ohlcv, symbols, limit=limit)
+    )
+    loaded = await refresh()
+
+    def _bars_for(symbol: str) -> list[Any]:
+        # Fail-closed: sin snapshot legible no hay barras ⇒ el decisor hace HOLD.
+        if not isinstance(loaded, dict):
+            return []
+        entry = loaded.get(symbol)
+        return list(entry) if entry else []
+
     return make_active_strategy_decider(
         active=record.active,
         watch=watch,
-        bars_by_symbol=snapshot.get,
+        bars_by_symbol=_bars_for,
         lot_qty=lot_qty,
     )
 
@@ -5996,13 +6106,21 @@ class AutoSimRuntime:
                 or _compose_regime_source(
                     session,
                     watch=tuple(_watch_symbols()),
+                    # W3: frontera de barras CERRADAS (B-1). El provider lee el reloj del
+                    # worker en cada refresco, así que el turno siguiente mueve la frontera
+                    # sin recomponer nada (una sola composición por sesión/tick).
+                    as_of=self._worker._v2_closed_bar_as_of,  # noqa: SLF001 — seam interno.
                     math_version=tunables_from_env().regime_math_version,
                 ),
                 trade_context_source=self._trade_context_source
                 or _compose_trade_context_source(session),
                 edge_source=self._edge_source or _compose_edge_source(session),
                 atr_source=self._atr_source
-                or _compose_atr_source(session, watch=tuple(_watch_symbols())),
+                or _compose_atr_source(
+                    session,
+                    watch=tuple(_watch_symbols()),
+                    as_of=self._worker._v2_closed_bar_as_of,  # noqa: SLF001 — seam interno.
+                ),
             )
 
 
@@ -6140,6 +6258,11 @@ def start_auto_sim_worker(
                     instrument_id=effective_account,
                     watch=spine_watch,
                     signal_enabled=active_strategy_signal_enabled(),
+                    # W3: la señal se evalúa con las barras CERRADAS hasta la barra anterior
+                    # (provider sobre el reloj del worker: el refresco es previo al turno,
+                    # así que la frontera va como mínimo un tick por detrás del reloj vivo
+                    # — estrictamente conservador, jamás por delante).
+                    as_of=runtime.worker._v2_closed_bar_as_of,  # noqa: SLF001 — seam interno.
                 )
 
             decider_refresher = _refresh_active_decider

@@ -65,6 +65,7 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
 # reimplementarla. Lo único propio es la identidad del instrumento con fill PARCIAL.
 from tests.test_golden_day_v2_process_pg import (  # noqa: E402
     _assert_materialized_and_flat,
+    _bar_ticks,
     _count_buy_orders,
     _count_distinct_orders,
     _count_fill_contexts,
@@ -95,11 +96,11 @@ _CLOSED_DAY_POLLS = 4
 _SYMBOL = "CRV46"
 _SECTOR = "Technology"
 _INSTRUMENT_PREFIX = "inst-v46crash-"
-#: La entrada real del proceso ocurre en el PRIMER tick (minuto 1); se exige además el
-#: minuto 2 para tolerar un arranque que tarde un tick en aprobar (medido: minuto 1).
-_BUY_WINDOW = (1, 2)
-#: El ``time_exit`` cierra en los primeros ticks del proceso reiniciado.
-_SELL_WINDOW = (1, 2, 3)
+#: ``V2.88.16`` (``W3``): el ``seed`` del venue se ancla a la BARRA
+#: (``fill_seed(bar_tick(moment, timeframe), symbol)``) y es constante dentro de ella, así
+#: que la propiedad (BUY PARCIAL con ≥2 tranchas y SELL COMPLETO) se exige en la barra REAL
+#: del run — la de ahora y la siguiente, por si el run cruza la medianoche UTC
+#: (``_bar_ticks``, el MISMO helper que el Golden Day). Antes se exigía minuto a minuto.
 _FILL_CHUNKS = 4
 _MIN_BUY_CHUNKS = 2
 
@@ -121,37 +122,35 @@ def _crash_instrument_id(prefix: str) -> str:
     que decida el sizing del pipeline. Si ningún candidato cumpliera, el test falla con
     diagnóstico propio en vez de dejar un rojo espurio al azar.
     """
-    from bolsa_application.simulated_broker import simulated_fill_schedule
+    from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
 
-    def _probe(side: str, minute: int, candidate: str) -> Any:
+    def _probe(side: str, tick: int, candidate: str) -> Any:
         return simulated_fill_schedule(
             instrument_id=candidate,
             side=side,
             quantity=Decimal("100"),
-            venue_order_id=f"probe-{side}-{candidate}-{minute}",
-            seed=minute * 100_003 + sum(map(ord, candidate)) % 9999,
+            venue_order_id=f"probe-{side}-{candidate}-{tick}",
+            seed=fill_seed(tick, candidate),
             fill_chunks=_FILL_CHUNKS,
             base_mid=100.0,
         )
 
+    ticks = _bar_ticks()
     for n in range(8192):
         candidate = f"{prefix}{n:010d}"
         buy_partial = all(
-            _probe("buy", minute, candidate).status == "partial"
-            and len(_probe("buy", minute, candidate).fills) >= _MIN_BUY_CHUNKS
-            for minute in _BUY_WINDOW
+            _probe("buy", tick, candidate).status == "partial"
+            and len(_probe("buy", tick, candidate).fills) >= _MIN_BUY_CHUNKS
+            for tick in ticks
         )
         if not buy_partial:
             continue
-        sell_ok = all(
-            _probe("sell", minute, candidate).status == "filled" for minute in _SELL_WINDOW
-        )
+        sell_ok = all(_probe("sell", tick, candidate).status == "filled" for tick in ticks)
         if sell_ok:
             return candidate
     raise AssertionError(
         f"ningún id determinista de {prefix} tiene BUY PARCIAL (≥{_MIN_BUY_CHUNKS} "
-        f"tranchas) en {_BUY_WINDOW} y SELL COMPLETO en {_SELL_WINDOW}; revisar "
-        "``draw_queue_noise``"
+        f"tranchas) y SELL COMPLETO en las barras {ticks}; revisar ``draw_queue_noise``"
     )
 
 

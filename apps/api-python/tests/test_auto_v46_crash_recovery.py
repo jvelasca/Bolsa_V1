@@ -38,7 +38,7 @@ que el sizing del pipeline decida.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
 
@@ -50,6 +50,7 @@ from bolsa_api.background.auto_simulation_worker import (
 )
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
+from bolsa_application.closed_bars import bar_tick
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
 from bolsa_application.exit_order_store import InMemoryExitOrderStore
@@ -64,6 +65,7 @@ from bolsa_application.sim_reconciliation import (
     POSITION_PROJECTION_DIVERGENT,
     POSITION_PROJECTION_UNKNOWN,
 )
+from bolsa_application.simulated_broker import fill_seed
 
 ACCOUNT_ID = "acc-v46-crash"
 ENGINE_ID = "auto-sim-v46-crash"
@@ -74,11 +76,19 @@ _PROBE_QTY = Decimal("100")
 _FILL_CHUNKS = 4
 _MIN_BUY_CHUNKS = 2
 #: Ventanas de minutos probadas. El primer ``auto_turn`` de cada proceso avanza el reloj
-#: a minuto 1 (``_advance``), y la apertura/el cierre ocurren en los primeros turnos; se
-#: exige la propiedad en los minutos 1 y 2 de la BUY y en 1..3 de la SELL para que el
-#: reparto no dependa de cuántos turnos tarde el pipeline en aprobar o en cerrar.
+#: a minuto 1 (``_advance``), y la apertura/el cierre ocurren en los primeros turnos.
+#: ``W3``: con el seed anclado a la BARRA todos los minutos de la ventana comparten
+#: sorteo, así que la propiedad es de barra (el minuto solo fija el instante del turno).
 _BUY_WINDOW = (1, 2)
 _SELL_WINDOW = (1, 2, 3)
+#: Día del reloj del arnés (los minutos se derivan de aquí): el fixture y el worker deben
+#: mirar la MISMA barra.
+_CLOCK_DAY = datetime(2026, 9, 18, 9, 0, tzinfo=UTC)
+
+
+def _clock_moment(minute: int) -> datetime:
+    """Instante del turno ``minute`` del reloj del arnés (mismo que usa ``_worker``)."""
+    return _CLOCK_DAY + timedelta(minutes=minute)
 
 #: Equity declarada del primer proceso (día normal: la entrada se aprueba).
 _EQUITY_OPEN = "100000"
@@ -105,19 +115,24 @@ def v46_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def _partial_fill_instrument_id(prefix: str) -> str:
     """Id determinista cuyo BUY es PARCIAL (≥2 tranchas) y cuyo SELL llena COMPLETO.
 
-    Barrida pura (sin BD, sin proceso): mismo id en cada ejecución. Exige las dos
-    propiedades en TODA la ventana de minutos relevante, de modo que el reparto sea fijo
-    con independencia del minuto exacto en que el test abra y cierre.
+    Barrida pura (sin BD, sin proceso): mismo id en cada ejecución.
+
+    ``W3`` (v2.88.16): el seed se deriva con ``fill_seed(tick_de_barra, id)`` — la MISMA
+    función que el motor — y el ancla es la **barra**, no el minuto. La consecuencia es que
+    los minutos de las ventanas comparten sorteo (una barra = un desenlace de mercado), así
+    que la propiedad se exige a nivel de BARRA y ya no puede depender del minuto exacto en
+    que el test abra o cierre: el fixture queda más robusto, no menos.
     """
     from bolsa_application.simulated_broker import simulated_fill_schedule
 
     def _probe(side: str, minute: int, candidate: str, quantity: Decimal) -> object:
+        moment = _clock_moment(minute)
         return simulated_fill_schedule(
             instrument_id=candidate,
             side=side,
             quantity=quantity,
             venue_order_id=f"probe-{side}-{candidate}-{minute}",
-            seed=minute * 100_003 + sum(map(ord, candidate)) % 9999,
+            seed=fill_seed(bar_tick(moment, "1d"), candidate),
             fill_chunks=_FILL_CHUNKS,
             base_mid=100.0,
         )
@@ -187,7 +202,7 @@ def _worker(stores: _Stores, *, minute: int, decider: _Prov) -> AutoSimulationWo
     async def _edge(_ref: str, _account: str | None) -> float | None:
         return 0.9
 
-    _start, clock = step_minute_clock(datetime(2026, 9, 18, 9, minute, tzinfo=UTC))
+    _start, clock = step_minute_clock(_clock_moment(minute))
     return AutoSimulationWorker(
         clock=clock,
         exec_store=stores.exec_store,

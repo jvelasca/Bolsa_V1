@@ -55,6 +55,18 @@ _ATR = 2.0  # 2 % de 100 ⇒ stop estructural en 100 − 1.5×2 = 97.
 _ENTRY = 100.0
 _BREAK = 96.0  # rompe el stop (97): dispara la salida estructural del arm V2.
 _LOT = 100.0
+#: ``W3`` (v2.88.16) — la orden de entrada la dimensiona el SIZING del motor, no la
+#: ``quantity`` del decider (que en el camino v2 solo propone la SEÑAL). Con la config
+#: PINNED de este harness (``AUTO_ENGINE_SIM_V2_EQUITY=100000``, ``RISK_BUDGET_PCT``=6,
+#: ``ATR=2.0``, ``ENTRY=100``, régimen ``BULL_TREND``, ``TOP_N=5``) el tamaño es **200 uds**.
+#: El sondeo exige el llenado COMPLETO de esa cantidad: antes bastaba con que hubiera
+#: ALGÚN fill, y un fill parcial dejaba un residuo que —con el seed anclado a la barra—
+#: no se limpiaba dentro del día y envenenaba los round-trips posteriores que reusaban el
+#: mismo instrumento (la posición durable entraba ya ``>0`` y el decider quedaba en HOLD).
+_ORDER_QTY = Decimal("200")
+#: Prefijo de la familia de instrumentos; cada round-trip usa una sub-familia por DÍA para
+#: que un residuo puntual no pueda contaminar la barra siguiente.
+_INSTRUMENT_FAMILY = "v75-sample-"
 _MINUTE_STEP = timedelta(minutes=1)
 _TICKS_PER_PHASE = 12
 
@@ -79,37 +91,61 @@ def _configure_env(*, venue: str) -> None:
 
 
 _FILL_CHUNKS = 4  # espeja ``auto_simulation_worker._FILL_CHUNKS``.
-#: Ventana de minutos (la del worker: ``seed = minute * 100_003 + sum(ord(symbol)) % 9999``) que la
-#: barrida exige que llene. Con worker NUEVO por round-trip, ``_minute`` arranca en ~1 y el
-#: round-trip entero (apertura + cierre) cae dentro de esta ventana.
-_FILL_WINDOW = range(0, 16)
+#: Reloj PINNED del harness: el round-trip ``day`` vive en ``_CLOCK_DAY + day`` días y avanza
+#: ``_TICKS_PER_PHASE`` minutos desde ahí.
+_CLOCK_DAY = datetime(2026, 9, 15, 9, 0, tzinfo=UTC)
+#: ``V2.88.16`` (``W3``) — la barrida es POR BARRA, no por minuto. El ``seed`` del venue se
+#: ancla a la barra (``fill_seed(bar_tick(moment, timeframe), symbol)``) y es constante dentro
+#: de ella, así que: (a) el ``_minute`` del worker **ya no** cambia el sorteo (el truco de
+#: «worker nuevo por round-trip para volver a la ventana» deja de tener efecto) y (b) exigir
+#: un ÚNICO id que llene en 40 barras distintas es imposible (≈``0,78**40``). El harness elige
+#: por tanto el id **de la barra de cada round-trip**: un id por día, determinista.
+_TICK_WINDOW = range(0, _TICKS_PER_PHASE + 4)
 
 
-def _filling_instrument_id(prefix: str) -> str:
-    """Id determinista cuya orden LLENA (BUY y SELL) en toda la ventana de minutos (cola SIM).
+def _bar_ticks_for_day(day: int) -> tuple[int, ...]:
+    """Barras que el round-trip ``day`` puede atravesar (mismo ancla que el motor)."""
+    from bolsa_application.closed_bars import bar_tick
 
-    El seed real del worker es ``minute * 100_003 + sum(map(ord, symbol)) % 9999`` y ``_minute``
-    avanza 1 por turno, así que un id que llena en ``_FILL_WINDOW`` garantiza que TANTO la entrada
-    (buy) como la salida estructural (sell) se materialicen. Se exige **los dos lados** porque el
-    ciclo necesita cerrar: un SELL sin llenar dejaría la posición abierta y el ciclo inexistente.
+    return tuple(
+        sorted(
+            {
+                bar_tick(_CLOCK_DAY + timedelta(days=day, minutes=m), "1d")
+                for m in _TICK_WINDOW
+            }
+        )
+    )
+
+
+def _filling_instrument_id(prefix: str, *, day: int) -> str:
+    """Id determinista cuya orden LLENA (BUY y SELL) en la BARRA del round-trip ``day``.
+
+    Un id por barra: con el ancla por barra el sorteo depende de ``(barra, id)``, así que la
+    familia ``prefix`` se recorre hasta dar con el id que llena **COMPLETA** (``status ==
+    "filled"``, no solo «algún fill») la orden en ambos sentidos y a la cantidad REAL del
+    motor (``_ORDER_QTY``). Se exigen los DOS lados porque el ciclo necesita cerrar: un SELL
+    con residuo dejaría la posición abierta y el ciclo inexistente. La completitud es lo que
+    ``W3`` obliga: con el seed anclado a la barra un fill parcial NO se reintenta dentro del
+    día, así que un sondeo que acepte parciales garantiza residuo.
     """
-    from bolsa_application.simulated_broker import simulated_fill_schedule
+    from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
 
+    ticks = _bar_ticks_for_day(day)
     for n in range(512):
         candidate = f"{prefix}{n:010d}"
         ok = True
         for side in ("buy", "sell"):
-            for minute in _FILL_WINDOW:
+            for tick in ticks:
                 schedule = simulated_fill_schedule(
                     instrument_id=candidate,
                     side=side,
-                    quantity=Decimal("100"),
-                    venue_order_id=f"probe-{side}-{candidate}-{minute}",
-                    seed=minute * 100_003 + sum(map(ord, candidate)) % 9999,
+                    quantity=_ORDER_QTY,
+                    venue_order_id=f"probe-{side}-{candidate}-{tick}",
+                    seed=fill_seed(tick, candidate),
                     fill_chunks=_FILL_CHUNKS,
                     base_mid=_ENTRY,
                 )
-                if not schedule.fills:
+                if schedule.status != "filled":
                     ok = False
                     break
             if not ok:
@@ -117,7 +153,8 @@ def _filling_instrument_id(prefix: str) -> str:
         if ok:
             return candidate
     raise AssertionError(
-        f"ningún id determinista de {prefix} llena (buy+sell) en {len(_FILL_WINDOW)} minutos"
+        f"ningún id determinista de {prefix} llena (buy+sell) POR COMPLETO "
+        f"({_ORDER_QTY} uds) en las barras {ticks} del round-trip {day}"
     )
 
 
@@ -229,9 +266,10 @@ async def _run_one_round_trip(
 
     Worker nuevo por round-trip por DOS razones, ambas legítimas (no se desactiva ningún dedupe):
 
-    * ``_minute`` (que arranca en ~1 y avanza por turno) vuelve a la ventana donde el sondeo
-      garantiza el llenado de AMBOS lados. Con un único worker, ``_minute`` crecía y las entradas
-      posteriores caían fuera de esa ventana: el fill es probabilístico por ``seed``.
+    * ``V2.88.16`` (``W3``): el ``seed`` del venue se ancla a la BARRA, así que el sorteo es
+      ``(barra, instrumento)`` y **no** depende de ``_minute``. El worker sigue siendo nuevo por
+      round-trip (aislamiento de RAM y de IDs de engine), pero el llenado lo garantiza el id
+      elegido **para la barra de este día** (``_filling_instrument_id``).
     * La identidad de señal es por BARRA DIARIA (``bar_timestamp`` = inicio del día): cada
       round-trip vive en un DÍA distinto, así el dedupe anti-repetición (``sim_consumed_signals``)
       no bloquea la entrada siguiente.
@@ -243,7 +281,7 @@ async def _run_one_round_trip(
 
     os.environ[_SYMBOLS_ENV] = instrument_id
     prices = {instrument_id: _ENTRY}
-    holder = {"now": datetime(2026, 9, 15, 9, 0, tzinfo=UTC) + timedelta(days=day)}
+    holder = {"now": _CLOCK_DAY + timedelta(days=day)}
 
     worker = AutoSimulationWorker(
         engine_id=engine_id,
@@ -297,12 +335,17 @@ async def _run_round_trips(
     factory: Any,
     *,
     account_id: str,
-    instrument_id: str,
+    instrument_ids: tuple[str, ...],
     engine_base: str,
     round_trips: int,
     ticks: int,
 ) -> dict[str, Any]:
-    """Encadena ``round_trips`` round-trips y devuelve el conteo (sin abortar por un fallo)."""
+    """Encadena ``round_trips`` round-trips y devuelve el conteo (sin abortar por un fallo).
+
+    ``V2.88.16`` (``W3``): el id del instrumento es **por día** (cada round-trip vive en su
+    propia barra y el sorteo del venue es ``(barra, instrumento)``), así que el llamante pasa
+    la tupla completa elegida barra a barra.
+    """
     opened = 0
     closed = 0
     failed: list[int] = []
@@ -310,7 +353,7 @@ async def _run_round_trips(
         closed_ok = await _run_one_round_trip(
             factory,
             account_id=account_id,
-            instrument_id=instrument_id,
+            instrument_id=instrument_ids[index],
             engine_id=f"{engine_base}-{index:03d}",
             day=index,
             ticks=ticks,
@@ -421,20 +464,27 @@ async def _run(*, round_trips: int, min_cycles: int) -> dict[str, Any]:
     await asyncio.to_thread(ensure_migrated)
     engine = create_engine(settings)
     factory = create_session_factory(engine)
-    instrument_id = _filling_instrument_id("v75-sample-")
+    # ``W3``: un id (barra, instrumento) por round-trip — el sorteo del venue se ancla a la
+    # barra, así que la garantía de llenado es por día y no por una ventana de minutos. La
+    # sub-familia es por DÍA para que un residuo puntual no contamine la barra siguiente.
+    instrument_ids = tuple(
+        _filling_instrument_id(f"{_INSTRUMENT_FAMILY}{day:02d}-", day=day)
+        for day in range(round_trips)
+    )
     account_id = ""
     engine_base = f"auto-v75-{os.urandom(4).hex()}"
     try:
         async with factory() as session:
             account_id = await _seed_account(session)
-            await _seed_instrument(session, instrument_id)
+            for instrument_id in instrument_ids:
+                await _seed_instrument(session, instrument_id)
             await _seed_edge_report(
                 session, account_id=account_id, strategy_ref=_STRATEGY_VERSION
             )
         run = await _run_round_trips(
             factory,
             account_id=account_id,
-            instrument_id=instrument_id,
+            instrument_ids=instrument_ids,
             engine_base=engine_base,
             round_trips=round_trips,
             ticks=_TICKS_PER_PHASE,
@@ -448,7 +498,11 @@ async def _run(*, round_trips: int, min_cycles: int) -> dict[str, Any]:
         "phase": "V2.75 AUTO-MATERIAL-3 EVIDENCE READY",
         "strategyVersion": _STRATEGY_VERSION,
         "account": account_id,
-        "instrument": instrument_id,
+        # ``W3``: la muestra se acumula con UN id por barra (el sorteo del venue se ancla a la
+        # barra), así que la evidencia declara la FAMILIA y el número de instrumentos, no un
+        # único id. Cambio declarado del esquema del JSON: ``instrument`` → ``instruments``.
+        "instrumentFamily": _INSTRUMENT_FAMILY,
+        "instruments": list(instrument_ids),
         "engineBase": engine_base,
         "run": run,
         "sample": _sample_row(readiness),
@@ -510,7 +564,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         _print_sample(evidence["sample"], evidence["run"], min_cycles=int(args.min_cycles))
         print(f"\naccount         {evidence['account']}")
-        print(f"instrument      {evidence['instrument']}")
+        print(f"instruments     {len(evidence['instruments'])} ({evidence['instrumentFamily']}…)")
         if evidence["blockers"]:
             print("\nBLOCKERS")
             for blocker in evidence["blockers"]:

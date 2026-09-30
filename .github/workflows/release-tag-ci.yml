@@ -561,6 +561,7 @@ jobs:
           apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py
           packages/py/application/tests/test_replay_oos_durable_cycle.py
           packages/py/application/tests/test_operative_granularity_policy.py
+          packages/py/application/tests/test_closed_bars.py
           apps/api-python/tests
           --ignore=apps/api-python/tests/integration
           --ignore=apps/api-python/tests/test_lists.py

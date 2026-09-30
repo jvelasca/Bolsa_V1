@@ -61,6 +61,14 @@ _ENTRY = 100.0
 _BREAK = 96.0  # rompe el stop (97): dispara la salida estructural del arm V2.
 _LOT = 100.0
 _MINUTE_STEP = timedelta(minutes=1)
+#: Reloj PINNED del harness: cada fase avanza ``_TICKS_PER_PHASE`` minutos desde aquí.
+_CLOCK_DAY = datetime(2026, 9, 15, 9, 0, tzinfo=UTC)
+_TICKS_PER_PHASE = 12
+#: ``V2.88.16`` (``W3``): el ``seed`` del venue se ancla a la BARRA
+#: (``fill_seed(bar_tick(moment, timeframe), symbol)``), no al minuto, así que la barrida
+#: exige la propiedad en las BARRAS que el run puede atravesar —deducidas de la MISMA
+#: ventana de ticks— en vez de exigirla minuto a minuto.
+_TICK_WINDOW = range(0, _TICKS_PER_PHASE + 1)
 
 
 def _configure_env(*, venue: str) -> None:
@@ -81,14 +89,24 @@ def _configure_env(*, venue: str) -> None:
     )
 
 
+def _bar_ticks() -> tuple[int, ...]:
+    """Barras que el run puede atravesar con el reloj PINNED del harness (mismo ancla)."""
+    from bolsa_application.closed_bars import bar_tick
+
+    return tuple(
+        sorted({bar_tick(_CLOCK_DAY + timedelta(minutes=m), "1d") for m in _TICK_WINDOW})
+    )
+
+
 def _filling_instrument_id(prefix: str, *, side: str = "buy") -> str:
-    """Id determinista cuya orden ``side`` LLENA en toda la ventana de ticks (cola SIM).
+    """Id determinista cuya orden ``side`` LLENA en las barras del run (cola SIM).
 
     Misma barrida que ``test_auto_v2_durable_pg``: sin esto el sorteo del venue puede dejar la
     entrada sin llenar y el rojo sería espurio (no un defecto del productor).
     """
-    from bolsa_application.simulated_broker import simulated_fill_schedule
+    from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
 
+    ticks = _bar_ticks()
     for n in range(64):
         candidate = f"{prefix}{n:010d}"
         fills = [
@@ -96,17 +114,17 @@ def _filling_instrument_id(prefix: str, *, side: str = "buy") -> str:
                 instrument_id=candidate,
                 side=side,
                 quantity=Decimal("100"),
-                venue_order_id=f"probe-{candidate}-{minute}",
-                seed=minute * 100_003 + sum(map(ord, candidate)) % 9999,
+                venue_order_id=f"probe-{candidate}-{tick}",
+                seed=fill_seed(tick, candidate),
                 fill_chunks=4,
                 base_mid=_ENTRY,
             ).fills
-            for minute in range(0, 9)
+            for tick in ticks
         ]
         if all(fills):
             return candidate
     raise AssertionError(
-        f"ningún id determinista de {prefix} llena en la ventana de minutos con la cola SIM"
+        f"ningún id determinista de {prefix} llena en las barras {ticks} con la cola SIM"
     )
 
 
@@ -234,7 +252,7 @@ async def _run_arm(
     # El watch del tick se lee por env en cada turno: cada arm vigila SU instrumento.
     os.environ[_SYMBOLS_ENV] = instrument_id
     prices = {instrument_id: _ENTRY}
-    holder = {"now": datetime(2026, 9, 15, 9, 0, tzinfo=UTC)}
+    holder = {"now": _CLOCK_DAY}
 
     worker = AutoSimulationWorker(
         engine_id=engine_id,

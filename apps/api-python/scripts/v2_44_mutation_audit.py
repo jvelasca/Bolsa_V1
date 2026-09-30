@@ -770,6 +770,12 @@ T_OPERATIVE_GRANULARITY_POLICY = (
 AUTO_SIM_WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
 T_AUTO_BAR_SHORT_CIRCUIT = "apps/api-python/tests/test_auto_v2_bar_short_circuit.py"
 
+# W3 (Fase B, anclaje temporal de BARRA). La costura nueva: el motor ancla el fill y la
+# identidad de la orden a la barra (``bar_tick``), y alimenta señal/régimen/ATR con la
+# frontera de barras CERRADAS (``B-1``). La suite del sello mide las dos mitades: que la
+# decisión no ve la barra en curso y que un reintento intra-barra no re-tira el dado.
+T_AUTO_CLOSED_BARS_SEAM = "apps/api-python/tests/test_auto_v2_closed_bars_and_bar_idempotency.py"
+
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
@@ -3040,6 +3046,37 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "                self._v2_plan = await self._v2_plan_tick(reuse_bar_datum=same_bar_datum)\n",
         "                self._v2_plan = await self._v2_plan_tick(reuse_bar_datum=False)\n",
         (T_AUTO_BAR_SHORT_CIRCUIT,),
+    ),
+    # ── W3 / v2.88.16: anclaje temporal de BARRA (frontera cerrada + idempotencia) ──
+    (
+        "M279 (W3, LOOKAHEAD): la frontera de barras cerradas devuelve el dia de la barra EN CURSO -> la senal, el regimen y el ATR se deciden con datos que la barra todavia no ha cerrado",
+        CLOSED_BARS,
+        "    start = parse_bar_timestamp(window[0])\n"
+        "    return (start - timedelta(seconds=1)).strftime(\"%Y-%m-%d\")\n",
+        "    start = parse_bar_timestamp(window[0])\n"
+        "    return start.strftime(\"%Y-%m-%d\")\n",
+        (T_AUTO_CLOSED_BARS_SEAM, T_CLOSED_BARS),
+    ),
+    (
+        "M280 (W3, seed por MINUTO): el fill vuelve a anclarse al minuto del bucle -> un reintento intra-barra es un sorteo NUEVO (puede llenar lo que la barra ya rechazo y duplicar dinero)",
+        AUTO_SIM_WORKER,
+        "                seed=fill_seed(bar_tick_now, symbol),\n",
+        "                seed=fill_seed(self._minute, symbol),\n",
+        (T_AUTO_CLOSED_BARS_SEAM,),
+    ),
+    (
+        "M281 (W3, bar_tick CONSTANTE): el indice de barra deja de depender del instante -> todas las barras comparten ancla y la identidad de la orden colisiona entre dias",
+        CLOSED_BARS,
+        "    return int(parse_bar_timestamp(window[0]).timestamp() // seconds)\n",
+        "    return 0\n",
+        (T_AUTO_CLOSED_BARS_SEAM, T_CLOSED_BARS),
+    ),
+    (
+        "M282 (W3, ejecucion en D / CLOSE(D)): el ancla de ejecucion se corre a la barra YA CERRADA en vez de a la barra corriente (OPEN(D+1)) -> se ejecuta con el reloj, no con la barra que decide",
+        AUTO_SIM_WORKER,
+        "        return bar_tick(self._time, self._v2_granularity.decision.timeframe)\n",
+        "        return bar_tick(self._time, self._v2_granularity.decision.timeframe) - 1\n",
+        (T_AUTO_CLOSED_BARS_SEAM,),
     ),
 ]
 

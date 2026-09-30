@@ -166,36 +166,41 @@ _CERT_FILL_CHUNKS = 4
 def _filling_instrument_id(prefix: str, *, side: str) -> str:
     """Instrumento determinista cuya orden ``side`` NO topa con una costa terminal.
 
-    El venue SIM decide si una orden llena a partir de ``draw_queue_noise(seed, instrument,
-    side)`` con ``seed = sum(ord(symbol)) % 9999`` en el primer tick de un proceso recién
-    arrancado (``_minute = 0``). Es decir: **el resultado depende del id del instrumento**, y
-    con un id aleatorio la orden puede caer en ``noise_reject``/``noise_timeout``/
-    ``noise_market_closed``/``noise_unavailable``/``noise_unknown`` (o en el residual que no
-    llena) ⇒ ``fills=()`` ⇒ el spine determinista ya no vuelve a proponer entrada en ese
-    proceso y el día AUTO nunca ocurre. Medido sobre 5 000 ids aleatorios de esta familia:
-    **12,4 %** de las ejecuciones se quedaban sin entrada — rojo espurio, sin defecto.
+    ``W3`` (v2.88.16): el venue SIM ancla su ruido a la BARRA
+    (``fill_seed(bar_tick(moment, timeframe), symbol)``), no al minuto del bucle. La barrida
+    usa la MISMA derivación que el motor sobre las barras que un run de reloj REAL puede
+    atravesar — la de ahora y la siguiente, por si el run cruza la medianoche UTC —, así que
+    un cambio de barra no convierte la elección en un rojo espurio. Con un id aleatorio la
+    orden puede caer en ``noise_reject``/``noise_timeout``/``noise_market_closed``/
+    ``noise_unavailable``/``noise_unknown`` (o en el residual que no llena) ⇒ ``fills=()`` ⇒
+    el spine determinista ya no vuelve a proponer entrada en ese proceso y el día AUTO nunca
+    ocurre.
 
-    La barrida es pura (sin BD, sin proceso) y determinista: mismo id en cada ejecución,
+    La barrida es pura (sin BD, sin proceso) y determinista: mismo id en cada ejecución del
     mismo día simulado. Si ningún candidato llenara, el test falla con diagnóstico propio en
     vez de quedarse esperando 120 s.
     """
-    from decimal import Decimal
+    from datetime import UTC, datetime, timedelta
 
-    from bolsa_application.simulated_broker import simulated_fill_schedule
+    from bolsa_application.closed_bars import bar_tick
+    from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
 
+    now = datetime.now(UTC)
+    ticks = (bar_tick(now, "1d"), bar_tick(now + timedelta(days=1), "1d"))
     for n in range(64):
         candidate = f"{prefix}{n:010d}"
-        seed = sum(map(ord, candidate)) % 9999
-        schedule = simulated_fill_schedule(
-            instrument_id=candidate,
-            side=side,
-            quantity=Decimal("100"),
-            venue_order_id=f"probe-{candidate}",
-            seed=seed,
-            fill_chunks=_CERT_FILL_CHUNKS,
-            base_mid=100.0,
-        )
-        if schedule.fills:
+        if all(
+            simulated_fill_schedule(
+                instrument_id=candidate,
+                side=side,
+                quantity=Decimal("100"),
+                venue_order_id=f"probe-{side}-{candidate}-{tick}",
+                seed=fill_seed(tick, candidate),
+                fill_chunks=_CERT_FILL_CHUNKS,
+                base_mid=100.0,
+            ).fills
+            for tick in ticks
+        ):
             return candidate
     raise AssertionError(
         f"ningún instrumento determinista de {prefix} llena en la cola SIM ({side}); "

@@ -56,6 +56,19 @@ _THESIS_LEVEL = 99.5
 #: Precio que rompe el stop estructural (97) de ``CCC``.
 _STRUCTURAL_BREAK = 96.0
 
+#: ``W3`` (v2.88.16) — instante de arranque del día golden.
+#:
+#: El ruido del venue (``draw_queue_noise``) se deriva del **seed anclado a la barra**, no
+#: del minuto: las órdenes de la barra ``B`` se sortean UNA vez, de modo que un reintento
+#: dentro de la barra es un NO-OP idempotente (mismo ``execution_id``) y ya no re-tira el
+#: dado cada 60 s. La consecuencia LEGÍTIMA es que el guion del día exige una barra donde la
+#: premisa se sostenga: las tres compras y las dos salidas de la MISMA barra llenan
+#: completas. Con el 2026-09-15 histórico el buy de ``BBB`` topa con ``noise_reject`` (5,6 %
+#: de probabilidad por orden) y ya no se reintenta dentro de la barra — comportamiento
+#: correcto, día inválido como fixture. ``2026-09-17`` es la primera barra posterior que
+#: cumple la premisa (verificado con ``simulated_fill_schedule`` sobre el seed del tick).
+_GOLDEN_DAY = datetime(2026, 9, 17, 9, 0, tzinfo=UTC)
+
 
 class _Prov(Protocol):
     def __call__(self, symbol: str) -> DecisionPackage: ...
@@ -97,7 +110,7 @@ def _worker(*, clock=None, prices: dict[str, float], atr: bool = True, **kwargs:
     defaults.update(kwargs)
     defaults.setdefault("exec_store", InMemoryExecutionEventStore())
     if clock is None:
-        _start, clock = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+        _start, clock = step_minute_clock(_GOLDEN_DAY)
     return AutoSimulationWorker(clock=clock, **defaults)  # type: ignore[arg-type]
 
 
@@ -196,7 +209,7 @@ async def test_v2_golden_day_journal_evidences_time_exit_and_thesis_exit(
 ) -> None:
     """Un día completo declara ``time_exit`` y ``thesis_exit`` (criterio de salida)."""
     prices = {"AAA": 100.0, "BBB": 100.0, "CCC": 100.0}
-    holder, clock = _clock_holder(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    holder, clock = _clock_holder(_GOLDEN_DAY)
     worker = _worker(clock=clock, prices=prices)
 
     await _run_golden_day(worker, holder, prices)
@@ -282,7 +295,7 @@ async def test_v2_golden_day_never_reads_the_legacy_protection_policy(
     monkeypatch.setattr(worker_mod, "protection_exit_fraction", _boom)
 
     prices = {"AAA": 100.0, "BBB": 100.0, "CCC": 100.0}
-    holder, clock = _clock_holder(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    holder, clock = _clock_holder(_GOLDEN_DAY)
     worker = _worker(clock=clock, prices=prices)
 
     await _run_golden_day(worker, holder, prices)
@@ -338,7 +351,7 @@ async def test_v2_golden_day_funnel_types_every_rejection_and_prices_its_cost(
     """
     monkeypatch.setenv("AUTO_ENGINE_SIM_V2_TOP_N", "1")
     prices = {"AAA": 100.0, "BBB": 100.0, "CCC": 100.0}
-    holder, clock = _clock_holder(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    holder, clock = _clock_holder(_GOLDEN_DAY)
     worker = _worker(clock=clock, prices=prices)
 
     # El día abre las tres: con TOP_N=1 hay que rechazar candidatas en cada turno.

@@ -58,6 +58,25 @@ def sim_rand(seed: int, *context: object) -> float:
     return sim_hash_int(seed, *context) / (2**64)
 
 
+def fill_seed(bar_tick: int, instrument_id: str) -> int:
+    """Seed determinista del book SIM para ``(barra, instrumento)``.
+
+    ``W3`` (v2.88.16): el ancla temporal es el **tick de BARRA**
+    (``bolsa_application.closed_bars.bar_tick``), no el minuto del bucle:
+
+    * un reintento dentro de la MISMA barra sortea el MISMO libro ⇒ el intento es
+      idempotente de verdad (mismo ``execution_id`` y mismo schedule), y
+    * el ruido del venue deja de re-tirarse cada 60 s: la barra ``B`` tiene UN desenlace
+      de mercado, que es lo que un modelo D1 declara.
+
+    Esta función es la **única fuente** de la derivación. Los arneses que BUSCAN un
+    instrumento cuyo fill tenga un perfil concreto (parcial, lleno, rechazado) deben
+    derivar el seed con ESTA función: duplicar la fórmula los separa del motor en
+    silencio (era exactamente el caso antes de ``W3``).
+    """
+    return int(bar_tick) * 100_003 + sum(map(ord, str(instrument_id))) % 9999
+
+
 # Fases ruidosas de cola simuladas (close-loop de mercado) del audit §13.
 SimQueueEvent = Literal[
     "ok",  # camino normal.

@@ -42,7 +42,7 @@ Límites declarados (no se disfrazan)
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -112,91 +112,20 @@ _LONG_FRIENDLY_TRIAL: frozenset[str] = frozenset({"trend_up", "range", "high_vol
 
 
 # ── Barras acotadas a ``as_of`` (no lookahead) ────────────────────────────────────
+#
+# La frontera de barras CERRADAS vive en ``bolsa_application.closed_bars``: una sola
+# definición, compartida con el MOTOR AUTO desde ``W3`` · v2.88.16 (señal, régimen, ATR y
+# ancla del precio de ejecución). Aquí se re-exporta para no romper el contrato público de
+# este módulo: ``bar_day``/``clamp_bars_as_of``/``make_as_of_bar_loader`` siguen
+# importándose desde ``replay_oos`` y comportándose igual.
+from bolsa_application.closed_bars import (  # noqa: E402
+    bar_day,
+    clamp_bars_as_of,
+    make_closed_bar_loader,
+)
 
-
-def bar_day(bar: Any) -> str:
-    """Día ISO (``YYYY-MM-DD``) de una barra (``OhlcvBar`` o ``Mapping``); ``""`` si no hay."""
-    if isinstance(bar, Mapping):
-        raw = bar.get("timestamp") or bar.get("date")
-    else:
-        raw = getattr(bar, "timestamp", None) or getattr(bar, "date", None)
-    text = str(raw or "").strip()
-    return text[:10] if text else ""
-
-
-def _resolve_as_of(as_of: str | datetime | Callable[[], Any] | None) -> str:
-    """Normaliza ``as_of`` (str/datetime/provider) al día ISO ``YYYY-MM-DD``."""
-    value = as_of() if callable(as_of) else as_of
-    if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%d")
-    return str(value or "").strip()[:10]
-
-
-def clamp_bars_as_of(bars: Sequence[Any] | None, as_of: Any) -> list[Any]:
-    """Devuelve SOLO las barras con día ``<= as_of`` (guardia de NO lookahead).
-
-    Es la guardia en CLIENTE, independiente de que el repositorio soporte ``date_to``: una
-    barra sin fecha legible se DESCARTA (fail-closed), nunca se asume que es del pasado.
-    Sin ``as_of`` resoluble devuelve ``[]`` (sin fecha límite no hay ventana segura).
-    """
-    limit = _resolve_as_of(as_of)
-    if not limit:
-        return []
-    return [bar for bar in (bars or []) if (day := bar_day(bar)) and day <= limit]
-
-
-def make_as_of_bar_loader(
-    ohlcv: Any,
-    symbols: Sequence[str],
-    as_of: str | datetime | Callable[[], Any] | None,
-    *,
-    timeframe: Any = None,
-    limit: int | None = 10_000,
-) -> Callable[[], Awaitable[dict[str, list[Any]]]]:
-    """``refresh()`` async que precarga ``{symbol: [bars <= as_of]}`` (no lookahead).
-
-    Misma FORMA que ``make_bar_snapshot_loader`` (devuelve un ``refresh()`` async que el
-    worker invoca una vez por tick), pero acotando cada símbolo a ``timestamp <= as_of``.
-    ``as_of`` acepta un ``str``, un ``datetime`` o un **provider** (``Callable[[], ...]``),
-    de modo que el harness mueve la barra temporal entre ticks sin recomponer el loader.
-
-    El repositorio real soporta ``date_to`` y lo usamos (menos filas en vuelo); un port de
-    test que no lo soporte cae al camino sin filtro y la guardia en cliente hace el trabajo.
-    Un fallo por símbolo se ignora (ese símbolo se queda sin barras ⇒ fail-closed), nunca
-    aborta el refresco.
-    """
-    from bolsa_domain.value_objects.timeframe import TimeFrame  # noqa: PLC0415
-
-    effective_timeframe = timeframe if timeframe is not None else TimeFrame.D1
-    watch = tuple(str(s) for s in symbols)
-
-    async def refresh() -> dict[str, list[Any]]:
-        day = _resolve_as_of(as_of)
-        snapshot: dict[str, list[Any]] = {}
-        if not day:
-            return snapshot
-        for symbol in watch:
-            try:
-                try:
-                    bars = await ohlcv.get_bars(
-                        symbol,
-                        timeframe=effective_timeframe,
-                        limit=limit,
-                        date_to=day,
-                    )
-                except TypeError:
-                    # Port sin ``date_to`` (firma reducida): se pide sin filtro y la guardia
-                    # en cliente acota. No se degrada el invariante, solo se lee de más.
-                    bars = await ohlcv.get_bars(symbol, timeframe=effective_timeframe, limit=limit)
-            except Exception:  # noqa: BLE001 — sin barras ⇒ ese símbolo no decide (fail-closed).
-                logger.debug("replay as_of: no bars for %s", symbol, exc_info=True)
-                continue
-            clamped = clamp_bars_as_of(bars, day)
-            if clamped:
-                snapshot[str(symbol)] = clamped
-        return snapshot
-
-    return refresh
+#: Nombre histórico del cargador acotado a ``as_of`` (hoy ``make_closed_bar_loader``).
+make_as_of_bar_loader = make_closed_bar_loader
 
 
 # ── Reloj de un día por tick y precio histórico ───────────────────────────────────

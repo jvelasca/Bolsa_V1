@@ -57,6 +57,7 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from tests.test_golden_day_v2_process_pg import (  # noqa: E402
+    _bar_ticks,
     _env_for,
     _seed_account,
     _seed_edge_report,
@@ -71,9 +72,11 @@ _SECTOR = "Technology"
 _INSTRUMENT_PREFIX = "inst-v46conc-"
 _FILL_CHUNKS = 4
 _MIN_BUY_CHUNKS = 2
-#: La entrada real del proceso ocurre en el primer tick (minuto 1); se exige además el
-#: minuto 2 para tolerar un arranque que tarde un tick en aprobar.
-_ENTRY_WINDOW = (1, 2)
+#: ``V2.88.16`` (``W3``): el ``seed`` del venue se ancla a la BARRA
+#: (``fill_seed(bar_tick(moment, timeframe), symbol)``) y es constante dentro de ella, así
+#: que la propiedad (BUY PARCIAL con ≥2 tranchas) se exige en la barra REAL del run — la de
+#: ahora y la siguiente, por si el run cruza la medianoche UTC (``_bar_ticks``, el MISMO
+#: helper que el Golden Day). Antes se exigía minuto a minuto.
 
 
 def _require_or_skip(exc: Exception) -> None:
@@ -117,8 +120,9 @@ def _partial_buy_instrument_id(prefix: str) -> str:
     decida el sizing del pipeline. El fill PARCIAL es lo que deja la reserva VIVA: sin cola
     viva no habría compromiso que medir y el test pasaría por vacío.
     """
-    from bolsa_application.simulated_broker import simulated_fill_schedule
+    from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
 
+    ticks = _bar_ticks()
     for n in range(8192):
         candidate = f"{prefix}{n:010d}"
         results = [
@@ -126,12 +130,12 @@ def _partial_buy_instrument_id(prefix: str) -> str:
                 instrument_id=candidate,
                 side="buy",
                 quantity=Decimal("100"),
-                venue_order_id=f"probe-{candidate}-{minute}",
-                seed=minute * 100_003 + sum(map(ord, candidate)) % 9999,
+                venue_order_id=f"probe-{candidate}-{tick}",
+                seed=fill_seed(tick, candidate),
                 fill_chunks=_FILL_CHUNKS,
                 base_mid=100.0,
             )
-            for minute in _ENTRY_WINDOW
+            for tick in ticks
         ]
         if all(
             r.status == "partial" and len(r.fills) >= _MIN_BUY_CHUNKS for r in results
@@ -139,7 +143,7 @@ def _partial_buy_instrument_id(prefix: str) -> str:
             return candidate
     raise AssertionError(
         f"ningún id determinista de {prefix} tiene BUY PARCIAL (≥{_MIN_BUY_CHUNKS} "
-        f"tranchas) en {_ENTRY_WINDOW}; revisar ``draw_queue_noise``"
+        f"tranchas) en las barras {ticks}; revisar ``draw_queue_noise``"
     )
 
 

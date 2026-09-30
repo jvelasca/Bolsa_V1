@@ -84,21 +84,33 @@ _CLOSE_POLLS = 240
 
 # ── V2.45/AUTO-5 — identidad DETERMINISTA del día (sin sorteo de la cola SIM) ──────
 #
-# El venue SIM deriva TODO su ruido de ``sha256(seed, instrument_id, side, ...)`` con
-# ``seed = self._minute * 100_003 + sum(ord(symbol)) % 9999``. Con un id ALEATORIO un
-# porcentaje de ejecuciones se queda sin entrada (orden rechazada por la cola noisy o
-# parcial que no consume la cantidad) ⇒ rojo espurio, sin defecto de producto. Los ids
-# se eligen con una barrida pura y determinista que exige, en TODA la ventana de ticks
-# del test: (a) que la orden BUY llene en ≥2 tranchas (para poder afirmar ``fills >
-# orders``) y (b) que la orden SELL llene en los primeros minutos (el cierre por
+# El venue SIM deriva TODO su ruido de ``sha256(seed, instrument_id, side, ...)``, con el
+# ``seed`` anclado a la BARRA desde ``V2.88.16`` (``W3``):
+# ``fill_seed(bar_tick(moment, timeframe), symbol)``. Con un id ALEATORIO un porcentaje de
+# ejecuciones se queda sin entrada (orden rechazada por la cola noisy o parcial que no
+# consume la cantidad) ⇒ rojo espurio, sin defecto de producto. Los ids se eligen con una
+# barrida pura y determinista que exige, en la barra REAL del run (y en la siguiente, por si
+# el run cruza la medianoche UTC): (a) que la orden BUY llene en ≥2 tranchas (para poder
+# afirmar ``fills > orders``) y (b) que la orden SELL llene COMPLETA (el cierre por
 # ``time_exit`` ocurre en el 2º proceso recién arrancado).
 _SYMBOLS = ("GDPA", "GDPB", "GDPC")
 _SECTORS = ("Technology", "Healthcare", "Energy")
 _INSTRUMENT_PREFIXES = ("inst-gd2-0-", "inst-gd2-1-", "inst-gd2-2-")
-_FILL_WINDOW = range(0, 9)
-_SELL_WINDOW = (1, 2, 3)
 _FILL_CHUNKS = 4
 _MIN_BUY_CHUNKS = 2
+
+
+def _bar_ticks() -> tuple[int, ...]:
+    """Barras que un run de reloj REAL puede atravesar: la de ahora y la siguiente.
+
+    Mismo ancla temporal que el motor (``fill_seed``/``bar_tick`` sobre la barra D1): el
+    id elegido llena en las dos, así que un cruce de medianoche UTC no produce un rojo
+    espurio.
+    """
+    from bolsa_application.closed_bars import bar_tick
+
+    now = datetime.now(UTC)
+    return (bar_tick(now, "1d"), bar_tick(now + timedelta(days=1), "1d"))
 
 
 def _require_or_skip(exc: Exception) -> None:
@@ -121,44 +133,43 @@ def _proc_failure(msg: str, log_path: Path) -> str:
 
 
 def _filling_instrument_id(prefix: str) -> str:
-    """Id determinista que llena en BUY (≥2 tranchas) y en SELL COMPLETO en la ventana.
+    """Id determinista que llena en BUY (≥2 tranchas) y en SELL COMPLETO en la barra.
 
-    Barrida pura (sin BD, sin proceso): mismo id en cada ejecución. Si ningún candidato
-    cumpliera, el test falla con diagnóstico propio en vez de dejar el rojo espurio al
-    azar (mismo patrón que ``test_a9_scheduler_process_pg_zero_human``).
+    Barrida pura (sin BD, sin proceso) con el MISMO ancla temporal que el motor: mismo id
+    en cada ejecución del mismo día. Si ningún candidato cumpliera, el test falla con
+    diagnóstico propio en vez de dejar el rojo espurio al azar (mismo patrón que
+    ``test_a9_scheduler_process_pg_zero_human``).
 
     El llenado COMPLETO de la SELL es una propiedad del sorteo (``sim_rand(seed, side,
     instrument_id, "partialcut", i)``) y NO de la cantidad: por eso garantizarlo aquí
     asegura que el ``time_exit`` del día cierra la posición entera (libro plano) sea
     cual sea la cantidad viva.
     """
-    from bolsa_application.simulated_broker import simulated_fill_schedule
+    from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
 
-    def _probe(side: str, minute: int, candidate: str) -> Any:
+    def _probe(side: str, tick: int, candidate: str) -> Any:
         return simulated_fill_schedule(
             instrument_id=candidate,
             side=side,
             quantity=Decimal("100"),
-            venue_order_id=f"probe-{side}-{candidate}-{minute}",
-            seed=minute * 100_003 + sum(map(ord, candidate)) % 9999,
+            venue_order_id=f"probe-{side}-{candidate}-{tick}",
+            seed=fill_seed(tick, candidate),
             fill_chunks=_FILL_CHUNKS,
             base_mid=100.0,
         )
 
+    ticks = _bar_ticks()
     for n in range(512):
         candidate = f"{prefix}{n:010d}"
         buy_ok = all(
-            len(_probe("buy", minute, candidate).fills) >= _MIN_BUY_CHUNKS
-            for minute in _FILL_WINDOW
+            len(_probe("buy", tick, candidate).fills) >= _MIN_BUY_CHUNKS for tick in ticks
         )
-        sell_ok = all(
-            _probe("sell", minute, candidate).status == "filled" for minute in _SELL_WINDOW
-        )
+        sell_ok = all(_probe("sell", tick, candidate).status == "filled" for tick in ticks)
         if buy_ok and sell_ok:
             return candidate
     raise AssertionError(
         f"ningún id determinista de {prefix} llena en BUY (≥{_MIN_BUY_CHUNKS} tranchas) y "
-        f"en SELL COMPLETO en la ventana del Golden Day; revisar ``draw_queue_noise``"
+        f"en SELL COMPLETO en la barra {ticks} del Golden Day; revisar ``draw_queue_noise``"
     )
 
 

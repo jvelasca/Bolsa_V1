@@ -30,7 +30,7 @@ Invariantes medidos:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
 
@@ -43,6 +43,7 @@ from bolsa_api.background.auto_simulation_worker import (
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.auto_reason_codes import RESERVATION_ALREADY_LIVE
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
+from bolsa_application.closed_bars import bar_tick
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
 from bolsa_application.exit_order_store import InMemoryExitOrderStore
@@ -53,6 +54,7 @@ from bolsa_application.sim_durable_store import (
     InMemorySimConsumedSignalStore,
     InMemorySimFillFinanceContextStore,
 )
+from bolsa_application.simulated_broker import fill_seed
 
 ACCOUNT_ID = "acc-v46-conc"
 ENGINE_ID = "auto-sim-v46-conc"
@@ -61,6 +63,14 @@ _PROBE_QTY = Decimal("100")
 _FILL_CHUNKS = 4
 _MIN_BUY_CHUNKS = 2
 _ENTRY_MINUTE = 1
+#: ``W3`` (v2.88.16) — reloj del arnés: la ÚNICA referencia temporal del fichero. El
+#: instrumento vigilado y el worker deben derivar el seed del MISMO instante; si el arnés
+#: se inventa su propio reloj, su premisa («este id llena parcial») se separa del motor.
+_CLOCK_START = datetime(2026, 9, 18, 9, 0, tzinfo=UTC)
+#: Instante del turno que abre (el worker avanza un minuto por turno antes de decidir).
+_ENTRY_MOMENT = _CLOCK_START + timedelta(minutes=_ENTRY_MINUTE)
+#: ``W3``: el book se sortea por BARRA, no por minuto ⇒ el ancla es el tick de la barra.
+_ENTRY_TICK = bar_tick(_ENTRY_MOMENT, "1d")
 
 
 class _Prov(Protocol):
@@ -77,7 +87,13 @@ def v46_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _partial_fill_instrument_id(prefix: str) -> str:
-    """Id determinista cuyo BUY en el minuto de entrada es PARCIAL (≥2 tranchas)."""
+    """Id determinista cuyo BUY en la barra de entrada es PARCIAL (≥2 tranchas).
+
+    ``W3`` (v2.88.16): el seed se deriva con ``fill_seed(tick_de_barra, id)`` — la MISMA
+    función que usa el motor — así que la barrida es fiel por construcción. Antes se
+    duplicaba aquí la fórmula ``minuto * 100_003 + …`` y el ancla era el minuto: con el
+    ancla movida a la barra, esa copia habría buscado un id que ya no es el del motor.
+    """
     from bolsa_application.simulated_broker import simulated_fill_schedule
 
     for n in range(8192):
@@ -87,15 +103,15 @@ def _partial_fill_instrument_id(prefix: str) -> str:
             side="buy",
             quantity=_PROBE_QTY,
             venue_order_id=f"probe-{candidate}-{_ENTRY_MINUTE}",
-            seed=_ENTRY_MINUTE * 100_003 + sum(map(ord, candidate)) % 9999,
+            seed=fill_seed(_ENTRY_TICK, candidate),
             fill_chunks=_FILL_CHUNKS,
             base_mid=100.0,
         )
         if result.status == "partial" and len(result.fills) >= _MIN_BUY_CHUNKS:
             return candidate
     raise AssertionError(
-        f"ningún id determinista de {prefix} tiene BUY parcial en el minuto "
-        f"{_ENTRY_MINUTE}; revisar ``draw_queue_noise``"
+        f"ningún id determinista de {prefix} tiene BUY parcial en la barra del "
+        f"{_ENTRY_MOMENT.date()}; revisar ``draw_queue_noise``"
     )
 
 
@@ -164,7 +180,7 @@ def _worker(stores: _Stores, *, decider: _Prov) -> AutoSimulationWorker:
     async def _edge(_ref: str, _account: str | None) -> float | None:
         return 0.9
 
-    _start, clock = step_minute_clock(datetime(2026, 9, 18, 9, 0, tzinfo=UTC))
+    _start, clock = step_minute_clock(_CLOCK_START)
     return AutoSimulationWorker(
         clock=clock,
         exec_store=stores.exec_store,
