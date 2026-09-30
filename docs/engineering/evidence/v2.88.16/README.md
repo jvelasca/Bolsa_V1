@@ -213,9 +213,19 @@ no puede vivir dentro del propio tag; se cita en `main` como commit **POST-TAG**
 los **`3142`** esperados de `v2.88.15` + **`24`** del bundle `W3`, con los **mismos `38` skips** y
 `ruff`/`import-linter`/`mypy` con los mismos veredictos. **Se cita el run, no se hereda.**
 
-> **PENDIENTE DE CITA.** Este documento se sella con la **predicción** y el **encaje que cierra** (los
-> `3204` recogidos local = `3180 + 24`); la cita verbatim del run se añade en `main` como commit
-> **POST-TAG** cuando el propietario publique `v2.88.16-beta` (mismo patrón que `v2.88.15`/`v2.88.14`).
+> **CITA REAL (POST-TAG, 2026-09-30) — TAG `v2.88.16-beta` ROJO.** `Release tag CI` run
+> **`36783698699`** (`ref=refs/tags/v2.88.16-beta`, HEAD `0af7af6b`): el job **`python` fue VERDE** con
+> **`3166 passed, 38 skipped`** ⇒ **ESPERADO = OBSERVADO** (`3166` = `3142` de `v2.88.15` + `24` del
+> bundle `W3`, mismos `38` skips), pero el job **`lifecycle-pg` fue ROJO**:
+> `test_auto_scheduler_real_pg_zero_human_intervention` falló con `assert report_close.closed == 1`
+> sobre `TurnReport(..., vetoes=1, orders=1, fills=1, opened=0, closed=0)`. **Causa:** ese certificador
+> A9 del **día AUTO real** quedó **fuera** del rebaseline al ancla de barra de `W3` (los otros 8
+> arneses sí se rebaselinaron) y confiaba en «el motor reintenta» el SELL, premisa que el ancla de
+> barra **anula** (reintento intra-barra **idempotente**). **Es una omisión de arnés (test-only), NO un
+> defecto del motor.** El tag **NO se reescribe** (patrón `V2.40.2` → `V2.40.3`) y lo **supersede**
+> **`v2.88.16.1-beta`**: [`evidence/v2.88.16.1/README.md`](../v2.88.16.1/README.md). La evidencia de
+> **producto** de este dossier (frontera de barras cerradas, ancla `OPEN(D+1)`, golden con delta medido,
+> mutaciones `M279`–`M282`) sigue **vigente sin cambios**.
 
 ---
 

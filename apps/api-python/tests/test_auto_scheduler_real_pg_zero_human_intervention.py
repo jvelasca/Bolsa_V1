@@ -25,6 +25,7 @@ import os
 import uuid
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -83,6 +84,12 @@ async def _seed_instrument(session: AsyncSession, instrument_id: str) -> None:
 
     from bolsa_infrastructure.database.models.tables import InstrumentRow
 
+    # W3 (v2.88.16): identidad DETERMINISTA (``_filling_instrument_id``) en vez de un id
+    # aleatorio por corrida. El alta es idempotente: un rerun del mismo día reusa la MISMA
+    # PK (posiciones y reservas de runs anteriores la referencian) en vez de chocar.
+    if await session.get(InstrumentRow, instrument_id) is not None:
+        return
+
     session.add(
         InstrumentRow(
             id=instrument_id,
@@ -100,6 +107,62 @@ async def _seed_instrument(session: AsyncSession, instrument_id: str) -> None:
         )
     )
     await session.commit()
+
+
+# ── W3 (v2.88.16) — identidad DETERMINISTA frente al ancla de BARRA ────────────────
+#
+# El venue SIM ancla su ruido a la BARRA (``fill_seed(bar_tick(moment, timeframe),
+# symbol)``), no al minuto del bucle. Consecuencia buscada: un reintento intra-barra
+# (mismo compromiso) reproduce el MISMO sorteo y NO puede rescatar una orden rechazada.
+# Un id ALEATORIO deja la entrada/salida al azar de la barra: medido en los arneses
+# hermanos, ~12 % de los ids caen en una cola terminal (``noise_reject``/parcial que no
+# llena) y el día AUTO jamás cierra ⇒ rojo espurio del test, no defecto del motor. La
+# barrida es pura (sin BD, sin proceso) y determinista: mismo id y mismo día en cada
+# ejecución (la de ahora y la siguiente, por si el run cruza la medianoche UTC). Se exige
+# además que la SELL llene COMPLETA (``status == "filled"``) para que el exit deje el
+# libro PLANO sea cual sea la cantidad viva (propiedad del sorteo, no de la cantidad).
+_FILL_CHUNKS = 4
+_MIN_BUY_CHUNKS = 2
+
+
+def _bar_ticks() -> tuple[int, ...]:
+    """Barras que un run de reloj REAL puede atravesar: la de ahora y la siguiente."""
+    from datetime import UTC, datetime, timedelta
+
+    from bolsa_application.closed_bars import bar_tick
+
+    now = datetime.now(UTC)
+    return (bar_tick(now, "1d"), bar_tick(now + timedelta(days=1), "1d"))
+
+
+def _filling_instrument_id(prefix: str) -> str:
+    """Id determinista que llena en BUY (≥2 tranchas) y en SELL COMPLETO en la barra."""
+    from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
+
+    def _probe(side: str, tick: int, candidate: str) -> Any:
+        return simulated_fill_schedule(
+            instrument_id=candidate,
+            side=side,
+            quantity=Decimal("100"),
+            venue_order_id=f"probe-{side}-{candidate}-{tick}",
+            seed=fill_seed(tick, candidate),
+            fill_chunks=_FILL_CHUNKS,
+            base_mid=100.0,
+        )
+
+    ticks = _bar_ticks()
+    for n in range(512):
+        candidate = f"{prefix}{n:010d}"
+        buy_ok = all(
+            len(_probe("buy", tick, candidate).fills) >= _MIN_BUY_CHUNKS for tick in ticks
+        )
+        sell_ok = all(_probe("sell", tick, candidate).status == "filled" for tick in ticks)
+        if buy_ok and sell_ok:
+            return candidate
+    raise AssertionError(
+        f"ningún id determinista de {prefix} llena en BUY (≥{_MIN_BUY_CHUNKS} tranchas) y "
+        f"en SELL COMPLETO en la barra {ticks}; revisar ``draw_queue_noise``"
+    )
 
 
 class _ScriptDecider:
@@ -297,7 +360,10 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
         _compose_real_stores,  # noqa: PLC0415
     )
 
-    instrument_id = f"inst-auto-{uuid.uuid4().hex[:10]}"
+    # W3 (v2.88.16): identidad DETERMINISTA que LLENA en la barra (BUY ≥2 tranchas y SELL
+    # completa); con un id aleatorio el ancla de barra deja el día AUTO sin cierre en ~12 %
+    # de los casos (ver ``_filling_instrument_id``).
+    instrument_id = _filling_instrument_id("inst-auto-")
     account_id: str | None = None
     engine_id = f"auto-cert-{uuid.uuid4().hex[:10]}"
     # Venue SIM-ONLY (nunca LIVE) y watch acotado al instrumento sembrado.
@@ -379,8 +445,9 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
         )
 
         # Exit determinista: SELL del total ⇒ libro plano, posición durable borrada.
-        # Un tick SELL puede quedar sin fill por la cola noisy determinista (comporta-
-        # miento realista del venue SIM): el motor reintenta, no es un fallo.
+        # W3 (v2.88.16): con el ancla de BARRA el reintento intra-barra es IDEMPOTENTE (mismo
+        # sorteo), así que un ``noise_reject`` NO se rescata re-tickeando; por eso el id es
+        # determinista y su SELL llena COMPLETA en la barra (ver ``_filling_instrument_id``).
         spine.sold = True
         worker2._decider = spine.make_exit()
         report_close = None
