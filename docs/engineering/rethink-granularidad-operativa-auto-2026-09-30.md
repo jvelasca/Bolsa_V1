@@ -6,6 +6,15 @@
 > **Padre:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md) · **Deuda:** [deuda-p3-post-auditoria-v2.70-2026-09-26.md](./deuda-p3-post-auditoria-v2.70-2026-09-26.md)
 > **Relevo de esta fase:** ver §11.
 >
+> **[NOTA POSTERIOR — 2026-09-30.]** Este documento queda **[SUPERSEDED]** en lo **arquitectónico** por la
+> revisión de diseño v2
+> [`rethink-granularidad-operativa-auto-v2-2026-09-30.md`](./rethink-granularidad-operativa-auto-v2-2026-09-30.md)
+> (`v2.88.13-beta`), que **conserva este diagnóstico** y sustituye el modelo de **una única**
+> `OperativeGranularity` por **relojes separados** (decisión / protección / ejecución / evidencia, con el
+> heartbeat de infraestructura fuera del VO), añade los **contratos explícitos** de protección OHLC y de
+> *fill* (`signal D → OPEN(D+1)`, sin `seed = minute`), el **contrato de `record_tick`** y la separación
+> **Fase A / Fase B**. El texto sellado se conserva **verbatim**.
+>
 > **[Naturaleza de este documento.]** **No toca código de producción, no enmienda ningún ADR y no
 > mueve ninguna compuerta de evidencia.** Su único producto es una **propuesta de arquitectura** con
 > el mapeo exacto del estado actual, para decidir *antes* de implementar. Cualquier fase del §7 que

@@ -2,6 +2,34 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.13-beta] — REVISIÓN DE DISEÑO v2 `GRANULARIDAD-OPERATIVA`: clocks separados, contratos temporales explícitos y Fase A/B
+
+**Bump** `2.11.12-beta` → `2.11.13-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+**SÓLO documentación: CERO `src`, CERO tests, CERO migraciones, CERO umbrales** (`TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-B:
+intactos, sin backdating); **NO enmienda el ADR 010**.
+
+- **Revisa (no sustituye) el diseño de `v2.88.12`.** Conserva el **diagnóstico** (el dato es **diario**, el bucle es de
+  **60 s**; precio plano `flat_price_script = 100.0`; *fill* con `seed = minute`) y **cambia el modelo**: de una única
+  `OperativeGranularity` a **relojes separados** (`DecisionClock` / `ProtectionClock` / `ExecutionModel` /
+  `EvidenceBucket`), con el **heartbeat de infraestructura FUERA** del value object.
+- **Contrato de protección D1 explícito (fail-closed).** Se declaran dos modelos — **A: OHLC de barra**
+  (`Low(D) <= stop`, con precedencia intra-barra, gap de apertura y barra incompleta) y **B: feed intradía** — y se
+  exige elegir uno. `D1 + precio plano + protección al cierre` **no** equivale a protección real.
+- **Contrato de ejecución/fill D1.** `signal_bar = D` → `execution_bar = D+1` → `price = OPEN(D+1)` (+`slippage_model`);
+  el **`seed = minute` desaparece** del modelo D1. **Un solo contrato temporal, dos proveedores de precio** (replay OOS
+  sintético al open vs PAPER live real), con `PriceScript` inyectable.
+- **Contrato de `record_tick`.** Inventario de consumidores (auditoría/heartbeat/recovery/ventanas/diagnóstico) **antes**
+  de reducir su frecuencia; separación de `DecisionEvent`/`ProtectionEvent`/`SettlementEvent`/`HeartbeatEvent`.
+- **Fase A ≠ Fase B.** A (short-circuit) es **semánticamente neutra**: golden de equivalencia con `Δfills = Δcycles =
+  ΔPnL = Δreservations = Δsettlements = Δevidence = 0`. B (`OPEN(D+1)`) **puede** cambiar resultados y se compara
+  contra un **golden nuevo**.
+- **`1wk` declarada pero NO habilitada** (gap del lunes sin pruebas temporales). **`OBS-21` está CERRADA** en
+  `v2.88.11-beta` (la auditoría la daba por pendiente); **`OBS-23`** (flake del test PG) sigue **ABIERTA**.
+- **Documento:** [`docs/engineering/rethink-granularidad-operativa-auto-v2-2026-09-30.md`](./docs/engineering/rethink-granularidad-operativa-auto-v2-2026-09-30.md).
+  El diseño de `v2.88.12` queda **anotado `[SUPERSEDED]`** en lo arquitectónico (texto verbatim).
+- **Deudas que NO cierra.** `P3-2`/`P3-3` (ventana PAPER real ≥4 días con material), `OBS-23`, `OBS-22`, `OBS-19`,
+  `OBS-15`, `OBS-16`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5`, `OBS-5`. Este sello **no** mide ni mueve ninguna.
+
 ## [2.11.12-beta] — DISEÑO `GRANULARIDAD-OPERATIVA`: rethink `config-driven` de la cadencia del motor AUTO (el dato es diario, el bucle es de 60 s)
 
 **Bump** `2.11.11-beta` → `2.11.12-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
