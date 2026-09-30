@@ -27,6 +27,15 @@ intactos, sin backdating); **NO enmienda el ADR 010** (sólo añade un enlace **
   Entrega con preguntas concretas: [`docs/engineering/entrega-auditoria-externa-mia-v2.88.12-2026-09-30.md`](./docs/engineering/entrega-auditoria-externa-mia-v2.88.12-2026-09-30.md).
 - **Deudas que NO cierra.** `P3-2`/`P3-3` (ventana PAPER real ≥4 días con material), `OBS-22`, `OBS-19`, `OBS-15`,
   `OBS-16`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5`, `OBS-5`. Este sello **no** mide ni mueve ninguna.
+- **CITA REAL (POST-TAG).** `Release tag CI` **`36715434260`** (ref `v2.88.12-beta`, HEAD `c0c0b89e`, `push`,
+  `2026-09-30T12:32:47Z`). **attempt 1 → FAILURE**: el único rojo fue `lifecycle-pg`, en
+  `test_simulated_finance_pg.py::test_permanent_rejection_materializes_failed_not_retry` (`1 failed, 165 passed`) —
+  **NO es el motor** (sello docs-only; código idéntico al verde `v2.88.11`), sino un **test flaky** (`OBS-23`): el
+  test genera un `instrument_id` **aleatorio** y `simulated_fill_schedule` → `draw_queue_noise(seed, side,
+  instrument_id)` cae en una cola TERMINAL sin fill con probabilidad `0.010+0.025+0.005+0.012+0.004 = 5,6 %`.
+  **attempt 2** (rerun de los jobs fallidos) → **SUCCESS**: `certify` **GREEN** (10 jobs requeridos verdes +
+  `playwright (integrated)` `skipped` por diseño); `python` **`3118 passed, 38 skipped`** (Ruff `All checks
+  passed!`); `lifecycle-pg` **`166 passed`** (0 fallos, 0 skips). Los **dos intentos** se citan; ningún rojo se oculta.
 
 ## [2.11.11-beta] — `OBS-21` **CERRADA**: el terminal del fill deja de confundir **TRANSITORIO** con **PERMANENTE** (un rechazo determinista del dominio pasa a `FAILED`, no a un `RETRY` indefinido) — 2026-09-30
 
