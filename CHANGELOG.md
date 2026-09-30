@@ -2,6 +2,48 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.10-beta] — Consolidación `v2.88.10`: el tag pasa a ser **autoconsistente** (cita de su CI + corrección del recuento local) y **queda como objeto auditado** — 2026-09-30
+
+**Bump** `2.11.9-beta` → `2.11.10-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).
+**SÓLO documentación: CERO `src`, CERO tests, CERO migraciones.** Medido: `git diff --name-only
+v2.88.9-beta..HEAD` → **8 ficheros, todos `docs/`**, y la comprobación por patrón de `src/`/`tests/`/
+`alembic/`/`*.py`/`*.ts` **sale vacía**. **El código es byte a byte el mismo que el de `v2.88.9-beta`.**
+
+- **Por qué existe.** `v2.88.9-beta` se selló en `1e2985f5` y su CI salió **VERDE** (`36685888972`), pero la
+  **cita** de esa corrida y una **corrección de exactitud** se hicieron **después**, en `main`
+  (`58189fb1`, `d7d89708`). Efecto medido: **8 ficheros de `docs/` divergían** entre el tag y `main`, y en el
+  tag su dossier decía **§9 `PENDIENTE DE CITAR`** y arrastraba el recuento **`59`** que ahora sabemos
+  **inflado**. Auditar desde el tag significaba auditar un dossier **sin su certificación y con una cifra
+  incorrecta**. Este sello lo consolida.
+- **Se consolida (a) la certificación.** El tag `v2.88.9-beta` es **VERDE**: `Release tag CI` **`36685888972`**
+  (`ref=v2.88.9-beta`, HEAD `1e2985f5`, `07:48:56Z → 07:57:11Z`, **~8m15s**) → **10 jobs reales verdes +
+  `certify` GREEN** (**11 verdes, 0 rojos**; `playwright` integrado `skipped` por diseño) ⇒ **primer tag verde
+  desde `v2.88.7-beta`**. `python` **`3115 passed, 37 skipped`** = **exactamente lo previsto**;
+  `lifecycle-pg` —el que daba el rojo— **`165 passed`** **VERDE** con **0 skips**; `replay-repro`
+  **`REPRODUCIDO`** (render LF `3 290 062` B / `A4DA036C…13CB`, **2ª corrida IDÉNTICA**, artefacto
+  `11083079436`); `certify` `"status": "GREEN"`.
+- **Se consolida (b) la corrección, medida sobre los logs crudos: `50` corridas válidas, no `59`.** De las
+  **tres** tandas que componían el `59`, **dos no ejecutaron nada**: la de **`50`** corridas directas murió
+  **entera** en `0,00–0,06 s` con `psycopg.InterfaceError: ProactorEventLoop` (el bug de `win32` ya conocido
+  del repo, `SelectorEventLoop`, PR #39 ⇒ **nunca llegó al dominio**), y las **`8`** iteraciones del comando
+  exacto duraron `0,1–0,6 s` con `resumen` **VACÍO** (la suite **no se ejecutó**; una corrida real tarda
+  ~`100 s`). Con tasa `6,68 %`, `P(0 en 50) ≈ **3,2 %**` (no `1,7 %`). El «`9` corridas del comando exacto» se
+  sostiene en **una** corrida, no en nueve.
+- **Y hay algo mejor que la suerte para explicar ese `0`, que sí está en los logs: la asimetría que salió era
+  la INOFENSIVA** — `buy=filled(60/60,chunks=3)` con `sell=partial(30/60,chunks=1)`: vende `30` de los `60`
+  que hay en cartera ⇒ **nunca sobrevende**. La orientación que hacía daño (**compra cortada** / **venta
+  completa**) **no salió en ninguna de las `50`**. El `0` deja de ser «mala suerte» y pasa a ser un **sesgo
+  del sorteo observable en los propios logs**.
+- **Los ficheros sellados no se reescriben** (invalidaría la cadena): cada uno recibe una **anotación
+  fechada** que remite a la corrección canónica. Anotados: `evidence/v2.88.7/README.md`, el relevo
+  `reproducibilidad-replay-oos-v2.88.7-2026-09-29.md`, `evidence/v2.88.8/README.md`, la sección
+  `[2.11.8-beta]` de este `CHANGELOG` y el párrafo del sello `v2.88.8` en `deuda-p3`.
+- **Deudas que NO cierra:** **`OBS-21`** (`🔴 ABIERTA`; el `RETRY` que trata como reintentable un rechazo
+  **permanente** del dominio — es el **único** trabajo pendiente que tocaría **motor**), **`OBS-19`**
+  (`🔴 ABIERTA`) y la deuda del `newline="\n"` del replay OOS. **No** acredita `P3-2`/`P3-3` ni cierra
+  `OBS-15`/`OBS-16`/`OBS-13`/`OBS-11`/`H-4`/`OBS-9`/`P3-5`/`OBS-5`.
+- **Evidencia (punto de entrada de la auditoría):** [`docs/engineering/evidence/v2.88.10/README.md`](./docs/engineering/evidence/v2.88.10/README.md).
+
 ## [2.11.9-beta] — `FLAKE-1` **CERRADA**: el rojo intermitente de `lifecycle-pg` NO era el motor, ni el entorno, ni la clave de idempotencia — era el **FIXTURE** (la venta del test pedía más acciones de las que su propia compra había dejado en cartera) — 2026-09-30
 
 **Bump** `2.11.8-beta` → `2.11.9-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`).

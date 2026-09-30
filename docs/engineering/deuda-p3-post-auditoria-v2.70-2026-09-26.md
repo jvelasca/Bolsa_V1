@@ -1575,7 +1575,7 @@ informes.
 
 ---
 
-## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟢 **CERRADA** (era el FIXTURE, no el motor) — causa raíz medida, reproducida contra PG y sellada con gate (2026-09-30) · **SELLO DE CIERRE `v2.88.9-beta` (`2.11.9-beta`)**
+## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟢 **CERRADA** (era el FIXTURE, no el motor) — causa raíz medida, reproducida contra PG y sellada con gate (2026-09-30) · **SELLO DE CIERRE `v2.88.9-beta` (`2.11.9-beta`)** · **CONSOLIDADO EN `v2.88.10-beta` (cita + corrección dentro del tag)**
 
 **Qué se midió.** Tres corridas de `release-tag-ci`: **dos rojos** (`36627838819`, `36636706369`) y
 **un verde** (`36638231729`, `165 passed in 82,89 s`; en los rojos, `1 failed, 164 passed in 100,07 s`).
@@ -1744,6 +1744,17 @@ Evidencia del sello: [`evidence/v2.88.9/README.md`](./evidence/v2.88.9/README.md
 **`36685888972`** → **`SUCCESS`** (10 jobs reales verdes + `certify` GREEN = **11 verdes, 0 rojos**;
 `python` **`3115 passed, 37 skipped`** = previsto, `lifecycle-pg` **`165 passed`** VERDE, `replay-repro`
 **`REPRODUCIDO`**) ⇒ **primer tag verde desde `v2.88.7-beta`**. Detalle en §9 de la evidencia.
+
+**CONSOLIDACIÓN EN EL OBJETO AUDITADO (`v2.88.10-beta`, `2.11.10-beta`, 2026-09-30).** La cita de arriba y la
+corrección del recuento local (`50`, no `59`) se hicieron **POST-SELLO**, en `main` (`58189fb1`, `d7d89708`),
+así que el tag `v2.88.9-beta` quedó con **8 ficheros de `docs/` divergentes** respecto a `main`, con su §9 en
+**`PENDIENTE DE CITAR`** y con el `59`: auditar desde *Releases* era auditar un dossier **sin su certificación
+y con una cifra incorrecta**. El sello **`v2.88.10-beta`** lo consolida con **ALCANCE: SÓLO documentación;
+CERO `src`, CERO tests, CERO migraciones** y **el CÓDIGO byte a byte idéntico al de `v2.88.9-beta`** ⇒ quien
+audite **motor** debe auditar **ese** código, que es el mismo. Evidencia (punto de entrada de la auditoría
+externa): [`evidence/v2.88.10/README.md`](./evidence/v2.88.10/README.md). **`FLAKE-1` sigue CERRADA y `OBS-21`
+sigue ABIERTA**: este sello **no** toca ni el motor ni los tests, y **por eso no modifica el estado de ninguna
+de las dos**.
 
 
 ---
