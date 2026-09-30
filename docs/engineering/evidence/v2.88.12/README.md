@@ -84,3 +84,12 @@ llenado. Fue la causa del **attempt 1 ROJO** del CI del sello (§4).
 `P3-2`/`P3-3` (ventana PAPER real ≥4 días con material), `OBS-14.b`, `OBS-15`, `OBS-16`, `OBS-22`,
 `OBS-19`, `OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5`, `OBS-5`. `OBS-21` quedó **cerrada** en
 `v2.88.11-beta`.
+
+---
+
+## 6. Pre-auditoría interna (NO externa)
+
+[`preauditoria-interna-granularidad-operativa-v2.88.12-2026-09-30.md`](../preauditoria-interna-granularidad-operativa-v2.88.12-2026-09-30.md)
+— autocrítica **del autor** (sin independencia) con verificación reproducible de las citas de §2 del diseño
+y 4 hallazgos menores (deriva de línea en algunas citas; el *seam* `_v2_consumed_bar` ya existente; cifras
+`NO MEDIDO`; §10 sin comando de verificación). **No** sustituye el veredicto del auditor externo.
