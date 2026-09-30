@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -114,6 +115,7 @@ def _finance_applier_for(
     side: str,
     seed: int,
     venue_order_id: str,
+    quantity: Decimal,
 ):
     """Applier ExecuteTrade real por fill; mapper puro resuelve price sobre el schedule.
 
@@ -121,9 +123,11 @@ def _finance_applier_for(
     lo resolvemos con ``resolve_execution_finance`` cerrado sobre el ``SimulatedOrderResult``
     determinista del settlement; el schedule es reproducible para los mismos inputs, por
     lo que el applier recupera el price/cantidad correctos SIN inventar (H4).
-    """
-    from decimal import Decimal
 
+    ``quantity`` DEBE ser la MISMA que la del settlement (FLAKE-1, 2026-09-30): el
+    resolver rehace el schedule para recuperar el price/qty de cada fill, así que si la
+    cantidad del resolver no coincide con la de la orden, los parciales no son los mismos.
+    """
     from bolsa_application.accounts.trade import ExecuteTrade
     from bolsa_application.execution_event import ExecutionEvent
     from bolsa_application.simulated_broker import simulated_fill_schedule
@@ -144,7 +148,7 @@ def _finance_applier_for(
     schedule = simulated_fill_schedule(
         instrument_id=instrument_id,
         side=side,
-        quantity=Decimal("60"),
+        quantity=quantity,
         venue_order_id=venue_order_id,
         seed=seed,
         fill_chunks=3,
@@ -176,16 +180,20 @@ async def _drive_buy_sell(
     account_id: str,
     instrument_id: str,
     seed: int,
+    quantities: dict[str, Decimal],
 ) -> list[str]:
-    """Recorre BUY→SELL (net-zero) materializando ExecuteTrade real por fill SIM.
+    """Recorre BUY→SELL materializando ExecuteTrade real por fill SIM.
 
     Cada lado se envía por el camino canónico del worker M5
     (``submit_simulated_order(..., apply_finance=<applier real>)``); cada fill CAPTURADO
     llega a APPLIED al materializar su ExecuteTrade idempotente. Devuelve los
     ``execution_id`` de los fills confirmados.
-    """
-    from decimal import Decimal
 
+    **FLAKE-1 (2026-09-30).** ``quantities`` permite dimensionar la venta a lo que la
+    compra LIQUIDA de verdad: los parciales NO son simétricos entre patas (el corte
+    deriva de ``(seed, side, instrument_id)``), así que pedir 60 en las dos podía
+    sobrevender y dejar el fill en RETRY. Ver ``_roundtrip_plan``.
+    """
     from bolsa_application.execution_event import PostgresExecutionEventStore
     from bolsa_application.simulated_settlement import (
         auto_venue_order_id,
@@ -214,12 +222,13 @@ async def _drive_buy_sell(
                 side=side,
                 seed=seed,
                 venue_order_id=venue_order_id,
+                quantity=quantities[side],
             )
             result, _out = await submit_simulated_order(
                 exec_store,
                 instrument_id=instrument_id,
                 side=side,
-                quantity=Decimal("60"),
+                quantity=quantities[side],
                 account_id=account_id,
                 venue="simulated",
                 seed=seed,
@@ -237,36 +246,63 @@ async def _drive_buy_sell(
     return fills
 
 
-def _seed_with_fills(instrument_id: str, *, side: str = "buy") -> int:
-    """Elige un seed DETERMINISTA que garantice fills (no dependa de la lotería).
+def _fill_chunks(
+    instrument_id: str, side: str, *, seed: int, quantity: Decimal
+) -> tuple[Decimal, ...]:
+    """(PURA) deltas por parcial de una pata: los MISMOS inputs que el settlement.
 
-    ``draw_queue_noise(seed, side, instrument_id)`` puede devolver una terminal
-    noisy (reject/closed/timeout) que deja ``fills=()``. El test asumía que el seed
-    aleatorio SIEMPRE llenaba → flaky ~13% de las corridas. Aquí se busca el primer
-    seed con fills para los DOS lados (buy/sell) del instrumento dado.
+    El corte de las parciales (``draw_queue_noise``/``mid_cut``) deriva de
+    ``(seed, side, instrument_id)`` y **nunca** del ``venue_order_id``, así que este
+    espejo reproduce exactamente lo que el settlement liquidará para esa pata.
     """
-    from decimal import Decimal
-
     from bolsa_application.simulated_broker import simulated_fill_schedule
 
+    result = simulated_fill_schedule(
+        instrument_id=instrument_id,
+        side=side,
+        quantity=quantity,
+        venue_order_id=f"sim-{side}-{instrument_id}-{seed}",
+        seed=seed,
+        fill_chunks=3,
+        base_mid=100.0,
+    )
+    return tuple(f.qty_delta for f in result.fills)
+
+
+def _roundtrip_plan(instrument_id: str) -> tuple[int, Decimal, Decimal]:
+    """Elige un seed DETERMINISTA con ida-y-vuelta VIABLE y dimensiona la pata ``sell``.
+
+    Devuelve ``(seed, cantidad_comprada, cantidad_a_vender)``.
+
+    El selector clásico (``_seed_with_fills``, retirado aquí) solo exigía «algún fill en
+    cada pata»: no garantizaba que la venta CUPIERA en la cartera, porque el test asumía
+    la MISMA cantidad en las dos patas.
+
+    **FLAKE-1 (2026-09-30).** El corte de la parcial deriva de ``(seed, side,
+    instrument_id)``: con el mismo seed, la pata ``buy`` puede cortarse tras su primer
+    chunk (30 de 60) mientras la pata ``sell`` llena los tres (30+14,1+15,9 = 60). La
+    venta pedía más de lo que la compra había dejado en cartera, ``portfolio_repository``
+    la rechazaba (rechazo CORRECTO y fail-closed) y el fill quedaba en ``RETRY`` → rojo
+    en **~6,7 %** de los ``instrument_id`` sorteados (medido: 1336 de 20000). No era el
+    entorno, ni el motor, ni la clave de idempotencia: era el fixture.
+
+    Ahora la pata ``sell`` se dimensiona a lo que la pata ``buy`` LIQUIDA de verdad, así
+    que el ida-y-vuelta es net-zero por construcción y el oversell no puede ocurrir
+    (medido tras el arreglo: **0 de 20000**).
+    """
+    total = Decimal("60")
     for seed in range(1, 100_000):
-        ok = True
-        for s in ("buy", "sell"):
-            r = simulated_fill_schedule(
-                instrument_id=instrument_id,
-                side=s,
-                quantity=Decimal("60"),
-                venue_order_id=f"sim-{s}-{instrument_id}-{seed}",
-                seed=seed,
-                fill_chunks=3,
-                base_mid=100.0,
-            )
-            if not r.fills:
-                ok = False
-                break
-        if ok:
-            return seed
-    raise AssertionError(f"no seed con fills para {instrument_id!r}")
+        buy = _fill_chunks(instrument_id, "buy", seed=seed, quantity=total)
+        if not buy:
+            continue  # terminal noisy (reject/timeout/closed) o corte en el 1er chunk.
+        realized = sum(buy, Decimal("0"))
+        sell = _fill_chunks(instrument_id, "sell", seed=seed, quantity=realized)
+        if not sell:
+            continue
+        # Invariante del FIXTURE: la venta no puede exceder lo que dejó la compra.
+        assert sum(sell, Decimal("0")) <= realized
+        return seed, total, realized
+    raise AssertionError(f"no seed con ida-y-vuelta viable para {instrument_id!r}")
 
 
 @pytest.mark.asyncio
@@ -279,10 +315,14 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
     comprueba sobre PG que cada fill quedó ``APPLIED`` y que re-aplicar el MISMO fill
     (crash/relaunch) devuelve ``already_applied`` sin volver a tocar dinero (invariante
     C3/P2-01 idempotente por ``simulated_idempotency_key``).
+
+    La venta se dimensiona a lo que la compra LIQUIDA de verdad (``_roundtrip_plan``):
+    los parciales no son simétricos entre patas y pedir la cantidad nominal en las dos
+    sobrevendía la cartera en ~6,7 % de los ``instrument_id`` (FLAKE-1, 2026-09-30).
     """
     instrument_id = f"inst-fin-{uuid.uuid4().hex[:10]}"
-    # V2.23/A9: seed determinista con fills garantizados (antes aleatorio ⇒ flaky ~13%).
-    seed = _seed_with_fills(instrument_id)
+    # V2.23/A9 + FLAKE-1 (2026-09-30): seed determinista con ida-y-vuelta VIABLE.
+    seed, buy_qty, sell_qty = _roundtrip_plan(instrument_id)
     account_id: str | None = None
     try:
         async with fin_pg_factory() as session:
@@ -294,6 +334,7 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
             account_id=account_id,
             instrument_id=instrument_id,
             seed=seed,
+            quantities={"buy": buy_qty, "sell": sell_qty},
         )
         assert fills, "la corrida finance debió confirmar fills reales"
         assert len(fills) == len(set(fills)), "cada execution_id es único (no-doble)"

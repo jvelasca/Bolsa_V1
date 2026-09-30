@@ -1575,7 +1575,7 @@ informes.
 
 ---
 
-## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟡 ABIERTA: **TRAZA CAZADA** en `v2.88.8` (run `36681305812`) — causa raíz localizada, falta aislar el *por qué* (2026-09-30)
+## FLAKE-1 — `lifecycle-pg`: `test_finance_auto_day_materializes_executetrade_exactly_once` rojo **intermitente** (`AssertionError: RETRY`) — 🟢 **CERRADA** (era el FIXTURE, no el motor) — causa raíz medida, reproducida contra PG y sellada con gate (2026-09-30)
 
 **Qué se midió.** Tres corridas de `release-tag-ci`: **dos rojos** (`36627838819`, `36636706369`) y
 **un verde** (`36638231729`, `165 passed in 82,89 s`; en los rojos, `1 failed, 164 passed in 100,07 s`).
@@ -1606,6 +1606,12 @@ documenta como «un chunk en `RETRY`»): cierto que el selector del test (`_seed
 selector) + **9** corridas del **comando exacto del CI** (`lifecycle-pg`, con BD scratch **fresca**
 drop+create+migrate por iteración; 8 con `161 passed, 4 skipped` y la última con `165 passed, 0 skipped`)
 ⇒ **0 rojos**. La variable es del **entorno** (runner 2 vCPU vs local), no del motor.
+**⚠️ REFUTADO el 2026-09-30 (`CAUSA RAÍZ`, abajo):** la variable **no** era del entorno — era
+el `instrument_id` que el test **sortea** (`uuid4`), y el desenlace es una **función pura** de
+él. Las `59` corridas locales dieron `0` rojos sencillamente porque la lotería no salió (y con
+**6,68 %** de tasa, `0/59` tiene probabilidad ≈ `1,7 %`… que es justo lo que hace de este un
+caso de «no reproducible en local» tan engañoso). El «no reproducible en local» era correcto
+como **observación** y falso como **explicación**.
 
 **Arreglo aplicado (lo único accionable sin repro): hacer visible lo que se tragaba.**
 `simulated_finance._apply` registra ahora `logger.exception(...)` con el `execution_id` y el
@@ -1637,15 +1643,52 @@ en la pata **SELL** (`execution_id=sim-engine-58b3e99de0f64798b13fd4cc2-sell-ins
 - **REFUTADA la hipótesis de clave de idempotencia:** la excepción es del **repo de cartera**, no un
   `IdempotencyKeyReused`; la sospecha `F1`/`v2.40.3` **cae**.
 - **Estado, no azar por trancha:** fallan **las dos** tranchas (`#2` y `#3`) ⇒ es un **estado del ciclo**
-  (orden/visibilidad de patas), no suerte de una sola trancha.
+  (orden/visibilidad de patas), no suerte de una sola trancha. **⚠️ La lectura «orden/visibilidad de
+  patas» quedó REFUTADA** (`CAUSA RAÍZ`, abajo): las patas son **secuenciales** en la misma sesión y el
+  mismo `scope`. El «estado» era el del **fixture** (la venta pedía más de lo que la compra dejó), no el
+  del ciclo. Lo que **sí** queda en pie de este punto: que fallaran las **dos** tranchas era señal de
+  **determinismo**, no de azar — y eso es exactamente lo que permitió cerrar el caso.
 - **El `except Exception: return False` era el mudo:** queda confirmado que el `RETRY` venía de
   `ExecuteTrade` **lanzando** y siendo tragado — exactamente el caso (b) que la lectura de código predijo.
 
-**Deuda que queda (aislar el *por qué*).** La causa raíz está **localizada**; falta decidir entre las dos
-lecturas: **(a)** la pata `sell` del ciclo se liquida **antes** de que las acciones del `buy` del mismo
-ciclo sean visibles en el repositorio de cartera, o **(b)** hay un **desajuste cuenta/cartera** entre patas
-(la pata `sell` consulta una cartera/cuenta distinta de la que recibió el `buy`). **No** se toca el motor
-en este sello.
+**CAUSA RAÍZ — CERRADA (2026-09-30).** Ni orden/visibilidad entre patas, ni desajuste
+cuenta/cartera: **era el fixture**. `draw_queue_noise` y `mid_cut` dependen de
+`(seed, side, instrument_id)` — de la **pata**, no de la orden —, así que con el MISMO seed
+la pata `buy` puede cortar sus parciales antes que la pata `sell`. El test asumía un
+ida-y-vuelta net-zero con la **misma cantidad** en las dos patas:
+
+```
+BUY   30                      (cortada tras su 1er chunk)  -> deja 30 en cartera
+SELL  30 + 14,1 + 15,9 = 60    (llena los tres)             -> pide 60
+```
+
+`sell#1` deja la cartera en 0 (la posición se borra), y `sell#2`/`sell#3` piden contra
+`held = 0.0` ⇒ `ValueError` ⇒ `RETRY`. **Eso predice exactamente las tranchas `#2` y `#3`
+del run `36681305812`**, y explica por qué `#1` sí pasaba. Medido sobre 20 000 sorteos:
+**6,68 %** de rojo con el fixture viejo (100 % con patrón `(2,3)`), **0** con el arreglado.
+Y **la sospecha de entorno queda REFUTADA**: la causa es una función **pura** del
+`instrument_id` sorteado, sin CPU, sin paralelismo y sin red. Reproducido contra **PG real**
+fijando el `instrument_id` del CI y variando SOLO la cantidad de la venta: **ROJO** con 60,
+**VERDE** con 30, con la traza línea por línea idéntica a la del CI. **El motor hizo lo
+correcto: rechazó (`fail-closed`) una venta que no cabía en la cartera.**
+
+**Sello del arreglo.** (i) el fixture PG pasa de `_seed_with_fills` («algún fill en cada
+pata») a **`_roundtrip_plan`**, que dimensiona la venta a lo que la compra **liquida** (y
+propaga esa cantidad al resolver del applier, que rehace el schedule); (ii) **tres gates
+herméticos** en `packages/py/application/tests/test_simulated_finance.py` (fichero **ya
+cableado a CI** desde `OBS-19`) que fuerzan la asimetría con el **`instrument_id` real del
+rojo**, exigen que el espejo puro del dominio **rechace** el plan viejo
+(`sell exceeds the held position`) y comprueban sobre una rejilla fija que el dimensionado
+nuevo **nunca** sobrevende — con la exigencia de que la rejilla **alcance al fallo** que
+arregla. **Alcance: sólo tests.** Motor, semántica `fail-closed`, umbrales y migraciones
+intactos. Informe: [`flake-1-causa-raiz-2026-09-30.md`](./flake-1-causa-raiz-2026-09-30.md).
+
+**Nota de honestidad (declarada).** La tasa medida (6,68 %) explica el rojo de
+`36681305812`, pero no explica del todo la racha de 3 rojos en 4 corridas (~0,1 % si fueran
+independientes a esa tasa): o fue mala suerte, o alguna corrida anterior tuvo un aporte
+adicional **que no se pudo ver** porque el `RETRY` era **mudo** hasta `v2.88.8`. Con la
+instrumentación ya no hay ese agujero, y con el arreglo **la clase entera desaparece**
+(0 de 20 000), así que la discrepancia se declara en vez de reclamar un cierre perfecto.
 
 **Alcance.** Proceso/tests (rojo **espurio** en la certificación). Si el tag se cortase en una corrida
 donde dispara, `certify` **no-GREENearía** el tag por una causa **ajena** al artefacto. **No** afecta al
@@ -1654,8 +1697,9 @@ sello del replay OOS de `v2.88.7` (otra cadena) ni a su remedición de integrida
 **SELLO `v2.88.8` (2026-09-30).** El arreglo se **sella** con **bump `2.11.7-beta` → `2.11.8-beta`**,
 **sin migración** y con el **motor intacto** (`git diff v2.88.7-beta..HEAD` sobre
 `auto_simulation_worker.py`/`replay_oos.py`/`v2_87_replay_oos_durable_cycle.py` → **vacío**; el único cambio
-funcional es **`+15/−0`** en `simulated_finance.py` y **`+42/−1`** en su test). **El hallazgo sigue
-ABIERTO**: lo que se sella es la **instrumentación**, no la causa. La razón de sellar en vez de seguir
+funcional es **`+15/−0`** en `simulated_finance.py` y **`+42/−1`** en su test). **En ese sello el hallazgo
+seguía ABIERTO**: lo que se selló entonces fue la **instrumentación**, no la causa (**cerrada el
+2026-09-30**, ver `CAUSA RAÍZ` arriba). La razón de sellar en vez de seguir
 depurando es aritmética: con **`0` rojos en `59` corridas** locales (50 directas + 9 del comando exacto con
 BD scratch fresca por iteración) no existe un caso que depurar — el **próximo rojo del CI llega con la
 traza**, y eso es lo que convierte este hallazgo en cerrable. **El sello cumplió su objeto:** el rojo
@@ -1664,3 +1708,47 @@ a nivel de tag** de `replay-repro` salió **verde**. Evidencia del sello:
 [`evidence/v2.88.8/README.md`](./evidence/v2.88.8/README.md) · cita cruda del CI:
 [`evidencia-ci-tag-v2.88.8-2026-09-30.txt`](./evidencia-ci-tag-v2.88.8-2026-09-30.txt).
 
+
+---
+
+## OBS-21 — El `RETRY` trata como REINTENTABLE un rechazo **permanente** del dominio (`No tienes suficientes acciones`) (LOW/MEDIUM, alcance motor) — 🔴 ABIERTA (2026-09-30)
+
+**Cómo aparece.** No se buscaba: la **traza que destapó `v2.88.8`** dejó a la vista el
+tratamiento que el `RETRY` mudo ocultaba. `apply_simulated_order_once(...,
+retryable_on_ineffective=True)` marca `RETRY` cuando el applier devuelve `False`, y el
+applier devuelve `False` ante **cualquier** excepción de `ExecuteTrade`
+(`simulated_finance._apply`, `except Exception`). Entre esas excepciones está:
+
+```
+ValueError: No tienes suficientes acciones. En cartera: 0.0
+```
+
+**Por qué es un defecto (y no solo ruido).** `RETRY` significa «reintenta», y el
+reintento es **correcto** para fallos **transitorios** (`deadlock`, `timeout`, conexión
+caída). Pero «la cartera no tiene esas acciones» es una condición **PERMANENTE** del
+estado: reintentar el mismo fill la volverá a encontrar idéntica. Un motor real con ese
+fill en `RETRY` lo reintentaría **indefinidamente** sobre un hecho que no cambia —y el
+`RETRY` es precisamente el estado que el reaper/recovery vuelve a barrer al arrancar—, con
+lo que se paga cómputo por un fill que **nunca** podrá materializarse. La clasificación
+correcta para un rechazo determinista es una terminal **no reintentable** (`FAILED`/rechazo
+duro), no `RETRY`.
+
+**Agujero de sellado que hay que evitar al arreglarlo.** La frontera **transitorio vs
+permanente** no es trivial: `ExecuteTrade`/`portfolio_repository` lanzan `ValueError` tanto
+para «cantidad ≤ 0» / «instrumento no encontrado» (permanentes, y que serían un **defecto
+de programación**) como para «efectivo insuficiente» (permanente **dado el estado**). Marcar
+`FAILED` a lo ancho **apagaría reintentos legítimos** y podría **cegar** (no re-aplicar tras
+crash) fills que sí eran transitorios. Un arreglo honesto exige una **clasificación
+explícita** de la causa (p.ej. un tipo de error de dominio para «rechazo permanente») y, con
+ella, su **mutación**: sin mutación no se sabe si el gate mira la línea correcta.
+
+**Alcance.** Motor (clasificación de la terminación del fill en el settlement AUTO). **No**
+afecta al sello del replay OOS ni a la corrección financiera: el rechazo es **fail-closed**
+correcto, y **jamás** se marca `APPLIED` por excepción. Afecta al **gasto** y a la **higiene
+de estados** del bucle AUTO.
+
+**Estado de esta observación.** **ABIERTA**, **sin arreglar en este cambio**: el alcance
+declarado era la causa del rojo de CI (`FLAKE-1`), y este hallazgo es una **derivada** de la
+instrumentación que lo cerró. Se registra porque la traza lo puso delante y porque
+«terminación correcta» es una propiedad del motor que conviene decidir a propósito, no por
+omisión.

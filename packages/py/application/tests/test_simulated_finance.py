@@ -364,3 +364,121 @@ def test_roundtrip_idempotent_on_replay() -> None:
     assert once.fills_credited == 2
     assert replay.fills_credited == 2  # buy/sell repetidos NO se vuelven a contar.
     assert replay.cash == once.cash == LIFECYCLE_CASH  # ambas vías balanceadas a nulo.
+
+
+# ── FLAKE-1 (2026-09-30): el corte de la parcial NO es simétrico entre patas ──────
+# El rojo intermitente de ``lifecycle-pg`` (``test_finance_auto_day_materializes_
+# executetrade_exactly_once`` → ``AssertionError: RETRY``) NO era el motor, ni la clave
+# de idempotencia, ni una carrera de entorno: era el FIXTURE. Ni ``draw_queue_noise`` ni
+# ``mid_cut`` dependen del ``venue_order_id`` — dependen de ``(seed, side,
+# instrument_id)``, es decir de la PATA. Con el MISMO seed, la pata ``buy`` puede cortar
+# sus parciales antes que la pata ``sell``; el fixture asumía un ida-y-vuelta net-zero con
+# la MISMA cantidad en las dos patas, así que la venta podía pedir más de lo que la compra
+# había dejado en cartera. El rechazo del repositorio era CORRECTO (fail-closed): el
+# defecto era construir ese plan. Medido: ~6,6 % de los ``instrument_id`` sorteados por el
+# gate PG (y ese mismo patrón de tranchas #2/#3 en el run ``36681305812``).
+# Estos gates fijan el mecanismo y el invariante del arreglo, SIN PG.
+
+_FLAKE1_INSTRUMENT = "inst-fin-59e064e70b"  # instrument_id REAL del rojo 36681305812
+_FLAKE1_SEED = 2  # seed que el selector del gate PG elegía para ese instrument_id
+_FLAKE1_TOTAL = Decimal("60")
+
+
+def _chunks_for(
+    instrument_id: str, side: str, *, seed: int, quantity: Decimal
+) -> tuple[Decimal, ...]:
+    """Deltas por parcial de una pata (mismos inputs que ``submit_simulated_order``)."""
+    result = simulated_fill_schedule(
+        instrument_id=instrument_id,
+        side=side,
+        quantity=quantity,
+        venue_order_id=f"sim-{side}-{instrument_id}-{seed}",
+        seed=seed,
+        fill_chunks=3,
+        base_mid=100.0,
+    )
+    return tuple(f.qty_delta for f in result.fills)
+
+
+def _finances_for(
+    instrument_id: str,
+    chunks_by_side: dict[str, tuple[Decimal, ...]],
+) -> tuple[SimulatedFillFinance, ...]:
+    """Traduce los deltas por pata a las finanzas por fill que consume el libro puro."""
+    out: list[SimulatedFillFinance] = []
+    for side, chunks in chunks_by_side.items():
+        for seq, qty in enumerate(chunks, start=1):
+            out.append(
+                SimulatedFillFinance(
+                    instrument_id=instrument_id,
+                    side=side,
+                    execution_id=f"{side}#{seq}",
+                    quantity=qty,
+                    price=Decimal("100.00"),
+                    account_id="acc-flake1",
+                    venue="simulated",
+                )
+            )
+    return tuple(out)
+
+
+def test_flake1_partial_cut_is_asymmetric_across_sides() -> None:
+    """La RAÍZ: con el mismo seed, ``buy`` se corta y ``sell`` no (30 ≠ 60)."""
+    buy = _chunks_for(_FLAKE1_INSTRUMENT, "buy", seed=_FLAKE1_SEED, quantity=_FLAKE1_TOTAL)
+    sell = _chunks_for(_FLAKE1_INSTRUMENT, "sell", seed=_FLAKE1_SEED, quantity=_FLAKE1_TOTAL)
+    assert buy == (Decimal("30.000000"),), buy
+    assert sell == (Decimal("30.000000"), Decimal("14.100000"), Decimal("15.900000")), sell
+    assert sum(buy, Decimal("0")) != sum(sell, Decimal("0"))
+    # ...y las DOS patas tienen fills: el selector clásico las daba por buenas.
+    assert buy and sell
+
+
+def test_flake1_oversell_plan_is_rejected_by_the_pure_domain_mirror() -> None:
+    """El plan que el fixture viejo construía lo RECHAZA el propio espejo del dominio.
+
+    Vender más de lo que dejó la compra no es «un RETRY misterioso»: es oversell, y el
+    libro puro lo nombra. Es la lectura que faltaba para no culpar al motor.
+    """
+    buy = _chunks_for(_FLAKE1_INSTRUMENT, "buy", seed=_FLAKE1_SEED, quantity=_FLAKE1_TOTAL)
+    sell = _chunks_for(_FLAKE1_INSTRUMENT, "sell", seed=_FLAKE1_SEED, quantity=_FLAKE1_TOTAL)
+    with pytest.raises(ValueError, match="sell exceeds the held position"):
+        sim_roundtrip_accounting(_finances_for(_FLAKE1_INSTRUMENT, {"buy": buy, "sell": sell}))
+
+
+def test_flake1_sizing_the_sell_to_the_realized_buy_never_oversells() -> None:
+    """El ARREGLO: dimensionar la venta a lo que la compra LIQUIDA ⇒ net-zero sin oversell.
+
+    Se comprueba en el caso real del rojo y en una rejilla FIJA de ``instrument_id`` (sin
+    lotería), y se exige que la rejilla CUBRA el fallo (la suposición vieja sí sobrevende):
+    un gate que no alcanza al fallo que arregla no sella nada.
+    """
+    buy = _chunks_for(_FLAKE1_INSTRUMENT, "buy", seed=_FLAKE1_SEED, quantity=_FLAKE1_TOTAL)
+    realized = sum(buy, Decimal("0"))
+    sell = _chunks_for(_FLAKE1_INSTRUMENT, "sell", seed=_FLAKE1_SEED, quantity=realized)
+    book = sim_roundtrip_accounting(_finances_for(_FLAKE1_INSTRUMENT, {"buy": buy, "sell": sell}))
+    assert book.remaining == 0  # ida-y-vuelta CERRADO (net-zero)
+    assert book.fills_credited == 1 + len(sell)
+
+    oversold_with_old_assumption = 0
+    for i in range(600):
+        iid = f"inst-flake1-{i:04d}"
+        # Espejo del selector del gate PG: primer seed con fills en AMBAS patas.
+        for seed in range(1, 5_000):
+            b = _chunks_for(iid, "buy", seed=seed, quantity=_FLAKE1_TOTAL)
+            if not b:
+                continue
+            r = sum(b, Decimal("0"))
+            s = _chunks_for(iid, "sell", seed=seed, quantity=r)
+            if s:
+                break
+        else:  # pragma: no cover — la rejilla debe tener plan para todo iid.
+            raise AssertionError(f"sin ida-y-vuelta viable para {iid!r}")
+
+        # Con el dimensionado viejo (venta a la cantidad nominal) SÍ había oversell...
+        if sum(_chunks_for(iid, "sell", seed=seed, quantity=_FLAKE1_TOTAL), Decimal("0")) > r:
+            oversold_with_old_assumption += 1
+        # ...y con el arreglo la venta nunca excede la cartera, ni cierra negativa.
+        assert sum(s, Decimal("0")) <= r
+        assert sim_roundtrip_accounting(_finances_for(iid, {"buy": b, "sell": s})).remaining >= 0
+
+    assert oversold_with_old_assumption > 0, "el gate debe alcanzar el fallo que arregla"
