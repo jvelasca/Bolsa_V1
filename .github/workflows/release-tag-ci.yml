@@ -469,6 +469,12 @@ jobs:
         # por EVIDENCIA de la fila, cola muerta y guardarraíl de estancamiento— nunca corrieron en
         # CI; medido al re-correr la batería local: +9 en vez de +25. Añadirlo aquí (y en
         # ``python-ci.yml``) es la corrección, y el job ``python`` del tag NO repite el hueco de v2.76.
+        # FLAKE-1 (2026-09-29, misma higiene ``OBS-19``): ``test_simulated_finance.py`` (HERMÉTICO:
+        # applier con un ExecuteTrade fake, ~0.1 s) va EXPLÍCITO porque este directorio NO tiene pase
+        # de directorio. Al instrumentar el rojo intermitente de ``lifecycle-pg`` se añadió ahí el
+        # gate que impide que un fallo de ExecuteTrade se trague en silencio
+        # (``test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause``); el fichero existía desde
+        # v2.22/A9 y no estaba en la lista de ningún workflow, así que ese gate no habría corrido.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -524,6 +530,7 @@ jobs:
           packages/py/application/tests/test_portfolio_decision_engine.py
           packages/py/application/tests/test_trade_plan.py
           packages/py/application/tests/test_execution_event.py
+          packages/py/application/tests/test_simulated_finance.py
           packages/py/application/tests/test_applied_fills.py
           packages/py/application/tests/test_position_manager.py
           packages/py/application/tests/test_v127_golden_path.py

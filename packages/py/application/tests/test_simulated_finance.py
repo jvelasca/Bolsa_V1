@@ -23,6 +23,7 @@ Sin PG: ejercita el tornillo ``simulated_finance`` por el lado puro/mapper +
 from __future__ import annotations
 
 import asyncio
+import logging
 from decimal import Decimal
 
 import pytest
@@ -162,7 +163,7 @@ def test_resolve_execution_finance_matches_or_fails_closed() -> None:
     )
 
 
-def _applier_for(result, *, fake: _FakeExecuteTrade):
+def _applier_for(result, *, fake: object):
     """Fina applier: ExecuteTrade-seco(idempotente por key) sobre un SIM result."""
 
     def _resolver(execution: ExecutionEvent) -> SimulatedFillFinance | None:
@@ -204,6 +205,46 @@ def test_applier_fail_closed_on_foreign_event_and_live_venue() -> None:
 
     asyncio.run(_go())
     assert fake.calls == []  # ningún ExecuteTrade-fake ocurrió (dinero intacto).
+
+
+class _ExplodingExecuteTrade:
+    """ExecuteTrade que SIEMPRE lanza: simula un fallo transitorio (PG/dominio)."""
+
+    async def execute(self, **kwargs: object) -> object:
+        raise RuntimeError("deadlock simulado")
+
+
+def test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause(caplog) -> None:
+    """FLAKE-1 (2026-09-29): el applier sigue devolviendo ``False`` (nunca APPLIED por
+    excepción), pero la CAUSA deja de tragarse.
+
+    Antes, un ``ExecuteTrade`` que lanzaba producía un fill en ``RETRY`` con
+    ``error="apply_ineffective"`` y CERO rastro del motivo: un rojo del CI (como el
+    intermitente de ``lifecycle-pg``) era indistinguible de un ``None`` del resolver.
+    Este gate fija que la traza queda registrada sin cambiar la semántica.
+    """
+    result = _schedule("buy")
+    applier = _applier_for(result, fake=_ExplodingExecuteTrade())
+    fill = result.fills[0]
+    event = ExecutionEvent(
+        execution_id=fill.execution_id,
+        order_id="o",
+        venue="SIMULATED",
+        qty=abs(fill.qty_delta),
+    )
+
+    with caplog.at_level(logging.ERROR):
+        ok = asyncio.run(applier(event))
+
+    assert ok is False  # contrato intacto: jamás APPLIED por excepción.
+    records = [r for r in caplog.records if r.name.endswith("simulated_finance")]
+    assert records, "el fallo de ExecuteTrade debe dejar rastro en el log"
+    record = records[-1]
+    assert record.levelno == logging.ERROR
+    assert event.execution_id in record.getMessage()  # el ejecutor sabe QUÉ fill falló
+    assert record.exc_info is not None
+    assert isinstance(record.exc_info[1], RuntimeError)  # ...y POR QUÉ (traza completa)
+    assert "deadlock simulado" in str(record.exc_info[1])
 
 
 def test_apply_idempotent_same_fill_effective_once() -> None:

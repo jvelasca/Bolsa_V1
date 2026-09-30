@@ -42,6 +42,7 @@ Diseño (dos mitades, recosen costuras sin ciclos):
 from __future__ import annotations
 
 import inspect
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
@@ -53,6 +54,8 @@ from bolsa_application.simulated_settlement import (
     AUTO_SETTLE_VENUES,
     simulated_idempotency_key,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "SIM_FINANCE_VENUES",
@@ -266,6 +269,18 @@ def build_simulated_execute_trade_applier(
             )
             return True
         except Exception:  # noqa: BLE001 — no applied; no marcar APPLIED por excepción.
+            # FLAKE-1 (2026-09-29): el contrato es fail-closed (False → el store lo
+            # encamina a RETRY/FAILED), pero tragarse la causa dejaba el RETRY SIN
+            # explicación: el único rastro era ``error="apply_ineffective"`` y había que
+            # adivinar si el fallo era del resolver (None) o de ExecuteTrade. Se registra
+            # la traza para que un rojo del CI sea diagnosticable. NO cambia la semántica:
+            # sigue devolviendo False y JAMÁS se marca APPLIED por excepción.
+            logger.exception(
+                "apply_finance NO efectivo por excepción de ExecuteTrade "
+                "(execution_id=%s, instrument_id=%s); el store lo encamina a RETRY",
+                getattr(execution, "execution_id", None),
+                getattr(finance, "instrument_id", None),
+            )
             return False
 
     return _apply

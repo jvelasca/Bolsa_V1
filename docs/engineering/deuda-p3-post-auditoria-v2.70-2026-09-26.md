@@ -1576,18 +1576,40 @@ en `PROJECT_STATE.md`, en el índice (`192`) y en el informe de reproducibilidad
 reportó **lleno** seguía en **`RETRY`** (dinero NO movido) al leerlo. El resto del rojo de `lifecycle-pg`
 es **cascada** (el step aborta y las baterías siguientes se quedan sin log ⇒ «no dejó log de la corrida»).
 
-**Hipótesis principal (medida, NO aislada).** El propio repo documenta ese estado como «un chunk en
-`RETRY` de un **llenado parcial**» (`src/bolsa_api/background/auto_simulation_worker.py`), y el selector
-del test (`_seed_with_fills`, que solo exige `fills` no vacío) **acepta** esquemas parciales: medido
-offline con ese mismo criterio sobre **40 instrumentos al azar** (`simulated_fill_schedule`,
-`fill_chunks=3`, `qty=60`), **9 de 80** órdenes (≈ **11 %**) salen `partial` (la cola topa a mitad y no
-llena el resto). El paso causal exacto **no** está aislado.
+**Mecanismo (por lectura del código, sin necesidad de repro).** Ese `RETRY` solo puede venir de
+`apply_execution_financial_once(retryable_on_ineffective=True)` → `mark_retry(error="apply_ineffective")`
+cuando el applier devuelve `False`; y `build_simulated_execute_trade_applier._apply` devuelve `False` en
+**dos** casos: (a) el resolver da `None` —**descartado aquí**: el schedule se recomputa determinista con
+el MISMO `venue_order_id`, así que el match por `execution_id` no puede fallar— o (b)
+`ExecuteTrade.execute` **lanzó** y la excepción se **tragaba** (`except Exception: return False`). Es
+decir: el `RETRY` es un fallo de `ExecuteTrade` **sin causa visible** (el único rastro era
+`error="apply_ineffective"`).
 
-**Repro pendiente (la deuda).** Bucle local contra PG real iterando `instrument_id` aleatorios hasta
-reproducir y, si se confirma, decidir entre (a) endurecer el selector del test para exigir esquema
-**completo** (determinista, como ya se hizo con `fill_chunks`) o (b) declarar explícito en el test que un
-`RETRY` de una cola parcial es un estado **esperado**. **No** se toca ni el motor ni el test en este
-trabajo.
+**Hipótesis previa REFUTADA (medida).** La sospecha era el camino de **llenado parcial** (el repo lo
+documenta como «un chunk en `RETRY`»): cierto que el selector del test (`_seed_with_fills`, que solo exige
+`fills` no vacío) **acepta** esquemas parciales —medido offline: **9 de 80** órdenes ≈ **11 %** salen
+`partial`—, pero **no** es la causa: en el bucle directo **4 de 25** corridas tuvieron un lado `partial` y
+**pasaron**, y forzar el selector a exigir esquema **completo** no cambia nada (`25/25` ok).
+
+**No reproducible en local (medido).** `50` corridas directas del test objetivo (dos políticas de
+selector) + **9** corridas del **comando exacto del CI** (`lifecycle-pg`, con BD scratch **fresca**
+drop+create+migrate por iteración; 8 con `161 passed, 4 skipped` y la última con `165 passed, 0 skipped`)
+⇒ **0 rojos**. La variable es del **entorno** (runner 2 vCPU vs local), no del motor.
+
+**Arreglo aplicado (lo único accionable sin repro): hacer visible lo que se tragaba.**
+`simulated_finance._apply` registra ahora `logger.exception(...)` con el `execution_id` y el
+`instrument_id` antes de devolver `False` —el contrato **no** cambia (sigue fail-closed; **jamás** APPLIED
+por excepción)— y se añade el gate `test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause` (la traza
+queda en el log, y pytest la muestra en «Captured log call» cuando el test falla).
+
+**Hallazgo de higiene en la misma pasada (`OBS-19`).** Ese gate **no habría corrido**:
+`packages/py/application/tests/test_simulated_finance.py` **no estaba en la lista de ningún workflow**
+(existe desde `v2.22/A9`), así que se añade a los **dos** jobs offline —`python-ci.yml` y el job `python`
+de `release-tag-ci.yml`— con su comentario de procedencia, igual que se hizo con
+`test_replay_oos_durable_cycle.py` en `v2.88.6`.
+
+**Deuda que queda.** La **causa raíz** (qué excepción lanza `ExecuteTrade` en el runner) solo se sabrá en
+el **próximo** rojo del CI, ya con traza. **No** se toca ni el motor ni el test del día AUTO.
 
 **Alcance.** Proceso/tests (rojo **espurio** en la certificación). Si el tag se cortase en una corrida
 donde dispara, `certify` **no-GREENearía** el tag por una causa **ajena** al artefacto. **No** afecta al

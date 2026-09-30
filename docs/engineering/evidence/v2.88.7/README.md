@@ -336,9 +336,18 @@ reproducción es del **contenido**, parte a parte, no una coincidencia de tamañ
 **Corrección:** el otro rojo de la primera corrida, `lifecycle-pg`, **no** es determinista — aquí salió
 **verde** (`165 passed in 82,89 s`) tras dos rojos con la misma firma (`AssertionError: RETRY` en
 `test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once`). Es
-**intermitente**: la hipótesis no aislada es el camino de **llenado parcial** (documentado en el repo
-como «un chunk en `RETRY`»), y el selector del test acepta esquemas parciales — medido offline, **9 de
-80** órdenes (≈11 %) salen `partial`. Deuda con repro local; **no** afecta al sello del replay.
+**intermitente**: la sospecha previa —el camino de **llenado parcial**— quedó **refutada** en el repro
+local (4 de 25 corridas directas con un lado `partial` **pasaron**; exigir esquema **completo** no cambia
+nada: `25/25`). La causa **sí** está acotada por código: ese `RETRY` solo sale de
+`mark_retry(error="apply_ineffective")` cuando el applier devuelve `False`, y el applier lo devuelve o
+bien si el resolver da `None` —descartado: el schedule se recomputa determinista con el MISMO
+`venue_order_id`— o porque `ExecuteTrade.execute` **lanzó** y la excepción se **tragaba**. **No
+reproducible en local:** 50 corridas directas del test objetivo + **9** del comando exacto de este job
+(BD scratch fresca por iteración, una de ellas `165 passed, 0 skipped`) ⇒ **0 rojos**. **Arreglo
+aplicado:** `simulated_finance._apply` registra ahora la traza (`logger.exception`) antes de devolver
+`False` —el contrato no cambia— con gate
+`test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause`, así que el **próximo** rojo del CI
+llegará con causa. **No** afecta al sello del replay.
 
 
 

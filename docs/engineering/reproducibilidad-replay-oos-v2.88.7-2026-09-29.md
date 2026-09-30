@@ -216,11 +216,19 @@ una coincidencia de tamaño, es el mismo contenido **parte a parte**.
 `lifecycle-pg`, **no** era determinista: esta corrida salió **verde** (`165 passed in 82,89 s`) tras
 dos rojos con la misma firma (`AssertionError: RETRY` en
 `test_simulated_finance_pg.py::test_finance_auto_day_materializes_executetrade_exactly_once`, que es
-el assert de la línea 327 leyendo `RETRY`). Es **intermitente**; la hipótesis —**no aislada**— es el
-camino de **llenado parcial** que el propio repo documenta como «un chunk en `RETRY`», y que el
-selector del test **sí** acepta: medido offline con el mismo criterio, **9 de 80** órdenes (≈11 %,
-40 instrumentos al azar) salen `partial`. Queda como **deuda** con repro local contra PG real;
-**no** afecta al sello del replay.
+el assert de la línea 327 leyendo `RETRY`). Es **intermitente**, y la sospecha previa —el camino de
+**llenado parcial** que el repo documenta como «un chunk en `RETRY`»— quedó **refutada** en el repro local:
+4 de 25 corridas directas con un lado `partial` **pasaron**, y exigir esquema **completo** no cambia nada
+(`25/25`). La causa **sí** está acotada por código: ese `RETRY` solo sale de
+`mark_retry(error="apply_ineffective")` cuando el applier devuelve `False`, y el applier lo devuelve o bien
+si el resolver da `None` —descartado: el schedule se recomputa determinista con el MISMO
+`venue_order_id`— o porque `ExecuteTrade.execute` **lanzó** y la excepción se **tragaba**. **No
+reproducible en local:** 50 corridas directas del test objetivo + **9** del comando exacto de este job (BD
+scratch fresca por iteración, una de ellas `165 passed, 0 skipped`) ⇒ **0 rojos**. **Arreglo aplicado:**
+`simulated_finance._apply` registra ahora la traza (`logger.exception`) antes de devolver `False` —el
+contrato no cambia: sigue fail-closed y **jamás** APPLIED por excepción— con gate
+`test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause`, así que el **próximo** rojo del CI llegará
+con causa. **No** afecta al sello del replay.
 
 ## 7. Límites de esta evidencia (lo que NO acredita)
 
