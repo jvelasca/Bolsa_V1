@@ -31,6 +31,30 @@ El diagnóstico de la auditoría se sostiene sobre estos hechos, todos presentes
 | Los **gates** son `Release tag CI` + `python-ci`; las listas de pytest son **manuales** | `.github/workflows/release-tag-ci.yml:261` (job `python`), `.github/workflows/python-ci.yml`; deuda `OBS-19` |
 | `OBS-21` está **CERRADA**; `OBS-23` sigue **ABIERTA** | `docs/engineering/evidence/v2.88.12/README.md:70` (`OBS-23`), `docs/engineering/evidence/v2.88.12/README.md:85` (`OBS-21` cerrada en `v2.88.11-beta`) |
 
+> **Deriva de citas tras `W1` (`v2.88.14-beta`) — re-medida 2026-09-30 (anotación fechada, NO reescritura).**
+> El sello `W1` toca **sólo dos** de los ficheros citados arriba (`auto_simulation_worker.py` y
+> `v2_44_mutation_audit.py`), así que las citas de esas filas se han **desplazado**; el resto de ficheros
+> (`protection_compat.py`, `signal_identity.py`, `auto_engine_state_store.py`, `paper_auto_engine_worker.py`,
+> `replay_oos.py`, `active_strategy_signal_evaluator.py`, los dos workflows) **no** se tocaron y sus líneas
+> siguen vigentes. Valores **hoy** en el árbol:
+>
+> - `auto_simulation_worker.py`: `PriceScript` `:296 → :297` · `flat_price_script` `:317 → :318` · default
+>   `:616 → :617` · `self._price_script` `:686 → :687` · `AutoSimRuntime` `:5997 → :6005` ·
+>   `interval_seconds=` `:6030 → :6038` · `_sim_interval_seconds` `:6036 → :6044` · `seed` del fill
+>   `:1324 → :1333` · `base_mid` `:1326 → :1334` · `_v2_current_bar_start` `:3020 → :3028` ·
+>   `_v2_roll_consumed_bar` `:3029 → :3037` · `_v2_consumed_bar` `:909 → :917`.
+> - `v2_44_mutation_audit.py`: `MUTATIONS` `:747 → :760`; la última mutación ya **no** es `M269` (`:2936 →
+>   :2949`): tras `W1` la matriz llega a **`M274`** (`:2962`, gate fail-OPEN / `1wk` habilitada /
+>   `next_bar_open` / política sin gate / degradación silenciosa).
+>
+> **Y dos citas cambian de SEMÁNTICA, no sólo de línea:** la lectura del dato diario (`bar_window`, antes
+> `:3026`) y la lectura de `signal_timeframe` (`:1936`) **ya no** leen `self._v2_tunables.signal_timeframe`
+> directo, sino `self._v2_granularity.decision.timeframe` — el **seam inerte** de `W1`; con el default `1d`
+> el valor es **idéntico** (`Δ = 0`, golden byte-idéntico).
+>
+> **Estado de la deuda:** la fila de `OBS-23` de esta tabla queda **caducada**: `OBS-23` fue **CERRADA** por
+> `W1` (`_sell_seed_with_fill` determinista; ver [`evidence/v2.88.14/README.md`](./evidence/v2.88.14/README.md) §5).
+
 **Consecuencia medida:** ~**1.440 ticks/día** para **~1 decisión real** por barra diaria, sobre un precio que **no se mueve** y con el fill anclado a un minuto que **no es la barra**.
 
 ---
@@ -52,6 +76,12 @@ El diagnóstico de la auditoría se sostiene sobre estos hechos, todos presentes
 ### W1 — `v2.88.14-beta` (`2.11.14-beta`) · Modelo puro `OperativeGranularity` + capability gate (**INERTE**)
 
 **Objetivo:** introducir el vocabulario y el gate **sin ningún efecto observable**.
+
+> **ESTADO (2026-09-30): SELLADO y CERTIFICADO.** `v2.88.14-beta` (`421686d4`) publicado; `Release tag CI`
+> run [`36737341525`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36737341525) → **`SUCCESS`** en la
+> primera pasada (`certify` GREEN, 10 jobs verdes; job `python` **`3137 passed, 38 skipped`**), con la cita
+> POST-TAG en `main` (`7fabd2ff`). `OBS-23` **CERRADA** y el **caso** de `OBS-19` cerrado. Evidencia:
+> [`evidence/v2.88.14/README.md`](./evidence/v2.88.14/README.md).
 
 **Entregables**
 - `packages/py/domain/src/bolsa_domain/operative_granularity.py` (nuevo): value object frozen.
