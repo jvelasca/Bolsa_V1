@@ -19,7 +19,7 @@ de `v2.88.8` dejó a la vista.
 | --- | --- |
 | Fase | Cierre de `OBS-21` (clasificación del terminal del fill) |
 | Versión de paquete | `2.11.10-beta` → **`2.11.11-beta`** |
-| Tag (lo crea el propietario) | **`v2.88.11-beta`** (anotado) |
+| Tag (creado por el propietario) | **`v2.88.11-beta`** (anotado, objeto `28c0fd23` → commit `4204ffbf`) |
 | Alembic head | **`046_fill_reference_mid`** (**SIN migración**) |
 | Contenido del sello | **MOTOR** (dominio + repo + settlement) + tests + mutación + docs |
 | Relación con `v2.88.9`/`v2.88.10` | Cambia el **terminal** del fill (clasificación), **no** la aritmética financiera ni la semántica fail-closed |
@@ -114,7 +114,29 @@ Suites hermeticas: **`42 passed`** (`test_execution_event.py` + `test_simulated_
 - No cierra `OBS-19`, `OBS-15`, `OBS-16`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, `OBS-9`, `P3-5`, `OBS-5`
   ni `P3-2`/`P3-3`.
 
-## 7. Cita del CI del tag
+## 7. Cita del CI del tag (POST-TAG)
 
-**PENDIENTE DE CITAR.** Se anota aquí el `Release tag CI` del tag `v2.88.11-beta` cuando exista (patrón de
-cita POST-TAG, `OBS-3`/`OBS-4`/`OBS-22`).
+`Release tag CI` **`36705565656`**, ref `v2.88.11-beta`, HEAD **`4204ffbf`**, `push`,
+`2026-09-30T10:57:30Z` → `11:06:28Z` (~8m58s) → **SUCCESS**. `certify` **`"status": "GREEN"`** con los **10
+jobs requeridos** en `success` (`security`, `shared`, `spine`, `frontend`, `python`, `playwright-mock`,
+`lifecycle-pg`, `replay-repro`, `dr-verify`, `a7-gate`); `playwright (integrated E2E)` `skipped` **por
+diseño** (opt-in). En total **11 jobs verdes, 0 rojos**.
+
+- **`python` (ruff/imports/mypy/pytest offline)** → `Ruff: All checks passed!` y
+  **`3118 passed, 38 skipped, 6 warnings`** (72.72s).
+- **`lifecycle-pg`** → step principal **`166 passed`** (incluye `test_simulated_finance_pg.py`:
+  el nuevo `test_permanent_rejection_materializes_failed_not_retry` **pasa en PG real**); account-isolation
+  `45`, Golden Day 2.0 `1`, Crash/Recovery Day `1`, Concurrent AUTO `3`, HardKill `2`, crash injection
+  `2`, multiprocess AUTO `1`; **0 skips** (gates `fail if skipped`). El log confirma el head
+  **`046_fill_reference_mid`** (`Running upgrade 045_adaptive_gate_state -> 046_fill_reference_mid`).
+- **`replay-repro`** → **`REPRODUCIDO`**: `render LF 3290062 · A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB`;
+  `DIGEST igual en las dos corridas`; artefacto `replay-oos-durable-v2.88.7` = `11092066734`.
+- **`certify`** → artefacto `release-tag-ci-summary` = `11092047247`.
+
+**Contraste con la expectativa del tag (declarado, no escondido).** El mensaje del tag predijo "los MISMOS
+`37` skips"; el observado es **`38`**. La predicción era **incorrecta por 1**, y la causa es exactamente el
+test nuevo: `test_simulated_finance_pg.py` **suma `+1` skip offline** (corre en el job PG, no en `python`),
+por eso `37 + 1 = 38`. Simétricamente, los `+3` de `passed` (`3115 → 3118`) son los 2 de
+`test_execution_event.py` + 1 de `test_simulated_finance.py`. La deriva `3118/38` **no** es un hallazgo de
+motor: es la firma aritmética de los tests añadidos. `lifecycle-pg` sube `165 → 166` por el mismo motivo.
+

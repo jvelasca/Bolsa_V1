@@ -41,8 +41,16 @@ Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-B, sin backdating.
   y **`M269`** (el applier vuelve a tragarse el rechazo como `False`): **ambas MUERDEN** y la sonda deja el
   árbol intacto.
 - **Evidencia (punto de entrada de la auditoría):** [`docs/engineering/evidence/v2.88.11/README.md`](./docs/engineering/evidence/v2.88.11/README.md).
-- **CITA REAL (POST-TAG):** **PENDIENTE DE CITAR** — patrón de cita POST-TAG (`OBS-3`/`OBS-4`/`OBS-22`); se
-  anota aquí cuando el tag `v2.88.11-beta` tenga su corrida de `Release tag CI`.
+- **CITA REAL (POST-TAG):** `Release tag CI` **`36705565656`** (ref `v2.88.11-beta`, HEAD `4204ffbf`, `push`,
+  `2026-09-30T10:57:30Z` → `11:06:28Z`) → **SUCCESS**; `certify` **`"status": "GREEN"`** con los **10 jobs
+  requeridos** verdes y `playwright (integrated)` `skipped` por diseño (**11 verdes, 0 rojos**). `python`
+  **`3118 passed, 38 skipped`** (Ruff `All checks passed!`); `lifecycle-pg` **`166 passed`**, **0 skips**, con
+  `test_simulated_finance_pg.py` (el nuevo test permanente→`FAILED`) **pasando en PG real** y el head
+  `046_fill_reference_mid` confirmado en su log; `replay-repro` → **`REPRODUCIDO`**
+  (`render LF 3290062 · A4DA036C…13CB`). **Corrección declarada:** el mensaje del tag predijo "los MISMOS
+  `37` skips"; el observado es **`38`** porque el test PG nuevo **suma `+1` skip offline** (corre en
+  `lifecycle-pg`, no en `python`) — `37+1=38` y `3115+3=3118` (2 de `test_execution_event.py` + 1 de
+  `test_simulated_finance.py`). Patrón de cita POST-TAG (`OBS-3`/`OBS-4`/`OBS-22`).
 
 ## [2.11.10-beta] — Consolidación `v2.88.10`: el tag pasa a ser **autoconsistente** (cita de su CI + corrección del recuento local) y **queda como objeto auditado** — 2026-09-30
 
