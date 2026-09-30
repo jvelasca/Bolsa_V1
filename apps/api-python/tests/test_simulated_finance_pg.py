@@ -305,6 +305,24 @@ def _roundtrip_plan(instrument_id: str) -> tuple[int, Decimal, Decimal]:
     raise AssertionError(f"no seed con ida-y-vuelta viable para {instrument_id!r}")
 
 
+def _sell_seed_with_fill(instrument_id: str, *, quantity: Decimal) -> int:
+    """Elige un seed DETERMINISTA cuya pata ``sell`` produzca al menos un fill.
+
+    **OBS-23 (2026-09-30).** ``draw_queue_noise`` deriva de ``(seed, side, instrument_id)``
+    y una cola TERMINAL sin fill (``reject``/``timeout``/``market_closed``/``unavailable``/
+    ``unknown``) tiene probabilidad ~5,6 % por corrida. Con un ``seed`` fijo y un
+    ``instrument_id`` ALEATORIO, el caso oscilaba (``result.fills == ()``). El escenario de
+    ``OBS-21`` no depende del seed, así que se ELIGE uno que llene y la entrada deja de ser
+    una lotería. ``_fill_chunks`` es el espejo exacto del schedule del settlement (el corte
+    no depende del ``venue_order_id``), así que el seed elegido vale para el caso real.
+    """
+    for seed in range(1, 100_000):
+        chunks = _fill_chunks(instrument_id, "sell", seed=seed, quantity=quantity)
+        if any(abs(chunk) > 0 for chunk in chunks):
+            return seed
+    raise AssertionError(f"no seed con fill para la pata sell de {instrument_id!r}")
+
+
 @pytest.mark.asyncio
 async def test_finance_auto_day_materializes_executetrade_exactly_once(
     fin_pg_factory: async_sessionmaker[AsyncSession],
@@ -409,7 +427,11 @@ async def test_permanent_rejection_materializes_failed_not_retry(
     applier RE-LANZA el rechazo permanente y el store lo sella en ``FAILED``.
     """
     instrument_id = f"inst-fin-{uuid.uuid4().hex[:10]}"
-    seed = 7
+    # OBS-23 (2026-09-30): el schedule del simulador puede caer en una cola TERMINAL sin
+    # fill (~5,6 %) y con un seed fijo el test oscilaba (``result.fills == ()``). El seed se
+    # ELIGE determinista (la pata ``sell`` llena); el escenario de OBS-21 no depende de él.
+    sell_qty = Decimal("60")
+    seed = _sell_seed_with_fill(instrument_id, quantity=sell_qty)
     account_id: str | None = None
     try:
         async with fin_pg_factory() as session:
@@ -423,7 +445,6 @@ async def test_permanent_rejection_materializes_failed_not_retry(
             submit_simulated_order,
         )
 
-        sell_qty = Decimal("60")
         logical_order_id = f"fin-sell-{uuid.uuid4().hex[:8]}"
         venue_order_id = auto_venue_order_id(
             engine_id="engine",

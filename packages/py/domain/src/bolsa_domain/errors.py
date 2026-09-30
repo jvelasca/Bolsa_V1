@@ -66,4 +66,28 @@ class PermanentRejectionError(ValueError):
         super().__init__(reason)
 
 
-__all__ = ["IdempotencyKeyExists", "IdempotencyKeyReused", "PermanentRejectionError"]
+class UnsupportedGranularityError(ValueError):
+    """Una granularidad operativa **declarada** no está **habilitada** (fail-closed).
+
+    Modela el rechazo explícito de una configuración de cadencia que pediría una
+    resolución de datos que la ingesta no sostiene (p. ej. ``1wk``, o protección
+    intradía sin feed intradía). El propósito es que **nunca** se degrade en silencio
+    a la cadencia por defecto: una granularidad no soportada es un error de
+    configuración visible, no un silencio (ver diseño v2 de granularidad operativa).
+
+    ``reason`` es el motivo tipado (un miembro de ``GranularityRejection``, que es
+    ``str``); ``detail`` es el texto humano con la combinación rechazada.
+    """
+
+    def __init__(self, reason: str, detail: str) -> None:
+        self.reason = reason
+        self.detail = detail
+        super().__init__(f"granularidad operativa no soportada [{reason}]: {detail}")
+
+
+__all__ = [
+    "IdempotencyKeyExists",
+    "IdempotencyKeyReused",
+    "PermanentRejectionError",
+    "UnsupportedGranularityError",
+]

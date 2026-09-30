@@ -212,6 +212,7 @@ from bolsa_application.execution_event import (
 )
 from bolsa_application.exit_order_store import ExitOrderStore
 from bolsa_application.kill_switch_store import KillState, KillSwitchStore
+from bolsa_application.operative_granularity_policy import resolve_operative_granularity
 from bolsa_application.position_manager import (
     KILL_SWITCH,
     RISK_EXIT,
@@ -732,6 +733,13 @@ class AutoSimulationWorker:
         # El settlement/ledger/reconciliación NO cambian: esto solo decide QUÉ emitir.
         self._v2_enabled = v2_engine_enabled()
         self._v2_tunables: V2Tunables = tunables_from_env()
+        # Granularidad operativa (diseño v2): relojes separados, gate fail-closed. En
+        # este incremento es un SEAM INERTE: la configuración por defecto (``1d``)
+        # reproduce el comportamiento previo byte a byte. ``signal_timeframe`` deja de
+        # leerse suelto y se DERIVA del ``DecisionClock`` (ver ``operative_granularity_policy``).
+        self._v2_granularity = resolve_operative_granularity(
+            self._v2_tunables.signal_timeframe
+        )
         self._v2_positions: dict[str, Any] = {}
         # V2.40.4 — libro de órdenes PENDIENTES (fills no materializados) del último
         # refresco, con su estado de medición. Por defecto vacío y COMPLETO (sin espejo
@@ -1925,7 +1933,7 @@ class AutoSimulationWorker:
                 # ``unversioned`` (una estrategia que no se identifica sigue sin poder
                 # repetir la MISMA señal sobre la MISMA barra).
                 strategy_version=version or "unversioned",
-                timeframe=self._v2_tunables.signal_timeframe,
+                timeframe=self._v2_granularity.decision.timeframe,
                 moment=self._time,
             )
             signal_id = identity.signal_id if identity is not None else ""
@@ -3023,7 +3031,7 @@ class AutoSimulationWorker:
         Es la clave con la que se acotan las señales consumidas: lo consumido fuera de
         esta barra NO puede bloquear una oportunidad nueva (y no se guarda para siempre).
         """
-        window = bar_window(self._time, self._v2_tunables.signal_timeframe)
+        window = bar_window(self._time, self._v2_granularity.decision.timeframe)
         return window[0] if window is not None else ""
 
     def _v2_roll_consumed_bar(self) -> None:

@@ -475,6 +475,13 @@ jobs:
         # gate que impide que un fallo de ExecuteTrade se trague en silencio
         # (``test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause``); el fichero existía desde
         # v2.22/A9 y no estaba en la lista de ningún workflow, así que ese gate no habría corrido.
+        # V2.88.14/W1 (granularidad operativa, costura inerte): el VO puro
+        # ``OperativeGranularity`` entra por el pase de directorio de
+        # ``packages/py/domain/tests`` (que este job recolecta entero); la POLÍTICA de
+        # aplicación que resuelve la granularidad desde el entorno va EXPLÍCITA porque
+        # ``packages/py/application/tests`` NO tiene pase de directorio aquí: sin registro
+        # el gate fail-closed (``1wk``/``OPEN(D+1)`` rechazados y valor desconocido no
+        # degradado en silencio) no correría, repitiendo el hueco de v2.76/OBS-19.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -553,6 +560,7 @@ jobs:
           packages/py/infrastructure/tests/test_verify_financial_invariants.py
           apps/api-python/tests/test_auto_v60_auto19_uncertainty_seam.py
           packages/py/application/tests/test_replay_oos_durable_cycle.py
+          packages/py/application/tests/test_operative_granularity_policy.py
           apps/api-python/tests
           --ignore=apps/api-python/tests/integration
           --ignore=apps/api-python/tests/test_lists.py

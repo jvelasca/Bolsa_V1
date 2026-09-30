@@ -743,6 +743,19 @@ EXECUTION_EVENT = "packages/py/application/src/bolsa_application/execution_event
 T_EXECUTION_EVENT = "packages/py/application/tests/test_execution_event.py"
 T_SIMULATED_FINANCE = "packages/py/application/tests/test_simulated_finance.py"
 
+# --- W1 (V2.88.14): modelo puro de granularidad operativa + capability gate FAIL-CLOSED ---
+# El value object (dominio puro) y su política de entorno. El invariante: una granularidad
+# declarada pero NO habilitada (``1wk``, ``next_bar_open``, cubo semanal) se RECHAZA con
+# motivo tipado; nunca se degrada en silencio a ``1d``.
+OPERATIVE_GRANULARITY = "packages/py/domain/src/bolsa_domain/operative_granularity.py"
+OPERATIVE_GRANULARITY_POLICY = (
+    "packages/py/application/src/bolsa_application/operative_granularity_policy.py"
+)
+T_OPERATIVE_GRANULARITY = "packages/py/domain/tests/test_operative_granularity.py"
+T_OPERATIVE_GRANULARITY_POLICY = (
+    "packages/py/application/tests/test_operative_granularity_policy.py"
+)
+
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
@@ -2944,6 +2957,41 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "            return False\n"
         "        except Exception:  # noqa: BLE001 — no applied; no marcar APPLIED por excepción.\n",
         (T_SIMULATED_FINANCE,),
+    ),
+    (
+        "M270 (W1, gate fail-OPEN): ``require_supported`` deja de rechazar lo NO habilitado -> una granularidad semanal o un banco temporal sin implementar pasan como validos",
+        OPERATIVE_GRANULARITY,
+        "        if reason is not None:\n",
+        "        if reason is None:\n",
+        (T_OPERATIVE_GRANULARITY,),
+    ),
+    (
+        "M271 (W1, 1wk habilitada): la matriz de decision admite ``1wk`` -> la granularidad semanal deja de declararse no-habilitada (gap del lunes sin pruebas)",
+        OPERATIVE_GRANULARITY,
+        '_ENABLED_DECISION_TIMEFRAMES: frozenset[str] = frozenset({"1d"})\n',
+        '_ENABLED_DECISION_TIMEFRAMES: frozenset[str] = frozenset({"1d", "1wk"})\n',
+        (T_OPERATIVE_GRANULARITY,),
+    ),
+    (
+        "M272 (W1, next_bar_open habilitado): la matriz de ejecucion da por implementado el banco temporal ``OPEN(D+1)`` que aun no existe -> se declara soportado lo que no lo esta",
+        OPERATIVE_GRANULARITY,
+        "_ENABLED_EXECUTION_TIMINGS: frozenset[ExecutionTiming] = frozenset({ExecutionTiming.SIGNAL_BAR})\n",
+        "_ENABLED_EXECUTION_TIMINGS: frozenset[ExecutionTiming] = frozenset({ExecutionTiming.SIGNAL_BAR, ExecutionTiming.NEXT_BAR_OPEN})\n",
+        (T_OPERATIVE_GRANULARITY,),
+    ),
+    (
+        "M273 (W1, gate NO exigido): la politica resuelve la granularidad pero deja de EXIGIRLA habilitada -> ``1wk`` se cuela en silencio sin rechazo",
+        OPERATIVE_GRANULARITY_POLICY,
+        "    return granularity.require_supported()\n",
+        "    return granularity\n",
+        (T_OPERATIVE_GRANULARITY_POLICY,),
+    ),
+    (
+        "M274 (W1, degradacion silenciosa): una granularidad DESCONOCIDA cae a ``1d`` en vez de rechazarse -> un error de configuracion se convierte en el default",
+        OPERATIVE_GRANULARITY_POLICY,
+        "    granularity = _KNOWN_GRANULARITIES.get(value)\n",
+        "    granularity = _KNOWN_GRANULARITIES.get(value) or DAILY_GRANULARITY\n",
+        (T_OPERATIVE_GRANULARITY_POLICY,),
     ),
 ]
 
