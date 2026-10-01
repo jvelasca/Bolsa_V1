@@ -242,6 +242,43 @@ async def _applied_buy_qty(factory: Any, account_id: str) -> Decimal:
     return total
 
 
+async def _applied_buy_facts(factory: Any, account_id: str) -> list[tuple[str, str, str, str]]:
+    """``(instrumento, lado, cantidad, cycle_id)`` de los hechos APPLIED de la cuenta.
+
+    Sonda de proveniencia: OBS-20 ata un fill a su reserva por ``cycle_id``, así que si la
+    fila declaró ``cancel`` habiendo materializado, el ciclo EFECTIVO del hecho es el dato
+    que separa "no lo vi" (visibilidad) de "es otro ciclo" (identidad partida).
+    """
+    from bolsa_infrastructure.database.models.tables import (
+        ExecutionEventRow,
+        SimFillFinanceContextRow,
+    )
+
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(
+                    SimFillFinanceContextRow.instrument_id,
+                    SimFillFinanceContextRow.side,
+                    SimFillFinanceContextRow.quantity,
+                    SimFillFinanceContextRow.cycle_id,
+                )
+                .join(
+                    ExecutionEventRow,
+                    ExecutionEventRow.execution_id == SimFillFinanceContextRow.execution_id,
+                )
+                .where(
+                    ExecutionEventRow.account_id == account_id,
+                    ExecutionEventRow.status == "APPLIED",
+                )
+            )
+        ).all()
+    return [
+        (str(instrument), str(side), str(quantity), str(cycle or ""))
+        for instrument, side, quantity, cycle in rows
+    ]
+
+
 @pytest.mark.parametrize("sessions", [2, 3, 5])
 @pytest.mark.asyncio
 async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
@@ -343,14 +380,21 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
         assert remaining == 0, (
             f"OBS-18: al cerrar el turno no puede quedar cola viva (remaining={remaining})"
         )
+        # Sonda de diagnóstico: si el motivo NO es ``tail_dead``, el mensaje debe decir si la
+        # fila materializó de verdad. ``Σ APPLIED`` lo manda el LEDGER (no la fila), así que
+        # distingue las dos causas: fila sin fill (``0``) o procedencia perdida (``>0``).
+        applied = await _applied_buy_qty(concurrent_pg_factory, account_id)
+        facts = await _applied_buy_facts(concurrent_pg_factory, account_id)
         assert str(reservation.release_reason) == "tail_dead", (
             "la retirada debe DECLARAR que había cola de fill parcial: "
-            f"motivo={reservation.release_reason!r} status={reservation.status!r}"
+            f"motivo={reservation.release_reason!r} status={reservation.status!r} "
+            f"cycle_id={getattr(reservation, 'cycle_id', None)!r} "
+            f"released_qty={reservation.released_qty!r} Σ_APPLIED={applied} "
+            f"materializado_en_posicion={held} pedido={requested} hechos={facts}"
         )
         assert str(reservation.status).upper() != "OPEN", (
             f"una reserva retirada no puede quedar OPEN: {reservation.status!r}"
         )
-        applied = await _applied_buy_qty(concurrent_pg_factory, account_id)
         assert applied == held, (
             f"Σ APPLIED BUY ({applied}) != materializado en posición ({held})"
         )

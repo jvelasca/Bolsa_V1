@@ -149,9 +149,10 @@ class PostgresAutoEngineStore:
     """``auto_engine_runs`` + ``auto_engine_ticks`` en PostgreSQL (Alembic 027).
 
     ``read`` relee la fila-run (+ cuenta de ticks). ``record_tick`` matricula la
-    fila de tick (INGEST) y sincroniza el acumulado de la run; si el ``seq`` ya
-    está matriculado (UNIQUE ``auto_engine_ticks_engine_seq_uidx``), el tick se
-    omite (no-doble) y la run no avanza. El commit único hace la operación
+    fila de tick (INGEST) y sincroniza el acumulado de la run; si el tick ya está
+    matriculado —``seq`` repetido (UNIQUE ``auto_engine_ticks_engine_seq_uidx``) **o**
+    ``tick_id`` repetido (PK ``auto_engine_ticks_pkey``, función de ``(engine_id, seq)``)—,
+    el tick se omite (no-doble) y la run no avanza. El commit único hace la operación
     atómica entre tick y run.
     """
 
@@ -219,6 +220,19 @@ class PostgresAutoEngineStore:
         # ``execution_events`` que el scheduler hizo sobre esta misma sesión). El
         # savepoint aísla SOLO la inserción duplicada; el resto de la transacción
         # queda intacto.
+        #
+        # OBS-21 — el árbitro NO se nombra y la omisión se lee por ``RETURNING``.
+        # Medido en la certificación concurrente (5 sesiones ``AsyncSession`` sobre la
+        # MISMA ``engine_id``/``seq``): con ``on_conflict_do_nothing(constraint=...)``
+        # el árbitro era SOLO el índice nombrado, y la carrera moría con
+        # ``UniqueViolation`` del PK (``auto_engine_ticks_pkey``) en 2 de 5 sesiones
+        # —el PK es otro índice y ``tick_id`` es función de ``(engine_id, seq)``, así
+        # que la clave repetida es la MISMA—. Sin árbitro, ``ON CONFLICT DO NOTHING``
+        # cubre todos los índices únicos usables: la matrícula es idempotente por
+        # ``seq`` o por ``tick_id`` y nunca revienta el tick. Además ``rowcount`` se
+        # midió inútil aquí (``-1`` en las 125 inserciones de la sonda, ganadas y
+        # omitidas: el guardián ``== 0`` era código muerto), así que la omisión se
+        # lee del ``RETURNING``: sin fila devuelta, el tick ya estaba matriculado.
         async with self._session.begin_nested() as _sp:
             inserted = await self._session.execute(
                 pg_insert(AutoEngineTickRow)
@@ -234,9 +248,10 @@ class PostgresAutoEngineStore:
                     tick_at=occurred,
                     created_at=now,
                 )
-                .on_conflict_do_nothing(constraint="auto_engine_ticks_engine_seq_uidx")
+                .on_conflict_do_nothing()
+                .returning(AutoEngineTickRow.tick_id)
             )
-            if inserted.rowcount == 0:
+            if inserted.scalar_one_or_none() is None:
                 # Tick ya matriculado (crash/re-registro) → no avanzar la run (no
                 # dobla) y deshace SOLO el savepoint (la transacción externa y su
                 # trabajo previo —p.ej. la captura de execution_events del tick—

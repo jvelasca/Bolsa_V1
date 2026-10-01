@@ -33,6 +33,7 @@ import pytest
 import bolsa_api.background.auto_simulation_worker as worker_module
 from bolsa_analytics.cognitive.portfolio_reservation import build_reservation
 from bolsa_api.background.auto_simulation_worker import (
+    V2_RESERVATION_GRACE_STAMP_RESOLUTION,
     AutoSimulationWorker,
     reservation_grace_window,
     step_minute_clock,
@@ -842,6 +843,47 @@ async def test_closing_reconcile_does_not_touch_a_young_foreign_reservation(
     propias = [row for key, row in after.items() if key != "RES-ajena-AAA"]
     assert propias, "el turno debe comprometer reservas propias"
     assert {row.status for row in propias} == {"RELEASED_BY_CANCEL"}
+
+
+@pytest.mark.asyncio
+async def test_reservation_grace_window_sums_the_stamp_resolution() -> None:
+    """OBS-21 · la ventana suma la RESOLUCIÓN del sello: el segundo del alta no envejece.
+
+    Medido en la certificación concurrente (``test_concurrent_auto_pg``, cadencia ``1 s``, la
+    MISMA que fija su ``_env_for``): la reserva sellada a ``16:08:09`` vista por un par con
+    reloj ``16:08:10.009331`` aparentaba ``1.009 s`` contra una ventana de ``1.000 s`` —con
+    edad REAL de milisegundos— y ese par AJENO (``mine=False``: la reserva es de la ganadora
+    del ``save_claim``) la retiraba declarando ``cancel`` ("nunca materializó") justo antes de
+    que llegara su fill parcial: ``released=200`` frente a ``Σ APPLIED=147`` con el MISMO
+    ``cycle_id`` y sin traza en vuelo (la orden aún no se había emitido). El sello de alta
+    (``_v2_instant``, ISO a segundos) hace que la edad APARENTE exceda la real en hasta un
+    segundo, así que la ventana tiene que SUMAR esa resolución: aquí se fija el borde —una
+    reserva que solo supera la ventana de TURNO por el error del sello NO está envejecida— y
+    las dos esquinas (joven/conservada, envejecida/retirada) las certifica el resto de la
+    suite OBS-14.b con el reloj real del cierre de turno.
+    """
+    # La ventana = turnos × cadencia + resolución del sello (con cadencia 0 no colapsa a 0: el
+    # error de medida del sello existe siempre).
+    assert reservation_grace_window(0.0) == V2_RESERVATION_GRACE_STAMP_RESOLUTION
+    grace = reservation_grace_window(1.0)
+    assert grace == timedelta(seconds=1) + V2_RESERVATION_GRACE_STAMP_RESOLUTION
+
+    worker = _worker(reservation_grace=grace)
+    now = worker._time  # noqa: SLF001
+    # BORDE MEDIDO: la edad aparente es exactamente la ventana (equivale al sello de segundos
+    # visto desde el segundo siguiente). Envejecerla aquí devolvía al mercado el capital de una
+    # orden en vuelo.
+    assert not worker._v2_reservation_is_aged(now - grace), (  # noqa: SLF001
+        "una ajena cuya vejez aparente es SOLO el error del sello se conserva"
+    )
+    # Y una resolución MÁS allá sí está envejecida: el sesgo sigue siendo fail-closed, no un
+    # borrado del discriminador por EDAD.
+    assert worker._v2_reservation_is_aged(  # noqa: SLF001
+        now - grace - V2_RESERVATION_GRACE_STAMP_RESOLUTION
+    )
+    assert not worker._v2_reservation_is_aged(now + timedelta(seconds=1)), (  # noqa: SLF001
+        "una fecha FUTURA no afirma edad: se conserva (relojes no comparables)"
+    )
 
 
 @pytest.mark.asyncio

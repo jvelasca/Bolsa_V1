@@ -491,6 +491,19 @@ def _dec_or_none(value: Any) -> Decimal | None:
 #: reinicio rodante (devuelve al mercado un capital que la otra sesión SÍ materializa).
 V2_RESERVATION_GRACE_TURNS = 1
 
+#: Resolución del SELLO de alta de las reservas (``_v2_instant``: ISO-UTC **a segundos**, el
+#: mismo formato que el ``tick_id`` del plan). La EDAD APARENTE de una reserva excede la real en
+#: hasta este margen, así que la ventana lo SUMA: sin él la edad no es afirmable.
+#:
+#: Medido en la certificación concurrente (`test_concurrent_auto_pg`, cadencia ``1 s``): la
+#: reserva sellada a ``16:08:09`` vista por un par con reloj ``16:08:10.009331`` daba una edad
+#: aparente de ``1.009 s`` contra una ventana de ``1.000 s`` — con edad REAL de milisegundos —
+#: y ese par AJENO (``mine=False``) la retiraba declarando ``cancel`` ("nunca materializó")
+#: sobre un fill parcial que llegó después (``147/200``, dos tranchas, el MISMO ``cycle_id``):
+#: fail-**OPEN**, capital de una orden en vuelo devuelto al mercado. Con la resolución sumada,
+#: ``aged`` implica edad real ``>`` ventana, y el sello de segundos deja de poder mentir.
+V2_RESERVATION_GRACE_STAMP_RESOLUTION = timedelta(seconds=1)
+
 
 def reservation_grace_window(interval_seconds: float | None = None) -> timedelta:
     """Ventana de gracia del barrido de reservas, derivada de la cadencia REAL del loop.
@@ -501,9 +514,16 @@ def reservation_grace_window(interval_seconds: float | None = None) -> timedelta
     ``run_tick()`` y luego ``sleep(interval)``), pero el turno SIM real es trabajo en proceso
     + BD sin esperas de red: con la cadencia nominal la ventana deja un margen de dos órdenes
     de magnitud sobre la duración medida del turno.
+
+    Se **suma** ``V2_RESERVATION_GRACE_STAMP_RESOLUTION`` porque la edad se mide contra un
+    sello de SEGUNDOS: la ventana tiene que superar el error de medida del sello, no solo la
+    cadencia, o una reserva recién creada puede parecer envejecida (ver la constante).
     """
     seconds = _sim_interval_seconds() if interval_seconds is None else interval_seconds
-    return timedelta(seconds=V2_RESERVATION_GRACE_TURNS * seconds)
+    return (
+        timedelta(seconds=V2_RESERVATION_GRACE_TURNS * seconds)
+        + V2_RESERVATION_GRACE_STAMP_RESOLUTION
+    )
 
 
 def _instant(value: Any) -> datetime | None:
