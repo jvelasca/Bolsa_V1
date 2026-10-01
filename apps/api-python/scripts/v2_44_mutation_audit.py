@@ -790,6 +790,15 @@ T_AUTO_CLOSED_BARS_SEAM = "apps/api-python/tests/test_auto_v2_closed_bars_and_ba
 T_AUTO_REAL_PRICE_SOURCE = "apps/api-python/tests/test_auto_v2_real_price_source.py"
 T_AUTO_REAL_PRICE_FAIL_CLOSED = "apps/api-python/tests/test_auto_v2_real_price_fail_closed.py"
 
+# V2.88.17.1/W4.1. El certifier A11 (E2E DISCOVERY → SHADOW → SIM sobre PG real) elegía el
+# id del instrumento AL AZAR (``uuid4``) mientras el venue SIM ancla su ruido a la BARRA
+# (``fill_seed(bar_tick, id)``, ``W3``): ~12,3 % de los ids acaban con ``fills=()`` en TODA
+# la barra (52,0 % de ellos por el corte de parciales y 48,0 % por canal noisy terminal)
+# y, con el seed constante dentro de la barra, el bucle de reintentos re-sortea el MISMO
+# desenlace ⇒ rojo espurio sin defecto de producto. La guarda pura de la barrida de llenado
+# (``test_a11_instrument_id_comes_from_a_fill_sweep``) es la que muerde aquí.
+T_A11_CERT = "apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py"
+
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
@@ -3173,6 +3182,15 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "            raw_price = self._v2_price_mid(symbol, self._v2_bar_tick())\n",
         "            raw_price = self._v2_price_mid(symbol, self._minute)\n",
         (T_AUTO_CLOSED_BARS_SEAM,),
+    ),
+    (
+        "M293 (W4.1, sorteo del venue en el certifier A11): la barrida de llenado se "
+        "INVIERTE -> el instrumento elegido es justo el que NO llena en la barra y el E2E "
+        "depende otra vez del azar del id",
+        T_A11_CERT,
+        "        if all(_buy_fills(candidate, tick) for tick in _bar_ticks()):\n",
+        "        if not all(_buy_fills(candidate, tick) for tick in _bar_ticks()):\n",
+        (T_A11_CERT,),
     ),
 ]
 

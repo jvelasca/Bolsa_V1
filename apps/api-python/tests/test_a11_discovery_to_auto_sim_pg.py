@@ -68,6 +68,83 @@ async def a11_factory() -> async_sessionmaker[AsyncSession]:
         await engine.dispose()
 
 
+# ── V2.88.17.1/W4.1 — el id del certifier NO se sortea (barra anclada) ─────────────
+#
+# El venue SIM deriva TODO su ruido de ``sim_hash(seed, instrument_id, side, ...)``, con el
+# ``seed`` anclado a la BARRA desde ``V2.88.16`` (``W3``):
+# ``fill_seed(bar_tick(moment, timeframe), symbol)``. Mientras el id del instrumento lo
+# sortee el test (``uuid4``), un porcentaje de ejecuciones acaba con ``fills=()`` en TODA la
+# barra; y como el seed es CONSTANTE dentro de ella, el bucle de 12 ticks re-sortea el MISMO
+# desenlace ⇒ rojo espurio, **sin defecto de producto** (el motor hizo lo correcto: no
+# inventó un fill que el venue no dio). Medido sobre una REJILLA determinista de 20 000 ids
+# ``inst-a11-<uuid4hex10>`` equiespaciados en el espacio de 40 bits (reproducible byte a
+# byte, ver evidencia ``v2.88.17.1``): **12,30 %** (2 460/20 000) no llenan la pata BUY en
+# la barra corriente y **1,59 %** (319/20 000) no llenan en ninguna de las dos barras. Los
+# motivos NO son solo canales noisy: **52,0 %** de esos ids quedan en ``submitted``/``ok``
+# (el corte de parciales no deja ninguna trancha) y el **48,0 %** restante son canales
+# terminales (``noise_timeout`` 21,1 %, ``noise_unavailable`` 9,3 %, ``noise_reject`` 8,1 %,
+# ``noise_market_closed`` 4,1 %, ``noise_unknown`` 3,4 %, ``noise_reconnect`` 1,2 %,
+# ``noise_duplicate`` 0,8 %) ⇒ la barrida de abajo exige ``fills`` NO vacío, sin clasificar
+# el motivo. Resuelve en **≤ 8 sorteos** (p99 = 4) frente al tope declarado de
+# ``_A11_FILL_DRAWS = 64``. Es el MISMO patrón que ya declaran
+# ``test_a9_scheduler_process_pg_zero_human._filling_instrument_id`` y
+# ``test_golden_day_v2_process_pg._filling_instrument_id`` (el rebaseline de ``W3`` pasó
+# por 8 arneses y este quedó fuera).
+_A11_INSTRUMENT_PREFIX = "inst-a11-"
+_A11_FILL_CHUNKS = 4  # = ``_FILL_CHUNKS`` del worker (mismo schedule de parciales).
+_A11_LOT_QTY = Decimal("100")
+_A11_FILL_DRAWS = 64
+
+
+def _bar_ticks() -> tuple[int, ...]:
+    """Barras que un run de reloj REAL puede atravesar: la de ahora y la siguiente.
+
+    Mismo ancla temporal que el motor (``fill_seed``/``bar_tick`` sobre la barra D1): el id
+    elegido llena en las DOS, así que un cruce de medianoche UTC no es un rojo espurio.
+    """
+    from bolsa_application.closed_bars import bar_tick
+
+    now = datetime.now(UTC)
+    return (bar_tick(now, "1d"), bar_tick(now + timedelta(days=1), "1d"))
+
+
+def _buy_fills(instrument_id: str, tick: int) -> bool:
+    """¿La cola SIM llena la pata BUY de este id en esta barra? (puro: sin BD ni proceso)."""
+    from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
+
+    return bool(
+        simulated_fill_schedule(
+            instrument_id=instrument_id,
+            side="buy",
+            quantity=_A11_LOT_QTY,
+            venue_order_id=f"probe-buy-{instrument_id}-{tick}",
+            seed=fill_seed(tick, instrument_id),
+            fill_chunks=_A11_FILL_CHUNKS,
+            base_mid=100.0,
+        ).fills
+    )
+
+
+def _filling_instrument_id() -> str:
+    """Id FRESCO por run que la cola SIM llena en BUY en la barra (y en la siguiente).
+
+    Barrida pura y determinista, con el MISMO ancla temporal que el motor. El id sigue
+    siendo único por ejecución (el certifier necesita un instrumento NUEVO cada vez: recorre
+    DISCOVERY → SHADOW → PROMOCIÓN desde cero), pero deja de ser un sorteo del venue. Si
+    ninguno de los ``_A11_FILL_DRAWS`` candidatos llenara, el test falla con diagnóstico
+    propio en vez de dejar el rojo al azar.
+    """
+    for _ in range(_A11_FILL_DRAWS):
+        candidate = f"{_A11_INSTRUMENT_PREFIX}{uuid.uuid4().hex[:10]}"
+        if all(_buy_fills(candidate, tick) for tick in _bar_ticks()):
+            return candidate
+    raise AssertionError(
+        f"ningún id {_A11_INSTRUMENT_PREFIX}<uuid4hex10> llena en BUY en "
+        f"{_A11_FILL_DRAWS} sorteos; revisar los umbrales de draw_queue_noise o la "
+        "familia de ids del certifier"
+    )
+
+
 async def _seed_instrument_with_bars(session: AsyncSession, instrument_id: str) -> None:
     """Instrumento con 700 barras: tendencia alcista sostenida y baja en ruido.
 
@@ -282,7 +359,7 @@ async def test_a11_discovery_to_auto_sim_pg(
         StrategyVersionRow,
     )
 
-    instrument_id = f"inst-a11-{uuid.uuid4().hex[:10]}"
+    instrument_id = _filling_instrument_id()
     account_id: str | None = None
     engine_id = f"auto-a11-{uuid.uuid4().hex[:10]}"
     monkeypatch.setenv("AUTO_ENGINE_SIMULATED_VENUE", "simulated")
@@ -460,6 +537,23 @@ async def test_a11_discovery_to_auto_sim_pg(
         # decenas de `inst-a11-*` con 700 barras cada uno, y `_seed_instrument_with_bars`
         # reventaba con UniqueViolation al re-sembrar (rompiendo suites sin relación).
         await _purge_synthetic_instrument(a11_factory, instrument_id)
+
+
+async def test_a11_instrument_id_comes_from_a_fill_sweep() -> None:
+    """El id del certifier NO depende del sorteo del venue (seed anclado a la barra).
+
+    Guarda PURA (sin PG, sin proceso) del contrato que arregla el rojo espurio de
+    ``v2.88.17-beta``: el instrumento del E2E se elige por una barrida que exige que la
+    pata BUY llene en la barra del run. Sin la barrida, el id vuelve a sortearse y ~12,3 %
+    de las ejecuciones no abren posición (con el seed constante dentro de la barra, el
+    reintento intra-barra re-sortea el mismo desenlace).
+    """
+    instrument_id = _filling_instrument_id()
+    for tick in _bar_ticks():
+        assert _buy_fills(instrument_id, tick), (
+            f"el id elegido ({instrument_id}) no llena en BUY en la barra {tick}: el "
+            "certifier A11 volvería a ser un sorteo del venue"
+        )
 
 
 async def _purge_synthetic_instrument(

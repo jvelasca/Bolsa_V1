@@ -2,6 +2,7 @@
 
 > **Clase: evidencia del sello `W4`. ESTADO: `W4` CERRADO en `main` — bump `2.11.17-beta` aplicado; tag y cita POST-TAG pendientes al escribir.**
 > **El tag anotado `v2.88.17-beta` y su cita POST-TAG los realiza el SELLO `W4`.**
+> **ACTUALIZACIÓN (2026-10-01, cierre POST-TAG):** el tag **`v2.88.17-beta`** salió **ROJO en `lifecycle-pg`** — **10 jobs `success`** (`security`/`shared`/`spine`/`frontend`/`python`/`playwright-mock`/`replay-repro`/`dr-verify`/`a7-gate`) + **`lifecycle-pg` `failure`** (`1 failed, 165 passed in 84.45s`) — por un **sorteo del arnés del certifier `A11`** (`uuid4()` + `seed` del venue anclado a la BARRA desde `W3`), **no** por el producto: `python` y **`replay-repro`** quedaron **verdes**. Lo **supersede** el sello del hotfix **`v2.88.17.1-beta`** ([`evidence/v2.88.17.1/README.md`](../v2.88.17.1/README.md)); el tag rojo **no se reescribe**. Todo lo sellado aquí (proveedor de precio real, paso `2b`, bundle direccional) queda **intacto** (`Δ src = 0` en el hotfix).
 > **AsOf:** 2026-10-01. **Base:** `v2.88.16.3-beta` (`b3876cdd`).
 > **Plan de la fase:** [`plan-w4-precio-real-2026-10-01.md`](../plan-w4-precio-real-2026-10-01.md).
 > **Plan del bundle (§2):** fix direccional del scorer OOS + casa única de geometría direccional.
