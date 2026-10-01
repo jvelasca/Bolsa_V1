@@ -152,6 +152,15 @@ from bolsa_application.auto_engine_state_store import (
     AutoEngineStore,
     AutoEngineTickInput,
 )
+from bolsa_application.auto_operational_audit import (
+    REASON_GRACE_WINDOW_KEEP,
+    REASON_SESSION_OWNED,
+    RECONCILIATION_KEEP,
+    RECONCILIATION_RELEASE,
+    build_reservation_claim_entry,
+    build_reservation_reconciliation_entry,
+    operational_audit_enabled,
+)
 from bolsa_application.auto_reason_codes import (
     ATR_GEOMETRY,
     ATR_SOURCE_FALLBACK,
@@ -720,6 +729,12 @@ class AutoSimulationWorker:
         # y devuelve la lectura con sus huecos declarados. Sin él, el productor de R conserva el
         # comportamiento de AUTO-9 (``regime_not_durable``): no se finge que se leyó.
         cycle_regime_reader: Callable[[Sequence[str]], Awaitable[CycleRegimeReading]] | None = None,
+        # AUTO Operational Monitor (``M2``): sink DURABLE de la auditoría operativa
+        # (``auto_entry_decision``/``auto_reservation_claim``/``auto_reservation_reconciliation``)
+        # sobre el mismo spine (``decision_journal_entries``). Sin él (hermético/test) no se
+        # escribe nada y el monitor declara los huecos; con él, ownership y concurrencia pasan
+        # de ``NO MEDIDO`` a hechos. Interruptor ``AUTO_OPERATIONAL_AUDIT`` default OFF (Δ = 0).
+        operational_audit_sink: Callable[[Any], Awaitable[None]] | None = None,
         # AUTO-11: la recomendación Adaptive DURABLE (``decision_journal_entries``). Con él, la
         # memoria de la rotación (cooldown/hysteresis) deja de vivir solo en la lista del proceso
         # y una pausa SOBREVIVE al reinicio. Sin él (hermético/test) no se escribe nada: no se
@@ -981,6 +996,13 @@ class AutoSimulationWorker:
         # AUTO-10: lo que se LEE de vuelta. Sin lector, el R por ciclo sigue midiéndose pero el
         # régimen queda declarado como no durable (comportamiento de AUTO-9).
         self._cycle_regime_reader = cycle_regime_reader
+        # AUTO Operational Monitor (``M2``): lo que se publica DURABLEMENTE en el spine con la
+        # auditoría operativa (decisión/claim/reconciliación). Sin sink no se escribe (ni se
+        # finge): los paneles de ownership/concurrencia siguen declarados ``NO MEDIDO``.
+        self._operational_audit_sink = operational_audit_sink
+        # Identidad de sesión para la auditoría (dueño del claim y ``caller`` del barrido). Se
+        # acuña perezosamente SÓLO cuando hay sink: sin auditoría no consume nada (Δ = 0).
+        self._audit_session_id: str | None = None
         # AUTO 2.0 (V2): fuente del sector por símbolo (inyectable). Sin ella, el sector
         # solo existe si la propuesta lo declara en su ``memo``; si no, es desconocido y
         # el gate de concentración sectorial veta (V2.40.1: nunca se asume exento).
@@ -2571,6 +2593,9 @@ class AutoSimulationWorker:
         blocked: set[str] = set()
         claimed: set[str] = set()
         persisted: list[PortfolioReservation] = []
+        # AUTO Operational Monitor (``M2``): carrera de claim por reserva (ganada/perdida) para
+        # el spine. Se emite DESPUÉS del commit (primero el dinero, después la traza).
+        claim_audits: list[tuple[PortfolioReservation, bool]] = []
         for reservation in reservations:
             try:
                 claimed_ok = await store.save_claim(reservation)
@@ -2581,6 +2606,7 @@ class AutoSimulationWorker:
                 )
                 blocked.add(reservation.instrument_id)
                 continue
+            claim_audits.append((reservation, bool(claimed_ok)))
             if not claimed_ok:
                 # AUTO-6: la identidad de la reserva es DETERMINISTA por (cuenta, señal)
                 # (``RES-dec-<hash>``), así que la PK de ``portfolio_reservations`` arbitra
@@ -2605,6 +2631,9 @@ class AutoSimulationWorker:
         # publica DESPUÉS del commit de la reserva: primero el compromiso de capital, después
         # la traza (si la traza falla, el dinero sigue comprometido y el hueco se declara).
         await self._v2_journal_cycle_regime(persisted)
+        # AUTO Operational Monitor (``M2``): la carrera de claim queda en el spine (ganada por
+        # esta sesión o perdida ante otro compromiso vivo). Sin sink no se escribe nada.
+        await self._v2_journal_reservation_claims(claim_audits)
         self._v2_reservation_blocked = frozenset(blocked)
         # Las carreras perdidas se suman al carryover: el veteo de emisión es el mismo
         # ("ya hay una reserva viva para este instrumento") y usa el mismo motivo.
@@ -2617,6 +2646,36 @@ class AutoSimulationWorker:
         self._v2_reservations = tuple(
             sorted(merged.values(), key=lambda r: (r.created_at or "", r.reservation_id))
         )
+
+    def _v2_audit_session(self) -> str:
+        """Identidad estable de esta sesión de motor para la auditoría operativa (``M2``).
+
+        Se acuña perezosamente y sólo tiene sentido con el sink inyectado. Es el dueño que se
+        publica en el claim y el ``caller`` del barrido: un ``NO MEDIDO`` en la UI es
+        preferible a un dueño inventado, por eso sin sink no se acuña nada.
+        """
+        session = self._audit_session_id
+        if session is None:
+            from uuid import uuid4
+
+            session = f"auto-{uuid4().hex[:12]}"
+            self._audit_session_id = session
+        return session
+
+    async def _v2_audit_emit(self, entry: Any, *, label: str) -> None:
+        """Publica UNA entrada de auditoría; best-effort declarado (``M2``).
+
+        Sin sink es un no-op silencioso: no hay nada que fingir. Un fallo del sink NO puede
+        tumbar el turno (el dinero ya está comprometido aguas arriba), pero se registra —
+        un silencio aquí volvería a convertir el hueco en mentira por omisión.
+        """
+        sink = self._operational_audit_sink
+        if sink is None or entry is None:
+            return
+        try:
+            await sink(entry)
+        except Exception:  # noqa: BLE001 — publicar no puede tumbar el turno.
+            logger.exception("auto_sim operational audit failed (%s)", label)
 
     async def _v2_journal_cycle_regime(self, reservations: Sequence[PortfolioReservation]) -> None:
         """AUTO-10 — publica el régimen del ciclo recién abierto en el journal durable.
@@ -2662,6 +2721,48 @@ class AutoSimulationWorker:
                 await sink(entry)
             except Exception:  # noqa: BLE001 — publicar no puede tumbar el turno.
                 logger.exception("auto_sim v2 cycle regime journal failed cycle=%s", cycle_id)
+
+    async def _v2_journal_reservation_claims(
+        self, claims: Sequence[tuple[PortfolioReservation, bool]]
+    ) -> None:
+        """(``M2``) publica en el spine la carrera de claim de cada reserva del tick.
+
+        ``True`` = claim ganado por esta sesión (dueña del compromiso); ``False`` = perdido
+        (ya había un compromiso vivo con la identidad determinista AUTO-6). Ambos hechos son
+        materia prima de los paneles de ownership/concurrencia; sin sink no se escribe nada y
+        el monitor los declara ``NO MEDIDO``.
+        """
+        if self._operational_audit_sink is None:
+            return
+        session = self._v2_audit_session()
+        as_of = self._v2_instant()
+        for reservation, claimed in claims:
+            entry = build_reservation_claim_entry(
+                reservation_id=getattr(reservation, "reservation_id", None),
+                cycle_id=getattr(reservation, "cycle_id", None),
+                claimed=claimed,
+                actor=self._engine_id,
+                session_id=session,
+                as_of=as_of,
+                account_id=self._account_id,
+                instrument_id=getattr(reservation, "instrument_id", None),
+            )
+            await self._v2_audit_emit(entry, label="reservation_claim")
+
+    async def _v2_journal_entry_decisions(self, entries: Sequence[Any]) -> None:
+        """(``M2``) persiste en el spine el journal de decisión AUTO (hoy en RAM).
+
+        Son las entradas ``auto_entry_decision`` que produce ``auto_v2_entry`` (con ``rank``/
+        ``opportunityScore``/``cycleId``). Al hacerlas durables, ``SIGNAL``/``TOP_N``/``RISK``
+        dejan de ser ``unknown`` y se enlazan por ``decision_id``/``cycleId`` sin migración.
+        """
+        if self._operational_audit_sink is None:
+            return
+        # La identidad (``decision_id``/``payload.cycleId``) la trae el productor: se persiste
+        # tal cual, sin reescribir ningún hecho. La columna ``session_id`` apunta por FK a
+        # ``decision_sessions`` y no se invade: la sesión de motor vive en los claims.
+        for entry in entries:
+            await self._v2_audit_emit(entry, label="entry_decision")
 
     async def _v2_save_exit_order(self, order: ExitOrder) -> bool:
         """Persiste un INTENT de salida; ``False`` si el store falta o no fue durable."""
@@ -3023,6 +3124,11 @@ class AutoSimulationWorker:
         consumed: dict[tuple[str, str], float] = {}
         resolved: list[PortfolioReservation] = []
         outcomes: dict[str, tuple[float, PortfolioReservation | None]] = {}
+        # AUTO Operational Monitor (``M2``): la decisión del barrido por reserva
+        # (KEEP/RELEASE, dueño/caller, motivo, edad y ventana de gracia) para el spine.
+        reconciliation_audits: list[
+            tuple[PortfolioReservation, str, str | None, bool | None, bool | None]
+        ] = []
         for reservation in live:
             created = _instant(reservation.created_at)
             instrument = reservation.instrument_id
@@ -3034,6 +3140,8 @@ class AutoSimulationWorker:
                         filled += qty
             available = max(0.0, filled - consumed.get(fill_key, 0.0))
             fill_qty = min(available, reservation.remaining_qty)
+            # (``M2``) la edad se mide UNA vez y viaja declarada en la auditoría del barrido.
+            aged = self._v2_reservation_is_aged(created)
             # OBS-14.b — FUERA DE ALCANCE y TODAVÍA JOVEN: ni se libera ni se toca su INTENT
             # de salida. Se conserva viva en el libro (su capital/riesgo SIGUE comprometido
             # para esta sesión) y no consume fills, así que el orden de lectura no la mezcla
@@ -3042,10 +3150,16 @@ class AutoSimulationWorker:
             # identidad ajena. Una vez envejecida (su dueño ya cerró su turno) SÍ entra en la
             # regla 2 como candidata: es la retirada diferida que acota la retención.
             mine = only_ids is not None and reservation.reservation_id in only_ids
-            if not mine and not self._v2_reservation_is_aged(created):
+            if not mine and not aged:
+                # (``M2``) AJENA y JOVEN: se CONSERVA por ventana de gracia. Es un KEEP con
+                # causa medible — lo que el panel de concurrencia cuenta como ``graceWindowKeeps``.
+                reconciliation_audits.append(
+                    (reservation, RECONCILIATION_KEEP, REASON_GRACE_WINDOW_KEEP, False, False)
+                )
                 resolved.append(reservation)
                 continue
             released: PortfolioReservation | None = None
+            release_reason: str | None = None
             materialized = float(reservation.released_qty or 0.0)
             # OBS-20 — si el fill de ESTE ciclo ya está en el ledger, la reserva materializó
             # aunque su fila no lo haya registrado todavía (la liberación del camino caliente
@@ -3071,6 +3185,7 @@ class AutoSimulationWorker:
                     reason=RELEASE_REASON_FILL,
                     released_qty=fill_qty,
                 )
+                release_reason = RELEASE_REASON_FILL
             elif (
                 measurable and created is not None and instrument not in (in_flight or frozenset())
             ):
@@ -3093,6 +3208,15 @@ class AutoSimulationWorker:
                 # el motivo declara la causa — ``tail_dead`` cuando la fila SÍ registró fill
                 # parcial (se retira la cola, no lo materializado) y ``cancel`` cuando no
                 # materializó nada. La liberación nunca supera la cantidad viva.
+                dead_reason = (
+                    RELEASE_REASON_RESTART
+                    if startup
+                    else (
+                        RELEASE_REASON_DEAD_TAIL
+                        if materialized > 0.0
+                        else RELEASE_REASON_CANCEL
+                    )
+                )
                 released = await self._v2_release_reservation(
                     reservation,
                     status=(
@@ -3100,21 +3224,24 @@ class AutoSimulationWorker:
                         if startup
                         else RESERVATION_RELEASED_BY_CANCEL
                     ),
-                    reason=(
-                        RELEASE_REASON_RESTART
-                        if startup
-                        else (
-                            RELEASE_REASON_DEAD_TAIL
-                            if materialized > 0.0
-                            else RELEASE_REASON_CANCEL
-                        )
-                    ),
+                    reason=dead_reason,
                     released_qty=None,
                 )
+                release_reason = dead_reason
                 # El outcome declara la evidencia DE LA RESERVA, no el agregado: una reserva
                 # que no materializó no puede "marcar como llenado" el fill de su hermana al
                 # sincronizar el INTENT de salida (lo cerraría como PARTIAL con cantidad ajena).
                 fill_qty = materialized
+            if released is not None:
+                reconciliation_audits.append(
+                    (reservation, RECONCILIATION_RELEASE, release_reason, True, aged)
+                )
+            else:
+                # Sin liberación (lectura incompleta o traza en vuelo): se CONSERVA. El dueño
+                # de la decisión se declara con ``mine`` para no confundirla con la gracia.
+                reconciliation_audits.append(
+                    (reservation, RECONCILIATION_KEEP, REASON_SESSION_OWNED, bool(mine), aged)
+                )
             outcomes[reservation.reservation_id] = (fill_qty, released)
             resolved.append(released if released is not None else reservation)
         self._v2_reservations = tuple(row for row in resolved if row.is_live)
@@ -3136,6 +3263,43 @@ class AutoSimulationWorker:
         # que una reconciliación explícita lo levante.
         if not measurable and self._v2_reservations:
             await self.engage_kill_switch_durable("RECONCILIATION_FAILURE")
+        # AUTO Operational Monitor (``M2``): la decisión del barrido deja su traza en el spine
+        # (última escritura del turno: el dinero y las salidas ya son durables). Sin sink es un
+        # no-op y el panel de concurrencia declara los huecos.
+        await self._v2_journal_reconciliation_decisions(reconciliation_audits)
+
+    async def _v2_journal_reconciliation_decisions(
+        self,
+        decisions: Sequence[tuple[PortfolioReservation, str, str | None, bool | None, bool | None]],
+    ) -> None:
+        """(``M2``) publica en el spine cada KEEP/RELEASE del barrido con su dueño y causa.
+
+        ``caller`` es la sesión que ejecuta el barrido (esta); ``mine`` distingue la reserva
+        propia de la ajena conservada por gracia; ``aged``/``graceWindowSeconds`` viajan con su
+        medición. Es lo que convierte ``ownerSession`` y ``graceWindowKeeps`` de ``NO MEDIDO``
+        en hechos cuando el flag está ON.
+        """
+        if self._operational_audit_sink is None:
+            return
+        session = self._v2_audit_session()
+        as_of = self._v2_instant()
+        grace_seconds = self._v2_reservation_grace.total_seconds()
+        for reservation, decision, reason, mine, aged in decisions:
+            entry = build_reservation_reconciliation_entry(
+                reservation_id=getattr(reservation, "reservation_id", None),
+                cycle_id=getattr(reservation, "cycle_id", None),
+                decision=decision,
+                reason=reason,
+                mine=mine,
+                aged=aged,
+                grace_window_seconds=grace_seconds,
+                actor=self._engine_id,
+                session_id=session,
+                as_of=as_of,
+                account_id=self._account_id,
+                instrument_id=getattr(reservation, "instrument_id", None),
+            )
+            await self._v2_audit_emit(entry, label="reservation_reconciliation")
 
     def _v2_reservation_is_aged(self, created: datetime | None) -> bool:
         """¿La reserva ya superó la ventana de gracia? ``False`` si no se puede afirmar.
@@ -3482,6 +3646,10 @@ class AutoSimulationWorker:
         # nunca registra una recomendación que no llegó a aplicarse.
         await self._v2_journal_adaptive_recommendation(adaptive)
         self._v2_journal.extend(plan.journal_entries)
+        # AUTO Operational Monitor (``M2``): el journal de decisión del turno deja de vivir
+        # sólo en RAM. Con el flag ON se persiste en el spine y ``SIGNAL``/``TOP_N``/``RISK``
+        # pasan a ser enlazables por ``decision_id``/``cycleId``. Sin sink es un no-op.
+        await self._v2_journal_entry_decisions(plan.journal_entries)
         # V2.45/AUTO-5 — embudo del día. El precio posterior de las rechazadas de ticks
         # ANTERIORES se mide con el tick corriente (es su primer precio DESPUÉS del
         # descarte); las filas de ESTE tick se incorporan después, porque una oportunidad no
@@ -5366,6 +5534,9 @@ class AutoSimulationWorker:
         cycle_regime_sink: Callable[[Any], Awaitable[None]] | None = None,
         # AUTO-10: lector de ese journal, también sobre la sesión del tick.
         cycle_regime_reader: Callable[[Sequence[str]], Awaitable[CycleRegimeReading]] | None = None,
+        # AUTO Operational Monitor (``M2``): sink de la auditoría operativa, sobre la MISMA
+        # sesión del tick. Sin él se conserva el del constructor (hermético/tests) ⇒ Δ = 0.
+        operational_audit_sink: Callable[[Any], Awaitable[None]] | None = None,
         # AUTO-11: sink de la recomendación Adaptive durable, atado a la MISMA sesión del tick.
         adaptive_sink: Callable[[Any], Awaitable[None]] | None = None,
         # AUTO-11: lector del estado Adaptive reconstruible, también sobre la sesión del tick.
@@ -5408,6 +5579,7 @@ class AutoSimulationWorker:
         prev_exit_store = self._exit_order_store
         prev_cycle_sink = self._cycle_regime_sink
         prev_cycle_reader = self._cycle_regime_reader
+        prev_operational_audit_sink = self._operational_audit_sink
         prev_adaptive_sink = self._adaptive_sink
         prev_adaptive_reader = self._adaptive_reader
         prev_adaptive_gate_store = self._adaptive_gate_store
@@ -5463,6 +5635,13 @@ class AutoSimulationWorker:
             # AUTO-10: y su mitad de lectura, con la misma regla.
             self._cycle_regime_reader = (
                 cycle_regime_reader if cycle_regime_reader is not None else prev_cycle_reader
+            )
+            # AUTO Operational Monitor (``M2``): el sink de auditoría viaja con la sesión del
+            # tick, con la misma regla (sin él se conserva el del constructor).
+            self._operational_audit_sink = (
+                operational_audit_sink
+                if operational_audit_sink is not None
+                else prev_operational_audit_sink
             )
             # AUTO-11: la recomendación Adaptive durable y su lector, con la misma regla de sesión.
             self._adaptive_sink = adaptive_sink if adaptive_sink is not None else prev_adaptive_sink
@@ -5556,6 +5735,7 @@ class AutoSimulationWorker:
             self._exit_order_store = prev_exit_store
             self._cycle_regime_sink = prev_cycle_sink
             self._cycle_regime_reader = prev_cycle_reader
+            self._operational_audit_sink = prev_operational_audit_sink
             self._adaptive_sink = prev_adaptive_sink
             self._adaptive_reader = prev_adaptive_reader
             self._adaptive_gate_store = prev_adaptive_gate_store
@@ -5705,6 +5885,34 @@ def build_adaptive_recommendation_sink(session: Any) -> Callable[[Any], Awaitabl
     sesión queda envenenada y el siguiente store del MISMO turno fallaría con
     ``PendingRollbackError``, con lo que un fallo de observabilidad tumbaría el compromiso de
     capital.
+    """
+    from bolsa_infrastructure.database.repositories.journal_repository import (  # noqa: PLC0415
+        SqlAlchemyJournalRepository,
+    )
+
+    repository = SqlAlchemyJournalRepository(session)
+
+    async def sink(entry: Any) -> None:
+        try:
+            await repository.append(entry)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+    return sink
+
+
+def build_operational_audit_sink(session: Any) -> Callable[[Any], Awaitable[None]]:
+    """AUTO Operational Monitor (``M2``): sink durable de la auditoría operativa.
+
+    Mismo repositorio del spine (``decision_journal_entries``) y mismo patrón que
+    ``build_cycle_regime_sink``/``build_adaptive_recommendation_sink``: atado a la sesión del
+    tick (una por turno), **commitea él mismo** —la sesión se cierra con ``close()`` y un
+    ``flush`` sin commit dejaría la traza sin escribir— y en el fallo hace ``rollback`` para no
+    envenenar la sesión del turno. La construcción es **inerte** por defecto: el llamante sólo
+    la inyecta tras ``AUTO_OPERATIONAL_AUDIT`` (OFF), de modo que sin flag el turno es byte
+    idéntico (Δ = 0).
     """
     from bolsa_infrastructure.database.repositories.journal_repository import (  # noqa: PLC0415
         SqlAlchemyJournalRepository,
@@ -6275,6 +6483,12 @@ class AutoSimRuntime:
             # AUTO-11: la recomendación Adaptive durable y su lector, también sobre la MISMA
             # sesión. Con el flag Adaptive OFF el worker no los usa: cero I/O nuevo.
             adaptive_sink = build_adaptive_recommendation_sink(session)
+            # AUTO Operational Monitor (``M2``): el sink de auditoría operativa se construye
+            # SÓLO tras el flag ``AUTO_OPERATIONAL_AUDIT`` (OFF por defecto). Con él apagado la
+            # costura es inerte (Δ = 0) y el monitor declara sus huecos ``NO MEDIDO``.
+            operational_audit_sink = (
+                build_operational_audit_sink(session) if operational_audit_enabled() else None
+            )
             adaptive_reader = build_adaptive_state_reader(
                 session,
                 policy=self._worker._v2_adaptive_policy(),  # noqa: SLF001 — seam interno.
@@ -6303,6 +6517,7 @@ class AutoSimRuntime:
                 exit_order_store=exit_order_store,
                 cycle_regime_sink=cycle_regime_sink,
                 cycle_regime_reader=cycle_regime_reader,
+                operational_audit_sink=operational_audit_sink,
                 adaptive_sink=adaptive_sink,
                 adaptive_reader=adaptive_reader,
                 adaptive_gate_store=adaptive_gate_store,

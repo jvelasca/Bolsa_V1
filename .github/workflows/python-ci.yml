@@ -304,6 +304,13 @@ jobs:
         # quedan SUPERADAS por esta entrada. Evidencia: el censo ``scripts/ci/test_selection.py``
         # (guarda ``apps/api-python/tests/test_ci_test_selection_census.py``) baja el agujero
         # declarado de 205 a 53 ficheros, sin dejar ninguno invisible.
+        # AUTO Operational Monitor (M1+M2): los dos puros de aplicación (read model de la
+        # cadena y sumidero de auditoría) entran por el pase de ``packages/py/application/tests``
+        # y se dejan como ANCLA explícita; la costura del worker
+        # (``test_auto_m2_operational_audit_seam.py``) por el pase de ``apps/api-python/tests``
+        # con nombre propio. Su certificación PG (``test_auto_operational_monitor_pg.py``) va en
+        # ``--ignore`` aquí —sin PG skipearía en mudo— y corre en ``auto-v2-durable-pg`` con
+        # gate fail-if-skipped.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -379,6 +386,9 @@ jobs:
           packages/py/application/tests/test_replay_oos_durable_cycle.py
           packages/py/application/tests/test_operative_granularity_policy.py
           packages/py/application/tests/test_closed_bars.py
+          packages/py/application/tests/test_auto_operational_monitor.py
+          packages/py/application/tests/test_auto_operational_audit.py
+          apps/api-python/tests/test_auto_m2_operational_audit_seam.py
           apps/api-python/tests
           --ignore=apps/api-python/tests/integration
           --ignore=apps/api-python/tests/test_lists.py
@@ -405,6 +415,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
           --ignore=apps/api-python/tests/test_auto_v2_lifecycle_pg.py
           --ignore=apps/api-python/tests/test_auto_v2_real_price_production_pg.py
+          --ignore=apps/api-python/tests/test_auto_operational_monitor_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
@@ -712,6 +723,12 @@ jobs:
       # (dos fronteras close(B-1)/open(B), fail-closed sin barra B y el interruptor que
       # gobierna la composición). Sin PG el test skipearía en mudo.
       AUTO_V2_REAL_PRICE_PG_REQUIRED: '1'
+      # AUTO Operational Monitor (M1+M2): la proyección de la cadena durable de un ciclo
+      # (reserva → fills con ``cycle_id`` → cierre con PnL) y la lectura del ownership y la
+      # concurrencia desde el spine (``auto_reservation_claim``/``auto_reservation_reconciliation``)
+      # solo se certifican contra PG real, con otra sesión leyendo lo ya commiteado. Sin PG el
+      # test skipearía en mudo y los paneles quedarían sin medir.
+      AUTO_OPERATIONAL_MONITOR_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -785,6 +802,7 @@ jobs:
             apps/api-python/tests/test_auto_v70_auto23_evidence_validation.py \
             apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
             apps/api-python/tests/test_auto_v2_real_price_production_pg.py \
+            apps/api-python/tests/test_auto_operational_monitor_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)
