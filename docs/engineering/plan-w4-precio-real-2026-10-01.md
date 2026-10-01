@@ -75,6 +75,45 @@ precios de instantes distintos** (y por tanto distintos símbolos «sin precio»
 **Regla de coherencia (test):** el *mid* del fill de un tick y la marca del mismo tick leen la
 **misma** frontera de ejecución; la decisión de ese tick lee `<= B-1`. Nunca al revés.
 
+#### 3.1.b Hallazgo de la exploración (2026-10-01): la ejecución necesita **dos ventanas**
+
+El cargador que ya usan régimen y ATR (`make_closed_bar_loader`) acota a **`<= B-1`** y
+**excluye** la barra corriente por diseño (es la guardia de `W3`). De esa ventana se obtiene
+el `close(B-1)` de la **decisión** ✅, pero **no** el `open(B)` de la **ejecución**: la barra
+`B` está fuera por construcción.
+
+⇒ La fuente real necesita **una lectura con `as_of = día(B)`** (ventana `<= B`) y partirla:
+
+| Uso | De la ventana `<= B` | Nunca |
+| --- | --- | --- |
+| DECISIÓN | `close` de la última barra con **día `< B`** | el `close`/`high`/`low` de `B` |
+| EJECUCIÓN/MARCA | **`open` de la barra con día `== B`** | su `close`/`high`/`low` |
+
+Sigue siendo **una sola lectura por tick** (una query), pero **no** la misma `as_of` que
+régimen y ATR: la foto del precio es `<= B` y la del dato de decisión es `<= B-1`.
+
+**Consecuencia operativa que hay que decidir ANTES de cablear (bloqueante):** con barras
+`D1`, ¿de dónde sale el `open(B)`?
+
+* **En replay/OOS** (histórico): la barra `B` **existe** en `ohlcv` ⇒ se lee su `open`. ✅
+* **En vivo/PAPER**: la barra `D1` de **hoy** puede **no estar persistida** todavía ⇒ **no hay
+  precio de ejecución** ⇒ por la regla fail-closed (§3.2) **ningún** símbolo ejecuta y el
+  turno sale **`BLOCKED`**: el motor se **congela**, no falla. Es la regla funcionando, pero
+  es una **consecuencia operativa de primer orden** que no se puede descubrir *después*.
+
+Opciones para el `open(B)` en vivo (decisión del propietario, §10):
+**(a)** sólo de la barra `ohlcv` de `B` (replay ✅ / vivo `BLOCKED` hasta que se persista);
+**(b)** del último precio observado vivo (*feed*/`liquidity_source`) — precio real de mercado,
+pero obliga a declarar su frontera temporal y su determinismo;
+**(c)** aproximarlo con el `close(B-1)` de forma **explícita y declarada** (no silenciosa),
+anotando que reintroduce el ancla de decisión como ancla de ejecución.
+
+#### 3.1.c `refresh` debe ser asíncrono
+
+El dato sale de PG por sesión/tick, igual que régimen y ATR ⇒ `PriceSource.refresh` es
+**`async`** (el worker ya espera la foto de las otras fuentes en el mismo punto). El paso 1
+(commit `10447d51`) lo dejó **síncrono**: se corrige al cablear, antes de sellar.
+
 ### 3.2 Fail-closed: **POR SÍMBOLO**
 
 * Símbolo sin precio ⇒ **no se puede ejecutar** (`HOLD`), **declarado y contado** en el informe del
@@ -105,6 +144,7 @@ precios de instantes distintos** (y por tanto distintos símbolos «sin precio»
 | `M284` | precio **no determinista** (`now()`/último precio vivo) | el contrato determinista del `PriceScript` |
 | `M285` | volver al **`or 0`** en la geometría de la señal | `P1-A` (§2) |
 | `M286` | **lookahead**: la decisión lee `close` de la barra **en curso** | la frontera `B-1` de la decisión (§3.1) |
+| `M287` | sin barra `B`, la ejecución cae a la barra **`B-1`** (precio rancio) | el fail-closed «sin `open(B)` ⇒ HOLD» (§3.1.b, §10.2) |
 
 ---
 
@@ -168,3 +208,19 @@ manuales), `OBS-16`, `OBS-15`, `OBS-22`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, 
 6. **Criterio de §7**: re-correr la banda de `W3.3` con precio real y **publicar el estrechamiento**
    (o la ausencia de él).
 7. Sello `v2.88.17-beta` (`2.11.17-beta`) con su cita POST-TAG.
+
+---
+
+## 10. Decisiones PENDIENTES del propietario (bloquean el paso 2)
+
+1. **Origen del `open(B)` en vivo/PAPER** (§3.1.b): **(a)** sólo `ohlcv` de `B`
+   (replay ✅, vivo `BLOCKED` hasta persistir), **(b)** último precio observado vivo, o
+   **(c)** `close(B-1)` declarado como aproximación. La opción cambia si el motor puede
+   operar en vivo sin esperar la barra del día.
+
+2. **Fuente sin barra `B`**: confirmar que «no hay `open(B)`» ⇒ **`HOLD` por símbolo y turno
+   `BLOCKED`** (§3.2), y **no** caer a la barra `B-1` (eso sería el *fallback* silencioso que
+   `W4` existe para matar; se añadirá como mutación `M287`).
+
+> La exploración de 2026-10-01 (**§3.1.b**) es un hallazgo **contra el plan original**, que
+> asumía «una sola foto por tick»: la frontera de ejecución **no** es la de régimen/ATR.
