@@ -225,7 +225,22 @@ no puede vivir dentro del propio tag; se cita en `main` como commit **POST-TAG**
 | **`replay-repro`** | **VERDE** — `REPRODUCIDO` contra los valores de §7 |
 | `certify` | **VERDE** |
 
-> **CITA REAL:** *(pendiente — se escribe al empujar el tag).*
+> **CITA REAL (POST-TAG, 2026-10-01) — TAG `v2.88.16.2-beta` **TODO VERDE**.** `Release tag CI` run
+> **`36821946619`** (`ref=refs/tags/v2.88.16.2-beta`, HEAD `683990ff`): **11 jobs `success`** + **1
+> skipped** (`playwright (integrated E2E, opt-in)`). **Encaje `ESPERADO = OBSERVADO`:**
+>
+> - job `python`: **`3166 passed, 38 skipped, 6 warnings in 72.95s`** ⇒ **`Δ = 0`** vs `v2.88.16`
+>   (este sello **no** toca `src` de producto).
+> - job **`replay-repro` VERDE** (era el rojo que este sello cierra): veredicto del runner
+>   **`REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`**, LF
+>   `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / `3 340 728` B,
+>   **2ª corrida IDÉNTICA** y digest por secciones **idéntico al local**: `replay` `919208`/
+>   `98ac89372f49822c`, `score` `29229`/`f78863a8c7c169f8`, `totals`
+>   `{"decided":24500,"fills":923,"orders":247,"proposals":285,"vetoes":24264}`.
+> - job **`lifecycle-pg` VERDE** (ya lo estaba en `v2.88.16.1`) y **`certify` VERDE**.
+>
+> ⇒ **La cadena queda cerrada:** `v2.88.16-beta` (rojo `lifecycle-pg`) → `v2.88.16.1-beta` (rojo
+> `replay-repro`) → **`v2.88.16.2-beta` TODO VERDE**.
 
 **Cita huérfana que se cierra aquí:** el sello `W2` (**`v2.88.15-beta`**) dejó su cita POST-TAG sin
 cerrar. Queda citada: `Release tag CI` run **`36761134323`**, **`certify` success**.

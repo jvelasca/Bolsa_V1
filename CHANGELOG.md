@@ -18,7 +18,7 @@ All notable releases of Bolsa V1.
 - **Cierre de cita huérfana:** se cita la del sello `W2` (**`v2.88.15-beta`**, run **`36761134323`**, `certify` **success**), que quedó **sin cerrar**.
 - **Cambio de orden del plan (declarado):** la **robustez del instrumento** (banda de K sorteos) pasa **antes** de `W4` — sin ella el OOS no es un instrumento válido.
 - **Evidencia:** [`docs/engineering/evidence/v2.88.16.2/README.md`](./docs/engineering/evidence/v2.88.16.2/README.md).
-- **Cita POST-TAG:** `python` esperado **`3166 passed, 38 skipped`** (`Δ = 0`), `lifecycle-pg` **VERDE** y `replay-repro` **VERDE** — **se cita el run, no se hereda**.
+- **Cita POST-TAG — TAG `v2.88.16.2-beta` TODO VERDE:** `Release tag CI` run **`36821946619`** (`ref=refs/tags/v2.88.16.2-beta`, HEAD `683990ff`): **11 jobs `success`** + **1 skipped** (`playwright integrated`, opt-in). **`ESPERADO = OBSERVADO`:** job `python` **`3166 passed, 38 skipped, 6 warnings in 72.95s`** (`Δ = 0`); **`replay-repro` VERDE** con veredicto `REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, LF `1E3ADAC2…929A37E7` / `3 340 728` B y **2ª corrida IDÉNTICA**; `lifecycle-pg` **VERDE** y `certify` **VERDE**. ⇒ **cadena cerrada:** `v2.88.16-beta` (rojo `lifecycle-pg`) → `v2.88.16.1-beta` (rojo `replay-repro`) → **`v2.88.16.2-beta` TODO VERDE**.
 
 ## [2.11.16.1-beta] — W3.1 `GRANULARIDAD-OPERATIVA`: HOTFIX DEL ARNÉS DEL DÍA AUTO (`lifecycle-pg`) — REBASELINE AL ANCLA DE BARRA DEL CERTIFICADOR A9 QUE `W3` OMITIÓ (TEST-ONLY, `Δ src = 0`)
 
