@@ -225,7 +225,8 @@ manuales), `OBS-16`, `OBS-15`, `OBS-22`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, 
    cuenta** (`price_missing_counts`) con la señal anclada en `mid` (§3.1) y el *fill* en
    `execution`. Evidencia: 17 tests nuevos, `463 passed / 1 failed` en la suite `auto`
    (el fallo es el pre-existente de PostgreSQL, verificado contra el árbol prístino),
-   `mypy` y `ruff` limpios.
+   `mypy` y `ruff` limpios, y —**la prueba fuerte**— el artefacto del sello **reproducido
+   byte a byte** (§11).
    **PENDIENTE de 2a**: cablear `price_source.refresh` en `_v2_refresh_regime` — **no se
    hace todavía** porque el contrato de refresco (async + `tick`/`symbols`) se fija con el
    proveedor real, y hoy ninguna fuente real está inyectada.
@@ -253,3 +254,39 @@ manuales), `OBS-16`, `OBS-15`, `OBS-22`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, 
 
 > La exploración de 2026-10-01 (**§3.1.b**) es un hallazgo **contra el plan original**, que
 > asumía «una sola foto por tick»: la frontera de ejecución **no** es la de régimen/ATR.
+
+---
+
+## 11. Evidencia del `Δ = 0` del paso 2a (2026-10-01): artefacto **byte a byte**
+
+El paso 2a se cierra **contra el artefacto sellado**, no contra la suite:
+
+```
+uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py seed \
+    --fixture docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson
+uv run --no-sync python apps/api-python/scripts/v2_87_replay_oos_durable_cycle.py \
+    --json --watch "$WATCH" --out artifacts/replay-fresh-w4.json
+uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py assert-artifact \
+    --file artifacts/replay-fresh-w4.json
+```
+
+`VEREDICTO  REPRODUCIDO (render del sello, byte a byte)`: **3 445 622 B** y
+`24066225…9F54F0` (CRLF) / `1E3ADAC2…9A37E7` (LF) — los tres idénticos al sello.
+
+### 11.a La atribución se hizo por **experimento**, no por argumento
+
+Con el worker **revertido a `d41a654b`** (pre-2a) el artefacto sale **byte a byte idéntico** al
+del worker de `W4` (`8EE343F5…`): el cambio del paso 2a es **neutro** sobre el replay. Dos
+corridas del mismo árbol también coinciden ⇒ el replay es determinista en esta máquina.
+
+### 11.b Hallazgo operativo: el sello sólo reproduce contra una base **FRESCA**
+
+La primera corrida dio `NO reproducido` (**3 540 095 B**): era la base de **desarrollo**
+(`bolsa_v1`), donde cada símbolo del watch tiene **1286** barras —**una de más** que las 1285
+del fixture congelado— por el dato real que ya vivía allí. La entrada no era la congelada y el
+censo del artefacto cambió.
+
+⇒ **`replay-repro` reproducido en local EXIGE base fresca** (`bolsa_v1_replay_w321` en `W3.2`;
+`bolsa_v1_replay_w4` aquí). El job del CI no lo sufre porque arranca un servicio PostgreSQL
+vacío, pero **correrlo a mano contra `bolsa_v1` da un rojo FALSO** cuya causa es la BD, no el
+motor. Queda declarado para no volver a perseguirlo.
