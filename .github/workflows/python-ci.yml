@@ -288,6 +288,10 @@ jobs:
         # registro explícito el gate fail-closed (``1wk`` y ``OPEN(D+1)`` rechazados, y la
         # degradación silenciosa de un valor desconocido prohibida) no correría en ninguna
         # parte.
+        # V2.88.17/W4 (precio REAL del motor AUTO): el criterio re-declarado de W4 (que el
+        # camino de PRODUCCIÓN deje de fabricar un precio) exige PG real y se certifica en
+        # el job auto-v2-durable-pg con gate fail-if-skipped (AUTO_V2_REAL_PRICE_PG_REQUIRED).
+        # Aquí va en ``--ignore`` (abajo): sin PG skipearía en mudo y aparentaría cubrirlo.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -384,8 +388,6 @@ jobs:
           --ignore=apps/api-python/tests/test_a14_grammar_discovery_pg.py
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
           --ignore=apps/api-python/tests/test_auto_v2_lifecycle_pg.py
-          # V2.88.17/W4: el criterio del precio REAL sobre el runtime de producción exige
-          # PG real (se certifica en el job auto-v2-durable-pg con gate fail-if-skipped).
           --ignore=apps/api-python/tests/test_auto_v2_real_price_production_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
