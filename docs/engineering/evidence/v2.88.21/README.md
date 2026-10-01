@@ -4,7 +4,7 @@
 > **Clase:** sello de **producto** (`Δ src ≠ 0`) que toca el motor de forma **aditiva** y **tras flag**: `AUTO_OPERATIONAL_AUDIT` **default OFF** ⇒ **`Δ = 0` por defecto** (mismo patrón que `AUTO_ENGINE_SIM_REAL_PRICE`). Con el flag ON, el motor **escribe** traza de auditoría en el spine `decision_journal_entries`, pero **ninguna decisión cambia**.
 > **Origen:** `M1` (`v2.88.20-beta`) dejó declarados `NO MEDIDO` los pasos `SIGNAL`/`TOP_N`/`RISK`, el ownership de reservas y la concurrencia porque su productor (el journal de decisión AUTO y las decisiones de reservas) vivía **en memoria**. `M2` los hace **durables** sin migración, reutilizando el spine.
 > **Padre:** [`evidence/v2.88.20/README.md`](../v2.88.20/README.md) (el sello hermano `M1`).
-> **CI del tag:** **NO CITADO** — sello **local** por decisión del propietario (sin push). Ver §6.
+> **CI del tag:** **ROJO — SUPERSEDIDO** por [`v2.88.21.1-beta`](../v2.88.21.1/README.md). `Release tag CI` run `36903850433` → **`FAILURE`** (`python` offline), con `lifecycle-pg` **verde**. Ver §6.
 
 ---
 
@@ -97,6 +97,6 @@ uv run mypy packages/py/domain/src packages/py/market/src packages/py/infrastruc
 
 ## 6. Sello y CI
 
-- **Sello local** (por decisión del propietario, **sin push**): este commit + tag anotado `v2.88.21-beta`, sobre `M1` (`v2.88.20-beta`, commit `4a3e78f6`).
+- **Sello**: este commit + tag anotado `v2.88.21-beta` (sobre `M1`, `v2.88.20-beta`, commit `4a3e78f6`); superseded por el hotfix `v2.88.21.1-beta`.
 - **Alta en CI**: los ficheros nuevos entran en **ambos** workflows ([`python-ci.yml`](../../../.github/workflows/python-ci.yml), [`release-tag-ci.yml`](../../../.github/workflows/release-tag-ci.yml)); el puro del monitor y el de auditoría por el pase de directorio con ancla explícita, la costura del worker por el pase de `apps/api-python/tests`, y el PG en `--ignore` del job offline + registrado en `auto-v2-durable-pg` / `lifecycle-pg` con gate `AUTO_OPERATIONAL_MONITOR_PG_REQUIRED=1` (fail-if-skipped).
-- **CI del tag NO CITADO**: al no empujar, no hay run de `Release tag CI` que citar. **Hueco declarado**, no certificación heredada; se citará (POST-TAG, patrón `OBS-3`/`OBS-4`) cuando el propietario decida empujar.
+- **CI del tag `v2.88.21-beta`: ROJO — SUPERSEDIDO.** `Release tag CI` run `36903850433` (HEAD `e58877ef`, `2026-10-01T18:02:25Z`) → **`FAILURE`**, con `python (ruff/imports/mypy/pytest offline)` rojo (`6 failed, 4182 passed, 42 skipped`) por `AttributeError: 'AutoSimulationWorker' object has no attribute '_operational_audit_sink'`, y **`lifecycle-pg` verde** (la certificación PG nunca estuvo en duda). El tag **NO se borra**: queda como **rojo citado**. El arreglo y su cierre viven en el sello **hotfix** [`evidence/v2.88.21.1/README.md`](../v2.88.21.1/README.md) (tag `v2.88.21.1-beta`, run `36928967231` **VERDE**).

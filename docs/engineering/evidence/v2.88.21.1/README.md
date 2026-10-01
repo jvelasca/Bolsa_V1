@@ -121,6 +121,17 @@ vía de construcción que no pasa por `__init__`.
 
 `Release tag CI` run **`36903850433`** (`refs/tags/v2.88.21-beta`, HEAD `e58877ef`, `2026-10-01T18:02:25Z`) → **`FAILURE`**: `python` rojo (`6 failed, 4182 passed, 42 skipped`), `lifecycle-pg` **verde**, `certify` rojo por agregación.
 
-### 6.2 CI del tag **`v2.88.21.1-beta`** — POST-TAG (se completa tras el push)
+### 6.2 CI del tag **`v2.88.21.1-beta`** — POST-TAG · **TODO VERDE**
 
-Pendiente de citar tras el push de este hotfix, con el patrón `OBS-3`/`OBS-4`. Criterio de cierre: `python` verde y `certify` `success`; y encaje de cuentas con §6.1 (**+1** = la guarda nueva `test_a_worker_without_the_seam_attribute_is_a_declared_noop`).
+`Release tag CI` run **[`36928967231`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36928967231)** (`ref=refs/tags/v2.88.21.1-beta`, HEAD `be388124`, `2026-10-01T21:28Z`) → **`SUCCESS`**: **11 jobs `success`** + `playwright (integrated E2E, opt-in)` `skipped` por diseño, con **`certify` `success`**.
+
+| Job | Conclusión | Cifra citada |
+|---|---|---|
+| `python (ruff/imports/mypy/pytest offline)` — **el job del rojo** | **success** | `All checks passed!` · **`4189 passed, 42 skipped`** in 128.66 s |
+| `lifecycle-pg (…)` | **success** | con `AUTO_OPERATIONAL_MONITOR_PG_REQUIRED: 1` y **`apps/api-python/tests/test_auto_operational_monitor_pg.py`** en la lista ⇒ la certificación **PG** del monitor corrió con gate fail-if-skipped |
+| `replay-repro` | **success** | **`VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`** ⇒ pese a `Δ src ≠ 0`, el artefacto OOS **no se mueve**: `M1`+`M2` son **INERTES** para el instrumento |
+| `shared` | **success** | `src/cognitive/auto-operational-monitor.test.ts` · **8 tests** |
+| `frontend` | **success** | **234 ficheros / 1352 tests** + `contract:check` |
+| `decision-spine` / `security` / `dr-verify` / `a7-gate` / `playwright (mock E2E)` | **success** | — |
+
+**Encaje de cuentas (el dato que cierra el sello):** el job `python` del run **rojo** de §6.1 dio **`4182 passed, 42 skipped` + 6 failed** (es decir **4188** veredictos) y el del tag **`4189 passed, 42 skipped`** ⇒ **+1** = **exactamente** la guarda de regresión nueva (`test_a_worker_without_the_seam_attribute_is_a_declared_noop`), con los **mismos `42` skips**. Esto **además demuestra** que la guarda **corre** en el job offline: no cae en la clase de `OBS-19`.

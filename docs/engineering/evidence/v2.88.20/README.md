@@ -4,7 +4,7 @@
 > **Clase:** sello de **producto** (`Δ src ≠ 0`), pero **`Δ = 0` sobre la semántica del motor**: este incremento es un **read model + endpoint + UI** que **no** escribe nada en el dominio ni cambia ninguna decisión del motor. No se toca `auto_simulation_worker.py`.
 > **Origen:** hallazgo del propietario sobre AUTO `v2.88.19-beta` — la UI sólo mostraba `AUTO = RUNNING`, sin poder reconstruir visualmente el ciclo `SIGNAL → TOP_N → RISK → RESERVATION → ORDER → FILL → PROTECTION → SETTLEMENT → CYCLE CLOSED`. `M1` proyecta **lo que ya era durable**; declara **`NO MEDIDO`** lo que aún no lo es.
 > **Padres:** [`evidence/v2.88.19/README.md`](../v2.88.19/README.md) · el hermano **`M2`** es [`evidence/v2.88.21/README.md`](../v2.88.21/README.md).
-> **CI del tag:** **NO CITADO** — el sello se crea **local** por decisión del propietario (commits y tags sin push). Ver §5.
+> **CI del tag:** **[`36903850807`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36903850807)** — **VERDE** (POST-TAG, patrón `OBS-3`/`OBS-4`). Ver §5.
 
 ---
 
@@ -91,6 +91,6 @@ uv run mypy packages/py/domain/src packages/py/market/src packages/py/infrastruc
 
 ## 5. Sello y CI
 
-- **Sello local** (por decisión del propietario, **sin push**): commit `M1` + tag anotado `v2.88.20-beta`, y a continuación commit `M2` + tag `v2.88.21-beta`.
-- **CI del tag NO CITADO**: al no empujar, no hay run de `Release tag CI` que citar. Es un **hueco declarado**, no una certificación heredada. Se citará (POST-TAG, patrón `OBS-3`/`OBS-4`) cuando el propietario decida empujar.
-- **`replay-repro`**: no ejecutado en `M1` (requiere el CI del tag). `M1` es read-only sobre el estado durable: **no** añade ninguna escritura al camino del motor, por lo que no puede mover el artefacto OOS; se declara como **razón**, no como medición.
+- **Sello**: commit `M1` + tag anotado `v2.88.20-beta` (sobre `main`); el hermano `M2` es `v2.88.21-beta` → hotfix `v2.88.21.1-beta`.
+- **CI del tag: VERDE (POST-TAG, patrón `OBS-3`/`OBS-4`).** `Release tag CI` run **[`36903850807`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36903850807)** (`ref=refs/tags/v2.88.20-beta`, HEAD `4a3e78f6`) → **`SUCCESS`**. También verdes en la misma ref: `Python CI` `36903851185`, `Frontend CI` `36903850858`, `Optimize lab` `36903850761`, `Fase 2 scientific` `36903850709`. Es decir: **`M1` está verde en su propio tag**, y el rojo de su hermano `M2` (run `36903850433`) es **ajeno** a este incremento — ver [`evidence/v2.88.21.1/README.md`](../v2.88.21.1/README.md).
+- **`replay-repro`**: `M1` es read-only sobre el estado durable (no añade ninguna escritura al camino del motor), así que **no puede** mover el artefacto OOS. Medido en el tag del hermano donde el artefacto sí se regenera: `VEREDICTO REPRODUCIDO` (run `36928967231`).
