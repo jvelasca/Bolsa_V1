@@ -153,6 +153,14 @@ worker (`replay_oos.py:247`, «manda el cursor»), así que unificar el tick **n
 del replay. Verificado regenerando el artefacto con el seed congelado **con** `2b`:
 `3 448 185 bytes`, `sha256 = 697526ED…C298967` — **idéntico** al baseline pre-`2b`.
 
+> ⚠️ **Aviso de lectura (añadido 2026-10-01).** Ese digest es el render **LOCAL en Windows** y **no** es el
+> sello: el mismo artefacto local ya divergía del sellado **antes** de este cambio (ver §1.3, «Nota OBS»).
+> La **autoridad** es el `assert-artifact` del job `replay-repro`, con el par
+> **`1E3ADAC2…929A37E7` / `3 340 728 B`** (LF, el del runner) y **`240662250347A2AA…6D9F54F0` /
+> `3 445 622 B`** (CRLF, el escrito en Windows) declarado en
+> `apps/api-python/scripts/replay_oos_input_fixture.py`. Un tercero que reproduzca el sello debe obtener
+> **ese** par, no el de arriba.
+
 **Golden day intacto:** `test_golden_day_v2_process_pg.py` ⇒ **`1 passed`** (el precio hermético es
 `flat_price_script` = `100.0`, constante ⇒ el tick es irrelevante).
 
