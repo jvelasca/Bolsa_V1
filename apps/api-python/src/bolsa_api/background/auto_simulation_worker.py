@@ -676,6 +676,14 @@ class AutoSimulationWorker:
     liquidación falla-cerrado (no abre ni llena; sin dinero). Sin LIVE nunca.
     """
 
+    # AUTO Operational Monitor (M2): la costura inerte se declara a nivel de CLASE para que
+    # cualquier instancia la vea —incluidas las que los tests construyen con ``object.__new__``
+    # sin pasar por ``__init__`` (patrón común para probar un solo método)—. Sin el default,
+    # leerla revienta con ``AttributeError`` en medio de un turno; con él, la ausencia de sink
+    # es exactamente el ``Δ = 0`` que promete el flag OFF.
+    _operational_audit_sink: Callable[[Any], Awaitable[None]] | None = None
+    _audit_session_id: str | None = None
+
     def __init__(
         self,
         *,

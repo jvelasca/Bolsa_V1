@@ -272,3 +272,36 @@ async def test_a_broken_write_leaves_the_tick_session_clean() -> None:
         await sink(entry)
 
     assert session.calls[-1] == "rollback", "la sesión se deja limpia para el resto del turno"
+
+
+# ── Regresión del rojo v2.88.21-beta: worker sin la costura declarada ────────────────
+
+
+@pytest.mark.asyncio
+async def test_a_worker_without_the_seam_attribute_is_a_declared_noop() -> None:
+    """Un worker montado con ``object.__new__`` (patrón de los tests de un solo método) **no**
+    pasa por ``__init__``, así que no declara ``_operational_audit_sink``. Leerlo a pelo
+    reventaba con ``AttributeError`` **en medio de un turno real** —es el rojo que tumbó el
+    ``python`` offline del tag ``v2.88.21-beta``—. El default a nivel de CLASE lo hace ``None``
+    ⇒ la ausencia de sink es exactamente el ``Δ = 0`` que promete el flag OFF, también por esta
+    vía de construcción.
+    """
+    worker = object.__new__(AutoSimulationWorker)
+    worker._account_id = _ACCOUNT
+
+    # Las tres costuras deben ser no-ops declarados: sin sink no hay nada que emitir.
+    await worker._v2_journal_entry_decisions([])
+    await worker._v2_journal_reservation_claims(
+        [(_reservation(reservation_id="RES-1", cycle_id="cyc-1"), True)]
+    )
+    await worker._v2_journal_reconciliation_decisions(
+        [
+            (
+                _reservation(reservation_id="RES-1", cycle_id="cyc-1"),
+                RECONCILIATION_KEEP,
+                None,
+                True,
+                None,
+            )
+        ]
+    )
