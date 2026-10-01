@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { lifecyclePanelQueryOptions } from "@/features/operational-console/lifecycle-panel-query";
 
 export type LifecycleReconciliation = Awaited<
   ReturnType<typeof api.getLifecycleReconciliation>
@@ -16,6 +17,6 @@ export function useLifecycleReconciliation(
     },
     enabled: Boolean(accountId),
     staleTime: 15_000,
-    refetchInterval: 30_000,
+    ...lifecyclePanelQueryOptions(),
   });
 }

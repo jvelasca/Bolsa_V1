@@ -10,6 +10,7 @@ import type { EstudioAutoTelemetry } from "@/features/operational-console/use-es
 import type { LifecycleOutboxStats } from "@/features/operational-console/use-lifecycle-outbox-stats";
 import { fetchEstudioInstrumentIds } from "@/features/trading/estudio-membership";
 import { api } from "@/lib/api";
+import { isAuthError } from "@/features/operational-console/lifecycle-panel-query";
 import { formatDateTimeCompact } from "@/lib/format";
 
 function markClasses(mark: string): string {
@@ -25,14 +26,39 @@ function markClasses(mark: string): string {
   return "border-rose-500/40 text-rose-800 dark:text-rose-200";
 }
 
+/**
+ * Error de sección con causa cuando la conocemos.
+ *
+ * Un 401/403 **no** es «avería de datos»: la API exige un JWT que esta sesión no
+ * aporta (`require_jwt_principal` no cae al principal de settings). Decirlo evita
+ * que el operador busque el fallo en el outbox o en el ledger, donde no está.
+ */
+function SectionError({ error, what }: { error: unknown; what: string }) {
+  if (isAuthError(error)) {
+    return (
+      <p
+        className="text-xs text-amber-800 dark:text-amber-200"
+        data-testid="ops-section-auth-error"
+      >
+        Requiere sesión: {what} exige un JWT y esta sesión no lo aporta (auth
+        desactivada). El resto de la consola sí responde, no es una avería de
+        datos.
+      </p>
+    );
+  }
+  return <p className="text-xs text-destructive">No se pudo cargar {what}.</p>;
+}
+
 export function OpsLifecycleOutboxSection({
   stats,
   isLoading,
   isError,
+  error,
 }: {
   stats: LifecycleOutboxStats | undefined;
   isLoading?: boolean;
   isError?: boolean;
+  error?: unknown;
 }) {
   return (
     <Card data-testid="ops-lifecycle-outbox-section">
@@ -43,11 +69,7 @@ export function OpsLifecycleOutboxSection({
         {isLoading ? (
           <p className="text-xs text-muted-foreground">Cargando cola…</p>
         ) : null}
-        {isError ? (
-          <p className="text-xs text-destructive">
-            No se pudo cargar outbox stats.
-          </p>
-        ) : null}
+        {isError ? <SectionError error={error} what="outbox stats" /> : null}
         {!isLoading && !isError ? (
           <>
             <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -161,12 +183,14 @@ export function OpsFinancialIntegritySection({
   report,
   isLoading,
   isError,
+  error,
 }: {
   report:
     | import("@/features/operational-console/use-financial-integrity").FinancialIntegrity
     | undefined;
   isLoading?: boolean;
   isError?: boolean;
+  error?: unknown;
 }) {
   return (
     <Card data-testid="ops-financial-integrity-section">
@@ -178,9 +202,7 @@ export function OpsFinancialIntegritySection({
           <p className="text-xs text-muted-foreground">Cargando integridad…</p>
         ) : null}
         {isError ? (
-          <p className="text-xs text-destructive">
-            No se pudo cargar financial integrity.
-          </p>
+          <SectionError error={error} what="financial integrity" />
         ) : null}
         {!isLoading && !isError ? (
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -252,12 +274,14 @@ export function OpsLifecycleReconSection({
   report,
   isLoading,
   isError,
+  error,
 }: {
   report:
     | import("@/features/operational-console/use-lifecycle-reconciliation").LifecycleReconciliation
     | undefined;
   isLoading?: boolean;
   isError?: boolean;
+  error?: unknown;
 }) {
   return (
     <Card data-testid="ops-lifecycle-recon-section">
@@ -268,11 +292,7 @@ export function OpsLifecycleReconSection({
         {isLoading ? (
           <p className="text-xs text-muted-foreground">Cargando recon…</p>
         ) : null}
-        {isError ? (
-          <p className="text-xs text-destructive">
-            No se pudo cargar lifecycle recon.
-          </p>
-        ) : null}
+        {isError ? <SectionError error={error} what="lifecycle recon" /> : null}
         {!isLoading && !isError ? (
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>

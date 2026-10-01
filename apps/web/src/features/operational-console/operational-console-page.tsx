@@ -143,16 +143,19 @@ export function OperationalConsolePage() {
           stats={outboxQuery.data}
           isLoading={outboxQuery.isLoading}
           isError={outboxQuery.isError}
+          error={outboxQuery.error}
         />
         <OpsFinancialIntegritySection
           report={financialIntegrityQuery.data}
           isLoading={financialIntegrityQuery.isLoading}
           isError={financialIntegrityQuery.isError}
+          error={financialIntegrityQuery.error}
         />
         <OpsLifecycleReconSection
           report={lifecycleReconQuery.data}
           isLoading={lifecycleReconQuery.isLoading}
           isError={lifecycleReconQuery.isError}
+          error={lifecycleReconQuery.error}
         />
       </div>
 
